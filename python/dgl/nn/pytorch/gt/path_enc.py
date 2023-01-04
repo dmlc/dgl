@@ -10,6 +10,7 @@ class PathEncoder(nn.Module):
     r"""Path Encoder, as introduced in Edge Encoding of
     `Do Transformers Really Perform Bad for Graph Representation?
     <https://proceedings.neurips.cc/paper/2021/file/f1c1592588411002af340cbaedd6fc33-Paper.pdf>`__
+    
     This module is a learnable path embedding module and encodes the shortest
     path between each pair of nodes as attention bias.
 
@@ -53,16 +54,17 @@ class PathEncoder(nn.Module):
         g : DGLGraph
             A DGLGraph to be encoded, which must be a homogeneous one.
         edge_feat : torch.Tensor
-            The input edge feature of shape :math:`(E, feat_dim)`,
-            where :math:`E` is the number of edges in the input graph.
+            The input edge feature of shape :math:`(E, d)`,
+            where :math:`E` is the number of edges in the input graph and
+            :math:`d` is :attr:`feat_dim`.
 
         Returns
         -------
         torch.Tensor
-            Return attention bias as path encoding,
-            of shape :math:`(batch_size, N, N, num_heads)`,
-            where :math:`N` is the maximum number of nodes
-            and batch_size is the batch size of the input graph.
+            Return attention bias as path encoding, of shape
+            :math:`(B, N, N, H)`, where :math:`B` is the batch size of
+            the input graph, :math:`N` is the maximum number of nodes, and
+            :math:`H` is :attr:`num_heads`.
         """
 
         g_list = unbatch(g)

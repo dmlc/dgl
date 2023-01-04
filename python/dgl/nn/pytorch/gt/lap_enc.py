@@ -8,6 +8,7 @@ class LapPosEncoder(nn.Module):
     r"""Laplacian Positional Encoder (LPE), as introduced in
     `GraphGPS: General Powerful Scalable Graph Transformers
     <https://arxiv.org/abs/2205.12454>`__
+    
     This module is a learned laplacian positional encoding module using Transformer or DeepSet.
 
     Parameters
@@ -123,8 +124,9 @@ class LapPosEncoder(nn.Module):
         Returns
         -------
         Tensor
-            Return the laplacian positional encodings of shape :math:`(N, lpe_dim)`,
-            where :math:`N` is the number of nodes in the input graph.
+            Return the laplacian positional encodings of shape :math:`(N, d)`,
+            where :math:`N` is the number of nodes in the input graph, d is
+            :attr:`lpe_dim`.
         """
         PosEnc = th.cat(
             (EigVecs.unsqueeze(2), EigVals.unsqueeze(2)), dim=2

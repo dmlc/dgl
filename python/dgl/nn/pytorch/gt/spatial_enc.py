@@ -14,6 +14,7 @@ class SpatialEncoder(nn.Module):
     r"""Spatial Encoder, as introduced in
     `Do Transformers Really Perform Bad for Graph Representation?
     <https://proceedings.neurips.cc/paper/2021/file/f1c1592588411002af340cbaedd6fc33-Paper.pdf>`__
+    
     This module is a learnable spatial embedding module which encodes
     the shortest distance between each node pair for attention bias.
 
@@ -96,6 +97,7 @@ class SpatialEncoder3d(nn.Module):
     r"""3D Spatial Encoder, as introduced in
     `One Transformer Can Understand Both 2D & 3D Molecular Data
     <https://arxiv.org/pdf/2210.01765.pdf>`__
+    
     This module encodes pair-wise relation between atom pair :math:`(i,j)` in
     the 3D geometric space, according to the Gaussian Basis Kernel function:
 

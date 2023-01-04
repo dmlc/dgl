@@ -2173,13 +2173,13 @@ def test_MetaPath2Vec(idtype):
     assert embeds.shape[0] == g.num_nodes()
 
 
-@pytest.mark.parametrize("num_layer", [1, 4])
-@pytest.mark.parametrize("k", [3, 5])
-@pytest.mark.parametrize("lpe_dim", [4, 16])
-@pytest.mark.parametrize("n_head", [1, 4])
-@pytest.mark.parametrize("batch_norm", [True, False])
-@pytest.mark.parametrize("num_post_layer", [0, 1, 2])
-def test_LaplacianPosEnc(
+@pytest.mark.parametrize('num_layer', [1, 4])
+@pytest.mark.parametrize('k', [3, 5])
+@pytest.mark.parametrize('lpe_dim', [4, 16])
+@pytest.mark.parametrize('n_head', [1, 4])
+@pytest.mark.parametrize('batch_norm', [True, False])
+@pytest.mark.parametrize('num_post_layer', [0, 1, 2])
+def test_LapPosEncoder(
     num_layer, k, lpe_dim, n_head, batch_norm, num_post_layer
 ):
     ctx = F.ctx()
@@ -2188,37 +2188,33 @@ def test_LaplacianPosEnc(
     EigVals = th.randn((num_nodes, k)).to(ctx)
     EigVecs = th.randn((num_nodes, k)).to(ctx)
 
-    model = nn.LaplacianPosEnc(
+    model = nn.LapPosEncoder(
         "Transformer", num_layer, k, lpe_dim, n_head, batch_norm, num_post_layer
     ).to(ctx)
     assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
 
-    model = nn.LaplacianPosEnc(
+    model = nn.LapPosEncoder(
         "DeepSet",
         num_layer,
         k,
         lpe_dim,
         batch_norm=batch_norm,
-        num_post_layer=num_post_layer,
+        num_post_layer=num_post_layer
     ).to(ctx)
     assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
 
 
-@pytest.mark.parametrize("feat_size", [128, 512])
-@pytest.mark.parametrize("num_heads", [8, 16])
-@pytest.mark.parametrize("bias", [True, False])
-@pytest.mark.parametrize("attn_bias_type", ["add", "mul"])
-@pytest.mark.parametrize("attn_drop", [0.1, 0.5])
-def test_BiasedMultiheadAttention(
-    feat_size, num_heads, bias, attn_bias_type, attn_drop
-):
+@pytest.mark.parametrize('feat_size', [128, 512])
+@pytest.mark.parametrize('num_heads', [8, 16])
+@pytest.mark.parametrize('bias', [True, False])
+@pytest.mark.parametrize('attn_bias_type', ['add', 'mul'])
+@pytest.mark.parametrize('attn_drop', [0.1, 0.5])
+def test_BiasedMHA(feat_size, num_heads, bias, attn_bias_type, attn_drop):
     ndata = th.rand(16, 100, feat_size)
     attn_bias = th.rand(16, 100, 100, num_heads)
     attn_mask = th.rand(16, 100, 100) < 0.5
 
-    net = nn.BiasedMultiheadAttention(
-        feat_size, num_heads, bias, attn_bias_type, attn_drop
-    )
+    net = nn.BiasedMHA(feat_size, num_heads, bias, attn_bias_type, attn_drop)
     out = net(ndata, attn_bias, attn_mask)
 
     assert out.shape == (16, 100, feat_size)
