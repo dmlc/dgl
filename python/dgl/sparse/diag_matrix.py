@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 
 import torch
 
-from .sparse_matrix import create_from_coo, SparseMatrix
+from .sparse_matrix import from_coo, SparseMatrix
 
 
 class DiagMatrix:
@@ -119,7 +119,7 @@ class DiagMatrix:
                      shape=(5, 5), nnz=5)
         """
         row = col = torch.arange(len(self.val)).to(self.device)
-        return create_from_coo(row=row, col=col, val=self.val, shape=self.shape)
+        return from_coo(row=row, col=col, val=self.val, shape=self.shape)
 
     def dense(self) -> torch.Tensor:
         """Return a dense representation of the matrix.

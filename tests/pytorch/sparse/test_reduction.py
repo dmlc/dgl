@@ -93,7 +93,7 @@ def test_reduce_all(shape, op, use_reduce):
     val2 = val.clone()
     val = val.requires_grad_()
     val2 = val2.requires_grad_()
-    A = dglsp.create_from_coo(row, col, val, shape=(NUM_ROWS, NUM_COLS))
+    A = dglsp.from_coo(row, col, val, shape=(NUM_ROWS, NUM_COLS))
 
     A2, M = _coalesce_dense(row, col, val2, NUM_ROWS, NUM_COLS, op)
 
@@ -139,7 +139,7 @@ def test_reduce_along(shape, dim, empty_nnz, op, use_reduce):
         row[row == 0] = 1
         col[col == 0] = 1
 
-    A = dglsp.create_from_coo(row, col, val, shape=(NUM_ROWS, NUM_COLS))
+    A = dglsp.from_coo(row, col, val, shape=(NUM_ROWS, NUM_COLS))
 
     A2, M = _coalesce_dense(row, col, val2, NUM_ROWS, NUM_COLS, op)
 

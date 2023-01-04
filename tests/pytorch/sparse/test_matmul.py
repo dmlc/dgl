@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import bspmm, create_from_coo, val_like
+from dgl.sparse import bspmm, from_coo, val_like
 
 from .utils import (
     clone_detach_and_grad,
@@ -37,18 +37,16 @@ def test_spmm(create_func, shape, nnz, out_dim):
     grad = torch.randn_like(sparse_result)
     sparse_result.backward(grad)
 
-    adj = sparse_matrix_to_torch_sparse(A)
+    adj = sparse_matrix_to_dense(A)
     XX = clone_detach_and_grad(X)
-    torch_sparse_result = torch.sparse.mm(
-        adj, XX.view(-1, 1) if out_dim is None else XX
-    )
+    dense_result = torch.matmul(adj, XX)
     if out_dim is None:
-        torch_sparse_result = torch_sparse_result.view(-1)
-    torch_sparse_result.backward(grad)
-    assert torch.allclose(sparse_result, torch_sparse_result, atol=1e-05)
+        dense_result = dense_result.view(-1)
+    dense_result.backward(grad)
+    assert torch.allclose(sparse_result, dense_result, atol=1e-05)
     assert torch.allclose(X.grad, XX.grad, atol=1e-05)
     assert torch.allclose(
-        adj.grad.coalesce().to_dense(),
+        dense_mask(adj.grad, A),
         sparse_matrix_to_dense(val_like(A, A.val.grad)),
         atol=1e-05,
     )
@@ -125,13 +123,13 @@ def test_spspmm_duplicate():
     col = torch.tensor([1, 1, 1, 2, 2]).to(dev)
     val = torch.randn(len(row)).to(dev)
     shape = (4, 4)
-    A1 = create_from_coo(row, col, val, shape)
+    A1 = from_coo(row, col, val, shape)
 
     row = torch.tensor([1, 0, 0, 1]).to(dev)
     col = torch.tensor([1, 1, 2, 2]).to(dev)
     val = torch.randn(len(row)).to(dev)
     shape = (4, 4)
-    A2 = create_from_coo(row, col, val, shape)
+    A2 = from_coo(row, col, val, shape)
 
     try:
         A1 @ A2

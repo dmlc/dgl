@@ -30,7 +30,7 @@ def add(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 1, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = create_from_coo(row, col, val)
+    >>> A = from_coo(row, col, val)
     >>> B = diag(torch.arange(1, 4))
     >>> A + B
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
@@ -65,7 +65,7 @@ def power(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = create_from_coo(row, col, val)
+    >>> A = from_coo(row, col, val)
     >>> power(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
             [0, 3, 2]]),
