@@ -9,7 +9,7 @@ pip install -r /asv/torch_gpu_pip.txt
 pip install pandas rdflib ogb
 
 # build
-CMAKE_VARS="-DUSE_OPENMP=ON"
+CMAKE_VARS="-DUSE_OPENMP=ON -DBUILD_TORCH=ON -DBUILD_SPARSE=ON -DTORCH_PYTHON_INTERPS=/opt/conda/envs/base/bin/python"
 if [[ $DEVICE == "gpu" ]]; then
     CMAKE_VARS="-DUSE_CUDA=ON -DUSE_NCCL=ON $CMAKE_VARS"
 fi
