@@ -184,7 +184,7 @@ c10::intrusive_ptr<SparseMatrix> SpSpMMNoAutoGrad(
   runtime::NDArray ret_val;
   std::tie(ret_dgl_csr, ret_val) =
       aten::CSRMM(lhs_dgl_csr, lhs_dgl_val, rhs_dgl_csr, rhs_dgl_val);
-  return SparseMatrix::FromCSR(
+  return SparseMatrix::FromCSRPointer(
       CSRFromOldDGLCSR(ret_dgl_csr), DGLArrayToTorchTensor(ret_val), ret_shape);
 }
 

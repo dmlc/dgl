@@ -20,7 +20,7 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Coalesce() {
   torch::Tensor indices = coalesced_coo.indices();
   torch::Tensor row = indices[0];
   torch::Tensor col = indices[1];
-  return CreateFromCOO(row, col, coalesced_coo.values(), this->shape());
+  return SparseMatrix::FromCOO(row, col, coalesced_coo.values(), this->shape());
 }
 
 bool SparseMatrix::HasDuplicate() {
