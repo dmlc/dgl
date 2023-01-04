@@ -10,7 +10,7 @@ class DegreeEncoder(nn.Module):
     r"""Degree Encoder, as introduced in
     `Do Transformers Really Perform Bad for Graph Representation?
     <https://proceedings.neurips.cc/paper/2021/file/f1c1592588411002af340cbaedd6fc33-Paper.pdf>`__
-    
+
     This module is a learnable degree embedding module.
 
     Parameters

@@ -10,7 +10,7 @@ class PathEncoder(nn.Module):
     r"""Path Encoder, as introduced in Edge Encoding of
     `Do Transformers Really Perform Bad for Graph Representation?
     <https://proceedings.neurips.cc/paper/2021/file/f1c1592588411002af340cbaedd6fc33-Paper.pdf>`__
-    
+
     This module is a learnable path embedding module and encodes the shortest
     path between each pair of nodes as attention bias.
 

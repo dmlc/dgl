@@ -8,7 +8,7 @@ class LapPosEncoder(nn.Module):
     r"""Laplacian Positional Encoder (LPE), as introduced in
     `GraphGPS: General Powerful Scalable Graph Transformers
     <https://arxiv.org/abs/2205.12454>`__
-    
+
     This module is a learned laplacian positional encoding module using Transformer or DeepSet.
 
     Parameters
