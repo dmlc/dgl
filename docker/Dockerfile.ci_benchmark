@@ -1,5 +1,8 @@
 # CI docker GPU env
-FROM nvidia/cuda:11.2.1-cudnn8-devel-ubuntu16.04
+FROM nvidia/cuda:11.6.0-cudnn8-devel-ubuntu18.04
+
+ENV TZ=US
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN apt-get update --fix-missing
 
@@ -18,12 +21,6 @@ ENV CONDA_ALWAYS_YES="true"
 COPY install/conda_env/torch_gpu.yml /install/conda_env/torch_gpu.yml
 COPY install/conda_env/torch_gpu_pip_latest.txt /install/conda_env/torch_gpu_pip.txt
 RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/torch_gpu.yml"]
-
-# COPY install/conda_env/tensorflow_gpu.yml /install/conda_env/tensorflow_gpu.yml
-# RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/tensorflow_gpu.yml"]
-
-# COPY install/conda_env/mxnet_gpu.yml /install/conda_env/mxnet_gpu.yml
-# RUN ["/bin/bash", "-i", "-c", "conda env create -f /install/conda_env/mxnet_gpu.yml"]
 
 ENV CONDA_ALWAYS_YES=
 
