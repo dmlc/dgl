@@ -5,8 +5,6 @@ import sys
 from itertools import product
 
 from .base import BuiltinFunction, TargetCode
-from .._deprecate.runtime import ir
-from .._deprecate.runtime.ir import var
 
 
 __all__ = ["copy_u", "copy_e",
@@ -43,23 +41,6 @@ class BinaryMessageFunction(MessageFunction):
         self.lhs_field = lhs_field
         self.rhs_field = rhs_field
         self.out_field = out_field
-
-    def _invoke(self, graph, src_frame, dst_frame, edge_frame, out_size,
-                src_map, dst_map, edge_map, out_map, reducer="none"):
-        """Symbolic computation of builtin binary message function to create
-        runtime.executor
-        """
-        graph = var.GRAPH(graph)
-        in_frames = (src_frame, dst_frame, edge_frame)
-        in_maps = (src_map, dst_map, edge_map)
-        lhs_data = ir.READ_COL(in_frames[self.lhs], var.STR(self.lhs_field))
-        rhs_data = ir.READ_COL(in_frames[self.rhs], var.STR(self.rhs_field))
-        lhs_map = var.MAP(in_maps[self.lhs])
-        rhs_map = var.MAP(in_maps[self.rhs])
-        out_map = var.MAP(out_map)
-        return ir.BINARY_REDUCE(reducer, self.binary_op, graph, self.lhs,
-                                self.rhs, lhs_data, rhs_data, out_size,
-                                lhs_map, rhs_map, out_map)
 
     @property
     def name(self):

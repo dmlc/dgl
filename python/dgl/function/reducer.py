@@ -4,8 +4,6 @@ from __future__ import absolute_import
 
 import sys
 
-from .._deprecate.runtime import ir
-from .._deprecate.runtime.ir import var
 from .base import BuiltinFunction, TargetCode
 
 
@@ -32,23 +30,6 @@ class SimpleReduceFunction(ReduceFunction):
         self._name = name
         self.msg_field = msg_field
         self.out_field = out_field
-
-    def _invoke(self, graph, edge_frame, out_size, edge_map=None, out_map=None):
-        """Symbolic execution of this builtin function"""
-        reducer = self._name
-        graph = var.GRAPH(graph)
-        edge_map = var.MAP(edge_map)
-        out_map = var.MAP(out_map)
-        edge_data = ir.READ_COL(edge_frame, var.STR(self.msg_field))
-        return ir.COPY_REDUCE(
-            reducer,
-            graph,
-            TargetCode.EDGE,
-            edge_data,
-            out_size,
-            edge_map,
-            out_map,
-        )
 
     @property
     def name(self):
