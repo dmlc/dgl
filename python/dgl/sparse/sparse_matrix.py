@@ -88,29 +88,6 @@ class SparseMatrix:
         """
         return self.coo()[1]
 
-    def indices(
-        self, fmt: str, return_shuffle=False
-    ) -> Tuple[torch.Tensor, ...]:
-        """Get the indices of the nonzero elements.
-
-        Parameters
-        ----------
-        fmt : str
-            Sparse matrix storage format. Can be COO or CSR or CSC.
-        return_shuffle: bool
-            If true, return an extra array of the nonzero value IDs
-
-        Returns
-        -------
-        tensor
-            Indices of the nonzero elements
-        """
-        if fmt == "COO" and not return_shuffle:
-            row, col = self.coo()
-            return torch.stack([row, col])
-        else:
-            raise NotImplementedError
-
     def __repr__(self):
         return _sparse_matrix_str(self)
 
@@ -522,7 +499,7 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
 
 def _sparse_matrix_str(spmat: SparseMatrix) -> str:
     """Internal function for converting a sparse matrix to string representation."""
-    indices_str = str(spmat.indices("COO"))
+    indices_str = str(torch.stack(spmat.coo()))
     values_str = str(spmat.val)
     meta_str = f"size={spmat.shape}, nnz={spmat.nnz}"
     if spmat.val.dim() > 1:

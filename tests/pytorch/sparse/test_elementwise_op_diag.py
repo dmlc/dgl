@@ -13,7 +13,7 @@ if not sys.platform.startswith("linux"):
 
 
 def all_close_sparse(A, B):
-    assert torch.allclose(A.indices(), B.indices())
+    assert torch.allclose(torch.stack(A.coo()), torch.stack(B.coo()))
     assert torch.allclose(A.values(), B.values())
     assert A.shape == B.shape
 
