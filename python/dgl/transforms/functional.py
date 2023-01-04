@@ -49,7 +49,6 @@ __all__ = [
     'khop_graph',
     'reverse',
     'to_bidirected',
-    'to_bidirected_stale',
     'add_reverse_edges',
     'laplacian_lambda_max',
     'knn_graph',

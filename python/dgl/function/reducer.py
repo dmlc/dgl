@@ -4,7 +4,7 @@ from __future__ import absolute_import
 
 import sys
 
-from .base import BuiltinFunction, TargetCode
+from .base import BuiltinFunction
 
 
 class ReduceFunction(BuiltinFunction):
@@ -30,6 +30,9 @@ class SimpleReduceFunction(ReduceFunction):
         self._name = name
         self.msg_field = msg_field
         self.out_field = out_field
+
+    def _invoke(self, graph, edge_frame, out_size, edge_map=None, out_map=None):
+        raise NotImplementedError
 
     @property
     def name(self):

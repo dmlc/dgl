@@ -7,7 +7,6 @@ from enum import Enum
 
 import dgl.backend as F
 
-from . import utils
 from ._ffi.function import _init_api
 
 _init_api("dgl.network")

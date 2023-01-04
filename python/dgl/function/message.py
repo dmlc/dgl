@@ -42,6 +42,10 @@ class BinaryMessageFunction(MessageFunction):
         self.rhs_field = rhs_field
         self.out_field = out_field
 
+    def _invoke(self, graph, src_frame, dst_frame, edge_frame, out_size,
+                src_map, dst_map, edge_map, out_map, reducer="none"):
+        raise NotImplementedError
+
     @property
     def name(self):
         lhs = TargetCode.CODE2STR[self.lhs]
