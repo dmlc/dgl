@@ -14,7 +14,7 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
-from dgl.data import AsNodePredDataset
+from dgl.data import AsNodePredDataset, RedditDataset
 from dgl.dataloading import (
     as_edge_prediction_sampler,
     DataLoader,
@@ -159,7 +159,7 @@ def evaluate(proc_id, model, g, device, use_uva):
 
 
 def train(
-        proc_id, nprocs, device, g, train_idx, val_idx, test_idx, model, use_uva
+    proc_id, nprocs, device, g, train_idx, val_idx, test_idx, model, use_uva
 ):
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.num_edges()
@@ -172,7 +172,7 @@ def train(
         exclude="reverse_id",
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
         reverse_eids=torch.cat(
-            [torch.arange(n_edges // 2, n_edges),torch.arange(0, n_edges // 2)]
+            [torch.arange(n_edges // 2, n_edges), torch.arange(0, n_edges // 2)]
         ).to(train_seeds),
         # num_negs = 1, neg_share = False
         negative_sampler=NegativeSampler(
@@ -199,7 +199,7 @@ def train(
         tic = time.time()
         model.train()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(
-                train_dataloader
+            train_dataloader
         ):
             x = blocks[0].srcdata["feat"]
             y_hat = model(blocks, x)
@@ -208,7 +208,7 @@ def train(
             loss.backward()
             opt.step()
 
-            if step % 20 == 0 and proc_id == 0: # log every 20 steps
+            if step % 20 == 0 and proc_id == 0:  # log every 20 steps
                 # gpu memory reserved by PyTorch
                 gpu_mem_alloc = (
                     torch.cuda.max_memory_allocated() / 1000000
@@ -222,8 +222,8 @@ def train(
         t = time.time() - tic
         if proc_id == 0:
             print(f"Epoch Time(s): {t:.4f}")
-        if (epoch + 1) % 5 == 0: # eval every 5 epochs
-            pred = evaluate(proc_id, model, g, device, use_uva) # in parallel
+        if (epoch + 1) % 5 == 0:  # eval every 5 epochs
+            pred = evaluate(proc_id, model, g, device, use_uva)  # in parallel
             if proc_id == 0:
                 # only master proc does the accuracy computation
                 eval_acc, test_acc = compute_acc_unsupervised(
@@ -260,6 +260,7 @@ def run(proc_id, nprocs, devices, g, data, mode):
     )
     # cleanup process group
     dist.destroy_process_group()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -298,7 +299,6 @@ if __name__ == "__main__":
         # can it be AsLinkPredDataset?
         dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
     elif args.dataset == "reddit":
-        from dgl.data import RedditDataset
         dataset = AsNodePredDataset(RedditDataset(self_loop=False))
 
     g = dataset[0]
