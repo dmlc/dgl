@@ -125,8 +125,8 @@ class LapPosEncoder(nn.Module):
         -------
         Tensor
             Return the laplacian positional encodings of shape :math:`(N, d)`,
-            where :math:`N` is the number of nodes in the input graph, d is
-            :attr:`lpe_dim`.
+            where :math:`N` is the number of nodes in the input graph,
+            :math:`d` is :attr:`lpe_dim`.
         """
         PosEnc = th.cat(
             (EigVecs.unsqueeze(2), EigVals.unsqueeze(2)), dim=2

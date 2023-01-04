@@ -64,8 +64,9 @@ class DegreeEncoder(nn.Module):
         Returns
         -------
         Tensor
-            Return degree embedding vectors of shape :math:`(N, embedding_dim)`,
-            where :math:`N` is th number of nodes in the input graph.
+            Return degree embedding vectors of shape :math:`(N, d)`,
+            where :math:`N` is th number of nodes in the input graph and
+            :math:`d` is :attr:`embedding_dim`.
         """
         if len(g.ntypes) > 1 or len(g.etypes) > 1:
             g = to_homogeneous(g)
