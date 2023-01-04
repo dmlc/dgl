@@ -13,7 +13,6 @@ from .. import utils
 @utils.parametrize("graph_name", ["cora", "livejournal"])
 @utils.parametrize("format", ["coo"])
 def track_time(graph_name, format):
-    print(f"-------------!!!!!!!! {dgl.__version__}, {torch.__version__}")
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, format)
     graph = graph.to(device)
