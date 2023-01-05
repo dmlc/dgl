@@ -141,20 +141,20 @@ std::shared_ptr<CSR> SparseMatrix::CSCPtr() {
 std::tuple<torch::Tensor, torch::Tensor> SparseMatrix::COOTensors() {
   auto coo = COOPtr();
   auto val = value();
-  return {coo->row, coo->col};
+  return std::make_tuple(coo->row, coo->col);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
 SparseMatrix::CSRTensors() {
   auto csr = CSRPtr();
   auto val = value();
-  return {csr->indptr, csr->indices, csr->value_indices};
+  return std::make_tuple(csr->indptr, csr->indices, csr->value_indices);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
 SparseMatrix::CSCTensors() {
   auto csc = CSCPtr();
-  return {csc->indptr, csc->indices, csc->value_indices};
+  return std::make_tuple(csc->indptr, csc->indices, csc->value_indices);
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::Transpose() const {
