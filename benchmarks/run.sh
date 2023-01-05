@@ -19,4 +19,5 @@ cat asv.conf.json
 asv machine --yes
 asv run --launch-method=spawn -e -v
 asv publish
+ls -lh ${ROOT}/benchmarks/*
 popd
