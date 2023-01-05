@@ -82,6 +82,7 @@ def _test_chunk_graph(
     num_chunks,
     data_fmt = 'numpy',
     edges_fmt = 'csv',
+    vector_rows = False,
     num_chunks_nodes = None,
     num_chunks_edges = None,
     num_chunks_node_data = None,
@@ -91,6 +92,7 @@ def _test_chunk_graph(
 
         g = create_chunked_dataset(root_dir, num_chunks,
                 data_fmt=data_fmt, edges_fmt=edges_fmt,
+                vector_rows=vector_rows,
                 num_chunks_nodes=num_chunks_nodes,
                 num_chunks_edges=num_chunks_edges,
                 num_chunks_node_data=num_chunks_node_data,
@@ -190,6 +192,11 @@ def _test_chunk_graph(
 @pytest.mark.parametrize("edges_fmt", ['csv', 'parquet'])
 def test_chunk_graph_basics(num_chunks, data_fmt, edges_fmt):
     _test_chunk_graph(num_chunks, data_fmt=data_fmt, edges_fmt=edges_fmt)
+
+@pytest.mark.parametrize("num_chunks", [1, 8])
+@pytest.mark.parametrize("vector_rows", [True, False])
+def test_chunk_graph_vector_rows(num_chunks, vector_rows):
+    _test_chunk_graph(num_chunks, data_fmt='parquet', edges_fmt='parquet', vector_rows=vector_rows)
 
 
 @pytest.mark.parametrize(
