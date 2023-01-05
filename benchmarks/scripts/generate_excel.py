@@ -33,12 +33,10 @@ def main():
         for commit in commit_results_json_paths:
             with commit.open() as f:
                 commit_result = json.load(f)
-            print(f"--------- {commit_result}")
             commit_hash = commit_result["commit_hash"]
             per_commit_result = {}
             for test_name, result in commit_result["results"].items():
                 per_commit_result[test_name] = []
-                print(f"~~~~~~~~~~ {result}")
                 if result["result"] is None:
                     for test_args in product(*result["params"]):
                         per_commit_result[test_name].append(
