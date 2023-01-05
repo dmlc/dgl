@@ -682,7 +682,8 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
 
 
 def _sparse_matrix_str(spmat: SparseMatrix) -> str:
-    """Internal function for converting a sparse matrix to string representation."""
+    """Internal function for converting a sparse matrix to string
+    representation."""
     indices_str = str(torch.stack(spmat.coo()))
     values_str = str(spmat.val)
     meta_str = f"size={spmat.shape}, nnz={spmat.nnz}"

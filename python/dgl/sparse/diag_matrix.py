@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 
 import torch
 
-from .sparse_matrix import from_coo, SparseMatrix
+from .sparse_matrix import SparseMatrix, from_coo
 
 
 class DiagMatrix:
@@ -444,7 +444,8 @@ def identity(
 
 
 def _diag_matrix_str(spmat: DiagMatrix) -> str:
-    """Internal function for converting a diagonal matrix to string representation."""
+    """Internal function for converting a diagonal matrix to string
+    representation."""
     values_str = str(spmat.val)
     meta_str = f"size={spmat.shape}"
     if spmat.val.dim() > 1:
