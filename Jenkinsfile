@@ -235,7 +235,7 @@ pipeline {
       }
     }
     stage('CI') {
-      when { not { regression_test_done } }
+      when { expression { !regression_test_done } }
       stages {
         stage('Lint Check') {
           agent {
