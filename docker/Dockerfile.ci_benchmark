@@ -1,5 +1,5 @@
 # CI docker GPU env
-FROM nvidia/cuda:11.6.0-cudnn8-devel-ubuntu18.04
+FROM nvidia/cuda:11.6.0-cudnn8-devel-ubuntu20.04
 
 ENV TZ=US
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone

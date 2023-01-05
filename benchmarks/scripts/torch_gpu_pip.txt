@@ -1,13 +1,13 @@
---find-links https://download.pytorch.org/whl/torch
-torch==1.13.0+cu116
-torchvision==0.14.0
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==1.13.1+cu116
+torchvision==0.14.1+cu116
 torchmetrics
 pytest
 nose
 numpy
 cython
 scipy
-networkx==2.5.1
+networkx
 matplotlib
 nltk
 requests[security]
