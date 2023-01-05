@@ -134,6 +134,8 @@ def is_admin(name) {
   return (name in admins)
 }
 
+def regression_test_done = false
+
 pipeline {
   agent any
   triggers {
@@ -228,9 +230,12 @@ pipeline {
               }
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
               currentBuild.result = 'SUCCESS'
+              regression_test_done = true
           }
-          return
       }
+    }
+    if (regression_test_done) {
+      return
     }
     stage('CI') {
       stages {
