@@ -38,6 +38,7 @@ def main():
             per_commit_result = {}
             for test_name, result in commit_result["results"].items():
                 per_commit_result[test_name] = []
+                print(f"~~~~~~~~~~ {result}")
                 if result["result"] is None:
                     for test_args in product(*result["params"]):
                         per_commit_result[test_name].append(

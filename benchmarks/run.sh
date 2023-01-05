@@ -9,7 +9,7 @@ ROOT=/asv/dgl
 
 conda activate base
 pip install --upgrade pip
-pip install asv
+pip install asv==0.4.2
 pip uninstall -y dgl
 
 export DGL_BENCH_DEVICE=$DEVICE
