@@ -6,6 +6,7 @@ import torch
 
 import dgl
 from distpartitioning import array_readwriter
+from distpartitioning.array_readwriter.parquet import ParquetArrayParser
 from files import setdir
 
 
@@ -18,11 +19,12 @@ def _chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt, vector_rows=False):
         arr_chunk = arr[offset: offset + n]
         shape = arr_chunk.shape
         logging.info("Chunking %d-%d" % (offset, offset + n))
-        # If requested we write multi-column arrays as single-column vector files
-        if vector_rows and len(shape) > 1 and shape[1] > 1:
-            array_readwriter.get_array_parser(**fmt_meta).write(path, arr_chunk, vector_rows=vector_rows)
+        # If requested we write multi-column arrays as single-column vector Parquet files
+        array_parser = array_readwriter.get_array_parser(**fmt_meta)
+        if isinstance(array_parser, ParquetArrayParser) and len(shape) > 1 and shape[1] > 1:
+            array_parser.write(path, arr_chunk, vector_rows=vector_rows)
         else:
-            array_readwriter.get_array_parser(**fmt_meta).write(path, arr_chunk)
+            array_parser.write(path, arr_chunk)
         offset += n
         paths.append(path)
 
