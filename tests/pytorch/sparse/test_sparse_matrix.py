@@ -446,7 +446,7 @@ def test_to_device(device):
 
     target_row = row.to(device)
     target_col = col.to(device)
-    target_val = mat.val.to(ctx)
+    target_val = mat.val.to(device)
 
     mat2 = mat.to(device=device)
     assert mat2.shape == mat.shape
@@ -481,6 +481,6 @@ def test_to_dtype(dtype):
         torch.int: "int",
         torch.long: "long",
     }
-    mat2 = getattr(mat, dtype)()
+    mat2 = getattr(mat, func_name[dtype])()
     assert mat2.shape == mat.shape
     assert torch.allclose(mat2.val, target_val)

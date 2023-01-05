@@ -127,6 +127,6 @@ def test_to_dtype(dtype):
         torch.int: "int",
         torch.long: "long",
     }
-    mat2 = getattr(mat, dtype)()
+    mat2 = getattr(mat, func_name[dtype])()
     assert mat2.shape == mat.shape
     assert torch.allclose(mat2.val, target_val)
