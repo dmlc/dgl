@@ -10,12 +10,6 @@ from .base import BuiltinFunction
 class ReduceFunction(BuiltinFunction):
     """Base builtin reduce function class."""
 
-    def _invoke(self, graph, edge_frame, out_size, edge_map=None, out_map=None):
-        """Symbolic computation of this builtin function to create
-        runtime.executor
-        """
-        raise NotImplementedError
-
     @property
     def name(self):
         """Return the name of this builtin function."""
@@ -30,9 +24,6 @@ class SimpleReduceFunction(ReduceFunction):
         self._name = name
         self.msg_field = msg_field
         self.out_field = out_field
-
-    def _invoke(self, graph, edge_frame, out_size, edge_map=None, out_map=None):
-        raise NotImplementedError
 
     @property
     def name(self):

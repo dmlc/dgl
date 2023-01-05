@@ -14,13 +14,6 @@ __all__ = ["copy_u", "copy_e",
 class MessageFunction(BuiltinFunction):
     """Base builtin message function class."""
 
-    def _invoke(self, graph, src_frame, dst_frame, edge_frame, out_size,
-                src_map, dst_map, edge_map, out_map, reducer="none"):
-        """Symbolic computation of this builtin function to create
-        runtime.executor
-        """
-        raise NotImplementedError
-
     @property
     def name(self):
         """Return the name of this builtin function."""
@@ -42,10 +35,6 @@ class BinaryMessageFunction(MessageFunction):
         self.rhs_field = rhs_field
         self.out_field = out_field
 
-    def _invoke(self, graph, src_frame, dst_frame, edge_frame, out_size,
-                src_map, dst_map, edge_map, out_map, reducer="none"):
-        raise NotImplementedError
-
     @property
     def name(self):
         lhs = TargetCode.CODE2STR[self.lhs]
@@ -64,20 +53,6 @@ class CopyMessageFunction(MessageFunction):
         self.target = target
         self.in_field = in_field
         self.out_field = out_field
-
-    def _invoke(self, graph, src_frame, dst_frame, edge_frame, out_size,
-                src_map, dst_map, edge_map, out_map, reducer="none"):
-        """Symbolic computation of builtin message function to create
-        runtime.executor
-        """
-        graph = var.GRAPH(graph)
-        in_frames = (src_frame, dst_frame, edge_frame)
-        in_maps = (src_map, dst_map, edge_map)
-        in_data = ir.READ_COL(in_frames[self.target], var.STR(self.in_field))
-        in_map = var.MAP(in_maps[self.target])
-        out_map = var.MAP(out_map)
-        return ir.COPY_REDUCE(reducer, graph, self.target, in_data, out_size,
-                              in_map, out_map)
 
     @property
     def name(self):
