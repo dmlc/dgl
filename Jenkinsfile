@@ -196,7 +196,6 @@ pipeline {
       }
       when { triggeredBy 'IssueCommentCause' }
       steps {
-        // container('dgl-ci-lint') {
           checkout scm
           script {
               def comment = env.GITHUB_COMMENT
@@ -229,9 +228,8 @@ pipeline {
               }
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
               currentBuild.result = 'SUCCESS'
-              return
           }
-        // }
+          return
       }
     }
     stage('CI') {
