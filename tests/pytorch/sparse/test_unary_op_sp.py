@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import create_from_coo
+from dgl.sparse import from_coo
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
@@ -16,7 +16,7 @@ def test_neg():
     row = torch.tensor([1, 1, 3]).to(ctx)
     col = torch.tensor([1, 2, 3]).to(ctx)
     val = torch.tensor([1.0, 1.0, 2.0]).to(ctx)
-    A = create_from_coo(row, col, val)
+    A = from_coo(row, col, val)
     neg_A = -A
     assert A.shape == neg_A.shape
     assert A.nnz == neg_A.nnz

@@ -32,9 +32,10 @@ torch::Tensor SoftmaxAutoGrad::forward(
   auto sparse_val_max = ReduceMax(sparse_mat, 1);
   auto sparse_val_exp =
       BroadcastSubNoAutoGrad(sparse_mat, sparse_val_max).exp();
-  auto sparse_val_sum = ReduceSum(CreateValLike(sparse_mat, sparse_val_exp), 1);
+  auto sparse_val_sum =
+      ReduceSum(SparseMatrix::ValLike(sparse_mat, sparse_val_exp), 1);
   auto sparse_score = BroadcastDivNoAutoGrad(
-      CreateValLike(sparse_mat, sparse_val_exp), sparse_val_sum);
+      SparseMatrix::ValLike(sparse_mat, sparse_val_exp), sparse_val_sum);
 
   const bool sparse_requires_grad = sparse_val.requires_grad();
   torch::Tensor cache_sparse_score;
@@ -61,9 +62,10 @@ tensor_list SoftmaxAutoGrad::backward(
   torch::Tensor sparse_val_grad;
   if (sparse_requires_grad) {
     auto sds = sparse_score * output_grad;
-    auto accum = ReduceSum(CreateValLike(sparse_mat, sds), 1);
-    sparse_val_grad = sds - BroadcastMulNoAutoGrad(
-                                CreateValLike(sparse_mat, sparse_score), accum);
+    auto accum = ReduceSum(SparseMatrix::ValLike(sparse_mat, sds), 1);
+    sparse_val_grad =
+        sds - BroadcastMulNoAutoGrad(
+                  SparseMatrix::ValLike(sparse_mat, sparse_score), accum);
   }
 
   return {torch::Tensor(), sparse_val_grad};
@@ -77,7 +79,7 @@ c10::intrusive_ptr<SparseMatrix> Softmax(
   if (sparse_val.dim() == 1) {
     sparse_val = sparse_val.view({-1, 1});
     expand_dim = true;
-    new_sparse_mat = CreateValLike(sparse_mat, sparse_val);
+    new_sparse_mat = SparseMatrix::ValLike(sparse_mat, sparse_val);
   }
 
   auto new_sparse_val = SoftmaxAutoGrad::apply(new_sparse_mat, sparse_val);
@@ -85,7 +87,7 @@ c10::intrusive_ptr<SparseMatrix> Softmax(
   if (expand_dim) {
     new_sparse_val = new_sparse_val.view(-1);
   }
-  return CreateValLike(sparse_mat, new_sparse_val);
+  return SparseMatrix::ValLike(sparse_mat, new_sparse_val);
 }
 
 }  // namespace sparse

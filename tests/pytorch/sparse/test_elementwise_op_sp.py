@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import create_from_coo, power
+from dgl.sparse import from_coo, power
 
 # TODO(#4818): Skipping tests on win.
 if not sys.platform.startswith("linux"):
@@ -26,7 +26,7 @@ def test_mul_scalar(v_scalar):
     row = torch.tensor([1, 0, 2]).to(ctx)
     col = torch.tensor([0, 3, 2]).to(ctx)
     val = torch.randn(len(row)).to(ctx)
-    A1 = create_from_coo(row, col, val, shape=(3, 4))
+    A1 = from_coo(row, col, val, shape=(3, 4))
 
     # A * v
     A2 = A1 * v_scalar
@@ -46,7 +46,7 @@ def test_pow(val_shape):
     row = torch.tensor([1, 0, 2]).to(ctx)
     col = torch.tensor([0, 3, 2]).to(ctx)
     val = torch.randn(val_shape).to(ctx)
-    A = create_from_coo(row, col, val, shape=(3, 4))
+    A = from_coo(row, col, val, shape=(3, 4))
     exponent = 2
     A_new = A**exponent
     assert torch.allclose(A_new.val, val**exponent)
