@@ -171,7 +171,7 @@ class Sampler(object):
             def sample(self, g, indices):
                 return g.subgraph(indices)
     """
-    def sample(self, g, indices):
+    def sample(self, g, indices, copy_ndata=True, copy_edata=True):
         """Abstract sample method.
 
         Parameters
@@ -219,7 +219,8 @@ class BlockSampler(Sampler):
         self.prefetch_edge_feats = prefetch_edge_feats or []
         self.output_device = output_device
 
-    def sample_blocks(self, g, seed_nodes, exclude_eids=None):
+    def sample_blocks(self, g, seed_nodes, exclude_eids=None, copy_ndata=True,
+                      copy_edata=True):
         """Generates a list of blocks from the given seed nodes.
 
         This function must return a triplet where the first element is the input node IDs
@@ -238,9 +239,10 @@ class BlockSampler(Sampler):
             set_edge_lazy_features(block, self.prefetch_edge_feats)
         return input_nodes, output_nodes, blocks
 
-    def sample(self, g, seed_nodes, exclude_eids=None):     # pylint: disable=arguments-differ
+    def sample(self, g, seed_nodes, exclude_eids=None, copy_ndata=True, copy_edata=True):     # pylint: disable=arguments-differ
         """Sample a list of blocks from the given seed nodes."""
-        result = self.sample_blocks(g, seed_nodes, exclude_eids=exclude_eids)
+        result = self.sample_blocks(g, seed_nodes, exclude_eids=exclude_eids,
+            copy_ndata=copy_ndata, copy_edata=copy_edata)
         return self.assign_lazy_features(result)
 
 
@@ -390,7 +392,7 @@ class EdgePredictionSampler(Sampler):
         # In-place updates
         return result
 
-    def sample(self, g, seed_edges):    # pylint: disable=arguments-differ
+    def sample(self, g, seed_edges, copy_ndata=True, copy_edata=True):    # pylint: disable=arguments-differ
         """Samples a list of blocks, as well as a subgraph containing the sampled
         edges from the original graph.
 
@@ -417,7 +419,8 @@ class EdgePredictionSampler(Sampler):
             g, seed_edges, exclude, self.reverse_eids, self.reverse_etypes,
             self.output_device)
 
-        input_nodes, _, blocks = self.sampler.sample(g, seed_nodes, exclude_eids)
+        input_nodes, _, blocks = self.sampler.sample(g, seed_nodes, \
+            exclude_eids, copy_ndata=copy_ndata, copy_edata=copy_edata)
 
         if self.negative_sampler is None:
             return self.assign_lazy_features((input_nodes, pair_graph, blocks))
