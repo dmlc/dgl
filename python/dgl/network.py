@@ -7,8 +7,6 @@ from enum import Enum
 
 import dgl.backend as F
 
-from . import utils
-from ._deprecate.nodeflow import NodeFlow
 from ._ffi.function import _init_api
 
 _init_api("dgl.network")
@@ -118,35 +116,6 @@ def _receiver_wait(receiver, ip_addr, port, num_sender):
 ################################ Distributed Sampler Components ################################
 
 
-def _send_nodeflow(sender, nodeflow, recv_id):
-    """Send sampled subgraph (Nodeflow) to remote Receiver.
-
-    Parameters
-    ----------
-    sender : ctypes.c_void_p
-        C Sender handle
-    nodeflow : NodeFlow
-        NodeFlow object
-    recv_id : int
-        Receiver ID
-    """
-    assert recv_id >= 0, "recv_id cannot be a negative number."
-    gidx = nodeflow._graph
-    node_mapping = nodeflow._node_mapping.todgltensor()
-    edge_mapping = nodeflow._edge_mapping.todgltensor()
-    layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
-    flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
-    _CAPI_SenderSendNodeFlow(
-        sender,
-        int(recv_id),
-        gidx,
-        node_mapping,
-        edge_mapping,
-        layers_offsets,
-        flows_offsets,
-    )
-
-
 def _send_sampler_end_signal(sender, recv_id):
     """Send an epoch-end signal to remote Receiver.
 
@@ -159,27 +128,6 @@ def _send_sampler_end_signal(sender, recv_id):
     """
     assert recv_id >= 0, "recv_id cannot be a negative number."
     _CAPI_SenderSendSamplerEndSignal(sender, int(recv_id))
-
-
-def _recv_nodeflow(receiver, graph):
-    """Receive sampled subgraph (NodeFlow) from remote sampler.
-
-    Parameters
-    ----------
-    receiver : ctypes.c_void_p
-        C Receiver handle
-    graph : DGLGraph
-        The parent graph
-
-    Returns
-    -------
-    NodeFlow or an end-signal
-    """
-    res = _CAPI_ReceiverRecvNodeFlow(receiver)
-    if isinstance(res, int):
-        return res
-    else:
-        return NodeFlow(graph, res)
 
 
 ################################ Distributed KVStore Components ################################
