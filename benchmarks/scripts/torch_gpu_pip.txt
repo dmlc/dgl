@@ -1,6 +1,6 @@
 --find-links https://download.pytorch.org/whl/torch
 torch==1.13.0+cu116
-torchvision==0.14.1
+torchvision==0.14.0
 torchmetrics
 pytest
 nose
