@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 
 import torch
 
-from .sparse_matrix import SparseMatrix, from_coo
+from .sparse_matrix import from_coo, SparseMatrix
 
 
 class DiagMatrix:

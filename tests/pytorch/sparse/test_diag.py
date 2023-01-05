@@ -1,9 +1,9 @@
 import sys
+import unittest
 
 import backend as F
 import pytest
 import torch
-import unittest
 
 from dgl.sparse import diag, DiagMatrix, identity
 
@@ -108,8 +108,9 @@ def test_to_device(device):
     assert torch.allclose(mat2.val, target_val)
 
 
-@pytest.mark.parametrize("dtype", [torch.float, torch.double, torch.int,
-                                   torch.long])
+@pytest.mark.parametrize(
+    "dtype", [torch.float, torch.double, torch.int, torch.long]
+)
 def test_to_dtype(dtype):
     val = torch.randn(3)
     mat_shape = (3, 4)
@@ -120,8 +121,12 @@ def test_to_dtype(dtype):
     assert mat2.shape == mat.shape
     assert torch.allclose(mat2.val, target_val)
 
-    func_name = {torch.float: "float", torch.double: "double",
-                 torch.int: "int", torch.long: "long"}
+    func_name = {
+        torch.float: "float",
+        torch.double: "double",
+        torch.int: "int",
+        torch.long: "long"
+    }
     mat2 = getattr(mat, dtype)()
     assert mat2.shape == mat.shape
     assert torch.allclose(mat2.val, target_val)
