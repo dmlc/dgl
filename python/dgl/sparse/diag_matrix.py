@@ -1,4 +1,5 @@
 """DGL diagonal matrix module."""
+# pylint: disable= invalid-name
 from typing import Optional, Tuple
 
 import torch
@@ -168,16 +169,16 @@ class DiagMatrix:
 
     def to(self, device=None, dtype=None):
         """Perform matrix dtype and/or device conversion. If the target device
-        and/or dtype are already in use, the original matrix will be returned.
+        and dtype are already in use, the original matrix will be returned.
 
         Parameters
         ----------
         device : torch.device, optional
-            This is the target device of the matrix. If not given, the current
-            device will be used.
+            The target device of the matrix if given, otherwise the current
+            device will be used
         dtype : torch.dtype, optional
-            This is the target data type of the matrix values. If not given,
-            the current data type will be used.
+            The target data type of the matrix values if given, otherwise the
+            current data type will be used
 
         Returns
         -------
