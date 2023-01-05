@@ -18,9 +18,9 @@ Sparse matrix class
 
     There are a few ways to create a sparse matrix:
 
-    * In COO format using row and col indices, use :func:`create_from_coo`.
-    * In CSR format using row pointers and col indices, use :func:`create_from_csr`.
-    * In CSC format using col pointers and row indices, use :func:`create_from_csc`.
+    * In COO format using row and col indices, use :func:`from_coo`.
+    * In CSR format using row pointers and col indices, use :func:`from_csr`.
+    * In CSC format using col pointers and row indices, use :func:`from_csc`.
 
     For example, one can create COO matrices as follows:
 
@@ -28,7 +28,7 @@ Sparse matrix class
 
         >>> row = torch.tensor([1, 1, 2])
         >>> col = torch.tensor([2, 4, 3])
-        >>> A = create_from_coo(row, col)
+        >>> A = from_coo(row, col)
         >>> A
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [2, 4, 3]]),
@@ -39,7 +39,7 @@ Sparse matrix class
 
         >>> # vector values
         >>> val = torch.tensor([[1, 1], [2, 2], [3, 3]])
-        >>> A = create_from_coo(row, col, val)
+        >>> A = from_coo(row, col, val)
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [2, 4, 3]]),
                      values=tensor([[1, 1],
@@ -52,7 +52,7 @@ Sparse matrix class
         >>> indptr = torch.tensor([0, 1, 2, 5])
         >>> indices = torch.tensor([1, 2, 0, 1, 2])
         >>> val = torch.tensor([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
-        >>> A = create_from_csr(indptr, indices, val)
+        >>> A = from_csr(indptr, indices, val)
         >>> A
         SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
                                      [1, 2, 0, 1, 2]]),
@@ -69,9 +69,9 @@ Creators
 .. autosummary::
     :toctree: ../../generated/
 
-    create_from_coo
-    create_from_csr
-    create_from_csc
+    from_coo
+    from_csr
+    from_csc
     val_like
 
 Attributes and methods
