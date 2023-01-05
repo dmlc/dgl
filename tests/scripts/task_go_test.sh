@@ -17,6 +17,8 @@ conda activate pytorch-ci
 pushd dglgo
 rm -rf build *.egg-info dist
 pip uninstall -y dglgo
+pip uninstall -y ogb
+pip install ogb==1.3.5
 python3 setup.py install
 popd
 
