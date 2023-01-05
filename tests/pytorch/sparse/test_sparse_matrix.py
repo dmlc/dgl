@@ -479,7 +479,7 @@ def test_to_dtype(dtype):
         torch.float: "float",
         torch.double: "double",
         torch.int: "int",
-        torch.long: "long"
+        torch.long: "long",
     }
     mat2 = getattr(mat, dtype)()
     assert mat2.shape == mat.shape
