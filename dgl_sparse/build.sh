@@ -1,5 +1,5 @@
 #!/bin/bash
-# Helper script to build tensor adapter libraries for PyTorch
+# Helper script to build dgl sparse libraries for PyTorch
 set -e
 
 rm -rf build
