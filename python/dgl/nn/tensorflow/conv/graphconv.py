@@ -122,7 +122,7 @@ class GraphConv(layers.Layer):
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
     >>> with tf.device("CPU:0"):
-    ...     g = dgl.bipartite((u, v))
+    ...     g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     ...     u_fea = tf.convert_to_tensor(np.random.rand(2, 5))
     ...     v_fea = tf.convert_to_tensor(np.random.rand(4, 5))
     ...     conv = GraphConv(5, 2, norm='both', weight=True, bias=True)
