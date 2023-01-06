@@ -119,7 +119,7 @@ def run_client_empty(
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph_empty(g, num_clients, num_nodes, num_edges)
@@ -187,7 +187,7 @@ def run_client(
     os.environ["DGL_GROUP_ID"] = str(group_id)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph(g, num_clients, num_nodes, num_edges)
@@ -206,7 +206,7 @@ def run_emb_client(
     os.environ["DGL_GROUP_ID"] = str(group_id)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_emb(g, num_clients, num_nodes, num_edges)
@@ -230,7 +230,7 @@ def run_optim_client(
         backend="gloo", rank=rank, world_size=world_size
     )
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_optim_store(rank, num_nodes, optimizer_states, save)
@@ -279,7 +279,7 @@ def run_client_hierarchy(
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     node_mask = F.tensor(node_mask)
@@ -687,7 +687,7 @@ def run_client_hetero(
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph_hetero(g, num_clients, num_nodes, num_edges)
