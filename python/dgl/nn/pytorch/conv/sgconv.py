@@ -196,7 +196,7 @@ class SGConv(nn.Module):
             else:
                 if edge_weight is None:
                     # compute normalization
-                    degs = graph.in_degrees().float().clamp(min=1)
+                    degs = graph.in_degrees().to(feat).clamp(min=1)
                     norm = th.pow(degs, -0.5)
                     norm = norm.to(feat.device).unsqueeze(1)
                 # compute (D^-1 A^k D)^k X
