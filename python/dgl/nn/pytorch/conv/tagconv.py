@@ -117,7 +117,7 @@ class TAGConv(nn.Module):
         with graph.local_scope():
             assert graph.is_homogeneous, "Graph is not homogeneous"
             if edge_weight is None:
-                norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+                norm = th.pow(graph.in_degrees().to(feat).clamp(min=1), -0.5)
                 shp = norm.shape + (1,) * (feat.dim() - 1)
                 norm = th.reshape(norm, shp).to(feat.device)
 

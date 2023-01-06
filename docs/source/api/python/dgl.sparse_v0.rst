@@ -97,6 +97,13 @@ Attributes and methods
     SparseMatrix.dense
     SparseMatrix.t
     SparseMatrix.T
+    SparseMatrix.to
+    SparseMatrix.cuda
+    SparseMatrix.cpu
+    SparseMatrix.float
+    SparseMatrix.double
+    SparseMatrix.int
+    SparseMatrix.long
     SparseMatrix.transpose
     SparseMatrix.reduce
     SparseMatrix.sum
@@ -139,6 +146,13 @@ Attributes and methods
     DiagMatrix.t
     DiagMatrix.T
     DiagMatrix.transpose
+    DiagMatrix.to
+    DiagMatrix.cuda
+    DiagMatrix.cpu
+    DiagMatrix.float
+    DiagMatrix.double
+    DiagMatrix.int
+    DiagMatrix.long
     DiagMatrix.neg
     DiagMatrix.inv
     DiagMatrix.__matmul__
