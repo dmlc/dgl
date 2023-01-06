@@ -1,7 +1,6 @@
 import networkx as nx
 import scipy.sparse as ssp
 import dgl
-import dgl.contrib as contrib
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
 import backend as F

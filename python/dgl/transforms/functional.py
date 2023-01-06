@@ -43,16 +43,12 @@ from .. import subgraph
 from .. import function
 from ..sampling.neighbor import sample_neighbors
 
-# TO BE DEPRECATED
-from .._deprecate.graph import DGLGraph as DGLGraphStale
-
 __all__ = [
     'line_graph',
     'khop_adj',
     'khop_graph',
     'reverse',
     'to_bidirected',
-    'to_bidirected_stale',
     'add_reverse_edges',
     'laplacian_lambda_max',
     'knn_graph',
@@ -1318,59 +1314,6 @@ def to_simple_graph(g):
     """
     dgl_warning('dgl.to_simple_graph is renamed to dgl.to_simple in v0.5.')
     return to_simple(g)
-
-def to_bidirected_stale(g, readonly=True):
-    """NOTE: this function only works on the deprecated
-    :class:`dgl.DGLGraphStale` object.
-
-    Convert the graph to a bidirected graph.
-
-    The function generates a new graph with no node/edge feature.
-    If g has an edge for ``(u, v)`` but no edge for ``(v, u)``, then the
-    returned graph will have both ``(u, v)`` and ``(v, u)``.
-
-    If the input graph is a multigraph (there are multiple edges from node u to node v),
-    the returned graph isn't well defined.
-
-    Parameters
-    ----------
-    g : DGLGraphStale
-        The input graph.
-    readonly : bool
-        Whether the returned bidirected graph is readonly or not.
-
-        (Default: True)
-
-    Notes
-    -----
-    Please make sure g is a simple graph, otherwise the return value is undefined.
-
-    This function discards the batch information. Please use
-    :func:`dgl.DGLGraph.set_batch_num_nodes`
-    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-    to maintain the information.
-
-    Returns
-    -------
-    DGLGraph
-
-    Examples
-    --------
-    The following two examples use PyTorch backend, one for non-multi graph
-    and one for multi-graph.
-
-    >>> g = dgl._deprecate.graph.DGLGraph()
-    >>> g.add_nodes(2)
-    >>> g.add_edges([0, 0], [0, 1])
-    >>> bg1 = dgl.to_bidirected_stale(g)
-    >>> bg1.edges()
-    (tensor([0, 1, 0]), tensor([0, 0, 1]))
-    """
-    if readonly:
-        newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
-    else:
-        newgidx = _CAPI_DGLToBidirectedMutableGraph(g._graph)
-    return DGLGraphStale(newgidx)
 
 def laplacian_lambda_max(g):
     """Return the largest eigenvalue of the normalized symmetric Laplacian of a graph.

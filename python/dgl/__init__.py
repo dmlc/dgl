@@ -18,7 +18,6 @@ from .logging import enable_verbose_logging
 from .backend import load_backend, backend_name
 
 from . import function
-from . import contrib
 from . import container
 from . import distributed
 from . import random
@@ -53,6 +52,3 @@ from .frame import LazyFeature
 from .utils import apply_each
 from .global_config import is_libxsmm_enabled, use_libxsmm
 from .mpops import *
-
-from ._deprecate.graph import DGLGraph as DGLGraphStale
-from ._deprecate.nodeflow import *

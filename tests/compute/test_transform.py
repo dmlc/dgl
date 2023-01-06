@@ -519,14 +519,6 @@ def create_large_graph(num_nodes, idtype=F.int64):
 
     return dgl.from_scipy(spm, idtype=idtype)
 
-def get_nodeflow(g, node_ids, num_layers):
-    batch_size = len(node_ids)
-    expand_factor = g.number_of_nodes()
-    sampler = dgl.contrib.sampling.NeighborSampler(g, batch_size,
-            expand_factor=expand_factor, num_hops=num_layers,
-            seed_nodes=node_ids)
-    return next(iter(sampler))
-
 # Disabled since everything will be on heterogeneous graphs
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
 def test_partition_with_halo():
