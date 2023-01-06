@@ -213,6 +213,8 @@ class SparseMatrix:
         elif device == self.device:
             return val_like(self, self.val.to(dtype=dtype))
         else:
+            # TODO(#5119): Find a better moving strategy instead of always
+            # convert to COO format.
             row, col = self.coo()
             row = row.to(device=device)
             col = col.to(device=device)
