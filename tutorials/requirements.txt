@@ -1,5 +1,4 @@
 networkx>=2.1
-ogb>=1.3.5
 torch
 numpy
 seaborn
