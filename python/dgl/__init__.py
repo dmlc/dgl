@@ -30,6 +30,8 @@ from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs
 from ._ffi.base import DGLError, __version__
 
+from distutils.version import LooseVersion
+
 from .base import ALL, NTYPE, NID, ETYPE, EID
 from .readout import *
 from .batch import *
