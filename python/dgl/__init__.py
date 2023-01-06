@@ -9,6 +9,8 @@ and transforming graphs.
 # This initializes Winsock and performs cleanup at termination as required
 import socket
 
+from distutils.version import LooseVersion
+
 # setup logging before everything
 from .logging import enable_verbose_logging
 
