@@ -23,7 +23,7 @@ from .._ffi.base import is_tensor_adaptor_enabled
 from ..heterograph import DGLGraph
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads, get_num_threads,
-    get_numa_nodes_cores, dtype_of)
+    get_numa_nodes_cores, context_of, dtype_of, version)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
 from .. import backend as F
