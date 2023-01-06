@@ -1,4 +1,5 @@
 """DGL sparse matrix module."""
+# pylint: disable= invalid-name
 from typing import Optional, Tuple
 
 import torch
@@ -88,29 +89,6 @@ class SparseMatrix:
         """
         return self.coo()[1]
 
-    def indices(
-        self, fmt: str, return_shuffle=False
-    ) -> Tuple[torch.Tensor, ...]:
-        """Get the indices of the nonzero elements.
-
-        Parameters
-        ----------
-        fmt : str
-            Sparse matrix storage format. Can be COO or CSR or CSC.
-        return_shuffle: bool
-            If true, return an extra array of the nonzero value IDs
-
-        Returns
-        -------
-        tensor
-            Indices of the nonzero elements
-        """
-        if fmt == "COO" and not return_shuffle:
-            row, col = self.coo()
-            return torch.stack([row, col])
-        else:
-            raise NotImplementedError
-
     def __repr__(self):
         return _sparse_matrix_str(self)
 
@@ -193,6 +171,195 @@ class SparseMatrix:
         shape=(4, 4), nnz=3)
         """
         return SparseMatrix(self.c_sparse_matrix.transpose())
+
+    def to(self, device=None, dtype=None):
+        """Perform matrix dtype and/or device conversion. If the target device
+        and dtype are already in use, the original matrix will be returned.
+
+        Parameters
+        ----------
+        device : torch.device, optional
+            The target device of the matrix if provided, otherwise the current
+            device will be used
+        dtype : torch.dtype, optional
+            The target data type of the matrix values, otherwise the current
+            data type will be used
+
+        Returns
+        -------
+        SparseMatrix
+            The result matrix
+
+        Example
+        --------
+
+        >>> row = torch.tensor([1, 1, 2])
+        >>> col = torch.tensor([1, 2, 0])
+        >>> A = from_coo(row, col, shape=(3, 4))
+        >>> A.to(device='cuda:0', dtype=torch.int32)
+        SparseMatrix(indices=tensor([[1, 1, 2],
+                                     [1, 2, 0]], device='cuda:0'),
+                     values=tensor([1, 1, 1], device='cuda:0',
+                                   dtype=torch.int32),
+                     size=(3, 4), nnz=3)
+        """
+        if device is None:
+            device = self.device
+        if dtype is None:
+            dtype = self.dtype
+
+        if device == self.device and dtype == self.dtype:
+            return self
+        elif device == self.device:
+            return val_like(self, self.val.to(dtype=dtype))
+        else:
+            # TODO(#5119): Find a better moving strategy instead of always
+            # convert to COO format.
+            row, col = self.coo()
+            row = row.to(device=device)
+            col = col.to(device=device)
+            val = self.val.to(device=device, dtype=dtype)
+            return from_coo(row, col, val, self.shape)
+
+    def cuda(self):
+        """Move the matrix to GPU. If the matrix is already on GPU, the
+        original matrix will be returned. If multiple GPU devices exist,
+        'cuda:0' will be selected.
+
+        Returns
+        -------
+        SparseMatrix
+            The matrix on GPU
+
+        Example
+        --------
+
+        >>> row = torch.tensor([1, 1, 2])
+        >>> col = torch.tensor([1, 2, 0])
+        >>> A = from_coo(row, col, shape=(3, 4))
+        >>> A.cuda()
+        SparseMatrix(indices=tensor([[1, 1, 2],
+                                     [1, 2, 0]], device='cuda:0'),
+                     values=tensor([1., 1., 1.], device='cuda:0'),
+                     size=(3, 4), nnz=3)
+        """
+        return self.to(device="cuda")
+
+    def cpu(self):
+        """Move the matrix to CPU. If the matrix is already on CPU, the
+        original matrix will be returned.
+
+        Returns
+        -------
+        SparseMatrix
+            The matrix on CPU
+
+        Example
+        --------
+
+        >>> row = torch.tensor([1, 1, 2]).to('cuda')
+        >>> col = torch.tensor([1, 2, 0]).to('cuda')
+        >>> A = from_coo(row, col, shape=(3, 4))
+        >>> A.cpu()
+        SparseMatrix(indices=tensor([[1, 1, 2],
+                                     [1, 2, 0]]),
+                     values=tensor([1., 1., 1.]),
+                     size=(3, 4), nnz=3)
+        """
+        return self.to(device="cpu")
+
+    def float(self):
+        """Convert the matrix values to float data type. If the matrix already
+        uses float data type, the original matrix will be returned.
+
+        Returns
+        -------
+        SparseMatrix
+            The matrix with float values
+
+        Example
+        --------
+
+        >>> row = torch.tensor([1, 1, 2])
+        >>> col = torch.tensor([1, 2, 0])
+        >>> val = torch.ones(len(row)).long()
+        >>> A = from_coo(row, col, val, shape=(3, 4))
+        >>> A.float()
+        SparseMatrix(indices=tensor([[1, 1, 2],
+                                     [1, 2, 0]]),
+                     values=tensor([1., 1., 1.]),
+                     size=(3, 4), nnz=3)
+        """
+        return self.to(dtype=torch.float)
+
+    def double(self):
+        """Convert the matrix values to double data type. If the matrix already
+        uses double data type, the original matrix will be returned.
+
+        Returns
+        -------
+        SparseMatrix
+            The matrix with double values
+
+        Example
+        --------
+
+        >>> row = torch.tensor([1, 1, 2])
+        >>> col = torch.tensor([1, 2, 0])
+        >>> A = from_coo(row, col, shape=(3, 4))
+        >>> A.double()
+        SparseMatrix(indices=tensor([[1, 1, 2],
+                                     [1, 2, 0]]),
+                     values=tensor([1., 1., 1.], dtype=torch.float64),
+                     size=(3, 4), nnz=3)
+        """
+        return self.to(dtype=torch.double)
+
+    def int(self):
+        """Convert the matrix values to int data type. If the matrix already
+        uses int data type, the original matrix will be returned.
+
+        Returns
+        -------
+        DiagMatrix
+            The matrix with int values
+
+        Example
+        --------
+
+        >>> row = torch.tensor([1, 1, 2])
+        >>> col = torch.tensor([1, 2, 0])
+        >>> A = from_coo(row, col, shape=(3, 4))
+        >>> A.int()
+        SparseMatrix(indices=tensor([[1, 1, 2],
+                                     [1, 2, 0]]),
+                     values=tensor([1, 1, 1], dtype=torch.int32),
+                     size=(3, 4), nnz=3)
+        """
+        return self.to(dtype=torch.int)
+
+    def long(self):
+        """Convert the matrix values to long data type. If the matrix already
+        uses long data type, the original matrix will be returned.
+
+        Returns
+        -------
+        DiagMatrix
+            The matrix with long values
+
+        Example
+        --------
+
+        >>> row = torch.tensor([1, 1, 2])
+        >>> col = torch.tensor([1, 2, 0])
+        >>> A = from_coo(row, col, shape=(3, 4))
+        >>> A.long()
+        SparseMatrix(indices=tensor([[1, 1, 2],
+                                     [1, 2, 0]]),
+                     values=tensor([1, 1, 1]),
+                     size=(3, 4), nnz=3)
+        """
+        return self.to(dtype=torch.long)
 
     def coalesce(self):
         """Return a coalesced sparse matrix.
@@ -521,8 +688,9 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
 
 
 def _sparse_matrix_str(spmat: SparseMatrix) -> str:
-    """Internal function for converting a sparse matrix to string representation."""
-    indices_str = str(spmat.indices("COO"))
+    """Internal function for converting a sparse matrix to string
+    representation."""
+    indices_str = str(torch.stack(spmat.coo()))
     values_str = str(spmat.val)
     meta_str = f"size={spmat.shape}, nnz={spmat.nnz}"
     if spmat.val.dim() > 1:

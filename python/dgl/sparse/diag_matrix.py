@@ -1,4 +1,5 @@
 """DGL diagonal matrix module."""
+# pylint: disable= invalid-name
 from typing import Optional, Tuple
 
 import torch
@@ -166,6 +167,164 @@ class DiagMatrix:
         """
         return DiagMatrix(self.val, self.shape[::-1])
 
+    def to(self, device=None, dtype=None):
+        """Perform matrix dtype and/or device conversion. If the target device
+        and dtype are already in use, the original matrix will be returned.
+
+        Parameters
+        ----------
+        device : torch.device, optional
+            The target device of the matrix if given, otherwise the current
+            device will be used
+        dtype : torch.dtype, optional
+            The target data type of the matrix values if given, otherwise the
+            current data type will be used
+
+        Returns
+        -------
+        DiagMatrix
+            The result matrix
+
+        Example
+        --------
+
+        >>> val = torch.ones(2)
+        >>> mat = diag(val)
+        >>> mat.to(device='cuda:0', dtype=torch.int32)
+        DiagMatrix(values=tensor([1, 1], device='cuda:0', dtype=torch.int32),
+                   size=(2, 2))
+        """
+        if device is None:
+            device = self.device
+        if dtype is None:
+            dtype = self.dtype
+
+        if device == self.device and dtype == self.dtype:
+            return self
+
+        return diag(self.val.to(device=device, dtype=dtype), self.shape)
+
+    def cuda(self):
+        """Move the matrix to GPU. If the matrix is already on GPU, the
+        original matrix will be returned. If multiple GPU devices exist,
+        'cuda:0' will be selected.
+
+        Returns
+        -------
+        DiagMatrix
+            The matrix on GPU
+
+        Example
+        --------
+
+        >>> val = torch.ones(2)
+        >>> mat = diag(val)
+        >>> mat.cuda()
+        DiagMatrix(values=tensor([1., 1.], device='cuda:0'),
+                   size=(2, 2))
+        """
+        return self.to(device="cuda")
+
+    def cpu(self):
+        """Move the matrix to CPU. If the matrix is already on CPU, the
+        original matrix will be returned.
+
+        Returns
+        -------
+        DiagMatrix
+            The matrix on CPU
+
+        Example
+        --------
+
+        >>> val = torch.ones(2)
+        >>> mat = diag(val)
+        >>> mat.cpu()
+        DiagMatrix(values=tensor([1., 1.]),
+                   size=(2, 2))
+        """
+        return self.to(device="cpu")
+
+    def float(self):
+        """Convert the matrix values to float data type. If the matrix already
+        uses float data type, the original matrix will be returned.
+
+        Returns
+        -------
+        DiagMatrix
+            The matrix with float values
+
+        Example
+        --------
+
+        >>> val = torch.ones(2)
+        >>> mat = diag(val)
+        >>> mat.float()
+        DiagMatrix(values=tensor([1., 1.]),
+                   size=(2, 2))
+        """
+        return self.to(dtype=torch.float)
+
+    def double(self):
+        """Convert the matrix values to double data type. If the matrix already
+        uses double data type, the original matrix will be returned.
+
+        Returns
+        -------
+        DiagMatrix
+            The matrix with double values
+
+        Example
+        --------
+
+        >>> val = torch.ones(2)
+        >>> mat = diag(val)
+        >>> mat.double()
+        DiagMatrix(values=tensor([1., 1.], dtype=torch.float64),
+                   size=(2, 2))
+        """
+        return self.to(dtype=torch.double)
+
+    def int(self):
+        """Convert the matrix values to int data type. If the matrix already
+        uses int data type, the original matrix will be returned.
+
+        Returns
+        -------
+        DiagMatrix
+            The matrix with int values
+
+        Example
+        --------
+
+        >>> val = torch.ones(2)
+        >>> mat = diag(val)
+        >>> mat.int()
+        DiagMatrix(values=tensor([1, 1], dtype=torch.int32),
+                   size=(2, 2))
+        """
+        return self.to(dtype=torch.int)
+
+    def long(self):
+        """Convert the matrix values to long data type. If the matrix already
+        uses long data type, the original matrix will be returned.
+
+        Returns
+        -------
+        DiagMatrix
+            The matrix with long values
+
+        Example
+        --------
+
+        >>> val = torch.ones(2)
+        >>> mat = diag(val)
+        >>> mat.long()
+        DiagMatrix(values=tensor([1, 1]),
+                   size=(2, 2))
+        """
+        return self.to(dtype=torch.long)
+
 
 def diag(
     val: torch.Tensor, shape: Optional[Tuple[int, int]] = None
@@ -287,7 +446,8 @@ def identity(
 
 
 def _diag_matrix_str(spmat: DiagMatrix) -> str:
-    """Internal function for converting a diagonal matrix to string representation."""
+    """Internal function for converting a diagonal matrix to string
+    representation."""
     values_str = str(spmat.val)
     meta_str = f"size={spmat.shape}"
     if spmat.val.dim() > 1:
