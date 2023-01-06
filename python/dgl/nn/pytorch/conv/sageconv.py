@@ -6,7 +6,7 @@ from torch.nn import functional as F
 
 from .... import function as fn
 from ....base import DGLError
-from ....utils import expand_as_pair, check_eq_shape, dgl_warning
+from ....utils import expand_as_pair, check_eq_shape
 
 
 class SAGEConv(nn.Module):
