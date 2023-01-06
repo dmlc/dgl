@@ -24,6 +24,8 @@ def test_graph_dataloader(batch_size):
         if batch_size is not None:
             assert F.asnumpy(label).shape[0] == batch_size
         else:
+            # If batch size is None, the label element will be a single scalar following
+            # PyTorch's practice.
             assert F.asnumpy(label).ndim == 0
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
