@@ -9,6 +9,8 @@ and transforming graphs.
 # This initializes Winsock and performs cleanup at termination as required
 import socket
 
+from distutils.version import LooseVersion
+
 # setup logging before everything
 from .logging import enable_verbose_logging
 
@@ -29,8 +31,6 @@ from . import cuda
 from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs
 from ._ffi.base import DGLError, __version__
-
-from distutils.version import LooseVersion
 
 from .base import ALL, NTYPE, NID, ETYPE, EID
 from .readout import *
