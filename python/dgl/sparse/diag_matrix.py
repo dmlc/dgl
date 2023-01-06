@@ -206,7 +206,8 @@ class DiagMatrix:
 
     def cuda(self):
         """Move the matrix to GPU. If the matrix is already on GPU, the
-        original matrix will be returned.
+        original matrix will be returned. If multiple GPU devices exist,
+        'cuda:0' will be selected.
 
         Returns
         -------
