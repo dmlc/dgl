@@ -1,5 +1,5 @@
 #!/bin/bash
-# Helper script to build dgl sparse libraries
+# Helper script to build dgl sparse libraries for PyTorch
 set -e
 
 rm -rf build
@@ -14,6 +14,9 @@ else
 fi
 
 CMAKE_FLAGS="-DCUDA_TOOLKIT_ROOT_DIR=$CUDA_TOOLKIT_ROOT_DIR -DTORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST -DUSE_CUDA=$USE_CUDA"
+# CMake passes in the list of directories separated by spaces.  Here we replace them with semicolons.
+CMAKE_FLAGS="$CMAKE_FLAGS -DDGL_INCLUDE_DIRS=${INCLUDEDIR// /;} -DDGL_BUILD_DIR=$BINDIR"
+echo $CMAKE_FLAGS
 
 if [ $# -eq 0 ]; then
 	$CMAKE_COMMAND $CMAKE_FLAGS ..

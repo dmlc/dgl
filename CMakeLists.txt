@@ -356,7 +356,46 @@ if(BUILD_CPP_TEST)
 endif(BUILD_CPP_TEST)
 
 if(BUILD_SPARSE)
-  set(DGL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-  list(APPEND DGL_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/src")
-  add_subdirectory(dgl_sparse)
+  message(STATUS "Configuring DGL sparse library")
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
+  file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  get_target_property(DGL_INCLUDE_DIRS dgl INCLUDE_DIRECTORIES)
+  message(STATUS "DGL include directories: ${DGL_INCLUDE_DIRS}")
+  message(STATUS "DGL link directories: ${DGL_INCLUDE_DIRS}")
+  if(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dgl_sparse/build.bat BUILD_SCRIPT)
+    add_custom_target(
+      dgl_sparse
+      ALL
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
+      BINDIR=${BINDIR}
+      INCLUDEDIR="${DGL_INCLUDE_DIRS}"
+      CFLAGS=${CMAKE_C_FLAGS}
+      CXXFLAGS=${CMAKE_CXX_FLAGS}
+      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+      cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
+  else(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dgl_sparse/build.sh BUILD_SCRIPT)
+    add_custom_target(
+      dgl_sparse
+      ALL
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
+      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      INCLUDEDIR="${DGL_INCLUDE_DIRS}"
+      CFLAGS=${CMAKE_C_FLAGS}
+      CXXFLAGS=${CMAKE_CXX_FLAGS}
+      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+      bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
+  endif(MSVC)
+  add_dependencies(dgl_sparse dgl)
 endif(BUILD_SPARSE)
