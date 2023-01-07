@@ -81,6 +81,7 @@ __all__ = [
     'to_double',
     'double_radius_node_labeling',
     'shortest_dist',
+    'svd_pe'
     ]
 
 

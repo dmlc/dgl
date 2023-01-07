@@ -54,7 +54,8 @@ __all__ = [
     'DropEdge',
     'AddEdge',
     'SIGNDiffusion',
-    'ToLevi'
+    'ToLevi',
+    'SvdPE'
 ]
 
 def update_graph_structure(g, data_dict, copy_edata=True):
