@@ -2692,6 +2692,37 @@ def test_module_to_levi(idtype):
     assert F.allclose(lg.nodes['node'].data['h'], g.ndata['h'])
     assert F.allclose(lg.nodes['edge'].data['w'], g.edata['w'])
 
+
+@parametrize_idtype
+def test_module_svd_pe(idtype):
+    g = dgl.graph(
+        ([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]),
+        idtype=idtype,
+        device=F.ctx()
+    )
+    # without padding
+    tgt_pe = F.copy_to(F.tensor(
+        [[6.3246e-01, 1.1373e-07, 6.3246e-01, 0.0000e+00],
+         [6.3246e-01, 7.6512e-01, 6.3246e-01, 7.6512e-01],
+         [6.3246e-01, 4.7287e-01, 6.3246e-01, 4.7287e-01],
+         [6.3246e-01, 7.6512e-01, 6.3246e-01, 7.6512e-01],
+         [6.3246e-01, 4.7287e-01, 6.3246e-01, 4.7287e-01]],
+        ),
+        g.device
+    )
+    transform_1 = dgl.SvdPE(r=2, feat_name='svd_pe')
+    g1 = transform_1(g)
+    if dgl.backend.backend_name == 'tensorflow':
+        assert F.allclose(g1.ndata['svd_pe'].__abs__(), tgt_pe)
+    else:
+        assert F.allclose(g1.ndata['svd_pe'].abs(), tgt_pe)
+
+    # with padding
+    transform_2 = dgl.SvdPE(r=6, feat_name='svd_pe', padding=True)
+    g2 = transform_2(g)
+    assert F.shape(g2.ndata['svd_pe']) == (5, 12)
+
+
 if __name__ == '__main__':
     test_partition_with_halo()
     test_module_heat_kernel(F.int32)
