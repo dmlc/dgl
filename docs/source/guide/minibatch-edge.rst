@@ -115,7 +115,7 @@ input features.
 The input to the latter part is usually the output from the
 former part, as well as the subgraph of the original graph induced by the
 edges in the minibatch. The subgraph is yielded from the same data
-loader. One can call :meth:`dgl.DGLHeteroGraph.apply_edges` to compute the
+loader. One can call :meth:`dgl.DGLGraph.apply_edges` to compute the
 scores on the edges with the edge subgraph.
 
 The following code shows an example of predicting scores on the edges by
@@ -212,7 +212,7 @@ classification/regression.
 
 For score prediction, the only implementation difference between the
 homogeneous graph and the heterogeneous graph is that we are looping
-over the edge types for :meth:`~dgl.DGLHeteroGraph.apply_edges`.
+over the edge types for :meth:`~dgl.DGLGraph.apply_edges`.
 
 .. code:: python
 

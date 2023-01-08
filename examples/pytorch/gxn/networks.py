@@ -251,7 +251,7 @@ class GraphCrossNet(torch.nn.Module):
             edge_feat = self.e2l_lin(edge_feat)
             with graph.local_scope():
                 graph.edata["he"] = edge_feat
-                graph.update_all(fn.copy_edge("he", "m"), fn.sum("m", "hn"))
+                graph.update_all(fn.copy_e("he", "m"), fn.sum("m", "hn"))
                 edge2node_feat = graph.ndata.pop("hn")
                 node_feat = torch.cat((node_feat, edge2node_feat), dim=1)
 

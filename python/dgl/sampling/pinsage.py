@@ -1,12 +1,12 @@
 """PinSAGE sampler & related functions and classes"""
 
 import numpy as np
-from .._ffi.function import _init_api
 
 from .. import backend as F
-from .. import convert
+from .. import convert, utils
+from .._ffi.function import _init_api
 from .randomwalks import random_walk
-from .. import utils
+
 
 def _select_pinsage_neighbors(src, dst, num_samples_per_node, k):
     """Determine the neighbors for PinSAGE algorithm from the given random walk traces.
@@ -16,11 +16,14 @@ def _select_pinsage_neighbors(src, dst, num_samples_per_node, k):
     """
     src = F.to_dgl_nd(src)
     dst = F.to_dgl_nd(dst)
-    src, dst, counts = _CAPI_DGLSamplingSelectPinSageNeighbors(src, dst, num_samples_per_node, k)
+    src, dst, counts = _CAPI_DGLSamplingSelectPinSageNeighbors(
+        src, dst, num_samples_per_node, k
+    )
     src = F.from_dgl_nd(src)
     dst = F.from_dgl_nd(dst)
     counts = F.from_dgl_nd(counts)
     return (src, dst, counts)
+
 
 class RandomWalkNeighborSampler(object):
     """PinSage-like neighbor sampler extended to any heterogeneous graphs.
@@ -72,8 +75,17 @@ class RandomWalkNeighborSampler(object):
     --------
     See examples in :any:`PinSAGESampler`.
     """
-    def __init__(self, G, num_traversals, termination_prob,
-                 num_random_walks, num_neighbors, metapath=None, weight_column='weights'):
+
+    def __init__(
+        self,
+        G,
+        num_traversals,
+        termination_prob,
+        num_random_walks,
+        num_neighbors,
+        metapath=None,
+        weight_column="weights",
+    ):
         self.G = G
         self.weight_column = weight_column
         self.num_random_walks = num_random_walks
@@ -82,19 +94,25 @@ class RandomWalkNeighborSampler(object):
 
         if metapath is None:
             if len(G.ntypes) > 1 or len(G.etypes) > 1:
-                raise ValueError('Metapath must be specified if the graph is homogeneous.')
+                raise ValueError(
+                    "Metapath must be specified if the graph is homogeneous."
+                )
             metapath = [G.canonical_etypes[0]]
         start_ntype = G.to_canonical_etype(metapath[0])[0]
         end_ntype = G.to_canonical_etype(metapath[-1])[-1]
         if start_ntype != end_ntype:
-            raise ValueError('The metapath must start and end at the same node type.')
+            raise ValueError(
+                "The metapath must start and end at the same node type."
+            )
         self.ntype = start_ntype
 
         self.metapath_hops = len(metapath)
         self.metapath = metapath
         self.full_metapath = metapath * num_traversals
         restart_prob = np.zeros(self.metapath_hops * num_traversals)
-        restart_prob[self.metapath_hops::self.metapath_hops] = termination_prob
+        restart_prob[
+            self.metapath_hops :: self.metapath_hops
+        ] = termination_prob
         restart_prob = F.tensor(restart_prob, dtype=F.float32)
         self.restart_prob = F.copy_to(restart_prob, G.device)
 
@@ -116,20 +134,30 @@ class RandomWalkNeighborSampler(object):
             A homogeneous graph constructed by selecting neighbors for each given node according
             to the algorithm above.
         """
-        seed_nodes = utils.prepare_tensor(self.G, seed_nodes, 'seed_nodes')
+        seed_nodes = utils.prepare_tensor(self.G, seed_nodes, "seed_nodes")
         self.restart_prob = F.copy_to(self.restart_prob, F.context(seed_nodes))
 
         seed_nodes = F.repeat(seed_nodes, self.num_random_walks, 0)
         paths, _ = random_walk(
-            self.G, seed_nodes, metapath=self.full_metapath, restart_prob=self.restart_prob)
-        src = F.reshape(paths[:, self.metapath_hops::self.metapath_hops], (-1,))
+            self.G,
+            seed_nodes,
+            metapath=self.full_metapath,
+            restart_prob=self.restart_prob,
+        )
+        src = F.reshape(
+            paths[:, self.metapath_hops :: self.metapath_hops], (-1,)
+        )
         dst = F.repeat(paths[:, 0], self.num_traversals, 0)
 
         src, dst, counts = _select_pinsage_neighbors(
-            src, dst, (self.num_random_walks * self.num_traversals), self.num_neighbors)
+            src,
+            dst,
+            (self.num_random_walks * self.num_traversals),
+            self.num_neighbors,
+        )
         neighbor_graph = convert.heterograph(
-            {(self.ntype, '_E', self.ntype): (src, dst)},
-            {self.ntype: self.G.number_of_nodes(self.ntype)}
+            {(self.ntype, "_E", self.ntype): (src, dst)},
+            {self.ntype: self.G.number_of_nodes(self.ntype)},
         )
         neighbor_graph.edata[self.weight_column] = counts
 
@@ -219,13 +247,30 @@ class PinSAGESampler(RandomWalkNeighborSampler):
     Graph Convolutional Neural Networks for Web-Scale Recommender Systems
         Ying et al., 2018, https://arxiv.org/abs/1806.01973
     """
-    def __init__(self, G, ntype, other_type, num_traversals, termination_prob,
-                 num_random_walks, num_neighbors, weight_column='weights'):
+
+    def __init__(
+        self,
+        G,
+        ntype,
+        other_type,
+        num_traversals,
+        termination_prob,
+        num_random_walks,
+        num_neighbors,
+        weight_column="weights",
+    ):
         metagraph = G.metagraph()
         fw_etype = list(metagraph[ntype][other_type])[0]
         bw_etype = list(metagraph[other_type][ntype])[0]
-        super().__init__(G, num_traversals,
-                         termination_prob, num_random_walks, num_neighbors,
-                         metapath=[fw_etype, bw_etype], weight_column=weight_column)
+        super().__init__(
+            G,
+            num_traversals,
+            termination_prob,
+            num_random_walks,
+            num_neighbors,
+            metapath=[fw_etype, bw_etype],
+            weight_column=weight_column,
+        )
 
-_init_api('dgl.sampling.pinsage', __name__)
+
+_init_api("dgl.sampling.pinsage", __name__)

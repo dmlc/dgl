@@ -114,7 +114,7 @@ class TAGConv(gluon.Block):
                 rst = rst * norm
                 graph.ndata['h'] = rst
 
-                graph.update_all(fn.copy_src(src='h', out='m'),
+                graph.update_all(fn.copy_u(u='h', out='m'),
                                  fn.sum(msg='m', out='h'))
                 rst = graph.ndata['h']
                 rst = rst * norm

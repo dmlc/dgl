@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 
-def allgather_sizes(send_data, world_size):
+def allgather_sizes(send_data, world_size, num_parts, return_sizes=False):
     """ 
     Perform all gather on list lengths, used to compute prefix sums
     to determine the offsets on each ranks. This is used to allocate
@@ -14,12 +14,20 @@ def allgather_sizes(send_data, world_size):
         Data on which allgather is performed.
     world_size : integer
         No. of processes configured for execution
+    num_parts : integer
+        No. of output graph partitions
+    return_sizes : bool
+        Boolean flag to indicate whether to return raw sizes from each process
+        or perform prefix sum on the raw sizes.
 
     Returns : 
     ---------
         numpy array
             array with the prefix sum
     """
+
+    # Assert on the world_size, num_parts
+    assert (num_parts % world_size) == 0
 
     #compute the length of the local data
     send_length = len(send_data)
@@ -30,12 +38,21 @@ def allgather_sizes(send_data, world_size):
     #all_gather message
     dist.all_gather(in_tensor, out_tensor)
 
+    # Return on the raw sizes from each process
+    if return_sizes:
+        return torch.cat(in_tensor).numpy()
+
     #gather sizes in on array to return to the invoking function
-    rank_sizes = np.zeros(world_size + 1, dtype=np.int64)
+    rank_sizes = np.zeros(num_parts + 1, dtype=np.int64)
+    part_counts = torch.cat(in_tensor).numpy()
+
     count = rank_sizes[0]
-    for i, t in enumerate(in_tensor): 
-        count += t.item()
-        rank_sizes[i+1] = count
+    idx = 1
+    for local_part_id in range(num_parts//world_size):
+        for r in range(world_size):
+            count += part_counts[r*(num_parts//world_size) + local_part_id]
+            rank_sizes[idx] = count
+            idx += 1
 
     return rank_sizes
 
@@ -56,10 +73,23 @@ def __alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
         The tensors to exchange
     """
     input_tensor_list = [tensor.to(torch.device('cpu')) for tensor in input_tensor_list]
+    # TODO(#5002): As Boolean data is not supported in
+    # ``torch.distributed.scatter()``, we convert boolean into uint8 before
+    # scatter and convert it back afterwards.
+    dtypes = [ t.dtype for t in input_tensor_list]
+    for i, dtype in enumerate(dtypes):
+        if dtype == torch.bool:
+            input_tensor_list[i] = input_tensor_list[i].to(torch.int8)
+            output_tensor_list[i] = output_tensor_list[i].to(torch.int8)
     for i in range(world_size):
         dist.scatter(output_tensor_list[i], input_tensor_list if i == rank else [], src=i)
+    # Convert back to original dtype
+    for i, dtype in enumerate(dtypes):
+        if dtype == torch.bool:
+            input_tensor_list[i] = input_tensor_list[i].to(dtype)
+            output_tensor_list[i] = output_tensor_list[i].to(dtype)
 
-def alltoallv_cpu(rank, world_size, input_tensor_list):
+def alltoallv_cpu(rank, world_size, input_tensor_list, retain_nones=True):
     """
     Wrapper function to providing the alltoallv functionality by using underlying alltoall
     messaging primitive. This function, in its current implementation, supports exchanging 
@@ -81,6 +111,8 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
         The size of the entire
     input_tensor_list : List of tensor
         The tensors to exchange
+    retain_nones : bool
+        Indicates whether to retain ``None`` data in returned value.
 
     Returns:
     --------
@@ -134,7 +166,8 @@ def alltoallv_cpu(rank, world_size, input_tensor_list):
     return_vals = []
     for s, t in zip(recv_counts, output_tensor_list):
         if s[0] == 0:
-            return_vals.append(None)
+            if retain_nones:
+                return_vals.append(None)
         else:
             return_vals.append(t[0:s[0]])
     return return_vals

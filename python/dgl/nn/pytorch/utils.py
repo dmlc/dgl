@@ -1,12 +1,14 @@
 """Utilities for pytorch NN package"""
-#pylint: disable=no-member, invalid-name
+# pylint: disable=no-member, invalid-name
 
 import torch as th
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
+
 from ... import DGLGraph
-from ...base import dgl_warning
 from ... import function as fn
+from ...base import dgl_warning
+
 
 def matmul_maybe_select(A, B):
     """Perform Matrix multiplication C = A * B but A could be an integer id vector.
@@ -48,6 +50,7 @@ def matmul_maybe_select(A, B):
         return B.index_select(0, A)
     else:
         return th.matmul(A, B)
+
 
 def bmm_maybe_select(A, B, index):
     """Slice submatrices of A by the given index and perform bmm.
@@ -92,18 +95,21 @@ def bmm_maybe_select(A, B, index):
         BB = B.index_select(0, index)
         return th.bmm(A.unsqueeze(1), BB).squeeze()
 
+
 # pylint: disable=W0235
 class Identity(nn.Module):
     """A placeholder identity operator that is argument-insensitive.
     (Identity has already been supported by PyTorch 1.2, we will directly
     import torch.nn.Identity in the future)
     """
+
     def __init__(self):
         super(Identity, self).__init__()
 
     def forward(self, x):
         """Return input"""
         return x
+
 
 class Sequential(nn.Sequential):
     r"""A sequential container for stacking graph neural network modules
@@ -220,9 +226,12 @@ class Sequential(nn.Sequential):
                     feats = (feats,)
                 feats = module(graph, *feats)
         else:
-            raise TypeError('The first argument of forward must be a DGLGraph'
-                            ' or a list of DGLGraph s')
+            raise TypeError(
+                "The first argument of forward must be a DGLGraph"
+                " or a list of DGLGraph s"
+            )
         return feats
+
 
 class WeightBasis(nn.Module):
     r"""Basis decomposition from `Modeling Relational Data with Graph
@@ -249,24 +258,28 @@ class WeightBasis(nn.Module):
     num_outputs : int
         Number of outputs.
     """
-    def __init__(self,
-                 shape,
-                 num_bases,
-                 num_outputs):
+
+    def __init__(self, shape, num_bases, num_outputs):
         super(WeightBasis, self).__init__()
         self.shape = shape
         self.num_bases = num_bases
         self.num_outputs = num_outputs
 
         if num_outputs <= num_bases:
-            dgl_warning('The number of weight outputs should be larger than the number'
-                        ' of bases.')
+            dgl_warning(
+                "The number of weight outputs should be larger than the number"
+                " of bases."
+            )
 
         self.weight = nn.Parameter(th.Tensor(self.num_bases, *shape))
-        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_uniform_(
+            self.weight, gain=nn.init.calculate_gain("relu")
+        )
         # linear combination coefficients
         self.w_comp = nn.Parameter(th.Tensor(self.num_outputs, self.num_bases))
-        nn.init.xavier_uniform_(self.w_comp, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_uniform_(
+            self.w_comp, gain=nn.init.calculate_gain("relu")
+        )
 
     def forward(self):
         r"""Forward computation
@@ -279,6 +292,7 @@ class WeightBasis(nn.Module):
         # generate all weights from bases
         weight = th.matmul(self.w_comp, self.weight.view(self.num_bases, -1))
         return weight.view(self.num_outputs, *self.shape)
+
 
 class JumpingKnowledge(nn.Module):
     r"""The Jumping Knowledge aggregation module from `Representation Learning on
@@ -345,17 +359,25 @@ class JumpingKnowledge(nn.Module):
     >>> model(feat_list).shape
     torch.Size([3, 4])
     """
-    def __init__(self, mode='cat', in_feats=None, num_layers=None):
+
+    def __init__(self, mode="cat", in_feats=None, num_layers=None):
         super(JumpingKnowledge, self).__init__()
-        assert mode in ['cat', 'max', 'lstm'], \
-            "Expect mode to be 'cat', or 'max' or 'lstm', got {}".format(mode)
+        assert mode in [
+            "cat",
+            "max",
+            "lstm",
+        ], "Expect mode to be 'cat', or 'max' or 'lstm', got {}".format(mode)
         self.mode = mode
 
-        if mode == 'lstm':
-            assert in_feats is not None, 'in_feats is required for lstm mode'
-            assert num_layers is not None, 'num_layers is required for lstm mode'
+        if mode == "lstm":
+            assert in_feats is not None, "in_feats is required for lstm mode"
+            assert (
+                num_layers is not None
+            ), "num_layers is required for lstm mode"
             hidden_size = (num_layers * in_feats) // 2
-            self.lstm = nn.LSTM(in_feats, hidden_size, bidirectional=True, batch_first=True)
+            self.lstm = nn.LSTM(
+                in_feats, hidden_size, bidirectional=True, batch_first=True
+            )
             self.att = nn.Linear(2 * hidden_size, 1)
 
     def reset_parameters(self):
@@ -365,7 +387,7 @@ class JumpingKnowledge(nn.Module):
         -----------
         Reinitialize learnable parameters. This comes into effect only for the lstm mode.
         """
-        if self.mode == 'lstm':
+        if self.mode == "lstm":
             self.lstm.reset_parameters()
             self.att.reset_parameters()
 
@@ -386,17 +408,20 @@ class JumpingKnowledge(nn.Module):
         Tensor
             The aggregated representations.
         """
-        if self.mode == 'cat':
+        if self.mode == "cat":
             return th.cat(feat_list, dim=-1)
-        elif self.mode == 'max':
+        elif self.mode == "max":
             return th.stack(feat_list, dim=-1).max(dim=-1)[0]
         else:
             # LSTM
-            stacked_feat_list = th.stack(feat_list, dim=1) # (N, num_layers, in_feats)
+            stacked_feat_list = th.stack(
+                feat_list, dim=1
+            )  # (N, num_layers, in_feats)
             alpha, _ = self.lstm(stacked_feat_list)
-            alpha = self.att(alpha).squeeze(-1)            # (N, num_layers)
+            alpha = self.att(alpha).squeeze(-1)  # (N, num_layers)
             alpha = th.softmax(alpha, dim=-1)
             return (stacked_feat_list * alpha.unsqueeze(-1)).sum(dim=1)
+
 
 class LabelPropagation(nn.Module):
     r"""Label Propagation from `Learning from Labeled and Unlabeled Data with Label
@@ -447,7 +472,16 @@ class LabelPropagation(nn.Module):
     >>> mask = torch.tensor([0, 1, 1, 1, 0]).bool()
     >>> new_labels = label_propagation(g, labels, mask)
     """
-    def __init__(self, k, alpha, norm_type='sym', clamp=True, normalize=False, reset=False):
+
+    def __init__(
+        self,
+        k,
+        alpha,
+        norm_type="sym",
+        clamp=True,
+        normalize=False,
+        reset=False,
+    ):
         super(LabelPropagation, self).__init__()
         self.k = k
         self.alpha = alpha
@@ -498,24 +532,178 @@ class LabelPropagation(nn.Module):
             init = (1 - self.alpha) * y
             in_degs = g.in_degrees().float().clamp(min=1)
             out_degs = g.out_degrees().float().clamp(min=1)
-            if self.norm_type == 'sym':
+            if self.norm_type == "sym":
                 norm_i = th.pow(in_degs, -0.5).to(labels.device).unsqueeze(1)
                 norm_j = th.pow(out_degs, -0.5).to(labels.device).unsqueeze(1)
-            elif self.norm_type == 'row':
-                norm_i = th.pow(in_degs, -1.).to(labels.device).unsqueeze(1)
+            elif self.norm_type == "row":
+                norm_i = th.pow(in_degs, -1.0).to(labels.device).unsqueeze(1)
             else:
-                raise ValueError(f"Expect norm_type to be 'sym' or 'row', got {self.norm_type}")
+                raise ValueError(
+                    f"Expect norm_type to be 'sym' or 'row', got {self.norm_type}"
+                )
 
             for _ in range(self.k):
-                g.ndata['h'] = y * norm_j if self.norm_type == 'sym' else y
-                g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-                y = init + self.alpha * g.ndata['h'] * norm_i
+                g.ndata["h"] = y * norm_j if self.norm_type == "sym" else y
+                g.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
+                y = init + self.alpha * g.ndata["h"] * norm_i
 
                 if self.clamp:
-                    y = y.clamp_(0., 1.)
+                    y = y.clamp_(0.0, 1.0)
                 if self.normalize:
                     y = F.normalize(y, p=1)
                 if self.reset:
                     y[mask] = labels[mask]
 
             return y
+
+
+class LaplacianPosEnc(nn.Module):
+    r"""Laplacian Positional Encoder (LPE), as introduced in
+    `GraphGPS: General Powerful Scalable Graph Transformers
+    <https://arxiv.org/abs/2205.12454>`__
+    This module is a learned laplacian positional encoding module using Transformer or DeepSet.
+
+    Parameters
+    ----------
+    model_type : str
+        Encoder model type for LPE, can only be "Transformer" or "DeepSet".
+    num_layer : int
+        Number of layers in Transformer/DeepSet Encoder.
+    k : int
+        Number of smallest non-trivial eigenvectors.
+    lpe_dim : int
+        Output size of final laplacian encoding.
+    n_head : int, optional
+        Number of heads in Transformer Encoder.
+        Default : 1.
+    batch_norm : bool, optional
+        If True, apply batch normalization on raw LaplacianPE.
+        Default : False.
+    num_post_layer : int, optional
+        If num_post_layer > 0, apply an MLP of ``num_post_layer`` layers after pooling.
+        Default : 0.
+
+    Example
+    -------
+    >>> import dgl
+    >>> from dgl import LaplacianPE
+    >>> from dgl.nn import LaplacianPosEnc
+
+    >>> transform = LaplacianPE(k=5, feat_name='eigvec', eigval_name='eigval', padding=True)
+    >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
+    >>> g = transform(g)
+    >>> EigVals, EigVecs = g.ndata['eigval'], g.ndata['eigvec']
+    >>> TransformerLPE = LaplacianPosEnc(model_type="Transformer", num_layer=3, k=5,
+                                         lpe_dim=16, n_head=4)
+    >>> PosEnc = TransformerLPE(EigVals, EigVecs)
+    >>> DeepSetLPE = LaplacianPosEnc(model_type="DeepSet", num_layer=3, k=5,
+                                     lpe_dim=16, num_post_layer=2)
+    >>> PosEnc = DeepSetLPE(EigVals, EigVecs)
+    """
+
+    def __init__(
+        self,
+        model_type,
+        num_layer,
+        k,
+        lpe_dim,
+        n_head=1,
+        batch_norm=False,
+        num_post_layer=0,
+    ):
+        super(LaplacianPosEnc, self).__init__()
+        self.model_type = model_type
+        self.linear = nn.Linear(2, lpe_dim)
+
+        if self.model_type == "Transformer":
+            encoder_layer = nn.TransformerEncoderLayer(
+                d_model=lpe_dim, nhead=n_head, batch_first=True
+            )
+            self.pe_encoder = nn.TransformerEncoder(
+                encoder_layer, num_layers=num_layer
+            )
+        elif self.model_type == "DeepSet":
+            layers = []
+            if num_layer == 1:
+                layers.append(nn.ReLU())
+            else:
+                self.linear = nn.Linear(2, 2 * lpe_dim)
+                layers.append(nn.ReLU())
+                for _ in range(num_layer - 2):
+                    layers.append(nn.Linear(2 * lpe_dim, 2 * lpe_dim))
+                    layers.append(nn.ReLU())
+                layers.append(nn.Linear(2 * lpe_dim, lpe_dim))
+                layers.append(nn.ReLU())
+            self.pe_encoder = nn.Sequential(*layers)
+        else:
+            raise ValueError(
+                f"model_type '{model_type}' is not allowed, must be 'Transformer'"
+                "or 'DeepSet'."
+            )
+
+        if batch_norm:
+            self.raw_norm = nn.BatchNorm1d(k)
+        else:
+            self.raw_norm = None
+
+        if num_post_layer > 0:
+            layers = []
+            if num_post_layer == 1:
+                layers.append(nn.Linear(lpe_dim, lpe_dim))
+                layers.append(nn.ReLU())
+            else:
+                layers.append(nn.Linear(lpe_dim, 2 * lpe_dim))
+                layers.append(nn.ReLU())
+                for _ in range(num_post_layer - 2):
+                    layers.append(nn.Linear(2 * lpe_dim, 2 * lpe_dim))
+                    layers.append(nn.ReLU())
+                layers.append(nn.Linear(2 * lpe_dim, lpe_dim))
+                layers.append(nn.ReLU())
+            self.post_mlp = nn.Sequential(*layers)
+        else:
+            self.post_mlp = None
+
+    def forward(self, EigVals, EigVecs):
+        r"""
+        Parameters
+        ----------
+        EigVals : Tensor
+            Laplacian Eigenvalues of shape :math:`(N, k)`, k different eigenvalues repeat N times,
+            can be obtained by using `LaplacianPE`.
+        EigVecs : Tensor
+            Laplacian Eigenvectors of shape :math:`(N, k)`, can be obtained by using `LaplacianPE`.
+
+        Returns
+        -------
+        Tensor
+            Return the laplacian positional encodings of shape :math:`(N, lpe_dim)`,
+            where :math:`N` is the number of nodes in the input graph.
+        """
+        PosEnc = th.cat(
+            (EigVecs.unsqueeze(2), EigVals.unsqueeze(2)), dim=2
+        ).float()
+        empty_mask = th.isnan(PosEnc)
+
+        PosEnc[empty_mask] = 0
+        if self.raw_norm:
+            PosEnc = self.raw_norm(PosEnc)
+        PosEnc = self.linear(PosEnc)
+
+        if self.model_type == "Transformer":
+            PosEnc = self.pe_encoder(
+                src=PosEnc, src_key_padding_mask=empty_mask[:, :, 1]
+            )
+        else:
+            PosEnc = self.pe_encoder(PosEnc)
+
+        # Remove masked sequences
+        PosEnc[empty_mask[:, :, 1]] = 0
+
+        # Sum pooling
+        PosEnc = th.sum(PosEnc, 1, keepdim=False)
+
+        # MLP post pooling
+        if self.post_mlp:
+            PosEnc = self.post_mlp(PosEnc)
+
+        return PosEnc

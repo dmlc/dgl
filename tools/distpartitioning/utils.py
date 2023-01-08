@@ -2,14 +2,14 @@ import json
 import logging
 import os
 
-import dgl
+import constants
 import numpy as np
 import psutil
 import pyarrow
-import torch
 from pyarrow import csv
 
-import constants
+import dgl
+from dgl.distributed.partition import _dump_part_config
 
 
 def read_ntype_partition_files(schema_map, input_dir):
@@ -67,6 +67,27 @@ def read_json(json_file):
 
     return val
 
+def get_etype_featnames(etype_name, schema_map):
+    """Retrieves edge feature names for a given edge_type
+
+    Parameters:
+    -----------
+    eype_name : string
+        a string specifying a edge_type name
+
+    schema : dictionary
+        metadata json object as a dictionary, which is read from the input
+        metadata file from the input dataset
+
+    Returns:
+    --------
+    list : 
+        a list of feature names for a given edge_type
+    """
+    edge_data = schema_map[constants.STR_EDGE_DATA]
+    feats = edge_data.get(etype_name, {})
+    return [feat for feat in feats]
+
 def get_ntype_featnames(ntype_name, schema_map): 
     """
     Retrieves node feature names for a given node_type
@@ -88,6 +109,30 @@ def get_ntype_featnames(ntype_name, schema_map):
     node_data = schema_map[constants.STR_NODE_DATA]
     feats = node_data.get(ntype_name, {})
     return [feat for feat in feats]
+
+def get_edge_types(schema_map):
+    """Utility method to extract edge_typename -> edge_type mappings
+    as defined by the input schema
+
+    Parameters:
+    -----------
+    schema_map : dictionary
+        Input schema from which the edge_typename -> edge_typeid
+        dictionary is created.
+
+    Returns:
+    --------
+    dictionary
+        with keys as edge type names and values as ids (integers)
+    list
+        list of etype name strings
+    dictionary
+        with keys as etype ids (integers) and values as edge type names
+    """
+    etypes = schema_map[constants.STR_EDGE_TYPE]
+    etype_etypeid_map = {e : i for i, e in enumerate(etypes)}
+    etypeid_etype_map = {i : e for i, e in enumerate(etypes)}
+    return etype_etypeid_map, etypes, etypeid_etype_map
 
 def get_node_types(schema_map):
     """ 
@@ -141,7 +186,7 @@ def get_gnid_range_map(node_tids):
 
     return ntypes_gid_range
 
-def write_metadata_json(metadata_list, output_dir, graph_name):
+def write_metadata_json(input_list, output_dir, graph_name, world_size, num_parts):
     """
     Merge json schema's from each of the rank's on rank-0. 
     This utility function, to be used on rank-0, to create aggregated json file.
@@ -155,6 +200,14 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     graph-name : string
         a string specifying the graph name
     """
+    # Preprocess the input_list, a list of dictionaries
+    # each dictionary will contain num_parts/world_size metadata json 
+    # which correspond to local partitions on the respective ranks.
+    metadata_list = []
+    for local_part_id in range(num_parts//world_size):
+        for idx in range(world_size):
+            metadata_list.append(input_list[idx]["local-part-id-"+str(local_part_id*world_size + idx)])
+
     #Initialize global metadata
     graph_metadata = {}
 
@@ -189,10 +242,9 @@ def write_metadata_json(metadata_list, output_dir, graph_name):
     for i in range(len(metadata_list)):
         graph_metadata["part-{}".format(i)] = metadata_list[i]["part-{}".format(i)]
 
-    with open('{}/metadata.json'.format(output_dir), 'w') as outfile: 
-        json.dump(graph_metadata, outfile, sort_keys=False, indent=4)
+    _dump_part_config(f'{output_dir}/metadata.json', graph_metadata)
 
-def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
+def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size, num_parts):
     """
     Add partition-id (rank which owns an edge) column to the edge_data.
 
@@ -210,6 +262,8 @@ def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
         rank of the current process
     world_size : integer
         total no. of process participating in the communication primitives
+    num_parts : integer
+        total no. of partitions requested for the input graph
 
     Returns:
     --------
@@ -223,16 +277,18 @@ def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size):
     offset = 0
     for etype_name, tid_range in edge_tids.items(): 
         assert int(tid_range[0][0]) == 0
-        assert len(tid_range) == world_size
+        assert len(tid_range) == num_parts 
         etype_offset[etype_name] = offset + int(tid_range[0][0])
         offset += int(tid_range[-1][1])
 
     global_eids = []
     for etype_name, tid_range in edge_tids.items(): 
-        global_eid_start = etype_offset[etype_name]
-        begin = global_eid_start + int(tid_range[rank][0])
-        end = global_eid_start + int(tid_range[rank][1])
-        global_eids.append(np.arange(begin, end, dtype=np.int64))
+        for idx in range(num_parts):
+            if map_partid_rank(idx, world_size) == rank:
+                global_eid_start = etype_offset[etype_name]
+                begin = global_eid_start + int(tid_range[idx][0])
+                end = global_eid_start + int(tid_range[idx][1])
+                global_eids.append(np.arange(begin, end, dtype=np.int64))
     global_eids = np.concatenate(global_eids)
     assert global_eids.shape[0] == edge_data[constants.ETYPE_ID].shape[0]
     edge_data[constants.GLOBAL_EID] = global_eids
@@ -334,7 +390,7 @@ def write_edge_features(edge_features, edge_file):
     """
     dgl.data.utils.save_tensors(edge_file, edge_features)
 
-def write_graph_dgl(graph_file, graph_obj): 
+def write_graph_dgl(graph_file, graph_obj, formats, sort_etypes):
     """
     Utility function to serialize graph dgl objects
 
@@ -344,11 +400,16 @@ def write_graph_dgl(graph_file, graph_obj):
         graph dgl object, as created in convert_partition.py, which is to be serialized
     graph_file : string
         File name in which graph object is serialized
+    formats : str or list[str]
+        Save graph in specified formats.
+    sort_etypes : bool
+        Whether to sort etypes in csc/csr.
     """
-    dgl.save_graphs(graph_file, [graph_obj])
+    dgl.distributed.partition._save_graphs(graph_file, [graph_obj],
+        formats, sort_etypes)
 
 def write_dgl_objects(graph_obj, node_features, edge_features,
-        output_dir, part_id, orig_nids, orig_eids):
+        output_dir, part_id, orig_nids, orig_eids, formats, sort_etypes):
     """
     Wrapper function to write graph, node/edge feature, original node/edge IDs.
 
@@ -368,11 +429,15 @@ def write_dgl_objects(graph_obj, node_features, edge_features,
         original node IDs
     orig_eids : dict
         original edge IDs
+    formats : str or list[str]
+        Save graph in formats.
+    sort_etypes : bool
+        Whether to sort etypes in csc/csr.
     """
-
     part_dir = output_dir + '/part' + str(part_id)
     os.makedirs(part_dir, exist_ok=True)
-    write_graph_dgl(os.path.join(part_dir ,'graph.dgl'), graph_obj)
+    write_graph_dgl(os.path.join(part_dir ,'graph.dgl'), graph_obj,
+        formats, sort_etypes)
 
     if node_features != None:
         write_node_features(node_features, os.path.join(part_dir, "node_feat.dgl"))
@@ -473,3 +538,45 @@ def memory_snapshot(tag, rank):
     mem_string = f'{total:.0f} (MB) total, {peak:.0f} (MB) peak, {used:.0f} (MB) used, {avail:.0f} (MB) avail'
     logging.debug(f'[Rank: {rank} MEMORY_SNAPSHOT] {mem_string} - {tag}')
 
+
+def map_partid_rank(partid, world_size):
+    """Auxiliary function to map a given partition id to one of the rank in the
+    MPI_WORLD processes. The range of partition ids is assumed to equal or a 
+    multiple of the total size of MPI_WORLD. In this implementation, we use
+    a cyclical mapping procedure to convert partition ids to ranks.
+
+    Parameters:
+    -----------
+    partid : int
+        partition id, as read from node id to partition id mappings.
+
+    Returns:
+    --------
+    int : 
+        rank of the process, which will be responsible for the given partition
+        id.
+    """
+    return partid % world_size
+
+
+def generate_read_list(num_files, world_size):
+    """Generate the file IDs to read for each rank.
+
+    Parameters:
+    -----------
+    num_files : int
+        Total number of files.
+    world_size : int
+        World size of group.
+
+    Returns:
+    --------
+    read_list : np.array
+        Array of target file IDs to read.
+
+    Examples
+    --------
+    >>> tools.distpartitionning.utils.generate_read_list(10, 4)
+    [array([0, 1, 2]), array([3, 4, 5]), array([6, 7]), array([8, 9])]
+    """
+    return np.array_split(np.arange(num_files), world_size)

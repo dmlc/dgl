@@ -71,7 +71,7 @@ class LintHelper(object):
                                       '+build/include_what_you_use',
                                       '+build/include_order']))
         cpplint._SetCountingStyle('toplevel')
-        cpplint._line_length = 100
+        cpplint._line_length = 80
 
     def process_cpp(self, path, suffix):
         """Process a cpp file."""

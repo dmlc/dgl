@@ -99,10 +99,10 @@ def test_no_backtracking():
     L = G.line_graph(backtracking=False)
     assert L.number_of_nodes() == 2 * N
     for i in range(1, N):
-        e1 = G.edge_id(0, i)
-        e2 = G.edge_id(i, 0)
-        assert not L.has_edge_between(e1, e2)
-        assert not L.has_edge_between(e2, e1)
+        e1 = G.edge_ids(0, i)
+        e2 = G.edge_ids(i, 0)
+        assert not L.has_edges_between(e1, e2)
+        assert not L.has_edges_between(e2, e1)
 
 # reverse graph related
 @parametrize_idtype
@@ -122,9 +122,9 @@ def test_reverse(idtype):
     assert g.number_of_edges() == rg.number_of_edges()
     assert F.allclose(F.astype(rg.has_edges_between(
         [1, 2, 1], [0, 1, 2]), F.float32), F.ones((3,)))
-    assert g.edge_id(0, 1) == rg.edge_id(1, 0)
-    assert g.edge_id(1, 2) == rg.edge_id(2, 1)
-    assert g.edge_id(2, 1) == rg.edge_id(1, 2)
+    assert g.edge_ids(0, 1) == rg.edge_ids(1, 0)
+    assert g.edge_ids(1, 2) == rg.edge_ids(2, 1)
+    assert g.edge_ids(2, 1) == rg.edge_ids(1, 2)
 
     # test dgl.reverse
     # test homogeneous graph
@@ -518,14 +518,6 @@ def create_large_graph(num_nodes, idtype=F.int64):
     spm.sum_duplicates()
 
     return dgl.from_scipy(spm, idtype=idtype)
-
-def get_nodeflow(g, node_ids, num_layers):
-    batch_size = len(node_ids)
-    expand_factor = g.number_of_nodes()
-    sampler = dgl.contrib.sampling.NeighborSampler(g, batch_size,
-            expand_factor=expand_factor, num_hops=num_layers,
-            seed_nodes=node_ids)
-    return next(iter(sampler))
 
 # Disabled since everything will be on heterogeneous graphs
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
@@ -2379,13 +2371,18 @@ def test_module_gdc(idtype):
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == {(0, 0), (1, 1), (2, 2), (3, 3), (4, 3), (4, 4), (5, 5)}
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support a slicing operation")
 @parametrize_idtype
 def test_module_node_shuffle(idtype):
     transform = dgl.NodeShuffle()
     g = dgl.heterograph({
         ('A', 'r', 'B'): ([0, 1], [1, 2]),
     }, idtype=idtype, device=F.ctx())
+    g.nodes['B'].data['h'] = F.randn((g.num_nodes('B'), 2))
+    old_nfeat = g.nodes['B'].data['h']
     new_g = transform(g)
+    new_nfeat = g.nodes['B'].data['h']
+    assert F.allclose(old_nfeat, new_nfeat)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_idtype
@@ -2394,11 +2391,15 @@ def test_module_drop_node(idtype):
     g = dgl.heterograph({
         ('A', 'r', 'B'): ([0, 1], [1, 2]),
     }, idtype=idtype, device=F.ctx())
+    num_nodes_old = g.num_nodes()
     new_g = transform(g)
     assert new_g.idtype == g.idtype
     assert new_g.device == g.device
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
+    num_nodes_new = g.num_nodes()
+    # Ensure that the original graph is not corrupted
+    assert num_nodes_old == num_nodes_new
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @parametrize_idtype
@@ -2408,11 +2409,15 @@ def test_module_drop_edge(idtype):
         ('A', 'r1', 'B'): ([0, 1], [1, 2]),
         ('C', 'r2', 'C'): ([3, 4, 5], [6, 7, 8])
     }, idtype=idtype, device=F.ctx())
+    num_edges_old = g.num_edges()
     new_g = transform(g)
     assert new_g.idtype == g.idtype
     assert new_g.device == g.device
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
+    num_edges_new = g.num_edges()
+    # Ensure that the original graph is not corrupted
+    assert num_edges_old == num_edges_new
 
 @parametrize_idtype
 def test_module_add_edge(idtype):
@@ -2421,6 +2426,7 @@ def test_module_add_edge(idtype):
         ('A', 'r1', 'B'): ([0, 1, 2, 3, 4], [1, 2, 3, 4, 5]),
         ('C', 'r2', 'C'): ([0, 1, 2, 3, 4], [1, 2, 3, 4, 5])
     }, idtype=idtype, device=F.ctx())
+    num_edges_old = g.num_edges()
     new_g = transform(g)
     assert new_g.num_edges(('A', 'r1', 'B')) == 6
     assert new_g.num_edges(('C', 'r2', 'C')) == 6
@@ -2428,6 +2434,9 @@ def test_module_add_edge(idtype):
     assert new_g.device == g.device
     assert new_g.ntypes == g.ntypes
     assert new_g.canonical_etypes == g.canonical_etypes
+    num_edges_new = g.num_edges()
+    # Ensure that the original graph is not corrupted
+    assert num_edges_old == num_edges_new
 
 @parametrize_idtype
 def test_module_random_walk_pe(idtype):
@@ -2439,25 +2448,51 @@ def test_module_random_walk_pe(idtype):
 
 @parametrize_idtype
 def test_module_laplacian_pe(idtype):
-    transform = dgl.LaplacianPE(2, 'lappe')
-    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 0, 1, 3, 3, 1]), idtype=idtype, device=F.ctx())
+    g = dgl.graph(([2, 1, 0, 3, 1, 1],[3, 1, 1, 2, 1, 0]), idtype=idtype, device=F.ctx())
+    tgt_eigval = F.copy_to(F.repeat(F.tensor([[1.1534e-17, 1.3333e+00, 2., np.nan, np.nan]]),
+        g.num_nodes(), dim=0), g.device)
+    tgt_pe = F.copy_to(F.tensor([[0.5, 0.86602539, 0., 0., 0.],
+        [0.86602539, 0.5, 0., 0., 0.],
+        [0., 0., 0.70710677, 0., 0.],
+        [0., 0., 0.70710677, 0., 0.]]), g.device)
+
+    # without padding (k<n)
+    transform = dgl.LaplacianPE(2, feat_name='lappe')
     new_g = transform(g)
-    tgt = F.copy_to(F.tensor([[ 0.24971116, 0.],
-        [ 0.11771496, 0.],
-        [ 0.83237050, 1.],
-        [ 0.48056933, 0.]]), g.device)
     # tensorflow has no abs() api
     if dgl.backend.backend_name == 'tensorflow':
-        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt)
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt_pe[:,:2])
     # pytorch & mxnet
     else:
-        assert F.allclose(new_g.ndata['lappe'].abs(), tgt)
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt_pe[:,:2])
+
+    # with padding (k>=n)
+    transform = dgl.LaplacianPE(5, feat_name='lappe', padding=True)
+    new_g = transform(g)
+    # tensorflow has no abs() api
+    if dgl.backend.backend_name == 'tensorflow':
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt_pe)
+    # pytorch & mxnet
+    else:
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt_pe)
+
+    # with eigenvalues
+    transform = dgl.LaplacianPE(5, feat_name='lappe', eigval_name='eigval', padding=True)
+    new_g = transform(g)
+    # tensorflow has no abs() api
+    if dgl.backend.backend_name == 'tensorflow':
+        assert F.allclose(new_g.ndata['eigval'][:,:3], tgt_eigval[:,:3])
+        assert F.allclose(new_g.ndata['lappe'].__abs__(), tgt_pe)
+    # pytorch & mxnet
+    else:
+        assert F.allclose(new_g.ndata['eigval'][:,:3], tgt_eigval[:,:3])
+        assert F.allclose(new_g.ndata['lappe'].abs(), tgt_pe)
 
 @unittest.skipIf(dgl.backend.backend_name != 'pytorch', reason='Only support PyTorch for now')
 @pytest.mark.parametrize('g', get_cases(['has_scalar_e_feature']))
 def test_module_sign(g):
     import torch
-    
+
     atol = 1e-06
 
     ctx = F.ctx()
@@ -2596,6 +2631,66 @@ def test_module_feat_mask(idtype):
     assert g.ndata['h']['player'].shape == (3, 5)
     assert g.edata['w'][('user', 'follows', 'user')].shape == (2, 5)
     assert g.edata['w'][('player', 'plays', 'game')].shape == (2, 5)
+
+@parametrize_idtype
+def test_shortest_dist(idtype):
+    g = dgl.graph(([0, 1, 1, 2], [2, 0, 3, 3]), idtype=idtype, device=F.ctx())
+
+    # case 1: directed single source
+    dist = dgl.shortest_dist(g, root=0)
+    tgt = F.copy_to(F.tensor([0, -1, 1, 2], dtype=F.int64), g.device)
+    assert F.array_equal(dist, tgt)
+
+    # case 2: undirected all pairs
+    dist, paths = dgl.shortest_dist(g, root=None, return_paths=True)
+    tgt_dist = F.copy_to(
+        F.tensor([
+            [0, -1, 1, 2],
+            [1, 0, 2, 1],
+            [-1, -1, 0, 1],
+            [-1, -1, -1, 0]
+        ], dtype=F.int64),
+        g.device
+    )
+    tgt_paths = F.copy_to(
+        F.tensor([
+            [[-1, -1], [-1, -1], [0, -1], [0, 3]],
+            [[1, -1], [-1, -1], [1, 0], [2, -1]],
+            [[-1, -1], [-1, -1], [-1, -1], [3, -1]],
+            [[-1, -1], [-1, -1], [-1, -1], [-1, -1]]
+        ], dtype=F.int64),
+        g.device
+    )
+    assert F.array_equal(dist, tgt_dist)
+    assert F.array_equal(paths, tgt_paths)
+
+@parametrize_idtype
+def test_module_to_levi(idtype):
+    transform = dgl.ToLevi()
+    g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 0]), idtype=idtype, device=F.ctx())
+    g.ndata['h'] = F.randn((g.num_nodes(), 2))
+    g.edata['w'] = F.randn((g.num_edges(), 2))
+    lg = transform(g)
+    assert lg.device == g.device
+    assert lg.idtype == g.idtype
+    assert lg.ntypes == ['edge', 'node']
+    assert lg.canonical_etypes == [('edge', 'e2n', 'node'),
+                                   ('node', 'n2e', 'edge')]
+    assert lg.num_nodes('node') == g.num_nodes()
+    assert lg.num_nodes('edge') == g.num_edges()
+    assert lg.num_edges('n2e') == g.num_edges()
+    assert lg.num_edges('e2n') == g.num_edges()
+
+    src, dst = lg.edges(etype='n2e')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 0), (1, 1), (2, 2), (3, 3)}
+
+    src, dst = lg.edges(etype='e2n')
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == {(0, 1), (1, 2), (2, 3), (3, 0)}
+
+    assert F.allclose(lg.nodes['node'].data['h'], g.ndata['h'])
+    assert F.allclose(lg.nodes['edge'].data['w'], g.edata['w'])
 
 if __name__ == '__main__':
     test_partition_with_halo()

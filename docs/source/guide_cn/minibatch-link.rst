@@ -167,7 +167,7 @@ DGL提供了在同构图上做链路预测的一个示例：
             return x
 
 对于得分的预测，同构图和异构图之间唯一的实现差异是后者需要用
-:meth:`dgl.DGLHeteroGraph.apply_edges`
+:meth:`dgl.DGLGraph.apply_edges`
 来遍历所有的边类型。
 
 .. code:: python

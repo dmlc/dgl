@@ -2,8 +2,6 @@
 
 set -e
 
-# . /opt/conda/etc/profile.d/conda.sh
-
 # install
 pushd python
 rm -rf build *.egg-info dist

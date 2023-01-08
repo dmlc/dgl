@@ -94,10 +94,10 @@ cdef inline int make_arg(object arg,
         tcode[0] = arg.__class__._dgl_tcode
     elif isinstance(arg, (int, long)):
         value[0].v_int64 = arg
-        tcode[0] = kInt
+        tcode[0] = kObjectInt
     elif isinstance(arg, float):
         value[0].v_float64 = arg
-        tcode[0] = kFloat
+        tcode[0] = kObjectFloat
     elif isinstance(arg, str):
         tstr = c_str(arg)
         value[0].v_str = tstr
@@ -108,7 +108,7 @@ cdef inline int make_arg(object arg,
         tcode[0] = kNull
     elif isinstance(arg, Number):
         value[0].v_float64 = arg
-        tcode[0] = kFloat
+        tcode[0] = kObjectFloat
     elif isinstance(arg, CTypesDGLDataType):
         tstr = c_str(str(arg))
         value[0].v_str = tstr
@@ -172,9 +172,9 @@ cdef inline object make_ret(DGLValue value, int tcode):
         return make_ret_object(value.v_handle)
     elif tcode == kNull:
         return None
-    elif tcode == kInt:
+    elif tcode == kObjectInt:
         return value.v_int64
-    elif tcode == kFloat:
+    elif tcode == kObjectFloat:
         return value.v_float64
     elif tcode == kNDArrayContainer:
         return c_make_array(value.v_handle, False)

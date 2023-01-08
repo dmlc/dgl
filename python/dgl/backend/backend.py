@@ -16,6 +16,7 @@ that returns whether the interface is supported by the framework or not.
 ###############################################################################
 # Tensor, data type and context interfaces
 
+
 def data_type_dict():
     """Returns a dictionary from data type string to the data type.
 
@@ -52,9 +53,11 @@ def data_type_dict():
     """
     pass
 
+
 def cpu():
     """Return a context object for CPU device."""
     pass
+
 
 def tensor(data, dtype=None):
     """Create a tensor given the data and data type.
@@ -81,6 +84,7 @@ def tensor(data, dtype=None):
     """
     pass
 
+
 def as_scalar(data):
     """Returns a scalar whose value is copied from this array.
 
@@ -96,6 +100,7 @@ def as_scalar(data):
     """
     pass
 
+
 def get_preferred_sparse_format():
     """Get the preferred sparse matrix format supported by the backend.
 
@@ -108,6 +113,7 @@ def get_preferred_sparse_format():
         the name of the preferred sparse matrix format.
     """
     pass
+
 
 def sparse_matrix(data, index, shape, force_format=False):
     """Create a sparse matrix.
@@ -146,6 +152,7 @@ def sparse_matrix(data, index, shape, force_format=False):
     """
     pass
 
+
 def sparse_matrix_indices(spmat):
     """Return the indices of the given sparse matrix.
 
@@ -169,9 +176,11 @@ def sparse_matrix_indices(spmat):
     """
     pass
 
+
 def is_tensor(obj):
     """Returns true if the given object is a framework-specific tensor."""
     pass
+
 
 def shape(input):
     """Return the shape of the tensor.
@@ -188,6 +197,7 @@ def shape(input):
     """
     pass
 
+
 def dtype(input):
     """Return the data type of the tensor.
 
@@ -202,6 +212,7 @@ def dtype(input):
         It should be one of the values in the data type dict.
     """
     pass
+
 
 def ndim(input):
     """Return the number of dimensions of the tensor.
@@ -218,6 +229,7 @@ def ndim(input):
     """
     pass
 
+
 def context(input):
     """Return the context/device of the input tensor.
 
@@ -233,6 +245,7 @@ def context(input):
     """
     pass
 
+
 def device_type(ctx):
     """Return a str representing device type.
 
@@ -246,6 +259,7 @@ def device_type(ctx):
     str
     """
     pass
+
 
 def device_id(ctx):
     """Return device index.
@@ -265,6 +279,7 @@ def device_id(ctx):
     """
     pass
 
+
 def to_backend_ctx(dglctx):
     """Convert a DGL context object to a backend context.
 
@@ -278,6 +293,7 @@ def to_backend_ctx(dglctx):
     ctx : framework-specific context object.
     """
     pass
+
 
 def astype(input, ty):
     """Convert the input tensor to the given data type.
@@ -296,6 +312,7 @@ def astype(input, ty):
     """
     pass
 
+
 def asnumpy(input):
     """Convert the input tensor to numpy array.
 
@@ -312,6 +329,7 @@ def asnumpy(input):
         Numpy array.
     """
     pass
+
 
 def copy_to(input, ctx, **kwargs):
     """Copy the given tensor to the context.
@@ -330,6 +348,7 @@ def copy_to(input, ctx, **kwargs):
     """
     pass
 
+
 def is_pinned(input):
     """Check whether the tensor is in pinned memory.
 
@@ -345,11 +364,13 @@ def is_pinned(input):
     """
     pass
 
+
 ###############################################################################
 # Tensor functions on feature data
 # --------------------------------
 # These functions are performance critical, so it's better to have efficient
 # implementation in each framework.
+
 
 def sum(input, dim, keepdims=False):
     """Reduce sum the input tensor along the given dim.
@@ -370,6 +391,7 @@ def sum(input, dim, keepdims=False):
     """
     pass
 
+
 def floor_div(in1, in2):
     """Element-wise integer division and rounds each quotient towards zero.
 
@@ -386,6 +408,7 @@ def floor_div(in1, in2):
         A framework-specific tensor.
     """
 
+
 def reduce_sum(input):
     """Returns the sum of all elements in the input tensor.
 
@@ -400,6 +423,7 @@ def reduce_sum(input):
         A framework-specific tensor with shape (1,)
     """
     pass
+
 
 def cumsum(input, dim):
     """Return the cumulative sum of the elements along a given axis.
@@ -418,6 +442,7 @@ def cumsum(input, dim):
     """
     pass
 
+
 def mean(input, dim):
     """Reduce average the input tensor along the given dim.
 
@@ -435,6 +460,7 @@ def mean(input, dim):
     """
     pass
 
+
 def reduce_mean(input):
     """Returns the average of all elements in the input tensor.
 
@@ -449,6 +475,7 @@ def reduce_mean(input):
         A framework-specific tensor with shape (1,)
     """
     pass
+
 
 def max(input, dim):
     """Reduce max the input tensor along the given dim.
@@ -467,6 +494,7 @@ def max(input, dim):
     """
     pass
 
+
 def reduce_max(input):
     """Returns the max of all elements in the input tensor.
 
@@ -481,6 +509,7 @@ def reduce_max(input):
         A framework-specific tensor with shape (1,)
     """
     pass
+
 
 def min(input, dim):
     """Reduce min the input tensor along the given dim.
@@ -498,6 +527,7 @@ def min(input, dim):
         A framework-specific tensor.
     """
     pass
+
 
 def reduce_min(input):
     """Returns the min of all elements in the input tensor.
@@ -533,6 +563,7 @@ def argsort(input, dim, descending):
         A framework-specific tensor.
     """
 
+
 def topk(input, k, dim, descending=True):
     """Return the k largest elements of the given input tensor along the given dimension.
 
@@ -550,6 +581,7 @@ def topk(input, k, dim, descending=True):
         Controls whether to return largest/smallest elements.
     """
     pass
+
 
 def argtopk(input, k, dim, descending=True):
     """Return the indices of the k largest elements of the given input tensor
@@ -570,6 +602,7 @@ def argtopk(input, k, dim, descending=True):
     """
     pass
 
+
 def exp(input):
     """Returns a new tensor with the exponential of the elements of the input tensor `input`.
 
@@ -584,6 +617,7 @@ def exp(input):
         The output tensor.
     """
     pass
+
 
 def inverse(input):
     """Returns the inverse matrix of a square matrix if it exists.
@@ -600,6 +634,7 @@ def inverse(input):
     """
     pass
 
+
 def sqrt(input):
     """Returns a new tensor with the square root of the elements of the input tensor `input`.
 
@@ -614,6 +649,7 @@ def sqrt(input):
         The output tensor.
     """
     pass
+
 
 def softmax(input, dim=-1):
     """Apply the softmax function on given dimension.
@@ -650,6 +686,7 @@ def cat(seq, dim):
     """
     pass
 
+
 def stack(seq, dim):
     """Stack the sequence of tensors along the given dimension.
 
@@ -666,6 +703,7 @@ def stack(seq, dim):
         A framework-specific tensor.
     """
     pass
+
 
 def split(input, sizes_or_sections, dim):
     """Split the input tensor into chunks.
@@ -692,6 +730,7 @@ def split(input, sizes_or_sections, dim):
     """
     pass
 
+
 def repeat(input, repeats, dim):
     """Repeats elements of an array.
 
@@ -711,6 +750,7 @@ def repeat(input, repeats, dim):
     """
     pass
 
+
 def gather_row(data, row_index):
     """Slice out the data given the row index.
 
@@ -727,6 +767,7 @@ def gather_row(data, row_index):
         The sliced data. The first dimension should equal to ``len(row_index)``.
     """
     pass
+
 
 def slice_axis(data, axis, begin, end):
     """Slice along a given axis.
@@ -749,6 +790,7 @@ def slice_axis(data, axis, begin, end):
     """
     pass
 
+
 def take(data, indices, dim):
     """Takes elements from an input array along the given dim.
 
@@ -762,6 +804,7 @@ def take(data, indices, dim):
         The dimension to gather along.
     """
     pass
+
 
 def narrow_row(x, start, stop):
     """Narrow down the tensor along the first dimension.
@@ -786,6 +829,7 @@ def narrow_row(x, start, stop):
     """
     pass
 
+
 def scatter_row(data, row_index, value):
     """Write the value into the data tensor using the row index.
 
@@ -806,6 +850,7 @@ def scatter_row(data, row_index, value):
         The new data.
     """
     pass
+
 
 def index_add_inplace(data, row_idx, value):
     """Add the values into the data tensor using the row index inplace.
@@ -832,6 +877,7 @@ def index_add_inplace(data, row_idx, value):
     """
     pass
 
+
 def scatter_row_inplace(data, row_index, value):
     """Write the value into the data tensor using the row index inplace.
 
@@ -847,6 +893,7 @@ def scatter_row_inplace(data, row_index, value):
         The new value.
     """
     pass
+
 
 def squeeze(input, dim):
     """Remove the given dimension of size 1.
@@ -865,6 +912,7 @@ def squeeze(input, dim):
     """
     pass
 
+
 def unsqueeze(input, dim):
     """Add the given dimension of size 1.
 
@@ -881,6 +929,7 @@ def unsqueeze(input, dim):
         The result tensor.
     """
     pass
+
 
 def reshape(input, shape):
     """Reshape the tensor.
@@ -899,6 +948,7 @@ def reshape(input, shape):
     """
     pass
 
+
 def swapaxes(input, axis1, axis2):
     """Interchange the two given axes of a tensor.
 
@@ -915,6 +965,7 @@ def swapaxes(input, axis1, axis2):
         The transposed tensor.
     """
     pass
+
 
 def zeros(shape, dtype, ctx):
     """Create a zero tensor.
@@ -935,6 +986,7 @@ def zeros(shape, dtype, ctx):
     """
     pass
 
+
 def zeros_like(input):
     """Create a zero tensor with the same shape, dtype and context of the
     given tensor.
@@ -950,6 +1002,7 @@ def zeros_like(input):
         The result
     """
     pass
+
 
 def ones(shape, dtype, ctx):
     """Create a one tensor.
@@ -969,6 +1022,7 @@ def ones(shape, dtype, ctx):
         The one tensor.
     """
     pass
+
 
 def uniform(shape, dtype, ctx, low, high):
     """Create a tensor with random value in a uniform
@@ -990,6 +1044,7 @@ def uniform(shape, dtype, ctx, low, high):
     """
     pass
 
+
 def randint(shape, dtype, ctx, low, high):
     """Create a tensor with random value in a uniform integer
     distribution between low (inclusive) and high (exclusive)
@@ -1009,6 +1064,7 @@ def randint(shape, dtype, ctx, low, high):
         The random tensor.
     """
     pass
+
 
 def pad_packed_tensor(input, lengths, value, l_min=None):
     r"""Pads a packed batch of variable length tensors with given value.
@@ -1034,6 +1090,7 @@ def pad_packed_tensor(input, lengths, value, l_min=None):
     """
     pass
 
+
 def pack_padded_tensor(input, lengths):
     r"""Packs a tensor containing padded sequence of variable length.
 
@@ -1054,6 +1111,7 @@ def pack_padded_tensor(input, lengths):
     """
     pass
 
+
 def boolean_mask(input, mask):
     """Selects elements in x according to the given mask from the first
     dimension.
@@ -1072,6 +1130,7 @@ def boolean_mask(input, mask):
     """
     pass
 
+
 def equal(x, y):
     """Compares whether the elements are equal.
 
@@ -1086,6 +1145,7 @@ def equal(x, y):
         The result, with the same shape as input.
     """
     pass
+
 
 def allclose(x, y, rtol=1e-4, atol=1e-4):
     """Compares whether all elements are close.
@@ -1102,6 +1162,7 @@ def allclose(x, y, rtol=1e-4, atol=1e-4):
         Absolute tolerance
     """
 
+
 def logical_not(input):
     """Perform a logical not operation.  Equivalent to np.logical_not
 
@@ -1117,8 +1178,10 @@ def logical_not(input):
     """
     pass
 
+
 def logical_and(input1, input2):
     pass
+
 
 def clone(input):
     """Return a clone of the input tensor.
@@ -1134,6 +1197,7 @@ def clone(input):
         A clone tensor.
     """
     pass
+
 
 def clamp(data, min_val, max_val):
     """Clamp all elements in :attr:`input` into the range [min_val, max_val]
@@ -1155,6 +1219,7 @@ def clamp(data, min_val, max_val):
     """
     pass
 
+
 def replace_inf_with_zero(x):
     """Returns a new tensor replacing infinity and negative infinity with zeros.
 
@@ -1169,6 +1234,7 @@ def replace_inf_with_zero(x):
         The result
     """
     pass
+
 
 def count_nonzero(input):
     """Return the count of non-zero values in the tensor input.
@@ -1185,6 +1251,7 @@ def count_nonzero(input):
     """
     pass
 
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
@@ -1192,6 +1259,7 @@ def count_nonzero(input):
 # numpy operators if currently missing in the framework. Ideally in the future,
 # DGL should contain all the operations on index, so this set of operators
 # should be gradually removed.
+
 
 def unique(input, return_inverse=False, return_counts=False):
     """Returns the unique scalar elements in a tensor.
@@ -1219,6 +1287,7 @@ def unique(input, return_inverse=False, return_counts=False):
     """
     pass
 
+
 def full_1d(length, fill_value, dtype, ctx):
     """Create a 1D tensor full of the fill_value.
 
@@ -1240,6 +1309,7 @@ def full_1d(length, fill_value, dtype, ctx):
     """
     pass
 
+
 def nonzero_1d(input):
     """Return the nonzero index of the given 1D input.
 
@@ -1254,6 +1324,7 @@ def nonzero_1d(input):
         A 1D integer tensor containing the nonzero indices.
     """
     pass
+
 
 def sort_1d(input):
     """Sort a 1D tensor (in ascending order) and also return the original index.
@@ -1271,6 +1342,7 @@ def sort_1d(input):
         Index tensor of the elements in the original input.
     """
     pass
+
 
 def arange(start, stop, dtype, ctx):
     """Create a 1D range int64 tensor.
@@ -1293,6 +1365,7 @@ def arange(start, stop, dtype, ctx):
     """
     pass
 
+
 def rand_shuffle(arr):
     """Random shuffle the data in the first dimension of the array.
 
@@ -1310,6 +1383,7 @@ def rand_shuffle(arr):
     """
     pass
 
+
 def zerocopy_to_dlpack(input):
     """Create a dlpack tensor that shares the input memory.
 
@@ -1324,6 +1398,7 @@ def zerocopy_to_dlpack(input):
         A dlpack capsule that can be used by other framework.
     """
     pass
+
 
 def zerocopy_from_dlpack(dlpack_tensor):
     """Create a tensor that shares the dlpack_tensor.
@@ -1340,6 +1415,7 @@ def zerocopy_from_dlpack(dlpack_tensor):
     """
     pass
 
+
 def zerocopy_to_numpy(input):
     """Create a numpy ndarray that shares the input memory.
 
@@ -1354,6 +1430,7 @@ def zerocopy_to_numpy(input):
         A numpy ndarray.
     """
     pass
+
 
 def zerocopy_from_numpy(np_array):
     """Create a tensor that shares the numpy array.
@@ -1370,6 +1447,7 @@ def zerocopy_from_numpy(np_array):
     """
     pass
 
+
 def zerocopy_to_dgl_ndarray(input):
     """Zerocopy a framework-specific Tensor to dgl.ndarray.NDArray
 
@@ -1382,6 +1460,7 @@ def zerocopy_to_dgl_ndarray(input):
     dgl.ndarray.NDArray
     """
     pass
+
 
 def zerocopy_to_dgl_ndarray_for_write(input):
     """Zerocopy a framework-specific Tensor to dgl.ndarray.NDArray
@@ -1412,7 +1491,6 @@ def zerocopy_from_dgl_ndarray(input):
     pass
 
 
-
 ###############################################################################
 # Custom Operators for graph level computations.
 
@@ -1420,8 +1498,20 @@ def zerocopy_from_dgl_ndarray(input):
 # kernels (see kernel.py), and plug into tensor framework using custom op
 # extensions.
 
-def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                  out_size, lhs_map, rhs_map, out_map):
+
+def binary_reduce(
+    reducer,
+    binary_op,
+    graph,
+    lhs,
+    rhs,
+    lhs_data,
+    rhs_data,
+    out_size,
+    lhs_map,
+    rhs_map,
+    out_map,
+):
     """Perform binary operation between given data and reduce based on graph
     structure.
 
@@ -1458,6 +1548,7 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
     """
     pass
 
+
 def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
     """Copy target data and perform reduce based on graph structure.
 
@@ -1486,8 +1577,9 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
     """
     pass
 
+
 def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
-    r""" Generalized Sparse Matrix Multiplication interface.
+    r"""Generalized Sparse Matrix Multiplication interface.
     It fuses two steps into one kernel.
     (1) Computes messages by :attr:`op` source node and edge features.
     (2) Aggregate the messages by :attr:`reduce_op` as the features on destination nodes.
@@ -1523,8 +1615,9 @@ def gspmm(gidx, op, reduce_op, lhs_data, rhs_data):
     """
     pass
 
+
 def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
-    r""" Generalized Sparse Matrix Multiplication interface on heterogenenous graph.
+    r"""Generalized Sparse Matrix Multiplication interface on heterogenenous graph.
     All the relation types of the heterogeneous graph will be processed together.
     It fuses two steps into one kernel.
     (1) Computes messages by :attr:`op` source node and edge features.
@@ -1564,8 +1657,9 @@ def gspmm_hetero(g, op, reduce_op, lhs_len, *lhs_and_rhs_tuple):
     """
     pass
 
-def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
-    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface.
+
+def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target="u", rhs_target="v"):
+    r"""Generalized Sampled-Dense-Dense Matrix Multiplication interface.
     It computes edge features by :attr:`op` lhs features and rhs features.
 
     .. math::
@@ -1599,8 +1693,11 @@ def gsddmm(gidx, op, lhs_data, rhs_data, lhs_target='u', rhs_target='v'):
     """
     pass
 
-def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_tuple):
-    r""" Generalized Sampled-Dense-Dense Matrix Multiplication interface on
+
+def gsddmm_hetero(
+    g, op, lhs_len, lhs_target="u", rhs_target="v", *lhs_and_rhs_tuple
+):
+    r"""Generalized Sampled-Dense-Dense Matrix Multiplication interface on
     heterogenenous graph. All the relation types of the heterogeneous graph
     will be processed together.
     It computes edge features by :attr:`op` lhs features and rhs features.
@@ -1639,6 +1736,7 @@ def gsddmm_hetero(g, op, lhs_len, lhs_target='u', rhs_target='v', *lhs_and_rhs_t
     """
     pass
 
+
 def edge_softmax(gidx, logits, eids, norm_by):
     r"""Compute edge softmax.
 
@@ -1675,6 +1773,7 @@ def edge_softmax(gidx, logits, eids, norm_by):
         Softmax value
     """
     pass
+
 
 def edge_softmax_hetero(gidx, eids, norm_by, *logits):
     r"""Compute edge softmax.
@@ -1713,6 +1812,7 @@ def edge_softmax_hetero(gidx, eids, norm_by, *logits):
     """
     pass
 
+
 def segment_reduce(op, x, offsets):
     """Segment reduction operator.
 
@@ -1741,6 +1841,7 @@ def segment_reduce(op, x, offsets):
     """
     pass
 
+
 def scatter_add(x, idx, m):
 
     """Scatter add (on first dimension) operator.
@@ -1762,6 +1863,7 @@ def scatter_add(x, idx, m):
         The output tensor.
     """
     pass
+
 
 def csrmm(A, A_weights, B, B_weights, num_vtypes):
     """Compute weighted adjacency matrix multiplication.
@@ -1795,6 +1897,7 @@ def csrmm(A, A_weights, B, B_weights, num_vtypes):
     """
     pass
 
+
 def csrsum(gidxs, weights):
     """Compute weighted adjacency matrix summation.
 
@@ -1820,6 +1923,7 @@ def csrsum(gidxs, weights):
         The output edge weights.
     """
     pass
+
 
 def csrmask(A, A_weights, B):
     """Retrieve the values in the weighted adjacency matrix of graph :attr:`A` at the
@@ -1848,8 +1952,9 @@ def csrmask(A, A_weights, B):
     """
     pass
 
+
 def gather_mm(A, B, idx_a, idx_b):
-    r""" Dense Matrix Multiplication interface. It multiplies 2D dense tensor A
+    r"""Dense Matrix Multiplication interface. It multiplies 2D dense tensor A
     and 3D dense tensor B according to their relation types. A is unsorted and
     the relation type is fetched from idx_b.
 
@@ -1871,8 +1976,9 @@ def gather_mm(A, B, idx_a, idx_b):
     """
     pass
 
+
 def segment_mm(A, B, seglen_A):
-    r""" Dense Matrix Multiplication interface. It multiplies dense tensor A
+    r"""Dense Matrix Multiplication interface. It multiplies dense tensor A
     and dense tensor B according to relation types. A is sorted and concatenated
     according to relation types.
 
@@ -1900,6 +2006,7 @@ def segment_mm(A, B, seglen_A):
 # These are not related to tensors. Some of them are temporary workarounds that
 # should be included in DGL in the future.
 
+
 def sync():
     """Synchronize computation.
 
@@ -1909,33 +2016,35 @@ def sync():
     """
     pass
 
+
 def attach_grad(tensor):
-    """ Attach gradients to the input tensor
-    """
+    """Attach gradients to the input tensor"""
     pass
+
 
 def backward(x, head_gradient=None):
-    """Invoke backward computation with an optional head gradient.
-    """
+    """Invoke backward computation with an optional head gradient."""
     pass
+
 
 def grad(x):
-    """Fetches the gradient from the tensor after backward computation.
-    """
+    """Fetches the gradient from the tensor after backward computation."""
     pass
+
 
 def is_no_grad(x):
-    """ Test if the input tensor has gradient
-    """
+    """Test if the input tensor has gradient"""
     pass
 
+
 def is_recording():
-    """ Test if the execution is recording gradients.
-    """
+    """Test if the execution is recording gradients."""
     pass
+
 
 class record_grad(object):
     """Context manager that records the gradients"""
+
     def __init__(self):
         pass
 
@@ -1948,6 +2057,7 @@ class record_grad(object):
 
 class no_grad(object):
     """Context manager that explicitly disables gradient computation"""
+
     def __init__(self):
         pass
 
@@ -1957,8 +2067,10 @@ class no_grad(object):
     def __exit__(self, exc_type, exc_value, exc_traceback):
         pass
 
+
 class NodeEmbedding(object):
     """Sparse node embeddings"""
+
     def __init__(self):
         pass
 

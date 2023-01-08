@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so'
+dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so, build/dgl_sparse/*.so'
 // Currently DGL on Windows is not working with Cython yet
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll"
 
@@ -65,7 +65,7 @@ def unit_test_linux(backend, dev) {
 def unit_distributed_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 40, unit: 'MINUTES') {
     sh "bash tests/scripts/task_distributed_test.sh ${backend} ${dev}"
   }
 }
@@ -134,6 +134,8 @@ def is_admin(name) {
   return (name in admins)
 }
 
+def regression_test_done = false
+
 pipeline {
   agent any
   triggers {
@@ -196,7 +198,6 @@ pipeline {
       }
       when { triggeredBy 'IssueCommentCause' }
       steps {
-        // container('dgl-ci-lint') {
           checkout scm
           script {
               def comment = env.GITHUB_COMMENT
@@ -229,12 +230,12 @@ pipeline {
               }
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
               currentBuild.result = 'SUCCESS'
-              return
+              regression_test_done = true
           }
-        // }
       }
     }
     stage('CI') {
+      when { expression { !regression_test_done } }
       stages {
         stage('Lint Check') {
           agent {
@@ -261,7 +262,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:v221216"
                   args "-u root"
                   alwaysPull true
                 }
@@ -279,7 +280,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
+                  image "dgllib/dgl-ci-gpu:cu102_v221216"
                   args "-u root"
                   alwaysPull true
                 }
@@ -298,7 +299,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.10"
+                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.12"
                   args "-u root"
                   alwaysPull true
                 }
@@ -334,7 +335,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:v221216"
                   alwaysPull true
                 }
               }
@@ -351,7 +352,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
+                  image "dgllib/dgl-ci-gpu:cu102_v221216"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -423,7 +424,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:v221216"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -475,7 +476,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
+                  image "dgllib/dgl-ci-gpu:cu102_v221216"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -503,7 +504,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:ssh_v220818"
+                  image "dgllib/dgl-ci-cpu:v221216"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -525,7 +526,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.10"
+                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.12"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -544,55 +545,11 @@ pipeline {
                 }
               }
             }
-            stage('MXNet CPU') {
-              agent {
-                docker {
-                  label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:cu101_v220629"
-                  alwaysPull true
-                }
-              }
-              stages {
-                stage('MXNet CPU Unit test') {
-                  steps {
-                    unit_test_linux('mxnet', 'cpu')
-                  }
-                }
-              }
-              post {
-                always {
-                  cleanWs disableDeferredWipeout: true, deleteDirs: true
-                }
-              }
-            }
-            stage('MXNet GPU') {
-              agent {
-                docker {
-                  label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
-                  args "--runtime nvidia"
-                  alwaysPull true
-                }
-              }
-              stages {
-                stage('MXNet GPU Unit test') {
-                  steps {
-                    sh 'nvidia-smi'
-                    unit_test_linux('mxnet', 'gpu')
-                  }
-                }
-              }
-              post {
-                always {
-                  cleanWs disableDeferredWipeout: true, deleteDirs: true
-                }
-              }
-            }
             stage('DGL-Go') {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:v221216"
                   alwaysPull true
                 }
               }

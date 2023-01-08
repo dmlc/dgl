@@ -15,10 +15,10 @@ def tree1(idtype):
     """
     g = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g.add_nodes(5)
-    g.add_edge(3, 1)
-    g.add_edge(4, 1)
-    g.add_edge(1, 0)
-    g.add_edge(2, 0)
+    g.add_edges(3, 1)
+    g.add_edges(4, 1)
+    g.add_edges(1, 0)
+    g.add_edges(2, 0)
     g.ndata['h'] = F.tensor([0, 1, 2, 3, 4])
     g.edata['h'] = F.randn((4, 10))
     return g
@@ -34,10 +34,10 @@ def tree2(idtype):
     """
     g = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g.add_nodes(5)
-    g.add_edge(2, 4)
-    g.add_edge(0, 4)
-    g.add_edge(4, 1)
-    g.add_edge(3, 1)
+    g.add_edges(2, 4)
+    g.add_edges(0, 4)
+    g.add_edges(4, 1)
+    g.add_edges(3, 1)
     g.ndata['h'] = F.tensor([0, 1, 2, 3, 4])
     g.edata['h'] = F.randn((4, 10))
     return g
@@ -191,8 +191,8 @@ def test_batched_edge_ordering(idtype):
     e2 = F.randn((6, 10))
     g2.edata['h'] = e2
     g = dgl.batch([g1, g2])
-    r1 = g.edata['h'][g.edge_id(4, 5)]
-    r2 = g1.edata['h'][g1.edge_id(4, 5)]
+    r1 = g.edata['h'][g.edge_ids(4, 5)]
+    r2 = g1.edata['h'][g1.edge_ids(4, 5)]
     assert F.array_equal(r1, r2)
 
 @parametrize_idtype

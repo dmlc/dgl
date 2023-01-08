@@ -14,6 +14,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GraphConv
     ~dgl.nn.pytorch.conv.EdgeWeightNorm
     ~dgl.nn.pytorch.conv.RelGraphConv
+    ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
     ~dgl.nn.pytorch.conv.TAGConv
     ~dgl.nn.pytorch.conv.GATConv
     ~dgl.nn.pytorch.conv.GATv2Conv
@@ -112,7 +113,15 @@ Utility Modules
     ~dgl.nn.pytorch.utils.JumpingKnowledge
     ~dgl.nn.pytorch.sparse_emb.NodeEmbedding
     ~dgl.nn.pytorch.explain.GNNExplainer
+    ~dgl.nn.pytorch.explain.HeteroGNNExplainer
     ~dgl.nn.pytorch.utils.LabelPropagation
+    ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
+    ~dgl.nn.pytorch.utils.LaplacianPosEnc
+    ~dgl.nn.pytorch.graph_transformer.BiasedMultiheadAttention
+    ~dgl.nn.pytorch.graph_transformer.GraphormerLayer
+    ~dgl.nn.pytorch.graph_transformer.PathEncoder
+    ~dgl.nn.pytorch.graph_transformer.SpatialEncoder
+    ~dgl.nn.pytorch.graph_transformer.SpatialEncoder3d
 
 Network Embedding Modules
 ----------------------------------------
@@ -123,3 +132,4 @@ Network Embedding Modules
     :template: classtemplate.rst
 
     ~dgl.nn.pytorch.DeepWalk
+    ~dgl.nn.pytorch.MetaPath2Vec

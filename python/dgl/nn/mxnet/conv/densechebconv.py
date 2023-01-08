@@ -1,6 +1,7 @@
 """MXNet Module for DenseChebConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 import math
+
 import mxnet as mx
 from mxnet import nd
 from mxnet.gluon import nn
@@ -29,11 +30,8 @@ class DenseChebConv(nn.Block):
     --------
     `ChebConv <https://docs.dgl.ai/api/python/nn.pytorch.html#chebconv>`__
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k,
-                 bias=True):
+
+    def __init__(self, in_feats, out_feats, k, bias=True):
         super(DenseChebConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -42,12 +40,19 @@ class DenseChebConv(nn.Block):
             self.fc = nn.Sequential()
             for _ in range(k):
                 self.fc.add(
-                    nn.Dense(out_feats, in_units=in_feats, use_bias=False,
-                             weight_initializer=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+                    nn.Dense(
+                        out_feats,
+                        in_units=in_feats,
+                        use_bias=False,
+                        weight_initializer=mx.init.Xavier(
+                            magnitude=math.sqrt(2.0)
+                        ),
+                    )
                 )
             if bias:
-                self.bias = self.params.get('bias', shape=(out_feats,),
-                                            init=mx.init.Zero())
+                self.bias = self.params.get(
+                    "bias", shape=(out_feats,), init=mx.init.Zero()
+                )
             else:
                 self.bias = None
 
@@ -80,7 +85,7 @@ class DenseChebConv(nn.Block):
         A = adj.astype(feat.dtype).as_in_context(feat.context)
         num_nodes = A.shape[0]
 
-        in_degree = 1. / nd.clip(A.sum(axis=1), 1, float('inf')).sqrt()
+        in_degree = 1.0 / nd.clip(A.sum(axis=1), 1, float("inf")).sqrt()
         D_invsqrt = nd.diag(in_degree)
         I = nd.eye(num_nodes, ctx=A.context)
         L = I - nd.dot(D_invsqrt, nd.dot(A, D_invsqrt))

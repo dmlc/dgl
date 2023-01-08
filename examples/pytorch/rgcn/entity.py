@@ -16,13 +16,13 @@ class RGCN(nn.Module):
                                   num_bases=num_rels, self_loop=False)
         self.conv2 = RelGraphConv(h_dim, out_dim, num_rels, regularizer='basis',
                                   num_bases=num_rels, self_loop=False)
-        
+
     def forward(self, g):
         x = self.emb.weight
         h = F.relu(self.conv1(g, x, g.edata[dgl.ETYPE], g.edata['norm']))
         h = self.conv2(g, h, g.edata[dgl.ETYPE], g.edata['norm'])
         return h
-    
+
 def evaluate(g, target_idx, labels, test_mask, model):
     test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
     model.eval()

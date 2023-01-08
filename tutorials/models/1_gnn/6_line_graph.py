@@ -97,7 +97,7 @@ from dgl.data import citation_graph as citegrh
 data = citegrh.load_cora()
 
 G = data[0]
-labels = th.tensor(data.labels)
+labels = th.tensor(G.ndata['label'])
 
 # find all the nodes labeled with class 0
 label0_nodes = th.nonzero(labels == 0, as_tuple=False).squeeze()
@@ -372,12 +372,12 @@ def aggregate_radius(radius, g, z):
     z_list = []
     g.ndata['z'] = z
     # pulling message from 1-hop neighbourhood
-    g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+    g.update_all(fn.copy_u(u='z', out='m'), fn.sum(msg='m', out='z'))
     z_list.append(g.ndata['z'])
     for i in range(radius - 1):
         for j in range(2 ** i):
             #pulling message from 2^j neighborhood
-            g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+            g.update_all(fn.copy_u(u='z', out='m'), fn.sum(msg='m', out='z'))
         z_list.append(g.ndata['z'])
     return z_list
 
