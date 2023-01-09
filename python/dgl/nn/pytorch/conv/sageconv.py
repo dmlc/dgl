@@ -130,7 +130,7 @@ class SAGEConv(nn.Module):
         elif bias:
             self.bias = nn.parameter.Parameter(torch.zeros(self._out_feats))
         else:
-            self.bias = None
+            self.register_buffer("bias", None)
 
         self.reset_parameters()
 
