@@ -1,5 +1,5 @@
 python:
-  - 3.6
+  - 3.6     # [not aarch64 and not arm64]
   - 3.7
   - 3.8
   - 3.9
