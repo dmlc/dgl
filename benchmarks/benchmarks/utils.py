@@ -534,8 +534,7 @@ def skip_if_not_4gpu():
     """skip if DGL_BENCH_DEVICE is gpu"""
 
     def _wrapper(func):
-        print(f"GPU count: {GPU_COUNT}")
-        if GPU_COUNT != 4:
+        if GPU_COUNT < 4:
             # skip if not enabled
             print("Skip {}".format(func.__name__))
             func.benchmark_name = "skip_" + func.__name__
