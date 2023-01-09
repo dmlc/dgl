@@ -129,6 +129,8 @@ class SAGEConv(nn.Module):
             self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=bias)
         elif bias:
             self.bias = nn.parameter.Parameter(torch.zeros(self._out_feats))
+        else:
+            self.bias = None
 
         self.reset_parameters()
 
