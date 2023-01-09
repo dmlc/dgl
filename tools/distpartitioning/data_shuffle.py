@@ -586,6 +586,40 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map):
 
     return node_tids, node_features, node_feat_tids, edge_data, edge_features, edge_tids, edge_feat_tids
 
+def reorder_data(params, world_size, data, key):
+    """
+    Auxiliary function used to sort node and edge data for the input graph.
+
+    Parameters:
+    -----------
+    params : argparser object 
+        object which stores the input arguments to the command line
+    world_size : int
+        total number of nodes used in this execution
+    data : dictionary
+        which is used to store the node and edge data for the input graph
+    key : string
+        specifies the column which is used to determine the sort order for
+        the remaining columns
+
+    Returns:
+    --------
+    dictionary
+        same as the input dictionary, but with reordered columns (values in 
+        the dictionary), as per the np.argsort results on the column specified
+        by the ``key`` column
+    """
+    for local_part_id in range(params.num_parts//world_size):
+        sorted_idx = data[key + "/" + str(local_part_id)].argsort()
+        for k, v in data.items():
+            tokens = k.split("/")
+            assert len(tokens) == 2
+            if tokens[1] == str(local_part_id):
+                data[k] = v[sorted_idx]
+        sorted_idx = None
+    gc.collect()
+    return data
+
 def gen_dist_partitions(rank, world_size, params):
     """
     Function which will be executed by all Gloo processes to begin execution of the pipeline.
@@ -755,16 +789,9 @@ def gen_dist_partitions(rank, world_size, params):
     memory_snapshot("DataShuffleComplete: ", rank)
 
     #sort node_data by ntype
-    for local_part_id in range(params.num_parts//world_size):
-        idx = node_data[constants.NTYPE_ID+"/"+str(local_part_id)].argsort()
-        for k, v in node_data.items():
-            tokens = k.split("/")
-            assert len(tokens) == 2
-            if tokens[1] == str(local_part_id):
-                node_data[k] = v[idx]
-        idx = None
-    gc.collect()
+    node_data = reorder_data(params, world_size, node_data, constants.NTYPE_ID)
     logging.info(f'[Rank: {rank}] Sorted node_data by node_type')
+    memory_snapshot("NodeDataSortComplete: ", rank)
 
     #resolve global_ids for nodes
     assign_shuffle_global_nids_nodes(rank, world_size, params.num_parts, node_data)
@@ -790,15 +817,9 @@ def gen_dist_partitions(rank, world_size, params):
     memory_snapshot("ReorderNodeFeaturesComplete: ", rank)
 
     #sort edge_data by etype
-    for local_part_id in range(params.num_parts//world_size):
-        sorted_idx = edge_data[constants.ETYPE_ID+"/"+str(local_part_id)].argsort()
-        for k, v in edge_data.items():
-            tokens = k.split("/")
-            assert len(tokens) == 2
-            if tokens[1] == str(local_part_id):
-                edge_data[k] = v[sorted_idx]
-        sorted_idx = None
-    gc.collect()
+    edge_data = reorder_data(params, world_size, edge_data, constants.ETYPE_ID)
+    logging.info(f'[Rank: {rank}] Sorted edge_data by edge_type')
+    memory_snapshot("EdgeDataSortComplete: ", rank)
 
     shuffle_global_eid_offsets = assign_shuffle_global_nids_edges(rank, world_size, params.num_parts, edge_data)
     logging.info(f'[Rank: {rank}] Done assigning global_ids to edges ...')
