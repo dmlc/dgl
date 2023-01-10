@@ -6,8 +6,6 @@ import torch
 from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix, val_like
 
-__all__ = ["sp_add", "sp_mul", "sp_power"]
-
 
 def spsp_add(A, B):
     """Invoke C++ sparse library for addition"""

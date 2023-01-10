@@ -85,10 +85,8 @@ Attributes and methods
     SparseMatrix.dtype
     SparseMatrix.device
     SparseMatrix.val
-    SparseMatrix.__repr__
     SparseMatrix.row
     SparseMatrix.col
-    SparseMatrix.indices
     SparseMatrix.coo
     SparseMatrix.csr
     SparseMatrix.csc
@@ -112,7 +110,6 @@ Attributes and methods
     SparseMatrix.smean
     SparseMatrix.neg
     SparseMatrix.softmax
-    SparseMatrix.__matmul__
 
 Diagonal matrix class
 -------------------------
@@ -140,7 +137,6 @@ Attributes and methods
     DiagMatrix.dtype
     DiagMatrix.device
     DiagMatrix.val
-    DiagMatrix.__repr__
     DiagMatrix.as_sparse
     DiagMatrix.dense
     DiagMatrix.t
@@ -155,7 +151,6 @@ Attributes and methods
     DiagMatrix.long
     DiagMatrix.neg
     DiagMatrix.inv
-    DiagMatrix.__matmul__
 
 Operators
 ---------
@@ -164,14 +159,6 @@ Operators
 .. autosummary::
     :toctree: ../../generated/
 
-    sp_add
-    sp_mul
-    sp_power
-    diag_add
-    diag_sub
-    diag_mul
-    diag_div
-    diag_power
     add
     power
     spmm
