@@ -1,3 +1,4 @@
+# pylint: disable=anomalous-backslash-in-string
 """DGL elementwise operator module."""
 from typing import Union
 
