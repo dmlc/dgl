@@ -26,7 +26,7 @@ else
 fi
 
 WS_ROOT=/asv/dgl
-docker pull public.ecr.aws/s1o7b3d9/benchmark_test:cu116
+docker pull public.ecr.aws/s1o7b3d9/benchmark_test:cu116_v230110
 if [ -z "$DGL_REG_CONF" ]; then
     DOCKER_ENV_OPT="$DOCKER_ENV_OPT"
 else
@@ -56,14 +56,14 @@ if [[ $DEVICE == "cpu" ]]; then
         $DOCKER_MOUNT_OPT \
         $DOCKER_ENV_OPT \
         --shm-size="16g" \
-        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmark_test:cu116 /bin/bash
+        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmark_test:cu116_v230110 /bin/bash
 else
     docker run --name dgl-reg \
         --rm --gpus all \
         $DOCKER_MOUNT_OPT \
         $DOCKER_ENV_OPT \
         --shm-size="16g" \
-        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmark_test:cu116 /bin/bash
+        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmark_test:cu116_v230110 /bin/bash
 fi
 
 pwd
