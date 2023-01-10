@@ -24,6 +24,9 @@ requirements:
 build:
   script_env:
     - USE_CUDA
+    - CUDA_VER
+    - CACHEDIR
+    - DGL_VERSION_SUFFIX
 
 about:
   home: https://github.com/dmlc/dgl.git
