@@ -268,7 +268,7 @@ def extract_archive(file, target_dir, overwrite=False):
                     member_path = os.path.join(path, member.name)
                     if not is_within_directory(path, member_path):
                         raise Exception("Attempted Path Traversal in Tar File")
-                tar.extractall(path, members, numeric_owner) 
+                tar.extractall(path, members, numeric_owner=numeric_owner)
             
             safe_extract(archive, path=target_dir)
     elif file.endswith(".gz"):
