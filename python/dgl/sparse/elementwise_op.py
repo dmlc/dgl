@@ -10,7 +10,18 @@ __all__ = ["add", "power"]
 def add(
     A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
 ) -> Union[DiagMatrix, SparseMatrix]:
-    """Elementwise addition
+    """Elementwise additions for `DiagMatrix` and `SparseMatrix`.
+
+    The supported combinations are shown as follow.
+    +--------------+------------+--------------+--------+
+    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
+    +--------------+------------+--------------+--------+
+    |  DiagMatrix  |     ✅     |      ✅      |   🚫   |
+    +--------------+------------+--------------+--------+
+    | SparseMatrix |     ✅     |      ✅      |   🚫   |
+    +--------------+------------+--------------+--------+
+    |    scalar    |     🚫     |      🚫      |   🚫   |
+    +--------------+------------+--------------+--------+
 
     Parameters
     ----------
@@ -34,18 +45,67 @@ def add(
     >>> B = diag(torch.arange(1, 4))
     >>> A + B
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
-            [0, 1, 0, 1, 2]]),
+                                 [0, 1, 0, 1, 2]]),
     values=tensor([ 1, 20, 10,  2, 33]),
     shape=(3, 3), nnz=5)
     """
     return A + B
 
 
+def sub(
+    A: Union[DiagMatrix], B: Union[DiagMatrix]
+) -> Union[DiagMatrix]:
+    """Elementwise subtraction for `DiagMatrix` and `SparseMatrix`.
+
+    The supported combinations are shown as follow.
+    +--------------+------------+--------------+--------+
+    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
+    +--------------+------------+--------------+--------+
+    |  DiagMatrix  |     ✅     |      🚫      |   🚫   |
+    +--------------+------------+--------------+--------+
+    | SparseMatrix |     🚫     |      🚫      |   🚫   |
+    +--------------+------------+--------------+--------+
+    |    scalar    |     🚫     |      🚫      |   🚫   |
+    +--------------+------------+--------------+--------+
+
+    Parameters
+    ----------
+    A : DiagMatrix
+        Diagonal matrix
+    B : DiagMatrix
+        Diagonal matrix
+
+    Returns
+    -------
+    DiagMatrix
+        Diagonal matrix
+
+    Examples
+    --------
+    >>> A = diag(torch.arange(1, 4))
+    >>> B = diag(torch.arange(10, 13))
+    >>> A - B
+    DiagMatrix(val=tensor([-9, -9, -9]),
+    shape=(3, 3))
+    """
+    return A - B
+
+
 def power(
     A: Union[SparseMatrix, DiagMatrix], scalar: Union[float, int]
 ) -> Union[SparseMatrix, DiagMatrix]:
-    """Take the power of each nonzero element and return a matrix with
-    the result.
+    """Elementwise exponentiation for `DiagMatrix` and `SparseMatrix`.
+
+    The supported combinations are shown as follow.
+    +--------------+------------+--------------+--------+
+    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
+    +--------------+------------+--------------+--------+
+    |  DiagMatrix  |     🚫     |      🚫      |   ✅   |
+    +--------------+------------+--------------+--------+
+    | SparseMatrix |     🚫     |      🚫      |   ✅   |
+    +--------------+------------+--------------+--------+
+    |    scalar    |     🚫     |      🚫      |   🚫   |
+    +--------------+------------+--------------+--------+
 
     Parameters
     ----------
