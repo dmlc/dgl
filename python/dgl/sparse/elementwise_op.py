@@ -52,9 +52,7 @@ def add(
     return A + B
 
 
-def sub(
-    A: Union[DiagMatrix], B: Union[DiagMatrix]
-) -> Union[DiagMatrix]:
+def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
     """Elementwise subtraction for `DiagMatrix` and `SparseMatrix`.
 
     The supported combinations are shown as follow.
