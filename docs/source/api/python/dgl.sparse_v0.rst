@@ -159,8 +159,6 @@ Operators
 .. autosummary::
     :toctree: ../../generated/
 
-    add
-    power
     spmm
     bspmm
     spspmm
