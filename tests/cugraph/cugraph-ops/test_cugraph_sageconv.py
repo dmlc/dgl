@@ -1,8 +1,7 @@
+import dgl
 import pytest
 import torch
-import dgl
-from dgl.nn import CuGraphSAGEConv
-from dgl.nn import SAGEConv
+from dgl.nn import CuGraphSAGEConv, SAGEConv
 
 options = {
     "idtype_int": [False, True],
