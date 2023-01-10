@@ -534,9 +534,7 @@ def skip_if_not_4gpu():
     """skip if DGL_BENCH_DEVICE is gpu"""
 
     def _wrapper(func):
-        gpu_counts = torch.cuda.device_count()
-        print(f"----------- gpu_counts: {gpu_counts}")
-        if gpu_counts < 4:
+        if GPU_COUNT < 4:
             # skip if not enabled
             print("Skip {}".format(func.__name__))
             func.benchmark_name = "skip_" + func.__name__
