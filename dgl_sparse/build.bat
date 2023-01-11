@@ -8,6 +8,7 @@ MD build
 PUSHD build
 
 IF x%1x == xx GOTO single
+COPY %BINDIR%\third_party\dmlc-core\Release\dmlc.lib %BINDIR%\third_party\dmlc-core
 
 FOR %%X IN (%*) DO (
 	DEL /S /Q *
