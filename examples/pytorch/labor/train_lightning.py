@@ -55,8 +55,8 @@ class SAGELightning(LightningModule):
         self.lr = lr
         f1score_class = MulticlassF1Score if not multilabel else MultilabelF1Score
         self.train_acc = f1score_class(n_classes, average='micro')
-        self.val_acc = f1score_class(n_classes, average='micro')
-        self.test_acc = f1score_class(n_classes, average='micro')
+        self.val_acc = nn.ModuleList([f1score_class(n_classes, average='micro'), f1score_class(n_classes, average='micro')])
+        self.test_acc = nn.ModuleList([f1score_class(n_classes, average='micro'), f1score_class(n_classes, average='micro')])
         self.num_steps = 0
         self.cum_sampled_nodes = [0 for _ in range(n_layers + 1)]
         self.cum_sampled_edges = [0 for _ in range(n_layers)]
@@ -96,27 +96,27 @@ class SAGELightning(LightningModule):
         self.pt = t
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         input_nodes, output_nodes, mfgs = batch
         mfgs = [mfg.int().to(device) for mfg in mfgs]
         batch_inputs = mfgs[0].srcdata['features']
         batch_labels = mfgs[-1].dstdata['labels']
         batch_pred = self.module(mfgs, batch_inputs)
         loss = self.loss_fn(batch_pred, batch_labels)
-        self.val_acc(batch_pred, batch_labels.int())
-        self.log('val_acc', self.val_acc, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
-        self.log('val_loss', loss, on_step=True, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
+        self.val_acc[dataloader_idx](batch_pred, batch_labels.int())
+        self.log('val_acc', self.val_acc[dataloader_idx], prog_bar=True, on_step=False, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
+        self.log('val_loss', loss, on_step=False, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
     
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
         input_nodes, output_nodes, mfgs = batch
         mfgs = [mfg.int().to(device) for mfg in mfgs]
         batch_inputs = mfgs[0].srcdata['features']
         batch_labels = mfgs[-1].dstdata['labels']
         batch_pred = self.module(mfgs, batch_inputs)
         loss = self.loss_fn(batch_pred, batch_labels)
-        self.test_acc(batch_pred, batch_labels.int())
-        self.log('test_acc', self.test_acc, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
-        self.log('test_loss', loss, on_step=True, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
+        self.test_acc[dataloader_idx](batch_pred, batch_labels.int())
+        self.log('test_acc', self.test_acc[dataloader_idx], prog_bar=True, on_step=False, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
+        self.log('test_loss', loss, on_step=False, on_epoch=True, sync_dist=True, batch_size=batch_labels.shape[0])
 
     def configure_optimizers(self):
         optimizer = th.optim.Adam(self.parameters(), lr=self.lr)
@@ -125,7 +125,7 @@ class SAGELightning(LightningModule):
 
 class DataModule(LightningDataModule):
     def __init__(self, dataset_name, undirected, data_cpu=False, use_uva=False, fan_out=[10, 25],
-                 device=th.device('cpu'), batch_size=1000, num_workers=4, sampler='labor', importance_sampling=0, layer_dependency=False, batch_dependency=1):
+                 device=th.device('cpu'), batch_size=1000, num_workers=4, sampler='labor', importance_sampling=0, layer_dependency=False, batch_dependency=1, cache_size=0):
         super().__init__()
 
         g, n_classes, multilabel = load_dataset(dataset_name)
@@ -138,13 +138,14 @@ class DataModule(LightningDataModule):
 
         train_nid = th.nonzero(g.ndata['train_mask'], as_tuple=True)[0]
         val_nid = th.nonzero(g.ndata['val_mask'], as_tuple=True)[0]
-        test_nid = th.nonzero(~(g.ndata['train_mask'] | g.ndata['val_mask']), as_tuple=True)[0]
+        test_nid = th.nonzero(g.ndata['test_mask'], as_tuple=True)[0]
 
         fanouts = [int(_) for _ in fan_out]
         if sampler == 'neighbor':
-            sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts, prefetch_node_feats=['features'], prefetch_labels=['labels'])
+            sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'], prefetch_labels=['labels'])
         else:
             sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'], prefetch_labels=['labels'])
+        unbiased_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'], prefetch_labels=['labels'])
 
         dataloader_device = th.device('cpu')
         g = g.formats(['csc'])
@@ -162,8 +163,7 @@ class DataModule(LightningDataModule):
         else:
             self.train_nid, self.val_nid, self.test_nid = train_nid, val_nid, test_nid
         self.sampler = sampler
-        self.val_sampler = sampler
-        self.test_sampler = sampler
+        self.unbiased_sampler = unbiased_sampler
         self.device = dataloader_device
         self.use_uva = use_uva
         self.batch_size = batch_size
@@ -171,6 +171,7 @@ class DataModule(LightningDataModule):
         self.in_feats = g.ndata['features'].shape[1]
         self.n_classes = n_classes
         self.multilabel = multilabel
+        self.cache = None if cache_size <= 0 else dgl.contrib.GPUCache(cache_size, self.in_feats, g.idtype)
 
     def train_dataloader(self):
         return dgl.dataloading.DataLoader(
@@ -185,28 +186,30 @@ class DataModule(LightningDataModule):
             num_workers=self.num_workers)
 
     def val_dataloader(self):
-        return dgl.dataloading.DataLoader(
+        return [dgl.dataloading.DataLoader(
             self.g,
             self.val_nid,
-            self.val_sampler,
+            sampler,
             device=self.device,
             use_uva=self.use_uva,
             batch_size=self.batch_size,
             shuffle=False,
             drop_last=False,
             num_workers=self.num_workers)
+            for sampler in [self.sampler, self.unbiased_sampler]]
     
     def test_dataloader(self):
-        return dgl.dataloading.DataLoader(
+        return [dgl.dataloading.DataLoader(
             self.g,
             self.test_nid,
-            self.test_sampler,
+            sampler,
             device=self.device,
             use_uva=self.use_uva,
             batch_size=self.batch_size,
             shuffle=False,
             drop_last=False,
             num_workers=self.num_workers)
+            for sampler in [self.sampler, self.unbiased_sampler]]
 
 class BatchSizeCallback(Callback):
     def __init__(self, limit, factor=3):
@@ -234,6 +237,16 @@ class BatchSizeCallback(Callback):
     def std(self):
         return math.sqrt(self.var)
     
+    def on_train_batch_start(self, trainer, datamodule, batch, batch_idx):
+        input_nodes, output_nodes, mfgs = batch
+        cache = trainer.datamodule.cache
+        if cache is not None:
+            values, missing_index, missing_keys = cache.query(input_nodes)
+            missing_values = trainer.datamodule.g.ndata['features'][missing_keys.long()]
+            cache.replace(missing_keys, missing_values)
+            cache_miss = missing_keys.shape[0] / input_nodes.shape[0]
+            trainer.strategy.model.log('cache_miss', cache_miss, prog_bar=True, on_step=True, on_epoch=False)
+    
     def on_train_batch_end(self, trainer, datamodule, outputs, batch, batch_idx):
         input_nodes, output_nodes, mfgs = batch
         self.push(mfgs[0].num_src_nodes())
@@ -255,7 +268,7 @@ if __name__ == '__main__':
     argparser.add_argument('--num-hidden', type=int, default=256)
     argparser.add_argument('--num-layers', type=int, default=3)
     argparser.add_argument('--fan-out', type=str, default='10,10,10')
-    argparser.add_argument('--batch-size', type=int, default=1000)
+    argparser.add_argument('--batch-size', type=int, default=1024)
     argparser.add_argument('--lr', type=float, default=0.001)
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
@@ -272,6 +285,7 @@ if __name__ == '__main__':
     argparser.add_argument('--logdir', type=str, default='tb_logs')
     argparser.add_argument('--vertex-limit', type=int, default=-1)
     argparser.add_argument('--use-uva', action='store_true')
+    argparser.add_argument('--cache-size', type=int, default=0)
     argparser.add_argument('--undirected', action='store_true')
     argparser.add_argument('--val-acc-target', type=float, default=1)
     argparser.add_argument('--early-stopping-patience', type=int, default=10)
@@ -286,7 +300,7 @@ if __name__ == '__main__':
     datamodule = DataModule(
         args.dataset, args.undirected, args.data_cpu, args.use_uva,
         [int(_) for _ in args.fan_out.split(',')],
-        device, args.batch_size, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency)
+        device, args.batch_size, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.cache_size)
     model = SAGELightning(
         datamodule.in_feats, args.num_hidden, datamodule.n_classes, args.num_layers,
         F.relu, args.dropout, args.lr, datamodule.multilabel)
@@ -294,9 +308,9 @@ if __name__ == '__main__':
     # Train
     callbacks = []
     if not args.disable_checkpoint:
-        callbacks.append(ModelCheckpoint(monitor='val_acc', save_top_k=1))
+        callbacks.append(ModelCheckpoint(monitor='val_acc/dataloader_idx_0', save_top_k=1))
     callbacks.append(BatchSizeCallback(args.vertex_limit))
-    callbacks.append(EarlyStopping(monitor='val_acc', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
+    callbacks.append(EarlyStopping(monitor='val_acc/dataloader_idx_0', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
     subdir = '{}_{}_{}_{}_{}'.format(args.dataset, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency)
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(gpus=[args.gpu] if args.gpu != -1 else None,
