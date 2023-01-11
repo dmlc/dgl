@@ -1,6 +1,9 @@
 # pylint: disable=anomalous-backslash-in-string
 """DGL elementwise operator module."""
+from numbers import Number
 from typing import Union
+
+import torch
 
 from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix
@@ -96,8 +99,8 @@ def sub(
     >>> A - B
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
                                  [0, 1, 0, 1, 2]]),
-    values=tensor([-1, 20, 10,  -2, 27]),
-    shape=(3, 3), nnz=5)
+                 values=tensor([-1, 20, 10,  -2, 27]),
+                 shape=(3, 3), nnz=5)
     """
     return A - B
 
@@ -205,7 +208,7 @@ def div(
 
 
 def power(
-    A: Union[SparseMatrix, DiagMatrix], scalar: Union[float, int]
+    A: Union[SparseMatrix, DiagMatrix], scalar: Union[Number, torch.Tensor]
 ) -> Union[SparseMatrix, DiagMatrix]:
     r"""Elementwise exponentiation for ``DiagMatrix`` and ``SparseMatrix``,
     equivalent to ``A ** scalar``.

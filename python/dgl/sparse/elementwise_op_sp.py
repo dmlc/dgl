@@ -16,15 +16,6 @@ def spsp_add(A, B):
     )
 
 
-# Since these functions are never exposed but instead used for implementing
-# the builtin operators, we can return NotImplemented to (1) raise TypeError
-# for invalid value types, (2) not handling DiagMatrix in SparseMatrix
-# functions but instead delegate it to DiagMatrix.__radd__ etc, (3) allow
-# others to implement their own class that operates with SparseMatrix objects.
-# See also:
-# https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
-
-
 def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     """Elementwise addition
 
@@ -49,10 +40,12 @@ def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     >>> A = from_coo(row, col, val, shape=(3, 4))
     >>> A + A
     SparseMatrix(indices=tensor([[0, 1, 2],
-            [3, 0, 2]]),
-    values=tensor([40, 20, 60]),
-    shape=(3, 4), nnz=3)
+                                 [3, 0, 2]]),
+                 values=tensor([40, 20, 60]),
+                 shape=(3, 4), nnz=3)
     """
+    # Python falls back to B.__radd__ then TypeError when NotImplemented is
+    # returned.
     return spsp_add(A, B) if isinstance(B, SparseMatrix) else NotImplemented
 
 
@@ -82,10 +75,12 @@ def sp_sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     >>> B = from_coo(row, col, val2, shape=(3, 4))
     >>> A - B
     SparseMatrix(indices=tensor([[0, 1, 2],
-            [3, 0, 2]]),
-    values=tensor([10, 5, 15]),
-    shape=(3, 4), nnz=3)
+                                 [3, 0, 2]]),
+                 values=tensor([10, 5, 15]),
+                 shape=(3, 4), nnz=3)
     """
+    # Python falls back to B.__rsub__ then TypeError when NotImplemented is
+    # returned.
     return A + (-B)
 
 
@@ -114,16 +109,20 @@ def sp_mul(A: SparseMatrix, B: Union[Number, torch.Tensor]) -> SparseMatrix:
 
     >>> A * 2
     SparseMatrix(indices=tensor([[1, 0, 2],
-            [0, 3, 2]]),
-    values=tensor([2, 4, 6]),
-    shape=(3, 4), nnz=3)
+                                 [0, 3, 2]]),
+                 values=tensor([2, 4, 6]),
+                 shape=(3, 4), nnz=3)
 
     >>> 2 * A
     SparseMatrix(indices=tensor([[1, 0, 2],
-            [0, 3, 2]]),
-    values=tensor([2, 4, 6]),
-    shape=(3, 4), nnz=3)
+                                 [0, 3, 2]]),
+                 values=tensor([2, 4, 6]),
+                 shape=(3, 4), nnz=3)
     """
+    # Python falls back to B.__rmul__(A) then TypeError when NotImplemented is
+    # returned.
+    # So this also handles the case of scalar * SparseMatrix since we set
+    # SparseMatrix.__rmul__ to be the same as SparseMatrix.__mul__.
     return val_like(A, A.val * B) if is_scalar(B) else NotImplemented
 
 
@@ -152,10 +151,12 @@ def sp_div(A: SparseMatrix, B: Union[Number, torch.Tensor]) -> SparseMatrix:
 
     >>> A / 2
     SparseMatrix(indices=tensor([[1, 0, 2],
-            [0, 3, 2]]),
-    values=tensor([0.5000, 1.0000, 1.5000]),
-    shape=(3, 4), nnz=3)
+                                 [0, 3, 2]]),
+                 values=tensor([0.5000, 1.0000, 1.5000]),
+                 shape=(3, 4), nnz=3)
     """
+    # Python falls back to B.__rtruediv__(A) then TypeError when NotImplemented
+    # is returned.
     return val_like(A, A.val / B) if is_scalar(B) else NotImplemented
 
 
@@ -185,10 +186,12 @@ def sp_power(
     >>> A = from_coo(row, col, val)
     >>> A ** 2
     SparseMatrix(indices=tensor([[1, 0, 2],
-            [0, 3, 2]]),
-    values=tensor([100, 400, 900]),
-    shape=(3, 4), nnz=3)
+                                 [0, 3, 2]]),
+                 values=tensor([100, 400, 900]),
+                 shape=(3, 4), nnz=3)
     """
+    # Python falls back to scalar.__rpow__ then TypeError when NotImplemented
+    # is returned.
     return val_like(A, A.val**scalar) if is_scalar(scalar) else NotImplemented
 
 
