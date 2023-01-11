@@ -251,4 +251,4 @@ def power(
     DiagMatrix(val=tensor([1, 4, 9]),
                shape=(3, 3))
     """
-    return A ** scalar
+    return A**scalar

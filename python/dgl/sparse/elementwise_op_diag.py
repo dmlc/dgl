@@ -17,6 +17,7 @@ from .utils import is_scalar
 # See also:
 # https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
 
+
 def diag_add(
     D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
 ) -> Union[DiagMatrix, SparseMatrix]:
@@ -273,7 +274,9 @@ def diag_power(
     DiagMatrix(val=tensor([1, 4, 9]),
     shape=(3, 3))
     """
-    return diag(D.val ** scalar, D.shape) if is_scalar(scalar) else NotImplemented
+    return (
+        diag(D.val**scalar, D.shape) if is_scalar(scalar) else NotImplemented
+    )
 
 
 DiagMatrix.__add__ = diag_add

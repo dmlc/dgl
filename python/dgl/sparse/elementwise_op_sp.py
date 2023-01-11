@@ -15,6 +15,7 @@ def spsp_add(A, B):
         torch.ops.dgl_sparse.spsp_add(A.c_sparse_matrix, B.c_sparse_matrix)
     )
 
+
 # Since these functions are never exposed but instead used for implementing
 # the builtin operators, we can return NotImplemented to (1) raise TypeError
 # for invalid value types, (2) not handling DiagMatrix in SparseMatrix
@@ -22,6 +23,7 @@ def spsp_add(A, B):
 # others to implement their own class that operates with SparseMatrix objects.
 # See also:
 # https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
+
 
 def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     """Elementwise addition
@@ -87,9 +89,7 @@ def sp_sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     return A + (-B)
 
 
-def sp_mul(
-    A: SparseMatrix, B: Union[Number, torch.Tensor]
-) -> SparseMatrix:
+def sp_mul(A: SparseMatrix, B: Union[Number, torch.Tensor]) -> SparseMatrix:
     """Elementwise multiplication
 
     Parameters
@@ -127,9 +127,7 @@ def sp_mul(
     return val_like(A, A.val * B) if is_scalar(B) else NotImplemented
 
 
-def sp_div(
-    A: SparseMatrix, B: Union[Number, torch.Tensor]
-) -> SparseMatrix:
+def sp_div(A: SparseMatrix, B: Union[Number, torch.Tensor]) -> SparseMatrix:
     """Elementwise division
 
     Parameters
@@ -191,7 +189,7 @@ def sp_power(
     values=tensor([100, 400, 900]),
     shape=(3, 4), nnz=3)
     """
-    return val_like(A, A.val ** scalar) if is_scalar(scalar) else NotImplemented
+    return val_like(A, A.val**scalar) if is_scalar(scalar) else NotImplemented
 
 
 SparseMatrix.__add__ = sp_add
