@@ -13,7 +13,8 @@ def add(
 ) -> Union[DiagMatrix, SparseMatrix]:
     """Elementwise additions for `DiagMatrix` and `SparseMatrix`.
 
-    The supported combinations are shown as follow.
+    The supported combinations are shown as follows.
+
     +--------------+------------+--------------+--------+
     |     A \ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
@@ -56,7 +57,8 @@ def add(
 def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
     """Elementwise subtraction for `DiagMatrix` and `SparseMatrix`.
 
-    The supported combinations are shown as follow.
+    The supported combinations are shown as follows.
+
     +--------------+------------+--------------+--------+
     |     A \ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
@@ -95,7 +97,8 @@ def power(
 ) -> Union[SparseMatrix, DiagMatrix]:
     """Elementwise exponentiation for `DiagMatrix` and `SparseMatrix`.
 
-    The supported combinations are shown as follow.
+    The supported combinations are shown as follows.
+
     +--------------+------------+--------------+--------+
     |     A \ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
