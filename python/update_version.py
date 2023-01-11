@@ -12,7 +12,12 @@ import re
 # current version
 # We use the version of the incoming release for code
 # that is under development
-__version__ = "1.0" + os.getenv("DGL_PRERELEASE", "")
+# The environment variable DGL_PRERELEASE is the prerelase suffix
+# (usually "aYYMMDD")
+# The environment variable DGL_VERSION_SUFFIX is the local version label
+# suffix for indicating CPU and CUDA versions as in PEP 440 (e.g. "+cu102")
+__version__ = "1.0" + os.getenv("DGL_PRERELEASE", "") 
+__verison__ += os.getenv("DGL_VERSION_SUFFIX", "")
 print(__version__)
 
 # Implementations
