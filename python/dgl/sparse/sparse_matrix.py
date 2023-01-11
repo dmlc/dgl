@@ -103,7 +103,8 @@ class SparseMatrix:
         return self.c_sparse_matrix.coo()
 
     def csr(self) -> Tuple[torch.Tensor, ...]:
-        """Get the coordinate (COO) representation of the sparse matrix.
+        r"""Get the compressed sparse row (CSR) representation of the sparse
+        matrix.
 
         Returns
         -------
@@ -114,7 +115,8 @@ class SparseMatrix:
         return self.c_sparse_matrix.csr()
 
     def csc(self) -> Tuple[torch.Tensor, ...]:
-        """Get the coordinate (COO) representation of the sparse matrix.
+        r"""Get the compressed sparse column (CSC) representation of the sparse
+        matrix.
 
         Returns
         -------
