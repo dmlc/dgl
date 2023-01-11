@@ -5,7 +5,7 @@ from typing import Union
 from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix
 
-__all__ = ["add", "sub", "power"]
+__all__ = ["add", "sub", "mul", "div", "power"]
 
 
 def add(
@@ -93,7 +93,8 @@ def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
 
 
 def mul(
-    A: Union[SparseMatrix, DiagMatrix, float, int], B: Union[SparseMatrix, DiagMatrix, float, int]
+    A: Union[SparseMatrix, DiagMatrix, float, int],
+    B: Union[SparseMatrix, DiagMatrix, float, int],
 ) -> Union[SparseMatrix, DiagMatrix]:
     """Elementwise multiplication for `DiagMatrix` and `SparseMatrix`.
 
@@ -146,7 +147,9 @@ def mul(
     return A * B
 
 
-def div(A: Union[DiagMatrix], B: Union[DiagMatrix, float, int]) -> Union[DiagMatrix]:
+def div(
+    A: Union[DiagMatrix], B: Union[DiagMatrix, float, int]
+) -> Union[DiagMatrix]:
     """Elementwise division for `DiagMatrix` and `SparseMatrix`.
 
     The supported combinations are shown as follows.
@@ -235,4 +238,4 @@ def power(
     DiagMatrix(val=tensor([1, 4, 9]),
                shape=(3, 3))
     """
-    return A ** scalar
+    return A**scalar
