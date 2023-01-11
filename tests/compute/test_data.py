@@ -1,5 +1,7 @@
 import gzip
+import tarfile
 import os
+import io
 import tempfile
 import unittest
 
@@ -379,6 +381,19 @@ def test_extract_archive():
             data.utils.extract_archive(gz_path, dst_dir, overwrite=True)
             assert os.path.exists(os.path.join(dst_dir, gz_file))
 
+    # tar
+    with tempfile.TemporaryDirectory() as src_dir:
+        tar_file = "tar_archive"
+        tar_path = os.path.join(src_dir, tar_file + ".tar")
+        # default encode to utf8
+        content = 'test extract archive tar\n'.encode()
+        info = tarfile.TarInfo(name='tar_archive')
+        info.size = len(content)
+        with tarfile.open(tar_path, "w") as f:
+            f.addfile(info, io.BytesIO(content))
+        with tempfile.TemporaryDirectory() as dst_dir:
+            data.utils.extract_archive(tar_path, dst_dir, overwrite=True)
+            assert os.path.exists(os.path.join(dst_dir, tar_file))
 
 def _test_construct_graphs_node_ids():
     from dgl.data.csv_dataset_base import (
