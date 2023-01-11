@@ -21,7 +21,7 @@ def track_time(graph_name, format, seed_nodes_num, fanout):
 
     edge_dir = "in"
     seed_nodes = np.random.randint(0, graph.num_nodes(), seed_nodes_num)
-    seed_nodes = seed_nodes.to(device)
+    seed_nodes = torch.from_numpy(seed_nodes).to(device)
 
     # dry run
     for i in range(3):
