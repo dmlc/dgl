@@ -11,13 +11,13 @@ __all__ = ["add", "sub", "mul", "div", "power"]
 def add(
     A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
 ) -> Union[DiagMatrix, SparseMatrix]:
-    """Elementwise additions for ``DiagMatrix`` and ``SparseMatrix``. This is
-     equivalent to ``A + B``.
+    r"""Elementwise additions for ``DiagMatrix`` and ``SparseMatrix``,
+    equivalent to ``A + B``.
 
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
+    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      ✅      |   🚫   |
     +--------------+------------+--------------+--------+
@@ -56,13 +56,13 @@ def add(
 
 
 def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
-    """Elementwise subtraction for ``DiagMatrix`` and ``SparseMatrix``. This is
+    r"""Elementwise subtraction for ``DiagMatrix`` and ``SparseMatrix``. This is
     equivalent to ``A - B``.
 
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
+    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      🚫      |   🚫   |
     +--------------+------------+--------------+--------+
@@ -98,13 +98,13 @@ def mul(
     A: Union[SparseMatrix, DiagMatrix, float, int],
     B: Union[SparseMatrix, DiagMatrix, float, int],
 ) -> Union[SparseMatrix, DiagMatrix]:
-    """Elementwise multiplication for ``DiagMatrix`` and ``SparseMatrix``. This
-     is equivalent to ``A * B``.
+    r"""Elementwise multiplication for ``DiagMatrix`` and ``SparseMatrix``,
+    equivalent to ``A * B``.
 
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
+    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+
@@ -153,13 +153,13 @@ def mul(
 def div(
     A: Union[DiagMatrix], B: Union[DiagMatrix, float, int]
 ) -> Union[DiagMatrix]:
-    """Elementwise division for ``DiagMatrix`` and ``SparseMatrix``. This is
-    equivalent to ``A / B``.
+    r"""Elementwise division for ``DiagMatrix`` and ``SparseMatrix``, equivalent
+    to ``A / B``.
 
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
+    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+
@@ -199,13 +199,13 @@ def div(
 def power(
     A: Union[SparseMatrix, DiagMatrix], scalar: Union[float, int]
 ) -> Union[SparseMatrix, DiagMatrix]:
-    """Elementwise exponentiation for ``DiagMatrix`` and ``SparseMatrix``. This
-     is equivalent to ``A ** scalar``.
+    r"""Elementwise exponentiation for ``DiagMatrix`` and ``SparseMatrix``,
+    equivalent to ``A ** scalar``.
 
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
+    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     🚫     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+

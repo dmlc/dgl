@@ -161,6 +161,8 @@ Elementwise Operators
 
     add
     sub
+    mul
+    div
     power
 
 Matrix Multiplication
