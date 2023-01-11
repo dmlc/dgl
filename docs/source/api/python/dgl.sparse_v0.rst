@@ -153,6 +153,19 @@ Operators
 ---------
 .. currentmodule:: dgl.sparse
 
+Elementwise Operators
+````````
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    add
+    sub
+    power
+
+Matrix Multiplication
+````````
+
 .. autosummary::
     :toctree: ../../generated/
 
@@ -162,4 +175,11 @@ Operators
     mm
     sddmm
     bsddmm
+
+Non-linear activation functions
+````````
+
+.. autosummary::
+    :toctree: ../../generated/
+
     softmax
