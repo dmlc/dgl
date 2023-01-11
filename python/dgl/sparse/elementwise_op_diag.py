@@ -1,9 +1,21 @@
 """DGL elementwise operators for diagonal matrix module."""
 from typing import Union
+from numbers import Number
+
+import torch
 
 from .diag_matrix import diag, DiagMatrix
 from .sparse_matrix import SparseMatrix
+from .utils import is_scalar
 
+# Since these functions are never exposed but instead used for implementing
+# the builtin operators, we can return NotImplemented to (1) raise TypeError
+# for invalid value types, (2) not handling the first argument not being
+# a DiagMatrix object but instead delegate it to DiagMatrix.__radd__ etc, (3)
+# allow others to implement their own class that operates with DiagMatrix
+# objects.
+# See also:
+# https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
 
 def diag_add(
     D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
@@ -43,21 +55,25 @@ def diag_add(
         )
         D1 = D1.as_sparse()
         return D1 + D2
-    raise RuntimeError(
-        "Elementwise addition between "
-        f"{type(D1)} and {type(D2)} is not supported."
-    )
+    return NotImplemented
 
 
-def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
-    """Elementwise subtraction
+def diag_sub(
+    D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
+) -> Union[DiagMatrix, SparseMatrix]:
+    """Elementwise subtraction ``D1 - D2``.
 
     Parameters
     ----------
     D1 : DiagMatrix
         Diagonal matrix
-    D2 : DiagMatrix
-        Diagonal matrix
+    D2 : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
+
+    Returns
+    -------
+    DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix, same as D2
 
     Returns
     -------
@@ -72,28 +88,52 @@ def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     DiagMatrix(val=tensor([-9, -9, -9]),
     shape=(3, 3))
     """
-    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
-        assert D1.shape == D2.shape, (
-            "The shape of diagonal matrix D1 "
-            f"{D1.shape} and D2 {D2.shape} must match."
-        )
-        return diag(D1.val - D2.val, D1.shape)
-    raise RuntimeError(
-        "Elementwise subtraction between "
-        f"{type(D1)} and {type(D2)} is not supported."
-    )
+    return D1 + (-D2)
 
 
-def diag_mul(
-    D1: Union[DiagMatrix, float, int], D2: Union[DiagMatrix, float, int]
-) -> DiagMatrix:
-    """Elementwise multiplication
+def diag_rsub(
+    D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
+) -> Union[DiagMatrix, SparseMatrix]:
+    """Elementwise subtraction ``D2 - D1``.
 
     Parameters
     ----------
-    D1 : DiagMatrix or float or int
-        Diagonal matrix or scalar value
-    D2 : DiagMatrix or float or int
+    D1 : DiagMatrix
+        Diagonal matrix
+    D2 : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
+
+    Returns
+    -------
+    DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix, same as D2
+
+    Returns
+    -------
+    DiagMatrix
+        Diagonal matrix
+
+    Examples
+    --------
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> D2 = diag(torch.arange(10, 13))
+    >>> D2 - D1
+    DiagMatrix(val=tensor([9, 9, 9]),
+    shape=(3, 3))
+    """
+    return (-D1) + D2
+
+
+def diag_mul(
+    D1: DiagMatrix, D2: Union[DiagMatrix, Number, torch.Tensor]
+) -> DiagMatrix:
+    """Elementwise multiplication.
+
+    Parameters
+    ----------
+    D1 : DiagMatrix
+        Diagonal matrix
+    D2 : DiagMatrix or Number or torch.Tensor
         Diagonal matrix or scalar value
 
     Returns
@@ -111,32 +151,28 @@ def diag_mul(
     DiagMatrix(val=tensor([2, 4, 6]),
     shape=(3, 3))
     """
-    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
+    if isinstance(D2, DiagMatrix):
         assert D1.shape == D2.shape, (
             "The shape of diagonal matrix D1 "
             f"{D1.shape} and D2 {D2.shape} must match."
         )
         return diag(D1.val * D2.val, D1.shape)
-    elif isinstance(D1, DiagMatrix) and isinstance(D2, (float, int)):
+    elif is_scalar(D2):
         return diag(D1.val * D2, D1.shape)
-    elif isinstance(D1, (float, int)) and isinstance(D2, DiagMatrix):
-        return diag(D1 * D2.val, D2.shape)
-
-    raise RuntimeError(
-        "Elementwise multiplication between "
-        f"{type(D1)} and {type(D2)} is not supported."
-    )
+    else:
+        return NotImplemented
 
 
-def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
-    """Elementwise division of a diagonal matrix by a diagonal matrix or a
-    scalar
+def diag_div(
+    D1: DiagMatrix, D2: Union[DiagMatrix, Number, torch.Tensor]
+) -> DiagMatrix:
+    """Elementwise division ``D1 / D2``.
 
     Parameters
     ----------
     D1 : DiagMatrix
         Diagonal matrix
-    D2 : DiagMatrix or float or int
+    D2 : DiagMatrix or Number or torch.Tensor
         Diagonal matrix or scalar value. If :attr:`D2` is a DiagMatrix,
         division is only applied to the diagonal elements.
 
@@ -162,35 +198,59 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
             "must match."
         )
         return diag(D1.val / D2.val, D1.shape)
-    elif isinstance(D2, (float, int)):
+    elif is_scalar(D2):
         assert D2 != 0, "Division by zero is not allowed."
         return diag(D1.val / D2, D1.shape)
-
-    raise RuntimeError(
-        f"Elementwise division between a diagonal matrix and {type(D2)} is "
-        "not supported."
-    )
+    else:
+        return NotImplemented
 
 
-def diag_rdiv(D1: DiagMatrix, D2: Union[float, int]):
-    """Function for preventing elementwise division of a scalar by a diagonal
-    matrix
+def diag_rdiv(
+    D1: DiagMatrix, D2: Union[DiagMatrix, Number, torch.Tensor]
+) -> DiagMatrix:
+    """Elementwise division ``D2 / D1``.
 
     Parameters
     ----------
     D1 : DiagMatrix
         Diagonal matrix
-    D2 : float or int
-        Scalar value
+    D2 : DiagMatrix or Number or torch.Tensor
+        Diagonal matrix or scalar value. If :attr:`D2` is a DiagMatrix,
+        division is only applied to the diagonal elements.
+
+    Returns
+    -------
+    DiagMatrix
+        diagonal matrix
+
+    Examples
+    --------
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> D2 = diag(torch.arange(10, 13))
+    >>> D2 / D1
+    DiagMatrix(val=tensor([10.0000, 5.5000, 4.0000]),
+    shape=(3, 3))
+    >>> 2.5 / D1
+    DiagMatrix(val=tensor([0.2500, 0.2273, 0.2083]),
+    shape=(3, 3))
     """
-    raise RuntimeError(
-        f"Elementwise division of {type(D2)} by a diagonal matrix is not "
-        "supported."
-    )
+    if isinstance(D2, DiagMatrix):
+        assert D1.shape == D2.shape, (
+            f"The shape of diagonal matrix D1 {D1.shape} and D2 {D2.shape} "
+            "must match."
+        )
+        return diag(D2.val / D1.val, D1.shape)
+    elif is_scalar(D2):
+        assert D2 != 0, "Division by zero is not allowed."
+        return diag(D2 / D1.val, D1.shape)
+    else:
+        return NotImplemented
 
 
 # pylint: disable=invalid-name
-def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
+def diag_power(
+    D: DiagMatrix, scalar: Union[Number, torch.Tensor]
+) -> DiagMatrix:
     """Take the power of each nonzero element and return a diagonal matrix with
     the result.
 
@@ -198,8 +258,8 @@ def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
     ----------
     D : DiagMatrix
         Diagonal matrix
-    scalar : float or int
-        Exponent
+    scalar : Number or torch.Tensor
+        Exponent.  Must be a scalar value.
 
     Returns
     -------
@@ -213,37 +273,15 @@ def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
     DiagMatrix(val=tensor([1, 4, 9]),
     shape=(3, 3))
     """
-    if isinstance(scalar, (float, int)):
-        return diag(D.val**scalar, D.shape)
-
-    raise RuntimeError(
-        f"Raising a diagonal matrix to exponent {type(scalar)} is not allowed."
-    )
-
-
-def diag_rpower(D: DiagMatrix, scalar: Union[float, int]):
-    """Function for preventing raising a scalar to a diagonal matrix exponent
-
-    Parameters
-    ----------
-    D : DiagMatrix
-        Diagonal matrix
-    scalar : float or int
-        Scalar
-    """
-    raise RuntimeError(
-        f"Raising {type(scalar)} to a diagonal matrix component is not "
-        "allowed."
-    )
+    return diag(D.val ** scalar, D.shape) if is_scalar(scalar) else NotImplemented
 
 
 DiagMatrix.__add__ = diag_add
 DiagMatrix.__radd__ = diag_add
 DiagMatrix.__sub__ = diag_sub
-DiagMatrix.__rsub__ = diag_sub
+DiagMatrix.__rsub__ = diag_rsub
 DiagMatrix.__mul__ = diag_mul
 DiagMatrix.__rmul__ = diag_mul
 DiagMatrix.__truediv__ = diag_div
 DiagMatrix.__rtruediv__ = diag_rdiv
 DiagMatrix.__pow__ = diag_power
-DiagMatrix.__rpow__ = diag_rpower

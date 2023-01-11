@@ -20,7 +20,7 @@ def all_close_sparse(A, row, col, val, shape):
     assert A.shape == shape
 
 
-@pytest.mark.parametrize("v_scalar", [2, 2.5])
+@pytest.mark.parametrize("v_scalar", [2, 2.5, torch.tensor(2), torch.tensor(2.5)])
 def test_mul_scalar(v_scalar):
     ctx = F.ctx()
     row = torch.tensor([1, 0, 2]).to(ctx)
@@ -39,15 +39,29 @@ def test_mul_scalar(v_scalar):
     assert A1.shape == A2.shape
 
 
+@pytest.mark.parametrize("v_scalar", [2, 2.5, torch.tensor(2), torch.tensor(2.5)])
+def test_div_scalar(v_scalar):
+    ctx = F.ctx()
+    row = torch.tensor([1, 0, 2]).to(ctx)
+    col = torch.tensor([0, 3, 2]).to(ctx)
+    val = torch.randn(len(row)).to(ctx)
+    A1 = from_coo(row, col, val, shape=(3, 4))
+
+    # A / v
+    A2 = A1 / v_scalar
+    assert torch.allclose(A1.val / v_scalar, A2.val, rtol=1e-4, atol=1e-4, equal_nan=True)
+    assert A1.shape == A2.shape
+
+
 @pytest.mark.parametrize("val_shape", [(3,), (3, 2)])
-def test_pow(val_shape):
+@pytest.mark.parametrize("exponent", [2, torch.tensor(2)])
+def test_pow(val_shape, exponent):
     # A ** v
     ctx = F.ctx()
     row = torch.tensor([1, 0, 2]).to(ctx)
     col = torch.tensor([0, 3, 2]).to(ctx)
     val = torch.randn(val_shape).to(ctx)
     A = from_coo(row, col, val, shape=(3, 4))
-    exponent = 2
     A_new = A**exponent
     assert torch.allclose(A_new.val, val**exponent)
     assert A_new.shape == A.shape
