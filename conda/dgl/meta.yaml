@@ -1,9 +1,9 @@
 package:
   name: dgl{{ environ.get('DGL_PACKAGE_SUFFIX', '') }}
-  version: "1.0"
+  version: 1.0{{ environ.get('DGL_VERSION_SUFFIX', '') }}
 
 source:
-  git_rev: 1.0.x
+  git_rev: {{ environ.get('DGL_RELEASE_BRANCH', 'master') }}
   git_url: https://github.com/dmlc/dgl.git
 
 requirements:
@@ -20,6 +20,7 @@ requirements:
     - networkx
     - requests
     - tqdm
+    - psutil
 
 build:
   script_env:
