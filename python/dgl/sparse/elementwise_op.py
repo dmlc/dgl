@@ -11,7 +11,8 @@ __all__ = ["add", "sub", "mul", "div", "power"]
 def add(
     A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
 ) -> Union[DiagMatrix, SparseMatrix]:
-    """Elementwise additions for `DiagMatrix` and `SparseMatrix`.
+    """Elementwise additions for `DiagMatrix` and `SparseMatrix`. This is
+     equivalent to `A + B`.
 
     The supported combinations are shown as follows.
 
@@ -55,7 +56,8 @@ def add(
 
 
 def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
-    """Elementwise subtraction for `DiagMatrix` and `SparseMatrix`.
+    """Elementwise subtraction for `DiagMatrix` and `SparseMatrix`. This is
+    equivalent to `A - B`.
 
     The supported combinations are shown as follows.
 
@@ -96,7 +98,8 @@ def mul(
     A: Union[SparseMatrix, DiagMatrix, float, int],
     B: Union[SparseMatrix, DiagMatrix, float, int],
 ) -> Union[SparseMatrix, DiagMatrix]:
-    """Elementwise multiplication for `DiagMatrix` and `SparseMatrix`.
+    """Elementwise multiplication for `DiagMatrix` and `SparseMatrix`. This is
+    equivalent to `A * B`.
 
     The supported combinations are shown as follows.
 
@@ -150,7 +153,8 @@ def mul(
 def div(
     A: Union[DiagMatrix], B: Union[DiagMatrix, float, int]
 ) -> Union[DiagMatrix]:
-    """Elementwise division for `DiagMatrix` and `SparseMatrix`.
+    """Elementwise division for `DiagMatrix` and `SparseMatrix`. This is
+    equivalent to `A / B`.
 
     The supported combinations are shown as follows.
 
@@ -195,7 +199,8 @@ def div(
 def power(
     A: Union[SparseMatrix, DiagMatrix], scalar: Union[float, int]
 ) -> Union[SparseMatrix, DiagMatrix]:
-    """Elementwise exponentiation for `DiagMatrix` and `SparseMatrix`.
+    """Elementwise exponentiation for `DiagMatrix` and `SparseMatrix`. This is
+    equivalent to `A ** scalar`.
 
     The supported combinations are shown as follows.
 
