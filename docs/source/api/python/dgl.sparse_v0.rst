@@ -90,9 +90,6 @@ Attributes and methods
     SparseMatrix.coalesce
     SparseMatrix.has_duplicate
     SparseMatrix.dense
-    SparseMatrix.transpose
-    SparseMatrix.t
-    SparseMatrix.T
     SparseMatrix.to
     SparseMatrix.cuda
     SparseMatrix.cpu
@@ -100,12 +97,15 @@ Attributes and methods
     SparseMatrix.double
     SparseMatrix.int
     SparseMatrix.long
+    SparseMatrix.transpose
+    SparseMatrix.t
+    SparseMatrix.T
+    SparseMatrix.neg
     SparseMatrix.reduce
     SparseMatrix.sum
     SparseMatrix.smax
     SparseMatrix.smin
     SparseMatrix.smean
-    SparseMatrix.neg
     SparseMatrix.softmax
 
 Diagonal matrix class
@@ -136,9 +136,6 @@ Attributes and methods
     DiagMatrix.val
     DiagMatrix.as_sparse
     DiagMatrix.dense
-    DiagMatrix.transpose
-    DiagMatrix.t
-    DiagMatrix.T
     DiagMatrix.to
     DiagMatrix.cuda
     DiagMatrix.cpu
@@ -146,6 +143,9 @@ Attributes and methods
     DiagMatrix.double
     DiagMatrix.int
     DiagMatrix.long
+    DiagMatrix.transpose
+    DiagMatrix.t
+    DiagMatrix.T
     DiagMatrix.neg
     DiagMatrix.inv
 
