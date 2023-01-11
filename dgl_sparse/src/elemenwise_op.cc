@@ -22,11 +22,13 @@ c10::intrusive_ptr<SparseMatrix> SpSpAdd(
     const c10::intrusive_ptr<SparseMatrix>& A,
     const c10::intrusive_ptr<SparseMatrix>& B) {
   ElementwiseOpSanityCheck(A, B);
-  auto torch_A = COOToTorchCOO(A->COOPtr(), A->value());
-  auto torch_B = COOToTorchCOO(B->COOPtr(), B->value());
-  auto sum = torch_A + torch_B;
-  torch_A = torch::Tensor();
-  torch_B = torch::Tensor();
+  torch::Tensor sum;
+  {
+    // To reduce peak memory usage.
+    auto torch_A = COOToTorchCOO(A->COOPtr(), A->value());
+    auto torch_B = COOToTorchCOO(B->COOPtr(), B->value());
+    sum = torch_A + torch_B;
+  }
   sum = sum.coalesce();
   auto indices = sum.indices();
   auto row = indices[0];
