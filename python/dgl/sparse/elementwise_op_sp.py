@@ -4,7 +4,6 @@ from numbers import Number
 
 import torch
 
-from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix, val_like
 from .utils import is_scalar
 
