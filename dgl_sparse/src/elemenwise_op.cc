@@ -24,7 +24,10 @@ c10::intrusive_ptr<SparseMatrix> SpSpAdd(
   ElementwiseOpSanityCheck(A, B);
   auto torch_A = COOToTorchCOO(A->COOPtr(), A->value());
   auto torch_B = COOToTorchCOO(B->COOPtr(), B->value());
-  auto sum = (torch_A + torch_B).coalesce();
+  auto sum = torch_A + torch_B;
+  torch_A = torch::Tensor();
+  torch_B = torch::Tensor();
+  sum = sum.coalesce();
   auto indices = sum.indices();
   auto row = indices[0];
   auto col = indices[1];
