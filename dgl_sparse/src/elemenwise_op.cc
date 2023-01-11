@@ -24,7 +24,8 @@ c10::intrusive_ptr<SparseMatrix> SpSpAdd(
   ElementwiseOpSanityCheck(A, B);
   torch::Tensor sum;
   {
-    // To reduce peak memory usage.
+    // TODO(#5145) This is a workaround to reduce peak memory usage. It is no
+    // longer needed after we address #5145.
     auto torch_A = COOToTorchCOO(A->COOPtr(), A->value());
     auto torch_B = COOToTorchCOO(B->COOPtr(), B->value());
     sum = torch_A + torch_B;
