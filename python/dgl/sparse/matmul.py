@@ -6,7 +6,7 @@ import torch
 
 from .diag_matrix import diag, DiagMatrix
 
-from .sparse_matrix import SparseMatrix
+from .sparse_matrix import SparseMatrix, val_like
 
 __all__ = ["spmm", "bspmm", "spspmm", "mm"]
 
@@ -117,6 +117,62 @@ def _diag_diag_mm(A1: DiagMatrix, A2: DiagMatrix) -> DiagMatrix:
     return diag(diag_val.to(A1.device), (M, P))
 
 
+def _sparse_diag_mm(A, D):
+    """Internal function for multiplying a sparse matrix by a diagonal matrix.
+
+    Parameters
+    ----------
+    A : SparseMatrix
+        Matrix of shape (N, M), with values of shape (nnz1)
+    D : DiagMatrix
+        Matrix of shape (M, P), with values of shape (nnz2)
+
+    Returns
+    -------
+    SparseMatrix
+        SparseMatrix with shape (N, P)
+    """
+    assert (
+        A.shape[1] == D.shape[0]
+    ), f"The second dimension of SparseMatrix should be equal to the first \
+    dimension of DiagMatrix in matmul(SparseMatrix, DiagMatrix), but the \
+    shapes of SparseMatrix and DiagMatrix are {A.shape} and {D.shape} \
+    respectively."
+    assert (
+        D.shape[0] == D.shape[1]
+    ), f"The DiagMatrix should be a square in matmul(SparseMatrix, DiagMatrix) \
+    but got {D.shape}"
+    return val_like(A, D.val[A.col] * A.val)
+
+
+def _diag_sparse_mm(D, A):
+    """Internal function for multiplying a diag matrix by a sparse matrix.
+
+    Parameters
+    ----------
+    D : DiagMatrix
+        Matrix of shape (N, M), with values of shape (nnz1)
+    A : DiagMatrix
+        Matrix of shape (M, P), with values of shape (nnz2)
+
+    Returns
+    -------
+    SparseMatrix
+        SparseMatrix with shape (N, P)
+    """
+    assert (
+        D.shape[1] == A.shape[0]
+    ), f"The second dimension of DiagMatrix should be equal to the first \
+    dimension of SparseMatrix in matmul(DiagMatrix, SparseMatrix), but the \
+    shapes of DiagMatrix and SparseMatrix are {D.shape} and {A.shape} \
+    respectively."
+    assert (
+        D.shape[0] == D.shape[1]
+    ), f"The DiagMatrix should be a square in matmul(DiagMatrix, SparseMatrix) \
+    but got {D.shape}"
+    return val_like(A, D.val[A.row] * A.val)
+
+
 def spspmm(
     A1: Union[SparseMatrix, DiagMatrix], A2: Union[SparseMatrix, DiagMatrix]
 ) -> Union[SparseMatrix, DiagMatrix]:
@@ -165,9 +221,9 @@ def spspmm(
     if isinstance(A1, DiagMatrix) and isinstance(A2, DiagMatrix):
         return _diag_diag_mm(A1, A2)
     if isinstance(A1, DiagMatrix):
-        A1 = A1.as_sparse()
+        return _diag_sparse_mm(A1, A2)
     if isinstance(A2, DiagMatrix):
-        A2 = A2.as_sparse()
+        return _sparse_diag_mm(A1, A2)
     return SparseMatrix(
         torch.ops.dgl_sparse.spspmm(A1.c_sparse_matrix, A2.c_sparse_matrix)
     )

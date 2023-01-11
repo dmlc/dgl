@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import bspmm, from_coo, val_like
+from dgl.sparse import bspmm, diag, from_coo, mm, val_like
 
 from .utils import (
     clone_detach_and_grad,
@@ -144,3 +144,71 @@ def test_spspmm_duplicate():
         pass
     else:
         assert False, "Should raise error."
+
+
+@pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("sparse_shape", [(5, 5), (5, 6)])
+@pytest.mark.parametrize("nnz", [1, 10])
+def test_sparse_diag_mm(create_func, sparse_shape, nnz):
+    dev = F.ctx()
+    diag_shape = sparse_shape[1], sparse_shape[1]
+    A = create_func(sparse_shape, nnz, dev)
+    diag_val = torch.randn(sparse_shape[1], device=dev, requires_grad=True)
+    D = diag(diag_val, diag_shape)
+    # (TODO) Need to use dgl.sparse.matmul after rename mm to matmul
+    B = mm(A, D)
+    grad = torch.randn_like(B.val)
+    B.val.backward(grad)
+
+    torch_A = sparse_matrix_to_torch_sparse(A)
+    torch_D = sparse_matrix_to_torch_sparse(D.as_sparse())
+    torch_B = torch.sparse.mm(torch_A, torch_D)
+    torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
+    torch_B.backward(torch_B_grad)
+
+    with torch.no_grad():
+        assert torch.allclose(B.dense(), torch_B.to_dense(), atol=1e-05)
+        assert torch.allclose(
+            val_like(A, A.val.grad).dense(),
+            torch_A.grad.to_dense(),
+            atol=1e-05,
+        )
+        assert torch.allclose(
+            diag(D.val.grad, D.shape).dense(),
+            torch_D.grad.to_dense(),
+            atol=1e-05,
+        )
+
+
+@pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("sparse_shape", [(5, 5), (5, 6)])
+@pytest.mark.parametrize("nnz", [1, 10])
+def test_diag_sparse_mm(create_func, sparse_shape, nnz):
+    dev = F.ctx()
+    diag_shape = sparse_shape[0], sparse_shape[0]
+    A = create_func(sparse_shape, nnz, dev)
+    diag_val = torch.randn(sparse_shape[0], device=dev, requires_grad=True)
+    D = diag(diag_val, diag_shape)
+    # (TODO) Need to use dgl.sparse.matmul after rename mm to matmul
+    B = mm(D, A)
+    grad = torch.randn_like(B.val)
+    B.val.backward(grad)
+
+    torch_A = sparse_matrix_to_torch_sparse(A)
+    torch_D = sparse_matrix_to_torch_sparse(D.as_sparse())
+    torch_B = torch.sparse.mm(torch_D, torch_A)
+    torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
+    torch_B.backward(torch_B_grad)
+
+    with torch.no_grad():
+        assert torch.allclose(B.dense(), torch_B.to_dense(), atol=1e-05)
+        assert torch.allclose(
+            val_like(A, A.val.grad).dense(),
+            torch_A.grad.to_dense(),
+            atol=1e-05,
+        )
+        assert torch.allclose(
+            diag(D.val.grad, D.shape).dense(),
+            torch_D.grad.to_dense(),
+            atol=1e-05,
+        )
