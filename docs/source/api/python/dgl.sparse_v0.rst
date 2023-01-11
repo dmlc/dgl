@@ -90,6 +90,7 @@ Attributes and methods
     SparseMatrix.coalesce
     SparseMatrix.has_duplicate
     SparseMatrix.dense
+    SparseMatrix.transpose
     SparseMatrix.t
     SparseMatrix.T
     SparseMatrix.to
@@ -99,7 +100,6 @@ Attributes and methods
     SparseMatrix.double
     SparseMatrix.int
     SparseMatrix.long
-    SparseMatrix.transpose
     SparseMatrix.reduce
     SparseMatrix.sum
     SparseMatrix.smax
@@ -136,9 +136,9 @@ Attributes and methods
     DiagMatrix.val
     DiagMatrix.as_sparse
     DiagMatrix.dense
+    DiagMatrix.transpose
     DiagMatrix.t
     DiagMatrix.T
-    DiagMatrix.transpose
     DiagMatrix.to
     DiagMatrix.cuda
     DiagMatrix.cpu
