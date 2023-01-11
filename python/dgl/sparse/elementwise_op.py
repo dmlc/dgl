@@ -17,7 +17,7 @@ def add(
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
+    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      ✅      |   🚫   |
     +--------------+------------+--------------+--------+
@@ -56,13 +56,13 @@ def add(
 
 
 def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
-    r"""Elementwise subtraction for ``DiagMatrix`` and ``SparseMatrix``. This is
+    r"""Elementwise subtraction for ``DiagMatrix`` and ``SparseMatrix``,
     equivalent to ``A - B``.
 
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
+    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      🚫      |   🚫   |
     +--------------+------------+--------------+--------+
@@ -104,7 +104,7 @@ def mul(
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
+    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+
@@ -159,7 +159,7 @@ def div(
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
+    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+
@@ -205,7 +205,7 @@ def power(
     The supported combinations are shown as follows.
 
     +--------------+------------+--------------+--------+
-    |     A \ B    | DiagMatrix | SparseMatrix | scalar |
+    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     🚫     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+
