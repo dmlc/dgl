@@ -39,7 +39,7 @@ class SAGE(nn.Module):
                 g, torch.arange(g.num_nodes()).to(g.device), sampler, device=device,
                 batch_size=batch_size, shuffle=False, drop_last=False,
                 num_workers=0)
-        buffer_device = 'cpu'
+        buffer_device = torch.device('cpu')
         pin_memory = (buffer_device != device)
 
         for l, layer in enumerate(self.layers):
@@ -57,7 +57,7 @@ class SAGE(nn.Module):
                 y[output_nodes[0]:output_nodes[-1]+1] = h.to(buffer_device)
             feat = y
         return y
-    
+
 def evaluate(model, graph, dataloader):
     model.eval()
     ys = []
@@ -72,9 +72,9 @@ def evaluate(model, graph, dataloader):
 def layerwise_infer(device, graph, nid, model, batch_size):
     model.eval()
     with torch.no_grad():
-        pred = model.inference(graph, device, batch_size)
+        pred = model.inference(graph, device, batch_size) # pred in buffer_device
         pred = pred[nid]
-        label = graph.ndata['label'][nid]
+        label = graph.ndata['label'][nid].to(pred.device)
         return MF.accuracy(pred, label)
 
 def train(args, device, g, dataset, model):
@@ -96,7 +96,7 @@ def train(args, device, g, dataset, model):
                                 use_uva=use_uva)
 
     opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
-    
+
     for epoch in range(10):
         model.train()
         total_loss = 0
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     if not torch.cuda.is_available():
         args.mode = 'cpu'
     print(f'Training in {args.mode} mode.')
-    
+
     # load and preprocess dataset
     print('Loading data')
     dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-products'))
@@ -141,5 +141,5 @@ if __name__ == '__main__':
 
     # test the model
     print('Testing...')
-    acc = layerwise_infer(device, g, dataset.test_idx.to(device), model, batch_size=4096)
+    acc = layerwise_infer(device, g, dataset.test_idx, model, batch_size=4096)
     print("Test Accuracy {:.4f}".format(acc.item()))

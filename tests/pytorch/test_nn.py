@@ -6,12 +6,15 @@ import dgl.nn.pytorch as nn
 import dgl.function as fn
 import backend as F
 import pytest
+import torch
 from test_utils.graph_cases import get_cases, random_graph, random_bipartite, random_dglgraph
 from test_utils import parametrize_idtype
 from copy import deepcopy
 import pickle
 
 import scipy as sp
+from torch.utils.data import DataLoader
+from torch.optim import SparseAdam, Adam
 
 tmp_buffer = io.BytesIO()
 
@@ -412,6 +415,60 @@ def test_rgcn(idtype, O):
         h_new = rgc_bdd(g, h, r, norm)
         assert h_new.shape == (100, O)
 
+@parametrize_idtype
+@pytest.mark.parametrize('O', [1, 10, 40])
+def test_rgcn_default_nbasis(idtype, O):
+    ctx = F.ctx()
+    etype = []
+    g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.1))
+    g = g.astype(idtype).to(F.ctx())
+    # 5 etypes
+    R = 5
+    for i in range(g.number_of_edges()):
+        etype.append(i % 5)
+    I = 10
+
+    h = th.randn((100, I)).to(ctx)
+    r = th.tensor(etype).to(ctx)
+    norm = th.rand((g.number_of_edges(), 1)).to(ctx)
+    sorted_r, idx = th.sort(r)
+    sorted_g = dgl.reorder_graph(g, edge_permute_algo='custom', permute_config={'edges_perm' : idx.to(idtype)})
+    sorted_norm = norm[idx]
+
+    rgc = nn.RelGraphConv(I, O, R).to(ctx)
+    th.save(rgc, tmp_buffer)  # test pickle
+    rgc_basis = nn.RelGraphConv(I, O, R, "basis").to(ctx)
+    th.save(rgc_basis, tmp_buffer)  # test pickle
+    if O % R == 0:
+        rgc_bdd = nn.RelGraphConv(I, O, R, "bdd").to(ctx)
+        th.save(rgc_bdd, tmp_buffer)  # test pickle
+
+    # basic usage
+    h_new = rgc(g, h, r)
+    assert h_new.shape == (100, O)
+    h_new_basis = rgc_basis(g, h, r)
+    assert h_new_basis.shape == (100, O)
+    if O % R == 0:
+        h_new_bdd = rgc_bdd(g, h, r)
+        assert h_new_bdd.shape == (100, O)
+
+    # sorted input
+    h_new_sorted = rgc(sorted_g, h, sorted_r, presorted=True)
+    assert th.allclose(h_new, h_new_sorted, atol=1e-4, rtol=1e-4)
+    h_new_basis_sorted = rgc_basis(sorted_g, h, sorted_r, presorted=True)
+    assert th.allclose(h_new_basis, h_new_basis_sorted, atol=1e-4, rtol=1e-4)
+    if O % R == 0:
+        h_new_bdd_sorted = rgc_bdd(sorted_g, h, sorted_r, presorted=True)
+        assert th.allclose(h_new_bdd, h_new_bdd_sorted, atol=1e-4, rtol=1e-4)
+
+    # norm input
+    h_new = rgc(g, h, r, norm)
+    assert h_new.shape == (100, O)
+    h_new = rgc_basis(g, h, r, norm)
+    assert h_new.shape == (100, O)
+    if O % R == 0:
+        h_new = rgc_bdd(g, h, r, norm)
+        assert h_new.shape == (100, O)
 
 @parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo', 'block-bipartite'], exclude=['zero-degree']))
@@ -647,10 +704,11 @@ def test_appnp_conv_e_weight(g, idtype):
 
 @parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
-def test_gcn2conv_e_weight(g, idtype):
+@pytest.mark.parametrize("bias", [True, False])
+def test_gcn2conv_e_weight(g, idtype, bias):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
-    gcn2conv = nn.GCN2Conv(5, layer=2, alpha=0.5,
+    gcn2conv = nn.GCN2Conv(5, layer=2, alpha=0.5, bias=bias,
                            project_initial_features=True)
     feat = F.randn((g.number_of_nodes(), 5))
     eweight = F.ones((g.num_edges(), ))
@@ -1091,17 +1149,26 @@ def myagg(alist, dsttype):
 
 @parametrize_idtype
 @pytest.mark.parametrize('agg', ['sum', 'max', 'min', 'mean', 'stack', myagg])
-def test_hetero_conv(agg, idtype):
+@pytest.mark.parametrize('canonical_keys', [False, True])
+def test_hetero_conv(agg, idtype, canonical_keys):
     g = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 0, 2, 1], [1, 2, 1, 3]),
         ('user', 'plays', 'game'): ([0, 0, 0, 1, 2], [0, 2, 3, 0, 2]),
         ('store', 'sells', 'game'): ([0, 0, 1, 1], [0, 3, 1, 2])},
         idtype=idtype, device=F.ctx())
-    conv = nn.HeteroGraphConv({
-        'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
-        'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
-        'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
-        agg)
+    if not canonical_keys:
+        conv = nn.HeteroGraphConv({
+            'follows': nn.GraphConv(2, 3, allow_zero_in_degree=True),
+            'plays': nn.GraphConv(2, 4, allow_zero_in_degree=True),
+            'sells': nn.GraphConv(3, 4, allow_zero_in_degree=True)},
+            agg)
+    else:
+        conv = nn.HeteroGraphConv({
+            ('user', 'follows', 'user'): nn.GraphConv(2, 3, allow_zero_in_degree=True),
+            ('user', 'plays', 'game'): nn.GraphConv(2, 4, allow_zero_in_degree=True),
+            ('store', 'sells', 'game'): nn.GraphConv(3, 4, allow_zero_in_degree=True)},
+            agg)
+
     conv = conv.to(F.ctx())
 
     # test pickle
@@ -1207,6 +1274,11 @@ def test_hetero_embedding(out_dim):
     assert embeds['user'].shape == (2, out_dim)
     assert embeds[('user', 'follows', 'user')].shape == (3, out_dim)
 
+    layer.reset_parameters()
+    embeds = layer.weight
+    assert embeds['user'].shape == (2, out_dim)
+    assert embeds[('user', 'follows', 'user')].shape == (3, out_dim)
+
     embeds = layer({
         'user': F.tensor([0], dtype=F.int64),
         ('user', 'follows', 'user'): F.tensor([0, 2], dtype=F.int64)
@@ -1256,6 +1328,71 @@ def test_gnnexplainer(g, idtype, out_dim):
     model = model.to(F.ctx())
     explainer = nn.GNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
+
+@pytest.mark.parametrize('g', get_cases(['hetero'], exclude=['zero-degree']))
+@pytest.mark.parametrize('idtype', [F.int64])
+@pytest.mark.parametrize('input_dim', [5])
+@pytest.mark.parametrize('output_dim', [1, 2])
+def test_heterognnexplainer(g, idtype, input_dim, output_dim):
+    g = g.astype(idtype).to(F.ctx())
+    device = g.device
+
+    # add self-loop and reverse edges
+    transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
+    g = transform1(g)
+    transform2 = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform2(g)
+
+    feat = {ntype: th.zeros((g.num_nodes(ntype), input_dim), device=device)
+            for ntype in g.ntypes}
+
+    class Model(th.nn.Module):
+        def __init__(self, in_dim, num_classes, canonical_etypes, graph=False):
+            super(Model, self).__init__()
+            self.graph=graph
+            self.etype_weights = th.nn.ModuleDict({
+                '_'.join(c_etype): th.nn.Linear(in_dim, num_classes)
+                for c_etype in canonical_etypes
+            })
+
+        def forward(self, graph, feat, eweight=None):
+            with graph.local_scope():
+                c_etype_func_dict = {}
+                for c_etype in graph.canonical_etypes:
+                    src_type, etype, dst_type = c_etype
+                    wh = self.etype_weights['_'.join(c_etype)](feat[src_type])
+                    graph.nodes[src_type].data[f'h_{c_etype}'] = wh
+                    if eweight is None:
+                        c_etype_func_dict[c_etype] = (fn.copy_u(f'h_{c_etype}', 'm'),
+                                                      fn.mean('m', 'h'))
+                    else:
+                        graph.edges[c_etype].data['w'] = eweight[c_etype]
+                        c_etype_func_dict[c_etype] = (
+                            fn.u_mul_e(f'h_{c_etype}', 'w', 'm'), fn.mean('m', 'h'))
+                graph.multi_update_all(c_etype_func_dict, 'sum')
+                if self.graph:
+                    hg = 0
+                    for ntype in graph.ntypes:
+                        if graph.num_nodes(ntype):
+                            hg = hg + dgl.mean_nodes(graph, 'h', ntype=ntype)
+
+                    return hg
+                else:
+                    return graph.ndata['h']
+
+    # Explain node prediction
+    model = Model(input_dim, output_dim, g.canonical_etypes)
+    model = model.to(F.ctx())
+    ntype = g.ntypes[0]
+    explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
+    new_center, sg, feat_mask, edge_mask = explainer.explain_node(ntype, 0, g, feat)
+
+    # Explain graph prediction
+    model = Model(input_dim, output_dim, g.canonical_etypes, graph=True)
+    model = model.to(F.ctx())
+    explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
+    feat_mask, edge_mask = explainer.explain_graph(g, feat)
+
 
 def test_jumping_knowledge():
     ctx = F.ctx()
@@ -1378,6 +1515,20 @@ def test_hgt(idtype, in_size, num_heads):
     sorted_x = sorted_g.ndata['x']
     sorted_y = m(sorted_g, sorted_x, sorted_ntype, sorted_etype, presorted=False)
     assert sorted_y.shape == (g.num_nodes(), head_size * num_heads)
+    # mini-batch
+    train_idx = th.randperm(100, dtype = idtype)[:10]
+    sampler = dgl.dataloading.NeighborSampler([-1])
+    train_loader = dgl.dataloading.DataLoader(g, train_idx.to(dev), sampler,
+                                            batch_size=8, device=dev,
+                                            shuffle=True)
+    (input_nodes, output_nodes, block) = next(iter(train_loader))
+    block = block[0]
+    x = x[input_nodes.to(th.long)]
+    ntype = ntype[input_nodes.to(th.long)]
+    edge = block.edata[dgl.EID]
+    etype = etype[edge.to(th.long)]
+    y = m(block, x, ntype, etype)
+    assert y.shape == (block.number_of_dst_nodes(), head_size * num_heads)
     # TODO(minjie): enable the following check
     #assert th.allclose(y, sorted_y[rev_idx], atol=1e-4, rtol=1e-4)
 
@@ -1533,18 +1684,15 @@ def test_label_prop(k, alpha, norm_type, clamp, normalize, reset):
     # multi-label case
     model(g, ml_labels, mask)
 
-@pytest.mark.parametrize('in_size', [16, 32])
+@pytest.mark.parametrize('in_size', [16])
 @pytest.mark.parametrize('out_size', [16, 32])
 @pytest.mark.parametrize('aggregators',
-    [['mean', 'max', 'dir2-av'], ['min', 'std', 'dir1-dx'], ['moment3', 'moment4', 'dir3-av']])
-@pytest.mark.parametrize('scalers', [['identity'], ['amplification', 'attenuation']])
-@pytest.mark.parametrize('delta', [2.5, 7.4])
-@pytest.mark.parametrize('dropout', [0., 0.1])
-@pytest.mark.parametrize('num_towers', [1, 4])
+    [['mean', 'max', 'dir2-av'], ['min', 'std', 'dir1-dx']])
+@pytest.mark.parametrize('scalers', [['amplification', 'attenuation']])
+@pytest.mark.parametrize('delta', [2.5])
 @pytest.mark.parametrize('edge_feat_size', [16, 0])
-@pytest.mark.parametrize('residual', [True, False])
 def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
-    dropout, num_towers, edge_feat_size, residual):
+    edge_feat_size):
     dev = F.ctx()
     num_nodes = 5
     num_edges = 20
@@ -1554,11 +1702,174 @@ def test_dgn_conv(in_size, out_size, aggregators, scalers, delta,
     transform = dgl.LaplacianPE(k=3, feat_name='eig')
     g = transform(g)
     eig = g.ndata['eig']
-    model = nn.DGNConv(in_size, out_size, aggregators, scalers, delta, dropout,
-        num_towers, edge_feat_size, residual).to(dev)
+    model = nn.DGNConv(in_size, out_size, aggregators, scalers, delta,
+        edge_feat_size=edge_feat_size).to(dev)
     model(g, h, edge_feat=e, eig_vec=eig)
 
     aggregators_non_eig = [aggr for aggr in aggregators if not aggr.startswith('dir')]
-    model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta, dropout,
-        num_towers, edge_feat_size, residual).to(dev)
+    model = nn.DGNConv(in_size, out_size, aggregators_non_eig, scalers, delta,
+        edge_feat_size=edge_feat_size).to(dev)
     model(g, h, edge_feat=e)
+
+def test_DeepWalk():
+    dev = F.ctx()
+    g = dgl.graph(([0, 1, 2, 1, 2, 0], [1, 2, 0, 0, 1, 2]))
+    model = nn.DeepWalk(g, emb_dim=8, walk_length=2, window_size=1, fast_neg=True, sparse=True)
+    model = model.to(dev)
+    dataloader = DataLoader(torch.arange(g.num_nodes()), batch_size=16, collate_fn=model.sample)
+    optim = SparseAdam(model.parameters(), lr=0.01)
+    walk = next(iter(dataloader)).to(dev)
+    loss = model(walk)
+    loss.backward()
+    optim.step()
+
+    model = nn.DeepWalk(g, emb_dim=8, walk_length=2, window_size=1, fast_neg=False, sparse=False)
+    model = model.to(dev)
+    dataloader = DataLoader(torch.arange(g.num_nodes()), batch_size=16, collate_fn=model.sample)
+    optim = Adam(model.parameters(), lr=0.01)
+    walk = next(iter(dataloader)).to(dev)
+    loss = model(walk)
+    loss.backward()
+    optim.step()
+
+@pytest.mark.parametrize('max_degree', [2, 6])
+@pytest.mark.parametrize('embedding_dim', [8, 16])
+@pytest.mark.parametrize('direction', ['in', 'out', 'both'])
+def test_degree_encoder(max_degree, embedding_dim, direction):
+    g = dgl.graph((
+        th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
+        th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    ))
+    # test heterograph
+    hg = dgl.heterograph({
+        ('drug', 'interacts', 'drug'): (th.tensor([0, 1]), th.tensor([1, 2])),
+        ('drug', 'interacts', 'gene'): (th.tensor([0, 1]), th.tensor([2, 3])),
+        ('drug', 'treats', 'disease'): (th.tensor([1]), th.tensor([2]))
+    })
+    model = nn.DegreeEncoder(max_degree, embedding_dim, direction=direction)
+    de_g = model(g)
+    de_hg = model(hg)
+    assert de_g.shape == (4, embedding_dim)
+    assert de_hg.shape == (10, embedding_dim)
+
+@parametrize_idtype
+def test_MetaPath2Vec(idtype):
+    dev = F.ctx()
+    g = dgl.heterograph({
+        ('user', 'uc', 'company'): ([0, 0, 2, 1, 3], [1, 2, 1, 3, 0]),
+        ('company', 'cp', 'product'): ([0, 0, 0, 1, 2, 3], [0, 2, 3, 0, 2, 1]),
+        ('company', 'cu', 'user'): ([1, 2, 1, 3, 0], [0, 0, 2, 1, 3]),
+        ('product', 'pc', 'company'): ([0, 2, 3, 0, 2, 1], [0, 0, 0, 1, 2, 3])
+    }, idtype=idtype, device=dev)
+    model = nn.MetaPath2Vec(g, ['uc', 'cu'], window_size=1)
+    model = model.to(dev)
+    embeds = model.node_embed.weight
+    assert embeds.shape[0] == g.num_nodes()
+
+@pytest.mark.parametrize('num_layer', [1, 4])
+@pytest.mark.parametrize('k', [3, 5])
+@pytest.mark.parametrize('lpe_dim', [4, 16])
+@pytest.mark.parametrize('n_head', [1, 4])
+@pytest.mark.parametrize('batch_norm', [True, False])
+@pytest.mark.parametrize('num_post_layer', [0, 1, 2])
+def test_LaplacianPosEnc(num_layer, k, lpe_dim, n_head, batch_norm, num_post_layer):
+    ctx = F.ctx()
+    num_nodes = 4
+
+    EigVals = th.randn((num_nodes, k)).to(ctx)
+    EigVecs = th.randn((num_nodes, k)).to(ctx)
+
+    model = nn.LaplacianPosEnc("Transformer", num_layer, k, lpe_dim, n_head,
+                               batch_norm, num_post_layer).to(ctx)
+    assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
+
+    model = nn.LaplacianPosEnc("DeepSet", num_layer, k, lpe_dim,
+                               batch_norm=batch_norm, num_post_layer=num_post_layer).to(ctx)
+    assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
+
+@pytest.mark.parametrize('feat_size', [128, 512])
+@pytest.mark.parametrize('num_heads', [8, 16])
+@pytest.mark.parametrize('bias', [True, False])
+@pytest.mark.parametrize('attn_bias_type', ['add', 'mul'])
+@pytest.mark.parametrize('attn_drop', [0.1, 0.5])
+def test_BiasedMultiheadAttention(feat_size, num_heads, bias, attn_bias_type, attn_drop):
+    ndata = th.rand(16, 100, feat_size)
+    attn_bias = th.rand(16, 100, 100, num_heads)
+    attn_mask = th.rand(16, 100, 100) < 0.5
+
+    net = nn.BiasedMultiheadAttention(feat_size, num_heads, bias, attn_bias_type, attn_drop)
+    out = net(ndata, attn_bias, attn_mask)
+
+    assert out.shape == (16, 100, feat_size)
+
+@pytest.mark.parametrize('attn_bias_type', ['add', 'mul'])
+@pytest.mark.parametrize('norm_first', [True, False])
+def test_GraphormerLayer(attn_bias_type, norm_first):
+    batch_size = 16
+    num_nodes = 100
+    feat_size = 512
+    num_heads = 8
+    nfeat = th.rand(batch_size, num_nodes, feat_size)
+    attn_bias = th.rand(batch_size, num_nodes, num_nodes, num_heads)
+    attn_mask = th.rand(batch_size, num_nodes, num_nodes) < 0.5
+
+    net = nn.GraphormerLayer(
+        feat_size=feat_size,
+        hidden_size=2048,
+        num_heads=num_heads,
+        attn_bias_type=attn_bias_type,
+        norm_first=norm_first,
+        dropout=0.1,
+        activation=th.nn.ReLU()
+    )
+    out = net(nfeat, attn_bias, attn_mask)
+
+    assert out.shape == (batch_size, num_nodes, feat_size)
+
+@pytest.mark.parametrize('max_len', [1, 4])
+@pytest.mark.parametrize('feat_dim', [16])
+@pytest.mark.parametrize('num_heads', [1, 8])
+def test_PathEncoder(max_len, feat_dim, num_heads):
+    dev = F.ctx()
+    g1 = dgl.graph((
+        th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
+        th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    )).to(dev)
+    g2 = dgl.graph((
+        th.tensor([0, 1, 2, 3, 2, 5]),
+        th.tensor([1, 2, 3, 4, 0, 3])
+    )).to(dev)
+    bg = dgl.batch([g1, g2])
+    edge_feat = th.rand(bg.num_edges(), feat_dim).to(dev)
+    model = nn.PathEncoder(max_len, feat_dim, num_heads=num_heads).to(dev)
+    bias = model(bg, edge_feat)
+    assert bias.shape == (2, 6, 6, num_heads)
+
+@pytest.mark.parametrize('max_dist', [1, 4])
+@pytest.mark.parametrize('num_kernels', [8, 16])
+@pytest.mark.parametrize('num_heads', [1, 8])
+def test_SpatialEncoder(max_dist, num_kernels, num_heads):
+    dev = F.ctx()
+    g1 = dgl.graph((
+        th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
+        th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
+    )).to(dev)
+    g2 = dgl.graph((
+        th.tensor([0, 1, 2, 3, 2, 5]),
+        th.tensor([1, 2, 3, 4, 0, 3])
+    )).to(dev)
+    bg = dgl.batch([g1, g2])
+    ndata = th.rand(bg.num_nodes(), 3).to(dev)
+    num_nodes = bg.num_nodes()
+    node_type = th.randint(0, 512, (num_nodes,)).to(dev)
+    model_1 = nn.SpatialEncoder(max_dist, num_heads=num_heads).to(dev)
+    model_2 = nn.SpatialEncoder3d(num_kernels, num_heads=num_heads).to(dev)
+    model_3 = nn.SpatialEncoder3d(
+        num_kernels, num_heads=num_heads, max_node_type=512
+    ).to(dev)
+    encoding = model_1(bg)
+    encoding3d_1 = model_2(bg, ndata)
+    encoding3d_2 = model_3(bg, ndata, node_type)
+    assert encoding.shape == (2, 6, 6, num_heads)
+    assert encoding3d_1.shape == (2, 6, 6, num_heads)
+    assert encoding3d_2.shape == (2, 6, 6, num_heads)

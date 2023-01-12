@@ -4,7 +4,9 @@ from cpython cimport Py_INCREF, Py_DECREF
 from numbers import Number, Integral
 from ..base import string_types
 from ..object_generic import convert_to_object, ObjectGeneric
-from ..runtime_ctypes import DGLType, DGLContext, DGLByteArray
+from ..runtime_ctypes import DGLDataType as CTypesDGLDataType, \
+                             DGLContext as CTypesDGLContext, \
+                             DGLByteArray
 
 
 cdef void dgl_callback_finalize(void* fhandle):
@@ -92,10 +94,10 @@ cdef inline int make_arg(object arg,
         tcode[0] = arg.__class__._dgl_tcode
     elif isinstance(arg, (int, long)):
         value[0].v_int64 = arg
-        tcode[0] = kInt
+        tcode[0] = kObjectInt
     elif isinstance(arg, float):
         value[0].v_float64 = arg
-        tcode[0] = kFloat
+        tcode[0] = kObjectFloat
     elif isinstance(arg, str):
         tstr = c_str(arg)
         value[0].v_str = tstr
@@ -106,14 +108,14 @@ cdef inline int make_arg(object arg,
         tcode[0] = kNull
     elif isinstance(arg, Number):
         value[0].v_float64 = arg
-        tcode[0] = kFloat
-    elif isinstance(arg, DGLType):
+        tcode[0] = kObjectFloat
+    elif isinstance(arg, CTypesDGLDataType):
         tstr = c_str(str(arg))
         value[0].v_str = tstr
         tcode[0] = kStr
         temp_args.append(tstr)
-    elif isinstance(arg, DGLContext):
-        value[0].v_ctx = (<DLContext*>(
+    elif isinstance(arg, CTypesDGLContext):
+        value[0].v_ctx = (<DGLContext*>(
             <unsigned long long>ctypes.addressof(arg)))[0]
         tcode[0] = kDGLContext
     elif isinstance(arg, bytearray):
@@ -170,9 +172,9 @@ cdef inline object make_ret(DGLValue value, int tcode):
         return make_ret_object(value.v_handle)
     elif tcode == kNull:
         return None
-    elif tcode == kInt:
+    elif tcode == kObjectInt:
         return value.v_int64
-    elif tcode == kFloat:
+    elif tcode == kObjectFloat:
         return value.v_float64
     elif tcode == kNDArrayContainer:
         return c_make_array(value.v_handle, False)
@@ -183,7 +185,7 @@ cdef inline object make_ret(DGLValue value, int tcode):
     elif tcode == kHandle:
         return ctypes_handle(value.v_handle)
     elif tcode == kDGLContext:
-        return DGLContext(value.v_ctx.device_type, value.v_ctx.device_id)
+        return CTypesDGLContext(value.v_ctx.device_type, value.v_ctx.device_id)
     # (minjie): class module are not used in DGL.
     #elif tcode == kModuleHandle:
     #    return _CLASS_MODULE(ctypes_handle(value.v_handle))

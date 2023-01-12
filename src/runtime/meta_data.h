@@ -1,25 +1,27 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
- * \file meta_data.h
- * \brief Meta data related utilities
+ * @file meta_data.h
+ * @brief Meta data related utilities
  */
 #ifndef DGL_RUNTIME_META_DATA_H_
 #define DGL_RUNTIME_META_DATA_H_
 
-#include <dmlc/json.h>
-#include <dmlc/io.h>
 #include <dgl/runtime/packed_func.h>
+#include <dmlc/io.h>
+#include <dmlc/json.h>
+
 #include <string>
 #include <vector>
+
 #include "runtime_base.h"
 
 namespace dgl {
 namespace runtime {
 
-/*! \brief function information needed by device */
+/** @brief function information needed by device */
 struct FunctionInfo {
   std::string name;
-  std::vector<DGLType> arg_types;
+  std::vector<DGLDataType> arg_types;
   std::vector<std::string> thread_axis_tags;
 
   void Save(dmlc::JSONWriter *writer) const;

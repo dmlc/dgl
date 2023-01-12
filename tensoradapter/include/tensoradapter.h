@@ -1,51 +1,71 @@
-/*!
- *  Copyright (c) 2020 by Contributors
- * \file tensoradapter.h
- * \brief Header file for functions exposed by the adapter library.
+/**
+ *  Copyright (c) 2020-2022 by Contributors
+ * @file tensoradapter.h
+ * @brief Header file for functions exposed by the adapter library.
  *
- * Functions in this library must be exported with extern "C" so that DGL can locate
- * them with dlsym(3) (or GetProcAddress on Windows).
+ * Functions in this library must be exported with extern "C" so that DGL can
+ * locate them with dlsym(3) (or GetProcAddress on Windows).
  */
 
 #ifndef TENSORADAPTER_H_
 #define TENSORADAPTER_H_
 
-#include <dlpack/dlpack.h>
-#include <vector>
+#ifdef DGL_USE_CUDA
+#include <cuda_runtime.h>
+#endif  // DGL_USE_CUDA
 
 namespace tensoradapter {
 
 extern "C" {
 
-/*!
- * \brief Allocate an empty tensor.
+/**
+ * @brief Allocate a piece of CPU memory via
+ * PyTorch's CPUAllocator
  *
- * \param shape The shape
- * \param dtype The data type
- * \param ctx The device
- * \return The allocated tensor
+ * @param nbytes The size to be allocated.
+ * @return Pointer to the allocated memory.
  */
-DLManagedTensor* TAempty(
-    std::vector<int64_t> shape, DLDataType dtype, DLContext ctx);
+void* CPURawAlloc(size_t nbytes);
+
+/**
+ * @brief Free the CPU memory.
+ *
+ * @param ptr Pointer to the memory to be freed.
+ */
+void CPURawDelete(void* ptr);
 
 #ifdef DGL_USE_CUDA
-/*!
- * \brief Allocate a piece of GPU memory via
+/**
+ * @brief Allocate a piece of GPU memory via
  * PyTorch's THCCachingAllocator.
  *
- * \param nbytes The size to be allocated.
- * \return Pointer to the allocated memory.
+ * @param nbytes The size to be allocated.
+ * @param stream The stream to be allocated on.
+ * @return Pointer to the allocated memory.
  */
-void* RawAlloc(size_t nbytes);
+void* CUDARawAlloc(size_t nbytes, cudaStream_t stream);
 
-/*!
- * \brief Free the GPU memory.
+/**
+ * @brief Free the GPU memory.
  *
- * \param ptr Pointer to the memory to be freed.
+ * @param ptr Pointer to the memory to be freed.
  */
-void RawDelete(void* ptr);
-#endif  // DGL_USE_CUDA
+void CUDARawDelete(void* ptr);
 
+/**
+ * @brief Get the current CUDA stream.
+ */
+cudaStream_t CUDACurrentStream();
+
+/**
+ * @brief Let the caching allocator know which streams are using this tensor.
+ *
+ * @param ptr Pointer of the tensor to be recorded.
+ * @param stream The stream that is using this tensor.
+ * @param device_id Device of the tensor.
+ */
+void RecordStream(void* ptr, cudaStream_t stream, int device_id);
+#endif  // DGL_USE_CUDA
 }
 
 };  // namespace tensoradapter

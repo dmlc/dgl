@@ -105,7 +105,7 @@ class RelGraphConvLayer(nn.Module):
         """Forward computation
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.
@@ -573,7 +573,8 @@ def main(args):
     if args.num_gpus == -1:
         device = th.device('cpu')
     else:
-        device = th.device('cuda:'+str(args.local_rank))
+        dev_id = g.rank() % args.num_gpus
+        device = th.device('cuda:'+str(dev_id))
     labels = g.nodes['paper'].data['labels'][np.arange(g.number_of_nodes('paper'))]
     all_val_nid = th.LongTensor(np.nonzero(g.nodes['paper'].data['val_mask'][np.arange(g.number_of_nodes('paper'))])).squeeze()
     all_test_nid = th.LongTensor(np.nonzero(g.nodes['paper'].data['test_mask'][np.arange(g.number_of_nodes('paper'))])).squeeze()

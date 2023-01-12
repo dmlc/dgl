@@ -98,7 +98,7 @@ def track_time(data):
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in fan_out.split(',')])
-    dataloader = dgl.dataloading.NodeDataLoader(
+    dataloader = dgl.dataloading.DataLoader(
         g,
         train_nid,
         sampler,
@@ -114,29 +114,32 @@ def track_time(data):
     loss_fcn = loss_fcn.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    # Training loop
-    avg = 0
-    iter_tput = []
-    # Loop over the dataloader to sample the computation dependency graph as a list of
-    # blocks.
-    for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
-        # Load the input features as well as output labels
-        blocks = [block.int().to(device) for block in blocks]
-        batch_inputs = blocks[0].srcdata['features']
-        batch_labels = blocks[-1].dstdata['labels']
+    # Enable dataloader cpu affinitization for cpu devices (no effect on gpu)
+    with dataloader.enable_cpu_affinity():
+        # Loop over the dataloader to sample the computation dependency graph as a list of
+        # blocks.
+        
+        # Training loop
+        avg = 0
+        iter_tput = []
+        for step, (input_nodes, seeds, blocks) in enumerate(dataloader):
+            # Load the input features as well as output labels
+            blocks = [block.int().to(device) for block in blocks]
+            batch_inputs = blocks[0].srcdata['features']
+            batch_labels = blocks[-1].dstdata['labels']
 
-        # Compute loss and prediction
-        batch_pred = model(blocks, batch_inputs)
-        loss = loss_fcn(batch_pred, batch_labels)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            # Compute loss and prediction
+            batch_pred = model(blocks, batch_inputs)
+            loss = loss_fcn(batch_pred, batch_labels)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        # start timer at before iter_start
-        if step == iter_start - 1:
-            t0 = time.time()
-        elif step == iter_count + iter_start - 1:  # time iter_count iterations
-            break
+            # start timer at before iter_start
+            if step == iter_start - 1:
+                t0 = time.time()
+            elif step == iter_count + iter_start - 1:  # time iter_count iterations
+                break
 
     t1 = time.time()
 

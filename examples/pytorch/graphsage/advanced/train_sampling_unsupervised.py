@@ -73,7 +73,7 @@ def run(proc_id, n_gpus, args, devices, data):
     if args.data_device == 'gpu':
         nfeat = nfeat.to(device)
     elif args.data_device == 'uva':
-        nfeat = dgl.contrib.UnifiedTensor(nfeat, device=device)
+        nfeat = nfeat.pin_memory()
     in_feats = nfeat.shape[1]
 
     # Create PyTorch DataLoader for constructing blocks
@@ -100,7 +100,7 @@ def run(proc_id, n_gpus, args, devices, data):
             th.arange(0, n_edges // 2)]).to(train_seeds),
         negative_sampler=NegativeSampler(g, args.num_negs, args.neg_share,
                                          device if args.graph_device == 'uva' else None))
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    dataloader = dgl.dataloading.DataLoader(
         g, train_seeds, sampler,
         device=device,
         use_ddp=n_gpus > 1,
@@ -133,10 +133,9 @@ def run(proc_id, n_gpus, args, devices, data):
         # blocks.
         tic_step = time.time()
         for step, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(dataloader):
-            batch_inputs = nfeat[input_nodes].to(device)
-            pos_graph = pos_graph.to(device)
-            neg_graph = neg_graph.to(device)
-            blocks = [block.int().to(device) for block in blocks]
+            input_nodes = input_nodes.to(device)
+            batch_inputs = dgl.utils.gather_pinned_tensor_rows(nfeat, input_nodes)
+            blocks = [block.int() for block in blocks]
             d_step = time.time()
 
             # Compute loss and prediction

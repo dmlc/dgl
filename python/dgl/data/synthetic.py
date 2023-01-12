@@ -1,17 +1,19 @@
 """Synthetic graph datasets."""
 import math
-import networkx as nx
-import numpy as np
 import os
 import pickle
 import random
 
-from .dgl_dataset import DGLBuiltinDataset
-from .utils import save_graphs, load_graphs, _get_dgl_url, download
+import networkx as nx
+import numpy as np
+
 from .. import backend as F
 from ..batch import batch
 from ..convert import graph
 from ..transforms import reorder_graph
+from .dgl_dataset import DGLBuiltinDataset
+from .utils import _get_dgl_url, download, load_graphs, save_graphs
+
 
 class BAShapeDataset(DGLBuiltinDataset):
     r"""BA-SHAPES dataset from `GNNExplainer: Generating Explanations for Graph Neural Networks
@@ -70,30 +72,37 @@ class BAShapeDataset(DGLBuiltinDataset):
     >>> label = g.ndata['label']
     >>> feat = g.ndata['feat']
     """
-    def __init__(self,
-                 num_base_nodes=300,
-                 num_base_edges_per_node=5,
-                 num_motifs=80,
-                 perturb_ratio=0.01,
-                 seed=None,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True,
-                 transform=None):
+
+    def __init__(
+        self,
+        num_base_nodes=300,
+        num_base_edges_per_node=5,
+        num_motifs=80,
+        perturb_ratio=0.01,
+        seed=None,
+        raw_dir=None,
+        force_reload=False,
+        verbose=True,
+        transform=None,
+    ):
         self.num_base_nodes = num_base_nodes
         self.num_base_edges_per_node = num_base_edges_per_node
         self.num_motifs = num_motifs
         self.perturb_ratio = perturb_ratio
         self.seed = seed
-        super(BAShapeDataset, self).__init__(name='BA-SHAPES',
-                                             url=None,
-                                             raw_dir=raw_dir,
-                                             force_reload=force_reload,
-                                             verbose=verbose,
-                                             transform=transform)
+        super(BAShapeDataset, self).__init__(
+            name="BA-SHAPES",
+            url=None,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
-        g = nx.barabasi_albert_graph(self.num_base_nodes, self.num_base_edges_per_node, self.seed)
+        g = nx.barabasi_albert_graph(
+            self.num_base_nodes, self.num_base_edges_per_node, self.seed
+        )
         edges = list(g.edges())
         src, dst = map(list, zip(*edges))
         n = self.num_base_nodes
@@ -111,7 +120,7 @@ class BAShapeDataset(DGLBuiltinDataset):
                 (n + 2, n + 3),
                 (n + 3, n),
                 (n + 4, n),
-                (n + 4, n + 1)
+                (n + 4, n + 1),
             ]
             motif_src, motif_dst = map(list, zip(*motif_edges))
             src.extend(motif_src)
@@ -132,8 +141,9 @@ class BAShapeDataset(DGLBuiltinDataset):
         # Perturb the graph by adding non-self-loop random edges
         num_real_edges = g.num_edges()
         max_ratio = (n * (n - 1) - num_real_edges) / num_real_edges
-        assert self.perturb_ratio <= max_ratio, \
-            'perturb_ratio cannot exceed {:.4f}'.format(max_ratio)
+        assert (
+            self.perturb_ratio <= max_ratio
+        ), "perturb_ratio cannot exceed {:.4f}".format(max_ratio)
         num_random_edges = int(num_real_edges * self.perturb_ratio)
 
         if self.seed is not None:
@@ -146,14 +156,20 @@ class BAShapeDataset(DGLBuiltinDataset):
                     break
             g.add_edges(u, v)
 
-        g.ndata['label'] = F.tensor(node_labels, F.int64)
-        g.ndata['feat'] = F.ones((n, 1), F.float32, F.cpu())
+        g.ndata["label"] = F.tensor(node_labels, F.int64)
+        g.ndata["feat"] = F.ones((n, 1), F.float32, F.cpu())
         self._graph = reorder_graph(
-            g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+            g,
+            node_permute_algo="rcmk",
+            edge_permute_algo="dst",
+            store_ids=False,
+        )
 
     @property
     def graph_path(self):
-        return os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.name))
+        return os.path.join(
+            self.save_path, "{}_dgl_graph.bin".format(self.name)
+        )
 
     def save(self):
         save_graphs(str(self.graph_path), self._graph)
@@ -178,6 +194,7 @@ class BAShapeDataset(DGLBuiltinDataset):
     @property
     def num_classes(self):
         return 4
+
 
 class BACommunityDataset(DGLBuiltinDataset):
     r"""BA-COMMUNITY dataset from `GNNExplainer: Generating Explanations for Graph Neural Networks
@@ -241,29 +258,34 @@ class BACommunityDataset(DGLBuiltinDataset):
     >>> label = g.ndata['label']
     >>> feat = g.ndata['feat']
     """
-    def __init__(self,
-                 num_base_nodes=300,
-                 num_base_edges_per_node=4,
-                 num_motifs=80,
-                 perturb_ratio=0.01,
-                 num_inter_edges=350,
-                 seed=None,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True,
-                 transform=None):
+
+    def __init__(
+        self,
+        num_base_nodes=300,
+        num_base_edges_per_node=4,
+        num_motifs=80,
+        perturb_ratio=0.01,
+        num_inter_edges=350,
+        seed=None,
+        raw_dir=None,
+        force_reload=False,
+        verbose=True,
+        transform=None,
+    ):
         self.num_base_nodes = num_base_nodes
         self.num_base_edges_per_node = num_base_edges_per_node
         self.num_motifs = num_motifs
         self.perturb_ratio = perturb_ratio
         self.num_inter_edges = num_inter_edges
         self.seed = seed
-        super(BACommunityDataset, self).__init__(name='BA-COMMUNITY',
-                                                 url=None,
-                                                 raw_dir=raw_dir,
-                                                 force_reload=force_reload,
-                                                 verbose=verbose,
-                                                 transform=transform)
+        super(BACommunityDataset, self).__init__(
+            name="BA-COMMUNITY",
+            url=None,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
         if self.seed is not None:
@@ -271,47 +293,65 @@ class BACommunityDataset(DGLBuiltinDataset):
             np.random.seed(self.seed)
 
         # Construct two BA-SHAPES graphs
-        g1 = BAShapeDataset(self.num_base_nodes,
-                            self.num_base_edges_per_node,
-                            self.num_motifs,
-                            self.perturb_ratio,
-                            force_reload=True,
-                            verbose=False)[0]
-        g2 = BAShapeDataset(self.num_base_nodes,
-                            self.num_base_edges_per_node,
-                            self.num_motifs,
-                            self.perturb_ratio,
-                            force_reload=True,
-                            verbose=False)[0]
+        g1 = BAShapeDataset(
+            self.num_base_nodes,
+            self.num_base_edges_per_node,
+            self.num_motifs,
+            self.perturb_ratio,
+            force_reload=True,
+            verbose=False,
+        )[0]
+        g2 = BAShapeDataset(
+            self.num_base_nodes,
+            self.num_base_edges_per_node,
+            self.num_motifs,
+            self.perturb_ratio,
+            force_reload=True,
+            verbose=False,
+        )[0]
 
         # Join them and randomly add edges between them
         g = batch([g1, g2])
         num_nodes = g.num_nodes() // 2
         src = np.random.randint(0, num_nodes, (self.num_inter_edges,))
-        dst = np.random.randint(num_nodes, 2 * num_nodes, (self.num_inter_edges,))
+        dst = np.random.randint(
+            num_nodes, 2 * num_nodes, (self.num_inter_edges,)
+        )
         src = F.astype(F.zerocopy_from_numpy(src), g.idtype)
         dst = F.astype(F.zerocopy_from_numpy(dst), g.idtype)
         g.add_edges(src, dst)
-        g.ndata['label'] = F.cat([g1.ndata['label'], g2.ndata['label'] + 4], dim=0)
+        g.ndata["label"] = F.cat(
+            [g1.ndata["label"], g2.ndata["label"] + 4], dim=0
+        )
 
         # feature generation
         random_mu = [0.0] * 8
         random_sigma = [1.0] * 8
 
-        mu_1, sigma_1 = np.array([-1.0] * 2 + random_mu), np.array([0.5] * 2 + random_sigma)
+        mu_1, sigma_1 = np.array([-1.0] * 2 + random_mu), np.array(
+            [0.5] * 2 + random_sigma
+        )
         feat1 = np.random.multivariate_normal(mu_1, np.diag(sigma_1), num_nodes)
 
-        mu_2, sigma_2 = np.array([1.0] * 2 + random_mu), np.array([0.5] * 2 + random_sigma)
+        mu_2, sigma_2 = np.array([1.0] * 2 + random_mu), np.array(
+            [0.5] * 2 + random_sigma
+        )
         feat2 = np.random.multivariate_normal(mu_2, np.diag(sigma_2), num_nodes)
 
         feat = np.concatenate([feat1, feat2])
-        g.ndata['feat'] = F.zerocopy_from_numpy(feat)
+        g.ndata["feat"] = F.zerocopy_from_numpy(feat)
         self._graph = reorder_graph(
-            g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+            g,
+            node_permute_algo="rcmk",
+            edge_permute_algo="dst",
+            store_ids=False,
+        )
 
     @property
     def graph_path(self):
-        return os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.name))
+        return os.path.join(
+            self.save_path, "{}_dgl_graph.bin".format(self.name)
+        )
 
     def save(self):
         save_graphs(str(self.graph_path), self._graph)
@@ -336,6 +376,7 @@ class BACommunityDataset(DGLBuiltinDataset):
     @property
     def num_classes(self):
         return 8
+
 
 class TreeCycleDataset(DGLBuiltinDataset):
     r"""TREE-CYCLES dataset from `GNNExplainer: Generating Explanations for Graph Neural Networks
@@ -392,27 +433,32 @@ class TreeCycleDataset(DGLBuiltinDataset):
     >>> label = g.ndata['label']
     >>> feat = g.ndata['feat']
     """
-    def __init__(self,
-                 tree_height=8,
-                 num_motifs=60,
-                 cycle_size=6,
-                 perturb_ratio=0.01,
-                 seed=None,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True,
-                 transform=None):
+
+    def __init__(
+        self,
+        tree_height=8,
+        num_motifs=60,
+        cycle_size=6,
+        perturb_ratio=0.01,
+        seed=None,
+        raw_dir=None,
+        force_reload=False,
+        verbose=True,
+        transform=None,
+    ):
         self.tree_height = tree_height
         self.num_motifs = num_motifs
         self.cycle_size = cycle_size
         self.perturb_ratio = perturb_ratio
         self.seed = seed
-        super(TreeCycleDataset, self).__init__(name='TREE-CYCLES',
-                                               url=None,
-                                               raw_dir=raw_dir,
-                                               force_reload=force_reload,
-                                               verbose=verbose,
-                                               transform=transform)
+        super(TreeCycleDataset, self).__init__(
+            name="TREE-CYCLES",
+            url=None,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
         if self.seed is not None:
@@ -457,8 +503,9 @@ class TreeCycleDataset(DGLBuiltinDataset):
         # Perturb the graph by adding non-self-loop random edges
         num_real_edges = g.num_edges()
         max_ratio = (n * (n - 1) - num_real_edges) / num_real_edges
-        assert self.perturb_ratio <= max_ratio, \
-            'perturb_ratio cannot exceed {:.4f}'.format(max_ratio)
+        assert (
+            self.perturb_ratio <= max_ratio
+        ), "perturb_ratio cannot exceed {:.4f}".format(max_ratio)
         num_random_edges = int(num_real_edges * self.perturb_ratio)
 
         for _ in range(num_random_edges):
@@ -469,14 +516,20 @@ class TreeCycleDataset(DGLBuiltinDataset):
                     break
             g.add_edges(u, v)
 
-        g.ndata['label'] = F.tensor(node_labels, F.int64)
-        g.ndata['feat'] = F.ones((n, 1), F.float32, F.cpu())
+        g.ndata["label"] = F.tensor(node_labels, F.int64)
+        g.ndata["feat"] = F.ones((n, 1), F.float32, F.cpu())
         self._graph = reorder_graph(
-            g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+            g,
+            node_permute_algo="rcmk",
+            edge_permute_algo="dst",
+            store_ids=False,
+        )
 
     @property
     def graph_path(self):
-        return os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.name))
+        return os.path.join(
+            self.save_path, "{}_dgl_graph.bin".format(self.name)
+        )
 
     def save(self):
         save_graphs(str(self.graph_path), self._graph)
@@ -501,6 +554,7 @@ class TreeCycleDataset(DGLBuiltinDataset):
     @property
     def num_classes(self):
         return 2
+
 
 class TreeGridDataset(DGLBuiltinDataset):
     r"""TREE-GRIDS dataset from `GNNExplainer: Generating Explanations for Graph Neural Networks
@@ -557,27 +611,32 @@ class TreeGridDataset(DGLBuiltinDataset):
     >>> label = g.ndata['label']
     >>> feat = g.ndata['feat']
     """
-    def __init__(self,
-                 tree_height=8,
-                 num_motifs=80,
-                 grid_size=3,
-                 perturb_ratio=0.1,
-                 seed=None,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True,
-                 transform=None):
+
+    def __init__(
+        self,
+        tree_height=8,
+        num_motifs=80,
+        grid_size=3,
+        perturb_ratio=0.1,
+        seed=None,
+        raw_dir=None,
+        force_reload=False,
+        verbose=True,
+        transform=None,
+    ):
         self.tree_height = tree_height
         self.num_motifs = num_motifs
         self.grid_size = grid_size
         self.perturb_ratio = perturb_ratio
         self.seed = seed
-        super(TreeGridDataset, self).__init__(name='TREE-GRIDS',
-                                              url=None,
-                                              raw_dir=raw_dir,
-                                              force_reload=force_reload,
-                                              verbose=verbose,
-                                              transform=transform)
+        super(TreeGridDataset, self).__init__(
+            name="TREE-GRIDS",
+            url=None,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
         if self.seed is not None:
@@ -619,8 +678,9 @@ class TreeGridDataset(DGLBuiltinDataset):
         # Perturb the graph by adding non-self-loop random edges
         num_real_edges = g.num_edges()
         max_ratio = (n * (n - 1) - num_real_edges) / num_real_edges
-        assert self.perturb_ratio <= max_ratio, \
-            'perturb_ratio cannot exceed {:.4f}'.format(max_ratio)
+        assert (
+            self.perturb_ratio <= max_ratio
+        ), "perturb_ratio cannot exceed {:.4f}".format(max_ratio)
         num_random_edges = int(num_real_edges * self.perturb_ratio)
 
         for _ in range(num_random_edges):
@@ -631,14 +691,20 @@ class TreeGridDataset(DGLBuiltinDataset):
                     break
             g.add_edges(u, v)
 
-        g.ndata['label'] = F.tensor(node_labels, F.int64)
-        g.ndata['feat'] = F.ones((n, 1), F.float32, F.cpu())
+        g.ndata["label"] = F.tensor(node_labels, F.int64)
+        g.ndata["feat"] = F.ones((n, 1), F.float32, F.cpu())
         self._graph = reorder_graph(
-            g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
+            g,
+            node_permute_algo="rcmk",
+            edge_permute_algo="dst",
+            store_ids=False,
+        )
 
     @property
     def graph_path(self):
-        return os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.name))
+        return os.path.join(
+            self.save_path, "{}_dgl_graph.bin".format(self.name)
+        )
 
     def save(self):
         save_graphs(str(self.graph_path), self._graph)
@@ -663,6 +729,7 @@ class TreeGridDataset(DGLBuiltinDataset):
     @property
     def num_classes(self):
         return 2
+
 
 class BA2MotifDataset(DGLBuiltinDataset):
     r"""BA-2motifs dataset from `Parameterized Explainer for Graph Neural Network
@@ -705,26 +772,27 @@ class BA2MotifDataset(DGLBuiltinDataset):
     >>> g, label = dataset[0]
     >>> feat = g.ndata['feat']
     """
-    def __init__(self,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True,
-                 transform=None):
-        super(BA2MotifDataset, self).__init__(name='BA-2motifs',
-                                              url=_get_dgl_url('dataset/BA-2motif.pkl'),
-                                              raw_dir=raw_dir,
-                                              force_reload=force_reload,
-                                              verbose=verbose,
-                                              transform=transform)
+
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
+        super(BA2MotifDataset, self).__init__(
+            name="BA-2motifs",
+            url=_get_dgl_url("dataset/BA-2motif.pkl"),
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def download(self):
-        r""" Automatically download data."""
-        file_path = os.path.join(self.raw_dir, self.name + '.pkl')
+        r"""Automatically download data."""
+        file_path = os.path.join(self.raw_dir, self.name + ".pkl")
         download(self.url, path=file_path)
 
     def process(self):
-        file_path = os.path.join(self.raw_dir, self.name + '.pkl')
-        with open(file_path, 'rb') as f:
+        file_path = os.path.join(self.raw_dir, self.name + ".pkl")
+        with open(file_path, "rb") as f:
             adjs, features, labels = pickle.load(f)
 
         self.graphs = []
@@ -732,15 +800,17 @@ class BA2MotifDataset(DGLBuiltinDataset):
 
         for i in range(len(adjs)):
             g = graph(adjs[i].nonzero())
-            g.ndata['feat'] = F.zerocopy_from_numpy(features[i])
+            g.ndata["feat"] = F.zerocopy_from_numpy(features[i])
             self.graphs.append(g)
 
     @property
     def graph_path(self):
-        return os.path.join(self.save_path, '{}_dgl_graph.bin'.format(self.name))
+        return os.path.join(
+            self.save_path, "{}_dgl_graph.bin".format(self.name)
+        )
 
     def save(self):
-        label_dict = {'labels': self.labels}
+        label_dict = {"labels": self.labels}
         save_graphs(str(self.graph_path), self.graphs, label_dict)
 
     def has_cache(self):
@@ -748,7 +818,7 @@ class BA2MotifDataset(DGLBuiltinDataset):
 
     def load(self):
         self.graphs, label_dict = load_graphs(str(self.graph_path))
-        self.labels = label_dict['labels']
+        self.labels = label_dict["labels"]
 
     def __getitem__(self, idx):
         g = self.graphs[idx]

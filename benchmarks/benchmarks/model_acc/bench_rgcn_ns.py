@@ -34,9 +34,6 @@ class EntityClassify(nn.Module):
         Dropout
     use_self_loop : bool
         Use self loop if True, default False.
-    low_mem : bool
-        True to use low memory implementation of relation message passing function
-        trade speed with memory consumption
     """
     def __init__(self,
                  device,
@@ -48,7 +45,6 @@ class EntityClassify(nn.Module):
                  num_hidden_layers=1,
                  dropout=0,
                  use_self_loop=False,
-                 low_mem=False,
                  layer_norm=False):
         super(EntityClassify, self).__init__()
         self.device = device
@@ -60,7 +56,6 @@ class EntityClassify(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
         self.use_self_loop = use_self_loop
-        self.low_mem = low_mem
         self.layer_norm = layer_norm
 
         self.layers = nn.ModuleList()
@@ -68,19 +63,19 @@ class EntityClassify(nn.Module):
         self.layers.append(RelGraphConv(
             self.h_dim, self.h_dim, self.num_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
+            dropout=self.dropout, layer_norm = layer_norm))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConv(
                 self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
+                dropout=self.dropout, layer_norm = layer_norm))
         # h2o
         self.layers.append(RelGraphConv(
             self.h_dim, self.out_dim, self.num_rels, "basis",
             self.num_bases, activation=None,
             self_loop=self.use_self_loop,
-            low_mem=self.low_mem, layer_norm = layer_norm))
+            layer_norm = layer_norm))
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -195,8 +190,7 @@ def evaluate(model, embed_layer, eval_loader, node_feats):
  
     return eval_logits, eval_seeds
 
-
-@utils.benchmark('time', 3600)  # ogbn-mag takes ~1 hour to train
+@utils.benchmark('acc', timeout=3600)  # ogbn-mag takes ~1 hour to train
 @utils.parametrize('data', ['am', 'ogbn-mag'])
 def track_acc(data):
     dataset = utils.process_data(data)
@@ -220,7 +214,6 @@ def track_acc(data):
     dropout = 0.5
     use_self_loop = True
     lr = 0.01
-    low_mem = True
     num_workers = 4
 
     hg = dataset[0]
@@ -268,7 +261,7 @@ def track_acc(data):
 
     g = g.formats('csc')
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    train_loader = dgl.dataloading.NodeDataLoader(
+    train_loader = dgl.dataloading.DataLoader(
         g,
         target_nids[train_idx],
         sampler,
@@ -276,7 +269,7 @@ def track_acc(data):
         shuffle=True,
         drop_last=False,
         num_workers=num_workers)
-    test_loader = dgl.dataloading.NodeDataLoader(
+    test_loader = dgl.dataloading.DataLoader(
         g,
         target_nids[test_idx],
         sampler,
@@ -306,7 +299,6 @@ def track_acc(data):
                            num_hidden_layers=n_layers - 2,
                            dropout=dropout,
                            use_self_loop=use_self_loop,
-                           low_mem=low_mem,
                            layer_norm=False)
 
     embed_layer = embed_layer.to(device)

@@ -1,74 +1,66 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file test_unit_graph.cc
- * \brief Test UnitGraph
+ * @file test_unit_graph.cc
+ * @brief Test UnitGraph
  */
-#include "../../src/graph/unit_graph.h"
-#include "./../src/graph/heterograph.h"
-#include "./common.h"
 #include <dgl/array.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/device_api.h>
 #include <gtest/gtest.h>
+
 #include <memory>
 #include <vector>
+
+#include "../../src/graph/unit_graph.h"
+#include "./../src/graph/heterograph.h"
+#include "./common.h"
 
 using namespace dgl;
 using namespace dgl::runtime;
 
 template <typename IdType>
-aten::CSRMatrix CSR1(DLContext ctx) {
-  /*
+aten::CSRMatrix CSR1(DGLContext ctx) {
+  /**
    * G = [[0, 0, 1],
    *      [1, 0, 1],
    *      [0, 1, 0],
    *      [1, 0, 1]]
    */
-  IdArray g_indptr =
-    aten::VecToIdArray(std::vector<IdType>({0, 1, 3, 4, 6}), sizeof(IdType)*8, CTX);
-  IdArray g_indices =
-    aten::VecToIdArray(std::vector<IdType>({2, 0, 2, 1, 0, 2}), sizeof(IdType)*8, CTX);
+  IdArray g_indptr = aten::VecToIdArray(
+      std::vector<IdType>({0, 1, 3, 4, 6}), sizeof(IdType) * 8, CTX);
+  IdArray g_indices = aten::VecToIdArray(
+      std::vector<IdType>({2, 0, 2, 1, 0, 2}), sizeof(IdType) * 8, CTX);
 
-  const aten::CSRMatrix &csr_a = aten::CSRMatrix(
-    4,
-    3,
-    g_indptr,
-    g_indices,
-    aten::NullArray(),
-    false);
+  const aten::CSRMatrix &csr_a =
+      aten::CSRMatrix(4, 3, g_indptr, g_indices, aten::NullArray(), false);
   return csr_a;
 }
 
-template aten::CSRMatrix CSR1<int32_t>(DLContext ctx);
-template aten::CSRMatrix CSR1<int64_t>(DLContext ctx);
+template aten::CSRMatrix CSR1<int32_t>(DGLContext ctx);
+template aten::CSRMatrix CSR1<int64_t>(DGLContext ctx);
 
 template <typename IdType>
-aten::COOMatrix COO1(DLContext ctx) {
-  /*
+aten::COOMatrix COO1(DGLContext ctx) {
+  /**
    * G = [[1, 1, 0],
    *      [0, 1, 0]]
    */
-  IdArray g_row =
-    aten::VecToIdArray(std::vector<IdType>({0, 0, 1}), sizeof(IdType)*8, CTX);
-  IdArray g_col =
-    aten::VecToIdArray(std::vector<IdType>({0, 1, 1}), sizeof(IdType)*8, CTX);
-  const aten::COOMatrix &coo = aten::COOMatrix(
-    2,
-    3,
-    g_row,
-    g_col,
-    aten::NullArray(),
-    true,
-    true);
+  IdArray g_row = aten::VecToIdArray(
+      std::vector<IdType>({0, 0, 1}), sizeof(IdType) * 8, CTX);
+  IdArray g_col = aten::VecToIdArray(
+      std::vector<IdType>({0, 1, 1}), sizeof(IdType) * 8, CTX);
+  const aten::COOMatrix &coo =
+      aten::COOMatrix(2, 3, g_row, g_col, aten::NullArray(), true, true);
 
   return coo;
 }
 
-template aten::COOMatrix COO1<int32_t>(DLContext ctx);
-template aten::COOMatrix COO1<int64_t>(DLContext ctx);
+template aten::COOMatrix COO1<int32_t>(DGLContext ctx);
+template aten::COOMatrix COO1<int64_t>(DGLContext ctx);
 
-template <typename IdType> void _TestUnitGraph_InOutDegrees(DLContext ctx) {
-  /*
+template <typename IdType>
+void _TestUnitGraph_InOutDegrees(DGLContext ctx) {
+  /**
   InDegree(s) is available only if COO or CSC formats permitted.
   OutDegree(s) is available only if COO or CSR formats permitted.
   */
@@ -114,7 +106,7 @@ template <typename IdType> void _TestUnitGraph_InOutDegrees(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph(DLContext ctx) {
+void _TestUnitGraph(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -156,7 +148,7 @@ void _TestUnitGraph(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_GetInCSR(DLContext ctx) {
+void _TestUnitGraph_GetInCSR(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -193,7 +185,7 @@ void _TestUnitGraph_GetInCSR(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_GetOutCSR(DLContext ctx) {
+void _TestUnitGraph_GetOutCSR(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -230,7 +222,7 @@ void _TestUnitGraph_GetOutCSR(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_GetCOO(DLContext ctx) {
+void _TestUnitGraph_GetCOO(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -266,7 +258,7 @@ void _TestUnitGraph_GetCOO(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_Reserve(DLContext ctx) {
+void _TestUnitGraph_Reserve(DGLContext ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(ctx);
   const aten::COOMatrix &coo = COO1<IdType>(ctx);
 
@@ -346,29 +338,30 @@ void _TestUnitGraph_Reserve(DLContext ctx) {
 }
 
 template <typename IdType>
-void _TestUnitGraph_CopyTo(const DLContext &src_ctx,
-                           const DGLContext &dst_ctx) {
+void _TestUnitGraph_CopyTo(
+    const DGLContext &src_ctx, const DGLContext &dst_ctx) {
   const aten::CSRMatrix &csr = CSR1<IdType>(src_ctx);
   const aten::COOMatrix &coo = COO1<IdType>(src_ctx);
 
   auto device = dgl::runtime::DeviceAPI::Get(dst_ctx);
-  auto stream = device->CreateStream(dst_ctx);
+  // We don't allow SetStream in DGL for now.
+  auto stream = nullptr;
 
   auto g = dgl::UnitGraph::CreateFromCSC(2, csr);
   ASSERT_EQ(g->GetCreatedFormats(), 4);
-  auto cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  auto cg = dgl::UnitGraph::CopyTo(g, dst_ctx);
   device->StreamSync(dst_ctx, stream);
   ASSERT_EQ(cg->GetCreatedFormats(), 4);
 
   g = dgl::UnitGraph::CreateFromCSR(2, csr);
   ASSERT_EQ(g->GetCreatedFormats(), 2);
-  cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  cg = dgl::UnitGraph::CopyTo(g, dst_ctx);
   device->StreamSync(dst_ctx, stream);
   ASSERT_EQ(cg->GetCreatedFormats(), 2);
 
   g = dgl::UnitGraph::CreateFromCOO(2, coo);
   ASSERT_EQ(g->GetCreatedFormats(), 1);
-  cg = dgl::UnitGraph::CopyTo(g, dst_ctx, stream);
+  cg = dgl::UnitGraph::CopyTo(g, dst_ctx);
   device->StreamSync(dst_ctx, stream);
   ASSERT_EQ(cg->GetCreatedFormats(), 1);
 }

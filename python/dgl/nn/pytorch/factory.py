@@ -1,19 +1,21 @@
 """Modules that transforms between graphs and between graph and tensors."""
 import torch.nn as nn
-from ...transforms import knn_graph, segmented_knn_graph, radius_graph
+
+from ...transforms import knn_graph, radius_graph, segmented_knn_graph
+
 
 def pairwise_squared_distance(x):
-    '''
+    """
     x : (n_samples, n_points, dims)
     return : (n_samples, n_points, n_points)
-    '''
+    """
     x2s = (x * x).sum(-1, keepdim=True)
     return x2s + x2s.transpose(-1, -2) - 2 * x @ x.transpose(-1, -2)
 
 
 class KNNGraph(nn.Module):
     r"""Layer that transforms one point set into a graph, or a batch of
-    point sets with the same number of points into a union of those graphs.
+    point sets with the same number of points into a batched union of those graphs.
 
     The KNNGraph is implemented in the following steps:
 
@@ -58,12 +60,19 @@ class KNNGraph(nn.Module):
         (tensor([0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5]),
          tensor([0, 0, 1, 2, 1, 2, 5, 3, 4, 3, 4, 5]))
     """
+
     def __init__(self, k):
         super(KNNGraph, self).__init__()
         self.k = k
 
-    #pylint: disable=invalid-name
-    def forward(self, x, algorithm='bruteforce-blas', dist='euclidean'):
+    # pylint: disable=invalid-name
+    def forward(
+        self,
+        x,
+        algorithm="bruteforce-blas",
+        dist="euclidean",
+        exclude_self=False,
+    ):
         r"""
 
         Forward computation.
@@ -113,18 +122,24 @@ class KNNGraph(nn.Module):
               :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
             * 'cosine': Use cosine distance.
             (default: 'euclidean')
+        exclude_self : bool, optional
+            If True, the output graph will not contain self loop edges, and each node will not
+            be counted as one of its own k neighbors.  If False, the output graph will contain
+            self loop edges, and a node will be counted as one of its own k neighbors.
 
         Returns
         -------
         DGLGraph
             A DGLGraph without features.
         """
-        return knn_graph(x, self.k, algorithm=algorithm, dist=dist)
+        return knn_graph(
+            x, self.k, algorithm=algorithm, dist=dist, exclude_self=exclude_self
+        )
 
 
 class SegmentedKNNGraph(nn.Module):
     r"""Layer that transforms one point set into a graph, or a batch of
-    point sets with different number of points into a union of those graphs.
+    point sets with different number of points into a batched union of those graphs.
 
     If a batch of point sets is provided, then the point :math:`j` in the point
     set :math:`i` is mapped to graph node ID:
@@ -166,12 +181,20 @@ class SegmentedKNNGraph(nn.Module):
     >>>
 
     """
+
     def __init__(self, k):
         super(SegmentedKNNGraph, self).__init__()
         self.k = k
 
-    #pylint: disable=invalid-name
-    def forward(self, x, segs, algorithm='bruteforce-blas', dist='euclidean'):
+    # pylint: disable=invalid-name
+    def forward(
+        self,
+        x,
+        segs,
+        algorithm="bruteforce-blas",
+        dist="euclidean",
+        exclude_self=False,
+    ):
         r"""Forward computation.
 
         Parameters
@@ -222,14 +245,25 @@ class SegmentedKNNGraph(nn.Module):
               :math:`\sqrt{\sum_{i} (x_{i} - y_{i})^{2}}`.
             * 'cosine': Use cosine distance.
             (default: 'euclidean')
+        exclude_self : bool, optional
+            If True, the output graph will not contain self loop edges, and each node will not
+            be counted as one of its own k neighbors.  If False, the output graph will contain
+            self loop edges, and a node will be counted as one of its own k neighbors.
 
         Returns
         -------
         DGLGraph
-            A DGLGraph without features.
+            A batched DGLGraph without features.
         """
 
-        return segmented_knn_graph(x, self.k, segs, algorithm=algorithm, dist=dist)
+        return segmented_knn_graph(
+            x,
+            self.k,
+            segs,
+            algorithm=algorithm,
+            dist=dist,
+            exclude_self=exclude_self,
+        )
 
 
 class RadiusGraph(nn.Module):
@@ -304,16 +338,21 @@ class RadiusGraph(nn.Module):
             [0.7000],
             [0.2828]])
     """
-    #pylint: disable=invalid-name
-    def __init__(self, r, p=2, self_loop=False,
-                 compute_mode='donot_use_mm_for_euclid_dist'):
+    # pylint: disable=invalid-name
+    def __init__(
+        self,
+        r,
+        p=2,
+        self_loop=False,
+        compute_mode="donot_use_mm_for_euclid_dist",
+    ):
         super(RadiusGraph, self).__init__()
         self.r = r
         self.p = p
         self.self_loop = self_loop
         self.compute_mode = compute_mode
 
-    #pylint: disable=invalid-name
+    # pylint: disable=invalid-name
     def forward(self, x, get_distances=False):
         r"""
         Forward computation.
@@ -339,5 +378,6 @@ class RadiusGraph(nn.Module):
             The distances for the edges in the constructed graph. The distances
             are in the same order as edge IDs.
         """
-        return radius_graph(x, self.r, self.p, self.self_loop,
-                            self.compute_mode, get_distances)
+        return radius_graph(
+            x, self.r, self.p, self.self_loop, self.compute_mode, get_distances
+        )

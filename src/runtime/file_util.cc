@@ -1,15 +1,16 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
- * \file file_util.cc
+ * @file file_util.cc
  */
+#include "file_util.h"
+
+#include <dgl/runtime/serializer.h>
 #include <dmlc/json.h>
 #include <dmlc/logging.h>
-#include <dgl/runtime/serializer.h>
-#include <fstream>
-#include <vector>
-#include <unordered_map>
 
-#include "file_util.h"
+#include <fstream>
+#include <unordered_map>
+#include <vector>
 
 namespace dgl {
 namespace runtime {
@@ -17,7 +18,7 @@ namespace runtime {
 void FunctionInfo::Save(dmlc::JSONWriter* writer) const {
   std::vector<std::string> sarg_types(arg_types.size());
   for (size_t i = 0; i < arg_types.size(); ++i) {
-    sarg_types[i] = DGLType2String(arg_types[i]);
+    sarg_types[i] = DGLDataType2String(arg_types[i]);
   }
   writer->BeginObject();
   writer->WriteObjectKeyValue("name", name);
@@ -35,7 +36,7 @@ void FunctionInfo::Load(dmlc::JSONReader* reader) {
   helper.ReadAllFields(reader);
   arg_types.resize(sarg_types.size());
   for (size_t i = 0; i < arg_types.size(); ++i) {
-    arg_types[i] = String2DGLType(sarg_types[i]);
+    arg_types[i] = String2DGLDataType(sarg_types[i]);
   }
 }
 
@@ -52,8 +53,8 @@ bool FunctionInfo::Load(dmlc::Stream* reader) {
   return true;
 }
 
-std::string GetFileFormat(const std::string& file_name,
-                          const std::string& format) {
+std::string GetFileFormat(
+    const std::string& file_name, const std::string& format) {
   std::string fmt = format;
   if (fmt.length() == 0) {
     if (file_name.find(".signed.so") != std::string::npos) return "sgx";
@@ -87,7 +88,7 @@ std::string GetFileBasename(const std::string& file_name) {
 }
 
 std::string GetMetaFilePath(const std::string& file_name) {
-  size_t pos  = file_name.find_last_of(".");
+  size_t pos = file_name.find_last_of(".");
   if (pos != std::string::npos) {
     return file_name.substr(0, pos) + ".dgl_meta.json";
   } else {
@@ -95,8 +96,7 @@ std::string GetMetaFilePath(const std::string& file_name) {
   }
 }
 
-void LoadBinaryFromFile(const std::string& file_name,
-                        std::string* data) {
+void LoadBinaryFromFile(const std::string& file_name, std::string* data) {
   std::ifstream fs(file_name, std::ios::in | std::ios::binary);
   CHECK(!fs.fail()) << "Cannot open " << file_name;
   // get its size:
@@ -107,9 +107,7 @@ void LoadBinaryFromFile(const std::string& file_name,
   fs.read(&(*data)[0], size);
 }
 
-void SaveBinaryToFile(
-    const std::string& file_name,
-    const std::string& data) {
+void SaveBinaryToFile(const std::string& file_name, const std::string& data) {
   std::ofstream fs(file_name, std::ios::out | std::ios::binary);
   CHECK(!fs.fail()) << "Cannot open " << file_name;
   fs.write(&data[0], data.length());

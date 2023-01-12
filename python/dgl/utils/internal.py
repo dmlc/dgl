@@ -1,39 +1,47 @@
 """Internal utilities."""
 from __future__ import absolute_import, division
 
-from collections.abc import Mapping, Iterable, Sequence
+import glob
+import os
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from functools import wraps
+
 import numpy as np
 
-from ..base import DGLError, dgl_warning, NID, EID
 from .. import backend as F
 from .. import ndarray as nd
 from .._ffi.function import _init_api
+from ..base import EID, NID, DGLError, dgl_warning
+
 
 def is_listlike(data):
     """Return if the data is a sequence but not a string."""
     return isinstance(data, Sequence) and not isinstance(data, str)
 
+
 class InconsistentDtypeException(DGLError):
     """Exception class for inconsistent dtype between graph and tensor"""
-    def __init__(self, msg='', *args, **kwargs): #pylint: disable=W1113
-        prefix_message = 'DGL now requires the input tensor to have\
-            the same dtype as the graph index\'s dtype(which you can get by g.idype). '
+
+    def __init__(self, msg="", *args, **kwargs):  # pylint: disable=W1113
+        prefix_message = "DGL now requires the input tensor to have\
+            the same dtype as the graph index's dtype(which you can get by g.idype). "
         super().__init__(prefix_message + msg, *args, **kwargs)
+
 
 class Index(object):
     """Index class that can be easily converted to list/tensor."""
+
     def __init__(self, data, dtype="int64"):
-        assert dtype in ['int32', 'int64']
+        assert dtype in ["int32", "int64"]
         self.dtype = dtype
         self._initialize_data(data)
 
     def _initialize_data(self, data):
-        self._pydata = None   # a numpy type data
+        self._pydata = None  # a numpy type data
         self._user_tensor_data = dict()  # dictionary of user tensors
         self._dgl_tensor_data = None  # a dgl ndarray
-        self._slice_data = None # a slice type data
+        self._slice_data = None  # a slice type data
         self._dispatch(data)
 
     def __iter__(self):
@@ -59,12 +67,16 @@ class Index(object):
         """Store data based on its type."""
         if F.is_tensor(data):
             if F.dtype(data) != F.data_type_dict[self.dtype]:
-                raise InconsistentDtypeException('Index data specified as %s, but got: %s' %
-                                                 (self.dtype,
-                                                  F.reverse_data_type_dict[F.dtype(data)]))
+                raise InconsistentDtypeException(
+                    "Index data specified as %s, but got: %s"
+                    % (self.dtype, F.reverse_data_type_dict[F.dtype(data)])
+                )
             if len(F.shape(data)) > 1:
-                raise InconsistentDtypeException('Index data must be 1D int32/int64 vector,\
-                    but got shape: %s' % str(F.shape(data)))
+                raise InconsistentDtypeException(
+                    "Index data must be 1D int32/int64 vector,\
+                    but got shape: %s"
+                    % str(F.shape(data))
+                )
             if len(F.shape(data)) == 0:
                 # a tensor of one int
                 self._dispatch(int(data))
@@ -72,26 +84,33 @@ class Index(object):
                 self._user_tensor_data[F.context(data)] = data
         elif isinstance(data, nd.NDArray):
             if not (data.dtype == self.dtype and len(data.shape) == 1):
-                raise InconsistentDtypeException('Index data must be 1D %s vector, but got: %s' %
-                                                 (self.dtype, data.dtype))
+                raise InconsistentDtypeException(
+                    "Index data must be 1D %s vector, but got: %s"
+                    % (self.dtype, data.dtype)
+                )
             self._dgl_tensor_data = data
         elif isinstance(data, slice):
             # save it in the _pydata temporarily; materialize it if `tonumpy` is called
-            assert data.step == 1 or data.step is None, \
-                "step for slice type must be 1"
+            assert (
+                data.step == 1 or data.step is None
+            ), "step for slice type must be 1"
             self._slice_data = slice(data.start, data.stop)
         else:
             try:
                 data = np.asarray(data, dtype=self.dtype)
             except Exception:  # pylint: disable=broad-except
-                raise DGLError('Error index data: %s' % str(data))
+                raise DGLError("Error index data: %s" % str(data))
             if data.ndim == 0:  # scalar array
                 data = np.expand_dims(data, 0)
             elif data.ndim != 1:
-                raise DGLError('Index data must be 1D int64 vector,'
-                               ' but got: %s' % str(data))
+                raise DGLError(
+                    "Index data must be 1D int64 vector,"
+                    " but got: %s" % str(data)
+                )
             self._pydata = data
-            self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._pydata)
+            self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(
+                self._pydata
+            )
 
     def tonumpy(self):
         """Convert to a numpy ndarray."""
@@ -117,7 +136,9 @@ class Index(object):
                 self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dlpack)
             else:
                 # zero copy from numpy array
-                self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self.tonumpy())
+                self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(
+                    self.tonumpy()
+                )
         if ctx not in self._user_tensor_data:
             # copy from cpu to another device
             data = next(iter(self._user_tensor_data.values()))
@@ -160,8 +181,10 @@ class Index(object):
             self._initialize_data(data)
         else:
             # pre-0.4.3
-            dgl_warning("The object is pickled before 0.4.3.  Setting dtype of graph to int64")
-            self.dtype = 'int64'
+            dgl_warning(
+                "The object is pickled before 0.4.3.  Setting dtype of graph to int64"
+            )
+            self.dtype = "int64"
             self._initialize_data(state)
 
     def get_items(self, index):
@@ -191,15 +214,21 @@ class Index(object):
             tensor = self.tousertensor()
             index = index._slice_data
             # TODO(Allen): Change F.narrow_row to dgl operation
-            return Index(F.astype(F.narrow_row(tensor, index.start, index.stop),
-                                  F.data_type_dict[self.dtype]),
-                         self.dtype)
+            return Index(
+                F.astype(
+                    F.narrow_row(tensor, index.start, index.stop),
+                    F.data_type_dict[self.dtype],
+                ),
+                self.dtype,
+            )
         else:
             # both self and index wrap a slice object, then return another
             # Index wrapping a slice
             start = self._slice_data.start
             index = index._slice_data
-            return Index(slice(start + index.start, start + index.stop), self.dtype)
+            return Index(
+                slice(start + index.start, start + index.stop), self.dtype
+            )
 
     def set_items(self, index, value):
         """Set values at given positions of an Index. Set is not done in place,
@@ -255,7 +284,8 @@ class Index(object):
         tensor = self.tousertensor()
         return F.sum(tensor, 0) > 0
 
-def toindex(data, dtype='int64'):
+
+def toindex(data, dtype="int64"):
     """Convert the given data to Index object.
 
     Parameters
@@ -274,6 +304,7 @@ def toindex(data, dtype='int64'):
     """
     return data if isinstance(data, Index) else Index(data, dtype)
 
+
 def zero_index(size, dtype="int64"):
     """Create a index with provided size initialized to zero
 
@@ -281,8 +312,11 @@ def zero_index(size, dtype="int64"):
     ----------
     size: int
     """
-    return Index(F.zeros((size,), dtype=F.data_type_dict[dtype], ctx=F.cpu()),
-                 dtype=dtype)
+    return Index(
+        F.zeros((size,), dtype=F.data_type_dict[dtype], ctx=F.cpu()),
+        dtype=dtype,
+    )
+
 
 def set_diff(ar1, ar2):
     """Find the set difference of two index arrays.
@@ -307,8 +341,10 @@ def set_diff(ar1, ar2):
     setdiff = toindex(setdiff)
     return setdiff
 
+
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""
+
     def __init__(self, fn, keys):
         self._fn = fn
         self._keys = keys
@@ -330,11 +366,13 @@ class LazyDict(Mapping):
     def keys(self):
         return self._keys
 
+
 class HybridDict(Mapping):
     """A readonly dictonary that merges several dict-like (python dict, LazyDict).
 
     If there are duplicate keys, early keys have priority over latter ones.
     """
+
     def __init__(self, *dict_like_list):
         self._dict_like_list = dict_like_list
         self._keys = set()
@@ -359,8 +397,10 @@ class HybridDict(Mapping):
     def __len__(self):
         return len(self.keys())
 
+
 class ReadOnlyDict(Mapping):
     """A readonly dictionary wrapper."""
+
     def __init__(self, dict_like):
         self._dict_like = dict_like
 
@@ -378,6 +418,7 @@ class ReadOnlyDict(Mapping):
 
     def __len__(self):
         return len(self._dict_like)
+
 
 def build_relabel_map(x, is_sorted=False):
     """Relabel the input ids to continuous ids that starts from zero.
@@ -421,6 +462,7 @@ def build_relabel_map(x, is_sorted=False):
     old_to_new = F.scatter_row(old_to_new, unique_x, F.arange(0, len(unique_x)))
     return unique_x, old_to_new
 
+
 def build_relabel_dict(x):
     """Relabel the input ids to continuous ids that starts from zero.
 
@@ -441,6 +483,7 @@ def build_relabel_dict(x):
         relabel_dict[v] = i
     return relabel_dict
 
+
 class CtxCachedObject(object):
     """A wrapper to cache object generated by different context.
 
@@ -451,6 +494,7 @@ class CtxCachedObject(object):
     generator : callable
         A callable function that can create the object given ctx as the only argument.
     """
+
     def __init__(self, generator):
         self._generator = generator
         self._ctx_dict = {}
@@ -459,6 +503,7 @@ class CtxCachedObject(object):
         if ctx not in self._ctx_dict:
             self._ctx_dict[ctx] = self._generator(ctx)
         return self._ctx_dict[ctx]
+
 
 def cached_member(cache, prefix):
     """A member function decorator to memorize the result.
@@ -474,23 +519,29 @@ def cached_member(cache, prefix):
     prefix : str
         The key prefix to save the result of the function.
     """
+
     def _creator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
             dic = getattr(self, cache)
-            key = '%s-%s-%s' % (
+            key = "%s-%s-%s" % (
                 prefix,
-                '-'.join([str(a) for a in args]),
-                '-'.join([str(k) + ':' + str(v) for k, v in kwargs.items()]))
+                "-".join([str(a) for a in args]),
+                "-".join([str(k) + ":" + str(v) for k, v in kwargs.items()]),
+            )
             if key not in dic:
                 dic[key] = func(self, *args, **kwargs)
             return dic[key]
+
         return wrapper
+
     return _creator
+
 
 def is_dict_like(obj):
     """Return true if the object can be treated as a dictionary."""
     return isinstance(obj, Mapping)
+
 
 def reorder(dict_like, index):
     """Reorder each column in the dict according to the index.
@@ -508,6 +559,7 @@ def reorder(dict_like, index):
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
 
+
 def reorder_index(idx, order):
     """Reorder the idx according to the given order
 
@@ -523,9 +575,11 @@ def reorder_index(idx, order):
     new_idx = F.gather_row(idx, order)
     return toindex(new_idx)
 
+
 def is_iterable(obj):
     """Return true if the object is an iterable."""
     return isinstance(obj, Iterable)
+
 
 def to_dgl_context(ctx):
     """Convert a backend context to DGLContext"""
@@ -533,15 +587,17 @@ def to_dgl_context(ctx):
     device_id = F.device_id(ctx)
     return nd.DGLContext(device_type, device_id)
 
+
 def to_nbits_int(tensor, nbits):
     """Change the dtype of integer tensor
     The dtype of returned tensor uses nbits, nbits can only be 32 or 64
     """
-    assert(nbits in (32, 64)), "nbits can either be 32 or 64"
+    assert nbits in (32, 64), "nbits can either be 32 or 64"
     if nbits == 32:
         return F.astype(tensor, F.int32)
     else:
         return F.astype(tensor, F.int64)
+
 
 def make_invmap(array, use_numpy=True):
     """Find the unique elements of the array and return another array with indices
@@ -554,6 +610,7 @@ def make_invmap(array, use_numpy=True):
     remapped = np.asarray([invmap[x] for x in array])
     return uniques, invmap, remapped
 
+
 def expand_as_pair(input_, g=None):
     """Return a pair of same element if the input is not a pair.
 
@@ -563,7 +620,7 @@ def expand_as_pair(input_, g=None):
     ----------
     input_ : Tensor, dict[str, Tensor], or their pairs
         The input features
-    g : DGLHeteroGraph or DGLGraph or None
+    g : DGLGraph or None
         The graph.
 
         If None, skip checking if the graph is a block.
@@ -579,12 +636,14 @@ def expand_as_pair(input_, g=None):
         if isinstance(input_, Mapping):
             input_dst = {
                 k: F.narrow_row(v, 0, g.number_of_dst_nodes(k))
-                for k, v in input_.items()}
+                for k, v in input_.items()
+            }
         else:
             input_dst = F.narrow_row(input_, 0, g.number_of_dst_nodes())
         return input_, input_dst
     else:
         return input_, input_
+
 
 def check_eq_shape(input_):
     """If input_ is a pair of features, check if the feature shape of source
@@ -594,9 +653,14 @@ def check_eq_shape(input_):
     src_feat_shape = tuple(F.shape(srcdata))[1:]
     dst_feat_shape = tuple(F.shape(dstdata))[1:]
     if src_feat_shape != dst_feat_shape:
-        raise DGLError("The feature shape of source nodes: {} \
+        raise DGLError(
+            "The feature shape of source nodes: {} \
             should be equal to the feature shape of destination \
-            nodes: {}.".format(src_feat_shape, dst_feat_shape))
+            nodes: {}.".format(
+                src_feat_shape, dst_feat_shape
+            )
+        )
+
 
 def retry_method_with_fix(fix_method):
     """Decorator that executes a fix method before retrying again when the decorated method
@@ -615,6 +679,7 @@ def retry_method_with_fix(fix_method):
         The fix method to execute.  It should not accept any arguments.  Its return values are
         ignored.
     """
+
     def _creator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -626,7 +691,9 @@ def retry_method_with_fix(fix_method):
                 return func(self, *args, **kwargs)
 
         return wrapper
+
     return _creator
+
 
 def group_as_dict(pairs):
     """Combines a list of key-value pairs to a dictionary of keys and value lists.
@@ -648,6 +715,7 @@ def group_as_dict(pairs):
         dic[key].append(value)
     return dic
 
+
 class FlattenedDict(object):
     """Iterates over each item in a dictionary of groups.
 
@@ -666,6 +734,7 @@ class FlattenedDict(object):
     >>> len(groups)
     6
     """
+
     def __init__(self, groups):
         self._groups = groups
         group_sizes = {k: len(v) for k, v in groups.items()}
@@ -673,9 +742,11 @@ class FlattenedDict(object):
         self._group_offsets = np.insert(np.cumsum(self._group_sizes), 0, 0)
         # TODO: this is faster (37s -> 21s per epoch compared to searchsorted in GCMC) but takes
         # O(E) memory.
-        self._idx_to_group = np.zeros(self._group_offsets[-1], dtype='int32')
+        self._idx_to_group = np.zeros(self._group_offsets[-1], dtype="int32")
         for i in range(len(self._groups)):
-            self._idx_to_group[self._group_offsets[i]:self._group_offsets[i + 1]] = i
+            self._idx_to_group[
+                self._group_offsets[i] : self._group_offsets[i + 1]
+            ] = i
 
     def __len__(self):
         """Return the total number of items."""
@@ -695,10 +766,11 @@ class FlattenedDict(object):
         g = self._groups[k]
         return k, g[j]
 
+
 def maybe_flatten_dict(data):
-    """Return a FlattenedDict if the input is a Mapping, or the data itself otherwise.
-    """
+    """Return a FlattenedDict if the input is a Mapping, or the data itself otherwise."""
     return FlattenedDict(data) if isinstance(data, Mapping) else data
+
 
 def compensate(ids, origin_ids):
     """computing the compensate set of ids from origin_ids
@@ -714,15 +786,18 @@ def compensate(ids, origin_ids):
     th.Tensor([1, 5])
     """
     # trick here, eid_0 or nid_0 can be 0.
-    mask = F.scatter_row(origin_ids,
-                         F.copy_to(F.tensor(0, dtype=F.int64),
-                                   F.context(origin_ids)),
-                         F.copy_to(F.tensor(1, dtype=F.dtype(origin_ids)),
-                                   F.context(origin_ids)))
-    mask = F.scatter_row(mask,
-                         ids,
-                         F.full_1d(len(ids), 0, F.dtype(ids), F.context(ids)))
+    mask = F.scatter_row(
+        origin_ids,
+        F.copy_to(F.tensor(0, dtype=F.int64), F.context(origin_ids)),
+        F.copy_to(
+            F.tensor(1, dtype=F.dtype(origin_ids)), F.context(origin_ids)
+        ),
+    )
+    mask = F.scatter_row(
+        mask, ids, F.full_1d(len(ids), 0, F.dtype(ids), F.context(ids))
+    )
     return F.tensor(F.nonzero_1d(mask), dtype=F.dtype(ids))
+
 
 def relabel(x):
     """Relabel the input ids to continuous ids that starts from zero.
@@ -759,9 +834,11 @@ def relabel(x):
     ctx = F.context(x)
     dtype = F.dtype(x)
     old_to_new = F.zeros((map_len,), dtype=dtype, ctx=ctx)
-    old_to_new = F.scatter_row(old_to_new, unique_x,
-                               F.copy_to(F.arange(0, len(unique_x), dtype), ctx))
+    old_to_new = F.scatter_row(
+        old_to_new, unique_x, F.copy_to(F.arange(0, len(unique_x), dtype), ctx)
+    )
     return unique_x, old_to_new
+
 
 def extract_node_subframes(graph, nodes_or_device, store_ids=True):
     """Extract node features of the given nodes from :attr:`graph`
@@ -799,9 +876,10 @@ def extract_node_subframes(graph, nodes_or_device, store_ids=True):
             if store_ids:
                 subf[NID] = ind_nodes
             node_frames.append(subf)
-    else:   # device object
+    else:  # device object
         node_frames = [nf.to(nodes_or_device) for nf in graph._node_frames]
     return node_frames
+
 
 def extract_node_subframes_for_block(graph, srcnodes, dstnodes):
     """Extract the input node features and output node features of the given nodes from
@@ -839,6 +917,7 @@ def extract_node_subframes_for_block(graph, srcnodes, dstnodes):
         node_frames.append(subf)
     return node_frames
 
+
 def extract_edge_subframes(graph, edges_or_device, store_ids=True):
     """Extract edge features of the given edges from :attr:`graph`
     and return them in frames.
@@ -875,9 +954,10 @@ def extract_edge_subframes(graph, edges_or_device, store_ids=True):
             if store_ids:
                 subf[EID] = ind_edges
             edge_frames.append(subf)
-    else:   # device object
-        edge_frames = [nf.to(device) for nf in graph._edge_frames]
+    else:  # device object
+        edge_frames = [nf.to(edges_or_device) for nf in graph._edge_frames]
     return edge_frames
+
 
 def set_new_frames(graph, *, node_frames=None, edge_frames=None):
     """Set the node and edge frames of a given graph to new ones.
@@ -896,13 +976,16 @@ def set_new_frames(graph, *, node_frames=None, edge_frames=None):
         Default is None, where the edge frames are not updated.
     """
     if node_frames is not None:
-        assert len(node_frames) == len(graph.ntypes), \
-            "[BUG] number of node frames different from number of node types"
+        assert len(node_frames) == len(
+            graph.ntypes
+        ), "[BUG] number of node frames different from number of node types"
         graph._node_frames = node_frames
     if edge_frames is not None:
-        assert len(edge_frames) == len(graph.etypes), \
-            "[BUG] number of edge frames different from number of edge types"
+        assert len(edge_frames) == len(
+            graph.etypes
+        ), "[BUG] number of edge frames different from number of edge types"
         graph._edge_frames = edge_frames
+
 
 def set_num_threads(num_threads):
     """Set the number of OMP threads in the process.
@@ -914,13 +997,63 @@ def set_num_threads(num_threads):
     """
     _CAPI_DGLSetOMPThreads(num_threads)
 
+
+def get_num_threads():
+    """Get the number of OMP threads in the process"""
+    return _CAPI_DGLGetOMPThreads()
+
+
+def get_numa_nodes_cores():
+    """Returns numa nodes info, format:
+    {<node_id>: [(<core_id>, [<sibling_thread_id_0>, <sibling_thread_id_1>, ...]), ...], ...}
+    E.g.: {0: [(0, [0, 4]), (1, [1, 5])], 1: [(2, [2, 6]), (3, [3, 7])]}
+
+    If not available, returns {}
+    """
+    numa_node_paths = glob.glob("/sys/devices/system/node/node[0-9]*")
+
+    if not numa_node_paths:
+        return {}
+
+    nodes = {}
+    try:
+        for node_path in numa_node_paths:
+            numa_node_id = int(os.path.basename(node_path)[4:])
+
+            thread_siblings = {}
+            for cpu_dir in glob.glob(os.path.join(node_path, "cpu[0-9]*")):
+                cpu_id = int(os.path.basename(cpu_dir)[3:])
+
+                with open(
+                    os.path.join(cpu_dir, "topology", "core_id")
+                ) as core_id_file:
+                    core_id = int(core_id_file.read().strip())
+                    if core_id in thread_siblings:
+                        thread_siblings[core_id].append(cpu_id)
+                    else:
+                        thread_siblings[core_id] = [cpu_id]
+
+            nodes[numa_node_id] = sorted(
+                [(k, sorted(v)) for k, v in thread_siblings.items()]
+            )
+
+    except (OSError, ValueError, IndexError, IOError):
+        dgl_warning("Failed to read NUMA info")
+        return {}
+
+    return nodes
+
+
 def alias_func(func):
     """Return an alias function with proper docstring."""
+
     @wraps(func)
     def _fn(*args, **kwargs):
         return func(*args, **kwargs)
+
     _fn.__doc__ = """Alias of :func:`dgl.{}`.""".format(func.__name__)
     return _fn
+
 
 def apply_each(data, fn, *args, **kwargs):
     """Apply a function to every element in a container.
@@ -958,6 +1091,7 @@ def apply_each(data, fn, *args, **kwargs):
     else:
         return fn(data, *args, **kwargs)
 
+
 def recursive_apply(data, fn, *args, **kwargs):
     """Recursively apply a function to every element in a container.
 
@@ -991,11 +1125,14 @@ def recursive_apply(data, fn, *args, **kwargs):
     >>> assert all((v >= 0).all() for v in h.values())
     """
     if isinstance(data, Mapping):
-        return {k: recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()}
+        return {
+            k: recursive_apply(v, fn, *args, **kwargs) for k, v in data.items()
+        }
     elif is_listlike(data):
         return [recursive_apply(v, fn, *args, **kwargs) for v in data]
     else:
         return fn(data, *args, **kwargs)
+
 
 def recursive_apply_pair(data1, data2, fn, *args, **kwargs):
     """Recursively apply a function to every pair of elements in two containers with the
@@ -1004,11 +1141,16 @@ def recursive_apply_pair(data1, data2, fn, *args, **kwargs):
     if isinstance(data1, Mapping) and isinstance(data2, Mapping):
         return {
             k: recursive_apply_pair(data1[k], data2[k], fn, *args, **kwargs)
-            for k in data1.keys()}
+            for k in data1.keys()
+        }
     elif is_listlike(data1) and is_listlike(data2):
-        return [recursive_apply_pair(x, y, fn, *args, **kwargs) for x, y in zip(data1, data2)]
+        return [
+            recursive_apply_pair(x, y, fn, *args, **kwargs)
+            for x, y in zip(data1, data2)
+        ]
     else:
         return fn(data1, data2, *args, **kwargs)
+
 
 def context_of(data):
     """Return the device of the data which can be either a tensor or a list/dict of tensors."""
@@ -1019,8 +1161,12 @@ def context_of(data):
     else:
         return F.context(data)
 
+
 def dtype_of(data):
     """Return the dtype of the data which can be either a tensor or a dict of tensors."""
-    return F.dtype(next(iter(data.values())) if isinstance(data, Mapping) else data)
+    return F.dtype(
+        next(iter(data.values())) if isinstance(data, Mapping) else data
+    )
+
 
 _init_api("dgl.utils.internal")

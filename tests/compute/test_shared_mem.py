@@ -1,7 +1,6 @@
 import networkx as nx
 import scipy.sparse as ssp
 import dgl
-import dgl.contrib as contrib
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
 import backend as F
@@ -23,7 +22,6 @@ def create_test_graph(idtype):
     return g
 
 def _assert_is_identical_hetero(g, g2):
-    assert g.is_readonly == g2.is_readonly
     assert g.ntypes == g2.ntypes
     assert g.canonical_etypes == g2.canonical_etypes
 

@@ -30,7 +30,7 @@ class ServerState:
     ----------
     kv_store : KVServer
         reference for KVServer
-    graph : DGLHeteroGraph
+    graph : DGLGraph
         Graph structure of one partition
     total_num_nodes : int
         Total number of nodes
@@ -76,5 +76,6 @@ class ServerState:
     def keep_alive(self):
         """Flag of whether keep alive"""
         return self._keep_alive
+
 
 _init_api("dgl.distributed.server_state")

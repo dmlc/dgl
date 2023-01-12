@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/array_nonzero.cc
- * \brief Array nonzero CPU implementation
+ * @file array/cpu/array_nonzero.cc
+ * @brief Array nonzero CPU implementation
  */
 #include <dgl/array.h>
 
@@ -10,18 +10,17 @@ using runtime::NDArray;
 namespace aten {
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 IdArray NonZero(IdArray array) {
   std::vector<int64_t> ret;
   const IdType* data = array.Ptr<IdType>();
   for (int64_t i = 0; i < array->shape[0]; ++i)
-    if (data[i] != 0)
-      ret.push_back(i);
+    if (data[i] != 0) ret.push_back(i);
   return NDArray::FromVector(ret, array->ctx);
 }
 
-template IdArray NonZero<kDLCPU, int32_t>(IdArray);
-template IdArray NonZero<kDLCPU, int64_t>(IdArray);
+template IdArray NonZero<kDGLCPU, int32_t>(IdArray);
+template IdArray NonZero<kDGLCPU, int64_t>(IdArray);
 
 }  // namespace impl
 }  // namespace aten

@@ -1,40 +1,47 @@
-from point_transformer import PointTransformerCLS
-from ModelNetDataLoader import ModelNetDataLoader
-import provider
 import argparse
 import os
-import tqdm
-from functools import partial
-from dgl.data.utils import download, get_download_dir
-from torch.utils.data import DataLoader
-import torch.nn as nn
-import torch
 import time
+from functools import partial
+
+import provider
+import torch
+import torch.nn as nn
+import tqdm
+from ModelNetDataLoader import ModelNetDataLoader
+from point_transformer import PointTransformerCLS
+from torch.utils.data import DataLoader
+
+from dgl.data.utils import download, get_download_dir
 
 torch.backends.cudnn.enabled = False
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset-path', type=str, default='')
-parser.add_argument('--load-model-path', type=str, default='')
-parser.add_argument('--save-model-path', type=str, default='')
-parser.add_argument('--num-epochs', type=int, default=200)
-parser.add_argument('--num-workers', type=int, default=8)
-parser.add_argument('--batch-size', type=int, default=16)
-parser.add_argument('--opt', type=str, default='adam')
+parser.add_argument("--dataset-path", type=str, default="")
+parser.add_argument("--load-model-path", type=str, default="")
+parser.add_argument("--save-model-path", type=str, default="")
+parser.add_argument("--num-epochs", type=int, default=200)
+parser.add_argument("--num-workers", type=int, default=8)
+parser.add_argument("--batch-size", type=int, default=16)
+parser.add_argument("--opt", type=str, default="adam")
 args = parser.parse_args()
 
 num_workers = args.num_workers
 batch_size = args.batch_size
 
-data_filename = 'modelnet40_normal_resampled.zip'
+data_filename = "modelnet40_normal_resampled.zip"
 download_path = os.path.join(get_download_dir(), data_filename)
 local_path = args.dataset_path or os.path.join(
-    get_download_dir(), 'modelnet40_normal_resampled')
+    get_download_dir(), "modelnet40_normal_resampled"
+)
 
 if not os.path.exists(local_path):
-    download('https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip',
-             download_path, verify_ssl=False)
+    download(
+        "https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip",
+        download_path,
+        verify_ssl=False,
+    )
     from zipfile import ZipFile
+
     with ZipFile(download_path) as z:
         z.extractall(path=get_download_dir())
 
@@ -43,7 +50,8 @@ CustomDataLoader = partial(
     num_workers=num_workers,
     batch_size=batch_size,
     shuffle=True,
-    drop_last=True)
+    drop_last=True,
+)
 
 
 def train(net, opt, scheduler, train_loader, dev):
@@ -60,8 +68,7 @@ def train(net, opt, scheduler, train_loader, dev):
         for data, label in tq:
             data = data.data.numpy()
             data = provider.random_point_dropout(data)
-            data[:, :, 0:3] = provider.random_scale_point_cloud(
-                data[:, :, 0:3])
+            data[:, :, 0:3] = provider.random_scale_point_cloud(data[:, :, 0:3])
             data[:, :, 0:3] = provider.jitter_point_cloud(data[:, :, 0:3])
             data[:, :, 0:3] = provider.shift_point_cloud(data[:, :, 0:3])
             data = torch.tensor(data)
@@ -84,11 +91,19 @@ def train(net, opt, scheduler, train_loader, dev):
             total_loss += loss
             total_correct += correct
 
-            tq.set_postfix({
-                'AvgLoss': '%.5f' % (total_loss / num_batches),
-                'AvgAcc': '%.5f' % (total_correct / count)})
-    print("[Train] AvgLoss: {:.5}, AvgAcc: {:.5}, Time: {:.5}s".format(total_loss /
-                                                                       num_batches, total_correct / count, time.time() - start_time))
+            tq.set_postfix(
+                {
+                    "AvgLoss": "%.5f" % (total_loss / num_batches),
+                    "AvgAcc": "%.5f" % (total_correct / count),
+                }
+            )
+    print(
+        "[Train] AvgLoss: {:.5}, AvgAcc: {:.5}, Time: {:.5}s".format(
+            total_loss / num_batches,
+            total_correct / count,
+            time.time() - start_time,
+        )
+    )
     scheduler.step()
 
 
@@ -111,10 +126,12 @@ def evaluate(net, test_loader, dev):
                 total_correct += correct
                 count += num_examples
 
-                tq.set_postfix({
-                    'AvgAcc': '%.5f' % (total_correct / count)})
-    print("[Test]  AvgAcc: {:.5}, Time: {:.5}s".format(
-        total_correct / count, time.time() - start_time))
+                tq.set_postfix({"AvgAcc": "%.5f" % (total_correct / count)})
+    print(
+        "[Test]  AvgAcc: {:.5}, Time: {:.5}s".format(
+            total_correct / count, time.time() - start_time
+        )
+    )
     return total_correct / count
 
 
@@ -125,13 +142,15 @@ net = net.to(dev)
 if args.load_model_path:
     net.load_state_dict(torch.load(args.load_model_path, map_location=dev))
 
-if args.opt == 'sgd':
+if args.opt == "sgd":
     # The optimizer strategy described in paper:
-    opt = torch.optim.SGD(net.parameters(), lr=0.01,
-                          momentum=0.9, weight_decay=1e-4)
+    opt = torch.optim.SGD(
+        net.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4
+    )
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        opt, milestones=[120, 160], gamma=0.1)
-elif args.opt == 'adam':
+        opt, milestones=[120, 160], gamma=0.1
+    )
+elif args.opt == "adam":
     # The optimizer strategy proposed by
     # https://github.com/qq456cvb/Point-Transformers:
     opt = torch.optim.Adam(
@@ -139,16 +158,26 @@ elif args.opt == 'adam':
         lr=1e-3,
         betas=(0.9, 0.999),
         eps=1e-08,
-        weight_decay=1e-4
+        weight_decay=1e-4,
     )
     scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=50, gamma=0.3)
 
-train_dataset = ModelNetDataLoader(local_path, 1024, split='train')
-test_dataset = ModelNetDataLoader(local_path, 1024, split='test')
+train_dataset = ModelNetDataLoader(local_path, 1024, split="train")
+test_dataset = ModelNetDataLoader(local_path, 1024, split="test")
 train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
+    train_dataset,
+    batch_size=batch_size,
+    shuffle=True,
+    num_workers=num_workers,
+    drop_last=True,
+)
 test_loader = torch.utils.data.DataLoader(
-    test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=True)
+    test_dataset,
+    batch_size=batch_size,
+    shuffle=False,
+    num_workers=num_workers,
+    drop_last=True,
+)
 
 best_test_acc = 0
 
@@ -161,6 +190,5 @@ for epoch in range(args.num_epochs):
             best_test_acc = test_acc
             if args.save_model_path:
                 torch.save(net.state_dict(), args.save_model_path)
-        print('Current test acc: %.5f (best: %.5f)' % (
-            test_acc, best_test_acc))
+        print("Current test acc: %.5f (best: %.5f)" % (test_acc, best_test_acc))
     print()

@@ -5,6 +5,7 @@ some work as trainers.
 """
 
 import os
+
 import numpy as np
 
 from . import rpc
@@ -12,10 +13,12 @@ from . import rpc
 REGISTER_ROLE = 700001
 REG_ROLE_MSG = "Register_Role"
 
+
 class RegisterRoleResponse(rpc.Response):
     """Send a confirmation signal (just a short string message)
     of RegisterRoleRequest to client.
     """
+
     def __init__(self, msg):
         self.msg = msg
 
@@ -24,6 +27,7 @@ class RegisterRoleResponse(rpc.Response):
 
     def __setstate__(self, state):
         self.msg = state
+
 
 class RegisterRoleRequest(rpc.Request):
     """Send client id and role to server
@@ -35,6 +39,7 @@ class RegisterRoleRequest(rpc.Request):
     role : str
         role of client
     """
+
     def __init__(self, client_id, machine_id, role):
         self.client_id = client_id
         self.machine_id = machine_id
@@ -53,7 +58,9 @@ class RegisterRoleRequest(rpc.Request):
         if self.role not in role:
             role[self.role] = set()
             if kv_store is not None:
-                barrier_count = kv_store.barrier_count.setdefault(self.group_id, {})
+                barrier_count = kv_store.barrier_count.setdefault(
+                    self.group_id, {}
+                )
                 barrier_count[self.role] = 0
         role[self.role].add((self.client_id, self.machine_id))
         total_count = 0
@@ -67,11 +74,14 @@ class RegisterRoleRequest(rpc.Request):
             return res_list
         return None
 
+
 GET_ROLE = 700002
 GET_ROLE_MSG = "Get_Role"
 
+
 class GetRoleResponse(rpc.Response):
     """Send the roles of all client processes"""
+
     def __init__(self, role):
         self.role = role
         self.msg = GET_ROLE_MSG
@@ -82,8 +92,10 @@ class GetRoleResponse(rpc.Response):
     def __setstate__(self, state):
         self.role, self.msg = state
 
+
 class GetRoleRequest(rpc.Request):
     """Send a request to get the roles of all client processes."""
+
     def __init__(self):
         self.msg = GET_ROLE_MSG
         self.group_id = rpc.get_group_id()
@@ -97,6 +109,7 @@ class GetRoleRequest(rpc.Request):
     def process_request(self, server_state):
         return GetRoleResponse(server_state.roles[self.group_id])
 
+
 # The key is role, the value is a dict of mapping RPC rank to a rank within the role.
 PER_ROLE_RANK = {}
 
@@ -108,6 +121,7 @@ GLOBAL_RANK = {}
 CUR_ROLE = None
 
 IS_STANDALONE = False
+
 
 def init_role(role):
     """Initialize the role of the current process.
@@ -128,10 +142,10 @@ def init_role(role):
     global GLOBAL_RANK
     global IS_STANDALONE
 
-    if os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone':
-        if role == 'default':
+    if os.environ.get("DGL_DIST_MODE", "standalone") == "standalone":
+        if role == "default":
             GLOBAL_RANK[0] = 0
-            PER_ROLE_RANK['default'] = {0:0}
+            PER_ROLE_RANK["default"] = {0: 0}
         IS_STANDALONE = True
         return
 
@@ -160,7 +174,7 @@ def init_role(role):
     global_rank = 0
 
     # We want to ensure that the global rank of the trainer process starts from 0.
-    role_names = ['default']
+    role_names = ["default"]
     for role_name in response.role:
         if role_name not in role_names:
             role_names.append(role_name)
@@ -185,6 +199,7 @@ def init_role(role):
                 PER_ROLE_RANK[role_name][client_id] = per_role_rank
                 per_role_rank += 1
 
+
 def get_global_rank():
     """Get the global rank
 
@@ -196,6 +211,7 @@ def get_global_rank():
     else:
         return GLOBAL_RANK[rpc.get_rank()]
 
+
 def get_rank(role):
     """Get the role-specific rank"""
     if IS_STANDALONE:
@@ -203,25 +219,29 @@ def get_rank(role):
     else:
         return PER_ROLE_RANK[role][rpc.get_rank()]
 
+
 def get_trainer_rank():
     """Get the rank of the current trainer process.
 
     This function can only be called in the trainer process. It will result in
     an error if it's called in the process of other roles.
     """
-    assert CUR_ROLE == 'default'
+    assert CUR_ROLE == "default"
     if IS_STANDALONE:
         return 0
     else:
-        return PER_ROLE_RANK['default'][rpc.get_rank()]
+        return PER_ROLE_RANK["default"][rpc.get_rank()]
+
 
 def get_role():
     """Get the role of the current process"""
     return CUR_ROLE
 
+
 def get_num_trainers():
     """Get the number of trainer processes"""
-    return len(PER_ROLE_RANK['default'])
+    return len(PER_ROLE_RANK["default"])
+
 
 rpc.register_service(REGISTER_ROLE, RegisterRoleRequest, RegisterRoleResponse)
 rpc.register_service(GET_ROLE, GetRoleRequest, GetRoleResponse)

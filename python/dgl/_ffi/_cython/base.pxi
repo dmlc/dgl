@@ -3,16 +3,16 @@ from libcpp.vector cimport vector
 from libcpp cimport bool
 from cpython.version cimport PY_MAJOR_VERSION
 from cpython cimport pycapsule
-from libc.stdint cimport int64_t, uint64_t, uint8_t, uint16_t
+from libc.stdint cimport int32_t, int64_t, uint64_t, uint8_t, uint16_t
 import ctypes
 
-cdef enum DGLTypeCode:
-    kInt = 0
-    kUInt = 1
-    kFloat = 2
+cdef enum DGLObjectTypeCode:
+    kObjectInt = 0
+    kObjectUInt = 1
+    kObjectFloat = 2
     kHandle = 3
     kNull = 4
-    kDGLType = 5
+    kDGLDataType = 5
     kDGLContext = 6
     kArrayHandle = 7
     kObjectHandle = 8
@@ -24,26 +24,26 @@ cdef enum DGLTypeCode:
     kExtBegin = 15
 
 cdef extern from "dgl/runtime/c_runtime_api.h":
-    ctypedef struct DLDataType:
+    ctypedef struct DGLDataType:
         uint8_t code
         uint8_t bits
         uint16_t lanes
 
-    ctypedef struct DLContext:
-        int device_type
-        int device_id
+    ctypedef struct DGLContext:
+        int32_t device_type
+        int32_t device_id
 
-    ctypedef struct DLTensor:
+    ctypedef struct DGLArray:
         void* data
-        DLContext ctx
-        int ndim
-        DLDataType dtype
+        DGLContext ctx
+        int32_t ndim
+        DGLDataType dtype
         int64_t* shape
         int64_t* strides
         uint64_t byte_offset
 
     ctypedef struct DLManagedTensor:
-        DLTensor dl_tensor
+        DGLArray dl_tensor
         void* manager_ctx
         void (*deleter)(DLManagedTensor* self)
 
@@ -52,13 +52,11 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
         double v_float64
         void* v_handle
         const char* v_str
-        DLDataType v_type
-        DLContext v_ctx
+        DGLDataType v_type
+        DGLContext v_ctx
 
 ctypedef int64_t dgl_index_t
-ctypedef DLTensor* DLTensorHandle
-ctypedef DLTensor DGLArray
-ctypedef DGLArray* CDGLArrayHandle
+ctypedef DGLArray* DGLArrayHandle
 ctypedef void* DGLStreamHandle
 ctypedef void* DGLRetValueHandle
 ctypedef void* DGLFunctionHandle
@@ -94,9 +92,9 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
     int DGLCbArgToReturn(DGLValue* value, int code)
     int DGLArrayAlloc(dgl_index_t* shape,
                       dgl_index_t ndim,
-                      DLDataType dtype,
-                      DLContext ctx,
-                      DLTensorHandle* out)
+                      DGLDataType dtype,
+                      DGLContext ctx,
+                      DGLArrayHandle* out)
     int DGLArrayAllocSharedMem(const char *mem_name,
                                const dgl_index_t *shape,
                                int ndim,
@@ -104,17 +102,10 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                                int dtype_bits,
                                int dtype_lanes,
                                bool is_create,
-                               CDGLArrayHandle* out)
-    int DGLArrayFree(DLTensorHandle handle)
-    int DGLArrayCopyFromTo(DLTensorHandle src,
-                           DLTensorHandle to,
-                           DGLStreamHandle stream)
-    int DGLArrayFromDLPack(DLManagedTensor* arr_from,
-                           DLTensorHandle* out)
-    int DGLArrayToDLPack(DLTensorHandle arr_from,
-                         DLManagedTensor** out,
-                         int alignment)
-    void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
+                               DGLArrayHandle* out)
+    int DGLArrayFree(DGLArrayHandle handle)
+    int DGLArrayCopyFromTo(DGLArrayHandle src,
+                           DGLArrayHandle to)
 
 cdef extern from "dgl/runtime/c_object_api.h":
     int DGLObjectFree(ObjectHandle handle)
@@ -127,6 +118,14 @@ cdef extern from "dgl/runtime/c_object_api.h":
                          DGLValue* out_value,
                          int* out_type_code,
                          int* out_success)
+
+cdef extern from "dgl/runtime/dlpack_convert.h":
+    int DGLArrayFromDLPack(DLManagedTensor* arr_from,
+                           DGLArrayHandle* out)
+    int DGLArrayToDLPack(DGLArrayHandle arr_from,
+                         DLManagedTensor** out,
+                         int alignment)
+    void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
 
 cdef inline py_str(const char* x):
     if PY_MAJOR_VERSION < 3:
@@ -163,5 +162,8 @@ cdef inline object ctypes_handle(void* chandle):
 cdef inline void* c_handle(object handle):
     """Cast C types handle to c handle."""
     cdef unsigned long long v_ptr
-    v_ptr = handle.value
-    return <void*>(v_ptr)
+    if handle.value is None:
+        return NULL
+    else:
+        v_ptr = handle.value
+        return <void*>(v_ptr)

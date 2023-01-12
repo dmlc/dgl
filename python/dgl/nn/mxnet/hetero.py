@@ -2,7 +2,8 @@
 from mxnet import nd
 from mxnet.gluon import nn
 
-__all__ = ['HeteroGraphConv']
+__all__ = ["HeteroGraphConv"]
+
 
 class HeteroGraphConv(nn.Block):
     r"""A generic module for computing convolution on heterogeneous graphs
@@ -92,7 +93,7 @@ class HeteroGraphConv(nn.Block):
     ----------
     mods : dict[str, nn.Module]
         Modules associated with every edge types. The forward function of each
-        module must have a `DGLHeteroGraph` object as the first argument, and
+        module must have a `DGLGraph` object as the first argument, and
         its second argument is either a tensor object representing the node
         features or a pair of tensor object representing the source and destination
         node features.
@@ -118,7 +119,8 @@ class HeteroGraphConv(nn.Block):
     mods : dict[str, nn.Module]
         Modules associated with every edge types.
     """
-    def __init__(self, mods, aggregate='sum'):
+
+    def __init__(self, mods, aggregate="sum"):
         super(HeteroGraphConv, self).__init__()
         with self.name_scope():
             for name, mod in mods.items():
@@ -127,7 +129,9 @@ class HeteroGraphConv(nn.Block):
             # Do not break if graph has 0-in-degree nodes.
             # Because there is no general rule to add self-loop for heterograph.
             for _, v in self.mods.items():
-                set_allow_zero_in_degree_fn = getattr(v, 'set_allow_zero_in_degree', None)
+                set_allow_zero_in_degree_fn = getattr(
+                    v, "set_allow_zero_in_degree", None
+                )
                 if callable(set_allow_zero_in_degree_fn):
                     set_allow_zero_in_degree_fn(True)
             if isinstance(aggregate, str):
@@ -142,7 +146,7 @@ class HeteroGraphConv(nn.Block):
 
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Graph data.
         inputs : dict[str, Tensor] or pair of dict[str, Tensor]
             Input node features.
@@ -160,7 +164,7 @@ class HeteroGraphConv(nn.Block):
             mod_args = {}
         if mod_kwargs is None:
             mod_kwargs = {}
-        outputs = {nty : [] for nty in g.dsttypes}
+        outputs = {nty: [] for nty in g.dsttypes}
         if isinstance(inputs, tuple):
             src_inputs, dst_inputs = inputs
             for stype, etype, dtype in g.canonical_etypes:
@@ -171,7 +175,8 @@ class HeteroGraphConv(nn.Block):
                     rel_graph,
                     (src_inputs[stype], dst_inputs[dtype]),
                     *mod_args.get(etype, ()),
-                    **mod_kwargs.get(etype, {}))
+                    **mod_kwargs.get(etype, {})
+                )
                 outputs[dtype].append(dstdata)
         else:
             for stype, etype, dtype in g.canonical_etypes:
@@ -182,7 +187,8 @@ class HeteroGraphConv(nn.Block):
                     rel_graph,
                     (inputs[stype], inputs[dtype]),
                     *mod_args.get(etype, ()),
-                    **mod_kwargs.get(etype, {}))
+                    **mod_kwargs.get(etype, {})
+                )
                 outputs[dtype].append(dstdata)
         rsts = {}
         for nty, alist in outputs.items():
@@ -191,11 +197,12 @@ class HeteroGraphConv(nn.Block):
         return rsts
 
     def __repr__(self):
-        summary = 'HeteroGraphConv({\n'
+        summary = "HeteroGraphConv({\n"
         for name, mod in self.mods.items():
-            summary += '  {} : {},\n'.format(name, mod)
-        summary += '\n})'
+            summary += "  {} : {},\n".format(name, mod)
+        summary += "\n})"
         return summary
+
 
 def get_aggregate_fn(agg):
     """Internal function to get the aggregation function for node data
@@ -213,29 +220,35 @@ def get_aggregate_fn(agg):
         Aggregator function that takes a list of tensors to aggregate
         and returns one aggregated tensor.
     """
-    if agg == 'sum':
+    if agg == "sum":
         fn = nd.sum
-    elif agg == 'max':
+    elif agg == "max":
         fn = nd.max
-    elif agg == 'min':
+    elif agg == "min":
         fn = nd.min
-    elif agg == 'mean':
+    elif agg == "mean":
         fn = nd.mean
-    elif agg == 'stack':
+    elif agg == "stack":
         fn = None  # will not be called
     else:
-        raise DGLError('Invalid cross type aggregator. Must be one of '
-                       '"sum", "max", "min", "mean" or "stack". But got "%s"' % agg)
-    if agg == 'stack':
+        raise DGLError(
+            "Invalid cross type aggregator. Must be one of "
+            '"sum", "max", "min", "mean" or "stack". But got "%s"' % agg
+        )
+    if agg == "stack":
+
         def stack_agg(inputs, dsttype):  # pylint: disable=unused-argument
             if len(inputs) == 0:
                 return None
             return nd.stack(*inputs, axis=1)
+
         return stack_agg
     else:
+
         def aggfn(inputs, dsttype):  # pylint: disable=unused-argument
             if len(inputs) == 0:
                 return None
             stacked = nd.stack(*inputs, axis=0)
             return fn(stacked, axis=0)
+
         return aggfn

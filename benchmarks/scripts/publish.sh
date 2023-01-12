@@ -26,20 +26,20 @@ else
 fi
 
 WS_ROOT=/asv/dgl
-docker pull public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch181_pyg170
-if [ -z "$DGL_REG_CONF"]; then
+docker pull public.ecr.aws/s1o7b3d9/benchmark_test:cu116_v230110
+if [ -z "$DGL_REG_CONF" ]; then
     DOCKER_ENV_OPT="$DOCKER_ENV_OPT"
 else
     DOCKER_ENV_OPT=" -e DGL_REG_CONF=$DGL_REG_CONF $DOCKER_ENV_OPT"
 fi
 
-if [ -z "$INSTANCE_TYPE"]; then
+if [ -z "$INSTANCE_TYPE" ]; then
     DOCKER_ENV_OPT="$DOCKER_ENV_OPT"
 else
     DOCKER_ENV_OPT=" -e INSTANCE_TYPE=$INSTANCE_TYPE $DOCKER_ENV_OPT"
 fi
 
-if [ -z "$MOUNT_PATH"]; then
+if [ -z "$MOUNT_PATH" ]; then
     DOCKER_MOUNT_OPT=""
 else
     DOCKER_MOUNT_OPT="-v ${MOUNT_PATH}:/tmp/dataset -v ${MOUNT_PATH}/dgl_home/:/root/.dgl/"
@@ -56,15 +56,17 @@ if [[ $DEVICE == "cpu" ]]; then
         $DOCKER_MOUNT_OPT \
         $DOCKER_ENV_OPT \
         --shm-size="16g" \
-        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch181_pyg170 /bin/bash
+        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmark_test:cu116_v230110 /bin/bash
 else
     docker run --name dgl-reg \
         --rm --gpus all \
         $DOCKER_MOUNT_OPT \
         $DOCKER_ENV_OPT \
         --shm-size="16g" \
-        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch181_pyg170 /bin/bash
+        --hostname=$MACHINE -dit public.ecr.aws/s1o7b3d9/benchmark_test:cu116_v230110 /bin/bash
 fi
+
+pwd
 
 docker exec dgl-reg mkdir -p $WS_ROOT
 docker cp ../../.git dgl-reg:$WS_ROOT

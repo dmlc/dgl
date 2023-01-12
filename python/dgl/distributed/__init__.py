@@ -1,31 +1,20 @@
-"""DGL distributed module contains classes and functions to support
-distributed graph neural network training and inference in a cluster of
-machines.
-
-This includes a few submodules:
-
-* distributed data structures including distributed graph, distributed tensor
-  and distributed embeddings.
-* distributed sampling.
-* distributed workload split at runtime.
-* graph partition.
-
-"""
-import os
-import sys
-
-from .dist_graph import DistGraphServer, DistGraph, node_split, edge_split
-from .dist_tensor import DistTensor
-from .partition import partition_graph, load_partition, load_partition_feats, load_partition_book
-from .graph_partition_book import GraphPartitionBook, PartitionPolicy
-from .nn import *
+"""DGL distributed module"""
 from . import optim
-
-from .rpc import *
-from .rpc_server import start_server
-from .rpc_client import connect_to_server, shutdown_servers
-from .dist_context import initialize, exit_client
-from .kvstore import KVServer, KVClient
-from .server_state import ServerState
+from .dist_context import exit_client, initialize
 from .dist_dataloader import DistDataLoader
-from .graph_services import sample_neighbors, sample_etype_neighbors, in_subgraph
+from .dist_graph import DistGraph, DistGraphServer, edge_split, node_split
+from .dist_tensor import DistTensor
+from .graph_partition_book import GraphPartitionBook, PartitionPolicy
+from .graph_services import *
+from .kvstore import KVClient, KVServer
+from .nn import *
+from .partition import (
+    load_partition,
+    load_partition_book,
+    load_partition_feats,
+    partition_graph,
+)
+from .rpc import *
+from .rpc_client import connect_to_server, shutdown_servers
+from .rpc_server import start_server
+from .server_state import ServerState

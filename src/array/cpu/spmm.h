@@ -1,20 +1,22 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/spmm.h
- * \brief SPMM CPU kernel function header.
+ * @file array/cpu/spmm.h
+ * @brief SPMM CPU kernel function header.
  */
 #ifndef DGL_ARRAY_CPU_SPMM_H_
 #define DGL_ARRAY_CPU_SPMM_H_
 
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+#include <dgl/runtime/config.h>
 #include <dgl/runtime/parallel_for.h>
 #include <math.h>
+
 #include <algorithm>
 #include <limits>
 #include <memory>
-#include <algorithm>
 #include <vector>
+
 #include "spmm_binary_ops.h"
 #if !defined(_WIN32)
 #ifdef USE_AVX
@@ -30,21 +32,22 @@ namespace cpu {
 
 #if !defined(_WIN32)
 #ifdef USE_AVX
-/*!
- * \brief CPU kernel of SpMM on Csr format using Xbyak.
- * \param cpu_spec JIT'ed kernel
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param X The feature on source nodes.
- * \param W The feature on edges.
- * \param O The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+/**
+ * @brief CPU kernel of SpMM on Csr format using Xbyak.
+ * @param cpu_spec JIT'ed kernel
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param X The feature on source nodes.
+ * @param W The feature on edges.
+ * @param O The result feature on destination nodes.
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes. For each edge, it uses the
  *       JIT'ed kernel.
  */
 template <typename IdType, typename DType, typename Op>
-void SpMMSumCsrXbyak(dgl::ElemWiseAddUpdate<Op>* cpu_spec, const BcastOff& bcast,
-                     const CSRMatrix& csr, const DType* X, const DType* W, DType* O) {
+void SpMMSumCsrXbyak(
+    dgl::ElemWiseAddUpdate<Op>* cpu_spec, const BcastOff& bcast,
+    const CSRMatrix& csr, const DType* X, const DType* W, DType* O) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
@@ -66,20 +69,21 @@ void SpMMSumCsrXbyak(dgl::ElemWiseAddUpdate<Op>* cpu_spec, const BcastOff& bcast
 #endif  // USE_AVX
 #endif  // _WIN32
 
-/*!
- * \brief Naive CPU kernel of SpMM on Csr format.
- * \param cpu_spec JIT'ed kernel
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param X The feature on source nodes.
- * \param W The feature on edges.
- * \param O The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+/**
+ * @brief Naive CPU kernel of SpMM on Csr format.
+ * @param cpu_spec JIT'ed kernel
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param X The feature on source nodes.
+ * @param W The feature on edges.
+ * @param O The result feature on destination nodes.
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
 template <typename IdType, typename DType, typename Op>
-void SpMMSumCsrNaive(const BcastOff& bcast, const CSRMatrix& csr, const DType* X,
-                     const DType* W, DType* O) {
+void SpMMSumCsrNaive(
+    const BcastOff& bcast, const CSRMatrix& csr, const DType* X, const DType* W,
+    DType* O) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
@@ -96,9 +100,9 @@ void SpMMSumCsrNaive(const BcastOff& bcast, const CSRMatrix& csr, const DType* X
           const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
           const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
           const DType* lhs_off =
-            Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
+              Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
           const DType* rhs_off =
-            Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+              Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
           out_off[k] += Op::Call(lhs_off, rhs_off);
         }
       }
@@ -106,26 +110,27 @@ void SpMMSumCsrNaive(const BcastOff& bcast, const CSRMatrix& csr, const DType* X
   });
 }
 
-/*!
- * \brief CPU kernel of SpMM on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+/**
+ * @brief CPU kernel of SpMM on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes.
  */
 template <typename IdType, typename DType, typename Op>
-void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
-                NDArray efeat, NDArray out) {
+void SpMMSumCsr(
+    const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
+    NDArray out) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
   const IdType* edges = csr.data.Ptr<IdType>();
   const DType* X = ufeat.Ptr<DType>();
   const DType* W = efeat.Ptr<DType>();
-  int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
+  int64_t dim = bcast.out_len;
   DType* O = out.Ptr<DType>();
   CHECK_NOTNULL(indptr);
   CHECK_NOTNULL(O);
@@ -134,15 +139,15 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
     CHECK_NOTNULL(X);
   }
   if (Op::use_rhs) {
-    if (has_idx)
-      CHECK_NOTNULL(edges);
+    if (has_idx) CHECK_NOTNULL(edges);
     CHECK_NOTNULL(W);
   }
 #if !defined(_WIN32)
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM
-  const bool no_libxsmm =
-       bcast.use_bcast || std::is_same<DType, double>::value;
+  const bool no_libxsmm = bcast.use_bcast ||
+                          std::is_same<DType, double>::value ||
+                          !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
   } else {
@@ -153,14 +158,14 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
         (dgl::IntelKernel<>::IsEnabled()) ? new ElemWiseUpd() : nullptr);
     /* Distribute the kernel among OMP threads */
     ElemWiseUpd* cpu_spec = (asm_kernel_ptr && asm_kernel_ptr->applicable())
-      ? asm_kernel_ptr.get()
-      : nullptr;
+                                ? asm_kernel_ptr.get()
+                                : nullptr;
     if (cpu_spec && dim > 16 && !bcast.use_bcast) {
       SpMMSumCsrXbyak<IdType, DType, Op>(cpu_spec, bcast, csr, X, W, O);
     } else {
 #endif  // USE_AVX
 #endif  // _WIN32
-    SpMMSumCsrNaive<IdType, DType, Op>(bcast, csr, X, W, O);
+      SpMMSumCsrNaive<IdType, DType, Op>(bcast, csr, X, W, O);
 #if !defined(_WIN32)
 #ifdef USE_AVX
     }
@@ -171,20 +176,21 @@ void SpMMSumCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #endif  // _WIN32
 }
 
-/*!
- * \brief CPU kernel of SpMM on Coo format.
- * \param bcast Broadcast information.
- * \param coo The Coo matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \note it uses node parallel strategy, different threads are responsible
+/**
+ * @brief CPU kernel of SpMM on Coo format.
+ * @param bcast Broadcast information.
+ * @param coo The Coo matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @note it uses node parallel strategy, different threads are responsible
  *       for the computation of different nodes. To avoid possible data hazard,
  *       we use atomic operators in the reduction phase.
  */
 template <typename IdType, typename DType, typename Op>
-void SpMMSumCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
-                NDArray efeat, NDArray out) {
+void SpMMSumCoo(
+    const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
+    NDArray out) {
   const bool has_idx = !IsNullArray(coo.data);
   const IdType* row = coo.row.Ptr<IdType>();
   const IdType* col = coo.col.Ptr<IdType>();
@@ -207,9 +213,9 @@ void SpMMSumCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
       const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
       const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
       const DType* lhs_off =
-        Op::use_lhs ? X + rid * lhs_dim + lhs_add : nullptr;
+          Op::use_lhs ? X + rid * lhs_dim + lhs_add : nullptr;
       const DType* rhs_off =
-        Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+          Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
       const DType val = Op::Call(lhs_off, rhs_off);
       if (val != 0) {
 #pragma omp atomic
@@ -219,31 +225,34 @@ void SpMMSumCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
   }
 }
 
-/*!
- * \brief CPU kernel of SpMM-Min/Max on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+/**
+ * @brief CPU kernel of SpMM-Min/Max on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
- * reducer. \param arge Arg-Min/Max on edges. which refers the source node
- * indices correspond to the minimum/maximum values of reduction result on
+ *        reducer.
+ * @param arge Arg-Min/Max on edges. which refers the source node indices
+          correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
- * reducer. \note It uses node parallel strategy, different threads are
- * responsible for the computation of different nodes. \note The result will
- * contain infinity for zero-degree nodes.
+ *        reducer.
+ * @note It uses node parallel strategy, different threads are responsible for
+ *       the computation of different nodes.
+ * @note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
-void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
-                NDArray efeat, NDArray out, NDArray argu, NDArray arge) {
+void SpMMCmpCsr(
+    const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
+    NDArray out, NDArray argu, NDArray arge) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices = static_cast<IdType*>(csr.indices->data);
   const IdType* edges =
-    has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
+      has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
   const DType* X = Op::use_lhs ? static_cast<DType*>(ufeat->data) : nullptr;
   const DType* W = Op::use_rhs ? static_cast<DType*>(efeat->data) : nullptr;
   const int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len,
@@ -259,8 +268,7 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
     CHECK_NOTNULL(argX);
   }
   if (Op::use_rhs) {
-    if (has_idx)
-      CHECK_NOTNULL(edges);
+    if (has_idx) CHECK_NOTNULL(edges);
     CHECK_NOTNULL(W);
     CHECK_NOTNULL(argW);
   }
@@ -268,10 +276,12 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #ifdef USE_AVX
 #ifdef USE_LIBXSMM
 
-  const bool no_libxsmm =
-       bcast.use_bcast || std::is_same<DType, double>::value;
+  const bool no_libxsmm = bcast.use_bcast ||
+                          std::is_same<DType, double>::value ||
+                          !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
-    SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(bcast, csr, ufeat, efeat, out, argu, arge);
+    SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(
+        bcast, csr, ufeat, efeat, out, argu, arge);
   } else {
 #endif  // USE_LIBXSMM
 #endif  // USE_AVX
@@ -290,9 +300,9 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
             const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
             const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
             const DType* lhs_off =
-              Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
+                Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
             const DType* rhs_off =
-              Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+                Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
             const DType val = Op::Call(lhs_off, rhs_off);
             if (Cmp::Call(out_off[k], val)) {
               out_off[k] = val;
@@ -312,40 +322,42 @@ void SpMMCmpCsr(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
 #endif  // _WIN32
 }
 
-/*!
- * \brief CPU kernel of SpMM-Min/Max on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+/**
+ * @brief CPU kernel of SpMM-Min/Max on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \param arge Arg-Min/Max on edges. which refers the source node
- *        indices correspond to the minimum/maximum values of reduction result on
+ * @param arge Arg-Min/Max on edges. which refers the source node indices
+ *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
  *        reducer.
- * \param argu_ntype Node type of the arg-Min/Max on source nodes, which refers the
- *        source node types correspond to the minimum/maximum values of reduction result
- *        on destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param arge_etype Edge-type of the arg-Min/Max on edges. which refers the source
- *        node indices correspond to the minimum/maximum values of reduction result on
- *        destination nodes. It's useful in computing gradients of Min/Max reducer.
- * \param src_type Node type of the source nodes of an etype
- * \param etype Edge type
+ * @param argu_ntype Node type of the arg-Min/Max on source nodes, which refers
+ *        the source node types correspond to the minimum/maximum values of
+ *        reduction result on destination nodes. It's useful in computing
+ *        gradients of Min/Max reducer.
+ * @param arge_etype Edge-type of the arg-Min/Max on edges. which refers the
+ *        source node indices correspond to the minimum/maximum values of
+ *        reduction result on destination nodes. It's useful in computing
+ *        gradients of Min/Max reducer.
+ * @param src_type Node type of the source nodes of an etype
+ * @param etype Edge type
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
-void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
-                NDArray efeat, NDArray out, NDArray argu, NDArray arge,
-                NDArray argu_ntype, NDArray arge_etype,
-                const int ntype, const int etype) {
+void SpMMCmpCsrHetero(
+    const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
+    NDArray out, NDArray argu, NDArray arge, NDArray argu_ntype,
+    NDArray arge_etype, const int ntype, const int etype) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* indices = static_cast<IdType*>(csr.indices->data);
   const IdType* edges =
-    has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
+      has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
   const DType* X = Op::use_lhs ? static_cast<DType*>(ufeat->data) : nullptr;
   const DType* W = Op::use_rhs ? static_cast<DType*>(efeat->data) : nullptr;
   const int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len,
@@ -353,8 +365,10 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
   DType* O = static_cast<DType*>(out->data);
   IdType* argX = Op::use_lhs ? static_cast<IdType*>(argu->data) : nullptr;
   IdType* argW = Op::use_rhs ? static_cast<IdType*>(arge->data) : nullptr;
-  IdType* argX_ntype = Op::use_lhs ? static_cast<IdType*>(argu_ntype->data) : nullptr;
-  IdType* argW_etype = Op::use_rhs ? static_cast<IdType*>(arge_etype->data) : nullptr;
+  IdType* argX_ntype =
+      Op::use_lhs ? static_cast<IdType*>(argu_ntype->data) : nullptr;
+  IdType* argW_etype =
+      Op::use_rhs ? static_cast<IdType*>(arge_etype->data) : nullptr;
   CHECK_NOTNULL(indptr);
   CHECK_NOTNULL(O);
   if (Op::use_lhs) {
@@ -363,8 +377,7 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
     CHECK_NOTNULL(argX);
   }
   if (Op::use_rhs) {
-    if (has_idx)
-      CHECK_NOTNULL(edges);
+    if (has_idx) CHECK_NOTNULL(edges);
     CHECK_NOTNULL(W);
     CHECK_NOTNULL(argW);
   }
@@ -384,9 +397,9 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
           const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
           const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
           const DType* lhs_off =
-            Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
+              Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
           const DType* rhs_off =
-            Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+              Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
           const DType val = Op::Call(lhs_off, rhs_off);
           if (Cmp::Call(out_off[k], val)) {
             out_off[k] = val;
@@ -405,33 +418,35 @@ void SpMMCmpCsrHetero(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat
   });
 }
 
-
-/*!
- * \brief CPU kernel of SpMM-Min/Max on Coo format.
- * \param bcast Broadcast information.
- * \param coo The Coo matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result feature on destination nodes.
- * \param argu Arg-Min/Max on source nodes, which refers the source node indices
+/**
+ * @brief CPU kernel of SpMM-Min/Max on Coo format.
+ * @param bcast Broadcast information.
+ * @param coo The Coo matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result feature on destination nodes.
+ * @param argu Arg-Min/Max on source nodes, which refers the source node indices
  *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
- * reducer. \param arge Arg-Min/Max on edges. which refers the source node
- * indices correspond to the minimum/maximum values of reduction result on
+ *        reducer.
+ * @param arge Arg-Min/Max on edges. which refers the source node indices
+ *        correspond to the minimum/maximum values of reduction result on
  *        destination nodes. It's useful in computing gradients of Min/Max
- * reducer. \note it uses node parallel strategy, different threads are
- * responsible for the computation of different nodes. To avoid possible data
- * hazard, we use atomic operators in the reduction phase. \note The result will
- * contain infinity for zero-degree nodes.
+ *        reducer.
+ * @note it uses node parallel strategy, different threads are responsible for
+ *       the computation of different nodes. To avoid possible data hazard, we
+ *       use atomic operators in the reduction phase.
+ * @note The result will contain infinity for zero-degree nodes.
  */
 template <typename IdType, typename DType, typename Op, typename Cmp>
-void SpMMCmpCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
-                NDArray efeat, NDArray out, NDArray argu, NDArray arge) {
+void SpMMCmpCoo(
+    const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
+    NDArray out, NDArray argu, NDArray arge) {
   const bool has_idx = !IsNullArray(coo.data);
   const IdType* row = static_cast<IdType*>(coo.row->data);
   const IdType* col = static_cast<IdType*>(coo.col->data);
   const IdType* edges =
-    has_idx ? static_cast<IdType*>(coo.data->data) : nullptr;
+      has_idx ? static_cast<IdType*>(coo.data->data) : nullptr;
   const DType* X = Op::use_lhs ? static_cast<DType*>(ufeat->data) : nullptr;
   const DType* W = Op::use_rhs ? static_cast<DType*>(efeat->data) : nullptr;
   const int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len,
@@ -455,9 +470,9 @@ void SpMMCmpCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
       const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
       const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
       const DType* lhs_off =
-        Op::use_lhs ? X + rid * lhs_dim + lhs_add : nullptr;
+          Op::use_lhs ? X + rid * lhs_dim + lhs_add : nullptr;
       const DType* rhs_off =
-        Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+          Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
       const DType val = Op::Call(lhs_off, rhs_off);
 #pragma omp critical
       if (Cmp::Call(out_off[k], val)) {
@@ -469,38 +484,38 @@ void SpMMCmpCoo(const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat,
   }
 }
 
-
-/*!
- * \brief CPU kernel of Edge_softmax_csr_forward on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param ufeat The feature on source nodes.
- * \param efeat The feature on edges.
- * \param out The result of edge_softmax_forward.
+/**
+ * @brief CPU kernel of Edge_softmax_csr_forward on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param ufeat The feature on source nodes.
+ * @param efeat The feature on edges.
+ * @param out The result of edge_softmax_forward.
  */
 template <typename IdType, typename DType, typename Op>
-void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat,
-                NDArray efeat, NDArray out) {
+void Edge_softmax_csr_forward(
+    const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
+    NDArray out) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* edges =
-    has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
+      has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
   const DType* W = Op::use_rhs ? static_cast<DType*>(efeat->data) : nullptr;
   const int64_t dim = bcast.out_len, rhs_dim = bcast.rhs_len;
   runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-      std::vector<DType> data_e(row_end-row_start, 0);
-      std::vector<IdType> num(row_end-row_start, 0);
+      std::vector<DType> data_e(row_end - row_start, 0);
+      std::vector<IdType> num(row_end - row_start, 0);
       for (int64_t k = 0; k < dim; ++k) {
         DType max_v = -std::numeric_limits<DType>::infinity();
         for (IdType j = row_start; j < row_end; ++j) {
           const IdType eid = has_idx ? edges[j] : j;
           const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
           const DType* rhs_off =
-            Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
-          data_e[j-row_start] = *rhs_off;
-          num[j-row_start] = eid*rhs_dim+rhs_add;
+              Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+          data_e[j - row_start] = *rhs_off;
+          num[j - row_start] = eid * rhs_dim + rhs_add;
           max_v = std::max<DType>(max_v, (*rhs_off));
         }
         DType exp_sum = 0;
@@ -509,30 +524,30 @@ void Edge_softmax_csr_forward(const BcastOff& bcast, const CSRMatrix& csr, NDArr
           element = std::exp(element);
           exp_sum += element;
         }
-        for (int i=0; i < row_end-row_start; i++) {
-          out.Ptr<DType>()[num[i]] = data_e[i]/exp_sum;
+        for (int i = 0; i < row_end - row_start; i++) {
+          out.Ptr<DType>()[num[i]] = data_e[i] / exp_sum;
         }
       }
     }
   });
 }
 
-
-/*!
- * \brief CPU kernel of Edge_softmax_csr_backward on Csr format.
- * \param bcast Broadcast information.
- * \param csr The Csr matrix.
- * \param out The result of forward.
- * \param sds The result of gradiet * out.
- * \param back_out The result of edge_softmax_backward.
+/**
+ * @brief CPU kernel of Edge_softmax_csr_backward on Csr format.
+ * @param bcast Broadcast information.
+ * @param csr The Csr matrix.
+ * @param out The result of forward.
+ * @param sds The result of gradiet * out.
+ * @param back_out The result of edge_softmax_backward.
  */
 template <typename IdType, typename DType, typename Op>
-void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDArray out,
-                NDArray sds, NDArray back_out) {
+void Edge_softmax_csr_backward(
+    const BcastOff& bcast, const CSRMatrix& csr, NDArray out, NDArray sds,
+    NDArray back_out) {
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* edges =
-    has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
+      has_idx ? static_cast<IdType*>(csr.data->data) : nullptr;
   const DType* W_out = Op::use_rhs ? static_cast<DType*>(out->data) : nullptr;
   const DType* W_sds = Op::use_rhs ? static_cast<DType*>(sds->data) : nullptr;
   const int64_t dim = bcast.out_len, rhs_dim = bcast.rhs_len;
@@ -545,17 +560,18 @@ void Edge_softmax_csr_backward(const BcastOff& bcast, const CSRMatrix& csr, NDAr
           const IdType eid = has_idx ? edges[j] : j;
           const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
           const DType* rhs_off_sds =
-            Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
+              Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
           sum_sds += (*rhs_off_sds);
         }
-        for (IdType j = row_start; j< row_end; ++j) {
+        for (IdType j = row_start; j < row_end; ++j) {
           const IdType eid = has_idx ? edges[j] : j;
           const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
           const DType* rhs_off_out =
-            Op::use_rhs ? W_out + eid * rhs_dim + rhs_add : nullptr;
+              Op::use_rhs ? W_out + eid * rhs_dim + rhs_add : nullptr;
           const DType* rhs_off_sds =
-            Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
-          back_out.Ptr<DType>()[eid*rhs_dim+rhs_add] =  (*rhs_off_sds) - sum_sds*(*rhs_off_out);
+              Op::use_rhs ? W_sds + eid * rhs_dim + rhs_add : nullptr;
+          back_out.Ptr<DType>()[eid * rhs_dim + rhs_add] =
+              (*rhs_off_sds) - sum_sds * (*rhs_off_out);
         }
       }
     }

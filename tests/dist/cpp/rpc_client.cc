@@ -1,14 +1,14 @@
 #include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <stdexcept>
 #include <thread>
 #include <vector>
-#include <cstdlib>
 
 #include "rpc_base.h"
 
 class RPCClient {
-public:
+ public:
   explicit RPCClient(const std::string &ip_config) : ip_config_(ip_config) {
     ParseIPs();
   }
@@ -23,7 +23,7 @@ public:
     }
   }
 
-private:
+ private:
   void ParseIPs() {
     std::ifstream ifs(ip_config_);
     if (!ifs) {

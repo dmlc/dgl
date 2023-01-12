@@ -67,8 +67,6 @@ Operators for generating new graphs by manipulating the structure of the existin
     add_self_loop
     adj_product_graph
     adj_sum_graph
-    as_heterograph
-    as_immutable_graph
     compact_graphs
     khop_adj
     khop_graph
@@ -116,6 +114,8 @@ Operators for generating positional encodings of each node.
 
     random_walk_pe
     laplacian_pe
+    double_radius_node_labeling
+    shortest_dist
 
 .. _api-partition:
 
@@ -208,7 +208,7 @@ set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` an
 Utilities
 -----------------------------------------------
 
-Other utilities for controlling randomness, saving and loading graphs, functions that applies
+Other utilities for controlling randomness, saving and loading graphs, setting and getting runtime configurations, functions that applies
 the same function to every elements in a container, etc.
 
 .. autosummary::
@@ -218,3 +218,5 @@ the same function to every elements in a container, etc.
     save_graphs
     load_graphs
     apply_each
+    use_libxsmm
+    is_libxsmm_enabled

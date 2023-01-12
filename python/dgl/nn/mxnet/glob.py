@@ -3,11 +3,24 @@
 from mxnet import gluon, nd
 from mxnet.gluon import nn
 
-from ...readout import sum_nodes, mean_nodes, max_nodes, broadcast_nodes,\
-    softmax_nodes, topk_nodes
+from ...readout import (
+    broadcast_nodes,
+    max_nodes,
+    mean_nodes,
+    softmax_nodes,
+    sum_nodes,
+    topk_nodes,
+)
 
-__all__ = ['SumPooling', 'AvgPooling', 'MaxPooling', 'SortPooling',
-           'GlobalAttentionPooling', 'Set2Set']
+__all__ = [
+    "SumPooling",
+    "AvgPooling",
+    "MaxPooling",
+    "SortPooling",
+    "GlobalAttentionPooling",
+    "Set2Set",
+]
+
 
 class SumPooling(nn.Block):
     r"""Apply sum pooling over the nodes in the graph.
@@ -15,6 +28,7 @@ class SumPooling(nn.Block):
     .. math::
         r^{(i)} = \sum_{k=1}^{N_i} x^{(i)}_k
     """
+
     def __init__(self):
         super(SumPooling, self).__init__()
 
@@ -36,13 +50,13 @@ class SumPooling(nn.Block):
             :math:`B` refers to the batch size.
         """
         with graph.local_scope():
-            graph.ndata['h'] = feat
-            readout = sum_nodes(graph, 'h')
-            graph.ndata.pop('h')
+            graph.ndata["h"] = feat
+            readout = sum_nodes(graph, "h")
+            graph.ndata.pop("h")
             return readout
 
     def __repr__(self):
-        return 'SumPooling()'
+        return "SumPooling()"
 
 
 class AvgPooling(nn.Block):
@@ -51,6 +65,7 @@ class AvgPooling(nn.Block):
     .. math::
         r^{(i)} = \frac{1}{N_i}\sum_{k=1}^{N_i} x^{(i)}_k
     """
+
     def __init__(self):
         super(AvgPooling, self).__init__()
 
@@ -72,13 +87,13 @@ class AvgPooling(nn.Block):
             :math:`B` refers to the batch size.
         """
         with graph.local_scope():
-            graph.ndata['h'] = feat
-            readout = mean_nodes(graph, 'h')
-            graph.ndata.pop('h')
+            graph.ndata["h"] = feat
+            readout = mean_nodes(graph, "h")
+            graph.ndata.pop("h")
             return readout
 
     def __repr__(self):
-        return 'AvgPooling()'
+        return "AvgPooling()"
 
 
 class MaxPooling(nn.Block):
@@ -87,6 +102,7 @@ class MaxPooling(nn.Block):
     .. math::
         r^{(i)} = \max_{k=1}^{N_i} \left( x^{(i)}_k \right)
     """
+
     def __init__(self):
         super(MaxPooling, self).__init__()
 
@@ -108,13 +124,13 @@ class MaxPooling(nn.Block):
             :math:`B` refers to the batch size.
         """
         with graph.local_scope():
-            graph.ndata['h'] = feat
-            readout = max_nodes(graph, 'h')
-            graph.ndata.pop('h')
+            graph.ndata["h"] = feat
+            readout = max_nodes(graph, "h")
+            graph.ndata.pop("h")
             return readout
 
     def __repr__(self):
-        return 'MaxPooling()'
+        return "MaxPooling()"
 
 
 class SortPooling(nn.Block):
@@ -126,6 +142,7 @@ class SortPooling(nn.Block):
     k : int
         The number of nodes to hold for each graph.
     """
+
     def __init__(self, k):
         super(SortPooling, self).__init__()
         self.k = k
@@ -150,14 +167,15 @@ class SortPooling(nn.Block):
         # Sort the feature of each node in ascending order.
         with graph.local_scope():
             feat = feat.sort(axis=-1)
-            graph.ndata['h'] = feat
+            graph.ndata["h"] = feat
             # Sort nodes according to their last features.
-            ret = topk_nodes(graph, 'h', self.k, sortby=-1)[0].reshape(
-                -1, self.k * feat.shape[-1])
+            ret = topk_nodes(graph, "h", self.k, sortby=-1)[0].reshape(
+                -1, self.k * feat.shape[-1]
+            )
             return ret
 
     def __repr__(self):
-        return 'SortPooling(k={})'.format(self.k)
+        return "SortPooling(k={})".format(self.k)
 
 
 class GlobalAttentionPooling(nn.Block):
@@ -176,6 +194,7 @@ class GlobalAttentionPooling(nn.Block):
         A neural network applied to each feature before combining them
         with attention scores.
     """
+
     def __init__(self, gate_nn, feat_nn=None):
         super(GlobalAttentionPooling, self).__init__()
         with self.name_scope():
@@ -201,14 +220,16 @@ class GlobalAttentionPooling(nn.Block):
         """
         with graph.local_scope():
             gate = self.gate_nn(feat)
-            assert gate.shape[-1] == 1, "The output of gate_nn should have size 1 at the last axis."
+            assert (
+                gate.shape[-1] == 1
+            ), "The output of gate_nn should have size 1 at the last axis."
             feat = self.feat_nn(feat) if self.feat_nn else feat
 
-            graph.ndata['gate'] = gate
-            gate = softmax_nodes(graph, 'gate')
+            graph.ndata["gate"] = gate
+            gate = softmax_nodes(graph, "gate")
 
-            graph.ndata['r'] = feat * gate
-            readout = sum_nodes(graph, 'r')
+            graph.ndata["r"] = feat * gate
+            readout = sum_nodes(graph, "r")
 
             return readout
 
@@ -239,6 +260,7 @@ class Set2Set(nn.Block):
     n_layers : int
         Number of recurrent layers.
     """
+
     def __init__(self, input_dim, n_iters, n_layers):
         super(Set2Set, self).__init__()
         self.input_dim = input_dim
@@ -247,7 +269,8 @@ class Set2Set(nn.Block):
         self.n_layers = n_layers
         with self.name_scope():
             self.lstm = gluon.rnn.LSTM(
-                self.input_dim, num_layers=n_layers, input_size=self.output_dim)
+                self.input_dim, num_layers=n_layers, input_size=self.output_dim
+            )
 
     def forward(self, graph, feat):
         r"""Compute set2set pooling.
@@ -269,28 +292,36 @@ class Set2Set(nn.Block):
         with graph.local_scope():
             batch_size = graph.batch_size
 
-            h = (nd.zeros((self.n_layers, batch_size, self.input_dim), ctx=feat.context),
-                 nd.zeros((self.n_layers, batch_size, self.input_dim), ctx=feat.context))
+            h = (
+                nd.zeros(
+                    (self.n_layers, batch_size, self.input_dim),
+                    ctx=feat.context,
+                ),
+                nd.zeros(
+                    (self.n_layers, batch_size, self.input_dim),
+                    ctx=feat.context,
+                ),
+            )
             q_star = nd.zeros((batch_size, self.output_dim), ctx=feat.context)
 
             for _ in range(self.n_iters):
                 q, h = self.lstm(q_star.expand_dims(axis=0), h)
                 q = q.reshape((batch_size, self.input_dim))
-                e = (feat * broadcast_nodes(graph, q)).sum(axis=-1, keepdims=True)
-                graph.ndata['e'] = e
-                alpha = softmax_nodes(graph, 'e')
-                graph.ndata['r'] = feat * alpha
-                readout = sum_nodes(graph, 'r')
+                e = (feat * broadcast_nodes(graph, q)).sum(
+                    axis=-1, keepdims=True
+                )
+                graph.ndata["e"] = e
+                alpha = softmax_nodes(graph, "e")
+                graph.ndata["r"] = feat * alpha
+                readout = sum_nodes(graph, "r")
                 q_star = nd.concat(q, readout, dim=-1)
 
             return q_star
 
     def __repr__(self):
-        summary = 'Set2Set('
-        summary += 'in={}, out={}, ' \
-                   'n_iters={}, n_layers={}'.format(self.input_dim,
-                                                    self.output_dim,
-                                                    self.n_iters,
-                                                    self.n_layers)
-        summary += ')'
+        summary = "Set2Set("
+        summary += "in={}, out={}, " "n_iters={}, n_layers={}".format(
+            self.input_dim, self.output_dim, self.n_iters, self.n_layers
+        )
+        summary += ")"
         return summary

@@ -1,13 +1,16 @@
-/*!
- *  Copyright (c) 2016 by Contributors
- * \file cpu_device_api.cc
+/**
+ *  Copyright (c) 2016-2022 by Contributors
+ * @file cpu_device_api.cc
  */
+#include <dgl/runtime/device_api.h>
+#include <dgl/runtime/registry.h>
+#include <dgl/runtime/tensordispatch.h>
 #include <dmlc/logging.h>
 #include <dmlc/thread_local.h>
-#include <dgl/runtime/registry.h>
-#include <dgl/runtime/device_api.h>
+
 #include <cstdlib>
 #include <cstring>
+
 #include "workspace_pool.h"
 
 namespace dgl {
@@ -20,10 +23,12 @@ class CPUDeviceAPI final : public DeviceAPI {
       *rv = 1;
     }
   }
-  void* AllocDataSpace(DGLContext ctx,
-                       size_t nbytes,
-                       size_t alignment,
-                       DGLType type_hint) final {
+  void* AllocDataSpace(
+      DGLContext ctx, size_t nbytes, size_t alignment,
+      DGLDataType type_hint) final {
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable()) return td->CPUAllocWorkspace(nbytes);
+
     void* ptr;
 #if _MSC_VER || defined(__MINGW32__)
     ptr = _aligned_malloc(nbytes, alignment);
@@ -39,6 +44,9 @@ class CPUDeviceAPI final : public DeviceAPI {
   }
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable()) return td->CPUFreeWorkspace(ptr);
+
 #if _MSC_VER || defined(__MINGW32__)
     _aligned_free(ptr);
 #else
@@ -46,26 +54,21 @@ class CPUDeviceAPI final : public DeviceAPI {
 #endif
   }
 
-  void CopyDataFromTo(const void* from,
-                      size_t from_offset,
-                      void* to,
-                      size_t to_offset,
-                      size_t size,
-                      DGLContext ctx_from,
-                      DGLContext ctx_to,
-                      DGLType type_hint,
-                      DGLStreamHandle stream) final {
-    memcpy(static_cast<char*>(to) + to_offset,
-           static_cast<const char*>(from) + from_offset,
-           size);
+  void CopyDataFromTo(
+      const void* from, size_t from_offset, void* to, size_t to_offset,
+      size_t size, DGLContext ctx_from, DGLContext ctx_to,
+      DGLDataType type_hint) final {
+    memcpy(
+        static_cast<char*>(to) + to_offset,
+        static_cast<const char*>(from) + from_offset, size);
   }
 
   DGLStreamHandle CreateStream(DGLContext) final { return nullptr; }
 
-  void StreamSync(DGLContext ctx, DGLStreamHandle stream) final {
-  }
+  void StreamSync(DGLContext ctx, DGLStreamHandle stream) final {}
 
-  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final;
+  void* AllocWorkspace(
+      DGLContext ctx, size_t size, DGLDataType type_hint) final;
   void FreeWorkspace(DGLContext ctx, void* data) final;
 
   static const std::shared_ptr<CPUDeviceAPI>& Global() {
@@ -76,25 +79,29 @@ class CPUDeviceAPI final : public DeviceAPI {
 };
 
 struct CPUWorkspacePool : public WorkspacePool {
-  CPUWorkspacePool() :
-      WorkspacePool(kDLCPU, CPUDeviceAPI::Global()) {}
+  CPUWorkspacePool() : WorkspacePool(kDGLCPU, CPUDeviceAPI::Global()) {}
 };
 
-void* CPUDeviceAPI::AllocWorkspace(DGLContext ctx,
-                                   size_t size,
-                                   DGLType type_hint) {
-  return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()
-      ->AllocWorkspace(ctx, size);
+void* CPUDeviceAPI::AllocWorkspace(
+    DGLContext ctx, size_t size, DGLDataType type_hint) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable()) return td->CPUAllocWorkspace(size);
+
+  return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->AllocWorkspace(
+      ctx, size);
 }
 
 void CPUDeviceAPI::FreeWorkspace(DGLContext ctx, void* data) {
+  TensorDispatcher* td = TensorDispatcher::Global();
+  if (td->IsAvailable()) return td->CPUFreeWorkspace(data);
+
   dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(ctx, data);
 }
 
 DGL_REGISTER_GLOBAL("device_api.cpu")
-.set_body([](DGLArgs args, DGLRetValue* rv) {
-    DeviceAPI* ptr = CPUDeviceAPI::Global().get();
-    *rv = static_cast<void*>(ptr);
-  });
+    .set_body([](DGLArgs args, DGLRetValue* rv) {
+      DeviceAPI* ptr = CPUDeviceAPI::Global().get();
+      *rv = static_cast<void*>(ptr);
+    });
 }  // namespace runtime
 }  // namespace dgl
