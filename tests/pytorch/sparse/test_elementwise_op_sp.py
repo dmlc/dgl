@@ -62,3 +62,23 @@ def test_pow(val_shape):
     new_row, new_col = A_new.coo()
     assert torch.allclose(new_row, row)
     assert torch.allclose(new_col, col)
+
+
+@pytest.mark.parametrize("op", ["add", "sub"])
+@pytest.mark.parametrize("v_scalar", [2, 2.5])
+def test_error_op_scalar(op, v_scalar):
+    ctx = F.ctx()
+    row = torch.tensor([1, 0, 2]).to(ctx)
+    col = torch.tensor([0, 3, 2]).to(ctx)
+    val = torch.randn(len(row)).to(ctx)
+    A = from_coo(row, col, val, shape=(3, 4))
+
+    with pytest.raises(TypeError):
+        A + v_scalar
+    with pytest.raises(TypeError):
+        v_scalar + A
+
+    with pytest.raises(TypeError):
+        A - v_scalar
+    with pytest.raises(TypeError):
+        v_scalar - A
