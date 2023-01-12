@@ -3,7 +3,6 @@ from typing import Union
 
 import torch
 
-from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix, val_like
 
 
@@ -21,8 +20,8 @@ def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     ----------
     A : SparseMatrix
         Sparse matrix
-    B : DiagMatrix or SparseMatrix
-        Diagonal matrix or sparse matrix
+    B : SparseMatrix
+        Sparse matrix
 
     Returns
     -------
@@ -38,9 +37,9 @@ def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     >>> A = from_coo(row, col, val, shape=(3, 4))
     >>> A + A
     SparseMatrix(indices=tensor([[0, 1, 2],
-            [3, 0, 2]]),
-    values=tensor([40, 20, 60]),
-    shape=(3, 4), nnz=3)
+                                 [3, 0, 2]]),
+                 values=tensor([40, 20, 60]),
+                 shape=(3, 4), nnz=3)
     """
     # Python falls back to B.__radd__ then TypeError when NotImplemented is
     # returned.
