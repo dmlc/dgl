@@ -1,8 +1,7 @@
+import dgl
 import pytest
 import torch
-import dgl
-from dgl.nn import CuGraphGATConv
-from dgl.nn import GATConv
+from dgl.nn import CuGraphGATConv, GATConv
 
 options = {
     "idtype_int": [False, True],
