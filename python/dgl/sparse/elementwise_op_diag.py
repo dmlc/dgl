@@ -30,13 +30,13 @@ def diag_add(
     DiagMatrix(val=tensor([11, 13, 15]),
     shape=(3, 3))
     """
-    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
+    if isinstance(D2, DiagMatrix):
         assert D1.shape == D2.shape, (
             "The shape of diagonal matrix D1 "
             f"{D1.shape} and D2 {D2.shape} must match."
         )
         return diag(D1.val + D2.val, D1.shape)
-    elif isinstance(D1, DiagMatrix) and isinstance(D2, SparseMatrix):
+    elif isinstance(D2, SparseMatrix):
         assert D1.shape == D2.shape, (
             "The shape of diagonal matrix D1 "
             f"{D1.shape} and sparse matrix D2 {D2.shape} must match."
@@ -71,7 +71,7 @@ def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     DiagMatrix(val=tensor([-9, -9, -9]),
     shape=(3, 3))
     """
-    if isinstance(D1, DiagMatrix) and isinstance(D2, DiagMatrix):
+    if isinstance(D2, DiagMatrix):
         assert D1.shape == D2.shape, (
             "The shape of diagonal matrix D1 "
             f"{D1.shape} and D2 {D2.shape} must match."
