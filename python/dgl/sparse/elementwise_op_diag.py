@@ -190,7 +190,9 @@ def diag_power(D: DiagMatrix, scalar: Scalar) -> DiagMatrix:
     shape=(3, 3))
     """
     return (
-        diag(D.val**scalar, D.shape) if is_scalar(scalar) else NotImplemented
+        diag(D.val**scalar, D.shape)
+        if is_scalar(scalar)
+        else NotImplemented
     )
 
 
