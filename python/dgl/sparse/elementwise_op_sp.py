@@ -4,7 +4,7 @@ from typing import Union
 import torch
 
 from .sparse_matrix import SparseMatrix, val_like
-from .utils import Scalar, is_scalar
+from .utils import is_scalar, Scalar
 
 
 def spsp_add(A, B):

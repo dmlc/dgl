@@ -3,7 +3,7 @@ from typing import Union
 
 from .diag_matrix import diag, DiagMatrix
 from .sparse_matrix import SparseMatrix
-from .utils import Scalar, is_scalar
+from .utils import is_scalar, Scalar
 
 
 def diag_add(
