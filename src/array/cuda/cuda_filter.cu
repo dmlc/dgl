@@ -18,8 +18,6 @@ namespace array {
 
 namespace {
 
-cudaStream_t cudaStream = runtime::getCurrentCUDAStream();
-
 template <typename IdType, bool include>
 __global__ void _IsInKernel(
     DeviceOrderedHashTable<IdType> table, const IdType* const array,
@@ -46,6 +44,7 @@ IdArray _PerformFilter(const OrderedHashTable<IdType>& table, IdArray test) {
   const auto& ctx = test->ctx;
   auto device = runtime::DeviceAPI::Get(ctx);
   const int64_t size = test->shape[0];
+  cudaStream_t cudaStream = runtime::getCurrentCUDAStream();
 
   if (size == 0) {
     return test;
@@ -108,7 +107,8 @@ template <typename IdType>
 class CudaFilterSet : public Filter {
  public:
   explicit CudaFilterSet(IdArray array)
-      : table_(array->shape[0], array->ctx, cudaStream) {
+      : table_(array->shape[0], array->ctx, runtime::getCurrentCUDAStream()) {
+    cudaStream_t cudaStream = runtime::getCurrentCUDAStream();
     table_.FillWithUnique(
         static_cast<const IdType*>(array->data), array->shape[0], cudaStream);
   }
