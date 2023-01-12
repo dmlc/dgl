@@ -46,7 +46,7 @@ def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     return spsp_add(A, B) if isinstance(B, SparseMatrix) else NotImplemented
 
 
-def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, float, int]) -> SparseMatrix:
+def sp_mul(A: SparseMatrix, B: Union[float, int]) -> SparseMatrix:
     """Elementwise multiplication
 
     Parameters
@@ -83,8 +83,6 @@ def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, float, int]) -> SparseMatrix:
     """
     if isinstance(B, (float, int)):
         return val_like(A, A.val * B)
-    elif isinstance(B, SparseMatrix):
-        return val_like(B, A * B.val)
     # Python falls back to B.__rmul__(A) then TypeError when NotImplemented is
     # returned.
     # So this also handles the case of scalar * SparseMatrix since we set
