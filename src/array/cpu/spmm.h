@@ -27,7 +27,6 @@ namespace dgl {
 namespace aten {
 namespace cpu {
 
-
 /**
  * @brief Naive CPU kernel of SpMM on Csr format.
  * @param cpu_spec JIT'ed kernel
@@ -111,7 +110,7 @@ void SpMMSumCsr(
   } else {
 #endif  // USE_LIBXSMM
 #endif  // _WIN32
-      SpMMSumCsrNaive<IdType, DType, Op>(bcast, csr, X, W, O);
+    SpMMSumCsrNaive<IdType, DType, Op>(bcast, csr, X, W, O);
 #if !defined(_WIN32)
 #ifdef USE_LIBXSMM
   }
