@@ -52,6 +52,11 @@ def test_diag_op_scalar(v_scalar):
     assert torch.allclose(D1.val / v_scalar, D2.val, rtol=1e-4, atol=1e-4)
     assert D1.shape == D2.shape
 
+    # v / D
+    D2 = v_scalar / D1
+    assert torch.allclose(v_scalar / D1.val, D2.val, rtol=1e-4, atol=1e-4)
+    assert D1.shape == D2.shape
+
     # D ^ v
     D1 = diag(torch.arange(1, 4).to(ctx))
     D2 = D1**v_scalar

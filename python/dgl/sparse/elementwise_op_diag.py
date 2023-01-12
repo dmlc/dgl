@@ -165,6 +165,44 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
         return NotImplemented
 
 
+def diag_rdiv(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
+    """Elementwise division of a diagonal matrix or a scalar by a diagonal
+    matrix
+
+    Parameters
+    ----------
+    D1 : DiagMatrix
+        Diagonal matrix
+    D2 : DiagMatrix or Scalar
+        Diagonal matrix or scalar value. If :attr:`D2` is a DiagMatrix,
+        division is only applied to the diagonal elements.
+
+    Returns
+    -------
+    DiagMatrix
+        diagonal matrix
+
+    Examples
+    --------
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> 2.5 / D1
+    DiagMatrix(val=tensor([2.5000, 1.2500, 0.8333]),
+    shape=(3, 3))
+    """
+    if is_scalar(D2):
+        assert D2 != 0, "Division by zero is not allowed."
+        return diag(D2 / D1.val, D1.shape)
+    elif isinstance(D2, DiagMatrix):
+        assert D1.shape == D2.shape, (
+            f"The shape of diagonal matrix D1 {D1.shape} and D2 {D2.shape} "
+            "must match."
+        )
+        return diag(D2.val / D1.val, D1.shape)
+    else:
+        # Python falls back TypeError when NotImplemented is returned.
+        return NotImplemented
+
+
 # pylint: disable=invalid-name
 def diag_power(D: DiagMatrix, scalar: Scalar) -> DiagMatrix:
     """Take the power of each nonzero element and return a diagonal matrix with
@@ -200,4 +238,5 @@ DiagMatrix.__sub__ = diag_sub
 DiagMatrix.__mul__ = diag_mul
 DiagMatrix.__rmul__ = diag_mul
 DiagMatrix.__truediv__ = diag_div
+DiagMatrix.__rtruediv__ = diag_rdiv
 DiagMatrix.__pow__ = diag_power
