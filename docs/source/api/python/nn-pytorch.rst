@@ -17,6 +17,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
     ~dgl.nn.pytorch.conv.TAGConv
     ~dgl.nn.pytorch.conv.GATConv
+    ~dgl.nn.pytorch.conv.CuGraphGATConv
     ~dgl.nn.pytorch.conv.GATv2Conv
     ~dgl.nn.pytorch.conv.EGATConv
     ~dgl.nn.pytorch.conv.EdgeConv
