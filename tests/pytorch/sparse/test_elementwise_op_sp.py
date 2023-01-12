@@ -63,6 +63,7 @@ def test_pow(val_shape):
     assert torch.allclose(new_row, row)
     assert torch.allclose(new_col, col)
 
+
 @pytest.mark.parametrize("op", ["add", "sub"])
 @pytest.mark.parametrize("v_scalar", [2, 2.5])
 def test_error_op_scalar(op, v_scalar):

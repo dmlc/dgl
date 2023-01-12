@@ -129,6 +129,7 @@ def test_add_sparse_diag(val_shape):
     assert torch.allclose(dense_sum, sum3)
     assert torch.allclose(dense_sum, sum4)
 
+
 @pytest.mark.parametrize("op", ["mul", "truediv", "pow"])
 def test_error_op_sparse_diag(op):
     ctx = F.ctx()
