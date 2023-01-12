@@ -1,3 +1,4 @@
+import operator
 import sys
 
 import backend as F
@@ -31,6 +32,11 @@ def test_add_coo(val_shape):
     assert torch.allclose(dense_sum, sum1)
     assert torch.allclose(dense_sum, sum2)
 
+    with pytest.raises(TypeError):
+        A + 2
+    with pytest.raises(TypeError):
+        2 + A
+
 
 @pytest.mark.parametrize("val_shape", [(), (2,)])
 def test_add_csr(val_shape):
@@ -52,6 +58,11 @@ def test_add_csr(val_shape):
     assert torch.allclose(dense_sum, sum1)
     assert torch.allclose(dense_sum, sum2)
 
+    with pytest.raises(TypeError):
+        A + 2
+    with pytest.raises(TypeError):
+        2 + A
+
 
 @pytest.mark.parametrize("val_shape", [(), (2,)])
 def test_add_csc(val_shape):
@@ -72,6 +83,11 @@ def test_add_csc(val_shape):
 
     assert torch.allclose(dense_sum, sum1)
     assert torch.allclose(dense_sum, sum2)
+
+    with pytest.raises(TypeError):
+        A + 2
+    with pytest.raises(TypeError):
+        2 + A
 
 
 @pytest.mark.parametrize("val_shape", [(), (2,)])
@@ -112,3 +128,20 @@ def test_add_sparse_diag(val_shape):
     assert torch.allclose(dense_sum, sum2)
     assert torch.allclose(dense_sum, sum3)
     assert torch.allclose(dense_sum, sum4)
+
+
+@pytest.mark.parametrize("op", ["mul", "truediv", "pow"])
+def test_error_op_sparse_diag(op):
+    ctx = F.ctx()
+    row = torch.tensor([1, 0, 2]).to(ctx)
+    col = torch.tensor([0, 3, 2]).to(ctx)
+    val = torch.randn(row.shape).to(ctx)
+    A = from_coo(row, col, val)
+
+    shape = (3, 4)
+    D = diag(torch.randn(row.shape[0]).to(ctx), shape=shape)
+
+    with pytest.raises(TypeError):
+        getattr(operator, op)(A, D)
+    with pytest.raises(TypeError):
+        getattr(operator, op)(D, A)
