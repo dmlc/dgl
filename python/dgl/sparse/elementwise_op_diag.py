@@ -194,7 +194,6 @@ def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
         else NotImplemented
     )
 
-
 DiagMatrix.__add__ = diag_add
 DiagMatrix.__radd__ = diag_add
 DiagMatrix.__sub__ = diag_sub
