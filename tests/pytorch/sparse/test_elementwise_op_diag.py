@@ -60,3 +60,13 @@ def test_diag_op_scalar(v_scalar):
     D2 = power(D1, v_scalar)
     assert torch.allclose(D1.val**v_scalar, D2.val, rtol=1e-4, atol=1e-4)
     assert D1.shape == D2.shape
+
+    with pytest.raises(TypeError):
+        D1 + v_scalar
+    with pytest.raises(TypeError):
+        v_scalar + D1
+
+    with pytest.raises(TypeError):
+        D1 - v_scalar
+    with pytest.raises(TypeError):
+        v_scalar - D1
