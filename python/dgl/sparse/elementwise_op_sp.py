@@ -1,6 +1,4 @@
 """DGL elementwise operators for sparse matrix module."""
-from typing import Union
-
 import torch
 
 from .sparse_matrix import SparseMatrix, val_like

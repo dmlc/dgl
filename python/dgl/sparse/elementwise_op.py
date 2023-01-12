@@ -4,7 +4,7 @@ from typing import Union
 
 from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix
-from .utils import is_scalar, Scalar
+from .utils import Scalar
 
 __all__ = ["add", "sub", "mul", "div", "power"]
 
