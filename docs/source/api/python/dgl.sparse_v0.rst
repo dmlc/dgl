@@ -171,10 +171,7 @@ Matrix Multiplication
 .. autosummary::
     :toctree: ../../generated/
 
-    spmm
-    bspmm
-    spspmm
-    mm
+    matmul
     sddmm
     bsddmm
 
