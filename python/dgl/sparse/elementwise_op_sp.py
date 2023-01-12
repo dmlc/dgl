@@ -53,7 +53,7 @@ def sp_mul(A: SparseMatrix, B: Union[float, int]) -> SparseMatrix:
     ----------
     A : SparseMatrix
         First operand
-    B : SparseMatrix or float or int
+    B : float or int
         Second operand
 
     Returns
