@@ -82,9 +82,7 @@ def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
     return NotImplemented
 
 
-def diag_mul(
-    D1: DiagMatrix, D2: Union[DiagMatrix, float, int]
-) -> DiagMatrix:
+def diag_mul(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
     """Elementwise multiplication
 
     Parameters
@@ -191,9 +189,11 @@ def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
     shape=(3, 3))
     """
     return (
-        diag(D.val**scalar, D.shape) if isinstance(scalar, (float, int))
+        diag(D.val**scalar, D.shape)
+        if isinstance(scalar, (float, int))
         else NotImplemented
     )
+
 
 DiagMatrix.__add__ = diag_add
 DiagMatrix.__radd__ = diag_add

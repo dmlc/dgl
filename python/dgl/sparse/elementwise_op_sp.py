@@ -47,9 +47,7 @@ def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     return spsp_add(A, B) if isinstance(B, SparseMatrix) else NotImplemented
 
 
-def sp_mul(
-    A: SparseMatrix, B: Union[SparseMatrix, float, int]
-) -> SparseMatrix:
+def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, float, int]) -> SparseMatrix:
     """Elementwise multiplication
 
     Parameters
@@ -126,7 +124,8 @@ def sp_power(A: SparseMatrix, scalar: Union[float, int]) -> SparseMatrix:
     # Python falls back to scalar.__rpow__ then TypeError when NotImplemented
     # is returned.
     return (
-        val_like(A, A.val**scalar) if isinstance(scalar, (float, int))
+        val_like(A, A.val**scalar)
+        if isinstance(scalar, (float, int))
         else NotImplemented
     )
 
