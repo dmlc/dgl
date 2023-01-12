@@ -193,6 +193,7 @@ def diag_power(D: DiagMatrix, scalar: Scalar) -> DiagMatrix:
         diag(D.val**scalar, D.shape) if is_scalar(scalar) else NotImplemented
     )
 
+
 DiagMatrix.__add__ = diag_add
 DiagMatrix.__radd__ = diag_add
 DiagMatrix.__sub__ = diag_sub
