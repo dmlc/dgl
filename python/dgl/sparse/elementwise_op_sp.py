@@ -4,6 +4,7 @@ from typing import Union
 import torch
 
 from .sparse_matrix import SparseMatrix, val_like
+from .utils import Scalar, is_scalar
 
 
 def spsp_add(A, B):
@@ -46,14 +47,14 @@ def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     return spsp_add(A, B) if isinstance(B, SparseMatrix) else NotImplemented
 
 
-def sp_mul(A: SparseMatrix, B: Union[float, int]) -> SparseMatrix:
+def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     """Elementwise multiplication
 
     Parameters
     ----------
     A : SparseMatrix
         First operand
-    B : float or int
+    B : Scalar
         Second operand
 
     Returns
@@ -81,7 +82,7 @@ def sp_mul(A: SparseMatrix, B: Union[float, int]) -> SparseMatrix:
     values=tensor([2, 4, 6]),
     shape=(3, 4), nnz=3)
     """
-    if isinstance(B, (float, int)):
+    if is_scalar(B):
         return val_like(A, A.val * B)
     # Python falls back to B.__rmul__(A) then TypeError when NotImplemented is
     # returned.
@@ -90,7 +91,7 @@ def sp_mul(A: SparseMatrix, B: Union[float, int]) -> SparseMatrix:
     return NotImplemented
 
 
-def sp_power(A: SparseMatrix, scalar: Union[float, int]) -> SparseMatrix:
+def sp_power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
     """Take the power of each nonzero element and return a sparse matrix with
     the result.
 
@@ -121,9 +122,7 @@ def sp_power(A: SparseMatrix, scalar: Union[float, int]) -> SparseMatrix:
     # Python falls back to scalar.__rpow__ then TypeError when NotImplemented
     # is returned.
     return (
-        val_like(A, A.val**scalar)
-        if isinstance(scalar, (float, int))
-        else NotImplemented
+        val_like(A, A.val**scalar) if is_scalar(scalar) else NotImplemented
     )
 
 

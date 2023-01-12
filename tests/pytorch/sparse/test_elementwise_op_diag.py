@@ -29,7 +29,7 @@ def test_diag_op_diag(op):
     assert result.shape == D1.shape
 
 
-@pytest.mark.parametrize("v_scalar", [2, 2.5])
+@pytest.mark.parametrize("v_scalar", [2, 2.5, torch.tensor(2), torch.tensor(2.5)])
 def test_diag_op_scalar(v_scalar):
     ctx = F.ctx()
     shape = (3, 4)

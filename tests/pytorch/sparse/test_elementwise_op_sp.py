@@ -20,7 +20,7 @@ def all_close_sparse(A, row, col, val, shape):
     assert A.shape == shape
 
 
-@pytest.mark.parametrize("v_scalar", [2, 2.5])
+@pytest.mark.parametrize("v_scalar", [2, 2.5, torch.tensor(2), torch.tensor(2.5)])
 def test_mul_scalar(v_scalar):
     ctx = F.ctx()
     row = torch.tensor([1, 0, 2]).to(ctx)
@@ -65,7 +65,7 @@ def test_pow(val_shape):
 
 
 @pytest.mark.parametrize("op", ["add", "sub"])
-@pytest.mark.parametrize("v_scalar", [2, 2.5])
+@pytest.mark.parametrize("v_scalar", [2, 2.5, torch.tensor(2), torch.tensor(2.5)])
 def test_error_op_scalar(op, v_scalar):
     ctx = F.ctx()
     row = torch.tensor([1, 0, 2]).to(ctx)
