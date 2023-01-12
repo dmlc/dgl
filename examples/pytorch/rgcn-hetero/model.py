@@ -4,10 +4,12 @@ from collections import defaultdict
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+import tqdm
+
 import dgl
 import dgl.function as fn
 import dgl.nn as dglnn
-import tqdm
+
 
 class RelGraphConvLayer(nn.Module):
     r"""Relational graph convolution layer.
@@ -33,17 +35,20 @@ class RelGraphConvLayer(nn.Module):
     dropout : float, optional
         Dropout rate. Default: 0.0
     """
-    def __init__(self,
-                 in_feat,
-                 out_feat,
-                 rel_names,
-                 num_bases,
-                 *,
-                 weight=True,
-                 bias=True,
-                 activation=None,
-                 self_loop=False,
-                 dropout=0.0):
+
+    def __init__(
+        self,
+        in_feat,
+        out_feat,
+        rel_names,
+        num_bases,
+        *,
+        weight=True,
+        bias=True,
+        activation=None,
+        self_loop=False,
+        dropout=0.0
+    ):
         super(RelGraphConvLayer, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -53,19 +58,29 @@ class RelGraphConvLayer(nn.Module):
         self.activation = activation
         self.self_loop = self_loop
 
-        self.conv = dglnn.HeteroGraphConv({
-                rel : dglnn.GraphConv(in_feat, out_feat, norm='right', weight=False, bias=False)
+        self.conv = dglnn.HeteroGraphConv(
+            {
+                rel: dglnn.GraphConv(
+                    in_feat, out_feat, norm="right", weight=False, bias=False
+                )
                 for rel in rel_names
-            })
+            }
+        )
 
         self.use_weight = weight
         self.use_basis = num_bases < len(self.rel_names) and weight
         if self.use_weight:
             if self.use_basis:
-                self.basis = dglnn.WeightBasis((in_feat, out_feat), num_bases, len(self.rel_names))
+                self.basis = dglnn.WeightBasis(
+                    (in_feat, out_feat), num_bases, len(self.rel_names)
+                )
             else:
-                self.weight = nn.Parameter(th.Tensor(len(self.rel_names), in_feat, out_feat))
-                nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+                self.weight = nn.Parameter(
+                    th.Tensor(len(self.rel_names), in_feat, out_feat)
+                )
+                nn.init.xavier_uniform_(
+                    self.weight, gain=nn.init.calculate_gain("relu")
+                )
 
         # bias
         if bias:
@@ -75,8 +90,9 @@ class RelGraphConvLayer(nn.Module):
         # weight for self loop
         if self.self_loop:
             self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
-            nn.init.xavier_uniform_(self.loop_weight,
-                                    gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(
+                self.loop_weight, gain=nn.init.calculate_gain("relu")
+            )
 
         self.dropout = nn.Dropout(dropout)
 
@@ -85,7 +101,7 @@ class RelGraphConvLayer(nn.Module):
 
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.
@@ -98,14 +114,18 @@ class RelGraphConvLayer(nn.Module):
         g = g.local_var()
         if self.use_weight:
             weight = self.basis() if self.use_basis else self.weight
-            wdict = {self.rel_names[i] : {'weight' : w.squeeze(0)}
-                     for i, w in enumerate(th.split(weight, 1, dim=0))}
+            wdict = {
+                self.rel_names[i]: {"weight": w.squeeze(0)}
+                for i, w in enumerate(th.split(weight, 1, dim=0))
+            }
         else:
             wdict = {}
 
         if g.is_block:
             inputs_src = inputs
-            inputs_dst = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
+            inputs_dst = {
+                k: v[: g.number_of_dst_nodes(k)] for k, v in inputs.items()
+            }
         else:
             inputs_src = inputs_dst = inputs
 
@@ -119,7 +139,9 @@ class RelGraphConvLayer(nn.Module):
             if self.activation:
                 h = self.activation(h)
             return self.dropout(h)
-        return {ntype : _apply(ntype, h) for ntype, h in hs.items()}
+
+        return {ntype: _apply(ntype, h) for ntype, h in hs.items()}
+
 
 class RelGraphConvLayerHeteroAPI(nn.Module):
     r"""Relational graph convolution layer.
@@ -145,17 +167,20 @@ class RelGraphConvLayerHeteroAPI(nn.Module):
     dropout : float, optional
         Dropout rate. Default: 0.0
     """
-    def __init__(self,
-                 in_feat,
-                 out_feat,
-                 rel_names,
-                 num_bases,
-                 *,
-                 weight=True,
-                 bias=True,
-                 activation=None,
-                 self_loop=False,
-                 dropout=0.0):
+
+    def __init__(
+        self,
+        in_feat,
+        out_feat,
+        rel_names,
+        num_bases,
+        *,
+        weight=True,
+        bias=True,
+        activation=None,
+        self_loop=False,
+        dropout=0.0
+    ):
         super(RelGraphConvLayerHeteroAPI, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -169,10 +194,16 @@ class RelGraphConvLayerHeteroAPI(nn.Module):
         self.use_basis = num_bases < len(self.rel_names) and weight
         if self.use_weight:
             if self.use_basis:
-                self.basis = dglnn.WeightBasis((in_feat, out_feat), num_bases, len(self.rel_names))
+                self.basis = dglnn.WeightBasis(
+                    (in_feat, out_feat), num_bases, len(self.rel_names)
+                )
             else:
-                self.weight = nn.Parameter(th.Tensor(len(self.rel_names), in_feat, out_feat))
-                nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+                self.weight = nn.Parameter(
+                    th.Tensor(len(self.rel_names), in_feat, out_feat)
+                )
+                nn.init.xavier_uniform_(
+                    self.weight, gain=nn.init.calculate_gain("relu")
+                )
 
         # bias
         if bias:
@@ -182,8 +213,9 @@ class RelGraphConvLayerHeteroAPI(nn.Module):
         # weight for self loop
         if self.self_loop:
             self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
-            nn.init.xavier_uniform_(self.loop_weight,
-                                    gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(
+                self.loop_weight, gain=nn.init.calculate_gain("relu")
+            )
 
         self.dropout = nn.Dropout(dropout)
 
@@ -192,7 +224,7 @@ class RelGraphConvLayerHeteroAPI(nn.Module):
 
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.
@@ -205,29 +237,33 @@ class RelGraphConvLayerHeteroAPI(nn.Module):
         g = g.local_var()
         if self.use_weight:
             weight = self.basis() if self.use_basis else self.weight
-            wdict = {self.rel_names[i] : {'weight' : w.squeeze(0)}
-                     for i, w in enumerate(th.split(weight, 1, dim=0))}
+            wdict = {
+                self.rel_names[i]: {"weight": w.squeeze(0)}
+                for i, w in enumerate(th.split(weight, 1, dim=0))
+            }
         else:
             wdict = {}
 
         inputs_src = inputs_dst = inputs
 
-        for srctype,_,_ in g.canonical_etypes:
-            g.nodes[srctype].data['h'] = inputs[srctype]
+        for srctype, _, _ in g.canonical_etypes:
+            g.nodes[srctype].data["h"] = inputs[srctype]
 
         if self.use_weight:
-            g.apply_edges(fn.copy_u('h', 'm'))
-            m = g.edata['m']
+            g.apply_edges(fn.copy_u("h", "m"))
+            m = g.edata["m"]
             for rel in g.canonical_etypes:
                 _, etype, _ = rel
-                g.edges[rel].data['h*w_r'] =  th.matmul(m[rel], wdict[etype]['weight'])
+                g.edges[rel].data["h*w_r"] = th.matmul(
+                    m[rel], wdict[etype]["weight"]
+                )
         else:
-            g.apply_edges(fn.copy_u('h', 'h*w_r'))
+            g.apply_edges(fn.copy_u("h", "h*w_r"))
 
-        g.update_all(fn.copy_e('h*w_r', 'm'), fn.sum('m', 'h'))
+        g.update_all(fn.copy_e("h*w_r", "m"), fn.sum("m", "h"))
 
         def _apply(ntype):
-            h = g.nodes[ntype].data['h']
+            h = g.nodes[ntype].data["h"]
             if self.self_loop:
                 h = h + th.matmul(inputs_dst[ntype], self.loop_weight)
             if self.bias:
@@ -235,16 +271,16 @@ class RelGraphConvLayerHeteroAPI(nn.Module):
             if self.activation:
                 h = self.activation(h)
             return self.dropout(h)
-        return {ntype : _apply(ntype) for ntype in g.dsttypes}
+
+        return {ntype: _apply(ntype) for ntype in g.dsttypes}
+
 
 class RelGraphEmbed(nn.Module):
     r"""Embedding layer for featureless heterograph."""
-    def __init__(self,
-                 g,
-                 embed_size,
-                 embed_name='embed',
-                 activation=None,
-                 dropout=0.0):
+
+    def __init__(
+        self, g, embed_size, embed_name="embed", activation=None, dropout=0.0
+    ):
         super(RelGraphEmbed, self).__init__()
         self.g = g
         self.embed_size = embed_size
@@ -255,8 +291,10 @@ class RelGraphEmbed(nn.Module):
         # create weight embeddings for each node for each relation
         self.embeds = nn.ParameterDict()
         for ntype in g.ntypes:
-            embed = nn.Parameter(th.Tensor(g.number_of_nodes(ntype), self.embed_size))
-            nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain('relu'))
+            embed = nn.Parameter(
+                th.Tensor(g.number_of_nodes(ntype), self.embed_size)
+            )
+            nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain("relu"))
             self.embeds[ntype] = embed
 
     def forward(self, block=None):
@@ -264,26 +302,30 @@ class RelGraphEmbed(nn.Module):
 
         Parameters
         ----------
-        block : DGLHeteroGraph, optional
+        block : DGLGraph, optional
             If not specified, directly return the full graph with embeddings stored in
             :attr:`embed_name`. Otherwise, extract and store the embeddings to the block
             graph and return.
 
         Returns
         -------
-        DGLHeteroGraph
+        DGLGraph
             The block graph fed with embeddings.
         """
         return self.embeds
 
+
 class EntityClassify(nn.Module):
-    def __init__(self,
-                 g,
-                 h_dim, out_dim,
-                 num_bases,
-                 num_hidden_layers=1,
-                 dropout=0,
-                 use_self_loop=False):
+    def __init__(
+        self,
+        g,
+        h_dim,
+        out_dim,
+        num_bases,
+        num_hidden_layers=1,
+        dropout=0,
+        use_self_loop=False,
+    ):
         super(EntityClassify, self).__init__()
         self.g = g
         self.h_dim = h_dim
@@ -301,21 +343,42 @@ class EntityClassify(nn.Module):
         self.embed_layer = RelGraphEmbed(g, self.h_dim)
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RelGraphConvLayer(
-            self.h_dim, self.h_dim, self.rel_names,
-            self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            dropout=self.dropout, weight=False))
+        self.layers.append(
+            RelGraphConvLayer(
+                self.h_dim,
+                self.h_dim,
+                self.rel_names,
+                self.num_bases,
+                activation=F.relu,
+                self_loop=self.use_self_loop,
+                dropout=self.dropout,
+                weight=False,
+            )
+        )
         # h2h
         for i in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConvLayer(
-                self.h_dim, self.h_dim, self.rel_names,
-                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout))
+            self.layers.append(
+                RelGraphConvLayer(
+                    self.h_dim,
+                    self.h_dim,
+                    self.rel_names,
+                    self.num_bases,
+                    activation=F.relu,
+                    self_loop=self.use_self_loop,
+                    dropout=self.dropout,
+                )
+            )
         # h2o
-        self.layers.append(RelGraphConvLayer(
-            self.h_dim, self.out_dim, self.rel_names,
-            self.num_bases, activation=None,
-            self_loop=self.use_self_loop))
+        self.layers.append(
+            RelGraphConvLayer(
+                self.h_dim,
+                self.out_dim,
+                self.rel_names,
+                self.num_bases,
+                activation=None,
+                self_loop=self.use_self_loop,
+            )
+        )
 
     def forward(self, h=None, blocks=None):
         if h is None:
@@ -346,8 +409,10 @@ class EntityClassify(nn.Module):
             y = {
                 k: th.zeros(
                     g.number_of_nodes(k),
-                    self.h_dim if l != len(self.layers) - 1 else self.out_dim)
-                for k in g.ntypes}
+                    self.h_dim if l != len(self.layers) - 1 else self.out_dim,
+                )
+                for k in g.ntypes
+            }
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.DataLoader(
@@ -357,12 +422,16 @@ class EntityClassify(nn.Module):
                 batch_size=batch_size,
                 shuffle=True,
                 drop_last=False,
-                num_workers=num_workers)
+                num_workers=num_workers,
+            )
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
 
-                h = {k: x[k][input_nodes[k]].to(device) for k in input_nodes.keys()}
+                h = {
+                    k: x[k][input_nodes[k]].to(device)
+                    for k in input_nodes.keys()
+                }
                 h = layer(block, h)
 
                 for k in output_nodes.keys():
@@ -371,14 +440,18 @@ class EntityClassify(nn.Module):
             x = y
         return y
 
+
 class EntityClassify_HeteroAPI(nn.Module):
-    def __init__(self,
-                 g,
-                 h_dim, out_dim,
-                 num_bases,
-                 num_hidden_layers=1,
-                 dropout=0,
-                 use_self_loop=False):
+    def __init__(
+        self,
+        g,
+        h_dim,
+        out_dim,
+        num_bases,
+        num_hidden_layers=1,
+        dropout=0,
+        use_self_loop=False,
+    ):
         super(EntityClassify_HeteroAPI, self).__init__()
         self.g = g
         self.h_dim = h_dim
@@ -396,21 +469,42 @@ class EntityClassify_HeteroAPI(nn.Module):
         self.embed_layer = RelGraphEmbed(g, self.h_dim)
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RelGraphConvLayerHeteroAPI(
-            self.h_dim, self.h_dim, self.rel_names,
-            self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            dropout=self.dropout, weight=False))
+        self.layers.append(
+            RelGraphConvLayerHeteroAPI(
+                self.h_dim,
+                self.h_dim,
+                self.rel_names,
+                self.num_bases,
+                activation=F.relu,
+                self_loop=self.use_self_loop,
+                dropout=self.dropout,
+                weight=False,
+            )
+        )
         # h2h
         for i in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConvLayerHeteroAPI(
-                self.h_dim, self.h_dim, self.rel_names,
-                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout))
+            self.layers.append(
+                RelGraphConvLayerHeteroAPI(
+                    self.h_dim,
+                    self.h_dim,
+                    self.rel_names,
+                    self.num_bases,
+                    activation=F.relu,
+                    self_loop=self.use_self_loop,
+                    dropout=self.dropout,
+                )
+            )
         # h2o
-        self.layers.append(RelGraphConvLayerHeteroAPI(
-            self.h_dim, self.out_dim, self.rel_names,
-            self.num_bases, activation=None,
-            self_loop=self.use_self_loop))
+        self.layers.append(
+            RelGraphConvLayerHeteroAPI(
+                self.h_dim,
+                self.out_dim,
+                self.rel_names,
+                self.num_bases,
+                activation=None,
+                self_loop=self.use_self_loop,
+            )
+        )
 
     def forward(self, h=None, blocks=None):
         if h is None:
@@ -441,8 +535,10 @@ class EntityClassify_HeteroAPI(nn.Module):
             y = {
                 k: th.zeros(
                     g.number_of_nodes(k),
-                    self.h_dim if l != len(self.layers) - 1 else self.out_dim)
-                for k in g.ntypes}
+                    self.h_dim if l != len(self.layers) - 1 else self.out_dim,
+                )
+                for k in g.ntypes
+            }
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.DataLoader(
@@ -452,12 +548,16 @@ class EntityClassify_HeteroAPI(nn.Module):
                 batch_size=batch_size,
                 shuffle=True,
                 drop_last=False,
-                num_workers=num_workers)
+                num_workers=num_workers,
+            )
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 block = blocks[0].to(device)
 
-                h = {k: x[k][input_nodes[k]].to(device) for k in input_nodes.keys()}
+                h = {
+                    k: x[k][input_nodes[k]].to(device)
+                    for k in input_nodes.keys()
+                }
                 h = layer(block, h)
 
                 for k in h.keys():

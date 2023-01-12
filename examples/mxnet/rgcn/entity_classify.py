@@ -16,7 +16,6 @@ from mxnet import gluon
 import mxnet.ndarray as F
 import dgl
 from dgl.nn.mxnet import RelGraphConv
-from dgl.contrib.data import load_data
 from functools import partial
 from dgl.data.rdf import AIFBDataset, MUTAGDataset, BGSDataset, AMDataset
 

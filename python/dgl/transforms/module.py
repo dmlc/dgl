@@ -23,6 +23,7 @@ from .. import backend as F
 from .. import function as fn
 from ..base import DGLError
 from . import functional
+from .. import utils
 
 try:
     import torch
@@ -52,7 +53,8 @@ __all__ = [
     'DropNode',
     'DropEdge',
     'AddEdge',
-    'SIGNDiffusion'
+    'SIGNDiffusion',
+    'ToLevi'
 ]
 
 def update_graph_structure(g, data_dict, copy_edata=True):
@@ -372,33 +374,70 @@ class LaplacianPE(BaseTransform):
     Parameters
     ----------
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding
-        (smaller than the number of nodes).
+        Number of smallest non-trivial eigenvectors to use for positional encoding.
     feat_name : str, optional
         Name to store the computed positional encodings in ndata.
+    eigval_name : str, optional
+        If None, store laplacian eigenvectors only.
+        Otherwise, it's the name to store corresponding laplacian eigenvalues in ndata.
+        Default: None.
+    padding : bool, optional
+        If False, raise an exception when k>=n.
+        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
+        in the end of eigenvalues when k>=n.
+        Default: False.
+        n is the number of nodes in the given graph.
 
     Example
     -------
-
     >>> import dgl
     >>> from dgl import LaplacianPE
-
-    >>> transform = LaplacianPE(k=3)
-    >>> g = dgl.rand_graph(5, 10)
-    >>> g = transform(g)
-    >>> print(g.ndata['PE'])
-    tensor([[ 0.0000, -0.3646,  0.3646],
-            [ 0.0000,  0.2825, -0.2825],
-            [ 1.0000, -0.6315,  0.6315],
-            [ 0.0000,  0.3739, -0.3739],
-            [ 0.0000, -0.1663,  0.1663]])
+    >>> transform1 = LaplacianPE(k=3)
+    >>> transform2 = LaplacianPE(k=5, padding=True)
+    >>> transform3 = LaplacianPE(k=5, feat_name='eigvec', eigval_name='eigval', padding=True)
+    >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
+    >>> g1 = transform1(g)
+    >>> print(g1.ndata['PE'])
+    tensor([[ 0.6325,  0.1039,  0.3489],
+            [-0.5117,  0.2826,  0.6095],
+            [ 0.1954,  0.6254, -0.5923],
+            [-0.5117, -0.4508, -0.3938],
+            [ 0.1954, -0.5612,  0.0278]])
+    >>> g2 = transform2(g)
+    >>> print(g2.ndata['PE'])
+    tensor([[-0.6325, -0.1039,  0.3489, -0.2530,  0.0000],
+            [ 0.5117, -0.2826,  0.6095,  0.4731,  0.0000],
+            [-0.1954, -0.6254, -0.5923, -0.1361,  0.0000],
+            [ 0.5117,  0.4508, -0.3938, -0.6295,  0.0000],
+            [-0.1954,  0.5612,  0.0278,  0.5454,  0.0000]])
+    >>> g3 = transform3(g)
+    >>> print(g3.ndata['eigval'])
+    tensor([[0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan],
+            [0.6910, 0.6910, 1.8090, 1.8090,    nan]])
+    >>> print(g3.ndata['eigvec'])
+    tensor([[ 0.6325, -0.1039,  0.3489,  0.2530,  0.0000],
+            [-0.5117, -0.2826,  0.6095, -0.4731,  0.0000],
+            [ 0.1954, -0.6254, -0.5923,  0.1361,  0.0000],
+            [-0.5117,  0.4508, -0.3938,  0.6295,  0.0000],
+            [ 0.1954,  0.5612,  0.0278, -0.5454,  0.0000]])
     """
-    def __init__(self, k, feat_name='PE'):
+    def __init__(self, k, feat_name='PE', eigval_name=None, padding=False):
         self.k = k
         self.feat_name = feat_name
+        self.eigval_name = eigval_name
+        self.padding = padding
 
     def __call__(self, g):
-        PE = functional.laplacian_pe(g, k=self.k)
+        if self.eigval_name:
+            PE, eigval = functional.laplacian_pe(g, k=self.k, padding=self.padding,
+                                                 return_eigval=True)
+            eigval = F.repeat(F.reshape(eigval, [1,-1]), g.num_nodes(), dim=0)
+            g.ndata[self.eigval_name] = F.copy_to(eigval, g.device)
+        else:
+            PE = functional.laplacian_pe(g, k=self.k, padding=self.padding)
         g.ndata[self.feat_name] = F.copy_to(PE, g.device)
 
         return g
@@ -1360,6 +1399,7 @@ class NodeShuffle(BaseTransform):
             [ 7.,  8.]])
     """
     def __call__(self, g):
+        g = g.clone()
         for ntype in g.ntypes:
             nids = F.astype(g.nodes(ntype), F.int64)
             perm = F.rand_shuffle(nids)
@@ -1403,6 +1443,8 @@ class DropNode(BaseTransform):
         self.dist = Bernoulli(p)
 
     def __call__(self, g):
+        g = g.clone()
+
         # Fast path
         if self.p == 0:
             return g
@@ -1448,6 +1490,8 @@ class DropEdge(BaseTransform):
         self.dist = Bernoulli(p)
 
     def __call__(self, g):
+        g = g.clone()
+
         # Fast path
         if self.p == 0:
             return g
@@ -1489,6 +1533,7 @@ class AddEdge(BaseTransform):
 
         device = g.device
         idtype = g.idtype
+        g = g.clone()
         for c_etype in g.canonical_etypes:
             utype, _, vtype = c_etype
             num_edges_to_add = int(g.num_edges(c_etype) * self.ratio)
@@ -1675,3 +1720,71 @@ class SIGNDiffusion(BaseTransform):
                     self.alpha * in_feat
                 feat_list.append(g.ndata[self.in_feat_name])
         return feat_list
+
+class ToLevi(BaseTransform):
+    r"""This function transforms the original graph to its heterogeneous Levi graph,
+    by converting edges to intermediate nodes, only support homogeneous directed graph.
+
+    Example
+    -------
+    >>> import dgl
+    >>> import torch as th
+    >>> from dgl import ToLevi
+
+    >>> transform = ToLevi()
+    >>> g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 0]))
+    >>> g.ndata['h'] = th.randn((g.num_nodes(), 2))
+    >>> g.edata['w'] = th.randn((g.num_edges(), 2))
+    >>> lg = transform(g)
+    >>> lg
+    Grpah(num_nodes={'edge': 4, 'node': 4},
+          num_edges={('edge', 'e2n', 'node'): 4,
+                     ('node', 'n2e', 'edge'): 4},
+          metagraph=[('edge', 'node', 'e2n'),
+                     ('node', 'edge', 'n2e')])
+    >>> lg.nodes('node')
+    tensor([0, 1, 2, 3])
+    >>> lg.nodes('edge')
+    tensor([0, 1, 2, 3])
+    >>> lg.nodes['node'].data['h'].shape
+    torch.Size([4, 2])
+    >>> lg.nodes['edge'].data['w'].shape
+    torch.Size([4, 2])
+    """
+
+    def __init__(self):
+        pass
+
+    def __call__(self, g):
+        r"""
+        Parameters
+        ----------
+        g : DGLGraph
+            The input graph, should be a homogeneous directed graph.
+
+        Returns
+        -------
+        DGLGraph
+            The Levi graph of input, will be a heterogeneous graph, where nodes of
+            ntypes ``'node'`` and ``'edge'`` have corresponding IDs of nodes and edges
+            in the original graph. Edge features of the input graph are copied to
+            corresponding new nodes of ntype ``'edge'``.
+        """
+        device = g.device
+        idtype = g.idtype
+
+        edge_list = g.edges()
+        n2e = edge_list[0], F.arange(0, g.num_edges(), idtype, device)
+        e2n = F.arange(0, g.num_edges(), idtype, device), edge_list[1]
+        graph_data = {('node', 'n2e', 'edge'): n2e,
+                      ('edge', 'e2n', 'node'): e2n}
+        levi_g = convert.heterograph(graph_data, idtype=idtype, device=device)
+
+        # Copy ndata and edata
+        # Since the node types in dgl.heterograph are in alphabetical order
+        # ('edge' < 'node'), edge_frames should be in front of node_frames.
+        node_frames = utils.extract_node_subframes(g, nodes_or_device=device)
+        edge_frames = utils.extract_edge_subframes(g, edges_or_device=device)
+        utils.set_new_frames(levi_g, node_frames=edge_frames+node_frames)
+
+        return levi_g

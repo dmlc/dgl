@@ -81,7 +81,7 @@ class EdgeConv(nn.Module):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     >>> u_fea = th.rand(2, 5)
     >>> v_fea = th.rand(4, 5)
     >>> conv = EdgeConv(5, 2, 3)

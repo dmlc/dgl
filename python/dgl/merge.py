@@ -1,10 +1,12 @@
 """Utilities for merging graphs."""
 
 import dgl
+
 from . import backend as F
 from .base import DGLError
 
-__all__ = ['merge']
+__all__ = ["merge"]
+
 
 def merge(graphs):
     r"""Merge a sequence of graphs together into a single graph.
@@ -62,7 +64,7 @@ def merge(graphs):
     """
 
     if len(graphs) == 0:
-        raise DGLError('The input list of graphs cannot be empty.')
+        raise DGLError("The input list of graphs cannot be empty.")
 
     ref = graphs[0]
     ntypes = ref.ntypes
@@ -87,9 +89,15 @@ def merge(graphs):
         if len(keys) == 0:
             edges_data = None
         else:
-            edges_data = {k: F.cat([f[k] for f in edata_frames], dim=0) for k in keys}
-        merged_us = F.copy_to(F.astype(F.cat(unmerged_us, dim=0), ref.idtype), ref.device)
-        merged_vs = F.copy_to(F.astype(F.cat(unmerged_vs, dim=0), ref.idtype), ref.device)
+            edges_data = {
+                k: F.cat([f[k] for f in edata_frames], dim=0) for k in keys
+            }
+        merged_us = F.copy_to(
+            F.astype(F.cat(unmerged_us, dim=0), ref.idtype), ref.device
+        )
+        merged_vs = F.copy_to(
+            F.astype(F.cat(unmerged_vs, dim=0), ref.idtype), ref.device
+        )
         merged.add_edges(merged_us, merged_vs, edges_data, etype)
 
     # Add node data and isolated nodes from next_graph to merged.
@@ -98,12 +106,16 @@ def merge(graphs):
             merged_ntype_id = merged.get_ntype_id(ntype)
             next_ntype_id = next_graph.get_ntype_id(ntype)
             next_ndata = next_graph._node_frames[next_ntype_id]
-            node_diff = (next_graph.num_nodes(ntype=ntype) -
-                         merged.num_nodes(ntype=ntype))
+            node_diff = next_graph.num_nodes(ntype=ntype) - merged.num_nodes(
+                ntype=ntype
+            )
             n_extra_nodes = max(0, node_diff)
             merged.add_nodes(n_extra_nodes, ntype=ntype)
             next_nodes = F.arange(
-                0, next_graph.num_nodes(ntype=ntype), merged.idtype, merged.device
+                0,
+                next_graph.num_nodes(ntype=ntype),
+                merged.idtype,
+                merged.device,
             )
             merged._node_frames[merged_ntype_id].update_row(
                 next_nodes, next_ndata

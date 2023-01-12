@@ -105,7 +105,7 @@ class RelGraphConvLayer(nn.Module):
         """Forward computation
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.

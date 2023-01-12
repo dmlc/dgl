@@ -3,7 +3,9 @@
 #include <dgl/array.h>
 #include <gtest/gtest.h>
 #include <time.h>
+
 #include <random>
+
 #include "./common.h"
 
 using namespace dgl;

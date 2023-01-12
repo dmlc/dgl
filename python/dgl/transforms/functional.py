@@ -30,7 +30,7 @@ except ImportError:
 from .._ffi.function import _init_api
 from ..base import dgl_warning, DGLError, NID, EID
 from .. import convert
-from ..heterograph import DGLHeteroGraph, DGLBlock
+from ..heterograph import DGLGraph, DGLBlock
 from ..heterograph_index import create_metagraph_index, create_heterograph_from_relations
 from ..frame import Frame
 from .. import ndarray as nd
@@ -43,16 +43,12 @@ from .. import subgraph
 from .. import function
 from ..sampling.neighbor import sample_neighbors
 
-# TO BE DEPRECATED
-from .._deprecate.graph import DGLGraph as DGLGraphStale
-
 __all__ = [
     'line_graph',
     'khop_adj',
     'khop_graph',
     'reverse',
     'to_bidirected',
-    'to_bidirected_stale',
     'add_reverse_edges',
     'laplacian_lambda_max',
     'knn_graph',
@@ -68,13 +64,11 @@ __all__ = [
     'to_block',
     'to_simple',
     'to_simple_graph',
-    'as_immutable_graph',
     'sort_csr_by_tag',
     'sort_csc_by_tag',
     'metis_partition_assignment',
     'partition_graph_with_halo',
     'metis_partition',
-    'as_heterograph',
     'adj_product_graph',
     'adj_sum_graph',
     'reorder_graph',
@@ -84,7 +78,9 @@ __all__ = [
     'laplacian_pe',
     'to_half',
     'to_float',
-    'to_double'
+    'to_double',
+    'double_radius_node_labeling',
+    'shortest_dist',
     ]
 
 
@@ -1032,7 +1028,7 @@ def line_graph(g, backtracking=True, shared=False):
         'only homogeneous graph is supported'
 
     dev = g.device
-    lg = DGLHeteroGraph(_CAPI_DGLHeteroLineGraph(g._graph.copy_to(nd.cpu()), backtracking))
+    lg = DGLGraph(_CAPI_DGLHeteroLineGraph(g._graph.copy_to(nd.cpu()), backtracking))
     lg = lg.to(dev)
     if shared:
         new_frames = utils.extract_edge_subframes(g, None)
@@ -1040,7 +1036,7 @@ def line_graph(g, backtracking=True, shared=False):
 
     return lg
 
-DGLHeteroGraph.line_graph = utils.alias_func(line_graph)
+DGLGraph.line_graph = utils.alias_func(line_graph)
 
 def khop_adj(g, k):
     """Return the matrix of :math:`A^k` where :math:`A` is the adjacency matrix of the graph
@@ -1274,7 +1270,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
         # currently reversing a block results in undefined behavior
         raise DGLError('Reversing a block graph is not supported.')
     gidx = g._graph.reverse()
-    new_g = DGLHeteroGraph(gidx, g.ntypes, g.etypes)
+    new_g = DGLGraph(gidx, g.ntypes, g.etypes)
 
     # handle ndata
     if copy_ndata:
@@ -1291,7 +1287,7 @@ def reverse(g, copy_ndata=True, copy_edata=False, *, share_ndata=None, share_eda
 
     return new_g
 
-DGLHeteroGraph.reverse = utils.alias_func(reverse)
+DGLGraph.reverse = utils.alias_func(reverse)
 
 def to_simple_graph(g):
     """Convert the graph to a simple graph with no multi-edge.
@@ -1318,59 +1314,6 @@ def to_simple_graph(g):
     """
     dgl_warning('dgl.to_simple_graph is renamed to dgl.to_simple in v0.5.')
     return to_simple(g)
-
-def to_bidirected_stale(g, readonly=True):
-    """NOTE: this function only works on the deprecated
-    :class:`dgl.DGLGraphStale` object.
-
-    Convert the graph to a bidirected graph.
-
-    The function generates a new graph with no node/edge feature.
-    If g has an edge for ``(u, v)`` but no edge for ``(v, u)``, then the
-    returned graph will have both ``(u, v)`` and ``(v, u)``.
-
-    If the input graph is a multigraph (there are multiple edges from node u to node v),
-    the returned graph isn't well defined.
-
-    Parameters
-    ----------
-    g : DGLGraphStale
-        The input graph.
-    readonly : bool
-        Whether the returned bidirected graph is readonly or not.
-
-        (Default: True)
-
-    Notes
-    -----
-    Please make sure g is a simple graph, otherwise the return value is undefined.
-
-    This function discards the batch information. Please use
-    :func:`dgl.DGLGraph.set_batch_num_nodes`
-    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-    to maintain the information.
-
-    Returns
-    -------
-    DGLGraph
-
-    Examples
-    --------
-    The following two examples use PyTorch backend, one for non-multi graph
-    and one for multi-graph.
-
-    >>> g = dgl._deprecate.graph.DGLGraph()
-    >>> g.add_nodes(2)
-    >>> g.add_edges([0, 0], [0, 1])
-    >>> bg1 = dgl.to_bidirected_stale(g)
-    >>> bg1.edges()
-    (tensor([0, 1, 0]), tensor([0, 0, 1]))
-    """
-    if readonly:
-        newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
-    else:
-        newgidx = _CAPI_DGLToBidirectedMutableGraph(g._graph)
-    return DGLGraphStale(newgidx)
 
 def laplacian_lambda_max(g):
     """Return the largest eigenvalue of the normalized symmetric Laplacian of a graph.
@@ -1957,7 +1900,7 @@ def add_self_loop(g, edge_feat_names=None, fill_data=1., etype=None):
         new_g = add_edges(g, nodes, nodes, etype=etype)
     return new_g
 
-DGLHeteroGraph.add_self_loop = utils.alias_func(add_self_loop)
+DGLGraph.add_self_loop = utils.alias_func(add_self_loop)
 
 def remove_self_loop(g, etype=None):
     r""" Remove self-loops for each node in the graph and return a new graph.
@@ -2032,7 +1975,7 @@ def remove_self_loop(g, etype=None):
     new_g = remove_edges(g, self_loop_eids, etype=etype)
     return new_g
 
-DGLHeteroGraph.remove_self_loop = utils.alias_func(remove_self_loop)
+DGLGraph.remove_self_loop = utils.alias_func(remove_self_loop)
 
 def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=True):
     """Given a list of graphs with the same set of nodes, find and eliminate the common
@@ -2190,7 +2133,7 @@ def compact_graphs(graphs, always_preserve=None, copy_ndata=True, copy_edata=Tru
     induced_nodes = [F.from_dgl_nd(nodes) for nodes in induced_nodes]
 
     new_graphs = [
-        DGLHeteroGraph(new_graph_index, graph.ntypes, graph.etypes)
+        DGLGraph(new_graph_index, graph.ntypes, graph.etypes)
         for new_graph_index, graph in zip(new_graph_indexes, graphs)]
 
     if copy_ndata:
@@ -2614,7 +2557,7 @@ def to_simple(g,
     if g.is_block:
         raise DGLError('Cannot convert a block graph to a simple graph.')
     simple_graph_index, counts, edge_maps = _CAPI_DGLToSimpleHetero(g._graph)
-    simple_graph = DGLHeteroGraph(simple_graph_index, g.ntypes, g.etypes)
+    simple_graph = DGLGraph(simple_graph_index, g.ntypes, g.etypes)
     counts = [F.from_dgl_nd(count) for count in counts]
     edge_maps = [F.from_dgl_nd(edge_map) for edge_map in edge_maps]
 
@@ -2642,7 +2585,7 @@ def to_simple(g,
 
     return simple_graph
 
-DGLHeteroGraph.to_simple = utils.alias_func(to_simple)
+DGLGraph.to_simple = utils.alias_func(to_simple)
 
 def _unitgraph_less_than_int32(g):
     """Check if a graph with only one edge type has more than 2 ** 31 - 1
@@ -2787,7 +2730,7 @@ def adj_product_graph(A, B, weight_name, etype='_E'):
     C_gidx = create_heterograph_from_relations(
         C_metagraph, [C_gidx], utils.toindex(num_nodes_per_type))
 
-    C = DGLHeteroGraph(C_gidx, ntypes, etypes)
+    C = DGLGraph(C_gidx, ntypes, etypes)
     C.edata[weight_name] = C_weights
     return C
 
@@ -2888,29 +2831,10 @@ def adj_sum_graph(graphs, weight_name):
     C_gidx, C_weights = F.csrsum(gidxs, weights)
     C_gidx = create_heterograph_from_relations(metagraph, [C_gidx], num_nodes)
 
-    C = DGLHeteroGraph(C_gidx, graphs[0].ntypes, graphs[0].etypes)
+    C = DGLGraph(C_gidx, graphs[0].ntypes, graphs[0].etypes)
     C.edata[weight_name] = C_weights
     return C
 
-def as_heterograph(g, ntype='_U', etype='_E'):  # pylint: disable=unused-argument
-    """Convert a DGLGraph to a DGLHeteroGraph with one node and edge type.
-
-    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
-                do nothing and can be removed safely in all cases.
-    """
-    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
-                '\tdgl.as_heterograph will do nothing and can be removed safely in all cases.')
-    return g
-
-def as_immutable_graph(hg):
-    """Convert a DGLHeteroGraph with one node and edge type into a DGLGraph.
-
-    DEPRECATED: DGLGraph and DGLHeteroGraph have been merged. This function will
-                do nothing and can be removed safely in all cases.
-    """
-    dgl_warning('DEPRECATED: DGLGraph and DGLHeteroGraph have been merged in v0.5.\n'
-                '\tdgl.as_immutable_graph will do nothing and can be removed safely in all cases.')
-    return hg
 
 def sort_csr_by_tag(g, tag, tag_offset_name='_TAG_OFFSET', tag_type='node'):
     r"""Return a new graph whose CSR matrix is sorted by the given tag.
@@ -3396,7 +3320,7 @@ def reorder_graph(g, node_permute_algo=None, edge_permute_algo='src',
     return rg
 
 
-DGLHeteroGraph.reorder_graph = utils.alias_func(reorder_graph)
+DGLGraph.reorder_graph = utils.alias_func(reorder_graph)
 
 
 def metis_perm(g, k):
@@ -3650,44 +3574,63 @@ def random_walk_pe(g, k, eweight_name=None):
 
     return PE
 
-def laplacian_pe(g, k):
+def laplacian_pe(g, k, padding=False, return_eigval=False):
     r"""Laplacian Positional Encoding, as introduced in
     `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
 
     This function computes the laplacian positional encodings as the
-    k smallest non-trivial eigenvectors (k << n). k and n are the positional
-    encoding dimensions and the number of nodes in the given graph.
+    k smallest non-trivial eigenvectors.
 
     Parameters
     ----------
     g : DGLGraph
-        The input graph. Must be homogeneous.
+        The input graph. Must be homogeneous and bidirected.
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding
-        (smaller than the number of nodes).
+        Number of smallest non-trivial eigenvectors to use for positional encoding.
+    padding : bool, optional
+        If False, raise an exception when k>=n.
+        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
+        in the end of eigenvalues when k>=n.
+        Default: False.
+        n is the number of nodes in the given graph.
+    return_eigval : bool, optional
+        If True, return laplacian eigenvalues together with eigenvectors.
+        Otherwise, return laplacian eigenvectors only.
+        Default: False.
 
     Returns
     -------
-    Tensor
-        The laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
-        number of nodes in the input graph.
+    Tensor or (Tensor, Tensor)
+        Return the laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
+        number of nodes in the input graph, when :attr:`return_eigval` is False. The eigenvalues
+        of shape :math:`N` is additionally returned as the second element when :attr:`return_eigval`
+        is True.
 
     Example
     -------
     >>> import dgl
-    >>> g = dgl.rand_graph(6, 12)
+    >>> g = dgl.graph(([0,1,2,3,1,2,3,0], [1,2,3,0,0,1,2,3]))
     >>> dgl.laplacian_pe(g, 2)
-    tensor([[-0.8931, -0.7713],
-            [-0.0000,  0.6198],
-            [ 0.2704, -0.0138],
-            [-0.0000,  0.0554],
-            [ 0.3595, -0.0477],
-            [-0.0000,  0.1240]])
+    tensor([[ 7.0711e-01, -6.4921e-17],
+            [ 3.0483e-16, -7.0711e-01],
+            [-7.0711e-01, -2.4910e-16],
+            [ 9.9288e-17,  7.0711e-01]])
+    >>> dgl.laplacian_pe(g, 5, padding=True)
+    tensor([[ 7.0711e-01, -6.4921e-17,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 3.0483e-16, -7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [-7.0711e-01, -2.4910e-16,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+            [ 9.9288e-17,  7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00]])
+    >>> dgl.laplacian_pe(g, 5, padding=True, return_eigval=True)
+    (tensor([[-7.0711e-01,  6.4921e-17, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-3.0483e-16,  7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [ 7.0711e-01,  2.4910e-16, -5.0000e-01,  0.0000e+00,  0.0000e+00],
+             [-9.9288e-17, -7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00]]),
+     tensor([1., 1., 2., nan, nan]))
     """
     # check for the "k < n" constraint
     n = g.num_nodes()
-    if n <= k:
+    if not padding and n <= k:
         assert "the number of eigenvectors k must be smaller than the number of nodes n, " + \
             f"{k} and {n} detected."
 
@@ -3698,15 +3641,26 @@ def laplacian_pe(g, k):
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
     EigVal, EigVec = np.linalg.eig(L.toarray())
-    kpartition_indices = np.argpartition(EigVal, k+1)[:k+1]
+    max_freqs = min(n-1, k)
+    kpartition_indices = np.argpartition(EigVal, max_freqs)[:max_freqs+1]
     topk_eigvals = EigVal[kpartition_indices]
     topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    topk_EigVec = np.real(EigVec[:, topk_indices])
+    topk_EigVec = EigVec[:, topk_indices]
+    eigvals = F.tensor(EigVal[topk_indices], dtype=F.float32)
 
     # get random flip signs
-    rand_sign = 2 * (np.random.rand(k) > 0.5) - 1.
+    rand_sign = 2 * (np.random.rand(max_freqs) > 0.5) - 1.
     PE = F.astype(F.tensor(rand_sign * topk_EigVec), F.float32)
 
+    # add paddings
+    if n <= k:
+        temp_EigVec = F.zeros([n, k-n+1], dtype=F.float32, ctx=F.context(PE))
+        PE = F.cat([PE, temp_EigVec], dim=1)
+        temp_EigVal = F.tensor(np.full(k-n+1, np.nan), F.float32)
+        eigvals = F.cat([eigvals, temp_EigVal], dim=0)
+
+    if return_eigval:
+        return PE, eigvals
     return PE
 
 def to_half(g):
@@ -3718,7 +3672,7 @@ def to_half(g):
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         Clone of graph with the feature data converted to float16.
     """
     ret = copy.copy(g)
@@ -3735,7 +3689,7 @@ def to_float(g):
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         Clone of graph with the feature data converted to float32.
     """
     ret = copy.copy(g)
@@ -3752,12 +3706,211 @@ def to_double(g):
 
     Returns
     -------
-    DGLHeteroGraph
+    DGLGraph
         Clone of graph with the feature data converted to float64.
     """
     ret = copy.copy(g)
     ret._edge_frames = [frame.double() for frame in ret._edge_frames]
     ret._node_frames = [frame.double() for frame in ret._node_frames]
     return ret
+
+def double_radius_node_labeling(g, src, dst):
+    r"""Double Radius Node Labeling, as introduced in `Link Prediction
+    Based on Graph Neural Networks <https://arxiv.org/abs/1802.09691>`__.
+
+    This function computes the double radius node labeling for each node to mark
+    nodes' different roles in an enclosing subgraph, given a target link.
+
+    The node labels of source :math:`s` and destination :math:`t` are set to 1 and
+    those of unreachable nodes from source or destination are set to 0. The labels
+    of other nodes :math:`l` are defined according to the following hash function:
+
+    :math:`l = 1 + min(d_s, d_t) + (d//2)[(d//2) + (d%2) - 1]`
+
+    where :math:`d_s` and :math:`d_t` denote the shortest distance to the source and
+    the target, respectively. :math:`d = d_s + d_t`.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    src : int
+        The source node ID of the target link.
+    dst : int
+        The destination node ID of the target link.
+
+    Returns
+    -------
+    Tensor
+        Labels of all nodes. The tensor is of shape :math:`(N,)`, where
+        :math:`N` is the number of nodes in the input graph.
+
+    Example
+    -------
+    >>> import dgl
+
+    >>> g = dgl.graph(([0,0,0,0,1,1,2,4], [1,2,3,6,3,4,4,5]))
+    >>> dgl.double_radius_node_labeling(g, 0, 1)
+    tensor([1, 1, 3, 2, 3, 7, 0])
+    """
+    adj = g.adj(scipy_fmt='csr')
+    src, dst = (dst, src) if src > dst else (src, dst)
+
+    idx = list(range(src)) + list(range(src + 1, adj.shape[0]))
+    adj_wo_src = adj[idx, :][:, idx]
+
+    idx = list(range(dst)) + list(range(dst + 1, adj.shape[0]))
+    adj_wo_dst = adj[idx, :][:, idx]
+
+    # distance to the source node
+    ds = sparse.csgraph.shortest_path(adj_wo_dst, directed=False, unweighted=True, indices=src)
+    ds = np.insert(ds, dst, 0, axis=0)
+    # distance to the destination node
+    dt = sparse.csgraph.shortest_path(adj_wo_src, directed=False, unweighted=True, indices=dst-1)
+    dt = np.insert(dt, src, 0, axis=0)
+
+    d = ds + dt
+    # suppress invalid value (nan) warnings
+    with np.errstate(invalid='ignore'):
+        z = 1 + np.stack([ds, dt]).min(axis=0) + d//2 * (d//2 + d%2 - 1)
+    z[src] = 1
+    z[dst] = 1
+    z[np.isnan(z)] = 0  # unreachable nodes
+
+    return F.tensor(z, F.int64)
+
+def shortest_dist(g, root=None, return_paths=False):
+    r"""Compute shortest distance and paths on the given graph.
+
+    Only unweighted cases are supported. Only directed paths (in which the
+    edges are all oriented in the same direction) are considered effective.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph. Must be homogeneous.
+    root : int, optional
+        Given a root node ID, it returns the shortest distance and paths
+        (optional) between the root node and all the nodes. If None, it returns
+        the results for all node pairs. Default: None.
+    return_paths : bool, optional
+        If True, it returns the shortest paths corresponding to the shortest
+        distances. Default: False.
+
+    Returns
+    -------
+    dist : Tensor
+        The shortest distance tensor.
+
+        * If :attr:`root` is a node ID, it is a tensor of shape :math:`(N,)`,
+          where :math:`N` is the number of nodes. :attr:`dist[j]` gives the
+          shortest distance from :attr:`root` to node :attr:`j`.
+        * Otherwise, it is a tensor of shape :math:`(N, N)`. :attr:`dist[i][j]`
+          gives the shortest distance from node :attr:`i` to node :attr:`j`.
+        * The distance values of unreachable node pairs are filled with -1.
+    paths : Tensor, optional
+        The shortest path tensor. It is only returned when :attr:`return_paths`
+        is True.
+
+        * If :attr:`root` is a node ID, it is a tensor of shape :math:`(N, L)`,
+          where :math:`L` is the length of the longest path. :attr:`path[j]` is
+          the shortest path from node :attr:`root` to node :attr:`j`.
+        * Otherwise, it is a tensor of shape :math:`(N, N, L)`.
+          :attr:`path[i][j]` is the shortest path from node :attr:`i` to node
+          :attr:`j`.
+        * Each path is a vector that consists of edge IDs with paddings of -1
+          at the end.
+        * Shortest path between a node and itself is a vector filled with -1's.
+
+    Example
+    -------
+    >>> import dgl
+
+    >>> g = dgl.graph(([0, 1, 1, 2], [2, 0, 3, 3]))
+    >>> dgl.shortest_dist(g, root=0)
+    tensor([ 0,  -1,  1, 2])
+    >>> dist, paths = dgl.shortest_dist(g, root=None, return_paths=True)
+    >>> print(dist)
+    tensor([[ 0, -1,  1,  2],
+            [ 1,  0,  2,  1],
+            [-1, -1,  0,  1],
+            [-1, -1, -1,  0]])
+    >>> print(paths)
+    tensor([[[-1, -1],
+             [-1, -1],
+             [ 0, -1],
+             [ 0,  3]],
+    <BLANKLINE>
+            [[ 1, -1],
+             [-1, -1],
+             [ 1,  0],
+             [ 2, -1]],
+    <BLANKLINE>
+            [[-1, -1],
+             [-1, -1],
+             [-1, -1],
+             [ 3, -1]],
+    <BLANKLINE>
+            [[-1, -1],
+             [-1, -1],
+             [-1, -1],
+             [-1, -1]]])
+    """
+    if root is None:
+        dist, pred = sparse.csgraph.shortest_path(
+            g.adj(scipy_fmt='csr'), return_predecessors=True, unweighted=True,
+            directed=True
+        )
+    else:
+        dist, pred = sparse.csgraph.dijkstra(
+            g.adj(scipy_fmt='csr'), directed=True, indices=root,
+            return_predecessors=True, unweighted=True,
+        )
+    dist[np.isinf(dist)] = -1
+
+    if not return_paths:
+        return F.copy_to(F.tensor(dist, dtype=F.int64), g.device)
+
+    def _get_nodes(pred, i, j):
+        r"""return node IDs of a path from i to j given predecessors"""
+        if i == j:
+            return []
+        prev = pred[j]
+        nodes = [j, prev]
+        while prev != i:
+            prev = pred[prev]
+            nodes.append(prev)
+        nodes.reverse()
+
+        return nodes
+
+    # construct paths with given predecessors
+    max_len = int(dist[~np.isinf(dist)].max())
+    N = g.num_nodes()
+    roots = list(range(N)) if root is None else [root]
+    paths = np.ones([len(roots), N, max_len], dtype=np.int64) * -1
+    masks, u, v = [], [], []
+    for i in roots:
+        pred_ = pred[i] if root is None else pred
+        masks_i = np.zeros([N, max_len], dtype=bool)
+        for j in range(N):
+            if pred_[j] < 0:
+                continue
+            nodes = _get_nodes(pred_, i, j)
+            u.extend(nodes[:-1])
+            v.extend(nodes[1:])
+            if nodes:
+                masks_i[j, :len(nodes) - 1] = True
+        masks.append(masks_i)
+    masks = np.stack(masks, axis=0)
+
+    u, v = np.array(u), np.array(v)
+    edge_ids = g.edge_ids(u, v)
+    paths[masks] = F.asnumpy(edge_ids)
+    if root is not None:
+        paths = paths[0]
+
+    return F.copy_to(F.tensor(dist, dtype=F.int64), g.device), \
+        F.copy_to(F.tensor(paths, dtype=F.int64), g.device)
 
 _init_api("dgl.transform", __name__)

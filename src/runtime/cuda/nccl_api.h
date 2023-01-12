@@ -1,4 +1,4 @@
-/*!
+/**
  *  Copyright (c) 2021-2022 by Contributors
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +13,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * \file nccl_api.h
- * \brief Wrapper around NCCL routines. 
+ * @file nccl_api.h
+ * @brief Wrapper around NCCL routines.
  */
-
 
 #ifndef DGL_RUNTIME_CUDA_NCCL_API_H_
 #define DGL_RUNTIME_CUDA_NCCL_API_H_
@@ -27,11 +26,14 @@
 // if not compiling with NCCL, this class will only support communicators of
 // size 1.
 #define NCCL_UNIQUE_ID_BYTES 128
-typedef struct { char internal[NCCL_UNIQUE_ID_BYTES]; } ncclUniqueId;
+typedef struct {
+  char internal[NCCL_UNIQUE_ID_BYTES];
+} ncclUniqueId;
 typedef int ncclComm_t;
 #endif
 
 #include <dgl/runtime/object.h>
+
 #include <string>
 
 namespace dgl {
@@ -59,17 +61,13 @@ DGL_DEFINE_OBJECT_REF(NCCLUniqueIdRef, NCCLUniqueId);
 
 class NCCLCommunicator : public runtime::Object {
  public:
-  NCCLCommunicator(
-      int size,
-      int rank,
-      ncclUniqueId id);
+  NCCLCommunicator(int size, int rank, ncclUniqueId id);
 
   ~NCCLCommunicator();
 
   // disable copying
   NCCLCommunicator(const NCCLCommunicator& other) = delete;
-  NCCLCommunicator& operator=(
-      const NCCLCommunicator& other);
+  NCCLCommunicator& operator=(const NCCLCommunicator& other);
 
   ncclComm_t Get();
 
@@ -81,12 +79,9 @@ class NCCLCommunicator : public runtime::Object {
    * @param count The size of data to send to each rank.
    * @param stream The stream to operate on.
    */
-  template<typename IdType>
+  template <typename IdType>
   void AllToAll(
-      const IdType * send,
-      IdType * recv,
-      int64_t count,
-      cudaStream_t stream);
+      const IdType* send, IdType* recv, int64_t count, cudaStream_t stream);
 
   /**
    * @brief Perform an all-to-all variable sized communication.
@@ -99,13 +94,10 @@ class NCCLCommunicator : public runtime::Object {
    * @param type The type of data to send.
    * @param stream The stream to operate on.
    */
-  template<typename DType>
+  template <typename DType>
   void AllToAllV(
-      const DType * const send,
-      const int64_t * send_prefix,
-      DType * const recv,
-      const int64_t * recv_prefix,
-      cudaStream_t stream);
+      const DType* const send, const int64_t* send_prefix, DType* const recv,
+      const int64_t* recv_prefix, cudaStream_t stream);
 
   /**
    * @brief Perform an all-to-all with sparse data (idx and value pairs). By
@@ -124,16 +116,11 @@ class NCCLCommunicator : public runtime::Object {
    * recieve on the host.
    * @param stream The stream to communicate on.
    */
-  template<typename IdType, typename DType>
+  template <typename IdType, typename DType>
   void SparseAllToAll(
-          const IdType * send_idx,
-          const DType * send_value,
-          const int64_t num_feat,
-          const int64_t * send_prefix,
-          IdType * recv_idx,
-          DType * recv_value,
-          const int64_t * recv_prefix,
-          cudaStream_t stream);
+      const IdType* send_idx, const DType* send_value, const int64_t num_feat,
+      const int64_t* send_prefix, IdType* recv_idx, DType* recv_value,
+      const int64_t* recv_prefix, cudaStream_t stream);
 
   int size() const;
 

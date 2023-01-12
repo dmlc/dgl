@@ -1,23 +1,23 @@
-from collections import defaultdict
+import datetime
 import math
 import os
 import sys
 import time
-import datetime
+from collections import defaultdict
 
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.parallel import DistributedDataParallel
-from tqdm.auto import tqdm
 from numpy import random
+from torch.nn.parallel import DistributedDataParallel
 from torch.nn.parameter import Parameter
+from tqdm.auto import tqdm
+from utils import *
+
 import dgl
 import dgl.function as fn
-import torch.multiprocessing as mp
-
-from utils import *
 
 
 def setup_seed(seed):
@@ -29,7 +29,7 @@ def setup_seed(seed):
 
 
 def get_graph(network_data, vocab):
-    """ Build graph, treat all nodes as the same type
+    """Build graph, treat all nodes as the same type
 
     Parameters
     ----------
@@ -39,7 +39,7 @@ def get_graph(network_data, vocab):
         mapping node IDs to node indices
     Output
     ------
-    DGLHeteroGraph
+    DGLGraph
         a heterogenous graph, with one node type and different edge types
     """
     graphs = []
@@ -69,7 +69,9 @@ class NeighborSampler(object):
     def sample(self, pairs):
         pairs = np.stack(pairs)
         heads, tails, types = pairs[:, 0], pairs[:, 1], pairs[:, 2]
-        seeds, head_invmap = torch.unique(torch.LongTensor(heads), return_inverse=True)
+        seeds, head_invmap = torch.unique(
+            torch.LongTensor(heads), return_inverse=True
+        )
         blocks = []
         for fanout in reversed(self.num_fanouts):
             sampled_graph = dgl.sampling.sample_neighbors(self.g, seeds, fanout)
@@ -102,7 +104,9 @@ class DGLGATNE(nn.Module):
         self.edge_type_count = edge_type_count
         self.dim_a = dim_a
 
-        self.node_embeddings = nn.Embedding(num_nodes, embedding_size, sparse=True)
+        self.node_embeddings = nn.Embedding(
+            num_nodes, embedding_size, sparse=True
+        )
         self.node_type_embeddings = nn.Embedding(
             num_nodes * edge_type_count, embedding_u_size, sparse=True
         )
@@ -112,16 +116,24 @@ class DGLGATNE(nn.Module):
         self.trans_weights_s1 = Parameter(
             torch.FloatTensor(edge_type_count, embedding_u_size, dim_a)
         )
-        self.trans_weights_s2 = Parameter(torch.FloatTensor(edge_type_count, dim_a, 1))
+        self.trans_weights_s2 = Parameter(
+            torch.FloatTensor(edge_type_count, dim_a, 1)
+        )
 
         self.reset_parameters()
 
     def reset_parameters(self):
         self.node_embeddings.weight.data.uniform_(-1.0, 1.0)
         self.node_type_embeddings.weight.data.uniform_(-1.0, 1.0)
-        self.trans_weights.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
-        self.trans_weights_s1.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
-        self.trans_weights_s2.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
+        self.trans_weights.data.normal_(
+            std=1.0 / math.sqrt(self.embedding_size)
+        )
+        self.trans_weights_s1.data.normal_(
+            std=1.0 / math.sqrt(self.embedding_size)
+        )
+        self.trans_weights_s2.data.normal_(
+            std=1.0 / math.sqrt(self.embedding_size)
+        )
 
     # embs: [batch_size, embedding_size]
     def forward(self, block):
@@ -140,7 +152,9 @@ class DGLGATNE(nn.Module):
                     output_nodes * self.edge_type_count + i
                 )
                 block.update_all(
-                    fn.copy_u(edge_type, "m"), fn.sum("m", edge_type), etype=edge_type
+                    fn.copy_u(edge_type, "m"),
+                    fn.sum("m", edge_type),
+                    etype=edge_type,
                 )
                 node_type_embed.append(block.dstdata[edge_type])
 
@@ -167,7 +181,9 @@ class DGLGATNE(nn.Module):
             attention = (
                 F.softmax(
                     torch.matmul(
-                        torch.tanh(torch.matmul(tmp_node_type_embed, trans_w_s1)),
+                        torch.tanh(
+                            torch.matmul(tmp_node_type_embed, trans_w_s1)
+                        ),
                         trans_w_s2,
                     )
                     .squeeze(2)
@@ -188,7 +204,9 @@ class DGLGATNE(nn.Module):
             )
             last_node_embed = F.normalize(node_embed, dim=2)
 
-            return last_node_embed  # [batch_size, edge_type_count, embedding_size]
+            return (
+                last_node_embed  # [batch_size, edge_type_count, embedding_size]
+            )
 
 
 class NSLoss(nn.Module):
@@ -202,7 +220,8 @@ class NSLoss(nn.Module):
         self.sample_weights = F.normalize(
             torch.Tensor(
                 [
-                    (math.log(k + 2) - math.log(k + 1)) / math.log(num_nodes + 1)
+                    (math.log(k + 2) - math.log(k + 1))
+                    / math.log(num_nodes + 1)
                     for k in range(num_nodes)
                 ]
             ),
@@ -212,7 +231,9 @@ class NSLoss(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        self.weights.weight.data.normal_(std=1.0 / math.sqrt(self.embedding_size))
+        self.weights.weight.data.normal_(
+            std=1.0 / math.sqrt(self.embedding_size)
+        )
 
     def forward(self, input, embs, label):
         n = input.shape[0]
@@ -267,7 +288,12 @@ def run(proc_id, n_gpus, args, devices, data):
     neighbor_sampler = NeighborSampler(g, [neighbor_samples])
     if n_gpus > 1:
         train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_pairs, num_replicas=world_size, rank=proc_id, shuffle=True, drop_last=False)
+            train_pairs,
+            num_replicas=world_size,
+            rank=proc_id,
+            shuffle=True,
+            drop_last=False,
+        )
         train_dataloader = torch.utils.data.DataLoader(
             train_pairs,
             batch_size=batch_size,
@@ -288,7 +314,12 @@ def run(proc_id, n_gpus, args, devices, data):
         )
 
     model = DGLGATNE(
-        num_nodes, embedding_size, embedding_u_size, edge_types, edge_type_count, dim_a,
+        num_nodes,
+        embedding_size,
+        embedding_u_size,
+        edge_types,
+        edge_type_count,
+        dim_a,
     )
 
     nsloss = NSLoss(num_nodes, num_sampled, embedding_size)
@@ -306,21 +337,23 @@ def run(proc_id, n_gpus, args, devices, data):
     else:
         mmodel = model
 
-    embeddings_params = list(map(id, mmodel.node_embeddings.parameters())) + list(
-        map(id, mmodel.node_type_embeddings.parameters())
-    )
+    embeddings_params = list(
+        map(id, mmodel.node_embeddings.parameters())
+    ) + list(map(id, mmodel.node_type_embeddings.parameters()))
     weights_params = list(map(id, nsloss.weights.parameters()))
 
     optimizer = torch.optim.Adam(
         [
             {
                 "params": filter(
-                    lambda p: id(p) not in embeddings_params, model.parameters(),
+                    lambda p: id(p) not in embeddings_params,
+                    model.parameters(),
                 )
             },
             {
                 "params": filter(
-                    lambda p: id(p) not in weights_params, nsloss.parameters(),
+                    lambda p: id(p) not in weights_params,
+                    nsloss.parameters(),
                 )
             },
         ],
@@ -363,7 +396,10 @@ def run(proc_id, n_gpus, args, devices, data):
             block_types = block_types.to(dev_id)
             embs = model(block[0].to(dev_id))[head_invmap]
             embs = embs.gather(
-                1, block_types.view(-1, 1, 1).expand(embs.shape[0], 1, embs.shape[2]),
+                1,
+                block_types.view(-1, 1, 1).expand(
+                    embs.shape[0], 1, embs.shape[2]
+                ),
             )[:, 0]
             loss = nsloss(
                 block[0].dstdata[dgl.NID][head_invmap].to(dev_id),
@@ -399,7 +435,9 @@ def run(proc_id, n_gpus, args, devices, data):
                     .to(dev_id)
                 )  # [i, i]
                 train_types = (
-                    torch.tensor(list(range(edge_type_count))).unsqueeze(1).to(dev_id)
+                    torch.tensor(list(range(edge_type_count)))
+                    .unsqueeze(1)
+                    .to(dev_id)
                 )  # [0, 1]
                 pairs = torch.cat(
                     (train_inputs, train_inputs, train_types), dim=1
@@ -427,9 +465,9 @@ def run(proc_id, n_gpus, args, devices, data):
             valid_aucs, valid_f1s, valid_prs = [], [], []
             test_aucs, test_f1s, test_prs = [], [], []
             for i in range(edge_type_count):
-                if args.eval_type == "all" or edge_types[i] in args.eval_type.split(
-                    ","
-                ):
+                if args.eval_type == "all" or edge_types[
+                    i
+                ] in args.eval_type.split(","):
                     tmp_auc, tmp_f1, tmp_pr = evaluate(
                         final_model[edge_types[i]],
                         valid_true_data_by_edge[edge_types[i]],

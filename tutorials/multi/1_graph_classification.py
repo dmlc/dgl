@@ -68,16 +68,19 @@ For communication between multiple processes in multi-gpu training, we need
 to start the distributed backend at the beginning of each process. We use
 `world_size` to refer to the number of processes and `rank` to refer to the
 process ID, which should be an integer from `0` to `world_size - 1`.
-""" 
+"""
 
 import torch.distributed as dist
 
+
 def init_process_group(world_size, rank):
     dist.init_process_group(
-        backend='gloo',     # change to 'nccl' for multiple GPUs
-        init_method='tcp://127.0.0.1:12345',
+        backend="gloo",  # change to 'nccl' for multiple GPUs
+        init_method="tcp://127.0.0.1:12345",
         world_size=world_size,
-        rank=rank)
+        rank=rank,
+    )
+
 
 ###############################################################################
 # Data Loader Preparation
@@ -87,24 +90,27 @@ def init_process_group(world_size, rank):
 # splitting, we need to use a same random seed across processes to ensure a
 # same split. We follow the common practice to train with multiple GPUs and
 # evaluate with a single GPU, thus only set `use_ddp` to True in the
-# :func:`~dgl.dataloading.pytorch.GraphDataLoader` for the training set, where 
+# :func:`~dgl.dataloading.pytorch.GraphDataLoader` for the training set, where
 # `ddp` stands for :func:`~torch.nn.parallel.DistributedDataParallel`.
 #
 
 from dgl.data import split_dataset
 from dgl.dataloading import GraphDataLoader
 
+
 def get_dataloaders(dataset, seed, batch_size=32):
     # Use a 80:10:10 train-val-test split
-    train_set, val_set, test_set = split_dataset(dataset,
-                                                 frac_list=[0.8, 0.1, 0.1],
-                                                 shuffle=True,
-                                                 random_state=seed)
-    train_loader = GraphDataLoader(train_set, use_ddp=True, batch_size=batch_size, shuffle=True)
+    train_set, val_set, test_set = split_dataset(
+        dataset, frac_list=[0.8, 0.1, 0.1], shuffle=True, random_state=seed
+    )
+    train_loader = GraphDataLoader(
+        train_set, use_ddp=True, batch_size=batch_size, shuffle=True
+    )
     val_loader = GraphDataLoader(val_set, batch_size=batch_size)
     test_loader = GraphDataLoader(test_set, batch_size=batch_size)
 
     return train_loader, val_loader, test_loader
+
 
 ###############################################################################
 # Model Initialization
@@ -115,14 +121,20 @@ def get_dataloaders(dataset, seed, batch_size=32):
 
 import torch.nn as nn
 import torch.nn.functional as F
+
 from dgl.nn.pytorch import GINConv, SumPooling
+
 
 class GIN(nn.Module):
     def __init__(self, input_size=1, num_classes=2):
         super(GIN, self).__init__()
 
-        self.conv1 = GINConv(nn.Linear(input_size, num_classes), aggregator_type='sum')
-        self.conv2 = GINConv(nn.Linear(num_classes, num_classes), aggregator_type='sum')
+        self.conv1 = GINConv(
+            nn.Linear(input_size, num_classes), aggregator_type="sum"
+        )
+        self.conv2 = GINConv(
+            nn.Linear(num_classes, num_classes), aggregator_type="sum"
+        )
         self.pool = SumPooling()
 
     def forward(self, g, feats):
@@ -131,6 +143,7 @@ class GIN(nn.Module):
         feats = self.conv2(g, feats)
 
         return self.pool(g, feats)
+
 
 ###############################################################################
 # To ensure same initial model parameters across processes, we need to set the
@@ -141,15 +154,19 @@ class GIN(nn.Module):
 import torch
 from torch.nn.parallel import DistributedDataParallel
 
+
 def init_model(seed, device):
     torch.manual_seed(seed)
     model = GIN().to(device)
-    if device.type == 'cpu':
+    if device.type == "cpu":
         model = DistributedDataParallel(model)
     else:
-        model = DistributedDataParallel(model, device_ids=[device], output_device=device)
+        model = DistributedDataParallel(
+            model, device_ids=[device], output_device=device
+        )
 
     return model
+
 
 ###############################################################################
 # Main Function for Each Process
@@ -157,6 +174,7 @@ def init_model(seed, device):
 #
 # Define the model evaluation function as in the single-GPU setting.
 #
+
 
 def evaluate(model, dataloader, device):
     model.eval()
@@ -168,7 +186,7 @@ def evaluate(model, dataloader, device):
         bg = bg.to(device)
         labels = labels.to(device)
         # Get input node features
-        feats = bg.ndata.pop('attr')
+        feats = bg.ndata.pop("attr")
         with torch.no_grad():
             pred = model(bg, feats)
         _, pred = torch.max(pred, 1)
@@ -177,26 +195,27 @@ def evaluate(model, dataloader, device):
 
     return 1.0 * total_correct / total
 
+
 ###############################################################################
 # Define the main function for each process.
 #
 
 from torch.optim import Adam
 
+
 def main(rank, world_size, dataset, seed=0):
     init_process_group(world_size, rank)
     if torch.cuda.is_available():
-        device = torch.device('cuda:{:d}'.format(rank))
+        device = torch.device("cuda:{:d}".format(rank))
         torch.cuda.set_device(device)
     else:
-        device = torch.device('cpu')
+        device = torch.device("cpu")
 
     model = init_model(seed, device)
     criterion = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=0.01)
 
-    train_loader, val_loader, test_loader = get_dataloaders(dataset,
-                                                            seed)
+    train_loader, val_loader, test_loader = get_dataloaders(dataset, seed)
     for epoch in range(5):
         model.train()
         # The line below ensures all processes use a different
@@ -207,7 +226,7 @@ def main(rank, world_size, dataset, seed=0):
         for bg, labels in train_loader:
             bg = bg.to(device)
             labels = labels.to(device)
-            feats = bg.ndata.pop('attr')
+            feats = bg.ndata.pop("attr")
             pred = model(bg, feats)
 
             loss = criterion(pred, labels)
@@ -216,14 +235,15 @@ def main(rank, world_size, dataset, seed=0):
             loss.backward()
             optimizer.step()
         loss = total_loss
-        print('Loss: {:.4f}'.format(loss))
+        print("Loss: {:.4f}".format(loss))
 
         val_acc = evaluate(model, val_loader, device)
-        print('Val acc: {:.4f}'.format(val_acc))
+        print("Val acc: {:.4f}".format(val_acc))
 
     test_acc = evaluate(model, test_loader, device)
-    print('Test acc: {:.4f}'.format(test_acc))
+    print("Test acc: {:.4f}".format(test_acc))
     dist.destroy_process_group()
+
 
 ###############################################################################
 # Finally we load the dataset and launch the processes.
@@ -232,9 +252,9 @@ def main(rank, world_size, dataset, seed=0):
 #
 #    if __name__ == '__main__':
 #        import torch.multiprocessing as mp
-#    
+#
 #        from dgl.data import GINDataset
-#    
+#
 #        num_gpus = 4
 #        procs = []
 #        dataset = GINDataset(name='IMDBBINARY', self_loop=False)

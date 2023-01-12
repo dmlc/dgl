@@ -15,60 +15,6 @@ where the amount of network communication is proportional to the number of
 cross-partition edges. DGL has integrated METIS as the default partitioning
 algorithm in its :func:`dgl.distributed.partition_graph` API.
 
-Load balancing
-~~~~~~~~~~~~~~~~
-
-When partitioning a graph, by default, METIS only balances the number of nodes
-in each partition.  This can result in suboptimal configuration, depending on
-the task at hand. For example, in the case of semi-supervised node
-classification, a trainer performs computation on a subset of labeled nodes in
-a local partition. A partitioning that only balances nodes in a graph (both
-labeled and unlabeled), may end up with computational load imbalance. To get a
-balanced workload in each partition, the partition API allows balancing between
-partitions with respect to the number of nodes in each node type, by specifying
-``balance_ntypes`` in :func:`~dgl.distributed.partition_graph`. Users can take
-advantage of this and consider nodes in the training set, validation set and
-test set are of different node types.
-
-The following example considers nodes inside the training set and outside the
-training set are two types of nodes:
-
-.. code:: python
-
-    dgl.distributed.partition_graph(g, 'graph_name', 4, '/tmp/test', balance_ntypes=g.ndata['train_mask'])
-
-In addition to balancing the node types,
-:func:`dgl.distributed.partition_graph` also allows balancing between
-in-degrees of nodes of different node types by specifying ``balance_edges``.
-This balances the number of edges incident to the nodes of different types.
-
-ID mapping
-~~~~~~~~~~~~~
-
-After partitioning, :func:`~dgl.distributed.partition_graph` remap node
-and edge IDs so that nodes of the same partition are aranged together
-(in a consecutive ID range), making it easier to store partitioned node/edge
-features. The API also automatically shuffles the node/edge features
-according to the new IDs. However, some downstream tasks may want to
-recover the original node/edge IDs (such as extracting the computed node
-embeddings for later use). For such cases, pass ``return_mapping=True``
-to :func:`~dgl.distributed.partition_graph`, which makes the API returns
-the ID mappings between the remapped node/edge IDs and their origianl ones.
-For a homogeneous graph, it returns two vectors. The first vector maps every new
-node ID to its original ID; the second vector maps every new edge ID to
-its original ID. For a heterogeneous graph, it returns two dictionaries of
-vectors. The first dictionary contains the mapping for each node type; the
-second dictionary contains the mapping for each edge type.
-
-.. code:: python
-
-    node_map, edge_map = dgl.distributed.partition_graph(g, 'graph_name', 4, '/tmp/test',
-                                                         balance_ntypes=g.ndata['train_mask'],
-                                                         return_mapping=True)
-    # Let's assume that node_emb is saved from the distributed training.
-    orig_node_emb = th.zeros(node_emb.shape, dtype=node_emb.dtype)
-    orig_node_emb[node_map] = node_emb
-
 Output format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 

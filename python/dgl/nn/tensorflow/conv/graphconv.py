@@ -122,7 +122,7 @@ class GraphConv(layers.Layer):
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
     >>> with tf.device("CPU:0"):
-    ...     g = dgl.bipartite((u, v))
+    ...     g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     ...     u_fea = tf.convert_to_tensor(np.random.rand(2, 5))
     ...     v_fea = tf.convert_to_tensor(np.random.rand(4, 5))
     ...     conv = GraphConv(5, 2, norm='both', weight=True, bias=True)
@@ -253,13 +253,13 @@ class GraphConv(layers.Layer):
                 if weight is not None:
                     feat_src = tf.matmul(feat_src, weight)
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src(src='h', out='m'),
+                graph.update_all(fn.copy_u(u='h', out='m'),
                                  fn.sum(msg='m', out='h'))
                 rst = graph.dstdata['h']
             else:
                 # aggregate first then mult W
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src(src='h', out='m'),
+                graph.update_all(fn.copy_u(u='h', out='m'),
                                  fn.sum(msg='m', out='h'))
                 rst = graph.dstdata['h']
                 if weight is not None:

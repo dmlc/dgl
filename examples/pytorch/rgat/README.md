@@ -1,15 +1,25 @@
-Relational GAT
+Relational Graph Attention Networks (RGAT)
 ==============
+This is an adaptation of RGCN where graph convolution is replaced with graph attention.
 
-Requirements:
-- TorchMetrics
+Dependencies
+------------
+- torchmetrics
 
-This is an adaptation of RGCN where the graph convolution is replaced with graph attention.
-
-Run
-
+Install as follows:
 ```bash
-python rgat.py
+pip install torchmetrics
 ```
 
-to see the results.
+How to Run
+-------
+
+Run with the following for node classification on ogbn-mag dataset
+```bash
+python train.py
+```
+
+
+Summary
+-------
+* ogbn-mag (test acc.): ~0.3647

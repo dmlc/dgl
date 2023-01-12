@@ -166,7 +166,7 @@ representation들을 구하는데 사용될 수 있다.
             return x
 
 점수를 예측하기 위한 homogeneous 그래프와 heterogeneous 그래프간의 유일한 구현상의 차이점은
-:meth:`dgl.DGLHeteroGraph.apply_edges` 를 호출할 때 에지 타입들을 사용한다는 점이다.
+:meth:`dgl.DGLGraph.apply_edges` 를 호출할 때 에지 타입들을 사용한다는 점이다.
 
 .. code:: python
 
