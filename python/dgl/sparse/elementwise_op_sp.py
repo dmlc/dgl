@@ -121,9 +121,7 @@ def sp_power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
     """
     # Python falls back to scalar.__rpow__ then TypeError when NotImplemented
     # is returned.
-    return (
-        val_like(A, A.val**scalar) if is_scalar(scalar) else NotImplemented
-    )
+    return val_like(A, A.val**scalar) if is_scalar(scalar) else NotImplemented
 
 
 SparseMatrix.__add__ = sp_add
