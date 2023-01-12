@@ -55,20 +55,20 @@ def main():
     # python path
     update(
         os.path.join(proj_root, "python", "dgl", "_ffi", "libinfo.py"),
-        r"(?<=__version__ = \")[.0-9a-z]+",
+        r"(?<=__version__ = \")[.0-9a-z+_]+",
         __version__,
     )
     # C++ header
     update(
         os.path.join(proj_root, "include", "dgl", "runtime", "c_runtime_api.h"),
-        '(?<=DGL_VERSION ")[.0-9a-z]+',
+        '(?<=DGL_VERSION ")[.0-9a-z+_]+',
         __version__,
     )
     # conda
     for path in ["dgl"]:
         update(
             os.path.join(proj_root, "conda", path, "meta.yaml"),
-            '(?<=version: ")[.0-9a-z]+',
+            '(?<=version: ")[.0-9a-z+_]+',
             __version__,
         )
 
