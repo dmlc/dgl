@@ -89,8 +89,6 @@ def test_filter_multistream(idtype):
             x = F.randint([30000], dtype=idtype, ctx=F.ctx(), low=0, high=50000)
             xi = f.find_included_indices(x)
 
-
-
 if __name__ == "__main__":
     test_graph_filter()
     test_array_filter()
