@@ -101,7 +101,7 @@ def rand_csc_uncoalesced(shape, nnz, dev):
 
 
 def sparse_matrix_to_dense(A: SparseMatrix):
-    dense = A.dense()
+    dense = A.to_dense()
     return clone_detach_and_grad(dense)
 
 
