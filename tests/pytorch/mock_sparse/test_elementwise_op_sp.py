@@ -63,7 +63,7 @@ def test_sparse_op_diag(idtype, dtype, op):
     valA = torch.rand(len(rowA))
     A = SparseMatrix(rowA, colA, valA, shape=(10, 50))
     D = diag(torch.arange(2, 12), shape=A.shape)
-    D_sp = D.to_sparse()
+    D_sp = D.as_sparse()
 
     def _test():
         if op is not operator.truediv:
@@ -71,7 +71,7 @@ def test_sparse_op_diag(idtype, dtype, op):
         else:
             # NOTE (Israt): Matrices mush have same sparsity pattern for div
             D2 = diag(torch.arange(12, 22), shape=A.shape)
-            A_sp2 = D2.to_sparse()
+            A_sp2 = D2.as_sparse()
             assert np.allclose(
                 op(A_sp2, D).val, op(A_sp2.val, D_sp.val), rtol=1e-4, atol=1e-4
             )
