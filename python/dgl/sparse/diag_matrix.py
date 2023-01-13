@@ -122,7 +122,7 @@ class DiagMatrix:
         row = col = torch.arange(len(self.val)).to(self.device)
         return from_coo(row=row, col=col, val=self.val, shape=self.shape)
 
-    def dense(self) -> torch.Tensor:
+    def to_dense(self) -> torch.Tensor:
         """Return a dense representation of the matrix.
 
         Returns

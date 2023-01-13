@@ -89,7 +89,7 @@ Attributes and methods
     SparseMatrix.csc
     SparseMatrix.coalesce
     SparseMatrix.has_duplicate
-    SparseMatrix.dense
+    SparseMatrix.to_dense
     SparseMatrix.to
     SparseMatrix.cuda
     SparseMatrix.cpu
@@ -134,8 +134,8 @@ Attributes and methods
     DiagMatrix.dtype
     DiagMatrix.device
     DiagMatrix.val
-    DiagMatrix.as_sparse
-    DiagMatrix.dense
+    DiagMatrix.to_sparse
+    DiagMatrix.to_dense
     DiagMatrix.to
     DiagMatrix.cuda
     DiagMatrix.cpu
