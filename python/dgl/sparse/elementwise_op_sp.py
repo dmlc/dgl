@@ -90,7 +90,7 @@ def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
 
 
 def sp_div(A: SparseMatrix, B: Scalar) -> SparseMatrix:
-    """Elementwise multiplication
+    """Elementwise division
 
     Parameters
     ----------
@@ -102,7 +102,7 @@ def sp_div(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     Returns
     -------
     SparseMatrix
-        Result of A * B
+        Result of A / B
 
     Examples
     --------
