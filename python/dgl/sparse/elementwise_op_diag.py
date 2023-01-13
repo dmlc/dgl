@@ -63,7 +63,7 @@ def diag_sub(
     Returns
     -------
     DiagMatrix
-        Diagonal matrix
+        Diagonal matrix, same as D2
 
     Examples
     --------
@@ -106,7 +106,7 @@ def diag_rsub(
     Returns
     -------
     DiagMatrix
-        Diagonal matrix
+        Diagonal matrix, same as D2
 
     Examples
     --------
@@ -116,22 +116,7 @@ def diag_rsub(
     DiagMatrix(val=tensor([-9, -9, -9]),
     shape=(3, 3))
     """
-    if isinstance(D2, DiagMatrix):
-        assert D1.shape == D2.shape, (
-            "The shape of diagonal matrix D1 "
-            f"{D1.shape} and D2 {D2.shape} must match."
-        )
-        return diag(D2.val - D1.val, D1.shape)
-    elif isinstance(D2, SparseMatrix):
-        assert D1.shape == D2.shape, (
-            "The shape of diagonal matrix D1 "
-            f"{D1.shape} and sparse matrix D2 {D2.shape} must match."
-        )
-        D1 = D1.as_sparse()
-        return D2 - D1
-    # Python falls back to D2.__rsub__(D1) then TypeError when NotImplemented
-    # is returned.
-    return NotImplemented
+    return -(D1 - D2)
 
 
 def diag_mul(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:

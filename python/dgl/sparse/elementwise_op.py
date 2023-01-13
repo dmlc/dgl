@@ -93,7 +93,7 @@ def sub(
     >>> val = torch.tensor([10, 20, 30])
     >>> A = from_coo(row, col, val)
     >>> B = diag(torch.arange(1, 4))
-    >>> add(A, B)
+    >>> sub(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
                                  [0, 1, 0, 1, 2]]),
                  values=tensor([-1, 20, 10, -2, 27]),
