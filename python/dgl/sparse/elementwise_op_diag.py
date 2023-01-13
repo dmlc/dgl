@@ -187,7 +187,7 @@ def diag_rdiv(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
     >>> D1 = diag(torch.arange(1, 4))
     >>> 2.5 / D1
     DiagMatrix(val=tensor([2.5000, 1.2500, 0.8333]),
-    shape=(3, 3))
+               shape=(3, 3))
     """
     if is_scalar(D2):
         return diag(D2 / D1.val, D1.shape)
