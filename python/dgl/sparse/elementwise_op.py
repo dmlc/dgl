@@ -4,6 +4,7 @@ from typing import Union
 
 from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix
+from .utils import Scalar
 
 __all__ = ["add", "sub", "mul", "div", "power"]
 
@@ -95,8 +96,8 @@ def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
 
 
 def mul(
-    A: Union[SparseMatrix, DiagMatrix, float, int],
-    B: Union[SparseMatrix, DiagMatrix, float, int],
+    A: Union[SparseMatrix, DiagMatrix, Scalar],
+    B: Union[SparseMatrix, DiagMatrix, Scalar],
 ) -> Union[SparseMatrix, DiagMatrix]:
     r"""Elementwise multiplication for ``DiagMatrix`` and ``SparseMatrix``,
     equivalent to ``A * B``.
@@ -115,9 +116,9 @@ def mul(
 
     Parameters
     ----------
-    A : SparseMatrix or DiagMatrix or float or int
+    A : SparseMatrix or DiagMatrix or Scalar
         Sparse matrix or diagonal matrix or scalar value
-    B : SparseMatrix or DiagMatrix or float or int
+    B : SparseMatrix or DiagMatrix or Scalar
         Sparse matrix or diagonal matrix or scalar value
 
     Returns
@@ -151,7 +152,7 @@ def mul(
 
 
 def div(
-    A: Union[DiagMatrix], B: Union[DiagMatrix, float, int]
+    A: Union[DiagMatrix], B: Union[DiagMatrix, Scalar]
 ) -> Union[DiagMatrix]:
     r"""Elementwise division for ``DiagMatrix`` and ``SparseMatrix``, equivalent
     to ``A / B``.
@@ -172,7 +173,7 @@ def div(
     ----------
     A : DiagMatrix
         Diagonal matrix
-    B : DiagMatrix or float or int
+    B : DiagMatrix or Scalar
         Diagonal matrix or scalar value
 
     Returns
@@ -197,7 +198,7 @@ def div(
 
 
 def power(
-    A: Union[SparseMatrix, DiagMatrix], scalar: Union[float, int]
+    A: Union[SparseMatrix, DiagMatrix], scalar: Scalar
 ) -> Union[SparseMatrix, DiagMatrix]:
     r"""Elementwise exponentiation for ``DiagMatrix`` and ``SparseMatrix``,
     equivalent to ``A ** scalar``.
@@ -218,7 +219,7 @@ def power(
     ----------
     A : SparseMatrix or DiagMatrix
         Sparse matrix or diagonal matrix
-    scalar : float or int
+    scalar : Scalar
         Exponent
 
     Returns
