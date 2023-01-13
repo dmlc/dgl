@@ -11,9 +11,9 @@ def sddmm(
 ) -> SparseMatrix:
     r"""Sampled-Dense-Dense Matrix Multiplication (SDDMM).
 
-    ``sddmm`` multiplies two dense matrices :attr:`mat1` and :attr:`mat2`
-    at the nonzero locations of sparse matrix :attr:`A`. Values of :attr:`A`
-    is not considered during the computation.
+    ``sddmm`` matrix-multiplies two dense matrices :attr:`mat1` and :attr:`mat2`
+    , then elementwise-multiplies the result with sparse matrix :attr:`A` at the
+    nonzero locations.
 
     Mathematically ``sddmm`` is formulated as:
 
