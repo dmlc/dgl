@@ -234,7 +234,7 @@ class SparseMatrix:
         """
         return self
 
-    def to_dense(self) -> torch.Tensor:
+    def dense(self) -> torch.Tensor:
         """Get the dense representation of the sparse matrix.
 
         Returns

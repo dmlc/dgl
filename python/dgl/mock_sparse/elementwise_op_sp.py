@@ -67,7 +67,7 @@ def sp_add(
     values=tensor([ 2, 20, 10,  3, 34]),
     shape=(3, 4), nnz=5)
     """
-    B = B.to_sparse() if isinstance(B, DiagMatrix) else B
+    B = B.as_sparse() if isinstance(B, DiagMatrix) else B
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
         assert A.shape == B.shape, (
             "The shape of sparse matrix A {} and"
@@ -125,7 +125,7 @@ def sp_sub(
     values=tensor([-2, 20, 10, -3, 26]),
     shape=(3, 4), nnz=5)
     """
-    B = B.to_sparse() if isinstance(B, DiagMatrix) else B
+    B = B.as_sparse() if isinstance(B, DiagMatrix) else B
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
         assert A.shape == B.shape, (
             "The shape of sparse matrix A {} and"
@@ -193,7 +193,7 @@ def sp_mul(
     values=tensor([120]),
     shape=(3, 4), nnz=1)
     """
-    B = B.to_sparse() if isinstance(B, DiagMatrix) else B
+    B = B.as_sparse() if isinstance(B, DiagMatrix) else B
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
         assert A.shape == B.shape, (
             "The shape of sparse matrix A {} and"
@@ -248,7 +248,7 @@ def sp_div(
     values=tensor([ 8.,  4., 20., 12., 16.]),
     shape=(10, 50), nnz=5)
     """
-    B = B.to_sparse() if isinstance(B, DiagMatrix) else B
+    B = B.as_sparse() if isinstance(B, DiagMatrix) else B
     if isinstance(A, SparseMatrix) and isinstance(B, SparseMatrix):
         # same sparsity structure
         if torch.equal(A.indices("COO"), B.indices("COO")):
