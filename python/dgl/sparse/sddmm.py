@@ -6,6 +6,7 @@ from .sparse_matrix import SparseMatrix
 __all__ = ["sddmm", "bsddmm"]
 
 
+# pylint: disable=invalid-name
 def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     r"""Sampled-Dense-Dense Matrix Multiplication (SDDMM).
 
@@ -53,6 +54,7 @@ def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     return SparseMatrix(torch.ops.dgl_sparse.sddmm(A.c_sparse_matrix, X1, X2))
 
 
+# pylint: disable=invalid-name
 def bsddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     r"""Sampled-Dense-Dense Matrix Multiplication (SDDMM) by batches.
 
