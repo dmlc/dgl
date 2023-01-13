@@ -98,7 +98,7 @@ class DiagMatrix:
         """
         return self.val.device
 
-    def as_sparse(self) -> SparseMatrix:
+    def to_sparse(self) -> SparseMatrix:
         """Convert the diagonal matrix into a sparse matrix object
 
         Returns
@@ -112,7 +112,7 @@ class DiagMatrix:
         >>> import torch
         >>> val = torch.ones(5)
         >>> mat = diag(val)
-        >>> sp_mat = mat.as_sparse()
+        >>> sp_mat = mat.to_sparse()
         >>> print(sp_mat)
         SparseMatrix(indices=tensor([[0, 1, 2, 3, 4],
                                      [0, 1, 2, 3, 4]]),
@@ -122,7 +122,7 @@ class DiagMatrix:
         row = col = torch.arange(len(self.val)).to(self.device)
         return from_coo(row=row, col=col, val=self.val, shape=self.shape)
 
-    def dense(self) -> torch.Tensor:
+    def to_dense(self) -> torch.Tensor:
         """Return a dense representation of the matrix.
 
         Returns

@@ -126,7 +126,7 @@ class SparseMatrix:
         """
         return self.c_sparse_matrix.csc()
 
-    def dense(self) -> torch.Tensor:
+    def to_dense(self) -> torch.Tensor:
         """Return a dense representation of the matrix.
 
         Returns

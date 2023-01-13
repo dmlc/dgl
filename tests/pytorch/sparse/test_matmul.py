@@ -65,7 +65,7 @@ def test_bspmm(create_func, shape, nnz):
     sparse_result.backward(grad)
 
     XX = clone_detach_and_grad(X)
-    torch_A = A.dense().clone().detach().requires_grad_()
+    torch_A = A.to_dense().clone().detach().requires_grad_()
     torch_result = torch_A.permute(2, 0, 1) @ XX.permute(2, 0, 1)
 
     torch_result.backward(grad.permute(2, 0, 1))
@@ -103,14 +103,14 @@ def test_spspmm(create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2):
     torch_A3.backward(torch_A3_grad)
 
     with torch.no_grad():
-        assert torch.allclose(A3.dense(), torch_A3.to_dense(), atol=1e-05)
+        assert torch.allclose(A3.to_dense(), torch_A3.to_dense(), atol=1e-05)
         assert torch.allclose(
-            val_like(A1, A1.val.grad).dense(),
+            val_like(A1, A1.val.grad).to_dense(),
             torch_A1.grad.to_dense(),
             atol=1e-05,
         )
         assert torch.allclose(
-            val_like(A2, A2.val.grad).dense(),
+            val_like(A2, A2.val.grad).to_dense(),
             torch_A2.grad.to_dense(),
             atol=1e-05,
         )
@@ -161,20 +161,20 @@ def test_sparse_diag_mm(create_func, sparse_shape, nnz):
     B.val.backward(grad)
 
     torch_A = sparse_matrix_to_torch_sparse(A)
-    torch_D = sparse_matrix_to_torch_sparse(D.as_sparse())
+    torch_D = sparse_matrix_to_torch_sparse(D.to_sparse())
     torch_B = torch.sparse.mm(torch_A, torch_D)
     torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
     torch_B.backward(torch_B_grad)
 
     with torch.no_grad():
-        assert torch.allclose(B.dense(), torch_B.to_dense(), atol=1e-05)
+        assert torch.allclose(B.to_dense(), torch_B.to_dense(), atol=1e-05)
         assert torch.allclose(
-            val_like(A, A.val.grad).dense(),
+            val_like(A, A.val.grad).to_dense(),
             torch_A.grad.to_dense(),
             atol=1e-05,
         )
         assert torch.allclose(
-            diag(D.val.grad, D.shape).dense(),
+            diag(D.val.grad, D.shape).to_dense(),
             torch_D.grad.to_dense(),
             atol=1e-05,
         )
@@ -195,20 +195,20 @@ def test_diag_sparse_mm(create_func, sparse_shape, nnz):
     B.val.backward(grad)
 
     torch_A = sparse_matrix_to_torch_sparse(A)
-    torch_D = sparse_matrix_to_torch_sparse(D.as_sparse())
+    torch_D = sparse_matrix_to_torch_sparse(D.to_sparse())
     torch_B = torch.sparse.mm(torch_D, torch_A)
     torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
     torch_B.backward(torch_B_grad)
 
     with torch.no_grad():
-        assert torch.allclose(B.dense(), torch_B.to_dense(), atol=1e-05)
+        assert torch.allclose(B.to_dense(), torch_B.to_dense(), atol=1e-05)
         assert torch.allclose(
-            val_like(A, A.val.grad).dense(),
+            val_like(A, A.val.grad).to_dense(),
             torch_A.grad.to_dense(),
             atol=1e-05,
         )
         assert torch.allclose(
-            diag(D.val.grad, D.shape).dense(),
+            diag(D.val.grad, D.shape).to_dense(),
             torch_D.grad.to_dense(),
             atol=1e-05,
         )
