@@ -92,7 +92,6 @@ def diag_sub(
     return NotImplemented
 
 
-
 def diag_rsub(
     D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
 ) -> Union[DiagMatrix, SparseMatrix]:
