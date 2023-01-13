@@ -63,8 +63,8 @@ def diag_sub(
 
     Returns
     -------
-    DiagMatrix
-        Diagonal matrix, same as D2
+    DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix, same as D2
 
     Examples
     --------
@@ -106,8 +106,8 @@ def diag_rsub(
 
     Returns
     -------
-    DiagMatrix
-        Diagonal matrix, same as D2
+    DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix, same as D2
 
     Examples
     --------
