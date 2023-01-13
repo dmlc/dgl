@@ -125,6 +125,40 @@ def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     return NotImplemented
 
 
+def sp_div(A: SparseMatrix, B: Scalar) -> SparseMatrix:
+    """Elementwise division
+
+    Parameters
+    ----------
+    A : SparseMatrix
+        First operand
+    B : Scalar
+        Second operand
+
+    Returns
+    -------
+    SparseMatrix
+        Result of A / B
+
+    Examples
+    --------
+    >>> row = torch.tensor([1, 0, 2])
+    >>> col = torch.tensor([0, 3, 2])
+    >>> val = torch.tensor([1, 2, 3])
+    >>> A = from_coo(row, col, val, shape=(3, 4))
+    >>> A / 2
+    SparseMatrix(indices=tensor([[1, 0, 2],
+                                 [0, 3, 2]]),
+                 values=tensor([0.5000, 1.0000, 1.5000]),
+                 shape=(3, 4), nnz=3)
+    """
+    if is_scalar(B):
+        return val_like(A, A.val / B)
+    # Python falls back to B.__rtruediv__(A) then TypeError when NotImplemented
+    # is returned.
+    return NotImplemented
+
+
 def sp_power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
     """Take the power of each nonzero element and return a sparse matrix with
     the result.
@@ -162,4 +196,5 @@ SparseMatrix.__add__ = sp_add
 SparseMatrix.__sub__ = sp_sub
 SparseMatrix.__mul__ = sp_mul
 SparseMatrix.__rmul__ = sp_mul
+SparseMatrix.__truediv__ = sp_div
 SparseMatrix.__pow__ = sp_power

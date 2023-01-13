@@ -160,8 +160,8 @@ def mul(
 
 
 def div(
-    A: Union[DiagMatrix], B: Union[DiagMatrix, Scalar]
-) -> Union[DiagMatrix]:
+    A: Union[SparseMatrix, DiagMatrix], B: Union[DiagMatrix, Scalar]
+) -> Union[SparseMatrix, DiagMatrix]:
     r"""Elementwise division for ``DiagMatrix`` and ``SparseMatrix``, equivalent
     to ``A / B``.
 
@@ -172,15 +172,15 @@ def div(
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+
-    | SparseMatrix |     🚫     |      🚫      |   🚫   |
+    | SparseMatrix |     🚫     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+
     |    scalar    |     🚫     |      🚫      |   🚫   |
     +--------------+------------+--------------+--------+
 
     Parameters
     ----------
-    A : DiagMatrix
-        Diagonal matrix
+    A : SparseMatrix or DiagMatrix
+        Sparse or diagonal matrix
     B : DiagMatrix or Scalar
         Diagonal matrix or scalar value
 
@@ -201,6 +201,16 @@ def div(
     >>> div(A, 2)
     DiagMatrix(val=tensor([0.5000, 1.0000, 1.5000]),
                shape=(3, 3))
+
+    >>> row = torch.tensor([1, 0, 2])
+    >>> col = torch.tensor([0, 3, 2])
+    >>> val = torch.tensor([1, 2, 3])
+    >>> A = from_coo(row, col, val, shape=(3, 4))
+    >>> A / 2
+    SparseMatrix(indices=tensor([[1, 0, 2],
+                                 [0, 3, 2]]),
+                 values=tensor([0.5000, 1.0000, 1.5000]),
+                 shape=(3, 4), nnz=3)
     """
     return A / B
 
