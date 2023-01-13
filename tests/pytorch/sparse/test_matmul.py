@@ -4,7 +4,8 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import bspmm, diag, from_coo, mm, val_like
+from dgl.sparse import bspmm, diag, from_coo, val_like
+from dgl.sparse.matmul import matmul
 
 from .utils import (
     clone_detach_and_grad,
@@ -33,7 +34,7 @@ def test_spmm(create_func, shape, nnz, out_dim):
     else:
         X = torch.randn(shape[1], requires_grad=True, device=dev)
 
-    sparse_result = A @ X
+    sparse_result = matmul(A, X)
     grad = torch.randn_like(sparse_result)
     sparse_result.backward(grad)
 
@@ -60,7 +61,7 @@ def test_bspmm(create_func, shape, nnz):
     A = create_func(shape, nnz, dev, 2)
     X = torch.randn(shape[1], 10, 2, requires_grad=True, device=dev)
 
-    sparse_result = bspmm(A, X)
+    sparse_result = matmul(A, X)
     grad = torch.randn_like(sparse_result)
     sparse_result.backward(grad)
 
@@ -92,7 +93,7 @@ def test_spspmm(create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2):
     shape2 = (shape_n_m[1], shape_k)
     A1 = create_func1(shape1, nnz1, dev)
     A2 = create_func2(shape2, nnz2, dev)
-    A3 = A1 @ A2
+    A3 = matmul(A1, A2)
     grad = torch.randn_like(A3.val)
     A3.val.backward(grad)
 
@@ -132,14 +133,14 @@ def test_spspmm_duplicate():
     A2 = from_coo(row, col, val, shape)
 
     try:
-        A1 @ A2
+        matmul(A1, A2)
     except:
         pass
     else:
         assert False, "Should raise error."
 
     try:
-        A2 @ A1
+        matmul(A2, A1)
     except:
         pass
     else:
@@ -155,8 +156,7 @@ def test_sparse_diag_mm(create_func, sparse_shape, nnz):
     A = create_func(sparse_shape, nnz, dev)
     diag_val = torch.randn(sparse_shape[1], device=dev, requires_grad=True)
     D = diag(diag_val, diag_shape)
-    # (TODO) Need to use dgl.sparse.matmul after rename mm to matmul
-    B = mm(A, D)
+    B = matmul(A, D)
     grad = torch.randn_like(B.val)
     B.val.backward(grad)
 
@@ -189,8 +189,7 @@ def test_diag_sparse_mm(create_func, sparse_shape, nnz):
     A = create_func(sparse_shape, nnz, dev)
     diag_val = torch.randn(sparse_shape[0], device=dev, requires_grad=True)
     D = diag(diag_val, diag_shape)
-    # (TODO) Need to use dgl.sparse.matmul after rename mm to matmul
-    B = mm(D, A)
+    B = matmul(D, A)
     grad = torch.randn_like(B.val)
     B.val.backward(grad)
 
