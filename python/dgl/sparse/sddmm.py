@@ -9,8 +9,8 @@ __all__ = ["sddmm", "bsddmm"]
 def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     r"""Sampled-Dense-Dense Matrix Multiplication (SDDMM).
 
-    ``sddmm`` matrix-multiplies two dense matrices :attr:`X1` and :attr:`X2`
-    , then elementwise-multiplies the result with sparse matrix :attr:`A` at the
+    ``sddmm`` matrix-multiplies two dense matrices :attr:`X1` and :attr:`X2`,
+    then elementwise-multiplies the result with sparse matrix :attr:`A` at the
     nonzero locations.
 
     Mathematically ``sddmm`` is formulated as:
@@ -18,9 +18,8 @@ def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     .. math::
         out = (X1 @ X2) * A
 
-    In particular, :attr:`X1` and :attr:`X2` can be 1-D, then ``X1 @
-    X2`` becomes the out-product of the two vector (which results in a
-    matrix).
+    In particular, :attr:`X1` and :attr:`X2` can be 1-D, then ``X1 @ X2``
+    becomes the out-product of the two vector (which results in a matrix).
 
     Parameters
     ----------
@@ -57,9 +56,9 @@ def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
 def bsddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     r"""Sampled-Dense-Dense Matrix Multiplication (SDDMM) by batches.
 
-    ``sddmm`` multiplies two dense matrices :attr:`X1` and :attr:`X2`
-    at the nonzero locations of sparse matrix :attr:`A`. Values of :attr:`A`
-    is not considered during the computation.
+    ``sddmm`` multiplies two dense matrices :attr:`X1` and :attr:`X2` at the
+    nonzero locations of sparse matrix :attr:`A`. Values of :attr:`A` is not
+    considered during the computation.
 
     Mathematically ``sddmm`` is formulated as:
 
