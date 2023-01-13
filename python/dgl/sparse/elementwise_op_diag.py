@@ -1,4 +1,5 @@
 """DGL elementwise operators for diagonal matrix module."""
+
 from typing import Union
 
 from .diag_matrix import diag, DiagMatrix
@@ -157,7 +158,6 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
         )
         return diag(D1.val / D2.val, D1.shape)
     elif is_scalar(D2):
-        assert D2 != 0, "Division by zero is not allowed."
         return diag(D1.val / D2, D1.shape)
     else:
         # Python falls back to D2.__rtruediv__(D1) then TypeError when
@@ -190,7 +190,6 @@ def diag_rdiv(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
     shape=(3, 3))
     """
     if is_scalar(D2):
-        assert D2 != 0, "Division by zero is not allowed."
         return diag(D2 / D1.val, D1.shape)
     elif isinstance(D2, DiagMatrix):
         assert D1.shape == D2.shape, (
