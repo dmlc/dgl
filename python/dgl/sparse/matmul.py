@@ -49,7 +49,7 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
 
     # The input is a DiagMatrix. Cast it to SparseMatrix
     if not isinstance(A, SparseMatrix):
-        A = A.as_sparse()
+        A = A.to_sparse()
     return torch.ops.dgl_sparse.spmm(A.c_sparse_matrix, X)
 
 
