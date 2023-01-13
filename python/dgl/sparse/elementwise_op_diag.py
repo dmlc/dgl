@@ -85,7 +85,7 @@ def diag_sub(
             "The shape of diagonal matrix D1 "
             f"{D1.shape} and sparse matrix D2 {D2.shape} must match."
         )
-        D1 = D1.as_sparse()
+        D1 = D1.to_sparse()
         return D1 - D2
     # Python falls back to D2.__rsub__(D1) then TypeError when NotImplemented
     # is returned.

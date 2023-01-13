@@ -28,9 +28,9 @@ def test_addsub_coo(val_shape, opname):
     val = torch.randn(row.shape + val_shape).to(ctx)
     B = dglsp.from_coo(row, col, val, shape=A.shape)
 
-    C1 = op(A, B).dense()
-    C2 = func(A, B).dense()
-    dense_C = op(A.dense(), B.dense())
+    C1 = op(A, B).to_dense()
+    C2 = func(A, B).to_dense()
+    dense_C = op(A.to_dense(), B.to_dense())
 
     assert torch.allclose(dense_C, C1)
     assert torch.allclose(dense_C, C2)
@@ -57,9 +57,9 @@ def test_addsub_csr(val_shape, opname):
     val = torch.randn(indices.shape + val_shape).to(ctx)
     B = dglsp.from_csr(indptr, indices, val, shape=A.shape)
 
-    C1 = op(A, B).dense()
-    C2 = func(A, B).dense()
-    dense_C = op(A.dense(), B.dense())
+    C1 = op(A, B).to_dense()
+    C2 = func(A, B).to_dense()
+    dense_C = op(A.to_dense(), B.to_dense())
 
     assert torch.allclose(dense_C, C1)
     assert torch.allclose(dense_C, C2)
@@ -86,9 +86,9 @@ def test_addsub_csc(val_shape, opname):
     val = torch.randn(indices.shape + val_shape).to(ctx)
     B = dglsp.from_csc(indptr, indices, val, shape=A.shape)
 
-    C1 = op(A, B).dense()
-    C2 = func(A, B).dense()
-    dense_C = op(A.dense(), B.dense())
+    C1 = op(A, B).to_dense()
+    C2 = func(A, B).to_dense()
+    dense_C = op(A.to_dense(), B.to_dense())
 
     assert torch.allclose(dense_C, C1)
     assert torch.allclose(dense_C, C2)
@@ -110,9 +110,9 @@ def test_addsub_diag(val_shape, opname):
     D1 = dglsp.diag(torch.randn(val_shape).to(ctx), shape=shape)
     D2 = dglsp.diag(torch.randn(val_shape).to(ctx), shape=shape)
 
-    C1 = op(D1, D2).dense()
-    C2 = func(D1, D2).dense()
-    dense_C = op(D1.dense(), D2.dense())
+    C1 = op(D1, D2).to_dense()
+    C2 = func(D1, D2).to_dense()
+    dense_C = op(D1.to_dense(), D2.to_dense())
 
     assert torch.allclose(dense_C, C1)
     assert torch.allclose(dense_C, C2)
@@ -135,11 +135,11 @@ def test_add_sparse_diag(val_shape):
     val_shape = (shape[0],) + val_shape
     D = dglsp.diag(torch.randn(val_shape).to(ctx), shape=shape)
 
-    sum1 = (A + D).dense()
-    sum2 = (D + A).dense()
-    sum3 = dglsp.add(A, D).dense()
-    sum4 = dglsp.add(D, A).dense()
-    dense_sum = A.dense() + D.dense()
+    sum1 = (A + D).to_dense()
+    sum2 = (D + A).to_dense()
+    sum3 = dglsp.add(A, D).to_dense()
+    sum4 = dglsp.add(D, A).to_dense()
+    dense_sum = A.to_dense() + D.to_dense()
 
     assert torch.allclose(dense_sum, sum1)
     assert torch.allclose(dense_sum, sum2)
@@ -159,11 +159,11 @@ def test_sub_sparse_diag(val_shape):
     val_shape = (shape[0],) + val_shape
     D = dglsp.diag(torch.randn(val_shape).to(ctx), shape=shape)
 
-    diff1 = (A - D).dense()
-    diff2 = (D - A).dense()
-    diff3 = dglsp.sub(A, D).dense()
-    diff4 = dglsp.sub(D, A).dense()
-    dense_diff = A.dense() - D.dense()
+    diff1 = (A - D).to_dense()
+    diff2 = (D - A).to_dense()
+    diff3 = dglsp.sub(A, D).to_dense()
+    diff4 = dglsp.sub(D, A).to_dense()
+    dense_diff = A.to_dense() - D.to_dense()
 
     assert torch.allclose(dense_diff, diff1)
     assert torch.allclose(dense_diff, -diff2)
