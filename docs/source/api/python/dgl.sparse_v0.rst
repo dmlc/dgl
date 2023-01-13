@@ -172,6 +172,9 @@ Matrix Multiplication
     :toctree: ../../generated/
 
     matmul
+    spmm
+    bspmm
+    spspmm
     sddmm
     bsddmm
 

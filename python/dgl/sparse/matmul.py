@@ -12,7 +12,7 @@ __all__ = ["spmm", "bspmm", "spspmm", "matmul"]
 
 
 def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
-    """Multiply a sparse matrix by a dense matrix.
+    """Multiply a sparse matrix by a dense matrix, equivalent to ``A @ X``.
 
     Parameters
     ----------
@@ -54,7 +54,8 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
 
 
 def bspmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
-    """Multiply a sparse matrix by a dense matrix by batches.
+    """Multiply a sparse matrix by a dense matrix by batches, equivalent to
+    ``A @ X``.
 
     Parameters
     ----------
@@ -176,8 +177,9 @@ def _diag_sparse_mm(D, A):
 def spspmm(
     A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
 ) -> Union[SparseMatrix, DiagMatrix]:
-    """Multiply a sparse matrix by a sparse matrix. The non-zero values of the
-    two sparse matrices must be 1D.
+    """Multiply a sparse matrix by a sparse matrix, equivalent to ``A @ B``.
+
+    The non-zero values of the two sparse matrices must be 1D.
 
     Parameters
     ----------
