@@ -3,6 +3,7 @@ from typing import Union
 
 from .diag_matrix import diag, DiagMatrix
 from .sparse_matrix import SparseMatrix
+from .utils import is_scalar, Scalar
 
 
 def diag_add(
@@ -91,6 +92,7 @@ def diag_sub(
     return NotImplemented
 
 
+
 def diag_rsub(
     D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
 ) -> Union[DiagMatrix, SparseMatrix]:
@@ -119,14 +121,14 @@ def diag_rsub(
     return -(D1 - D2)
 
 
-def diag_mul(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
+def diag_mul(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
     """Elementwise multiplication
 
     Parameters
     ----------
     D1 : DiagMatrix
         Diagonal matrix
-    D2 : DiagMatrix or float or int
+    D2 : DiagMatrix or Scalar
         Diagonal matrix or scalar value
 
     Returns
@@ -150,7 +152,7 @@ def diag_mul(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
             f"{D1.shape} and D2 {D2.shape} must match."
         )
         return diag(D1.val * D2.val, D1.shape)
-    elif isinstance(D2, (float, int)):
+    elif is_scalar(D2):
         return diag(D1.val * D2, D1.shape)
     else:
         # Python falls back to D2.__rmul__(D1) then TypeError when
@@ -158,7 +160,7 @@ def diag_mul(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
         return NotImplemented
 
 
-def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
+def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
     """Elementwise division of a diagonal matrix by a diagonal matrix or a
     scalar
 
@@ -166,7 +168,7 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
     ----------
     D1 : DiagMatrix
         Diagonal matrix
-    D2 : DiagMatrix or float or int
+    D2 : DiagMatrix or Scalar
         Diagonal matrix or scalar value. If :attr:`D2` is a DiagMatrix,
         division is only applied to the diagonal elements.
 
@@ -192,7 +194,7 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
             "must match."
         )
         return diag(D1.val / D2.val, D1.shape)
-    elif isinstance(D2, (float, int)):
+    elif is_scalar(D2):
         assert D2 != 0, "Division by zero is not allowed."
         return diag(D1.val / D2, D1.shape)
     else:
@@ -202,7 +204,7 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, float, int]) -> DiagMatrix:
 
 
 # pylint: disable=invalid-name
-def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
+def diag_power(D: DiagMatrix, scalar: Scalar) -> DiagMatrix:
     """Take the power of each nonzero element and return a diagonal matrix with
     the result.
 
@@ -210,7 +212,7 @@ def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
     ----------
     D : DiagMatrix
         Diagonal matrix
-    scalar : float or int
+    scalar : Scalar
         Exponent
 
     Returns
@@ -226,9 +228,7 @@ def diag_power(D: DiagMatrix, scalar: Union[float, int]) -> DiagMatrix:
     shape=(3, 3))
     """
     return (
-        diag(D.val**scalar, D.shape)
-        if isinstance(scalar, (float, int))
-        else NotImplemented
+        diag(D.val**scalar, D.shape) if is_scalar(scalar) else NotImplemented
     )
 
 
