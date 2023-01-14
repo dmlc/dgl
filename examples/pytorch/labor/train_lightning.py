@@ -77,12 +77,12 @@ class SAGELightning(LightningModule):
         for i, mfg in enumerate(mfgs):
             self.cum_sampled_nodes[i] = self.cum_sampled_nodes[i] * self.w + mfg.num_src_nodes()
             self.cum_sampled_edges[i] = self.cum_sampled_edges[i] * self.w + mfg.num_edges()
-            self.log('num_nodes[{}]'.format(i), self.num_sampled_nodes(i), prog_bar=True, on_step=True, on_epoch=False)
-            self.log('num_edges[{}]'.format(i), self.num_sampled_edges(i), prog_bar=True, on_step=True, on_epoch=False)
+            self.log('num_nodes/{}'.format(i), self.num_sampled_nodes(i), prog_bar=True, on_step=True, on_epoch=False)
+            self.log('num_edges/{}'.format(i), self.num_sampled_edges(i), prog_bar=True, on_step=True, on_epoch=False)
         # for batch size monitoring
         i = len(mfgs)
         self.cum_sampled_nodes[i] = self.cum_sampled_nodes[i] * self.w + mfgs[-1].num_dst_nodes()
-        self.log('num_nodes[{}]'.format(i), self.num_sampled_nodes(i), prog_bar=True, on_step=True, on_epoch=False)
+        self.log('num_nodes/{}'.format(i), self.num_sampled_nodes(i), prog_bar=True, on_step=True, on_epoch=False)
         
         batch_inputs = mfgs[0].srcdata['features']
         batch_labels = mfgs[-1].dstdata['labels']
@@ -271,6 +271,7 @@ if __name__ == '__main__':
     argparser.add_argument('--batch-size', type=int, default=1024)
     argparser.add_argument('--lr', type=float, default=0.001)
     argparser.add_argument('--dropout', type=float, default=0.5)
+    argparser.add_argument('--independent-batches', type=int, default=1)
     argparser.add_argument('--num-workers', type=int, default=0,
                            help="Number of sampling processes. Use 0 for no extra process.")
     argparser.add_argument('--data-cpu', action='store_true',
@@ -300,7 +301,7 @@ if __name__ == '__main__':
     datamodule = DataModule(
         args.dataset, args.undirected, args.data_cpu, args.use_uva,
         [int(_) for _ in args.fan_out.split(',')],
-        device, args.batch_size, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.cache_size)
+        device, args.batch_size // args.independent_batches, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.cache_size)
     model = SAGELightning(
         datamodule.in_feats, args.num_hidden, datamodule.n_classes, args.num_layers,
         F.relu, args.dropout, args.lr, datamodule.multilabel)
@@ -311,9 +312,10 @@ if __name__ == '__main__':
         callbacks.append(ModelCheckpoint(monitor='val_acc/dataloader_idx_0', save_top_k=1))
     callbacks.append(BatchSizeCallback(args.vertex_limit))
     callbacks.append(EarlyStopping(monitor='val_acc/dataloader_idx_0', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
-    subdir = '{}_{}_{}_{}_{}'.format(args.dataset, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency)
+    subdir = '{}_{}_{}_{}_{}_{}'.format(args.dataset, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.independent_batches)
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(gpus=[args.gpu] if args.gpu != -1 else None,
+                      accumulate_grad_batches=args.independent_batches,
                       max_epochs=args.num_epochs,
                       max_steps=args.num_steps,
                       callbacks=callbacks,
