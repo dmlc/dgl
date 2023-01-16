@@ -52,10 +52,10 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.ops
    api/python/dgl.optim
    api/python/dgl.sampling
+   api/python/dgl.sparse_v0
    api/python/dgl.multiprocessing
    api/python/transforms
    api/python/udf
-   api/python/dgl.sparse_v0
 
 .. toctree::
    :maxdepth: 1
