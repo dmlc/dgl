@@ -9,17 +9,12 @@ __all__ = ["softmax"]
 
 
 def softmax(input: SparseMatrix) -> SparseMatrix:
-    """Apply row-wise softmax to the non-zero entries of the sparse matrix.
+    """Apply row-wise softmax to the non-zero elements of the sparse matrix.
 
-    If :attr:`A.val` takes shape :attr:`(nnz, D)`, then the output matrix
-    :attr:`A'` and :attr:`A'.val` take the same shape as :attr:`A` and
-    :attr:`A.val`. :attr:`A'.val[:, i]` is calculated based on
-    :attr:`A.val[:, i]`.
-
-    Parameters
-    ----------
-    A : SparseMatrix
-        The input sparse matrix
+    If :attr:`input.val` takes shape :attr:`(nnz, D)`, then the output matrix
+    :attr:`output` and :attr:`output.val` take the same shape as :attr:`input`
+    and :attr:`input.val`. :attr:`output.val[:, i]` is calculated based on
+    :attr:`input.val[:, i]`.
 
     Returns
     -------
@@ -55,7 +50,7 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
         [1.0000, 1.0000]]),
     shape=(3, 3), nnz=4)
     """
-    return SparseMatrix(torch.ops.dgl_sparse.softmax(A.c_sparse_matrix))
+    return SparseMatrix(torch.ops.dgl_sparse.softmax(input.c_sparse_matrix))
 
 
 SparseMatrix.softmax = softmax
