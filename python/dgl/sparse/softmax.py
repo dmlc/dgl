@@ -1,5 +1,5 @@
 """Softmax op for SparseMatrix"""
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, W0622
 
 import torch
 
@@ -8,7 +8,7 @@ from .sparse_matrix import SparseMatrix
 __all__ = ["softmax"]
 
 
-def softmax(A: SparseMatrix) -> SparseMatrix:
+def softmax(input: SparseMatrix) -> SparseMatrix:
     """Apply row-wise softmax to the non-zero entries of the sparse matrix.
 
     If :attr:`A.val` takes shape :attr:`(nnz, D)`, then the output matrix
