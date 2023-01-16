@@ -43,33 +43,33 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.reduce(A, rtype='sum'))
+    >>> print(A.reduce(rtype='sum'))
     tensor(4)
-    >>> print(dglsp.reduce(A, 0, 'sum'))
+    >>> print(A.reduce(0, 'sum'))
     tensor([2, 0, 2])
-    >>> print(dglsp.reduce(A, 1, 'sum'))
+    >>> print(A.reduce(1, 'sum'))
     tensor([1, 3, 0, 0])
-    >>> print(dglsp.reduce(A, 0, 'smax'))
+    >>> print(A.reduce(0, 'smax'))
     tensor([1, 0, 2])
-    >>> print(dglsp.reduce(A, 1, 'smin'))
+    >>> print(A.reduce(1, 'smin'))
     tensor([1, 1, 0, 0])
 
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1., 2.], [2., 1.], [2., 2.]])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.reduce(A, rtype='sum'))
+    >>> print(A.reduce(rtype='sum'))
     tensor([5., 5.])
-    >>> print(dglsp.reduce(A, 0, 'sum'))
+    >>> print(A.reduce(0, 'sum'))
     tensor([[3., 3.],
             [0., 0.],
             [2., 2.]])
-    >>> print(dglsp.reduce(A, 1, 'smin'))
+    >>> print(A.reduce(1, 'smin'))
     tensor([[1., 2.],
             [2., 1.],
             [0., 0.],
             [0., 0.]])
-    >>> print(dglsp.reduce(A, 0, 'smean'))
+    >>> print(A.reduce(0, 'smean'))
     tensor([[1.5000, 1.5000],
             [0.0000, 0.0000],
             [2.0000, 2.0000]])
@@ -108,20 +108,20 @@ def sum(input: SparseMatrix, dim: Optional[int] = None):
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.sum(A))
+    >>> print(A.sum())
     tensor(4)
-    >>> print(dglsp.sum(A, 0))
+    >>> print(A.sum(0))
     tensor([2, 0, 2])
-    >>> print(dglsp.sum(A, 1))
+    >>> print(A.sum(1))
     tensor([1, 3, 0, 0])
 
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.sum(A))
+    >>> print(A.sum())
     tensor([5, 5])
-    >>> print(dglsp.sum(A, 0))
+    >>> print(A.sum(0))
     tensor([[3, 3],
             [0, 0],
             [2, 2]])
@@ -162,20 +162,20 @@ def smax(input: SparseMatrix, dim: Optional[int] = None):
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smax(A))
+    >>> print(A.smax())
     tensor(2)
-    >>> print(dglsp.smax(A, 0))
+    >>> print(A.smax(0))
     tensor([1, 0, 2])
-    >>> print(dglsp.smax(A, 1))
+    >>> print(A.smax(1))
     tensor([1, 2, 0, 0])
 
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smax(A))
+    >>> print(A.smax())
     tensor([2, 2])
-    >>> print(dglsp.smax(A, 1))
+    >>> print(A.smax(1))
     tensor([[1, 2],
             [2, 2],
             [0, 0],
@@ -217,24 +217,24 @@ def smin(input: SparseMatrix, dim: Optional[int] = None):
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smin(A))
+    >>> print(A.smin())
     tensor(1)
-    >>> print(dglsp.smin(A, 0))
+    >>> print(A.smin(0))
     tensor([1, 0, 2])
-    >>> print(dglsp.smin(A, 1))
+    >>> print(A.smin(1))
     tensor([1, 1, 0, 0])
 
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smin(A))
+    >>> print(A.smin())
     tensor([1, 1])
-    >>> print(dglsp.smin(A, 0))
+    >>> print(A.smin(0))
     tensor([[1, 1],
             [0, 0],
             [2, 2]])
-    >>> print(dglsp.smin(A, 1))
+    >>> print(A.smin(1))
     tensor([[1, 2],
             [2, 1],
             [0, 0],
@@ -276,24 +276,24 @@ def smean(input: SparseMatrix, dim: Optional[int] = None):
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1., 1., 2.])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smean(A))
+    >>> print(A.smean())
     tensor(1.3333)
-    >>> print(dglsp.smean(A, 0))
+    >>> print(A.smean(0))
     tensor([1., 0., 2.])
-    >>> print(dglsp.smean(A, 1))
+    >>> print(A.smean(1))
     tensor([1.0000, 1.5000, 0.0000, 0.0000])
 
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1., 2.], [2., 1.], [2., 2.]])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smean(A))
+    >>> print(A.smean())
     tensor([1.6667, 1.6667])
-    >>> print(dglsp.smean(A, 0))
+    >>> print(A.smean(0))
     tensor([[1.5000, 1.5000],
             [0.0000, 0.0000],
             [2.0000, 2.0000]])
-    >>> print(dglsp.smean(A, 1))
+    >>> print(A.smean(1))
     tensor([[1.0000, 2.0000],
             [2.0000, 1.5000],
             [0.0000, 0.0000],
@@ -335,24 +335,24 @@ def sprod(input: SparseMatrix, dim: Optional[int] = None):
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.sprod(A))
+    >>> print(A.sprod())
     tensor(2)
-    >>> print(dglsp.sprod(A, 0))
+    >>> print(A.sprod(0))
     tensor([1, 0, 2])
-    >>> print(dglsp.sprod(A, 1))
+    >>> print(A.sprod(1))
     tensor([1, 2, 0, 0])
 
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([0, 0, 2])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
     >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.sprod(A))
+    >>> print(A.sprod())
     tensor([4, 4])
-    >>> print(dglsp.sprod(A, 0))
+    >>> print(A.sprod(0))
     tensor([[2, 2],
             [0, 0],
             [2, 2]])
-    >>> print(dglsp.sprod(A, 1))
+    >>> print(A.sprod(1))
     tensor([[1, 2],
             [4, 2],
             [0, 0],
