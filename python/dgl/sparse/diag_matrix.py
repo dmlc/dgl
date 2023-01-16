@@ -24,6 +24,9 @@ class DiagMatrix:
         self._val = val
         self._shape = shape
 
+    def __repr__(self):
+        return _diag_matrix_str(self)
+
     @property
     def val(self) -> torch.Tensor:
         """Returns the values of the non-zero elements.
@@ -46,9 +49,6 @@ class DiagMatrix:
         """
         return self._shape
 
-    def __repr__(self):
-        return _diag_matrix_str(self)
-
     @property
     def nnz(self) -> int:
         """Returns the number of non-zero elements in the diagonal matrix.
@@ -67,7 +67,7 @@ class DiagMatrix:
         Returns
         -------
         torch.dtype
-            Data type of the matrix
+            Data type of the diagonal matrix
         """
         return self.val.dtype
 

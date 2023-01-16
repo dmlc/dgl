@@ -11,6 +11,9 @@ class SparseMatrix:
     def __init__(self, c_sparse_matrix: torch.ScriptObject):
         self.c_sparse_matrix = c_sparse_matrix
 
+    def __repr__(self):
+        return _sparse_matrix_str(self)
+
     @property
     def val(self) -> torch.Tensor:
         """Returns the values of the non-zero elements.
@@ -46,30 +49,30 @@ class SparseMatrix:
 
     @property
     def dtype(self) -> torch.dtype:
-        """Data type of the values of the sparse matrix.
+        """Returns the data type of the sparse matrix.
 
         Returns
         -------
         torch.dtype
-            Data type of the values of the matrix
+            Data type of the sparse matrix
         """
         # FIXME: find a proper way to pass dtype from C++ to Python
         return self.c_sparse_matrix.val().dtype
 
     @property
     def device(self) -> torch.device:
-        """Device of the sparse matrix.
+        """Returns the device the sparse matrix is on.
 
         Returns
         -------
         torch.device
-            Device of the matrix
+            The device the sparse matrix is on
         """
         return self.c_sparse_matrix.device()
 
     @property
     def row(self) -> torch.Tensor:
-        """Get the row indices of the non-zero elements.
+        """Returns the row indices of the non-zero elements.
 
         Returns
         -------
@@ -80,7 +83,7 @@ class SparseMatrix:
 
     @property
     def col(self) -> torch.Tensor:
-        """Get the column indices of the non-zero elements.
+        """Returns the column indices of the non-zero elements.
 
         Returns
         -------
@@ -89,11 +92,8 @@ class SparseMatrix:
         """
         return self.coo()[1]
 
-    def __repr__(self):
-        return _sparse_matrix_str(self)
-
     def coo(self) -> Tuple[torch.Tensor, ...]:
-        """Get the coordinate (COO) representation of the sparse matrix.
+        """Returns the coordinate (COO) representation of the sparse matrix.
 
         Returns
         -------
@@ -103,7 +103,7 @@ class SparseMatrix:
         return self.c_sparse_matrix.coo()
 
     def csr(self) -> Tuple[torch.Tensor, ...]:
-        r"""Get the compressed sparse row (CSR) representation of the sparse
+        r"""Returns the compressed sparse row (CSR) representation of the sparse
         matrix.
 
         Returns
@@ -115,8 +115,8 @@ class SparseMatrix:
         return self.c_sparse_matrix.csr()
 
     def csc(self) -> Tuple[torch.Tensor, ...]:
-        r"""Get the compressed sparse column (CSC) representation of the sparse
-        matrix.
+        r"""Returns the compressed sparse column (CSC) representation of the
+        sparse matrix.
 
         Returns
         -------
