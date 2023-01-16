@@ -26,18 +26,18 @@ class DiagMatrix:
 
     @property
     def val(self) -> torch.Tensor:
-        """Returns the values of the nonzero elements.
+        """Returns the values of the non-zero elements.
 
         Returns
         -------
         torch.Tensor
-            Values of the nonzero elements
+            Values of the non-zero elements
         """
         return self._val
 
     @property
     def shape(self) -> Tuple[int]:
-        """Returns the thape of the diagonal matrix.
+        """Returns the shape of the diagonal matrix.
 
         Returns
         -------
@@ -51,12 +51,12 @@ class DiagMatrix:
 
     @property
     def nnz(self) -> int:
-        """Returns the number of non-zero values in the diagonal matrix.
+        """Returns the number of non-zero elements in the diagonal matrix.
 
         Returns
         -------
         int
-            The number of non-zero values in the diagonal matrix
+            The number of non-zero elements in the diagonal matrix
         """
         return self.val.shape[0]
 

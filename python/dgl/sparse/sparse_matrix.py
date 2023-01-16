@@ -13,34 +13,34 @@ class SparseMatrix:
 
     @property
     def val(self) -> torch.Tensor:
-        """Get the values of the nonzero elements.
+        """Returns the values of the non-zero elements.
 
         Returns
         -------
         torch.Tensor
-            Values of the nonzero elements
+            Values of the non-zero elements
         """
         return self.c_sparse_matrix.val()
 
     @property
     def shape(self) -> Tuple[int]:
-        """Shape of the sparse matrix.
+        """Returns the shape of the sparse matrix.
 
         Returns
         -------
         Tuple[int]
-            The shape of the matrix
+            The shape of the sparse matrix
         """
         return tuple(self.c_sparse_matrix.shape())
 
     @property
     def nnz(self) -> int:
-        """The number of nonzero elements of the sparse matrix.
+        """Returns the number of non-zero elements in the sparse matrix.
 
         Returns
         -------
         int
-            The number of nonzero elements of the matrix
+            The number of non-zero elements of the matrix
         """
         return self.c_sparse_matrix.nnz()
 
@@ -69,23 +69,23 @@ class SparseMatrix:
 
     @property
     def row(self) -> torch.Tensor:
-        """Get the row indices of the nonzero elements.
+        """Get the row indices of the non-zero elements.
 
         Returns
         -------
         tensor
-            Row indices of the nonzero elements
+            Row indices of the non-zero elements
         """
         return self.coo()[0]
 
     @property
     def col(self) -> torch.Tensor:
-        """Get the column indices of the nonzero elements.
+        """Get the column indices of the non-zero elements.
 
         Returns
         -------
         tensor
-            Column indices of the nonzero elements
+            Column indices of the non-zero elements
         """
         return self.coo()[1]
 
@@ -371,7 +371,7 @@ class SparseMatrix:
           - the indices of the non-zero elements are unique,
           - the indices are sorted in lexicographical order.
 
-        The coalescing process will accumulate the non-zero values of the same
+        The coalescing process will accumulate the non-zero elements of the same
         indices by summation.
 
         The function does not support autograd.
@@ -496,7 +496,7 @@ def from_csr(
 
     For row i of the sparse matrix
 
-    - the column indices of the nonzero entries are stored in
+    - the column indices of the non-zero elements are stored in
       ``indices[indptr[i]: indptr[i+1]]``
     - the corresponding values are stored in ``val[indptr[i]: indptr[i+1]]``
 
@@ -580,7 +580,7 @@ def from_csc(
 
     For column i of the sparse matrix
 
-    - the row indices of the nonzero entries are stored in
+    - the row indices of the non-zero elements are stored in
       ``indices[indptr[i]: indptr[i+1]]``
     - the corresponding values are stored in ``val[indptr[i]: indptr[i+1]]``
 
@@ -657,15 +657,15 @@ def from_csc(
 def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     """Create a sparse matrix from an existing sparse matrix using new values.
 
-    The new sparse matrix will have the same nonzero indices as the given
-    sparse matrix and use the given values as the new nonzero values.
+    The new sparse matrix will have the same non-zero indices as the given
+    sparse matrix and use the given values as the new non-zero values.
 
     Parameters
     ----------
     mat : SparseMatrix
-        An existing sparse matrix with nnz nonzero values
+        An existing sparse matrix with non-zero values
     val : tensor
-        The new nonzero values, a tensor of shape (nnz) or (nnz, D)
+        The new values of the non-zero elements, a tensor of shape (nnz) or (nnz, D)
 
     Returns
     -------
