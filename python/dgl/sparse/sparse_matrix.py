@@ -108,8 +108,10 @@ class SparseMatrix:
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and value
-            indices
+            A tuple of tensors containing row indptr, column indices and value
+            indices. Value indices is an index tensor, indicating the nonzero
+            value order of the CSR. When it is null, assume it is from 0 to NNZ
+            - 1.
         """
         return self.c_sparse_matrix.csr()
 
@@ -120,8 +122,10 @@ class SparseMatrix:
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row, column coordinates and value
-            indices
+            A tuple of tensors containing column indptr, row indices and value
+            indices. Value indices is an index tensor, indicating the nonzero
+            value order of the CSC. When it is null, assume it is from 0 to NNZ
+            - 1.
         """
         return self.c_sparse_matrix.csc()
 
