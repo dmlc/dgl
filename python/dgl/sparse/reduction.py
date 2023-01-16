@@ -1,6 +1,6 @@
+"""DGL sparse matrix reduce operators"""
 # pylint: disable=W0622
 
-"""DGL sparse matrix reduce operators"""
 from typing import Optional
 
 import torch
