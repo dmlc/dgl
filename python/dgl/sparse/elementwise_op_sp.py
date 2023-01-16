@@ -45,7 +45,43 @@ def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     return spsp_add(A, B) if isinstance(B, SparseMatrix) else NotImplemented
 
 
+def sp_sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
+    """Elementwise subtraction
+
+    Parameters
+    ----------
+    A : SparseMatrix
+        Sparse matrix
+    B : SparseMatrix
+        Sparse matrix
+
+    Returns
+    -------
+    SparseMatrix
+        Sparse matrix
+
+    Examples
+    --------
+
+    >>> row = torch.tensor([1, 0, 2])
+    >>> col = torch.tensor([0, 3, 2])
+    >>> val = torch.tensor([10, 20, 30])
+    >>> val2 = torch.tensor([5, 10, 15])
+    >>> A = from_coo(row, col, val, shape=(3, 4))
+    >>> B = from_coo(row, col, val2, shape=(3, 4))
+    >>> A - B
+    SparseMatrix(indices=tensor([[0, 1, 2],
+                                 [3, 0, 2]]),
+                 values=tensor([10, 5, 15]),
+                 shape=(3, 4), nnz=3)
+    """
+    # Python falls back to B.__rsub__ then TypeError when NotImplemented is
+    # returned.
+    return spsp_add(A, -B) if isinstance(B, SparseMatrix) else NotImplemented
+
+
 def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
+
     """Elementwise multiplication
 
     Parameters
@@ -157,6 +193,7 @@ def sp_power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
 
 
 SparseMatrix.__add__ = sp_add
+SparseMatrix.__sub__ = sp_sub
 SparseMatrix.__mul__ = sp_mul
 SparseMatrix.__rmul__ = sp_mul
 SparseMatrix.__truediv__ = sp_div

@@ -49,20 +49,22 @@ def diag_add(
     return NotImplemented
 
 
-def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
+def diag_sub(
+    D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
+) -> Union[DiagMatrix, SparseMatrix]:
     """Elementwise subtraction
 
     Parameters
     ----------
     D1 : DiagMatrix
         Diagonal matrix
-    D2 : DiagMatrix
-        Diagonal matrix
+    D2 : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
 
     Returns
     -------
-    DiagMatrix
-        Diagonal matrix
+    DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix, same as D2
 
     Examples
     --------
@@ -78,9 +80,44 @@ def diag_sub(D1: DiagMatrix, D2: DiagMatrix) -> DiagMatrix:
             f"{D1.shape} and D2 {D2.shape} must match."
         )
         return diag(D1.val - D2.val, D1.shape)
+    elif isinstance(D2, SparseMatrix):
+        assert D1.shape == D2.shape, (
+            "The shape of diagonal matrix D1 "
+            f"{D1.shape} and sparse matrix D2 {D2.shape} must match."
+        )
+        D1 = D1.to_sparse()
+        return D1 - D2
     # Python falls back to D2.__rsub__(D1) then TypeError when NotImplemented
     # is returned.
     return NotImplemented
+
+
+def diag_rsub(
+    D1: DiagMatrix, D2: Union[DiagMatrix, SparseMatrix]
+) -> Union[DiagMatrix, SparseMatrix]:
+    """Elementwise subtraction in the opposite direction (``D2 - D1``)
+
+    Parameters
+    ----------
+    D1 : DiagMatrix
+        Diagonal matrix
+    D2 : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
+
+    Returns
+    -------
+    DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix, same as D2
+
+    Examples
+    --------
+    >>> D1 = diag(torch.arange(1, 4))
+    >>> D2 = diag(torch.arange(10, 13))
+    >>> D2 - D1
+    DiagMatrix(val=tensor([-9, -9, -9]),
+    shape=(3, 3))
+    """
+    return -(D1 - D2)
 
 
 def diag_mul(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
@@ -197,6 +234,7 @@ def diag_power(D: DiagMatrix, scalar: Scalar) -> DiagMatrix:
 DiagMatrix.__add__ = diag_add
 DiagMatrix.__radd__ = diag_add
 DiagMatrix.__sub__ = diag_sub
+DiagMatrix.__rsub__ = diag_rsub
 DiagMatrix.__mul__ = diag_mul
 DiagMatrix.__rmul__ = diag_mul
 DiagMatrix.__truediv__ = diag_div

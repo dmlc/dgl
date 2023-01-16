@@ -56,7 +56,9 @@ def add(
     return A + B
 
 
-def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
+def sub(
+    A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
+) -> Union[DiagMatrix, SparseMatrix]:
     r"""Elementwise subtraction for ``DiagMatrix`` and ``SparseMatrix``,
     equivalent to ``A - B``.
 
@@ -65,32 +67,38 @@ def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
     +--------------+------------+--------------+--------+
     |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
-    |  DiagMatrix  |     ✅     |      🚫      |   🚫   |
+    |  DiagMatrix  |     ✅     |      ✅      |   🚫   |
     +--------------+------------+--------------+--------+
-    | SparseMatrix |     🚫     |      🚫      |   🚫   |
+    | SparseMatrix |     ✅     |      ✅      |   🚫   |
     +--------------+------------+--------------+--------+
     |    scalar    |     🚫     |      🚫      |   🚫   |
     +--------------+------------+--------------+--------+
 
     Parameters
     ----------
-    A : DiagMatrix
-        Diagonal matrix
-    B : DiagMatrix
-        Diagonal matrix
+    A : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
+    B : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
 
     Returns
     -------
-    DiagMatrix
-        Diagonal matrix
+    DiagMatrix or SparseMatrix
+        Diagonal matrix if both :attr:`A` and :attr:`B` are diagonal matrices,
+        sparse matrix otherwise
 
     Examples
     --------
-    >>> A = diag(torch.arange(1, 4))
-    >>> B = diag(torch.arange(10, 13))
+    >>> row = torch.tensor([1, 0, 2])
+    >>> col = torch.tensor([0, 1, 2])
+    >>> val = torch.tensor([10, 20, 30])
+    >>> A = from_coo(row, col, val)
+    >>> B = diag(torch.arange(1, 4))
     >>> sub(A, B)
-    DiagMatrix(val=tensor([-9, -9, -9]),
-               shape=(3, 3))
+    SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
+                                 [0, 1, 0, 1, 2]]),
+                 values=tensor([-1, 20, 10, -2, 27]),
+                 shape=(3, 3), nnz=5)
     """
     return A - B
 
