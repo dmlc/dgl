@@ -1,3 +1,5 @@
+# pylint: disable=W0622
+
 """DGL sparse matrix reduce operators"""
 from typing import Optional
 
@@ -77,7 +79,6 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
     return torch.ops.dgl_sparse.reduce(input.c_sparse_matrix, rtype, dim)
 
 
-# pylint: disable=W0622
 def sum(input: SparseMatrix, dim: Optional[int] = None):
     """Computes the sum of non-zero values of the ``input`` sparse matrix along
     the given dimension :attr:`dim`.
