@@ -56,7 +56,6 @@ class SparseMatrix:
         torch.dtype
             Data type of the sparse matrix
         """
-        # FIXME: find a proper way to pass dtype from C++ to Python
         return self.c_sparse_matrix.val().dtype
 
     @property
@@ -98,7 +97,7 @@ class SparseMatrix:
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row and column coordinates.
+            A tuple of tensors containing row and column coordinates
         """
         return self.c_sparse_matrix.coo()
 
@@ -110,7 +109,7 @@ class SparseMatrix:
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
             A tuple of tensors containing row, column coordinates and value
-            indices.
+            indices
         """
         return self.c_sparse_matrix.csr()
 
@@ -122,17 +121,17 @@ class SparseMatrix:
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
             A tuple of tensors containing row, column coordinates and value
-            indices.
+            indices
         """
         return self.c_sparse_matrix.csc()
 
     def to_dense(self) -> torch.Tensor:
-        """Return a dense representation of the matrix.
+        """Returns a copy in dense matrix format of the sparse matrix.
 
         Returns
         -------
         torch.Tensor
-            Dense representation of the sparse matrix.
+            The copy in dense matrix format
         """
         row, col = self.coo()
         val = self.val
@@ -175,7 +174,7 @@ class SparseMatrix:
         return SparseMatrix(self.c_sparse_matrix.transpose())
 
     def to(self, device=None, dtype=None):
-        """Perform matrix dtype and/or device conversion. If the target device
+        """Performs matrix dtype and/or device conversion. If the target device
         and dtype are already in use, the original matrix will be returned.
 
         Parameters
@@ -184,13 +183,13 @@ class SparseMatrix:
             The target device of the matrix if provided, otherwise the current
             device will be used
         dtype : torch.dtype, optional
-            The target data type of the matrix values, otherwise the current
-            data type will be used
+            The target data type of the matrix values if provided, otherwise the
+            current data type will be used
 
         Returns
         -------
         SparseMatrix
-            The result matrix
+            The converted matrix
 
         Example
         --------
@@ -224,7 +223,7 @@ class SparseMatrix:
             return from_coo(row, col, val, self.shape)
 
     def cuda(self):
-        """Move the matrix to GPU. If the matrix is already on GPU, the
+        """Moves the matrix to GPU. If the matrix is already on GPU, the
         original matrix will be returned. If multiple GPU devices exist,
         'cuda:0' will be selected.
 
@@ -248,7 +247,7 @@ class SparseMatrix:
         return self.to(device="cuda")
 
     def cpu(self):
-        """Move the matrix to CPU. If the matrix is already on CPU, the
+        """Moves the matrix to CPU. If the matrix is already on CPU, the
         original matrix will be returned.
 
         Returns
@@ -271,7 +270,7 @@ class SparseMatrix:
         return self.to(device="cpu")
 
     def float(self):
-        """Convert the matrix values to float data type. If the matrix already
+        """Converts the matrix values to float data type. If the matrix already
         uses float data type, the original matrix will be returned.
 
         Returns
@@ -295,7 +294,7 @@ class SparseMatrix:
         return self.to(dtype=torch.float)
 
     def double(self):
-        """Convert the matrix values to double data type. If the matrix already
+        """Converts the matrix values to double data type. If the matrix already
         uses double data type, the original matrix will be returned.
 
         Returns
@@ -318,7 +317,7 @@ class SparseMatrix:
         return self.to(dtype=torch.double)
 
     def int(self):
-        """Convert the matrix values to int data type. If the matrix already
+        """Converts the matrix values to int data type. If the matrix already
         uses int data type, the original matrix will be returned.
 
         Returns
@@ -341,7 +340,7 @@ class SparseMatrix:
         return self.to(dtype=torch.int)
 
     def long(self):
-        """Convert the matrix values to long data type. If the matrix already
+        """Converts the matrix values to long data type. If the matrix already
         uses long data type, the original matrix will be returned.
 
         Returns
@@ -364,7 +363,7 @@ class SparseMatrix:
         return self.to(dtype=torch.long)
 
     def coalesce(self):
-        """Return a coalesced sparse matrix.
+        """Returns a coalesced sparse matrix.
 
         A coalesced sparse matrix satisfies the following properties:
 
@@ -379,7 +378,7 @@ class SparseMatrix:
         Returns
         -------
         SparseMatrix
-            The coalesced sparse matrix.
+            The coalesced sparse matrix
 
         Examples
         --------
@@ -397,12 +396,7 @@ class SparseMatrix:
         return SparseMatrix(self.c_sparse_matrix.coalesce())
 
     def has_duplicate(self):
-        """Return whether this sparse matrix contains duplicate indices.
-
-        Returns
-        -------
-        bool
-            True if this sparse matrix contains duplicate indices.
+        """Returns ``True`` if the sparse matrix contains duplicate indices.
 
         Examples
         --------
@@ -424,14 +418,14 @@ def from_coo(
     val: Optional[torch.Tensor] = None,
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
-    """Create a sparse matrix from row and column coordinates.
+    """Creates a sparse matrix from row and column coordinates.
 
     Parameters
     ----------
     row : tensor
-        The row indices of shape (nnz).
+        The row indices of shape (nnz)
     col : tensor
-        The column indices of shape (nnz).
+        The column indices of shape (nnz)
     val : tensor, optional
         The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
         shape (nnz) filled by 1.
@@ -492,7 +486,7 @@ def from_csr(
     val: Optional[torch.Tensor] = None,
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
-    """Create a sparse matrix from CSR indices.
+    """Creates a sparse matrix from CSR indices.
 
     For row i of the sparse matrix
 
@@ -504,9 +498,9 @@ def from_csr(
     ----------
     indptr : tensor
         Pointer to the column indices of shape (N + 1), where N is the number
-        of rows.
+        of rows
     indices : tensor
-        The column indices of shape (nnz).
+        The column indices of shape (nnz)
     val : tensor, optional
         The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
         shape (nnz) filled by 1.
@@ -576,7 +570,7 @@ def from_csc(
     val: Optional[torch.Tensor] = None,
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
-    """Create a sparse matrix from CSC indices.
+    """Creates a sparse matrix from CSC indices.
 
     For column i of the sparse matrix
 
@@ -588,9 +582,9 @@ def from_csc(
     ----------
     indptr : tensor
         Pointer to the row indices of shape N + 1, where N is the
-        number of columns.
+        number of columns
     indices : tensor
-        The row indices of shape nnz.
+        The row indices of shape nnz
     val : tensor, optional
         The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
         shape (nnz) filled by 1.
@@ -655,7 +649,7 @@ def from_csc(
 
 
 def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
-    """Create a sparse matrix from an existing sparse matrix using new values.
+    """Creates a sparse matrix from an existing sparse matrix using new values.
 
     The new sparse matrix will have the same non-zero indices as the given
     sparse matrix and use the given values as the new non-zero values.
@@ -691,7 +685,8 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
 
 def _sparse_matrix_str(spmat: SparseMatrix) -> str:
     """Internal function for converting a sparse matrix to string
-    representation."""
+    representation.
+    """
     indices_str = str(torch.stack(spmat.coo()))
     values_str = str(spmat.val)
     meta_str = f"size={spmat.shape}, nnz={spmat.nnz}"

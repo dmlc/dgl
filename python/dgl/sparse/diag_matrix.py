@@ -158,10 +158,10 @@ class DiagMatrix:
         Parameters
         ----------
         device : torch.device, optional
-            The target device of the matrix if given, otherwise the current
+            The target device of the matrix if provided, otherwise the current
             device will be used
         dtype : torch.dtype, optional
-            The target data type of the matrix values if given, otherwise the
+            The target data type of the matrix values if provided, otherwise the
             current data type will be used
 
         Returns
@@ -318,7 +318,7 @@ def diag(
     Parameters
     ----------
     val : torch.Tensor
-        Diagonal of the matrix, in shape ``(N)`` or ``(N, D)``.
+        Diagonal of the matrix, in shape ``(N)`` or ``(N, D)``
     shape : tuple[int, int], optional
         If specified, :attr:`len(val)` must be equal to :attr:`min(shape)`,
         otherwise, it will be inferred from :attr:`val`, i.e., ``(N, N)``
