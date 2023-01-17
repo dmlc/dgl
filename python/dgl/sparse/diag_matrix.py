@@ -8,7 +8,16 @@ from .sparse_matrix import from_coo, SparseMatrix
 
 
 class DiagMatrix:
-    r"""Class for diagonal matrix."""
+    r"""Class for diagonal matrix.
+
+    Parameters
+    ----------
+    val : torch.Tensor
+        Diagonal of the matrix, in shape ``(N)`` or ``(N, D)``
+    shape : tuple[int, int], optional
+        If specified, :attr:`len(val)` must be equal to :attr:`min(shape)`,
+        otherwise, it will be inferred from :attr:`val`, i.e., ``(N, N)``
+    """
 
     def __init__(
         self, val: torch.Tensor, shape: Optional[Tuple[int, int]] = None
