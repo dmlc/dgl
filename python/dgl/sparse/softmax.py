@@ -16,6 +16,11 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
     and :attr:`input.val`. :attr:`output.val[:, i]` is calculated based on
     :attr:`input.val[:, i]`.
 
+    Parameters
+    ----------
+    input : SparseMatrix
+        The input sparse matrix
+
     Returns
     -------
     SparseMatrix
@@ -30,8 +35,8 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
     >>> col = torch.tensor([1, 2, 2, 0])
     >>> nnz = len(row)
     >>> val = torch.arange(nnz).float()
-    >>> A = from_coo(row, col, val)
-    >>> softmax(A)
+    >>> A = dglsp.from_coo(row, col, val)
+    >>> dglsp.softmax(A)
     SparseMatrix(indices=tensor([[0, 0, 1, 2],
         [1, 2, 2, 0]]),
     values=tensor([0.2689, 0.7311, 1.0000, 1.0000]),
@@ -40,8 +45,8 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
     Case2: matrix with values of shape (nnz, D)
 
     >>> val = torch.tensor([[0., 7.], [1., 3.], [2., 2.], [3., 1.]])
-    >>> A = from_coo(row, col, val)
-    >>> softmax(A)
+    >>> A = dglsp.from_coo(row, col, val)
+    >>> dglsp.softmax(A)
     SparseMatrix(indices=tensor([[0, 0, 1, 2],
         [1, 2, 2, 0]]),
     values=tensor([[0.2689, 0.9820],
