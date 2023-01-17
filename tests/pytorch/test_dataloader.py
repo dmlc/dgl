@@ -12,15 +12,21 @@ from test_utils import parametrize_idtype
 import pytest
 
 
-def test_graph_dataloader():
-    batch_size = 16
+@pytest.mark.parametrize('batch_size', [None, 16])
+def test_graph_dataloader(batch_size):
     num_batches = 2
-    minigc_dataset = dgl.data.MiniGCDataset(batch_size * num_batches, 10, 20)
+    num_samples = num_batches * (batch_size if batch_size is not None else 1)
+    minigc_dataset = dgl.data.MiniGCDataset(num_samples, 10, 20)
     data_loader = dgl.dataloading.GraphDataLoader(minigc_dataset, batch_size=batch_size, shuffle=True)
     assert isinstance(iter(data_loader), Iterator)
     for graph, label in data_loader:
         assert isinstance(graph, dgl.DGLGraph)
-        assert F.asnumpy(label).shape[0] == batch_size
+        if batch_size is not None:
+            assert F.asnumpy(label).shape[0] == batch_size
+        else:
+            # If batch size is None, the label element will be a single scalar following
+            # PyTorch's practice.
+            assert F.asnumpy(label).ndim == 0
 
 @unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @pytest.mark.parametrize('num_workers', [0, 4])

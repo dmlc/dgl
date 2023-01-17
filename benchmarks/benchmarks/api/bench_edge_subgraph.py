@@ -9,7 +9,6 @@ import dgl.function as fn
 from .. import utils
 
 
-@utils.skip_if_gpu()
 @utils.benchmark("time")
 @utils.parametrize("graph_name", ["livejournal", "reddit"])
 @utils.parametrize("format", ["coo"])
@@ -20,15 +19,16 @@ def track_time(graph_name, format, seed_egdes_num):
     graph = graph.to(device)
 
     seed_edges = np.random.randint(0, graph.num_edges(), seed_egdes_num)
+    seed_edges = torch.from_numpy(seed_edges).to(device)
 
     # dry run
     for i in range(3):
         dgl.edge_subgraph(graph, seed_edges)
 
     # timing
-
+    num_iters = 50
     with utils.Timer() as t:
-        for i in range(3):
+        for i in range(num_iters):
             dgl.edge_subgraph(graph, seed_edges)
 
-    return t.elapsed_secs / 3
+    return t.elapsed_secs / num_iters

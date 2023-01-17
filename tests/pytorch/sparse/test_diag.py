@@ -36,7 +36,7 @@ def test_diag(val_shape, mat_shape):
     assert mat.device == val.device
 
     # as_sparse
-    sp_mat = mat.as_sparse()
+    sp_mat = mat.to_sparse()
     # shape
     assert tuple(sp_mat.shape) == mat_shape
     # nnz

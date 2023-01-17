@@ -5,9 +5,6 @@ dgl.sparse
 
 `dgl.sparse` is a library for sparse operators that are commonly used in GNN models.
 
-.. warning::
-    This is an experimental package. The sparse operators provided in this library do not guarantee the same performance as their message-passing api counterparts.
-
 Sparse matrix class
 -------------------------
 .. currentmodule:: dgl.sparse
@@ -85,18 +82,14 @@ Attributes and methods
     SparseMatrix.dtype
     SparseMatrix.device
     SparseMatrix.val
-    SparseMatrix.__repr__
     SparseMatrix.row
     SparseMatrix.col
-    SparseMatrix.indices
     SparseMatrix.coo
     SparseMatrix.csr
     SparseMatrix.csc
     SparseMatrix.coalesce
     SparseMatrix.has_duplicate
-    SparseMatrix.dense
-    SparseMatrix.t
-    SparseMatrix.T
+    SparseMatrix.to_dense
     SparseMatrix.to
     SparseMatrix.cuda
     SparseMatrix.cpu
@@ -105,14 +98,15 @@ Attributes and methods
     SparseMatrix.int
     SparseMatrix.long
     SparseMatrix.transpose
+    SparseMatrix.t
+    SparseMatrix.T
+    SparseMatrix.neg
     SparseMatrix.reduce
     SparseMatrix.sum
     SparseMatrix.smax
     SparseMatrix.smin
     SparseMatrix.smean
-    SparseMatrix.neg
     SparseMatrix.softmax
-    SparseMatrix.__matmul__
 
 Diagonal matrix class
 -------------------------
@@ -140,12 +134,8 @@ Attributes and methods
     DiagMatrix.dtype
     DiagMatrix.device
     DiagMatrix.val
-    DiagMatrix.__repr__
-    DiagMatrix.as_sparse
-    DiagMatrix.dense
-    DiagMatrix.t
-    DiagMatrix.T
-    DiagMatrix.transpose
+    DiagMatrix.to_sparse
+    DiagMatrix.to_dense
     DiagMatrix.to
     DiagMatrix.cuda
     DiagMatrix.cpu
@@ -153,31 +143,45 @@ Attributes and methods
     DiagMatrix.double
     DiagMatrix.int
     DiagMatrix.long
+    DiagMatrix.transpose
+    DiagMatrix.t
+    DiagMatrix.T
     DiagMatrix.neg
     DiagMatrix.inv
-    DiagMatrix.__matmul__
 
 Operators
 ---------
 .. currentmodule:: dgl.sparse
 
+Elementwise Operators
+````````
+
 .. autosummary::
     :toctree: ../../generated/
 
-    sp_add
-    sp_mul
-    sp_power
-    diag_add
-    diag_sub
-    diag_mul
-    diag_div
-    diag_power
     add
+    sub
+    mul
+    div
     power
+
+Matrix Multiplication
+````````
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    matmul
     spmm
     bspmm
     spspmm
-    mm
     sddmm
     bsddmm
+
+Non-linear activation functions
+````````
+
+.. autosummary::
+    :toctree: ../../generated/
+
     softmax

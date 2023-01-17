@@ -8,22 +8,15 @@ from .sparse_matrix import from_coo, SparseMatrix
 
 
 class DiagMatrix:
-    """Diagonal Matrix Class
+    r"""Class for diagonal matrix.
 
     Parameters
     ----------
     val : torch.Tensor
-        Diagonal of the matrix. It can take shape (N) or (N, D).
+        Diagonal of the matrix, in shape ``(N)`` or ``(N, D)``
     shape : tuple[int, int], optional
-        If not specified, it will be inferred from :attr:`val`, i.e.,
-        (N, N). Otherwise, :attr:`len(val)` must be equal to :attr:`min(shape)`.
-
-    Attributes
-    ----------
-    val : torch.Tensor
-        Diagonal of the matrix.
-    shape : tuple[int, int]
-        Shape of the matrix.
+        If specified, :attr:`len(val)` must be equal to :attr:`min(shape)`,
+        otherwise, it will be inferred from :attr:`val`, i.e., ``(N, N)``
     """
 
     def __init__(
@@ -40,71 +33,71 @@ class DiagMatrix:
         self._val = val
         self._shape = shape
 
+    def __repr__(self):
+        return _diag_matrix_str(self)
+
     @property
     def val(self) -> torch.Tensor:
-        """Get the values of the nonzero elements.
+        """Returns the values of the non-zero elements.
 
         Returns
         -------
         torch.Tensor
-            Values of the nonzero elements
+            Values of the non-zero elements
         """
         return self._val
 
     @property
     def shape(self) -> Tuple[int]:
-        """Shape of the sparse matrix.
+        """Returns the shape of the diagonal matrix.
 
         Returns
         -------
         Tuple[int]
-            The shape of the matrix
+            The shape of the diagonal matrix
         """
         return self._shape
 
-    def __repr__(self):
-        return _diag_matrix_str(self)
-
     @property
     def nnz(self) -> int:
-        """Return the number of non-zero values in the matrix
+        """Returns the number of non-zero elements in the diagonal matrix.
 
         Returns
         -------
         int
-            The number of non-zero values in the matrix
+            The number of non-zero elements in the diagonal matrix
         """
         return self.val.shape[0]
 
     @property
     def dtype(self) -> torch.dtype:
-        """Return the data type of the matrix
+        """Returns the data type of the diagonal matrix.
 
         Returns
         -------
         torch.dtype
-            Data type of the matrix
+            Data type of the diagonal matrix
         """
         return self.val.dtype
 
     @property
     def device(self) -> torch.device:
-        """Return the device of the matrix
+        """Returns the device the diagonal matrix is on.
 
         Returns
         -------
         torch.device
-            Device of the matrix
+            The device the diagonal matrix is on
         """
         return self.val.device
 
-    def as_sparse(self) -> SparseMatrix:
-        """Convert the diagonal matrix into a sparse matrix object
+    def to_sparse(self) -> SparseMatrix:
+        """Returns a copy in sparse matrix format of the diagonal matrix.
 
         Returns
         -------
         SparseMatrix
-            The converted sparse matrix object
+            The copy in sparse matrix format
 
         Example
         -------
@@ -112,7 +105,7 @@ class DiagMatrix:
         >>> import torch
         >>> val = torch.ones(5)
         >>> mat = diag(val)
-        >>> sp_mat = mat.as_sparse()
+        >>> sp_mat = mat.to_sparse()
         >>> print(sp_mat)
         SparseMatrix(indices=tensor([[0, 1, 2, 3, 4],
                                      [0, 1, 2, 3, 4]]),
@@ -122,13 +115,13 @@ class DiagMatrix:
         row = col = torch.arange(len(self.val)).to(self.device)
         return from_coo(row=row, col=col, val=self.val, shape=self.shape)
 
-    def dense(self) -> torch.Tensor:
-        """Return a dense representation of the matrix.
+    def to_dense(self) -> torch.Tensor:
+        """Returns a copy in dense matrix format of the diagonal matrix.
 
         Returns
         -------
         torch.Tensor
-            Dense representation of the diagonal matrix.
+            The copy in dense matrix format
         """
         val = self.val
         device = self.device
@@ -148,12 +141,12 @@ class DiagMatrix:
         return self.transpose()
 
     def transpose(self):
-        """Return the transpose of the matrix.
+        """Returns a matrix that is a transposed version of the diagonal matrix.
 
         Returns
         -------
         DiagMatrix
-            The transpose of the matrix.
+            The transpose of the matrix
 
         Example
         --------
@@ -168,22 +161,22 @@ class DiagMatrix:
         return DiagMatrix(self.val, self.shape[::-1])
 
     def to(self, device=None, dtype=None):
-        """Perform matrix dtype and/or device conversion. If the target device
+        """Performs matrix dtype and/or device conversion. If the target device
         and dtype are already in use, the original matrix will be returned.
 
         Parameters
         ----------
         device : torch.device, optional
-            The target device of the matrix if given, otherwise the current
+            The target device of the matrix if provided, otherwise the current
             device will be used
         dtype : torch.dtype, optional
-            The target data type of the matrix values if given, otherwise the
+            The target data type of the matrix values if provided, otherwise the
             current data type will be used
 
         Returns
         -------
         DiagMatrix
-            The result matrix
+            The converted matrix
 
         Example
         --------
@@ -205,7 +198,7 @@ class DiagMatrix:
         return diag(self.val.to(device=device, dtype=dtype), self.shape)
 
     def cuda(self):
-        """Move the matrix to GPU. If the matrix is already on GPU, the
+        """Moves the matrix to GPU. If the matrix is already on GPU, the
         original matrix will be returned. If multiple GPU devices exist,
         'cuda:0' will be selected.
 
@@ -226,7 +219,7 @@ class DiagMatrix:
         return self.to(device="cuda")
 
     def cpu(self):
-        """Move the matrix to CPU. If the matrix is already on CPU, the
+        """Moves the matrix to CPU. If the matrix is already on CPU, the
         original matrix will be returned.
 
         Returns
@@ -246,7 +239,7 @@ class DiagMatrix:
         return self.to(device="cpu")
 
     def float(self):
-        """Convert the matrix values to float data type. If the matrix already
+        """Converts the matrix values to float data type. If the matrix already
         uses float data type, the original matrix will be returned.
 
         Returns
@@ -266,7 +259,7 @@ class DiagMatrix:
         return self.to(dtype=torch.float)
 
     def double(self):
-        """Convert the matrix values to double data type. If the matrix already
+        """Converts the matrix values to double data type. If the matrix already
         uses double data type, the original matrix will be returned.
 
         Returns
@@ -286,7 +279,7 @@ class DiagMatrix:
         return self.to(dtype=torch.double)
 
     def int(self):
-        """Convert the matrix values to int data type. If the matrix already
+        """Converts the matrix values to int data type. If the matrix already
         uses int data type, the original matrix will be returned.
 
         Returns
@@ -306,7 +299,7 @@ class DiagMatrix:
         return self.to(dtype=torch.int)
 
     def long(self):
-        """Convert the matrix values to long data type. If the matrix already
+        """Converts the matrix values to long data type. If the matrix already
         uses long data type, the original matrix will be returned.
 
         Returns
@@ -329,15 +322,15 @@ class DiagMatrix:
 def diag(
     val: torch.Tensor, shape: Optional[Tuple[int, int]] = None
 ) -> DiagMatrix:
-    """Create a diagonal matrix based on the diagonal values
+    """Creates a diagonal matrix based on the diagonal values.
 
     Parameters
     ----------
     val : torch.Tensor
-        Diagonal of the matrix. It can take shape (N) or (N, D).
+        Diagonal of the matrix, in shape ``(N)`` or ``(N, D)``
     shape : tuple[int, int], optional
-        If not specified, it will be inferred from :attr:`val`, i.e.,
-        (N, N). Otherwise, :attr:`len(val)` must be equal to :attr:`min(shape)`.
+        If specified, :attr:`len(val)` must be equal to :attr:`min(shape)`,
+        otherwise, it will be inferred from :attr:`val`, i.e., ``(N, N)``
 
     Returns
     -------
@@ -383,7 +376,7 @@ def identity(
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
 ) -> DiagMatrix:
-    """Create a diagonal matrix with ones on the diagonal and zeros elsewhere
+    """Creates a diagonal matrix with ones on the diagonal and zeros elsewhere.
 
     Parameters
     ----------
@@ -447,7 +440,8 @@ def identity(
 
 def _diag_matrix_str(spmat: DiagMatrix) -> str:
     """Internal function for converting a diagonal matrix to string
-    representation."""
+    representation.
+    """
     values_str = str(spmat.val)
     meta_str = f"size={spmat.shape}"
     if spmat.val.dim() > 1:

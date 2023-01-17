@@ -26,8 +26,6 @@ DataLoaders
 
     DataLoader
     GraphDataLoader
-    NodeDataLoader
-    EdgeDataLoader
     DistNodeDataLoader
     DistEdgeDataLoader
 
