@@ -126,7 +126,7 @@ def _sparse_diag_mm(A, D):
     A : SparseMatrix
         Sparse matrix of shape ``(L, M)``
     D : DiagMatrix
-        Sparse matrix of shape ``(M, N)``
+        Diagonal matrix of shape ``(M, N)``
 
     Returns
     -------
@@ -153,8 +153,8 @@ def _diag_sparse_mm(D, A):
     ----------
     D : DiagMatrix
         Diagonal matrix of shape ``(L, M)``
-    A : DiagMatrix
-        Diagonal matrix of shape ``(M, N)``
+    A : SparseMatrix
+        Sparse matrix of shape ``(M, N)``
 
     Returns
     -------
