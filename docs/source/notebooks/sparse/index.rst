@@ -10,4 +10,5 @@ TODO(minjie): intro for the new library.
   quickstart.nblink
   gcn.nblink
   graph_diffusion.nblink
+  hgnn.nblink
   graph_transformer.nblink
