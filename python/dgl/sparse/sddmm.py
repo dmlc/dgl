@@ -34,7 +34,7 @@ def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     Returns
     -------
     SparseMatrix
-        Sparse matrix of shape ``(L, N)``.
+        Sparse matrix of shape ``(L, N)``
 
     Examples
     --------
@@ -84,7 +84,8 @@ def bsddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     Returns
     -------
     SparseMatrix
-        Sparse matrix of shape ``(L, N, K)``.
+        Sparse matrix of shape ``(L, N)`` with scalar values or vector values of
+        length ``K``
 
     Examples
     --------
