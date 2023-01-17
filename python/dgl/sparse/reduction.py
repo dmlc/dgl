@@ -17,6 +17,8 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
 
     Parameters
     ----------
+    input : SparseMatrix
+        The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
         or None (on all non-zero entries)
@@ -83,6 +85,8 @@ def sum(input: SparseMatrix, dim: Optional[int] = None):
 
     Parameters
     ----------
+    input : SparseMatrix
+        The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
         or None (on all non-zero entries)
@@ -135,6 +139,8 @@ def smax(input: SparseMatrix, dim: Optional[int] = None):
 
     Parameters
     ----------
+    input : SparseMatrix
+        The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
         or None (on all non-zero entries)
@@ -188,6 +194,8 @@ def smin(input: SparseMatrix, dim: Optional[int] = None):
 
     Parameters
     ----------
+    input : SparseMatrix
+        The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
         or None (on all non-zero entries)
@@ -245,6 +253,8 @@ def smean(input: SparseMatrix, dim: Optional[int] = None):
 
     Parameters
     ----------
+    input : SparseMatrix
+        The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
         or None (on all non-zero entries)
@@ -302,6 +312,8 @@ def sprod(input: SparseMatrix, dim: Optional[int] = None):
 
     Parameters
     ----------
+    input : SparseMatrix
+        The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
         or None (on all non-zero entries)
