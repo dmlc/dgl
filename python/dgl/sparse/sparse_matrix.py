@@ -111,8 +111,8 @@ class SparseMatrix:
             A tuple of tensors containing row indptr, column indices and value
             indices. Value indices is an index tensor, indicating the order of
             the values of non-zero elements in the CSR representation. A null
-            value indices indicates the order of the values stays the same in
-            the CSR representation.
+            value indices indicates the order of the values stays the same as
+            the values of the SparseMatrix.
         """
         return self.c_sparse_matrix.csr()
 
@@ -126,8 +126,8 @@ class SparseMatrix:
             A tuple of tensors containing column indptr, row indices and value
             indices. Value indices is an index tensor, indicating the order of
             the values of non-zero elements in the CSC representation. A null
-            value indices indicates the order of the values stays the same in
-            the CSC representation.
+            value indices indicates the order of the values stays the same as
+            the values of the SparseMatrix.
         """
         return self.c_sparse_matrix.csc()
 
