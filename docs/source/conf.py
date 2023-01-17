@@ -235,6 +235,8 @@ if dglbackend == 'mxnet':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<=mx)\.py"
 if dglbackend == 'pytorch':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<!mx)\.py"
+else:
+    sphinx_gallery_conf['ignore_pattern'] = "/*tutorials/*\.py"
 
 # sphinx-copybutton tool
 copybutton_prompt_text = r'>>> |\.\.\. '
