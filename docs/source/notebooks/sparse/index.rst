@@ -9,3 +9,4 @@ TODO(minjie): intro for the new library.
 
   quickstart.nblink
   graph_diffusion.nblink
+  graph_transformer.nblink
