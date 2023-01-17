@@ -8,3 +8,4 @@ TODO(minjie): intro for the new library.
   :titlesonly:
 
   quickstart.nblink
+  graph_diffusion.nblink
