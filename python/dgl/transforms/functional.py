@@ -3915,24 +3915,25 @@ def shortest_dist(g, root=None, return_paths=False):
         F.copy_to(F.tensor(paths, dtype=F.int64), g.device)
 
 
-def svd_pe(g, r, padding=False, random_flip=True):
+def svd_pe(g, k, padding=False, random_flip=True):
     r"""SVD-based Positional Encoding, as introduced in
     `Global Self-Attention as a Replacement for Graph Convolution
     <https://arxiv.org/pdf/2108.03348.pdf>`__
-    This function computes the largest :math:`r` singular values and
+    This function computes the largest :math:`k` singular values and
     corresponding left and right singular vectors to form positional encodings.
 
     Parameters
     ----------
     g : DGLGraph
         A DGLGraph to be encoded, which must be a homogeneous one.
-    r : int
+    k : int
         Number of largest singular values and corresponding singular vectors
         used for positional encoding.
     padding : bool, optional
-        If False, raise an error when :math:`r > N`,
-        where :math:`N` is number of nodes in :attr:`g`.
-        If True, add zero paddings in the end of encodings when :math:`r > N`.
+        If False, raise an error when :math:`k > N`,
+        where :math:`N` is the number of nodes in :attr:`g`.
+        If True, add zero paddings in the end of encoding vectorss when
+        :math:`k > N`.
         Default : False.
     random_flip : bool, optional
         If True, randomly flip the signs of encoding vectors.
@@ -3942,15 +3943,14 @@ def svd_pe(g, r, padding=False, random_flip=True):
     Returns
     -------
     Tensor
-        Return SVD-based positional encodings of shape :math:`(N, 2r)`,
-        where :math:`N` is number of nodes in :attr:`g`.
+        Return SVD-based positional encodings of shape :math:`(N, 2k)`.
 
     Example
     -------
     >>> import dgl
 
     >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
-    >>> dgl.svd_pe(g, r=2, padding=False, random_flip=True)
+    >>> dgl.svd_pe(g, k=2, padding=False, random_flip=True)
     tensor([[-6.3246e-01, -1.1373e-07, -6.3246e-01,  0.0000e+00],
             [-6.3246e-01,  7.6512e-01, -6.3246e-01, -7.6512e-01],
             [ 6.3246e-01,  4.7287e-01,  6.3246e-01, -4.7287e-01],
@@ -3958,37 +3958,36 @@ def svd_pe(g, r, padding=False, random_flip=True):
             [ 6.3246e-01, -4.7287e-01,  6.3246e-01,  4.7287e-01]])
     """
     n = g.num_nodes()
-    if not padding and n < r:
+    if not padding and n < k:
         raise ValueError(
             'The number of singular values r must be no greater than the '
             'number of nodes n, but ' +
-            f'got {r} and {n} respectively.'
+            f'got {k} and {n} respectively.'
         )
     a = g.adj(ctx=g.device, scipy_fmt='coo').toarray()
     u, d, vh = scipy.linalg.svd(a)
     v = vh.transpose()
-    k = min(n, r)
-    topk_u = u[:, 0: k]
-    topk_v = v[:, 0: k]
-    topk_sqrt_d = sparse.diags(np.sqrt(d[0: k]))
-    # shape: [n, 2k], n = num_nodes, k = min(n, r)
+    m = min(n, k)
+    topm_u = u[:, 0: m]
+    topm_v = v[:, 0: m]
+    topm_sqrt_d = sparse.diags(np.sqrt(d[0: m]))
     encoding = np.concatenate(
-        ((topk_u @ topk_sqrt_d), (topk_v @ topk_sqrt_d)),
+        ((topm_u @ topm_sqrt_d), (topm_v @ topm_sqrt_d)),
         axis=1
     )
     # randomly flip row vectors
     if random_flip:
         rand_sign = 2 * (np.random.rand(n) > 0.5) - 1
         flipped_encoding = F.tensor(
-            (encoding.transpose() * rand_sign).transpose(),
+            rand_sign[:, np.newaxis] * encoding,
             dtype=F.float32
         )
     else:
         flipped_encoding = F.tensor(encoding, dtype=F.float32)
 
-    if n < r:
+    if n < k:
         zero_padding = F.zeros(
-            [n, 2*(r-n)], dtype=F.float32, ctx=F.context(flipped_encoding)
+            [n, 2*(k-n)], dtype=F.float32, ctx=F.context(flipped_encoding)
         )
         flipped_encoding = F.cat([flipped_encoding, zero_padding], dim=1)
 

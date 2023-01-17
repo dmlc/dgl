@@ -34,4 +34,4 @@ dgl.transforms
     RowFeatNormalizer
     SIGNDiffusion
     ToLevi
-    SvdPE
+    SVDPE

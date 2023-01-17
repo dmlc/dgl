@@ -2710,7 +2710,7 @@ def test_module_svd_pe(idtype):
         ),
         g.device
     )
-    transform_1 = dgl.SvdPE(r=2, feat_name='svd_pe')
+    transform_1 = dgl.SVDPE(k=2, feat_name='svd_pe')
     g1 = transform_1(g)
     if dgl.backend.backend_name == 'tensorflow':
         assert F.allclose(g1.ndata['svd_pe'].__abs__(), tgt_pe)
@@ -2718,7 +2718,7 @@ def test_module_svd_pe(idtype):
         assert F.allclose(g1.ndata['svd_pe'].abs(), tgt_pe)
 
     # with padding
-    transform_2 = dgl.SvdPE(r=6, feat_name='svd_pe', padding=True)
+    transform_2 = dgl.SVDPE(k=6, feat_name='svd_pe', padding=True)
     g2 = transform_2(g)
     assert F.shape(g2.ndata['svd_pe']) == (5, 12)
 
