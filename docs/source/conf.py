@@ -219,6 +219,10 @@ gallery_dirs = ['tutorials/blitz/',
                 'tutorials/models/',
                 'tutorials/multi/',
                 'tutorials/cpu']  # path to generate docs
+if dglbackend != "pytorch":
+    examples_dirs = []
+    gallery_dirs = []
+
 reference_url = {
     'dgl' : None,
     'numpy': 'http://docs.scipy.org/doc/numpy/',
