@@ -53,6 +53,9 @@ extensions = [
     'nbsphinx_link',
 ]
 
+# TODO(#5199): 'auto' or 'always' should be used.
+nbsphinx_execute = 'never'
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
