@@ -77,10 +77,8 @@ language = None
 exclude_patterns = []
 if dglbackend == "mxnet":
     include_patterns = ['api/python/nn-mxnet*']
-    exclude_patterns = ['api/python/.*(?!mxnet)*']
 elif dglbackend == "tensorflow":
     include_patterns = ['api/python/nn-tensorflow*']
-    exclude_patterns = ['api/python/.*(?!tensorflow)*']
 else:
     # pytorch
     exclude_patterns = ['api/python/nn-tensorflow*', 'api/python/nn-mxnet*']
