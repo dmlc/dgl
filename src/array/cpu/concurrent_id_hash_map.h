@@ -4,11 +4,10 @@
  * @brief Utility classes and functions for DGL arrays.
  */
 
-#ifndef DGL_ARRAY_CPU_MY_HASH_MAP_H_
-#define DGL_ARRAY_CPU_MY_HASH_MAP_H_
+#ifndef DGL_ARRAY_CONCURRENT_HASH_MAP_H_
+#define DGL_ARRAY_CONCURRENT_HASH_MAP_H_
 
 #include <vector>
-#include <iostream>
 #include <atomic>
 #include <omp.h>
 #include <algorithm>
@@ -203,4 +202,4 @@ class ConcurrentIdHashMap {
 }  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_ARRAY_CPU_MY_HASH_MAP_H_
+#endif  // DGL_ARRAY_CONCURRENT_HASH_MAP_H_
