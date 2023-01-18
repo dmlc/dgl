@@ -136,6 +136,8 @@ multiple edges among any given pair.
 #    efficient :class:`builtin R-GCN layer module <dgl.nn.pytorch.conv.RelGraphConv>`.
 #
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 import torch
 import torch.nn as nn
