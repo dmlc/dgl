@@ -26,6 +26,7 @@ author = 'DGL Team'
 import dgl
 version = dgl.__version__
 release = dgl.__version__
+dglbackend = os.environ.get("DGLBACKEND", "pytorch")
 
 
 # -- General configuration ---------------------------------------------------
@@ -74,6 +75,13 @@ language = None
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
+if dglbackend == "mxnet":
+    include_patterns = ['api/python/nn-mxnet']
+elif dglbackend == "tensorflow":
+    include_patterns = ['api/python/nn-tensorflow']
+else:
+    # pytorch
+    exclude_patterns = ['api/python/nn-tensorflow', 'api/python/nn-mxnet']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
@@ -230,14 +238,10 @@ sphinx_gallery_conf = {
 }
 
 # Compatibility for different backend when builds tutorials
-dglbackend = os.environ.get("DGLBACKEND", "")
 if dglbackend == 'mxnet':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<=mx)\.py"
 if dglbackend == 'pytorch':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<!mx)\.py"
-else:
-    sphinx_gallery_conf['ignore_pattern'] = ".*tutorials/.*"
-    sphinx_gallery_conf['plot_gallery'] = False
 
 # sphinx-copybutton tool
 copybutton_prompt_text = r'>>> |\.\.\. '
