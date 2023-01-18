@@ -30,6 +30,8 @@ By the end of this tutorial you will be able to:
 # center node to the leaves.
 #
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import numpy as np
 import torch
 

@@ -13,6 +13,8 @@ for stochastic GNN training. It assumes that
 
 """
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 import torch
 import numpy as np
