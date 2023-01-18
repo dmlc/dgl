@@ -21,11 +21,12 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
     rtype: str, optional
@@ -89,11 +90,12 @@ def sum(input: SparseMatrix, dim: Optional[int] = None):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
 
@@ -143,11 +145,12 @@ def smax(input: SparseMatrix, dim: Optional[int] = None):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
 
@@ -198,11 +201,12 @@ def smin(input: SparseMatrix, dim: Optional[int] = None):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
 
@@ -257,11 +261,12 @@ def smean(input: SparseMatrix, dim: Optional[int] = None):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
 
@@ -316,11 +321,12 @@ def sprod(input: SparseMatrix, dim: Optional[int] = None):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
 
