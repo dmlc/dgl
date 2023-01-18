@@ -75,6 +75,7 @@ language = None
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
+'''
 if dglbackend == "mxnet":
     include_patterns = ['api/python/nn-mxnet*']
 elif dglbackend == "tensorflow":
@@ -82,6 +83,7 @@ elif dglbackend == "tensorflow":
 else:
     # pytorch
     exclude_patterns = ['api/python/nn-tensorflow*', 'api/python/nn-mxnet*']
+'''
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
