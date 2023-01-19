@@ -416,6 +416,77 @@ class SparseMatrix:
         return self.c_sparse_matrix.has_duplicate()
 
 
+def spmatrix(
+    indices: torch.Tensor,
+    val: Optional[torch.Tensor] = None,
+    shape: Optional[Tuple[int, int]] = None,
+) -> SparseMatrix:
+    r"""Creates a sparse matrix from COO indices.
+
+    Parameters
+    ----------
+    indices : tensor
+        The stacked tensor of row and column coordinates
+    val : tensor, optional
+        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
+        shape (nnz) filled by 1.
+    shape : tuple[int, int], optional
+        If not specified, it will be inferred from :attr:`row` and :attr:`col`,
+        i.e., (row.max() + 1, col.max() + 1). Otherwise, :attr:`shape` should
+        be no smaller than this.
+
+    Returns
+    -------
+    SparseMatrix
+        Sparse matrix
+
+    Examples
+    --------
+
+    Case1: Sparse matrix with row and column indices without values.
+
+    >>> dst = torch.tensor([1, 1, 2])
+    >>> src = torch.tensor([2, 4, 3])
+    >>> indices = torch.stack(dst, src)
+    >>> A = dglsp.spmatrix(indices)
+    SparseMatrix(indices=tensor([[1, 1, 2],
+            [2, 4, 3]]),
+    values=tensor([1., 1., 1.]),
+    shape=(3, 5), nnz=3)
+    >>> # Specify shape
+    >>> A = dglsp.spmatrix(indices, shape=(5, 5))
+    >>> print(A)
+    SparseMatrix(indices=tensor([[1, 1, 2],
+            [2, 4, 3]]),
+    values=tensor([1., 1., 1.]),
+    shape=(5, 5), nnz=3)
+
+    Case2: Sparse matrix with scalar values.
+
+    >>> val = torch.tensor([[1.], [2.], [3.]])
+    >>> A = dglsp.spmatrix(indices, val)
+    SparseMatrix(indices=tensor([[1, 1, 2],
+                                 [2, 4, 3]]),
+                 values=tensor([[1.],
+                                [2.],
+                                [3.]]),
+                 size=(3, 5), nnz=3, val_size=(1,))
+
+    Case3: Sparse matrix with vector values.
+
+    >>> val = torch.tensor([[1., 1.], [2., 2.], [3., 3.]])
+    >>> A = dglsp.spmatrix(indices, val)
+    SparseMatrix(indices=tensor([[1, 1, 2],
+                                 [2, 4, 3]]),
+                 values=tensor([[1., 1.],
+                                [2., 2.],
+                                [3., 3.]]),
+                 shape=(3, 5), nnz=3, val_size=(2,))
+
+    """
+    return from_coo(indices[0], indices[1], val, shape)
+
+
 def from_coo(
     row: torch.Tensor,
     col: torch.Tensor,
