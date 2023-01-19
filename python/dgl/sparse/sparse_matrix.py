@@ -518,7 +518,7 @@ def from_coo(
     Case2: Sparse matrix with scalar values.
 
     >>> val = torch.tensor([[1.], [2.], [3.]])
-    >>> A = from_coo(dst, src, val)
+    >>> A = dglsp.from_coo(dst, src, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([[1.],
