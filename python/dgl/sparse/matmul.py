@@ -29,10 +29,10 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     Examples
     --------
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([1, 0, 1])
+    >>> indices = torch.tensor([[0, 1, 1],
+    >>>                         [1, 0, 1]])
     >>> val = torch.randn(len(row))
-    >>> A = dglsp.from_coo(row, col, val)
+    >>> A = dglsp.spmatrix(indices, val)
     >>> X = torch.randn(2, 3)
     >>> result = dglsp.spmm(A, X)
     >>> type(result)
@@ -72,10 +72,10 @@ def bspmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     Examples
     --------
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([1, 0, 2])
+    >>> indices = torch.tensor([[0, 1, 1],
+    >>>                         [1, 0, 2]])
     >>> val = torch.randn(len(row), 2)
-    >>> A = dglsp.from_coo(row, col, val, shape=(3, 3))
+    >>> A = dglsp.spmatrix(indices, val, shape=(3, 3))
     >>> X = torch.randn(3, 3, 2)
     >>> result = dglsp.bspmm(A, X)
     >>> type(result)
@@ -293,10 +293,10 @@ def matmul(
 
     Multiplies a sparse matrix with a dense matrix.
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([1, 0, 1])
+    >>> indices = torch.tensor([[0, 1, 1],
+    >>>                         [1, 0, 1]])
     >>> val = torch.randn(len(row))
-    >>> A = dglsp.from_coo(row, col, val)
+    >>> A = dglsp.spmatrix(indices, val)
     >>> X = torch.randn(2, 3)
     >>> result = dglsp.matmul(A, X)
     >>> type(result)
