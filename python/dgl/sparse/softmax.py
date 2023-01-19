@@ -9,7 +9,7 @@ __all__ = ["softmax"]
 
 
 def softmax(input: SparseMatrix) -> SparseMatrix:
-    """Apply row-wise softmax to the non-zero elements of the sparse matrix.
+    """Apples row-wise softmax to the non-zero elements of the sparse matrix.
 
     If :attr:`input.val` takes shape :attr:`(nnz, D)`, then the output matrix
     :attr:`output` and :attr:`output.val` take the same shape as :attr:`input`
@@ -38,22 +38,24 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
     >>> A = dglsp.from_coo(row, col, val)
     >>> dglsp.softmax(A)
     SparseMatrix(indices=tensor([[0, 0, 1, 2],
-        [1, 2, 2, 0]]),
-    values=tensor([0.2689, 0.7311, 1.0000, 1.0000]),
-    shape=(3, 3), nnz=4)
+                                 [1, 2, 2, 0]]),
+                 values=tensor([0.2689, 0.7311, 1.0000, 1.0000]),
+                 shape=(3, 3), nnz=4)
 
     Case2: matrix with values of shape (nnz, D)
 
+    >>> row = torch.tensor([0, 0, 1, 2])
+    >>> col = torch.tensor([1, 2, 2, 0])
     >>> val = torch.tensor([[0., 7.], [1., 3.], [2., 2.], [3., 1.]])
     >>> A = dglsp.from_coo(row, col, val)
     >>> dglsp.softmax(A)
     SparseMatrix(indices=tensor([[0, 0, 1, 2],
-        [1, 2, 2, 0]]),
-    values=tensor([[0.2689, 0.9820],
-        [0.7311, 0.0180],
-        [1.0000, 1.0000],
-        [1.0000, 1.0000]]),
-    shape=(3, 3), nnz=4)
+                                 [1, 2, 2, 0]]),
+                 values=tensor([[0.2689, 0.9820],
+                                [0.7311, 0.0180],
+                                [1.0000, 1.0000],
+                                [1.0000, 1.0000]]),
+                 shape=(3, 3), nnz=4, val_size=(2,))
     """
     return SparseMatrix(torch.ops.dgl_sparse.softmax(input.c_sparse_matrix))
 
