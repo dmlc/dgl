@@ -53,8 +53,9 @@ extensions = [
     'nbsphinx_link',
 ]
 
-# TODO(#5199): 'auto' or 'always' should be used.
-nbsphinx_execute = 'never'
+# Do not run notebooks on non-pytorch backends
+if dglbackend != "pytorch":
+    nbsphinx_execute = 'never'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -215,6 +216,9 @@ gallery_dirs = ['tutorials/blitz/',
                 'tutorials/models/',
                 'tutorials/multi/',
                 'tutorials/cpu']  # path to generate docs
+if dglbackend != "pytorch":
+    examples_dirs = []
+    gallery_dirs = []
 
 reference_url = {
     'dgl' : None,
