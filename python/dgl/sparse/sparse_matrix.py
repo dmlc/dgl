@@ -93,7 +93,9 @@ class SparseMatrix:
 
     def coo(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """Returns the coordinate list (COO) representation of the sparse
-        matrix. See `COO in Wikipedia <https://en.wikipedia.org/wiki/
+        matrix.
+
+        See `COO in Wikipedia <https://en.wikipedia.org/wiki/
         Sparse_matrix#Coordinate_list_(COO)>`_.
 
         Returns
@@ -114,15 +116,17 @@ class SparseMatrix:
         """
         return self.c_sparse_matrix.coo()
 
-    def csr(self) -> Tuple[torch.Tensor, ...]:
+    def csr(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         r"""Returns the compressed sparse row (CSR) representation of the sparse
-        matrix. See `CSR in Wikipedia <https://en.wikipedia.org/wiki/
+        matrix.
+
+        See `CSR in Wikipedia <https://en.wikipedia.org/wiki/
         Sparse_matrix#Compressed_sparse_row_(CSR, _CRS_or_Yale_format)>`_.
 
         This function also returns value indices as an index tensor, indicating
         the order of the values of non-zero elements in the CSR representation.
-        A ``None`` value indices indicates the order of the values stays the
-        same as the values of the SparseMatrix.
+        A ``None`` value indices array indicates the order of the values stays
+        the same as the values of the SparseMatrix.
 
         Returns
         -------
@@ -144,15 +148,17 @@ class SparseMatrix:
         """
         return self.c_sparse_matrix.csr()
 
-    def csc(self) -> Tuple[torch.Tensor, ...]:
+    def csc(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         r"""Returns the compressed sparse column (CSC) representation of the
-        sparse matrix. See `CSC in Wikipedia <https://en.wikipedia.org/wiki/
+        sparse matrix.
+
+        See `CSC in Wikipedia <https://en.wikipedia.org/wiki/
         Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS)>`_.
 
         This function also returns value indices as an index tensor, indicating
         the order of the values of non-zero elements in the CSC representation.
-        A ``None`` value indices indicates the order of the values stays the
-        same as the values of the SparseMatrix.
+        A ``None`` value indices array indicates the order of the values stays
+        the same as the values of the SparseMatrix.
 
         Returns
         -------
@@ -466,7 +472,9 @@ def from_coo(
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
     r"""Creates a sparse matrix from a coordinate list (COO), which stores a list
-    of (row, column, value) tuples. See `COO in Wikipedia
+    of (row, column, value) tuples.
+
+    See `COO in Wikipedia
     <https://en.wikipedia.org/wiki/Sparse_matrix#Coordinate_list_(COO)>`_.
 
     Parameters
@@ -545,9 +553,10 @@ def from_csr(
     val: Optional[torch.Tensor] = None,
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
-    r"""Creates a sparse matrix from compress sparse row (CSR) format. See `CSR
-    in Wikipedia <https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_
-    row_(CSR,_CRS_or_Yale_format)>`_.
+    r"""Creates a sparse matrix from compress sparse row (CSR) format.
+
+    See `CSR in Wikipedia <https://en.wikipedia.org/wiki/
+    Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)>`_.
 
     For row i of the sparse matrix
 
@@ -630,8 +639,9 @@ def from_csc(
     val: Optional[torch.Tensor] = None,
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
-    r"""Creates a sparse matrix from compress sparse column (CSC) format. See
-    `CSC in Wikipedia <https://en.wikipedia.org/wiki/
+    r"""Creates a sparse matrix from compress sparse column (CSC) format.
+
+    See `CSC in Wikipedia <https://en.wikipedia.org/wiki/
     Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS)>`_.
 
     For column i of the sparse matrix
