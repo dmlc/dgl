@@ -235,10 +235,6 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Pooling module: [PyTorch](https://docs.dgl.ai/api/python/nn.pytorch.html#sortpooling), [TensorFlow](https://docs.dgl.ai/api/python/nn.tensorflow.html#sortpooling), [MXNet](https://docs.dgl.ai/api/python/nn.mxnet.html#sortpooling)
     - Tags: graph classification
 
-- <a name="seal"></a>  Zhang et al. Link Prediction Based on Graph Neural Networks. [Paper link](https://papers.nips.cc/paper/2018/file/53f0d7c537d99b3824f0f99d62ea2428-Paper.pdf).
-    - Example code: [PyTorch](../examples/pytorch/seal)
-    - Tags: link prediction, sampling
-
 - <a name="jknet"></a>  Xu et al. Representation Learning on Graphs with Jumping Knowledge Networks. [Paper link](https://arxiv.org/abs/1806.03536).
     - Example code: [PyTorch](../examples/pytorch/jknet)
     - Tags: message passing, neighborhood

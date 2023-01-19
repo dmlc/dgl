@@ -28,6 +28,12 @@ python main.py \
     --hidden_channels 256 \
     --use_valedges_as_input
 
+# ogbl-collab w/o val input
+python main.py \
+    --dataset ogbl-collab \
+    --train_percent 15 \
+    --hidden_channels 256 \
+
 # ogbl-ddi
 python main.py \
     --dataset ogbl-ddi \
@@ -52,10 +58,10 @@ python main.py \
 Results
 -------
 
-|              | ogbl-ppa (Hits@100) | ogbl-collab (Hits@50) | ogbl-ddi (Hits@20) | ogbl-citation2 (MRRd) |
-|--------------|---------------------|-----------------------|--------------------|---------------------|
-| Paper Test Results |  48.80%&plusmn;3.16% |    64.74%&plusmn;0.43% | 30.56%&plusmn;3.86%* |   87.67%&plusmn;0.32r% |
-| Our Test Results |  49.48%&plusmn;2.52% |    64.23%&plusmn;0.57% | 27.93%&plusmn;4.19% |   86.29%&plusmn;0.47% |
+|              | ogbl-ppa (Hits@100) | ogbl-collab (Hits@50) | ogbl-collab (Hits@50)<br>w/o val input | ogbl-ddi (Hits@20) | ogbl-citation2 (MRRd) |
+|-----|------|-----|-----|-----|-----|
+| Paper Test Results | 48.80%&plusmn;3.16% | 64.74%&plusmn;0.43% | 54.71%&plusmn;0.49% | 30.56%&plusmn;3.86%* |   87.67%&plusmn;0.32% |
+| Our Test Results | 49.48%&plusmn;2.52% | 64.23%&plusmn;0.57% | 54.36%&plusmn;0.30% | 27.93%&plusmn;4.19% |   86.29%&plusmn;0.47% |
 
 \* Note that the relatively large gap on ogbl-ddi may come from the high variance of results on this dataset. We get 28.77%&plusmn;3.43% by only changing the sampling seed.
 
