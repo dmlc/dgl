@@ -40,10 +40,6 @@ class CuGraphSAGEConv(nn.Module):
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
         If not None, applies normalization to the updated node features.
-    max_in_degree : int
-        Maximum number of sampled neighbors of a destination node,
-        i.e. maximum in-degree of destination nodes. If ``None``, it will be
-        calculated on the fly during :meth:`forward`.
 
     Examples
     --------
@@ -74,7 +70,7 @@ class CuGraphSAGEConv(nn.Module):
         feat_drop=0.0,
         bias=True,
         norm=None,
-        max_in_degree=None,
+
     ):
         if has_pylibcugraphops is False:
             raise ModuleNotFoundError(
@@ -88,17 +84,15 @@ class CuGraphSAGEConv(nn.Module):
         if aggregator_type not in valid_aggr_types:
             raise ValueError(
                 f"Invalid aggregator_type. Must be one of {valid_aggr_types}. "
-                f"But got {aggregator_type} instead."
+                f"But got '{aggregator_type}' instead."
             )
         self.aggr = aggregator_type
-
-        self.norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
-        self.max_in_degree = max_in_degree
+        self.norm = norm
 
         self.linear = nn.Linear(2 * in_feats, out_feats, bias=bias)
 
-    def forward(self, g, feat):
+    def forward(self, g, feat, max_in_degree=None):
         r"""Forward computation.
 
         Parameters
@@ -107,6 +101,12 @@ class CuGraphSAGEConv(nn.Module):
             The graph.
         feat : torch.Tensor
             Node features. Shape: :math:`(|V|, D_{in})`.
+        max_in_degree : int
+            Maximum in-degree of destination nodes. It is only effective when
+            :attr:`g` is a :class:`DGLBlock`, i.e., bipartite graph. When
+            :attr:`g` is generated from a neighbor sampler, the value should be
+            set to the corresponding :attr:`fanout`. If not given,
+            :attr:`max_in_degree` will be calculated on-the-fly.
 
         Returns
         -------
@@ -116,12 +116,11 @@ class CuGraphSAGEConv(nn.Module):
         offsets, indices, _ = g.adj_sparse("csc")
 
         if g.is_block:
-            max_in_degree = self.max_in_degree
             if max_in_degree is None:
                 max_in_degree = g.in_degrees().max().item()
 
             _graph = make_mfg_csr(
-                g.dstnodes(), g.srcnodes(), offsets, indices, max_in_degree
+                g.dstnodes(), offsets, indices, max_in_degree, g.num_src_nodes()
             )
         else:
             _graph = make_fg_csr(offsets, indices)

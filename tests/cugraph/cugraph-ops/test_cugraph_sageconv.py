@@ -37,7 +37,6 @@ def test_SAGEConv_equality(idtype_int, max_in_degree, to_block):
     conv1 = SAGEConv(in_feat, out_feat, **kwargs).to(device)
 
     torch.manual_seed(0)
-    kwargs["max_in_degree"] = max_in_degree
     conv2 = CuGraphSAGEConv(in_feat, out_feat, **kwargs).to(device)
 
     with torch.no_grad():
@@ -46,7 +45,7 @@ def test_SAGEConv_equality(idtype_int, max_in_degree, to_block):
         conv2.linear.bias.data[:] = conv1.fc_self.bias.data
 
     out1 = conv1(g, feat)
-    out2 = conv2(g, feat)
+    out2 = conv2(g, feat, max_in_degree=max_in_degree)
     assert torch.allclose(out1, out2, atol=1e-06)
 
     grad_out = torch.rand_like(out1)
