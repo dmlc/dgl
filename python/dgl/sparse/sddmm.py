@@ -42,14 +42,14 @@ def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     >>> row = torch.tensor([1, 1, 2])
     >>> col = torch.tensor([2, 3, 3])
     >>> val = torch.arange(1, 4).float()
-    >>> A = from_coo(row, col, val, (3, 4))
+    >>> A = dglsp.from_coo(row, col, val, (3, 4))
     >>> X1 = torch.randn(3, 5)
     >>> X2 = torch.randn(5, 4)
-    >>> dgl.sparse.sddmm(A, X1, X2)
+    >>> dglsp.sddmm(A, X1, X2)
     SparseMatrix(indices=tensor([[1, 1, 2],
-            [2, 3, 3]]),
-    values=tensor([ 1.3097, -1.0977,  1.6953]),
-    shape=(3, 4), nnz=3)
+                                 [2, 3, 3]]),
+                 values=tensor([-1.6585, -3.9714, -0.5406]),
+                 size=(3, 4), nnz=3)
     """
     return SparseMatrix(torch.ops.dgl_sparse.sddmm(A.c_sparse_matrix, X1, X2))
 
@@ -92,15 +92,15 @@ def bsddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     >>> row = torch.tensor([1, 1, 2])
     >>> col = torch.tensor([2, 3, 3])
     >>> val = torch.arange(1, 4).float()
-    >>> A = from_coo(row, col, val, (3, 4))
+    >>> A = dglsp.from_coo(row, col, val, (3, 4))
     >>> X1 = torch.arange(0, 3 * 5 * 2).view(3, 5, 2).float()
     >>> X2 = torch.arange(0, 5 * 4 * 2).view(5, 4, 2).float()
-    >>> dgl.sparse.bsddmm(A, X1, X2)
+    >>> dglsp.bsddmm(A, X1, X2)
     SparseMatrix(indices=tensor([[1, 1, 2],
-            [2, 3, 3]]),
-    values=tensor([[1560., 1735.],
-            [3400., 3770.],
-            [8400., 9105.]]),
-    shape=(3, 4), nnz=3)
+                                 [2, 3, 3]]),
+                 values=tensor([[1560., 1735.],
+                                [3400., 3770.],
+                                [8400., 9105.]]),
+                 size=(3, 4), nnz=3, val_size=(2,))
     """
     return sddmm(A, X1, X2)

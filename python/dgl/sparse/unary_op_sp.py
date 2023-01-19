@@ -17,13 +17,12 @@ def neg(A: SparseMatrix) -> SparseMatrix:
     >>> row = torch.tensor([1, 1, 3])
     >>> col = torch.tensor([1, 2, 3])
     >>> val = torch.tensor([1., 1., 2.])
-    >>> A = from_coo(row, col, val)
+    >>> A = dglsp.from_coo(row, col, val)
     >>> A = -A
-    >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 3],
-        [1, 2, 3]]),
-    values=tensor([-1., -1., -2.]),
-    shape=(4, 4), nnz=3)
+                                 [1, 2, 3]]),
+                 values=tensor([-1., -1., -2.]),
+                 shape=(4, 4), nnz=3)
     """
     return val_like(A, -A.val)
 
