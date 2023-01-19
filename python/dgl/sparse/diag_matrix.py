@@ -104,7 +104,7 @@ class DiagMatrix:
 
         >>> import torch
         >>> val = torch.ones(5)
-        >>> mat = diag(val)
+        >>> mat = dglsp.diag(val)
         >>> sp_mat = mat.to_sparse()
         >>> print(sp_mat)
         SparseMatrix(indices=tensor([[0, 1, 2, 3, 4],
@@ -152,7 +152,7 @@ class DiagMatrix:
         --------
 
         >>> val = torch.arange(1, 5).float()
-        >>> mat = diag(val, shape=(4, 5))
+        >>> mat = dglsp.diag(val, shape=(4, 5))
         >>> mat = mat.transpose()
         >>> print(mat)
         DiagMatrix(val=tensor([1., 2., 3., 4.]),
@@ -182,7 +182,7 @@ class DiagMatrix:
         --------
 
         >>> val = torch.ones(2)
-        >>> mat = diag(val)
+        >>> mat = dglsp.diag(val)
         >>> mat.to(device='cuda:0', dtype=torch.int32)
         DiagMatrix(values=tensor([1, 1], device='cuda:0', dtype=torch.int32),
                    size=(2, 2))
@@ -211,7 +211,7 @@ class DiagMatrix:
         --------
 
         >>> val = torch.ones(2)
-        >>> mat = diag(val)
+        >>> mat = dglsp.diag(val)
         >>> mat.cuda()
         DiagMatrix(values=tensor([1., 1.], device='cuda:0'),
                    size=(2, 2))
@@ -231,7 +231,7 @@ class DiagMatrix:
         --------
 
         >>> val = torch.ones(2)
-        >>> mat = diag(val)
+        >>> mat = dglsp.diag(val)
         >>> mat.cpu()
         DiagMatrix(values=tensor([1., 1.]),
                    size=(2, 2))
@@ -251,7 +251,7 @@ class DiagMatrix:
         --------
 
         >>> val = torch.ones(2)
-        >>> mat = diag(val)
+        >>> mat = dglsp.diag(val)
         >>> mat.float()
         DiagMatrix(values=tensor([1., 1.]),
                    size=(2, 2))
@@ -271,7 +271,7 @@ class DiagMatrix:
         --------
 
         >>> val = torch.ones(2)
-        >>> mat = diag(val)
+        >>> mat = dglsp.diag(val)
         >>> mat.double()
         DiagMatrix(values=tensor([1., 1.], dtype=torch.float64),
                    size=(2, 2))
@@ -291,7 +291,7 @@ class DiagMatrix:
         --------
 
         >>> val = torch.ones(2)
-        >>> mat = diag(val)
+        >>> mat = dglsp.diag(val)
         >>> mat.int()
         DiagMatrix(values=tensor([1, 1], dtype=torch.int32),
                    size=(2, 2))
@@ -311,7 +311,7 @@ class DiagMatrix:
         --------
 
         >>> val = torch.ones(2)
-        >>> mat = diag(val)
+        >>> mat = dglsp.diag(val)
         >>> mat.long()
         DiagMatrix(values=tensor([1, 1]),
                    size=(2, 2))
@@ -344,7 +344,7 @@ def diag(
 
     >>> import torch
     >>> val = torch.ones(5)
-    >>> mat = diag(val)
+    >>> mat = dglsp.diag(val)
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
                size=(5, 5))
@@ -352,15 +352,15 @@ def diag(
     Case2: 5-by-10 diagonal matrix with scaler values on the diagonal
 
     >>> val = torch.ones(5)
-    >>> mat = diag(val, shape=(5, 10))
+    >>> mat = dglsp.diag(val, shape=(5, 10))
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
                size=(5, 10))
 
-    Case3: 5-by-5 diagonal matrix with tensor values on the diagonal
+    Case3: 5-by-5 diagonal matrix with vector values on the diagonal
 
     >>> val = torch.randn(5, 3)
-    >>> mat = diag(val)
+    >>> mat = dglsp.diag(val)
     >>> mat.shape
     (5, 5)
     >>> mat.nnz
@@ -420,7 +420,7 @@ def identity(
     DiagMatrix(val=tensor([1., 1., 1.]),
                size=(3, 5))
 
-    Case3: 3-by-3 matrix with tensor diagonal values
+    Case3: 3-by-3 matrix with vector diagonal values
 
     >>> mat = identity(shape=(3, 3), d=2)
     >>> print(mat)

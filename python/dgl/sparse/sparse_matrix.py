@@ -75,7 +75,7 @@ class SparseMatrix:
 
         Returns
         -------
-        tensor
+        torch.Tensor
             Row indices of the non-zero elements
         """
         return self.coo()[0]
@@ -86,7 +86,7 @@ class SparseMatrix:
 
         Returns
         -------
-        tensor
+        torch.Tensor
             Column indices of the non-zero elements
         """
         return self.coo()[1]
@@ -426,11 +426,11 @@ def from_coo(
 
     Parameters
     ----------
-    row : tensor
+    row : torch.Tensor
         The row indices of shape (nnz)
-    col : tensor
+    col : torch.Tensor
         The column indices of shape (nnz)
-    val : tensor, optional
+    val : torch.Tensor, optional
         The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
         shape (nnz) filled by 1.
     shape : tuple[int, int], optional
@@ -500,12 +500,12 @@ def from_csr(
 
     Parameters
     ----------
-    indptr : tensor
+    indptr : torch.Tensor
         Pointer to the column indices of shape (N + 1), where N is the number
         of rows
-    indices : tensor
+    indices : torch.Tensor
         The column indices of shape (nnz)
-    val : tensor, optional
+    val : torch.Tensor, optional
         The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
         shape (nnz) filled by 1.
     shape : tuple[int, int], optional
@@ -583,12 +583,12 @@ def from_csc(
 
     Parameters
     ----------
-    indptr : tensor
+    indptr : torch.Tensor
         Pointer to the row indices of shape N + 1, where N is the
         number of columns
-    indices : tensor
+    indices : torch.Tensor
         The row indices of shape nnz
-    val : tensor, optional
+    val : torch.Tensor, optional
         The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
         shape (nnz) filled by 1.
     shape : tuple[int, int], optional
@@ -660,7 +660,7 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     ----------
     mat : SparseMatrix
         An existing sparse matrix with non-zero values
-    val : tensor
+    val : torch.Tensor
         The new values of the non-zero elements, a tensor of shape (nnz) or (nnz, D)
 
     Returns
