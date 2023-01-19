@@ -697,7 +697,6 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     values=tensor([2, 2, 2]),
     shape=(3, 5), nnz=3)
     """
-
     assert (
         val.dim() <= 2
     ), "The values of a SparseMatrix can only be scalars or vectors."
