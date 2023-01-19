@@ -197,14 +197,14 @@ def spspmm(
     Examples
     --------
 
-    >>> row1 = torch.tensor([0, 1, 1])
-    >>> col1 = torch.tensor([1, 0, 1])
+    >>> indices1 = torch.tensor([[0, 1, 1],
+    >>>                          [1, 0, 1]])
     >>> val1 = torch.ones(len(row1))
-    >>> A = dglsp.from_coo(row1, col1, val1)
-    >>> row2 = torch.tensor([0, 1, 1])
-    >>> col2 = torch.tensor([0, 2, 1])
+    >>> A = dglsp.spmatrix(indices1, val1)
+    >>> indices2 = torch.tensor([[0, 1, 1],
+    >>>                          [0, 2, 1]])
     >>> val2 = torch.ones(len(row2))
-    >>> B = dglsp.from_coo(row2, col2, val2)
+    >>> B = dglsp.spmatrix(indices2, val2)
     >>> dglsp.spspmm(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 1],
                                  [1, 2, 0, 1, 2]]),
@@ -306,14 +306,14 @@ def matmul(
 
     Multiplies a sparse matrix with a sparse matrix.
 
-    >>> row1 = torch.tensor([0, 1, 1])
-    >>> col1 = torch.tensor([1, 0, 1])
+    >>> indices1 = torch.tensor([[0, 1, 1],
+    >>>                          [1, 0, 1]])
     >>> val1 = torch.ones(len(row1))
-    >>> A = dglsp.from_coo(row1, col1, val1)
-    >>> row2 = torch.tensor([0, 1, 1])
-    >>> col2 = torch.tensor([0, 2, 1])
+    >>> A = dglsp.spmatrix(indices1, val1)
+    >>> indices2 = torch.tensor([[0, 1, 1],
+    >>>                          [0, 2, 1]])
     >>> val2 = torch.ones(len(row2))
-    >>> B = dglsp.from_coo(row2, col2, val2)
+    >>> B = dglsp.spmatrix(indices2, val2)
     >>> result = dglsp.matmul(A, B)
     >>> type(result)
     <class 'dgl.sparse.sparse_matrix.SparseMatrix'>
