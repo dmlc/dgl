@@ -106,13 +106,13 @@ def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
 
     >>> A * 2
     SparseMatrix(indices=tensor([[1, 0, 2],
-            [0, 3, 2]]),
+                                 [0, 3, 2]]),
     values=tensor([2, 4, 6]),
     shape=(3, 4), nnz=3)
 
     >>> 2 * A
     SparseMatrix(indices=tensor([[1, 0, 2],
-            [0, 3, 2]]),
+                                 [0, 3, 2]]),
     values=tensor([2, 4, 6]),
     shape=(3, 4), nnz=3)
     """
@@ -183,7 +183,7 @@ def sp_power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
     >>> A = from_coo(row, col, val)
     >>> A ** 2
     SparseMatrix(indices=tensor([[1, 0, 2],
-            [0, 3, 2]]),
+                                 [0, 3, 2]]),
     values=tensor([100, 400, 900]),
     shape=(3, 4), nnz=3)
     """

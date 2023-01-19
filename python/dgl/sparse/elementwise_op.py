@@ -12,8 +12,8 @@ __all__ = ["add", "sub", "mul", "div", "power"]
 def add(
     A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
 ) -> Union[DiagMatrix, SparseMatrix]:
-    r"""Elementwise additions for ``DiagMatrix`` and ``SparseMatrix``,
-    equivalent to ``A + B``.
+    r"""Elementwise addition for ``DiagMatrix`` and ``SparseMatrix``, equivalent
+    to ``A + B``.
 
     The supported combinations are shown as follows.
 

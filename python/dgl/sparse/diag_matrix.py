@@ -110,7 +110,7 @@ class DiagMatrix:
         SparseMatrix(indices=tensor([[0, 1, 2, 3, 4],
                                      [0, 1, 2, 3, 4]]),
                      values=tensor([1., 1., 1., 1., 1.]),
-                     shape=(5, 5), nnz=5)
+                     size=(5, 5), nnz=5)
         """
         row = col = torch.arange(len(self.val)).to(self.device)
         return from_coo(row=row, col=col, val=self.val, shape=self.shape)
@@ -156,7 +156,7 @@ class DiagMatrix:
         >>> mat = mat.transpose()
         >>> print(mat)
         DiagMatrix(val=tensor([1., 2., 3., 4.]),
-        shape=(5, 4))
+                   size=(5, 4))
         """
         return DiagMatrix(self.val, self.shape[::-1])
 
@@ -347,7 +347,7 @@ def diag(
     >>> mat = diag(val)
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
-               shape=(5, 5))
+               size=(5, 5))
 
     Case2: 5-by-10 diagonal matrix with scaler values on the diagonal
 
@@ -355,7 +355,7 @@ def diag(
     >>> mat = diag(val, shape=(5, 10))
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1., 1., 1.]),
-               shape=(5, 10))
+               size=(5, 10))
 
     Case3: 5-by-5 diagonal matrix with tensor values on the diagonal
 
@@ -376,7 +376,7 @@ def identity(
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
 ) -> DiagMatrix:
-    """Creates a diagonal matrix with ones on the diagonal and zeros elsewhere.
+    r"""Creates a diagonal matrix with ones on the diagonal and zeros elsewhere.
 
     Parameters
     ----------
@@ -407,7 +407,7 @@ def identity(
     >>> mat = identity(shape=(3, 3))
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1.]),
-               shape=(3, 3))
+               size=(3, 3))
 
     Case2: 3-by-5 matrix with scaler diagonal values
 
@@ -418,16 +418,16 @@ def identity(
     >>> mat = identity(shape=(3, 5))
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1.]),
-               shape=(3, 5))
+               size=(3, 5))
 
     Case3: 3-by-3 matrix with tensor diagonal values
 
     >>> mat = identity(shape=(3, 3), d=2)
     >>> print(mat)
-    DiagMatrix(val=tensor([[1., 1.],
-            [1., 1.],
-            [1., 1.]]),
-    shape=(3, 3))
+    DiagMatrix(values=tensor([[1., 1.],
+                              [1., 1.],
+                              [1., 1.]]),
+               size=(3, 3), val_size=(2,))
     """
     len_val = min(shape)
     if d is None:
