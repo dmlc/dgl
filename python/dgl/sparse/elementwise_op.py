@@ -45,7 +45,7 @@ def add(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 1, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
+    >>> A = dglsp.from_coo(row, col, val)
     >>> B = diag(torch.arange(1, 4))
     >>> add(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
@@ -92,7 +92,7 @@ def sub(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 1, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
+    >>> A = dglsp.from_coo(row, col, val)
     >>> B = diag(torch.arange(1, 4))
     >>> sub(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
@@ -139,7 +139,7 @@ def mul(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
+    >>> A = dglsp.from_coo(row, col, val)
     >>> mul(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
@@ -205,7 +205,7 @@ def div(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([1, 2, 3])
-    >>> A = from_coo(row, col, val, shape=(3, 4))
+    >>> A = dglsp.from_coo(row, col, val, shape=(3, 4))
     >>> A / 2
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
@@ -250,7 +250,7 @@ def power(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
+    >>> A = dglsp.from_coo(row, col, val)
     >>> power(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),

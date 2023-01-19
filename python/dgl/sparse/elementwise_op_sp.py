@@ -33,7 +33,7 @@ def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val, shape=(3, 4))
+    >>> A = dglsp.from_coo(row, col, val, shape=(3, 4))
     >>> A + A
     SparseMatrix(indices=tensor([[0, 1, 2],
                                  [3, 0, 2]]),
@@ -67,8 +67,8 @@ def sp_sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
     >>> val2 = torch.tensor([5, 10, 15])
-    >>> A = from_coo(row, col, val, shape=(3, 4))
-    >>> B = from_coo(row, col, val2, shape=(3, 4))
+    >>> A = dglsp.from_coo(row, col, val, shape=(3, 4))
+    >>> B = dglsp.from_coo(row, col, val2, shape=(3, 4))
     >>> A - B
     SparseMatrix(indices=tensor([[0, 1, 2],
                                  [3, 0, 2]]),
@@ -102,7 +102,7 @@ def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([1, 2, 3])
-    >>> A = from_coo(row, col, val, shape=(3, 4))
+    >>> A = dglsp.from_coo(row, col, val, shape=(3, 4))
 
     >>> A * 2
     SparseMatrix(indices=tensor([[1, 0, 2],
@@ -145,7 +145,7 @@ def sp_div(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([1, 2, 3])
-    >>> A = from_coo(row, col, val, shape=(3, 4))
+    >>> A = dglsp.from_coo(row, col, val, shape=(3, 4))
     >>> A / 2
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
@@ -180,7 +180,7 @@ def sp_power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
+    >>> A = dglsp.from_coo(row, col, val)
     >>> A ** 2
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
