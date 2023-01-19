@@ -8,7 +8,7 @@ from torch import nn
 try:
     from pylibcugraphops import make_fg_csr, make_mfg_csr
     from pylibcugraphops.torch.autograd import mha_gat_n2n as GATConvAgg
-except ModuleNotFoundError:
+except ImportError:
     has_pylibcugraphops = False
 else:
     has_pylibcugraphops = True
@@ -24,6 +24,9 @@ class CuGraphGATConv(nn.Module):
     This module depends on :code:`pylibcugraphops` package, which can be
     installed via :code:`conda install -c nvidia pylibcugraphops>=23.02`.
 
+    .. note::
+        This is an **experimental** feature.
+
     Parameters
     ----------
     in_feats : int
@@ -36,21 +39,17 @@ class CuGraphGATConv(nn.Module):
         LeakyReLU angle of negative slope. Defaults: ``0.2``.
     bias : bool, optional
         If True, learns a bias term. Defaults: ``True``.
-    max_in_degree : int, optional
-        Maximum number of sampled neighbors of a destination node,
-        i.e. maximum in degree of destination nodes. If ``None``, it will be
-        calculated on the fly during :meth:`forward`.
 
     Examples
     --------
     >>> import dgl
-    >>> import torch as th
+    >>> import torch
     >>> from dgl.nn import CuGraphGATConv
     ...
     >>> device = 'cuda'
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3])).to(device)
     >>> g = dgl.add_self_loop(g)
-    >>> feat = th.ones(6, 10).to(device)
+    >>> feat = torch.ones(6, 10).to(device)
     >>> conv = CuGraphGATConv(10, 2, num_heads=3).to(device)
     >>> res = conv(g, feat)
     >>> res
@@ -81,7 +80,6 @@ class CuGraphGATConv(nn.Module):
         num_heads,
         negative_slope=0.2,
         bias=True,
-        max_in_degree=None,
     ):
         if has_pylibcugraphops is False:
             raise ModuleNotFoundError(
@@ -93,7 +91,6 @@ class CuGraphGATConv(nn.Module):
         self.out_feats = out_feats
         self.num_heads = num_heads
         self.negative_slope = negative_slope
-        self.max_in_degree = max_in_degree
 
         self.fc = nn.Linear(in_feats, out_feats * num_heads, bias=False)
         self.attn_weights = nn.Parameter(
@@ -118,7 +115,7 @@ class CuGraphGATConv(nn.Module):
         if self.bias is not None:
             nn.init.zeros_(self.bias)
 
-    def forward(self, g, feat):
+    def forward(self, g, feat, max_in_degree=None):
         r"""Forward computation.
 
         Parameters
@@ -127,6 +124,12 @@ class CuGraphGATConv(nn.Module):
             The graph.
         feat : torch.Tensor
             Input features of shape :math:`(N, D_{in})`.
+        max_in_degree : int
+            Maximum in-degree of destination nodes. It is only effective when
+            :attr:`g` is a :class:`DGLBlock`, i.e., bipartite graph. When
+            :attr:`g` is generated from a neighbor sampler, the value should be
+            set to the corresponding :attr:`fanout`. If not given,
+            :attr:`max_in_degree` will be calculated on-the-fly.
 
         Returns
         -------
@@ -139,11 +142,10 @@ class CuGraphGATConv(nn.Module):
         offsets, indices, _ = g.adj_sparse("csc")
 
         if g.is_block:
-            max_in_degree = self.max_in_degree
             if max_in_degree is None:
                 max_in_degree = g.in_degrees().max().item()
             _graph = make_mfg_csr(
-                g.dstnodes(), g.srcnodes(), offsets, indices, max_in_degree
+                g.dstnodes(), offsets, indices, max_in_degree, g.num_src_nodes()
             )
         else:
             _graph = make_fg_csr(offsets, indices)

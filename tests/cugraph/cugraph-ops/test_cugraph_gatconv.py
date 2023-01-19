@@ -41,14 +41,13 @@ def test_gatconv_equality(idtype_int, max_in_degree, num_heads, to_block):
     out1 = conv1(g, feat)
 
     torch.manual_seed(0)
-    kwargs["max_in_degree"] = max_in_degree
     conv2 = CuGraphGATConv(*args, **kwargs).to(device)
     dim = num_heads * out_feat
     with torch.no_grad():
         conv2.attn_weights.data[:dim] = conv1.attn_l.data.flatten()
         conv2.attn_weights.data[dim:] = conv1.attn_r.data.flatten()
         conv2.fc.weight.data[:] = conv1.fc.weight.data
-    out2 = conv2(g, feat)
+    out2 = conv2(g, feat, max_in_degree=max_in_degree)
     assert torch.allclose(out1, out2, atol=1e-6)
 
     grad_out1 = torch.rand_like(out1)
