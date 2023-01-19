@@ -91,43 +91,92 @@ class SparseMatrix:
         """
         return self.coo()[1]
 
-    def coo(self) -> Tuple[torch.Tensor, ...]:
-        """Returns the coordinate (COO) representation of the sparse matrix.
+    def coo(self) -> Tuple[torch.Tensor, torch.Tensor]:
+        r"""Returns the coordinate list (COO) representation of the sparse
+        matrix.
+
+        See `COO in Wikipedia <https://en.wikipedia.org/wiki/
+        Sparse_matrix#Coordinate_list_(COO)>`_.
 
         Returns
         -------
-        Tuple[torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row and column coordinates
+        torch.Tensor
+            Row coordinate
+        torch.Tensor
+            Column coordinate
+
+        Example
+        -------
+
+        >>> dst = torch.tensor([1, 2, 1])
+        >>> src = torch.tensor([2, 4, 3])
+        >>> A = from_coo(dst, src)
+        >>> A.coo()
+        (tensor([1, 2, 1]), tensor([2, 4, 3]))
         """
         return self.c_sparse_matrix.coo()
 
-    def csr(self) -> Tuple[torch.Tensor, ...]:
+    def csr(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         r"""Returns the compressed sparse row (CSR) representation of the sparse
         matrix.
 
+        See `CSR in Wikipedia <https://en.wikipedia.org/wiki/
+        Sparse_matrix#Compressed_sparse_row_(CSR, _CRS_or_Yale_format)>`_.
+
+        This function also returns value indices as an index tensor, indicating
+        the order of the values of non-zero elements in the CSR representation.
+        A ``None`` value indices array indicates the order of the values stays
+        the same as the values of the SparseMatrix.
+
         Returns
         -------
-        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing row indptr, column indices and value
-            indices. Value indices is an index tensor, indicating the order of
-            the values of non-zero elements in the CSR representation. A null
-            value indices indicates the order of the values stays the same as
-            the values of the SparseMatrix.
+        torch.Tensor
+            Row indptr
+        torch.Tensor
+            Column indices
+        torch.Tensor
+            Value indices
+
+        Example
+        -------
+
+        >>> dst = torch.tensor([1, 2, 1])
+        >>> src = torch.tensor([2, 4, 3])
+        >>> A = from_coo(dst, src)
+        >>> A.csr()
+        (tensor([0, 0, 2, 3]), tensor([2, 3, 4]), tensor([0, 2, 1]))
         """
         return self.c_sparse_matrix.csr()
 
-    def csc(self) -> Tuple[torch.Tensor, ...]:
+    def csc(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         r"""Returns the compressed sparse column (CSC) representation of the
         sparse matrix.
 
+        See `CSC in Wikipedia <https://en.wikipedia.org/wiki/
+        Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS)>`_.
+
+        This function also returns value indices as an index tensor, indicating
+        the order of the values of non-zero elements in the CSC representation.
+        A ``None`` value indices array indicates the order of the values stays
+        the same as the values of the SparseMatrix.
+
         Returns
         -------
-        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            A tuple of tensors containing column indptr, row indices and value
-            indices. Value indices is an index tensor, indicating the order of
-            the values of non-zero elements in the CSC representation. A null
-            value indices indicates the order of the values stays the same as
-            the values of the SparseMatrix.
+        torch.Tensor
+            Column indptr
+        torch.Tensor
+            Row indices
+        torch.Tensor
+            Value indices
+
+        Example
+        -------
+
+        >>> dst = torch.tensor([1, 2, 1])
+        >>> src = torch.tensor([2, 4, 3])
+        >>> A = from_coo(dst, src)
+        >>> A.csc()
+        (tensor([0, 0, 0, 1, 2, 3]), tensor([1, 1, 2]), tensor([0, 2, 1]))
         """
         return self.c_sparse_matrix.csc()
 
@@ -422,7 +471,11 @@ def from_coo(
     val: Optional[torch.Tensor] = None,
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
-    r"""Creates a sparse matrix from row and column coordinates.
+    r"""Creates a sparse matrix from a coordinate list (COO), which stores a list
+    of (row, column, value) tuples.
+
+    See `COO in Wikipedia
+    <https://en.wikipedia.org/wiki/Sparse_matrix#Coordinate_list_(COO)>`_.
 
     Parameters
     ----------
@@ -462,8 +515,18 @@ def from_coo(
                  values=tensor([1., 1., 1.]),
                  shape=(5, 5), nnz=3)
 
-    Case2: Sparse matrix with scalar/vector values. Following example is with
-    vector data.
+    Case2: Sparse matrix with scalar values.
+
+    >>> val = torch.tensor([[1.], [2.], [3.]])
+    >>> A = dglsp.from_coo(dst, src, val)
+    SparseMatrix(indices=tensor([[1, 1, 2],
+                                 [2, 4, 3]]),
+                 values=tensor([[1.],
+                                [2.],
+                                [3.]]),
+                 size=(3, 5), nnz=3, val_size=(1,))
+
+    Case3: Sparse matrix with vector values.
 
     >>> dst = torch.tensor([1, 1, 2])
     >>> src = torch.tensor([2, 4, 3])
@@ -494,7 +557,10 @@ def from_csr(
     val: Optional[torch.Tensor] = None,
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
-    r"""Creates a sparse matrix from CSR indices.
+    r"""Creates a sparse matrix from compress sparse row (CSR) format.
+
+    See `CSR in Wikipedia <https://en.wikipedia.org/wiki/
+    Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)>`_.
 
     For row i of the sparse matrix
 
@@ -581,7 +647,10 @@ def from_csc(
     val: Optional[torch.Tensor] = None,
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
-    r"""Creates a sparse matrix from CSC indices.
+    r"""Creates a sparse matrix from compress sparse column (CSC) format.
+
+    See `CSC in Wikipedia <https://en.wikipedia.org/wiki/
+    Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS)>`_.
 
     For column i of the sparse matrix
 
