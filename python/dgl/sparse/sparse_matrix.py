@@ -111,7 +111,7 @@ class SparseMatrix:
         >>> dst = torch.tensor([1, 2, 1])
         >>> src = torch.tensor([2, 4, 3])
         >>> A = from_coo(dst, src)
-        >>> print(A.coo())
+        >>> A.coo()
         (tensor([1, 2, 1]), tensor([2, 4, 3]))
         """
         return self.c_sparse_matrix.coo()
@@ -143,7 +143,7 @@ class SparseMatrix:
         >>> dst = torch.tensor([1, 2, 1])
         >>> src = torch.tensor([2, 4, 3])
         >>> A = from_coo(dst, src)
-        >>> print(A.csr())
+        >>> A.csr()
         (tensor([0, 0, 2, 3]), tensor([2, 3, 4]), tensor([0, 2, 1]))
         """
         return self.c_sparse_matrix.csr()
@@ -175,7 +175,7 @@ class SparseMatrix:
         >>> dst = torch.tensor([1, 2, 1])
         >>> src = torch.tensor([2, 4, 3])
         >>> A = from_coo(dst, src)
-        >>> print(A.csc())
+        >>> A.csc()
         (tensor([0, 0, 0, 1, 2, 3]), tensor([1, 1, 2]), tensor([0, 2, 1]))
         """
         return self.c_sparse_matrix.csc()
@@ -520,11 +520,11 @@ def from_coo(
     >>> val = torch.tensor([[1.], [2.], [3.]])
     >>> A = from_coo(dst, src, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
-                             [2, 4, 3]]),
-             values=tensor([[1.],
-                            [2.],
-                            [3.]]),
-             size=(3, 5), nnz=3, val_size=(1,))
+                                [2, 4, 3]]),
+                values=tensor([[1.],
+                                [2.],
+                                [3.]]),
+                size=(3, 5), nnz=3, val_size=(1,))
 
     Case3: Sparse matrix with vector values.
 
