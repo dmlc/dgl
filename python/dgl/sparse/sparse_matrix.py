@@ -482,6 +482,7 @@ def from_coo(
         shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
     if val is None:
         val = torch.ones(row.shape[0]).to(row.device)
+
     assert (
         val.dim() <= 2
     ), "The values of a SparseMatrix can only be scalars or vectors."
