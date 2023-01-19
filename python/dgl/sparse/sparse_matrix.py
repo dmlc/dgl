@@ -464,6 +464,8 @@ def spmatrix(
 
     Case2: Sparse matrix with scalar values.
 
+    >>> indices = torch.tensor([[1, 1, 2],
+    >>>                         [2, 4, 3]])
     >>> val = torch.tensor([[1.], [2.], [3.]])
     >>> A = dglsp.spmatrix(indices, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
@@ -471,10 +473,12 @@ def spmatrix(
                  values=tensor([[1.],
                                 [2.],
                                 [3.]]),
-                 size=(3, 5), nnz=3, val_size=(1,))
+                 shape=(3, 5), nnz=3, val_size=(1,))
 
     Case3: Sparse matrix with vector values.
 
+    >>> indices = torch.tensor([[1, 1, 2],
+    >>>                         [2, 4, 3]])
     >>> val = torch.tensor([[1., 1.], [2., 2.], [3., 3.]])
     >>> A = dglsp.spmatrix(indices, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
@@ -483,7 +487,6 @@ def spmatrix(
                                 [2., 2.],
                                 [3., 3.]]),
                  shape=(3, 5), nnz=3, val_size=(2,))
-
     """
     return from_coo(indices[0], indices[1], val, shape)
 
