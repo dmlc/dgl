@@ -1,6 +1,6 @@
 .. _apibackend:
 
-dgl.sparse
+🆕 dgl.sparse
 =================================
 
 `dgl.sparse` is a library for sparse operators that are commonly used in GNN models.
