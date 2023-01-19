@@ -690,7 +690,7 @@ def _sparse_matrix_str(spmat: SparseMatrix) -> str:
     """
     indices_str = str(torch.stack(spmat.coo()))
     values_str = str(spmat.val)
-    meta_str = f"size={spmat.shape}, nnz={spmat.nnz}"
+    meta_str = f"shape={spmat.shape}, nnz={spmat.nnz}"
     if spmat.val.dim() > 1:
         val_size = tuple(spmat.val.shape[1:])
         meta_str += f", val_size={val_size}"

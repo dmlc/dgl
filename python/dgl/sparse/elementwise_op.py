@@ -50,7 +50,7 @@ def add(
     >>> dglsp.add(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
                                  [0, 1, 0, 1, 2]]),
-                 values=tensor([ 1, 20, 10,  2, 33]),
+                 values=tensor([1, 20, 10,  2, 33]),
                  shape=(3, 3), nnz=5)
     """
     return A + B
