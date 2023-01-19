@@ -92,7 +92,7 @@ class SparseMatrix:
         return self.coo()[1]
 
     def coo(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Returns the coordinate list (COO) representation of the sparse
+        r"""Returns the coordinate list (COO) representation of the sparse
         matrix.
 
         See `COO in Wikipedia <https://en.wikipedia.org/wiki/
@@ -520,11 +520,11 @@ def from_coo(
     >>> val = torch.tensor([[1.], [2.], [3.]])
     >>> A = from_coo(dst, src, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
-                                [2, 4, 3]]),
-                values=tensor([[1.],
+                                 [2, 4, 3]]),
+                 values=tensor([[1.],
                                 [2.],
                                 [3.]]),
-                size=(3, 5), nnz=3, val_size=(1,))
+                 size=(3, 5), nnz=3, val_size=(1,))
 
     Case3: Sparse matrix with vector values.
 
