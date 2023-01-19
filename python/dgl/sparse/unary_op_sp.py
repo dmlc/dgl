@@ -3,8 +3,8 @@ from .sparse_matrix import SparseMatrix, val_like
 
 
 def neg(A: SparseMatrix) -> SparseMatrix:
-    """Return a new sparse matrix with the negation of the original nonzero
-    values.
+    """Returns a new sparse matrix with the negation of the original nonzero
+    values, equivalent to ``-A``.
 
     Returns
     -------

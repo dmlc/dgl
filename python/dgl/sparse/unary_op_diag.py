@@ -4,8 +4,8 @@ from .diag_matrix import diag, DiagMatrix
 
 
 def neg(D: DiagMatrix) -> DiagMatrix:
-    """Return a new diagonal matrix with the negation of the original nonzero
-    values.
+    """Returns a new diagonal matrix with the negation of the original nonzero
+    values, equivalent to ``-D``.
 
     Returns
     -------
@@ -25,7 +25,7 @@ def neg(D: DiagMatrix) -> DiagMatrix:
 
 
 def inv(D: DiagMatrix) -> DiagMatrix:
-    """Return the inverse of the diagonal matrix.
+    """Returns the inverse of the diagonal matrix.
 
     This function only supports square matrices with scalar nonzero values.
 

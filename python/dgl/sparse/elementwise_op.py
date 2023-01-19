@@ -47,11 +47,11 @@ def add(
     >>> val = torch.tensor([10, 20, 30])
     >>> A = dglsp.from_coo(row, col, val)
     >>> B = dglsp.diag(torch.arange(1, 4))
-    >>> add(A, B)
+    >>> dglsp.add(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
                                  [0, 1, 0, 1, 2]]),
                  values=tensor([ 1, 20, 10,  2, 33]),
-                 shape=(3, 3), nnz=5)
+                 size=(3, 3), nnz=5)
     """
     return A + B
 
@@ -94,11 +94,11 @@ def sub(
     >>> val = torch.tensor([10, 20, 30])
     >>> A = dglsp.from_coo(row, col, val)
     >>> B = dglsp.diag(torch.arange(1, 4))
-    >>> sub(A, B)
+    >>> dglsp.sub(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
                                  [0, 1, 0, 1, 2]]),
                  values=tensor([-1, 20, 10, -2, 27]),
-                 shape=(3, 3), nnz=5)
+                 size=(3, 3), nnz=5)
     """
     return A - B
 
@@ -140,21 +140,21 @@ def mul(
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
     >>> A = dglsp.from_coo(row, col, val)
-    >>> mul(A, 2)
+    >>> dglsp.mul(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([20, 40, 60]),
-                 shape=(3, 4), nnz=3)
+                 size=(3, 4), nnz=3)
 
     >>> D = dglsp.diag(torch.arange(1, 4))
-    >>> mul(D, 2)
+    >>> dglsp.mul(D, 2)
     DiagMatrix(val=tensor([2, 4, 6]),
-               shape=(3, 3))
+               size=(3, 3))
 
     >>> D = dglsp.diag(torch.arange(1, 4))
-    >>> mul(D, D)
+    >>> dglsp.mul(D, D)
     DiagMatrix(val=tensor([1, 4, 9]),
-               shape=(3, 3))
+               size=(3, 3))
     """
     return A * B
 
@@ -193,24 +193,24 @@ def div(
     --------
     >>> A = dglsp.diag(torch.arange(1, 4))
     >>> B = dglsp.diag(torch.arange(10, 13))
-    >>> div(A, B)
+    >>> dglsp.div(A, B)
     DiagMatrix(val=tensor([0.1000, 0.1818, 0.2500]),
-               shape=(3, 3))
+               size=(3, 3))
 
     >>> A = dglsp.diag(torch.arange(1, 4))
-    >>> div(A, 2)
+    >>> dglsp.div(A, 2)
     DiagMatrix(val=tensor([0.5000, 1.0000, 1.5000]),
-               shape=(3, 3))
+               size=(3, 3))
 
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([1, 2, 3])
     >>> A = dglsp.from_coo(row, col, val, shape=(3, 4))
-    >>> A / 2
+    >>> dglsp.div(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([0.5000, 1.0000, 1.5000]),
-                 shape=(3, 4), nnz=3)
+                 size=(3, 4), nnz=3)
     """
     return A / B
 
@@ -251,15 +251,15 @@ def power(
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
     >>> A = dglsp.from_coo(row, col, val)
-    >>> power(A, 2)
+    >>> dglsp.power(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([100, 400, 900]),
-                 shape=(3, 4), nnz=3)
+                 size=(3, 4), nnz=3)
 
     >>> D = dglsp.diag(torch.arange(1, 4))
-    >>> power(D, 2)
+    >>> dglsp.power(D, 2)
     DiagMatrix(val=tensor([1, 4, 9]),
-               shape=(3, 3))
+               size=(3, 3))
     """
     return A**scalar
