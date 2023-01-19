@@ -70,7 +70,6 @@ class CuGraphSAGEConv(nn.Module):
         feat_drop=0.0,
         bias=True,
         norm=None,
-
     ):
         if has_pylibcugraphops is False:
             raise ModuleNotFoundError(
