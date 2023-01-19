@@ -421,13 +421,15 @@ def spmatrix(
     val: Optional[torch.Tensor] = None,
     shape: Optional[Tuple[int, int]] = None,
 ) -> SparseMatrix:
-    r"""Creates a sparse matrix from COO indices.
+    r"""Creates a sparse matrix from Coordinate format indices.
 
     Parameters
     ----------
-    indices : tensor
-        The stacked tensor of row and column coordinates
-    val : tensor, optional
+    indices : tensor.Tensor
+        The indices are the coordinates of the non-zero elements in the matrix,
+        which should have shape of ``(2, N)`` where the first row is the row
+        indices and the second row is the column indices of non-zero elements.
+    val : tensor.Tensor, optional
         The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
         shape (nnz) filled by 1.
     shape : tuple[int, int], optional
@@ -445,21 +447,20 @@ def spmatrix(
 
     Case1: Sparse matrix with row and column indices without values.
 
-    >>> dst = torch.tensor([1, 1, 2])
-    >>> src = torch.tensor([2, 4, 3])
-    >>> indices = torch.stack(dst, src)
+    >>> indices = torch.tensor([[1, 1, 2],
+    >>>                         [2, 4, 3]])
     >>> A = dglsp.spmatrix(indices)
     SparseMatrix(indices=tensor([[1, 1, 2],
-            [2, 4, 3]]),
-    values=tensor([1., 1., 1.]),
-    shape=(3, 5), nnz=3)
+                                 [2, 4, 3]]),
+                 values=tensor([1., 1., 1.]),
+                 shape=(3, 5), nnz=3)
     >>> # Specify shape
     >>> A = dglsp.spmatrix(indices, shape=(5, 5))
     >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 2],
-            [2, 4, 3]]),
-    values=tensor([1., 1., 1.]),
-    shape=(5, 5), nnz=3)
+                                 [2, 4, 3]]),
+                 values=tensor([1., 1., 1.]),
+                 shape=(5, 5), nnz=3)
 
     Case2: Sparse matrix with scalar values.
 
