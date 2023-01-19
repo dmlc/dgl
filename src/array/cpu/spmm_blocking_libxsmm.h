@@ -83,12 +83,12 @@ inline void SpMMCreateBlocks(
     IdType *indices_block_buf = nullptr;
     if (use_lhs) {
       indices_block_buf = reinterpret_cast<IdType *>(
-        aligned_alloc(64, indptr[M] * sizeof(IdType)));
+          aligned_alloc(64, indptr[M] * sizeof(IdType)));
     }
     IdType *edges_block_buf = nullptr;
     if (use_rhs) {
       edges_block_buf = reinterpret_cast<IdType *>(
-        aligned_alloc(64, indptr[M] * sizeof(IdType)));
+          aligned_alloc(64, indptr[M] * sizeof(IdType)));
     }
 
 #pragma omp parallel
