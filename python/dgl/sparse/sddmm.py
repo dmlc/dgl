@@ -20,7 +20,7 @@ def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
         out = (X1 @ X2) * A
 
     In particular, :attr:`X1` and :attr:`X2` can be 1-D, then ``X1 @ X2``
-    becomes the out-product of the two vector (which results in a matrix).
+    becomes the out-product of the two vectors (which results in a matrix).
 
     Parameters
     ----------
