@@ -436,7 +436,7 @@ def _diag_matrix_str(spmat: DiagMatrix) -> str:
     representation.
     """
     values_str = str(spmat.val)
-    meta_str = f"size={spmat.shape}"
+    meta_str = f"shape={spmat.shape}"
     if spmat.val.dim() > 1:
         val_size = tuple(spmat.val.shape[1:])
         meta_str += f", val_size={val_size}"
