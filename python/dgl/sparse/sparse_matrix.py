@@ -156,7 +156,7 @@ class SparseMatrix:
         return self.transpose()
 
     def transpose(self):
-        """Return the transpose of this sparse matrix.
+        """Returns the transpose of this sparse matrix.
 
         Returns
         -------

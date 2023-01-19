@@ -9,7 +9,7 @@ __all__ = ["softmax"]
 
 
 def softmax(input: SparseMatrix) -> SparseMatrix:
-    """Apply row-wise softmax to the non-zero elements of the sparse matrix.
+    """Apples row-wise softmax to the non-zero elements of the sparse matrix.
 
     If :attr:`input.val` takes shape :attr:`(nnz, D)`, then the output matrix
     :attr:`output` and :attr:`output.val` take the same shape as :attr:`input`

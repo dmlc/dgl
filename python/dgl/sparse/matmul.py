@@ -12,7 +12,7 @@ __all__ = ["spmm", "bspmm", "spspmm", "matmul"]
 
 
 def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
-    """Multiply a sparse matrix by a dense matrix, equivalent to ``A @ X``.
+    """Multiplies a sparse matrix by a dense matrix, equivalent to ``A @ X``.
 
     Parameters
     ----------
@@ -54,7 +54,7 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
 
 
 def bspmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
-    """Multiply a sparse matrix by a dense matrix by batches, equivalent to
+    """Multiplies a sparse matrix by a dense matrix by batches, equivalent to
     ``A @ X``.
 
     Parameters
@@ -177,7 +177,7 @@ def _diag_sparse_mm(D, A):
 def spspmm(
     A: Union[SparseMatrix, DiagMatrix], B: Union[SparseMatrix, DiagMatrix]
 ) -> Union[SparseMatrix, DiagMatrix]:
-    """Multiply a sparse matrix by a sparse matrix, equivalent to ``A @ B``.
+    """Multiplies a sparse matrix by a sparse matrix, equivalent to ``A @ B``.
 
     The non-zero values of the two sparse matrices must be 1D.
 
@@ -233,7 +233,7 @@ def matmul(
     A: Union[torch.Tensor, SparseMatrix, DiagMatrix],
     B: Union[torch.Tensor, SparseMatrix, DiagMatrix],
 ) -> Union[torch.Tensor, SparseMatrix, DiagMatrix]:
-    """Multiply two dense/sparse/diagonal matrices, equivalent to ``A @ B``.
+    """Multiplies two dense/sparse/diagonal matrices, equivalent to ``A @ B``.
 
     The supported combinations are shown as follows.
 
@@ -280,7 +280,7 @@ def matmul(
     Examples
     --------
 
-    Multiply a diagonal matrix with a dense matrix.
+    Multiplies a diagonal matrix with a dense matrix.
 
     >>> val = torch.randn(3)
     >>> A = dglsp.diag(val)
@@ -291,7 +291,7 @@ def matmul(
     >>> result.shape
     torch.Size([3, 2])
 
-    Multiply a sparse matrix with a dense matrix.
+    Multiplies a sparse matrix with a dense matrix.
 
     >>> row = torch.tensor([0, 1, 1])
     >>> col = torch.tensor([1, 0, 1])
@@ -304,7 +304,7 @@ def matmul(
     >>> result.shape
     torch.Size([2, 3])
 
-    Multiply a sparse matrix with a sparse matrix.
+    Multiplies a sparse matrix with a sparse matrix.
 
     >>> row1 = torch.tensor([0, 1, 1])
     >>> col1 = torch.tensor([1, 0, 1])
