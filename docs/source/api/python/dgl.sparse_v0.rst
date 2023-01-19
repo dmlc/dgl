@@ -60,16 +60,17 @@ Sparse matrix class
                                     [5, 5]]),
                      shape=(3, 3), nnz=5)
 
-Creators
+Creation Ops
 ````````
 
 .. autosummary::
     :toctree: ../../generated/
 
+    spmatrix
+    val_like
     from_coo
     from_csr
     from_csc
-    val_like
 
 Attributes and methods
 ``````````````````````
