@@ -481,6 +481,10 @@ def from_coo(
     if val is None:
         val = torch.ones(row.shape[0]).to(row.device)
 
+    assert (
+        val.dim() <= 2
+    ), "The values of a SparseMatrix can only be scalars or vectors."
+
     return SparseMatrix(torch.ops.dgl_sparse.from_coo(row, col, val, shape))
 
 
@@ -561,6 +565,10 @@ def from_csr(
         shape = (indptr.shape[0] - 1, torch.max(indices) + 1)
     if val is None:
         val = torch.ones(indices.shape[0]).to(indptr.device)
+
+    assert (
+        val.dim() <= 2
+    ), "The values of a SparseMatrix can only be scalars or vectors."
 
     return SparseMatrix(
         torch.ops.dgl_sparse.from_csr(indptr, indices, val, shape)
@@ -645,6 +653,10 @@ def from_csc(
     if val is None:
         val = torch.ones(indices.shape[0]).to(indptr.device)
 
+    assert (
+        val.dim() <= 2
+    ), "The values of a SparseMatrix can only be scalars or vectors."
+
     return SparseMatrix(
         torch.ops.dgl_sparse.from_csc(indptr, indices, val, shape)
     )
@@ -681,6 +693,10 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
                  values=tensor([2, 2, 2]),
                  shape=(3, 5), nnz=3)
     """
+    assert (
+        val.dim() <= 2
+    ), "The values of a SparseMatrix can only be scalars or vectors."
+
     return SparseMatrix(torch.ops.dgl_sparse.val_like(mat.c_sparse_matrix, val))
 
 

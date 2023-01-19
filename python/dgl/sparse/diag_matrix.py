@@ -362,6 +362,9 @@ def diag(
     >>> D.nnz
     5
     """
+    assert (
+        val.dim() <= 2
+    ), "The values of a DiagMatrix can only be scalars or vectors."
     # NOTE(Mufei): this may not be needed if DiagMatrix is simple enough
     return DiagMatrix(val, shape)
 
