@@ -575,15 +575,15 @@ def from_coo(
 
     Case1: Sparse matrix with row and column indices without values.
 
-    >>> src = torch.tensor([1, 1, 2])
-    >>> dst = torch.tensor([2, 4, 3])
-    >>> A = dglsp.from_coo(src, dst)
+    >>> indices = torch.tensor([[1, 1, 2],
+    >>>                         [2, 4, 3]])
+    >>> A = dglsp.spmatrix(indices)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([1., 1., 1.]),
                  shape=(3, 5), nnz=3)
     >>> # Specify shape
-    >>> A = dglsp.from_coo(src, dst, shape=(5, 5))
+    >>> A = dglsp.spmatrix(indices, shape=(5, 5))
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([1., 1., 1.]),
@@ -602,10 +602,10 @@ def from_coo(
 
     Case3: Sparse matrix with vector values.
 
-    >>> src = torch.tensor([1, 1, 2])
-    >>> dst = torch.tensor([2, 4, 3])
+    >>> indices = torch.tensor([[1, 1, 2],
+    >>>                         [2, 4, 3]])
     >>> val = torch.tensor([[1., 1.], [2., 2.], [3., 3.]])
-    >>> A = dglsp.from_coo(src, dst, val)
+    >>> A = dglsp.spmatrix(indices, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([[1., 1.],
