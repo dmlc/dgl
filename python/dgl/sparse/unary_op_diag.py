@@ -19,7 +19,7 @@ def neg(D: DiagMatrix) -> DiagMatrix:
     >>> D = dglsp.diag(val)
     >>> D = -D
     DiagMatrix(val=tensor([-0., -1., -2.]),
-               size=(3, 3))
+               shape=(3, 3))
     """
     return diag(-D.val, D.shape)
 
@@ -41,7 +41,7 @@ def inv(D: DiagMatrix) -> DiagMatrix:
     >>> D = dglsp.diag(val)
     >>> D = D.inv()
     DiagMatrix(val=tensor([1.0000, 0.5000, 0.3333]),
-               size=(3, 3))
+               shape=(3, 3))
     """
     num_rows, num_cols = D.shape
     assert num_rows == num_cols, f"Expect a square matrix, got shape {D.shape}"

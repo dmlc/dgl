@@ -40,7 +40,7 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
     SparseMatrix(indices=tensor([[0, 0, 1, 2],
                                  [1, 2, 2, 0]]),
                  values=tensor([0.2689, 0.7311, 1.0000, 1.0000]),
-                 size=(3, 3), nnz=4)
+                 shape=(3, 3), nnz=4)
 
     Case2: matrix with values of shape (nnz, D)
 
@@ -55,7 +55,7 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
                                 [0.7311, 0.0180],
                                 [1.0000, 1.0000],
                                 [1.0000, 1.0000]]),
-                 size=(3, 3), nnz=4, val_size=(2,))
+                 shape=(3, 3), nnz=4, val_size=(2,))
     """
     return SparseMatrix(torch.ops.dgl_sparse.softmax(input.c_sparse_matrix))
 

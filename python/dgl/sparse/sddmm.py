@@ -49,7 +49,7 @@ def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 3, 3]]),
                  values=tensor([-1.6585, -3.9714, -0.5406]),
-                 size=(3, 4), nnz=3)
+                 shape=(3, 4), nnz=3)
     """
     return SparseMatrix(torch.ops.dgl_sparse.sddmm(A.c_sparse_matrix, X1, X2))
 
@@ -101,6 +101,6 @@ def bsddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
                  values=tensor([[1560., 1735.],
                                 [3400., 3770.],
                                 [8400., 9105.]]),
-                 size=(3, 4), nnz=3, val_size=(2,))
+                 shape=(3, 4), nnz=3, val_size=(2,))
     """
     return sddmm(A, X1, X2)

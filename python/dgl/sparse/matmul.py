@@ -209,7 +209,7 @@ def spspmm(
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 1],
                                  [1, 2, 0, 1, 2]]),
                  values=tensor([1., 1., 1., 1., 1.]),
-                 size=(2, 3), nnz=5)
+                 shape=(2, 3), nnz=5)
     """
     assert isinstance(
         A, (SparseMatrix, DiagMatrix)

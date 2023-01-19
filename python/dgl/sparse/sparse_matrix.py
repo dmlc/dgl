@@ -174,7 +174,7 @@ class SparseMatrix:
         SparseMatrix(indices=tensor([[2, 1, 3],
                                      [1, 1, 3]]),
                      values=tensor([1, 1, 2]),
-                     size=(4, 4), nnz=3)
+                     shape=(4, 4), nnz=3)
         """
         return SparseMatrix(self.c_sparse_matrix.transpose())
 
@@ -207,7 +207,7 @@ class SparseMatrix:
                                      [1, 2, 0]], device='cuda:0'),
                      values=tensor([1, 1, 1], device='cuda:0',
                                    dtype=torch.int32),
-                     size=(3, 4), nnz=3)
+                     shape=(3, 4), nnz=3)
         """
         if device is None:
             device = self.device
@@ -247,7 +247,7 @@ class SparseMatrix:
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [1, 2, 0]], device='cuda:0'),
                      values=tensor([1., 1., 1.], device='cuda:0'),
-                     size=(3, 4), nnz=3)
+                     shape=(3, 4), nnz=3)
         """
         return self.to(device="cuda")
 
@@ -270,7 +270,7 @@ class SparseMatrix:
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [1, 2, 0]]),
                      values=tensor([1., 1., 1.]),
-                     size=(3, 4), nnz=3)
+                     shape=(3, 4), nnz=3)
         """
         return self.to(device="cpu")
 
@@ -294,7 +294,7 @@ class SparseMatrix:
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [1, 2, 0]]),
                      values=tensor([1., 1., 1.]),
-                     size=(3, 4), nnz=3)
+                     shape=(3, 4), nnz=3)
         """
         return self.to(dtype=torch.float)
 
@@ -317,7 +317,7 @@ class SparseMatrix:
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [1, 2, 0]]),
                      values=tensor([1., 1., 1.], dtype=torch.float64),
-                     size=(3, 4), nnz=3)
+                     shape=(3, 4), nnz=3)
         """
         return self.to(dtype=torch.double)
 
@@ -340,7 +340,7 @@ class SparseMatrix:
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [1, 2, 0]]),
                      values=tensor([1, 1, 1], dtype=torch.int32),
-                     size=(3, 4), nnz=3)
+                     shape=(3, 4), nnz=3)
         """
         return self.to(dtype=torch.int)
 
@@ -363,7 +363,7 @@ class SparseMatrix:
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [1, 2, 0]]),
                      values=tensor([1, 1, 1]),
-                     size=(3, 4), nnz=3)
+                     shape=(3, 4), nnz=3)
         """
         return self.to(dtype=torch.long)
 
@@ -395,7 +395,7 @@ class SparseMatrix:
         SparseMatrix(indices=tensor([[0, 0, 1, 1],
                                      [1, 2, 1, 2]]),
                      values=tensor([3, 3, 0, 4]),
-                     size=(2, 3), nnz=4)
+                     shape=(2, 3), nnz=4)
         """
         return SparseMatrix(self.c_sparse_matrix.coalesce())
 
@@ -454,13 +454,13 @@ def from_coo(
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([1., 1., 1.]),
-                 size=(3, 5), nnz=3)
+                 shape=(3, 5), nnz=3)
     >>> # Specify shape
     >>> A = dglsp.from_coo(dst, src, shape=(5, 5))
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([1., 1., 1.]),
-                 size=(5, 5), nnz=3)
+                 shape=(5, 5), nnz=3)
 
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
@@ -474,7 +474,7 @@ def from_coo(
                  values=tensor([[1., 1.],
                                 [2., 2.],
                                 [3., 3.]]),
-                 size=(3, 5), nnz=3, val_size=(2,))
+                 shape=(3, 5), nnz=3, val_size=(2,))
     """
     if shape is None:
         shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
@@ -533,13 +533,13 @@ def from_csr(
     SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
                                  [1, 2, 0, 1, 2]]),
                  values=tensor([1., 1., 1., 1., 1.]),
-                 size=(3, 3), nnz=5)
+                 shape=(3, 3), nnz=5)
     >>> # Specify shape
     >>> A = dglsp.from_csr(indptr, indices, shape=(3, 5))
     SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
                                  [1, 2, 0, 1, 2]]),
                  values=tensor([1., 1., 1., 1., 1.]),
-                 size=(3, 5), nnz=5)
+                 shape=(3, 5), nnz=5)
 
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
@@ -555,7 +555,7 @@ def from_csr(
                                 [3, 3],
                                 [4, 4],
                                 [5, 5]]),
-                 size=(3, 3), nnz=5, val_size=(2,))
+                 shape=(3, 3), nnz=5, val_size=(2,))
     """
     if shape is None:
         shape = (indptr.shape[0] - 1, torch.max(indices) + 1)
@@ -616,13 +616,13 @@ def from_csc(
     SparseMatrix(indices=tensor([[2, 0, 2, 1, 2],
                                  [0, 1, 1, 2, 2]]),
                  values=tensor([1., 1., 1., 1., 1.]),
-                 size=(3, 3), nnz=5)
+                 shape=(3, 3), nnz=5)
     >>> # Specify shape
     >>> A = dglsp.from_csc(indptr, indices, shape=(5, 3))
     SparseMatrix(indices=tensor([[2, 0, 2, 1, 2],
                                  [0, 1, 1, 2, 2]]),
                  values=tensor([1., 1., 1., 1., 1.]),
-                 size=(5, 3), nnz=5)
+                 shape=(5, 3), nnz=5)
 
     Case2: Sparse matrix with scalar/vector values. Following example is with
     vector data.
@@ -638,7 +638,7 @@ def from_csc(
                                 [3, 3],
                                 [4, 4],
                                 [5, 5]]),
-                 size=(3, 3), nnz=5, val_size=(2,))
+                 shape=(3, 3), nnz=5, val_size=(2,))
     """
     if shape is None:
         shape = (torch.max(indices) + 1, indptr.shape[0] - 1)
@@ -679,7 +679,7 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([2, 2, 2]),
-                 size=(3, 5), nnz=3)
+                 shape=(3, 5), nnz=3)
     """
     return SparseMatrix(torch.ops.dgl_sparse.val_like(mat.c_sparse_matrix, val))
 

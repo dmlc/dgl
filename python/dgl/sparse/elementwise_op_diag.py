@@ -29,7 +29,7 @@ def diag_add(
     >>> D2 = dglsp.diag(torch.arange(10, 13))
     >>> D1 + D2
     DiagMatrix(val=tensor([11, 13, 15]),
-               size=(3, 3))
+               shape=(3, 3))
     """
     if isinstance(D2, DiagMatrix):
         assert D1.shape == D2.shape, (
@@ -72,7 +72,7 @@ def diag_sub(
     >>> D2 = dglsp.diag(torch.arange(10, 13))
     >>> D1 - D2
     DiagMatrix(val=tensor([-9, -9, -9]),
-               size=(3, 3))
+               shape=(3, 3))
     """
     if isinstance(D2, DiagMatrix):
         assert D1.shape == D2.shape, (
@@ -115,7 +115,7 @@ def diag_rsub(
     >>> D2 = dglsp.diag(torch.arange(10, 13))
     >>> D2 - D1
     DiagMatrix(val=tensor([-9, -9, -9]),
-               size=(3, 3))
+               shape=(3, 3))
     """
     return -(D1 - D2)
 
@@ -140,10 +140,10 @@ def diag_mul(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
     >>> D = dglsp.diag(torch.arange(1, 4))
     >>> D * 2.5
     DiagMatrix(val=tensor([2.5000, 5.0000, 7.5000]),
-               size=(3, 3))
+               shape=(3, 3))
     >>> 2 * D
     DiagMatrix(val=tensor([2, 4, 6]),
-               size=(3, 3))
+               shape=(3, 3))
     """
     if isinstance(D2, DiagMatrix):
         assert D1.shape == D2.shape, (
@@ -182,10 +182,10 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
     >>> D2 = dglsp.diag(torch.arange(10, 13))
     >>> D1 / D2
     DiagMatrix(val=tensor([0.1000, 0.1818, 0.2500]),
-               size=(3, 3))
+               shape=(3, 3))
     >>> D1 / 2.5
     DiagMatrix(val=tensor([0.4000, 0.8000, 1.2000]),
-               size=(3, 3))
+               shape=(3, 3))
     """
     if isinstance(D2, DiagMatrix):
         assert D1.shape == D2.shape, (
@@ -224,7 +224,7 @@ def diag_power(D: DiagMatrix, scalar: Scalar) -> DiagMatrix:
     >>> D = dglsp.diag(torch.arange(1, 4))
     >>> D ** 2
     DiagMatrix(val=tensor([1, 4, 9]),
-               size=(3, 3))
+               shape=(3, 3))
     """
     return (
         diag(D.val**scalar, D.shape) if is_scalar(scalar) else NotImplemented
