@@ -285,7 +285,7 @@ def matmul(
     Multiply a diagonal matrix with a dense matrix.
 
     >>> val = torch.randn(3)
-    >>> A = diag(val)
+    >>> A = dglsp.diag(val)
     >>> B = torch.randn(3, 2)
     >>> result = dglsp.matmul(A, B)
     >>> print(type(result))

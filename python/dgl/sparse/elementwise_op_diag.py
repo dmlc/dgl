@@ -25,8 +25,8 @@ def diag_add(
 
     Examples
     --------
-    >>> D1 = diag(torch.arange(1, 4))
-    >>> D2 = diag(torch.arange(10, 13))
+    >>> D1 = dglsp.diag(torch.arange(1, 4))
+    >>> D2 = dglsp.diag(torch.arange(10, 13))
     >>> D1 + D2
     DiagMatrix(val=tensor([11, 13, 15]),
                size=(3, 3))
@@ -68,8 +68,8 @@ def diag_sub(
 
     Examples
     --------
-    >>> D1 = diag(torch.arange(1, 4))
-    >>> D2 = diag(torch.arange(10, 13))
+    >>> D1 = dglsp.diag(torch.arange(1, 4))
+    >>> D2 = dglsp.diag(torch.arange(10, 13))
     >>> D1 - D2
     DiagMatrix(val=tensor([-9, -9, -9]),
                size=(3, 3))
@@ -111,8 +111,8 @@ def diag_rsub(
 
     Examples
     --------
-    >>> D1 = diag(torch.arange(1, 4))
-    >>> D2 = diag(torch.arange(10, 13))
+    >>> D1 = dglsp.diag(torch.arange(1, 4))
+    >>> D2 = dglsp.diag(torch.arange(10, 13))
     >>> D2 - D1
     DiagMatrix(val=tensor([-9, -9, -9]),
                size=(3, 3))
@@ -137,7 +137,7 @@ def diag_mul(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
 
     Examples
     --------
-    >>> D = diag(torch.arange(1, 4))
+    >>> D = dglsp.diag(torch.arange(1, 4))
     >>> D * 2.5
     DiagMatrix(val=tensor([2.5000, 5.0000, 7.5000]),
                size=(3, 3))
@@ -178,8 +178,8 @@ def diag_div(D1: DiagMatrix, D2: Union[DiagMatrix, Scalar]) -> DiagMatrix:
 
     Examples
     --------
-    >>> D1 = diag(torch.arange(1, 4))
-    >>> D2 = diag(torch.arange(10, 13))
+    >>> D1 = dglsp.diag(torch.arange(1, 4))
+    >>> D2 = dglsp.diag(torch.arange(10, 13))
     >>> D1 / D2
     DiagMatrix(val=tensor([0.1000, 0.1818, 0.2500]),
                size=(3, 3))
@@ -221,7 +221,7 @@ def diag_power(D: DiagMatrix, scalar: Scalar) -> DiagMatrix:
 
     Examples
     --------
-    >>> D = diag(torch.arange(1, 4))
+    >>> D = dglsp.diag(torch.arange(1, 4))
     >>> D ** 2
     DiagMatrix(val=tensor([1, 4, 9]),
                size=(3, 3))

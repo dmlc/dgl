@@ -404,7 +404,7 @@ def identity(
      [0, 1, 0],
      [0, 0, 1]]
 
-    >>> mat = identity(shape=(3, 3))
+    >>> mat = dglsp.identity(shape=(3, 3))
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1.]),
                size=(3, 3))
@@ -415,14 +415,14 @@ def identity(
      [0, 1, 0, 0, 0],
      [0, 0, 1, 0, 0]]
 
-    >>> mat = identity(shape=(3, 5))
+    >>> mat = dglsp.identity(shape=(3, 5))
     >>> print(mat)
     DiagMatrix(val=tensor([1., 1., 1.]),
                size=(3, 5))
 
     Case3: 3-by-3 matrix with vector diagonal values
 
-    >>> mat = identity(shape=(3, 3), d=2)
+    >>> mat = dglsp.identity(shape=(3, 3), d=2)
     >>> print(mat)
     DiagMatrix(values=tensor([[1., 1.],
                               [1., 1.],
