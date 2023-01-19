@@ -35,9 +35,9 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     >>> A = dglsp.from_coo(row, col, val)
     >>> X = torch.randn(2, 3)
     >>> result = dglsp.spmm(A, X)
-    >>> print(type(result))
+    >>> type(result)
     <class 'torch.Tensor'>
-    >>> print(result.shape)
+    >>> result.shape
     torch.Size([2, 3])
     """
     assert isinstance(
@@ -78,9 +78,9 @@ def bspmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     >>> A = dglsp.from_coo(row, col, val, shape=(3, 3))
     >>> X = torch.randn(3, 3, 2)
     >>> result = dglsp.bspmm(A, X)
-    >>> print(type(result))
+    >>> type(result)
     <class 'torch.Tensor'>
-    >>> print(result.shape)
+    >>> result.shape
     torch.Size([3, 3, 2])
     """
     assert isinstance(
@@ -201,13 +201,11 @@ def spspmm(
     >>> col1 = torch.tensor([1, 0, 1])
     >>> val1 = torch.ones(len(row1))
     >>> A = dglsp.from_coo(row1, col1, val1)
-
     >>> row2 = torch.tensor([0, 1, 1])
     >>> col2 = torch.tensor([0, 2, 1])
     >>> val2 = torch.ones(len(row2))
     >>> B = dglsp.from_coo(row2, col2, val2)
-    >>> result = dglsp.spspmm(A, B)
-    >>> print(result)
+    >>> dglsp.spspmm(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 1],
                                  [1, 2, 0, 1, 2]]),
                  values=tensor([1., 1., 1., 1., 1.]),
@@ -288,9 +286,9 @@ def matmul(
     >>> A = dglsp.diag(val)
     >>> B = torch.randn(3, 2)
     >>> result = dglsp.matmul(A, B)
-    >>> print(type(result))
+    >>> type(result)
     <class 'torch.Tensor'>
-    >>> print(result.shape)
+    >>> result.shape
     torch.Size([3, 2])
 
     Multiply a sparse matrix with a dense matrix.
@@ -301,9 +299,9 @@ def matmul(
     >>> A = dglsp.from_coo(row, col, val)
     >>> X = torch.randn(2, 3)
     >>> result = dglsp.matmul(A, X)
-    >>> print(type(result))
+    >>> type(result)
     <class 'torch.Tensor'>
-    >>> print(result.shape)
+    >>> result.shape
     torch.Size([2, 3])
 
     Multiply a sparse matrix with a sparse matrix.
@@ -317,9 +315,9 @@ def matmul(
     >>> val2 = torch.ones(len(row2))
     >>> B = dglsp.from_coo(row2, col2, val2)
     >>> result = dglsp.matmul(A, B)
-    >>> print(type(result))
+    >>> type(result)
     <class 'dgl.sparse.sparse_matrix.SparseMatrix'>
-    >>> print(result.shape)
+    >>> result.shape
     (2, 3)
     """
     assert isinstance(A, (torch.Tensor, SparseMatrix, DiagMatrix)), (
