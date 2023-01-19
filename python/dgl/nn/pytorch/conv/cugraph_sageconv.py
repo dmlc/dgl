@@ -91,6 +91,10 @@ class CuGraphSAGEConv(nn.Module):
 
         self.linear = nn.Linear(2 * in_feats, out_feats, bias=bias)
 
+    def reset_parameters(self):
+        r"""Reinitialize learnable parameters."""
+        self.linear.reset_parameters()
+
     def forward(self, g, feat, max_in_degree=None):
         r"""Forward computation.
 
