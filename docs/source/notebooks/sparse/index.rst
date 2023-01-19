@@ -4,7 +4,7 @@
 TODO(minjie): intro for the new library.
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 3
   :titlesonly:
 
   quickstart.nblink
