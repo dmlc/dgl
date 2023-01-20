@@ -21,6 +21,7 @@ def generate_graph():
     g = dgl.graph((u, v))
     return g
 
+
 @pytest.mark.skip()
 @pytest.mark.parametrize("to_block", options["to_block"])
 @pytest.mark.parametrize("self_loop", options["self_loop"])
