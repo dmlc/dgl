@@ -480,12 +480,12 @@ def spmatrix(
         which should have shape of ``(2, N)`` where the first row is the row
         indices and the second row is the column indices of non-zero elements.
     val : tensor.Tensor, optional
-        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
-        shape (nnz) filled by 1.
+        The values of shape ``(nnz)`` or ``(nnz, D)``. If None, it will be a
+        tensor of shape ``(nnz)`` filled by 1.
     shape : tuple[int, int], optional
         If not specified, it will be inferred from :attr:`row` and :attr:`col`,
-        i.e., (row.max() + 1, col.max() + 1). Otherwise, :attr:`shape` should
-        be no smaller than this.
+        i.e., ``(row.max() + 1, col.max() + 1)``. Otherwise, :attr:`shape`
+        should be no smaller than this.
 
     Returns
     -------
