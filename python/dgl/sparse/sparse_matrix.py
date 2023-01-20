@@ -456,7 +456,6 @@ def spmatrix(
                  shape=(3, 5), nnz=3)
     >>> # Specify shape
     >>> A = dglsp.spmatrix(indices, shape=(5, 5))
-    >>> print(A)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([1., 1., 1.]),
