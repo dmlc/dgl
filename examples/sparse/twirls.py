@@ -184,9 +184,9 @@ if __name__ == "__main__":
     X = g.ndata["feat"]
 
     # Create the sparse adjacency matrix A.
-    src, dst = g.edges()
+    indices = torch.stack(g.edges())
     N = g.num_nodes()
-    A = dglsp.from_coo(dst, src, shape=(N, N))
+    A = dglsp.spmatrix(indices, shape=(N, N))
 
     # Create the TWIRLS model.
     in_size = X.shape[1]
