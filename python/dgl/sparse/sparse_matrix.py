@@ -108,8 +108,8 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> dst = torch.tensor([1, 2, 1])
-        >>> src = torch.tensor([2, 4, 3])
+        >>> indices = torch.tensor([[1, 2, 1],
+        >>>                         [2, 4, 3]])
         >>> A = from_coo(dst, src)
         >>> A.coo()
         (tensor([1, 2, 1]), tensor([2, 4, 3]))
@@ -140,8 +140,8 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> dst = torch.tensor([1, 2, 1])
-        >>> src = torch.tensor([2, 4, 3])
+        >>> indices = torch.tensor([[1, 2, 1],
+        >>>                         [2, 4, 3]])
         >>> A = from_coo(dst, src)
         >>> A.csr()
         (tensor([0, 0, 2, 3]), tensor([2, 3, 4]), tensor([0, 2, 1]))
@@ -172,8 +172,8 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> dst = torch.tensor([1, 2, 1])
-        >>> src = torch.tensor([2, 4, 3])
+        >>> indices = torch.tensor([[1, 2, 1],
+        >>>                         [2, 4, 3]])
         >>> A = from_coo(dst, src)
         >>> A.csc()
         (tensor([0, 0, 0, 1, 2, 3]), tensor([1, 1, 2]), tensor([0, 2, 1]))
@@ -591,8 +591,10 @@ def from_coo(
 
     Case2: Sparse matrix with scalar values.
 
+    >>> indices = torch.tensor([[1, 1, 2],
+    >>>                         [2, 4, 3]])
     >>> val = torch.tensor([[1.], [2.], [3.]])
-    >>> A = dglsp.from_coo(dst, src, val)
+    >>> A = dglsp.spmatrix(indices, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
                  values=tensor([[1.],
