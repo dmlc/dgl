@@ -105,8 +105,8 @@ class SparseMatrix:
         torch.Tensor
             Column coordinate
 
-        Example
-        -------
+        Examples
+        --------
 
         >>> dst = torch.tensor([1, 2, 1])
         >>> src = torch.tensor([2, 4, 3])
@@ -137,8 +137,8 @@ class SparseMatrix:
         torch.Tensor
             Value indices
 
-        Example
-        -------
+        Examples
+        --------
 
         >>> dst = torch.tensor([1, 2, 1])
         >>> src = torch.tensor([2, 4, 3])
@@ -169,8 +169,8 @@ class SparseMatrix:
         torch.Tensor
             Value indices
 
-        Example
-        -------
+        Examples
+        --------
 
         >>> dst = torch.tensor([1, 2, 1])
         >>> src = torch.tensor([2, 4, 3])
@@ -212,8 +212,8 @@ class SparseMatrix:
         SparseMatrix
             The transpose of this sparse matrix.
 
-        Example
-        -------
+        Examples
+        --------
 
         >>> row = torch.tensor([1, 1, 3])
         >>> col = torch.tensor([2, 1, 3])
@@ -245,7 +245,7 @@ class SparseMatrix:
         SparseMatrix
             The converted matrix
 
-        Example
+        Examples
         --------
 
         >>> row = torch.tensor([1, 1, 2])
@@ -286,7 +286,7 @@ class SparseMatrix:
         SparseMatrix
             The matrix on GPU
 
-        Example
+        Examples
         --------
 
         >>> row = torch.tensor([1, 1, 2])
@@ -309,7 +309,7 @@ class SparseMatrix:
         SparseMatrix
             The matrix on CPU
 
-        Example
+        Examples
         --------
 
         >>> row = torch.tensor([1, 1, 2]).to('cuda')
@@ -332,7 +332,7 @@ class SparseMatrix:
         SparseMatrix
             The matrix with float values
 
-        Example
+        Examples
         --------
 
         >>> row = torch.tensor([1, 1, 2])
@@ -356,7 +356,7 @@ class SparseMatrix:
         SparseMatrix
             The matrix with double values
 
-        Example
+        Examples
         --------
 
         >>> row = torch.tensor([1, 1, 2])
@@ -379,7 +379,7 @@ class SparseMatrix:
         DiagMatrix
             The matrix with int values
 
-        Example
+        Examples
         --------
 
         >>> row = torch.tensor([1, 1, 2])
@@ -402,7 +402,7 @@ class SparseMatrix:
         DiagMatrix
             The matrix with long values
 
-        Example
+        Examples
         --------
 
         >>> row = torch.tensor([1, 1, 2])

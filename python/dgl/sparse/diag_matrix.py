@@ -99,8 +99,8 @@ class DiagMatrix:
         SparseMatrix
             The copy in sparse matrix format
 
-        Example
-        -------
+        Examples
+        --------
 
         >>> import torch
         >>> val = torch.ones(5)
@@ -147,7 +147,7 @@ class DiagMatrix:
         DiagMatrix
             The transpose of the matrix
 
-        Example
+        Examples
         --------
 
         >>> val = torch.arange(1, 5).float()
@@ -176,7 +176,7 @@ class DiagMatrix:
         DiagMatrix
             The converted matrix
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -205,7 +205,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix on GPU
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -225,7 +225,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix on CPU
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -245,7 +245,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix with float values
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -265,7 +265,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix with double values
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -285,7 +285,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix with int values
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -305,7 +305,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix with long values
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
