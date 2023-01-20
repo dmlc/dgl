@@ -47,6 +47,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
     'sphinx.ext.graphviz',
+    'sphinxemoji.sphinxemoji',
     'sphinx_gallery.gen_gallery',
     'sphinx_copybutton',
     'nbsphinx',
