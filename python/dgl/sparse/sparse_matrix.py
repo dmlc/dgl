@@ -670,9 +670,11 @@ def from_csr(
 
     Case1: Sparse matrix without values
 
-    [0, 1, 0],
-    [0, 0, 1],
-    [1, 1, 1]
+    .. code::
+
+        [[0, 1, 0],
+         [0, 0, 1],
+         [1, 1, 1]]
 
     >>> indptr = torch.tensor([0, 1, 2, 5])
     >>> indices = torch.tensor([1, 2, 0, 1, 2])
@@ -760,9 +762,11 @@ def from_csc(
 
     Case1: Sparse matrix without values
 
-    [0, 1, 0],
-    [0, 0, 1],
-    [1, 1, 1]
+    .. code::
+
+        [[0, 1, 0],
+         [0, 0, 1],
+         [1, 1, 1]]
 
     >>> indptr = torch.tensor([0, 1, 3, 5])
     >>> indices = torch.tensor([2, 0, 2, 1, 2])

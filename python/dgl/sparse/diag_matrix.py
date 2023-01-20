@@ -399,9 +399,11 @@ def identity(
 
     Case1: 3-by-3 matrix with scaler diagonal values
 
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, 1]
+    .. code::
+
+        [[1, 0, 0],
+         [0, 1, 0],
+         [0, 0, 1]]
 
     >>> dglsp.identity(shape=(3, 3))
     DiagMatrix(val=tensor([1., 1., 1.]),
@@ -409,9 +411,11 @@ def identity(
 
     Case2: 3-by-5 matrix with scaler diagonal values
 
-    [1, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0],
-    [0, 0, 1, 0, 0]
+    .. code::
+
+        [[1, 0, 0, 0, 0],
+         [0, 1, 0, 0, 0],
+         [0, 0, 1, 0, 0]]
 
     >>> dglsp.identity(shape=(3, 5))
     DiagMatrix(val=tensor([1., 1., 1.]),
