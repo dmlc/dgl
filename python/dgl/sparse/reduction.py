@@ -9,8 +9,8 @@ from .sparse_matrix import SparseMatrix
 
 
 def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
-    """Computes the reduction of non-zero values of the ``input`` sparse matrix
-    along the given dimension :attr:`dim`.
+    """Computes the reduction of non-zero values of the :attr:`input` sparse
+    matrix along the given dimension :attr:`dim`.
 
     The reduction does not count zero elements. If the row or column to be
     reduced does not have any non-zero elements, the result will be 0.
@@ -85,8 +85,8 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
 
 
 def sum(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the sum of non-zero values of the ``input`` sparse matrix along
-    the given dimension :attr:`dim`.
+    """Computes the sum of non-zero values of the :attr:`input` sparse matrix
+    along the given dimension :attr:`dim`.
 
     Parameters
     ----------
@@ -141,8 +141,8 @@ def sum(input: SparseMatrix, dim: Optional[int] = None):
 
 
 def smax(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the maximum of non-zero values of the ``input`` sparse matrix
-    along the given dimension :attr:`dim`.
+    """Computes the maximum of non-zero values of the :attr:`input` sparse
+    matrix along the given dimension :attr:`dim`.
 
     The reduction does not count zero values. If the row or column to be
     reduced does not have any non-zero value, the result will be 0.
@@ -201,8 +201,8 @@ def smax(input: SparseMatrix, dim: Optional[int] = None):
 
 
 def smin(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the minimum of non-zero values of the ``input`` sparse matrix
-    along the given dimension :attr:`dim`.
+    """Computes the minimum of non-zero values of the :attr:`input` sparse
+    matrix along the given dimension :attr:`dim`.
 
     The reduction does not count zero values. If the row or column to be reduced
     does not have any non-zero value, the result will be 0.
@@ -265,8 +265,8 @@ def smin(input: SparseMatrix, dim: Optional[int] = None):
 
 
 def smean(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the mean of non-zero values of the ``input`` sparse matrix along
-    the given dimension :attr:`dim`.
+    """Computes the mean of non-zero values of the :attr:`input` sparse matrix
+    along the given dimension :attr:`dim`.
 
     The reduction does not count zero values. If the row or column to be reduced
     does not have any non-zero value, the result will be 0.
@@ -329,8 +329,8 @@ def smean(input: SparseMatrix, dim: Optional[int] = None):
 
 
 def sprod(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the product of non-zero values of the ``input`` sparse matrix
-    along the given dimension :attr:`dim`.
+    """Computes the product of non-zero values of the :attr:`input` sparse
+    matrix along the given dimension :attr:`dim`.
 
     The reduction does not count zero values. If the row or column to be reduced
     does not have any non-zero value, the result will be 0.
