@@ -72,7 +72,7 @@ def load_data():
     # We follow the paper and assume that the rows of the incidence matrix
     # are for nodes and the columns are for edges.
     src, dst = graph.edges()
-    H = dglsp.from_coo(dst, src)
+    H = dglsp.spmatrix(indices)
     H = H + dglsp.identity(H.shape)
 
     X = graph.ndata["feat"]
