@@ -251,7 +251,7 @@ class SparseMatrix:
         >>> indices = torch.tensor([[1, 1, 2],
         >>>                         [1, 2, 0]])
         >>> A = dglsp.spmatrix(indices, shape=(3, 4))
-        >>> A.to(device='cuda:0', dtype=torch.int32)
+        >>> A.to(device="cuda:0", dtype=torch.int32)
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [1, 2, 0]], device='cuda:0'),
                      values=tensor([1, 1, 1], device='cuda:0',
@@ -279,7 +279,7 @@ class SparseMatrix:
     def cuda(self):
         """Moves the matrix to GPU. If the matrix is already on GPU, the
         original matrix will be returned. If multiple GPU devices exist,
-        'cuda:0' will be selected.
+        ``cuda:0`` will be selected.
 
         Returns
         -------
@@ -315,6 +315,7 @@ class SparseMatrix:
         >>> indices = torch.tensor([[1, 1, 2],
         >>>                         [1, 2, 0]]).to("cuda")
         >>> A = dglsp.spmatrix(indices, shape=(3, 4))
+
         >>> A.cpu()
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [1, 2, 0]]),
