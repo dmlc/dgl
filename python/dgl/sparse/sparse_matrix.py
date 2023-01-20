@@ -555,16 +555,16 @@ def from_coo(
     Parameters
     ----------
     row : torch.Tensor
-        The row indices of shape (nnz)
+        The row indices of shape ``(nnz)``
     col : torch.Tensor
-        The column indices of shape (nnz)
+        The column indices of shape ``(nnz)``
     val : torch.Tensor, optional
-        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
-        shape (nnz) filled by 1.
+        The values of shape ``(nnz)`` or ``(nnz, D)``. If None, it will be a
+        tensor of shape ``(nnz)`` filled by 1.
     shape : tuple[int, int], optional
         If not specified, it will be inferred from :attr:`row` and :attr:`col`,
-        i.e., (row.max() + 1, col.max() + 1). Otherwise, :attr:`shape` should
-        be no smaller than this.
+        i.e., ``(row.max() + 1, col.max() + 1)``. Otherwise, :attr:`shape`
+        should be no smaller than this.
 
     Returns
     -------
@@ -648,17 +648,17 @@ def from_csr(
     Parameters
     ----------
     indptr : torch.Tensor
-        Pointer to the column indices of shape (N + 1), where N is the number
-        of rows
+        Pointer to the column indices of shape ``(N + 1)``, where ``N`` is the
+        number of rows
     indices : torch.Tensor
-        The column indices of shape (nnz)
+        The column indices of shape ``(nnz)``
     val : torch.Tensor, optional
-        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
-        shape (nnz) filled by 1.
+        The values of shape ``(nnz)`` or ``(nnz, D)``. If None, it will be a
+        tensor of shape ``(nnz)`` filled by 1.
     shape : tuple[int, int], optional
         If not specified, it will be inferred from :attr:`indptr` and
-        :attr:`indices`, i.e., (len(indptr) - 1, indices.max() + 1). Otherwise,
-        :attr:`shape` should be no smaller than this.
+        :attr:`indices`, i.e., ``(len(indptr) - 1, indices.max() + 1)``.
+        Otherwise, :attr:`shape` should be no smaller than this.
 
     Returns
     -------
@@ -670,9 +670,9 @@ def from_csr(
 
     Case1: Sparse matrix without values
 
-    [[0, 1, 0],
-     [0, 0, 1],
-     [1, 1, 1]]
+    [0, 1, 0],
+    [0, 0, 1],
+    [1, 1, 1]
 
     >>> indptr = torch.tensor([0, 1, 2, 5])
     >>> indices = torch.tensor([1, 2, 0, 1, 2])
@@ -743,12 +743,12 @@ def from_csc(
     indices : torch.Tensor
         The row indices of shape nnz
     val : torch.Tensor, optional
-        The values of shape (nnz) or (nnz, D). If None, it will be a tensor of
-        shape (nnz) filled by 1.
+        The values of shape ``(nnz)`` or ``(nnz, D)``. If None, it will be a
+        tensor of shape ``(nnz)`` filled by 1.
     shape : tuple[int, int], optional
         If not specified, it will be inferred from :attr:`indptr` and
-        :attr:`indices`, i.e., (indices.max() + 1, len(indptr) - 1). Otherwise,
-        :attr:`shape` should be no smaller than this.
+        :attr:`indices`, i.e., ``(indices.max() + 1, len(indptr) - 1)``.
+        Otherwise, :attr:`shape` should be no smaller than this.
 
     Returns
     -------
@@ -760,9 +760,9 @@ def from_csc(
 
     Case1: Sparse matrix without values
 
-    [[0, 1, 0],
-     [0, 0, 1],
-     [1, 1, 1]]
+    [0, 1, 0],
+    [0, 0, 1],
+    [1, 1, 1]
 
     >>> indptr = torch.tensor([0, 1, 3, 5])
     >>> indices = torch.tensor([2, 0, 2, 1, 2])
@@ -819,7 +819,8 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     mat : SparseMatrix
         An existing sparse matrix with non-zero values
     val : torch.Tensor
-        The new values of the non-zero elements, a tensor of shape (nnz) or (nnz, D)
+        The new values of the non-zero elements, a tensor of shape ``(nnz)`` or
+        ``(nnz, D)``
 
     Returns
     -------
