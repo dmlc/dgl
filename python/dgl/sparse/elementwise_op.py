@@ -12,8 +12,8 @@ __all__ = ["add", "sub", "mul", "div", "power"]
 def add(
     A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
 ) -> Union[DiagMatrix, SparseMatrix]:
-    r"""Elementwise additions for ``DiagMatrix`` and ``SparseMatrix``,
-    equivalent to ``A + B``.
+    r"""Elementwise addition for ``DiagMatrix`` and ``SparseMatrix``, equivalent
+    to ``A + B``.
 
     The supported combinations are shown as follows.
 
@@ -45,12 +45,12 @@ def add(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 1, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
-    >>> B = diag(torch.arange(1, 4))
-    >>> add(A, B)
+    >>> A = dglsp.from_coo(row, col, val)
+    >>> B = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.add(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
                                  [0, 1, 0, 1, 2]]),
-                 values=tensor([ 1, 20, 10,  2, 33]),
+                 values=tensor([1, 20, 10,  2, 33]),
                  shape=(3, 3), nnz=5)
     """
     return A + B
@@ -92,9 +92,9 @@ def sub(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 1, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
-    >>> B = diag(torch.arange(1, 4))
-    >>> sub(A, B)
+    >>> A = dglsp.from_coo(row, col, val)
+    >>> B = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.sub(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
                                  [0, 1, 0, 1, 2]]),
                  values=tensor([-1, 20, 10, -2, 27]),
@@ -139,20 +139,20 @@ def mul(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
-    >>> mul(A, 2)
+    >>> A = dglsp.from_coo(row, col, val)
+    >>> dglsp.mul(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([20, 40, 60]),
                  shape=(3, 4), nnz=3)
 
-    >>> D = diag(torch.arange(1, 4))
-    >>> mul(D, 2)
+    >>> D = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.mul(D, 2)
     DiagMatrix(val=tensor([2, 4, 6]),
                shape=(3, 3))
 
-    >>> D = diag(torch.arange(1, 4))
-    >>> mul(D, D)
+    >>> D = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.mul(D, D)
     DiagMatrix(val=tensor([1, 4, 9]),
                shape=(3, 3))
     """
@@ -191,22 +191,22 @@ def div(
 
     Examples
     --------
-    >>> A = diag(torch.arange(1, 4))
-    >>> B = diag(torch.arange(10, 13))
-    >>> div(A, B)
+    >>> A = dglsp.diag(torch.arange(1, 4))
+    >>> B = dglsp.diag(torch.arange(10, 13))
+    >>> dglsp.div(A, B)
     DiagMatrix(val=tensor([0.1000, 0.1818, 0.2500]),
                shape=(3, 3))
 
-    >>> A = diag(torch.arange(1, 4))
-    >>> div(A, 2)
+    >>> A = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.div(A, 2)
     DiagMatrix(val=tensor([0.5000, 1.0000, 1.5000]),
                shape=(3, 3))
 
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([1, 2, 3])
-    >>> A = from_coo(row, col, val, shape=(3, 4))
-    >>> A / 2
+    >>> A = dglsp.from_coo(row, col, val, shape=(3, 4))
+    >>> dglsp.div(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([0.5000, 1.0000, 1.5000]),
@@ -250,15 +250,15 @@ def power(
     >>> row = torch.tensor([1, 0, 2])
     >>> col = torch.tensor([0, 3, 2])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
-    >>> power(A, 2)
+    >>> A = dglsp.from_coo(row, col, val)
+    >>> dglsp.power(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([100, 400, 900]),
                  shape=(3, 4), nnz=3)
 
-    >>> D = diag(torch.arange(1, 4))
-    >>> power(D, 2)
+    >>> D = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.power(D, 2)
     DiagMatrix(val=tensor([1, 4, 9]),
                shape=(3, 3))
     """

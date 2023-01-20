@@ -50,6 +50,8 @@ Generative Models of Graphs
 # you can write the code as follows.
 #
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 
 g = dgl.DGLGraph()

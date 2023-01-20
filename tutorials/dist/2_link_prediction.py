@@ -19,6 +19,8 @@ into a training graph, validation edges and test edges with :class:`~dgl.data.As
 .. code-block:: python
 
 
+    import os
+    os.environ['DGLBACKEND'] = 'pytorch'
     import dgl
     import torch as th
     from ogb.linkproppred import DglLinkPropPredDataset

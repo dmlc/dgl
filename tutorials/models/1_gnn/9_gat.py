@@ -104,6 +104,8 @@ structure-free normalization, in the style of attention.
 # DGL provides an off-the-shelf implementation of the GAT layer under the ``dgl.nn.<backend>``
 # subpackage. Simply import the ``GATConv`` as the follows.
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 from dgl.nn.pytorch import GATConv
 
 ###############################################################

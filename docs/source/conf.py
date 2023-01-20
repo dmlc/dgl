@@ -47,11 +47,16 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
     'sphinx.ext.graphviz',
+    'sphinxemoji.sphinxemoji',
     'sphinx_gallery.gen_gallery',
     'sphinx_copybutton',
     'nbsphinx',
     'nbsphinx_link',
 ]
+
+# Do not run notebooks on non-pytorch backends
+if dglbackend != "pytorch":
+    nbsphinx_execute = 'never'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -75,13 +80,6 @@ language = None
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
-if dglbackend == "mxnet":
-    include_patterns = ['api/python/nn-mxnet*']
-elif dglbackend == "tensorflow":
-    include_patterns = ['api/python/nn-tensorflow*']
-else:
-    # pytorch
-    exclude_patterns = ['api/python/nn-tensorflow*', 'api/python/nn-mxnet*']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
