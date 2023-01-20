@@ -312,8 +312,8 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 1, 2]).to('cuda',
-        >>>                         [1, 2, 0]).to('cuda'])
+        >>> indices = torch.tensor([[1, 1, 2],
+        >>>                         [1, 2, 0]]).to("cuda")
         >>> A = dglsp.spmatrix(indices, shape=(3, 4))
         >>> A.cpu()
         SparseMatrix(indices=tensor([[1, 1, 2],
