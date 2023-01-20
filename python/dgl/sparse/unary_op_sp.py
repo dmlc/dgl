@@ -14,10 +14,10 @@ def neg(A: SparseMatrix) -> SparseMatrix:
     Examples
     --------
 
-    >>> row = torch.tensor([1, 1, 3])
-    >>> col = torch.tensor([1, 2, 3])
+    >>> indices = torch.tensor([[1, 1, 3],
+    >>>                         [1, 2, 3]])
     >>> val = torch.tensor([1., 1., 2.])
-    >>> A = dglsp.from_coo(row, col, val)
+    >>> A = dglsp.spmatrix(indices, val)
     >>> A = -A
     SparseMatrix(indices=tensor([[1, 1, 3],
                                  [1, 2, 3]]),

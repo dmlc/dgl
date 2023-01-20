@@ -42,10 +42,10 @@ def add(
 
     Examples
     --------
-    >>> row = torch.tensor([1, 0, 2])
-    >>> col = torch.tensor([0, 1, 2])
+    >>> indices = torch.tensor([[1, 0, 2],
+    >>>                         [0, 1, 2]])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = dglsp.from_coo(row, col, val)
+    >>> A = dglsp.spmatrix(indices, val)
     >>> B = dglsp.diag(torch.arange(1, 4))
     >>> dglsp.add(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
@@ -89,10 +89,10 @@ def sub(
 
     Examples
     --------
-    >>> row = torch.tensor([1, 0, 2])
-    >>> col = torch.tensor([0, 1, 2])
+    >>> indices = torch.tensor([[1, 0, 2],
+    >>>                         [0, 1, 2]])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = dglsp.from_coo(row, col, val)
+    >>> A = dglsp.spmatrix(indices, val)
     >>> B = dglsp.diag(torch.arange(1, 4))
     >>> dglsp.sub(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
@@ -136,10 +136,10 @@ def mul(
 
     Examples
     --------
-    >>> row = torch.tensor([1, 0, 2])
-    >>> col = torch.tensor([0, 3, 2])
+    >>> indices = torch.tensor([[1, 0, 2],
+    >>>                         [0, 3, 2]])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = dglsp.from_coo(row, col, val)
+    >>> A = dglsp.spmatrix(indices, val)
     >>> dglsp.mul(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
@@ -202,10 +202,10 @@ def div(
     DiagMatrix(val=tensor([0.5000, 1.0000, 1.5000]),
                shape=(3, 3))
 
-    >>> row = torch.tensor([1, 0, 2])
-    >>> col = torch.tensor([0, 3, 2])
+    >>> indices = torch.tensor([[1, 0, 2],
+    >>>                         [0, 3, 2]])
     >>> val = torch.tensor([1, 2, 3])
-    >>> A = dglsp.from_coo(row, col, val, shape=(3, 4))
+    >>> A = dglsp.spmatrix(indices, val, shape=(3, 4))
     >>> dglsp.div(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
@@ -247,10 +247,10 @@ def power(
 
     Examples
     --------
-    >>> row = torch.tensor([1, 0, 2])
-    >>> col = torch.tensor([0, 3, 2])
+    >>> indices = torch.tensor([[1, 0, 2],
+    >>>                         [0, 3, 2]])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = dglsp.from_coo(row, col, val)
+    >>> A = dglsp.spmatrix(indices, val)
     >>> dglsp.power(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
