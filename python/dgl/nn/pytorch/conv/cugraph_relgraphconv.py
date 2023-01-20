@@ -137,11 +137,14 @@ class CuGraphRelGraphConv(nn.Module):
     def reset_parameters(self):
         r"""Reinitialize learnable parameters."""
         bound = 1 / math.sqrt(self.in_feat)
-        nn.init.uniform_(self.W, -bound, bound)
+        end = -1 if self.self_loop else None
+        nn.init.uniform_(self.W[:end], -bound, bound)
         if self.regularizer == "basis":
             nn.init.xavier_uniform_(
                 self.coeff, gain=nn.init.calculate_gain("relu")
             )
+        if self.self_loop:
+            nn.init.xavier_uniform_(self.W[-1], nn.init.calculate_gain("relu"))
         if self.bias is not None:
             nn.init.zeros_(self.bias)
 
