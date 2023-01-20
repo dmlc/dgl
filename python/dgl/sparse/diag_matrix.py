@@ -237,8 +237,8 @@ class DiagMatrix:
         return self.to(device="cpu")
 
     def float(self):
-        """Converts the matrix values to float data type. If the matrix already
-        uses float data type, the original matrix will be returned.
+        """Converts the matrix values to float32 data type. If the matrix
+        already uses float data type, the original matrix will be returned.
 
         Returns
         -------
@@ -277,7 +277,7 @@ class DiagMatrix:
         return self.to(dtype=torch.double)
 
     def int(self):
-        """Converts the matrix values to int data type. If the matrix already
+        """Converts the matrix values to int32 data type. If the matrix already
         uses int data type, the original matrix will be returned.
 
         Returns
