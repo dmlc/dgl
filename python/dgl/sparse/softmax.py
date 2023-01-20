@@ -12,7 +12,7 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
     """Applies row-wise softmax to the non-zero elements of the sparse matrix.
 
     Equivalently, applies softmax to the non-zero elements of the sparse
-    matrix along the *second* dimension.
+    matrix along the column (``dim=1``) dimension.
 
     If :attr:`input.val` takes shape :attr:`(nnz, D)`, then the output matrix
     :attr:`output` and :attr:`output.val` take the same shape as :attr:`input`
