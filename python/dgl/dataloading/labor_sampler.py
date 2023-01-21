@@ -58,7 +58,9 @@ class LaborSampler(BlockSampler):
         Whether to use importance sampling or uniform sampling, use of negative
         values optimizes importance sampling probabilities until convergence
         while use of positive values runs optimization steps that many times.
-        If the value is i, then LABOR-i variant is used.
+        If the value is i, then LABOR-i variant is used. When used with a
+        nonzero parameter, the returned blocks edata include ``'edge_weights'``
+        that needs to be used in the message passing operation.
     layer_dependency : bool, default ``False``
         Specifies whether different layers should use same random variates.
         Results into a reduction in the number of vertices sampled, but may
