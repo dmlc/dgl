@@ -14,8 +14,7 @@ def neg(A: SparseMatrix) -> SparseMatrix:
     Examples
     --------
 
-    >>> indices = torch.tensor([[1, 1, 3], \
-    >>>                         [1, 2, 3]])
+    >>> indices = torch.tensor([[1, 1, 3], [1, 2, 3]])
     >>> val = torch.tensor([1., 1., 2.])
     >>> A = dglsp.spmatrix(indices, val)
     >>> A = -A

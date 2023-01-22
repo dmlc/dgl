@@ -44,8 +44,7 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
 
     Case1: scalar-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.reduce(A, rtype='sum')
@@ -61,8 +60,7 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
 
     Case2: vector-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1., 2.], [2., 1.], [2., 2.]])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.reduce(A, rtype='sum')
@@ -113,8 +111,7 @@ def sum(input: SparseMatrix, dim: Optional[int] = None):
 
     Case1: scalar-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.sum(A)
@@ -126,8 +123,7 @@ def sum(input: SparseMatrix, dim: Optional[int] = None):
 
     Case2: vector-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.sum(A)
@@ -172,8 +168,7 @@ def smax(input: SparseMatrix, dim: Optional[int] = None):
 
     Case1: scalar-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.smax(A)
@@ -185,8 +180,7 @@ def smax(input: SparseMatrix, dim: Optional[int] = None):
 
     Case2: vector-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.smax(A)
@@ -232,8 +226,7 @@ def smin(input: SparseMatrix, dim: Optional[int] = None):
 
     Case1: scalar-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.smin(A)
@@ -245,8 +238,7 @@ def smin(input: SparseMatrix, dim: Optional[int] = None):
 
     Case2: vector-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.smin(A)
@@ -296,8 +288,7 @@ def smean(input: SparseMatrix, dim: Optional[int] = None):
 
     Case1: scalar-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1., 1., 2.])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.smean(A)
@@ -309,8 +300,7 @@ def smean(input: SparseMatrix, dim: Optional[int] = None):
 
     Case2: vector-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1., 2.], [2., 1.], [2., 2.]])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.smean(A)
@@ -360,8 +350,7 @@ def sprod(input: SparseMatrix, dim: Optional[int] = None):
 
     Case1: scalar-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.sprod(A)
@@ -373,8 +362,7 @@ def sprod(input: SparseMatrix, dim: Optional[int] = None):
 
     Case2: vector-valued sparse matrix
 
-    >>> indices = torch.tensor([[0, 1, 1], \
-    >>>                         [0, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
     >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
     >>> dglsp.sprod(A)

@@ -39,8 +39,7 @@ def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     Examples
     --------
 
-    >>> indices = torch.tensor([[1, 1, 2], \
-    >>>                         [2, 3, 3]])
+    >>> indices = torch.tensor([[1, 1, 2], [2, 3, 3]])
     >>> val = torch.arange(1, 4).float()
     >>> A = dglsp.spmatrix(indices, val, (3, 4))
     >>> X1 = torch.randn(3, 5)
@@ -89,8 +88,7 @@ def bsddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
     Examples
     --------
 
-    >>> indices = torch.tensor([[1, 1, 2], \
-    >>>                         [2, 3, 3]])
+    >>> indices = torch.tensor([[1, 1, 2], [2, 3, 3]])
     >>> val = torch.arange(1, 4).float()
     >>> A = dglsp.spmatrix(indices, val, (3, 4))
     >>> X1 = torch.arange(0, 3 * 5 * 2).view(3, 5, 2).float()
