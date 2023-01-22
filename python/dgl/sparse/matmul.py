@@ -29,7 +29,7 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     Examples
     --------
 
-    >>> indices = torch.tensor([[0, 1, 1],
+    >>> indices = torch.tensor([[0, 1, 1], \
     >>>                         [1, 0, 1]])
     >>> val = torch.randn(len(row))
     >>> A = dglsp.spmatrix(indices, val)
@@ -72,7 +72,7 @@ def bspmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     Examples
     --------
 
-    >>> indices = torch.tensor([[0, 1, 1],
+    >>> indices = torch.tensor([[0, 1, 1], \
     >>>                         [1, 0, 2]])
     >>> val = torch.randn(len(row), 2)
     >>> A = dglsp.spmatrix(indices, val, shape=(3, 3))
@@ -293,7 +293,7 @@ def matmul(
 
     Multiplies a sparse matrix with a dense matrix.
 
-    >>> indices = torch.tensor([[0, 1, 1],
+    >>> indices = torch.tensor([[0, 1, 1], \
     >>>                         [1, 0, 1]])
     >>> val = torch.randn(len(row))
     >>> A = dglsp.spmatrix(indices, val)

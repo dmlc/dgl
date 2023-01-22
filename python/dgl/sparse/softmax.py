@@ -34,7 +34,7 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
 
     Case1: matrix with values of shape (nnz)
 
-    >>> indices = torch.tensor([[0, 0, 1, 2],
+    >>> indices = torch.tensor([[0, 0, 1, 2], \
     >>>                         [1, 2, 2, 0]])
     >>> nnz = len(row)
     >>> val = torch.arange(nnz).float()
@@ -47,7 +47,7 @@ def softmax(input: SparseMatrix) -> SparseMatrix:
 
     Case2: matrix with values of shape (nnz, D)
 
-    >>> indices = torch.tensor([[0, 0, 1, 2],
+    >>> indices = torch.tensor([[0, 0, 1, 2], \
     >>>                         [1, 2, 2, 0]])
     >>> val = torch.tensor([[0., 7.], [1., 3.], [2., 2.], [3., 1.]])
     >>> A = dglsp.spmatrix(indices, val)
