@@ -53,7 +53,9 @@ class LaborSampler(BlockSampler):
     prob : str, optional
         If given, the probability of each neighbor being sampled is proportional
         to the edge feature value with the given name in ``g.edata``.
-        The feature must be a scalar on each edge.
+        The feature must be a scalar on each edge. In this case, the returned
+        blocks edata include ``'edge_weights'`` that needs to be used in the
+        message passing operation.
     importance_sampling : int, default ``0``
         Whether to use importance sampling or uniform sampling, use of negative
         values optimizes importance sampling probabilities until convergence
