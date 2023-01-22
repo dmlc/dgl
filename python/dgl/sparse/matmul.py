@@ -29,8 +29,7 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     Examples
     --------
 
-    >>> indices = torch.tensor([[0, 1, 1],
-    >>>                         [1, 0, 1]])
+    >>> indices = torch.tensor([[0, 1, 1], [1, 0, 1]])
     >>> val = torch.randn(len(row))
     >>> A = dglsp.spmatrix(indices, val)
     >>> X = torch.randn(2, 3)
@@ -72,8 +71,7 @@ def bspmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     Examples
     --------
 
-    >>> indices = torch.tensor([[0, 1, 1],
-    >>>                         [1, 0, 2]])
+    >>> indices = torch.tensor([[0, 1, 1], [1, 0, 2]])
     >>> val = torch.randn(len(row), 2)
     >>> A = dglsp.spmatrix(indices, val, shape=(3, 3))
     >>> X = torch.randn(3, 3, 2)
@@ -197,12 +195,10 @@ def spspmm(
     Examples
     --------
 
-    >>> indices1 = torch.tensor([[0, 1, 1],
-    >>>                          [1, 0, 1]])
+    >>> indices1 = torch.tensor([[0, 1, 1], [1, 0, 1]])
     >>> val1 = torch.ones(len(row1))
     >>> A = dglsp.spmatrix(indices1, val1)
-    >>> indices2 = torch.tensor([[0, 1, 1],
-    >>>                          [0, 2, 1]])
+    >>> indices2 = torch.tensor([[0, 1, 1], [0, 2, 1]])
     >>> val2 = torch.ones(len(row2))
     >>> B = dglsp.spmatrix(indices2, val2)
     >>> dglsp.spspmm(A, B)
@@ -292,8 +288,7 @@ def matmul(
 
     Multiplies a sparse matrix with a dense matrix.
 
-    >>> indices = torch.tensor([[0, 1, 1],
-    >>>                         [1, 0, 1]])
+    >>> indices = torch.tensor([[0, 1, 1], [1, 0, 1]])
     >>> val = torch.randn(len(row))
     >>> A = dglsp.spmatrix(indices, val)
     >>> X = torch.randn(2, 3)
@@ -305,12 +300,10 @@ def matmul(
 
     Multiplies a sparse matrix with a sparse matrix.
 
-    >>> indices1 = torch.tensor([[0, 1, 1],
-    >>>                          [1, 0, 1]])
+    >>> indices1 = torch.tensor([[0, 1, 1], [1, 0, 1]])
     >>> val1 = torch.ones(len(row1))
     >>> A = dglsp.spmatrix(indices1, val1)
-    >>> indices2 = torch.tensor([[0, 1, 1],
-    >>>                          [0, 2, 1]])
+    >>> indices2 = torch.tensor([[0, 1, 1], [0, 2, 1]])
     >>> val2 = torch.ones(len(row2))
     >>> B = dglsp.spmatrix(indices2, val2)
     >>> result = dglsp.matmul(A, B)

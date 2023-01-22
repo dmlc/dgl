@@ -108,8 +108,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 2, 1],
-        >>>                         [2, 4, 3]])
+        >>> indices = torch.tensor([[1, 2, 1], [2, 4, 3]])
         >>> A = from_coo(dst, src)
         >>> A.coo()
         (tensor([1, 2, 1]), tensor([2, 4, 3]))
@@ -140,8 +139,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 2, 1],
-        >>>                         [2, 4, 3]])
+        >>> indices = torch.tensor([[1, 2, 1], [2, 4, 3]])
         >>> A = from_coo(dst, src)
         >>> A.csr()
         (tensor([0, 0, 2, 3]), tensor([2, 3, 4]), tensor([0, 2, 1]))
@@ -172,8 +170,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 2, 1],
-        >>>                         [2, 4, 3]])
+        >>> indices = torch.tensor([[1, 2, 1], [2, 4, 3]])
         >>> A = from_coo(dst, src)
         >>> A.csc()
         (tensor([0, 0, 0, 1, 2, 3]), tensor([1, 1, 2]), tensor([0, 2, 1]))
@@ -215,8 +212,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 1, 3],
-        >>>                         [2, 1, 3]])
+        >>> indices = torch.tensor([[1, 1, 3], [2, 1, 3]])
         >>> val = torch.tensor([1, 1, 2])
         >>> A = dglsp.spmatrix(indices, val)
         >>> A = A.transpose()
@@ -248,8 +244,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 1, 2],
-        >>>                         [1, 2, 0]])
+        >>> indices = torch.tensor([[1, 1, 2], [1, 2, 0]])
         >>> A = dglsp.spmatrix(indices, shape=(3, 4))
         >>> A.to(device="cuda:0", dtype=torch.int32)
         SparseMatrix(indices=tensor([[1, 1, 2],
@@ -289,8 +284,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 1, 2],
-        >>>                         [1, 2, 0]])
+        >>> indices = torch.tensor([[1, 1, 2], [1, 2, 0]])
         >>> A = dglsp.spmatrix(indices, shape=(3, 4))
         >>> A.cuda()
         SparseMatrix(indices=tensor([[1, 1, 2],
@@ -312,8 +306,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 1, 2],
-        >>>                         [1, 2, 0]]).to("cuda")
+        >>> indices = torch.tensor([[1, 1, 2], [1, 2, 0]]).to("cuda")
         >>> A = dglsp.spmatrix(indices, shape=(3, 4))
 
         >>> A.cpu()
@@ -336,8 +329,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 1, 2],
-        >>>                         [1, 2, 0]])
+        >>> indices = torch.tensor([[1, 1, 2], [1, 2, 0]])
         >>> val = torch.ones(len(row)).long()
         >>> A = dglsp.spmatrix(indices, val, shape=(3, 4))
         >>> A.float()
@@ -360,8 +352,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 1, 2],
-        >>>                         [1, 2, 0]])
+        >>> indices = torch.tensor([[1, 1, 2], [1, 2, 0]])
         >>> A = dglsp.spmatrix(indices, shape=(3, 4))
         >>> A.double()
         SparseMatrix(indices=tensor([[1, 1, 2],
@@ -383,8 +374,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 1, 2],
-        >>>                         [1, 2, 0]])
+        >>> indices = torch.tensor([[1, 1, 2], [1, 2, 0]])
         >>> A = dglsp.spmatrix(indices, shape=(3, 4))
         >>> A.int()
         SparseMatrix(indices=tensor([[1, 1, 2],
@@ -406,8 +396,7 @@ class SparseMatrix:
         Examples
         --------
 
-        >>> indices = torch.tensor([[1, 1, 2],
-        >>>                         [1, 2, 0]])
+        >>> indices = torch.tensor([[1, 1, 2], [1, 2, 0]])
         >>> A = dglsp.spmatrix(indices, shape=(3, 4))
         >>> A.long()
         SparseMatrix(indices=tensor([[1, 1, 2],
@@ -437,8 +426,7 @@ class SparseMatrix:
 
         Examples
         --------
-        >>> indices = torch.tensor([[1, 0, 0, 0, 1],
-        >>>                         [1, 1, 1, 2, 2]])
+        >>> indices = torch.tensor([[1, 0, 0, 0, 1], [1, 1, 1, 2, 2]])
         >>> val = torch.tensor([0, 1, 2, 3, 4])
         >>> A = dglsp.spmatrix(indices, val)
         >>> A.coalesce()
@@ -454,8 +442,7 @@ class SparseMatrix:
 
         Examples
         --------
-        >>> indices = torch.tensor([[1, 0, 0, 0, 1],
-        >>>                         [1, 1, 1, 2, 2]])
+        >>> indices = torch.tensor([[1, 0, 0, 0, 1], [1, 1, 1, 2, 2]])
         >>> val = torch.tensor([0, 1, 2, 3, 4])
         >>> A = dglsp.spmatrix(indices, val)
         >>> A.has_duplicate()
@@ -513,8 +500,7 @@ def spmatrix(
 
     Case2: Sparse matrix with scalar values.
 
-    >>> indices = torch.tensor([[1, 1, 2],
-    >>>                         [2, 4, 3]])
+    >>> indices = torch.tensor([[1, 1, 2], [2, 4, 3]])
     >>> val = torch.tensor([[1.], [2.], [3.]])
     >>> A = dglsp.spmatrix(indices, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
@@ -576,8 +562,7 @@ def from_coo(
 
     Case1: Sparse matrix with row and column indices without values.
 
-    >>> indices = torch.tensor([[1, 1, 2],
-    >>>                         [2, 4, 3]])
+    >>> indices = torch.tensor([[1, 1, 2], [2, 4, 3]])
     >>> A = dglsp.spmatrix(indices)
     SparseMatrix(indices=tensor([[1, 1, 2],
                                  [2, 4, 3]]),
@@ -592,8 +577,7 @@ def from_coo(
 
     Case2: Sparse matrix with scalar values.
 
-    >>> indices = torch.tensor([[1, 1, 2],
-    >>>                         [2, 4, 3]])
+    >>> indices = torch.tensor([[1, 1, 2], [2, 4, 3]])
     >>> val = torch.tensor([[1.], [2.], [3.]])
     >>> A = dglsp.spmatrix(indices, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
@@ -605,8 +589,7 @@ def from_coo(
 
     Case3: Sparse matrix with vector values.
 
-    >>> indices = torch.tensor([[1, 1, 2],
-    >>>                         [2, 4, 3]])
+    >>> indices = torch.tensor([[1, 1, 2], [2, 4, 3]])
     >>> val = torch.tensor([[1., 1.], [2., 2.], [3., 3.]])
     >>> A = dglsp.spmatrix(indices, val)
     SparseMatrix(indices=tensor([[1, 1, 2],
@@ -834,8 +817,7 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     Examples
     --------
 
-    >>> indices = torch.tensor([[1, 1, 2],
-    >>>                         [2, 4, 3]])
+    >>> indices = torch.tensor([[1, 1, 2], [2, 4, 3]])
     >>> val = torch.ones(3)
     >>> A = dglsp.spmatrix(indices, val)
     >>> A = dglsp.val_like(A, torch.tensor([2, 2, 2]))

@@ -42,8 +42,7 @@ def add(
 
     Examples
     --------
-    >>> indices = torch.tensor([[1, 0, 2],
-    >>>                         [0, 1, 2]])
+    >>> indices = torch.tensor([[1, 0, 2], [0, 1, 2]])
     >>> val = torch.tensor([10, 20, 30])
     >>> A = dglsp.spmatrix(indices, val)
     >>> B = dglsp.diag(torch.arange(1, 4))
@@ -89,8 +88,7 @@ def sub(
 
     Examples
     --------
-    >>> indices = torch.tensor([[1, 0, 2],
-    >>>                         [0, 1, 2]])
+    >>> indices = torch.tensor([[1, 0, 2], [0, 1, 2]])
     >>> val = torch.tensor([10, 20, 30])
     >>> A = dglsp.spmatrix(indices, val)
     >>> B = dglsp.diag(torch.arange(1, 4))
@@ -136,8 +134,7 @@ def mul(
 
     Examples
     --------
-    >>> indices = torch.tensor([[1, 0, 2],
-    >>>                         [0, 3, 2]])
+    >>> indices = torch.tensor([[1, 0, 2], [0, 3, 2]])
     >>> val = torch.tensor([10, 20, 30])
     >>> A = dglsp.spmatrix(indices, val)
     >>> dglsp.mul(A, 2)
@@ -202,8 +199,7 @@ def div(
     DiagMatrix(val=tensor([0.5000, 1.0000, 1.5000]),
                shape=(3, 3))
 
-    >>> indices = torch.tensor([[1, 0, 2],
-    >>>                         [0, 3, 2]])
+    >>> indices = torch.tensor([[1, 0, 2], [0, 3, 2]])
     >>> val = torch.tensor([1, 2, 3])
     >>> A = dglsp.spmatrix(indices, val, shape=(3, 4))
     >>> dglsp.div(A, 2)
@@ -247,8 +243,7 @@ def power(
 
     Examples
     --------
-    >>> indices = torch.tensor([[1, 0, 2],
-    >>>                         [0, 3, 2]])
+    >>> indices = torch.tensor([[1, 0, 2], [0, 3, 2]])
     >>> val = torch.tensor([10, 20, 30])
     >>> A = dglsp.spmatrix(indices, val)
     >>> dglsp.power(A, 2)
