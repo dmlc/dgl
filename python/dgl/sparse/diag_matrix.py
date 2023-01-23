@@ -181,7 +181,7 @@ class DiagMatrix:
 
         >>> val = torch.ones(2)
         >>> D = dglsp.diag(val)
-        >>> D.to(device='cuda:0', dtype=torch.int32)
+        >>> D.to(device="cuda:0", dtype=torch.int32)
         DiagMatrix(values=tensor([1, 1], device='cuda:0', dtype=torch.int32),
                    shape=(2, 2))
         """
@@ -198,7 +198,7 @@ class DiagMatrix:
     def cuda(self):
         """Moves the matrix to GPU. If the matrix is already on GPU, the
         original matrix will be returned. If multiple GPU devices exist,
-        'cuda:0' will be selected.
+        ``cuda:0`` will be selected.
 
         Returns
         -------
@@ -383,7 +383,7 @@ def identity(
         Shape of the matrix.
     d : int, optional
         If None, the diagonal entries will be scaler 1. Otherwise, the diagonal
-        entries will be a 1-valued tensor of shape (d).
+        entries will be a 1-valued tensor of shape ``(d)``.
     dtype : torch.dtype, optional
         The data type of the matrix
     device : torch.device, optional
@@ -399,9 +399,11 @@ def identity(
 
     Case1: 3-by-3 matrix with scaler diagonal values
 
-    [[1, 0, 0],
-     [0, 1, 0],
-     [0, 0, 1]]
+    .. code::
+
+        [[1, 0, 0],
+         [0, 1, 0],
+         [0, 0, 1]]
 
     >>> dglsp.identity(shape=(3, 3))
     DiagMatrix(val=tensor([1., 1., 1.]),
@@ -409,9 +411,11 @@ def identity(
 
     Case2: 3-by-5 matrix with scaler diagonal values
 
-    [[1, 0, 0, 0, 0],
-     [0, 1, 0, 0, 0],
-     [0, 0, 1, 0, 0]]
+    .. code::
+
+        [[1, 0, 0, 0, 0],
+         [0, 1, 0, 0, 0],
+         [0, 0, 1, 0, 0]]
 
     >>> dglsp.identity(shape=(3, 5))
     DiagMatrix(val=tensor([1., 1., 1.]),
