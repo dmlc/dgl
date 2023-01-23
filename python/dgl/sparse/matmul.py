@@ -254,10 +254,9 @@ def matmul(
 
     * The operator supports batched sparse-dense matrix multiplication. In \
         this case, the sparse or diagonal matrix :attr:`A` should have shape \
-        :math:`(L, M)`, where the non-zero values have a batch dimension \
-        :math:`K`. The dense matrix :attr:`B` should have shape \
-        :math:`(M, N, K)`. The output is a dense matrix of shape \
-        :math:`(L, N, K)`.
+        ``(L, M)``, where the non-zero values have a batch dimension ``K``. \
+        The dense matrix :attr:`B` should have shape ``(M, N, K)``. The output \
+        is a dense matrix of shape ``(L, N, K)``.
 
     * Sparse-sparse matrix multiplication does not support batched computation.
 
