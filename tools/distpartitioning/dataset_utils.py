@@ -501,8 +501,14 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
             constants.GLOBAL_TYPE_EID, constants.ETYPE_ID]:
         edge_datadict[col] = []
 
-    for etype_name, etype_info in edge_data.items():
-        edge_info = etype_info[constants.STR_DATA]
+    # Load the edges in the order defined by STR_EDGE_TYPE. 
+    # This order is also used to assign GLOBAL_EID to edges in the function
+    # 'augment_edge_data'
+    # GLOBAL_EID is used to exchange edge features
+
+    for etype_name, etype_id in etype_name_idmap.items():
+
+        edge_info = edge_data[etype_name][constants.STR_DATA]
 
         #edgetype strings are in canonical format, src_node_type:edge_type:dst_node_type
         tokens = etype_name.split(":")
@@ -552,7 +558,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         #currently these are just type_edge_ids... which will be converted to global ids
         edge_datadict[constants.GLOBAL_SRC_ID].append(src_ids + ntype_gnid_offset[src_ntype_name][0, 0])
         edge_datadict[constants.GLOBAL_DST_ID].append(dst_ids + ntype_gnid_offset[dst_ntype_name][0, 0])
-        edge_datadict[constants.ETYPE_ID].append(etype_name_idmap[etype_name] * \
+        edge_datadict[constants.ETYPE_ID].append(etype_id * \
             np.ones(shape=(src_ids.shape), dtype=np.int64))
 
         for local_part_id in range(num_parts):

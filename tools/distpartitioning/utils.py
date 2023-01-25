@@ -295,6 +295,7 @@ def augment_edge_data(edge_data, lookup_service, edge_tids, rank, world_size, nu
 
     #assign the owner process/rank for each edge 
     edge_data[constants.OWNER_PROCESS] = lookup_service.get_partition_ids(edge_data[constants.GLOBAL_DST_ID])
+    assert edge_data[constants.OWNER_PROCESS].shape[0] == edge_data[constants.GLOBAL_DST_ID].shape[0]
     return edge_data
 
 def read_edges_file(edge_file, edge_data_dict):
