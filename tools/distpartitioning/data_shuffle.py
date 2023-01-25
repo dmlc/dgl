@@ -264,27 +264,28 @@ def exchange_feature(rank, data, id_lookup, feat_type, feat_key, featdata_key, g
     tokens = feat_key.split("/")
     assert len(tokens) == 3
     local_feat_key = "/".join(tokens[:-1]) +"/"+ str(local_part_id)
+
+    # Get the partition ids for the range of global nids.
+    if feat_type == constants.STR_NODE_FEATURES:
+        # Retrieve the partition ids for the node features.
+        # Each partition id will be in the range [0, num_parts).
+        partid_slice = id_lookup.get_partition_ids(np.arange(gid_start, gid_end, dtype=np.int64))
+    else:
+        #Edge data case. 
+        #Ownership is determined by the destination node.
+        assert data is not None
+        global_eids = np.arange(gid_start, gid_end, dtype=np.int64)
+
+        #Now use `data` to extract destination nodes' global id 
+        #and use that to get the ownership
+        common, idx1, idx2 = np.intersect1d(data[constants.GLOBAL_EID], global_eids, return_indices=True)
+        assert common.shape[0] == idx2.shape[0]
+
+        global_dst_nids = data[constants.GLOBAL_DST_ID][idx1]
+        assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
+        partid_slice = id_lookup.get_partition_ids(global_dst_nids)
+
     for idx in range(world_size):
-        # Get the partition ids for the range of global nids.
-        if feat_type == constants.STR_NODE_FEATURES:
-            # Retrieve the partition ids for the node features.
-            # Each partition id will be in the range [0, num_parts).
-            partid_slice = id_lookup.get_partition_ids(np.arange(gid_start, gid_end, dtype=np.int64))
-        else:
-            #Edge data case. 
-            #Ownership is determined by the destination node.
-            assert data is not None
-            global_eids = np.arange(gid_start, gid_end, dtype=np.int64)
-
-            #Now use `data` to extract destination nodes' global id 
-            #and use that to get the ownership
-            common, idx1, idx2 = np.intersect1d(data[constants.GLOBAL_EID], global_eids, return_indices=True)
-            assert common.shape[0] == idx2.shape[0]
-
-            global_dst_nids = data[constants.GLOBAL_DST_ID][idx1]
-            assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
-            partid_slice = id_lookup.get_partition_ids(global_dst_nids)
-
         cond = (partid_slice == (idx + local_part_id*world_size))
         gids_per_partid = gids_feat[cond]
         tids_per_partid = tids_feat[cond]
