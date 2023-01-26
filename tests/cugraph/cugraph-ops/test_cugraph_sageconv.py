@@ -1,15 +1,19 @@
+# pylint: disable=too-many-arguments, too-many-locals
+from collections import OrderedDict
+from itertools import product
+
 import dgl
 import pytest
 import torch
 from dgl.nn import CuGraphSAGEConv, SAGEConv
 
-options = {
-    "idtype_int": [False, True],
-    "max_in_degree": [None, 8],
-    "to_block": [False, True],
-}
-
-device = "cuda:0"
+options = OrderedDict(
+    {
+        "idtype_int": [False, True],
+        "max_in_degree": [None, 8],
+        "to_block": [False, True],
+    }
+)
 
 
 def generate_graph():
@@ -20,10 +24,9 @@ def generate_graph():
 
 
 @pytest.mark.skip()
-@pytest.mark.parametrize("to_block", options["to_block"])
-@pytest.mark.parametrize("max_in_degree", options["max_in_degree"])
-@pytest.mark.parametrize("idtype_int", options["idtype_int"])
+@pytest.mark.parametrize(",".join(options.keys()), product(*options.values()))
 def test_SAGEConv_equality(idtype_int, max_in_degree, to_block):
+    device = "cuda:0"
     in_feat, out_feat = 5, 2
     kwargs = {"aggregator_type": "mean"}
     g = generate_graph().to(device)

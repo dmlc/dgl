@@ -38,8 +38,6 @@ class CuGraphSAGEConv(nn.Module):
         Dropout rate on features, default: ``0``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
-    norm : callable activation function/layer or None, optional
-        If not None, applies normalization to the updated node features.
 
     Examples
     --------
@@ -69,7 +67,6 @@ class CuGraphSAGEConv(nn.Module):
         aggregator_type="mean",
         feat_drop=0.0,
         bias=True,
-        norm=None,
     ):
         if has_pylibcugraphops is False:
             raise ModuleNotFoundError(
@@ -87,7 +84,6 @@ class CuGraphSAGEConv(nn.Module):
             )
         self.aggr = aggregator_type
         self.feat_drop = nn.Dropout(feat_drop)
-        self.norm = norm
 
         self.linear = nn.Linear(2 * in_feats, out_feats, bias=bias)
 
@@ -131,8 +127,5 @@ class CuGraphSAGEConv(nn.Module):
         feat = self.feat_drop(feat)
         h = SAGEConvAgg(feat, _graph, self.aggr)
         h = self.linear(h)
-
-        if self.norm is not None:
-            h = self.norm(h)
 
         return h
