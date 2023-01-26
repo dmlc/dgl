@@ -727,7 +727,7 @@ def gen_dist_partitions(rank, world_size, params):
     # each physical node.
     id_lookup = DistLookupService(os.path.join(params.input_dir, params.partitions_dir),\
                                     schema_map[constants.STR_NODE_TYPE],\
-                                    id_map, rank, world_size)
+                                    id_map, rank, world_size, params.num_parts)
 
     ntypes_ntypeid_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
     etypes_etypeid_map, etypes, etypeid_etypes_map = get_edge_types(schema_map)
