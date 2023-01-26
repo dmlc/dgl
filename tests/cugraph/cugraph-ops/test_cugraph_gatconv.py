@@ -1,16 +1,20 @@
+# pylint: disable=too-many-arguments, too-many-locals
+from collections import OrderedDict
+from itertools import product
+
 import dgl
 import pytest
 import torch
 from dgl.nn import CuGraphGATConv, GATConv
 
-options = {
-    "idtype_int": [False, True],
-    "max_in_degree": [None, 8],
-    "num_heads": [1, 3],
-    "to_block": [False, True],
-}
-
-device = "cuda:0"
+options = OrderedDict(
+    {
+        "idtype_int": [False, True],
+        "max_in_degree": [None, 8],
+        "num_heads": [1, 3],
+        "to_block": [False, True],
+    }
+)
 
 
 def generate_graph():
@@ -21,11 +25,9 @@ def generate_graph():
 
 
 @pytest.mark.skip()
-@pytest.mark.parametrize("to_block", options["to_block"])
-@pytest.mark.parametrize("num_heads", options["num_heads"])
-@pytest.mark.parametrize("max_in_degree", options["max_in_degree"])
-@pytest.mark.parametrize("idtype_int", options["idtype_int"])
+@pytest.mark.parametrize(",".join(options.keys()), product(*options.values()))
 def test_gatconv_equality(idtype_int, max_in_degree, num_heads, to_block):
+    device = "cuda:0"
     in_feat, out_feat = 10, 2
     args = (in_feat, out_feat, num_heads)
     kwargs = {"bias": False}
