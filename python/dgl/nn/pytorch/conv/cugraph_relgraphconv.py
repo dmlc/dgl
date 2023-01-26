@@ -206,7 +206,11 @@ class CuGraphRelGraphConv(nn.Module):
             )
 
         h = RelGraphConvAgg(
-            feat, self.coeff, _graph, not self.self_loop, self.apply_norm
+            feat,
+            self.coeff,
+            _graph,
+            concat_own=self.self_loop,
+            norm_by_out_degree=self.apply_norm,
         )
         h = h @ self.W.view(-1, self.out_feat)
         if self.bias is not None:

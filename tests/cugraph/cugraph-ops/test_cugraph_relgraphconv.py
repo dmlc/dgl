@@ -1,18 +1,23 @@
+# pylint: disable=too-many-arguments, too-many-locals
+from collections import OrderedDict
+from itertools import product
+
 import dgl
 import pytest
 import torch
 from dgl.nn import CuGraphRelGraphConv, RelGraphConv
 
 # TODO(tingyu66): Re-enable the following tests after updating cuGraph CI image.
-options = {
-    "idtype_int": [False, True],
-    "max_in_degree": [None, 8],
-    "regularizer": [None, "basis"],
-    "self_loop": [False, True],
-    "to_block": [False, True],
-}
-
-device = "cuda:0"
+options = OrderedDict(
+    {
+        "idtype_int": [False, True],
+        "max_in_degree": [None, 8],
+        "num_bases": [1, 2, 5],
+        "regularizer": [None, "basis"],
+        "self_loop": [False, True],
+        "to_block": [False, True],
+    }
+)
 
 
 def generate_graph():
@@ -23,18 +28,15 @@ def generate_graph():
 
 
 @pytest.mark.skip()
-@pytest.mark.parametrize("to_block", options["to_block"])
-@pytest.mark.parametrize("self_loop", options["self_loop"])
-@pytest.mark.parametrize("regularizer", options["regularizer"])
-@pytest.mark.parametrize("max_in_degree", options["max_in_degree"])
-@pytest.mark.parametrize("idtype_int", options["idtype_int"])
+@pytest.mark.parametrize(",".join(options.keys()), product(*options.values()))
 def test_relgraphconv_equality(
-    idtype_int, max_in_degree, regularizer, self_loop, to_block
+    idtype_int, max_in_degree, num_bases, regularizer, self_loop, to_block
 ):
+    device = "cuda:0"
     in_feat, out_feat, num_rels = 10, 2, 3
     args = (in_feat, out_feat, num_rels)
     kwargs = {
-        "num_bases": 2,
+        "num_bases": num_bases,
         "regularizer": regularizer,
         "bias": False,
         "self_loop": self_loop,
