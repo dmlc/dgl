@@ -507,7 +507,7 @@ def spmatrix(
                  values=tensor([[1.],
                                 [2.],
                                 [3.]]),
-                 size=(3, 5), nnz=3, val_size=(1,))
+                 shape=(3, 5), nnz=3, val_size=(1,))
 
     Case3: Sparse matrix with vector values.
 
