@@ -26,6 +26,7 @@ author = 'DGL Team'
 import dgl
 version = dgl.__version__
 release = dgl.__version__
+dglbackend = os.environ.get("DGLBACKEND", "pytorch")
 
 
 # -- General configuration ---------------------------------------------------
@@ -46,11 +47,16 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
     'sphinx.ext.graphviz',
+    'sphinxemoji.sphinxemoji',
     'sphinx_gallery.gen_gallery',
     'sphinx_copybutton',
     'nbsphinx',
     'nbsphinx_link',
 ]
+
+# Do not run notebooks on non-pytorch backends
+if dglbackend != "pytorch":
+    nbsphinx_execute = 'never'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -211,6 +217,10 @@ gallery_dirs = ['tutorials/blitz/',
                 'tutorials/models/',
                 'tutorials/multi/',
                 'tutorials/cpu']  # path to generate docs
+if dglbackend != "pytorch":
+    examples_dirs = []
+    gallery_dirs = []
+
 reference_url = {
     'dgl' : None,
     'numpy': 'http://docs.scipy.org/doc/numpy/',
@@ -230,14 +240,10 @@ sphinx_gallery_conf = {
 }
 
 # Compatibility for different backend when builds tutorials
-dglbackend = os.environ.get("DGLBACKEND", "")
 if dglbackend == 'mxnet':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<=mx)\.py"
 if dglbackend == 'pytorch':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<!mx)\.py"
-else:
-    sphinx_gallery_conf['ignore_pattern'] = ".*tutorials/.*"
-    sphinx_gallery_conf['plot_gallery'] = False
 
 # sphinx-copybutton tool
 copybutton_prompt_text = r'>>> |\.\.\. '

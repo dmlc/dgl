@@ -13,6 +13,8 @@ By the end of this tutorial, you will be able to
 (Time estimate: 18 minutes)
 """
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

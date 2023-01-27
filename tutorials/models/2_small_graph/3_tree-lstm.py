@@ -58,6 +58,8 @@ Tree-LSTM in DGL
 
 from collections import namedtuple
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 from dgl.data.tree import SSTDataset
 

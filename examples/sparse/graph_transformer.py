@@ -98,9 +98,9 @@ class GTModel(nn.Module):
         )
 
     def forward(self, g, X, pos_enc):
-        src, dst = g.edges()
+        indices = torch.stack(g.edges())
         N = g.num_nodes()
-        A = dglsp.from_coo(dst, src, shape=(N, N))
+        A = dglsp.spmatrix(indices, shape=(N, N))
         h = self.atom_encoder(X) + self.pos_linear(pos_enc)
         for layer in self.layers:
             h = layer(A, h)
