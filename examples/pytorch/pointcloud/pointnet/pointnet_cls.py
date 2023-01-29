@@ -1,12 +1,19 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-import numpy as np
+
 
 class PointNetCls(nn.Module):
-    def __init__(self, output_classes, input_dims=3, conv1_dim=64,
-                 dropout_prob=0.5, use_transform=True):
+    def __init__(
+        self,
+        output_classes,
+        input_dims=3,
+        conv1_dim=64,
+        dropout_prob=0.5,
+        use_transform=True,
+    ):
         super(PointNetCls, self).__init__()
         self.input_dims = input_dims
         self.conv1 = nn.ModuleList()
@@ -85,6 +92,7 @@ class PointNetCls(nn.Module):
         out = self.mlp_out(h)
         return out
 
+
 class TransformNet(nn.Module):
     def __init__(self, input_dims=3, conv1_dim=64):
         super(TransformNet, self).__init__()
@@ -118,7 +126,7 @@ class TransformNet(nn.Module):
             h = conv(h)
             h = bn(h)
             h = F.relu(h)
-        
+
         h = self.maxpool(h).view(-1, self.pool_feat_len)
         for mlp, bn in zip(self.mlp2, self.bn2):
             h = mlp(h)
@@ -127,8 +135,14 @@ class TransformNet(nn.Module):
 
         out = self.mlp_out(h)
 
-        iden = Variable(torch.from_numpy(np.eye(self.input_dims).flatten().astype(np.float32)))
-        iden = iden.view(1, self.input_dims * self.input_dims).repeat(batch_size, 1)
+        iden = Variable(
+            torch.from_numpy(
+                np.eye(self.input_dims).flatten().astype(np.float32)
+            )
+        )
+        iden = iden.view(1, self.input_dims * self.input_dims).repeat(
+            batch_size, 1
+        )
         if out.is_cuda:
             iden = iden.cuda()
         out = out + iden

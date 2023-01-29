@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/graph_serialize.cc
- * \brief Graph serialization implementation
+ * @file graph/serialize/graph_serialize.cc
+ * @brief Graph serialization implementation
  *
  * The storage structure is
  * {
@@ -67,60 +67,60 @@ namespace dgl {
 namespace serialize {
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_MakeGraphData")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    GraphRef gptr = args[0];
-    ImmutableGraphPtr imGPtr = ToImmutableGraph(gptr.sptr());
-    Map<std::string, Value> node_tensors = args[1];
-    Map<std::string, Value> edge_tensors = args[2];
-    GraphData gd = GraphData::Create();
-    gd->SetData(imGPtr, node_tensors, edge_tensors);
-    *rv = gd;
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      GraphRef gptr = args[0];
+      ImmutableGraphPtr imGPtr = ToImmutableGraph(gptr.sptr());
+      Map<std::string, Value> node_tensors = args[1];
+      Map<std::string, Value> edge_tensors = args[2];
+      GraphData gd = GraphData::Create();
+      gd->SetData(imGPtr, node_tensors, edge_tensors);
+      *rv = gd;
+    });
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_SaveDGLGraphs_V0")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    std::string filename = args[0];
-    List<GraphData> graph_data = args[1];
-    Map<std::string, Value> labels = args[2];
-    std::vector<NamedTensor> labels_list;
-    for (auto kv : labels) {
-      std::string name = kv.first;
-      Value v = kv.second;
-      NDArray ndarray = static_cast<NDArray>(v->data);
-      labels_list.emplace_back(name, ndarray);
-    }
-    SaveDGLGraphs(filename, graph_data, labels_list);
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      std::string filename = args[0];
+      List<GraphData> graph_data = args[1];
+      Map<std::string, Value> labels = args[2];
+      std::vector<NamedTensor> labels_list;
+      for (auto kv : labels) {
+        std::string name = kv.first;
+        Value v = kv.second;
+        NDArray ndarray = static_cast<NDArray>(v->data);
+        labels_list.emplace_back(name, ndarray);
+      }
+      SaveDGLGraphs(filename, graph_data, labels_list);
+    });
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataGraphHandle")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    GraphData gdata = args[0];
-    *rv = gdata->gptr;
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      GraphData gdata = args[0];
+      *rv = gdata->gptr;
+    });
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataNodeTensors")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    GraphData gdata = args[0];
-    Map<std::string, Value> rvmap;
-    for (auto kv : gdata->node_tensors) {
-      rvmap.Set(kv.first, Value(MakeValue(kv.second)));
-    }
-    *rv = rvmap;
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      GraphData gdata = args[0];
+      Map<std::string, Value> rvmap;
+      for (auto kv : gdata->node_tensors) {
+        rvmap.Set(kv.first, Value(MakeValue(kv.second)));
+      }
+      *rv = rvmap;
+    });
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GDataEdgeTensors")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    GraphData gdata = args[0];
-    Map<std::string, Value> rvmap;
-    for (auto kv : gdata->edge_tensors) {
-      rvmap.Set(kv.first, Value(MakeValue(kv.second)));
-    }
-    *rv = rvmap;
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      GraphData gdata = args[0];
+      Map<std::string, Value> rvmap;
+      for (auto kv : gdata->edge_tensors) {
+        rvmap.Set(kv.first, Value(MakeValue(kv.second)));
+      }
+      *rv = rvmap;
+    });
 
 uint64_t GetFileVersion(const std::string &filename) {
   auto fs = std::unique_ptr<SeekStream>(
-    SeekStream::CreateForRead(filename.c_str(), false));
+      SeekStream::CreateForRead(filename.c_str(), false));
   CHECK(fs) << "File " << filename << " not found";
   uint64_t magicNum, version;
   fs->Read(&magicNum);
@@ -130,35 +130,36 @@ uint64_t GetFileVersion(const std::string &filename) {
 }
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_GetFileVersion")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    std::string filename = args[0];
-    *rv = static_cast<int64_t>(GetFileVersion(filename));
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      std::string filename = args[0];
+      *rv = static_cast<int64_t>(GetFileVersion(filename));
+    });
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V1")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    std::string filename = args[0];
-    List<Value> idxs = args[1];
-    bool onlyMeta = args[2];
-    auto idx_list = ListValueToVector<dgl_id_t>(idxs);
-    *rv = LoadDGLGraphs(filename, idx_list, onlyMeta);
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      std::string filename = args[0];
+      List<Value> idxs = args[1];
+      bool onlyMeta = args[2];
+      auto idx_list = ListValueToVector<dgl_id_t>(idxs);
+      *rv = LoadDGLGraphs(filename, idx_list, onlyMeta);
+    });
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_DGLAsHeteroGraph")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    GraphRef g = args[0];
-    ImmutableGraphPtr ig = std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
-    CHECK(ig) << "graph is not readonly";
-    *rv = HeteroGraphRef(ig->AsHeteroGraph());
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      GraphRef g = args[0];
+      ImmutableGraphPtr ig =
+          std::dynamic_pointer_cast<ImmutableGraph>(g.sptr());
+      CHECK(ig) << "graph is not readonly";
+      *rv = HeteroGraphRef(ig->AsHeteroGraph());
+    });
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadGraphFiles_V2")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    std::string filename = args[0];
-    List<Value> idxs = args[1];
-    auto idx_list = ListValueToVector<dgl_id_t>(idxs);
-    *rv = List<HeteroGraphData>(LoadHeteroGraphs(filename, idx_list));
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      std::string filename = args[0];
+      List<Value> idxs = args[1];
+      auto idx_list = ListValueToVector<dgl_id_t>(idxs);
+      *rv = List<HeteroGraphData>(LoadHeteroGraphs(filename, idx_list));
+    });
 
 }  // namespace serialize
 }  // namespace dgl

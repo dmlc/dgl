@@ -1,7 +1,7 @@
-/*!
- *  Copyright (c) 2020 by Contributors
- * \file graph/serailize/zerocopy_serializer.cc
- * \brief serializer implementation.
+/**
+ *  Copyright (c) 2020-2022 by Contributors
+ * @file graph/serailize/zerocopy_serializer.cc
+ * @brief serializer implementation.
  */
 
 #include <dgl/zerocopy_serializer.h>
@@ -13,38 +13,9 @@ namespace dgl {
 
 using dgl::runtime::NDArray;
 
-struct RawDataTensorCtx {
-  std::vector<int64_t> shape;
-  std::vector<int64_t> stride;
-  DLManagedTensor tensor;
-};
-
-void RawDataTensoDLPackDeleter(DLManagedTensor* tensor) {
-  auto ctx = static_cast<RawDataTensorCtx*>(tensor->manager_ctx);
-  delete[] ctx->tensor.dl_tensor.data;
-  delete ctx;
-}
-
-NDArray CreateNDArrayFromRawData(std::vector<int64_t> shape, DLDataType dtype,
-                                 DLContext ctx, void* raw) {
-  auto dlm_tensor_ctx = new RawDataTensorCtx();
-  DLManagedTensor* dlm_tensor = &dlm_tensor_ctx->tensor;
-  dlm_tensor_ctx->shape = shape;
-  dlm_tensor->manager_ctx = dlm_tensor_ctx;
-  dlm_tensor->dl_tensor.shape = dmlc::BeginPtr(dlm_tensor_ctx->shape);
-  dlm_tensor->dl_tensor.ctx = ctx;
-  dlm_tensor->dl_tensor.ndim = static_cast<int>(shape.size());
-  dlm_tensor->dl_tensor.dtype = dtype;
-
-  dlm_tensor_ctx->stride.resize(dlm_tensor->dl_tensor.ndim, 1);
-  for (int i = dlm_tensor->dl_tensor.ndim - 2; i >= 0; --i) {
-    dlm_tensor_ctx->stride[i] =
-      dlm_tensor_ctx->shape[i + 1] * dlm_tensor_ctx->stride[i + 1];
-  }
-  dlm_tensor->dl_tensor.strides = dmlc::BeginPtr(dlm_tensor_ctx->stride);
-  dlm_tensor->dl_tensor.data = raw;
-  dlm_tensor->deleter = RawDataTensoDLPackDeleter;
-  return NDArray::FromDLPack(dlm_tensor);
+NDArray CreateNDArrayFromRawData(
+    std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx, void* raw) {
+  return NDArray::CreateFromRaw(shape, dtype, ctx, raw, true);
 }
 
 void StreamWithBuffer::PushNDArray(const NDArray& tensor) {
@@ -54,9 +25,9 @@ void StreamWithBuffer::PushNDArray(const NDArray& tensor) {
   int ndim = tensor->ndim;
   this->WriteArray(tensor->shape, ndim);
   CHECK(tensor.IsContiguous())
-    << "StreamWithBuffer only supports contiguous tensor";
+      << "StreamWithBuffer only supports contiguous tensor";
   CHECK_EQ(tensor->byte_offset, 0)
-    << "StreamWithBuffer only supports zero byte offset tensor";
+      << "StreamWithBuffer only supports zero byte offset tensor";
   int type_bytes = tensor->dtype.bits / 8;
   int64_t num_elems = 1;
   for (int i = 0; i < ndim; ++i) {
@@ -69,7 +40,8 @@ void StreamWithBuffer::PushNDArray(const NDArray& tensor) {
     // If the stream is for remote communication or the data is not stored in
     // shared memory, serialize the data content as a buffer.
     this->Write<bool>(false);
-    // If this is a null ndarray, we will not push it into the underlying buffer_list
+    // If this is a null ndarray, we will not push it into the underlying
+    // buffer_list
     if (data_byte_size != 0) {
       buffer_list_.emplace_back(tensor, tensor->data, data_byte_size);
     }
@@ -89,18 +61,18 @@ void StreamWithBuffer::PushNDArray(const NDArray& tensor) {
 NDArray StreamWithBuffer::PopNDArray() {
 #ifndef _WIN32
   int ndim;
-  DLDataType dtype;
+  DGLDataType dtype;
 
-  CHECK(this->Read(&ndim)) << "Invalid DLTensor file format";
-  CHECK(this->Read(&dtype)) << "Invalid DLTensor file format";
+  CHECK(this->Read(&ndim)) << "Invalid DGLArray file format";
+  CHECK(this->Read(&dtype)) << "Invalid DGLArray file format";
 
   std::vector<int64_t> shape(ndim);
   if (ndim != 0) {
-    CHECK(this->ReadArray(&shape[0], ndim)) << "Invalid DLTensor file format";
+    CHECK(this->ReadArray(&shape[0], ndim)) << "Invalid DGLArray file format";
   }
 
-  DLContext cpu_ctx;
-  cpu_ctx.device_type = kDLCPU;
+  DGLContext cpu_ctx;
+  cpu_ctx.device_type = kDGLCPU;
   cpu_ctx.device_id = 0;
 
   bool is_shared_mem;
@@ -119,8 +91,8 @@ NDArray StreamWithBuffer::PopNDArray() {
       // Mean this is a null ndarray
       ret = CreateNDArrayFromRawData(shape, dtype, cpu_ctx, nullptr);
     } else {
-      ret = CreateNDArrayFromRawData(shape, dtype, cpu_ctx,
-                                     buffer_list_.front().data);
+      ret = CreateNDArrayFromRawData(
+          shape, dtype, cpu_ctx, buffer_list_.front().data);
       buffer_list_.pop_front();
     }
     return ret;

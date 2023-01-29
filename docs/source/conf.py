@@ -26,6 +26,7 @@ author = 'DGL Team'
 import dgl
 version = dgl.__version__
 release = dgl.__version__
+dglbackend = os.environ.get("DGLBACKEND", "pytorch")
 
 
 # -- General configuration ---------------------------------------------------
@@ -46,9 +47,16 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
     'sphinx.ext.graphviz',
+    'sphinxemoji.sphinxemoji',
     'sphinx_gallery.gen_gallery',
     'sphinx_copybutton',
+    'nbsphinx',
+    'nbsphinx_link',
 ]
+
+# Do not run notebooks on non-pytorch backends
+if dglbackend != "pytorch":
+    nbsphinx_execute = 'never'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -94,6 +102,7 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+html_css_files = ['css/custom.css']
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -208,6 +217,10 @@ gallery_dirs = ['tutorials/blitz/',
                 'tutorials/models/',
                 'tutorials/multi/',
                 'tutorials/cpu']  # path to generate docs
+if dglbackend != "pytorch":
+    examples_dirs = []
+    gallery_dirs = []
+
 reference_url = {
     'dgl' : None,
     'numpy': 'http://docs.scipy.org/doc/numpy/',
@@ -227,7 +240,6 @@ sphinx_gallery_conf = {
 }
 
 # Compatibility for different backend when builds tutorials
-dglbackend = os.environ.get("DGLBACKEND", "")
 if dglbackend == 'mxnet':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<=mx)\.py"
 if dglbackend == 'pytorch':

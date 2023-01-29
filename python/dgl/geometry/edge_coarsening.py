@@ -3,7 +3,8 @@
 from .. import remove_self_loop
 from .capi import _neighbor_matching
 
-__all__ = ['neighbor_matching']
+__all__ = ["neighbor_matching"]
+
 
 def neighbor_matching(graph, e_weights=None, relabel_idx=True):
     r"""
@@ -48,13 +49,16 @@ def neighbor_matching(graph, e_weights=None, relabel_idx=True):
     >>> res = neighbor_matching(g)
         tensor([0, 1, 1])
     """
-    assert graph.is_homogeneous, \
-        "The graph used in graph node matching must be homogeneous"
+    assert (
+        graph.is_homogeneous
+    ), "The graph used in graph node matching must be homogeneous"
     if e_weights is not None:
-        graph.edata['e_weights'] = e_weights
+        graph.edata["e_weights"] = e_weights
         graph = remove_self_loop(graph)
-        e_weights = graph.edata['e_weights']
-        graph.edata.pop('e_weights')
+        e_weights = graph.edata["e_weights"]
+        graph.edata.pop("e_weights")
     else:
         graph = remove_self_loop(graph)
-    return _neighbor_matching(graph._graph, graph.num_nodes(), e_weights, relabel_idx)
+    return _neighbor_matching(
+        graph._graph, graph.num_nodes(), e_weights, relabel_idx
+    )

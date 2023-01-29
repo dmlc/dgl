@@ -44,7 +44,7 @@ class WeightedGraphConv(GraphConv):
             n_feat = n_feat * src_norm
             graph.ndata["h"] = n_feat
             graph.edata["e"] = e_feat
-            graph.update_all(fn.src_mul_edge("h", "e", "m"),
+            graph.update_all(fn.u_mul_e("h", "e", "m"),
                              fn.sum("m", "h"))
             n_feat = graph.ndata.pop("h")
             n_feat = n_feat * dst_norm
@@ -100,7 +100,7 @@ class NodeInfoScoreLayer(nn.Module):
                 graph.ndata["h"] = src_feat
                 graph.edata["e"] = e_feat
                 graph = dgl.remove_self_loop(graph)
-                graph.update_all(fn.src_mul_edge("h", "e", "m"), fn.sum("m", "h"))
+                graph.update_all(fn.u_mul_e("h", "e", "m"), fn.sum("m", "h"))
                 
                 dst_feat = graph.ndata.pop("h") * dst_norm
                 feat = feat - dst_feat
@@ -111,7 +111,7 @@ class NodeInfoScoreLayer(nn.Module):
                 graph.ndata["h"] = feat
                 graph.edata["e"] = e_feat
                 graph = dgl.remove_self_loop(graph)
-                graph.update_all(fn.src_mul_edge("h", "e", "m"), fn.sum("m", "h"))
+                graph.update_all(fn.u_mul_e("h", "e", "m"), fn.sum("m", "h"))
 
                 feat = feat - dst_norm * graph.ndata.pop("h")
 

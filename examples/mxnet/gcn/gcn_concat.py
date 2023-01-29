@@ -28,7 +28,7 @@ class GCNLayer(gluon.Block):
 
     def forward(self, h):
         self.g.ndata['h'] = h * self.g.ndata['out_norm']
-        self.g.update_all(fn.copy_src(src='h', out='m'),
+        self.g.update_all(fn.copy_u(u='h', out='m'),
                           fn.sum(msg='m', out='accum'))
         accum = self.g.ndata.pop('accum')
         accum = self.dense(accum * self.g.ndata['in_norm'])

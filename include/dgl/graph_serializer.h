@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
- * \file graph/graph_serializer.cc
- * \brief DGL serializer APIs
+ * @file graph/graph_serializer.cc
+ * @brief DGL serializer APIs
  */
 
 #ifndef DGL_GRAPH_SERIALIZER_H_
@@ -10,7 +10,8 @@
 #include <memory>
 namespace dgl {
 
-// Util class to call the private/public empty constructor, which is needed for serialization
+// Util class to call the private/public empty constructor, which is needed for
+// serialization
 class Serializer {
  public:
   template <typename T>

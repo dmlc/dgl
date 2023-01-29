@@ -22,6 +22,7 @@ export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
 export TF_FORCE_GPU_ALLOW_GROWTH=true
+unset TORCH_ALLOW_TF32_CUBLAS_OVERRIDE
 
 if [ $2 == "gpu" ] 
 then
@@ -32,12 +33,11 @@ fi
 
 conda activate ${DGLBACKEND}-ci
 
-python3 -m pytest -v --junitxml=pytest_compute.xml tests/compute || fail "compute"
-python3 -m pytest -v --junitxml=pytest_backend.xml tests/$DGLBACKEND || fail "backend-specific"
-
-export OMP_NUM_THREADS=1
-if [ $2 != "gpu" ]; then
-    python3 -m pytest -v --capture=tee-sys --junitxml=pytest_distributed.xml tests/distributed/*.py || fail "distributed"
-    # Seperate kvstore test to another process, to avoid hangs
-    python3 -m pytest -v --capture=tee-sys --junitxml=pytest_distributed.xml tests/distributed/kv_store/*.py || fail "distributed kvstore"
+python3 -m pip install pytest psutil pyyaml pydantic pandas rdflib ogb torchmetrics || fail "pip install"
+if [ $DGLBACKEND == "mxnet" ]
+then
+  python3 -m pytest -v --junitxml=pytest_compute.xml --durations=100 --ignore=tests/compute/test_ffi.py tests/compute || fail "compute"
+else
+  python3 -m pytest -v --junitxml=pytest_compute.xml --durations=100 tests/compute || fail "compute"
 fi
+python3 -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests/$DGLBACKEND || fail "backend-specific"

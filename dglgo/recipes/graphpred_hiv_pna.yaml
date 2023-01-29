@@ -1,0 +1,37 @@
+version: 0.0.2
+pipeline_name: graphpred
+pipeline_mode: train
+device: cuda:0                # Torch device name, e.q. cpu or cuda or cuda:0
+data:
+  name: ogbg-molhiv
+  split_ratio:                # Ratio to generate data split, for example set to [0.8, 0.1, 0.1] for 80% train/10% val/10% test. Leave blank to use builtin split in original dataset
+model:
+  name: pna
+  embed_size: 80              # Embedding size.
+  aggregators: mean max min std # Aggregation function names separated by space, can include mean, max, min, std, sum
+  scalers: identity amplification attenuation # Scaler function names separated by space, can include identity, amplification, and attenuation
+  dropout: 0.3                # Dropout rate.
+  batch_norm: true            # Whether to use batch normalization.
+  residual: true              # Whether to use residual connection.
+  num_mlp_layers: 1           # Number of MLP layers to use after message aggregation in each PNA layer.
+  num_layers: 4               # Number of PNA layers.
+  readout: mean               # Readout for computing graph-level representations, can be 'sum' or 'mean'.
+general_pipeline:
+  num_runs: 10                # Number of experiments to run
+  train_batch_size: 128       # Graph batch size when training
+  eval_batch_size: 128        # Graph batch size when evaluating
+  num_workers: 4              # Number of workers for data loading
+  optimizer:
+    name: Adam
+    lr: 0.01
+    weight_decay: 0.000003
+  lr_scheduler:
+    name: ReduceLROnPlateau
+    mode: max
+    factor: 0.5
+    patience: 20
+    verbose: true
+  loss: BCEWithLogitsLoss
+  metric: roc_auc_score
+  num_epochs: 200             # Number of training epochs
+  save_path: "results"        # Directory to save the experiment results

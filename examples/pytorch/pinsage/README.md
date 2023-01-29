@@ -4,7 +4,7 @@
 
 - dask
 - pandas
-- torchtext==0.5
+- torchtext>=0.9.0
 
 ## Prepare datasets
 
@@ -12,15 +12,15 @@
 
 1. Download and extract the MovieLens-1M dataset from http://files.grouplens.org/datasets/movielens/ml-1m.zip
    into the current directory.
-2. Run `python process_movielens1m.py ./ml-1m ./data.pkl`.
-   Replace `ml-1m` with the directory you put the `.dat` files, and replace `data.pkl` to
-   any path you wish to put the output pickle file.
+2. Run `python process_movielens1m.py ./ml-1m ./data_processed`.
+   Replace `ml-1m` with the directory you put the `.dat` files, and replace `data_processed` with
+   any path you wish to put the output files.
 
 ### Nowplaying-rs
 
 1. Download and extract the Nowplaying-rs dataset from https://zenodo.org/record/3248543/files/nowplayingrs.zip?download=1
    into the current directory.
-2. Run `python process_nowplaying_rs.py ./nowplaying_rs_dataset ./data.pkl`
+2. Run `python process_nowplaying_rs.py ./nowplaying_rs_dataset ./data_processed`
 
 ## Run model
 
@@ -31,7 +31,7 @@ interacted.  The distance between two items are measured by Euclidean distance o
 item embeddings, which are learned as outputs of PinSAGE.
 
 ```
-python model.py data.pkl --num-epochs 300 --num-workers 2 --device cuda:0 --hidden-dims 64
+python model.py data_processed --num-epochs 300 --num-workers 2 --device cuda:0 --hidden-dims 64
 ```
 
 The implementation here also assigns a learnable vector to each item.  If your hidden
@@ -40,7 +40,7 @@ for sparse embedding update (written with `torch.optim.SparseAdam`) instead:
 
 
 ```
-python model_sparse.py data.pkl --num-epochs 300 --num-workers 2 --device cuda:0 --hidden-dims 1024
+python model_sparse.py data_processed --num-epochs 300 --num-workers 2 --device cuda:0 --hidden-dims 1024
 ```
 
 Note that since the embedding update is done on CPU, it will be significantly slower than doing

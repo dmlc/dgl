@@ -58,6 +58,7 @@ class KVClient(object):
     def delete_data(self, name):
         '''delete the data'''
         del self._data[name]
+        self._gdata_name_list.remove(name)
 
     def data_name_list(self):
         '''get the names of all data'''
@@ -102,3 +103,21 @@ class KVClient(object):
             the number of nonzero in this data.
         """
         return F.count_nonzero(self._data[name])
+
+    @property
+    def data_store(self):
+        """Return the local partition of the data storage.
+
+        Returns
+        -------
+        dict[str, Tensor]
+            The tensor storages of the local partition.
+        """
+        return self._data
+
+    def union(self, operand1_name, operand2_name, output_name):
+        """Compute the union of two mask arrays in the KVStore.
+        """
+        self._data[output_name][:] = (
+                self._data[operand1_name] | self._data[operand2_name]
+        )

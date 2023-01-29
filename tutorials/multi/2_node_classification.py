@@ -33,6 +33,8 @@ models with multi-GPU with ``DistributedDataParallel``.
 # tutorial.
 # 
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 import torch
 import numpy as np
@@ -118,9 +120,9 @@ def run(proc_id, devices):
     # Define training and validation dataloader, copied from the previous tutorial
     # but with one line of difference: use_ddp to enable distributed data parallel
     # data loading.
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-    train_dataloader = dgl.dataloading.NodeDataLoader(
-        # The following arguments are specific to NodeDataLoader.
+    sampler = dgl.dataloading.NeighborSampler([4, 4])
+    train_dataloader = dgl.dataloading.DataLoader(
+        # The following arguments are specific to DataLoader.
         graph,              # The graph
         train_nids,         # The node IDs to iterate over in minibatches
         sampler,            # The neighbor sampler
@@ -133,7 +135,7 @@ def run(proc_id, devices):
         drop_last=False,    # Whether to drop the last incomplete batch
         num_workers=0       # Number of sampler processes
     )
-    valid_dataloader = dgl.dataloading.NodeDataLoader(
+    valid_dataloader = dgl.dataloading.DataLoader(
         graph, valid_nids, sampler,
         device=device,
         use_ddp=False,
@@ -158,7 +160,6 @@ def run(proc_id, devices):
     
     # Copied from previous tutorial with changes highlighted.
     for epoch in range(10):
-        train_dataloader.set_epoch(epoch)    # <--- necessary for dataloader with DDP.
         model.train()
 
         with tqdm.tqdm(train_dataloader) as tq:
@@ -207,19 +208,6 @@ def run(proc_id, devices):
 # 
 # A typical scenario for multi-GPU training with DDP is to replicate the
 # model once per GPU, and spawn one trainer process per GPU.
-# 
-# PyTorch tutorials recommend using ``multiprocessing.spawn`` to spawn
-# multiple processes. This however is undesirable for training node
-# classification or link prediction models on a single large graph,
-# especially on Linux. The reason is that a single large graph itself may
-# take a lot of memory, and ``mp.spawn`` will duplicate all objects in the
-# program, including the large graph. Consequently, the large graph will
-# be duplicated as many times as the number of GPUs.
-# 
-# To alleviate the problem we recommend using ``multiprocessing.Process``,
-# which *forks* from the main process and allows sharing the same graph
-# object to trainer processes via *copy-on-write*. This can greatly reduce
-# the memory consumption.
 #
 # Normally, DGL maintains only one sparse matrix representation (usually COO)
 # for each graph, and will create new formats when some APIs are called for
@@ -239,25 +227,14 @@ graph.create_formats_()
 ######################################################################
 # Then you can spawn the subprocesses to train with multiple GPUs.
 # 
-# .. note::
 # 
-#    You will need to use ``dgl.multiprocessing`` instead of the Python
-#    ``multiprocessing`` package. ``dgl.multiprocessing`` is identical to
-#    Python’s built-in ``multiprocessing`` except that it handles the
-#    subtleties between forking and multithreading in Python.
-# 
-
-# Say you have four GPUs.
-num_gpus = 4
-import dgl.multiprocessing as mp
-devices = list(range(num_gpus))
-procs = []
-for proc_id in range(num_gpus):
-    p = mp.Process(target=run, args=(proc_id, devices))
-    p.start()
-    procs.append(p)
-for p in procs:
-    p.join()
+# .. code:: python
+#
+#    # Say you have four GPUs.
+#    if __name__ == '__main__':
+#        num_gpus = 4
+#        import torch.multiprocessing as mp
+#        mp.spawn(run, args=(list(range(num_gpus)),), nprocs=num_gpus)
 
 # Thumbnail credits: Stanford CS224W Notes
 # sphinx_gallery_thumbnail_path = '_static/blitz_1_introduction.png'

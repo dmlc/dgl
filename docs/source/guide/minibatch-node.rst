@@ -26,8 +26,8 @@ The simplest neighborhood sampler is
 which makes the node gather messages from all of its neighbors.
 
 To use a sampler provided by DGL, one also need to combine it with
-:class:`~dgl.dataloading.pytorch.NodeDataLoader`, which iterates
-over a set of nodes in minibatches.
+:class:`~dgl.dataloading.DataLoader`, which iterates
+over a set of indices (nodes in this case) in minibatches.
 
 For example, the following code creates a PyTorch DataLoader that
 iterates over the training node ID array ``train_nids`` in batches,
@@ -42,7 +42,7 @@ putting the list of generated MFGs onto GPU.
     import torch.nn.functional as F
     
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
-    dataloader = dgl.dataloading.NodeDataLoader(
+    dataloader = dgl.dataloading.DataLoader(
         g, train_nids, sampler,
         batch_size=1024,
         shuffle=True,
@@ -176,7 +176,7 @@ of MFGs, we:
         opt.step()
 
 DGL provides an end-to-end stochastic training example `GraphSAGE
-implementation <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_sampling.py>`__.
+implementation <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/node_classification.py>`__.
 
 For heterogeneous graphs
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -212,7 +212,7 @@ removed for simplicity):
 Some of the samplers provided by DGL also support heterogeneous graphs.
 For example, one can still use the provided
 :class:`~dgl.dataloading.neighbor.MultiLayerFullNeighborSampler` class and
-:class:`~dgl.dataloading.pytorch.NodeDataLoader` class for
+:class:`~dgl.dataloading.DataLoader` class for
 stochastic training. For full-neighbor sampling, the only difference
 would be that you would specify a dictionary of node
 types and node IDs for the training set.
@@ -220,7 +220,7 @@ types and node IDs for the training set.
 .. code:: python
 
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
-    dataloader = dgl.dataloading.NodeDataLoader(
+    dataloader = dgl.dataloading.DataLoader(
         g, train_nid_dict, sampler,
         batch_size=1024,
         shuffle=True,

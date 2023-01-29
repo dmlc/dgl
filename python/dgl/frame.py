@@ -7,6 +7,9 @@ from collections.abc import MutableMapping
 from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
+from .storages import TensorStorage
+from .utils import gather_pinned_tensor_rows, pin_memory_inplace
+
 
 class _LazyIndex(object):
     def __init__(self, index):
@@ -19,17 +22,17 @@ class _LazyIndex(object):
         return len(self._indices[-1])
 
     def slice(self, index):
-        """ Create a new _LazyIndex object sliced by the given index tensor.
-        """
+        """Create a new _LazyIndex object sliced by the given index tensor."""
         # if our indices are in the same context, lets just slice now and free
         # memory, otherwise do nothing until we have to
         if F.context(self._indices[-1]) == F.context(index):
-            return _LazyIndex(self._indices[:-1] + [F.gather_row(self._indices[-1], index)])
+            return _LazyIndex(
+                self._indices[:-1] + [F.gather_row(self._indices[-1], index)]
+            )
         return _LazyIndex(self._indices + [index])
 
     def flatten(self):
-        """ Evaluate the chain of indices, and return a single index tensor.
-        """
+        """Evaluate the chain of indices, and return a single index tensor."""
         flat_index = self._indices[0]
         # here we actually need to resolve it
         for index in self._indices[1:]:
@@ -38,7 +41,77 @@ class _LazyIndex(object):
             flat_index = F.gather_row(flat_index, index)
         return flat_index
 
-class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
+
+class LazyFeature(object):
+    """Placeholder for feature prefetching.
+
+    One can assign this object to ``ndata`` or ``edata`` of the graphs returned by various
+    samplers' :attr:`sample` method.  When DGL's dataloader receives the subgraphs
+    returned by the sampler, it will automatically look up all the ``ndata`` and ``edata``
+    whose data is a LazyFeature, replacing them with the actual data of the corresponding
+    nodes/edges from the original graph instead.  In particular, for a subgraph returned
+    by the sampler has a LazyFeature with name ``k`` in ``subgraph.ndata[key]``:
+
+    .. code:: python
+
+       subgraph.ndata[key] = LazyFeature(k)
+
+    Assuming that ``graph`` is the original graph, DGL's dataloader will perform
+
+    .. code:: python
+
+       subgraph.ndata[key] = graph.ndata[k][subgraph.ndata[dgl.NID]]
+
+    DGL dataloader performs similar replacement for ``edata``.
+    For heterogeneous graphs, the replacement is:
+
+    .. code:: python
+
+       subgraph.nodes[ntype].data[key] = graph.nodes[ntype].data[k][
+           subgraph.nodes[ntype].data[dgl.NID]]
+
+    For MFGs' ``srcdata`` (and similarly ``dstdata``), the replacement is
+
+    .. code:: python
+
+       mfg.srcdata[key] = graph.ndata[k][mfg.srcdata[dgl.NID]]
+
+    Parameters
+    ----------
+    name : str
+        The name of the data in the original graph.
+    id_ : Tensor, optional
+        The ID tensor.
+    """
+
+    __slots__ = ["name", "id_"]
+
+    def __init__(self, name=None, id_=None):
+        self.name = name
+        self.id_ = id_
+
+    def to(
+        self, *args, **kwargs
+    ):  # pylint: disable=invalid-name, unused-argument
+        """No-op.  For compatibility of :meth:`Frame.to` method."""
+        return self
+
+    @property
+    def data(self):
+        """No-op.  For compatibility of :meth:`Frame.__repr__` method."""
+        return self
+
+    def pin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.pin_memory_` method."""
+
+    def unpin_memory_(self):
+        """No-op.  For compatibility of :meth:`Frame.unpin_memory_` method."""
+
+    def record_stream(self, stream):
+        """No-op.  For compatibility of :meth:`Frame.record_stream` method."""
+
+
+class Scheme(namedtuple("Scheme", ["shape", "dtype"])):
     """The column scheme.
 
     Parameters
@@ -48,6 +121,7 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     dtype : backend-specific type object
         The feature data type.
     """
+
     # Pickling torch dtypes could be problemetic; this is a workaround.
     # I also have to create data_type_dict and reverse_data_type_dict
     # attribute just for this bug.
@@ -61,6 +135,7 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     def _reconstruct_scheme(cls, shape, dtype_str):
         dtype = F.data_type_dict[dtype_str]
         return cls(shape, dtype)
+
 
 def infer_scheme(tensor):
     """Infer column scheme from the given tensor data.
@@ -77,7 +152,8 @@ def infer_scheme(tensor):
     """
     return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
 
-class Column(object):
+
+class Column(TensorStorage):
     """A column is a compact store of features of multiple nodes/edges.
 
     It batches all the feature tensors together along the first dimension
@@ -119,11 +195,10 @@ class Column(object):
     index : Tensor
         Index tensor
     """
-    def __init__(self, storage, scheme=None, index=None, device=None):
-        self.storage = storage
-        self.scheme = scheme if scheme else infer_scheme(storage)
-        self.index = index
-        self.device = device
+
+    def __init__(self, storage, *args, **kwargs):
+        super().__init__(storage)
+        self._init(*args, **kwargs)
 
     def __len__(self):
         """The number of features (number of rows) in this column."""
@@ -143,31 +218,56 @@ class Column(object):
         if self.index is not None:
             if isinstance(self.index, _LazyIndex):
                 self.index = self.index.flatten()
-            # If index and storage is not in the same context,
-            # copy index to the same context of storage.
-            # Copy index is usually cheaper than copy data
-            if F.context(self.storage) != F.context(self.index):
-                kwargs = {}
-                if self.device is not None:
-                    kwargs = self.device[1]
-                self.index = F.copy_to(self.index, F.context(self.storage), **kwargs)
-            self.storage = F.gather_row(self.storage, self.index)
+
+            storage_ctx = F.context(self.storage)
+            index_ctx = F.context(self.index)
+            # If under the special case where the storage is pinned and the index is on
+            # CUDA, directly call UVA slicing (even if they aree not in the same context).
+            if (
+                storage_ctx != index_ctx
+                and storage_ctx == F.cpu()
+                and F.is_pinned(self.storage)
+            ):
+                self.storage = gather_pinned_tensor_rows(
+                    self.storage, self.index
+                )
+            else:
+                # If index and storage is not in the same context,
+                # copy index to the same context of storage.
+                # Copy index is usually cheaper than copy data
+                if storage_ctx != index_ctx:
+                    kwargs = {}
+                    if self.device is not None:
+                        kwargs = self.device[1]
+                    self.index = F.copy_to(self.index, storage_ctx, **kwargs)
+                self.storage = F.gather_row(self.storage, self.index)
             self.index = None
 
         # move data to the right device
         if self.device is not None:
-            self.storage = F.copy_to(self.storage, self.device[0], **self.device[1])
+            self.storage = F.copy_to(
+                self.storage, self.device[0], **self.device[1]
+            )
             self.device = None
+
+        # convert data to the right type
+        if self.deferred_dtype is not None:
+            self.storage = F.astype(self.storage, self.deferred_dtype)
+            self.deferred_dtype = None
         return self.storage
 
     @data.setter
     def data(self, val):
         """Update the column data."""
         self.index = None
+        self.device = None
+        self.deferred_dtype = None
         self.storage = val
+        self._data_nd = None  # should unpin data if it was pinned.
+        self.pinned_by_dgl = False
 
-    def to(self, device, **kwargs): # pylint: disable=invalid-name
-        """ Return a new column with columns copy to the targeted device (cpu/gpu).
+    def to(self, device, **kwargs):  # pylint: disable=invalid-name
+        """Return a new column with columns copy to the targeted device (cpu/gpu).
 
         Parameters
         ----------
@@ -183,6 +283,49 @@ class Column(object):
         """
         col = self.clone()
         col.device = (device, kwargs)
+        return col
+
+    @property
+    def dtype(self):
+        """Return the effective data type of this Column"""
+        if self.deferred_dtype is not None:
+            return self.deferred_dtype
+        return self.storage.dtype
+
+    def astype(self, new_dtype):
+        """Return a new column such that when its data is requested,
+        it will be converted to new_dtype.
+
+        Parameters
+        ----------
+        new_dtype : Framework-specific type object
+            The type to convert the data to.
+
+        Returns
+        -------
+        Column
+            A new column
+        """
+        col = self.clone()
+        if col.dtype != new_dtype:
+            # If there is already a pending conversion, ensure that the pending
+            # conversion and transfer/sampling are done before this new conversion.
+            if col.deferred_dtype is not None:
+                _ = col.data
+
+            if (col.device is None) and (col.index is None):
+                # Do the conversion immediately if no device transfer or index
+                # sampling is pending.  The assumption is that this is most
+                # likely to be the desired behaviour, such as converting an
+                # entire graph's feature data to float16 (half) before transfer
+                # to device when training, or converting back to float32 (float)
+                # after fetching the data to a device.
+                col.storage = F.astype(col.storage, new_dtype)
+            else:
+                # Defer the conversion if there is a pending transfer or sampling.
+                # This is so that feature data that never gets accessed on the
+                # device never needs to be transferred or sampled or converted.
+                col.deferred_dtype = new_dtype
         return col
 
     def __getitem__(self, rowids):
@@ -229,8 +372,10 @@ class Column(object):
         """
         feat_scheme = infer_scheme(feats)
         if feat_scheme != self.scheme:
-            raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
-                           % (feat_scheme, self.scheme))
+            raise DGLError(
+                "Cannot update column of scheme %s using feature of scheme %s."
+                % (feat_scheme, self.scheme)
+            )
         self.data = F.scatter_row(self.data, rowids, feats)
 
     def extend(self, feats, feat_scheme=None):
@@ -249,14 +394,22 @@ class Column(object):
             feat_scheme = infer_scheme(feats)
 
         if feat_scheme != self.scheme:
-            raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
-                           % (feat_scheme, self.scheme))
+            raise DGLError(
+                "Cannot update column of scheme %s using feature of scheme %s."
+                % (feat_scheme, self.scheme)
+            )
 
         self.data = F.cat([self.data, feats], dim=0)
 
     def clone(self):
         """Return a shallow copy of this column."""
-        return Column(self.storage, self.scheme, self.index, self.device)
+        return Column(
+            self.storage,
+            self.scheme,
+            self.index,
+            self.device,
+            self.deferred_dtype,
+        )
 
     def deepclone(self):
         """Return a deepcopy of this column.
@@ -285,13 +438,25 @@ class Column(object):
             Sub-column
         """
         if self.index is None:
-            return Column(self.storage, self.scheme, rowids, self.device)
+            return Column(
+                self.storage,
+                self.scheme,
+                rowids,
+                self.device,
+                self.deferred_dtype,
+            )
         else:
             index = self.index
             if not isinstance(index, _LazyIndex):
                 index = _LazyIndex(self.index)
             index = index.slice(rowids)
-            return Column(self.storage, self.scheme, index, self.device)
+            return Column(
+                self.storage,
+                self.scheme,
+                index,
+                self.device,
+                self.deferred_dtype,
+            )
 
     @staticmethod
     def create(data):
@@ -306,11 +471,85 @@ class Column(object):
 
     def __getstate__(self):
         if self.storage is not None:
-            _ = self.data               # evaluate feature slicing
-        return self.__dict__
+            # flush any deferred operations
+            _ = self.data
+        state = self.__dict__.copy()
+        # data pinning does not get serialized, so we need to remove that from
+        # the state
+        state["_data_nd"] = None
+        state["pinned_by_dgl"] = False
+        return state
+
+    def __setstate__(self, state):
+        index = None
+        device = None
+        if "storage" in state and state["storage"] is not None:
+            assert "index" not in state or state["index"] is None
+            assert "device" not in state or state["device"] is None
+        else:
+            # we may have a column with only index information, and that is
+            # valid
+            index = None if "index" not in state else state["index"]
+            device = None if "device" not in state else state["device"]
+        assert "deferred_dtype" not in state or state["deferred_dtype"] is None
+        assert "pinned_by_dgl" not in state or state["pinned_by_dgl"] is False
+        assert "_data_nd" not in state or state["_data_nd"] is None
+
+        self.__dict__ = state
+        # properly initialize this object
+        self._init(
+            self.scheme if hasattr(self, "scheme") else None,
+            index=index,
+            device=device,
+        )
+
+    def _init(self, scheme=None, index=None, device=None, deferred_dtype=None):
+        self.scheme = scheme if scheme else infer_scheme(self.storage)
+        self.index = index
+        self.device = device
+        self.deferred_dtype = deferred_dtype
+        self.pinned_by_dgl = False
+        self._data_nd = None
 
     def __copy__(self):
         return self.clone()
+
+    def fetch(self, indices, device, pin_memory=False, **kwargs):
+        _ = self.data  # materialize in case of lazy slicing & data transfer
+        return super().fetch(indices, device, pin_memory=pin_memory, **kwargs)
+
+    def pin_memory_(self):
+        """Pin the storage into page-locked memory.
+
+        Does nothing if the storage is already pinned.
+        """
+        if not self.pinned_by_dgl and not F.is_pinned(self.data):
+            self._data_nd = pin_memory_inplace(self.data)
+            self.pinned_by_dgl = True
+
+    def unpin_memory_(self):
+        """Unpin the storage pinned by ``pin_memory_`` method.
+
+        Does nothing if the storage is not pinned by ``pin_memory_`` method, even if
+        it is actually in page-locked memory.
+        """
+        if self.pinned_by_dgl:
+            self._data_nd.unpin_memory_()
+            self._data_nd = None
+            self.pinned_by_dgl = False
+
+    def record_stream(self, stream):
+        """Record stream that is using the storage.
+        Does nothing if the backend is not PyTorch.
+
+        Parameters
+        ----------
+        stream : torch.cuda.Stream.
+        """
+        if F.get_preferred_backend() != "pytorch":
+            raise DGLError("record_stream only supports the PyTorch backend.")
+        self.data.record_stream(stream)
+
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
@@ -328,6 +567,7 @@ class Frame(MutableMapping):
         The number of rows in this frame. If ``data`` is provided and is not empty,
         ``num_rows`` will be ignored and inferred from the given data.
     """
+
     def __init__(self, data=None, num_rows=None):
         if data is None:
             self._columns = dict()
@@ -336,15 +576,22 @@ class Frame(MutableMapping):
             assert not isinstance(data, Frame)  # sanity check for code refactor
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
-            self._columns = {k : Column.create(v) for k, v in data.items()}
+            self._columns = {
+                k: v if isinstance(v, LazyFeature) else Column.create(v)
+                for k, v in data.items()
+            }
             self._num_rows = num_rows
             # infer num_rows & sanity check
             for name, col in self._columns.items():
+                if isinstance(col, LazyFeature):
+                    continue
                 if self._num_rows is None:
                     self._num_rows = len(col)
                 elif len(col) != self._num_rows:
-                    raise DGLError('Expected all columns to have same # rows (%d), '
-                                   'got %d on %r.' % (self._num_rows, len(col), name))
+                    raise DGLError(
+                        "Expected all columns to have same # rows (%d), "
+                        "got %d on %r." % (self._num_rows, len(col), name)
+                    )
 
         # Initializer for empty values. Initializer is a callable.
         # If is none, then a warning will be raised
@@ -392,7 +639,7 @@ class Frame(MutableMapping):
     @property
     def schemes(self):
         """Return a dictionary of column name to column schemes."""
-        return {k : col.scheme for k, col in self._columns.items()}
+        return {k: col.scheme for k, col in self._columns.items()}
 
     @property
     def num_columns(self):
@@ -460,14 +707,21 @@ class Frame(MutableMapping):
             The column context.
         """
         if name in self:
-            dgl_warning('Column "%s" already exists. Ignore adding this column again.' % name)
+            dgl_warning(
+                'Column "%s" already exists. Ignore adding this column again.'
+                % name
+            )
             return
 
         if self.get_initializer(name) is None:
             self._set_zero_default_initializer()
         initializer = self.get_initializer(name)
-        init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
-                                ctx, slice(0, self.num_rows))
+        init_data = initializer(
+            (self.num_rows,) + scheme.shape,
+            scheme.dtype,
+            ctx,
+            slice(0, self.num_rows),
+        )
         self._columns[name] = Column(init_data, scheme)
 
     def add_rows(self, num_rows):
@@ -488,8 +742,12 @@ class Frame(MutableMapping):
             if self.get_initializer(key) is None:
                 self._set_zero_default_initializer()
             initializer = self.get_initializer(key)
-            new_data = initializer((num_rows,) + scheme.shape, scheme.dtype,
-                                   ctx, slice(self._num_rows, self._num_rows + num_rows))
+            new_data = initializer(
+                (num_rows,) + scheme.shape,
+                scheme.dtype,
+                ctx,
+                slice(self._num_rows, self._num_rows + num_rows),
+            )
             feat_placeholders[key] = new_data
         self._append(Frame(feat_placeholders))
         self._num_rows += num_rows
@@ -504,10 +762,16 @@ class Frame(MutableMapping):
         data : Column or data convertible to Column
             The column data.
         """
+        if isinstance(data, LazyFeature):
+            self._columns[name] = data
+            return
+
         col = Column.create(data)
         if len(col) != self.num_rows:
-            raise DGLError('Expected data to have %d rows, got %d.' %
-                           (self.num_rows, len(col)))
+            raise DGLError(
+                "Expected data to have %d rows, got %d."
+                % (self.num_rows, len(col))
+            )
         self._columns[name] = col
 
     def update_row(self, rowids, data):
@@ -545,9 +809,12 @@ class Frame(MutableMapping):
             if self.get_initializer(key) is None:
                 self._set_zero_default_initializer()
             initializer = self.get_initializer(key)
-            new_data = initializer((other.num_rows,) + scheme.shape,
-                                   scheme.dtype, ctx,
-                                   slice(self._num_rows, self._num_rows + other.num_rows))
+            new_data = initializer(
+                (other.num_rows,) + scheme.shape,
+                scheme.dtype,
+                ctx,
+                slice(self._num_rows, self._num_rows + other.num_rows),
+            )
             other[key] = new_data
         # append other to self
         for key, col in other._columns.items():
@@ -627,8 +894,10 @@ class Frame(MutableMapping):
         Frame
             A deep-cloned frame.
         """
-        newframe = Frame({k : col.deepclone() for k, col in self._columns.items()},
-                         self._num_rows)
+        newframe = Frame(
+            {k: col.deepclone() for k, col in self._columns.items()},
+            self._num_rows,
+        )
         newframe._initializers = self._initializers
         newframe._default_initializer = self._default_initializer
         return newframe
@@ -649,14 +918,14 @@ class Frame(MutableMapping):
         Frame
             A new subframe.
         """
-        subcols = {k : col.subcolumn(rowids) for k, col in self._columns.items()}
+        subcols = {k: col.subcolumn(rowids) for k, col in self._columns.items()}
         subf = Frame(subcols, len(rowids))
         subf._initializers = self._initializers
         subf._default_initializer = self._default_initializer
         return subf
 
-    def to(self, device, **kwargs): # pylint: disable=invalid-name
-        """ Return a new frame with columns copy to the targeted device (cpu/gpu).
+    def to(self, device, **kwargs):  # pylint: disable=invalid-name
+        """Return a new frame with columns copy to the targeted device (cpu/gpu).
 
         Parameters
         ----------
@@ -671,9 +940,62 @@ class Frame(MutableMapping):
             A new frame
         """
         newframe = self.clone()
-        new_columns = {key : col.to(device, **kwargs) for key, col in newframe._columns.items()}
+        new_columns = {
+            key: col.to(device, **kwargs)
+            for key, col in newframe._columns.items()
+        }
         newframe._columns = new_columns
         return newframe
 
     def __repr__(self):
         return repr(dict(self))
+
+    def pin_memory_(self):
+        """Registers the data of every column into pinned memory, materializing them if
+        necessary."""
+        for column in self._columns.values():
+            column.pin_memory_()
+
+    def unpin_memory_(self):
+        """Unregisters the data of every column from pinned memory, materializing them
+        if necessary."""
+        for column in self._columns.values():
+            column.unpin_memory_()
+
+    def record_stream(self, stream):
+        """Record stream that is using the data of every column, materializing them
+        if necessary."""
+        for column in self._columns.values():
+            column.record_stream(stream)
+
+    def _astype_float(self, new_type):
+        assert new_type in [
+            F.float64,
+            F.float32,
+            F.float16,
+        ], "'new_type' must be floating-point type: %s" % str(new_type)
+        newframe = self.clone()
+        new_columns = {}
+        for name, column in self._columns.items():
+            dtype = column.dtype
+            if dtype != new_type and dtype in [F.float64, F.float32, F.float16]:
+                new_columns[name] = column.astype(new_type)
+            else:
+                new_columns[name] = column
+        newframe._columns = new_columns
+        return newframe
+
+    def half(self):
+        """Return a new frame with all floating-point columns converted
+        to half-precision (float16)"""
+        return self._astype_float(F.float16)
+
+    def float(self):
+        """Return a new frame with all floating-point columns converted
+        to single-precision (float32)"""
+        return self._astype_float(F.float32)
+
+    def double(self):
+        """Return a new frame with all floating-point columns converted
+        to double-precision (float64)"""
+        return self._astype_float(F.float64)

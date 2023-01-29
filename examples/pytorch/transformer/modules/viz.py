@@ -17,7 +17,7 @@ def get_attention_map(g, src_nodes, dst_nodes, h):
         for j, dst in enumerate(dst_nodes.tolist()):
             if not g.has_edge_between(src, dst):
                 continue
-            eid = g.edge_id(src, dst)
+            eid = g.edge_ids(src, dst)
             weight[i][j] = g.edata['score'][eid].squeeze(-1).cpu().detach()
 
     weight = weight.transpose(0, 2)

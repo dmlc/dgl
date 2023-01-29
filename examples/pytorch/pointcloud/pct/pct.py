@@ -1,12 +1,12 @@
 import torch
+from helper import TransitionDown
 from torch import nn
 
-from helper import TransitionDown
-
-'''
+"""
 Part of the code are adapted from
 https://github.com/MenghaoGuo/PCT
-'''
+"""
+
 
 class PCTPositionEmbedding(nn.Module):
     def __init__(self, channels=256):
@@ -98,15 +98,21 @@ class PointTransformerCLS(nn.Module):
         self.conv2 = nn.Conv1d(64, 64, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm1d(64)
         self.bn2 = nn.BatchNorm1d(64)
-        self.g_op0 = TransitionDown(in_channels=128, out_channels=128, n_neighbor=32)
-        self.g_op1 = TransitionDown(in_channels=256, out_channels=256, n_neighbor=32)
+        self.g_op0 = TransitionDown(
+            in_channels=128, out_channels=128, n_neighbor=32
+        )
+        self.g_op1 = TransitionDown(
+            in_channels=256, out_channels=256, n_neighbor=32
+        )
 
         self.pt_last = PCTPositionEmbedding()
 
         self.relu = nn.ReLU()
-        self.conv_fuse = nn.Sequential(nn.Conv1d(1280, 1024, kernel_size=1, bias=False),
-                                       nn.BatchNorm1d(1024),
-                                       nn.LeakyReLU(negative_slope=0.2))
+        self.conv_fuse = nn.Sequential(
+            nn.Conv1d(1280, 1024, kernel_size=1, bias=False),
+            nn.BatchNorm1d(1024),
+            nn.LeakyReLU(negative_slope=0.2),
+        )
 
         self.linear1 = nn.Linear(1024, 512, bias=False)
         self.bn6 = nn.BatchNorm1d(512)
@@ -159,13 +165,17 @@ class PointTransformerSeg(nn.Module):
         self.sa3 = SALayerSeg(128)
         self.sa4 = SALayerSeg(128)
 
-        self.conv_fuse = nn.Sequential(nn.Conv1d(512, 1024, kernel_size=1, bias=False),
-                                       nn.BatchNorm1d(1024),
-                                       nn.LeakyReLU(negative_slope=0.2))
+        self.conv_fuse = nn.Sequential(
+            nn.Conv1d(512, 1024, kernel_size=1, bias=False),
+            nn.BatchNorm1d(1024),
+            nn.LeakyReLU(negative_slope=0.2),
+        )
 
-        self.label_conv = nn.Sequential(nn.Conv1d(16, 64, kernel_size=1, bias=False),
-                                        nn.BatchNorm1d(64),
-                                        nn.LeakyReLU(negative_slope=0.2))
+        self.label_conv = nn.Sequential(
+            nn.Conv1d(16, 64, kernel_size=1, bias=False),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(negative_slope=0.2),
+        )
 
         self.convs1 = nn.Conv1d(1024 * 3 + 64, 512, 1)
         self.dp1 = nn.Dropout(0.5)
@@ -189,13 +199,12 @@ class PointTransformerSeg(nn.Module):
         x = self.conv_fuse(x)
         x_max, _ = torch.max(x, 2)
         x_avg = torch.mean(x, 2)
-        x_max_feature = x_max.view(
-            batch_size, -1).unsqueeze(-1).repeat(1, 1, N)
-        x_avg_feature = x_avg.view(
-            batch_size, -1).unsqueeze(-1).repeat(1, 1, N)
+        x_max_feature = x_max.view(batch_size, -1).unsqueeze(-1).repeat(1, 1, N)
+        x_avg_feature = x_avg.view(batch_size, -1).unsqueeze(-1).repeat(1, 1, N)
         cls_label_feature = self.label_conv(cls_label).repeat(1, 1, N)
         x_global_feature = torch.cat(
-            (x_max_feature, x_avg_feature, cls_label_feature), 1)
+            (x_max_feature, x_avg_feature, cls_label_feature), 1
+        )
         x = torch.cat((x, x_global_feature), 1)
         x = self.relu(self.bns1(self.convs1(x)))
         x = self.dp1(x)

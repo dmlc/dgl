@@ -1,10 +1,11 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file array/cpu/coo_coalesce.cc
- * \brief COO coalescing
+ * @file array/cpu/coo_coalesce.cc
+ * @brief COO coalescing
  */
 
 #include <dgl/array.h>
+
 #include <vector>
 
 namespace dgl {
@@ -13,14 +14,13 @@ namespace aten {
 
 namespace impl {
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   const int64_t nnz = coo.row->shape[0];
   const IdType* coo_row_data = static_cast<IdType*>(coo.row->data);
   const IdType* coo_col_data = static_cast<IdType*>(coo.col->data);
 
-  if (!coo.row_sorted || !coo.col_sorted)
-    coo = COOSort(coo, true);
+  if (!coo.row_sorted || !coo.col_sorted) coo = COOSort(coo, true);
 
   std::vector<IdType> new_row, new_col, count;
   IdType prev_row = -1, prev_col = -1;
@@ -39,13 +39,17 @@ std::pair<COOMatrix, IdArray> COOCoalesce(COOMatrix coo) {
   }
 
   COOMatrix coo_result = COOMatrix{
-      coo.num_rows, coo.num_cols, NDArray::FromVector(new_row), NDArray::FromVector(new_col),
-      NullArray(), true};
+      coo.num_rows,
+      coo.num_cols,
+      NDArray::FromVector(new_row),
+      NDArray::FromVector(new_col),
+      NullArray(),
+      true};
   return std::make_pair(coo_result, NDArray::FromVector(count));
 }
 
-template std::pair<COOMatrix, IdArray> COOCoalesce<kDLCPU, int32_t>(COOMatrix);
-template std::pair<COOMatrix, IdArray> COOCoalesce<kDLCPU, int64_t>(COOMatrix);
+template std::pair<COOMatrix, IdArray> COOCoalesce<kDGLCPU, int32_t>(COOMatrix);
+template std::pair<COOMatrix, IdArray> COOCoalesce<kDGLCPU, int64_t>(COOMatrix);
 
 };  // namespace impl
 };  // namespace aten

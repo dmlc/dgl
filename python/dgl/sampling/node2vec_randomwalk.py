@@ -1,15 +1,18 @@
 """Node2vec random walk"""
 
-from .._ffi.function import _init_api
 from .. import backend as F
 from .. import ndarray as nd
 from .. import utils
+from .._ffi.function import _init_api
+
 # pylint: disable=invalid-name
 
-__all__ = ['node2vec_random_walk']
+__all__ = ["node2vec_random_walk"]
 
 
-def node2vec_random_walk(g, nodes, p, q, walk_length, prob=None, return_eids=False):
+def node2vec_random_walk(
+    g, nodes, p, q, walk_length, prob=None, return_eids=False
+):
     """
     Generate random walk traces from an array of starting nodes based on the node2vec model.
     Paper: `node2vec: Scalable Feature Learning for Networks
@@ -82,14 +85,16 @@ def node2vec_random_walk(g, nodes, p, q, walk_length, prob=None, return_eids=Fal
     assert g.device == F.cpu(), "Graph must be on CPU."
 
     gidx = g._graph
-    nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, 'nodes'))
+    nodes = F.to_dgl_nd(utils.prepare_tensor(g, nodes, "nodes"))
 
     if prob is None:
         prob_nd = nd.array([], ctx=nodes.ctx)
     else:
         prob_nd = F.to_dgl_nd(g.edata[prob])
 
-    traces, eids = _CAPI_DGLSamplingNode2vec(gidx, nodes, p, q, walk_length, prob_nd)
+    traces, eids = _CAPI_DGLSamplingNode2vec(
+        gidx, nodes, p, q, walk_length, prob_nd
+    )
 
     traces = F.from_dgl_nd(traces)
     eids = F.from_dgl_nd(eids)
@@ -97,4 +102,4 @@ def node2vec_random_walk(g, nodes, p, q, walk_length, prob=None, return_eids=Fal
     return (traces, eids) if return_eids else traces
 
 
-_init_api('dgl.sampling.randomwalks', __name__)
+_init_api("dgl.sampling.randomwalks", __name__)

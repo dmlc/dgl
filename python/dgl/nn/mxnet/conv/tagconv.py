@@ -9,11 +9,7 @@ from .... import function as fn
 
 
 class TAGConv(gluon.Block):
-    r"""
-
-    Description
-    -----------
-    Topology Adaptive Graph Convolutional layer from paper `Topology
+    r"""Topology Adaptive Graph Convolutional layer from `Topology
     Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
 
     .. math::
@@ -118,7 +114,7 @@ class TAGConv(gluon.Block):
                 rst = rst * norm
                 graph.ndata['h'] = rst
 
-                graph.update_all(fn.copy_src(src='h', out='m'),
+                graph.update_all(fn.copy_u(u='h', out='m'),
                                  fn.sum(msg='m', out='h'))
                 rst = graph.ndata['h']
                 rst = rst * norm

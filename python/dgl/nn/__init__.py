@@ -14,20 +14,22 @@ with "[NN] XXX module".
 """
 
 import importlib
-import sys
 import os
-
-# [BarclayII] Not sure what's going on with pylint.
-# Possible issue: https://github.com/PyCQA/pylint/issues/2648
-from . import functional        # pylint: disable=import-self
+import sys
 
 from ..backend import backend_name
 from ..utils import expand_as_pair
 
+# [BarclayII] Not sure what's going on with pylint.
+# Possible issue: https://github.com/PyCQA/pylint/issues/2648
+from . import functional  # pylint: disable=import-self
+
+
 def _load_backend(mod_name):
-    mod = importlib.import_module('.%s' % mod_name, __name__)
+    mod = importlib.import_module(".%s" % mod_name, __name__)
     thismod = sys.modules[__name__]
     for api, obj in mod.__dict__.items():
         setattr(thismod, api, obj)
+
 
 _load_backend(backend_name)

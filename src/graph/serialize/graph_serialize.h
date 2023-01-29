@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/graph_serialize.h
- * \brief Graph serialization header
+ * @file graph/serialize/graph_serialize.h
+ * @brief Graph serialization header
  */
 #ifndef DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_
 #define DGL_GRAPH_SERIALIZE_GRAPH_SERIALIZE_H_
@@ -53,9 +53,10 @@ class StorageMetaDataObject : public runtime::Object {
 
   static constexpr const char *_type_key = "graph_serialize.StorageMetaData";
 
-  void SetMetaData(dgl_id_t num_graph, std::vector<int64_t> nodes_num_list,
-                   std::vector<int64_t> edges_num_list,
-                   std::vector<NamedTensor> labels_list);
+  void SetMetaData(
+      dgl_id_t num_graph, std::vector<int64_t> nodes_num_list,
+      std::vector<int64_t> edges_num_list,
+      std::vector<NamedTensor> labels_list);
 
   void SetGraphData(std::vector<GraphData> gdata);
 
@@ -72,27 +73,27 @@ class StorageMetaDataObject : public runtime::Object {
 
 class StorageMetaData : public runtime::ObjectRef {
  public:
-  DGL_DEFINE_OBJECT_REF_METHODS(StorageMetaData, runtime::ObjectRef,
-                                StorageMetaDataObject);
+  DGL_DEFINE_OBJECT_REF_METHODS(
+      StorageMetaData, runtime::ObjectRef, StorageMetaDataObject);
 
-  /*! \brief create a new StorageMetaData reference */
+  /** @brief create a new StorageMetaData reference */
   static StorageMetaData Create() {
     return StorageMetaData(std::make_shared<StorageMetaDataObject>());
   }
 };
 
-StorageMetaData LoadDGLGraphFiles(const std::string &filename,
-                                  std::vector<dgl_id_t> idx_list,
-                                  bool onlyMeta);
+StorageMetaData LoadDGLGraphFiles(
+    const std::string &filename, std::vector<dgl_id_t> idx_list, bool onlyMeta);
 
-StorageMetaData LoadDGLGraphs(const std::string &filename,
-                              std::vector<dgl_id_t> idx_list, bool onlyMeta);
+StorageMetaData LoadDGLGraphs(
+    const std::string &filename, std::vector<dgl_id_t> idx_list, bool onlyMeta);
 
-bool SaveDGLGraphs(std::string filename, List<GraphData> graph_data,
-                   std::vector<NamedTensor> labels_list);
+bool SaveDGLGraphs(
+    std::string filename, List<GraphData> graph_data,
+    std::vector<NamedTensor> labels_list);
 
-std::vector<HeteroGraphData> LoadHeteroGraphs(const std::string &filename,
-                                              std::vector<dgl_id_t> idx_list);
+std::vector<HeteroGraphData> LoadHeteroGraphs(
+    const std::string &filename, std::vector<dgl_id_t> idx_list);
 
 ImmutableGraphPtr ToImmutableGraph(GraphPtr g);
 

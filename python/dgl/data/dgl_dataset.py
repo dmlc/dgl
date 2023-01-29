@@ -3,11 +3,15 @@
 
 from __future__ import absolute_import
 
-import os, sys, hashlib
-import traceback
 import abc
-from .utils import download, extract_archive, get_download_dir, makedirs
+import hashlib
+import os
+import sys
+import traceback
+
 from ..utils import retry_method_with_fix
+from .utils import download, extract_archive, get_download_dir, makedirs
+
 
 class DGLDataset(object):
     r"""The basic DGL dataset for creating graph datasets.
@@ -17,7 +21,7 @@ class DGLDataset(object):
       1. Check whether there is a dataset cache on disk
          (already processed and stored on the disk) by
          invoking ``has_cache()``. If true, goto 5.
-      2. Call ``download()`` to download the data.
+      2. Call ``download()`` to download the data if ``url`` is not None.
       3. Call ``process()`` to process the data.
       4. Call ``save()`` to save the processed dataset on disk and goto 6.
       5. Call ``load()`` to load the processed dataset from disk.
@@ -31,7 +35,7 @@ class DGLDataset(object):
     name : str
         Name of the dataset
     url : str
-        Url to download the raw dataset
+        Url to download the raw dataset. Default: None
     raw_dir : str
         Specifying the directory that will store the
         downloaded data or the directory that
@@ -49,6 +53,10 @@ class DGLDataset(object):
         Whether to reload the dataset. Default: False
     verbose : bool
         Whether to print out progress information
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
@@ -57,27 +65,39 @@ class DGLDataset(object):
     name : str
         The dataset name
     raw_dir : str
-        Raw file directory contains the input data folder
+        Directory to store all the downloaded raw datasets.
     raw_path : str
-        Directory contains the input data files.
-        Default : ``os.path.join(self.raw_dir, self.name)``
+        Path to the downloaded raw dataset folder. An alias for
+        ``os.path.join(self.raw_dir, self.name)``.
     save_dir : str
-        Directory to save the processed dataset
+        Directory to save all the processed datasets.
     save_path : str
-        File path to save the processed dataset
+        Path to the processed dataset folder. An alias for
+        ``os.path.join(self.save_dir, self.name)``.
     verbose : bool
-        Whether to print information
+        Whether to print more runtime information.
     hash : str
         Hash value for the dataset and the setting.
     """
-    def __init__(self, name, url=None, raw_dir=None, save_dir=None,
-                 hash_key=(), force_reload=False, verbose=False):
+
+    def __init__(
+        self,
+        name,
+        url=None,
+        raw_dir=None,
+        save_dir=None,
+        hash_key=(),
+        force_reload=False,
+        verbose=False,
+        transform=None,
+    ):
         self._name = name
         self._url = url
         self._force_reload = force_reload
         self._verbose = verbose
         self._hash_key = hash_key
         self._hash = self._get_hash()
+        self._transform = transform
 
         # if no dir is provided, the default dgl download dir is used.
         if raw_dir is None:
@@ -123,10 +143,10 @@ class DGLDataset(object):
         """
         pass
 
+    @abc.abstractmethod
     def process(self):
-        r"""Overwrite to realize your own logic of processing the input data.
-        """
-        raise NotImplementedError
+        r"""Overwrite to realize your own logic of processing the input data."""
+        pass
 
     def has_cache(self):
         r"""Overwrite to realize your own logic of
@@ -138,9 +158,11 @@ class DGLDataset(object):
 
     @retry_method_with_fix(download)
     def _download(self):
-        r"""Download dataset by calling ``self.download()`` if the dataset does not exists under ``self.raw_path``.
-            By default ``self.raw_path = os.path.join(self.raw_dir, self.name)``
-            One can overwrite ``raw_path()`` function to change the path.
+        """Download dataset by calling ``self.download()``
+        if the dataset does not exists under ``self.raw_path``.
+
+        By default ``self.raw_path = os.path.join(self.raw_dir, self.name)``
+        One can overwrite ``raw_path()`` function to change the path.
         """
         if os.path.exists(self.raw_path):  # pragma: no cover
             return
@@ -149,14 +171,18 @@ class DGLDataset(object):
         self.download()
 
     def _load(self):
-        r"""Entry point from __init__ to load the dataset.
-            if the cache exists:
-                Load the dataset from saved dgl graph and information files.
-                If loadin process fails, re-download and process the dataset.
-            else:
-                1. Download the dataset if needed.
-                2. Process the dataset and build the dgl graph.
-                3. Save the processed dataset into files.
+        """Entry point from __init__ to load the dataset.
+
+        If cache exists:
+
+          - Load the dataset from saved dgl graph and information files.
+          - If loadin process fails, re-download and process the dataset.
+
+        else:
+
+          - Download the dataset if needed.
+          - Process the dataset and build the dgl graph.
+          - Save the processed dataset into files.
         """
         load_flag = not self._force_reload and self.has_cache()
 
@@ -164,21 +190,21 @@ class DGLDataset(object):
             try:
                 self.load()
                 if self.verbose:
-                    print('Done loading data from cached files.')
+                    print("Done loading data from cached files.")
             except KeyboardInterrupt:
                 raise
             except:
                 load_flag = False
                 if self.verbose:
                     print(traceback.format_exc())
-                    print('Loading from cache failed, re-processing.')
+                    print("Loading from cache failed, re-processing.")
 
         if not load_flag:
             self._download()
             self.process()
             self.save()
             if self.verbose:
-                print('Done saving data into cached files.')
+                print("Done saving data into cached files.")
 
     def _get_hash(self):
         """Compute the hash of the input tuple
@@ -192,68 +218,67 @@ class DGLDataset(object):
         'a770b222'
         """
         hash_func = hashlib.sha1()
-        hash_func.update(str(self._hash_key).encode('utf-8'))
+        hash_func.update(str(self._hash_key).encode("utf-8"))
         return hash_func.hexdigest()[:8]
 
     @property
     def url(self):
-        r"""Get url to download the raw dataset.
-        """
+        r"""Get url to download the raw dataset."""
         return self._url
 
     @property
     def name(self):
-        r"""Name of the dataset.
-        """
+        r"""Name of the dataset."""
         return self._name
 
     @property
     def raw_dir(self):
-        r"""Raw file directory contains the input data folder.
-        """
+        r"""Raw file directory contains the input data folder."""
         return self._raw_dir
 
     @property
     def raw_path(self):
         r"""Directory contains the input data files.
-            By default raw_path = os.path.join(self.raw_dir, self.name)
+        By default raw_path = os.path.join(self.raw_dir, self.name)
         """
         return os.path.join(self.raw_dir, self.name)
 
     @property
     def save_dir(self):
-        r"""Directory to save the processed dataset.
-        """
+        r"""Directory to save the processed dataset."""
         return self._save_dir
 
     @property
     def save_path(self):
-        r"""Path to save the processed dataset.
-        """
+        r"""Path to save the processed dataset."""
         return os.path.join(self._save_dir, self.name)
 
     @property
     def verbose(self):
-        r"""Whether to print information.
-        """
+        r"""Whether to print information."""
         return self._verbose
 
     @property
     def hash(self):
-        r"""Hash value for the dataset and the setting.
-        """
+        r"""Hash value for the dataset and the setting."""
         return self._hash
 
     @abc.abstractmethod
     def __getitem__(self, idx):
-        r"""Gets the data object at index.
-        """
+        r"""Gets the data object at index."""
         pass
 
     @abc.abstractmethod
     def __len__(self):
         r"""The number of examples in the dataset."""
         pass
+
+    def __repr__(self):
+        return (
+            f'Dataset("{self.name}", num_graphs={len(self)},'
+            + f" save_path={self.save_path})"
+        )
+
 
 class DGLBuiltinDataset(DGLDataset):
     r"""The Basic DGL Builtin Dataset.
@@ -275,21 +300,38 @@ class DGLBuiltinDataset(DGLDataset):
         from the same dataset class by comparing the hash values.
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: False
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
     """
-    def __init__(self, name, url, raw_dir=None, hash_key=(), force_reload=False, verbose=False):
-        super(DGLBuiltinDataset, self).__init__(name,
-                                                url=url,
-                                                raw_dir=raw_dir,
-                                                save_dir=None,
-                                                hash_key=hash_key,
-                                                force_reload=force_reload,
-                                                verbose=verbose)
+
+    def __init__(
+        self,
+        name,
+        url,
+        raw_dir=None,
+        hash_key=(),
+        force_reload=False,
+        verbose=False,
+        transform=None,
+    ):
+        super(DGLBuiltinDataset, self).__init__(
+            name,
+            url=url,
+            raw_dir=raw_dir,
+            save_dir=None,
+            hash_key=hash_key,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def download(self):
-        r""" Automatically download data and extract it.
-        """
-        zip_file_path = os.path.join(self.raw_dir, self.name + '.zip')
-        download(self.url, path=zip_file_path)
-        extract_archive(zip_file_path, self.raw_path)
+        r"""Automatically download data and extract it."""
+        if self.url is not None:
+            zip_file_path = os.path.join(self.raw_dir, self.name + ".zip")
+            download(self.url, path=zip_file_path)
+            extract_archive(zip_file_path, self.raw_path)

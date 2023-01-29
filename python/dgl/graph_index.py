@@ -1,23 +1,26 @@
 """Module for graph index class definition."""
 from __future__ import absolute_import
 
-import numpy as np
 import networkx as nx
+import numpy as np
 import scipy
 
-from ._ffi.object import register_object, ObjectBase
-from ._ffi.function import _init_api
-from .base import DGLError, dgl_warning
 from . import backend as F
 from . import utils
+from ._ffi.function import _init_api
+from ._ffi.object import ObjectBase, register_object
+from .base import DGLError, dgl_warning
+
 
 class BoolFlag(object):
     """Bool flag with unknown value"""
+
     BOOL_UNKNOWN = -1
     BOOL_FALSE = 0
     BOOL_TRUE = 1
 
-@register_object('graph.Graph')
+
+@register_object("graph.Graph")
 class GraphIndex(ObjectBase):
     """Graph index object.
 
@@ -33,6 +36,7 @@ class GraphIndex(ObjectBase):
     - `dgl.graph_index.from_csr`
     - `dgl.graph_index.from_coo`
     """
+
     def __new__(cls):
         obj = ObjectBase.__new__(cls)
         obj._readonly = None  # python-side cache of the flag
@@ -53,13 +57,15 @@ class GraphIndex(ObjectBase):
         # Pickle compatibility check
         # TODO: we should store a storage version number in later releases.
         if isinstance(state, tuple) and len(state) == 5:
-            dgl_warning("The object is pickled pre-0.4.2.  Multigraph flag is ignored in 0.4.3")
+            dgl_warning(
+                "The object is pickled pre-0.4.2.  Multigraph flag is ignored in 0.4.3"
+            )
             num_nodes, _, readonly, src, dst = state
         elif isinstance(state, tuple) and len(state) == 4:
             # post-0.4.3.
             num_nodes, readonly, src, dst = state
         else:
-            raise IOError('Unrecognized storage format.')
+            raise IOError("Unrecognized storage format.")
 
         self._cache = {}
         self._readonly = readonly
@@ -68,7 +74,8 @@ class GraphIndex(ObjectBase):
             src.todgltensor(),
             dst.todgltensor(),
             int(num_nodes),
-            readonly)
+            readonly,
+        )
 
     def add_nodes(self, num):
         """Add nodes.
@@ -240,7 +247,9 @@ class GraphIndex(ObjectBase):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLGraphHasEdgesBetween(self, u_array, v_array))
+        return utils.toindex(
+            _CAPI_DGLGraphHasEdgesBetween(self, u_array, v_array)
+        )
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.
@@ -257,8 +266,9 @@ class GraphIndex(ObjectBase):
         utils.Index
             Array of predecessors
         """
-        return utils.toindex(_CAPI_DGLGraphPredecessors(
-            self, int(v), int(radius)))
+        return utils.toindex(
+            _CAPI_DGLGraphPredecessors(self, int(v), int(radius))
+        )
 
     def successors(self, v, radius=1):
         """Return the successors of the node.
@@ -275,8 +285,9 @@ class GraphIndex(ObjectBase):
         utils.Index
             Array of successors
         """
-        return utils.toindex(_CAPI_DGLGraphSuccessors(
-            self, int(v), int(radius)))
+        return utils.toindex(
+            _CAPI_DGLGraphSuccessors(self, int(v), int(radius))
+        )
 
     def edge_id(self, u, v):
         """Return the id array of all edges between u and v.
@@ -432,7 +443,7 @@ class GraphIndex(ObjectBase):
         """
         _CAPI_DGLSortAdj(self)
 
-    @utils.cached_member(cache='_cache', prefix='edges')
+    @utils.cached_member(cache="_cache", prefix="edges")
     def edges(self, order=None):
         """Return all the edges
 
@@ -606,7 +617,7 @@ class GraphIndex(ObjectBase):
         e_array = e.todgltensor()
         return _CAPI_DGLGraphEdgeSubgraph(self, e_array, preserve_nodes)
 
-    @utils.cached_member(cache='_cache', prefix='scipy_adj')
+    @utils.cached_member(cache="_cache", prefix="scipy_adj")
     def adjacency_matrix_scipy(self, transpose, fmt, return_edge_ids=None):
         """Return the scipy adjacency matrix representation of this graph.
 
@@ -631,8 +642,10 @@ class GraphIndex(ObjectBase):
             The scipy representation of adjacency matrix.
         """
         if not isinstance(transpose, bool):
-            raise DGLError('Expect bool value for "transpose" arg,'
-                           ' but got %s.' % (type(transpose)))
+            raise DGLError(
+                'Expect bool value for "transpose" arg,'
+                " but got %s." % (type(transpose))
+            )
 
         if return_edge_ids is None:
             dgl_warning(
@@ -640,17 +653,24 @@ class GraphIndex(ObjectBase):
                 "  As a result there is one 0 entry which is not eliminated."
                 "  In the next release it will return 1s by default,"
                 " and 0 will be eliminated otherwise.",
-                FutureWarning)
+                FutureWarning,
+            )
             return_edge_ids = True
 
         rst = _CAPI_DGLGraphGetAdj(self, transpose, fmt)
         if fmt == "csr":
             indptr = utils.toindex(rst(0)).tonumpy()
             indices = utils.toindex(rst(1)).tonumpy()
-            data = utils.toindex(rst(2)).tonumpy() if return_edge_ids else np.ones_like(indices)
+            data = (
+                utils.toindex(rst(2)).tonumpy()
+                if return_edge_ids
+                else np.ones_like(indices)
+            )
             n = self.number_of_nodes()
-            return scipy.sparse.csr_matrix((data, indices, indptr), shape=(n, n))
-        elif fmt == 'coo':
+            return scipy.sparse.csr_matrix(
+                (data, indices, indptr), shape=(n, n)
+            )
+        elif fmt == "coo":
             idx = utils.toindex(rst(0)).tonumpy()
             n = self.number_of_nodes()
             m = self.number_of_edges()
@@ -660,7 +680,7 @@ class GraphIndex(ObjectBase):
         else:
             raise Exception("unknown format")
 
-    @utils.cached_member(cache='_cache', prefix='immu_gidx')
+    @utils.cached_member(cache="_cache", prefix="immu_gidx")
     def get_immutable_gidx(self, ctx):
         """Create an immutable graph index and copy to the given device context.
 
@@ -717,8 +737,10 @@ class GraphIndex(ObjectBase):
             if shuffle is not required.
         """
         if not isinstance(transpose, bool):
-            raise DGLError('Expect bool value for "transpose" arg,'
-                           ' but got %s.' % (type(transpose)))
+            raise DGLError(
+                'Expect bool value for "transpose" arg,'
+                " but got %s." % (type(transpose))
+            )
         fmt = F.get_preferred_sparse_format()
         rst = _CAPI_DGLGraphGetAdj(self, transpose, fmt)
         if fmt == "csr":
@@ -726,8 +748,11 @@ class GraphIndex(ObjectBase):
             indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
             shuffle = utils.toindex(rst(2))
             dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
-            spmat = F.sparse_matrix(dat, ('csr', indices, indptr),
-                                    (self.number_of_nodes(), self.number_of_nodes()))[0]
+            spmat = F.sparse_matrix(
+                dat,
+                ("csr", indices, indptr),
+                (self.number_of_nodes(), self.number_of_nodes()),
+            )[0]
             return spmat, shuffle
         elif fmt == "coo":
             ## FIXME(minjie): data type
@@ -736,8 +761,10 @@ class GraphIndex(ObjectBase):
             idx = F.reshape(idx, (2, m))
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
             n = self.number_of_nodes()
-            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
-            shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+            adj, shuffle_idx = F.sparse_matrix(dat, ("coo", idx), (n, n))
+            shuffle_idx = (
+                utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+            )
             return adj, shuffle_idx
         else:
             raise Exception("unknown format")
@@ -783,21 +810,21 @@ class GraphIndex(ObjectBase):
         eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
         n = self.number_of_nodes()
         m = self.number_of_edges()
-        if typestr == 'in':
+        if typestr == "in":
             row = F.unsqueeze(dst, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
-        elif typestr == 'out':
+            inc, shuffle_idx = F.sparse_matrix(dat, ("coo", idx), (n, m))
+        elif typestr == "out":
             row = F.unsqueeze(src, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
-        elif typestr == 'both':
+            inc, shuffle_idx = F.sparse_matrix(dat, ("coo", idx), (n, m))
+        elif typestr == "both":
             # first remove entries for self loops
             mask = F.logical_not(F.equal(src, dst))
             src = F.boolean_mask(src, mask)
@@ -812,10 +839,12 @@ class GraphIndex(ObjectBase):
             x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             dat = F.cat([x, y], dim=0)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ("coo", idx), (n, m))
         else:
-            raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
-        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+            raise DGLError("Invalid incidence matrix type: %s" % str(typestr))
+        shuffle_idx = (
+            utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+        )
         return inc, shuffle_idx
 
     def to_networkx(self):
@@ -902,7 +931,9 @@ class GraphIndex(ObjectBase):
         GraphIndex
             The graph index on the given device context.
         """
-        return _CAPI_DGLImmutableGraphCopyTo(self, ctx.device_type, ctx.device_id)
+        return _CAPI_DGLImmutableGraphCopyTo(
+            self, ctx.device_type, ctx.device_id
+        )
 
     def copyto_shared_mem(self, shared_mem_name):
         """Copy this immutable graph index to shared memory.
@@ -939,7 +970,10 @@ class GraphIndex(ObjectBase):
         int
             The number of bits needed
         """
-        if self.number_of_edges() >= 0x80000000 or self.number_of_nodes() >= 0x80000000:
+        if (
+            self.number_of_edges() >= 0x80000000
+            or self.number_of_nodes() >= 0x80000000
+        ):
             return 64
         else:
             return 32
@@ -961,9 +995,11 @@ class GraphIndex(ObjectBase):
         """
         return _CAPI_DGLImmutableGraphAsNumBits(self, int(bits))
 
-@register_object('graph.Subgraph')
+
+@register_object("graph.Subgraph")
 class SubgraphIndex(ObjectBase):
     """Subgraph data structure"""
+
     @property
     def graph(self):
         """The subgraph structure
@@ -1028,15 +1064,14 @@ def from_coo(num_nodes, src, dst, readonly):
     dst = utils.toindex(dst)
     if readonly:
         gidx = _CAPI_DGLGraphCreate(
-            src.todgltensor(),
-            dst.todgltensor(),
-            int(num_nodes),
-            readonly)
+            src.todgltensor(), dst.todgltensor(), int(num_nodes), readonly
+        )
     else:
         gidx = _CAPI_DGLGraphCreateMutable()
         gidx.add_nodes(num_nodes)
         gidx.add_edges(src, dst)
     return gidx
+
 
 def from_csr(indptr, indices, direction):
     """Load a graph from CSR arrays.
@@ -1058,10 +1093,10 @@ def from_csr(indptr, indices, direction):
     indptr = utils.toindex(indptr)
     indices = utils.toindex(indices)
     gidx = _CAPI_DGLGraphCSRCreate(
-        indptr.todgltensor(),
-        indices.todgltensor(),
-        direction)
+        indptr.todgltensor(), indices.todgltensor(), direction
+    )
     return gidx
+
 
 def from_shared_mem_graph_index(shared_mem_name):
     """Load a graph index from the shared memory.
@@ -1077,6 +1112,7 @@ def from_shared_mem_graph_index(shared_mem_name):
         The graph index
     """
     return _CAPI_DGLGraphCSRCreateMMap(shared_mem_name)
+
 
 def from_networkx(nx_graph, readonly):
     """Convert from networkx graph.
@@ -1107,7 +1143,7 @@ def from_networkx(nx_graph, readonly):
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
     if nx_graph.number_of_edges() > 0:
-        has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
+        has_edge_id = "id" in next(iter(nx_graph.edges(data=True)))[-1]
     else:
         has_edge_id = False
 
@@ -1116,7 +1152,7 @@ def from_networkx(nx_graph, readonly):
         src = np.zeros((num_edges,), dtype=np.int64)
         dst = np.zeros((num_edges,), dtype=np.int64)
         for u, v, attr in nx_graph.edges(data=True):
-            eid = attr['id']
+            eid = attr["id"]
             src[eid] = u
             dst[eid] = v
     else:
@@ -1130,6 +1166,7 @@ def from_networkx(nx_graph, readonly):
     src = utils.toindex(src)
     dst = utils.toindex(dst)
     return from_coo(num_nodes, src, dst, readonly)
+
 
 def from_scipy_sparse_matrix(adj, readonly):
     """Convert from scipy sparse matrix.
@@ -1145,13 +1182,14 @@ def from_scipy_sparse_matrix(adj, readonly):
     GraphIndex
         The graph index.
     """
-    if adj.getformat() != 'csr' or not readonly:
+    if adj.getformat() != "csr" or not readonly:
         num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
         return from_coo(num_nodes, adj_coo.row, adj_coo.col, readonly)
     else:
         # If the input matrix is csr, we still treat it as multigraph.
         return from_csr(adj.indptr, adj.indices, "out")
+
 
 def from_edge_list(elist, readonly):
     """Convert from an edge list.
@@ -1172,6 +1210,7 @@ def from_edge_list(elist, readonly):
     num_nodes = max(src.max(), dst.max()) + 1
     return from_coo(num_nodes, src_ids, dst_ids, readonly)
 
+
 def map_to_subgraph_nid(induced_nodes, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
 
@@ -1188,8 +1227,12 @@ def map_to_subgraph_nid(induced_nodes, parent_nids):
     utils.Index
         Node Ids in the subgraph.
     """
-    return utils.toindex(_CAPI_DGLMapSubgraphNID(induced_nodes.todgltensor(),
-                                                 parent_nids.todgltensor()))
+    return utils.toindex(
+        _CAPI_DGLMapSubgraphNID(
+            induced_nodes.todgltensor(), parent_nids.todgltensor()
+        )
+    )
+
 
 def transform_ids(mapping, ids):
     """Transform ids by the given mapping.
@@ -1206,8 +1249,10 @@ def transform_ids(mapping, ids):
     utils.Index
         The new ids.
     """
-    return utils.toindex(_CAPI_DGLMapSubgraphNID(
-        mapping.todgltensor(), ids.todgltensor()))
+    return utils.toindex(
+        _CAPI_DGLMapSubgraphNID(mapping.todgltensor(), ids.todgltensor())
+    )
+
 
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
@@ -1229,6 +1274,7 @@ def disjoint_union(graphs):
         The disjoint union
     """
     return _CAPI_DGLDisjointUnion(list(graphs))
+
 
 def disjoint_partition(graph, num_or_size_splits):
     """Partition the graph disjointly.
@@ -1252,13 +1298,12 @@ def disjoint_partition(graph, num_or_size_splits):
     """
     if isinstance(num_or_size_splits, utils.Index):
         rst = _CAPI_DGLDisjointPartitionBySizes(
-            graph,
-            num_or_size_splits.todgltensor())
+            graph, num_or_size_splits.todgltensor()
+        )
     else:
-        rst = _CAPI_DGLDisjointPartitionByNum(
-            graph,
-            int(num_or_size_splits))
+        rst = _CAPI_DGLDisjointPartitionByNum(graph, int(num_or_size_splits))
     return rst
+
 
 def create_graph_index(graph_data, readonly):
     """Create a graph index object.
@@ -1289,11 +1334,15 @@ def create_graph_index(graph_data, readonly):
         try:
             gidx = from_networkx(graph_data, readonly)
         except Exception:  # pylint: disable=broad-except
-            raise DGLError('Error while creating graph from input of type "%s".'
-                           % type(graph_data))
+            raise DGLError(
+                'Error while creating graph from input of type "%s".'
+                % type(graph_data)
+            )
         return gidx
+
 
 def _get_halo_subgraph_inner_node(halo_subg):
     return _CAPI_GetHaloSubgraphInnerNodes(halo_subg)
+
 
 _init_api("dgl.graph_index")

@@ -12,14 +12,10 @@ from .graphconv import EdgeWeightNorm
 
 
 class GCN2Conv(nn.Module):
+    r"""Graph Convolutional Network via Initial residual
+    and Identity mapping (GCNII) from `Simple and Deep Graph Convolutional
+    Networks <https://arxiv.org/abs/2007.02133>`__
 
-    r"""
-
-    Description
-    -----------
-    The Graph Convolutional Network via Initial residual
-    and Identity mapping (GCNII) was introduced in `"Simple and Deep Graph Convolutional
-    Networks" <https://arxiv.org/abs/2007.02133>`_ paper.
     It is mathematically is defined as follows:
 
     .. math::
@@ -108,15 +104,17 @@ class GCN2Conv(nn.Module):
 
     """
 
-    def __init__(self,
-                 in_feats,
-                 layer,
-                 alpha=0.1,
-                 lambda_=1,
-                 project_initial_features=True,
-                 allow_zero_in_degree=False,
-                 bias=True,
-                 activation=None):
+    def __init__(
+        self,
+        in_feats,
+        layer,
+        alpha=0.1,
+        lambda_=1,
+        project_initial_features=True,
+        allow_zero_in_degree=False,
+        bias=True,
+        activation=None,
+    ):
         super().__init__()
 
         self._in_feats = in_feats
@@ -135,7 +133,8 @@ class GCN2Conv(nn.Module):
             self.register_parameter("weight2", None)
         else:
             self.weight2 = nn.Parameter(
-                th.Tensor(self._in_feats, self._in_feats))
+                th.Tensor(self._in_feats, self._in_feats)
+            )
 
         if self._bias:
             self.bias = nn.Parameter(th.Tensor(self._in_feats))
@@ -155,7 +154,7 @@ class GCN2Conv(nn.Module):
         nn.init.normal_(self.weight1)
         if not self._project_initial_features:
             nn.init.normal_(self.weight2)
-        if self._bias is not None:
+        if self._bias:
             nn.init.zeros_(self.bias)
 
     def set_allow_zero_in_degree(self, set_value):
@@ -192,7 +191,7 @@ class GCN2Conv(nn.Module):
         edge_weight: torch.Tensor, optional
             edge_weight to use in the message passing process. This is equivalent to
             using weighted adjacency matrix in the equation above, and
-            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            :math:`\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}`
             is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
 
@@ -233,11 +232,11 @@ class GCN2Conv(nn.Module):
 
             # normalize  to get smoothed representation
             if edge_weight is None:
-                degs = graph.in_degrees().float().clamp(min=1)
+                degs = graph.in_degrees().to(feat).clamp(min=1)
                 norm = th.pow(degs, -0.5)
                 norm = norm.to(feat.device).unsqueeze(1)
             else:
-                edge_weight = EdgeWeightNorm('both')(graph, edge_weight)
+                edge_weight = EdgeWeightNorm("both")(graph, edge_weight)
 
             if edge_weight is None:
                 feat = feat * norm
@@ -259,18 +258,30 @@ class GCN2Conv(nn.Module):
             if self._project_initial_features:
                 rst = feat.add_(feat_0)
                 rst = th.addmm(
-                    feat, feat, self.weight1, beta=(1 - self.beta), alpha=self.beta
+                    feat,
+                    feat,
+                    self.weight1,
+                    beta=(1 - self.beta),
+                    alpha=self.beta,
                 )
             else:
                 rst = th.addmm(
-                    feat, feat, self.weight1, beta=(1 - self.beta), alpha=self.beta
+                    feat,
+                    feat,
+                    self.weight1,
+                    beta=(1 - self.beta),
+                    alpha=self.beta,
                 )
                 rst += th.addmm(
-                    feat_0, feat_0, self.weight2, beta=(1 - self.beta), alpha=self.beta
+                    feat_0,
+                    feat_0,
+                    self.weight2,
+                    beta=(1 - self.beta),
+                    alpha=self.beta,
                 )
 
-            if self._bias is not None:
-                rst = rst + self._bias
+            if self._bias:
+                rst = rst + self.bias
 
             if self._activation is not None:
                 rst = self._activation(rst)

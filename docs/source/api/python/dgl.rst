@@ -18,6 +18,7 @@ Operators for constructing :class:`DGLGraph` from raw data formats.
 
     graph
     heterograph
+    from_cugraph
     from_scipy
     from_networkx
     bipartite_from_scipy
@@ -26,8 +27,10 @@ Operators for constructing :class:`DGLGraph` from raw data formats.
     rand_bipartite
     knn_graph
     segmented_knn_graph
+    radius_graph
     create_block
     block_to_graph
+    merge
 
 .. _api-subgraph-extraction:
 
@@ -58,29 +61,61 @@ Operators for generating new graphs by manipulating the structure of the existin
 .. autosummary::
     :toctree: ../../generated/
 
-    add_nodes
     add_edges
-    remove_nodes
-    remove_edges
-    add_self_loop
-    remove_self_loop
+    add_nodes
     add_reverse_edges
-    reverse
-    to_bidirected
-    to_simple
-    to_block
+    add_self_loop
+    adj_product_graph
+    adj_sum_graph
     compact_graphs
+    khop_adj
+    khop_graph
+    knn_graph
+    laplacian_lambda_max
+    laplacian_pe
+    line_graph
+    metapath_reachable_graph
+    metis_partition
+    metis_partition_assignment
+    norm_by_dst
+    partition_graph_with_halo
+    radius_graph
+    random_walk_pe
+    remove_edges
+    remove_nodes
+    remove_self_loop
+    reorder_graph
+    reverse
+    segmented_knn_graph
+    sort_csr_by_tag
+    sort_csc_by_tag
+    to_bidirected
+    to_bidirected_stale
+    to_block
+    to_cugraph
+    to_double
+    to_float
+    to_half
     to_heterogeneous
     to_homogeneous
     to_networkx
-    line_graph
-    khop_graph
-    metapath_reachable_graph
-    adj_product_graph
-    adj_sum_graph
-    reorder_graph
-    sort_csr_by_tag
-    sort_csc_by_tag
+    to_simple
+    to_simple_graph
+
+.. _api-positional-encoding:
+
+Graph Positional Encoding Ops:
+-----------------------------------------
+
+Operators for generating positional encodings of each node.
+
+.. autosummary::
+    :toctree: ../../generated
+
+    random_walk_pe
+    laplacian_pe
+    double_radius_node_labeling
+    shortest_dist
 
 .. _api-partition:
 
@@ -173,7 +208,8 @@ set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` an
 Utilities
 -----------------------------------------------
 
-Other utilities for controlling randomness, saving and loading graphs, etc.
+Other utilities for controlling randomness, saving and loading graphs, setting and getting runtime configurations, functions that applies
+the same function to every elements in a container, etc.
 
 .. autosummary::
     :toctree: ../../generated/
@@ -181,3 +217,6 @@ Other utilities for controlling randomness, saving and loading graphs, etc.
     seed
     save_graphs
     load_graphs
+    apply_each
+    use_libxsmm
+    is_libxsmm_enabled

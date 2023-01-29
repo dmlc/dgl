@@ -1,0 +1,67 @@
+import torch
+import dgl
+import os
+import csv
+
+from dgl.data import AsNodePredDataset
+{{ data_import_code }}
+
+{{ model_code }}
+
+def infer(device, data, model):
+    g = data[0] # Only infer on the first graph
+    g = dgl.remove_self_loop(g)
+    g = dgl.add_self_loop(g)
+    g = g.to(device)
+
+    node_feat = g.ndata.get('feat', None)
+    edge_feat = g.edata.get('feat', None)
+
+    model = model.to(device)
+    model.eval()
+
+    with torch.no_grad():
+        logits = model(g, node_feat, edge_feat)
+
+    return logits
+
+def main():
+    {{ user_cfg_str }}
+
+    device = cfg['device']
+    if not torch.cuda.is_available():
+        device = 'cpu'
+
+    # load data
+    data = AsNodePredDataset({{data_initialize_code}})
+    # validation
+    if cfg['model']['embed_size'] > 0:
+        model_num_nodes = cfg['model']['data_info']['num_nodes']
+        data_num_nodes = data[0].num_nodes()
+        assert model_num_nodes == data_num_nodes, \
+            'Training and inference need to be on the same dataset when node embeddings were learned from scratch'
+    else:
+        model_in_size = cfg['model']['data_info']['in_size']
+        data_in_size = data[0].ndata['feat'].shape[1]
+        assert model_in_size == data_in_size, \
+            'Expect the training data and inference data to have the same number of input node \
+                features, got {:d} and {:d}'.format(model_in_size, data_in_size)
+
+    model = {{ model_class_name }}(**cfg['model'])
+    model.load_state_dict(torch.load(cfg['cpt_path'], map_location='cpu')['model'])
+    logits = infer(device, data, model)
+    pred = logits.argmax(dim=1).cpu()
+
+    # Dump the results
+    os.makedirs(cfg['general_pipeline']["save_path"])
+    file_path = os.path.join(cfg['general_pipeline']["save_path"], 'output.csv')
+    with open(file_path, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(['node id', 'predicted label'])
+        writer.writerows([
+            [i, pred[i].item()] for i in range(len(pred))
+        ])
+    print('Saved inference results to {}'.format(file_path))
+
+if __name__ == '__main__':
+    main()

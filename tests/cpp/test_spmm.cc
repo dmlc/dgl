@@ -4,7 +4,9 @@
 #include <dgl/array.h>
 #include <gtest/gtest.h>
 #include <time.h>
+
 #include <random>
+
 #include "./common.h"
 
 using namespace dgl;
@@ -87,10 +89,10 @@ void CheckResult(T* exp, T* out, T* out_intel_kernel, int dim) {
 template <class ElemWiseUpd>
 ElemWiseUpd* generic_ElemWiseUpd() {
   static std::unique_ptr<ElemWiseUpd> asm_kernel_ptr(
-    (dgl::IntelKernel<>::IsEnabled()) ? new ElemWiseUpd() : nullptr);
+      (dgl::IntelKernel<>::IsEnabled()) ? new ElemWiseUpd() : nullptr);
   ElemWiseUpd* cpu_spec = (asm_kernel_ptr && asm_kernel_ptr->applicable())
-                            ? asm_kernel_ptr.get()
-                            : nullptr;
+                              ? asm_kernel_ptr.get()
+                              : nullptr;
 
   return cpu_spec;
 }
@@ -113,7 +115,7 @@ void _TestSpmmCopyLhs() {
 
     // Calculation of output using intel path - 'out_intel_kernel'
     auto* cpu_spec =
-      generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::CopyLhs<IDX>>>();
+        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::CopyLhs<IDX>>>();
     if (cpu_spec) {
       IDX out_intel_kernel[dim];
       GenerateZeroData(out_intel_kernel, dim);
@@ -149,7 +151,7 @@ void _TestSpmmCopyRhs() {
 
     // Calculation of output using intel path - 'out_intel_kernel'
     auto* cpu_spec =
-      generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::CopyRhs<IDX>>>();
+        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::CopyRhs<IDX>>>();
     if (cpu_spec) {
       IDX out_intel_kernel[dim];
       GenerateZeroData(out_intel_kernel, dim);
@@ -186,7 +188,7 @@ void _TestSpmmAdd() {
 
     // Calculation of output using intel path - 'out_intel_kernel'
     auto* cpu_spec =
-      generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Add<IDX>>>();
+        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Add<IDX>>>();
     if (cpu_spec) {
       IDX out_intel_kernel[dim];
       GenerateZeroData(out_intel_kernel, dim);
@@ -223,7 +225,7 @@ void _TestSpmmSub() {
 
     // Calculation of output using intel path - 'out_intel_kernel'
     auto* cpu_spec =
-      generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Sub<IDX>>>();
+        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Sub<IDX>>>();
     if (cpu_spec) {
       IDX out_intel_kernel[dim];
       GenerateZeroData(out_intel_kernel, dim);
@@ -260,7 +262,7 @@ void _TestSpmmMul() {
 
     // Calculation of output using intel path - 'out_intel_kernel'
     auto* cpu_spec =
-      generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Mul<IDX>>>();
+        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Mul<IDX>>>();
     if (cpu_spec) {
       IDX out_intel_kernel[dim];
       GenerateZeroData(out_intel_kernel, dim);
@@ -297,7 +299,7 @@ void _TestSpmmDiv() {
 
     // Calculation of output using intel path - 'out_intel_kernel'
     auto* cpu_spec =
-      generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Div<IDX>>>();
+        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Div<IDX>>>();
     if (cpu_spec) {
       IDX out_intel_kernel[dim];
       GenerateZeroData(out_intel_kernel, dim);

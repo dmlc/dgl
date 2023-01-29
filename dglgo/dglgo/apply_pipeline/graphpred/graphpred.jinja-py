@@ -1,0 +1,77 @@
+import torch
+import os
+import csv
+
+from tqdm import tqdm
+from dgl.data import AsGraphPredDataset
+from dgl.dataloading import GraphDataLoader
+{{ data_import_code }}
+
+{{ model_code }}
+
+def infer(device, loader, model):
+    model = model.to(device)
+    model.eval()
+    all_pred = []
+
+    with torch.no_grad():
+        for _, (g, labels) in enumerate(tqdm(loader, desc="Iteration")):
+            g = g.to(device)
+            node_feat = g.ndata['feat']
+            edge_feat = g.edata['feat']
+            pred = model(g, node_feat, edge_feat)
+            pred = (pred.sigmoid() >= 0.5).long()
+            all_pred.append(pred)
+
+    return torch.cat(all_pred, dim=0)
+
+def main():
+    {{ user_cfg_str }}
+
+    device = cfg['device']
+    if not torch.cuda.is_available():
+        device = 'cpu'
+    pipeline_cfg = cfg['general_pipeline']
+
+    # load data
+    data = AsGraphPredDataset({{data_initialize_code}})
+    data_loader = GraphDataLoader(data, batch_size=pipeline_cfg['batch_size'],
+                                  num_workers=pipeline_cfg['num_workers'], shuffle=False)
+
+    # validation
+    train_data_name = cfg['model']['data_info']['name']
+    infer_data_name = cfg['data']['name']
+    if train_data_name.startswith('ogbg-mol'):
+        assert infer_data_name.startswith('ogbg-mol'), 'Expect the inference data name to start \
+            with ogbg-mol, got {}'.format(infer_data_name)
+    else:
+        assert train_data_name == infer_data_name, 'Expect the training and inference data to \
+            have the same name, got {} and {}'.format(train_data_name, infer_data_name)
+    model_node_feat_size = cfg['model']['data_info']['node_feat_size']
+    model_edge_feat_size = cfg['model']['data_info']['edge_feat_size']
+    data_node_feat_size = data.node_feat_size
+    data_edge_feat_size = data.edge_feat_size
+    assert model_node_feat_size == data_node_feat_size, 'Expect the training data and inference \
+        data to have the same number of input node features, got {:d} and {:d}'.format(model_node_feat_size, data_node_feat_size)
+    assert model_edge_feat_size == data_edge_feat_size, 'Expect the training data and inference \
+        data to have the same number of input edge features, got {:d} and {:d}'.format(model_edge_feat_size, data_edge_feat_size)
+
+    model = {{ model_class_name }}(**cfg['model'])
+    model.load_state_dict(torch.load(cfg['cpt_path'], map_location='cpu')['model'])
+    pred = infer(device, data_loader, model).detach().cpu()
+
+    # Dump the results
+    os.makedirs(cfg['general_pipeline']["save_path"])
+    file_path = os.path.join(cfg['general_pipeline']["save_path"], 'output.csv')
+    header = ['graph id']
+    header.extend(['task_{:d}'.format(i) for i in range(cfg['model']['data_info']['out_size'])])
+    with open(file_path, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows([
+            [i] + pred[i].tolist() for i in range(len(pred))
+        ])
+    print('Saved inference results to {}'.format(file_path))
+
+if __name__ == '__main__':
+    main()

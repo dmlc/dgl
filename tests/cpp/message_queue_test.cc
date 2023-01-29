@@ -1,18 +1,19 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file msg_queue.cc
- * \brief Message queue for DGL distributed training.
+ * @file msg_queue.cc
+ * @brief Message queue for DGL distributed training.
  */
 #include <gtest/gtest.h>
+
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "../src/rpc/network/msg_queue.h"
 
-using std::string;
 using dgl::network::Message;
 using dgl::network::MessageQueue;
+using std::string;
 
 TEST(MessageQueueTest, AddRemove) {
   MessageQueue queue(5, 1);  // size:5, num_of_producer:1
@@ -50,7 +51,7 @@ TEST(MessageQueueTest, AddRemove) {
   // msg 9
   std::string str_9("666666");
   Message msg_9 = {const_cast<char*>(str_9.data()), 6};
-  EXPECT_EQ(queue.Add(msg_9), MSG_GT_SIZE);      // exceed queue size
+  EXPECT_EQ(queue.Add(msg_9), MSG_GT_SIZE);  // exceed queue size
   // msg 10
   std::string str_10("55555");
   Message msg_10 = {const_cast<char*>(str_10.data()), 5};
@@ -92,7 +93,7 @@ TEST(MessageQueueTest, MultiThread) {
   for (int i = 0; i < kNumOfProducer; ++i) {
     thread_pool.push_back(new std::thread(start_add, &queue, i));
   }
-  for (int i = 0; i < kNumOfProducer*kNumOfMessage; ++i) {
+  for (int i = 0; i < kNumOfProducer * kNumOfMessage; ++i) {
     Message msg;
     EXPECT_EQ(queue.Remove(&msg), REMOVE_SUCCESS);
     EXPECT_EQ(string(msg.data, msg.size), string("apple"));

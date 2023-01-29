@@ -72,21 +72,21 @@ MFGs.
 
 -  Obtain the features for output nodes from the input features by
    slicing the first few rows. The number of rows can be obtained by
-   :meth:`block.number_of_dst_nodes <dgl.DGLHeteroGraph.number_of_dst_nodes>`.
+   :meth:`block.number_of_dst_nodes <dgl.DGLGraph.number_of_dst_nodes>`.
 -  Replace
-   :attr:`g.ndata <dgl.DGLHeteroGraph.ndata>` with either
-   :attr:`block.srcdata <dgl.DGLHeteroGraph.srcdata>` for features on input nodes or
-   :attr:`block.dstdata <dgl.DGLHeteroGraph.dstdata>` for features on output nodes, if
+   :attr:`g.ndata <dgl.DGLGraph.ndata>` with either
+   :attr:`block.srcdata <dgl.DGLGraph.srcdata>` for features on input nodes or
+   :attr:`block.dstdata <dgl.DGLGraph.dstdata>` for features on output nodes, if
    the original graph has only one node type.
 -  Replace
-   :attr:`g.nodes <dgl.DGLHeteroGraph.nodes>` with either
-   :attr:`block.srcnodes <dgl.DGLHeteroGraph.srcnodes>` for features on input nodes or
-   :attr:`block.dstnodes <dgl.DGLHeteroGraph.dstnodes>` for features on output nodes,
+   :attr:`g.nodes <dgl.DGLGraph.nodes>` with either
+   :attr:`block.srcnodes <dgl.DGLGraph.srcnodes>` for features on input nodes or
+   :attr:`block.dstnodes <dgl.DGLGraph.dstnodes>` for features on output nodes,
    if the original graph has multiple node types.
 -  Replace
-   :meth:`g.number_of_nodes <dgl.DGLHeteroGraph.number_of_nodes>` with either
-   :meth:`block.number_of_src_nodes <dgl.DGLHeteroGraph.number_of_src_nodes>` or
-   :meth:`block.number_of_dst_nodes <dgl.DGLHeteroGraph.number_of_dst_nodes>` for the number of
+   :meth:`g.number_of_nodes <dgl.DGLGraph.number_of_nodes>` with either
+   :meth:`block.number_of_src_nodes <dgl.DGLGraph.number_of_src_nodes>` or
+   :meth:`block.number_of_dst_nodes <dgl.DGLGraph.number_of_dst_nodes>` for the number of
    input nodes or output nodes respectively.
 
 Heterogeneous graphs

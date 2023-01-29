@@ -7,16 +7,12 @@ from torch.nn import init
 from .... import function as fn
 from ....base import DGLError
 from ....utils import expand_as_pair
-from ....transform import reverse
+from ....transforms import reverse
 from ....convert import block_to_graph
 from ....heterograph import DGLBlock
 
 class EdgeWeightNorm(nn.Module):
-    r"""
-
-    Description
-    -----------
-    This module normalizes positive scalar edge weights on a graph
+    r"""This module normalizes positive scalar edge weights on a graph
     following the form in `GCN <https://arxiv.org/abs/1609.02907>`__.
 
     Mathematically, setting ``norm='both'`` yields the following normalization term:
@@ -111,20 +107,23 @@ class EdgeWeightNorm(nn.Module):
                                'This leads to square root of zero or negative values.')
 
             dev = graph.device
-            graph.srcdata['_src_out_w'] = th.ones((graph.number_of_src_nodes())).float().to(dev)
-            graph.dstdata['_dst_in_w'] = th.ones((graph.number_of_dst_nodes())).float().to(dev)
+            dtype = edge_weight.dtype
+            graph.srcdata['_src_out_w'] = th.ones(
+                graph.number_of_src_nodes(), dtype=dtype, device=dev)
+            graph.dstdata['_dst_in_w'] = th.ones(
+                graph.number_of_dst_nodes(), dtype=dtype, device=dev)
             graph.edata['_edge_w'] = edge_weight
 
             if self._norm == 'both':
                 reversed_g = reverse(graph)
                 reversed_g.edata['_edge_w'] = edge_weight
-                reversed_g.update_all(fn.copy_edge('_edge_w', 'm'), fn.sum('m', 'out_weight'))
+                reversed_g.update_all(fn.copy_e('_edge_w', 'm'), fn.sum('m', 'out_weight'))
                 degs = reversed_g.dstdata['out_weight'] + self._eps
                 norm = th.pow(degs, -0.5)
                 graph.srcdata['_src_out_w'] = norm
 
             if self._norm != 'none':
-                graph.update_all(fn.copy_edge('_edge_w', 'm'), fn.sum('m', 'in_weight'))
+                graph.update_all(fn.copy_e('_edge_w', 'm'), fn.sum('m', 'in_weight'))
                 degs = graph.dstdata['in_weight'] + self._eps
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)
@@ -139,12 +138,10 @@ class EdgeWeightNorm(nn.Module):
 
 # pylint: disable=W0235
 class GraphConv(nn.Module):
-    r"""
+    r"""Graph convolutional layer from `Semi-Supervised Classification with Graph Convolutional
+    Networks <https://arxiv.org/abs/1609.02907>`__
 
-    Description
-    -----------
-    Graph convolution was introduced in `GCN <https://arxiv.org/abs/1609.02907>`__
-    and mathematically is defined as follows:
+    Mathematically it is defined as follows:
 
     .. math::
       h_i^{(l+1)} = \sigma(b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{1}{c_{ji}}h_j^{(l)}W^{(l)})
@@ -395,7 +392,7 @@ class GraphConv(nn.Module):
                                    'the issue. Setting ``allow_zero_in_degree`` '
                                    'to be `True` when constructing this module will '
                                    'suppress the check and let the code run.')
-            aggregate_fn = fn.copy_src('h', 'm')
+            aggregate_fn = fn.copy_u('h', 'm')
             if edge_weight is not None:
                 assert edge_weight.shape[0] == graph.number_of_edges()
                 graph.edata['_edge_weight'] = edge_weight
@@ -404,7 +401,7 @@ class GraphConv(nn.Module):
             # (BarclayII) For RGCN on heterogeneous graphs we need to support GCN on bipartite.
             feat_src, feat_dst = expand_as_pair(feat, graph)
             if self._norm in ['left', 'both']:
-                degs = graph.out_degrees().float().clamp(min=1)
+                degs = graph.out_degrees().to(feat_src).clamp(min=1)
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)
                 else:
@@ -437,7 +434,7 @@ class GraphConv(nn.Module):
                     rst = th.matmul(rst, weight)
 
             if self._norm in ['right', 'both']:
-                degs = graph.in_degrees().float().clamp(min=1)
+                degs = graph.in_degrees().to(feat_dst).clamp(min=1)
                 if self._norm == 'both':
                     norm = th.pow(degs, -0.5)
                 else:

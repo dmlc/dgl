@@ -2,22 +2,27 @@
 # pylint: disable=unused-import
 from __future__ import absolute_import
 
-from numbers import Number, Integral
+from numbers import Integral, Number
+
 from .. import _api_internal
 from .base import string_types
 
 # Object base class
 _CLASS_OBJECT_BASE = None
 
+
 def _set_class_object_base(cls):
     global _CLASS_OBJECT_BASE
     _CLASS_OBJECT_BASE = cls
 
+
 class ObjectGeneric(object):
     """Base class for all classes that can be converted to object."""
+
     def asobject(self):
         """Convert value to object"""
         raise NotImplementedError()
+
 
 def convert_to_object(value):
     """Convert a python value to corresponding object type.
@@ -40,9 +45,12 @@ def convert_to_object(value):
     if isinstance(value, dict):
         vlist = []
         for item in value.items():
-            if (not isinstance(item[0], _CLASS_OBJECT_BASE) and
-                    not isinstance(item[0], string_types)):
-                raise ValueError("key of map must already been a container type")
+            if not isinstance(item[0], _CLASS_OBJECT_BASE) and not isinstance(
+                item[0], string_types
+            ):
+                raise ValueError(
+                    "key of map must already been a container type"
+                )
             vlist.append(item[0])
             vlist.append(convert_to_object(item[1]))
         return _api_internal._Map(*vlist)

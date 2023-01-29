@@ -88,7 +88,7 @@ class RelGraphConvLayer(nn.Module):
 
         Parameters
         ----------
-        g : DGLHeteroGraph
+        g : DGLGraph
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.
@@ -164,14 +164,14 @@ class RelGraphEmbed(nn.Module):
 
         Parameters
         ----------
-        block : DGLHeteroGraph, optional
+        block : DGLGraph, optional
             If not specified, directly return the full graph with embeddings stored in
             :attr:`embed_name`. Otherwise, extract and store the embeddings to the block
             graph and return.
 
         Returns
         -------
-        DGLHeteroGraph
+        DGLGraph
             The block graph fed with embeddings.
         """
         embeds = {}
@@ -228,15 +228,12 @@ class EntityClassify(nn.Module):
         return h
 
 @utils.benchmark('time', 600)
-@utils.parametrize('data', ['am', 'ogbn-mag'])
+@utils.parametrize('data', ['ogbn-mag'])
 def track_time(data):
     dataset = utils.process_data(data)
     device = utils.get_bench_device()
 
-    if data == 'am':
-        n_bases = 40
-        l2norm = 5e-4
-    elif data == 'ogbn-mag':
+    if data == 'ogbn-mag':
         n_bases = 2
         l2norm = 0
     else:
@@ -249,6 +246,8 @@ def track_time(data):
     dropout = 0.5
     use_self_loop = True
     lr = 0.01
+    iter_start = 3
+    iter_count = 10
 
     hg = dataset[0]
     category = dataset.predict_category
@@ -279,26 +278,9 @@ def track_time(data):
     sparse_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler([fanout] * n_layers)
-    loader = dgl.dataloading.NodeDataLoader(
+    loader = dgl.dataloading.DataLoader(
         hg, {category: train_idx}, sampler,
         batch_size=batch_size, shuffle=True, num_workers=4)
-
-    # dry run
-    for i, (input_nodes, seeds, blocks) in enumerate(loader):
-        blocks = [blk.to(device) for blk in blocks]
-        seeds = seeds[category]     # we only predict the nodes with type "category"
-        batch_tic = time.time()
-        emb = embed_layer(blocks[0])
-        lbl = labels[seeds].to(device)
-        emb = {k : e.to(device) for k, e in emb.items()}
-        logits = model(emb, blocks)[category]
-        loss = F.cross_entropy(logits, lbl)
-        loss.backward()
-        optimizer.step()
-        sparse_optimizer.step()
-
-        if i >= 3:
-            break
 
     print("start training...")
     model.train()
@@ -306,23 +288,27 @@ def track_time(data):
     optimizer.zero_grad()
     sparse_optimizer.zero_grad()
 
-    t0 = time.time()
-    for i, (input_nodes, seeds, blocks) in enumerate(loader):
-        blocks = [blk.to(device) for blk in blocks]
-        seeds = seeds[category]     # we only predict the nodes with type "category"
-        batch_tic = time.time()
-        emb = embed_layer(blocks[0])
-        lbl = labels[seeds].to(device)
-        emb = {k : e.to(device) for k, e in emb.items()}
-        logits = model(emb, blocks)[category]
-        loss = F.cross_entropy(logits, lbl)
-        loss.backward()
-        optimizer.step()
-        sparse_optimizer.step()
+    # Enable dataloader cpu affinitization for cpu devices (no effect on gpu)
+    with loader.enable_cpu_affinity():
+        for step, (input_nodes, seeds, blocks) in enumerate(loader):
+            blocks = [blk.to(device) for blk in blocks]
+            seeds = seeds[category]     # we only predict the nodes with type "category"
+            batch_tic = time.time()
+            emb = embed_layer(blocks[0])
+            lbl = labels[seeds].to(device)
+            emb = {k : e.to(device) for k, e in emb.items()}
+            logits = model(emb, blocks)[category]
+            loss = F.cross_entropy(logits, lbl)
+            loss.backward()
+            optimizer.step()
+            sparse_optimizer.step()
 
-        if i >= 9:  # time 10 loops
-            break
+            # start timer at before iter_start
+            if step == iter_start - 1:
+                t0 = time.time()
+            elif step == iter_count + iter_start - 1:  # time iter_count iterations
+                break
 
     t1 = time.time()
 
-    return (t1 - t0) / (i + 1)
+    return (t1 - t0) / iter_count

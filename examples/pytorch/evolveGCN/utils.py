@@ -31,18 +31,24 @@ class Measure(object):
 
     def reset_info(self):
         """
-            reset info after each epoch.
+        reset info after each epoch.
         """
-        self.true_positives = {cur_class: [] for cur_class in range(self.num_classes)}
-        self.false_positives = {cur_class: [] for cur_class in range(self.num_classes)}
-        self.false_negatives = {cur_class: [] for cur_class in range(self.num_classes)}
+        self.true_positives = {
+            cur_class: [] for cur_class in range(self.num_classes)
+        }
+        self.false_positives = {
+            cur_class: [] for cur_class in range(self.num_classes)
+        }
+        self.false_negatives = {
+            cur_class: [] for cur_class in range(self.num_classes)
+        }
 
     def append_measures(self, predictions, labels):
         predicted_classes = predictions.argmax(dim=1)
         for cl in range(self.num_classes):
-            cl_indices = (labels == cl)
-            pos = (predicted_classes == cl)
-            hits = (predicted_classes[cl_indices] == labels[cl_indices])
+            cl_indices = labels == cl
+            pos = predicted_classes == cl
+            hits = predicted_classes[cl_indices] == labels[cl_indices]
 
             tp = hits.sum()
             fn = hits.size(0) - tp

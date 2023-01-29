@@ -1,18 +1,21 @@
 """Views of DGLGraph."""
 from __future__ import absolute_import
 
-from collections import namedtuple, defaultdict
+from collections import defaultdict, namedtuple
 from collections.abc import MutableMapping
 
-from .base import ALL, DGLError
 from . import backend as F
+from .base import ALL, DGLError
+from .frame import LazyFeature
 
-NodeSpace = namedtuple('NodeSpace', ['data'])
-EdgeSpace = namedtuple('EdgeSpace', ['data'])
+NodeSpace = namedtuple("NodeSpace", ["data"])
+EdgeSpace = namedtuple("EdgeSpace", ["data"])
+
 
 class HeteroNodeView(object):
-    """A NodeView class to act as G.nodes for a DGLHeteroGraph."""
-    __slots__ = ['_graph', '_typeid_getter']
+    """A NodeView class to act as G.nodes for a DGLGraph."""
+
+    __slots__ = ["_graph", "_typeid_getter"]
 
     def __init__(self, graph, typeid_getter):
         self._graph = graph
@@ -21,8 +24,9 @@ class HeteroNodeView(object):
     def __getitem__(self, key):
         if isinstance(key, slice):
             # slice
-            if not (key.start is None and key.stop is None
-                    and key.step is None):
+            if not (
+                key.start is None and key.stop is None and key.step is None
+            ):
                 raise DGLError('Currently only full slice ":" is supported')
             nodes = ALL
             ntype = None
@@ -35,18 +39,26 @@ class HeteroNodeView(object):
             nodes = key
             ntype = None
         ntid = self._typeid_getter(ntype)
-        return NodeSpace(data=HeteroNodeDataView(self._graph, ntype, ntid, nodes))
+        return NodeSpace(
+            data=HeteroNodeDataView(self._graph, ntype, ntid, nodes)
+        )
 
     def __call__(self, ntype=None):
         """Return the nodes."""
         ntid = self._typeid_getter(ntype)
-        ret = F.arange(0, self._graph._graph.number_of_nodes(ntid),
-                       dtype=self._graph.idtype, ctx=self._graph.device)
+        ret = F.arange(
+            0,
+            self._graph._graph.number_of_nodes(ntid),
+            dtype=self._graph.idtype,
+            ctx=self._graph.device,
+        )
         return ret
+
 
 class HeteroNodeDataView(MutableMapping):
     """The data view class when G.ndata[ntype] is called."""
-    __slots__ = ['_graph', '_ntype', '_ntid', '_nodes']
+
+    __slots__ = ["_graph", "_ntype", "_ntid", "_nodes"]
 
     def __init__(self, graph, ntype, ntid, nodes):
         self._graph = graph
@@ -58,7 +70,9 @@ class HeteroNodeDataView(MutableMapping):
         if isinstance(self._ntype, list):
             ret = {}
             for (i, ntype) in enumerate(self._ntype):
-                value = self._graph._get_n_repr(self._ntid[i], self._nodes).get(key, None)
+                value = self._graph._get_n_repr(self._ntid[i], self._nodes).get(
+                    key, None
+                )
                 if value is not None:
                     ret[ntype] = value
             return ret
@@ -66,19 +80,23 @@ class HeteroNodeDataView(MutableMapping):
             return self._graph._get_n_repr(self._ntid, self._nodes)[key]
 
     def __setitem__(self, key, val):
-        if isinstance(self._ntype, list):
-            assert isinstance(val, dict), \
-                'Current HeteroNodeDataView has multiple node types, ' \
-                'please passing the node type and the corresponding data through a dict.'
+        if isinstance(val, LazyFeature):
+            self._graph._node_frames[self._ntid][key] = val
+        elif isinstance(self._ntype, list):
+            assert isinstance(val, dict), (
+                "Current HeteroNodeDataView has multiple node types, "
+                "please passing the node type and the corresponding data through a dict."
+            )
 
             for (ntype, data) in val.items():
                 ntid = self._graph.get_ntype_id(ntype)
-                self._graph._set_n_repr(ntid, self._nodes, {key : data})
+                self._graph._set_n_repr(ntid, self._nodes, {key: data})
         else:
-            assert isinstance(val, dict) is False, \
-                'The HeteroNodeDataView has only one node type. ' \
-                'please pass a tensor directly'
-            self._graph._set_n_repr(self._ntid, self._nodes, {key : val})
+            assert isinstance(val, dict) is False, (
+                "The HeteroNodeDataView has only one node type. "
+                "please pass a tensor directly"
+            )
+            self._graph._set_n_repr(self._ntid, self._nodes, {key: val})
 
     def __delitem__(self, key):
         if isinstance(self._ntype, list):
@@ -89,40 +107,42 @@ class HeteroNodeDataView(MutableMapping):
         else:
             self._graph._pop_n_repr(self._ntid, key)
 
-    def __len__(self):
-        assert isinstance(self._ntype, list) is False, \
-            'Current HeteroNodeDataView has multiple node types, ' \
-            'can not support len().'
-        return len(self._graph._node_frames[self._ntid])
-
-    def __iter__(self):
-        assert isinstance(self._ntype, list) is False, \
-            'Current HeteroNodeDataView has multiple node types, ' \
-            'can not be iterated.'
-        return iter(self._graph._node_frames[self._ntid])
-
-    def keys(self):
-        return self._graph._node_frames[self._ntid].keys()
-
-    def values(self):
-        return self._graph._node_frames[self._ntid].values()
-
-    def __repr__(self):
+    def _transpose(self, as_dict=False):
         if isinstance(self._ntype, list):
             ret = defaultdict(dict)
             for (i, ntype) in enumerate(self._ntype):
                 data = self._graph._get_n_repr(self._ntid[i], self._nodes)
                 for key in self._graph._node_frames[self._ntid[i]]:
                     ret[key][ntype] = data[key]
-            return repr(ret)
         else:
-            data = self._graph._get_n_repr(self._ntid, self._nodes)
-            return repr({key : data[key]
-                         for key in self._graph._node_frames[self._ntid]})
+            ret = self._graph._get_n_repr(self._ntid, self._nodes)
+            if as_dict:
+                ret = {
+                    key: ret[key]
+                    for key in self._graph._node_frames[self._ntid]
+                }
+        return ret
+
+    def __len__(self):
+        return len(self._transpose())
+
+    def __iter__(self):
+        return iter(self._transpose())
+
+    def keys(self):
+        return self._transpose().keys()
+
+    def values(self):
+        return self._transpose().values()
+
+    def __repr__(self):
+        return repr(self._transpose(as_dict=True))
+
 
 class HeteroEdgeView(object):
-    """A EdgeView class to act as G.edges for a DGLHeteroGraph."""
-    __slots__ = ['_graph']
+    """A EdgeView class to act as G.edges for a DGLGraph."""
+
+    __slots__ = ["_graph"]
 
     def __init__(self, graph):
         self._graph = graph
@@ -130,8 +150,9 @@ class HeteroEdgeView(object):
     def __getitem__(self, key):
         if isinstance(key, slice):
             # slice
-            if not (key.start is None and key.stop is None
-                    and key.step is None):
+            if not (
+                key.start is None and key.stop is None and key.step is None
+            ):
                 raise DGLError('Currently only full slice ":" is supported')
             edges = ALL
             etype = None
@@ -157,23 +178,29 @@ class HeteroEdgeView(object):
         """Return all the edges."""
         return self._graph.all_edges(*args, **kwargs)
 
+
 class HeteroEdgeDataView(MutableMapping):
     """The data view class when G.edata[etype] is called."""
-    __slots__ = ['_graph', '_etype', '_etid', '_edges']
+
+    __slots__ = ["_graph", "_etype", "_etid", "_edges"]
 
     def __init__(self, graph, etype, edges):
         self._graph = graph
         self._etype = etype
-        self._etid = [self._graph.get_etype_id(t) for t in etype] \
-                     if isinstance(etype, list) \
-                     else self._graph.get_etype_id(etype)
+        self._etid = (
+            [self._graph.get_etype_id(t) for t in etype]
+            if isinstance(etype, list)
+            else self._graph.get_etype_id(etype)
+        )
         self._edges = edges
 
     def __getitem__(self, key):
         if isinstance(self._etype, list):
             ret = {}
             for (i, etype) in enumerate(self._etype):
-                value = self._graph._get_e_repr(self._etid[i], self._edges).get(key, None)
+                value = self._graph._get_e_repr(self._etid[i], self._edges).get(
+                    key, None
+                )
                 if value is not None:
                     ret[etype] = value
             return ret
@@ -181,19 +208,23 @@ class HeteroEdgeDataView(MutableMapping):
             return self._graph._get_e_repr(self._etid, self._edges)[key]
 
     def __setitem__(self, key, val):
-        if isinstance(self._etype, list):
-            assert isinstance(val, dict), \
-                'Current HeteroEdgeDataView has multiple edge types, ' \
-                'please pass the edge type and the corresponding data through a dict.'
+        if isinstance(val, LazyFeature):
+            self._graph._edge_frames[self._etid][key] = val
+        elif isinstance(self._etype, list):
+            assert isinstance(val, dict), (
+                "Current HeteroEdgeDataView has multiple edge types, "
+                "please pass the edge type and the corresponding data through a dict."
+            )
 
             for (etype, data) in val.items():
                 etid = self._graph.get_etype_id(etype)
-                self._graph._set_e_repr(etid, self._edges, {key : data})
+                self._graph._set_e_repr(etid, self._edges, {key: data})
         else:
-            assert isinstance(val, dict) is False, \
-                'The HeteroEdgeDataView has only one edge type. ' \
-                'please pass a tensor directly'
-            self._graph._set_e_repr(self._etid, self._edges, {key : val})
+            assert isinstance(val, dict) is False, (
+                "The HeteroEdgeDataView has only one edge type. "
+                "please pass a tensor directly"
+            )
+            self._graph._set_e_repr(self._etid, self._edges, {key: val})
 
     def __delitem__(self, key):
         if isinstance(self._etype, list):
@@ -204,33 +235,33 @@ class HeteroEdgeDataView(MutableMapping):
         else:
             self._graph._pop_e_repr(self._etid, key)
 
-    def __len__(self):
-        assert isinstance(self._etype, list) is False, \
-            'Current HeteroEdgeDataView has multiple edge types, ' \
-            'can not support len().'
-        return len(self._graph._edge_frames[self._etid])
-
-    def __iter__(self):
-        assert isinstance(self._etype, list) is False, \
-            'Current HeteroEdgeDataView has multiple edge types, ' \
-            'can not be iterated.'
-        return iter(self._graph._edge_frames[self._etid])
-
-    def keys(self):
-        return self._graph._edge_frames[self._etid].keys()
-
-    def values(self):
-        return self._graph._edge_frames[self._etid].values()
-
-    def __repr__(self):
+    def _transpose(self, as_dict=False):
         if isinstance(self._etype, list):
             ret = defaultdict(dict)
             for (i, etype) in enumerate(self._etype):
                 data = self._graph._get_e_repr(self._etid[i], self._edges)
                 for key in self._graph._edge_frames[self._etid[i]]:
                     ret[key][etype] = data[key]
-            return repr(ret)
         else:
-            data = self._graph._get_e_repr(self._etid, self._edges)
-            return repr({key : data[key]
-                         for key in self._graph._edge_frames[self._etid]})
+            ret = self._graph._get_e_repr(self._etid, self._edges)
+            if as_dict:
+                ret = {
+                    key: ret[key]
+                    for key in self._graph._edge_frames[self._etid]
+                }
+        return ret
+
+    def __len__(self):
+        return len(self._transpose())
+
+    def __iter__(self):
+        return iter(self._transpose())
+
+    def keys(self):
+        return self._transpose().keys()
+
+    def values(self):
+        return self._transpose().values()
+
+    def __repr__(self):
+        return repr(self._transpose(as_dict=True))

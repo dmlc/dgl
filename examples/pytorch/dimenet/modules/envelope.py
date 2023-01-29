@@ -1,9 +1,11 @@
 import torch.nn as nn
 
+
 class Envelope(nn.Module):
     """
     Envelope function that ensures a smooth cutoff
     """
+
     def __init__(self, exponent):
         super(Envelope, self).__init__()
 
@@ -11,7 +13,7 @@ class Envelope(nn.Module):
         self.a = -(self.p + 1) * (self.p + 2) / 2
         self.b = self.p * (self.p + 2)
         self.c = -self.p * (self.p + 1) / 2
-    
+
     def forward(self, x):
         # Envelope function divided by r
         x_p_0 = x.pow(self.p - 1)

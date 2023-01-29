@@ -8,14 +8,10 @@ from ....utils import expand_as_pair
 
 
 class EdgeConv(nn.Module):
-    r"""
+    r"""EdgeConv layer from `Dynamic Graph CNN for Learning on Point Clouds
+    <https://arxiv.org/pdf/1801.07829>`__
 
-    Description
-    -----------
-    EdgeConv layer.
-
-    Introduced in "`Dynamic Graph CNN for Learning on Point Clouds
-    <https://arxiv.org/pdf/1801.07829>`__".  Can be described as follows:
+    It can be described as follows:
 
     .. math::
        h_i^{(l+1)} = \max_{j \in \mathcal{N}(i)} (
@@ -85,7 +81,7 @@ class EdgeConv(nn.Module):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     >>> u_fea = th.rand(2, 5)
     >>> v_fea = th.rand(4, 5)
     >>> conv = EdgeConv(5, 2, 3)

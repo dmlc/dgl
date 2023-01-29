@@ -2,21 +2,25 @@
 # <https://github.com/xiangwang1223/neural_graph_collaborative_filtering/blob/master/NGCF/utility/batch_test.py>.
 # It implements the batch test.
 
-import utility.metrics as metrics
-from utility.parser import parse_args
-from utility.load_data import *
-import multiprocessing
 import heapq
+import multiprocessing
+
+import utility.metrics as metrics
+from utility.load_data import *
+from utility.parser import parse_args
 
 cores = multiprocessing.cpu_count()
 
 args = parse_args()
 Ks = eval(args.Ks)
 
-data_generator = Data(path=args.data_path + args.dataset, batch_size=args.batch_size)
+data_generator = Data(
+    path=args.data_path + args.dataset, batch_size=args.batch_size
+)
 USR_NUM, ITEM_NUM = data_generator.n_users, data_generator.n_items
 N_TRAIN, N_TEST = data_generator.n_train, data_generator.n_test
 BATCH_SIZE = args.batch_size
+
 
 def ranklist_by_heapq(user_pos_test, test_items, rating, Ks):
     item_score = {}
@@ -32,8 +36,9 @@ def ranklist_by_heapq(user_pos_test, test_items, rating, Ks):
             r.append(1)
         else:
             r.append(0)
-    auc = 0.
+    auc = 0.0
     return r, auc
+
 
 def get_auc(item_score, user_pos_test):
     item_score = sorted(item_score.items(), key=lambda kv: kv[1])
@@ -49,6 +54,7 @@ def get_auc(item_score, user_pos_test):
             r.append(0)
     auc = metrics.auc(ground_truth=r, prediction=posterior)
     return auc
+
 
 def ranklist_by_sorted(user_pos_test, test_items, rating, Ks):
     item_score = {}
@@ -67,6 +73,7 @@ def ranklist_by_sorted(user_pos_test, test_items, rating, Ks):
     auc = get_auc(item_score, user_pos_test)
     return r, auc
 
+
 def get_performance(user_pos_test, r, auc, Ks):
     precision, recall, ndcg, hit_ratio = [], [], [], []
 
@@ -76,28 +83,33 @@ def get_performance(user_pos_test, r, auc, Ks):
         ndcg.append(metrics.ndcg_at_k(r, K))
         hit_ratio.append(metrics.hit_at_k(r, K))
 
-    return {'recall': np.array(recall), 'precision': np.array(precision),
-            'ndcg': np.array(ndcg), 'hit_ratio': np.array(hit_ratio), 'auc': auc}
+    return {
+        "recall": np.array(recall),
+        "precision": np.array(precision),
+        "ndcg": np.array(ndcg),
+        "hit_ratio": np.array(hit_ratio),
+        "auc": auc,
+    }
 
 
 def test_one_user(x):
     # user u's ratings for user u
     rating = x[0]
-    #uid
+    # uid
     u = x[1]
-    #user u's items in the training set
+    # user u's items in the training set
     try:
         training_items = data_generator.train_items[u]
     except Exception:
         training_items = []
-    #user u's items in the test set
+    # user u's items in the test set
     user_pos_test = data_generator.test_set[u]
 
     all_items = set(range(ITEM_NUM))
 
     test_items = list(all_items - set(training_items))
 
-    if args.test_flag == 'part':
+    if args.test_flag == "part":
         r, auc = ranklist_by_heapq(user_pos_test, test_items, rating, Ks)
     else:
         r, auc = ranklist_by_sorted(user_pos_test, test_items, rating, Ks)
@@ -106,8 +118,13 @@ def test_one_user(x):
 
 
 def test(model, g, users_to_test, batch_test_flag=False):
-    result = {'precision': np.zeros(len(Ks)), 'recall': np.zeros(len(Ks)), 'ndcg': np.zeros(len(Ks)),
-              'hit_ratio': np.zeros(len(Ks)), 'auc': 0.}
+    result = {
+        "precision": np.zeros(len(Ks)),
+        "recall": np.zeros(len(Ks)),
+        "ndcg": np.zeros(len(Ks)),
+        "hit_ratio": np.zeros(len(Ks)),
+        "auc": 0.0,
+    }
 
     pool = multiprocessing.Pool(cores)
 
@@ -124,7 +141,7 @@ def test(model, g, users_to_test, batch_test_flag=False):
         start = u_batch_id * u_batch_size
         end = (u_batch_id + 1) * u_batch_size
 
-        user_batch = test_users[start: end]
+        user_batch = test_users[start:end]
 
         if batch_test_flag:
             # batch-item test
@@ -138,10 +155,16 @@ def test(model, g, users_to_test, batch_test_flag=False):
 
                 item_batch = range(i_start, i_end)
 
-                u_g_embeddings, pos_i_g_embeddings, _ = model(g, 'user', 'item',user_batch, item_batch, [])
-                i_rate_batch = model.rating(u_g_embeddings, pos_i_g_embeddings).detach().cpu()
+                u_g_embeddings, pos_i_g_embeddings, _ = model(
+                    g, "user", "item", user_batch, item_batch, []
+                )
+                i_rate_batch = (
+                    model.rating(u_g_embeddings, pos_i_g_embeddings)
+                    .detach()
+                    .cpu()
+                )
 
-                rate_batch[:, i_start: i_end] = i_rate_batch
+                rate_batch[:, i_start:i_end] = i_rate_batch
                 i_count += i_rate_batch.shape[1]
 
             assert i_count == ITEM_NUM
@@ -149,20 +172,23 @@ def test(model, g, users_to_test, batch_test_flag=False):
         else:
             # all-item test
             item_batch = range(ITEM_NUM)
-            u_g_embeddings, pos_i_g_embeddings, _ = model(g, 'user', 'item',user_batch, item_batch, [])
-            rate_batch = model.rating(u_g_embeddings, pos_i_g_embeddings).detach().cpu()
+            u_g_embeddings, pos_i_g_embeddings, _ = model(
+                g, "user", "item", user_batch, item_batch, []
+            )
+            rate_batch = (
+                model.rating(u_g_embeddings, pos_i_g_embeddings).detach().cpu()
+            )
 
         user_batch_rating_uid = zip(rate_batch.numpy(), user_batch)
         batch_result = pool.map(test_one_user, user_batch_rating_uid)
         count += len(batch_result)
 
         for re in batch_result:
-            result['precision'] += re['precision']/n_test_users
-            result['recall'] += re['recall']/n_test_users
-            result['ndcg'] += re['ndcg']/n_test_users
-            result['hit_ratio'] += re['hit_ratio']/n_test_users
-            result['auc'] += re['auc']/n_test_users
-
+            result["precision"] += re["precision"] / n_test_users
+            result["recall"] += re["recall"] / n_test_users
+            result["ndcg"] += re["ndcg"] / n_test_users
+            result["hit_ratio"] += re["hit_ratio"] / n_test_users
+            result["auc"] += re["auc"] / n_test_users
 
     assert count == n_test_users
     pool.close()

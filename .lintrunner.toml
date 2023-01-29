@@ -1,0 +1,56 @@
+# Black + usort
+[[linter]]
+code = 'UFMT'
+include_patterns = [
+    '**/*.py',
+]
+command = [
+    'python3',
+    'tests/lint/ufmt_linter.py',
+    '--',
+    '@{{PATHSFILE}}'
+]
+exclude_patterns = [
+    '.github/*',
+    'build/*',
+    'cmake/*',
+    'conda/*',
+    'docker/*',
+    'third_party/*',
+]
+init_command = [
+    'python3',
+    'tests/lint/pip_init.py',
+    '--dry-run={{DRYRUN}}',
+    'black==22.10.0',
+    'ufmt==2.0.1',
+    'usort==1.0.5',
+]
+is_formatter = true
+
+[[linter]]
+code = 'CLANGFORMAT'
+include_patterns = [
+    '**/*.h',
+    '**/*.c',
+    '**/*.cc',
+    '**/*.cpp',
+    '**/*.cuh',
+    '**/*.cu',
+]
+exclude_patterns = [
+]
+init_command = [
+    'python3',
+    'tests/lint/pip_init.py',
+    '--dry-run={{DRYRUN}}',
+    'clang-format==15.0.4',
+]
+command = [
+    'python3',
+    'tests/lint/clangformat_linter.py',
+    '--binary=clang-format',
+    '--',
+    '@{{PATHSFILE}}'
+]
+is_formatter = true

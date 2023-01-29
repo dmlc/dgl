@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 from sklearn.linear_model import LogisticRegression
+from torch.utils.data import DataLoader
+
 from dgl.sampling import node2vec_random_walk
 
 
@@ -39,8 +40,19 @@ class Node2vec(nn.Module):
         If omitted, DGL assumes that the neighbors are picked uniformly.
     """
 
-    def __init__(self, g, embedding_dim, walk_length, p, q, num_walks=10, window_size=5, num_negatives=5,
-                 use_sparse=True, weight_name=None):
+    def __init__(
+        self,
+        g,
+        embedding_dim,
+        walk_length,
+        p,
+        q,
+        num_walks=10,
+        window_size=5,
+        num_negatives=5,
+        use_sparse=True,
+        weight_name=None,
+    ):
         super(Node2vec, self).__init__()
 
         assert walk_length >= window_size
@@ -75,13 +87,17 @@ class Node2vec(nn.Module):
 
         batch = batch.repeat(self.num_walks)
         # positive
-        pos_traces = node2vec_random_walk(self.g, batch, self.p, self.q, self.walk_length, self.prob)
+        pos_traces = node2vec_random_walk(
+            self.g, batch, self.p, self.q, self.walk_length, self.prob
+        )
         pos_traces = pos_traces.unfold(1, self.window_size, 1)  # rolling window
         pos_traces = pos_traces.contiguous().view(-1, self.window_size)
 
         # negative
         neg_batch = batch.repeat(self.num_negatives)
-        neg_traces = torch.randint(self.N, (neg_batch.size(0), self.walk_length))
+        neg_traces = torch.randint(
+            self.N, (neg_batch.size(0), self.walk_length)
+        )
         neg_traces = torch.cat([neg_batch.view(-1, 1), neg_traces], dim=-1)
         neg_traces = neg_traces.unfold(1, self.window_size, 1)  # rolling window
         neg_traces = neg_traces.contiguous().view(-1, self.window_size)
@@ -122,7 +138,10 @@ class Node2vec(nn.Module):
         e = 1e-15
 
         # Positive
-        pos_start, pos_rest = pos_trace[:, 0], pos_trace[:, 1:].contiguous()  # start node and following trace
+        pos_start, pos_rest = (
+            pos_trace[:, 0],
+            pos_trace[:, 1:].contiguous(),
+        )  # start node and following trace
         w_start = self.embedding(pos_start).unsqueeze(dim=1)
         w_rest = self.embedding(pos_rest)
         pos_out = (w_start * w_rest).sum(dim=-1).view(-1)
@@ -154,7 +173,12 @@ class Node2vec(nn.Module):
             Node2vec training data loader
 
         """
-        return DataLoader(torch.arange(self.N), batch_size=batch_size, shuffle=True, collate_fn=self.sample)
+        return DataLoader(
+            torch.arange(self.N),
+            batch_size=batch_size,
+            shuffle=True,
+            collate_fn=self.sample,
+        )
 
     @torch.no_grad()
     def evaluate(self, x_train, y_train, x_val, y_val):
@@ -166,7 +190,9 @@ class Node2vec(nn.Module):
 
         x_train, y_train = x_train.cpu().numpy(), y_train.cpu().numpy()
         x_val, y_val = x_val.cpu().numpy(), y_val.cpu().numpy()
-        lr = LogisticRegression(solver='lbfgs', multi_class='auto', max_iter=150).fit(x_train, y_train)
+        lr = LogisticRegression(
+            solver="lbfgs", multi_class="auto", max_iter=150
+        ).fit(x_train, y_train)
 
         return lr.score(x_val, y_val)
 
@@ -213,26 +239,52 @@ class Node2vecModel(object):
         device, default 'cpu'.
     """
 
-    def __init__(self, g, embedding_dim, walk_length, p=1.0, q=1.0, num_walks=1, window_size=5,
-                 num_negatives=5, use_sparse=True, weight_name=None, eval_set=None, eval_steps=-1, device='cpu'):
+    def __init__(
+        self,
+        g,
+        embedding_dim,
+        walk_length,
+        p=1.0,
+        q=1.0,
+        num_walks=1,
+        window_size=5,
+        num_negatives=5,
+        use_sparse=True,
+        weight_name=None,
+        eval_set=None,
+        eval_steps=-1,
+        device="cpu",
+    ):
 
-        self.model = Node2vec(g, embedding_dim, walk_length, p, q, num_walks,
-                              window_size, num_negatives, use_sparse, weight_name)
+        self.model = Node2vec(
+            g,
+            embedding_dim,
+            walk_length,
+            p,
+            q,
+            num_walks,
+            window_size,
+            num_negatives,
+            use_sparse,
+            weight_name,
+        )
         self.g = g
         self.use_sparse = use_sparse
         self.eval_steps = eval_steps
         self.eval_set = eval_set
 
-        if device == 'cpu':
+        if device == "cpu":
             self.device = device
         else:
-            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def _train_step(self, model, loader, optimizer, device):
         model.train()
         total_loss = 0
         for pos_traces, neg_traces in loader:
-            pos_traces, neg_traces = pos_traces.to(device), neg_traces.to(device)
+            pos_traces, neg_traces = pos_traces.to(device), neg_traces.to(
+                device
+            )
             optimizer.zero_grad()
             loss = model.loss(pos_traces, neg_traces)
             loss.backward()
@@ -265,15 +317,23 @@ class Node2vecModel(object):
         self.model = self.model.to(self.device)
         loader = self.model.loader(batch_size)
         if self.use_sparse:
-            optimizer = torch.optim.SparseAdam(list(self.model.parameters()), lr=learning_rate)
+            optimizer = torch.optim.SparseAdam(
+                list(self.model.parameters()), lr=learning_rate
+            )
         else:
-            optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+            optimizer = torch.optim.Adam(
+                self.model.parameters(), lr=learning_rate
+            )
         for i in range(epochs):
             loss = self._train_step(self.model, loader, optimizer, self.device)
             if self.eval_steps > 0:
                 if epochs % self.eval_steps == 0:
                     acc = self._evaluate_step()
-                    print("Epoch: {}, Train Loss: {:.4f}, Val Acc: {:.4f}".format(i, loss, acc))
+                    print(
+                        "Epoch: {}, Train Loss: {:.4f}, Val Acc: {:.4f}".format(
+                            i, loss, acc
+                        )
+                    )
 
     def embedding(self, nodes=None):
         """

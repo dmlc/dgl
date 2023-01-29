@@ -6,40 +6,28 @@ Graph Isomorphism Network (GIN)
 
 Dependencies
 ------------
-- PyTorch 1.1.0+
 - sklearn
-- tqdm
 
-``bash
-pip install torch sklearn tqdm
-``
+Install as follows:
+```bash
+pip install sklearn
+```
 
 How to run
-----------
-
-An experiment on the GIN in default settings can be run with
-
-```bash
-python main.py
-```
-
-An experiment on the GIN in customized settings can be run with
-```bash
-python main.py [--device 0 | --disable-cuda] --dataset COLLAB \
-               --graph_pooling_type max --neighbor_pooling_type sum
-```
-
-Results
 -------
 
-Run with following with the double SUM pooling way:
-(tested dataset: "MUTAG"(default), "COLLAB", "IMDBBINARY", "IMDBMULTI")
+Run with the following for bioinformatics graph classification (available datasets: MUTAG (default), PTC, NCI1, and PROTEINS)
 ```bash
-python main.py --dataset MUTAG --device 0  \
-                --graph_pooling_type sum --neighbor_pooling_type sum
+python3 train.py --dataset MUTAG
 ```
 
-* MUTAG: 0.85 (paper: ~0.89)
-* COLLAB: 0.89 (paper: ~0.80)
-* IMDBBINARY: 0.76 (paper: ~0.75)
-* IMDBMULTI: 0.51 (paper: ~0.52)
+> **_NOTE:_**  Users may observe results fluctuate due to the randomness with relatively small dataset.  In consistence with the original [paper](https://arxiv.org/abs/1810.00826), five social network datasets, 'COLLAB', 'IMDBBINARY' 'IMDBMULTI' 'REDDITBINARY' and 'REDDITMULTI5K', are also available as the input. Users are encouraged to update the script slightly for social network applications, for example, replacing sum readout on bioinformatics datasets with mean readout on social network datasets and using one-hot encodings of node degrees by setting "degree_as_nlabel=True" in GINDataset.
+
+Summary (10-fold cross-validation)
+-------
+| Dataset       | Result
+| ------------- | -------
+| MUTAG         | ~89.4
+| PTC           | ~68.5
+| NCI1          | ~82.9
+| PROTEINS      | ~74.1

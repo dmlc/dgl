@@ -4,7 +4,7 @@ import unittest
 import pytest
 
 from dgl.base import ALL
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 from test_utils import check_graph_equal, get_cases
 
 
@@ -46,9 +46,9 @@ def check_equivalence_between_heterographs(g1, g2, node_attrs=None, edge_attrs=N
 
 
 @pytest.mark.parametrize('gs', get_cases(['two_hetero_batch']))
-@parametrize_dtype
+@parametrize_idtype
 def test_topology(gs, idtype):
-    """Test batching two DGLHeteroGraphs where some nodes are isolated in some relations"""
+    """Test batching two DGLGraphs where some nodes are isolated in some relations"""
     g1, g2 = gs
     g1 = g1.astype(idtype).to(F.ctx())
     g2 = g2.astype(idtype).to(F.ctx())
@@ -110,9 +110,9 @@ def test_topology(gs, idtype):
     assert bg.batch_size == bg_local.batch_size
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batching_batched(idtype):
-    """Test batching a DGLHeteroGraph and a BatchedDGLHeteroGraph."""
+    """Test batching a DGLGraph and a batched DGLGraph."""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([0, 1], [0, 0])
@@ -168,9 +168,9 @@ def test_batching_batched(idtype):
     check_equivalence_between_heterographs(g3, g6)
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_features(idtype):
-    """Test the features of batched DGLHeteroGraphs"""
+    """Test the features of batched DGLGraphs"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([0, 1], [0, 0])
@@ -237,15 +237,11 @@ def test_features(idtype):
         node_attrs={'user': ['h2'], 'game': ['h2']},
         edge_attrs={('user', 'follows', 'user'): ['h1']})
 
-    # test legacy
-    bg = dgl.batch([g1, g2], edge_attrs=['h1'])
-    assert 'h2' not in bg.edges['follows'].data.keys()
-
 
 @unittest.skipIf(F.backend_name == 'mxnet', reason="MXNet does not support split array with zero-length segment.")
-@parametrize_dtype
+@parametrize_idtype
 def test_empty_relation(idtype):
-    """Test the features of batched DGLHeteroGraphs"""
+    """Test the features of batched DGLGraphs"""
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
         ('user', 'plays', 'game'): ([], [])
@@ -308,7 +304,7 @@ def test_empty_relation(idtype):
     dgl.batch([g1, g2])
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_unbatch2(idtype):
     # batch 3 graphs but unbatch to 2
     g1 = dgl.graph(([0, 1, 2], [1, 2, 3]), idtype=idtype, device=F.ctx())
@@ -333,7 +329,7 @@ def test_unbatch2(idtype):
     check_graph_equal(g3, gg3)
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_slice_batch(idtype):
     g1 = dgl.heterograph({
         ('user', 'follows', 'user'): ([0, 1], [1, 2]),
@@ -376,7 +372,7 @@ def test_slice_batch(idtype):
                     assert F.allclose(g_i.edges[ety].data[feat], g_slice.edges[ety].data[feat])
 
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_keeps_empty_data(idtype):
     g1 = dgl.heterograph({("a", "to", "a"): ([], [])}
                          ).astype(idtype).to(F.ctx())

@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file common.cc
- * \brief This file provide basic facilities for string
+ * @file common.cc
+ * @brief This file provide basic facilities for string
  * to make programming convenient.
  */
 #include "common.h"
@@ -17,7 +17,8 @@ namespace network {
 // In most cases, delim contains only one character. In this case, we
 // use CalculateReserveForVector to count the number of elements should
 // be reserved in result vector, and thus optimize SplitStringUsing.
-static int CalculateReserveForVector(const std::string& full, const char* delim) {
+static int CalculateReserveForVector(
+    const std::string& full, const char* delim) {
   int count = 0;
   if (delim[0] != '\0' && delim[1] == '\0') {
     // Optimize the common case where delim is a single character.
@@ -38,19 +39,18 @@ static int CalculateReserveForVector(const std::string& full, const char* delim)
   return count;
 }
 
-void SplitStringUsing(const std::string& full,
-                      const char* delim,
-                      std::vector<std::string>* result) {
+void SplitStringUsing(
+    const std::string& full, const char* delim,
+    std::vector<std::string>* result) {
   CHECK(delim != NULL);
   CHECK(result != NULL);
   result->reserve(CalculateReserveForVector(full, delim));
-  back_insert_iterator< std::vector<std::string> > it(*result);
+  back_insert_iterator<std::vector<std::string> > it(*result);
   SplitStringToIteratorUsing(full, delim, &it);
 }
 
-void SplitStringToSetUsing(const std::string& full,
-                           const char* delim,
-                           std::set<std::string>* result) {
+void SplitStringToSetUsing(
+    const std::string& full, const char* delim, std::set<std::string>* result) {
   CHECK(delim != NULL);
   CHECK(result != NULL);
   simple_insert_iterator<std::set<std::string> > it(result);
@@ -68,7 +68,7 @@ static void StringAppendV(string* dst, const char* format, va_list ap) {
   int result = vsnprintf(space, sizeof(space), format, backup_ap);
   va_end(backup_ap);
 
-  if ((result >= 0) && (result < sizeof(space))) {
+  if ((result >= 0) && (result < static_cast<int>(sizeof(space)))) {
     // It fit
     dst->append(space, result);
     return;

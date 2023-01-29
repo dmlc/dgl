@@ -7,12 +7,15 @@ Copyright (c) 2021 Intel Corporation
 
 import os
 import random
+
 import requests
-from scipy.io import mmread
 import torch as th
+from scipy.io import mmread
+
 import dgl
 from dgl.base import DGLError
 from dgl.data.utils import load_graphs, save_graphs, save_tensors
+
 
 def rep_per_node(prefix, num_community):
     """
@@ -24,17 +27,17 @@ def rep_per_node(prefix, num_community):
     prefix: Partition folder location (contains replicationlist.csv)
     num_community: number of partitions or communities
     """
-    ifile = os.path.join(prefix, 'replicationlist.csv')
+    ifile = os.path.join(prefix, "replicationlist.csv")
     fhandle = open(ifile, "r")
     r_dt = {}
 
-    fline = fhandle.readline()   ## reading first line, contains the comment.
+    fline = fhandle.readline()  ## reading first line, contains the comment.
     print(fline)
     for line in fhandle:
-        if line[0] == '#':
+        if line[0] == "#":
             raise DGLError("[Bug] Read Hash char in rep_per_node func.")
 
-        node = line.strip('\n')
+        node = line.strip("\n")
         if r_dt.get(node, -100) == -100:
             r_dt[node] = 1
         else:
@@ -44,7 +47,9 @@ def rep_per_node(prefix, num_community):
     ## sanity checks
     for v in r_dt.values():
         if v >= num_community:
-            raise DGLError("[Bug] Unexpected event in rep_per_node() in tools.py.")
+            raise DGLError(
+                "[Bug] Unexpected event in rep_per_node() in tools.py."
+            )
 
     return r_dt
 
@@ -61,7 +66,9 @@ def download_proteins():
     try:
         req = requests.get(url)
     except:
-        raise DGLError("Error: Failed to download Proteins dataset!! Aborting..")
+        raise DGLError(
+            "Error: Failed to download Proteins dataset!! Aborting.."
+        )
 
     with open("proteins.mtx", "wb") as handle:
         handle.write(req.content)
@@ -73,7 +80,7 @@ def proteins_mtx2dgl():
     """
     print("Converting mtx2dgl..")
     print("This might a take while..")
-    a_mtx = mmread('proteins.mtx')
+    a_mtx = mmread("proteins.mtx")
     coo = a_mtx.tocoo()
     u = th.tensor(coo.row, dtype=th.int64)
     v = th.tensor(coo.col, dtype=th.int64)
@@ -82,7 +89,7 @@ def proteins_mtx2dgl():
     g.add_edges(u, v)
 
     n = g.number_of_nodes()
-    feat_size = 128         ## arbitrary number
+    feat_size = 128  ## arbitrary number
     feats = th.empty([n, feat_size], dtype=th.float32)
 
     ## arbitrary numbers
@@ -108,11 +115,11 @@ def proteins_mtx2dgl():
     for i in range(n):
         label[i] = random.choice(range(nlabels))
 
-    g.ndata['feat'] = feats
-    g.ndata['train_mask'] = train_mask
-    g.ndata['test_mask'] = test_mask
-    g.ndata['val_mask'] = val_mask
-    g.ndata['label'] = label
+    g.ndata["feat"] = feats
+    g.ndata["train_mask"] = train_mask
+    g.ndata["test_mask"] = test_mask
+    g.ndata["val_mask"] = val_mask
+    g.ndata["label"] = label
 
     return g
 

@@ -1,0 +1,1 @@
+python -m pytest --pdb -vv --capture=tee-sys test_pipeline.py::test_recipe

@@ -1,12 +1,13 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file msg_queue.cc
- * \brief Message queue for DGL distributed training.
+ * @file msg_queue.cc
+ * @brief Message queue for DGL distributed training.
  */
-#include <dmlc/logging.h>
-#include <cstring>
-
 #include "msg_queue.h"
+
+#include <dmlc/logging.h>
+
+#include <cstring>
 
 namespace dgl {
 namespace network {
@@ -38,9 +39,7 @@ STATUS MessageQueue::Add(Message msg, bool is_blocking) {
   if (msg.size > free_size_ && !is_blocking) {
     return QUEUE_FULL;
   }
-  cond_not_full_.wait(lock, [&]() {
-    return msg.size <= free_size_;
-  });
+  cond_not_full_.wait(lock, [&]() { return msg.size <= free_size_; });
   // Add data pointer to queue
   queue_.push(msg);
   free_size_ -= msg.size;
@@ -61,9 +60,8 @@ STATUS MessageQueue::Remove(Message* msg, bool is_blocking) {
     }
   }
 
-  cond_not_empty_.wait(lock, [this] {
-    return !queue_.empty() || exit_flag_.load();
-  });
+  cond_not_empty_.wait(
+      lock, [this] { return !queue_.empty() || exit_flag_.load(); });
   if (finished_producers_.size() >= num_producers_ && queue_.empty()) {
     return QUEUE_CLOSE;
   }
@@ -98,8 +96,7 @@ bool MessageQueue::Empty() const {
 
 bool MessageQueue::EmptyAndNoMoreAdd() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return queue_.size() == 0 &&
-         finished_producers_.size() >= num_producers_;
+  return queue_.size() == 0 && finished_producers_.size() >= num_producers_;
 }
 
 }  // namespace network

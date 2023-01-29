@@ -52,13 +52,15 @@ Sampling for Node Classification <L1_large_node_classification>`.
 # :doc:`previous tutorial <L1_large_node_classification>`.
 #
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 import torch
 import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset
 
-dataset = DglNodePropPredDataset('ogbn-arxiv')
-device = 'cpu'      # change to 'cuda' for GPU
+dataset = DglNodePropPredDataset("ogbn-arxiv")
+device = "cpu"  # change to 'cuda' for GPU
 
 graph, node_labels = dataset[0]
 # Add reverse edges since ogbn-arxiv is unidirectional.
@@ -66,16 +68,16 @@ graph = dgl.add_reverse_edges(graph)
 print(graph)
 print(node_labels)
 
-node_features = graph.ndata['feat']
+node_features = graph.ndata["feat"]
 node_labels = node_labels[:, 0]
 num_features = node_features.shape[1]
 num_classes = (node_labels.max() + 1).item()
-print('Number of classes:', num_classes)
+print("Number of classes:", num_classes)
 
 idx_split = dataset.get_idx_split()
-train_nids = idx_split['train']
-valid_nids = idx_split['valid']
-test_nids = idx_split['test']
+train_nids = idx_split["train"]
+valid_nids = idx_split["valid"]
+test_nids = idx_split["test"]
 
 
 ######################################################################
@@ -91,7 +93,7 @@ test_nids = idx_split['test']
 # in a similar fashion introduced in the :doc:`large-scale node classification
 # tutorial <L1_large_node_classification>`.
 #
-# DGL provides ``dgl.dataloading.EdgeDataLoader`` to
+# DGL provides ``dgl.dataloading.as_edge_prediction_sampler`` to
 # iterate over edges for edge classification or link prediction tasks.
 #
 # To perform link prediction, you need to specify a negative sampler. DGL
@@ -105,24 +107,26 @@ negative_sampler = dgl.dataloading.negative_sampler.Uniform(5)
 
 ######################################################################
 # After defining the negative sampler, one can then define the edge data
-# loader with neighbor sampling.  To create an ``EdgeDataLoader`` for
+# loader with neighbor sampling.  To create an ``DataLoader`` for
 # link prediction, provide a neighbor sampler object as well as the negative
 # sampler object created above.
 #
 
-sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-train_dataloader = dgl.dataloading.EdgeDataLoader(
-    # The following arguments are specific to EdgeDataLoader.
-    graph,                                  # The graph
+sampler = dgl.dataloading.NeighborSampler([4, 4])
+sampler = dgl.dataloading.as_edge_prediction_sampler(
+    sampler, negative_sampler=negative_sampler
+)
+train_dataloader = dgl.dataloading.DataLoader(
+    # The following arguments are specific to DataLoader.
+    graph,  # The graph
     torch.arange(graph.number_of_edges()),  # The edges to iterate over
-    sampler,                                # The neighbor sampler
-    negative_sampler=negative_sampler,      # The negative sampler
-    device=device,                          # Put the MFGs on CPU or GPU
+    sampler,  # The neighbor sampler
+    device=device,  # Put the MFGs on CPU or GPU
     # The following arguments are inherited from PyTorch DataLoader.
-    batch_size=1024,    # Batch size
-    shuffle=True,       # Whether to shuffle the nodes for every epoch
-    drop_last=False,    # Whether to drop the last incomplete batch
-    num_workers=0       # Number of sampler processes
+    batch_size=1024,  # Batch size
+    shuffle=True,  # Whether to shuffle the nodes for every epoch
+    drop_last=False,  # Whether to drop the last incomplete batch
+    num_workers=0,  # Number of sampler processes
 )
 
 
@@ -132,9 +136,19 @@ train_dataloader = dgl.dataloading.EdgeDataLoader(
 #
 
 input_nodes, pos_graph, neg_graph, mfgs = next(iter(train_dataloader))
-print('Number of input nodes:', len(input_nodes))
-print('Positive graph # nodes:', pos_graph.number_of_nodes(), '# edges:', pos_graph.number_of_edges())
-print('Negative graph # nodes:', neg_graph.number_of_nodes(), '# edges:', neg_graph.number_of_edges())
+print("Number of input nodes:", len(input_nodes))
+print(
+    "Positive graph # nodes:",
+    pos_graph.number_of_nodes(),
+    "# edges:",
+    pos_graph.number_of_edges(),
+)
+print(
+    "Negative graph # nodes:",
+    neg_graph.number_of_nodes(),
+    "# edges:",
+    neg_graph.number_of_edges(),
+)
 print(mfgs)
 
 
@@ -173,20 +187,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn import SAGEConv
 
+
 class Model(nn.Module):
     def __init__(self, in_feats, h_feats):
         super(Model, self).__init__()
-        self.conv1 = SAGEConv(in_feats, h_feats, aggregator_type='mean')
-        self.conv2 = SAGEConv(h_feats, h_feats, aggregator_type='mean')
+        self.conv1 = SAGEConv(in_feats, h_feats, aggregator_type="mean")
+        self.conv2 = SAGEConv(h_feats, h_feats, aggregator_type="mean")
         self.h_feats = h_feats
 
     def forward(self, mfgs, x):
-        h_dst = x[:mfgs[0].num_dst_nodes()]
+        h_dst = x[: mfgs[0].num_dst_nodes()]
         h = self.conv1(mfgs[0], (x, h_dst))
         h = F.relu(h)
-        h_dst = h[:mfgs[1].num_dst_nodes()]
+        h_dst = h[: mfgs[1].num_dst_nodes()]
         h = self.conv2(mfgs[1], (h, h_dst))
         return h
+
 
 model = Model(num_features, 128).to(device)
 
@@ -206,15 +222,16 @@ model = Model(num_features, 128).to(device)
 
 import dgl.function as fn
 
+
 class DotPredictor(nn.Module):
     def forward(self, g, h):
         with g.local_scope():
-            g.ndata['h'] = h
+            g.ndata["h"] = h
             # Compute a new edge feature named 'score' by a dot-product between the
             # source node feature 'h' and destination node feature 'h'.
-            g.apply_edges(fn.u_dot_v('h', 'h', 'score'))
+            g.apply_edges(fn.u_dot_v("h", "h", "score"))
             # u_dot_v returns a 1-element vector for each edge so you need to squeeze it.
-            return g.edata['score'][:, 0]
+            return g.edata["score"][:, 0]
 
 
 ######################################################################
@@ -243,28 +260,34 @@ class DotPredictor(nn.Module):
 #    guide <guide-minibatch-inference>`.
 #
 
+
 def inference(model, graph, node_features):
     with torch.no_grad():
         nodes = torch.arange(graph.number_of_nodes())
 
-        sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-        train_dataloader = dgl.dataloading.NodeDataLoader(
-            graph, torch.arange(graph.number_of_nodes()), sampler,
+        sampler = dgl.dataloading.NeighborSampler([4, 4])
+        train_dataloader = dgl.dataloading.DataLoader(
+            graph,
+            torch.arange(graph.number_of_nodes()),
+            sampler,
             batch_size=1024,
             shuffle=False,
             drop_last=False,
             num_workers=4,
-            device=device)
+            device=device,
+        )
 
         result = []
         for input_nodes, output_nodes, mfgs in train_dataloader:
             # feature copy from CPU to GPU takes place here
-            inputs = mfgs[0].srcdata['feat']
+            inputs = mfgs[0].srcdata["feat"]
             result.append(model(mfgs, inputs))
 
         return torch.cat(result)
 
+
 import sklearn.metrics
+
 
 def evaluate(emb, label, train_nids, valid_nids, test_nids):
     classifier = nn.Linear(emb.shape[1], num_classes).to(device)
@@ -281,13 +304,13 @@ def evaluate(emb, label, train_nids, valid_nids, test_nids):
         loss.backward()
         return loss
 
-    prev_loss = float('inf')
+    prev_loss = float("inf")
     for i in range(1000):
         opt.step(closure)
         with torch.no_grad():
             loss = compute_loss().item()
             if np.abs(loss - prev_loss) < 1e-4:
-                print('Converges at iteration', i)
+                print("Converges at iteration", i)
                 break
             else:
                 prev_loss = loss
@@ -295,8 +318,12 @@ def evaluate(emb, label, train_nids, valid_nids, test_nids):
     with torch.no_grad():
         pred = classifier(emb.to(device)).cpu()
         label = label
-        valid_acc = sklearn.metrics.accuracy_score(label[valid_nids].numpy(), pred[valid_nids].numpy().argmax(1))
-        test_acc = sklearn.metrics.accuracy_score(label[test_nids].numpy(), pred[test_nids].numpy().argmax(1))
+        valid_acc = sklearn.metrics.accuracy_score(
+            label[valid_nids].numpy(), pred[valid_nids].numpy().argmax(1)
+        )
+        test_acc = sklearn.metrics.accuracy_score(
+            label[test_nids].numpy(), pred[test_nids].numpy().argmax(1)
+        )
     return valid_acc, test_acc
 
 
@@ -322,32 +349,40 @@ import tqdm
 import sklearn.metrics
 
 best_accuracy = 0
-best_model_path = 'model.pt'
+best_model_path = "model.pt"
 for epoch in range(1):
     with tqdm.tqdm(train_dataloader) as tq:
         for step, (input_nodes, pos_graph, neg_graph, mfgs) in enumerate(tq):
             # feature copy from CPU to GPU takes place here
-            inputs = mfgs[0].srcdata['feat']
+            inputs = mfgs[0].srcdata["feat"]
 
             outputs = model(mfgs, inputs)
             pos_score = predictor(pos_graph, outputs)
             neg_score = predictor(neg_graph, outputs)
 
             score = torch.cat([pos_score, neg_score])
-            label = torch.cat([torch.ones_like(pos_score), torch.zeros_like(neg_score)])
+            label = torch.cat(
+                [torch.ones_like(pos_score), torch.zeros_like(neg_score)]
+            )
             loss = F.binary_cross_entropy_with_logits(score, label)
 
             opt.zero_grad()
             loss.backward()
             opt.step()
 
-            tq.set_postfix({'loss': '%.03f' % loss.item()}, refresh=False)
+            tq.set_postfix({"loss": "%.03f" % loss.item()}, refresh=False)
 
             if (step + 1) % 500 == 0:
                 model.eval()
                 emb = inference(model, graph, node_features)
-                valid_acc, test_acc = evaluate(emb, node_labels, train_nids, valid_nids, test_nids)
-                print('Epoch {} Validation Accuracy {} Test Accuracy {}'.format(epoch, valid_acc, test_acc))
+                valid_acc, test_acc = evaluate(
+                    emb, node_labels, train_nids, valid_nids, test_nids
+                )
+                print(
+                    "Epoch {} Validation Accuracy {} Test Accuracy {}".format(
+                        epoch, valid_acc, test_acc
+                    )
+                )
                 if best_accuracy < valid_acc:
                     best_accuracy = valid_acc
                     torch.save(model.state_dict(), best_model_path)
@@ -369,12 +404,6 @@ for epoch in range(1):
 # Ultimately, they require the model to predict one scalar score given
 # a node pair among a set of node pairs.
 #
-# ``dgl.dataloading.EdgeDataLoader`` allows you to iterate over
-# the edges of a new graph with the same nodes, while performing
-# neighbor sampling on the original graph with ``g_sampling`` argument.
-# This functionality enables convenient evaluation of a link prediction
-# model.
-#
 # Assuming that you have the following test set with labels, where
 # ``test_pos_src`` and ``test_pos_dst`` are ground truth node pairs
 # with edges in between (or *positive* pairs), and ``test_neg_src``
@@ -383,76 +412,47 @@ for epoch in range(1):
 #
 
 # Positive pairs
-test_pos_src, test_pos_dst = graph.edges()
-# Negative pairs
+# These are randomly generated as an example.  You will need to
+# replace them with your own ground truth.
+n_test_pos = 1000
+test_pos_src, test_pos_dst = (
+    torch.randint(0, graph.num_nodes(), (n_test_pos,)),
+    torch.randint(0, graph.num_nodes(), (n_test_pos,)),
+)
+# Negative pairs.  Likewise, you will need to replace them with your
+# own ground truth.
 test_neg_src = test_pos_src
-test_neg_dst = torch.randint(0, graph.num_nodes(), (graph.num_edges(),))
+test_neg_dst = torch.randint(0, graph.num_nodes(), (n_test_pos,))
 
 
 ######################################################################
-# First you need to construct a graph for ``dgl.dataloading.EdgeDataLoader``
-# to iterate on, i.e. with the testing node pairs as edges.
-# You also need to label the edges, 1 if positive and 0 if negative.
+# First you need to compute the node representations for all the nodes
+# with the ``inference`` method above:
 #
 
-test_src = torch.cat([test_pos_src, test_pos_dst])
-test_dst = torch.cat([test_neg_src, test_neg_dst])
-test_graph = dgl.graph((test_src, test_dst), num_nodes=graph.num_nodes())
-test_graph.edata['label'] = torch.cat(
-        [torch.ones_like(test_pos_src), torch.zeros_like(test_neg_src)])
-
+node_reprs = inference(model, graph, node_features)
 
 ######################################################################
-# Then you could create a new ``EdgeDataLoader`` instance that
-# iterates on the new ``test_graph``, but uses the original ``graph``
-# for neighbor sampling.
+# Since the predictor is a dot product, you can now easily compute the
+# score of positive and negative test pairs to compute metrics such
+# as AUC:
 #
-# Note that you do not need negative sampling in this dataloader: the
-# negative pairs are already in the new test graph.
-#
-test_dataloader = dgl.dataloading.EdgeDataLoader(
-    # The following arguments are specific to EdgeDataLoader.
-    test_graph,                             # The graph to iterate edges over
-    torch.arange(test_graph.number_of_edges()),  # The edges to iterate over
-    sampler,                                # The neighbor sampler
-    device=device,                          # Put the MFGs on CPU or GPU
-    g_sampling=graph,                       # Graph to sample neighbors
-    # The following arguments are inherited from PyTorch DataLoader.
-    batch_size=1024,    # Batch size
-    shuffle=True,       # Whether to shuffle the nodes for every epoch
-    drop_last=False,    # Whether to drop the last incomplete batch
-    num_workers=0       # Number of sampler processes
+
+h_pos_src = node_reprs[test_pos_src]
+h_pos_dst = node_reprs[test_pos_dst]
+h_neg_src = node_reprs[test_neg_src]
+h_neg_dst = node_reprs[test_neg_dst]
+score_pos = (h_pos_src * h_pos_dst).sum(1)
+score_neg = (h_neg_src * h_neg_dst).sum(1)
+test_preds = torch.cat([score_pos, score_neg]).cpu().numpy()
+test_labels = (
+    torch.cat([torch.ones_like(score_pos), torch.zeros_like(score_neg)])
+    .cpu()
+    .numpy()
 )
 
-
-######################################################################
-# The rest is similar to training except that you no longer compute
-# the gradients, and you collect all the scores and ground truth
-# labels for final metric calculation.
-#
-# .. note::
-#
-#    If the graph does not change, you can also precompute all the
-#    node representations beforehand with ``inference`` function.
-#    You can then feed the precomputed results directly into the
-#    predictor without passing the MFGs into the model.
-#
-test_preds = []
-test_labels = []
-
-with tqdm.tqdm(test_dataloader) as tq, torch.no_grad():
-    for step, (input_nodes, pair_graph, mfgs) in enumerate(tq):
-        # feature copy from CPU to GPU takes place here
-        inputs = mfgs[0].srcdata['feat']
-
-        outputs = model(mfgs, inputs)
-        test_preds.append(predictor(pair_graph, outputs))
-        test_labels.append(pair_graph.edata['label'])
-
-test_preds = torch.cat(test_preds).cpu().numpy()
-test_labels = torch.cat(test_labels).cpu().numpy()
 auc = sklearn.metrics.roc_auc_score(test_labels, test_preds)
-print('Link Prediction AUC:', auc)
+print("Link Prediction AUC:", auc)
 
 
 ######################################################################

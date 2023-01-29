@@ -1,0 +1,144 @@
+import numpy as np
+import sklearn
+import torch
+import torch.nn as nn
+import os
+
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from tqdm import tqdm
+from dgl.data import AsGraphPredDataset
+from dgl.dataloading import GraphDataLoader
+{{ data_import_code }}
+
+{{ model_code }}
+
+def train(device, loader, model, criterion, optimizer):
+    model.train()
+
+    for _, (g, labels) in enumerate(tqdm(loader, desc="Iteration")):
+        g = g.to(device)
+        labels = labels.to(device)
+        node_feat = g.ndata['feat']
+        edge_feat = g.edata['feat']
+
+        pred = model(g, node_feat, edge_feat)
+        optimizer.zero_grad()
+        # ignore nan targets (unlabeled) when computing training loss
+        is_labeled = labels == labels
+        loss = criterion(pred.float()[is_labeled], labels.float()[is_labeled])
+        loss.backward()
+        optimizer.step()
+
+def calc_metric(y_true, y_pred):
+    task_metric_list = []
+    for i in range(y_true.shape[1]):
+        # AUC is only defined when there is at least one positive and negative datapoint.
+        if np.sum(y_true[:, i] == 1) > 0 and np.sum(y_true[:, i] == 0) > 0:
+            # ignore nan values
+            is_labeled = y_true[:,i] == y_true[:,i]
+            task_metric = sklearn.metrics.{{ user_cfg.general_pipeline.metric }}(
+                y_true[is_labeled, i], y_pred[is_labeled, i])
+            task_metric_list.append(task_metric)
+
+    return sum(task_metric_list) / len(task_metric_list)
+
+def evaluate(device, loader, model):
+    model.eval()
+    y_true = []
+    y_pred = []
+
+    for _, (g, labels) in enumerate(tqdm(loader, desc="Iteration")):
+        g = g.to(device)
+        labels = labels.to(device)
+        node_feat = g.ndata['feat']
+        edge_feat = g.edata['feat']
+
+        with torch.no_grad():
+            pred = model(g, node_feat, edge_feat)
+        y_true.append(labels.view(pred.shape).detach().cpu())
+        y_pred.append(pred.detach().cpu())
+
+    y_true = torch.cat(y_true, dim=0).numpy()
+    y_pred = torch.cat(y_pred, dim=0).numpy()
+
+    return calc_metric(y_true, y_pred)
+
+def main(run, cfg, data):
+    device = cfg['device']
+    pipeline_cfg = cfg['general_pipeline']
+
+    train_loader = GraphDataLoader(data[data.train_idx], batch_size=pipeline_cfg['train_batch_size'],
+                                   shuffle=True, num_workers=pipeline_cfg['num_workers'])
+    val_loader = GraphDataLoader(data[data.val_idx], batch_size=pipeline_cfg['eval_batch_size'],
+                                 shuffle=False, num_workers=pipeline_cfg['num_workers'])
+    test_loader = GraphDataLoader(data[data.test_idx], batch_size=pipeline_cfg['eval_batch_size'],
+                                  shuffle=False, num_workers=pipeline_cfg['num_workers'])
+
+    # create model
+    model = {{ model_class_name }}(**cfg["model"])
+    model = model.to(device)
+
+    criterion = nn.{{ user_cfg.general_pipeline.loss }}()
+    optimizer = torch.optim.{{ user_cfg.general_pipeline.optimizer.name }}(
+        model.parameters(), **pipeline_cfg["optimizer"])
+    lr_scheduler = torch.optim.lr_scheduler.{{ user_cfg.general_pipeline.lr_scheduler.name }}(
+        optimizer, **pipeline_cfg["lr_scheduler"])
+    best_val_metric = 0.
+
+    tmp_cpt_path = 'checkpoint.pth'
+
+    for epoch in range(pipeline_cfg['num_epochs']):
+        train(device, train_loader, model, criterion, optimizer)
+        val_metric = evaluate(device, val_loader, model)
+        if val_metric >= best_val_metric:
+            best_val_metric = val_metric
+            torch.save(model.state_dict(), tmp_cpt_path)
+        print('Run {:d} | Epoch {:d} | Val Metric {:.4f} | Best Val Metric {:.4f}'.format(
+              run, epoch, val_metric, best_val_metric))
+
+        if isinstance(lr_scheduler, ReduceLROnPlateau):
+            lr_scheduler.step(val_metric)
+        else:
+            lr_scheduler.step()
+
+    model.load_state_dict(torch.load(tmp_cpt_path))
+    os.remove(tmp_cpt_path)
+    test_metric = evaluate(device, test_loader, model)
+    print('Test Metric: {:.4f}'.format(test_metric))
+
+    cpt_path = os.path.join(pipeline_cfg["save_path"], 'run_{}.pth'.format(run))
+    torch.save({'cfg': cfg, 'model': model.state_dict()}, cpt_path)
+    print('Saved training checkpoint to {}'.format(cpt_path))
+
+    return test_metric
+
+if __name__ == '__main__':
+    {{ user_cfg_str }}
+    if not torch.cuda.is_available():
+        cfg['device'] = 'cpu'
+
+    # load data
+    data = AsGraphPredDataset({{data_initialize_code}})
+
+    cfg["model"]["data_info"] = {
+        "name": cfg["data_name"],
+        "node_feat_size": data.node_feat_size,
+        "edge_feat_size": data.edge_feat_size,
+        "out_size": data.num_tasks
+    }
+    if cfg["model_name"] == 'pna':
+        in_deg = torch.cat([g.in_degrees() for (g, _) in data[data.train_idx]])
+        cfg["model"]["data_info"]["delta"] = torch.mean(torch.log(in_deg + 1)).item()
+
+    os.makedirs(cfg['general_pipeline']["save_path"])
+
+    all_run_metrics = []
+    num_runs = {{ user_cfg.general_pipeline.num_runs }}
+    for run in range(num_runs):
+        print('Run experiment {:d}'.format(run))
+        test_metric = main(run, cfg, data)
+        all_run_metrics.append(test_metric)
+    avg_metric = np.round(np.mean(all_run_metrics), 6)
+    std_metric = np.round(np.std(all_run_metrics), 6)
+    print('Test Metric across {:d} runs: {:.6f} ± {:.6f}'.format(
+        num_runs, avg_metric, std_metric))

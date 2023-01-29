@@ -1,9 +1,14 @@
-import dgl
-import backend as F
-import numpy as np
 import unittest
 
-@unittest.skipIf(F._default_context_str == 'gpu', reason="GPU random choice not implemented")
+import backend as F
+import numpy as np
+
+import dgl
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu", reason="GPU random choice not implemented"
+)
 def test_rand_graph():
     g = dgl.rand_graph(10000, 100000)
     assert g.number_of_nodes() == 10000
@@ -18,5 +23,6 @@ def test_rand_graph():
     assert F.array_equal(u1, u2)
     assert F.array_equal(v1, v2)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test_rand_graph()

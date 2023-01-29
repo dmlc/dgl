@@ -31,7 +31,7 @@ def track_time(feat_size, num_relations, multi_reduce_type):
     update_dict = {}
     for i in range(num_relations):
         update_dict['e_{}'.format(i)] = (
-            fn.copy_src('h', 'm'), fn.sum('m', 'h'))
+            fn.copy_u('h', 'm'), fn.sum('m', 'h'))
     graph.multi_update_all(
         update_dict,
         multi_reduce_type)

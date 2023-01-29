@@ -1,16 +1,16 @@
 import argparse
+import multiprocessing
+import time
 from collections import defaultdict
+from functools import partial, reduce, wraps
 
 import networkx as nx
 import numpy as np
+import torch
 from gensim.models.keyedvectors import Vocab
 from six import iteritems
-from sklearn.metrics import auc, f1_score, precision_recall_curve, roc_auc_score
-import torch
-
-import time
-import multiprocessing
-from functools import partial, reduce, wraps
+from sklearn.metrics import (auc, f1_score, precision_recall_curve,
+                             roc_auc_score)
 
 
 def parse_args():
@@ -25,7 +25,10 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--epoch", type=int, default=100, help="Number of epoch. Default is 100."
+        "--epoch",
+        type=int,
+        default=100,
+        help="Number of epoch. Default is 100.",
     )
 
     parser.add_argument(
@@ -36,7 +39,10 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--eval-type", type=str, default="all", help="The edge type(s) for evaluation."
+        "--eval-type",
+        type=str,
+        default="all",
+        help="The edge type(s) for evaluation.",
     )
 
     parser.add_argument(
@@ -103,15 +109,24 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--patience", type=int, default=5, help="Early stopping patience. Default is 5."
+        "--patience",
+        type=int,
+        default=5,
+        help="Early stopping patience. Default is 5.",
     )
 
     parser.add_argument(
-        "--gpu", type=str, default=None, help="Comma separated list of GPU device IDs."
+        "--gpu",
+        type=str,
+        default=None,
+        help="Comma separated list of GPU device IDs.",
     )
 
     parser.add_argument(
-        "--workers", type=int, default=4, help="Number of workers.",
+        "--workers",
+        type=int,
+        default=4,
+        help="Number of workers.",
     )
 
     return parser.parse_args()
@@ -205,7 +220,9 @@ def generate_pairs(all_walks, window_size, num_workers):
             walks_list = [walks]
         tmp_result = pool.map(
             partial(
-                generate_pairs_parallel, skip_window=skip_window, layer_id=layer_id
+                generate_pairs_parallel,
+                skip_window=skip_window,
+                layer_id=layer_id,
             ),
             walks_list,
         )
@@ -285,4 +302,8 @@ def evaluate(model, true_edges, false_edges, num_workers):
     y_true = np.array(true_list)
     y_scores = np.array(prediction_list)
     ps, rs, _ = precision_recall_curve(y_true, y_scores)
-    return roc_auc_score(y_true, y_scores), f1_score(y_true, y_pred), auc(rs, ps)
+    return (
+        roc_auc_score(y_true, y_scores),
+        f1_score(y_true, y_pred),
+        auc(rs, ps),
+    )

@@ -34,9 +34,6 @@ class EntityClassify(nn.Module):
         Dropout
     use_self_loop : bool
         Use self loop if True, default False.
-    low_mem : bool
-        True to use low memory implementation of relation message passing function
-        trade speed with memory consumption
     """
     def __init__(self,
                  device,
@@ -48,7 +45,6 @@ class EntityClassify(nn.Module):
                  num_hidden_layers=1,
                  dropout=0,
                  use_self_loop=False,
-                 low_mem=False,
                  layer_norm=False):
         super(EntityClassify, self).__init__()
         self.device = device
@@ -60,7 +56,6 @@ class EntityClassify(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
         self.use_self_loop = use_self_loop
-        self.low_mem = low_mem
         self.layer_norm = layer_norm
 
         self.layers = nn.ModuleList()
@@ -68,19 +63,19 @@ class EntityClassify(nn.Module):
         self.layers.append(RelGraphConv(
             self.h_dim, self.h_dim, self.num_rels, "basis",
             self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
+            dropout=self.dropout, layer_norm = layer_norm))
         # h2h
         for idx in range(self.num_hidden_layers):
             self.layers.append(RelGraphConv(
                 self.h_dim, self.h_dim, self.num_rels, "basis",
                 self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                low_mem=self.low_mem, dropout=self.dropout, layer_norm = layer_norm))
+                dropout=self.dropout, layer_norm = layer_norm))
         # h2o
         self.layers.append(RelGraphConv(
             self.h_dim, self.out_dim, self.num_rels, "basis",
             self.num_bases, activation=None,
             self_loop=self.use_self_loop,
-            low_mem=self.low_mem, layer_norm = layer_norm))
+            layer_norm = layer_norm))
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -180,9 +175,11 @@ def track_time(data):
     device = utils.get_bench_device()
 
     if data == 'am':
+        batch_size = 64
         n_bases = 40
         l2norm = 5e-4
     elif data == 'ogbn-mag':
+        batch_size = 1024
         n_bases = 2
         l2norm = 0
     else:
@@ -190,13 +187,13 @@ def track_time(data):
 
     fanouts = [25,15]
     n_layers = 2
-    batch_size = 1024
     n_hidden = 64
     dropout = 0.5
     use_self_loop = True
     lr = 0.01
-    low_mem = True
     num_workers = 4
+    iter_start = 3
+    iter_count = 10
 
     hg = dataset[0]
     category = dataset.predict_category
@@ -242,7 +239,7 @@ def track_time(data):
 
     g = g.formats('csc')
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    loader = dgl.dataloading.NodeDataLoader(
+    loader = dgl.dataloading.DataLoader(
         g,
         target_nids[train_idx],
         sampler,
@@ -273,7 +270,6 @@ def track_time(data):
                            num_hidden_layers=n_layers - 2,
                            dropout=dropout,
                            use_self_loop=use_self_loop,
-                           low_mem=low_mem,
                            layer_norm=False)
 
     embed_layer = embed_layer.to(device)
@@ -283,49 +279,34 @@ def track_time(data):
     optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
     emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
 
-    # dry run
-    for i, sample_data in enumerate(loader):
-        input_nodes, output_nodes, blocks = sample_data
-        feats = embed_layer(input_nodes,
-                            blocks[0].srcdata['ntype'],
-                            blocks[0].srcdata['type_id'],
-                            node_feats)
-        logits = model(blocks, feats)
-        seed_idx = blocks[-1].dstdata['type_id']
-        loss = F.cross_entropy(logits, labels[seed_idx])
-        optimizer.zero_grad()
-        emb_optimizer.zero_grad()
-
-        loss.backward()
-        optimizer.step()
-        emb_optimizer.step()
-
-        if i >= 3:
-            break
-
     print("start training...")
     model.train()
     embed_layer.train()
 
-    t0 = time.time()
-    for i, sample_data in enumerate(loader):
-        input_nodes, output_nodes, blocks = sample_data
-        feats = embed_layer(input_nodes,
-                            blocks[0].srcdata['ntype'],
-                            blocks[0].srcdata['type_id'],
-                            node_feats)
-        logits = model(blocks, feats)
-        seed_idx = blocks[-1].dstdata['type_id']
-        loss = F.cross_entropy(logits, labels[seed_idx])
-        optimizer.zero_grad()
-        emb_optimizer.zero_grad()
+    # Enable dataloader cpu affinitization for cpu devices (no effect on gpu)
+    with loader.enable_cpu_affinity():
+        for step, sample_data in enumerate(loader):
+            input_nodes, output_nodes, blocks = sample_data
+            feats = embed_layer(input_nodes,
+                                blocks[0].srcdata['ntype'],
+                                blocks[0].srcdata['type_id'],
+                                node_feats)
+            logits = model(blocks, feats)
+            seed_idx = blocks[-1].dstdata['type_id']
+            loss = F.cross_entropy(logits, labels[seed_idx])
+            optimizer.zero_grad()
+            emb_optimizer.zero_grad()
 
-        loss.backward()
-        optimizer.step()
-        emb_optimizer.step()
-        
-        if i >= 9:  # time 10 loops
-            break
+            loss.backward()
+            optimizer.step()
+            emb_optimizer.step()
+            
+            # start timer at before iter_start
+            if step == iter_start - 1:
+                t0 = time.time()
+            elif step == iter_count + iter_start - 1:  # time iter_count iterations
+                break
+
     t1 = time.time()
 
-    return (t1 - t0) / (i + 1)
+    return (t1 - t0) / iter_count

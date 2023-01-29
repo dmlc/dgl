@@ -2,16 +2,18 @@
 # pylint: disable=not-callable
 import numpy as np
 
-from .base import DGLError, is_all, NID, EID, ALL, dgl_warning
 from . import backend as F
 from . import function as fn
-from .frame import Frame
-from .udf import NodeBatch, EdgeBatch
 from . import ops
+from .base import ALL, EID, NID, DGLError, dgl_warning, is_all
+from .frame import Frame
+from .udf import EdgeBatch, NodeBatch
+
 
 def is_builtin(func):
     """Return true if the function is a DGL builtin function."""
     return isinstance(func, fn.BuiltinFunction)
+
 
 def invoke_node_udf(graph, nid, ntype, func, *, ndata=None, orig_nid=None):
     """Invoke user-defined node function on the given nodes.
@@ -43,8 +45,11 @@ def invoke_node_udf(graph, nid, ntype, func, *, ndata=None, orig_nid=None):
             nid = graph.nodes(ntype=ntype)
         else:
             ndata = graph._node_frames[ntid].subframe(nid)
-    nbatch = NodeBatch(graph, nid if orig_nid is None else orig_nid, ntype, ndata)
+    nbatch = NodeBatch(
+        graph, nid if orig_nid is None else orig_nid, ntype, ndata
+    )
     return func(nbatch)
+
 
 def invoke_edge_udf(graph, eid, etype, func, *, orig_eid=None):
     """Invoke user-defined edge function on the given edges.
@@ -70,19 +75,28 @@ def invoke_edge_udf(graph, eid, etype, func, *, orig_eid=None):
     etid = graph.get_etype_id(etype)
     stid, dtid = graph._graph.metagraph.find_edge(etid)
     if is_all(eid):
-        u, v, eid = graph.edges(form='all')
+        u, v, eid = graph.edges(form="all")
         edata = graph._edge_frames[etid]
     else:
         u, v = graph.find_edges(eid)
         edata = graph._edge_frames[etid].subframe(eid)
     if len(u) == 0:
-        dgl_warning('The input graph for the user-defined edge function ' \
-                    'does not contain valid edges')
+        dgl_warning(
+            "The input graph for the user-defined edge function "
+            "does not contain valid edges"
+        )
     srcdata = graph._node_frames[stid].subframe(u)
     dstdata = graph._node_frames[dtid].subframe(v)
-    ebatch = EdgeBatch(graph, eid if orig_eid is None else orig_eid,
-                       etype, srcdata, edata, dstdata)
+    ebatch = EdgeBatch(
+        graph,
+        eid if orig_eid is None else orig_eid,
+        etype,
+        srcdata,
+        edata,
+        dstdata,
+    )
     return func(ebatch)
+
 
 def invoke_udf_reduce(graph, func, msgdata, *, orig_nid=None):
     """Invoke user-defined reduce function on all the nodes in the graph.
@@ -119,7 +133,9 @@ def invoke_udf_reduce(graph, func, msgdata, *, orig_nid=None):
     unique_degs, bucketor = _bucketing(degs)
     bkt_rsts = []
     bkt_nodes = []
-    for deg, node_bkt, orig_nid_bkt in zip(unique_degs, bucketor(nodes), bucketor(orig_nid)):
+    for deg, node_bkt, orig_nid_bkt in zip(
+        unique_degs, bucketor(nodes), bucketor(orig_nid)
+    ):
         if deg == 0:
             # skip reduce function for zero-degree nodes
             continue
@@ -127,7 +143,7 @@ def invoke_udf_reduce(graph, func, msgdata, *, orig_nid=None):
         ndata_bkt = dstdata.subframe(node_bkt)
 
         # order the incoming edges per node by edge ID
-        eid_bkt = F.zerocopy_to_numpy(graph.in_edges(node_bkt, form='eid'))
+        eid_bkt = F.zerocopy_to_numpy(graph.in_edges(node_bkt, form="eid"))
         assert len(eid_bkt) == deg * len(node_bkt)
         eid_bkt = np.sort(eid_bkt.reshape((len(node_bkt), deg)), 1)
         eid_bkt = F.zerocopy_from_numpy(eid_bkt.flatten())
@@ -148,7 +164,9 @@ def invoke_udf_reduce(graph, func, msgdata, *, orig_nid=None):
     retf._default_initializer = dstdata._default_initializer
 
     # merge bucket results and write to the result frame
-    if len(bkt_rsts) != 0:  # if all the nodes have zero degree, no need to merge results.
+    if (
+        len(bkt_rsts) != 0
+    ):  # if all the nodes have zero degree, no need to merge results.
         merged_rst = {}
         for k in bkt_rsts[0].keys():
             merged_rst[k] = F.cat([rst[k] for rst in bkt_rsts], dim=0)
@@ -156,6 +174,7 @@ def invoke_udf_reduce(graph, func, msgdata, *, orig_nid=None):
         retf.update_row(merged_nodes, merged_rst)
 
     return retf
+
 
 def _bucketing(val):
     """Internal function to create groups on the values.
@@ -179,10 +198,13 @@ def _bucketing(val):
     for v in unique_val:
         eqidx = F.nonzero_1d(F.equal(sorted_val, v))
         bkt_idx.append(F.gather_row(idx, eqidx))
+
     def bucketor(data):
         bkts = [F.gather_row(data, idx) for idx in bkt_idx]
         return bkts
+
     return unique_val, bucketor
+
 
 def data_dict_to_list(graph, data_dict, func, target):
     """Get node or edge feature data of the given name for all the types.
@@ -206,23 +228,23 @@ def data_dict_to_list(graph, data_dict, func, target):
         data of type ``types[i]``.
     """
     if isinstance(func, fn.BinaryMessageFunction):
-        if target in ['u', 'v']:
+        if target in ["u", "v"]:
             output_list = [None] * graph._graph.number_of_ntypes()
             for srctype, _, dsttype in graph.canonical_etypes:
-                if target == 'u':
+                if target == "u":
                     src_id = graph.get_ntype_id(srctype)
                     output_list[src_id] = data_dict[srctype]
                 else:
                     dst_id = graph.get_ntype_id(dsttype)
                     output_list[dst_id] = data_dict[dsttype]
-        else: # target == 'e'
+        else:  # target == 'e'
             output_list = [None] * graph._graph.number_of_etypes()
             for rel in graph.canonical_etypes:
                 etid = graph.get_etype_id(rel)
                 output_list[etid] = data_dict[rel]
         return output_list
     else:
-        if target == 'u':
+        if target == "u":
             lhs_list = [None] * graph._graph.number_of_ntypes()
             if not isinstance(data_dict, dict):
                 src_id, _ = graph._graph.metagraph.find_edge(0)
@@ -232,12 +254,13 @@ def data_dict_to_list(graph, data_dict, func, target):
                     src_id = graph.get_ntype_id(srctype)
                     lhs_list[src_id] = data_dict[srctype]
             return lhs_list
-        else: # target == 'e':
+        else:  # target == 'e':
             rhs_list = [None] * graph._graph.number_of_etypes()
             for rel in graph.canonical_etypes:
                 etid = graph.get_etype_id(rel)
                 rhs_list[etid] = data_dict[rel]
             return rhs_list
+
 
 def invoke_gsddmm(graph, func):
     """Invoke g-SDDMM computation on the graph.
@@ -270,13 +293,16 @@ def invoke_gsddmm(graph, func):
         if graph._graph.number_of_etypes() > 1:
             # Convert to list as dict is unordered.
             if func.name == "copy_u":
-                x = data_dict_to_list(graph, x, func, 'u')
-            else: # "copy_e"
-                x = data_dict_to_list(graph, x, func, 'e')
+                x = data_dict_to_list(graph, x, func, "u")
+            else:  # "copy_e"
+                x = data_dict_to_list(graph, x, func, "e")
         z = op(graph, x)
-    return {func.out_field : z}
+    return {func.out_field: z}
 
-def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None):
+
+def invoke_gspmm(
+    graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None
+):
     """Invoke g-SPMM computation on the graph.
 
     Parameters
@@ -301,9 +327,11 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
     """
     # sanity check
     if mfunc.out_field != rfunc.msg_field:
-        raise DGLError('Invalid message ({}) and reduce ({}) function pairs.'
-                       ' The output field of the message function must be equal to the'
-                       ' message field of the reduce function.'.format(mfunc, rfunc))
+        raise DGLError(
+            "Invalid message ({}) and reduce ({}) function pairs."
+            " The output field of the message function must be equal to the"
+            " message field of the reduce function.".format(mfunc, rfunc)
+        )
     if edata is None:
         edata = graph.edata
     if srcdata is None:
@@ -315,7 +343,7 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
     if isinstance(mfunc, fn.BinaryMessageFunction):
         x = alldata[mfunc.lhs][mfunc.lhs_field]
         y = alldata[mfunc.rhs][mfunc.rhs_field]
-        op = getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name))
+        op = getattr(ops, "{}_{}".format(mfunc.name, rfunc.name))
         if graph._graph.number_of_etypes() > 1:
             lhs_target, _, rhs_target = mfunc.name.split("_", 2)
             x = data_dict_to_list(graph, x, mfunc, lhs_target)
@@ -323,14 +351,15 @@ def invoke_gspmm(graph, mfunc, rfunc, *, srcdata=None, dstdata=None, edata=None)
         z = op(graph, x, y)
     else:
         x = alldata[mfunc.target][mfunc.in_field]
-        op = getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name))
+        op = getattr(ops, "{}_{}".format(mfunc.name, rfunc.name))
         if graph._graph.number_of_etypes() > 1 and not isinstance(x, tuple):
             if mfunc.name == "copy_u":
-                x = data_dict_to_list(graph, x, mfunc, 'u')
-            else: # "copy_e"
-                x = data_dict_to_list(graph, x, mfunc, 'e')
+                x = data_dict_to_list(graph, x, mfunc, "u")
+            else:  # "copy_e"
+                x = data_dict_to_list(graph, x, mfunc, "e")
         z = op(graph, x)
-    return {rfunc.out_field : z}
+    return {rfunc.out_field: z}
+
 
 def message_passing(g, mfunc, rfunc, afunc):
     """Invoke message passing computation on the whole graph.
@@ -351,8 +380,12 @@ def message_passing(g, mfunc, rfunc, afunc):
     dict[str, Tensor]
         Results from the message passing computation.
     """
-    if (is_builtin(mfunc) and is_builtin(rfunc) and
-            getattr(ops, '{}_{}'.format(mfunc.name, rfunc.name), None) is not None):
+    if (
+        is_builtin(mfunc)
+        and is_builtin(rfunc)
+        and getattr(ops, "{}_{}".format(mfunc.name, rfunc.name), None)
+        is not None
+    ):
         # invoke fused message passing
         ndata = invoke_gspmm(g, mfunc, rfunc)
     else:
@@ -362,7 +395,9 @@ def message_passing(g, mfunc, rfunc, afunc):
             msgdata = invoke_gsddmm(g, mfunc)
         else:
             orig_eid = g.edata.get(EID, None)
-            msgdata = invoke_edge_udf(g, ALL, g.canonical_etypes[0], mfunc, orig_eid=orig_eid)
+            msgdata = invoke_edge_udf(
+                g, ALL, g.canonical_etypes[0], mfunc, orig_eid=orig_eid
+            )
         # reduce phase
         if is_builtin(rfunc):
             msg = rfunc.msg_field
@@ -372,9 +407,11 @@ def message_passing(g, mfunc, rfunc, afunc):
             ndata = invoke_udf_reduce(g, rfunc, msgdata, orig_nid=orig_nid)
     # apply phase
     if afunc is not None:
-        for k, v in g.dstdata.items():   # include original node features
+        for k, v in g.dstdata.items():  # include original node features
             if k not in ndata:
                 ndata[k] = v
         orig_nid = g.dstdata.get(NID, None)
-        ndata = invoke_node_udf(g, ALL, g.dsttypes[0], afunc, ndata=ndata, orig_nid=orig_nid)
+        ndata = invoke_node_udf(
+            g, ALL, g.dsttypes[0], afunc, ndata=ndata, orig_nid=orig_nid
+        )
     return ndata

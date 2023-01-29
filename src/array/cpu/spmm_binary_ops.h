@@ -1,12 +1,13 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/spmm_binary_ops.h
- * \brief SPMM CPU Binary ops.
+ * @file array/cpu/spmm_binary_ops.h
+ * @brief SPMM CPU Binary ops.
  */
 #ifndef DGL_ARRAY_CPU_SPMM_BINARY_OPS_H_
 #define DGL_ARRAY_CPU_SPMM_BINARY_OPS_H_
 #include <dgl/array.h>
 #include <dgl/bcast.h>
+
 #include <limits>
 namespace dgl {
 namespace aten {
@@ -143,21 +144,6 @@ constexpr DType Min<DType>::zero;
       { __VA_ARGS__ }                                           \
     } else {                                                    \
       LOG(FATAL) << "Unsupported SpMM binary operator: " << op; \
-    }                                                           \
-  } while (0)
-
-#define SWITCH_BITS(bits, DType, ...)                           \
-  do {                                                          \
-    if ((bits) == 16) {                                         \
-      LOG(FATAL) << "FP16 not supported on CPU";                \
-    } else if ((bits) == 32) {                                  \
-      typedef float DType;                                      \
-      { __VA_ARGS__ }                                           \
-    } else if ((bits) == 64) {                                  \
-      typedef double DType;                                     \
-      { __VA_ARGS__ }                                           \
-    } else {                                                    \
-      LOG(FATAL) << "Data type not recognized with bits " << bits; \
     }                                                           \
   } while (0)
 

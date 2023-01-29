@@ -1,10 +1,20 @@
 import mxnet as mx
 from mxnet import gluon
 
+
 class BaseRGCN(gluon.Block):
-    def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases=-1,
-                 num_hidden_layers=1, dropout=0,
-                 use_self_loop=False, gpu_id=-1):
+    def __init__(
+        self,
+        num_nodes,
+        h_dim,
+        out_dim,
+        num_rels,
+        num_bases=-1,
+        num_hidden_layers=1,
+        dropout=0,
+        use_self_loop=False,
+        gpu_id=-1,
+    ):
         super(BaseRGCN, self).__init__()
         self.num_nodes = num_nodes
         self.h_dim = h_dim

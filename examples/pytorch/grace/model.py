@@ -1,12 +1,13 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+
 from dgl.nn import GraphConv
 
 
 # Multi-layer Graph Convolutional Networks
 class GCN(nn.Module):
-    def __init__(self, in_dim, out_dim, act_fn, num_layers = 2):
+    def __init__(self, in_dim, out_dim, act_fn, num_layers=2):
         super(GCN, self).__init__()
 
         assert num_layers >= 2
@@ -25,6 +26,7 @@ class GCN(nn.Module):
             feat = self.act_fn(self.convs[i](graph, feat))
 
         return feat
+
 
 # Multi-layer(2-layer) Perceptron
 class MLP(nn.Module):
@@ -56,6 +58,7 @@ class Grace(nn.Module):
     temp: float
         Temperature constant.
     """
+
     def __init__(self, in_dim, hid_dim, out_dim, num_layers, act_fn, temp):
         super(Grace, self).__init__()
         self.encoder = GCN(in_dim, hid_dim, act_fn, num_layers)
@@ -74,8 +77,8 @@ class Grace(nn.Module):
         # calculate SimCLR loss
         f = lambda x: th.exp(x / self.temp)
 
-        refl_sim = f(self.sim(z1, z1))        # intra-view pairs
-        between_sim = f(self.sim(z1, z2))     # inter-view pairs
+        refl_sim = f(self.sim(z1, z1))  # intra-view pairs
+        between_sim = f(self.sim(z1, z2))  # inter-view pairs
 
         # between_sim.diag(): positive pairs
         x1 = refl_sim.sum(1) + between_sim.sum(1) - refl_sim.diag()

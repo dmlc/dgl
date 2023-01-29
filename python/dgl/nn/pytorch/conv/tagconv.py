@@ -8,12 +8,8 @@ from .graphconv import EdgeWeightNorm
 
 
 class TAGConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Topology Adaptive Graph Convolutional layer from paper `Topology
-    Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__.
+    r"""Topology Adaptive Graph Convolutional layer from `Topology
+    Adaptive Graph Convolutional Networks <https://arxiv.org/pdf/1710.10370.pdf>`__
 
     .. math::
         H^{K} = {\sum}_{k=0}^K (D^{-1/2} A D^{-1/2})^{k} X {\Theta}_{k},
@@ -61,13 +57,14 @@ class TAGConv(nn.Module):
             [ 0.3304, -1.9927]], grad_fn=<AddmmBackward>)
     """
 
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k=2,
-                 bias=True,
-                 activation=None,
-                 ):
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        k=2,
+        bias=True,
+        activation=None,
+    ):
         super(TAGConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -88,7 +85,7 @@ class TAGConv(nn.Module):
         ----
         The model parameters are initialized using Glorot uniform initialization.
         """
-        gain = nn.init.calculate_gain('relu')
+        gain = nn.init.calculate_gain("relu")
         nn.init.xavier_normal_(self.lin.weight, gain=gain)
 
     def forward(self, graph, feat, edge_weight=None):
@@ -108,7 +105,7 @@ class TAGConv(nn.Module):
         edge_weight: torch.Tensor, optional
             edge_weight to use in the message passing process. This is equivalent to
             using weighted adjacency matrix in the equation above, and
-            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            :math:`\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}`
             is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns
@@ -118,16 +115,17 @@ class TAGConv(nn.Module):
             is size of output feature.
         """
         with graph.local_scope():
-            assert graph.is_homogeneous, 'Graph is not homogeneous'
+            assert graph.is_homogeneous, "Graph is not homogeneous"
             if edge_weight is None:
-                norm = th.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+                norm = th.pow(graph.in_degrees().to(feat).clamp(min=1), -0.5)
                 shp = norm.shape + (1,) * (feat.dim() - 1)
                 norm = th.reshape(norm, shp).to(feat.device)
 
             msg_func = fn.copy_u("h", "m")
             if edge_weight is not None:
-                graph.edata["_edge_weight"] = EdgeWeightNorm(
-                    'both')(graph, edge_weight)
+                graph.edata["_edge_weight"] = EdgeWeightNorm("both")(
+                    graph, edge_weight
+                )
                 msg_func = fn.u_mul_e("h", "_edge_weight", "m")
             # D-1/2 A D -1/2 X
             fstack = [feat]
@@ -136,11 +134,10 @@ class TAGConv(nn.Module):
                     rst = fstack[-1] * norm
                 else:
                     rst = fstack[-1]
-                graph.ndata['h'] = rst
+                graph.ndata["h"] = rst
 
-                graph.update_all(msg_func,
-                                 fn.sum(msg='m', out='h'))
-                rst = graph.ndata['h']
+                graph.update_all(msg_func, fn.sum(msg="m", out="h"))
+                rst = graph.ndata["h"]
                 if edge_weight is None:
                     rst = rst * norm
                 fstack.append(rst)

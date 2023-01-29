@@ -1,17 +1,17 @@
-/*!
+/**
  *  Copyright (c) 2020 by Contributors
- * \file array/cpu/coo_sort.cc
- * \brief COO sorting
+ * @file array/cpu/coo_sort.cc
+ * @brief COO sorting
  */
 #include <dgl/array.h>
 #ifdef PARALLEL_ALGORITHMS
 #include <parallel/algorithm>
 #endif
-#include <numeric>
 #include <algorithm>
-#include <vector>
 #include <iterator>
+#include <numeric>
 #include <tuple>
+#include <vector>
 
 namespace {
 
@@ -20,8 +20,8 @@ struct TupleRef {
   TupleRef() = delete;
   TupleRef(const TupleRef& other) = default;
   TupleRef(TupleRef&& other) = default;
-  TupleRef(IdType *const r, IdType *const c, IdType *const d)
-    : row(r), col(c), data(d) {}
+  TupleRef(IdType* const r, IdType* const c, IdType* const d)
+      : row(r), col(c), data(d) {}
 
   TupleRef& operator=(const TupleRef& other) {
     *row = *other.row;
@@ -56,43 +56,31 @@ void swap(const TupleRef<IdType>& r1, const TupleRef<IdType>& r2) {
 }
 
 template <typename IdType>
-struct CooIterator : public std::iterator<std::random_access_iterator_tag,
-                                          std::tuple<IdType, IdType, IdType>,
-                                          std::ptrdiff_t,
-                                          std::tuple<IdType*, IdType*, IdType*>,
-                                          TupleRef<IdType>> {
+struct CooIterator
+    : public std::iterator<
+          std::random_access_iterator_tag, std::tuple<IdType, IdType, IdType>,
+          std::ptrdiff_t, std::tuple<IdType*, IdType*, IdType*>,
+          TupleRef<IdType>> {
   CooIterator() = default;
   CooIterator(const CooIterator& other) = default;
   CooIterator(CooIterator&& other) = default;
-  CooIterator(IdType *r, IdType *c, IdType *d): row(r), col(c), data(d) {}
+  CooIterator(IdType* r, IdType* c, IdType* d) : row(r), col(c), data(d) {}
 
   CooIterator& operator=(const CooIterator& other) = default;
   CooIterator& operator=(CooIterator&& other) = default;
   ~CooIterator() = default;
 
-  bool operator==(const CooIterator& other) const {
-    return row == other.row;
-  }
+  bool operator==(const CooIterator& other) const { return row == other.row; }
 
-  bool operator!=(const CooIterator& other) const {
-    return row != other.row;
-  }
+  bool operator!=(const CooIterator& other) const { return row != other.row; }
 
-  bool operator<(const CooIterator& other) const {
-    return row < other.row;
-  }
+  bool operator<(const CooIterator& other) const { return row < other.row; }
 
-  bool operator>(const CooIterator& other) const {
-    return row > other.row;
-  }
+  bool operator>(const CooIterator& other) const { return row > other.row; }
 
-  bool operator<=(const CooIterator& other) const {
-    return row <= other.row;
-  }
+  bool operator<=(const CooIterator& other) const { return row <= other.row; }
 
-  bool operator>=(const CooIterator& other) const {
-    return row >= other.row;
-  }
+  bool operator>=(const CooIterator& other) const { return row >= other.row; }
 
   CooIterator& operator+=(const std::ptrdiff_t& movement) {
     row += movement;
@@ -108,13 +96,9 @@ struct CooIterator : public std::iterator<std::random_access_iterator_tag,
     return *this;
   }
 
-  CooIterator& operator++() {
-    return operator+=(1);
-  }
+  CooIterator& operator++() { return operator+=(1); }
 
-  CooIterator& operator--() {
-    return operator-=(1);
-  }
+  CooIterator& operator--() { return operator-=(1); }
 
   CooIterator operator++(int) {
     CooIterator ret(*this);
@@ -147,9 +131,7 @@ struct CooIterator : public std::iterator<std::random_access_iterator_tag,
   TupleRef<IdType> operator*() const {
     return TupleRef<IdType>(row, col, data);
   }
-  TupleRef<IdType> operator*() {
-    return TupleRef<IdType>(row, col, data);
-  }
+  TupleRef<IdType> operator*() { return TupleRef<IdType>(row, col, data); }
 
   // required for random access iterators in VS2019
   TupleRef<IdType> operator[](size_t offset) const {
@@ -167,7 +149,7 @@ namespace impl {
 
 ///////////////////////////// COOSort_ /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
   const int64_t nnz = coo->row->shape[0];
   IdType* coo_row = coo->row.Ptr<IdType>();
@@ -188,8 +170,9 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
         CooIterator<IdType>(coo_row, coo_col, coo_data),
         CooIterator<IdType>(coo_row, coo_col, coo_data) + nnz,
         [](const Tuple& a, const Tuple& b) {
-          return (std::get<0>(a) != std::get<0>(b)) ?
-              (std::get<0>(a) < std::get<0>(b)) : (std::get<1>(a) < std::get<1>(b));
+          return (std::get<0>(a) != std::get<0>(b))
+                     ? (std::get<0>(a) < std::get<0>(b))
+                     : (std::get<1>(a) < std::get<1>(b));
         });
   } else {
 #ifdef PARALLEL_ALGORITHMS
@@ -208,13 +191,12 @@ void COOSort_(COOMatrix* coo, bool sort_column) {
   coo->col_sorted = sort_column;
 }
 
-template void COOSort_<kDLCPU, int32_t>(COOMatrix*, bool);
-template void COOSort_<kDLCPU, int64_t>(COOMatrix*, bool);
-
+template void COOSort_<kDGLCPU, int32_t>(COOMatrix*, bool);
+template void COOSort_<kDGLCPU, int64_t>(COOMatrix*, bool);
 
 ///////////////////////////// COOIsSorted /////////////////////////////
 
-template <DLDeviceType XPU, typename IdType>
+template <DGLDeviceType XPU, typename IdType>
 std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
   const int64_t nnz = coo.row->shape[0];
   IdType* row = coo.row.Ptr<IdType>();
@@ -225,13 +207,12 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo) {
     row_sorted = (row[i - 1] <= row[i]);
     col_sorted = col_sorted && (row[i - 1] < row[i] || col[i - 1] <= col[i]);
   }
-  if (!row_sorted)
-    col_sorted = false;
+  if (!row_sorted) col_sorted = false;
   return {row_sorted, col_sorted};
 }
 
-template std::pair<bool, bool> COOIsSorted<kDLCPU, int32_t>(COOMatrix coo);
-template std::pair<bool, bool> COOIsSorted<kDLCPU, int64_t>(COOMatrix coo);
+template std::pair<bool, bool> COOIsSorted<kDGLCPU, int32_t>(COOMatrix coo);
+template std::pair<bool, bool> COOIsSorted<kDGLCPU, int64_t>(COOMatrix coo);
 
 }  // namespace impl
 }  // namespace aten

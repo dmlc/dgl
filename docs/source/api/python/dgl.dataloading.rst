@@ -3,77 +3,58 @@
 dgl.dataloading
 =================================
 
-.. automodule:: dgl.dataloading
+.. currentmodule:: dgl.dataloading
+
+The ``dgl.dataloading`` package provides two primitives to compose a data pipeline
+for loading from graph data. ``Sampler`` represents algorithms
+to generate subgraph samples from the original graph, and ``DataLoader``
+represents the iterable over these samples.
+
+DGL provides a number of built-in samplers that subclass :class:`~dgl.dataloading.Sampler`.
+Creating new samplers follow the same paradigm. Read our user guide chapter
+:ref:`guide-minibatch` for more examples and explanations.
+
+The entire package only works for PyTorch backend.
 
 DataLoaders
 -----------
-.. currentmodule:: dgl.dataloading.pytorch
 
-DGL DataLoader for mini-batch training works similarly to PyTorch's DataLoader.
-It has a generator interface that returns mini-batches sampled from some given graphs.
-DGL provides two DataLoaders: a ``NodeDataLoader`` for node classification task
-and an ``EdgeDataLoader`` for edge/link prediction task.
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-.. autoclass:: NodeDataLoader
-.. autoclass:: EdgeDataLoader
-.. autoclass:: GraphDataLoader
+    DataLoader
+    GraphDataLoader
+    DistNodeDataLoader
+    DistEdgeDataLoader
 
 .. _api-dataloading-neighbor-sampling:
 
-Neighbor Sampler
-----------------
-.. currentmodule:: dgl.dataloading.neighbor
+Samplers
+--------
 
-Neighbor samplers are classes that control the behavior of ``DataLoader`` s
-to sample neighbors. All of them inherit the base :class:`BlockSampler` class, but implement
-different neighbor sampling strategies by overriding the ``sample_frontier`` or
-the ``sample_blocks`` methods.
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-.. autoclass:: BlockSampler
-    :members: sample_frontier, sample_blocks, sample
+    Sampler
+    NeighborSampler
+    LaborSampler
+    MultiLayerFullNeighborSampler
+    ClusterGCNSampler
+    ShaDowKHopSampler
+    SAINTSampler
 
-.. autoclass:: MultiLayerNeighborSampler
-    :members: sample_frontier
-    :show-inheritance:
+Sampler Transformations
+-----------------------
 
-.. autoclass:: MultiLayerFullNeighborSampler
-    :show-inheritance:
+.. autosummary::
+    :toctree: ../../generated/
 
-Subgraph Iterators
-------------------
-Subgraph iterators iterate over the original graph in subgraphs. One should use subgraph
-iterators with ``GraphDataLoader`` like follows:
-
-.. code:: python
-
-   sgiter = dgl.dataloading.ClusterGCNSubgraphIterator(
-       g, num_partitions=100, cache_directory='.', refresh=True)
-   dataloader = dgl.dataloading.GraphDataLoader(sgiter, batch_size=4, num_workers=0)
-   for subgraph_batch in dataloader:
-       train_on(subgraph_batch)
-
-.. autoclass:: dgl.dataloading.dataloader.SubgraphIterator
-
-.. autoclass:: dgl.dataloading.cluster_gcn.ClusterGCNSubgraphIterator
-
-ShaDow-GNN Subgraph Sampler
----------------------------
-.. currentmodule:: dgl.dataloading.shadow
-
-.. autoclass:: ShaDowKHopSampler
-
-.. _api-dataloading-collators:
-
-Collators
----------
-.. currentmodule:: dgl.dataloading
-
-Collators are platform-agnostic classes that generates the mini-batches
-given the graphs and indices to sample from.
-
-.. autoclass:: NodeCollator
-.. autoclass:: EdgeCollator
-.. autoclass:: GraphCollator
+    as_edge_prediction_sampler
+    BlockSampler
 
 .. _api-dataloading-negative-sampling:
 
@@ -81,27 +62,26 @@ Negative Samplers for Link Prediction
 -------------------------------------
 .. currentmodule:: dgl.dataloading.negative_sampler
 
-Negative samplers are classes that control the behavior of the ``EdgeDataLoader``
-to generate negative edges.
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-.. autoclass:: Uniform
-    :members: __call__
+    Uniform
+    PerSourceUniform
+    GlobalUniform
 
-Async Copying to/from GPUs
---------------------------
-.. currentmodule:: dgl.dataloading
+Utility Class and Functions for Feature Prefetching
+---------------------------------------------------
+.. currentmodule:: dgl.dataloading.base
 
-Data can be copied from the CPU to the GPU
-while the GPU is being used for
-computation, using the :class:`AsyncTransferer`.
-For the transfer to be fully asynchronous, the context the
-:class:`AsyncTranserer`
-is created with must be a GPU context, and the input tensor must be in 
-pinned memory.
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
 
-
-.. autoclass:: AsyncTransferer
-    :members: __init__, async_copy
-
-.. autoclass:: async_transferer.Transfer
-    :members: wait
+    set_node_lazy_features
+    set_edge_lazy_features
+    set_src_lazy_features
+    set_dst_lazy_features
+    LazyFeature

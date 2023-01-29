@@ -3,12 +3,6 @@ import backend as F
 import dgl
 from dgl.base import is_internal_column
 
-if F._default_context_str == 'cpu':
-    parametrize_dtype = pytest.mark.parametrize("idtype", [F.int32, F.int64])
-else:
-    # only test int32 on GPU because many graph operators are not supported for int64.
-    parametrize_dtype = pytest.mark.parametrize("idtype", [F.int32, F.int64])
-
 def check_fail(fn, *args, **kwargs):
     try:
         fn(*args, **kwargs)
@@ -17,7 +11,6 @@ def check_fail(fn, *args, **kwargs):
         return True
 
 def assert_is_identical(g, g2):
-    assert g.is_readonly == g2.is_readonly
     assert g.number_of_nodes() == g2.number_of_nodes()
     src, dst = g.all_edges(order='eid')
     src2, dst2 = g2.all_edges(order='eid')
@@ -32,7 +25,6 @@ def assert_is_identical(g, g2):
         assert F.allclose(g.edata[k], g2.edata[k])
 
 def assert_is_identical_hetero(g, g2, ignore_internal_data=False):
-    assert g.is_readonly == g2.is_readonly
     assert g.ntypes == g2.ntypes
     assert g.canonical_etypes == g2.canonical_etypes
 

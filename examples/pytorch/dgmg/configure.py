@@ -5,10 +5,10 @@ and will be loaded when setting up."""
 
 def dataset_based_configure(opts):
 
-    if opts['dataset'] == 'cycles':
+    if opts["dataset"] == "cycles":
         ds_configure = cycles_configure
     else:
-        raise ValueError('Unsupported dataset: {}'.format(opts['dataset']))
+        raise ValueError("Unsupported dataset: {}".format(opts["dataset"]))
 
     opts = {**opts, **ds_configure}
 
@@ -16,19 +16,19 @@ def dataset_based_configure(opts):
 
 
 synthetic_dataset_configure = {
-    'node_hidden_size': 16,
-    'num_propagation_rounds': 2,
-    'optimizer': 'Adam',
-    'nepochs': 25,
-    'ds_size': 4000,
-    'num_generated_samples': 10000,
+    "node_hidden_size": 16,
+    "num_propagation_rounds": 2,
+    "optimizer": "Adam",
+    "nepochs": 25,
+    "ds_size": 4000,
+    "num_generated_samples": 10000,
 }
 
 cycles_configure = {
     **synthetic_dataset_configure,
     **{
-        'min_size': 10,
-        'max_size': 20,
-        'lr': 5e-4,
-    }
+        "min_size": 10,
+        "max_size": 20,
+        "lr": 5e-4,
+    },
 }

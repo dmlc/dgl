@@ -1,18 +1,17 @@
 import torch
-from torch import nn
-
 from DGLDigitCapsule import DGLDigitCapsuleLayer
 from DGLRoutingLayer import squash
+from torch import nn
 
 
 class Net(nn.Module):
-    def __init__(self, device='cpu'):
+    def __init__(self, device="cpu"):
         super(Net, self).__init__()
         self.device = device
-        self.conv1 = nn.Sequential(nn.Conv2d(in_channels=1,
-                                             out_channels=256,
-                                             kernel_size=9,
-                                             stride=1), nn.ReLU(inplace=True))
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=256, kernel_size=9, stride=1),
+            nn.ReLU(inplace=True),
+        )
 
         self.primary = PrimaryCapsuleLayer(device=device)
         self.digits = DGLDigitCapsuleLayer(device=device)
@@ -29,7 +28,7 @@ class Net(nn.Module):
         for i in range(batch_s):
             one_hot_vec[i, target[i]] = 1.0
         batch_size = input.size(0)
-        v_c = torch.sqrt((input ** 2).sum(dim=2, keepdim=True))
+        v_c = torch.sqrt((input**2).sum(dim=2, keepdim=True))
         zero = torch.zeros(1).to(self.device)
         m_plus = 0.9
         m_minus = 0.1
@@ -43,15 +42,14 @@ class Net(nn.Module):
 
 
 class PrimaryCapsuleLayer(nn.Module):
-
-    def __init__(self, in_channel=256, num_unit=8, device='cpu'):
+    def __init__(self, in_channel=256, num_unit=8, device="cpu"):
         super(PrimaryCapsuleLayer, self).__init__()
         self.in_channel = in_channel
         self.num_unit = num_unit
         self.deivce = device
-        self.conv_units = nn.ModuleList([
-            nn.Conv2d(self.in_channel, 32, 9, 2) for _ in range(self.num_unit)
-        ])
+        self.conv_units = nn.ModuleList(
+            [nn.Conv2d(self.in_channel, 32, 9, 2) for _ in range(self.num_unit)]
+        )
 
     def forward(self, x):
         unit = [self.conv_units[i](x) for i, l in enumerate(self.conv_units)]

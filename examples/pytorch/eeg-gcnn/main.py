@@ -1,38 +1,67 @@
 import argparse
+
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.model_selection import train_test_split
-from joblib import load
 from EEGGraphDataset import EEGGraphDataset
-from dgl.dataloading import GraphDataLoader
-from torch.utils.data import WeightedRandomSampler
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import balanced_accuracy_score
+from joblib import load
 from sklearn import preprocessing
+from sklearn.metrics import balanced_accuracy_score, roc_auc_score
+from sklearn.model_selection import train_test_split
+from torch.utils.data import WeightedRandomSampler
 
+from dgl.dataloading import GraphDataLoader
 
 if __name__ == "__main__":
     # argparse commandline args
-    parser = argparse.ArgumentParser(description='Execute training pipeline on a given train/val subjects')
-    parser.add_argument('--num_feats', type=int, default=6, help='Number of features per node for the graph')
-    parser.add_argument('--num_nodes', type=int, default=8, help='Number of nodes in the graph')
-    parser.add_argument('--gpu_idx', type=int, default=0,
-                        help='index of GPU device that should be used for this run, defaults to 0.')
-    parser.add_argument('--num_epochs', type=int, default=40, help='Number of epochs used to train')
-    parser.add_argument('--exp_name', type=str, default='default', help='Name for the test.')
-    parser.add_argument('--batch_size', type=int, default=512, help='Batch Size. Default is 512.')
-    parser.add_argument('--model', type=str, default='shallow',
-                        help='type shallow to use shallow_EEGGraphDataset; '
-                             'type deep to use deep_EEGGraphDataset. Default is shallow')
+    parser = argparse.ArgumentParser(
+        description="Execute training pipeline on a given train/val subjects"
+    )
+    parser.add_argument(
+        "--num_feats",
+        type=int,
+        default=6,
+        help="Number of features per node for the graph",
+    )
+    parser.add_argument(
+        "--num_nodes", type=int, default=8, help="Number of nodes in the graph"
+    )
+    parser.add_argument(
+        "--gpu_idx",
+        type=int,
+        default=0,
+        help="index of GPU device that should be used for this run, defaults to 0.",
+    )
+    parser.add_argument(
+        "--num_epochs",
+        type=int,
+        default=40,
+        help="Number of epochs used to train",
+    )
+    parser.add_argument(
+        "--exp_name", type=str, default="default", help="Name for the test."
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=512,
+        help="Batch Size. Default is 512.",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="shallow",
+        help="type shallow to use shallow_EEGGraphDataset; "
+        "type deep to use deep_EEGGraphDataset. Default is shallow",
+    )
     args = parser.parse_args()
 
     # choose model
-    if args.model == 'shallow':
+    if args.model == "shallow":
         from shallow_EEGGraphConvNet import EEGGraphConvNet
 
-    if args.model == 'deep':
+    if args.model == "deep":
         from deep_EEGGraphConvNet import EEGGraphConvNet
 
     # set the random seed so that we can reproduce the results
@@ -41,9 +70,11 @@ if __name__ == "__main__":
 
     # use GPU when available
     _GPU_IDX = args.gpu_idx
-    _DEVICE = torch.device(f'cuda:{_GPU_IDX}' if torch.cuda.is_available() else 'cpu')
+    _DEVICE = torch.device(
+        f"cuda:{_GPU_IDX}" if torch.cuda.is_available() else "cpu"
+    )
     torch.cuda.set_device(_DEVICE)
-    print(f' Using device: {_DEVICE} {torch.cuda.get_device_name(_DEVICE)}')
+    print(f" Using device: {_DEVICE} {torch.cuda.get_device_name(_DEVICE)}")
 
     # load patient level indices
     _DATASET_INDEX = pd.read_csv("master_metadata_index.csv")
@@ -58,10 +89,10 @@ if __name__ == "__main__":
     num_feats = args.num_feats
 
     # set up input and targets from files
-    memmap_x = f'psd_features_data_X'
-    memmap_y = f'labels_y'
-    x = load(memmap_x, mmap_mode='r')
-    y = load(memmap_y, mmap_mode='r')
+    memmap_x = f"psd_features_data_X"
+    memmap_y = f"labels_y"
+    x = load(memmap_x, mmap_mode="r")
+    y = load(memmap_y, mmap_mode="r")
 
     # normalize psd features data
     normd_x = []
@@ -79,22 +110,33 @@ if __name__ == "__main__":
     print(f"Unique labels 0/1 mapping: {label_mapping}")
 
     # split the dataset to train and test. The ratio of test is 0.3.
-    train_and_val_subjects, heldout_subjects = train_test_split(all_subjects, test_size=0.3, random_state=42)
+    train_and_val_subjects, heldout_subjects = train_test_split(
+        all_subjects, test_size=0.3, random_state=42
+    )
 
     # split the dataset using patient indices
     train_window_indices = _DATASET_INDEX.index[
-        _DATASET_INDEX["patient_ID"].astype("str").isin(train_and_val_subjects)].tolist()
+        _DATASET_INDEX["patient_ID"].astype("str").isin(train_and_val_subjects)
+    ].tolist()
     heldout_test_window_indices = _DATASET_INDEX.index[
-        _DATASET_INDEX["patient_ID"].astype("str").isin(heldout_subjects)].tolist()
+        _DATASET_INDEX["patient_ID"].astype("str").isin(heldout_subjects)
+    ].tolist()
 
     # define model, optimizer, scheduler
     model = EEGGraphConvNet(num_feats)
     loss_function = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i * 10 for i in range(1, 26)], gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optimizer, milestones=[i * 10 for i in range(1, 26)], gamma=0.1
+    )
 
     model = model.to(_DEVICE).double()
-    num_trainable_params = np.sum([np.prod(p.size()) if p.requires_grad else 0 for p in model.parameters()])
+    num_trainable_params = np.sum(
+        [
+            np.prod(p.size()) if p.requires_grad else 0
+            for p in model.parameters()
+        ]
+    )
 
     # Dataloader========================================================================================================
 
@@ -109,7 +151,8 @@ if __name__ == "__main__":
     # sampler needs to come up with training set size number of samples
     weighted_sampler = WeightedRandomSampler(
         weights=sample_weights,
-        num_samples=len(train_window_indices), replacement=True
+        num_samples=len(train_window_indices),
+        replacement=True,
     )
 
     # train data loader
@@ -118,17 +161,20 @@ if __name__ == "__main__":
     )
 
     train_loader = GraphDataLoader(
-        dataset=train_dataset, batch_size=_BATCH_SIZE,
+        dataset=train_dataset,
+        batch_size=_BATCH_SIZE,
         sampler=weighted_sampler,
         num_workers=NUM_WORKERS,
-        pin_memory=True
+        pin_memory=True,
     )
 
     # this loader is used without weighted sampling, to evaluate metrics on full training set after each epoch
     train_metrics_loader = GraphDataLoader(
-        dataset=train_dataset, batch_size=_BATCH_SIZE,
-        shuffle=False, num_workers=NUM_WORKERS,
-        pin_memory=True
+        dataset=train_dataset,
+        batch_size=_BATCH_SIZE,
+        shuffle=False,
+        num_workers=NUM_WORKERS,
+        pin_memory=True,
     )
 
     # test data loader
@@ -137,9 +183,11 @@ if __name__ == "__main__":
     )
 
     test_loader = GraphDataLoader(
-        dataset=test_dataset, batch_size=_BATCH_SIZE,
-        shuffle=False, num_workers=NUM_WORKERS,
-        pin_memory=True
+        dataset=test_dataset,
+        batch_size=_BATCH_SIZE,
+        shuffle=False,
+        num_workers=NUM_WORKERS,
+        pin_memory=True,
     )
 
     auroc_train_history = []
@@ -173,7 +221,7 @@ if __name__ == "__main__":
         # update learning rate
         scheduler.step()
 
-    # evaluate model after each epoch for train-metric data============================================================
+        # evaluate model after each epoch for train-metric data============================================================
         model.eval()
         with torch.no_grad():
             y_probs_train = torch.empty(0, 2).to(_DEVICE)
@@ -194,10 +242,12 @@ if __name__ == "__main__":
                 y_true_train += y_batch.cpu().numpy().tolist()
 
         # returning prob distribution over target classes, take softmax over the 1st dimension
-        y_probs_train = nn.functional.softmax(y_probs_train, dim=1).cpu().numpy()
+        y_probs_train = (
+            nn.functional.softmax(y_probs_train, dim=1).cpu().numpy()
+        )
         y_true_train = np.array(y_true_train)
 
-    # evaluate model after each epoch for validation data ==============================================================
+        # evaluate model after each epoch for validation data ==============================================================
         y_probs_test = torch.empty(0, 2).to(_DEVICE)
         y_true_test, minibatch_loss, y_pred_test = [], [], []
 
@@ -217,32 +267,54 @@ if __name__ == "__main__":
             y_true_test += y_batch.cpu().numpy().tolist()
 
         # returning prob distribution over target classes, take softmax over the 1st dimension
-        y_probs_test = torch.nn.functional.softmax(y_probs_test, dim=1).cpu().numpy()
+        y_probs_test = (
+            torch.nn.functional.softmax(y_probs_test, dim=1).cpu().numpy()
+        )
         y_true_test = np.array(y_true_test)
 
         # record training auroc and testing auroc
-        auroc_train_history.append(roc_auc_score(y_true_train, y_probs_train[:, 1]))
-        auroc_test_history.append(roc_auc_score(y_true_test, y_probs_test[:, 1]))
+        auroc_train_history.append(
+            roc_auc_score(y_true_train, y_probs_train[:, 1])
+        )
+        auroc_test_history.append(
+            roc_auc_score(y_true_test, y_probs_test[:, 1])
+        )
 
         # record training balanced accuracy and testing balanced accuracy
-        balACC_train_history.append(balanced_accuracy_score(y_true_train, y_pred_train))
-        balACC_test_history.append(balanced_accuracy_score(y_true_test, y_pred_test))
+        balACC_train_history.append(
+            balanced_accuracy_score(y_true_train, y_pred_train)
+        )
+        balACC_test_history.append(
+            balanced_accuracy_score(y_true_test, y_pred_test)
+        )
 
         # LOSS - epoch loss is defined as mean of minibatch losses within epoch
         loss_train_history.append(np.mean(train_loss))
         loss_test_history.append(np.mean(minibatch_loss))
 
         # print the metrics
-        print("Train loss: {}, test loss: {}".format(loss_train_history[-1], loss_test_history[-1]))
-        print("Train AUC: {}, test AUC: {}".format(auroc_train_history[-1], auroc_test_history[-1]))
-        print("Train Bal.ACC: {}, test Bal.ACC: {}".format(balACC_train_history[-1], balACC_test_history[-1]))
+        print(
+            "Train loss: {}, test loss: {}".format(
+                loss_train_history[-1], loss_test_history[-1]
+            )
+        )
+        print(
+            "Train AUC: {}, test AUC: {}".format(
+                auroc_train_history[-1], auroc_test_history[-1]
+            )
+        )
+        print(
+            "Train Bal.ACC: {}, test Bal.ACC: {}".format(
+                balACC_train_history[-1], balACC_test_history[-1]
+            )
+        )
 
         # save model from each epoch====================================================================================
         state = {
-            'epochs': _NUM_EPOCHS,
-            'experiment_name': _EXPERIMENT_NAME,
-            'model_description': str(model),
-            'state_dict': model.state_dict(),
-            'optimizer': optimizer.state_dict()
+            "epochs": _NUM_EPOCHS,
+            "experiment_name": _EXPERIMENT_NAME,
+            "model_description": str(model),
+            "state_dict": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
         }
         torch.save(state, f"{_EXPERIMENT_NAME}_Epoch_{epoch}.ckpt")

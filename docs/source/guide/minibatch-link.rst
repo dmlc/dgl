@@ -15,7 +15,7 @@ classification.
 
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
 
-:class:`~dgl.dataloading.pytorch.EdgeDataLoader` in DGL also
+:func:`~dgl.dataloading.as_edge_prediction_sampler` in DGL also
 supports generating negative samples for link prediction. To do so, you
 need to provide the negative sampling function.
 :class:`~dgl.dataloading.negative_sampler.Uniform` is a
@@ -27,9 +27,10 @@ uniformly for each source node of an edge.
 
 .. code:: python
 
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(5))
+    dataloader = dgl.dataloading.DataLoader(
         g, train_seeds, sampler,
-        negative_sampler=dgl.dataloading.negative_sampler.Uniform(5),
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -60,10 +61,10 @@ proportional to a power of degrees.
             src = src.repeat_interleave(self.k)
             dst = self.weights.multinomial(len(src), replacement=True)
             return src, dst
-    
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, negative_sampler=NegativeSampler(g, 5))
+    dataloader = dgl.dataloading.DataLoader(
         g, train_seeds, sampler,
-        negative_sampler=NegativeSampler(g, 5),
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
@@ -193,7 +194,7 @@ classification/regression.
 
 For score prediction, the only implementation difference between the
 homogeneous graph and the heterogeneous graph is that we are looping
-over the edge types for :meth:`dgl.DGLHeteroGraph.apply_edges`.
+over the edge types for :meth:`dgl.DGLGraph.apply_edges`.
 
 .. code:: python
 
@@ -229,9 +230,10 @@ ID tensors.
 .. code:: python
 
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, negative_sampler=dgl.dataloading.negative_sampler.Uniform(5))
+    dataloader = dgl.dataloading.DataLoader(
         g, train_eid_dict, sampler,
-        negative_sampler=dgl.dataloading.negative_sampler.Uniform(5),
         batch_size=1024,
         shuffle=True,
         drop_last=False,
@@ -269,10 +271,10 @@ sampler.  For instance, the following iterates over all edges of the heterogeneo
     train_eid_dict = {
         etype: g.edges(etype=etype, form='eid')
         for etype in g.canonical_etypes}
-
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, negative_sampler=NegativeSampler(g, 5))
+    dataloader = dgl.dataloading.DataLoader(
         g, train_eid_dict, sampler,
-        negative_sampler=NegativeSampler(g, 5),
         batch_size=1024,
         shuffle=True,
         drop_last=False,

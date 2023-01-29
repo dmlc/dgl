@@ -1,48 +1,51 @@
 """
 Gated Graph Neural Network module for node selection tasks
 """
-from dgl.nn.pytorch import GatedGraphConv
 import torch
 from torch import nn
+
 import dgl
+from dgl.nn.pytorch import GatedGraphConv
 
 
 class NodeSelectionGGNN(nn.Module):
-    def __init__(self,
-                 annotation_size,
-                 out_feats,
-                 n_steps,
-                 n_etypes):
+    def __init__(self, annotation_size, out_feats, n_steps, n_etypes):
         super(NodeSelectionGGNN, self).__init__()
 
         self.annotation_size = annotation_size
         self.out_feats = out_feats
 
-        self.ggnn = GatedGraphConv(in_feats=out_feats,
-                                   out_feats=out_feats,
-                                   n_steps=n_steps,
-                                   n_etypes=n_etypes)
+        self.ggnn = GatedGraphConv(
+            in_feats=out_feats,
+            out_feats=out_feats,
+            n_steps=n_steps,
+            n_etypes=n_etypes,
+        )
 
         self.output_layer = nn.Linear(annotation_size + out_feats, 1)
         self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, graph, labels=None):
-        etypes = graph.edata.pop('type')
-        annotation = graph.ndata.pop('annotation').float()
+        etypes = graph.edata.pop("type")
+        annotation = graph.ndata.pop("annotation").float()
 
         assert annotation.size()[-1] == self.annotation_size
 
         node_num = graph.number_of_nodes()
 
-        zero_pad = torch.zeros([node_num, self.out_feats - self.annotation_size],
-                               dtype=torch.float,
-                               device=annotation.device)
+        zero_pad = torch.zeros(
+            [node_num, self.out_feats - self.annotation_size],
+            dtype=torch.float,
+            device=annotation.device,
+        )
 
         h1 = torch.cat([annotation, zero_pad], -1)
         out = self.ggnn(graph, h1, etypes)
 
-        all_logits = self.output_layer(torch.cat([out, annotation], -1)).squeeze(-1)
-        graph.ndata['logits'] = all_logits
+        all_logits = self.output_layer(
+            torch.cat([out, annotation], -1)
+        ).squeeze(-1)
+        graph.ndata["logits"] = all_logits
 
         batch_g = dgl.unbatch(graph)
 
@@ -50,7 +53,7 @@ class NodeSelectionGGNN(nn.Module):
         if labels is not None:
             loss = 0.0
         for i, g in enumerate(batch_g):
-            logits = g.ndata['logits']
+            logits = g.ndata["logits"]
             preds.append(torch.argmax(logits))
             if labels is not None:
                 logits = logits.unsqueeze(0)

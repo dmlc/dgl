@@ -7,16 +7,16 @@ import os
 import random
 import time
 
-import dgl
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from matplotlib import pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
+from models import GAT
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
-from models import GAT
+import dgl
 
 epsilon = 1 - math.log(2)
 
@@ -44,7 +44,11 @@ def load_data(dataset):
     evaluator = Evaluator(name=dataset)
 
     splitted_idx = data.get_idx_split()
-    train_idx, val_idx, test_idx = splitted_idx["train"], splitted_idx["valid"], splitted_idx["test"]
+    train_idx, val_idx, test_idx = (
+        splitted_idx["train"],
+        splitted_idx["valid"],
+        splitted_idx["test"],
+    )
     graph, labels = data[0]
 
     n_node_feats = graph.ndata["feat"].shape[1]
@@ -113,7 +117,17 @@ def adjust_learning_rate(optimizer, lr, epoch):
             param_group["lr"] = lr * epoch / 50
 
 
-def train(args, model, graph, labels, train_idx, val_idx, test_idx, optimizer, evaluator):
+def train(
+    args,
+    model,
+    graph,
+    labels,
+    train_idx,
+    val_idx,
+    test_idx,
+    optimizer,
+    evaluator,
+):
     model.train()
 
     feat = graph.ndata["feat"]
@@ -138,7 +152,9 @@ def train(args, model, graph, labels, train_idx, val_idx, test_idx, optimizer, e
         for _ in range(args.n_label_iters):
             pred = pred.detach()
             torch.cuda.empty_cache()
-            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx], dim=-1)
+            feat[unlabel_idx, -n_classes:] = F.softmax(
+                pred[unlabel_idx], dim=-1
+            )
             pred = model(graph, feat)
 
     loss = custom_loss_function(pred[train_pred_idx], labels[train_pred_idx])
@@ -149,7 +165,9 @@ def train(args, model, graph, labels, train_idx, val_idx, test_idx, optimizer, e
 
 
 @torch.no_grad()
-def evaluate(args, model, graph, labels, train_idx, val_idx, test_idx, evaluator):
+def evaluate(
+    args, model, graph, labels, train_idx, val_idx, test_idx, evaluator
+):
     model.eval()
 
     feat = graph.ndata["feat"]
@@ -162,7 +180,9 @@ def evaluate(args, model, graph, labels, train_idx, val_idx, test_idx, evaluator
     if args.n_label_iters > 0:
         unlabel_idx = torch.cat([val_idx, test_idx])
         for _ in range(args.n_label_iters):
-            feat[unlabel_idx, -n_classes:] = F.softmax(pred[unlabel_idx], dim=-1)
+            feat[unlabel_idx, -n_classes:] = F.softmax(
+                pred[unlabel_idx], dim=-1
+            )
             pred = model(graph, feat)
 
     train_loss = custom_loss_function(pred[train_idx], labels[train_idx])
@@ -180,14 +200,18 @@ def evaluate(args, model, graph, labels, train_idx, val_idx, test_idx, evaluator
     )
 
 
-def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running):
+def run(
+    args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running
+):
     evaluator_wrapper = lambda pred, labels: evaluator.eval(
         {"y_pred": pred.argmax(dim=-1, keepdim=True), "y_true": labels}
     )["acc"]
 
     # define model and optimizer
     model = gen_model(args).to(device)
-    optimizer = optim.RMSprop(model.parameters(), lr=args.lr, weight_decay=args.wd)
+    optimizer = optim.RMSprop(
+        model.parameters(), lr=args.lr, weight_decay=args.wd
+    )
 
     # training loop
     total_time = 0
@@ -202,10 +226,35 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
         adjust_learning_rate(optimizer, args.lr, epoch)
 
-        acc, loss = train(args, model, graph, labels, train_idx, val_idx, test_idx, optimizer, evaluator_wrapper)
+        acc, loss = train(
+            args,
+            model,
+            graph,
+            labels,
+            train_idx,
+            val_idx,
+            test_idx,
+            optimizer,
+            evaluator_wrapper,
+        )
 
-        train_acc, val_acc, test_acc, train_loss, val_loss, test_loss, pred = evaluate(
-            args, model, graph, labels, train_idx, val_idx, test_idx, evaluator_wrapper
+        (
+            train_acc,
+            val_acc,
+            test_acc,
+            train_loss,
+            val_loss,
+            test_loss,
+            pred,
+        ) = evaluate(
+            args,
+            model,
+            graph,
+            labels,
+            train_idx,
+            val_idx,
+            test_idx,
+            evaluator_wrapper,
         )
 
         toc = time.time()
@@ -226,8 +275,26 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             )
 
         for l, e in zip(
-            [accs, train_accs, val_accs, test_accs, losses, train_losses, val_losses, test_losses],
-            [acc, train_acc, val_acc, test_acc, loss, train_loss, val_loss, test_loss],
+            [
+                accs,
+                train_accs,
+                val_accs,
+                test_accs,
+                losses,
+                train_losses,
+                val_losses,
+                test_losses,
+            ],
+            [
+                acc,
+                train_acc,
+                val_acc,
+                test_acc,
+                loss,
+                train_loss,
+                val_loss,
+                test_loss,
+            ],
         ):
             l.append(e)
 
@@ -242,7 +309,10 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         ax.set_xticks(np.arange(0, args.n_epochs, 100))
         ax.set_yticks(np.linspace(0, 1.0, 101))
         ax.tick_params(labeltop=True, labelright=True)
-        for y, label in zip([accs, train_accs, val_accs, test_accs], ["acc", "train acc", "val acc", "test acc"]):
+        for y, label in zip(
+            [accs, train_accs, val_accs, test_accs],
+            ["acc", "train acc", "val acc", "test acc"],
+        ):
             plt.plot(range(args.n_epochs), y, label=label, linewidth=1)
         ax.xaxis.set_major_locator(MultipleLocator(100))
         ax.xaxis.set_minor_locator(AutoMinorLocator(1))
@@ -259,7 +329,8 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         ax.set_xticks(np.arange(0, args.n_epochs, 100))
         ax.tick_params(labeltop=True, labelright=True)
         for y, label in zip(
-            [losses, train_losses, val_losses, test_losses], ["loss", "train loss", "val loss", "test loss"]
+            [losses, train_losses, val_losses, test_losses],
+            ["loss", "train loss", "val loss", "test loss"],
         ):
             plt.plot(range(args.n_epochs), y, label=label, linewidth=1)
         ax.xaxis.set_major_locator(MultipleLocator(100))
@@ -288,36 +359,84 @@ def main():
     global device, n_node_feats, n_classes, epsilon
 
     argparser = argparse.ArgumentParser(
-        "GAT implementation on ogbn-arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        "GAT implementation on ogbn-arxiv",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
+    argparser.add_argument(
+        "--cpu",
+        action="store_true",
+        help="CPU mode. This option overrides --gpu.",
+    )
     argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
     argparser.add_argument("--seed", type=int, default=0, help="seed")
-    argparser.add_argument("--n-runs", type=int, default=10, help="running times")
-    argparser.add_argument("--n-epochs", type=int, default=2000, help="number of epochs")
     argparser.add_argument(
-        "--use-labels", action="store_true", help="Use labels in the training set as input features."
+        "--n-runs", type=int, default=10, help="running times"
     )
-    argparser.add_argument("--n-label-iters", type=int, default=0, help="number of label iterations")
-    argparser.add_argument("--mask-rate", type=float, default=0.5, help="mask rate")
-    argparser.add_argument("--no-attn-dst", action="store_true", help="Don't use attn_dst.")
-    argparser.add_argument("--use-norm", action="store_true", help="Use symmetrically normalized adjacency matrix.")
-    argparser.add_argument("--lr", type=float, default=0.002, help="learning rate")
-    argparser.add_argument("--n-layers", type=int, default=3, help="number of layers")
-    argparser.add_argument("--n-heads", type=int, default=3, help="number of heads")
-    argparser.add_argument("--n-hidden", type=int, default=250, help="number of hidden units")
-    argparser.add_argument("--dropout", type=float, default=0.75, help="dropout rate")
-    argparser.add_argument("--input-drop", type=float, default=0.1, help="input drop rate")
-    argparser.add_argument("--attn-drop", type=float, default=0.0, help="attention drop rate")
-    argparser.add_argument("--edge-drop", type=float, default=0.0, help="edge drop rate")
+    argparser.add_argument(
+        "--n-epochs", type=int, default=2000, help="number of epochs"
+    )
+    argparser.add_argument(
+        "--use-labels",
+        action="store_true",
+        help="Use labels in the training set as input features.",
+    )
+    argparser.add_argument(
+        "--n-label-iters",
+        type=int,
+        default=0,
+        help="number of label iterations",
+    )
+    argparser.add_argument(
+        "--mask-rate", type=float, default=0.5, help="mask rate"
+    )
+    argparser.add_argument(
+        "--no-attn-dst", action="store_true", help="Don't use attn_dst."
+    )
+    argparser.add_argument(
+        "--use-norm",
+        action="store_true",
+        help="Use symmetrically normalized adjacency matrix.",
+    )
+    argparser.add_argument(
+        "--lr", type=float, default=0.002, help="learning rate"
+    )
+    argparser.add_argument(
+        "--n-layers", type=int, default=3, help="number of layers"
+    )
+    argparser.add_argument(
+        "--n-heads", type=int, default=3, help="number of heads"
+    )
+    argparser.add_argument(
+        "--n-hidden", type=int, default=250, help="number of hidden units"
+    )
+    argparser.add_argument(
+        "--dropout", type=float, default=0.75, help="dropout rate"
+    )
+    argparser.add_argument(
+        "--input-drop", type=float, default=0.1, help="input drop rate"
+    )
+    argparser.add_argument(
+        "--attn-drop", type=float, default=0.0, help="attention drop rate"
+    )
+    argparser.add_argument(
+        "--edge-drop", type=float, default=0.0, help="edge drop rate"
+    )
     argparser.add_argument("--wd", type=float, default=0, help="weight decay")
-    argparser.add_argument("--log-every", type=int, default=20, help="log every LOG_EVERY epochs")
-    argparser.add_argument("--plot-curves", action="store_true", help="plot learning curves")
-    argparser.add_argument("--save-pred", action="store_true", help="save final predictions")
+    argparser.add_argument(
+        "--log-every", type=int, default=20, help="log every LOG_EVERY epochs"
+    )
+    argparser.add_argument(
+        "--plot-curves", action="store_true", help="plot learning curves"
+    )
+    argparser.add_argument(
+        "--save-pred", action="store_true", help="save final predictions"
+    )
     args = argparser.parse_args()
 
     if not args.use_labels and args.n_label_iters > 0:
-        raise ValueError("'--use-labels' must be enabled when n_label_iters > 0")
+        raise ValueError(
+            "'--use-labels' must be enabled when n_label_iters > 0"
+        )
 
     if args.cpu:
         device = torch.device("cpu")
@@ -337,7 +456,9 @@ def main():
 
     for i in range(args.n_runs):
         seed(args.seed + i)
-        val_acc, test_acc = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i + 1)
+        val_acc, test_acc = run(
+            args, graph, labels, train_idx, val_idx, test_idx, evaluator, i + 1
+        )
         val_accs.append(val_acc)
         test_accs.append(test_acc)
 

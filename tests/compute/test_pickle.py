@@ -1,7 +1,6 @@
 import networkx as nx
 import scipy.sparse as ssp
 import dgl
-import dgl.contrib as contrib
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
 import backend as F
@@ -10,11 +9,10 @@ import pickle
 import io
 import unittest, pytest
 import test_utils
-from test_utils import parametrize_dtype, get_cases
+from test_utils import parametrize_idtype, get_cases
 from utils import assert_is_identical, assert_is_identical_hetero
 
 def _assert_is_identical_nodeflow(nf1, nf2):
-    assert nf1.is_readonly == nf2.is_readonly
     assert nf1.number_of_nodes() == nf2.number_of_nodes()
     src, dst = nf1.all_edges()
     src2, dst2 = nf2.all_edges()
@@ -92,7 +90,7 @@ def _global_message_func(nodes):
     return {'x': nodes.data['x']}
 
 @unittest.skipIf(F._default_context_str == 'gpu', reason="GPU not implemented")
-@parametrize_dtype
+@parametrize_idtype
 @pytest.mark.parametrize('g', get_cases(exclude=['dglgraph', 'two_hetero_batch']))
 def test_pickling_graph(g, idtype):
     g = g.astype(idtype)
@@ -122,7 +120,7 @@ def test_pickling_batched_heterograph():
     g2.nodes['game'].data['g_h'] = F.randn((2, 5))
     g2.edges['plays'].data['p_h'] = F.randn((4, 6))
 
-    bg = dgl.batch_hetero([g, g2])
+    bg = dgl.batch([g, g2])
     new_bg = _reconstruct_pickle(bg)
     test_utils.check_graph_equal(bg, new_bg)
 
@@ -163,6 +161,31 @@ def test_pickling_subgraph():
     f1.close()
     f2.close()
 
+@unittest.skipIf(F._default_context_str != 'gpu', reason="Need GPU for pin")
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TensorFlow create graph on gpu when unpickle")
+@parametrize_idtype
+def test_pickling_is_pinned(idtype):
+    from copy import deepcopy
+    g = dgl.rand_graph(10, 20, idtype=idtype, device=F.cpu())
+    hg = dgl.heterograph({
+        ('user', 'follows', 'user'): ([0, 1], [1, 2]),
+        ('user', 'plays', 'game'): ([0, 1, 2, 1], [0, 0, 1, 1]),
+        ('user', 'wishes', 'game'): ([0, 2], [1, 0]),
+        ('developer', 'develops', 'game'): ([0, 1], [0, 1])
+    }, idtype=idtype, device=F.cpu())
+    for graph in [g, hg]:
+        assert not graph.is_pinned()
+        graph.pin_memory_()
+        assert graph.is_pinned()
+        pg = _reconstruct_pickle(graph)
+        assert pg.is_pinned()
+        pg.unpin_memory_()
+        dg = deepcopy(graph)
+        assert dg.is_pinned()
+        dg.unpin_memory_()
+        graph.unpin_memory_()
+
+
 if __name__ == '__main__':
     test_pickling_index()
     test_pickling_graph_index()
@@ -172,3 +195,4 @@ if __name__ == '__main__':
     test_pickling_batched_graph()
     test_pickling_heterograph()
     test_pickling_batched_heterograph()
+    test_pickling_is_pinned()

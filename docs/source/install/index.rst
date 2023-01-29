@@ -174,13 +174,13 @@ PyTorch backend
 ```````````````
 
 Export ``DGLBACKEND`` as ``pytorch`` to specify PyTorch backend. The required PyTorch
-version is 1.5.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
+version is 1.9.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
 
 MXNet backend
 `````````````
 
 Export ``DGLBACKEND`` as ``mxnet`` to specify MXNet backend. The required MXNet version is
-1.5 or later. See `mxnet.apache.org <https://mxnet.apache.org/get_started>`_ for installation
+1.6 or later. See `mxnet.apache.org <https://mxnet.apache.org/get_started>`_ for installation
 instructions.
 
 MXNet uses uint32 as the default data type for integer tensors, which only supports graph of
@@ -196,10 +196,6 @@ Tensorflow backend
 ``````````````````
 
 Export ``DGLBACKEND`` as ``tensorflow`` to specify Tensorflow backend. The required Tensorflow
-version is 2.2.0 or later. See `tensorflow.org <https://www.tensorflow.org/install>`_ for installation
+version is 2.3.0 or later. See `tensorflow.org <https://www.tensorflow.org/install>`_ for installation
 instructions. In addition, DGL will set ``TF_FORCE_GPU_ALLOW_GROWTH`` to ``true`` to prevent Tensorflow take over the whole GPU memory:
-
-.. code:: bash
-
-   pip install "tensorflow>=2.2.0"  # when using tensorflow cpu version
 

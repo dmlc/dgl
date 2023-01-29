@@ -13,6 +13,8 @@ for stochastic GNN training. It assumes that
 
 """
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 import torch
 import numpy as np
@@ -30,7 +32,7 @@ train_nids = idx_split['train']
 node_features = graph.ndata['feat']
 
 sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-train_dataloader = dgl.dataloading.NodeDataLoader(
+train_dataloader = dgl.dataloading.DataLoader(
     graph, train_nids, sampler,
     batch_size=1024,
     shuffle=True,
@@ -94,8 +96,8 @@ mfg.srcdata[dgl.NID], mfg.dstdata[dgl.NID]
 
 
 ######################################################################
-# Recall that the MFGs yielded by the ``NodeDataLoader`` and
-# ``EdgeDataLoader`` have the property that the first few source nodes are
+# Recall that the MFGs yielded by the ``DataLoader``
+# have the property that the first few source nodes are
 # always identical to the destination nodes:
 #
 # |image1|
@@ -195,7 +197,7 @@ class Model(nn.Module):
         return h
 
 sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
-train_dataloader = dgl.dataloading.NodeDataLoader(
+train_dataloader = dgl.dataloading.DataLoader(
     graph, train_nids, sampler,
     device=device,
     batch_size=1024,

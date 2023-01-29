@@ -1,18 +1,14 @@
 """Tensorflow Module for DenseChebConv"""
 # pylint: disable= no-member, arguments-differ, invalid-name
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-import numpy as np
 
 
 class DenseChebConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    Chebyshev Spectral Graph Convolution layer from paper `Convolutional
+    r"""Chebyshev Spectral Graph Convolution layer from `Convolutional
     Neural Networks on Graphs with Fast Localized Spectral Filtering
-    <https://arxiv.org/pdf/1606.09375.pdf>`__.
+    <https://arxiv.org/pdf/1606.09375.pdf>`__
 
     We recommend to use this module when applying ChebConv on dense graphs.
 
@@ -34,11 +30,7 @@ class DenseChebConv(layers.Layer):
     `ChebConv <https://docs.dgl.ai/api/python/nn.tensorflow.html#chebconv>`__
     """
 
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k,
-                 bias=True):
+    def __init__(self, in_feats, out_feats, k, bias=True):
         super(DenseChebConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
@@ -46,22 +38,24 @@ class DenseChebConv(layers.Layer):
 
         # keras initializer assume last two dims as fan_in and fan_out
         xinit = tf.keras.initializers.glorot_normal()
-        self.W = tf.Variable(initial_value=xinit(
-            shape=(k, in_feats, out_feats), dtype='float32'), trainable=True)
+        self.W = tf.Variable(
+            initial_value=xinit(
+                shape=(k, in_feats, out_feats), dtype="float32"
+            ),
+            trainable=True,
+        )
 
         if bias:
             zeroinit = tf.keras.initializers.zeros()
-            self.bias = tf.Variable(initial_value=zeroinit(
-                shape=(out_feats), dtype='float32'), trainable=True)
+            self.bias = tf.Variable(
+                initial_value=zeroinit(shape=(out_feats), dtype="float32"),
+                trainable=True,
+            )
         else:
             self.bias = None
 
     def call(self, adj, feat, lambda_max=None):
-        r"""
-
-        Description
-        -----------
-        Compute (Dense) Chebyshev Spectral Graph Convolution layer.
+        r"""Compute (Dense) Chebyshev Spectral Graph Convolution layer.
 
         Parameters
         ----------
@@ -84,9 +78,11 @@ class DenseChebConv(layers.Layer):
         """
         A = adj
         num_nodes = A.shape[0]
-        in_degree = 1 / tf.sqrt(tf.clip_by_value(tf.reduce_sum(A, 1),
-                                                 clip_value_min=1,
-                                                 clip_value_max=np.inf))
+        in_degree = 1 / tf.sqrt(
+            tf.clip_by_value(
+                tf.reduce_sum(A, 1), clip_value_min=1, clip_value_max=np.inf
+            )
+        )
         D_invsqrt = tf.linalg.diag(in_degree)
         I = tf.eye(num_nodes)
         L = I - D_invsqrt @ A @ D_invsqrt
@@ -105,7 +101,7 @@ class DenseChebConv(layers.Layer):
 
         Zs = tf.stack(Z, 0)  # (k, n, n)
 
-        Zh = (Zs @ tf.expand_dims(feat, axis=0) @ self.W)
+        Zh = Zs @ tf.expand_dims(feat, axis=0) @ self.W
         Zh = tf.reduce_sum(Zh, 0)
 
         if self.bias is not None:

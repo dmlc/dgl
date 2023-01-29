@@ -132,6 +132,7 @@ under the ``dgl`` namespace.
     DGLGraph.add_self_loop
     DGLGraph.remove_self_loop
     DGLGraph.to_simple
+    DGLGraph.to_cugraph
     DGLGraph.reorder_graph
 
 Adjacency and incidence matrix
@@ -208,6 +209,10 @@ Methods for getting or changing the device on which the graph is hosted.
 
     DGLGraph.to
     DGLGraph.device
+    DGLGraph.cpu
+    DGLGraph.pin_memory_
+    DGLGraph.unpin_memory_
+    DGLGraph.is_pinned
 
 Misc
 ----

@@ -1,7 +1,6 @@
 import networkx as nx
 import scipy.sparse as ssp
 import dgl
-import dgl.contrib as contrib
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
 import backend as F
@@ -9,7 +8,7 @@ import dgl.function as fn
 import pickle
 import io
 import unittest
-from utils import parametrize_dtype
+from test_utils import parametrize_idtype
 import multiprocessing as mp
 import os
 
@@ -23,7 +22,6 @@ def create_test_graph(idtype):
     return g
 
 def _assert_is_identical_hetero(g, g2):
-    assert g.is_readonly == g2.is_readonly
     assert g.ntypes == g2.ntypes
     assert g.canonical_etypes == g2.canonical_etypes
 
@@ -42,9 +40,8 @@ def _assert_is_identical_hetero(g, g2):
         assert F.array_equal(src, src2)
         assert F.array_equal(dst, dst2)
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_single_process(idtype):
     hg = create_test_graph(idtype=idtype)
     hg_share = hg.shared_memory("hg")
@@ -60,9 +57,8 @@ def sub_proc(hg_origin, name):
     _assert_is_identical_hetero(hg_origin, hg_rebuild)
     _assert_is_identical_hetero(hg_origin, hg_save_again)
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
-@parametrize_dtype
+@parametrize_idtype
 def test_multi_process(idtype):
     hg = create_test_graph(idtype=idtype)
     hg_share = hg.shared_memory("hg1")
@@ -70,7 +66,6 @@ def test_multi_process(idtype):
     p.start()
     p.join()
 
-@unittest.skipIf(os.name == 'nt', reason='Do not support windows yet')
 @unittest.skipIf(F._default_context_str == 'cpu', reason="Need gpu for this test")
 @unittest.skipIf(dgl.backend.backend_name == 'tensorflow', reason='Not support tensorflow for now')
 def test_copy_from_gpu():

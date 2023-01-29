@@ -114,11 +114,11 @@ class LoopyBPUpdate(nn.Module):
 
 if PAPER:
     mpn_gather_msg = [
-        DGLF.copy_edge(edge='msg', out='msg'),
-        DGLF.copy_edge(edge='alpha', out='alpha')
+        DGLF.copy_e(edge='msg', out='msg'),
+        DGLF.copy_e(edge='alpha', out='alpha')
     ]
 else:
-    mpn_gather_msg = DGLF.copy_edge(edge='msg', out='msg')
+    mpn_gather_msg = DGLF.copy_e(edge='msg', out='msg')
 
 
 if PAPER:

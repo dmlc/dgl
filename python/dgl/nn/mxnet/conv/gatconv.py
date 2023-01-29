@@ -12,12 +12,8 @@ from ....utils import expand_as_pair
 
 #pylint: enable=W0235
 class GATConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    Apply `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__
-    over an input signal.
+    r"""Graph attention layer from `Graph Attention Network
+    <https://arxiv.org/pdf/1710.10903.pdf>`__
 
     .. math::
         h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)} h_j^{(l)}

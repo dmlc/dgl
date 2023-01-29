@@ -22,6 +22,15 @@ Neighbor sampling
     :toctree: ../../generated/
 
     sample_neighbors
+    sample_labors
     sample_neighbors_biased
     select_topk
     PinSAGESampler
+
+Negative sampling
+-----------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    global_uniform_negative_sampling

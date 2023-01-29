@@ -22,16 +22,6 @@ __all__ = ['SST', 'SSTDataset']
 class SSTDataset(DGLBuiltinDataset):
     r"""Stanford Sentiment Treebank dataset.
 
-    .. deprecated:: 0.5.0
-        
-        - ``trees`` is deprecated, it is replaced by:
-
-            >>> dataset = SSTDataset()
-            >>> for tree in dataset:
-            ....    # your code here
-
-        - ``num_vocabs`` is deprecated, it is replaced by ``vocab_size``.
-
     Each sample is the constituency tree of a sentence. The leaf nodes
     represent words. The word is a int value stored in the ``x`` feature field.
     The non-leaf node has a special value ``PAD_WORD`` in the ``x`` field.
@@ -63,22 +53,22 @@ class SSTDataset(DGLBuiltinDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
     vocab : OrderedDict
         Vocabulary of the dataset
-    trees : list
-        A list of DGLGraph objects
     num_classes : int
         Number of classes for each node
     pretrained_emb: Tensor
         Pretrained glove embedding with respect the vocabulary.
     vocab_size : int
-        The size of the vocabulary
-    num_vocabs : int
         The size of the vocabulary
 
     Notes
@@ -120,7 +110,8 @@ class SSTDataset(DGLBuiltinDataset):
                  vocab_file=None,
                  raw_dir=None,
                  force_reload=False,
-                 verbose=False):
+                 verbose=False,
+                 transform=None):
         assert mode in ['train', 'dev', 'test', 'tiny']
         _url = _get_dgl_url('dataset/sst.zip')
         self._glove_embed_file = glove_embed_file if mode == 'train' else None
@@ -130,7 +121,8 @@ class SSTDataset(DGLBuiltinDataset):
                                          url=_url,
                                          raw_dir=raw_dir,
                                          force_reload=force_reload,
-                                         verbose=verbose)
+                                         verbose=verbose,
+                                         transform=transform)
 
     def process(self):
         from nltk.corpus.reader import BracketParseCorpusReader
@@ -219,11 +211,6 @@ class SSTDataset(DGLBuiltinDataset):
             self._pretrained_emb = load_info(emb_path)['embed']
 
     @property
-    def trees(self):
-        deprecate_property('dataset.trees', '[dataset[i] for i in len(dataset)]')
-        return self._trees
-
-    @property
     def vocab(self):
         r""" Vocabulary
 
@@ -255,16 +242,14 @@ class SSTDataset(DGLBuiltinDataset):
             - ``ndata['y']:`` label of the node
             - ``ndata['mask']``: 1 if the node is a leaf, otherwise 0
         """
-        return self._trees[idx]
+        if self._transform is None:
+            return self._trees[idx]
+        else:
+            return self._transform(self._trees[idx])
 
     def __len__(self):
         r"""Number of graphs in the dataset."""
         return len(self._trees)
-
-    @property
-    def num_vocabs(self):
-        deprecate_property('dataset.num_vocabs', 'dataset.vocab_size')
-        return self.vocab_size
 
     @property
     def vocab_size(self):

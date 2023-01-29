@@ -94,7 +94,7 @@
             return x
 
 第二部分的输入通常是前一部分的输出，以及由小批次边导出的原始图的子图。
-子图是从相同的数据加载器产生的。用户可以调用 :meth:`dgl.DGLHeteroGraph.apply_edges` 计算边子图中边的得分。
+子图是从相同的数据加载器产生的。用户可以调用 :meth:`dgl.DGLGraph.apply_edges` 计算边子图中边的得分。
 
 以下代码片段实现了通过合并边两端节点的特征并将其映射到全连接层来预测边的得分。
 
@@ -180,7 +180,7 @@ DGL保证边子图中的节点与生成的块列表中最后一个块的输出�
             return x
 
 在同构图和异构图上做评分预测时，代码实现的唯一不同在于调用
-:meth:`~dgl.DGLHeteroGraph.apply_edges`
+:meth:`~dgl.DGLGraph.apply_edges`
 时需要在特定类型的边上进行迭代。
 
 .. code:: python

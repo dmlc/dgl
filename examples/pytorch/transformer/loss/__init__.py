@@ -1,12 +1,14 @@
 import torch as T
+import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.distributed as dist
+
 
 class LabelSmoothing(nn.Module):
     """
     Computer loss at one time step.
     """
+
     def __init__(self, size, padding_idx, smoothing=0.0):
         """Label Smoothing module
         args:
@@ -15,7 +17,7 @@ class LabelSmoothing(nn.Module):
             smoothing: smoothing ratio
         """
         super(LabelSmoothing, self).__init__()
-        self.criterion = nn.KLDivLoss(reduction='sum')
+        self.criterion = nn.KLDivLoss(reduction="sum")
         self.size = size
         self.padding_idx = padding_idx
         self.smoothing = smoothing
@@ -26,7 +28,9 @@ class LabelSmoothing(nn.Module):
         assert x.size(1) == self.size
         with T.no_grad():
             tgt_dist = T.zeros_like(x, dtype=T.float)
-            tgt_dist.fill_(self.smoothing / (self.size - 2)) # one for padding, another for label
+            tgt_dist.fill_(
+                self.smoothing / (self.size - 2)
+            )  # one for padding, another for label
             tgt_dist[:, self.padding_idx] = 0
             tgt_dist.scatter_(1, target.unsqueeze(1), 1 - self.smoothing)
 
@@ -36,8 +40,10 @@ class LabelSmoothing(nn.Module):
 
         return self.criterion(x, tgt_dist)
 
+
 class SimpleLossCompute(nn.Module):
-    eps=1e-8
+    eps = 1e-8
+
     def __init__(self, criterion, grad_accum, opt=None):
         """Loss function and optimizer for single device
 
@@ -96,10 +102,15 @@ class SimpleLossCompute(nn.Module):
         self.loss = self.criterion(y_pred, y) / norm
         if self.opt is not None:
             self.backward_and_step()
-        self.n_correct += ((y_pred.max(dim=-1)[1] == y) & (y != self.criterion.padding_idx)).sum().item()
+        self.n_correct += (
+            ((y_pred.max(dim=-1)[1] == y) & (y != self.criterion.padding_idx))
+            .sum()
+            .item()
+        )
         self.acc_loss += self.loss.item() * norm
         self.norm_term += norm
         return self.loss.item() * norm
+
 
 class MultiGPULossCompute(SimpleLossCompute):
     def __init__(self, criterion, ndev, grad_accum, model, opt=None):
@@ -119,7 +130,9 @@ class MultiGPULossCompute(SimpleLossCompute):
             Model optimizer to use. If None, then no backward and update will be
             performed
         """
-        super(MultiGPULossCompute, self).__init__(criterion, grad_accum, opt=opt)
+        super(MultiGPULossCompute, self).__init__(
+            criterion, grad_accum, opt=opt
+        )
         self.ndev = ndev
         self.model = model
 

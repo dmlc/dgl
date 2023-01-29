@@ -1,0 +1,33 @@
+# Accuracy across 10 runs: 0.7097 ± 0.006914
+version: 0.0.2
+pipeline_name: nodepred
+pipeline_mode: train
+device: cuda:0
+data:
+  name: citeseer
+model:
+  name: gat
+  embed_size: -1              # The dimension of created embedding table. -1 means using original node embedding
+  num_layers: 2               # Number of layers.
+  hidden_size: 8              # Hidden size.
+  heads:
+  - 8
+  - 1
+  activation: elu             # Activation function.
+  feat_drop: 0.6              # Dropout rate for features.
+  attn_drop: 0.6              # Dropout rate for attentions.
+  negative_slope: 0.2
+  residual: false             # If true, the GATConv will use residule connection
+general_pipeline:
+  early_stop:
+    patience: 100             # Steps before early stop
+    checkpoint_path: checkpoint.pth # Early stop checkpoint model file path
+  num_epochs: 200             # Number of training epochs
+  eval_period: 5              # Interval epochs between evaluations
+  optimizer:
+    name: Adam
+    lr: 0.005
+    weight_decay: 0.0005
+  loss: CrossEntropyLoss
+  save_path: "results"       # Directory to save the experiment results
+  num_runs: 10               # Number of experiments to run

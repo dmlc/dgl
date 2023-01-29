@@ -5,7 +5,15 @@ import torch.nn.functional as F
 
 class MLP(nn.Module):
     def __init__(
-        self, in_feats, n_classes, n_layers, n_hidden, activation, dropout=0.0, input_drop=0.0, residual=False,
+        self,
+        in_feats,
+        n_classes,
+        n_layers,
+        n_hidden,
+        activation,
+        dropout=0.0,
+        input_drop=0.0,
+        residual=False,
     ):
         super().__init__()
         self.n_layers = n_layers

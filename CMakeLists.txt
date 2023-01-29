@@ -26,16 +26,18 @@ dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_NCCL "Build with NCCL support" OFF)
 dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
-dgl_option(USE_AVX "Build with AVX optimization" ON)
+dgl_option(USE_AVX "Build with AVX optimization" OFF)
 dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
-dgl_option(USE_FP16 "Build with fp16 support to enable mixed precision training" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
 dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
-dgl_option(USE_EPOLL "Build with epoll for socket communicator" OFF)
+dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
+dgl_option(TP_BUILD_LIBUV "Build libuv together with tensorpipe (only impacts Linux)" ON)
+dgl_option(BUILD_SPARSE "Build DGL sparse library" ON)
+dgl_option(TORCH_PYTHON_INTERPS "Python interpreter used to build tensoradapter and DGL sparse library" python3)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
@@ -45,18 +47,12 @@ endif(NOT MSVC)
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
+  # see https://github.com/NVIDIA/thrust/issues/1401
+  add_definitions(-DTHRUST_CUB_WRAPPED_NAMESPACE=dgl)
   include(cmake/modules/CUDA.cmake)
-  if ((CUDA_VERSION_MAJOR LESS 11) OR
-      ((CUDA_VERSION_MAJOR EQUAL 11) AND (CUDA_VERSION_MINOR EQUAL 0)))
-    # For cuda<11, use external CUB/Thrust library because CUB is not part of CUDA.
-    # For cuda==11.0, use external CUB/Thrust library because there is a bug in the
-    #   official CUB library which causes invalid device ordinal error for DGL. The bug
-    #   is fixed by https://github.com/NVIDIA/cub/commit/9143e47e048641aa0e6ddfd645bcd54ff1059939
-    #   in 11.1.
-    message(STATUS "Detected CUDA of version ${CUDA_VERSION}. Use external CUB/Thrust library.")
-    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
-    cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/cub")
-  endif()
+  message(STATUS "Use external CUB/Thrust library for a consistent API and performance.")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/cub")
 endif(USE_CUDA)
 
 # initial variables
@@ -91,11 +87,10 @@ if(MSVC)
   endif()
 else(MSVC)
   include(CheckCXXCompilerFlag)
-  check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
+  # tensorpipe's dependencies require C++14
+  check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
-  # We still use c++11 flag in CPU build because gcc5.4 (our default compiler) is
-  # not fully compatible with c++14 feature.
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
   if(NOT APPLE)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
   endif(NOT APPLE)
@@ -122,20 +117,16 @@ if(USE_AVX)
   endif(USE_LIBXSMM)
 endif(USE_AVX)
 
-if (USE_EPOLL)
-  check_include_file("sys/epoll.h" USE_EPOLL)
-  if (USE_EPOLL)
+if ((NOT MSVC) AND USE_EPOLL)
+  INCLUDE(CheckIncludeFile)
+  check_include_file("sys/epoll.h" EPOLL_AVAILABLE)
+  if (EPOLL_AVAILABLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_EPOLL")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_EPOLL")
+  else()
+    message(WARNING "EPOLL is not available on this platform...")
   endif()
 endif ()
-
-# Build with fp16 to support mixed precision training.
-if(USE_FP16)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_FP16")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_FP16")
-  message(STATUS "Build with fp16 to support mixed precision training")
-endif(USE_FP16)
 
 # To compile METIS correct for DGL.
 if(MSVC)
@@ -158,7 +149,6 @@ file(GLOB DGL_SRC
   src/runtime/*.cc
   src/geometry/*.cc
   src/geometry/cpu/*.cc
-  src/dataloading/*.cc
   src/partition/*.cc
 )
 
@@ -216,7 +206,7 @@ target_include_directories(dgl PRIVATE "third_party/METIS/include/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/nanoflann/include")
 target_include_directories(dgl PRIVATE "third_party/libxsmm/include")
-
+target_include_directories(dgl PRIVATE "third_party/pcg/include")
 
 # For serialization
 if (USE_HDFS)
@@ -254,11 +244,20 @@ endif((NOT MSVC) AND USE_LIBXSMM)
 if(NOT MSVC)
   # Only build tensorpipe on linux
   string(REPLACE "-pedantic" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-  set(TP_BUILD_LIBUV ON)
+  # Disable -Wall for third-party tensorpipe due to too many warnings
+  string(REPLACE "-Wall" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+  string(REPLACE "-Wall" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
   set(TP_STATIC_OR_SHARED STATIC)
   add_subdirectory(third_party/tensorpipe)
   list(APPEND DGL_LINKER_LIBS tensorpipe)
   target_include_directories(dgl PRIVATE third_party/tensorpipe)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  # Avoid exposing third-party symbols when using DGL as a library.
+  if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
+  endif()
 endif(NOT MSVC)
 
 # Compile TVM Runtime and Featgraph
@@ -302,6 +301,7 @@ if(BUILD_TORCH)
       ${CMAKE_COMMAND} -E env
       CMAKE_COMMAND=${CMAKE_CMD}
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
       BINDIR=${BINDIR}
       cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
       DEPENDS ${BUILD_SCRIPT}
@@ -313,6 +313,7 @@ if(BUILD_TORCH)
       ${CMAKE_COMMAND} -E env
       CMAKE_COMMAND=${CMAKE_CMD}
       CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
       BINDIR=${CMAKE_CURRENT_BINARY_DIR}
       bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
       DEPENDS ${BUILD_SCRIPT}
@@ -336,9 +337,65 @@ if(BUILD_CPP_TEST)
   include_directories("third_party/dmlc-core/include")
   include_directories("third_party/phmap")
   include_directories("third_party/libxsmm/include")
+  include_directories("third_party/pcg/include")
   file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/cpp/*.cc)
   add_executable(runUnitTests ${TEST_SRC_FILES})
   target_link_libraries(runUnitTests gtest gtest_main)
   target_link_libraries(runUnitTests dgl)
   add_test(UnitTests runUnitTests)
+
+  if(NOT MSVC)
+    message(STATUS "Building dist/rpc tests")
+    file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/dist/cpp/rpc_client.cc)
+    add_executable(rpc_client ${TEST_SRC_FILES})
+    target_link_libraries(rpc_client dgl)
+    file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/dist/cpp/rpc_server.cc)
+    add_executable(rpc_server ${TEST_SRC_FILES})
+    target_link_libraries(rpc_server dgl)
+  endif(NOT MSVC)
 endif(BUILD_CPP_TEST)
+
+if(BUILD_SPARSE)
+  message(STATUS "Configuring DGL sparse library")
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
+  file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  get_target_property(DGL_INCLUDE_DIRS dgl INCLUDE_DIRECTORIES)
+  message(STATUS "DGL include directories: ${DGL_INCLUDE_DIRS}")
+  message(STATUS "DGL link directories: ${DGL_INCLUDE_DIRS}")
+  if(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dgl_sparse/build.bat BUILD_SCRIPT)
+    add_custom_target(
+      dgl_sparse
+      ALL
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
+      BINDIR=${BINDIR}
+      INCLUDEDIR="${DGL_INCLUDE_DIRS}"
+      CFLAGS=${CMAKE_C_FLAGS}
+      CXXFLAGS=${CMAKE_CXX_FLAGS}
+      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+      cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
+  else(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/dgl_sparse/build.sh BUILD_SCRIPT)
+    add_custom_target(
+      dgl_sparse
+      ALL
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
+      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      INCLUDEDIR="${DGL_INCLUDE_DIRS}"
+      CFLAGS=${CMAKE_C_FLAGS}
+      CXXFLAGS=${CMAKE_CXX_FLAGS}
+      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+      bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/dgl_sparse)
+  endif(MSVC)
+  add_dependencies(dgl_sparse dgl)
+endif(BUILD_SPARSE)

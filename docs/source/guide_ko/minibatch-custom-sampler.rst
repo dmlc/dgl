@@ -128,15 +128,15 @@ DGL은 임의의 프론티어를 MFG로 변환하는 :func:`dgl.to_block` 함수
     dst_nodes = torch.LongTensor([8])
     block = dgl.to_block(frontier, dst_nodes)
 
-:meth:`dgl.DGLHeteroGraph.number_of_src_nodes` 와
-:meth:`dgl.DGLHeteroGraph.number_of_dst_nodes` 메소스들 사용해서 특정 노트 타입의 소스 노드 및 목적지 노드의 수를 알아낼 수 있다.
+:meth:`dgl.DGLGraph.number_of_src_nodes` 와
+:meth:`dgl.DGLGraph.number_of_dst_nodes` 메소스들 사용해서 특정 노트 타입의 소스 노드 및 목적지 노드의 수를 알아낼 수 있다.
 
 .. code:: python
 
     num_src_nodes, num_dst_nodes = block.number_of_src_nodes(), block.number_of_dst_nodes()
     print(num_src_nodes, num_dst_nodes)
 
-:attr:`dgl.DGLHeteroGraph.srcdata` 와 :attr:`dgl.DGLHeteroGraph.srcnodes` 같은 멤머를 통해서 MFG의 소스 노드 피쳐들을 접근할 수 있고, :attr:`dgl.DGLHeteroGraph.dstdata` 와 :attr:`dgl.DGLHeteroGraph.dstnodes` 를 통해서는 목적지 노드의 피쳐들을 접근할 수 있다. ``srcdata`` / ``dstdata`` 와 ``srcnodes`` / ``dstnodes`` 의 사용법은 일반 그래프에 사용하는 :attr:`dgl.DGLHeteroGraph.ndata` 와 :attr:`dgl.DGLHeteroGraph.nodes` 와 동일하다.
+:attr:`dgl.DGLGraph.srcdata` 와 :attr:`dgl.DGLGraph.srcnodes` 같은 멤머를 통해서 MFG의 소스 노드 피쳐들을 접근할 수 있고, :attr:`dgl.DGLGraph.dstdata` 와 :attr:`dgl.DGLGraph.dstnodes` 를 통해서는 목적지 노드의 피쳐들을 접근할 수 있다. ``srcdata`` / ``dstdata`` 와 ``srcnodes`` / ``dstnodes`` 의 사용법은 일반 그래프에 사용하는 :attr:`dgl.DGLGraph.ndata` 와 :attr:`dgl.DGLGraph.nodes` 와 동일하다.
 
 .. code:: python
 

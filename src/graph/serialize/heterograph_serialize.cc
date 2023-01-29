@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file graph/serialize/heterograph_serialize.cc
- * \brief DGLHeteroGraph serialization implementation
+ * @file graph/serialize/heterograph_serialize.cc
+ * @brief DGLHeteroGraph serialization implementation
  *
  * The storage structure is
  * {
@@ -48,8 +48,8 @@
 #include <vector>
 
 #include "../heterograph.h"
+#include "./dglstream.h"
 #include "./graph_serialize.h"
-#include "./streamwithcount.h"
 #include "dmlc/memory_io.h"
 
 namespace dgl {
@@ -61,10 +61,11 @@ using dmlc::Stream;
 using dmlc::io::FileSystem;
 using dmlc::io::URI;
 
-bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
-                      const std::vector<NamedTensor> &nd_list) {
-  auto fs = std::unique_ptr<StreamWithCount>(
-    StreamWithCount::Create(filename.c_str(), "w", false));
+bool SaveHeteroGraphs(
+    std::string filename, List<HeteroGraphData> hdata,
+    const std::vector<NamedTensor> &nd_list, dgl_format_code_t formats) {
+  auto fs = std::unique_ptr<DGLStream>(
+      DGLStream::Create(filename.c_str(), "w", false, formats));
   CHECK(fs->IsValid()) << "File name " << filename << " is not a valid name";
 
   // Write DGL MetaData
@@ -90,7 +91,7 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
   label_fs->Write(nd_list);
 
   uint64_t gdata_start_pos =
-    fs->Count() + sizeof(uint64_t) + labels_blob.size();
+      fs->Count() + sizeof(uint64_t) + labels_blob.size();
 
   // Write start position of gdata, which can be skipped when only reading gdata
   // And label dict
@@ -119,10 +120,10 @@ bool SaveHeteroGraphs(std::string filename, List<HeteroGraphData> hdata,
   return true;
 }
 
-std::vector<HeteroGraphData> LoadHeteroGraphs(const std::string &filename,
-                                              std::vector<dgl_id_t> idx_list) {
+std::vector<HeteroGraphData> LoadHeteroGraphs(
+    const std::string &filename, std::vector<dgl_id_t> idx_list) {
   auto fs = std::unique_ptr<SeekStream>(
-    SeekStream::CreateForRead(filename.c_str(), false));
+      SeekStream::CreateForRead(filename.c_str(), false));
   CHECK(fs) << "File name " << filename << " is not a valid name";
   // Read DGL MetaData
   uint64_t magicNum, graphType, version, num_graph;
@@ -171,8 +172,8 @@ std::vector<HeteroGraphData> LoadHeteroGraphs(const std::string &filename,
     for (uint64_t i = 0; i < idx_list.size(); ++i) {
       auto gid = idx_list[i];
       CHECK((gid < graph_indices.size()) && (gid >= 0))
-        << "ID " << gid
-        << " in idx_list is out of bound. Please check your idx_list.";
+          << "ID " << gid
+          << " in idx_list is out of bound. Please check your idx_list.";
       fs->Seek(graph_indices[gid]);
       HeteroGraphData gdata = HeteroGraphData::Create();
       auto hetero_data = gdata.sptr();
@@ -186,7 +187,7 @@ std::vector<HeteroGraphData> LoadHeteroGraphs(const std::string &filename,
 
 std::vector<NamedTensor> LoadLabels_V2(const std::string &filename) {
   auto fs = std::unique_ptr<SeekStream>(
-    SeekStream::CreateForRead(filename.c_str(), false));
+      SeekStream::CreateForRead(filename.c_str(), false));
   CHECK(fs) << "File name " << filename << " is not a valid name";
   // Read DGL MetaData
   uint64_t magicNum, graphType, version, num_graph;
@@ -206,100 +207,107 @@ std::vector<NamedTensor> LoadLabels_V2(const std::string &filename) {
 }
 
 DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_MakeHeteroGraphData")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphRef hg = args[0];
-    List<Map<std::string, Value>> ndata = args[1];
-    List<Map<std::string, Value>> edata = args[2];
-    List<Value> ntype_names = args[3];
-    List<Value> etype_names = args[4];
-    *rv = HeteroGraphData::Create(hg.sptr(), ndata, edata, ntype_names,
-                                  etype_names);
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphRef hg = args[0];
+      List<Map<std::string, Value>> ndata = args[1];
+      List<Map<std::string, Value>> edata = args[2];
+      List<Value> ntype_names = args[3];
+      List<Value> etype_names = args[4];
+      *rv = HeteroGraphData::Create(
+          hg.sptr(), ndata, edata, ntype_names, etype_names);
+    });
 
 DGL_REGISTER_GLOBAL("data.heterograph_serialize._CAPI_SaveHeteroGraphData")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    std::string filename = args[0];
-    List<HeteroGraphData> hgdata = args[1];
-    Map<std::string, Value> nd_map = args[2];
-    std::vector<NamedTensor> nd_list;
-    for (auto kv : nd_map) {
-      NDArray ndarray = static_cast<NDArray>(kv.second->data);
-      nd_list.emplace_back(kv.first, ndarray);
-    }
-    *rv = dgl::serialize::SaveHeteroGraphs(filename, hgdata, nd_list);
-  });
-
-DGL_REGISTER_GLOBAL(
-  "data.heterograph_serialize._CAPI_GetGindexFromHeteroGraphData")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphData hdata = args[0];
-    *rv = HeteroGraphRef(hdata->gptr);
-  });
-
-DGL_REGISTER_GLOBAL(
-  "data.heterograph_serialize._CAPI_GetEtypesFromHeteroGraphData")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphData hdata = args[0];
-    List<Value> etype_names;
-    for (const auto &name : hdata->etype_names) {
-      etype_names.push_back(Value(MakeValue(name)));
-    }
-    *rv = etype_names;
-  });
-
-DGL_REGISTER_GLOBAL(
-  "data.heterograph_serialize._CAPI_GetNtypesFromHeteroGraphData")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphData hdata = args[0];
-    List<Value> ntype_names;
-    for (auto name : hdata->ntype_names) {
-      ntype_names.push_back(Value(MakeValue(name)));
-    }
-    *rv = ntype_names;
-  });
-
-DGL_REGISTER_GLOBAL(
-  "data.heterograph_serialize._CAPI_GetNDataFromHeteroGraphData")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphData hdata = args[0];
-    List<List<Value>> ntensors;
-    for (auto tensor_list : hdata->node_tensors) {
-      List<Value> nlist;
-      for (const auto &kv : tensor_list) {
-        nlist.push_back(Value(MakeValue(kv.first)));
-        nlist.push_back(Value(MakeValue(kv.second)));
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      std::string filename = args[0];
+      List<HeteroGraphData> hgdata = args[1];
+      Map<std::string, Value> nd_map = args[2];
+      List<Value> formats = args[3];
+      std::vector<SparseFormat> formats_vec;
+      for (const auto &val : formats) {
+        formats_vec.push_back(ParseSparseFormat(val->data));
       }
-      ntensors.push_back(nlist);
-    }
-    *rv = ntensors;
-  });
+      const auto formats_code = SparseFormatsToCode(formats_vec);
+      std::vector<NamedTensor> nd_list;
+      for (auto kv : nd_map) {
+        NDArray ndarray = static_cast<NDArray>(kv.second->data);
+        nd_list.emplace_back(kv.first, ndarray);
+      }
+      *rv = dgl::serialize::SaveHeteroGraphs(
+          filename, hgdata, nd_list, formats_code);
+    });
 
 DGL_REGISTER_GLOBAL(
-  "data.heterograph_serialize._CAPI_GetEDataFromHeteroGraphData")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    HeteroGraphData hdata = args[0];
-    List<List<Value>> etensors;
-    for (auto tensor_list : hdata->edge_tensors) {
-      List<Value> elist;
-      for (const auto &kv : tensor_list) {
-        elist.push_back(Value(MakeValue(kv.first)));
-        elist.push_back(Value(MakeValue(kv.second)));
+    "data.heterograph_serialize._CAPI_GetGindexFromHeteroGraphData")
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphData hdata = args[0];
+      *rv = HeteroGraphRef(hdata->gptr);
+    });
+
+DGL_REGISTER_GLOBAL(
+    "data.heterograph_serialize._CAPI_GetEtypesFromHeteroGraphData")
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphData hdata = args[0];
+      List<Value> etype_names;
+      for (const auto &name : hdata->etype_names) {
+        etype_names.push_back(Value(MakeValue(name)));
       }
-      etensors.push_back(elist);
-    }
-    *rv = etensors;
-  });
+      *rv = etype_names;
+    });
+
+DGL_REGISTER_GLOBAL(
+    "data.heterograph_serialize._CAPI_GetNtypesFromHeteroGraphData")
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphData hdata = args[0];
+      List<Value> ntype_names;
+      for (auto name : hdata->ntype_names) {
+        ntype_names.push_back(Value(MakeValue(name)));
+      }
+      *rv = ntype_names;
+    });
+
+DGL_REGISTER_GLOBAL(
+    "data.heterograph_serialize._CAPI_GetNDataFromHeteroGraphData")
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphData hdata = args[0];
+      List<List<Value>> ntensors;
+      for (auto tensor_list : hdata->node_tensors) {
+        List<Value> nlist;
+        for (const auto &kv : tensor_list) {
+          nlist.push_back(Value(MakeValue(kv.first)));
+          nlist.push_back(Value(MakeValue(kv.second)));
+        }
+        ntensors.push_back(nlist);
+      }
+      *rv = ntensors;
+    });
+
+DGL_REGISTER_GLOBAL(
+    "data.heterograph_serialize._CAPI_GetEDataFromHeteroGraphData")
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      HeteroGraphData hdata = args[0];
+      List<List<Value>> etensors;
+      for (auto tensor_list : hdata->edge_tensors) {
+        List<Value> elist;
+        for (const auto &kv : tensor_list) {
+          elist.push_back(Value(MakeValue(kv.first)));
+          elist.push_back(Value(MakeValue(kv.second)));
+        }
+        etensors.push_back(elist);
+      }
+      *rv = etensors;
+    });
 
 DGL_REGISTER_GLOBAL("data.graph_serialize._CAPI_LoadLabels_V2")
-  .set_body([](DGLArgs args, DGLRetValue *rv) {
-    std::string filename = args[0];
-    auto labels_list = LoadLabels_V2(filename);
-    Map<std::string, Value> rvmap;
-    for (auto kv : labels_list) {
-      rvmap.Set(kv.first, Value(MakeValue(kv.second)));
-    }
-    *rv = rvmap;
-  });
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      std::string filename = args[0];
+      auto labels_list = LoadLabels_V2(filename);
+      Map<std::string, Value> rvmap;
+      for (auto kv : labels_list) {
+        rvmap.Set(kv.first, Value(MakeValue(kv.second)));
+      }
+      *rv = rvmap;
+    });
 
 }  // namespace serialize
 }  // namespace dgl

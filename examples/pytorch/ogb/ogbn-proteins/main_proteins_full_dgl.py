@@ -1,7 +1,6 @@
 import os
 import time
 
-import dgl.function as fn
 import numpy as np
 import torch
 import torch.nn as nn
@@ -11,8 +10,9 @@ from ogb.nodeproppred.dataset_dgl import DglNodePropPredDataset
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
-
 from utils import load_model, set_random_seed
+
+import dgl.function as fn
 
 
 def normalize_edge_weights(graph, device, num_ew_channels):
@@ -24,7 +24,9 @@ def normalize_edge_weights(graph, device, num_ew_channels):
     graph.apply_edges(fn.e_div_u("feat", "norm", "feat"))
     graph.apply_edges(fn.e_div_v("feat", "norm", "feat"))
     for channel in range(num_ew_channels):
-        graph.edata["feat_" + str(channel)] = graph.edata["feat"][:, channel : channel + 1]
+        graph.edata["feat_" + str(channel)] = graph.edata["feat"][
+            :, channel : channel + 1
+        ]
 
 
 def run_a_train_epoch(graph, node_idx, model, criterion, optimizer, evaluator):
@@ -50,9 +52,24 @@ def run_an_eval_epoch(graph, splitted_idx, model, evaluator):
     labels = graph.ndata["labels"].cpu().numpy()
     preds = logits.cpu().detach().numpy()
 
-    train_score = evaluator.eval({"y_true": labels[splitted_idx["train"]], "y_pred": preds[splitted_idx["train"]]})
-    val_score = evaluator.eval({"y_true": labels[splitted_idx["valid"]], "y_pred": preds[splitted_idx["valid"]]})
-    test_score = evaluator.eval({"y_true": labels[splitted_idx["test"]], "y_pred": preds[splitted_idx["test"]]})
+    train_score = evaluator.eval(
+        {
+            "y_true": labels[splitted_idx["train"]],
+            "y_pred": preds[splitted_idx["train"]],
+        }
+    )
+    val_score = evaluator.eval(
+        {
+            "y_true": labels[splitted_idx["valid"]],
+            "y_pred": preds[splitted_idx["valid"]],
+        }
+    )
+    test_score = evaluator.eval(
+        {
+            "y_true": labels[splitted_idx["test"]],
+            "y_pred": preds[splitted_idx["test"]],
+        }
+    )
 
     return train_score["rocauc"], val_score["rocauc"], test_score["rocauc"]
 
@@ -75,12 +92,18 @@ def main(args):
     elif args["ewnorm"] == "none":
         print("Not normalizing edge weights")
         for channel in range(args["num_ew_channels"]):
-            graph.edata["feat_" + str(channel)] = graph.edata["feat"][:, channel : channel + 1]
+            graph.edata["feat_" + str(channel)] = graph.edata["feat"][
+                :, channel : channel + 1
+            ]
 
     model = load_model(args).to(args["device"])
-    optimizer = Adam(model.parameters(), lr=args["lr"], weight_decay=args["weight_decay"])
+    optimizer = Adam(
+        model.parameters(), lr=args["lr"], weight_decay=args["weight_decay"]
+    )
     min_lr = 1e-3
-    scheduler = ReduceLROnPlateau(optimizer, "max", factor=0.7, patience=100, verbose=True, min_lr=min_lr)
+    scheduler = ReduceLROnPlateau(
+        optimizer, "max", factor=0.7, patience=100, verbose=True, min_lr=min_lr
+    )
     print("scheduler min_lr", min_lr)
 
     criterion = nn.BCEWithLogitsLoss()
@@ -95,7 +118,9 @@ def main(args):
     best_val_score = 0.0
     num_patient_epochs = 0
     model_folder = "./saved_models/"
-    model_path = model_folder + str(args["exp_name"]) + "_" + str(args["postfix"])
+    model_path = (
+        model_folder + str(args["exp_name"]) + "_" + str(args["postfix"])
+    )
 
     if not os.path.exists(model_folder):
         os.makedirs(model_folder)
@@ -104,7 +129,9 @@ def main(args):
         if epoch >= 3:
             t0 = time.time()
 
-        loss, train_score = run_a_train_epoch(graph, splitted_idx["train"], model, criterion, optimizer, evaluator)
+        loss, train_score = run_a_train_epoch(
+            graph, splitted_idx["train"], model, criterion, optimizer, evaluator
+        )
 
         if epoch >= 3:
             dur.append(time.time() - t0)
@@ -112,7 +139,9 @@ def main(args):
         else:
             avg_time = None
 
-        train_score, val_score, test_score = run_an_eval_epoch(graph, splitted_idx, model, evaluator)
+        train_score, val_score, test_score = run_an_eval_epoch(
+            graph, splitted_idx, model, evaluator
+        )
 
         scheduler.step(val_score)
 
@@ -127,7 +156,12 @@ def main(args):
         print(
             "Epoch {:d}, loss {:.4f}, train score {:.4f}, "
             "val score {:.4f}, avg time {}, num patient epochs {:d}".format(
-                epoch, loss, train_score, val_score, avg_time, num_patient_epochs
+                epoch,
+                loss,
+                train_score,
+                val_score,
+                avg_time,
+                num_patient_epochs,
             )
         )
 
@@ -135,7 +169,9 @@ def main(args):
             break
 
     model.load_state_dict(torch.load(model_path))
-    train_score, val_score, test_score = run_an_eval_epoch(graph, splitted_idx, model, evaluator)
+    train_score, val_score, test_score = run_an_eval_epoch(
+        graph, splitted_idx, model, evaluator
+    )
     print("Train score {:.4f}".format(train_score))
     print("Valid score {:.4f}".format(val_score))
     print("Test score {:.4f}".format(test_score))
@@ -153,15 +189,34 @@ if __name__ == "__main__":
 
     from configure import get_exp_configure
 
-    parser = argparse.ArgumentParser(description="OGB node property prediction with DGL using full graph training")
+    parser = argparse.ArgumentParser(
+        description="OGB node property prediction with DGL using full graph training"
+    )
     parser.add_argument(
-        "-m", "--model", type=str, choices=["MWE-GCN", "MWE-DGCN"], default="MWE-DGCN", help="Model to use"
+        "-m",
+        "--model",
+        type=str,
+        choices=["MWE-GCN", "MWE-DGCN"],
+        default="MWE-DGCN",
+        help="Model to use",
     )
     parser.add_argument("-c", "--cuda", type=str, default="none")
-    parser.add_argument("--postfix", type=str, default="", help="a string appended to the file name of the saved model")
-    parser.add_argument("--rand_seed", type=int, default=-1, help="random seed for torch and numpy")
+    parser.add_argument(
+        "--postfix",
+        type=str,
+        default="",
+        help="a string appended to the file name of the saved model",
+    )
+    parser.add_argument(
+        "--rand_seed",
+        type=int,
+        default=-1,
+        help="random seed for torch and numpy",
+    )
     parser.add_argument("--residual", action="store_true")
-    parser.add_argument("--ewnorm", type=str, default="none", choices=["none", "both"])
+    parser.add_argument(
+        "--ewnorm", type=str, default="none", choices=["none", "both"]
+    )
     args = parser.parse_args().__dict__
 
     # Get experiment configuration

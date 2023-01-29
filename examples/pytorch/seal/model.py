@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.nn.pytorch import SortPooling, SumPooling
-from dgl.nn.pytorch import GraphConv, SAGEConv
+
+from dgl.nn.pytorch import GraphConv, SAGEConv, SortPooling, SumPooling
 
 
 class GCN(nn.Module):
@@ -26,9 +26,20 @@ class GCN(nn.Module):
 
     """
 
-    def __init__(self, num_layers, hidden_units, gcn_type='gcn', pooling_type='sum', node_attributes=None,
-                 edge_weights=None, node_embedding=None, use_embedding=False,
-                 num_nodes=None, dropout=0.5, max_z=1000):
+    def __init__(
+        self,
+        num_layers,
+        hidden_units,
+        gcn_type="gcn",
+        pooling_type="sum",
+        node_attributes=None,
+        edge_weights=None,
+        node_embedding=None,
+        use_embedding=False,
+        num_nodes=None,
+        dropout=0.5,
+        max_z=1000,
+    ):
         super(GCN, self).__init__()
         self.num_layers = num_layers
         self.dropout = dropout
@@ -39,10 +50,14 @@ class GCN(nn.Module):
 
         self.z_embedding = nn.Embedding(max_z, hidden_units)
         if node_attributes is not None:
-            self.node_attributes_lookup = nn.Embedding.from_pretrained(node_attributes)
+            self.node_attributes_lookup = nn.Embedding.from_pretrained(
+                node_attributes
+            )
             self.node_attributes_lookup.weight.requires_grad = False
         if edge_weights is not None:
-            self.edge_weights_lookup = nn.Embedding.from_pretrained(edge_weights)
+            self.edge_weights_lookup = nn.Embedding.from_pretrained(
+                edge_weights
+            )
             self.edge_weights_lookup.weight.requires_grad = False
         if node_embedding is not None:
             self.node_embedding = nn.Embedding.from_pretrained(node_embedding)
@@ -57,21 +72,31 @@ class GCN(nn.Module):
             initial_dim += self.node_embedding.embedding_dim
 
         self.layers = nn.ModuleList()
-        if gcn_type == 'gcn':
-            self.layers.append(GraphConv(initial_dim, hidden_units, allow_zero_in_degree=True))
+        if gcn_type == "gcn":
+            self.layers.append(
+                GraphConv(initial_dim, hidden_units, allow_zero_in_degree=True)
+            )
             for _ in range(num_layers - 1):
-                self.layers.append(GraphConv(hidden_units, hidden_units, allow_zero_in_degree=True))
-        elif gcn_type == 'sage':
-            self.layers.append(SAGEConv(initial_dim, hidden_units, aggregator_type='gcn'))
+                self.layers.append(
+                    GraphConv(
+                        hidden_units, hidden_units, allow_zero_in_degree=True
+                    )
+                )
+        elif gcn_type == "sage":
+            self.layers.append(
+                SAGEConv(initial_dim, hidden_units, aggregator_type="gcn")
+            )
             for _ in range(num_layers - 1):
-                self.layers.append(SAGEConv(hidden_units, hidden_units, aggregator_type='gcn'))
+                self.layers.append(
+                    SAGEConv(hidden_units, hidden_units, aggregator_type="gcn")
+                )
         else:
-            raise ValueError('Gcn type error.')
+            raise ValueError("Gcn type error.")
 
         self.linear_1 = nn.Linear(hidden_units, hidden_units)
         self.linear_2 = nn.Linear(hidden_units, 1)
-        if pooling_type != 'sum':
-            raise ValueError('Pooling type error.')
+        if pooling_type != "sum":
+            raise ValueError("Pooling type error.")
         self.pooling = SumPooling()
 
     def reset_parameters(self):
@@ -141,8 +166,20 @@ class DGCNN(nn.Module):
         max_z(int, optional): default max vocab size of node labeling, default 1000.
     """
 
-    def __init__(self, num_layers, hidden_units, k=10, gcn_type='gcn', node_attributes=None,
-                 edge_weights=None, node_embedding=None, use_embedding=False, num_nodes=None, dropout=0.5, max_z=1000):
+    def __init__(
+        self,
+        num_layers,
+        hidden_units,
+        k=10,
+        gcn_type="gcn",
+        node_attributes=None,
+        edge_weights=None,
+        node_embedding=None,
+        use_embedding=False,
+        num_nodes=None,
+        dropout=0.5,
+        max_z=1000,
+    ):
         super(DGCNN, self).__init__()
         self.num_layers = num_layers
         self.dropout = dropout
@@ -153,10 +190,14 @@ class DGCNN(nn.Module):
         self.z_embedding = nn.Embedding(max_z, hidden_units)
 
         if node_attributes is not None:
-            self.node_attributes_lookup = nn.Embedding.from_pretrained(node_attributes)
+            self.node_attributes_lookup = nn.Embedding.from_pretrained(
+                node_attributes
+            )
             self.node_attributes_lookup.weight.requires_grad = False
         if edge_weights is not None:
-            self.edge_weights_lookup = nn.Embedding.from_pretrained(edge_weights)
+            self.edge_weights_lookup = nn.Embedding.from_pretrained(
+                edge_weights
+            )
             self.edge_weights_lookup.weight.requires_grad = False
         if node_embedding is not None:
             self.node_embedding = nn.Embedding.from_pretrained(node_embedding)
@@ -171,28 +212,42 @@ class DGCNN(nn.Module):
             initial_dim += self.node_embedding.embedding_dim
 
         self.layers = nn.ModuleList()
-        if gcn_type == 'gcn':
-            self.layers.append(GraphConv(initial_dim, hidden_units, allow_zero_in_degree=True))
+        if gcn_type == "gcn":
+            self.layers.append(
+                GraphConv(initial_dim, hidden_units, allow_zero_in_degree=True)
+            )
             for _ in range(num_layers - 1):
-                self.layers.append(GraphConv(hidden_units, hidden_units, allow_zero_in_degree=True))
-            self.layers.append(GraphConv(hidden_units, 1, allow_zero_in_degree=True))
-        elif gcn_type == 'sage':
-            self.layers.append(SAGEConv(initial_dim, hidden_units, aggregator_type='gcn'))
+                self.layers.append(
+                    GraphConv(
+                        hidden_units, hidden_units, allow_zero_in_degree=True
+                    )
+                )
+            self.layers.append(
+                GraphConv(hidden_units, 1, allow_zero_in_degree=True)
+            )
+        elif gcn_type == "sage":
+            self.layers.append(
+                SAGEConv(initial_dim, hidden_units, aggregator_type="gcn")
+            )
             for _ in range(num_layers - 1):
-                self.layers.append(SAGEConv(hidden_units, hidden_units, aggregator_type='gcn'))
-            self.layers.append(SAGEConv(hidden_units, 1, aggregator_type='gcn'))
+                self.layers.append(
+                    SAGEConv(hidden_units, hidden_units, aggregator_type="gcn")
+                )
+            self.layers.append(SAGEConv(hidden_units, 1, aggregator_type="gcn"))
         else:
-            raise ValueError('Gcn type error.')
+            raise ValueError("Gcn type error.")
 
         self.pooling = SortPooling(k=k)
         conv1d_channels = [16, 32]
         total_latent_dim = hidden_units * num_layers + 1
         conv1d_kws = [total_latent_dim, 5]
-        self.conv_1 = nn.Conv1d(1, conv1d_channels[0], conv1d_kws[0],
-                                conv1d_kws[0])
+        self.conv_1 = nn.Conv1d(
+            1, conv1d_channels[0], conv1d_kws[0], conv1d_kws[0]
+        )
         self.maxpool1d = nn.MaxPool1d(2, 2)
-        self.conv_2 = nn.Conv1d(conv1d_channels[0], conv1d_channels[1],
-                                conv1d_kws[1], 1)
+        self.conv_2 = nn.Conv1d(
+            conv1d_channels[0], conv1d_channels[1], conv1d_kws[1], 1
+        )
         dense_dim = int((k - 2) / 2 + 1)
         dense_dim = (dense_dim - conv1d_kws[1] + 1) * conv1d_channels[1]
         self.linear_1 = nn.Linear(dense_dim, 128)

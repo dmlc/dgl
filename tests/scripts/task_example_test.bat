@@ -24,7 +24,7 @@ SET DGL_DOWNLOAD_DIR=!CD!
 
 PUSHD !GCN_EXAMPLE_DIR!
 python pagerank.py || GOTO :FAIL
-python gcn\gcn.py --dataset cora --gpu !DEV! || GOTO :FAIL
+python gcn\train.py --dataset cora || GOTO :FAIL
 POPD
 ENDLOCAL
 EXIT /B

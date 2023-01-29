@@ -1,18 +1,19 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file graph/transform/remove_edges.cc
- * \brief Remove edges.
+ * @file graph/transform/remove_edges.cc
+ * @brief Remove edges.
  */
 
-#include <dgl/base_heterograph.h>
-#include <dgl/transform.h>
 #include <dgl/array.h>
+#include <dgl/base_heterograph.h>
 #include <dgl/packed_func_ext.h>
-#include <dgl/runtime/registry.h>
 #include <dgl/runtime/container.h>
-#include <vector>
-#include <utility>
+#include <dgl/runtime/registry.h>
+#include <dgl/transform.h>
+
 #include <tuple>
+#include <utility>
+#include <vector>
 
 namespace dgl {
 
@@ -21,8 +22,8 @@ using namespace dgl::aten;
 
 namespace transform {
 
-std::pair<HeteroGraphPtr, std::vector<IdArray>>
-RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
+std::pair<HeteroGraphPtr, std::vector<IdArray>> RemoveEdges(
+    const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
   std::vector<IdArray> induced_eids;
   std::vector<HeteroGraphPtr> rel_graphs;
   const int64_t num_etypes = graph->NumEdgeTypes();
@@ -40,23 +41,30 @@ RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
       const COOMatrix &coo = graph->GetCOOMatrix(etype);
       const COOMatrix &result = COORemove(coo, eids[etype]);
       new_rel_graph = CreateFromCOO(
-          num_ntypes_rel, result.num_rows, result.num_cols, result.row, result.col);
+          num_ntypes_rel, result.num_rows, result.num_cols, result.row,
+          result.col);
       induced_eids_rel = result.data;
     } else if (fmt == SparseFormat::kCSR) {
       const CSRMatrix &csr = graph->GetCSRMatrix(etype);
       const CSRMatrix &result = CSRRemove(csr, eids[etype]);
       new_rel_graph = CreateFromCSR(
-          num_ntypes_rel, result.num_rows, result.num_cols, result.indptr, result.indices,
+          num_ntypes_rel, result.num_rows, result.num_cols, result.indptr,
+          result.indices,
           // TODO(BarclayII): make CSR support null eid array
-          Range(0, result.indices->shape[0], result.indices->dtype.bits, result.indices->ctx));
+          Range(
+              0, result.indices->shape[0], result.indices->dtype.bits,
+              result.indices->ctx));
       induced_eids_rel = result.data;
     } else if (fmt == SparseFormat::kCSC) {
       const CSRMatrix &csc = graph->GetCSCMatrix(etype);
       const CSRMatrix &result = CSRRemove(csc, eids[etype]);
       new_rel_graph = CreateFromCSC(
-          num_ntypes_rel, result.num_rows, result.num_cols, result.indptr, result.indices,
+          num_ntypes_rel, result.num_rows, result.num_cols, result.indptr,
+          result.indices,
           // TODO(BarclayII): make CSR support null eid array
-          Range(0, result.indices->shape[0], result.indices->dtype.bits, result.indices->ctx));
+          Range(
+              0, result.indices->shape[0], result.indices->dtype.bits,
+              result.indices->ctx));
       induced_eids_rel = result.data;
     }
 
@@ -70,24 +78,24 @@ RemoveEdges(const HeteroGraphPtr graph, const std::vector<IdArray> &eids) {
 }
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLRemoveEdges")
-.set_body([] (DGLArgs args, DGLRetValue *rv) {
-    const HeteroGraphRef graph_ref = args[0];
-    const std::vector<IdArray> &eids = ListValueToVector<IdArray>(args[1]);
+    .set_body([](DGLArgs args, DGLRetValue *rv) {
+      const HeteroGraphRef graph_ref = args[0];
+      const std::vector<IdArray> &eids = ListValueToVector<IdArray>(args[1]);
 
-    HeteroGraphPtr new_graph;
-    std::vector<IdArray> induced_eids;
-    std::tie(new_graph, induced_eids) = RemoveEdges(graph_ref.sptr(), eids);
+      HeteroGraphPtr new_graph;
+      std::vector<IdArray> induced_eids;
+      std::tie(new_graph, induced_eids) = RemoveEdges(graph_ref.sptr(), eids);
 
-    List<Value> induced_eids_ref;
-    for (IdArray &array : induced_eids)
-      induced_eids_ref.push_back(Value(MakeValue(array)));
+      List<Value> induced_eids_ref;
+      for (IdArray &array : induced_eids)
+        induced_eids_ref.push_back(Value(MakeValue(array)));
 
-    List<ObjectRef> ret;
-    ret.push_back(HeteroGraphRef(new_graph));
-    ret.push_back(induced_eids_ref);
+      List<ObjectRef> ret;
+      ret.push_back(HeteroGraphRef(new_graph));
+      ret.push_back(induced_eids_ref);
 
-    *rv = ret;
-  });
+      *rv = ret;
+    });
 
 };  // namespace transform
 

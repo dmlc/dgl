@@ -1,23 +1,39 @@
 from typing import Optional
 
-import dgl
 import torch
 import torch.nn
+from torch import Tensor
+
+import dgl
 from dgl import DGLGraph
 from dgl.nn import GraphConv
-from torch import Tensor
 
 
 class GraphConvWithDropout(GraphConv):
     """
     A GraphConv followed by a Dropout.
     """
-    def __init__(self, in_feats, out_feats, dropout=0.3, norm='both', weight=True, 
-                 bias=True, activation=None, allow_zero_in_degree=False):
-        super(GraphConvWithDropout, self).__init__(in_feats, out_feats,
-                                                   norm, weight, bias,
-                                                   activation,
-                                                   allow_zero_in_degree)
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        dropout=0.3,
+        norm="both",
+        weight=True,
+        bias=True,
+        activation=None,
+        allow_zero_in_degree=False,
+    ):
+        super(GraphConvWithDropout, self).__init__(
+            in_feats,
+            out_feats,
+            norm,
+            weight,
+            bias,
+            activation,
+            allow_zero_in_degree,
+        )
         self.dropout = torch.nn.Dropout(p=dropout)
 
     def call(self, graph, feat, weight=None):
@@ -30,7 +46,7 @@ class Discriminator(torch.nn.Module):
     Description
     -----------
     A discriminator used to let the network to discrimate
-    between positive (neighborhood of center node) and 
+    between positive (neighborhood of center node) and
     negative (any neighborhood in graph) samplings.
 
     Parameters
@@ -38,18 +54,24 @@ class Discriminator(torch.nn.Module):
     feat_dim : int
         The number of channels of node features.
     """
-    def __init__(self, feat_dim:int):
+
+    def __init__(self, feat_dim: int):
         super(Discriminator, self).__init__()
         self.affine = torch.nn.Bilinear(feat_dim, feat_dim, 1)
         self.reset_parameters()
-    
+
     def reset_parameters(self):
         torch.nn.init.xavier_uniform_(self.affine.weight)
         torch.nn.init.zeros_(self.affine.bias)
-    
-    def forward(self, h_x:Tensor, h_pos:Tensor,
-                h_neg:Tensor, bias_pos:Optional[Tensor]=None,
-                bias_neg:Optional[Tensor]=None):
+
+    def forward(
+        self,
+        h_x: Tensor,
+        h_pos: Tensor,
+        h_neg: Tensor,
+        bias_pos: Optional[Tensor] = None,
+        bias_neg: Optional[Tensor] = None,
+    ):
         """
         Parameters
         ----------
@@ -79,9 +101,9 @@ class Discriminator(torch.nn.Module):
             score_pos = score_pos + bias_pos
         if bias_neg is not None:
             score_neg = score_neg + bias_neg
-        
+
         logits = torch.cat((score_pos, score_neg), 0)
-        
+
         return logits, score_pos
 
 
@@ -91,13 +113,15 @@ class DenseLayer(torch.nn.Module):
     -----------
     Dense layer with a linear layer and an activation function
     """
-    def __init__(self, in_dim:int, out_dim:int,
-                 act:str="prelu", bias=True):
+
+    def __init__(
+        self, in_dim: int, out_dim: int, act: str = "prelu", bias=True
+    ):
         super(DenseLayer, self).__init__()
         self.lin = torch.nn.Linear(in_dim, out_dim, bias=bias)
         self.act_type = act.lower()
         self.reset_parameters()
-        
+
     def reset_parameters(self):
         torch.nn.init.xavier_uniform_(self.lin.weight)
         if self.lin.bias is not None:
@@ -121,7 +145,7 @@ class IndexSelect(torch.nn.Module):
     Parameters
     ----------
     pool_ratio : float
-        The pooling ratio (for keeping nodes). For example, 
+        The pooling ratio (for keeping nodes). For example,
         if `pool_ratio=0.8`, 80\% nodes will be preserved.
     hidden_dim : int
         The number of channels in node features.
@@ -131,8 +155,14 @@ class IndexSelect(torch.nn.Module):
     dist : int, optional
         DO NOT USE THIS PARAMETER
     """
-    def __init__(self, pool_ratio:float, hidden_dim:int,
-                 act:str="prelu", dist:int=1):
+
+    def __init__(
+        self,
+        pool_ratio: float,
+        hidden_dim: int,
+        act: str = "prelu",
+        dist: int = 1,
+    ):
         super(IndexSelect, self).__init__()
         self.pool_ratio = pool_ratio
         self.dist = dist
@@ -140,9 +170,14 @@ class IndexSelect(torch.nn.Module):
         self.discriminator = Discriminator(hidden_dim)
         self.gcn = GraphConvWithDropout(hidden_dim, hidden_dim)
 
-    def forward(self, graph:DGLGraph, h_pos:Tensor,
-                h_neg:Tensor, bias_pos:Optional[Tensor]=None,
-                bias_neg:Optional[Tensor]=None):
+    def forward(
+        self,
+        graph: DGLGraph,
+        h_pos: Tensor,
+        h_neg: Tensor,
+        bias_pos: Optional[Tensor] = None,
+        bias_neg: Optional[Tensor] = None,
+    ):
         """
         Description
         -----------
@@ -171,11 +206,11 @@ class IndexSelect(torch.nn.Module):
         embed = self.gcn(graph, h_pos)
         h_center = torch.sigmoid(embed)
 
-        logit, logit_pos = self.discriminator(h_center, h_pos,
-                                              h_neg, bias_pos,
-                                              bias_neg)
+        logit, logit_pos = self.discriminator(
+            h_center, h_pos, h_neg, bias_pos, bias_neg
+        )
         scores = torch.sigmoid(logit_pos)
-        
+
         # sort scores
         scores, idx = torch.sort(scores, descending=True)
 
@@ -203,15 +238,23 @@ class GraphPool(torch.nn.Module):
         Whether use gcn in down sampling process.
         default: :obj:`False`
     """
-    def __init__(self, hidden_dim:int, use_gcn=False):
+
+    def __init__(self, hidden_dim: int, use_gcn=False):
         super(GraphPool, self).__init__()
         self.use_gcn = use_gcn
-        self.down_sample_gcn = GraphConvWithDropout(hidden_dim, hidden_dim) \
-                               if use_gcn else None
-        
-    def forward(self, graph:DGLGraph, feat:Tensor,
-                select_idx:Tensor, non_select_idx:Optional[Tensor]=None,
-                scores:Optional[Tensor]=None, pool_graph=False):
+        self.down_sample_gcn = (
+            GraphConvWithDropout(hidden_dim, hidden_dim) if use_gcn else None
+        )
+
+    def forward(
+        self,
+        graph: DGLGraph,
+        feat: Tensor,
+        select_idx: Tensor,
+        non_select_idx: Optional[Tensor] = None,
+        scores: Optional[Tensor] = None,
+        pool_graph=False,
+    ):
         """
         Description
         -----------
@@ -226,7 +269,7 @@ class GraphPool(torch.nn.Module):
         select_idx : torch.Tensor
             The index in fine graph of node from
             coarse graph, this is obtained from
-            previous graph pooling layers. 
+            previous graph pooling layers.
         non_select_idx : torch.Tensor, optional
             The index that not included in output graph.
             default: :obj:`None`
@@ -239,7 +282,7 @@ class GraphPool(torch.nn.Module):
         """
         if self.use_gcn:
             feat = self.down_sample_gcn(graph, feat)
-        
+
         feat = feat[select_idx]
         if scores is not None:
             feat = feat * scores.unsqueeze(-1)
@@ -264,12 +307,12 @@ class GraphUnpool(torch.nn.Module):
     hidden_dim : int
         The number of channels of node features.
     """
-    def __init__(self, hidden_dim:int):
+
+    def __init__(self, hidden_dim: int):
         super(GraphUnpool, self).__init__()
         self.up_sample_gcn = GraphConvWithDropout(hidden_dim, hidden_dim)
-    
-    def forward(self, graph:DGLGraph,
-                feat:Tensor, select_idx:Tensor):
+
+    def forward(self, graph: DGLGraph, feat: Tensor, select_idx: Tensor):
         """
         Description
         -----------
@@ -286,8 +329,9 @@ class GraphUnpool(torch.nn.Module):
             coarse graph, this is obtained from
             previous graph pooling layers.
         """
-        fine_feat = torch.zeros((graph.num_nodes(), feat.size(-1)), 
-                                device=feat.device)
+        fine_feat = torch.zeros(
+            (graph.num_nodes(), feat.size(-1)), device=feat.device
+        )
         fine_feat[select_idx] = feat
         fine_feat = self.up_sample_gcn(graph, fine_feat)
         return fine_feat

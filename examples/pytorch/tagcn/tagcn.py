@@ -6,17 +6,14 @@ References:
 """
 import torch
 import torch.nn as nn
+
 from dgl.nn.pytorch.conv import TAGConv
 
+
 class TAGCN(nn.Module):
-    def __init__(self,
-                 g,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout):
+    def __init__(
+        self, g, in_feats, n_hidden, n_classes, n_layers, activation, dropout
+    ):
         super(TAGCN, self).__init__()
         self.g = g
         self.layers = nn.ModuleList()
@@ -24,9 +21,11 @@ class TAGCN(nn.Module):
         self.layers.append(TAGConv(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(TAGConv(n_hidden, n_hidden, activation=activation))
+            self.layers.append(
+                TAGConv(n_hidden, n_hidden, activation=activation)
+            )
         # output layer
-        self.layers.append(TAGConv(n_hidden, n_classes)) #activation=None
+        self.layers.append(TAGConv(n_hidden, n_classes))  # activation=None
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, features):

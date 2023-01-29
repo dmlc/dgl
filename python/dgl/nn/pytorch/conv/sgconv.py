@@ -9,12 +9,8 @@ from .graphconv import EdgeWeightNorm
 
 
 class SGConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Simplifying Graph Convolution layer from paper `Simplifying Graph
-    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
+    r"""SGC layer from `Simplifying Graph
+    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__
 
     .. math::
         H^{K} = (\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2})^K X \Theta
@@ -75,7 +71,7 @@ class SGConv(nn.Module):
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
     >>> g = dgl.add_self_loop(g)
     >>> feat = th.ones(6, 10)
-    >>> conv = SGConv(10, 2, k=2, cached=True)
+    >>> conv = SGConv(10, 2, k=2)
     >>> res = conv(g, feat)
     >>> res
     tensor([[-1.9441, -0.9343],
@@ -86,14 +82,16 @@ class SGConv(nn.Module):
             [-1.9441, -0.9343]], grad_fn=<AddmmBackward>)
     """
 
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k=1,
-                 cached=False,
-                 bias=True,
-                 norm=None,
-                 allow_zero_in_degree=False):
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        k=1,
+        cached=False,
+        bias=True,
+        norm=None,
+        allow_zero_in_degree=False,
+    ):
         super(SGConv, self).__init__()
         self.fc = nn.Linear(in_feats, out_feats, bias=bias)
         self._cached = cached
@@ -150,7 +148,7 @@ class SGConv(nn.Module):
         edge_weight: torch.Tensor, optional
             edge_weight to use in the message passing process. This is equivalent to
             using weighted adjacency matrix in the equation above, and
-            :math:\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}
+            :math:`\tilde{D}^{-1/2}\tilde{A} \tilde{D}^{-1/2}`
             is based on :class:`dgl.nn.pytorch.conv.graphconv.EdgeWeightNorm`.
 
         Returns
@@ -174,20 +172,23 @@ class SGConv(nn.Module):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             msg_func = fn.copy_u("h", "m")
             if edge_weight is not None:
-                graph.edata["_edge_weight"] = EdgeWeightNorm(
-                    'both')(graph, edge_weight)
+                graph.edata["_edge_weight"] = EdgeWeightNorm("both")(
+                    graph, edge_weight
+                )
                 msg_func = fn.u_mul_e("h", "_edge_weight", "m")
 
             if self._cached_h is not None:
@@ -195,17 +196,16 @@ class SGConv(nn.Module):
             else:
                 if edge_weight is None:
                     # compute normalization
-                    degs = graph.in_degrees().float().clamp(min=1)
+                    degs = graph.in_degrees().to(feat).clamp(min=1)
                     norm = th.pow(degs, -0.5)
                     norm = norm.to(feat.device).unsqueeze(1)
                 # compute (D^-1 A^k D)^k X
                 for _ in range(self._k):
                     if edge_weight is None:
                         feat = feat * norm
-                    graph.ndata['h'] = feat
-                    graph.update_all(msg_func,
-                                     fn.sum('m', 'h'))
-                    feat = graph.ndata.pop('h')
+                    graph.ndata["h"] = feat
+                    graph.update_all(msg_func, fn.sum("m", "h"))
+                    feat = graph.ndata.pop("h")
                     if edge_weight is None:
                         feat = feat * norm
 

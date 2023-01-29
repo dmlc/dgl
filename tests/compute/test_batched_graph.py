@@ -2,7 +2,7 @@ import dgl
 import numpy as np
 import backend as F
 import unittest
-from test_utils import parametrize_dtype
+from test_utils import parametrize_idtype
 
 def tree1(idtype):
     """Generate a tree
@@ -15,10 +15,10 @@ def tree1(idtype):
     """
     g = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g.add_nodes(5)
-    g.add_edge(3, 1)
-    g.add_edge(4, 1)
-    g.add_edge(1, 0)
-    g.add_edge(2, 0)
+    g.add_edges(3, 1)
+    g.add_edges(4, 1)
+    g.add_edges(1, 0)
+    g.add_edges(2, 0)
     g.ndata['h'] = F.tensor([0, 1, 2, 3, 4])
     g.edata['h'] = F.randn((4, 10))
     return g
@@ -34,15 +34,15 @@ def tree2(idtype):
     """
     g = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g.add_nodes(5)
-    g.add_edge(2, 4)
-    g.add_edge(0, 4)
-    g.add_edge(4, 1)
-    g.add_edge(3, 1)
+    g.add_edges(2, 4)
+    g.add_edges(0, 4)
+    g.add_edges(4, 1)
+    g.add_edges(3, 1)
     g.ndata['h'] = F.tensor([0, 1, 2, 3, 4])
     g.edata['h'] = F.randn((4, 10))
     return g
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_unbatch(idtype):
     t1 = tree1(idtype)
     t2 = tree2(idtype)
@@ -60,7 +60,7 @@ def test_batch_unbatch(idtype):
     assert F.allclose(t2.ndata['h'], tt2.ndata['h'])
     assert F.allclose(t2.edata['h'], tt2.edata['h'])
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_unbatch1(idtype):
     t1 = tree1(idtype)
     t2 = tree2(idtype)
@@ -81,7 +81,7 @@ def test_batch_unbatch1(idtype):
     assert F.allclose(t2.edata['h'], s3.edata['h'])
 
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="TF doesn't support inplace update")
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_unbatch_frame(idtype):
     """Test module of node/edge frames of batched/unbatched DGLGraphs.
     Also address the bug mentioned in https://github.com/dmlc/dgl/issues/1475.
@@ -118,7 +118,7 @@ def test_batch_unbatch_frame(idtype):
     assert F.allclose(_g2.ndata['h'], F.zeros((N2, D)))
     assert F.allclose(_g2.edata['h'], F.zeros((E2, D)))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_unbatch2(idtype):
     # test setting/getting features after batch
     a = dgl.graph(([], [])).astype(idtype).to(F.ctx())
@@ -133,7 +133,7 @@ def test_batch_unbatch2(idtype):
     assert F.allclose(c.ndata['h'], F.ones((7, 1)))
     assert F.allclose(c.edata['w'], F.ones((5, 1)))
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_send_and_recv(idtype):
     t1 = tree1(idtype)
     t2 = tree2(idtype)
@@ -150,7 +150,7 @@ def test_batch_send_and_recv(idtype):
     assert F.asnumpy(t1.ndata['h'][1]) == 7
     assert F.asnumpy(t2.ndata['h'][4]) == 2
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_propagate(idtype):
     t1 = tree1(idtype)
     t2 = tree2(idtype)
@@ -178,7 +178,7 @@ def test_batch_propagate(idtype):
     assert F.asnumpy(t1.ndata['h'][0]) == 9
     assert F.asnumpy(t2.ndata['h'][1]) == 5
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batched_edge_ordering(idtype):
     g1 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g1.add_nodes(6)
@@ -191,11 +191,11 @@ def test_batched_edge_ordering(idtype):
     e2 = F.randn((6, 10))
     g2.edata['h'] = e2
     g = dgl.batch([g1, g2])
-    r1 = g.edata['h'][g.edge_id(4, 5)]
-    r2 = g1.edata['h'][g1.edge_id(4, 5)]
+    r1 = g.edata['h'][g.edge_ids(4, 5)]
+    r2 = g1.edata['h'][g1.edge_ids(4, 5)]
     assert F.array_equal(r1, r2)
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_no_edge(idtype):
     g1 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g1.add_nodes(6)
@@ -207,7 +207,7 @@ def test_batch_no_edge(idtype):
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
 
-@parametrize_dtype
+@parametrize_idtype
 def test_batch_keeps_empty_data(idtype):
     g1 = dgl.graph(([], [])).astype(idtype).to(F.ctx())
     g1.ndata["nh"] = F.tensor([])
@@ -248,7 +248,7 @@ def _get_subgraph_batch_info(keys, induced_indices_arr, batch_num_objs):
         ret[key] = F.tensor(new_batch_num_objs, dtype=F.dtype(batch_num_objs))
     return ret
 
-@parametrize_dtype
+@parametrize_idtype
 def test_set_batch_info(idtype):
     ctx = F.ctx()
 

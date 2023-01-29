@@ -9,7 +9,9 @@ ROOT=/asv/dgl
 
 conda activate base
 pip install --upgrade pip
-pip install asv
+# Newer asv version like 0.5.1 has different result format,
+# so we fix the version here. Or `generate_excel.py` has to be changed.
+pip install asv==0.4.2
 pip uninstall -y dgl
 
 export DGL_BENCH_DEVICE=$DEVICE

@@ -1,5 +1,6 @@
 import torch.nn as nn
 
+
 def GlorotOrthogonal(tensor, scale=2.0):
     if tensor is not None:
         nn.init.orthogonal_(tensor.data)

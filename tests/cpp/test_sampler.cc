@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
-#include <vector>
+
 #include <algorithm>
 #include <iostream>
-#include "./common.h"
+#include <vector>
+
 #include "../../src/random/cpu/sample_utils.h"
+#include "./common.h"
 
 using namespace dgl;
 using namespace dgl::aten;
@@ -11,7 +13,7 @@ using namespace dgl::aten;
 // TODO: adapt this to Random::Choice
 
 template <typename Idx, typename DType>
-void _TestWithReplacement(RandomEngine *re) {
+void _TestWithReplacement(RandomEngine* re) {
   Idx n_categories = 100;
   Idx n_rolls = 1000000;
   std::vector<DType> _prob;
@@ -20,12 +22,11 @@ void _TestWithReplacement(RandomEngine *re) {
     _prob.push_back(re->Uniform<DType>());
     accum += _prob.back();
   }
-  for (Idx i = 0; i < n_categories; ++i)
-    _prob[i] /= accum;
+  for (Idx i = 0; i < n_categories; ++i) _prob[i] /= accum;
   FloatArray prob = NDArray::FromVector(_prob);
 
-  auto _check_given_sampler = [n_categories, n_rolls, &_prob](
-      utils::BaseSampler<Idx> *s) {
+  auto _check_given_sampler = [n_categories, n_rolls,
+                               &_prob](utils::BaseSampler<Idx>* s) {
     std::vector<Idx> counter(n_categories, 0);
     for (Idx i = 0; i < n_rolls; ++i) {
       Idx dice = s->Draw();
@@ -67,14 +68,13 @@ TEST(SampleUtilsTest, TestWithReplacement) {
 };
 
 template <typename Idx, typename DType>
-void _TestWithoutReplacementOrder(RandomEngine *re) {
+void _TestWithoutReplacementOrder(RandomEngine* re) {
   // TODO(BarclayII): is there a reliable way to do this test?
   std::vector<DType> _prob = {1e6f, 1e-6f, 1e-2f, 1e2f};
   FloatArray prob = NDArray::FromVector(_prob);
   std::vector<Idx> ground_truth = {0, 3, 2, 1};
 
-  auto _check_given_sampler = [&ground_truth](
-      utils::BaseSampler<Idx> *s) {
+  auto _check_given_sampler = [&ground_truth](utils::BaseSampler<Idx>* s) {
     for (size_t i = 0; i < ground_truth.size(); ++i) {
       Idx dice = s->Draw();
       ASSERT_EQ(dice, ground_truth[i]);
@@ -102,22 +102,19 @@ TEST(SampleUtilsTest, TestWithoutReplacementOrder) {
 };
 
 template <typename Idx, typename DType>
-void _TestWithoutReplacementUnique(RandomEngine *re) {
+void _TestWithoutReplacementUnique(RandomEngine* re) {
   Idx N = 1000000;
   std::vector<DType> _likelihood;
-  for (Idx i = 0; i < N; ++i)
-    _likelihood.push_back(re->Uniform<DType>());
+  for (Idx i = 0; i < N; ++i) _likelihood.push_back(re->Uniform<DType>());
   FloatArray likelihood = NDArray::FromVector(_likelihood);
 
-  auto _check_given_sampler = [N](
-      utils::BaseSampler<Idx> *s) {
+  auto _check_given_sampler = [N](utils::BaseSampler<Idx>* s) {
     std::vector<int> cnt(N, 0);
     for (Idx i = 0; i < N; ++i) {
       Idx dice = s->Draw();
       cnt[dice]++;
     }
-    for (Idx i = 0; i < N; ++i)
-      ASSERT_EQ(cnt[i], 1);
+    for (Idx i = 0; i < N; ++i) ASSERT_EQ(cnt[i], 1);
   };
 
   utils::AliasSampler<Idx, DType, false> as(re, likelihood);
@@ -242,15 +239,15 @@ void _TestBiasedChoice(RandomEngine* re) {
   {
     Idx sample_num = 100000;
     Idx population = 1000000;
-    Idx split[] = {0, population/2, population};
+    Idx split[] = {0, population / 2, population};
     FloatArray bias = NDArray::FromVector(std::vector<FloatType>({1, 3}));
 
-    IdArray rst = re->BiasedChoice<Idx, FloatType>(sample_num, split, bias, true);
-    auto rst_data = static_cast<Idx *>(rst->data);
+    IdArray rst =
+        re->BiasedChoice<Idx, FloatType>(sample_num, split, bias, true);
+    auto rst_data = static_cast<Idx*>(rst->data);
     Idx larger = 0;
-    for (Idx i = 0 ; i < sample_num ; ++i)
-      if (rst_data[i] >= population / 2)
-        larger++;
+    for (Idx i = 0; i < sample_num; ++i)
+      if (rst_data[i] >= population / 2) larger++;
     ASSERT_LE(fabs((double)larger / sample_num - 0.75), 1e-2);
   }
   // without replacement
@@ -260,8 +257,9 @@ void _TestBiasedChoice(RandomEngine* re) {
     Idx split[] = {0, sample_num, population};
     FloatArray bias = NDArray::FromVector(std::vector<FloatType>({1, 0}));
 
-    IdArray rst = re->BiasedChoice<Idx, FloatType>(sample_num, split, bias, false);
-    auto rst_data = static_cast<Idx *>(rst->data);
+    IdArray rst =
+        re->BiasedChoice<Idx, FloatType>(sample_num, split, bias, false);
+    auto rst_data = static_cast<Idx*>(rst->data);
 
     std::set<Idx> idxset;
     for (int64_t i = 0; i < sample_num; ++i) {

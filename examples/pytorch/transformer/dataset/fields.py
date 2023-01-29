@@ -1,5 +1,7 @@
 class Vocab:
-    def __init__(self, init_token=None, eos_token=None, pad_token=None, unk_token=None):
+    def __init__(
+        self, init_token=None, eos_token=None, pad_token=None, unk_token=None
+    ):
         self.init_token = init_token
         self.eos_token = eos_token
         self.pad_token = pad_token
@@ -16,13 +18,11 @@ class Vocab:
             self.vocab_lst.append(self.pad_token)
         if self.unk_token is not None:
             self.vocab_lst.append(self.unk_token)
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             for token in f.readlines():
                 token = token.strip()
                 self.vocab_lst.append(token)
-        self.vocab_dict = {
-            v: k for k, v in enumerate(self.vocab_lst)
-        }
+        self.vocab_dict = {v: k for k, v in enumerate(self.vocab_lst)}
 
     def __len__(self):
         return len(self.vocab_lst)
@@ -35,6 +35,7 @@ class Vocab:
                 return self.vocab_dict[self.unk_token]
         else:
             return self.vocab_lst[key]
+
 
 class Field:
     def __init__(self, vocab, preprocessing=None, postprocessing=None):
@@ -56,8 +57,4 @@ class Field:
         return [self.vocab[token] for token in x]
 
     def __call__(self, x):
-        return self.postprocess(
-            self.numericalize(
-                self.preprocess(x)
-            )
-        )
+        return self.postprocess(self.numericalize(self.preprocess(x)))

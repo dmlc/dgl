@@ -6,14 +6,16 @@ Author's implementation: https://github.com/weihua916/powerful-gnns
 """
 
 import mxnet as mx
-from mxnet import nd, gluon
+from mxnet import gluon, nd
 from mxnet.gluon import nn
+
 from dgl.nn.mxnet.conv import GINConv
-from dgl.nn.mxnet.glob import SumPooling, AvgPooling, MaxPooling
+from dgl.nn.mxnet.glob import AvgPooling, MaxPooling, SumPooling
 
 
 class ApplyNodeFunc(nn.Block):
     """Update the node feature hv with MLP, BN and ReLU."""
+
     def __init__(self, mlp):
         super(ApplyNodeFunc, self).__init__()
         with self.name_scope():
@@ -29,6 +31,7 @@ class ApplyNodeFunc(nn.Block):
 
 class MLP(nn.Block):
     """MLP with linear output"""
+
     def __init__(self, num_layers, input_dim, hidden_dim, output_dim):
         """MLP layers construction
 
@@ -79,9 +82,19 @@ class MLP(nn.Block):
 
 class GIN(nn.Block):
     """GIN model"""
-    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim,
-                 output_dim, final_dropout, learn_eps, graph_pooling_type,
-                 neighbor_pooling_type):
+
+    def __init__(
+        self,
+        num_layers,
+        num_mlp_layers,
+        input_dim,
+        hidden_dim,
+        output_dim,
+        final_dropout,
+        learn_eps,
+        graph_pooling_type,
+        neighbor_pooling_type,
+    ):
         """model parameters setting
 
         Paramters
@@ -120,27 +133,39 @@ class GIN(nn.Block):
                 if i == 0:
                     mlp = MLP(num_mlp_layers, input_dim, hidden_dim, hidden_dim)
                 else:
-                    mlp = MLP(num_mlp_layers, hidden_dim, hidden_dim, hidden_dim)
+                    mlp = MLP(
+                        num_mlp_layers, hidden_dim, hidden_dim, hidden_dim
+                    )
 
                 self.ginlayers.add(
-                    GINConv(ApplyNodeFunc(mlp), neighbor_pooling_type, 0, self.learn_eps))
+                    GINConv(
+                        ApplyNodeFunc(mlp),
+                        neighbor_pooling_type,
+                        0,
+                        self.learn_eps,
+                    )
+                )
                 self.batch_norms.add(nn.BatchNorm(in_channels=hidden_dim))
 
             self.linears_prediction = nn.Sequential()
 
             for i in range(num_layers):
                 if i == 0:
-                    self.linears_prediction.add(nn.Dense(output_dim, in_units=input_dim))
+                    self.linears_prediction.add(
+                        nn.Dense(output_dim, in_units=input_dim)
+                    )
                 else:
-                    self.linears_prediction.add(nn.Dense(output_dim, in_units=hidden_dim))
+                    self.linears_prediction.add(
+                        nn.Dense(output_dim, in_units=hidden_dim)
+                    )
 
             self.drop = nn.Dropout(final_dropout)
 
-            if graph_pooling_type == 'sum':
+            if graph_pooling_type == "sum":
                 self.pool = SumPooling()
-            elif graph_pooling_type == 'mean':
+            elif graph_pooling_type == "mean":
                 self.pool = AvgPooling()
-            elif graph_pooling_type == 'max':
+            elif graph_pooling_type == "max":
                 self.pool = MaxPooling()
             else:
                 raise NotImplementedError
@@ -158,6 +183,8 @@ class GIN(nn.Block):
         # perform pooling over all nodes in each graph in every layer
         for i, h in enumerate(hidden_rep):
             pooled_h = self.pool(g, h)
-            score_over_layer = score_over_layer + self.drop(self.linears_prediction[i](pooled_h))
+            score_over_layer = score_over_layer + self.drop(
+                self.linears_prediction[i](pooled_h)
+            )
 
         return score_over_layer

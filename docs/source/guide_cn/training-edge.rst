@@ -9,7 +9,7 @@
 
 以下代码生成了一个随机图用于演示边分类/回归。
 
-.. code:: ipython3
+.. code:: python
 
     src = np.random.randint(0, 100, 500)
     dst = np.random.randint(0, 100, 500)
@@ -59,13 +59,13 @@
         def __init__(self, in_features, out_classes):
             super().__init__()
             self.W = nn.Linear(in_features * 2, out_classes)
-    
+
         def apply_edges(self, edges):
             h_u = edges.src['h']
             h_v = edges.dst['h']
             score = self.W(torch.cat([h_u, h_v], 1))
             return {'score': score}
-    
+
         def forward(self, graph, h):
             # h是从5.1节的GNN模型中计算出的节点表示
             with graph.local_scope():
@@ -115,7 +115,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 例如想在某一特定类型的边上进行分类任务，用户只需要计算所有节点类型的节点表示，
-然后同样通过调用 :meth:`~dgl.DGLHeteroGraph.apply_edges` 方法计算预测值即可。
+然后同样通过调用 :meth:`~dgl.DGLGraph.apply_edges` 方法计算预测值即可。
 唯一的区别是在调用 ``apply_edges`` 时需要指定边的类型。
 
 .. code:: python
@@ -136,13 +136,13 @@
         def __init__(self, in_features, out_classes):
             super().__init__()
             self.W = nn.Linear(in_features * 2, out_classes)
-    
+
         def apply_edges(self, edges):
             h_u = edges.src['h']
             h_v = edges.dst['h']
             score = self.W(torch.cat([h_u, h_v], 1))
             return {'score': score}
-    
+
         def forward(self, graph, h, etype):
             # h是从5.1节中对异构图的每种类型的边所计算的节点表示
             with graph.local_scope():
@@ -229,12 +229,12 @@
         def __init__(self, in_dims, n_classes):
             super().__init__()
             self.W = nn.Linear(in_dims * 2, n_classes)
-    
+
         def apply_edges(self, edges):
             x = torch.cat([edges.src['h'], edges.dst['h']], 1)
             y = self.W(x)
             return {'score': y}
-    
+
         def forward(self, graph, h):
             # h是从5.1节中对异构图的每种类型的边所计算的节点表示
             with graph.local_scope():
@@ -263,7 +263,7 @@
     user_feats = hetero_graph.nodes['user'].data['feature']
     item_feats = hetero_graph.nodes['item'].data['feature']
     node_features = {'user': user_feats, 'item': item_feats}
-    
+
     opt = torch.optim.Adam(model.parameters())
     for epoch in range(10):
         logits = model(hetero_graph, node_features, dec_graph)

@@ -9,53 +9,11 @@ from .dgl_dataset import DGLBuiltinDataset
 from .utils import _get_dgl_url, generate_mask_tensor, load_graphs, save_graphs, deprecate_property
 from .. import backend as F
 from ..convert import from_scipy
-from ..transform import reorder_graph
+from ..transforms import reorder_graph
 
 
 class RedditDataset(DGLBuiltinDataset):
     r""" Reddit dataset for community detection (node classification)
-
-    .. deprecated:: 0.5.0
-
-        - ``graph`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-
-        - ``num_labels`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> num_classes = dataset.num_classes
-
-        - ``train_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> train_mask = graph.ndata['train_mask']
-
-        - ``val_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> val_mask = graph.ndata['val_mask']
-
-        - ``test_mask`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> test_mask = graph.ndata['test_mask']
-
-        - ``features`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> features = graph.ndata['feat']
-
-        - ``labels`` is deprecated, it is replaced by:
-
-            >>> dataset = RedditDataset()
-            >>> graph = dataset[0]
-            >>> labels = graph.ndata['label']
 
     This is a graph dataset from Reddit posts made in the month of September, 2014.
     The node label in this case is the community, or “subreddit”, that a post belongs to.
@@ -84,27 +42,17 @@ class RedditDataset(DGLBuiltinDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
     num_classes : int
         Number of classes for each node
-    graph : :class:`dgl.DGLGraph`
-        Graph of the dataset
-    num_labels : int
-        Number of classes for each node
-    train_mask: numpy.ndarray
-        Mask of training nodes
-    val_mask: numpy.ndarray
-        Mask of validation nodes
-    test_mask: numpy.ndarray
-        Mask of test nodes
-    features : Tensor
-        Node features
-    labels :  Tensor
-        Node labels
 
     Examples
     --------
@@ -125,7 +73,8 @@ class RedditDataset(DGLBuiltinDataset):
     >>>
     >>> # Train, Validation and Test
     """
-    def __init__(self, self_loop=False, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, self_loop=False, raw_dir=None, force_reload=False,
+                 verbose=False, transform=None):
         self_loop_str = ""
         if self_loop:
             self_loop_str = "_self_loop"
@@ -135,7 +84,8 @@ class RedditDataset(DGLBuiltinDataset):
                                             url=_url,
                                             raw_dir=raw_dir,
                                             force_reload=force_reload,
-                                            verbose=verbose)
+                                            verbose=verbose,
+                                            transform=transform)
 
     def process(self):
         # graph
@@ -196,41 +146,6 @@ class RedditDataset(DGLBuiltinDataset):
         r"""Number of classes for each node."""
         return 41
 
-    @property
-    def num_labels(self):
-        deprecate_property('dataset.num_labels', 'dataset.num_classes')
-        return self.num_classes
-
-    @property
-    def graph(self):
-        deprecate_property('dataset.graph', 'dataset[0]')
-        return self._graph
-
-    @property
-    def train_mask(self):
-        deprecate_property('dataset.train_mask', 'graph.ndata[\'train_mask\']')
-        return F.asnumpy(self._graph.ndata['train_mask'])
-
-    @property
-    def val_mask(self):
-        deprecate_property('dataset.val_mask', 'graph.ndata[\'val_mask\']')
-        return F.asnumpy(self._graph.ndata['val_mask'])
-
-    @property
-    def test_mask(self):
-        deprecate_property('dataset.test_mask', 'graph.ndata[\'test_mask\']')
-        return F.asnumpy(self._graph.ndata['test_mask'])
-
-    @property
-    def features(self):
-        deprecate_property('dataset.features', 'graph.ndata[\'feat\']')
-        return self._graph.ndata['feat']
-
-    @property
-    def labels(self):
-        deprecate_property('dataset.labels', 'graph.ndata[\'label\']')
-        return self._graph.ndata['label']
-
     def __getitem__(self, idx):
         r""" Get graph by index
 
@@ -251,7 +166,10 @@ class RedditDataset(DGLBuiltinDataset):
             - ``ndata['test_mask']:`` mask for test node set
         """
         assert idx == 0, "Reddit Dataset only has one graph"
-        return self._graph
+        if self._transform is None:
+            return self._graph
+        else:
+            return self._transform(self._graph)
 
     def __len__(self):
         r"""Number of graphs in the dataset"""

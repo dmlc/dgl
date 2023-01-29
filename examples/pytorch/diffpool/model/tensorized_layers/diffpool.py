@@ -1,9 +1,8 @@
 import torch
-from torch import nn as nn
-
+from model.loss import EntropyLoss, LinkPredLoss
 from model.tensorized_layers.assignment import DiffPoolAssignment
 from model.tensorized_layers.graphsage import BatchedGraphSAGE
-from model.loss import EntropyLoss, LinkPredLoss
+from torch import nn as nn
 
 
 class BatchedDiffPool(nn.Module):
@@ -25,7 +24,7 @@ class BatchedDiffPool(nn.Module):
         z_l = self.embed(x, adj)
         s_l = self.assign(x, adj)
         if log:
-            self.log['s'] = s_l.cpu().numpy()
+            self.log["s"] = s_l.cpu().numpy()
         xnext = torch.matmul(s_l.transpose(-1, -2), z_l)
         anext = (s_l.transpose(-1, -2)).matmul(adj).matmul(s_l)
 
@@ -33,5 +32,5 @@ class BatchedDiffPool(nn.Module):
             loss_name = str(type(loss_layer).__name__)
             self.loss_log[loss_name] = loss_layer(adj, anext, s_l)
         if log:
-            self.log['a'] = anext.cpu().numpy()
+            self.log["a"] = anext.cpu().numpy()
         return xnext, anext

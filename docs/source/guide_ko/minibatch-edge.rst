@@ -85,7 +85,7 @@
             x = F.relu(self.conv2(blocks[1], x))
             return x
 
-두번째 부분에 대한 입력은 보통은 이전 부분의 출력과 미니배치의 에지들에 의해서 유도된 원본 그래프의 서브 그래프가 된다. 서브 그래프는 같은 데이터 로더에서 리턴된다. :meth:`dgl.DGLHeteroGraph.apply_edges` 를 사용해서 에지 서브 그래프를 사용해서 에지들의 점수를 계산한다.
+두번째 부분에 대한 입력은 보통은 이전 부분의 출력과 미니배치의 에지들에 의해서 유도된 원본 그래프의 서브 그래프가 된다. 서브 그래프는 같은 데이터 로더에서 리턴된다. :meth:`dgl.DGLGraph.apply_edges` 를 사용해서 에지 서브 그래프를 사용해서 에지들의 점수를 계산한다.
 
 다음 코드는 부속 노드 피처들을 연결하고, 이를 dense 레이어에 입력해서 얻은 결과로 에지들의 점수를 예측하는 예를 보여준다.
 
@@ -169,7 +169,7 @@ Heterogeneous 그래프들의 노드 representation들을 계산하는 모델은
             x = self.conv2(blocks[1], x)
             return x
 
-점수를 예측하기 위한 homogeneous 그래프와 heterogeneous 그래프간의 유일한 구현상의 차이점은 :meth:`~dgl.DGLHeteroGraph.apply_edges` 를 호출할 때 에지 타입들을 사용한다는 점이다.
+점수를 예측하기 위한 homogeneous 그래프와 heterogeneous 그래프간의 유일한 구현상의 차이점은 :meth:`~dgl.DGLGraph.apply_edges` 를 호출할 때 에지 타입들을 사용한다는 점이다.
 
 .. code:: python
 

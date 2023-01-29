@@ -1,6 +1,7 @@
-#include <gtest/gtest.h>
-#include <dmlc/omp.h>
 #include <dgl/array.h>
+#include <dmlc/omp.h>
+#include <gtest/gtest.h>
+
 #include "./common.h"
 
 using namespace dgl;
@@ -9,7 +10,7 @@ using namespace dgl::runtime;
 namespace {
 
 template <typename IDX>
-aten::CSRMatrix CSR1(DLContext ctx = CTX) {
+aten::CSRMatrix CSR1(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -17,14 +18,17 @@ aten::CSRMatrix CSR1(DLContext ctx = CTX) {
   // data: [0, 2, 3, 1, 4]
   return aten::CSRMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 4, 1}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 2, 3, 5, 5}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 2, 3, 4, 1}), sizeof(IDX) * 8, ctx),
       false);
 }
 
 template <typename IDX>
-aten::CSRMatrix CSR2(DLContext ctx = CTX) {
+aten::CSRMatrix CSR2(DGLContext ctx = CTX) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -33,14 +37,17 @@ aten::CSRMatrix CSR2(DLContext ctx = CTX) {
   // data: [0, 2, 5, 3, 1, 4]
   return aten::CSRMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX) * 8, ctx),
       false);
 }
 
 template <typename IDX>
-aten::COOMatrix COO1(DLContext ctx = CTX) {
+aten::COOMatrix COO1(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
@@ -50,12 +57,14 @@ aten::COOMatrix COO1(DLContext ctx = CTX) {
   // col : [1, 2, 2, 0, 3]
   return aten::COOMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3}), sizeof(IDX)*8, ctx));
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 2, 0, 1, 2}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({1, 2, 2, 0, 3}), sizeof(IDX) * 8, ctx));
 }
 
 template <typename IDX>
-aten::COOMatrix COO2(DLContext ctx = CTX) {
+aten::COOMatrix COO2(DGLContext ctx = CTX) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -66,40 +75,48 @@ aten::COOMatrix COO2(DLContext ctx = CTX) {
   // col : [1, 2, 2, 0, 3, 2]
   return aten::COOMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 3, 2}), sizeof(IDX)*8, ctx));
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({1, 2, 2, 0, 3, 2}), sizeof(IDX) * 8, ctx));
 }
 
 template <typename IDX>
-aten::CSRMatrix SR_CSR3(DLContext ctx) {
+aten::CSRMatrix SR_CSR3(DGLContext ctx) {
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
   //  [0, 0, 0, 0, 0]]
   return aten::CSRMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({2, 1, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({2, 1, 2, 0, 2, 3}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 2, 5, 3, 1, 4}), sizeof(IDX) * 8, ctx),
       false);
 }
 
 template <typename IDX>
-aten::CSRMatrix SRC_CSR3(DLContext ctx) {
+aten::CSRMatrix SRC_CSR3(DGLContext ctx) {
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
   //  [0, 0, 0, 0, 0]]
   return aten::CSRMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({2, 0, 5, 3, 1, 4}), sizeof(IDX)*8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 3, 4, 6, 6}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({2, 0, 5, 3, 1, 4}), sizeof(IDX) * 8, ctx),
       false);
 }
 
 template <typename IDX>
-aten::COOMatrix COO3(DLContext ctx) {
+aten::COOMatrix COO3(DGLContext ctx) {
   // has duplicate entries
   // [[0, 1, 2, 0, 0],
   //  [1, 0, 0, 0, 0],
@@ -109,8 +126,10 @@ aten::COOMatrix COO3(DLContext ctx) {
   // col : [2, 2, 1, 0, 3, 2]
   return aten::COOMatrix(
       4, 5,
-      aten::VecToIdArray(std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX)*8, ctx),
-      aten::VecToIdArray(std::vector<IDX>({2, 2, 1, 0, 3, 2}), sizeof(IDX)*8, ctx));
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({2, 2, 1, 0, 3, 2}), sizeof(IDX) * 8, ctx));
 }
 
 struct SparseCOOCSR {
@@ -118,73 +137,77 @@ struct SparseCOOCSR {
   static constexpr uint64_t NUM_COLS = 150;
   static constexpr uint64_t NUM_NZ = 5;
   template <typename IDX>
-  static aten::COOMatrix COOSparse(const DLContext &ctx = CTX) {
-    return aten::COOMatrix(NUM_ROWS, NUM_COLS,
-                           aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 3, 4}),
-                                              sizeof(IDX) * 8, ctx),
-                           aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5}),
-                                              sizeof(IDX) * 8, ctx));
+  static aten::COOMatrix COOSparse(const DGLContext &ctx = CTX) {
+    return aten::COOMatrix(
+        NUM_ROWS, NUM_COLS,
+        aten::VecToIdArray(
+            std::vector<IDX>({0, 1, 2, 3, 4}), sizeof(IDX) * 8, ctx),
+        aten::VecToIdArray(
+            std::vector<IDX>({1, 2, 3, 4, 5}), sizeof(IDX) * 8, ctx));
   }
 
   template <typename IDX>
-  static aten::CSRMatrix CSRSparse(const DLContext &ctx = CTX) {
+  static aten::CSRMatrix CSRSparse(const DGLContext &ctx = CTX) {
     auto &&indptr = std::vector<IDX>(NUM_ROWS + 1, NUM_NZ);
     for (size_t i = 0; i < NUM_NZ; ++i) {
       indptr[i + 1] = static_cast<IDX>(i + 1);
     }
     indptr[0] = 0;
-    return aten::CSRMatrix(NUM_ROWS, NUM_COLS,
-                           aten::VecToIdArray(indptr, sizeof(IDX) * 8, ctx),
-                           aten::VecToIdArray(std::vector<IDX>({1, 2, 3, 4, 5}),
-                                              sizeof(IDX) * 8, ctx),
-                           aten::VecToIdArray(std::vector<IDX>({1, 1, 1, 1, 1}),
-                                              sizeof(IDX) * 8, ctx),
-                           false);
+    return aten::CSRMatrix(
+        NUM_ROWS, NUM_COLS, aten::VecToIdArray(indptr, sizeof(IDX) * 8, ctx),
+        aten::VecToIdArray(
+            std::vector<IDX>({1, 2, 3, 4, 5}), sizeof(IDX) * 8, ctx),
+        aten::VecToIdArray(
+            std::vector<IDX>({1, 1, 1, 1, 1}), sizeof(IDX) * 8, ctx),
+        false);
   }
 };
 
-bool isSparseCOO(const int64_t &num_threads, const int64_t &num_nodes,
-                 const int64_t &num_edges) {
+bool isSparseCOO(
+    const int64_t &num_threads, const int64_t &num_nodes,
+    const int64_t &num_edges) {
   // refer to COOToCSR<>() in ~dgl/src/array/cpu/spmat_op_impl_coo for details.
   return num_threads * num_nodes > 4 * num_edges;
 }
 
 template <typename IDX>
-aten::COOMatrix RowSorted_NullData_COO(DLContext ctx = CTX) {
+aten::COOMatrix RowSorted_NullData_COO(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
   //  [0, 0, 0, 0, 0]]
   // row : [0, 0, 1, 2, 2]
   // col : [1, 2, 0, 2, 3]
-  return aten::COOMatrix(4, 5,
-                         aten::VecToIdArray(std::vector<IDX>({0, 0, 1, 2, 2}),
-                                            sizeof(IDX) * 8, ctx),
-                         aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}),
-                                            sizeof(IDX) * 8, ctx),
-                         aten::NullArray(), true, false);
+  return aten::COOMatrix(
+      4, 5,
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 0, 1, 2, 2}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX) * 8, ctx),
+      aten::NullArray(), true, false);
 }
 
 template <typename IDX>
-aten::CSRMatrix RowSorted_NullData_CSR(DLContext ctx = CTX) {
+aten::CSRMatrix RowSorted_NullData_CSR(DGLContext ctx = CTX) {
   // [[0, 1, 1, 0, 0],
   //  [1, 0, 0, 0, 0],
   //  [0, 0, 1, 1, 0],
   //  [0, 0, 0, 0, 0]]
   // data: [0, 1, 2, 3, 4]
-  return aten::CSRMatrix(4, 5,
-                         aten::VecToIdArray(std::vector<IDX>({0, 2, 3, 5, 5}),
-                                            sizeof(IDX) * 8, ctx),
-                         aten::VecToIdArray(std::vector<IDX>({1, 2, 0, 2, 3}),
-                                            sizeof(IDX) * 8, ctx),
-                         aten::VecToIdArray(std::vector<IDX>({0, 1, 2, 3, 4}),
-                                            sizeof(IDX) * 8, ctx),
-                         false);
+  return aten::CSRMatrix(
+      4, 5,
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 2, 3, 5, 5}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({1, 2, 0, 2, 3}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 1, 2, 3, 4}), sizeof(IDX) * 8, ctx),
+      false);
 }
 }  // namespace
 
 template <typename IDX>
-void _TestCOOToCSR(DLContext ctx) {
+void _TestCOOToCSR(DGLContext ctx) {
   auto coo = COO1<IDX>(ctx);
   auto csr = CSR1<IDX>(ctx);
   auto tcsr = aten::COOToCSR(coo);
@@ -297,9 +320,9 @@ TEST(SpmatTest, TestCOOHasDuplicate) {
 }
 
 template <typename IDX>
-void _TestCOOSort(DLContext ctx) {
+void _TestCOOSort(DGLContext ctx) {
   auto coo = COO3<IDX>(ctx);
-  
+
   auto sr_coo = COOSort(coo, false);
   ASSERT_EQ(coo.num_rows, sr_coo.num_rows);
   ASSERT_EQ(coo.num_cols, sr_coo.num_cols);
@@ -348,11 +371,11 @@ void _TestCOOSort(DLContext ctx) {
   // row : [0, 0, 0, 1, 2, 2]
   // col : [1, 2, 2, 0, 2, 3]
   auto sort_row = aten::VecToIdArray(
-    std::vector<IDX>({0, 0, 0, 1, 2, 2}), sizeof(IDX)*8, ctx);
+      std::vector<IDX>({0, 0, 0, 1, 2, 2}), sizeof(IDX) * 8, ctx);
   auto sort_col = aten::VecToIdArray(
-    std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX)*8, ctx);
+      std::vector<IDX>({1, 2, 2, 0, 2, 3}), sizeof(IDX) * 8, ctx);
   auto sort_col_data = aten::VecToIdArray(
-    std::vector<IDX>({2, 0, 5, 3, 1, 4}), sizeof(IDX)*8, ctx);
+      std::vector<IDX>({2, 0, 5, 3, 1, 4}), sizeof(IDX) * 8, ctx);
 
   ASSERT_TRUE(ArrayEQ<IDX>(sr_coo.row, sort_row));
   ASSERT_TRUE(ArrayEQ<IDX>(src_coo.row, sort_row));
@@ -372,10 +395,10 @@ TEST(SpmatTest, COOSort) {
 template <typename IDX>
 void _TestCOOReorder() {
   auto coo = COO2<IDX>();
-  auto new_row = aten::VecToIdArray(
-    std::vector<IDX>({2, 0, 3, 1}), sizeof(IDX)*8, CTX);
+  auto new_row =
+      aten::VecToIdArray(std::vector<IDX>({2, 0, 3, 1}), sizeof(IDX) * 8, CTX);
   auto new_col = aten::VecToIdArray(
-    std::vector<IDX>({2, 0, 4, 3, 1}), sizeof(IDX)*8, CTX);
+      std::vector<IDX>({2, 0, 4, 3, 1}), sizeof(IDX) * 8, CTX);
   auto new_coo = COOReorder(coo, new_row, new_col);
   ASSERT_EQ(new_coo.num_rows, coo.num_rows);
   ASSERT_EQ(new_coo.num_cols, coo.num_cols);
@@ -387,58 +410,64 @@ TEST(SpmatTest, TestCOOReorder) {
 }
 
 template <typename IDX>
-void _TestCOOGetData(DLContext ctx) {
+void _TestCOOGetData(DGLContext ctx) {
   auto coo = COO2<IDX>(ctx);
   // test get all data
   auto x = aten::COOGetAllData(coo, 0, 0);
-  auto tx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX)*8, ctx);
+  auto tx = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX) * 8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
   x = aten::COOGetAllData(coo, 0, 2);
-  tx = aten::VecToIdArray(std::vector<IDX>({2, 5}), sizeof(IDX)*8, ctx);
+  tx = aten::VecToIdArray(std::vector<IDX>({2, 5}), sizeof(IDX) * 8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 
   // test get data
-  auto r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, ctx);
-  auto c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
+  auto r =
+      aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX) * 8, ctx);
+  auto c =
+      aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX) * 8, ctx);
   x = aten::COOGetData(coo, r, c);
-  tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX)*8, ctx);
+  tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX) * 8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 
   // test get data on sorted
-  coo = aten::COOSort(coo); 
-  r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, ctx);
-  c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
+  coo = aten::COOSort(coo);
+  r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX) * 8, ctx);
+  c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX) * 8, ctx);
   x = aten::COOGetData(coo, r, c);
-  tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX)*8, ctx);
+  tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX) * 8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
 
   // test get data w/ broadcasting
-  r = aten::VecToIdArray(std::vector<IDX>({0}), sizeof(IDX)*8, ctx);
-  c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, ctx);
+  r = aten::VecToIdArray(std::vector<IDX>({0}), sizeof(IDX) * 8, ctx);
+  c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX) * 8, ctx);
   x = aten::COOGetData(coo, r, c);
-  tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX)*8, ctx);
+  tx = aten::VecToIdArray(std::vector<IDX>({-1, 0, 2}), sizeof(IDX) * 8, ctx);
   ASSERT_TRUE(ArrayEQ<IDX>(x, tx));
-
 }
 
 TEST(SpmatTest, COOGetData) {
   _TestCOOGetData<int32_t>(CPU);
   _TestCOOGetData<int64_t>(CPU);
-//#ifdef DGL_USE_CUDA
+  //#ifdef DGL_USE_CUDA
   //_TestCOOGetData<int32_t>(GPU);
   //_TestCOOGetData<int64_t>(GPU);
-//#endif
+  //#endif
 }
 
 template <typename IDX>
 void _TestCOOGetDataAndIndices() {
   auto csr = COO2<IDX>();
-  auto r = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, CTX);
-  auto c = aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX)*8, CTX);
+  auto r =
+      aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX) * 8, CTX);
+  auto c =
+      aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX) * 8, CTX);
   auto x = aten::COOGetDataAndIndices(csr, r, c);
-  auto tr = aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX)*8, CTX);
-  auto tc = aten::VecToIdArray(std::vector<IDX>({1, 2, 2}), sizeof(IDX)*8, CTX);
-  auto td = aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX)*8, CTX);
+  auto tr =
+      aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX) * 8, CTX);
+  auto tc =
+      aten::VecToIdArray(std::vector<IDX>({1, 2, 2}), sizeof(IDX) * 8, CTX);
+  auto td =
+      aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX) * 8, CTX);
   ASSERT_TRUE(ArrayEQ<IDX>(x[0], tr));
   ASSERT_TRUE(ArrayEQ<IDX>(x[1], tc));
   ASSERT_TRUE(ArrayEQ<IDX>(x[2], td));

@@ -16,8 +16,8 @@ Understand Graph Attention Network
     efficiency. For recommended implementation, please refer to the `official
     examples <https://github.com/dmlc/dgl/tree/master/examples>`_.
 
-In this tutorial, you learn about a graph attention network (GAT) and how it can be 
-implemented in PyTorch. You can also learn to visualize and understand what the attention 
+In this tutorial, you learn about a graph attention network (GAT) and how it can be
+implemented in PyTorch. You can also learn to visualize and understand what the attention
 mechanism has learned.
 
 The research described in the paper `Graph Convolutional Network (GCN) <https://arxiv.org/abs/1609.02907>`_,
@@ -93,7 +93,7 @@ structure-free normalization, in the style of attention.
 #   scaled by the attention scores.
 #
 # There are other details from the paper, such as dropout and skip connections.
-# For the purpose of simplicity, those details are left out of this tutorial. To see more details, 
+# For the purpose of simplicity, those details are left out of this tutorial. To see more details,
 # download the `full example <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gat/gat.py>`_.
 # In its essence, GAT is just a different aggregation function with attention
 # over features of neighbors, instead of a simple mean aggregation.
@@ -104,6 +104,8 @@ structure-free normalization, in the style of attention.
 # DGL provides an off-the-shelf implementation of the GAT layer under the ``dgl.nn.<backend>``
 # subpackage. Simply import the ``GATConv`` as the follows.
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 from dgl.nn.pytorch import GATConv
 
 ###############################################################
@@ -111,7 +113,7 @@ from dgl.nn.pytorch import GATConv
 # jump to the `Put everything together`_ for training and visualization results.
 #
 # To begin, you can get an overall impression about how a ``GATLayer`` module is
-# implemented in DGL. In this section, the four equations above are broken down 
+# implemented in DGL. In this section, the four equations above are broken down
 # one at a time.
 #
 # .. note::
@@ -303,11 +305,9 @@ import networkx as nx
 
 def load_cora_data():
     data = citegrh.load_cora()
-    features = torch.FloatTensor(data.features)
-    labels = torch.LongTensor(data.labels)
-    mask = torch.BoolTensor(data.train_mask)
-    g = DGLGraph(data.graph)
-    return g, features, labels, mask
+    g = data[0]
+    mask = torch.BoolTensor(g.ndata['train_mask'])
+    return g, g.ndata['feat'], g.ndata['label'], mask
 
 ##############################################################################
 # The training loop is exactly the same as in the GCN tutorial.
@@ -355,7 +355,7 @@ for epoch in range(30):
 # ^^^^
 #
 # The following table summarizes the model performance on Cora that is reported in
-# `the GAT paper <https://arxiv.org/pdf/1710.10903.pdf>`_ and obtained with DGL 
+# `the GAT paper <https://arxiv.org/pdf/1710.10903.pdf>`_ and obtained with DGL
 # implementations.
 #
 # .. list-table::
@@ -460,15 +460,15 @@ for epoch in range(30):
 # .. note::
 #
 #   Below is the calculation process of F1 score:
-#  
+#
 #   .. math::
-#  
+#
 #      precision=\frac{\sum_{t=1}^{n}TP_{t}}{\sum_{t=1}^{n}(TP_{t} +FP_{t})}
-#  
+#
 #      recall=\frac{\sum_{t=1}^{n}TP_{t}}{\sum_{t=1}^{n}(TP_{t} +FN_{t})}
-#  
+#
 #      F1_{micro}=2\frac{precision*recall}{precision+recall}
-#  
+#
 #   * :math:`TP_{t}` represents for number of nodes that both have and are predicted to have label :math:`t`
 #   * :math:`FP_{t}` represents for number of nodes that do not have but are predicted to have label :math:`t`
 #   * :math:`FN_{t}` represents for number of output classes labeled as :math:`t` but predicted as others.
@@ -498,7 +498,7 @@ for epoch in range(30):
 #
 # |image7|
 #
-# Again, comparing with uniform distribution: 
+# Again, comparing with uniform distribution:
 #
 # .. image:: https://data.dgl.ai/tutorial/gat/ppi-uniform-hist.png
 #   :width: 250px

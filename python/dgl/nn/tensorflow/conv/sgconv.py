@@ -1,20 +1,16 @@
 """tf Module for Simplifying Graph Convolution layer"""
 # pylint: disable= no-member, arguments-differ, invalid-name, W0613
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-import numpy as np
 
 from .... import function as fn
 from ....base import DGLError
 
 
 class SGConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    Simplifying Graph Convolution layer from paper `Simplifying Graph
-    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__.
+    r"""SGC layer from `Simplifying Graph
+    Convolutional Networks <https://arxiv.org/pdf/1902.07153.pdf>`__
 
     .. math::
         H^{K} = (\tilde{D}^{-1/2} \tilde{A} \tilde{D}^{-1/2})^K X \Theta
@@ -87,14 +83,17 @@ class SGConv(layers.Layer):
         [0.60570633, 0.520766  ],
         [0.6102368 , 0.52466124]], dtype=float32)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k=1,
-                 cached=False,
-                 bias=True,
-                 norm=None,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        k=1,
+        cached=False,
+        bias=True,
+        norm=None,
+        allow_zero_in_degree=False,
+    ):
         super(SGConv, self).__init__()
         self.fc = layers.Dense(out_feats, use_bias=bias)
         self._cached = cached
@@ -104,11 +103,7 @@ class SGConv(layers.Layer):
         self._allow_zero_in_degree = allow_zero_in_degree
 
     def set_allow_zero_in_degree(self, set_value):
-        r"""
-
-        Description
-        -----------
-        Set allow_zero_in_degree flag.
+        r"""Set allow_zero_in_degree flag.
 
         Parameters
         ----------
@@ -118,11 +113,7 @@ class SGConv(layers.Layer):
         self._allow_zero_in_degree = set_value
 
     def call(self, graph, feat):
-        r"""
-
-        Description
-        -----------
-        Compute Simplifying Graph Convolution layer.
+        r"""Compute Simplifying Graph Convolution layer.
 
         Parameters
         ----------
@@ -152,32 +143,36 @@ class SGConv(layers.Layer):
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
-                if  tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                if tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             if self._cached_h is not None:
                 feat = self._cached_h
             else:
                 # compute normalization
-                degs = tf.clip_by_value(tf.cast(
-                    graph.in_degrees(), tf.float32), clip_value_min=1, clip_value_max=np.inf)
+                degs = tf.clip_by_value(
+                    tf.cast(graph.in_degrees(), tf.float32),
+                    clip_value_min=1,
+                    clip_value_max=np.inf,
+                )
                 norm = tf.pow(degs, -0.5)
                 norm = tf.expand_dims(norm, 1)
                 # compute (D^-1 A^k D)^k X
                 for _ in range(self._k):
                     feat = feat * norm
-                    graph.ndata['h'] = feat
-                    graph.update_all(fn.copy_u('h', 'm'),
-                                     fn.sum('m', 'h'))
-                    feat = graph.ndata.pop('h')
+                    graph.ndata["h"] = feat
+                    graph.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
+                    feat = graph.ndata.pop("h")
                     feat = feat * norm
 
                 if self.norm is not None:

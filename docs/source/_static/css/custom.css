@@ -1,0 +1,23 @@
+.wy-table-responsive table td,
+.wy-table-responsive table th {
+  white-space: normal;
+}
+
+.wy-table-bordered-all,
+.rst-content table.docutils {
+  border: none;
+}
+
+.wy-table-bordered-all td,
+.rst-content table.docutils td {
+  border: none;
+}
+
+.wy-table td,
+.rst-content table.docutils td,
+.rst-content table.field-list td,
+.wy-table th,
+.rst-content table.docutils th,
+.rst-content table.field-list th {
+  padding: 14px;
+}

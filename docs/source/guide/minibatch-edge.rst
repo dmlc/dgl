@@ -20,7 +20,7 @@ You can use the
 
 To use the neighborhood sampler provided by DGL for edge classification,
 one need to instead combine it with
-:class:`~dgl.dataloading.pytorch.EdgeDataLoader`, which iterates
+:func:`~dgl.dataloading.as_edge_prediction_sampler`, which iterates
 over a set of edges in minibatches, yielding the subgraph induced by the
 edge minibatch and *message flow graphs* (MFGs) to be consumed by the module below.
 
@@ -30,7 +30,8 @@ putting the list of generated MFGs onto GPU.
 
 .. code:: python
 
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    sampler = dgl.dataloading.as_edge_prediction_sampler(sampler)
+    dataloader = dgl.dataloading.DataLoader(
         g, train_eid_dict, sampler,
         batch_size=1024,
         shuffle=True,
@@ -50,6 +51,8 @@ putting the list of generated MFGs onto GPU.
    detailed explanation of the concept of MFGs, please refer to
    :ref:`guide-minibatch-customizing-neighborhood-sampler`.
 
+.. _guide-minibatch-edge-classification-sampler-exclude:
+
 Removing edges in the minibatch from the original graph for neighbor sampling
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -62,8 +65,8 @@ advantage.
 Therefore in edge classification you sometimes would like to exclude the
 edges sampled in the minibatch from the original graph for neighborhood
 sampling, as well as the reverse edges of the sampled edges on an
-undirected graph. You can specify ``exclude='reverse_id'`` in instantiation
-of :class:`~dgl.dataloading.pytorch.EdgeDataLoader`, with the mapping of the edge
+undirected graph. You can specify ``exclude='reverse_id'`` in calling
+:func:`~dgl.dataloading.as_edge_prediction_sampler`, with the mapping of the edge
 IDs to their reverse edges IDs.  Usually doing so will lead to much slower
 sampling process due to locating the reverse edges involving in the minibatch
 and removing them.
@@ -71,16 +74,11 @@ and removing them.
 .. code:: python
 
     n_edges = g.number_of_edges()
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, exclude='reverse_id', reverse_eids=torch.cat([
+            torch.arange(n_edges // 2, n_edges), torch.arange(0, n_edges // 2)]))
+    dataloader = dgl.dataloading.DataLoader(
         g, train_eid_dict, sampler,
-    
-        # The following two arguments are specifically for excluding the minibatch
-        # edges and their reverse edges from the original graph for neighborhood
-        # sampling.
-        exclude='reverse_id',
-        reverse_eids=torch.cat([
-            torch.arange(n_edges // 2, n_edges), torch.arange(0, n_edges // 2)]),
-    
         batch_size=1024,
         shuffle=True,
         drop_last=False,
@@ -117,7 +115,7 @@ input features.
 The input to the latter part is usually the output from the
 former part, as well as the subgraph of the original graph induced by the
 edges in the minibatch. The subgraph is yielded from the same data
-loader. One can call :meth:`dgl.DGLHeteroGraph.apply_edges` to compute the
+loader. One can call :meth:`dgl.DGLGraph.apply_edges` to compute the
 scores on the edges with the edge subgraph.
 
 The following code shows an example of predicting scores on the edges by
@@ -214,7 +212,7 @@ classification/regression.
 
 For score prediction, the only implementation difference between the
 homogeneous graph and the heterogeneous graph is that we are looping
-over the edge types for :meth:`~dgl.DGLHeteroGraph.apply_edges`.
+over the edge types for :meth:`~dgl.DGLGraph.apply_edges`.
 
 .. code:: python
 
@@ -248,15 +246,16 @@ over the edge types for :meth:`~dgl.DGLHeteroGraph.apply_edges`.
 
 Data loader definition is also very similar to that of node
 classification. The only difference is that you need
-:class:`~dgl.dataloading.pytorch.EdgeDataLoader` instead of
-:class:`~dgl.dataloading.pytorch.NodeDataLoader`, and you will be supplying a
+:func:`~dgl.dataloading.as_edge_prediction_sampler`,
+and you will be supplying a
 dictionary of edge types and edge ID tensors instead of a dictionary of
 node types and node ID tensors.
 
 .. code:: python
 
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    sampler = dgl.dataloading.as_edge_prediction_sampler(sampler)
+    dataloader = dgl.dataloading.DataLoader(
         g, train_eid_dict, sampler,
         batch_size=1024,
         shuffle=True,
@@ -278,16 +277,12 @@ reverse edges then goes as follows.
 
 .. code:: python
 
-    dataloader = dgl.dataloading.EdgeDataLoader(
-        g, train_eid_dict, sampler,
-    
-        # The following two arguments are specifically for excluding the minibatch
-        # edges and their reverse edges from the original graph for neighborhood
-        # sampling.
-        exclude='reverse_types',
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        sampler, exclude='reverse_types',
         reverse_etypes={'follow': 'followed by', 'followed by': 'follow',
-                        'purchase': 'purchased by', 'purchased by': 'purchase'}
-    
+                        'purchase': 'purchased by', 'purchased by': 'purchase'})
+    dataloader = dgl.dataloading.DataLoader(
+        g, train_eid_dict, sampler,
         batch_size=1024,
         shuffle=True,
         drop_last=False,

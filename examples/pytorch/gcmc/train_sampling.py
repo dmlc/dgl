@@ -20,8 +20,7 @@ from data import MovieLens
 from model import GCMCLayer, DenseBiDecoder, BiDecoder
 from utils import get_activation, get_optimizer, torch_total_param_num, torch_net_info, MetricLogger, to_etype_name
 import dgl
-import dgl.multiprocessing as mp
-from dgl.multiprocessing import Queue
+import torch.multiprocessing as mp
 
 class Net(nn.Module):
     def __init__(self, args, dev_id):
@@ -201,7 +200,8 @@ def run(proc_id, n_gpus, args, devices, dataset):
                      for k in dataset.possible_rating_values}
     reverse_types.update({v: k for k, v in reverse_types.items()})
     sampler = dgl.dataloading.MultiLayerNeighborSampler([None], return_eids=True)
-    dataloader = dgl.dataloading.EdgeDataLoader(
+    sampler = dgl.dataloading.as_edge_prediction_sampler(sampler)
+    dataloader = dgl.dataloading.DataLoader(
         dataset.train_enc_graph,
         {to_etype_name(k): th.arange(
             dataset.train_enc_graph.number_of_edges(etype=to_etype_name(k)))
@@ -213,7 +213,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
         drop_last=False)
 
     if proc_id == 0:
-        valid_dataloader = dgl.dataloading.EdgeDataLoader(
+        valid_dataloader = dgl.dataloading.DataLoader(
             dataset.valid_dec_graph,
             th.arange(dataset.valid_dec_graph.number_of_edges()),
             sampler,
@@ -221,7 +221,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
             batch_size=args.minibatch_size,
             shuffle=False,
             drop_last=False)
-        test_dataloader = dgl.dataloading.EdgeDataLoader(
+        test_dataloader = dgl.dataloading.DataLoader(
             dataset.test_dec_graph,
             th.arange(dataset.test_dec_graph.number_of_edges()),
             sampler,
@@ -382,10 +382,4 @@ if __name__ == '__main__':
         # This avoids creating certain formats in each sub-process, which saves momory and CPU.
         dataset.train_enc_graph.create_formats_()
         dataset.train_dec_graph.create_formats_()
-        procs = []
-        for proc_id in range(n_gpus):
-            p = mp.Process(target=run, args=(proc_id, n_gpus, args, devices, dataset))
-            p.start()
-            procs.append(p)
-        for p in procs:
-            p.join()
+        mp.spawn(run, args=(n_gpus, args, devices, dataset), nprocs=n_gpus)

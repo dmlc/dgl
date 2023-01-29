@@ -6,20 +6,23 @@ Paper: https://arxiv.org/abs/1810.05997
 Author's code: https://github.com/klicperajo/ppnp
 """
 import torch.nn as nn
+
 from dgl.nn.pytorch.conv import APPNPConv
 
 
 class APPNP(nn.Module):
-    def __init__(self,
-                 g,
-                 in_feats,
-                 hiddens,
-                 n_classes,
-                 activation,
-                 feat_drop,
-                 edge_drop,
-                 alpha,
-                 k):
+    def __init__(
+        self,
+        g,
+        in_feats,
+        hiddens,
+        n_classes,
+        activation,
+        feat_drop,
+        edge_drop,
+        alpha,
+        k,
+    ):
         super(APPNP, self).__init__()
         self.g = g
         self.layers = nn.ModuleList()

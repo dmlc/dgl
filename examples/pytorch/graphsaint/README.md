@@ -8,6 +8,8 @@ Author's code: https://github.com/GraphSAINT/GraphSAINT
 
 Contributor: Jiahang Li ([@ljh1064126026](https://github.com/ljh1064126026))  Tang Liu ([@lt610](https://github.com/lt610))
 
+For built-in GraphSAINT subgraph samplers with online sampling, use `dgl.dataloading.SAINTSampler`.
+
 ## Dependencies
 
 - Python 3.7.10
@@ -69,7 +71,7 @@ python train_sampling.py --task $task $online
 
 * Paper: results from the paper
 * Running: results from experiments with the authors' code
-* DGL: results from experiments with the DGL example. The experiment config comes from `config.py`. You can modify parameters in the `config.py` to see different performance of different setup. 
+* DGL: results from experiments with the DGL example. The experiment config comes from `config.py`. You can modify parameters in the `config.py` to see different performance of different setup.
 
 > Note that we implement offline sampling and online sampling in training phase. Offline sampling means all subgraphs utilized in training phase come from pre-sampled subgraphs. Online sampling means we discard all pre-sampled subgraphs and re-sample new subgraphs in training phase.
 
@@ -132,7 +134,7 @@ python train_sampling.py --task $task $online
 
 - We've run experiments 10 times repeatedly to test average and standard deviation of sampling and normalization time. Here we just test time without training model to the end. Moreover, for efficient testing, the hardware and config employed here are not the same as the experiments above, so the sampling time might be a bit different from that above. But we keep the environment consistent in all experiments below.
 
-> The config here which is different with that in the section above is only `num_workers_sampler`, `batch_size_sampler` and `num_workers`, which are only correlated to the sampling speed. Other parameters are kept consistent across two sections thus the model's performance is not affected. 
+> The config here which is different with that in the section above is only `num_workers_sampler`, `batch_size_sampler` and `num_workers`, which are only correlated to the sampling speed. Other parameters are kept consistent across two sections thus the model's performance is not affected.
 
 > The value is (average, std).
 

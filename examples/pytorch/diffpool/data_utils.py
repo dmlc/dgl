@@ -3,9 +3,9 @@ import torch
 
 
 def one_hotify(labels, pad=-1):
-    '''
+    """
     cast label to one hot vector
-    '''
+    """
     num_instances = len(labels)
     if pad <= 0:
         dim_embedding = np.max(labels) + 1  # zero-indexed assumed
@@ -24,17 +24,17 @@ def pre_process(dataset, prog_args):
     """
     if prog_args.data_mode != "default":
         print("overwrite node attributes with DiffPool's preprocess setting")
-        if prog_args.data_mode == 'id':
+        if prog_args.data_mode == "id":
             for g, _ in dataset:
                 id_list = np.arange(g.number_of_nodes())
-                g.ndata['feat'] = one_hotify(id_list, pad=dataset.max_num_node)
+                g.ndata["feat"] = one_hotify(id_list, pad=dataset.max_num_node)
 
-        elif prog_args.data_mode == 'deg-num':
+        elif prog_args.data_mode == "deg-num":
             for g, _ in dataset:
-                g.ndata['feat'] = np.expand_dims(g.in_degrees(), axis=1)
+                g.ndata["feat"] = np.expand_dims(g.in_degrees(), axis=1)
 
-        elif prog_args.data_mode == 'deg':
+        elif prog_args.data_mode == "deg":
             for g in dataset:
                 degs = list(g.in_degrees())
                 degs_one_hot = one_hotify(degs, pad=dataset.max_degrees)
-                g.ndata['feat'] = degs_one_hot
+                g.ndata["feat"] = degs_one_hot

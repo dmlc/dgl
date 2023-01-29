@@ -80,8 +80,13 @@ disable=design,
         useless-object-inheritance,
         no-else-return,
         len-as-condition,
-        cyclic-import,       # disabled due to the inevitable dgl.graph -> dgl.subgraph loop
-        undefined-variable,  # disabled due to C extension (should enable)
+        cyclic-import,          # disabled due to the inevitable dgl.graph -> dgl.subgraph loop
+        undefined-variable,     # disabled due to C extension (should enable)
+        raise-missing-from,     # meh
+        import-outside-toplevel,    # due to inevitable imports within blocks
+        using-constant-test,    # due to in-place object modification in C
+        super-with-arguments,   # 2.3.0->2.6.0, should enable but there's too many...
+        not-callable,           # due to optional callables that can be None
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
@@ -192,7 +197,23 @@ function-naming-style=snake_case
 #function-rgx=
 
 # Good variable names which should always be accepted, separated by a comma.
-good-names=i,j,k,u,v,e,n,m,w,x,y,z,g,G,hg,fn,ex,Run,_,us,vs,gs,op,ty
+# f - files
+# i, j, k - loop variables
+# u, v, e - nodes and edges
+# s, d - source and destination
+# t - time
+# r - relation type
+# n, m - general integers representing quantity
+# w, x, y, z - general math variables
+# g, G - graphs
+# hg - heterogeneous graphs
+# sg - subgraphs
+# fn - functions
+# us, vs, es, gs - plural form of u, v, g, e
+# op - operators
+# ty - type
+# A, B, C, W - for tensor operators like matmul
+good-names=f,i,j,k,u,v,e,n,m,w,x,y,z,s,d,t,r,g,G,hg,sg,fn,ex,Run,_,us,vs,gs,es,op,ty,A,B,C,W,a,b,N,D1,D2,R
 
 # Include a hint for the correct naming format with invalid-name.
 include-naming-hint=no

@@ -10,7 +10,7 @@ case, you would like to have an *edge classification/regression* model.
 
 Here we generate a random graph for edge prediction as a demonstration.
 
-.. code:: ipython3
+.. code:: python
 
     src = np.random.randint(0, 100, 500)
     dst = np.random.randint(0, 100, 500)
@@ -134,7 +134,7 @@ Edge classification on heterogeneous graphs is not very different from
 that on homogeneous graphs. If you wish to perform edge classification
 on one edge type, you only need to compute the node representation for
 all node types, and predict on that edge type with
-:meth:`~dgl.DGLHeteroGraph.apply_edges` method.
+:meth:`~dgl.DGLGraph.apply_edges` method.
 
 For example, to make ``DotProductPredictor`` work on one edge type of a
 heterogeneous graph, you only need to specify the edge type in
@@ -328,5 +328,3 @@ file <https://github.com/dmlc/dgl/tree/master/examples/pytorch/gcmc>`__
 is called ``GCMCLayer``. The edge type predictor module is called
 ``BiDecoder``. Both of them are more complicated than the setting
 described here.
-
-

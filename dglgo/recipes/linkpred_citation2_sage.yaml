@@ -1,0 +1,36 @@
+version: 0.0.2
+pipeline_name: linkpred
+pipeline_mode: train
+device: cpu
+data:
+  name: ogbl-citation2
+  split_ratio:                # List of float, e.q. [0.8, 0.1, 0.1]. Split ratios for training, validation and test sets. Must sum to one. Leave blank to use builtin split in original dataset
+  neg_ratio:                  # Int, e.q. 2. Indicate how much negative samples to be sampled per positive samples. Leave blank to use builtin split in original dataset
+node_model:
+  name: sage
+  embed_size: -1              # The dimension of created embedding table. -1 means using original node embedding
+  hidden_size: 16             # Hidden size.
+  num_layers: 1               # Number of hidden layers.
+  activation: relu
+  dropout: 0.5                # Dropout rate.
+  aggregator_type: gcn        # Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
+edge_model:
+  name: ele
+  hidden_size: 64             # Hidden size.
+  num_layers: 2               # Number of hidden layers.
+  bias: true                  # Whether to use bias in the linaer layer.
+neg_sampler:
+  name: persource
+  k: 3                        # The number of negative samples per edge.
+general_pipeline:
+  hidden_size: 256            # The intermediate hidden size between node model and edge model
+  eval_batch_size: 32769      # Edge batch size when evaluating
+  train_batch_size: 32769     # Edge batch size when training
+  num_epochs: 200             # Number of training epochs
+  eval_period: 5              # Interval epochs between evaluations
+  optimizer:
+    name: Adam
+    lr: 0.005
+  loss: BCELoss
+  save_path: "results"        # Directory to save the experiment results
+  num_runs: 1                 # Number of experiments to run

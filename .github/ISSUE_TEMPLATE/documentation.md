@@ -1,6 +1,9 @@
 ---
 name: "\U0001F4DA Documentation"
 about: Report an issue related to docs.dgl.ai
+title: ''
+labels: ''
+assignees: ''
 
 ---
 

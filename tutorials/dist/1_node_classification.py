@@ -22,6 +22,8 @@ Here we store the node labels as node data in the DGL Graph.
 .. code-block:: python
 
 
+    import os
+    os.environ['DGLBACKEND'] = 'pytorch'
     import dgl
     import torch as th
     from ogb.nodeproppred import DglNodePropPredDataset
@@ -265,7 +267,8 @@ Pytorch's `DistributedDataParallel`.
 Distributed mini-batch sampler
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We can use the same `NodeDataLoader` to create a distributed mini-batch sampler for
+We can use the same :class:`~dgl.dataloading.pytorch.DistNodeDataLoader`, the distributed counterpart
+of :class:`~dgl.dataloading.pytorch.NodeDataLoader`, to create a distributed mini-batch sampler for
 node classification.
 
 
@@ -274,10 +277,10 @@ node classification.
 .. code-block:: python
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler([25,10])
-    train_dataloader = dgl.dataloading.NodeDataLoader(
+    train_dataloader = dgl.dataloading.DistNodeDataLoader(
                                  g, train_nid, sampler, batch_size=1024,
                                  shuffle=True, drop_last=False)
-    valid_dataloader = dgl.dataloading.NodeDataLoader(
+    valid_dataloader = dgl.dataloading.DistNodeDataLoader(
                                  g, valid_nid, sampler, batch_size=1024,
                                  shuffle=False, drop_last=False)
 
@@ -298,23 +301,24 @@ The training loop for distributed training is also exactly the same as the singl
     for epoch in range(10):
         # Loop over the dataloader to sample mini-batches.
         losses = []
-        for step, (input_nodes, seeds, blocks) in enumerate(train_dataloader):
-            # Load the input features as well as output labels
-            batch_inputs = g.ndata['feat'][input_nodes]
-            batch_labels = g.ndata['labels'][seeds]
+        with model.join():
+            for step, (input_nodes, seeds, blocks) in enumerate(train_dataloader):
+                # Load the input features as well as output labels
+                batch_inputs = g.ndata['feat'][input_nodes]
+                batch_labels = g.ndata['labels'][seeds]
 
-            # Compute loss and prediction
-            batch_pred = model(blocks, batch_inputs)
-            loss = loss_fcn(batch_pred, batch_labels)
-            optimizer.zero_grad()
-            loss.backward()
-            losses.append(loss.detach().cpu().numpy())
-            optimizer.step()
+                # Compute loss and prediction
+                batch_pred = model(blocks, batch_inputs)
+                loss = loss_fcn(batch_pred, batch_labels)
+                optimizer.zero_grad()
+                loss.backward()
+                losses.append(loss.detach().cpu().numpy())
+                optimizer.step()
 
         # validation
         predictions = []
         labels = []
-        with th.no_grad():
+        with th.no_grad(), model.join():
             for step, (input_nodes, seeds, blocks) in enumerate(valid_dataloader):
                 inputs = g.ndata['feat'][input_nodes]
                 labels.append(g.ndata['labels'][seeds].numpy())

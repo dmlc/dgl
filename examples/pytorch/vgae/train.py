@@ -2,42 +2,77 @@ import argparse
 import os
 import time
 
-import dgl
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
+import model
 import numpy as np
 import scipy.sparse as sp
-from sklearn.metrics import roc_auc_score, average_precision_score
 import torch
 import torch.nn.functional as F
-
 from input_data import load_data
-import model
-from preprocess import mask_test_edges, mask_test_edges_dgl, sparse_to_tuple, preprocess_graph
+from preprocess import (
+    mask_test_edges,
+    mask_test_edges_dgl,
+    preprocess_graph,
+    sparse_to_tuple,
+)
+from sklearn.metrics import average_precision_score, roc_auc_score
 
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+import dgl
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
-parser = argparse.ArgumentParser(description='Variant Graph Auto Encoder')
-parser.add_argument('--learning_rate', type=float, default=0.01, help='Initial learning rate.')
-parser.add_argument('--epochs', '-e', type=int, default=200, help='Number of epochs to train.')
-parser.add_argument('--hidden1', '-h1', type=int, default=32, help='Number of units in hidden layer 1.')
-parser.add_argument('--hidden2', '-h2', type=int, default=16, help='Number of units in hidden layer 2.')
-parser.add_argument('--datasrc', '-s', type=str, default='dgl',
-                    help='Dataset download from dgl Dataset or website.')
-parser.add_argument('--dataset', '-d', type=str, default='cora', help='Dataset string.')
-parser.add_argument('--gpu_id', type=int, default=0, help='GPU id to use.')
+os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
+
+parser = argparse.ArgumentParser(description="Variant Graph Auto Encoder")
+parser.add_argument(
+    "--learning_rate", type=float, default=0.01, help="Initial learning rate."
+)
+parser.add_argument(
+    "--epochs", "-e", type=int, default=200, help="Number of epochs to train."
+)
+parser.add_argument(
+    "--hidden1",
+    "-h1",
+    type=int,
+    default=32,
+    help="Number of units in hidden layer 1.",
+)
+parser.add_argument(
+    "--hidden2",
+    "-h2",
+    type=int,
+    default=16,
+    help="Number of units in hidden layer 2.",
+)
+parser.add_argument(
+    "--datasrc",
+    "-s",
+    type=str,
+    default="dgl",
+    help="Dataset download from dgl Dataset or website.",
+)
+parser.add_argument(
+    "--dataset", "-d", type=str, default="cora", help="Dataset string."
+)
+parser.add_argument("--gpu_id", type=int, default=0, help="GPU id to use.")
 args = parser.parse_args()
 
 
 # check device
-device = torch.device("cuda:{}".format(args.gpu_id) if torch.cuda.is_available() else "cpu")
+device = torch.device(
+    "cuda:{}".format(args.gpu_id) if torch.cuda.is_available() else "cpu"
+)
 # device = "cpu"
 
 # roc_means = []
 # ap_means = []
 
+
 def compute_loss_para(adj):
-    pos_weight = ((adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum())
-    norm = adj.shape[0] * adj.shape[0] / float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
+    pos_weight = (adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()
+    norm = (
+        adj.shape[0]
+        * adj.shape[0]
+        / float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
+    )
     weight_mask = adj.view(-1) == 1
     weight_tensor = torch.ones(weight_mask.size(0)).to(device)
     weight_tensor[weight_mask] = pos_weight
@@ -75,25 +110,31 @@ def get_scores(edges_pos, edges_neg, adj_rec):
 
 def dgl_main():
     # Load from DGL dataset
-    if args.dataset == 'cora':
+    if args.dataset == "cora":
         dataset = CoraGraphDataset(reverse_edge=False)
-    elif args.dataset == 'citeseer':
+    elif args.dataset == "citeseer":
         dataset = CiteseerGraphDataset(reverse_edge=False)
-    elif args.dataset == 'pubmed':
+    elif args.dataset == "pubmed":
         dataset = PubmedGraphDataset(reverse_edge=False)
     else:
         raise NotImplementedError
     graph = dataset[0]
 
     # Extract node features
-    feats = graph.ndata.pop('feat').to(device)
+    feats = graph.ndata.pop("feat").to(device)
     in_dim = feats.shape[-1]
 
     # generate input
     adj_orig = graph.adjacency_matrix().to_dense()
 
     # build test set with 10% positive links
-    train_edge_idx, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges_dgl(graph, adj_orig)
+    (
+        train_edge_idx,
+        val_edges,
+        val_edges_false,
+        test_edges,
+        test_edges_false,
+    ) = mask_test_edges_dgl(graph, adj_orig)
 
     graph = graph.to(device)
 
@@ -112,7 +153,10 @@ def dgl_main():
 
     # create training component
     optimizer = torch.optim.Adam(vgae_model.parameters(), lr=args.learning_rate)
-    print('Total Parameters:', sum([p.nelement() for p in vgae_model.parameters()]))
+    print(
+        "Total Parameters:",
+        sum([p.nelement() for p in vgae_model.parameters()]),
+    )
 
     # create training epoch
     for epoch in range(args.epochs):
@@ -124,10 +168,21 @@ def dgl_main():
         logits = vgae_model.forward(graph, feats)
 
         # compute loss
-        loss = norm * F.binary_cross_entropy(logits.view(-1), adj.view(-1), weight=weight_tensor)
-        kl_divergence = 0.5 / logits.size(0) * (
-                1 + 2 * vgae_model.log_std - vgae_model.mean ** 2 - torch.exp(vgae_model.log_std) ** 2).sum(
-            1).mean()
+        loss = norm * F.binary_cross_entropy(
+            logits.view(-1), adj.view(-1), weight=weight_tensor
+        )
+        kl_divergence = (
+            0.5
+            / logits.size(0)
+            * (
+                1
+                + 2 * vgae_model.log_std
+                - vgae_model.mean**2
+                - torch.exp(vgae_model.log_std) ** 2
+            )
+            .sum(1)
+            .mean()
+        )
         loss -= kl_divergence
 
         # backward
@@ -140,14 +195,31 @@ def dgl_main():
         val_roc, val_ap = get_scores(val_edges, val_edges_false, logits)
 
         # Print out performance
-        print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(loss.item()), "train_acc=",
-              "{:.5f}".format(train_acc), "val_roc=", "{:.5f}".format(val_roc), "val_ap=", "{:.5f}".format(val_ap),
-              "time=", "{:.5f}".format(time.time() - t))
+        print(
+            "Epoch:",
+            "%04d" % (epoch + 1),
+            "train_loss=",
+            "{:.5f}".format(loss.item()),
+            "train_acc=",
+            "{:.5f}".format(train_acc),
+            "val_roc=",
+            "{:.5f}".format(val_roc),
+            "val_ap=",
+            "{:.5f}".format(val_ap),
+            "time=",
+            "{:.5f}".format(time.time() - t),
+        )
 
     test_roc, test_ap = get_scores(test_edges, test_edges_false, logits)
     # roc_means.append(test_roc)
     # ap_means.append(test_ap)
-    print("End of training!", "test_roc=", "{:.5f}".format(test_roc), "test_ap=", "{:.5f}".format(test_ap))
+    print(
+        "End of training!",
+        "test_roc=",
+        "{:.5f}".format(test_roc),
+        "test_ap=",
+        "{:.5f}".format(test_ap),
+    )
 
 
 def web_main():
@@ -157,10 +229,19 @@ def web_main():
 
     # Store original adjacency matrix (without diagonal entries) for later
     adj_orig = adj
-    adj_orig = adj_orig - sp.dia_matrix((adj_orig.diagonal()[np.newaxis, :], [0]), shape=adj_orig.shape)
+    adj_orig = adj_orig - sp.dia_matrix(
+        (adj_orig.diagonal()[np.newaxis, :], [0]), shape=adj_orig.shape
+    )
     adj_orig.eliminate_zeros()
 
-    adj_train, train_edges, val_edges, val_edges_false, test_edges, test_edges_false = mask_test_edges(adj)
+    (
+        adj_train,
+        train_edges,
+        val_edges,
+        val_edges_false,
+        test_edges,
+        test_edges_false,
+    ) = mask_test_edges(adj)
     adj = adj_train
 
     # # Create model
@@ -176,20 +257,30 @@ def web_main():
 
     # Create Model
     pos_weight = float(adj.shape[0] * adj.shape[0] - adj.sum()) / adj.sum()
-    norm = adj.shape[0] * adj.shape[0] / float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
+    norm = (
+        adj.shape[0]
+        * adj.shape[0]
+        / float((adj.shape[0] * adj.shape[0] - adj.sum()) * 2)
+    )
 
     adj_label = adj_train + sp.eye(adj_train.shape[0])
     adj_label = sparse_to_tuple(adj_label)
 
-    adj_norm = torch.sparse.FloatTensor(torch.LongTensor(adj_norm[0].T),
-                                        torch.FloatTensor(adj_norm[1]),
-                                        torch.Size(adj_norm[2]))
-    adj_label = torch.sparse.FloatTensor(torch.LongTensor(adj_label[0].T),
-                                         torch.FloatTensor(adj_label[1]),
-                                         torch.Size(adj_label[2]))
-    features = torch.sparse.FloatTensor(torch.LongTensor(features[0].T),
-                                        torch.FloatTensor(features[1]),
-                                        torch.Size(features[2]))
+    adj_norm = torch.sparse.FloatTensor(
+        torch.LongTensor(adj_norm[0].T),
+        torch.FloatTensor(adj_norm[1]),
+        torch.Size(adj_norm[2]),
+    )
+    adj_label = torch.sparse.FloatTensor(
+        torch.LongTensor(adj_label[0].T),
+        torch.FloatTensor(adj_label[1]),
+        torch.Size(adj_label[2]),
+    )
+    features = torch.sparse.FloatTensor(
+        torch.LongTensor(features[0].T),
+        torch.FloatTensor(features[1]),
+        torch.Size(features[2]),
+    )
 
     weight_mask = adj_label.to_dense().view(-1) == 1
     weight_tensor = torch.ones(weight_mask.size(0))
@@ -201,7 +292,10 @@ def web_main():
     vgae_model = model.VGAEModel(in_dim, args.hidden1, args.hidden2)
     # create training component
     optimizer = torch.optim.Adam(vgae_model.parameters(), lr=args.learning_rate)
-    print('Total Parameters:', sum([p.nelement() for p in vgae_model.parameters()]))
+    print(
+        "Total Parameters:",
+        sum([p.nelement() for p in vgae_model.parameters()]),
+    )
 
     def get_scores(edges_pos, edges_neg, adj_rec):
         def sigmoid(x):
@@ -245,10 +339,21 @@ def web_main():
         logits = vgae_model.forward(graph, features)
 
         # compute loss
-        loss = norm * F.binary_cross_entropy(logits.view(-1), adj_label.to_dense().view(-1), weight=weight_tensor)
-        kl_divergence = 0.5 / logits.size(0) * (
-                1 + 2 * vgae_model.log_std - vgae_model.mean ** 2 - torch.exp(vgae_model.log_std) ** 2).sum(
-            1).mean()
+        loss = norm * F.binary_cross_entropy(
+            logits.view(-1), adj_label.to_dense().view(-1), weight=weight_tensor
+        )
+        kl_divergence = (
+            0.5
+            / logits.size(0)
+            * (
+                1
+                + 2 * vgae_model.log_std
+                - vgae_model.mean**2
+                - torch.exp(vgae_model.log_std) ** 2
+            )
+            .sum(1)
+            .mean()
+        )
         loss -= kl_divergence
 
         # backward
@@ -261,12 +366,29 @@ def web_main():
         val_roc, val_ap = get_scores(val_edges, val_edges_false, logits)
 
         # Print out performance
-        print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(loss.item()), "train_acc=",
-              "{:.5f}".format(train_acc), "val_roc=", "{:.5f}".format(val_roc), "val_ap=", "{:.5f}".format(val_ap),
-              "time=", "{:.5f}".format(time.time() - t))
+        print(
+            "Epoch:",
+            "%04d" % (epoch + 1),
+            "train_loss=",
+            "{:.5f}".format(loss.item()),
+            "train_acc=",
+            "{:.5f}".format(train_acc),
+            "val_roc=",
+            "{:.5f}".format(val_roc),
+            "val_ap=",
+            "{:.5f}".format(val_ap),
+            "time=",
+            "{:.5f}".format(time.time() - t),
+        )
 
     test_roc, test_ap = get_scores(test_edges, test_edges_false, logits)
-    print("End of training!", "test_roc=", "{:.5f}".format(test_roc), "test_ap=", "{:.5f}".format(test_ap))
+    print(
+        "End of training!",
+        "test_roc=",
+        "{:.5f}".format(test_roc),
+        "test_ap=",
+        "{:.5f}".format(test_ap),
+    )
     # roc_means.append(test_roc)
     # ap_means.append(test_ap)
 
@@ -282,8 +404,8 @@ def web_main():
 #     print("roc_mean=", "{:.5f}".format(roc_mean), "roc_std=", "{:.5f}".format(roc_std), "ap_mean=",
 #           "{:.5f}".format(ap_mean), "ap_std=", "{:.5f}".format(ap_std))
 
-if __name__ == '__main__':
-    if args.datasrc == 'dgl':
+if __name__ == "__main__":
+    if args.datasrc == "dgl":
         dgl_main()
-    elif args.datasrc == 'website':
+    elif args.datasrc == "website":
         web_main()

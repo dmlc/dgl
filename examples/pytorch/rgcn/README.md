@@ -1,84 +1,61 @@
 # Relational-GCN
 
-* Paper: [https://arxiv.org/abs/1703.06103](https://arxiv.org/abs/1703.06103)
+* Paper: [Modeling Relational Data with Graph Convolutional Networks](https://arxiv.org/abs/1703.06103)
 * Author's code for entity classification: [https://github.com/tkipf/relational-gcn](https://github.com/tkipf/relational-gcn)
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
 ### Dependencies
-* PyTorch 0.4.1+
-* requests
-* rdflib
-* pandas
+- rdflib
+- torchmetrics
 
-```
-pip install requests torch rdflib pandas
+Install as follows:
+```bash
+pip install rdflib
+pip install torchmetrics
 ```
 
-Example code was tested with rdflib 4.2.2 and pandas 0.23.4
+How to run
+-------
 
 ### Entity Classification
-AIFB: accuracy 96.29% (3 runs, DGL), 95.83% (paper)
-```
-python3 entity_classify.py -d aifb --testing --gpu 0
+
+Run with the following for entity classification (available datasets: aifb (default), mutag, bgs, and am)
+```bash
+python3 entity.py --dataset aifb
 ```
 
-MUTAG: accuracy 70.59% (3 runs, DGL), 73.23% (paper)
+For mini-batch training, run with the following (available datasets are the same as above)
+```bash
+python3 entity_sample.py --dataset aifb
 ```
-python3 entity_classify.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0
+For multi-gpu training (with sampling), run with the following (same datasets and GPU IDs separated by comma)
+```bash
+python3 entity_sample_multi_gpu.py --dataset aifb --gpu 0,1
 ```
-
-BGS: accuracy 93.10% (3 runs, DGL), 83.10% (paper)
-```
-python3 entity_classify.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0
-```
-
-AM: accuracy 89.22% (3 runs, DGL), 89.29% (paper)
-```
-python3 entity_classify.py -d am --n-bases=40 --n-hidden=10 --l2norm=5e-4 --testing
-```
-
-### Entity Classification with minibatch
-AIFB: accuracy avg(5 runs) 90.00%, best 94.44% (DGL)
-```
-python3 entity_classify_mp.py -d aifb --testing --gpu 0 --fanout='20,20' --batch-size 128
-```
-
-MUTAG: accuracy avg(10 runs) 62.94%, best 72.06% (DGL)
-```
-python3 entity_classify_mp.py -d mutag --l2norm 5e-4 --n-bases 30 --testing --gpu 0 --batch-size 64 --fanout "-1, -1" --use-self-loop --dgl-sparse --n-epochs 20 --sparse-lr 0.01 --dropout 0.5
-```
-
-BGS: accuracy avg(5 runs) 78.62%, best 86.21% (DGL)
-```
-python3 entity_classify_mp.py -d bgs --l2norm 5e-4 --n-bases 40 --testing --gpu 0 --fanout "-1, -1"  --n-epochs=16 --batch-size=16 --dgl-sparse  --lr 0.01 --sparse-lr 0.05 --dropout 0.3
-```
-
-AM: accuracy avg(5 runs) 87.37%, best 89.9% (DGL)
-```
-python3 entity_classify_mp.py -d am --l2norm 5e-4 --n-bases 40 --testing  --gpu 0 --fanout '35,35' --batch-size 64 --n-hidden 16 --use-self-loop --n-epochs=20 --dgl-sparse --lr 0.01  --sparse-lr 0.02 --dropout 0.7
-```
-
-### Entity Classification on OGBN-MAG
-Test-bd: P3-8xlarge
-
-OGBN-MAG accuracy 45.5 (3 runs)
-```
-python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='30,30' --batch-size 1024 --n-hidden 128 --lr 0.01 --num-worker 4 --eval-batch-size 8 --low-mem --gpu 0,1,2,3 --dropout 0.7 --use-self-loop --n-bases 2 --n-epochs 3 --node-feats --dgl-sparse --sparse-lr 0.08
-```
-
-OGBN-MAG without node-feats 42.79
-```
-python3 entity_classify_mp.py -d ogbn-mag --testing --fanout='30,30' --batch-size 1024 --n-hidden 128 --lr 0.01 --num-worker 4 --eval-batch-size 8 --low-mem --gpu 0,1,2,3 --dropout 0.7 --use-self-loop --n-bases 2 --n-epochs 3 --dgl-sparse --sparse-lr 0.08
-```
-
-Test-bd: P2-8xlarge
 
 ### Link Prediction
-FB15k-237: MRR 0.151 (DGL), 0.158 (paper)
+
+Run with the following for link prediction on dataset FB15k-237 with filtered-MRR
+
+```bash
+python link.py
 ```
-python3 link_predict.py -d FB15k-237 --gpu 0 --eval-protocol raw
-```
-FB15k-237: Filtered-MRR 0.2044
-```
-python3 link_predict.py -d FB15k-237 --gpu 0 --eval-protocol filtered
-```
+> **_NOTE:_** By default, we use uniform edge sampling instead of neighbor-based edge sampling as in [author's code](https://github.com/MichSchli/RelationPrediction). In practice, we find that it can achieve similar MRR.
+
+
+Summary
+-------
+
+### Entity Classification
+
+| Dataset       | Full-graph | Mini-batch
+| ------------- | -------    |  ------
+| aifb          | ~0.85      | ~0.82
+| mutag         | ~0.70      | ~0.50
+| bgs           | ~0.86      | ~0.64
+| am            | ~0.78      | ~0.42
+
+### Link Prediction
+| Dataset       | Best MRR
+| ------------- | -------
+| FB15k-237     | ~0.2439

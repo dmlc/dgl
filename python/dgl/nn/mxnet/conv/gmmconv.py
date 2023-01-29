@@ -12,13 +12,8 @@ from ....utils import expand_as_pair
 
 
 class GMMConv(nn.Block):
-    r"""
-
-    Description
-    -----------
-    The Gaussian Mixture Model Convolution layer from `Geometric Deep
-    Learning on Graphs and Manifolds using Mixture Model CNNs
-    <http://openaccess.thecvf.com/content_cvpr_2017/papers/Monti_Geometric_Deep_Learning_CVPR_2017_paper.pdf>`__.
+    r"""Gaussian Mixture Model Convolution layer from `Geometric Deep Learning on Graphs and
+    Manifolds using Mixture Model CNNs <https://arxiv.org/abs/1611.08402>`__
 
     .. math::
         u_{ij} &= f(x_i, x_j), x_j \in \mathcal{N}(i)
@@ -98,7 +93,7 @@ class GMMConv(nn.Block):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     >>> u_fea = mx.nd.random.randn(2, 5)
     >>> v_fea = mx.nd.random.randn(4, 10)
     >>> pseudo = mx.nd.ones((5, 3))

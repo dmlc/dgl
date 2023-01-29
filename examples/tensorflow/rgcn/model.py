@@ -1,10 +1,20 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 
+
 class BaseRGCN(layers.Layer):
-    def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases,
-                 num_hidden_layers=1, dropout=0,
-                 use_self_loop=False, use_cuda=False):
+    def __init__(
+        self,
+        num_nodes,
+        h_dim,
+        out_dim,
+        num_rels,
+        num_bases,
+        num_hidden_layers=1,
+        dropout=0,
+        use_self_loop=False,
+        use_cuda=False,
+    ):
         super(BaseRGCN, self).__init__()
         self.num_nodes = num_nodes
         self.h_dim = h_dim

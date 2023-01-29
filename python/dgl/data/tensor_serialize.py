@@ -1,10 +1,11 @@
 """For Tensor Serialization"""
 from __future__ import absolute_import
-from ..ndarray import NDArray
-from .._ffi.function import _init_api
-from .. import backend as F
 
-__all__ = ['save_tensors', "load_tensors"]
+from .. import backend as F
+from .._ffi.function import _init_api
+from ..ndarray import NDArray
+
+__all__ = ["save_tensors", "load_tensors"]
 
 _init_api("dgl.data.tensor_serialize")
 
@@ -12,11 +13,11 @@ _init_api("dgl.data.tensor_serialize")
 def save_tensors(filename, tensor_dict):
     """
     Save dict of tensors to file
-    
+
     Parameters
     ----------
     filename : str
-        File name to store dict of tensors. 
+        File name to store dict of tensors.
     tensor_dict: dict of dgl NDArray or backend tensor
         Python dict using string as key and tensor as value
 
@@ -36,19 +37,20 @@ def save_tensors(filename, tensor_dict):
             nd_dict[key] = value
         else:
             raise Exception(
-                "Dict value has to be backend tensor or dgl ndarray")
-    
+                "Dict value has to be backend tensor or dgl ndarray"
+            )
+
     return _CAPI_SaveNDArrayDict(filename, nd_dict, is_empty_dict)
 
 
 def load_tensors(filename, return_dgl_ndarray=False):
     """
     load dict of tensors from file
-    
+
     Parameters
     ----------
     filename : str
-        File name to load dict of tensors. 
+        File name to load dict of tensors.
     return_dgl_ndarray: bool
         Whether return dict of dgl NDArrays or backend tensors
 

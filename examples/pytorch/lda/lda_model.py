@@ -17,8 +17,17 @@
 # limitations under the License.
 
 
-import os, functools, warnings, torch, collections, dgl, io
-import numpy as np, scipy as sp
+import collections
+import functools
+import io
+import os
+import warnings
+
+import numpy as np
+import scipy as sp
+import torch
+
+import dgl
 
 try:
     from functools import cached_property
@@ -37,17 +46,21 @@ class EdgeData:
 
     @property
     def loglike(self):
-        return (self.src_data['Elog'] + self.dst_data['Elog']).logsumexp(1)
+        return (self.src_data["Elog"] + self.dst_data["Elog"]).logsumexp(1)
 
     @property
     def phi(self):
         return (
-            self.src_data['Elog'] + self.dst_data['Elog'] - self.loglike.unsqueeze(1)
+            self.src_data["Elog"]
+            + self.dst_data["Elog"]
+            - self.loglike.unsqueeze(1)
         ).exp()
 
     @property
     def expectation(self):
-        return (self.src_data['expectation'] * self.dst_data['expectation']).sum(1)
+        return (
+            self.src_data["expectation"] * self.dst_data["expectation"]
+        ).sum(1)
 
 
 class _Dirichlet:
@@ -55,10 +68,13 @@ class _Dirichlet:
         self.prior = prior
         self.nphi = nphi
         self.device = nphi.device
-        self._sum_by_parts = lambda map_fn: functools.reduce(torch.add, [
-            map_fn(slice(i, min(i+_chunksize, nphi.shape[1]))).sum(1)
-            for i in list(range(0, nphi.shape[1], _chunksize))
-        ])
+        self._sum_by_parts = lambda map_fn: functools.reduce(
+            torch.add,
+            [
+                map_fn(slice(i, min(i + _chunksize, nphi.shape[1]))).sum(1)
+                for i in list(range(0, nphi.shape[1], _chunksize))
+            ],
+        )
 
     def _posterior(self, _ID=slice(None)):
         return self.prior + self.nphi[:, _ID]
@@ -68,14 +84,15 @@ class _Dirichlet:
         return self.nphi.sum(1) + self.prior * self.nphi.shape[1]
 
     def _Elog(self, _ID=slice(None)):
-        return torch.digamma(self._posterior(_ID)) - \
-               torch.digamma(self.posterior_sum.unsqueeze(1))
+        return torch.digamma(self._posterior(_ID)) - torch.digamma(
+            self.posterior_sum.unsqueeze(1)
+        )
 
     @cached_property
     def loglike(self):
         neg_evid = -self._sum_by_parts(
             lambda s: (self.nphi[:, s] * self._Elog(s))
-            )
+        )
 
         prior = torch.as_tensor(self.prior).to(self.nphi)
         K = self.nphi.shape[1]
@@ -83,7 +100,7 @@ class _Dirichlet:
 
         log_B_posterior = self._sum_by_parts(
             lambda s: torch.lgamma(self._posterior(s))
-            ) - torch.lgamma(self.posterior_sum)
+        ) - torch.lgamma(self.posterior_sum)
 
         return neg_evid - log_B_prior + log_B_posterior
 
@@ -105,9 +122,15 @@ class _Dirichlet:
 
     @cached_property
     def Bayesian_gap(self):
-        return 1. - self._sum_by_parts(lambda s: self._Elog(s).exp())
+        return 1.0 - self._sum_by_parts(lambda s: self._Elog(s).exp())
 
-    _cached_properties = ["posterior_sum", "loglike", "n", "cdf", "Bayesian_gap"]
+    _cached_properties = [
+        "posterior_sum",
+        "loglike",
+        "n",
+        "cdf",
+        "Bayesian_gap",
+    ]
 
     def clear_cache(self):
         for name in self._cached_properties:
@@ -117,27 +140,29 @@ class _Dirichlet:
                 pass
 
     def update(self, new, _ID=slice(None), rho=1):
-        """ inplace: old * (1-rho) + new * rho """
+        """inplace: old * (1-rho) + new * rho"""
         self.clear_cache()
         mean_change = (self.nphi[:, _ID] - new).abs().mean().tolist()
 
-        self.nphi *= (1 - rho)
+        self.nphi *= 1 - rho
         self.nphi[:, _ID] += new * rho
         return mean_change
 
 
 class DocData(_Dirichlet):
-    """ nphi (n_docs by n_topics) """
+    """nphi (n_docs by n_topics)"""
+
     def prepare_graph(self, G, key="Elog"):
-        G.nodes['doc'].data[key] = getattr(self, '_'+key)().to(G.device)
+        G.nodes["doc"].data[key] = getattr(self, "_" + key)().to(G.device)
 
     def update_from(self, G, mult):
-        new = G.nodes['doc'].data['nphi'] * mult
+        new = G.nodes["doc"].data["nphi"] * mult
         return self.update(new.to(self.device))
 
 
 class _Distributed(collections.UserList):
-    """ split on dim=0 and store on multiple devices  """
+    """split on dim=0 and store on multiple devices"""
+
     def __init__(self, prior, nphi):
         self.prior = prior
         self.nphi = nphi
@@ -146,36 +171,38 @@ class _Distributed(collections.UserList):
     def split_device(self, other, dim=0):
         split_sections = [x.shape[0] for x in self.nphi]
         out = torch.split(other, split_sections, dim)
-        return [y.to(x.device) for x,y in zip(self.nphi, out)]
+        return [y.to(x.device) for x, y in zip(self.nphi, out)]
 
 
 class WordData(_Distributed):
-    """ distributed nphi (n_topics by n_words), transpose to/from graph nodes data """
+    """distributed nphi (n_topics by n_words), transpose to/from graph nodes data"""
+
     def prepare_graph(self, G, key="Elog"):
-        if '_ID' in G.nodes['word'].data:
-            _ID = G.nodes['word'].data['_ID']
+        if "_ID" in G.nodes["word"].data:
+            _ID = G.nodes["word"].data["_ID"]
         else:
             _ID = slice(None)
 
-        out = [getattr(part, '_'+key)(_ID).to(G.device) for part in self]
-        G.nodes['word'].data[key] = torch.cat(out).T
-
+        out = [getattr(part, "_" + key)(_ID).to(G.device) for part in self]
+        G.nodes["word"].data[key] = torch.cat(out).T
 
     def update_from(self, G, mult, rho):
-        nphi = G.nodes['word'].data['nphi'].T * mult
+        nphi = G.nodes["word"].data["nphi"].T * mult
 
-        if '_ID' in G.nodes['word'].data:
-            _ID = G.nodes['word'].data['_ID']
+        if "_ID" in G.nodes["word"].data:
+            _ID = G.nodes["word"].data["_ID"]
         else:
             _ID = slice(None)
 
-        mean_change = [x.update(y, _ID, rho)
-            for x, y in zip(self, self.split_device(nphi))]
+        mean_change = [
+            x.update(y, _ID, rho) for x, y in zip(self, self.split_device(nphi))
+        ]
         return np.mean(mean_change)
 
 
-class Gamma(collections.namedtuple('Gamma', "concentration, rate")):
-    """ articulate the difference between torch gamma and numpy gamma """
+class Gamma(collections.namedtuple("Gamma", "concentration, rate")):
+    """articulate the difference between torch gamma and numpy gamma"""
+
     @property
     def shape(self):
         return self.concentration
@@ -218,20 +245,23 @@ class LatentDirichletAllocation:
     (NIPS 2010).
     [2] Reactive LDA Library blogpost by Yingjie Miao for a similar Gibbs model
     """
+
     def __init__(
-        self, n_words, n_components,
+        self,
+        n_words,
+        n_components,
         prior=None,
         rho=1,
-        mult={'doc': 1, 'word': 1},
-        init={'doc': (100., 100.), 'word': (100., 100.)},
-        device_list=['cpu'],
+        mult={"doc": 1, "word": 1},
+        init={"doc": (100.0, 100.0), "word": (100.0, 100.0)},
+        device_list=["cpu"],
         verbose=True,
-        ):
+    ):
         self.n_words = n_words
         self.n_components = n_components
 
         if prior is None:
-            prior = {'doc': 1./n_components, 'word': 1./n_components}
+            prior = {"doc": 1.0 / n_components, "word": 1.0 / n_components}
         self.prior = prior
 
         self.rho = rho
@@ -239,116 +269,127 @@ class LatentDirichletAllocation:
         self.init = init
 
         assert not isinstance(device_list, str), "plz wrap devices in a list"
-        self.device_list = device_list[:n_components] # avoid edge cases
+        self.device_list = device_list[:n_components]  # avoid edge cases
         self.verbose = verbose
 
         self._init_word_data()
 
-
     def _init_word_data(self):
         split_sections = np.diff(
-            np.linspace(0, self.n_components, len(self.device_list)+1).astype(int)
+            np.linspace(0, self.n_components, len(self.device_list) + 1).astype(
+                int
+            )
         )
         word_nphi = [
-            Gamma(*self.init['word']).sample((s, self.n_words), device)
+            Gamma(*self.init["word"]).sample((s, self.n_words), device)
             for s, device in zip(split_sections, self.device_list)
         ]
-        self.word_data = WordData(self.prior['word'], word_nphi)
-
+        self.word_data = WordData(self.prior["word"], word_nphi)
 
     def _init_doc_data(self, n_docs, device):
-        doc_nphi = Gamma(*self.init['doc']).sample(
-            (n_docs, self.n_components), device)
-        return DocData(self.prior['doc'], doc_nphi)
-
+        doc_nphi = Gamma(*self.init["doc"]).sample(
+            (n_docs, self.n_components), device
+        )
+        return DocData(self.prior["doc"], doc_nphi)
 
     def save(self, f):
         for w in self.word_data:
             w.clear_cache()
-        torch.save({
-            'prior': self.prior,
-            'rho': self.rho,
-            'mult': self.mult,
-            'init': self.init,
-            'word_data': [part.nphi for part in self.word_data],
-        }, f)
-
+        torch.save(
+            {
+                "prior": self.prior,
+                "rho": self.rho,
+                "mult": self.mult,
+                "init": self.init,
+                "word_data": [part.nphi for part in self.word_data],
+            },
+            f,
+        )
 
     def _prepare_graph(self, G, doc_data, key="Elog"):
         doc_data.prepare_graph(G, key)
         self.word_data.prepare_graph(G, key)
 
-
     def _e_step(self, G, doc_data=None, mean_change_tol=1e-3, max_iters=100):
-        """_e_step implements doc data sampling until convergence or max_iters
-        """
+        """_e_step implements doc data sampling until convergence or max_iters"""
         if doc_data is None:
-            doc_data = self._init_doc_data(G.num_nodes('doc'), G.device)
+            doc_data = self._init_doc_data(G.num_nodes("doc"), G.device)
 
-        G_rev = G.reverse() # word -> doc
+        G_rev = G.reverse()  # word -> doc
         self.word_data.prepare_graph(G_rev)
 
         for i in range(max_iters):
             doc_data.prepare_graph(G_rev)
             G_rev.update_all(
-                lambda edges: {'phi': EdgeData(edges.src, edges.dst).phi},
-                dgl.function.sum('phi', 'nphi')
+                lambda edges: {"phi": EdgeData(edges.src, edges.dst).phi},
+                dgl.function.sum("phi", "nphi"),
             )
-            mean_change = doc_data.update_from(G_rev, self.mult['doc'])
+            mean_change = doc_data.update_from(G_rev, self.mult["doc"])
             if mean_change < mean_change_tol:
                 break
 
         if self.verbose:
-            print(f"e-step num_iters={i+1} with mean_change={mean_change:.4f}, "
-                  f"perplexity={self.perplexity(G, doc_data):.4f}")
+            print(
+                f"e-step num_iters={i+1} with mean_change={mean_change:.4f}, "
+                f"perplexity={self.perplexity(G, doc_data):.4f}"
+            )
 
         return doc_data
 
-
     transform = _e_step
-
 
     def predict(self, doc_data):
         pred_scores = [
             # d_exp @ w._expectation()
-            (lambda x: x @ w.nphi + x.sum(1, keepdims=True) * w.prior)
-            (d_exp / w.posterior_sum.unsqueeze(0))
+            (lambda x: x @ w.nphi + x.sum(1, keepdims=True) * w.prior)(
+                d_exp / w.posterior_sum.unsqueeze(0)
+            )
             for (d_exp, w) in zip(
                 self.word_data.split_device(doc_data._expectation(), dim=1),
-                self.word_data)
+                self.word_data,
+            )
         ]
         x = torch.zeros_like(pred_scores[0], device=doc_data.device)
         for p in pred_scores:
             x += p.to(x.device)
         return x
 
-
     def sample(self, doc_data, num_samples):
-        """ draw independent words and return the marginal probabilities,
+        """draw independent words and return the marginal probabilities,
         i.e., the expectations in Dirichlet distributions.
         """
+
         def fn(cdf):
             u = torch.rand(cdf.shape[0], num_samples, device=cdf.device)
             return torch.searchsorted(cdf, u).to(doc_data.device)
 
         topic_ids = fn(doc_data.cdf)
         word_ids = torch.cat([fn(part.cdf) for part in self.word_data])
-        ids = torch.gather(word_ids, 0, topic_ids) # pick components by topic_ids
+        ids = torch.gather(
+            word_ids, 0, topic_ids
+        )  # pick components by topic_ids
 
         # compute expectation scores on sampled ids
-        src_ids = torch.arange(
-            ids.shape[0], dtype=ids.dtype, device=ids.device
-            ).reshape((-1, 1)).expand(ids.shape)
-        unique_ids, inverse_ids = torch.unique(ids, sorted=False, return_inverse=True)
+        src_ids = (
+            torch.arange(ids.shape[0], dtype=ids.dtype, device=ids.device)
+            .reshape((-1, 1))
+            .expand(ids.shape)
+        )
+        unique_ids, inverse_ids = torch.unique(
+            ids, sorted=False, return_inverse=True
+        )
 
-        G = dgl.heterograph({('doc','','word'): (src_ids.ravel(), inverse_ids.ravel())})
-        G.nodes['word'].data['_ID'] = unique_ids
+        G = dgl.heterograph(
+            {("doc", "", "word"): (src_ids.ravel(), inverse_ids.ravel())}
+        )
+        G.nodes["word"].data["_ID"] = unique_ids
         self._prepare_graph(G, doc_data, "expectation")
-        G.apply_edges(lambda e: {'expectation': EdgeData(e.src, e.dst).expectation})
-        expectation = G.edata.pop('expectation').reshape(ids.shape)
+        G.apply_edges(
+            lambda e: {"expectation": EdgeData(e.src, e.dst).expectation}
+        )
+        expectation = G.edata.pop("expectation").reshape(ids.shape)
 
         return ids, expectation
-
 
     def _m_step(self, G, doc_data):
         """_m_step implements word data sampling and stores word_z stats.
@@ -357,25 +398,24 @@ class LatentDirichletAllocation:
         G = G.clone()
         self._prepare_graph(G, doc_data)
         G.update_all(
-            lambda edges: {'phi': EdgeData(edges.src, edges.dst).phi},
-            dgl.function.sum('phi', 'nphi')
+            lambda edges: {"phi": EdgeData(edges.src, edges.dst).phi},
+            dgl.function.sum("phi", "nphi"),
         )
         self._last_mean_change = self.word_data.update_from(
-            G, self.mult['word'], self.rho)
+            G, self.mult["word"], self.rho
+        )
 
         if self.verbose:
             print(f"m-step mean_change={self._last_mean_change:.4f}, ", end="")
-            Bayesian_gap = np.mean([
-                part.Bayesian_gap.mean().tolist() for part in self.word_data
-            ])
+            Bayesian_gap = np.mean(
+                [part.Bayesian_gap.mean().tolist() for part in self.word_data]
+            )
             print(f"Bayesian_gap={Bayesian_gap:.4f}")
-
 
     def partial_fit(self, G):
         doc_data = self._e_step(G)
         self._m_step(G, doc_data)
         return self
-
 
     def fit(self, G, mean_change_tol=1e-3, max_epochs=10):
         for i in range(max_epochs):
@@ -387,7 +427,6 @@ class LatentDirichletAllocation:
                 break
         return self
 
-
     def perplexity(self, G, doc_data=None):
         """ppl = exp{-sum[log(p(w1,...,wn|d))] / n}
         Follows Eq (15) in Hoffman et al., 2010.
@@ -398,45 +437,50 @@ class LatentDirichletAllocation:
         # compute E[log p(docs | theta, beta)]
         G = G.clone()
         self._prepare_graph(G, doc_data)
-        G.apply_edges(lambda edges: {'loglike': EdgeData(edges.src, edges.dst).loglike})
-        edge_elbo = (G.edata['loglike'].sum() / G.num_edges()).tolist()
+        G.apply_edges(
+            lambda edges: {"loglike": EdgeData(edges.src, edges.dst).loglike}
+        )
+        edge_elbo = (G.edata["loglike"].sum() / G.num_edges()).tolist()
         if self.verbose:
-            print(f'neg_elbo phi: {-edge_elbo:.3f}', end=' ')
+            print(f"neg_elbo phi: {-edge_elbo:.3f}", end=" ")
 
         # compute E[log p(theta | alpha) - log q(theta | gamma)]
         doc_elbo = (doc_data.loglike.sum() / doc_data.n.sum()).tolist()
         if self.verbose:
-            print(f'theta: {-doc_elbo:.3f}', end=' ')
+            print(f"theta: {-doc_elbo:.3f}", end=" ")
 
         # compute E[log p(beta | eta) - log q(beta | lambda)]
         # The denominator n for extrapolation perplexity is undefined.
         # We use the train set, whereas sklearn uses the test set.
-        word_elbo = (
-            sum([part.loglike.sum().tolist() for part in self.word_data])
-            / sum([part.n.sum().tolist() for part in self.word_data])
-            )
+        word_elbo = sum(
+            [part.loglike.sum().tolist() for part in self.word_data]
+        ) / sum([part.n.sum().tolist() for part in self.word_data])
         if self.verbose:
-            print(f'beta: {-word_elbo:.3f}')
+            print(f"beta: {-word_elbo:.3f}")
 
         ppl = np.exp(-edge_elbo - doc_elbo - word_elbo)
-        if G.num_edges()>0 and np.isnan(ppl):
+        if G.num_edges() > 0 and np.isnan(ppl):
             warnings.warn("numerical issue in perplexity")
         return ppl
 
 
 def doc_subgraph(G, doc_ids):
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-    _, _, (block,) = sampler.sample(G.reverse(), {'doc': torch.as_tensor(doc_ids)})
-    B = dgl.DGLHeteroGraph(
-        block._graph, ['_', 'word', 'doc', '_'], block.etypes
+    _, _, (block,) = sampler.sample(
+        G.reverse(), {"doc": torch.as_tensor(doc_ids)}
+    )
+    B = dgl.DGLGraph(
+        block._graph, ["_", "word", "doc", "_"], block.etypes
     ).reverse()
-    B.nodes['word'].data['_ID'] = block.nodes['word'].data['_ID']
+    B.nodes["word"].data["_ID"] = block.nodes["word"].data["_ID"]
     return B
 
 
-if __name__ == '__main__':
-    print('Testing LatentDirichletAllocation ...')
-    G = dgl.heterograph({('doc', '', 'word'): [(0, 0), (1, 3)]}, {'doc': 2, 'word': 5})
+if __name__ == "__main__":
+    print("Testing LatentDirichletAllocation ...")
+    G = dgl.heterograph(
+        {("doc", "", "word"): [(0, 0), (1, 3)]}, {"doc": 2, "word": 5}
+    )
     model = LatentDirichletAllocation(n_words=5, n_components=10, verbose=False)
     model.fit(G)
     model.transform(G)
@@ -454,4 +498,4 @@ if __name__ == '__main__':
         f.seek(0)
         print(torch.load(f))
 
-    print('Testing LatentDirichletAllocation passed!')
+    print("Testing LatentDirichletAllocation passed!")

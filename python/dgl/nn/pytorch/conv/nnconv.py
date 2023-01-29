@@ -10,12 +10,8 @@ from ....utils import expand_as_pair
 
 
 class NNConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    Graph Convolution layer introduced in `Neural Message Passing
-    for Quantum Chemistry <https://arxiv.org/pdf/1704.01212.pdf>`__.
+    r"""Graph Convolution layer from `Neural Message Passing
+    for Quantum Chemistry <https://arxiv.org/pdf/1704.01212.pdf>`__
 
     .. math::
         h_{i}^{l+1} = h_{i}^{l} + \mathrm{aggregate}\left(\left\{
@@ -76,7 +72,7 @@ class NNConv(nn.Module):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     >>> u_feat = th.tensor(np.random.rand(2, 10).astype(np.float32))
     >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
     >>> conv = NNConv(10, 2, edge_func, 'mean')

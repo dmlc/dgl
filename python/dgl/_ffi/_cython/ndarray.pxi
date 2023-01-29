@@ -1,4 +1,4 @@
-from ..runtime_ctypes import DGLArrayHandle
+from ..runtime_ctypes import DGLArrayHandle as PyDGLArrayHandle
 
 cdef const char* _c_str_dltensor = "dltensor"
 cdef const char* _c_str_used_dltensor = "used_dltensor"
@@ -13,7 +13,7 @@ cdef void _c_dlpack_deleter(object pycaps):
 
 def _from_dlpack(object dltensor):
     cdef DLManagedTensor* ptr
-    cdef DLTensorHandle chandle
+    cdef DGLArrayHandle chandle
     if pycapsule.PyCapsule_IsValid(dltensor, _c_str_dltensor):
         ptr = <DLManagedTensor*>pycapsule.PyCapsule_GetPointer(dltensor, _c_str_dltensor)
         CALL(DGLArrayFromDLPack(ptr, &chandle))
@@ -25,7 +25,7 @@ def _from_dlpack(object dltensor):
 
 
 cdef class NDArrayBase:
-    cdef DLTensor* chandle
+    cdef DGLArray* chandle
     cdef int c_is_view
 
     cdef inline _set_handle(self, handle):
@@ -34,7 +34,7 @@ cdef class NDArrayBase:
             self.chandle = NULL
         else:
             ptr = ctypes.cast(handle, ctypes.c_void_p).value
-            self.chandle = <DLTensor*>(ptr)
+            self.chandle = <DGLArray*>(ptr)
 
     property _dgl_handle:
         def __get__(self):
@@ -46,7 +46,7 @@ cdef class NDArrayBase:
                 return None
             else:
                 return ctypes.cast(
-                    <unsigned long long>self.chandle, DGLArrayHandle)
+                    <unsigned long long>self.chandle, PyDGLArrayHandle)
 
         def __set__(self, value):
             self._set_handle(value)
@@ -82,7 +82,7 @@ cdef class NDArrayBase:
 
 cdef c_make_array(void* chandle, is_view):
     ret = _CLASS_NDARRAY(None, is_view)
-    (<NDArrayBase>ret).chandle = <DLTensor*>chandle
+    (<NDArrayBase>ret).chandle = <DGLArray*>chandle
     return ret
 
 

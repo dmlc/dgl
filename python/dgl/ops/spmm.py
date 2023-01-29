@@ -1,14 +1,15 @@
-"""dgl spmm operator module."""
+"""Internal module for general spmm operators."""
 import sys
 
+from .. import backend as F
 from ..backend import gspmm as gspmm_internal
 from ..backend import gspmm_hetero as gspmm_internal_hetero
-from .. import backend as F
 
-__all__ = ['gspmm']
+__all__ = ["gspmm"]
+
 
 def reshape_lhs_rhs(lhs_data, rhs_data):
-    r""" Expand dims so that there will be no broadcasting issues with different
+    r"""Expand dims so that there will be no broadcasting issues with different
     number of dimensions. For example, given two shapes (N, 3, 1), (E, 5, 3, 4)
     that are valid broadcastable shapes, change them to (N, 1, 3, 1) and
     (E, 5, 3, 4)
@@ -32,8 +33,9 @@ def reshape_lhs_rhs(lhs_data, rhs_data):
         rhs_data = F.reshape(rhs_data, new_rhs_shape)
     return lhs_data, rhs_data
 
+
 def gspmm(g, op, reduce_op, lhs_data, rhs_data):
-    r""" Generalized Sparse Matrix Multiplication interface.
+    r"""Generalized Sparse Matrix Multiplication interface.
     It fuses two steps into one kernel.
 
     1. Computes messages by :attr:`op` source node and edge features.
@@ -69,27 +71,45 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
         The result tensor.
     """
     if g._graph.number_of_etypes() == 1:
-        if op not in ['copy_lhs', 'copy_rhs']:
+        if op not in ["copy_lhs", "copy_rhs"]:
             lhs_data, rhs_data = reshape_lhs_rhs(lhs_data, rhs_data)
         # With max and min reducers infinity will be returned for zero degree nodes
-        ret = gspmm_internal(g._graph, op,
-                             'sum' if reduce_op == 'mean' else reduce_op,
-                             lhs_data, rhs_data)
+        ret = gspmm_internal(
+            g._graph,
+            op,
+            "sum" if reduce_op == "mean" else reduce_op,
+            lhs_data,
+            rhs_data,
+        )
     else:
         # lhs_data or rhs_data is None only in unary functions like ``copy-u`` or ``copy_e``
-        lhs_data = [None] * g._graph.number_of_ntypes() if lhs_data is None else lhs_data
-        rhs_data = [None] * g._graph.number_of_etypes() if rhs_data is None else rhs_data
+        lhs_data = (
+            [None] * g._graph.number_of_ntypes()
+            if lhs_data is None
+            else lhs_data
+        )
+        rhs_data = (
+            [None] * g._graph.number_of_etypes()
+            if rhs_data is None
+            else rhs_data
+        )
         # TODO (Israt): Call reshape func
         lhs_and_rhs_tuple = tuple(list(lhs_data) + list(rhs_data))
-        ret = gspmm_internal_hetero(g._graph, op,
-                                    'sum' if reduce_op == 'mean' else reduce_op,
-                                    len(lhs_data), *lhs_and_rhs_tuple)
+        ret = gspmm_internal_hetero(
+            g._graph,
+            op,
+            "sum" if reduce_op == "mean" else reduce_op,
+            len(lhs_data),
+            *lhs_and_rhs_tuple
+        )
     # TODO (Israt): Add support for 'mean' in heterograph
     # divide in degrees for mean reducer.
-    if reduce_op == 'mean':
+    if reduce_op == "mean":
         ret_shape = F.shape(ret)
         deg = g.in_degrees()
-        deg = F.astype(F.clamp(deg, 1, max(g.number_of_edges(), 1)), F.dtype(ret))
+        deg = F.astype(
+            F.clamp(deg, 1, max(g.number_of_edges(), 1)), F.dtype(ret)
+        )
         deg_shape = (ret_shape[0],) + (1,) * (len(ret_shape) - 1)
         return ret / F.reshape(deg, deg_shape)
     else:
@@ -98,13 +118,17 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
 
 def _attach_zerodeg_note(docstring, reducer):
     note1 = """
-    The {} function will return zero for nodes with no incoming messages.""".format(reducer)
+    The {} function will return zero for nodes with no incoming messages.""".format(
+        reducer
+    )
     note2 = """
     This is implemented by replacing all {} values to zero.
-    """.format("infinity" if reducer == "min" else "negative infinity")
+    """.format(
+        "infinity" if reducer == "min" else "negative infinity"
+    )
 
     docstring = docstring + note1
-    if reducer in ('min', 'max'):
+    if reducer in ("min", "max"):
         docstring = docstring + note2
     return docstring
 
@@ -119,7 +143,7 @@ def _gen_spmm_func(binary_op, reduce_op):
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The input graph
     x : tensor
         The source node features.
@@ -140,11 +164,14 @@ def _gen_spmm_func(binary_op, reduce_op):
     Broadcasting follows NumPy semantics. Please see
     https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
     for more details about the NumPy broadcasting semantics.
-    """.format(binary_op, reduce_op)
+    """.format(
+        binary_op, reduce_op
+    )
     docstring = _attach_zerodeg_note(docstring, reduce_op)
 
     def func(g, x, y):
         return gspmm(g, binary_op, reduce_op, x, y)
+
     func.__name__ = name
     func.__doc__ = docstring
     return func
@@ -155,18 +182,16 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
     name = "{}_{}".format(binary_op, reduce_op)
     binary_str = {
         "copy_u": "It copies node feature to edge as the message.",
-        'copy_e': "It regards edge feature as message."
+        "copy_e": "It regards edge feature as message.",
     }
-    x_str = {
-        "copy_u": "source node",
-        "copy_e": "edge"
-    }
-    docstring = lambda binary_op: _attach_zerodeg_note("""Generalized SpMM function. {}
+    x_str = {"copy_u": "source node", "copy_e": "edge"}
+    docstring = lambda binary_op: _attach_zerodeg_note(
+        """Generalized SpMM function. {}
     Then aggregates the message by {} on destination nodes.
 
     Parameters
     ----------
-    g : DGLHeteroGraph
+    g : DGLGraph
         The input graph
     x : tensor
         The {} features.
@@ -180,15 +205,16 @@ def _gen_copy_reduce_func(binary_op, reduce_op):
     -----
     This function supports autograd (computing input gradients given the output gradient).
     """.format(
-        binary_str[binary_op],
+            binary_str[binary_op], reduce_op, x_str[binary_op]
+        ),
         reduce_op,
-        x_str[binary_op]), reduce_op)
+    )
 
     def func(g, x):
-        if binary_op == 'copy_u':
-            return gspmm(g, 'copy_lhs', reduce_op, x, None)
+        if binary_op == "copy_u":
+            return gspmm(g, "copy_lhs", reduce_op, x, None)
         else:
-            return gspmm(g, 'copy_rhs', reduce_op, None, x)
+            return gspmm(g, "copy_rhs", reduce_op, None, x)
 
     func.__name__ = name
     func.__doc__ = docstring(binary_op)

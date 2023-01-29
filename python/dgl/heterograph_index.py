@@ -2,17 +2,21 @@
 from __future__ import absolute_import
 
 import itertools
+import sys
+
 import numpy as np
 import scipy
 
-from ._ffi.object import register_object, ObjectBase
-from ._ffi.function import _init_api
-from .base import DGLError, dgl_warning
-from .graph_index import from_coo
 from . import backend as F
 from . import utils
+from ._ffi.function import _init_api
+from ._ffi.object import ObjectBase, register_object
+from ._ffi.streams import to_dgl_stream_handle
+from .base import DGLError, dgl_warning
+from .graph_index import from_coo
 
-@register_object('graph.HeteroGraph')
+
+@register_object("graph.HeteroGraph")
 class HeteroGraphIndex(ObjectBase):
     """HeteroGraph index object.
 
@@ -20,6 +24,7 @@ class HeteroGraphIndex(ObjectBase):
     ----
     Do not create GraphIndex directly.
     """
+
     def __new__(cls):
         obj = ObjectBase.__new__(cls)
         obj._cache = {}
@@ -27,8 +32,8 @@ class HeteroGraphIndex(ObjectBase):
 
     def __getstate__(self):
         """Issue: https://github.com/pytorch/pytorch/issues/32351
-           Need to set the tensor created in the __getstate__ function
-            as object attribute to avoid potential bugs
+        Need to set the tensor created in the __getstate__ function
+         as object attribute to avoid potential bugs
         """
         self._pk_state = _CAPI_DGLHeteroPickle(self)
         return self._pk_state
@@ -53,11 +58,19 @@ class HeteroGraphIndex(ObjectBase):
                 num_src = number_of_nodes[src_ntype]
                 num_dst = number_of_nodes[dst_ntype]
                 src_id, dst_id, _ = edges_per_type
-                rel_graphs.append(create_unitgraph_from_coo(
-                    1 if src_ntype == dst_ntype else 2, num_src, num_dst, src_id, dst_id,
-                    ['coo', 'csr', ' csc']))
+                rel_graphs.append(
+                    create_unitgraph_from_coo(
+                        1 if src_ntype == dst_ntype else 2,
+                        num_src,
+                        num_dst,
+                        src_id,
+                        dst_id,
+                        ["coo", "csr", " csc"],
+                    )
+                )
             self.__init_handle_by_constructor__(
-                _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs)
+                _CAPI_DGLHeteroCreateHeteroGraph, metagraph, rel_graphs
+            )
 
     @property
     def metagraph(self):
@@ -69,6 +82,10 @@ class HeteroGraphIndex(ObjectBase):
             The meta graph.
         """
         return _CAPI_DGLHeteroGetMetaGraph(self)
+
+    def is_metagraph_unibipartite(self):
+        """Return whether or not the graph is unibiparite."""
+        return _CAPI_DGLHeteroIsMetaGraphUniBipartite(self)
 
     def number_of_ntypes(self):
         """Return number of node types."""
@@ -149,7 +166,9 @@ class HeteroGraphIndex(ObjectBase):
         v : utils.Index
             The dst nodes.
         """
-        _CAPI_DGLHeteroAddEdges(self, int(etype), u.todgltensor(), v.todgltensor())
+        _CAPI_DGLHeteroAddEdges(
+            self, int(etype), u.todgltensor(), v.todgltensor()
+        )
         self.clear_cache()
 
     def clear(self):
@@ -193,9 +212,11 @@ class HeteroGraphIndex(ObjectBase):
             The number of bits needed.
         """
         stype, dtype = self.metagraph.find_edge(etype)
-        if (self.number_of_edges(etype) >= 0x80000000 or
-                self.number_of_nodes(stype) >= 0x80000000 or
-                self.number_of_nodes(dtype) >= 0x80000000):
+        if (
+            self.number_of_edges(etype) >= 0x80000000
+            or self.number_of_nodes(stype) >= 0x80000000
+            or self.number_of_nodes(dtype) >= 0x80000000
+        ):
             return 64
         else:
             return 32
@@ -234,7 +255,62 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroCopyTo(self, ctx.device_type, ctx.device_id)
 
-    def shared_memory(self, name, ntypes=None, etypes=None, formats=('coo', 'csr', 'csc')):
+    def pin_memory_(self):
+        """Pin this graph to the page-locked memory.
+
+        NOTE: This is an inplace method.
+              The graph structure must be on CPU to be pinned.
+              If the graph struture is already pinned, the function directly returns it.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The pinned graph index.
+        """
+        return _CAPI_DGLHeteroPinMemory_(self)
+
+    def unpin_memory_(self):
+        """Unpin this graph from the page-locked memory.
+
+        NOTE: this is an inplace method.
+              If the graph struture is not pinned, e.g., on CPU or GPU,
+              the function directly returns it.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The unpinned graph index.
+        """
+        return _CAPI_DGLHeteroUnpinMemory_(self)
+
+    def is_pinned(self):
+        """Check if this graph is pinned to the page-locked memory.
+
+        Returns
+        -------
+        bool
+            True if the graph is pinned.
+        """
+        return bool(_CAPI_DGLHeteroIsPinned(self))
+
+    def record_stream(self, stream):
+        """Record the stream that is using this graph.
+
+        Parameters
+        ----------
+        stream : torch.cuda.Stream
+            The stream that is using this graph.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            self.
+        """
+        return _CAPI_DGLHeteroRecordStream(self, to_dgl_stream_handle(stream))
+
+    def shared_memory(
+        self, name, ntypes=None, etypes=None, formats=("coo", "csr", "csc")
+    ):
         """Return a copy of this graph in shared memory
 
         Parameters
@@ -259,7 +335,9 @@ class HeteroGraphIndex(ObjectBase):
             assert fmt in ("coo", "csr", "csc")
         ntypes = [] if ntypes is None else ntypes
         etypes = [] if etypes is None else etypes
-        return _CAPI_DGLHeteroCopyToSharedMem(self, name, ntypes, etypes, formats)
+        return _CAPI_DGLHeteroCopyToSharedMem(
+            self, name, ntypes, etypes, formats
+        )
 
     def is_multigraph(self):
         """Return whether the graph is a multigraph
@@ -327,8 +405,9 @@ class HeteroGraphIndex(ObjectBase):
         Tensor
             0-1 array indicating existence
         """
-        return F.from_dgl_nd(_CAPI_DGLHeteroHasVertices(
-            self, int(ntype), F.to_dgl_nd(vids)))
+        return F.from_dgl_nd(
+            _CAPI_DGLHeteroHasVertices(self, int(ntype), F.to_dgl_nd(vids))
+        )
 
     def has_edges_between(self, etype, u, v):
         """Return true if the edge exists.
@@ -347,8 +426,11 @@ class HeteroGraphIndex(ObjectBase):
         Tensor
             0-1 array indicating existence
         """
-        return F.from_dgl_nd(_CAPI_DGLHeteroHasEdgesBetween(
-            self, int(etype), F.to_dgl_nd(u), F.to_dgl_nd(v)))
+        return F.from_dgl_nd(
+            _CAPI_DGLHeteroHasEdgesBetween(
+                self, int(etype), F.to_dgl_nd(u), F.to_dgl_nd(v)
+            )
+        )
 
     def predecessors(self, etype, v):
         """Return the predecessors of the node.
@@ -367,8 +449,9 @@ class HeteroGraphIndex(ObjectBase):
         Tensor
             Array of predecessors
         """
-        return F.from_dgl_nd(_CAPI_DGLHeteroPredecessors(
-            self, int(etype), int(v)))
+        return F.from_dgl_nd(
+            _CAPI_DGLHeteroPredecessors(self, int(etype), int(v))
+        )
 
     def successors(self, etype, v):
         """Return the successors of the node.
@@ -387,8 +470,9 @@ class HeteroGraphIndex(ObjectBase):
         Tensor
             Array of successors
         """
-        return F.from_dgl_nd(_CAPI_DGLHeteroSuccessors(
-            self, int(etype), int(v)))
+        return F.from_dgl_nd(
+            _CAPI_DGLHeteroSuccessors(self, int(etype), int(v))
+        )
 
     def edge_ids_all(self, etype, u, v):
         """Return a triplet of arrays that contains the edge IDs.
@@ -412,7 +496,8 @@ class HeteroGraphIndex(ObjectBase):
             The edge ids.
         """
         edge_array = _CAPI_DGLHeteroEdgeIdsAll(
-            self, int(etype), F.to_dgl_nd(u), F.to_dgl_nd(v))
+            self, int(etype), F.to_dgl_nd(u), F.to_dgl_nd(v)
+        )
 
         src = F.from_dgl_nd(edge_array(0))
         dst = F.from_dgl_nd(edge_array(1))
@@ -437,8 +522,11 @@ class HeteroGraphIndex(ObjectBase):
         Tensor
             The edge ids.
         """
-        eid = F.from_dgl_nd(_CAPI_DGLHeteroEdgeIdsOne(
-            self, int(etype), F.to_dgl_nd(u), F.to_dgl_nd(v)))
+        eid = F.from_dgl_nd(
+            _CAPI_DGLHeteroEdgeIdsOne(
+                self, int(etype), F.to_dgl_nd(u), F.to_dgl_nd(v)
+            )
+        )
         return eid
 
     def find_edges(self, etype, eid):
@@ -461,7 +549,8 @@ class HeteroGraphIndex(ObjectBase):
             The edge ids.
         """
         edge_array = _CAPI_DGLHeteroFindEdges(
-            self, int(etype), F.to_dgl_nd(eid))
+            self, int(etype), F.to_dgl_nd(eid)
+        )
 
         src = F.from_dgl_nd(edge_array(0))
         dst = F.from_dgl_nd(edge_array(1))
@@ -548,9 +637,11 @@ class HeteroGraphIndex(ObjectBase):
         """
         if order is None:
             order = ""
-        elif order not in ['srcdst', 'eid']:
-            raise DGLError("Expect order to be one of None, 'srcdst', 'eid', "
-                           "got {}".format(order))
+        elif order not in ["srcdst", "eid"]:
+            raise DGLError(
+                "Expect order to be one of None, 'srcdst', 'eid', "
+                "got {}".format(order)
+            )
         edge_array = _CAPI_DGLHeteroEdges(self, int(etype), order)
         src = F.from_dgl_nd(edge_array(0))
         dst = F.from_dgl_nd(edge_array(1))
@@ -574,8 +665,9 @@ class HeteroGraphIndex(ObjectBase):
         Tensor
             The in degree array.
         """
-        return F.from_dgl_nd(_CAPI_DGLHeteroInDegrees(
-            self, int(etype), F.to_dgl_nd(v)))
+        return F.from_dgl_nd(
+            _CAPI_DGLHeteroInDegrees(self, int(etype), F.to_dgl_nd(v))
+        )
 
     def out_degrees(self, etype, v):
         """Return the out degrees of the nodes.
@@ -594,8 +686,9 @@ class HeteroGraphIndex(ObjectBase):
         Tensor
             The out degree array.
         """
-        return F.from_dgl_nd(_CAPI_DGLHeteroOutDegrees(
-            self, int(etype), F.to_dgl_nd(v)))
+        return F.from_dgl_nd(
+            _CAPI_DGLHeteroOutDegrees(self, int(etype), F.to_dgl_nd(v))
+        )
 
     def adjacency_matrix(self, etype, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
@@ -624,28 +717,43 @@ class HeteroGraphIndex(ObjectBase):
             if shuffle is not required.
         """
         if not isinstance(transpose, bool):
-            raise DGLError('Expect bool value for "transpose" arg,'
-                           ' but got %s.' % (type(transpose)))
+            raise DGLError(
+                'Expect bool value for "transpose" arg,'
+                " but got %s." % (type(transpose))
+            )
         fmt = F.get_preferred_sparse_format()
         rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
         # convert to framework-specific sparse matrix
         srctype, dsttype = self.metagraph.find_edge(etype)
-        nrows = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
-        ncols = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
+        nrows = (
+            self.number_of_nodes(dsttype)
+            if transpose
+            else self.number_of_nodes(srctype)
+        )
+        ncols = (
+            self.number_of_nodes(srctype)
+            if transpose
+            else self.number_of_nodes(dsttype)
+        )
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
             indptr = F.copy_to(F.from_dgl_nd(rst(0)), ctx)
             indices = F.copy_to(F.from_dgl_nd(rst(1)), ctx)
             shuffle = F.copy_to(F.from_dgl_nd(rst(2)), ctx)
-            dat = F.ones(nnz, dtype=F.float32, ctx=ctx)  # FIXME(minjie): data type
-            spmat = F.sparse_matrix(dat, ('csr', indices, indptr), (nrows, ncols))[0]
+            dat = F.ones(
+                nnz, dtype=F.float32, ctx=ctx
+            )  # FIXME(minjie): data type
+            spmat = F.sparse_matrix(
+                dat, ("csr", indices, indptr), (nrows, ncols)
+            )[0]
             return spmat, shuffle
         elif fmt == "coo":
             idx = F.copy_to(F.from_dgl_nd(rst(0)), ctx)
             idx = F.reshape(idx, (2, nnz))
             dat = F.ones((nnz,), dtype=F.float32, ctx=ctx)
             adj, shuffle_idx = F.sparse_matrix(
-                dat, ('coo', idx), (nrows, ncols))
+                dat, ("coo", idx), (nrows, ncols)
+            )
             return adj, shuffle_idx
         else:
             raise Exception("unknown format")
@@ -684,27 +792,39 @@ class HeteroGraphIndex(ObjectBase):
             equivalent to a consecutive array from zero to the number of edges minus one.
         """
         if not isinstance(transpose, bool):
-            raise DGLError('Expect bool value for "transpose" arg,'
-                           ' but got %s.' % (type(transpose)))
+            raise DGLError(
+                'Expect bool value for "transpose" arg,'
+                " but got %s." % (type(transpose))
+            )
 
         rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
         srctype, dsttype = self.metagraph.find_edge(etype)
-        nrows = self.number_of_nodes(dsttype) if transpose else self.number_of_nodes(srctype)
-        ncols = self.number_of_nodes(srctype) if transpose else self.number_of_nodes(dsttype)
+        nrows = (
+            self.number_of_nodes(dsttype)
+            if transpose
+            else self.number_of_nodes(srctype)
+        )
+        ncols = (
+            self.number_of_nodes(srctype)
+            if transpose
+            else self.number_of_nodes(dsttype)
+        )
         nnz = self.number_of_edges(etype)
         if fmt == "csr":
             indptr = F.from_dgl_nd(rst(0))
             indices = F.from_dgl_nd(rst(1))
             data = F.from_dgl_nd(rst(2))
             return nrows, ncols, indptr, indices, data
-        elif fmt == 'coo':
+        elif fmt == "coo":
             idx = F.from_dgl_nd(rst(0))
             row, col = F.reshape(idx, (2, nnz))
             return nrows, ncols, row, col
         else:
             raise ValueError("unknown format")
 
-    def adjacency_matrix_scipy(self, etype, transpose, fmt, return_edge_ids=None):
+    def adjacency_matrix_scipy(
+        self, etype, transpose, fmt, return_edge_ids=None
+    ):
         """Return the scipy adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -735,12 +855,14 @@ class HeteroGraphIndex(ObjectBase):
                 "  As a result there is one 0 entry which is not eliminated."
                 "  In the next release it will return 1s by default,"
                 " and 0 will be eliminated otherwise.",
-                FutureWarning)
+                FutureWarning,
+            )
             return_edge_ids = True
 
-        if fmt == 'csr':
-            nrows, ncols, indptr, indices, data = \
-                self.adjacency_matrix_tensors(etype, transpose, fmt)
+        if fmt == "csr":
+            nrows, ncols, indptr, indices, data = self.adjacency_matrix_tensors(
+                etype, transpose, fmt
+            )
             indptr = F.asnumpy(indptr)
             indices = F.asnumpy(indices)
             data = F.asnumpy(data)
@@ -751,15 +873,23 @@ class HeteroGraphIndex(ObjectBase):
             else:
                 data = np.ones_like(indices)
 
-            return scipy.sparse.csr_matrix((data, indices, indptr), shape=(nrows, ncols))
-        elif fmt == 'coo':
-            nrows, ncols, row, col = \
-                self.adjacency_matrix_tensors(etype, transpose, fmt)
+            return scipy.sparse.csr_matrix(
+                (data, indices, indptr), shape=(nrows, ncols)
+            )
+        elif fmt == "coo":
+            nrows, ncols, row, col = self.adjacency_matrix_tensors(
+                etype, transpose, fmt
+            )
             row = F.asnumpy(row)
             col = F.asnumpy(col)
-            data = np.arange(self.number_of_edges(etype)) if return_edge_ids \
-                   else np.ones_like(row)
-            return scipy.sparse.coo_matrix((data, (row, col)), shape=(nrows, ncols))
+            data = (
+                np.arange(self.number_of_edges(etype))
+                if return_edge_ids
+                else np.ones_like(row)
+            )
+            return scipy.sparse.coo_matrix(
+                (data, (row, col)), shape=(nrows, ncols)
+            )
         else:
             raise ValueError("unknown format")
 
@@ -804,25 +934,26 @@ class HeteroGraphIndex(ObjectBase):
         srctype, dsttype = self.metagraph.find_edge(etype)
 
         m = self.number_of_edges(etype)
-        if typestr == 'in':
+        if typestr == "in":
             n = self.number_of_nodes(dsttype)
             row = F.unsqueeze(dst, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.copy_to(F.cat([row, col], dim=0), ctx)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
-        elif typestr == 'out':
+            inc, shuffle_idx = F.sparse_matrix(dat, ("coo", idx), (n, m))
+        elif typestr == "out":
             n = self.number_of_nodes(srctype)
             row = F.unsqueeze(src, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.copy_to(F.cat([row, col], dim=0), ctx)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
-        elif typestr == 'both':
-            assert srctype == dsttype, \
-                    "'both' is supported only if source and destination type are the same"
+            inc, shuffle_idx = F.sparse_matrix(dat, ("coo", idx), (n, m))
+        elif typestr == "both":
+            assert (
+                srctype == dsttype
+            ), "'both' is supported only if source and destination type are the same"
             n = self.number_of_nodes(srctype)
             # first remove entries for self loops
             mask = F.logical_not(F.equal(src, dst))
@@ -838,9 +969,9 @@ class HeteroGraphIndex(ObjectBase):
             x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             dat = F.cat([x, y], dim=0)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ("coo", idx), (n, m))
         else:
-            raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
+            raise DGLError("Invalid incidence matrix type: %s" % str(typestr))
         return inc, shuffle_idx
 
     def node_subgraph(self, induced_nodes, relabel_nodes):
@@ -923,7 +1054,9 @@ class HeteroGraphIndex(ObjectBase):
         order = csr(2)
         rev_csr = _CAPI_DGLHeteroGetAdj(self, int(etype), True, "csr")
         rev_order = rev_csr(2)
-        return utils.toindex(order, self.dtype), utils.toindex(rev_order, self.dtype)
+        return utils.toindex(order, self.dtype), utils.toindex(
+            rev_order, self.dtype
+        )
 
     def formats(self, formats=None):
         """Get a graph index with the specified sparse format(s) or query
@@ -955,16 +1088,13 @@ class HeteroGraphIndex(ObjectBase):
         created = []
         not_created = []
         if formats is None:
-            for fmt in ['coo', 'csr', 'csc']:
+            for fmt in ["coo", "csr", "csc"]:
                 if fmt in formats_allowed:
                     if fmt in formats_created:
                         created.append(fmt)
                     else:
                         not_created.append(fmt)
-            return {
-                'created': created,
-                'not created': not_created
-            }
+            return {"created": created, "not created": not_created}
         else:
             if isinstance(formats, str):
                 formats = [formats]
@@ -985,9 +1115,11 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroReverse(self)
 
-@register_object('graph.HeteroSubgraph')
+
+@register_object("graph.HeteroSubgraph")
 class HeteroSubgraphIndex(ObjectBase):
     """Hetero-subgraph data structure"""
+
     @property
     def graph(self):
         """The subgraph structure
@@ -1030,6 +1162,7 @@ class HeteroSubgraphIndex(ObjectBase):
 # Creators
 #################################################################
 
+
 def create_metagraph_index(ntypes, canonical_etypes):
     """Return a GraphIndex instance for a metagraph given the node types and canonical
     edge types.
@@ -1070,8 +1203,17 @@ def create_metagraph_index(ntypes, canonical_etypes):
     metagraph = from_coo(len(ntypes), meta_edges_src, meta_edges_dst, True)
     return metagraph, ntypes, etypes, relations
 
-def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
-                              formats, row_sorted=False, col_sorted=False):
+
+def create_unitgraph_from_coo(
+    num_ntypes,
+    num_src,
+    num_dst,
+    row,
+    col,
+    formats,
+    row_sorted=False,
+    col_sorted=False,
+):
     """Create a unitgraph graph index from COO format
 
     Parameters
@@ -1101,12 +1243,27 @@ def create_unitgraph_from_coo(num_ntypes, num_src, num_dst, row, col,
     if isinstance(formats, str):
         formats = [formats]
     return _CAPI_DGLHeteroCreateUnitGraphFromCOO(
-        int(num_ntypes), int(num_src), int(num_dst),
-        F.to_dgl_nd(row), F.to_dgl_nd(col),
-        formats, row_sorted, col_sorted)
+        int(num_ntypes),
+        int(num_src),
+        int(num_dst),
+        F.to_dgl_nd(row),
+        F.to_dgl_nd(col),
+        formats,
+        row_sorted,
+        col_sorted,
+    )
 
-def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edge_ids,
-                              formats, transpose=False):
+
+def create_unitgraph_from_csr(
+    num_ntypes,
+    num_src,
+    num_dst,
+    indptr,
+    indices,
+    edge_ids,
+    formats,
+    transpose=False,
+):
     """Create a unitgraph graph index from CSR format
 
     Parameters
@@ -1135,11 +1292,20 @@ def create_unitgraph_from_csr(num_ntypes, num_src, num_dst, indptr, indices, edg
     if isinstance(formats, str):
         formats = [formats]
     return _CAPI_DGLHeteroCreateUnitGraphFromCSR(
-        int(num_ntypes), int(num_src), int(num_dst),
-        F.to_dgl_nd(indptr), F.to_dgl_nd(indices), F.to_dgl_nd(edge_ids),
-        formats, transpose)
+        int(num_ntypes),
+        int(num_src),
+        int(num_dst),
+        F.to_dgl_nd(indptr),
+        F.to_dgl_nd(indices),
+        F.to_dgl_nd(edge_ids),
+        formats,
+        transpose,
+    )
 
-def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type):
+
+def create_heterograph_from_relations(
+    metagraph, rel_graphs, num_nodes_per_type
+):
     """Create a heterograph from metagraph and graphs of every relation.
 
     Parameters
@@ -1159,7 +1325,9 @@ def create_heterograph_from_relations(metagraph, rel_graphs, num_nodes_per_type)
         return _CAPI_DGLHeteroCreateHeteroGraph(metagraph, rel_graphs)
     else:
         return _CAPI_DGLHeteroCreateHeteroGraphWithNumNodes(
-            metagraph, rel_graphs, num_nodes_per_type.todgltensor())
+            metagraph, rel_graphs, num_nodes_per_type.todgltensor()
+        )
+
 
 def create_heterograph_from_shared_memory(name):
     """Create a heterograph from shared memory with the given name.
@@ -1180,6 +1348,7 @@ def create_heterograph_from_shared_memory(name):
     g, ntypes, etypes = _CAPI_DGLHeteroCreateFromSharedMem(name)
     return g, list(ntypes), list(etypes)
 
+
 def joint_union(metagraph, gidx_list):
     """Return a joint union of the input heterographs.
 
@@ -1196,6 +1365,7 @@ def joint_union(metagraph, gidx_list):
         joint_unioned Heterograph.
     """
     return _CAPI_DGLHeteroJointUnion(metagraph, gidx_list)
+
 
 def disjoint_union(metagraph, graphs):
     """Return a disjoint union of the input heterographs.
@@ -1214,6 +1384,7 @@ def disjoint_union(metagraph, graphs):
     """
     return _CAPI_DGLHeteroDisjointUnion_v2(metagraph, graphs)
 
+
 def disjoint_partition(graph, bnn_all_types, bne_all_types):
     """Partition the graph disjointly.
 
@@ -1231,10 +1402,16 @@ def disjoint_partition(graph, bnn_all_types, bne_all_types):
     list of HeteroGraphIndex
         Heterographs unbatched.
     """
-    bnn_all_types = utils.toindex(list(itertools.chain.from_iterable(bnn_all_types)))
-    bne_all_types = utils.toindex(list(itertools.chain.from_iterable(bne_all_types)))
+    bnn_all_types = utils.toindex(
+        list(itertools.chain.from_iterable(bnn_all_types))
+    )
+    bne_all_types = utils.toindex(
+        list(itertools.chain.from_iterable(bne_all_types))
+    )
     return _CAPI_DGLHeteroDisjointPartitionBySizes_v2(
-        graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor())
+        graph, bnn_all_types.todgltensor(), bne_all_types.todgltensor()
+    )
+
 
 def slice_gidx(graph, num_nodes, start_nid, num_edges, start_eid):
     """Slice a chunk of the graph.
@@ -1258,20 +1435,28 @@ def slice_gidx(graph, num_nodes, start_nid, num_edges, start_eid):
         The sliced graph.
     """
     return _CAPI_DGLHeteroSlice(
-        graph, num_nodes.todgltensor(), start_nid.todgltensor(),
-        num_edges.todgltensor(), start_eid.todgltensor())
+        graph,
+        num_nodes.todgltensor(),
+        start_nid.todgltensor(),
+        num_edges.todgltensor(),
+        start_eid.todgltensor(),
+    )
+
 
 #################################################################
 # Data structure used by C APIs
 #################################################################
 
+
 @register_object("graph.FlattenedHeteroGraph")
 class FlattenedHeteroGraph(ObjectBase):
     """FlattenedHeteroGraph object class in C++ backend."""
 
+
 @register_object("graph.HeteroPickleStates")
 class HeteroPickleStates(ObjectBase):
     """Pickle states object class in C++ backend."""
+
     @property
     def version(self):
         """Version number
@@ -1309,22 +1494,67 @@ class HeteroPickleStates(ObjectBase):
 
     def __getstate__(self):
         """Issue: https://github.com/pytorch/pytorch/issues/32351
-           Need to set the tensor created in the __getstate__ function
-            as object attribute to avoid potential bugs
+        Need to set the tensor created in the __getstate__ function
+         as object attribute to avoid potential bugs
         """
-        self._pk_arrays = [F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays]
+        self._pk_arrays = [
+            F.zerocopy_from_dgl_ndarray(arr) for arr in self.arrays
+        ]
         return self.version, self.meta, self._pk_arrays
 
     def __setstate__(self, state):
         if isinstance(state[0], int):
-            _, meta, arrays = state
+            version, meta, arrays = state
             arrays = [F.zerocopy_to_dgl_ndarray(arr) for arr in arrays]
             self.__init_handle_by_constructor__(
-                _CAPI_DGLCreateHeteroPickleStates, meta, arrays)
+                _CAPI_DGLCreateHeteroPickleStates, version, meta, arrays
+            )
         else:
             metagraph, num_nodes_per_type, adjs = state
             num_nodes_per_type = F.zerocopy_to_dgl_ndarray(num_nodes_per_type)
             self.__init_handle_by_constructor__(
-                _CAPI_DGLCreateHeteroPickleStatesOld, metagraph, num_nodes_per_type, adjs)
+                _CAPI_DGLCreateHeteroPickleStatesOld,
+                metagraph,
+                num_nodes_per_type,
+                adjs,
+            )
+
+
+def _forking_rebuild(pk_state):
+    version, meta, arrays = pk_state
+    arrays = [F.to_dgl_nd(arr) for arr in arrays]
+    states = _CAPI_DGLCreateHeteroPickleStates(version, meta, arrays)
+    graph_index = _CAPI_DGLHeteroForkingUnpickle(states)
+    graph_index._forking_pk_state = pk_state
+    return graph_index
+
+
+def _forking_reduce(graph_index):
+    # Because F.from_dgl_nd(F.to_dgl_nd(x)) loses the information of shared memory
+    # file descriptor (because DLPack does not keep it), without caching the tensors
+    # PyTorch will allocate one shared memory region for every single worker.
+    # The downside is that if a graph_index is shared by forking and new formats are created
+    # afterwards, then sharing it again will not bring together the new formats.  This case
+    # should be rare though because (1) DataLoader will create all the formats if num_workers > 0
+    # anyway, and (2) we require the users to explicitly create all formats before calling
+    # mp.spawn().
+    if hasattr(graph_index, "_forking_pk_state"):
+        return _forking_rebuild, (graph_index._forking_pk_state,)
+    states = _CAPI_DGLHeteroForkingPickle(graph_index)
+    arrays = [F.from_dgl_nd(arr) for arr in states.arrays]
+    # Similar to what being mentioned in HeteroGraphIndex.__getstate__, we need to save
+    # the tensors as an attribute of the original graph index object.  Otherwise
+    # PyTorch will throw weird errors like bad value(s) in fds_to_keep or unable to
+    # resize file.
+    graph_index._forking_pk_state = (states.version, states.meta, arrays)
+    return _forking_rebuild, (graph_index._forking_pk_state,)
+
+
+if not (F.get_preferred_backend() == "mxnet" and sys.version_info.minor <= 6):
+    # Python 3.6 MXNet crashes with the following statement; remove until we no longer support
+    # 3.6 (which is EOL anyway).
+    from multiprocessing.reduction import ForkingPickler
+
+    ForkingPickler.register(HeteroGraphIndex, _forking_reduce)
 
 _init_api("dgl.heterograph_index")

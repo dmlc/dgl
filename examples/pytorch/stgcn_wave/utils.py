@@ -1,6 +1,5 @@
-import torch
 import numpy as np
-
+import torch
 
 
 def evaluate_model(model, loss, data_iter):
@@ -21,11 +20,13 @@ def evaluate_metric(model, data_iter, scaler):
         mae, mape, mse = [], [], []
         for x, y in data_iter:
             y = scaler.inverse_transform(y.cpu().numpy()).reshape(-1)
-            y_pred = scaler.inverse_transform(model(x).view(len(x), -1).cpu().numpy()).reshape(-1)
+            y_pred = scaler.inverse_transform(
+                model(x).view(len(x), -1).cpu().numpy()
+            ).reshape(-1)
             d = np.abs(y - y_pred)
             mae += d.tolist()
             mape += (d / y).tolist()
-            mse += (d ** 2).tolist()
+            mse += (d**2).tolist()
         MAE = np.array(mae).mean()
         MAPE = np.array(mape).mean()
         RMSE = np.sqrt(np.array(mse).mean())

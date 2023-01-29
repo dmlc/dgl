@@ -3,15 +3,13 @@
 import torch
 import torch.nn as nn
 
-class TransR(nn.Module):
-    r"""
 
-    Description
-    -----------
-    Similarity measure introduced in
+class TransR(nn.Module):
+    r"""Similarity measure from
     `Learning entity and relation embeddings for knowledge graph completion
-    <https://ojs.aaai.org/index.php/AAAI/article/view/9491>`__. Mathematically,
-    it is defined as follows:
+    <https://ojs.aaai.org/index.php/AAAI/article/view/9491>`__
+
+    Mathematically, it is defined as follows:
 
     .. math::
 
@@ -50,7 +48,7 @@ class TransR(nn.Module):
     >>> num_rels = 3
     >>> feats = 4
 
-    >>> scorer = TransE(num_rels=num_rels, rfeats=2, nfeats=feats)
+    >>> scorer = TransR(num_rels=num_rels, rfeats=2, nfeats=feats)
     >>> g = dgl.rand_graph(num_nodes=num_nodes, num_edges=num_edges)
     >>> src, dst = g.edges()
     >>> h = th.randn(num_nodes, feats)
@@ -61,6 +59,7 @@ class TransR(nn.Module):
     >>> scorer(h_head, h_tail, rels).shape
     torch.Size([30])
     """
+
     def __init__(self, num_rels, rfeats, nfeats, p=1):
         super(TransR, self).__init__()
 
@@ -106,4 +105,4 @@ class TransR(nn.Module):
         h_head = (h_head.unsqueeze(1) @ proj_rel).squeeze(1)
         h_tail = (h_tail.unsqueeze(1) @ proj_rel).squeeze(1)
 
-        return - torch.norm(h_head + h_rel - h_tail, p=self.p, dim=-1)
+        return -torch.norm(h_head + h_rel - h_tail, p=self.p, dim=-1)

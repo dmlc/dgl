@@ -142,7 +142,7 @@ DGL提供了几个邻居采样类，这些类会生成需计算的节点在每�
         opt.step()
 
 DGL提供了一个端到端的随机批次训练示例
-`GraphSAGE的实现 <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/train_sampling.py>`__。
+`GraphSAGE的实现 <https://github.com/dmlc/dgl/blob/master/examples/pytorch/graphsage/node_classification.py>`__。
 
 
 异构图上模型的训练

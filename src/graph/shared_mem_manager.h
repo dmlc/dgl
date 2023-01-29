@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2018 by Contributors
- * \file graph/shared_mem_manager.cc
- * \brief DGL shared mem manager APIs
+ * @file graph/shared_mem_manager.cc
+ * @brief DGL shared mem manager APIs
  */
 
 #ifndef DGL_GRAPH_SHARED_MEM_MANAGER_H_
@@ -29,8 +29,7 @@ const size_t SHARED_MEM_METAINFO_SIZE_MAX = 1024 * 32;
 class SharedMemManager : public dmlc::Stream {
  public:
   explicit SharedMemManager(std::string graph_name, dmlc::Stream* strm)
-      : graph_name_(graph_name),
-        strm_(strm) {}
+      : graph_name_(graph_name), strm_(strm) {}
 
   template <typename T>
   T CopyToSharedMem(const T& data, std::string name);

@@ -4,16 +4,13 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 from .... import function as fn
+from ....base import DGLError
 from ....utils import expand_as_pair, check_eq_shape
 
 
 class SAGEConv(layers.Layer):
-    r"""
-
-    Description
-    -----------
-    GraphSAGE layer from paper `Inductive Representation Learning on
-    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
+    r"""GraphSAGE layer from `Inductive Representation Learning on
+    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__
 
     .. math::
         h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}
@@ -22,7 +19,7 @@ class SAGEConv(layers.Layer):
         h_{i}^{(l+1)} &= \sigma \left(W \cdot \mathrm{concat}
         (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1}) \right)
 
-        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{l})
+        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{(l+1)})
 
     Parameters
     ----------
@@ -40,10 +37,10 @@ class SAGEConv(layers.Layer):
         are required to be the same.
     out_feats : int
         Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
-    feat_drop : float
-        Dropout rate on features, default: ``0``.
     aggregator_type : str
         Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
+    feat_drop : float
+        Dropout rate on features, default: ``0``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
@@ -79,7 +76,7 @@ class SAGEConv(layers.Layer):
     >>> with tf.device("CPU:0"):
     >>>     u = [0, 1, 0, 0, 1]
     >>>     v = [0, 1, 2, 3, 2]
-    >>>     g = dgl.bipartite((u, v))
+    >>>     g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     >>>     u_fea = tf.convert_to_tensor(np.random.rand(2, 5))
     >>>     v_fea = tf.convert_to_tensor(np.random.rand(4, 5))
     >>>     conv = SAGEConv((5, 10), 2, 'mean')
@@ -100,6 +97,12 @@ class SAGEConv(layers.Layer):
                  norm=None,
                  activation=None):
         super(SAGEConv, self).__init__()
+        valid_aggre_types = {'mean', 'gcn', 'pool', 'lstm'}
+        if aggregator_type not in valid_aggre_types:
+            raise DGLError(
+                'Invalid aggregator_type. Must be one of {}. '
+                'But got {!r} instead.'.format(valid_aggre_types, aggregator_type)
+            )
 
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
@@ -126,11 +129,7 @@ class SAGEConv(layers.Layer):
         return {'neigh': rst}
 
     def call(self, graph, feat):
-        r"""
-
-        Description
-        -----------
-        Compute GraphSAGE layer.
+        r"""Compute GraphSAGE layer.
 
         Parameters
         ----------
@@ -167,24 +166,24 @@ class SAGEConv(layers.Layer):
 
             if self._aggre_type == 'mean':
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src('h', 'm'), fn.mean('m', 'neigh'))
+                graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'neigh'))
                 h_neigh = graph.dstdata['neigh']
             elif self._aggre_type == 'gcn':
                 check_eq_shape(feat)
                 graph.srcdata['h'] = feat_src
                 graph.dstdata['h'] = feat_dst       # same as above if homogeneous
-                graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'neigh'))
+                graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'neigh'))
                 # divide in_degrees
                 degs = tf.cast(graph.in_degrees(), tf.float32)
                 h_neigh = (graph.dstdata['neigh'] + graph.dstdata['h']
                            ) / (tf.expand_dims(degs, -1) + 1)
             elif self._aggre_type == 'pool':
                 graph.srcdata['h'] = tf.nn.relu(self.fc_pool(feat_src))
-                graph.update_all(fn.copy_src('h', 'm'), fn.max('m', 'neigh'))
+                graph.update_all(fn.copy_u('h', 'm'), fn.max('m', 'neigh'))
                 h_neigh = graph.dstdata['neigh']
             elif self._aggre_type == 'lstm':
                 graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_src('h', 'm'), self._lstm_reducer)
+                graph.update_all(fn.copy_u('h', 'm'), self._lstm_reducer)
                 h_neigh = graph.dstdata['neigh']
             else:
                 raise KeyError(

@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) Facebook, Inc. and its affiliates.
  * All rights reserved.
  *
@@ -8,9 +8,13 @@
 #ifndef DGL_RPC_TENSORPIPE_QUEUE_H_
 #define DGL_RPC_TENSORPIPE_QUEUE_H_
 
+#include <dmlc/logging.h>
+
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
+#include <utility>
 
 namespace dgl {
 namespace rpc {
@@ -30,15 +34,24 @@ class Queue {
     cv_.notify_all();
   }
 
-  T pop() {
+  bool pop(T *msg, int timeout) {
     std::unique_lock<std::mutex> lock(mutex_);
-    while (items_.size() == 0) {
-      cv_.wait(lock);
+    if (timeout == 0) {
+      DLOG(WARNING) << "Will wait infinitely until message is popped...";
+      cv_.wait(lock, [this] { return items_.size() > 0; });
+    } else {
+      if (!cv_.wait_for(lock, std::chrono::milliseconds(timeout), [this] {
+            return items_.size() > 0;
+          })) {
+        DLOG(WARNING) << "Times out for popping message after " << timeout
+                      << " milliseconds.";
+        return false;
+      }
     }
-    T t(std::move(items_.front()));
+    *msg = std::move(items_.front());
     items_.pop_front();
     cv_.notify_all();
-    return t;
+    return true;
   }
 
  private:

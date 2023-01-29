@@ -93,7 +93,8 @@ assert th.all(local_eid == eid)
 assert th.all(subg0.edata[dgl.EID][local_eid] == eid)
 lsrc, ldst = subg0.find_edges(local_eid)
 gsrc, gdst = subg0.ndata[dgl.NID][lsrc], subg0.ndata[dgl.NID][ldst]
-assert th.all(gsrc == lsrc)
+# The destination nodes are owned by the partition.
+assert th.all(gdst == ldst)
 # gdst which is not assigned into current partition is not required to equal ldst
 assert th.all(th.logical_or(
     gdst == ldst, subg0.ndata['inner_node'][ldst] == 0))
@@ -135,6 +136,19 @@ for partid in range(num_parts):
         assert np.all(nid[inner_node == 1].numpy() == np.arange(
             node_map[ntype][partid, 0], node_map[ntype][partid, 1]))
         orig_node_ids[ntype].append(orig_type_nid[inner_node == 1])
+
+        # Check the degree of the inner nodes.
+        inner_nids = th.nonzero(th.logical_and(subg_ntype == ntype_id, subg.ndata['inner_node']),
+                                as_tuple=True)[0]
+        subg_deg = subg.in_degrees(inner_nids)
+        orig_nids = subg.ndata['orig_id'][inner_nids]
+        # Calculate the in-degrees of nodes of a particular node type.
+        glob_deg = th.zeros(len(subg_deg), dtype=th.int64)
+        for etype in hg.canonical_etypes:
+            dst_ntype = etype[2]
+            if dst_ntype == ntype:
+                glob_deg += hg.in_degrees(orig_nids, etype=etype)
+        assert np.all(glob_deg.numpy() == subg_deg.numpy())
 
         # Check node data.
         for name in hg.nodes[ntype].data:

@@ -1,18 +1,19 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file string_test.cc
- * \brief Test String Common
+ * @file string_test.cc
+ * @brief Test String Common
  */
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
 
 #include "../src/rpc/network/common.h"
 
 using dgl::network::SplitStringUsing;
-using dgl::network::StringPrintf;
 using dgl::network::SStringPrintf;
 using dgl::network::StringAppendF;
+using dgl::network::StringPrintf;
 
 TEST(SplitStringTest, SplitStringUsingCompoundDelim) {
   std::string full(" apple \torange ");

@@ -7,7 +7,7 @@ from .dgl_dataset import DGLBuiltinDataset
 from .utils import save_graphs, load_graphs, _get_dgl_url, deprecate_property, deprecate_class
 from ..convert import graph as dgl_graph
 from .. import backend as F
-from .. import transform
+from .. import transforms
 
 __all__ = ["AmazonCoBuyComputerDataset", "AmazonCoBuyPhotoDataset", "CoauthorPhysicsDataset", "CoauthorCSDataset",
            "CoraFullDataset", "AmazonCoBuy", "Coauthor", "CoraFull"]
@@ -27,18 +27,19 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
 
     Reference: https://github.com/shchur/gnn-benchmark#datasets
     """
-    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, name, raw_dir=None, force_reload=False, verbose=False, transform=None):
         _url = _get_dgl_url('dataset/' + name + '.zip')
         super(GNNBenchmarkDataset, self).__init__(name=name,
                                                   url=_url,
                                                   raw_dir=raw_dir,
                                                   force_reload=force_reload,
-                                                  verbose=verbose)
+                                                  verbose=verbose,
+                                                  transform=transform)
 
     def process(self):
         npz_path = os.path.join(self.raw_path, self.name + '.npz')
         g = self._load_npz(npz_path)
-        g = transform.reorder_graph(
+        g = transforms.reorder_graph(
             g, node_permute_algo='rcmk', edge_permute_algo='dst', store_ids=False)
         self._graph = g
         self._data = [g]
@@ -95,7 +96,7 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
             else:
                 labels = None
         g = dgl_graph((adj_matrix.row, adj_matrix.col))
-        g = transform.to_bidirected(g)
+        g = transforms.to_bidirected(g)
         g.ndata['feat'] = F.tensor(attr_matrix, F.data_type_dict['float32'])
         g.ndata['label'] = F.tensor(labels, F.data_type_dict['int64'])
         return g
@@ -104,11 +105,6 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
     def num_classes(self):
         """Number of classes."""
         raise NotImplementedError
-
-    @property
-    def data(self):
-        deprecate_property('dataset.data', 'dataset[0]')
-        return self._data
 
     def __getitem__(self, idx):
         r""" Get graph by index
@@ -128,7 +124,10 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
             - ``ndata['label']``: node labels
         """
         assert idx == 0, "This dataset has only one graph"
-        return self._graph
+        if self._transform is None:
+            return self._graph
+        else:
+            return self._transform(self._graph)
 
     def __len__(self):
         r"""Number of graphs in the dataset"""
@@ -137,13 +136,6 @@ class GNNBenchmarkDataset(DGLBuiltinDataset):
 
 class CoraFullDataset(GNNBenchmarkDataset):
     r"""CORA-Full dataset for node classification task.
-
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = CoraFullDataset()
-        >>> graph = dataset[0]
 
     Extended Cora dataset. Nodes represent paper and edges represent citations.
 
@@ -164,15 +156,17 @@ class CoraFullDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
@@ -182,11 +176,12 @@ class CoraFullDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(CoraFullDataset, self).__init__(name="cora_full",
                                               raw_dir=raw_dir,
                                               force_reload=force_reload,
-                                              verbose=verbose)
+                                              verbose=verbose,
+                                              transform=transform)
 
     @property
     def num_classes(self):
@@ -201,13 +196,6 @@ class CoraFullDataset(GNNBenchmarkDataset):
 
 class CoauthorCSDataset(GNNBenchmarkDataset):
     r""" 'Computer Science (CS)' part of the Coauthor dataset for node classification task.
-
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = CoauthorCSDataset()
-        >>> graph = dataset[0]
 
     Coauthor CS and Coauthor Physics are co-authorship graphs based on the Microsoft Academic Graph
     from the KDD Cup 2016 challenge. Here, nodes are authors, that are connected by an edge if they
@@ -231,15 +219,17 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
@@ -249,11 +239,12 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(CoauthorCSDataset, self).__init__(name='coauthor_cs',
                                                 raw_dir=raw_dir,
                                                 force_reload=force_reload,
-                                                verbose=verbose)
+                                                verbose=verbose,
+                                                transform=transform)
 
     @property
     def num_classes(self):
@@ -268,13 +259,6 @@ class CoauthorCSDataset(GNNBenchmarkDataset):
 
 class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     r""" 'Physics' part of the Coauthor dataset for node classification task.
-
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = CoauthorPhysicsDataset()
-        >>> graph = dataset[0]
 
     Coauthor CS and Coauthor Physics are co-authorship graphs based on the Microsoft Academic Graph
     from the KDD Cup 2016 challenge. Here, nodes are authors, that are connected by an edge if they
@@ -298,15 +282,17 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
@@ -316,11 +302,12 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(CoauthorPhysicsDataset, self).__init__(name='coauthor_physics',
                                                      raw_dir=raw_dir,
                                                      force_reload=force_reload,
-                                                     verbose=verbose)
+                                                     verbose=verbose,
+                                                     transform=transform)
 
     @property
     def num_classes(self):
@@ -335,13 +322,6 @@ class CoauthorPhysicsDataset(GNNBenchmarkDataset):
 
 class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     r""" 'Computer' part of the AmazonCoBuy dataset for node classification task.
-
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = AmazonCoBuyComputerDataset()
-        >>> graph = dataset[0]
 
     Amazon Computers and Amazon Photo are segments of the Amazon co-purchase graph [McAuley et al., 2015],
     where nodes represent goods, edges indicate that two goods are frequently bought together, node
@@ -364,15 +344,17 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
@@ -382,11 +364,12 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(AmazonCoBuyComputerDataset, self).__init__(name='amazon_co_buy_computer',
                                                          raw_dir=raw_dir,
                                                          force_reload=force_reload,
-                                                         verbose=verbose)
+                                                         verbose=verbose,
+                                                         transform=transform)
 
     @property
     def num_classes(self):
@@ -401,13 +384,6 @@ class AmazonCoBuyComputerDataset(GNNBenchmarkDataset):
 
 class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     r"""AmazonCoBuy dataset for node classification task.
-
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is repalced by:
-
-        >>> dataset = AmazonCoBuyPhotoDataset()
-        >>> graph = dataset[0]
 
     Amazon Computers and Amazon Photo are segments of the Amazon co-purchase graph [McAuley et al., 2015],
     where nodes represent goods, edges indicate that two goods are frequently bought together, node
@@ -430,15 +406,17 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
-    verbose: bool
+    verbose : bool
         Whether to print out progress information. Default: True.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
 
     Attributes
     ----------
     num_classes : int
         Number of classes for each node.
-    data : list
-        A list of DGLGraph objects
 
     Examples
     --------
@@ -448,11 +426,12 @@ class AmazonCoBuyPhotoDataset(GNNBenchmarkDataset):
     >>> feat = g.ndata['feat']  # get node feature
     >>> label = g.ndata['label']  # get node labels
     """
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
+    def __init__(self, raw_dir=None, force_reload=False, verbose=False, transform=None):
         super(AmazonCoBuyPhotoDataset, self).__init__(name='amazon_co_buy_photo',
                                                       raw_dir=raw_dir,
                                                       force_reload=force_reload,
-                                                      verbose=verbose)
+                                                      verbose=verbose,
+                                                      transform=transform)
 
     @property
     def num_classes(self):

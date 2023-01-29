@@ -14,13 +14,6 @@ __all__ = ['KarateClubDataset', 'KarateClub']
 class KarateClubDataset(DGLDataset):
     r""" Karate Club dataset for Node Classification
 
-    .. deprecated:: 0.5.0
-
-        - ``data`` is deprecated, it is replaced by:
-
-            >>> dataset = KarateClubDataset()
-            >>> g = dataset[0]
-
     Zachary's karate club is a social network of a university
     karate club, described in the paper "An Information Flow
     Model for Conflict and Fission in Small Groups" by Wayne W. Zachary.
@@ -34,12 +27,17 @@ class KarateClubDataset(DGLDataset):
     - Edges: 156
     - Number of Classes: 2
 
+    Parameters
+    ----------
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
+
     Attributes
     ----------
     num_classes : int
         Number of node classes
-    data : list
-        A list of :class:`dgl.DGLGraph` objects
 
     Examples
     --------
@@ -48,8 +46,8 @@ class KarateClubDataset(DGLDataset):
     >>> g = dataset[0]
     >>> labels = g.ndata['label']
     """
-    def __init__(self):
-        super(KarateClubDataset, self).__init__(name='karate_club')
+    def __init__(self, transform=None):
+        super(KarateClubDataset, self).__init__(name='karate_club', transform=transform)
 
     def process(self):
         kc_graph = nx.karate_club_graph()
@@ -65,11 +63,6 @@ class KarateClubDataset(DGLDataset):
     def num_classes(self):
         """Number of classes."""
         return 2
-
-    @property
-    def data(self):
-        deprecate_property('dataset.data', 'dataset[0]')
-        return self._data
 
     def __getitem__(self, idx):
         r""" Get graph object
@@ -88,7 +81,10 @@ class KarateClubDataset(DGLDataset):
             - ``ndata['label']``: ground truth labels
         """
         assert idx == 0, "This dataset has only one graph"
-        return self._graph
+        if self._transform is None:
+            return self._graph
+        else:
+            return self._transform(self._graph)
 
     def __len__(self):
         r"""The number of graphs in the dataset."""

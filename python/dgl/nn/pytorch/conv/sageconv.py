@@ -5,16 +5,13 @@ from torch import nn
 from torch.nn import functional as F
 
 from .... import function as fn
-from ....utils import expand_as_pair, check_eq_shape, dgl_warning
+from ....base import DGLError
+from ....utils import expand_as_pair, check_eq_shape
 
 
 class SAGEConv(nn.Module):
-    r"""
-
-    Description
-    -----------
-    GraphSAGE layer from paper `Inductive Representation Learning on
-    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__.
+    r"""GraphSAGE layer from `Inductive Representation Learning on
+    Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__
 
     .. math::
         h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}
@@ -23,7 +20,7 @@ class SAGEConv(nn.Module):
         h_{i}^{(l+1)} &= \sigma \left(W \cdot \mathrm{concat}
         (h_{i}^{l}, h_{\mathcal{N}(i)}^{l+1}) \right)
 
-        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{l})
+        h_{i}^{(l+1)} &= \mathrm{norm}(h_{i}^{(l+1)})
 
     If a weight tensor on each edge is provided, the aggregation becomes:
 
@@ -50,10 +47,10 @@ class SAGEConv(nn.Module):
         are required to be the same.
     out_feats : int
         Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
-    feat_drop : float
-        Dropout rate on features, default: ``0``.
     aggregator_type : str
         Aggregator type to use (``mean``, ``gcn``, ``pool``, ``lstm``).
+    feat_drop : float
+        Dropout rate on features, default: ``0``.
     bias : bool
         If True, adds a learnable bias to the output. Default: ``True``.
     norm : callable activation function/layer or None, optional
@@ -86,7 +83,7 @@ class SAGEConv(nn.Module):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     >>> u_fea = th.rand(2, 5)
     >>> v_fea = th.rand(4, 10)
     >>> conv = SAGEConv((5, 10), 2, 'mean')
@@ -106,6 +103,12 @@ class SAGEConv(nn.Module):
                  norm=None,
                  activation=None):
         super(SAGEConv, self).__init__()
+        valid_aggre_types = {'mean', 'gcn', 'pool', 'lstm'}
+        if aggregator_type not in valid_aggre_types:
+            raise DGLError(
+                'Invalid aggregator_type. Must be one of {}. '
+                'But got {!r} instead.'.format(valid_aggre_types, aggregator_type)
+            )
 
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
@@ -113,18 +116,22 @@ class SAGEConv(nn.Module):
         self.norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
+
         # aggregator type: mean/pool/lstm/gcn
         if aggregator_type == 'pool':
             self.fc_pool = nn.Linear(self._in_src_feats, self._in_src_feats)
         if aggregator_type == 'lstm':
             self.lstm = nn.LSTM(self._in_src_feats, self._in_src_feats, batch_first=True)
-        if aggregator_type != 'gcn':
-            self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=False)
+
         self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=False)
-        if bias:
+
+        if aggregator_type != 'gcn':
+            self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=bias)
+        elif bias:
             self.bias = nn.parameter.Parameter(torch.zeros(self._out_feats))
         else:
-            self.register_buffer('bias', None)
+            self.register_buffer("bias", None)
+
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -147,19 +154,6 @@ class SAGEConv(nn.Module):
         if self._aggre_type != 'gcn':
             nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
-
-    def _compatibility_check(self):
-        """Address the backward compatibility issue brought by #2747"""
-        if not hasattr(self, 'bias'):
-            dgl_warning("You are loading a GraphSAGE model trained from a old version of DGL, "
-                        "DGL automatically convert it to be compatible with latest version.")
-            bias = self.fc_neigh.bias
-            self.fc_neigh.bias = None
-            if hasattr(self, 'fc_self'):
-                if bias is not None:
-                    bias = bias + self.fc_self.bias
-                    self.fc_self.bias = None
-            self.bias = bias
 
     def _lstm_reducer(self, nodes):
         """LSTM reducer
@@ -199,9 +193,8 @@ class SAGEConv(nn.Module):
         torch.Tensor
             The output feature of shape :math:`(N_{dst}, D_{out})`
             where :math:`N_{dst}` is the number of destination nodes in the input graph,
-            math:`D_{out}` is size of output feature.
+            :math:`D_{out}` is the size of the output feature.
         """
-        self._compatibility_check()
         with graph.local_scope():
             if isinstance(feat, tuple):
                 feat_src = self.feat_drop(feat[0])
@@ -210,7 +203,7 @@ class SAGEConv(nn.Module):
                 feat_src = feat_dst = self.feat_drop(feat)
                 if graph.is_block:
                     feat_dst = feat_src[:graph.number_of_dst_nodes()]
-            msg_fn = fn.copy_src('h', 'm')
+            msg_fn = fn.copy_u('h', 'm')
             if edge_weight is not None:
                 assert edge_weight.shape[0] == graph.number_of_edges()
                 graph.edata['_edge_weight'] = edge_weight
@@ -263,12 +256,12 @@ class SAGEConv(nn.Module):
             # GraphSAGE GCN does not require fc_self.
             if self._aggre_type == 'gcn':
                 rst = h_neigh
+                # add bias manually for GCN
+                if self.bias is not None:
+                    rst = rst + self.bias
             else:
                 rst = self.fc_self(h_self) + h_neigh
 
-            # bias term
-            if self.bias is not None:
-                rst = rst + self.bias
 
             # activation
             if self.activation is not None:

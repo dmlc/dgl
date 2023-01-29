@@ -22,25 +22,39 @@ OpenMP settings
 During training on CPU, the training and dataloading part need to be maintained simultaneously.
 Best performance of parallelization in OpenMP
 can be achieved by setting up the optimal number of working threads and dataloading workers.
+Nodes with high number of CPU cores may benefit from higher number of dataloading workers.
+A good starting point could be setting num_threads=4 in Dataloader constructor for nodes with 32 cores or more.
+If number of cores is rather small, the best performance might be achieved with just one
+dataloader worker or even with dataloader num_threads=0 for dataloading and trainig performed
+in the same process
 
-**GNU OpenMP**
-    Default BKM for setting the number of OMP threads with Pytorch backend:
+**Dataloader CPU affinity**
 
-    ``OMP_NUM_THREADS`` = number of physical cores – ``num_workers``
+If number of dataloader workers is more than 0, please consider using **use_cpu_affinity()** method
+of DGL Dataloader class, it will generally result in significant performance improvement for training.
 
-    Number of physical cores can be checked by using ``lscpu`` ("Core(s) per socket")
-    or ``nproc`` command in Linux command line.
-    Below simple bash script example for setting the OMP threads and ``pytorch`` backend dataloader workers:
+*use_cpu_affinity* will set the proper OpenMP thread count (equal to the number of CPU cores allocated for main process),
+affinitize dataloader workers for separate CPU cores and restrict the main process to remaining cores
 
-    .. code:: bash
+In multiple NUMA nodes setups *use_cpu_affinity* will only use cores of NUMA node 0 by default
+with an assumption, that the workload is scaling poorly across multiple NUMA nodes. If you believe
+your workload will have better performance utilizing more than one NUMA node, you can pass
+the list of cores to use for dataloading (loader_cores) and for compute (compute_cores).
 
-        cores=`nproc`
-        num_workers=4
-        export OMP_NUM_THREADS=$(($cores-$num_workers))
-        python script.py --gpu -1 --num_workers=$num_workers
+loader_cores and compute_cores arguments (list of CPU cores) can be passed to *enable_cpu_affinity* for more
+control over which cores should be used, e.g. in case a workload scales well across multiple NUMA nodes.
 
-    Depending on the dataset, model and CPU optimal number of dataloader workers and OpemMP threads may vary
-    but close to the general default advise presented above [#f4]_ .
+Usage:
+    .. code:: python
+
+        dataloader = dgl.dataloading.DataLoader(...)
+        ...
+        with dataloader.enable_cpu_affinity():
+            <training loop or inferencing>
+
+**Manual control**
+
+For advanced and more fine-grained control over OpenMP settings please refer to Maximize Performance of Intel® Optimization for PyTorch* on CPU [#f4]_ article
 
 .. rubric:: Footnotes
 

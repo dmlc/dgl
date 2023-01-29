@@ -7,7 +7,9 @@ The folder contains example implementations of selected research papers related 
 To quickly locate the examples of your interest, search for the tagged keywords or use the search tool on [dgl.ai](https://www.dgl.ai/).
 
 ## 2021
-
+- <a name="rnaglib"></a> Mallet et al. Learning Protein and Small Molecule binding sites in RNA molecules with 2.5D graphs. [Paper link](https://academic.oup.com/bioinformatics/article/38/5/1458/6462185?login=true)
+    - Example code: [PyTorch](https://jwgitlab.cs.mcgill.ca/cgoliver/rnaglib)
+    - Tags: semi-supervised node classification
 - <a name="hilander"></a> Xing et al. Learning Hierarchical Graph Neural Networks for Image Clustering.
     - Example code: [PyTorch](../examples/pytorch/hilander)
     - Tags: clustering
@@ -26,6 +28,19 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='gatv2'></a> Brody et al. How Attentive are Graph Attention Networks? [Paper link](https://arxiv.org/abs/2105.14491).
     - Example code: [PyTorch](../examples/pytorch/gatv2)
     - Tags: graph attention, gat, gatv2, attention
+- <a name='bgrl'></a> Thakoor et al. Large-Scale Representation Learning on Graphs via Bootstrapping. [Paper link](https://arxiv.org/abs/2102.06514).
+    - Example code: [PyTorch](../examples/pytorch/bgrl)
+    - Tags: contrastive learning for node classification.
+- <a name='directional_gsn'></a> Bouritsas et al. Improving Graph Neural Network Expressivity via Subgraph Isomorphism Counting. [Paper link](https://arxiv.org/abs/2006.09252).
+    - Example code: [PyTorch](../examples/pytorch/ogb/directional_GSN)
+    - Tags: subgraph isomorphism counting, graph classification.
+- <a name='ngnn'></a> Song et al. Network In Graph Neural Network. [Paper link](https://arxiv.org/abs/2111.11638).
+    - Example code: [PyTorch](../examples/pytorch/ogb/ngnn)
+    - Tags: model-agnostic methodology, link prediction, open graph benchmark.
+- <a name='bipointnet'></a>Qin et al. BiPointNet: Binary Neural Network for Point Clouds. [Paper link](https://openreview.net/forum?id=9QLRCVysdlO)
+    - Example code: [PyTorch](../examples/pytorch/pointcloud/bipointnet)
+    - Tags: point cloud classification, network binarization.
+
 
 ## 2020
 - <a name="eeg-gcnn"></a> Wagh et al. EEG-GCNN: Augmenting Electroencephalogram-based Neurological Disease Diagnosis using a Domain-guided Graph Convolutional Neural Network. [Paper link](http://proceedings.mlr.press/v136/wagh20a.html). 
@@ -89,6 +104,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name="caregnn"></a> Dou Y, Liu Z, et al. Enhancing Graph Neural Network-based Fraud Detectors against Camouflaged Fraudsters. [Paper link](https://arxiv.org/abs/2008.08692).
     - Example code: [PyTorch](../examples/pytorch/caregnn)
     - Tags: Multi-relational graph, Graph neural network, Fraud detection, Reinforcement learning, Node classification
+- <a name="seal_ogbl"></a>  Zhang et al. Labeling Trick: A Theory of Using Graph Neural Networks for Multi-Node Representation Learning. [Paper link](https://arxiv.org/pdf/2010.16103.pdf).
+    - Example code: [PyTorch](../examples/pytorch/ogb/seal_ogbl)
+    - Tags: link prediction, labeling trick, OGB
 
 ## 2019
 
@@ -179,6 +197,9 @@ To quickly locate the examples of your interest, search for the tagged keywords 
 - <a name='geniepath'></a> Liu Z, et al. Geniepath: Graph neural networks with adaptive receptive paths. [Paper link](https://arxiv.org/abs/1802.00910).
     - Example code: [PyTorch](../examples/pytorch/geniepath)
     - Tags:  Fraud detection, Node classification, Graph attention, LSTM, Adaptive receptive fields
+- <a name='pgnn'></a> You J, et al. Position-aware graph neural networks. [Paper link](https://arxiv.org/abs/1906.04817).
+    - Example code: [PyTorch](../examples/pytorch/P-GNN)
+    - Tags:  Positional encoding, Link prediction, Link-pair prediction
 
 ## 2018
 
@@ -226,6 +247,10 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Example code: [pytorch](../examples/pytorch/dtgrnn)
     - Tags: Static discrete temporal graph, traffic forecasting
 
+- <a name="hgnn"></a> Feng et al. Hypergraph Neural Networks. [Paper link](https://arxiv.org/abs/1809.09401).
+    - Example code: [pytorch](../examples/sparse/hgnn)
+    - Tags: hypergraph
+
 ## 2017
 
 - <a name="gcn"></a> Kipf and Welling. Semi-Supervised Classification with Graph Convolutional Networks. [Paper link](https://arxiv.org/abs/1609.02907). 
@@ -241,7 +266,7 @@ To quickly locate the examples of your interest, search for the tagged keywords 
     - Tags: matrix completion, recommender system, link prediction, bipartite graphs
 
 - <a name="graphsage"></a> Hamilton et al. Inductive Representation Learning on Large Graphs. [Paper link](https://cs.stanford.edu/people/jure/pubs/graphsage-nips17.pdf).
-    - Example code: [PyTorch](../examples/pytorch/graphsage), [PyTorch on ogbn-products](../examples/pytorch/ogb/ogbn-products), [PyTorch on ogbl-ppa](https://github.com/awslabs/dgl-lifesci/tree/master/examples/link_prediction/ogbl-ppa), [MXNet](../examples/mxnet/graphsage)
+    - Example code: [PyTorch](../examples/pytorch/graphsage), [PyTorch on ogbn-products](../examples/pytorch/ogb/ogbn-products), [PyTorch on ogbn-mag](../examples/pytorch/ogb/ogbn-mag), [PyTorch on ogbl-ppa](https://github.com/awslabs/dgl-lifesci/tree/master/examples/link_prediction/ogbl-ppa), [MXNet](../examples/mxnet/graphsage)
     - Tags: node classification, sampling, unsupervised learning, link prediction, OGB
 
 - <a name="metapath2vec"></a> Dong et al. metapath2vec: Scalable Representation Learning for Heterogeneous Networks. [Paper link](https://dl.acm.org/doi/10.1145/3097983.3098036).

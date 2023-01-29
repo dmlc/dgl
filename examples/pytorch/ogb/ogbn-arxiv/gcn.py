@@ -11,9 +11,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from matplotlib import pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
-from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-
 from models import GCN
+from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
 device = None
 in_feats, n_classes = None, None
@@ -23,10 +22,24 @@ epsilon = 1 - math.log(2)
 def gen_model(args):
     if args.use_labels:
         model = GCN(
-            in_feats + n_classes, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout, args.use_linear
+            in_feats + n_classes,
+            args.n_hidden,
+            n_classes,
+            args.n_layers,
+            F.relu,
+            args.dropout,
+            args.use_linear,
         )
     else:
-        model = GCN(in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout, args.use_linear)
+        model = GCN(
+            in_feats,
+            args.n_hidden,
+            n_classes,
+            args.n_layers,
+            F.relu,
+            args.dropout,
+            args.use_linear,
+        )
     return model
 
 
@@ -37,7 +50,9 @@ def cross_entropy(x, labels):
 
 
 def compute_acc(pred, labels, evaluator):
-    return evaluator.eval({"y_pred": pred.argmax(dim=-1, keepdim=True), "y_true": labels})["acc"]
+    return evaluator.eval(
+        {"y_pred": pred.argmax(dim=-1, keepdim=True), "y_true": labels}
+    )["acc"]
 
 
 def add_labels(feat, labels, idx):
@@ -81,7 +96,9 @@ def train(model, graph, labels, train_idx, optimizer, use_labels):
 
 
 @th.no_grad()
-def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels, evaluator):
+def evaluate(
+    model, graph, labels, train_idx, val_idx, test_idx, use_labels, evaluator
+):
     model.eval()
 
     feat = graph.ndata["feat"]
@@ -104,14 +121,23 @@ def evaluate(model, graph, labels, train_idx, val_idx, test_idx, use_labels, eva
     )
 
 
-def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running):
+def run(
+    args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running
+):
     # define model and optimizer
     model = gen_model(args)
     model = model.to(device)
 
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
+    optimizer = optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.wd
+    )
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=100, verbose=True, min_lr=1e-3
+        optimizer,
+        mode="min",
+        factor=0.5,
+        patience=100,
+        verbose=True,
+        min_lr=1e-3,
     )
 
     # training loop
@@ -126,11 +152,27 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
         adjust_learning_rate(optimizer, args.lr, epoch)
 
-        loss, pred = train(model, graph, labels, train_idx, optimizer, args.use_labels)
+        loss, pred = train(
+            model, graph, labels, train_idx, optimizer, args.use_labels
+        )
         acc = compute_acc(pred[train_idx], labels[train_idx], evaluator)
 
-        train_acc, val_acc, test_acc, train_loss, val_loss, test_loss = evaluate(
-            model, graph, labels, train_idx, val_idx, test_idx, args.use_labels, evaluator
+        (
+            train_acc,
+            val_acc,
+            test_acc,
+            train_loss,
+            val_loss,
+            test_loss,
+        ) = evaluate(
+            model,
+            graph,
+            labels,
+            train_idx,
+            val_idx,
+            test_idx,
+            args.use_labels,
+            evaluator,
         )
 
         lr_scheduler.step(loss)
@@ -152,8 +194,26 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
             )
 
         for l, e in zip(
-            [accs, train_accs, val_accs, test_accs, losses, train_losses, val_losses, test_losses],
-            [acc, train_acc, val_acc, test_acc, loss, train_loss, val_loss, test_loss],
+            [
+                accs,
+                train_accs,
+                val_accs,
+                test_accs,
+                losses,
+                train_losses,
+                val_losses,
+                test_losses,
+            ],
+            [
+                acc,
+                train_acc,
+                val_acc,
+                test_acc,
+                loss,
+                train_loss,
+                val_loss,
+                test_loss,
+            ],
         ):
             l.append(e)
 
@@ -167,7 +227,10 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         ax.set_xticks(np.arange(0, args.n_epochs, 100))
         ax.set_yticks(np.linspace(0, 1.0, 101))
         ax.tick_params(labeltop=True, labelright=True)
-        for y, label in zip([accs, train_accs, val_accs, test_accs], ["acc", "train acc", "val acc", "test acc"]):
+        for y, label in zip(
+            [accs, train_accs, val_accs, test_accs],
+            ["acc", "train acc", "val acc", "test acc"],
+        ):
             plt.plot(range(args.n_epochs), y, label=label)
         ax.xaxis.set_major_locator(MultipleLocator(100))
         ax.xaxis.set_minor_locator(AutoMinorLocator(1))
@@ -184,7 +247,8 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
         ax.set_xticks(np.arange(0, args.n_epochs, 100))
         ax.tick_params(labeltop=True, labelright=True)
         for y, label in zip(
-            [losses, train_losses, val_losses, test_losses], ["loss", "train loss", "val loss", "test loss"]
+            [losses, train_losses, val_losses, test_losses],
+            ["loss", "train loss", "val loss", "test loss"],
         ):
             plt.plot(range(args.n_epochs), y, label=label)
         ax.xaxis.set_major_locator(MultipleLocator(100))
@@ -202,28 +266,57 @@ def run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, n_running)
 
 def count_parameters(args):
     model = gen_model(args)
-    return sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
+    return sum(
+        [np.prod(p.size()) for p in model.parameters() if p.requires_grad]
+    )
 
 
 def main():
     global device, in_feats, n_classes
 
-    argparser = argparse.ArgumentParser("GCN on OGBN-Arxiv", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    argparser.add_argument("--cpu", action="store_true", help="CPU mode. This option overrides --gpu.")
-    argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
-    argparser.add_argument("--n-runs", type=int, default=10, help="running times")
-    argparser.add_argument("--n-epochs", type=int, default=1000, help="number of epochs")
-    argparser.add_argument(
-        "--use-labels", action="store_true", help="Use labels in the training set as input features."
+    argparser = argparse.ArgumentParser(
+        "GCN on OGBN-Arxiv",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    argparser.add_argument("--use-linear", action="store_true", help="Use linear layer.")
-    argparser.add_argument("--lr", type=float, default=0.005, help="learning rate")
-    argparser.add_argument("--n-layers", type=int, default=3, help="number of layers")
-    argparser.add_argument("--n-hidden", type=int, default=256, help="number of hidden units")
-    argparser.add_argument("--dropout", type=float, default=0.5, help="dropout rate")
+    argparser.add_argument(
+        "--cpu",
+        action="store_true",
+        help="CPU mode. This option overrides --gpu.",
+    )
+    argparser.add_argument("--gpu", type=int, default=0, help="GPU device ID.")
+    argparser.add_argument(
+        "--n-runs", type=int, default=10, help="running times"
+    )
+    argparser.add_argument(
+        "--n-epochs", type=int, default=1000, help="number of epochs"
+    )
+    argparser.add_argument(
+        "--use-labels",
+        action="store_true",
+        help="Use labels in the training set as input features.",
+    )
+    argparser.add_argument(
+        "--use-linear", action="store_true", help="Use linear layer."
+    )
+    argparser.add_argument(
+        "--lr", type=float, default=0.005, help="learning rate"
+    )
+    argparser.add_argument(
+        "--n-layers", type=int, default=3, help="number of layers"
+    )
+    argparser.add_argument(
+        "--n-hidden", type=int, default=256, help="number of hidden units"
+    )
+    argparser.add_argument(
+        "--dropout", type=float, default=0.5, help="dropout rate"
+    )
     argparser.add_argument("--wd", type=float, default=0, help="weight decay")
-    argparser.add_argument("--log-every", type=int, default=20, help="log every LOG_EVERY epochs")
-    argparser.add_argument("--plot-curves", action="store_true", help="plot learning curves")
+    argparser.add_argument(
+        "--log-every", type=int, default=20, help="log every LOG_EVERY epochs"
+    )
+    argparser.add_argument(
+        "--plot-curves", action="store_true", help="plot learning curves"
+    )
     args = argparser.parse_args()
 
     if args.cpu:
@@ -236,7 +329,11 @@ def main():
     evaluator = Evaluator(name="ogbn-arxiv")
 
     splitted_idx = data.get_idx_split()
-    train_idx, val_idx, test_idx = splitted_idx["train"], splitted_idx["valid"], splitted_idx["test"]
+    train_idx, val_idx, test_idx = (
+        splitted_idx["train"],
+        splitted_idx["valid"],
+        splitted_idx["test"],
+    )
     graph, labels = data[0]
 
     # add reverse edges
@@ -263,7 +360,9 @@ def main():
     test_accs = []
 
     for i in range(args.n_runs):
-        val_acc, test_acc = run(args, graph, labels, train_idx, val_idx, test_idx, evaluator, i)
+        val_acc, test_acc = run(
+            args, graph, labels, train_idx, val_idx, test_idx, evaluator, i
+        )
         val_accs.append(val_acc)
         test_accs.append(test_acc)
 

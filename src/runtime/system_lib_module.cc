@@ -1,11 +1,13 @@
-/*!
+/**
  *  Copyright (c) 2017 by Contributors
- * \file system_lib_module.cc
- * \brief SystemLib module.
+ * @file system_lib_module.cc
+ * @brief SystemLib module.
  */
-#include <dgl/runtime/registry.h>
 #include <dgl/runtime/c_backend_api.h>
+#include <dgl/runtime/registry.h>
+
 #include <mutex>
+
 #include "module_util.h"
 
 namespace dgl {
@@ -15,9 +17,7 @@ class SystemLibModuleNode : public ModuleNode {
  public:
   SystemLibModuleNode() = default;
 
-  const char* type_key() const final {
-    return "system_lib";
-  }
+  const char* type_key() const final { return "system_lib"; }
 
   PackedFunc GetFunction(
       const std::string& name,
@@ -57,8 +57,8 @@ class SystemLibModuleNode : public ModuleNode {
       auto it = tbl_.find(name);
       if (it != tbl_.end() && ptr != it->second) {
         LOG(WARNING) << "SystemLib symbol " << name
-                     << " get overriden to a different address "
-                     << ptr << "->" << it->second;
+                     << " get overriden to a different address " << ptr << "->"
+                     << it->second;
       }
       tbl_[name] = ptr;
     }
@@ -80,9 +80,9 @@ class SystemLibModuleNode : public ModuleNode {
 };
 
 DGL_REGISTER_GLOBAL("module._GetSystemLib")
-.set_body([](DGLArgs args, DGLRetValue* rv) {
-    *rv = runtime::Module(SystemLibModuleNode::Global());
-  });
+    .set_body([](DGLArgs args, DGLRetValue* rv) {
+      *rv = runtime::Module(SystemLibModuleNode::Global());
+    });
 }  // namespace runtime
 }  // namespace dgl
 

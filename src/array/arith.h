@@ -1,7 +1,7 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file array/arith.h
- * \brief Arithmetic functors
+ * @file array/arith.h
+ * @brief Arithmetic functors
  */
 #ifndef DGL_ARRAY_ARITH_H_
 #define DGL_ARRAY_ARITH_H_

@@ -1,34 +1,33 @@
-/*!
+/**
  *  Copyright (c) 2019 by Contributors
- * \file communicator.cc
- * \brief SocketCommunicator for DGL distributed training.
+ * @file communicator.cc
+ * @brief SocketCommunicator for DGL distributed training.
  */
-#include <dmlc/logging.h>
+#include "socket_communicator.h"
 
-#include <string.h>
+#include <dmlc/logging.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
+
 #include <memory>
 
-#include "socket_communicator.h"
 #include "../../c_api_common.h"
 #include "socket_pool.h"
 
 #ifdef _WIN32
 #include <windows.h>
-#else   // !_WIN32
+#else  // !_WIN32
 #include <unistd.h>
 #endif  // _WIN32
 
 namespace dgl {
 namespace network {
 
+/////////////////////////////////////// SocketSender
+//////////////////////////////////////////////
 
-/////////////////////////////////////// SocketSender ///////////////////////////////////////////
-
-
-void SocketSender::AddReceiver(const char* addr, int recv_id) {
-  CHECK_NOTNULL(addr);
+bool SocketSender::ConnectReceiver(const std::string& addr, int recv_id) {
   if (recv_id < 0) {
     LOG(FATAL) << "recv_id cannot be a negative number.";
   }
@@ -36,25 +35,27 @@ void SocketSender::AddReceiver(const char* addr, int recv_id) {
   std::vector<std::string> ip_and_port;
   SplitStringUsing(addr, "//", &substring);
   // Check address format
-  if (substring[0] != "socket:" || substring.size() != 2) {
+  if (substring[0] != "tcp:" || substring.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
+               << "e.g, 'tcp://127.0.0.1:50051'. ";
   }
   // Get IP and port
   SplitStringUsing(substring[1], ":", &ip_and_port);
   if (ip_and_port.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
+               << "e.g, 'tcp://127.0.0.1:50051'. ";
   }
   IPAddr address;
   address.ip = ip_and_port[0];
   address.port = std::stoi(ip_and_port[1]);
   receiver_addrs_[recv_id] = address;
+
+  return true;
 }
 
-bool SocketSender::Connect() {
+bool SocketSender::ConnectReceiverFinalize(const int max_try_times) {
   // Create N sockets for Receiver
   int receiver_count = static_cast<int>(receiver_addrs_.size());
   if (max_thread_count_ == 0 || max_thread_count_ > receiver_count) {
@@ -70,20 +71,16 @@ bool SocketSender::Connect() {
     int try_count = 0;
     const char* ip = r.second.ip.c_str();
     int port = r.second.port;
-    while (bo == false && try_count < kMaxTryCount) {
+    while (bo == false && try_count < max_try_times) {
       if (client_socket->Connect(ip, port)) {
         bo = true;
       } else {
         if (try_count % 200 == 0 && try_count != 0) {
-          // every 1000 seconds show this message
-          LOG(INFO) << "Try to connect to: " << ip << ":" << port;
+          // every 600 seconds show this message
+          LOG(INFO) << "Trying to connect receiver: " << ip << ":" << port;
         }
         try_count++;
-#ifdef _WIN32
-        Sleep(5);
-#else   // !_WIN32
-        sleep(5);
-#endif  // _WIN32
+        std::this_thread::sleep_for(std::chrono::seconds(3));
       }
     }
     if (bo == false) {
@@ -95,12 +92,36 @@ bool SocketSender::Connect() {
     msg_queue_.push_back(std::make_shared<MessageQueue>(queue_size_));
     // Create a new thread for this socket connection
     threads_.push_back(std::make_shared<std::thread>(
-      SendLoop,
-      sockets_[thread_id],
-      msg_queue_[thread_id]));
+        SendLoop, sockets_[thread_id], msg_queue_[thread_id]));
   }
 
   return true;
+}
+
+void SocketSender::Send(const rpc::RPCMessage& msg, int recv_id) {
+  std::shared_ptr<std::string> zerocopy_blob(new std::string());
+  StreamWithBuffer zc_write_strm(zerocopy_blob.get(), true);
+  zc_write_strm.Write(msg);
+  int32_t nonempty_ndarray_count = zc_write_strm.buffer_list().size();
+  zerocopy_blob->append(
+      reinterpret_cast<char*>(&nonempty_ndarray_count), sizeof(int32_t));
+  Message rpc_meta_msg;
+  rpc_meta_msg.data = const_cast<char*>(zerocopy_blob->data());
+  rpc_meta_msg.size = zerocopy_blob->size();
+  rpc_meta_msg.deallocator = [zerocopy_blob](Message*) {};
+  CHECK_EQ(Send(rpc_meta_msg, recv_id), ADD_SUCCESS);
+  // send real ndarray data
+  for (auto ptr : zc_write_strm.buffer_list()) {
+    Message ndarray_data_msg;
+    ndarray_data_msg.data = reinterpret_cast<char*>(ptr.data);
+    if (ptr.size == 0) {
+      LOG(FATAL) << "Cannot send a empty NDArray.";
+    }
+    ndarray_data_msg.size = ptr.size;
+    NDArray tensor = ptr.tensor;
+    ndarray_data_msg.deallocator = [tensor](Message*) {};
+    CHECK_EQ(Send(ndarray_data_msg, recv_id), ADD_SUCCESS);
+  }
 }
 
 STATUS SocketSender::Send(Message msg, int recv_id) {
@@ -119,11 +140,7 @@ void SocketSender::Finalize() {
     // wait until queue is empty
     auto& mq = msg_queue_[i];
     while (mq->Empty() == false) {
-#ifdef _WIN32
-        // just loop
-#else   // !_WIN32
-        usleep(1000);
-#endif  // _WIN32
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     // All queues have only one producer, which is main thread, so
     // the producerID argument here should be zero.
@@ -135,7 +152,7 @@ void SocketSender::Finalize() {
   }
   // Clear all sockets
   for (auto& group_sockets_ : sockets_) {
-    for (auto &socket : group_sockets_) {
+    for (auto& socket : group_sockets_) {
       socket.second->Close();
     }
   }
@@ -147,9 +164,8 @@ void SendCore(Message msg, TCPSocket* socket) {
   int64_t sent_bytes = 0;
   while (static_cast<size_t>(sent_bytes) < sizeof(int64_t)) {
     int64_t max_len = sizeof(int64_t) - sent_bytes;
-    int64_t tmp = socket->Send(
-      reinterpret_cast<char*>(&msg.size) + sent_bytes,
-      max_len);
+    int64_t tmp =
+        socket->Send(reinterpret_cast<char*>(&msg.size) + sent_bytes, max_len);
     CHECK_NE(tmp, -1);
     sent_bytes += tmp;
   }
@@ -157,7 +173,7 @@ void SendCore(Message msg, TCPSocket* socket) {
   sent_bytes = 0;
   while (sent_bytes < msg.size) {
     int64_t max_len = msg.size - sent_bytes;
-    int64_t tmp = socket->Send(msg.data+sent_bytes, max_len);
+    int64_t tmp = socket->Send(msg.data + sent_bytes, max_len);
     CHECK_NE(tmp, -1);
     sent_bytes += tmp;
   }
@@ -168,8 +184,8 @@ void SendCore(Message msg, TCPSocket* socket) {
 }
 
 void SocketSender::SendLoop(
-  std::unordered_map<int, std::shared_ptr<TCPSocket>> sockets,
-  std::shared_ptr<MessageQueue> queue) {
+    std::unordered_map<int, std::shared_ptr<TCPSocket>> sockets,
+    std::shared_ptr<MessageQueue> queue) {
   for (;;) {
     Message msg;
     STATUS code = queue->Remove(&msg);
@@ -184,26 +200,27 @@ void SocketSender::SendLoop(
   }
 }
 
-/////////////////////////////////////// SocketReceiver ///////////////////////////////////////////
-
-bool SocketReceiver::Wait(const char* addr, int num_sender) {
-  CHECK_NOTNULL(addr);
+/////////////////////////////////////// SocketReceiver
+//////////////////////////////////////////////
+bool SocketReceiver::Wait(
+    const std::string& addr, int num_sender, bool blocking) {
   CHECK_GT(num_sender, 0);
+  CHECK_EQ(blocking, true);
   std::vector<std::string> substring;
   std::vector<std::string> ip_and_port;
   SplitStringUsing(addr, "//", &substring);
   // Check address format
-  if (substring[0] != "socket:" || substring.size() != 2) {
+  if (substring[0] != "tcp:" || substring.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
+               << "e.g, 'tcp://127.0.0.1:50051'. ";
   }
   // Get IP and port
   SplitStringUsing(substring[1], ":", &ip_and_port);
   if (ip_and_port.size() != 2) {
     LOG(FATAL) << "Incorrect address format:" << addr
                << " Please provide right address format, "
-               << "e.g, 'socket://127.0.0.1:50051'. ";
+               << "e.g, 'tcp://127.0.0.1:50051'. ";
   }
   std::string ip = ip_and_port[0];
   int port = stoi(ip_and_port[1]);
@@ -211,7 +228,7 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   num_sender_ = num_sender;
 #ifdef USE_EPOLL
   if (max_thread_count_ == 0 || max_thread_count_ > num_sender_) {
-      max_thread_count_ = num_sender_;
+    max_thread_count_ = num_sender_;
   }
 #else
   max_thread_count_ = num_sender_;
@@ -236,7 +253,8 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
     auto socket = std::make_shared<TCPSocket>();
     sockets_[thread_id][i] = socket;
     msg_queue_[i] = std::make_shared<MessageQueue>(queue_size_);
-    if (server_socket_->Accept(socket.get(), &accept_ip, &accept_port) == false) {
+    if (server_socket_->Accept(socket.get(), &accept_ip, &accept_port) ==
+        false) {
       LOG(WARNING) << "Error on accept socket.";
       return false;
     }
@@ -246,21 +264,58 @@ bool SocketReceiver::Wait(const char* addr, int num_sender) {
   for (int thread_id = 0; thread_id < max_thread_count_; ++thread_id) {
     // create new thread for each socket
     threads_.push_back(std::make_shared<std::thread>(
-      RecvLoop,
-      sockets_[thread_id],
-      msg_queue_,
-      &queue_sem_));
+        RecvLoop, sockets_[thread_id], msg_queue_, &queue_sem_));
   }
 
   return true;
 }
 
-STATUS SocketReceiver::Recv(Message* msg, int* send_id) {
+rpc::RPCStatus SocketReceiver::Recv(rpc::RPCMessage* msg, int timeout) {
+  Message rpc_meta_msg;
+  int send_id;
+  auto status = Recv(&rpc_meta_msg, &send_id, timeout);
+  if (status == QUEUE_EMPTY) {
+    DLOG(WARNING) << "Timed out when trying to receive rpc meta data after "
+                  << timeout << " milliseconds.";
+    return rpc::kRPCTimeOut;
+  }
+  CHECK_EQ(status, REMOVE_SUCCESS);
+  char* count_ptr = rpc_meta_msg.data + rpc_meta_msg.size - sizeof(int32_t);
+  int32_t nonempty_ndarray_count = *(reinterpret_cast<int32_t*>(count_ptr));
+  // Recv real ndarray data
+  std::vector<void*> buffer_list(nonempty_ndarray_count);
+  for (int i = 0; i < nonempty_ndarray_count; ++i) {
+    Message ndarray_data_msg;
+    // As meta message has been received, data message is always expected unless
+    // connection is closed.
+    STATUS status;
+    do {
+      status = RecvFrom(&ndarray_data_msg, send_id, timeout);
+      if (status == QUEUE_EMPTY) {
+        DLOG(WARNING)
+            << "Timed out when trying to receive rpc ndarray data after "
+            << timeout << " milliseconds.";
+      }
+    } while (status == QUEUE_EMPTY);
+    CHECK_EQ(status, REMOVE_SUCCESS);
+    buffer_list[i] = ndarray_data_msg.data;
+  }
+  StreamWithBuffer zc_read_strm(
+      rpc_meta_msg.data, rpc_meta_msg.size - sizeof(int32_t), buffer_list);
+  zc_read_strm.Read(msg);
+  rpc_meta_msg.deallocator(&rpc_meta_msg);
+  return rpc::kRPCSuccess;
+}
+
+STATUS SocketReceiver::Recv(Message* msg, int* send_id, int timeout) {
   // queue_sem_ is a semaphore indicating how many elements in multiple
   // message queues.
   // When calling queue_sem_.Wait(), this Recv will be suspended until
-  // queue_sem_ > 0, decrease queue_sem_ by 1, then start to fetch a message.
-  queue_sem_.Wait();
+  // queue_sem_ > 0 or specified timeout expires, decrease queue_sem_ by 1,
+  // then start to fetch a message.
+  if (!queue_sem_.TimedWait(timeout)) {
+    return QUEUE_EMPTY;
+  }
   for (;;) {
     for (; mq_iter_ != msg_queue_.end(); ++mq_iter_) {
       STATUS code = mq_iter_->second->Remove(msg, false);
@@ -274,11 +329,16 @@ STATUS SocketReceiver::Recv(Message* msg, int* send_id) {
     }
     mq_iter_ = msg_queue_.begin();
   }
+  LOG(ERROR)
+      << "Failed to remove message from queue due to unexpected queue status.";
+  return QUEUE_CLOSE;
 }
 
-STATUS SocketReceiver::RecvFrom(Message* msg, int send_id) {
+STATUS SocketReceiver::RecvFrom(Message* msg, int send_id, int timeout) {
   // Get message from specified message queue
-  queue_sem_.Wait();
+  if (!queue_sem_.TimedWait(timeout)) {
+    return QUEUE_EMPTY;
+  }
   STATUS code = msg_queue_[send_id]->Remove(msg);
   return code;
 }
@@ -288,11 +348,7 @@ void SocketReceiver::Finalize() {
   for (auto& mq : msg_queue_) {
     // wait until queue is empty
     while (mq.second->Empty() == false) {
-#ifdef _WIN32
-        // just loop
-#else   // !_WIN32
-        usleep(1000);
-#endif  // _WIN32
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     mq.second->SignalFinished(mq.first);
   }
@@ -316,8 +372,7 @@ int64_t RecvDataSize(TCPSocket* socket) {
   while (static_cast<size_t>(received_bytes) < sizeof(int64_t)) {
     int64_t max_len = sizeof(int64_t) - received_bytes;
     int64_t tmp = socket->Receive(
-      reinterpret_cast<char*>(&data_size) + received_bytes,
-      max_len);
+        reinterpret_cast<char*>(&data_size) + received_bytes, max_len);
     if (tmp == -1) {
       if (received_bytes > 0) {
         // We want to finish reading full data_size
@@ -330,8 +385,9 @@ int64_t RecvDataSize(TCPSocket* socket) {
   return data_size;
 }
 
-void RecvData(TCPSocket* socket, char* buffer, const int64_t &data_size,
-  int64_t *received_bytes) {
+void RecvData(
+    TCPSocket* socket, char* buffer, const int64_t& data_size,
+    int64_t* received_bytes) {
   while (*received_bytes < data_size) {
     int64_t max_len = data_size - *received_bytes;
     int64_t tmp = socket->Receive(buffer + *received_bytes, max_len);
@@ -344,15 +400,17 @@ void RecvData(TCPSocket* socket, char* buffer, const int64_t &data_size,
 }
 
 void SocketReceiver::RecvLoop(
-  std::unordered_map<int /* Sender (virtual) ID */,
-    std::shared_ptr<TCPSocket>> sockets,
-  std::unordered_map<int /* Sender (virtual) ID */,
-    std::shared_ptr<MessageQueue>> queues,
-  runtime::Semaphore *queue_sem) {
+    std::unordered_map<
+        int /* Sender (virtual) ID */, std::shared_ptr<TCPSocket>>
+        sockets,
+    std::unordered_map<
+        int /* Sender (virtual) ID */, std::shared_ptr<MessageQueue>>
+        queues,
+    runtime::Semaphore* queue_sem) {
   std::unordered_map<int, std::unique_ptr<RecvContext>> recv_contexts;
   SocketPool socket_pool;
   for (auto& socket : sockets) {
-    auto &sender_id = socket.first;
+    auto& sender_id = socket.first;
     socket_pool.AddSocket(socket.second, sender_id);
     recv_contexts[sender_id] = std::unique_ptr<RecvContext>(new RecvContext());
   }
@@ -372,9 +430,9 @@ void SocketReceiver::RecvLoop(
 
     // Nonblocking socket might be interrupted at any point. So we need to
     // store the partially received data
-    std::unique_ptr<RecvContext> &ctx = recv_contexts[sender_id];
-    int64_t &data_size = ctx->data_size;
-    int64_t &received_bytes = ctx->received_bytes;
+    std::unique_ptr<RecvContext>& ctx = recv_contexts[sender_id];
+    int64_t& data_size = ctx->data_size;
+    int64_t& received_bytes = ctx->received_bytes;
     char*& buffer = ctx->buffer;
 
     if (data_size == -1) {
@@ -383,7 +441,7 @@ void SocketReceiver::RecvLoop(
       if (data_size > 0) {
         try {
           buffer = new char[data_size];
-        } catch(const std::bad_alloc&) {
+        } catch (const std::bad_alloc&) {
           LOG(FATAL) << "Cannot allocate enough memory for message, "
                      << "(message size: " << data_size << ")";
         }

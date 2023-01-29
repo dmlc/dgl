@@ -2,9 +2,10 @@
 reference: tvm/python/tvm/collections.py
 """
 from __future__ import absolute_import as _abs
+
+from . import _api_internal
 from ._ffi.object import ObjectBase, register_object
 from ._ffi.object_generic import convert_to_object
-from . import _api_internal
 
 
 @register_object
@@ -29,8 +30,11 @@ class List(ObjectBase):
             return [self[idx] for idx in range(start, stop, step)]
 
         if i < -len(self) or i >= len(self):
-            raise IndexError("List index out of range. List size: {}, got index {}"
-                             .format(len(self), i))
+            raise IndexError(
+                "List index out of range. List size: {}, got index {}".format(
+                    len(self), i
+                )
+            )
         if i < 0:
             i += len(self)
         ret = _api_internal._ListGetItem(self, i)
@@ -60,7 +64,7 @@ class Map(ObjectBase):
     def items(self):
         """Get the items from the map"""
         akvs = _api_internal._MapItems(self)
-        return [(akvs[i], akvs[i+1]) for i in range(0, len(akvs), 2)]
+        return [(akvs[i], akvs[i + 1]) for i in range(0, len(akvs), 2)]
 
     def __len__(self):
         return _api_internal._MapSize(self)
@@ -76,12 +80,13 @@ class StrMap(Map):
     def items(self):
         """Get the items from the map"""
         akvs = _api_internal._MapItems(self)
-        return [(akvs[i], akvs[i+1]) for i in range(0, len(akvs), 2)]
+        return [(akvs[i], akvs[i + 1]) for i in range(0, len(akvs), 2)]
 
 
 @register_object
 class Value(ObjectBase):
     """Object wrapper for various values."""
+
     @property
     def data(self):
         """Return the value data."""

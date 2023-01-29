@@ -5,6 +5,7 @@
 #include <dmlc/memory_io.h>
 #include <dmlc/parameter.h>
 #include <gtest/gtest.h>
+
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -70,12 +71,12 @@ TYPED_TEST(SmartPtrTest, Vector_Test1) {
   std::vector<Pair> copy_myclasses;
   static_cast<dmlc::Stream *>(&ofs)->Read<std::vector<Pair>>(&copy_myclasses);
 
-  EXPECT_TRUE(std::equal(myclasses.begin(), myclasses.end(),
-                         copy_myclasses.begin(),
-                         [](const Pair &left, const Pair &right) {
-                           return (left.second->data_ == right.second->data_) &&
-                                  (left.first == right.first);
-                         }));
+  EXPECT_TRUE(std::equal(
+      myclasses.begin(), myclasses.end(), copy_myclasses.begin(),
+      [](const Pair &left, const Pair &right) {
+        return (left.second->data_ == right.second->data_) &&
+               (left.first == right.first);
+      }));
 }
 
 TYPED_TEST(SmartPtrTest, Vector_Test2) {
@@ -95,9 +96,9 @@ TYPED_TEST(SmartPtrTest, Vector_Test2) {
   static_cast<dmlc::Stream *>(&ofs)->Read<std::vector<SmartPtr>>(
       &copy_myclasses);
 
-  EXPECT_TRUE(std::equal(myclasses.begin(), myclasses.end(),
-                         copy_myclasses.begin(),
-                         [](const SmartPtr &left, const SmartPtr &right) {
-                           return left->data_ == right->data_;
-                         }));
+  EXPECT_TRUE(std::equal(
+      myclasses.begin(), myclasses.end(), copy_myclasses.begin(),
+      [](const SmartPtr &left, const SmartPtr &right) {
+        return left->data_ == right->data_;
+      }));
 }

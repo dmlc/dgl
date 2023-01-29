@@ -16,11 +16,11 @@ class DistEmbedding:
 
     To support efficient training on a graph with many nodes, the embeddings support sparse
     updates. That is, only the embeddings involved in a mini-batch computation are updated.
-    Currently, DGL provides only one optimizer: `SparseAdagrad`. DGL will provide more
-    optimizers in the future.
+    Please refer to `Distributed Optimizers <https://docs.dgl.ai/api/python/dgl.distributed.html#
+    distributed-embedding-optimizer>`__ for available optimizers in DGL.
 
     Distributed embeddings are sharded and stored in a cluster of machines in the same way as
-    py:meth:`dgl.distributed.DistTensor`, except that distributed embeddings are trainable.
+    :class:`dgl.distributed.DistTensor`, except that distributed embeddings are trainable.
     Because distributed embeddings are sharded
     in the same way as nodes and edges of a distributed graph, it is usually much more
     efficient to access than the sparse embeddings provided by the deep learning frameworks.
@@ -77,8 +77,10 @@ class DistEmbedding:
         if th.distributed.is_initialized():
             self._rank = th.distributed.get_rank()
             self._world_size = th.distributed.get_world_size()
-        else:
-            assert 'th.distributed shoud be initialized'
+        # [TODO] The following code is clearly wrong but changing it to "raise DGLError"
+        # actually fails unit test.  ???
+        # else:
+        #     assert 'th.distributed should be initialized'
         self._optm_state = None # track optimizer state
         self._part_policy = part_policy
 
@@ -127,6 +129,17 @@ class DistEmbedding:
             The name of the embeddings
         """
         return self._tensor.tensor_name
+
+    @property
+    def data_name(self):
+        """Return the data name of the embeddings
+
+        Returns
+        -------
+        str
+            The data name of the embeddings
+        """
+        return self._tensor._name
 
     @property
     def kvstore(self):

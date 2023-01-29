@@ -1,37 +1,74 @@
+import rdkit.Chem as Chem
 import torch
 import torch.nn as nn
-import rdkit.Chem as Chem
 import torch.nn.functional as F
-from .chemutils import get_mol
-import dgl
-from dgl import mean_nodes, line_graph
-import dgl.function as DGLF
 
-ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca',
-             'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
+import dgl
+import dgl.function as DGLF
+from dgl import line_graph, mean_nodes
+
+from .chemutils import get_mol
+
+ELEM_LIST = [
+    "C",
+    "N",
+    "O",
+    "S",
+    "F",
+    "Si",
+    "P",
+    "Cl",
+    "Br",
+    "Mg",
+    "Na",
+    "Ca",
+    "Fe",
+    "Al",
+    "I",
+    "B",
+    "K",
+    "Se",
+    "Zn",
+    "H",
+    "Cu",
+    "Mn",
+    "unknown",
+]
 
 ATOM_FDIM = len(ELEM_LIST) + 6 + 5 + 4 + 1
 BOND_FDIM = 5 + 6
 MAX_NB = 6
+
 
 def onek_encoding_unk(x, allowable_set):
     if x not in allowable_set:
         x = allowable_set[-1]
     return [x == s for s in allowable_set]
 
+
 def atom_features(atom):
-    return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST) 
-            + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5]) 
-            + onek_encoding_unk(atom.GetFormalCharge(), [-1,-2,1,2,0])
-            + onek_encoding_unk(int(atom.GetChiralTag()), [0,1,2,3])
-            + [atom.GetIsAromatic()]))
+    return torch.Tensor(
+        onek_encoding_unk(atom.GetSymbol(), ELEM_LIST)
+        + onek_encoding_unk(atom.GetDegree(), [0, 1, 2, 3, 4, 5])
+        + onek_encoding_unk(atom.GetFormalCharge(), [-1, -2, 1, 2, 0])
+        + onek_encoding_unk(int(atom.GetChiralTag()), [0, 1, 2, 3])
+        + [atom.GetIsAromatic()]
+    )
+
 
 def bond_features(bond):
     bt = bond.GetBondType()
     stereo = int(bond.GetStereo())
-    fbond = [bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]
-    fstereo = onek_encoding_unk(stereo, [0,1,2,3,4,5])
-    return (torch.Tensor(fbond + fstereo))
+    fbond = [
+        bt == Chem.rdchem.BondType.SINGLE,
+        bt == Chem.rdchem.BondType.DOUBLE,
+        bt == Chem.rdchem.BondType.TRIPLE,
+        bt == Chem.rdchem.BondType.AROMATIC,
+        bond.IsInRing(),
+    ]
+    fstereo = onek_encoding_unk(stereo, [0, 1, 2, 3, 4, 5])
+    return torch.Tensor(fbond + fstereo)
+
 
 def mol2dgl_single(smiles):
     n_edges = 0
@@ -61,8 +98,11 @@ def mol2dgl_single(smiles):
         bond_x.append(features)
     graph = dgl.graph((bond_src, bond_dst), num_nodes=n_atoms)
     n_edges += n_bonds
-    return graph, torch.stack(atom_x), \
-            torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0)
+    return (
+        graph,
+        torch.stack(atom_x),
+        torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0),
+    )
 
 
 class LoopyBPUpdate(nn.Module):
@@ -73,10 +113,10 @@ class LoopyBPUpdate(nn.Module):
         self.W_h = nn.Linear(hidden_size, hidden_size, bias=False)
 
     def forward(self, nodes):
-        msg_input = nodes.data['msg_input']
-        msg_delta = self.W_h(nodes.data['accum_msg'])
+        msg_input = nodes.data["msg_input"]
+        msg_delta = self.W_h(nodes.data["accum_msg"])
         msg = F.relu(msg_input + msg_delta)
-        return {'msg': msg}
+        return {"msg": msg}
 
 
 class GatherUpdate(nn.Module):
@@ -87,9 +127,9 @@ class GatherUpdate(nn.Module):
         self.W_o = nn.Linear(ATOM_FDIM + hidden_size, hidden_size)
 
     def forward(self, nodes):
-        m = nodes.data['m']
+        m = nodes.data["m"]
         return {
-            'h': F.relu(self.W_o(torch.cat([nodes.data['x'], m], 1))),
+            "h": F.relu(self.W_o(torch.cat([nodes.data["x"], m], 1))),
         }
 
 
@@ -121,7 +161,7 @@ class DGLMPN(nn.Module):
         mol_graph = self.run(mol_graph, mol_line_graph)
 
         # TODO: replace with unbatch or readout
-        g_repr = mean_nodes(mol_graph, 'h')
+        g_repr = mean_nodes(mol_graph, "h")
 
         self.n_samples_total += n_samples
         self.n_nodes_total += n_nodes
@@ -134,32 +174,38 @@ class DGLMPN(nn.Module):
         n_nodes = mol_graph.number_of_nodes()
 
         mol_graph.apply_edges(
-            func=lambda edges: {'src_x': edges.src['x']},
+            func=lambda edges: {"src_x": edges.src["x"]},
         )
         mol_line_graph.ndata.update(mol_graph.edata)
 
         e_repr = mol_line_graph.ndata
-        bond_features = e_repr['x']
-        source_features = e_repr['src_x']
+        bond_features = e_repr["x"]
+        source_features = e_repr["src_x"]
 
         features = torch.cat([source_features, bond_features], 1)
         msg_input = self.W_i(features)
-        mol_line_graph.ndata.update({
-            'msg_input': msg_input,
-            'msg': F.relu(msg_input),
-            'accum_msg': torch.zeros_like(msg_input),
-        })
-        mol_graph.ndata.update({
-            'm': bond_features.new(n_nodes, self.hidden_size).zero_(),
-            'h': bond_features.new(n_nodes, self.hidden_size).zero_(),
-        })
+        mol_line_graph.ndata.update(
+            {
+                "msg_input": msg_input,
+                "msg": F.relu(msg_input),
+                "accum_msg": torch.zeros_like(msg_input),
+            }
+        )
+        mol_graph.ndata.update(
+            {
+                "m": bond_features.new(n_nodes, self.hidden_size).zero_(),
+                "h": bond_features.new(n_nodes, self.hidden_size).zero_(),
+            }
+        )
 
         for i in range(self.depth - 1):
-            mol_line_graph.update_all(DGLF.copy_u('msg', 'msg'), DGLF.sum('msg', 'accum_msg'))
+            mol_line_graph.update_all(
+                DGLF.copy_u("msg", "msg"), DGLF.sum("msg", "accum_msg")
+            )
             mol_line_graph.apply_nodes(self.loopy_bp_updater)
 
         mol_graph.edata.update(mol_line_graph.ndata)
-        mol_graph.update_all(DGLF.copy_e('msg', 'msg'), DGLF.sum('msg', 'm'))
+        mol_graph.update_all(DGLF.copy_e("msg", "msg"), DGLF.sum("msg", "m"))
         mol_graph.apply_nodes(self.gather_updater)
 
         return mol_graph
