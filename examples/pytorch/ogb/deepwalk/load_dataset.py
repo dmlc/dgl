@@ -7,10 +7,22 @@ from ogb.linkproppred import DglLinkPropPredDataset
 
 
 def load_from_ogbl_with_name(name):
-    choices = ["ogbl-collab", "ogbl-ddi", "ogbl-ppa", "ogbl-citation"]
+    choices = ["ogbl-collab", "ogbl-ddi", "ogbl-ppa", "ogbl-citation2"]
     assert name in choices, "name must be selected from " + str(choices)
     dataset = DglLinkPropPredDataset(name)
     return dataset[0]
+
+
+def load_from_ogbn_with_name(name):
+    choices = [
+        "ogbn-products",
+        "ogbn-proteins",
+        "ogbn-arxiv",
+        "ogbn-papers100M",
+    ]
+    assert name in choices, "name must be selected from " + str(choices)
+    dataset, label = DglNodePropPredDataset(name)[0]
+    return dataset
 
 
 if __name__ == "__main__":
@@ -18,7 +30,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--name",
         type=str,
-        choices=["ogbl-collab", "ogbl-ddi", "ogbl-ppa", "ogbl-citation"],
+        choices=[
+            "ogbl-collab",
+            "ogbl-ddi",
+            "ogbl-ppa",
+            "ogbl-citation",
+            "ogbn-products",
+            "ogbn-proteins",
+            "ogbn-arxiv",
+            "ogbn-papers100M",
+        ],
         default="ogbl-collab",
         help="name of datasets by ogb",
     )
@@ -26,7 +47,10 @@ if __name__ == "__main__":
 
     print("loading graph... it might take some time")
     name = args.name
-    g = load_from_ogbl_with_name(name=name)
+    if name.startswith("ogbl"):
+        g = load_from_ogbl_with_name(name=name)
+    else:
+        g = load_from_ogbn_with_name(name=name)
 
     try:
         w = g.edata["edge_weight"]
