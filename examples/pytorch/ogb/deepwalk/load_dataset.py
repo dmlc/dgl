@@ -4,6 +4,9 @@ import argparse
 import time
 
 from ogb.linkproppred import DglLinkPropPredDataset
+from ogb.nodeproppred import DglNodePropPredDataset
+
+import dgl
 
 
 def load_from_ogbl_with_name(name):
