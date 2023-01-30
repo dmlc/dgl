@@ -130,7 +130,7 @@ def gen_edge_files(schema_map, output):
     return edge_files
 
 
-def read_node_features(schema_map, tgt_ntype_name, feat_names):
+def read_node_features(schema_map, tgt_ntype_name, feat_names, input_dir):
     """Helper function to read the node features.
     Only node features which are requested are read from the input dataset.
 
@@ -142,6 +142,8 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names):
         node-type name, for which node features will be read from the input dataset.
     feat_names : set
         A set of strings, feature names, which will be read for a given node type.
+    input_dir : str
+        The input directory where the dataset is located.
 
     Returns:
     --------
@@ -171,7 +173,7 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names):
     return node_features
 
 
-def gen_node_weights_files(schema_map, output):
+def gen_node_weights_files(schema_map, input_dir, output):
     """Function to create node weight files for ParMETIS along with the edge files.
 
     This function generates node-data files, which will be read by the ParMETIS
@@ -190,6 +192,8 @@ def gen_node_weights_files(schema_map, output):
     -----------
     schema_map : json dictionary
         Dictionary created by reading the metadata.json file for the input dataset.
+    input_dir : str
+        The input directory where the dataset is located.
     output : string
         Location of storing the node-weights and edge files for ParMETIS.
 
@@ -236,7 +240,8 @@ def gen_node_weights_files(schema_map, output):
         # Add train/test/validation masks if present. node-degree will be added when this file
         # is read by ParMETIS to mimic the exisiting single process pipeline present in dgl.
         node_feats = read_node_features(
-            schema_map, ntype_name, set(["train_mask", "val_mask", "test_mask"])
+            schema_map, ntype_name, set(["train_mask", "val_mask", "test_mask"]),
+            input_dir
         )
         for k, v in node_feats.items():
             assert sz == v.shape
@@ -388,7 +393,7 @@ def run_preprocess_data(params):
     schema_map = read_json(params.schema_file)
     num_nodes_per_chunk = schema_map[constants.STR_NUM_NODES_PER_CHUNK]
     num_parts = len(num_nodes_per_chunk[0])
-    gen_node_weights_files(schema_map, params.output_dir)
+    gen_node_weights_files(schema_map, params.input_dir, params.output_dir)
     logging.info(f"Done with node weights....")
 
     gen_edge_files(schema_map, params.output_dir)
@@ -415,6 +420,11 @@ if __name__ == "__main__":
         required=True,
         type=str,
         help="The schema of the input graph",
+    )
+    parser.add_argument(
+        "--input_dir",
+        type=str,
+        help="The input directory where the dataset is located",
     )
     parser.add_argument(
         "--output_dir",
