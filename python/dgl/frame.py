@@ -548,7 +548,9 @@ class Column(TensorStorage):
         """
         if F.get_preferred_backend() != "pytorch":
             raise DGLError("record_stream only supports the PyTorch backend.")
-        self.data.record_stream(stream)
+        # Only record streams for materialized tensors
+        if self.index is None:
+            self.data.record_stream(stream)
 
 
 class Frame(MutableMapping):
