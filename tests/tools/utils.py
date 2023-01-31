@@ -122,7 +122,8 @@ def _chunk_graph(
             num_nodes_list.append(n)
         num_nodes_per_chunk.append(num_nodes_list)
 
-    metadata["edge_type"] = [etypestrs[etype] for etype in g.canonical_etypes]
+    canonical_etypes = [etypestrs[etype] for etype in g.canonical_etypes]
+    metadata["edge_type"] = canonical_etypes[np.random.shuffle(np.arange(len(canonical_etypes)))]
 
     # Compute the number of edges per chunk per edge type
     metadata["num_edges_per_chunk"] = num_edges_per_chunk = []
@@ -142,7 +143,7 @@ def _chunk_graph(
     # Split edge index
     metadata["edges"] = {}
     with setdir("edge_index"):
-        for etype in g.canonical_etypes:
+        for etype in canonical_etypes[random.shuffle(np.arange(len(canonical_etypes)))]
             etypestr = etypestrs[etype]
             logging.info("Chunking edge index for %s" % etypestr)
             edges_meta = {}
@@ -247,7 +248,7 @@ def _chunk_graph(
 
     metadata_path = "metadata.json"
     with open(metadata_path, "w") as f:
-        json.dump(metadata, f, sort_keys=True, indent=4)
+        json.dump(metadata, f, indent=4)
     logging.info("Saved metadata in %s" % os.path.abspath(metadata_path))
 
 
