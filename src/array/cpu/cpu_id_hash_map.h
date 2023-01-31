@@ -9,8 +9,6 @@
 
 #include <vector>
 #include <atomic>
-#include <omp.h>
-#include <algorithm>
 
 #include <dgl/aten/types.h>
 
@@ -45,16 +43,17 @@ class CpuIdHashMap {
     // in the hash map, returns the default_val instead.
     IdType map(IdType id, IdType default_val) const;
     
+    void next(IdType& pos, IdType&delta) const;
     void insert_cas(IdType id, std::vector<bool>& valid, size_t index);
-  
+    
     // Key must exist.
     void set_value(IdType k, IdType v);
 
     bool attempt_insert_at(int64_t pos, IdType key, std::vector<bool>& valid, size_t index);
 
  private:
-    DGLContext _ctx;
     Mapping* _hmap;
+    DGLContext _ctx;
     IdType _mask;
 };
 

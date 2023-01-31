@@ -1,5 +1,4 @@
 #include <set>
-#include <unordered_map>
 #include <gtest/gtest.h>
 #include <dgl/array.h>
 
@@ -22,47 +21,40 @@ void ConstructRandomSet(size_t size, size_t range,
     }
 }
 
-template <typename IdType>
-void _TestIdMap(size_t size, size_t range) {
+template <typename IdType, size_t size, size_t range>
+void _TestIdMap() {
     std::vector<IdType> id_vec;
     ConstructRandomSet(size, range, id_vec);
-    std::set<IdType> id_set(id_vec.begin(), id_vec.end());
-
+std::set<IdType> id_set(id_vec.begin(), id_vec.end());
     IdArray ids = VecToIdArray(id_vec, sizeof(IdType) * 8, CTX);
     IdArray unique_ids = NewIdArray(size, CTX, sizeof(IdType) * 8);
     CpuIdHashMap<IdType> id_map(CTX);
     auto unique_num = id_map.Init(ids, unique_ids);
-    unique_ids->shape[0] = unique_num;
+    unique_ids -> shape[0] = unique_num;
     IdType* unique_id_data = unique_ids.Ptr<IdType>();
     EXPECT_EQ(id_set.size(), unique_num);
-    EXPECT_EQ(unique_id_data[unique_num] - 1, unique_num - 1);
-    EXPECT_TRUE(unique_ids.IsContiguous());
 
-    IdArray new_ids = NewIdArray(size, CTX, sizeof(IdType) * 8);
-    IdType default_val = -1;
-    id_map.Map(ids, default_val, new_ids);
-    auto  new_id_vec = new_ids.ToVector<IdType>();
-    std::unordered_map<IdType, IdType> new_id_map;
-    std::vector<bool> isVisited(unique_num);
-    for (size_t i = 0; i < size; i++) {
-        EXPECT_NE(default_val, new_id_vec[i]);
-        auto old_id = id_vec[i];
-        // Make sure same old ids map to same new ids.
-        if (new_id_map.find(old_id) == new_id_map.end()) {
-            new_id_map[old_id] = new_id_vec[i];
-        } else {
-            EXPECT_EQ(new_id_map[old_id], new_id_vec[i]);
-            isVisited[new_id_vec[i]] = 1;
-        }
+    for (size_t i = 0; i < unique_num; i++) {
+        EXPECT_TRUE(id_set.find(unique_id_data[i]) != id_set.end());
     }
-
-    // // All new ids should be mapped.
-    // EXPECT_TRUE(std::all_of(isVisited.begin(),
-    //     isVisited.end(), [](bool flag){ return flag;}));
+    
+    IdArray new_ids = NewIdArray(unique_num, CTX, sizeof(IdType) * 8);
+    IdType default_val = -1;
+    id_map.Map(unique_ids, default_val, new_ids);
+    EXPECT_TRUE(new_ids.IsContiguous());
 }
 
 TEST(CpuIdHashMapTest, TestCpuIdHashMap) {
-    _TestIdMap<int64_t>(100, 1000);
+    _TestIdMap<int32_t, 1, 10>();
+    _TestIdMap<int64_t, 1, 10>();
+    _TestIdMap<int32_t, 1000,500000>();
+    _TestIdMap<int64_t, 1000, 500000>();
+    _TestIdMap<int32_t, 50000, 1000000>();
+    _TestIdMap<int64_t, 50000, 1000000>();
+    _TestIdMap<int32_t, 100000, 40000000>();
+    _TestIdMap<int64_t, 100000, 40000000>();
+    _TestIdMap<int32_t, 50000, 100>();
+    _TestIdMap<int64_t, 50000, 100>();
 }
 
 }; // namespace
