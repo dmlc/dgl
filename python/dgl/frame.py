@@ -41,6 +41,11 @@ class _LazyIndex(object):
             flat_index = F.gather_row(flat_index, index)
         return flat_index
 
+    def record_stream(self, stream):
+        for index in self._indices:
+            if F.context(index) != F.cpu():
+                index.record_stream(stream)
+
 
 class LazyFeature(object):
     """Placeholder for feature prefetching.
@@ -548,9 +553,11 @@ class Column(TensorStorage):
         """
         if F.get_preferred_backend() != "pytorch":
             raise DGLError("record_stream only supports the PyTorch backend.")
-        # Only record streams for materialized tensors
+        # Only record streams for materialized tensors otherwise just record for the index
         if self.index is None:
             self.data.record_stream(stream)
+        else:
+            self.index.record_stream(stream)
 
 
 class Frame(MutableMapping):
