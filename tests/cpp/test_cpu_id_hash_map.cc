@@ -25,7 +25,7 @@ template <typename IdType, size_t size, size_t range>
 void _TestIdMap() {
     std::vector<IdType> id_vec;
     ConstructRandomSet(size, range, id_vec);
-std::set<IdType> id_set(id_vec.begin(), id_vec.end());
+    std::set<IdType> id_set(id_vec.begin(), id_vec.end());
     IdArray ids = VecToIdArray(id_vec, sizeof(IdType) * 8, CTX);
     IdArray unique_ids = NewIdArray(size, CTX, sizeof(IdType) * 8);
     CpuIdHashMap<IdType> id_map(CTX);
