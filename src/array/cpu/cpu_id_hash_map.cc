@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2019 by Contributors
- * @file dgl/concurrent_id_hash_map.h
- * @brief Utility classes and functions for DGL arrays.
+ * @file dgl/cpu_id_hash_map.cc
+ * @brief Class about CPU id hash map
  */
 
 #include <cmath>
