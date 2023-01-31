@@ -1,29 +1,27 @@
-import logging
-import os
-import time
-import re
 import argparse
 import json
+import logging
+import os
+import re
+import time
 
 from task import Task
+
 
 class PartitionTask(Task):
     def __init__(self):
         parser = argparse.ArgumentParser(
             description="Graph Partition Task",
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
         parser.add_argument(
             "--data_store",
             type=str,
             required=True,
-            help="data store path like S3 URI which stores datasets"
+            help="data store path like S3 URI which stores datasets",
         )
         parser.add_argument(
-            "--data_name",
-            type=str,
-            required=True,
-            help="target dataset name"
+            "--data_name", type=str, required=True, help="target dataset name"
         )
         args, _ = parser.parse_known_args()
         self.data_store = args.data_store
@@ -31,12 +29,11 @@ class PartitionTask(Task):
         self.num_parts = 4
 
     def _prepare_data(self):
-        workspace = os.environ.get('WORKSPACE', '/workspace')
+        workspace = os.environ.get("WORKSPACE", "/workspace")
 
         # download raw data
         bin_path = os.path.join(
-            os.environ['DGL_ROOT_DIR'],
-            'tests/regression/data_store.py'
+            os.environ["DGL_ROOT_DIR"], "tests/regression/data_store.py"
         )
         os.system(
             f"python3 {bin_path}"
@@ -53,8 +50,8 @@ class PartitionTask(Task):
         in_dir = os.path.join(self.data_path, "chunked-data")
         output_dir = os.path.join(self.data_path, "parted_data")
         bin_path = os.path.join(
-            os.environ['DGL_ROOT_DIR'],
-            'tools/partition_algo/random_partition.py'
+            os.environ["DGL_ROOT_DIR"],
+            "tools/partition_algo/random_partition.py",
         )
         os.system(
             f"python3 {bin_path}"
@@ -64,7 +61,7 @@ class PartitionTask(Task):
         # copy partition results to all nodes
         ip_config = os.environ["IP_CONFIG"]
         ssh_port = os.environ["SSH_PORT"]
-        with open(ip_config, 'r') as f:
+        with open(ip_config, "r") as f:
             for i, line in enumerate(f):
                 if i == 0:
                     # skip current node
@@ -75,7 +72,7 @@ class PartitionTask(Task):
                     f" {output_dir} {ip}:{output_dir} "
                 )
                 logging.info(f"Finished to copy partition results to {ip}...")
-        with open(ip_config, 'r') as f:
+        with open(ip_config, "r") as f:
             for line in f:
                 ip = line.rstrip()
                 logging.info(f"-------IP: {ip}")
@@ -85,13 +82,12 @@ class PartitionTask(Task):
 
         tic = time.time()
         # Step2: data dispatch
-        partition_dir = os.path.join(self.data_path, 'parted_data')
-        out_dir = os.path.join(self.data_path, 'partitioned')
+        partition_dir = os.path.join(self.data_path, "parted_data")
+        out_dir = os.path.join(self.data_path, "partitioned")
         in_dir = os.path.join(self.data_path, "chunked-data")
 
         bin_path = os.path.join(
-            os.environ['DGL_ROOT_DIR'],
-            'tools/dispatch_data.py'
+            os.environ["DGL_ROOT_DIR"], "tools/dispatch_data.py"
         )
         cmd = f"python3 {bin_path}"
         cmd += f" --in-dir {in_dir}"
@@ -111,9 +107,9 @@ class PartitionTask(Task):
         )
 
     def _print_metrics(self):
-        workspace = os.environ.get('WORKSPACE', '/workspace')
-        self.metric_file = os.path.join(workspace, 'metric.log')
-        with open(self.metric_file, 'w') as f:
+        workspace = os.environ.get("WORKSPACE", "/workspace")
+        self.metric_file = os.path.join(workspace, "metric.log")
+        with open(self.metric_file, "w") as f:
             data = {
                 "task": "Graph Partition Pipeline",
                 "dataset": self.data_name,
@@ -121,6 +117,4 @@ class PartitionTask(Task):
                 "partition_time": self.tic_toc,
             }
             f.write(json.dumps(data))
-        os.system(
-            f"cat {self.metric_file}"
-        )
+        os.system(f"cat {self.metric_file}")

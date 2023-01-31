@@ -1,7 +1,7 @@
-import os
 import logging
-import time
+import os
 import pathlib
+import time
 
 
 class Task:
@@ -18,20 +18,22 @@ class Task:
         raise RuntimeError("Not implemented...")
 
     def _continue_on_main_node_only(self):
-        workspace = os.environ['WORKSPACE']
-        sync_file = os.path.join(workspace, 'dist_dgl_node_ready.sync')
+        workspace = os.environ["WORKSPACE"]
+        sync_file = os.path.join(workspace, "dist_dgl_node_ready.sync")
         pathlib.Path(sync_file).touch()
-        if os.environ["AWS_BATCH_JOB_MAIN_NODE_INDEX"] != \
-            os.environ["AWS_BATCH_JOB_NODE_INDEX"]:
+        if (
+            os.environ["AWS_BATCH_JOB_MAIN_NODE_INDEX"]
+            != os.environ["AWS_BATCH_JOB_NODE_INDEX"]
+        ):
             logging.info("Child node goes to sleep now...")
-            time.sleep(60*60*24)
-        ip_config = os.environ['IP_CONFIG']
-        ssh_port = os.environ['SSH_PORT']
-        with open(ip_config, 'r') as f:
+            time.sleep(60 * 60 * 24)
+        ip_config = os.environ["IP_CONFIG"]
+        ssh_port = os.environ["SSH_PORT"]
+        with open(ip_config, "r") as f:
             for line in f:
                 ip = line.rstrip()
                 logging.info(f"-------IP: {ip}")
-                cmd = f'while [ ! -f {sync_file} ]; do sleep 2; done'
+                cmd = f"while [ ! -f {sync_file} ]; do sleep 2; done"
                 os.system(
                     f"ssh -o StrictHostKeyChecking=no -p {ssh_port} "
                     f"{ip} '{cmd}'"
@@ -44,4 +46,3 @@ class Task:
 
     def _print_metrics(self):
         raise RuntimeError("Not implemented...")
-
