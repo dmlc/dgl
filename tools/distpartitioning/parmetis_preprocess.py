@@ -13,6 +13,7 @@ import torch.distributed as dist
 
 import constants
 from utils import get_idranges, get_node_types, read_json
+import array_readwriter
 
 
 def get_proc_info():
@@ -163,13 +164,15 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names, input_dir):
                 for feat_name, feat_data in ntype_feature_data.items():
                     if feat_name in feat_names:
                         feat_data_fname = feat_data[constants.STR_DATA][rank]
+                        if not os.path.isabs(feat_data_fname):
+                            feat_data_fname = os.path.join(input_dir, feat_data_fname)
                         logging.info(f"Reading: {feat_data_fname}")
-                        if os.path.isabs(feat_data_fname):
-                            node_features[feat_name] = np.load(feat_data_fname)
-                        else:
-                            node_features[feat_name] = np.load(
-                                os.path.join(input_dir, feat_data_fname)
-                            )
+                        file_suffix = Path(feat_data_fname).suffix
+                        reader_fmt_meta = {
+                            "name": file_suffix[1:]
+                        }
+                        node_features[feat_name] = array_readwriter.get_array_parser(
+                            **reader_fmt_meta).read(feat_data_fname)
     return node_features
 
 
