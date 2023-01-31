@@ -5,7 +5,7 @@ from collections import namedtuple
 from collections.abc import MutableMapping
 
 from . import backend as F
-from .base import DGLError, dgl_warning
+from .base import dgl_warning, DGLError
 from .init import zero_initializer
 from .storages import TensorStorage
 from .utils import gather_pinned_tensor_rows, pin_memory_inplace
