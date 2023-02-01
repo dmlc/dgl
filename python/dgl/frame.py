@@ -42,6 +42,12 @@ class _LazyIndex(object):
         return flat_index
 
     def record_stream(self, stream):
+        """Record stream for index.
+
+        Parameters
+        ----------
+        stream : torch.cuda.Stream.
+        """
         for index in self._indices:
             if F.context(index) != F.cpu():
                 index.record_stream(stream)
