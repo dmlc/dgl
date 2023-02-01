@@ -52,6 +52,8 @@ Sampling for Node Classification <L1_large_node_classification>`.
 # :doc:`previous tutorial <L1_large_node_classification>`.
 #
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 import torch
 import numpy as np

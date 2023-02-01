@@ -33,6 +33,8 @@ models with multi-GPU with ``DistributedDataParallel``.
 # tutorial.
 # 
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 import torch
 import numpy as np

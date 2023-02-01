@@ -9,8 +9,8 @@ from .sparse_matrix import SparseMatrix
 
 
 def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
-    """Computes the reduction of non-zero values of the ``input`` sparse matrix
-    along the given dimension :attr:`dim`.
+    """Computes the reduction of non-zero values of the :attr:`input` sparse
+    matrix along the given dimension :attr:`dim`.
 
     The reduction does not count zero elements. If the row or column to be
     reduced does not have any non-zero elements, the result will be 0.
@@ -21,11 +21,12 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
     rtype: str, optional
@@ -35,43 +36,45 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
 
     Returns
     ----------
-    Tensor
+    torch.Tensor
         Reduced tensor
 
     Examples
     ----------
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case1: scalar-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.reduce(A, rtype='sum'))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.reduce(A, rtype='sum')
     tensor(4)
-    >>> print(dglsp.reduce(A, 0, 'sum'))
+    >>> dglsp.reduce(A, 0, 'sum')
     tensor([2, 0, 2])
-    >>> print(dglsp.reduce(A, 1, 'sum'))
+    >>> dglsp.reduce(A, 1, 'sum')
     tensor([1, 3, 0, 0])
-    >>> print(dglsp.reduce(A, 0, 'smax'))
+    >>> dglsp.reduce(A, 0, 'smax')
     tensor([1, 0, 2])
-    >>> print(dglsp.reduce(A, 1, 'smin'))
+    >>> dglsp.reduce(A, 1, 'smin')
     tensor([1, 1, 0, 0])
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case2: vector-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1., 2.], [2., 1.], [2., 2.]])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.reduce(A, rtype='sum'))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.reduce(A, rtype='sum')
     tensor([5., 5.])
-    >>> print(dglsp.reduce(A, 0, 'sum'))
+    >>> dglsp.reduce(A, 0, 'sum')
     tensor([[3., 3.],
             [0., 0.],
             [2., 2.]])
-    >>> print(dglsp.reduce(A, 1, 'smin'))
+    >>> dglsp.reduce(A, 1, 'smin')
     tensor([[1., 2.],
             [2., 1.],
             [0., 0.],
             [0., 0.]])
-    >>> print(dglsp.reduce(A, 0, 'smean'))
+    >>> dglsp.reduce(A, 0, 'smean')
     tensor([[1.5000, 1.5000],
             [0.0000, 0.0000],
             [2.0000, 2.0000]])
@@ -80,8 +83,8 @@ def reduce(input: SparseMatrix, dim: Optional[int] = None, rtype: str = "sum"):
 
 
 def sum(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the sum of non-zero values of the ``input`` sparse matrix along
-    the given dimension :attr:`dim`.
+    """Computes the sum of non-zero values of the :attr:`input` sparse matrix
+    along the given dimension :attr:`dim`.
 
     Parameters
     ----------
@@ -89,40 +92,43 @@ def sum(input: SparseMatrix, dim: Optional[int] = None):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
 
     Returns
     ----------
-    Tensor
+    torch.Tensor
         Reduced tensor
 
     Examples
     ----------
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case1: scalar-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.sum(A))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.sum(A)
     tensor(4)
-    >>> print(dglsp.sum(A, 0))
+    >>> dglsp.sum(A, 0)
     tensor([2, 0, 2])
-    >>> print(dglsp.sum(A, 1))
+    >>> dglsp.sum(A, 1)
     tensor([1, 3, 0, 0])
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case2: vector-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.sum(A))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.sum(A)
     tensor([5, 5])
-    >>> print(dglsp.sum(A, 0))
+    >>> dglsp.sum(A, 0)
     tensor([[3, 3],
             [0, 0],
             [2, 2]])
@@ -131,8 +137,8 @@ def sum(input: SparseMatrix, dim: Optional[int] = None):
 
 
 def smax(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the maximum of non-zero values of the ``input`` sparse matrix
-    along the given dimension :attr:`dim`.
+    """Computes the maximum of non-zero values of the :attr:`input` sparse
+    matrix along the given dimension :attr:`dim`.
 
     The reduction does not count zero values. If the row or column to be
     reduced does not have any non-zero value, the result will be 0.
@@ -143,40 +149,43 @@ def smax(input: SparseMatrix, dim: Optional[int] = None):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
 
     Returns
     ----------
-    Tensor
+    torch.Tensor
         Reduced tensor
 
     Examples
     ----------
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case1: scalar-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smax(A))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.smax(A)
     tensor(2)
-    >>> print(dglsp.smax(A, 0))
+    >>> dglsp.smax(A, 0)
     tensor([1, 0, 2])
-    >>> print(dglsp.smax(A, 1))
+    >>> dglsp.smax(A, 1)
     tensor([1, 2, 0, 0])
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case2: vector-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smax(A))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.smax(A)
     tensor([2, 2])
-    >>> print(dglsp.smax(A, 1))
+    >>> dglsp.smax(A, 1)
     tensor([[1, 2],
             [2, 2],
             [0, 0],
@@ -186,8 +195,8 @@ def smax(input: SparseMatrix, dim: Optional[int] = None):
 
 
 def smin(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the minimum of non-zero values of the ``input`` sparse matrix
-    along the given dimension :attr:`dim`.
+    """Computes the minimum of non-zero values of the :attr:`input` sparse
+    matrix along the given dimension :attr:`dim`.
 
     The reduction does not count zero values. If the row or column to be reduced
     does not have any non-zero value, the result will be 0.
@@ -198,44 +207,47 @@ def smin(input: SparseMatrix, dim: Optional[int] = None):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
 
     Returns
     ----------
-    Tensor
+    torch.Tensor
         Reduced tensor
 
     Examples
     ----------
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case1: scalar-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smin(A))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.smin(A)
     tensor(1)
-    >>> print(dglsp.smin(A, 0))
+    >>> dglsp.smin(A, 0)
     tensor([1, 0, 2])
-    >>> print(dglsp.smin(A, 1))
+    >>> dglsp.smin(A, 1)
     tensor([1, 1, 0, 0])
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case2: vector-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smin(A))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.smin(A)
     tensor([1, 1])
-    >>> print(dglsp.smin(A, 0))
+    >>> dglsp.smin(A, 0)
     tensor([[1, 1],
             [0, 0],
             [2, 2]])
-    >>> print(dglsp.smin(A, 1))
+    >>> dglsp.smin(A, 1)
     tensor([[1, 2],
             [2, 1],
             [0, 0],
@@ -245,66 +257,7 @@ def smin(input: SparseMatrix, dim: Optional[int] = None):
 
 
 def smean(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the mean of non-zero values of the ``input`` sparse matrix along
-    the given dimension :attr:`dim`.
-
-    The reduction does not count zero values. If the row or column to be reduced
-    does not have any non-zero value, the result will be 0.
-
-    Parameters
-    ----------
-    input : SparseMatrix
-        The input sparse matrix
-    dim : int, optional
-        The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
-
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
-        ``(input.shape[1],) + input.val.shape[1:]`` or
-        ``(input.shape[0],) + input.val.shape[1:]``.
-
-    Returns
-    ----------
-    Tensor
-        Reduced tensor
-
-    Examples
-    ----------
-
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
-    >>> val = torch.tensor([1., 1., 2.])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smean(A))
-    tensor(1.3333)
-    >>> print(dglsp.smean(A, 0))
-    tensor([1., 0., 2.])
-    >>> print(dglsp.smean(A, 1))
-    tensor([1.0000, 1.5000, 0.0000, 0.0000])
-
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
-    >>> val = torch.tensor([[1., 2.], [2., 1.], [2., 2.]])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.smean(A))
-    tensor([1.6667, 1.6667])
-    >>> print(dglsp.smean(A, 0))
-    tensor([[1.5000, 1.5000],
-            [0.0000, 0.0000],
-            [2.0000, 2.0000]])
-    >>> print(dglsp.smean(A, 1))
-    tensor([[1.0000, 2.0000],
-            [2.0000, 1.5000],
-            [0.0000, 0.0000],
-            [0.0000, 0.0000]])
-    """
-    return torch.ops.dgl_sparse.smean(input.c_sparse_matrix, dim)
-
-
-def sprod(input: SparseMatrix, dim: Optional[int] = None):
-    """Computes the product of non-zero values of the ``input`` sparse matrix
+    """Computes the mean of non-zero values of the :attr:`input` sparse matrix
     along the given dimension :attr:`dim`.
 
     The reduction does not count zero values. If the row or column to be reduced
@@ -316,44 +269,109 @@ def sprod(input: SparseMatrix, dim: Optional[int] = None):
         The input sparse matrix
     dim : int, optional
         The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
-        or None (on all non-zero entries)
+        or None (on both rows and columns simultaneously)
 
-        If :attr:`dim` is None, it reduces all the elements in the sparse
-        matrix. Otherwise, it reduces on the row (``dim=0``) or column
-        (``dim=1``) dimension, producing a tensor of shape
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
         ``(input.shape[1],) + input.val.shape[1:]`` or
         ``(input.shape[0],) + input.val.shape[1:]``.
 
     Returns
     ----------
-    Tensor
+    torch.Tensor
         Reduced tensor
 
     Examples
     ----------
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case1: scalar-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
+    >>> val = torch.tensor([1., 1., 2.])
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.smean(A)
+    tensor(1.3333)
+    >>> dglsp.smean(A, 0)
+    tensor([1., 0., 2.])
+    >>> dglsp.smean(A, 1)
+    tensor([1.0000, 1.5000, 0.0000, 0.0000])
+
+    Case2: vector-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
+    >>> val = torch.tensor([[1., 2.], [2., 1.], [2., 2.]])
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.smean(A)
+    tensor([1.6667, 1.6667])
+    >>> dglsp.smean(A, 0)
+    tensor([[1.5000, 1.5000],
+            [0.0000, 0.0000],
+            [2.0000, 2.0000]])
+    >>> dglsp.smean(A, 1)
+    tensor([[1.0000, 2.0000],
+            [2.0000, 1.5000],
+            [0.0000, 0.0000],
+            [0.0000, 0.0000]])
+    """
+    return torch.ops.dgl_sparse.smean(input.c_sparse_matrix, dim)
+
+
+def sprod(input: SparseMatrix, dim: Optional[int] = None):
+    """Computes the product of non-zero values of the :attr:`input` sparse
+    matrix along the given dimension :attr:`dim`.
+
+    The reduction does not count zero values. If the row or column to be reduced
+    does not have any non-zero value, the result will be 0.
+
+    Parameters
+    ----------
+    input : SparseMatrix
+        The input sparse matrix
+    dim : int, optional
+        The dimension to reduce, must be either 0 (by rows) or 1 (by columns)
+        or None (on both rows and columns simultaneously)
+
+        If :attr:`dim` is None, it reduces both the rows and the columns
+        in the sparse matrix, producing a tensor of shape
+        ``input.val.shape[1:]``. Otherwise, it reduces on the row (``dim=0``)
+        or column (``dim=1``) dimension, producing a tensor of shape
+        ``(input.shape[1],) + input.val.shape[1:]`` or
+        ``(input.shape[0],) + input.val.shape[1:]``.
+
+    Returns
+    ----------
+    torch.Tensor
+        Reduced tensor
+
+    Examples
+    ----------
+
+    Case1: scalar-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([1, 1, 2])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.sprod(A))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.sprod(A)
     tensor(2)
-    >>> print(dglsp.sprod(A, 0))
+    >>> dglsp.sprod(A, 0)
     tensor([1, 0, 2])
-    >>> print(dglsp.sprod(A, 1))
+    >>> dglsp.sprod(A, 1)
     tensor([1, 2, 0, 0])
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([0, 0, 2])
+    Case2: vector-valued sparse matrix
+
+    >>> indices = torch.tensor([[0, 1, 1], [0, 0, 2]])
     >>> val = torch.tensor([[1, 2], [2, 1], [2, 2]])
-    >>> A = dglsp.from_coo(row, col, val, shape=(4, 3))
-    >>> print(dglsp.sprod(A))
+    >>> A = dglsp.spmatrix(indices, val, shape=(4, 3))
+    >>> dglsp.sprod(A)
     tensor([4, 4])
-    >>> print(dglsp.sprod(A, 0))
+    >>> dglsp.sprod(A, 0)
     tensor([[2, 2],
             [0, 0],
             [2, 2]])
-    >>> print(dglsp.sprod(A, 1))
+    >>> dglsp.sprod(A, 1)
     tensor([[1, 2],
             [4, 2],
             [0, 0],

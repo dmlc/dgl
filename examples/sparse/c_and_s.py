@@ -99,9 +99,9 @@ if __name__ == "__main__":
     g = dataset[0].to(dev)
 
     # Create the sparse adjacency matrix A.
-    src, dst = g.edges()
+    indices = torch.stack(g.edges())
     N = g.num_nodes()
-    A = dglsp.from_coo(dst, src, shape=(N, N))
+    A = dglsp.spmatrix(indices, shape=(N, N))
 
     # Calculate the symmetrically normalized adjacency matrix.
     I = dglsp.identity(A.shape, device=dev)
