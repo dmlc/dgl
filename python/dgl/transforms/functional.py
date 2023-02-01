@@ -3960,7 +3960,7 @@ def svd_pe(g, k, padding=False, random_flip=True):
     n = g.num_nodes()
     if not padding and n < k:
         raise ValueError(
-            'The number of singular values r must be no greater than the '
+            'The number of singular values k must be no greater than the '
             'number of nodes n, but ' +
             f'got {k} and {n} respectively.'
         )
