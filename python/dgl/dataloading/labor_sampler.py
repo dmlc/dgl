@@ -28,7 +28,7 @@ class LaborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
     labor sampling for multilayer GNN from
     `(LA)yer-neigh(BOR) Sampling: Defusing Neighborhood Explosion in GNNs
-    <https://arxiv.org/abs/2210.13339>`
+    <https://arxiv.org/abs/2210.13339>`__
 
     This sampler will make every node gather messages from a fixed number of
     neighbors per edge type. The neighbors are picked uniformly with default
@@ -47,7 +47,7 @@ class LaborSampler(BlockSampler):
         If -1 is provided for one edge type on one layer, then all inbound edges
         of that edge type will be included.
     edge_dir : str, default ``'in'``
-        Can be either ``'in' `` where the neighbors will be sampled according to
+        Can be either ``'in'`` where the neighbors will be sampled according to
         incoming edges, or ``'out'`` otherwise, same as
         :func:`dgl.sampling.sample_neighbors`.
     prob : str, optional
