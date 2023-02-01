@@ -4,14 +4,14 @@ import os
 import sys
 from pathlib import Path
 
+import constants
+
 import numpy as np
 import pyarrow
 import pyarrow.csv as csv
 import pyarrow.parquet as pq
 import torch
 import torch.distributed as dist
-
-import constants
 from utils import get_idranges, get_node_types, read_json
 
 
@@ -32,11 +32,12 @@ def get_proc_info():
     # mpich
     if "PMI_RANK" in env_variables:
         return int(env_variables["PMI_RANK"])
-    #openmpi
+    # openmpi
     elif "OMPI_COMM_WORLD_RANK" in env_variables:
         return int(env_variables["OMPI_COMM_WORLD_RANK"])
     else:
         return 0
+
 
 def gen_edge_files(schema_map, output):
     """Function to create edges files to be consumed by ParMETIS
@@ -105,12 +106,16 @@ def gen_edge_files(schema_map, output):
             options = csv.WriteOptions(include_header=False, delimiter=" ")
             options.delimiter = " "
             csv.write_csv(
-                pyarrow.Table.from_arrays(cols, names=col_names), out_file, options
+                pyarrow.Table.from_arrays(cols, names=col_names),
+                out_file,
+                options,
             )
             return out_file
 
         if edges_format == constants.STR_CSV:
-            delimiter = etype_info[constants.STR_FORMAT][constants.STR_FORMAT_DELIMITER]
+            delimiter = etype_info[constants.STR_FORMAT][
+                constants.STR_FORMAT_DELIMITER
+            ]
             data_df = csv.read_csv(
                 edge_data_files[rank],
                 read_options=pyarrow.csv.ReadOptions(
@@ -301,16 +306,22 @@ def gen_parmetis_input_args(params, schema_map):
     )
 
     # Check if <graph-name>_stats.txt exists, if not create one using metadata.
-    # Here stats file will be created in the current directory. 
+    # Here stats file will be created in the current directory.
     # No. of constraints, third column in the stats file is computed as follows:
     #   num_constraints = no. of node types + train_mask + test_mask + val_mask
     #   Here, (train/test/val) masks will be set to 1 if these masks exist for
     #   all the node types in the graph, otherwise these flags will be set to 0
-    assert constants.STR_GRAPH_NAME in schema_map, "Graph name is not present in the json file"
+    assert (
+        constants.STR_GRAPH_NAME in schema_map
+    ), "Graph name is not present in the json file"
     graph_name = schema_map[constants.STR_GRAPH_NAME]
-    if not os.path.isfile(f'{graph_name}_stats.txt'):
-        num_nodes = np.sum(np.concatenate(schema_map[constants.STR_NUM_NODES_PER_CHUNK]))
-        num_edges = np.sum(np.concatenate(schema_map[constants.STR_NUM_EDGES_PER_CHUNK]))
+    if not os.path.isfile(f"{graph_name}_stats.txt"):
+        num_nodes = np.sum(
+            np.concatenate(schema_map[constants.STR_NUM_NODES_PER_CHUNK])
+        )
+        num_edges = np.sum(
+            np.concatenate(schema_map[constants.STR_NUM_EDGES_PER_CHUNK])
+        )
         num_ntypes = len(schema_map[constants.STR_NODE_TYPE])
 
         train_mask = test_mask = val_mask = 0
@@ -327,8 +338,8 @@ def gen_parmetis_input_args(params, schema_map):
         val_mask = val_mask // num_ntypes
         num_constraints = num_ntypes + train_mask + test_mask + val_mask
 
-        with open(f'{graph_name}_stats.txt', 'w') as sf:
-            sf.write(f'{num_nodes} {num_edges} {num_constraints}')
+        with open(f"{graph_name}_stats.txt", "w") as sf:
+            sf.write(f"{num_nodes} {num_edges} {num_constraints}")
 
     node_files = []
     outdir = Path(params.output_dir)
