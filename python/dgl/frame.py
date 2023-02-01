@@ -562,7 +562,10 @@ class Column(TensorStorage):
         # Only record streams for materialized tensors otherwise just record for the index
         if self.index is None:
             self.data.record_stream(stream)
-        else:
+        elif (
+            isinstance(self.index, _LazyIndex)
+            or F.context(self.index) != F.cpu()
+        ):
             self.index.record_stream(stream)
 
 
