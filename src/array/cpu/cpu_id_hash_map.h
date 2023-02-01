@@ -35,9 +35,6 @@ class CpuIdHashMap {
         IdType key;
         IdType value;
     };
-
-    static constexpr IdType kEmptyKey = static_cast<IdType>(-1);
-    static constexpr int grain_size = 1024;
     
     explicit CpuIdHashMap();
 
@@ -57,6 +54,7 @@ class CpuIdHashMap {
     size_t fillInIds(size_t num_ids, const IdType* ids_data, IdArray unique_ids);
 
     void next(IdType& pos, IdType&delta) const;
+
     void insert_cas(IdType id, std::vector<short>& valid, size_t index);
     
     // Key must exist.
@@ -65,6 +63,9 @@ class CpuIdHashMap {
     bool attempt_insert_at(int64_t pos, IdType key, std::vector<short>& valid, size_t index);
 
  private:
+    static constexpr IdType kEmptyKey = static_cast<IdType>(-1);
+    static constexpr int grain_size = 1024;
+
     Mapping* _hmap;
     IdType _mask;
 };
