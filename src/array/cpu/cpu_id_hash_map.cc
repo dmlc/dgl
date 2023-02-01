@@ -5,8 +5,10 @@
  */
 
 #include <cmath>
+
 #include <dgl/runtime/parallel_for.h>
 #include <dgl/runtime/device_api.h>
+
 #include "cpu_id_hash_map.h"
 
 using namespace dgl::runtime;
@@ -31,13 +33,17 @@ size_t CpuIdHashMap<IdType>::Init(IdArray ids, IdArray unique_ids) {
     auto device = DeviceAPI::Get(_ctx);
     _hmap = static_cast<Mapping*>(
         device->AllocWorkspace(_ctx, sizeof(Mapping) * capcacity));
+    memset(_hmap, -1, sizeof(Mapping) * capcacity);
 
-    return FillInIds(num, ids_data, unique_ids);
+    return fillInIds(num, ids_data, unique_ids);
 }
 
 template <typename IdType>
-size_t CpuIdHashMap<IdType>::FillInIds(size_t num_ids, const IdType* ids_data, IdArray unique_ids) {
-    std::vector<bool> valid(num_ids);
+size_t CpuIdHashMap<IdType>::fillInIds(size_t num_ids, const IdType* ids_data, IdArray unique_ids) {
+    // Use `short` instead of `bool` here. As vector<bool> is an exception that updating
+    // different elements from different threads is unsafe for it.
+    // see https://en.cppreference.com/w/cpp/container#Thread_safety.
+    std::vector<short> valid(num_ids);
     auto thread_num = compute_num_threads(0, num_ids, grain_size);
     std::vector<size_t> block_offset(thread_num + 1, 0);
     IdType* unique_ids_data = unique_ids.Ptr<IdType>();
@@ -46,8 +52,7 @@ size_t CpuIdHashMap<IdType>::FillInIds(size_t num_ids, const IdType* ids_data, I
     parallel_for(0, num_ids, grain_size, [&](int64_t s, int64_t e) {
         size_t count = 0;
         for (int64_t i = s; i < e; i++) {
-            // Add 1 to avoid conflict with default value 0.
-            insert_cas(ids_data[i] + 1, valid, i);
+            insert_cas(ids_data[i], valid, i);
             if (valid[i]) {
                 count++;
             }
@@ -69,7 +74,7 @@ size_t CpuIdHashMap<IdType>::FillInIds(size_t num_ids, const IdType* ids_data, I
         for (int64_t i = s; i < e; i++) {
             if (valid[i]) {
                 unique_ids_data[pos] = ids_data[i];
-                set_value(ids_data[i] + 1, pos);
+                set_value(ids_data[i], pos);
                 pos = pos + 1;
             }
         }
@@ -102,7 +107,6 @@ void CpuIdHashMap<IdType>::Map(IdArray ids,
 
 template <typename IdType>
 IdType CpuIdHashMap<IdType>::map(IdType id, IdType default_val) const {
-    id += 1;
     IdType pos = (id & _mask);
     IdType delta = 1;
     while (_hmap[pos].key != kEmptyKey && _hmap[pos].key != id) {
@@ -123,7 +127,7 @@ void CpuIdHashMap<IdType>::next(IdType& pos, IdType&delta) const {
 }
 
 template <typename IdType>
-void CpuIdHashMap<IdType>::insert_cas(IdType id, std::vector<bool>& valid, size_t index) {
+void CpuIdHashMap<IdType>::insert_cas(IdType id, std::vector<short>& valid, size_t index) {
     IdType pos = (id & _mask), delta = 1;
     while (!attempt_insert_at(pos, id, valid, index)) {
         next(pos, delta);
@@ -142,15 +146,17 @@ void CpuIdHashMap<IdType>::set_value(IdType k, IdType v) {
 
 template <typename IdType>
 bool CpuIdHashMap<IdType>::attempt_insert_at(int64_t pos,
-    IdType key, std::vector<bool>& valid, size_t index) {
+    IdType key, std::vector<short>& valid, size_t index) {
     IdType empty_key = kEmptyKey;
-    bool success = _hmap[pos].key.compare_exchange_weak(empty_key, key);
-    if (success) {
+    
+    IdType old_val = CAS(&(_hmap[pos].key), empty_key, key);
+
+    if (old_val == empty_key) {
         valid[index] = true;
         return true;
     }
     else {
-        if(_hmap[pos].key == key)
+        if(old_val == key)
             return true;
         else
             return false; 

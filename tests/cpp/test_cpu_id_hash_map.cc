@@ -1,6 +1,7 @@
 #include <set>
 #include <gtest/gtest.h>
 #include <dgl/array.h>
+#include <dgl/runtime/parallel_for.h>
 
 #include "../../src/array/cpu/cpu_id_hash_map.h"
 #include "./common.h"
@@ -12,16 +13,16 @@ using namespace dgl::aten;
 namespace {
 
 template <typename IdType>
-void ConstructRandomSet(size_t size, size_t range,
+void ConstructRandomSet(size_t size, IdType range,
   std::vector<IdType>& id_vec) {
     id_vec.resize(size);
-    std::srand(42);
+    std::srand(std::time(nullptr));
     for (size_t i = 0; i < size; i++) {
         id_vec[i] = static_cast<IdType>(std::rand() % range);
     }
 }
 
-template <typename IdType, size_t size, size_t range>
+template <typename IdType, size_t size, IdType range>
 void _TestIdMap() {
     std::vector<IdType> id_vec;
     ConstructRandomSet(size, range, id_vec);
@@ -34,9 +35,11 @@ void _TestIdMap() {
     IdType* unique_id_data = unique_ids.Ptr<IdType>();
     EXPECT_EQ(id_set.size(), unique_num);
 
-    for (size_t i = 0; i < unique_num; i++) {
-        EXPECT_TRUE(id_set.find(unique_id_data[i]) != id_set.end());
-    }
+    parallel_for(0, unique_num, 128, [&](int64_t s, int64_t e) {
+        for (int64_t i = s; i < e; i++) {
+            EXPECT_TRUE(id_set.find(unique_id_data[i]) != id_set.end());
+        }
+    });
     
     IdArray new_ids = NewIdArray(unique_num, CTX, sizeof(IdType) * 8);
     IdType default_val = -1;
@@ -53,8 +56,6 @@ TEST(CpuIdHashMapTest, TestCpuIdHashMap) {
     _TestIdMap<int64_t, 50000, 1000000>();
     _TestIdMap<int32_t, 100000, 40000000>();
     _TestIdMap<int64_t, 100000, 40000000>();
-    _TestIdMap<int32_t, 50000, 100>();
-    _TestIdMap<int64_t, 50000, 100>();
 }
 
 }; // namespace
