@@ -39,7 +39,7 @@ class CpuIdHashMap {
     static constexpr IdType kEmptyKey = static_cast<IdType>(-1);
     static constexpr int grain_size = 1024;
     
-    explicit CpuIdHashMap(DGLContext ctx);
+    explicit CpuIdHashMap();
 
     CpuIdHashMap(const CpuIdHashMap& other) = delete;
     CpuIdHashMap& operator=(const CpuIdHashMap& other) = delete;
@@ -66,7 +66,6 @@ class CpuIdHashMap {
 
  private:
     Mapping* _hmap;
-    DGLContext _ctx;
     IdType _mask;
 };
 

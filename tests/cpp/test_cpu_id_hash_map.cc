@@ -29,7 +29,7 @@ void _TestIdMap() {
     std::set<IdType> id_set(id_vec.begin(), id_vec.end());
     IdArray ids = VecToIdArray(id_vec, sizeof(IdType) * 8, CTX);
     IdArray unique_ids = NewIdArray(size, CTX, sizeof(IdType) * 8);
-    CpuIdHashMap<IdType> id_map(CTX);
+    CpuIdHashMap<IdType> id_map;
     auto unique_num = id_map.Init(ids, unique_ids);
     unique_ids -> shape[0] = unique_num;
     IdType* unique_id_data = unique_ids.Ptr<IdType>();

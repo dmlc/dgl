@@ -17,7 +17,7 @@ namespace dgl {
 namespace aten {
 
 template <typename IdType>
-CpuIdHashMap<IdType>::CpuIdHashMap(DGLContext ctx) : _hmap(nullptr), _ctx(ctx) {
+CpuIdHashMap<IdType>::CpuIdHashMap() : _hmap(nullptr) {
 }
 
 template <typename IdType>
@@ -30,9 +30,10 @@ size_t CpuIdHashMap<IdType>::Init(IdArray ids, IdArray unique_ids) {
     size_t capcacity = 1 << static_cast<size_t>(1 + std::log2(num * 3));
     _mask =  static_cast<IdType>(capcacity - 1);
 
-    auto device = DeviceAPI::Get(_ctx);
+    DGLContext ctx = DGLContext{kDGLCPU, 0};
+    auto device = DeviceAPI::Get(ctx);
     _hmap = static_cast<Mapping*>(
-        device->AllocWorkspace(_ctx, sizeof(Mapping) * capcacity));
+        device->AllocWorkspace(ctx, sizeof(Mapping) * capcacity));
     memset(_hmap, -1, sizeof(Mapping) * capcacity);
 
     return fillInIds(num, ids_data, unique_ids);
@@ -86,8 +87,9 @@ size_t CpuIdHashMap<IdType>::fillInIds(size_t num_ids, const IdType* ids_data, I
 template <typename IdType>
 CpuIdHashMap<IdType>::~CpuIdHashMap() {
     if (_hmap != nullptr) {
-        auto device = DeviceAPI::Get(_ctx);
-        device->FreeWorkspace(_ctx, _hmap);
+        DGLContext ctx = DGLContext{kDGLCPU, 0};
+        auto device = DeviceAPI::Get(ctx);
+        device->FreeWorkspace(ctx, _hmap);
     }
 }
 
