@@ -58,4 +58,4 @@ TEST(CpuIdHashMapTest, TestCpuIdHashMap) {
     _TestIdMap<int64_t, 100000, 40000000>();
 }
 
-}; // namespace
+};  // namespace

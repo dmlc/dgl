@@ -13,27 +13,7 @@
 
 #ifdef _MSC_VER
 #include <intrin.h>
-#define COMPARE_AND_SWAP(ptr, oldval, newval, ret)                         \
-  do {                                                        \
-    if (sizeof(newval) == 32) {                               \
-      *ret = _InterlockedCompareExchange(                     \
-        reinterpret_cast<LONG*>(ptr), newval, oldval);        \
-    } else if (sizeof(newval) == 64) {                        \
-      *ret = _InterlockedCompareExchange64(                   \
-        reinterpret_cast<LONGLONG*>(ptr), newval, oldval);    \
-    } else {                                                  \
-      LOG(FATAL) << "ID can only be int32 or int64";          \
-    }                                                         \
-  } while (0)
-#elif __GNUC__
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 1)
-#error "requires GCC 4.1 or greater"
-#endif
-#define COMPARE_AND_SWAP(ptr, oldval, newval, ret) \
-  *ret = __sync_val_compare_and_swap(ptr, oldval, newval)
-#else
-#error "CAS not supported on this platform"
-#endif
+#endif  // _MSC_VER
 
 namespace dgl {
 namespace aten {
@@ -43,7 +23,7 @@ namespace aten {
  * in the provided array to unique and consecutive ones. It utilizes multi-threading
  * to accelerate the insert and search speed. Currently it is only
  * designed to be used in `ToBlockCpu` for optimizing.
- * 
+ *
  * The hashmap should be used in two phases. With the first being creating the
  * hashmap, and then init it with an id array. After that, searching any old ids
  * to get the mappings according to your need. 
@@ -88,6 +68,22 @@ class CpuIdHashMap {
      */
       IdType value;
   };
+
+  /**
+   * @brief Cross platform CAS operation.
+   * It is an atomic operation that compares the contents of a memory
+   * location with a given value and, only if they are the same, modifies
+   * the contents of that memory location to a new given value.
+   *
+   * @param ptr The pointer to the object to test and modify .
+   *
+   * @param old_val The value expected to be found in `ptr`.
+   *
+   * @param new_val The value to store in `ptr` if it is as expected.
+   *
+   * @return Old value pointed by the `ptr`.
+   */
+  static IdType CompareAndSwap(IdType* ptr, IdType old_val, IdType new_val);
 
   CpuIdHashMap();
 

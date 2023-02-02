@@ -17,6 +17,26 @@ namespace dgl {
 namespace aten {
 
 template <typename IdType>
+IdType CpuIdHashMap<IdType>::CompareAndSwap(IdType* ptr,
+    IdType old_val, IdType new_val) {
+  #ifdef _MSC_VER
+  if (sizeof(IdType) == 32) {
+    return _InterlockedCompareExchange(reinterpret_cast<LONG*>(ptr),
+      new_val, old_val);
+  } else if (sizeof(IdType) == 64) {
+    return _InterlockedCompareExchange(reinterpret_cast<LONGLONG*>(ptr),
+      new_val, old_val);
+  } else {
+    LOG(FATAL) << "ID can only be int32 or int64";
+  }
+  #elif __GNUC__   // _MSC_VER
+    return __sync_val_compare_and_swap(ptr, old_val, new_val);
+  #else  // _MSC_VER
+    #error "CompareAndSwap is not supported on this platform."
+  #endif  // _MSC_VER
+}
+
+template <typename IdType>
 CpuIdHashMap<IdType>::CpuIdHashMap() : _hmap(nullptr), _mask(0) {
 }
 
@@ -154,8 +174,7 @@ template <typename IdType>
 bool CpuIdHashMap<IdType>::attemptInsertAt(int64_t pos, IdType key,
     std::vector<int16_t>* valid, size_t index) {
   IdType empty_key = k_empty_key;
-  IdType old_val = k_empty_key;
-  COMPARE_AND_SWAP(&(_hmap[pos].key), empty_key, key, &old_val);
+  IdType old_val = CompareAndSwap(&(_hmap[pos].key), empty_key, key);
 
   if (old_val == empty_key) {
       (*valid)[index] = true;
