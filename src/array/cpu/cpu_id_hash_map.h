@@ -53,10 +53,10 @@ namespace aten {
  * Create the hashmap H with:
  * `H = CpuIdHashMap()` (1)
  * And Init it with:
- * `H.Init(A, U)` (2)  (U is the unique id array which used to store the unqiue
- * ids in original array).
+ * `H.Init(A, U)` (2)  (U is an id array used to store the unqiue
+ * ids in the original array).
  * Then U should be (The result is not exclusive as the element order is not
- * guaranteed to keep same with original array):
+ * guaranteed to be steady):
  * [98, 100, 99, 97, 101, 102]
  * And the hashmap should generate following mappings:
  *  * [
