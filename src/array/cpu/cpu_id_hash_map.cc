@@ -20,10 +20,10 @@ template <typename IdType>
 IdType CpuIdHashMap<IdType>::CompareAndSwap(IdType* ptr,
     IdType old_val, IdType new_val) {
   #ifdef _MSC_VER
-  if (sizeof(IdType) == 32) {
+  if (sizeof(IdType) == 4) {
     return _InterlockedCompareExchange(reinterpret_cast<LONG*>(ptr),
       new_val, old_val);
-  } else if (sizeof(IdType) == 64) {
+  } else if (sizeof(IdType) == 8) {
     return _InterlockedCompareExchange64(reinterpret_cast<LONGLONG*>(ptr),
       new_val, old_val);
   } else {
