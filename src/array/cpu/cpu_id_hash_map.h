@@ -1,6 +1,6 @@
 /**
  *  Copyright (c) 2019 by Contributors
- * @file dgl/cpu_id_hash_map.h
+ * @file array/cpu/cpu_id_hash_map.h
  * @brief Class about CPU id hash map
  */
 
