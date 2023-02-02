@@ -41,6 +41,29 @@ size_t CpuIdHashMap<IdType>::Init(IdArray ids, IdArray unique_ids) {
 }
 
 template <typename IdType>
+void CpuIdHashMap<IdType>::Map(IdArray ids,
+    IdType default_val, IdArray new_ids) const {
+  const IdType* ids_data = ids.Ptr<IdType>();
+  const size_t len = static_cast<size_t>(ids->shape[0]);
+  IdType* values_data = new_ids.Ptr<IdType>();
+
+  parallel_for(0, len, grain_size, [&](int64_t s, int64_t e) {
+    for (int64_t i = s; i < e; i++) {
+        values_data[i] = mapId(ids_data[i], default_val);
+    }
+  });
+}
+
+template <typename IdType>
+CpuIdHashMap<IdType>::~CpuIdHashMap() {
+  if (_hmap != nullptr) {
+      DGLContext ctx = DGLContext{kDGLCPU, 0};
+      auto device = DeviceAPI::Get(ctx);
+      device->FreeWorkspace(ctx, _hmap);
+  }
+}
+
+template <typename IdType>
 size_t CpuIdHashMap<IdType>::fillInIds(size_t num_ids,
     const IdType* ids_data, IdArray unique_ids) {
   // Use `int16_t` instead of `bool` here. As vector<bool> is an exception
@@ -84,29 +107,6 @@ size_t CpuIdHashMap<IdType>::fillInIds(size_t num_ids,
   });
 
   return block_offset[thread_num];
-}
-
-template <typename IdType>
-CpuIdHashMap<IdType>::~CpuIdHashMap() {
-  if (_hmap != nullptr) {
-      DGLContext ctx = DGLContext{kDGLCPU, 0};
-      auto device = DeviceAPI::Get(ctx);
-      device->FreeWorkspace(ctx, _hmap);
-  }
-}
-
-template <typename IdType>
-void CpuIdHashMap<IdType>::Map(IdArray ids,
-    IdType default_val, IdArray new_ids) const {
-  const IdType* ids_data = ids.Ptr<IdType>();
-  const size_t len = static_cast<size_t>(ids->shape[0]);
-  IdType* values_data = new_ids.Ptr<IdType>();
-
-  parallel_for(0, len, grain_size, [&](int64_t s, int64_t e) {
-    for (int64_t i = s; i < e; i++) {
-        values_data[i] = mapId(ids_data[i], default_val);
-    }
-  });
 }
 
 template <typename IdType>
