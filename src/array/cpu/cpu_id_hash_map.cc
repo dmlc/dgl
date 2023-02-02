@@ -24,7 +24,7 @@ IdType CpuIdHashMap<IdType>::CompareAndSwap(IdType* ptr,
     return _InterlockedCompareExchange(reinterpret_cast<LONG*>(ptr),
       new_val, old_val);
   } else if (sizeof(IdType) == 64) {
-    return _InterlockedCompareExchange(reinterpret_cast<LONGLONG*>(ptr),
+    return _InterlockedCompareExchange64(reinterpret_cast<LONGLONG*>(ptr),
       new_val, old_val);
   } else {
     LOG(FATAL) << "ID can only be int32 or int64";
