@@ -134,11 +134,11 @@ class CpuIdHashMap {
 
   void set(IdType key, IdType value);
 
-  bool attempt_insert_at(int64_t pos, IdType key,
+  bool attemptInsertAt(int64_t pos, IdType key,
     std::vector<int16_t>* valid, size_t index);
 
  private:
-  static constexpr IdType kEmptyKey = static_cast<IdType>(-1);
+  static constexpr IdType k_empty_key = static_cast<IdType>(-1);
   static constexpr int grain_size = 1024;
 
   Mapping* _hmap;

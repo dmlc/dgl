@@ -113,11 +113,11 @@ template <typename IdType>
 IdType CpuIdHashMap<IdType>::mapId(IdType id, IdType default_val) const {
   IdType pos = (id & _mask);
   IdType delta = 1;
-  while (_hmap[pos].key != kEmptyKey && _hmap[pos].key != id) {
+  while (_hmap[pos].key != k_empty_key && _hmap[pos].key != id) {
       next(&pos, &delta);
   }
 
-  if (_hmap[pos].key == kEmptyKey) {
+  if (_hmap[pos].key == k_empty_key) {
       return default_val;
   } else {
       return _hmap[pos].value;
@@ -135,7 +135,7 @@ void CpuIdHashMap<IdType>::insert(IdType id,
     std::vector<int16_t>* valid,
     size_t index) {
   IdType pos = (id & _mask), delta = 1;
-  while (!attempt_insert_at(pos, id, valid, index)) {
+  while (!attemptInsertAt(pos, id, valid, index)) {
       next(&pos, &delta);
   }
 }
@@ -151,10 +151,10 @@ void CpuIdHashMap<IdType>::set(IdType key, IdType value) {
 }
 
 template <typename IdType>
-bool CpuIdHashMap<IdType>::attempt_insert_at(int64_t pos, IdType key,
+bool CpuIdHashMap<IdType>::attemptInsertAt(int64_t pos, IdType key,
     std::vector<int16_t>* valid, size_t index) {
-  IdType empty_key = kEmptyKey;
-  IdType old_val = kEmptyKey;
+  IdType empty_key = k_empty_key;
+  IdType old_val = k_empty_key;
   COMPARE_AND_SWAP(&(_hmap[pos].key), empty_key, key, &old_val);
 
   if (old_val == empty_key) {
