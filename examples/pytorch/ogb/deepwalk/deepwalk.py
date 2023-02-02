@@ -3,6 +3,8 @@ import os
 import random
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.multiprocessing as mp
@@ -10,8 +12,6 @@ from model import SkipGramModel
 from reading_data import DeepwalkDataset
 from torch.utils.data import DataLoader
 from utils import shuffle_walks, sum_up_params
-
-import dgl
 
 
 class DeepwalkTrainer:
@@ -31,7 +31,8 @@ class DeepwalkTrainer:
             ogbl_name=args.ogbl_name,
             load_from_ogbl=args.load_from_ogbl,
             ogbn_name=args.ogbn_name,
-            load_from_ogbn=args.load_from_ogbn)
+            load_from_ogbn=args.load_from_ogbn,
+        )
         self.emb_size = self.dataset.G.number_of_nodes()
         self.emb_model = None
 
@@ -311,7 +312,7 @@ if __name__ == "__main__":
         action="store_true",
         help="whether load dataset from ogbn",
     )
-    
+
     # output files
     parser.add_argument(
         "--save_in_txt",
