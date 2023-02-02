@@ -17,7 +17,7 @@ namespace dgl {
 namespace aten {
 
 template <typename IdType>
-CpuIdHashMap<IdType>::CpuIdHashMap() : _hmap(nullptr) {
+CpuIdHashMap<IdType>::CpuIdHashMap() : _hmap(nullptr), _mask(0) {
 }
 
 template <typename IdType>
@@ -27,7 +27,8 @@ size_t CpuIdHashMap<IdType>::Init(IdArray ids, IdArray unique_ids) {
 
   CHECK_GT(num, 0);
 
-  size_t capcacity = 1 << static_cast<size_t>(1 + std::log2(num * 3));
+  size_t capcacity = 1;
+  capcacity = capcacity << static_cast<size_t>(1 + std::log2(num * 3));
   _mask =  static_cast<IdType>(capcacity - 1);
 
   DGLContext ctx = DGLContext{kDGLCPU, 0};
@@ -60,7 +61,7 @@ size_t CpuIdHashMap<IdType>::fillInIds(size_t num_ids,
           }
       }
 
-      auto tid = omp_get_thread_num();
+      size_t tid = omp_get_thread_num();
       block_offset[tid + 1] = count;
   });
 
@@ -102,9 +103,9 @@ void CpuIdHashMap<IdType>::Map(IdArray ids,
   IdType* values_data = new_ids.Ptr<IdType>();
 
   parallel_for(0, len, grain_size, [&](int64_t s, int64_t e) {
-      for (int64_t i = s; i < e; i++) {
-          values_data[i] = map(ids_data[i], default_val);
-      }
+    for (int64_t i = s; i < e; i++) {
+        values_data[i] = map(ids_data[i], default_val);
+    }
   });
 }
 
@@ -153,7 +154,8 @@ template <typename IdType>
 bool CpuIdHashMap<IdType>::attempt_insert_at(int64_t pos, IdType key,
     std::vector<int16_t>* valid, size_t index) {
   IdType empty_key = kEmptyKey;
-  IdType old_val = CAS(&(_hmap[pos].key), empty_key, key);
+  IdType old_val = kEmptyKey;
+  CAS(&(_hmap[pos].key), empty_key, key, &old_val);
 
   if (old_val == empty_key) {
       (*valid)[index] = true;

@@ -12,17 +12,27 @@
 #include <vector>
 
 #ifdef _MSC_VER
-# include <intrin.h>
-# define CAS(ptr, oldval, newval) \
-    _InterlockedCompareExchange(ptr, newval, oldval)
+#include <intrin.h>
+#define CAS(ptr, oldval, newval, ret)                         \
+  do {                                                        \
+    if (sizeof(newval) == 32) {                               \
+      *ret = _InterlockedCompareExchange(                     \
+        reinterpret_cast<LONG*>(ptr), newval, oldval);        \
+    } else if (sizeof(newval) == 64) {                        \
+      *ret = _InterlockedCompareExchange64(                   \
+        reinterpret_cast<LONGLONG*>(ptr), newval, oldval);    \
+    } else {                                                  \
+      LOG(FATAL) << "ID can only be int32 or int64";          \
+    }                                                         \
+  } while (0)
 #elif __GNUC__
-# if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 1)
-#  error "requires GCC 4.1 or greater"
-# endif
-# define CAS(ptr, oldval, newval) \
-    __sync_val_compare_and_swap(ptr, oldval, newval)
+#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 1)
+#error "requires GCC 4.1 or greater"
+#endif
+#define CAS(ptr, oldval, newval, ret) \
+  *ret = __sync_val_compare_and_swap(ptr, oldval, newval)
 #else
-# error "CAS not supported on this platform"
+#error "CAS not supported on this platform"
 #endif
 
 namespace dgl {
