@@ -20,14 +20,14 @@ namespace aten {
 
 /**
  * @brief A CPU targeted hashmap for mapping duplicate and non-consecutive ids
- * in the provided array to unique and consecutive ones. It utilizes multi-threading
- * to accelerate the insert and search speed. Currently it is only
- * designed to be used in `ToBlockCpu` for optimizing.
+ * in the provided array to unique and consecutive ones. It utilizes
+ *multi-threading to accelerate the insert and search speed. Currently it is
+ *only designed to be used in `ToBlockCpu` for optimizing.
  *
  * The hashmap should be used in two phases. With the first being creating the
  * hashmap, and then init it with an id array. After that, searching any old ids
- * to get the mappings according to your need. 
- * 
+ * to get the mappings according to your need.
+ *
  * For example, for an array A with following entries:
  * [98, 98, 100, 99, 97, 99, 101, 100, 102]
  * Create the hashmap H with:
@@ -49,9 +49,9 @@ namespace aten {
  * ]
  * Search the hashmap with array I=[98, 99, 102]:
  * H.Map(I, -1, R) (3)
- * R should be: 
+ * R should be:
  * [0, 2, 5]
-**/
+ **/
 template <typename IdType>
 class CpuIdHashMap {
  public:
@@ -62,11 +62,11 @@ class CpuIdHashMap {
     /**
      * @brief The ID of the item inserted.
      */
-      IdType key;
+    IdType key;
     /**
      * @brief The value of the item inserted.
      */
-      IdType value;
+    IdType value;
   };
 
   /**
@@ -76,9 +76,7 @@ class CpuIdHashMap {
    * the contents of that memory location to a new given value.
    *
    * @param ptr The pointer to the object to test and modify .
-   *
    * @param old_val The value expected to be found in `ptr`.
-   *
    * @param new_val The value to store in `ptr` if it is as expected.
    *
    * @return Old value pointed by the `ptr`.
@@ -94,51 +92,48 @@ class CpuIdHashMap {
    * @brief Init the hashmap with an array of ids.
    * Firstly allocating the memeory and init the entire space with empty key.
    * And then insert the items in `ids` concurrently to generate the
-   * mappings, in passing returning the unique ids in `ids`. 
+   * mappings, in passing returning the unique ids in `ids`.
    *
    * @param ids The array of ids to be inserted as keys.
    *
-   * @param unique_ids An id array for storing unique items in `ids`.
-   * 
-   * @return Number of unique items in input `ids`.
+   * @return Unique ids for the input `ids`.
    */
-  size_t Init(IdArray ids, IdArray unique_ids);
+  IdArray Init(const IdArray ids);
 
   /**
    * @brief Find the mappings of given keys.
    *
    * @param ids The keys to map for.
-   * 
-   * @param default_val Default value for missing keys.
-   * 
-   * @param new_ids Array for storing results.
    *
+   * @return Mapping results corresponding to `ids`.
    */
-  void Map(IdArray ids, IdType default_val, IdArray new_ids) const;
+  IdArray Map(const IdArray ids) const;
 
   ~CpuIdHashMap();
 
  private:
-  IdType mapId(IdType id, IdType default_val) const;
+  void Next(IdType* pos, IdType* delta) const;
 
-  size_t fillInIds(size_t num_ids,
-    const IdType* ids_data, IdArray unique_ids);
+  IdType MapId(const IdType id) const;
 
-  void next(IdType* pos, IdType* delta) const;
+  IdArray FillInIds(size_t num_ids, const IdType* ids_data, IdArray unique_ids);
 
-  void insert(IdType id, std::vector<int16_t>* valid, size_t index);
+  void Insert(IdType id, std::vector<int16_t>* valid, size_t index);
 
-  void set(IdType key, IdType value);
+  /**
+   * @warning Key must exist.
+   */
+  void Set(IdType key, IdType value);
 
-  bool attemptInsertAt(int64_t pos, IdType key,
-    std::vector<int16_t>* valid, size_t index);
+  bool AttemptInsertAt(
+      int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index);
 
  private:
-  static constexpr IdType k_empty_key = static_cast<IdType>(-1);
-  static constexpr int grain_size = 1024;
+  static constexpr IdType kEmptyKey = static_cast<IdType>(-1);
+  static constexpr int kGrainSize = 256;
 
-  Mapping* _hmap;
-  IdType _mask;
+  Mapping* hmap_;
+  IdType mask_;
 };
 
 }  // namespace aten

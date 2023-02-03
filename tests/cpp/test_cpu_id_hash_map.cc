@@ -28,10 +28,9 @@ void _TestIdMap() {
     ConstructRandomSet(size, range, id_vec);
     std::set<IdType> id_set(id_vec.begin(), id_vec.end());
     IdArray ids = VecToIdArray(id_vec, sizeof(IdType) * 8, CTX);
-    IdArray unique_ids = NewIdArray(size, CTX, sizeof(IdType) * 8);
     CpuIdHashMap<IdType> id_map;
-    auto unique_num = id_map.Init(ids, unique_ids);
-    unique_ids -> shape[0] = unique_num;
+    IdArray unique_ids = id_map.Init(ids);
+    auto unique_num = static_cast<size_t>(unique_ids -> shape[0]);
     IdType* unique_id_data = unique_ids.Ptr<IdType>();
     EXPECT_EQ(id_set.size(), unique_num);
 
@@ -41,9 +40,7 @@ void _TestIdMap() {
         }
     });
     
-    IdArray new_ids = NewIdArray(unique_num, CTX, sizeof(IdType) * 8);
-    IdType default_val = -1;
-    id_map.Map(unique_ids, default_val, new_ids);
+    IdArray new_ids = id_map.Map(unique_ids);
     EXPECT_TRUE(new_ids.IsContiguous());
 }
 
