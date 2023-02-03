@@ -33,9 +33,9 @@ namespace aten {
  * Create the hashmap H with:
  * `H = CpuIdHashMap()` (1)
  * And Init it with:
- * `H.Init(A, U)` (2)  (U is an id array used to store the unqiue
- * ids in the original array).
- * Then U should be (The result is not exclusive as the element order is not
+ * `U = H.Init(A)` (2)  (U is an id array used to store the unqiue
+ * ids in A).
+ * Then U should be (U is not exclusive as the element order is not
  * guaranteed to be steady):
  * [98, 100, 99, 97, 101, 102]
  * And the hashmap should generate following mappings:
@@ -48,7 +48,7 @@ namespace aten {
  *   {key: 102, value: 5}
  * ]
  * Search the hashmap with array I=[98, 99, 102]:
- * H.Map(I, -1, R) (3)
+ * R = H.Map(I) (3)
  * R should be:
  * [0, 2, 5]
  **/
