@@ -129,9 +129,6 @@ class CpuIdHashMap {
       int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index);
 
  private:
-  static constexpr IdType kEmptyKey = static_cast<IdType>(-1);
-  static constexpr int kGrainSize = 256;
-
   Mapping* hmap_;
   IdType mask_;
 };

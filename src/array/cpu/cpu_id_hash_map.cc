@@ -15,6 +15,12 @@
 
 using namespace dgl::runtime;
 
+namespace {
+  static constexpr int64_t kEmptyKey = -1;
+  static constexpr int kGrainSize = 256;
+}  // namespace
+
+
 namespace dgl {
 namespace aten {
 
@@ -140,7 +146,8 @@ template <typename IdType>
 IdType CpuIdHashMap<IdType>::MapId(IdType id) const {
   IdType pos = (id & mask_);
   IdType delta = 1;
-  while (hmap_[pos].key != kEmptyKey && hmap_[pos].key != id) {
+  IdType empty_key = static_cast<IdType>(kEmptyKey);
+  while (hmap_[pos].key != empty_key && hmap_[pos].key != id) {
     Next(&pos, &delta);
   }
   return hmap_[pos].value;
@@ -170,7 +177,7 @@ void CpuIdHashMap<IdType>::Set(IdType key, IdType value) {
 template <typename IdType>
 bool CpuIdHashMap<IdType>::AttemptInsertAt(
     int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index) {
-  IdType empty_key = kEmptyKey;
+  IdType empty_key = static_cast<IdType>(kEmptyKey);;
   IdType old_val = CompareAndSwap(&(hmap_[pos].key), empty_key, key);
 
   if (old_val == empty_key) {
