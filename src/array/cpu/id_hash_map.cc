@@ -1,13 +1,16 @@
 /**
- *  Copyright (c) latest by Contributors
+ *  Copyright (c) 2023 by Contributors
  * @file array/cpu/id_hash_map.cc
  * @brief Class about id hash map
  */
 
 #include "id_hash_map.h"
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif  // _MSC_VER
+
 #include <dgl/array.h>
-#include <dgl/runtime/device_api.h>
 #include <dgl/runtime/parallel_for.h>
 
 #include <cmath>
@@ -18,6 +21,13 @@ using namespace dgl::runtime;
 namespace {
 static constexpr int64_t kEmptyKey = -1;
 static constexpr int kGrainSize = 256;
+
+// The formula is established from experience which is used
+// to get the hashmap size from the input array size.
+inline size_t GetMapSize(size_t num) {
+  size_t capcacity = 1;
+  return capcacity << static_cast<size_t>(1 + std::log2(num * 3));
+}
 }  // namespace
 
 namespace dgl {
@@ -44,60 +54,37 @@ IdType IdHashMap<IdType>::CompareAndSwap(
 }
 
 template <typename IdType>
-IdHashMap<IdType>::IdHashMap() : hmap_(nullptr), mask_(0) {}
+IdHashMap<IdType>::IdHashMap() : mask_(0) {
+  // Used to deallocate the memory in hash_map_ with device api
+  // when the pointer is freed.
+  auto deleter = [](Mapping* mappings) {
+    if (mappings != nullptr) {
+      DGLContext ctx = DGLContext{kDGLCPU, 0};
+      auto device = DeviceAPI::Get(ctx);
+      device->FreeWorkspace(ctx, mappings);
+    }
+  };
+  hash_map_ = {nullptr, deleter};
+}
 
 template <typename IdType>
 IdArray IdHashMap<IdType>::Init(const IdArray ids) {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
-  const size_t num = static_cast<size_t>(ids->shape[0]);
-  CHECK_GT(num, 0);
-  size_t capcacity = 1;
-  capcacity = capcacity << static_cast<size_t>(1 + std::log2(num * 3));
+  const size_t num_ids = static_cast<size_t>(ids->shape[0]);
+  // Make sure `ids` is not 0 dim.
+  CHECK_GT(num_ids, 0);
+  size_t capcacity = GetMapSize(num_ids);
   mask_ = static_cast<IdType>(capcacity - 1);
 
-  DGLContext ctx = DGLContext{kDGLCPU, 0};
-  auto device = DeviceAPI::Get(ctx);
-  hmap_ = static_cast<Mapping*>(
-      device->AllocWorkspace(ctx, sizeof(Mapping) * capcacity));
-  memset(hmap_, -1, sizeof(Mapping) * capcacity);
+  auto ctx = DGLContext{kDGLCPU, 0};
+  hash_map_.reset(static_cast<Mapping*>(
+      DeviceAPI::Get(ctx)->AllocWorkspace(ctx, sizeof(Mapping) * capcacity)));
+  memset(hash_map_.get(), -1, sizeof(Mapping) * capcacity);
 
-  IdArray unique_ids = NewIdArray(num, ctx, sizeof(IdType) * 8);
-  return FillInIds(num, ids_data, unique_ids);
-}
-
-template <typename IdType>
-IdArray IdHashMap<IdType>::Map(const IdArray ids) const {
-  CHECK_EQ(ids.defined(), true);
-  const IdType* ids_data = ids.Ptr<IdType>();
-  const size_t len = static_cast<size_t>(ids->shape[0]);
-  CHECK_GT(len, 0);
-
-  DGLContext ctx = DGLContext{kDGLCPU, 0};
-  IdArray new_ids = NewIdArray(len, ctx, sizeof(IdType) * 8);
-  IdType* values_data = new_ids.Ptr<IdType>();
-
-  parallel_for(0, len, kGrainSize, [&](int64_t s, int64_t e) {
-    for (int64_t i = s; i < e; i++) {
-      values_data[i] = MapId(ids_data[i]);
-    }
-  });
-  return new_ids;
-}
-
-template <typename IdType>
-IdHashMap<IdType>::~IdHashMap() {
-  if (hmap_ != nullptr) {
-    DGLContext ctx = DGLContext{kDGLCPU, 0};
-    auto device = DeviceAPI::Get(ctx);
-    device->FreeWorkspace(ctx, hmap_);
-  }
-}
-
-template <typename IdType>
-IdArray IdHashMap<IdType>::FillInIds(
-    size_t num_ids, const IdType* ids_data, IdArray unique_ids) {
-  // Use `int16_t` instead of `bool` here. As vector<bool> is an exception
+  // This code block is to fill the ids into hash_map_.
+  IdArray unique_ids = NewIdArray(num_ids, ctx, sizeof(IdType) * 8);
+  // Use `int16_t` instead of `bool`. As vector<bool> is an exception
   // for whom updating different elements from different threads is unsafe.
   // see https://en.cppreference.com/w/cpp/container#Thread_safety.
   std::vector<int16_t> valid(num_ids);
@@ -136,6 +123,28 @@ IdArray IdHashMap<IdType>::FillInIds(
 }
 
 template <typename IdType>
+IdArray IdHashMap<IdType>::MapIds(const IdArray ids) const {
+  CHECK_EQ(ids.defined(), true);
+  const IdType* ids_data = ids.Ptr<IdType>();
+  const size_t len = static_cast<size_t>(ids->shape[0]);
+  CHECK_GT(len, 0);
+
+  DGLContext ctx = DGLContext{kDGLCPU, 0};
+  IdArray new_ids = NewIdArray(len, ctx, sizeof(IdType) * 8);
+  IdType* values_data = new_ids.Ptr<IdType>();
+
+  parallel_for(0, len, kGrainSize, [&](int64_t s, int64_t e) {
+    for (int64_t i = s; i < e; i++) {
+      values_data[i] = MapId(ids_data[i]);
+    }
+  });
+  return new_ids;
+}
+
+template <typename IdType>
+IdHashMap<IdType>::~IdHashMap() {}
+
+template <typename IdType>
 inline void IdHashMap<IdType>::Next(IdType* pos, IdType* delta) const {
   // Use Quadric probing.
   *pos = (*pos + (*delta) * (*delta)) & mask_;
@@ -144,20 +153,18 @@ inline void IdHashMap<IdType>::Next(IdType* pos, IdType* delta) const {
 
 template <typename IdType>
 IdType IdHashMap<IdType>::MapId(IdType id) const {
-  IdType pos = (id & mask_);
-  IdType delta = 1;
+  IdType pos = (id & mask_), delta = 1;
   IdType empty_key = static_cast<IdType>(kEmptyKey);
-  while (hmap_[pos].key != empty_key && hmap_[pos].key != id) {
+  while (hash_map_[pos].key != empty_key && hash_map_[pos].key != id) {
     Next(&pos, &delta);
   }
-  return hmap_[pos].value;
+  return hash_map_[pos].value;
 }
 
 template <typename IdType>
 void IdHashMap<IdType>::Insert(
     IdType id, std::vector<int16_t>* valid, size_t index) {
-  IdType pos = (id & mask_);
-  IdType delta = 1;
+  IdType pos = (id & mask_), delta = 1;
   while (!AttemptInsertAt(pos, id, valid, index)) {
     Next(&pos, &delta);
   }
@@ -165,20 +172,19 @@ void IdHashMap<IdType>::Insert(
 
 template <typename IdType>
 void IdHashMap<IdType>::Set(IdType key, IdType value) {
-  IdType pos = (key & mask_);
-  IdType delta = 1;
-  while (hmap_[pos].key != key) {
+  IdType pos = (key & mask_), delta = 1;
+  while (hash_map_[pos].key != key) {
     Next(&pos, &delta);
   }
 
-  hmap_[pos].value = value;
+  hash_map_[pos].value = value;
 }
 
 template <typename IdType>
 bool IdHashMap<IdType>::AttemptInsertAt(
     int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index) {
   IdType empty_key = static_cast<IdType>(kEmptyKey);
-  IdType old_val = CompareAndSwap(&(hmap_[pos].key), empty_key, key);
+  IdType old_val = CompareAndSwap(&(hash_map_[pos].key), empty_key, key);
 
   if (old_val != empty_key && old_val != key) {
     return false;

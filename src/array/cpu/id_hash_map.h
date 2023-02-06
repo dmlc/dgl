@@ -1,5 +1,5 @@
 /**
- *  Copyright (c) latest by Contributors
+ *  Copyright (c) 2023 by Contributors
  * @file array/cpu/id_hash_map.h
  * @brief Class about id hash map
  */
@@ -8,12 +8,10 @@
 #define DGL_ARRAY_CPU_ID_HASH_MAP_H_
 
 #include <dgl/aten/types.h>
+#include <dgl/runtime/device_api.h>
 
+#include <memory>
 #include <vector>
-
-#ifdef _MSC_VER
-#include <intrin.h>
-#endif  // _MSC_VER
 
 namespace dgl {
 namespace aten {
@@ -21,8 +19,8 @@ namespace aten {
 /**
  * @brief A CPU targeted hashmap for mapping duplicate and non-consecutive ids
  * in the provided array to unique and consecutive ones. It utilizes
- *multi-threading to accelerate the insert and search speed. Currently it is
- *only designed to be used in `ToBlockCpu` for optimizing.
+ * multi-threading to accelerate the insert and search speed. Currently it is
+ * only designed to be used in `ToBlockCpu` for optimizing.
  *
  * The hashmap should be used in two phases. With the first being creating the
  * hashmap, and then init it with an id array. After that, searching any old ids
@@ -107,7 +105,7 @@ class IdHashMap {
    *
    * @return Mapping results corresponding to `ids`.
    */
-  IdArray Map(const IdArray ids) const;
+  IdArray MapIds(const IdArray ids) const;
 
   ~IdHashMap();
 
@@ -115,8 +113,6 @@ class IdHashMap {
   void Next(IdType* pos, IdType* delta) const;
 
   IdType MapId(const IdType id) const;
-
-  IdArray FillInIds(size_t num_ids, const IdType* ids_data, IdArray unique_ids);
 
   void Insert(IdType id, std::vector<int16_t>* valid, size_t index);
 
@@ -130,11 +126,13 @@ class IdHashMap {
 
  private:
   /**
-   * @brief Array used to save all elelemnts in the hash table.
+   * @brief Hash maps which is used to store all elements.
    */
-  Mapping* hmap_;
+  std::unique_ptr<Mapping[], std::function<void(Mapping*)>> hash_map_;
+
   /**
-   * @brief Mask assisted to get the position for a key.
+   * @brief Mask which is assisted to get the position in the table
+   * for a key by performing `&` operation with it.
    */
   IdType mask_;
 };
