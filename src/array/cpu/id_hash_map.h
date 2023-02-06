@@ -129,7 +129,13 @@ class IdHashMap {
       int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index);
 
  private:
+  /**
+   * @brief Array used to save all elelemnts in the hash table.
+   */
   Mapping* hmap_;
+  /**
+   * @brief Mask assisted to get the position for a key.
+   */
   IdType mask_;
 };
 
