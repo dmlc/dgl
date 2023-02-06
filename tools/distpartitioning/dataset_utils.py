@@ -529,7 +529,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     ]:
         edge_datadict[col] = []
 
-    for etype_name, etype_info in edge_data.items():
+    for etype_name, etype_id in etype_name_idmap.items():
         edge_info = etype_info[constants.STR_DATA]
 
         # edgetype strings are in canonical format, src_node_type:edge_type:dst_node_type
@@ -539,6 +539,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         src_ntype_name = tokens[0]
         dst_ntype_name = tokens[2]
 
+        edge_info = edge_data[etype_name][constants.STR_DATA]
         num_chunks = len(edge_info)
         read_list = generate_read_list(num_chunks, num_parts)
         src_ids = []
