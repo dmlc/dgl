@@ -1,11 +1,11 @@
 /**
- *  Copyright (c) 2019 by Contributors
- * @file array/cpu/cpu_id_hash_map.h
- * @brief Class about CPU id hash map
+ *  Copyright (c) latest by Contributors
+ * @file array/cpu/id_hash_map.h
+ * @brief Class about id hash map
  */
 
-#ifndef DGL_ARRAY_CPU_CPU_ID_HASH_MAP_H_
-#define DGL_ARRAY_CPU_CPU_ID_HASH_MAP_H_
+#ifndef DGL_ARRAY_CPU_ID_HASH_MAP_H_
+#define DGL_ARRAY_CPU_ID_HASH_MAP_H_
 
 #include <dgl/aten/types.h>
 
@@ -53,7 +53,7 @@ namespace aten {
  * [0, 2, 5]
  **/
 template <typename IdType>
-class CpuIdHashMap {
+class IdHashMap {
  public:
   /**
    * @brief An entry in the hashtable.
@@ -83,10 +83,10 @@ class CpuIdHashMap {
    */
   static IdType CompareAndSwap(IdType* ptr, IdType old_val, IdType new_val);
 
-  CpuIdHashMap();
+  IdHashMap();
 
-  CpuIdHashMap(const CpuIdHashMap& other) = delete;
-  CpuIdHashMap& operator=(const CpuIdHashMap& other) = delete;
+  IdHashMap(const IdHashMap& other) = delete;
+  IdHashMap& operator=(const IdHashMap& other) = delete;
 
   /**
    * @brief Init the hashmap with an array of ids.
@@ -109,7 +109,7 @@ class CpuIdHashMap {
    */
   IdArray Map(const IdArray ids) const;
 
-  ~CpuIdHashMap();
+  ~IdHashMap();
 
  private:
   void Next(IdType* pos, IdType* delta) const;
@@ -136,4 +136,4 @@ class CpuIdHashMap {
 }  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_ARRAY_CPU_CPU_ID_HASH_MAP_H_
+#endif  // DGL_ARRAY_CPU_ID_HASH_MAP_H_

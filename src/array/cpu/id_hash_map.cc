@@ -1,10 +1,10 @@
 /**
- *  Copyright (c) 2019 by Contributors
- * @file array/cpu/cpu_id_hash_map.cc
- * @brief Class about CPU id hash map
+ *  Copyright (c) latest by Contributors
+ * @file array/cpu/id_hash_map.cc
+ * @brief Class about id hash map
  */
 
-#include "cpu_id_hash_map.h"
+#include "id_hash_map.h"
 
 #include <dgl/array.h>
 #include <dgl/runtime/device_api.h>
@@ -16,16 +16,15 @@
 using namespace dgl::runtime;
 
 namespace {
-  static constexpr int64_t kEmptyKey = -1;
-  static constexpr int kGrainSize = 256;
+static constexpr int64_t kEmptyKey = -1;
+static constexpr int kGrainSize = 256;
 }  // namespace
-
 
 namespace dgl {
 namespace aten {
 
 template <typename IdType>
-IdType CpuIdHashMap<IdType>::CompareAndSwap(
+IdType IdHashMap<IdType>::CompareAndSwap(
     IdType* ptr, IdType old_val, IdType new_val) {
 #ifdef _MSC_VER
   if (sizeof(IdType) == 4) {
@@ -45,10 +44,10 @@ IdType CpuIdHashMap<IdType>::CompareAndSwap(
 }
 
 template <typename IdType>
-CpuIdHashMap<IdType>::CpuIdHashMap() : hmap_(nullptr), mask_(0) {}
+IdHashMap<IdType>::IdHashMap() : hmap_(nullptr), mask_(0) {}
 
 template <typename IdType>
-IdArray CpuIdHashMap<IdType>::Init(const IdArray ids) {
+IdArray IdHashMap<IdType>::Init(const IdArray ids) {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
   const size_t num = static_cast<size_t>(ids->shape[0]);
@@ -68,7 +67,7 @@ IdArray CpuIdHashMap<IdType>::Init(const IdArray ids) {
 }
 
 template <typename IdType>
-IdArray CpuIdHashMap<IdType>::Map(const IdArray ids) const {
+IdArray IdHashMap<IdType>::Map(const IdArray ids) const {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
   const size_t len = static_cast<size_t>(ids->shape[0]);
@@ -87,7 +86,7 @@ IdArray CpuIdHashMap<IdType>::Map(const IdArray ids) const {
 }
 
 template <typename IdType>
-CpuIdHashMap<IdType>::~CpuIdHashMap() {
+IdHashMap<IdType>::~IdHashMap() {
   if (hmap_ != nullptr) {
     DGLContext ctx = DGLContext{kDGLCPU, 0};
     auto device = DeviceAPI::Get(ctx);
@@ -96,7 +95,7 @@ CpuIdHashMap<IdType>::~CpuIdHashMap() {
 }
 
 template <typename IdType>
-IdArray CpuIdHashMap<IdType>::FillInIds(
+IdArray IdHashMap<IdType>::FillInIds(
     size_t num_ids, const IdType* ids_data, IdArray unique_ids) {
   // Use `int16_t` instead of `bool` here. As vector<bool> is an exception
   // for whom updating different elements from different threads is unsafe.
@@ -137,13 +136,14 @@ IdArray CpuIdHashMap<IdType>::FillInIds(
 }
 
 template <typename IdType>
-inline void CpuIdHashMap<IdType>::Next(IdType* pos, IdType* delta) const {
+inline void IdHashMap<IdType>::Next(IdType* pos, IdType* delta) const {
+  // Use Quadric probing.
   *pos = (*pos + (*delta) * (*delta)) & mask_;
   *delta = *delta + 1;
 }
 
 template <typename IdType>
-IdType CpuIdHashMap<IdType>::MapId(IdType id) const {
+IdType IdHashMap<IdType>::MapId(IdType id) const {
   IdType pos = (id & mask_);
   IdType delta = 1;
   IdType empty_key = static_cast<IdType>(kEmptyKey);
@@ -154,7 +154,7 @@ IdType CpuIdHashMap<IdType>::MapId(IdType id) const {
 }
 
 template <typename IdType>
-void CpuIdHashMap<IdType>::Insert(
+void IdHashMap<IdType>::Insert(
     IdType id, std::vector<int16_t>* valid, size_t index) {
   IdType pos = (id & mask_);
   IdType delta = 1;
@@ -164,7 +164,7 @@ void CpuIdHashMap<IdType>::Insert(
 }
 
 template <typename IdType>
-void CpuIdHashMap<IdType>::Set(IdType key, IdType value) {
+void IdHashMap<IdType>::Set(IdType key, IdType value) {
   IdType pos = (key & mask_);
   IdType delta = 1;
   while (hmap_[pos].key != key) {
@@ -175,9 +175,9 @@ void CpuIdHashMap<IdType>::Set(IdType key, IdType value) {
 }
 
 template <typename IdType>
-bool CpuIdHashMap<IdType>::AttemptInsertAt(
+bool IdHashMap<IdType>::AttemptInsertAt(
     int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index) {
-  IdType empty_key = static_cast<IdType>(kEmptyKey);;
+  IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType old_val = CompareAndSwap(&(hmap_[pos].key), empty_key, key);
 
   if (old_val == empty_key) {
@@ -191,8 +191,8 @@ bool CpuIdHashMap<IdType>::AttemptInsertAt(
   }
 }
 
-template class CpuIdHashMap<int32_t>;
-template class CpuIdHashMap<int64_t>;
+template class IdHashMap<int32_t>;
+template class IdHashMap<int64_t>;
 
 }  // namespace aten
 }  // namespace dgl

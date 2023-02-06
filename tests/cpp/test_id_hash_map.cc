@@ -3,7 +3,7 @@
 #include <dgl/array.h>
 #include <dgl/runtime/parallel_for.h>
 
-#include "../../src/array/cpu/cpu_id_hash_map.h"
+#include "../../src/array/cpu/id_hash_map.h"
 #include "./common.h"
 
 using namespace dgl;
@@ -28,7 +28,7 @@ void _TestIdMap() {
     ConstructRandomSet(size, range, id_vec);
     std::set<IdType> id_set(id_vec.begin(), id_vec.end());
     IdArray ids = VecToIdArray(id_vec, sizeof(IdType) * 8, CTX);
-    CpuIdHashMap<IdType> id_map;
+    IdHashMap<IdType> id_map;
     IdArray unique_ids = id_map.Init(ids);
     auto unique_num = static_cast<size_t>(unique_ids -> shape[0]);
     IdType* unique_id_data = unique_ids.Ptr<IdType>();
@@ -44,7 +44,7 @@ void _TestIdMap() {
     EXPECT_TRUE(new_ids.IsContiguous());
 }
 
-TEST(CpuIdHashMapTest, TestCpuIdHashMap) {
+TEST(IdHashMapTest, TestIdHashMap) {
     _TestIdMap<int32_t, 1, 10>();
     _TestIdMap<int64_t, 1, 10>();
     _TestIdMap<int32_t, 1000,500000>();
