@@ -72,7 +72,6 @@ Operators for generating new graphs by manipulating the structure of the existin
     khop_graph
     knn_graph
     laplacian_lambda_max
-    laplacian_pe
     line_graph
     metapath_reachable_graph
     metis_partition
@@ -80,7 +79,6 @@ Operators for generating new graphs by manipulating the structure of the existin
     norm_by_dst
     partition_graph_with_halo
     radius_graph
-    random_walk_pe
     remove_edges
     remove_nodes
     remove_self_loop
@@ -89,7 +87,6 @@ Operators for generating new graphs by manipulating the structure of the existin
     segmented_knn_graph
     sort_csr_by_tag
     sort_csc_by_tag
-    svd_pe
     to_bidirected
     to_bidirected_stale
     to_block
@@ -117,6 +114,7 @@ Operators for generating positional encodings of each node.
     laplacian_pe
     double_radius_node_labeling
     shortest_dist
+    svd_pe
 
 .. _api-partition:
 
