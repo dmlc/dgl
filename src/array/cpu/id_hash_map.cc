@@ -180,14 +180,11 @@ bool IdHashMap<IdType>::AttemptInsertAt(
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType old_val = CompareAndSwap(&(hmap_[pos].key), empty_key, key);
 
-  if (old_val == empty_key) {
-    (*valid)[index] = true;
-    return true;
+  if (old_val != empty_key && old_val != key) {
+    return false;
   } else {
-    if (old_val == key)
-      return true;
-    else
-      return false;
+    if (old_val == empty_key) (*valid)[index] = true;
+    return true;
   }
 }
 
