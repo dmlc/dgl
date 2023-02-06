@@ -89,6 +89,7 @@ Operators for generating new graphs by manipulating the structure of the existin
     segmented_knn_graph
     sort_csr_by_tag
     sort_csc_by_tag
+    svd_pe
     to_bidirected
     to_bidirected_stale
     to_block
