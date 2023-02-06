@@ -1795,6 +1795,7 @@ class SVDPE(BaseTransform):
     r"""SVD-based Positional Encoding, as introduced in
     `Global Self-Attention as a Replacement for Graph Convolution
     <https://arxiv.org/pdf/2108.03348.pdf>`__
+
     This function computes the largest :math:`k` singular values and
     corresponding left and right singular vectors to form positional encodings,
     which could be stored in ndata.
@@ -1809,7 +1810,7 @@ class SVDPE(BaseTransform):
         Default : ``svd_pe``
     padding : bool, optional
         If False, raise an error when :math:`k > N`,
-        where :math:`N` is number of nodes in :attr:`g`.
+        where :math:`N` is the number of nodes in :attr:`g`.
         If True, add zero paddings in the end of encodings when :math:`k > N`.
         Default : False.
     random_flip : bool, optional
@@ -1822,7 +1823,7 @@ class SVDPE(BaseTransform):
     >>> import dgl
     >>> from dgl import SVDPE
 
-    >>> transform = SVDPE(k=2, feat_name='svd_pe')
+    >>> transform = SVDPE(k=2, feat_name="svd_pe")
     >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
     >>> g_ = transform(g)
     >>> print(g_.ndata['svd_pe'])
@@ -1832,17 +1833,16 @@ class SVDPE(BaseTransform):
             [-6.3246e-01, -7.6512e-01, -6.3246e-01,  7.6512e-01],
             [ 6.3246e-01, -4.7287e-01,  6.3246e-01,  4.7287e-01]])
     """
-    def __init__(self, k, feat_name='svd_pe', padding=False, random_flip=True):
+    def __init__(self, k, feat_name="svd_pe", padding=False, random_flip=True):
         self.k = k
         self.feat_name = feat_name
         self.padding = padding
         self.random_flip = random_flip
 
     def __call__(self, g):
-        encoding = functional.svd_pe(g,
-                                     k=self.k,
-                                     padding=self.padding,
-                                     random_flip=self.random_flip)
+        encoding = functional.svd_pe(
+            g, k=self.k, padding=self.padding, random_flip=self.random_flip
+        )
         g.ndata[self.feat_name] = F.copy_to(encoding, g.device)
 
         return g

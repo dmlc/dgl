@@ -3919,6 +3919,7 @@ def svd_pe(g, k, padding=False, random_flip=True):
     r"""SVD-based Positional Encoding, as introduced in
     `Global Self-Attention as a Replacement for Graph Convolution
     <https://arxiv.org/pdf/2108.03348.pdf>`__
+
     This function computes the largest :math:`k` singular values and
     corresponding left and right singular vectors to form positional encodings.
 
@@ -3932,7 +3933,7 @@ def svd_pe(g, k, padding=False, random_flip=True):
     padding : bool, optional
         If False, raise an error when :math:`k > N`,
         where :math:`N` is the number of nodes in :attr:`g`.
-        If True, add zero paddings in the end of encoding vectorss when
+        If True, add zero paddings in the end of encoding vectors when
         :math:`k > N`.
         Default : False.
     random_flip : bool, optional
@@ -3960,34 +3961,32 @@ def svd_pe(g, k, padding=False, random_flip=True):
     n = g.num_nodes()
     if not padding and n < k:
         raise ValueError(
-            'The number of singular values k must be no greater than the '
-            'number of nodes n, but ' +
-            f'got {k} and {n} respectively.'
+            "The number of singular values k must be no greater than the "
+            "number of nodes n, but " +
+            f"got {k} and {n} respectively."
         )
-    a = g.adj(ctx=g.device, scipy_fmt='coo').toarray()
+    a = g.adj(ctx=g.device, scipy_fmt="coo").toarray()
     u, d, vh = scipy.linalg.svd(a)
     v = vh.transpose()
     m = min(n, k)
-    topm_u = u[:, 0: m]
-    topm_v = v[:, 0: m]
-    topm_sqrt_d = sparse.diags(np.sqrt(d[0: m]))
+    topm_u = u[:, 0:m]
+    topm_v = v[:, 0:m]
+    topm_sqrt_d = sparse.diags(np.sqrt(d[0:m]))
     encoding = np.concatenate(
-        ((topm_u @ topm_sqrt_d), (topm_v @ topm_sqrt_d)),
-        axis=1
+        ((topm_u @ topm_sqrt_d), (topm_v @ topm_sqrt_d)), axis=1
     )
     # randomly flip row vectors
     if random_flip:
         rand_sign = 2 * (np.random.rand(n) > 0.5) - 1
         flipped_encoding = F.tensor(
-            rand_sign[:, np.newaxis] * encoding,
-            dtype=F.float32
+            rand_sign[:, np.newaxis] * encoding, dtype=F.float32
         )
     else:
         flipped_encoding = F.tensor(encoding, dtype=F.float32)
 
     if n < k:
         zero_padding = F.zeros(
-            [n, 2*(k-n)], dtype=F.float32, ctx=F.context(flipped_encoding)
+            [n, 2 * (k - n)], dtype=F.float32, ctx=F.context(flipped_encoding)
         )
         flipped_encoding = F.cat([flipped_encoding, zero_padding], dim=1)
 
