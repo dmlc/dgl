@@ -134,9 +134,9 @@ def _chunk_graph(
         num_nodes_per_chunk.append(num_nodes_list)
 
     canonical_etypes = [etypestrs[etype] for etype in g.canonical_etypes]
-    metadata["edge_type"] = canonical_etypes[
-        np.random.shuffle(np.arange(len(canonical_etypes)))
-    ]
+    idxes = np.arange(len(canonical_etypes))
+    np.random.shuffle(idxes)
+    metadata["edge_type"] = canonical_etypes[idxes]
 
     # Compute the number of edges per chunk per edge type
     metadata["num_edges_per_chunk"] = num_edges_per_chunk = []
