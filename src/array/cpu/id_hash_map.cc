@@ -25,8 +25,8 @@ static constexpr int kGrainSize = 256;
 // The formula is established from experience which is used
 // to get the hashmap size from the input array size.
 inline size_t GetMapSize(size_t num) {
-  size_t capcacity = 1;
-  return capcacity << static_cast<size_t>(1 + std::log2(num * 3));
+  size_t capacity = 1;
+  return capacity << static_cast<size_t>(1 + std::log2(num * 3));
 }
 }  // namespace
 
@@ -74,13 +74,13 @@ IdArray IdHashMap<IdType>::Init(const IdArray ids) {
   const size_t num_ids = static_cast<size_t>(ids->shape[0]);
   // Make sure `ids` is not 0 dim.
   CHECK_GT(num_ids, 0);
-  size_t capcacity = GetMapSize(num_ids);
-  mask_ = static_cast<IdType>(capcacity - 1);
+  size_t capacity = GetMapSize(num_ids);
+  mask_ = static_cast<IdType>(capacity - 1);
 
   auto ctx = DGLContext{kDGLCPU, 0};
   hash_map_.reset(static_cast<Mapping*>(
-      DeviceAPI::Get(ctx)->AllocWorkspace(ctx, sizeof(Mapping) * capcacity)));
-  memset(hash_map_.get(), -1, sizeof(Mapping) * capcacity);
+      DeviceAPI::Get(ctx)->AllocWorkspace(ctx, sizeof(Mapping) * capacity)));
+  memset(hash_map_.get(), -1, sizeof(Mapping) * capacity);
 
   // This code block is to fill the ids into hash_map_.
   IdArray unique_ids = NewIdArray(num_ids, ctx, sizeof(IdType) * 8);
@@ -126,23 +126,20 @@ template <typename IdType>
 IdArray IdHashMap<IdType>::MapIds(const IdArray ids) const {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
-  const size_t len = static_cast<size_t>(ids->shape[0]);
-  CHECK_GT(len, 0);
+  const size_t num_ids = static_cast<size_t>(ids->shape[0]);
+  CHECK_GT(num_ids, 0);
 
   DGLContext ctx = DGLContext{kDGLCPU, 0};
-  IdArray new_ids = NewIdArray(len, ctx, sizeof(IdType) * 8);
+  IdArray new_ids = NewIdArray(num_ids, ctx, sizeof(IdType) * 8);
   IdType* values_data = new_ids.Ptr<IdType>();
 
-  parallel_for(0, len, kGrainSize, [&](int64_t s, int64_t e) {
+  parallel_for(0, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
     for (int64_t i = s; i < e; i++) {
       values_data[i] = MapId(ids_data[i]);
     }
   });
   return new_ids;
 }
-
-template <typename IdType>
-IdHashMap<IdType>::~IdHashMap() {}
 
 template <typename IdType>
 inline void IdHashMap<IdType>::Next(IdType* pos, IdType* delta) const {

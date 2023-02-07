@@ -107,8 +107,6 @@ class IdHashMap {
    */
   IdArray MapIds(const IdArray ids) const;
 
-  ~IdHashMap();
-
  private:
   void Next(IdType* pos, IdType* delta) const;
 
