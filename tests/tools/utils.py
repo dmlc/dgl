@@ -133,11 +133,13 @@ def _chunk_graph(
             num_nodes_list.append(n)
         num_nodes_per_chunk.append(num_nodes_list)
 
-    idxes_etypestr = {idx: (etype, etypestrs[etype]) for idx, etype in enumerate(g.canonical_etypes)}
+    idxes_etypestr = {
+        idx: (etype, etypestrs[etype])
+        for idx, etype in enumerate(g.canonical_etypes)
+    }
     idxes = np.arange(len(canonical_etypes))
     np.random.shuffle(idxes)
     metadata["edge_type"] = [idxes_etypestr[idx][1] for idx in idxes]
-
 
     # Compute the number of edges per chunk per edge type
     metadata["num_edges_per_chunk"] = num_edges_per_chunk = []
@@ -157,9 +159,9 @@ def _chunk_graph(
     # Split edge index
     metadata["edges"] = {}
     with setdir("edge_index"):
-	np.random.shuffle(idxes)
+        np.random.shuffle(idxes)
         for idx in idxes:
-	    etype = idxes_etypestr[idx][0] 
+            etype = idxes_etypestr[idx][0]
             etypestr = idxes_etypestr[idx][1]
             logging.info("Chunking edge index for %s" % etypestr)
             edges_meta = {}
