@@ -11,6 +11,7 @@
 #endif  // _MSC_VER
 
 #include <dgl/array.h>
+#include <dgl/runtime/device_api.h>
 #include <dgl/runtime/parallel_for.h>
 
 #include <cmath>
@@ -59,7 +60,6 @@ IdHashMap<IdType>::IdHashMap() : mask_(0) {
   // when the pointer is freed.
   auto deleter = [](Mapping* mappings) {
     if (mappings != nullptr) {
-      std::cout << "Delete rcalled!\n";
       DGLContext ctx = DGLContext{kDGLCPU, 0};
       auto device = DeviceAPI::Get(ctx);
       device->FreeWorkspace(ctx, mappings);

@@ -8,8 +8,8 @@
 #define DGL_ARRAY_CPU_ID_HASH_MAP_H_
 
 #include <dgl/aten/types.h>
-#include <dgl/runtime/device_api.h>
 
+#include <functional>
 #include <memory>
 #include <vector>
 
