@@ -137,7 +137,7 @@ def _chunk_graph(
         idx: (etype, etypestrs[etype])
         for idx, etype in enumerate(g.canonical_etypes)
     }
-    idxes = np.arange(len(canonical_etypes))
+    idxes = np.arange(len(idxes_etypestr))
     np.random.shuffle(idxes)
     metadata["edge_type"] = [idxes_etypestr[idx][1] for idx in idxes]
 
