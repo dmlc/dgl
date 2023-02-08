@@ -59,6 +59,7 @@ IdHashMap<IdType>::IdHashMap() : mask_(0) {
   // when the pointer is freed.
   auto deleter = [](Mapping* mappings) {
     if (mappings != nullptr) {
+      std::cout << "Delete rcalled!\n";
       DGLContext ctx = DGLContext{kDGLCPU, 0};
       auto device = DeviceAPI::Get(ctx);
       device->FreeWorkspace(ctx, mappings);
@@ -68,7 +69,7 @@ IdHashMap<IdType>::IdHashMap() : mask_(0) {
 }
 
 template <typename IdType>
-IdArray IdHashMap<IdType>::Init(const IdArray ids) {
+IdArray IdHashMap<IdType>::Init(const IdArray& ids) {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
   const size_t num_ids = static_cast<size_t>(ids->shape[0]);
@@ -84,9 +85,10 @@ IdArray IdHashMap<IdType>::Init(const IdArray ids) {
 
   // This code block is to fill the ids into hash_map_.
   IdArray unique_ids = NewIdArray(num_ids, ctx, sizeof(IdType) * 8);
-  // Use `int16_t` instead of `bool`. As vector<bool> is an exception
-  // for whom updating different elements from different threads is unsafe.
-  // see https://en.cppreference.com/w/cpp/container#Thread_safety.
+  // An auxiliary array indicates whether the corresponding elements
+  // are inserted into hash map or not. Use `int16_t` instead of `bool` as
+  // vector<bool> is unsafe when updating different elements from different
+  // threads. See https://en.cppreference.com/w/cpp/container#Thread_safety.
   std::vector<int16_t> valid(num_ids);
   auto thread_num = compute_num_threads(0, num_ids, kGrainSize);
   std::vector<size_t> block_offset(thread_num + 1, 0);
@@ -123,7 +125,7 @@ IdArray IdHashMap<IdType>::Init(const IdArray ids) {
 }
 
 template <typename IdType>
-IdArray IdHashMap<IdType>::MapIds(const IdArray ids) const {
+IdArray IdHashMap<IdType>::MapIds(const IdArray& ids) const {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
   const size_t num_ids = static_cast<size_t>(ids->shape[0]);

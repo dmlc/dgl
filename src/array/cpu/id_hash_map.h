@@ -20,11 +20,11 @@ namespace aten {
  * @brief A CPU targeted hashmap for mapping duplicate and non-consecutive ids
  * in the provided array to unique and consecutive ones. It utilizes
  * multi-threading to accelerate the insert and search speed. Currently it is
- * only designed to be used in `ToBlockCpu` for optimizing.
+ * only designed to be used in `ToBlockCpu` for optimizing, so it only support
+ * key insertions once with Init function, and it does not support key deletion.
  *
- * The hashmap should be used in two phases. With the first being creating the
- * hashmap, and then init it with an id array. After that, searching any old ids
- * to get the mappings according to your need.
+ * The hash map should be prepared in two phases before using. With the first
+ * being creating the hashmap, and then init it with an id array.
  *
  * For example, for an array A with following entries:
  * [98, 98, 100, 99, 97, 99, 101, 100, 102]
@@ -96,7 +96,7 @@ class IdHashMap {
    *
    * @return Unique ids for the input `ids`.
    */
-  IdArray Init(const IdArray ids);
+  IdArray Init(const IdArray& ids);
 
   /**
    * @brief Find the mappings of given keys.
@@ -105,20 +105,61 @@ class IdHashMap {
    *
    * @return Mapping results corresponding to `ids`.
    */
-  IdArray MapIds(const IdArray ids) const;
+  IdArray MapIds(const IdArray& ids) const;
 
  private:
+  /**
+   * @brief Get the next position and delta for probing.
+   *
+   * @param[in,out] pos Calculate the next position with quadric probing.
+   * @param[in,out] delta Calculate the next delta by adding 1.
+   */
   void Next(IdType* pos, IdType* delta) const;
 
+  /**
+   * @brief Find the mapping of a given key.
+   *
+   * @param id The key to map for.
+   *
+   * @return Mapping result for the `id`.
+   */
   IdType MapId(const IdType id) const;
 
+  /**
+   * @brief Insert an id into the hash map.
+   *
+   * @param id The id to be inserted.
+   * @param valid The item at index will be set to indicate
+   * whether the `id` at `index` is inserted or not.
+   * @param index The index of the `id`.
+   *
+   */
   void Insert(IdType id, std::vector<int16_t>* valid, size_t index);
 
   /**
+   * @brief Set the value for the key in the hash map.
+   *
+   * @param key The key to set for.
+   * @param value The value to be set for the `key`.
+   *
    * @warning Key must exist.
    */
   void Set(IdType key, IdType value);
 
+  /**
+   * @brief Attempt to insert the key into the hash map at the given position.
+   * 1. If the key at `pos` is empty -> Set the key, return true and set
+   * `valid[index]` to true.
+   * 2. If the key at `pos` is equal to `key` -> Return true.
+   * 3. If the key at `pos` is non-empty and not equal to `key` -> Return false.
+   * @param pos The position in the hash map to be inserted at.
+   * @param key The key to be inserted.
+   * @param valid The item at index will be set to indicate
+   * whether the `key` at `index` is inserted or not.
+   * @param index The index of the `key`.
+   *
+   * @return Whether the key exists in the map now.
+   */
   bool AttemptInsertAt(
       int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index);
 
