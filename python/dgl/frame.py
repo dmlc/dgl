@@ -559,17 +559,14 @@ class Column(TensorStorage):
         """
         if F.get_preferred_backend() != "pytorch":
             raise DGLError("record_stream only supports the PyTorch backend.")
-        # Only record streams for materialized tensors otherwise just record for the index
-        if self.index is None:
-            self.data.record_stream(stream)
-        else:
-            if (
-                isinstance(self.index, _LazyIndex)
-                or F.context(self.index) != F.cpu()
-            ):
-                self.index.record_stream(stream)
-            if F.context(self.storage) != F.cpu():
-                self.storage.record_stream(stream)
+        if (
+            self.index is not None and
+            (isinstance(self.index, _LazyIndex)
+            or F.context(self.index) != F.cpu())
+        ):
+            self.index.record_stream(stream)
+        if F.context(self.storage) != F.cpu():
+            self.storage.record_stream(stream)
 
 
 class Frame(MutableMapping):
