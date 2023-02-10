@@ -29,7 +29,7 @@ validate() {
 }
 
 confirm() {
-  echo "[yes/no]:"
+  echo "Continue? [yes/no]:"
   read confirm
   if [[ ! $confirm == "yes" ]]; then
     exit 0
@@ -74,11 +74,15 @@ if [[ -n $gpu ]]; then
     usage
     exit 1
   fi
+
+  echo "Confirm the installed CUDA version matches the specified one."
+  confirm
+
   torchversion=${TORCH_VERSION}"+cu"${gpu//[-._]/}
   name="dgl-dev-gpu"
 fi
 
-echo "Make sure you are excuting the script from your DGL root directory."
+echo "Confirm you are excuting the script from your DGL root directory."
 echo "Current working directory: $PWD"
 confirm
 
