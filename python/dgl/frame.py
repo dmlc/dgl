@@ -5,7 +5,7 @@ from collections import namedtuple
 from collections.abc import MutableMapping
 
 from . import backend as F
-from .base import DGLError, dgl_warning
+from .base import dgl_warning, DGLError
 from .init import zero_initializer
 from .storages import TensorStorage
 from .utils import gather_pinned_tensor_rows, pin_memory_inplace
@@ -40,6 +40,17 @@ class _LazyIndex(object):
                 index = F.copy_to(index, F.context(flat_index))
             flat_index = F.gather_row(flat_index, index)
         return flat_index
+
+    def record_stream(self, stream):
+        """Record stream for index.
+
+        Parameters
+        ----------
+        stream : torch.cuda.Stream.
+        """
+        for index in self._indices:
+            if F.context(index) != F.cpu():
+                index.record_stream(stream)
 
 
 class LazyFeature(object):
@@ -548,7 +559,13 @@ class Column(TensorStorage):
         """
         if F.get_preferred_backend() != "pytorch":
             raise DGLError("record_stream only supports the PyTorch backend.")
-        self.data.record_stream(stream)
+        if self.index is not None and (
+            isinstance(self.index, _LazyIndex)
+            or F.context(self.index) != F.cpu()
+        ):
+            self.index.record_stream(stream)
+        if F.context(self.storage) != F.cpu():
+            self.storage.record_stream(stream)
 
 
 class Frame(MutableMapping):
