@@ -530,6 +530,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         edge_datadict[col] = []
 
     for etype_name, etype_id in etype_name_idmap.items():
+        etype_info = edge_data[etype_name]
         edge_info = etype_info[constants.STR_DATA]
 
         # edgetype strings are in canonical format, src_node_type:edge_type:dst_node_type
