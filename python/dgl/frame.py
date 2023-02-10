@@ -559,10 +559,9 @@ class Column(TensorStorage):
         """
         if F.get_preferred_backend() != "pytorch":
             raise DGLError("record_stream only supports the PyTorch backend.")
-        if (
-            self.index is not None and
-            (isinstance(self.index, _LazyIndex)
-            or F.context(self.index) != F.cpu())
+        if self.index is not None and (
+            isinstance(self.index, _LazyIndex)
+            or F.context(self.index) != F.cpu()
         ):
             self.index.record_stream(stream)
         if F.context(self.storage) != F.cpu():
