@@ -67,7 +67,7 @@ if [[ $cpu -eq 1 ]]; then
   name="dgl-dev-cpu"
 fi
 
-#Set up GPU mode.
+# Set up GPU mode.
 if [[ -n $gpu ]]; then
   if ! validate ${CUDA_VERSIONS} ${gpu}; then
     echo "Error: Invalid CUDA version."
