@@ -27,7 +27,7 @@ def load_dgl_sparse():
     elif sys.platform.startswith("darwin"):
         basename = f"libdgl_sparse_pytorch_{version}.dylib"
     elif sys.platform.startswith("win"):
-        basename = "dgl_sparse_pytorch_{version}.dll"
+        basename = f"dgl_sparse_pytorch_{version}.dll"
     else:
         raise NotImplementedError("Unsupported system: %s" % sys.platform)
 
