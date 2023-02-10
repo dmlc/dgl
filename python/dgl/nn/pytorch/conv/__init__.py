@@ -14,6 +14,7 @@ from .dgnconv import DGNConv
 from .dotgatconv import DotGatConv
 from .edgeconv import EdgeConv
 from .egatconv import EGATConv
+from .edgegatconv import EdgeGATConv
 from .egnnconv import EGNNConv
 from .gatconv import GATConv
 from .gatedgraphconv import GatedGraphConv
@@ -39,6 +40,7 @@ __all__ = [
     "GATConv",
     "GATv2Conv",
     "EGATConv",
+    "EdgeGATConv",
     "TAGConv",
     "RelGraphConv",
     "SAGEConv",

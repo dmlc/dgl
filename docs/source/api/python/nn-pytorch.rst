@@ -19,6 +19,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GATConv
     ~dgl.nn.pytorch.conv.GATv2Conv
     ~dgl.nn.pytorch.conv.EGATConv
+    ~dgl.nn.pytorch.conv.EdgeGATConv
     ~dgl.nn.pytorch.conv.EdgeConv
     ~dgl.nn.pytorch.conv.SAGEConv
     ~dgl.nn.pytorch.conv.SGConv
