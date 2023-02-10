@@ -54,7 +54,8 @@ __all__ = [
     'DropEdge',
     'AddEdge',
     'SIGNDiffusion',
-    'ToLevi'
+    'ToLevi',
+    'SVDPE'
 ]
 
 def update_graph_structure(g, data_dict, copy_edata=True):
@@ -1788,3 +1789,60 @@ class ToLevi(BaseTransform):
         utils.set_new_frames(levi_g, node_frames=edge_frames+node_frames)
 
         return levi_g
+
+
+class SVDPE(BaseTransform):
+    r"""SVD-based Positional Encoding, as introduced in
+    `Global Self-Attention as a Replacement for Graph Convolution
+    <https://arxiv.org/pdf/2108.03348.pdf>`__
+
+    This function computes the largest :math:`k` singular values and
+    corresponding left and right singular vectors to form positional encodings,
+    which could be stored in ndata.
+
+    Parameters
+    ----------
+    k : int
+        Number of largest singular values and corresponding singular vectors
+        used for positional encoding.
+    feat_name : str, optional
+        Name to store the computed positional encodings in ndata.
+        Default : ``svd_pe``
+    padding : bool, optional
+        If False, raise an error when :math:`k > N`,
+        where :math:`N` is the number of nodes in :attr:`g`.
+        If True, add zero paddings in the end of encodings when :math:`k > N`.
+        Default : False.
+    random_flip : bool, optional
+        If True, randomly flip the signs of encoding vectors.
+        Proposed to be activated during training for better generalization.
+        Default : True.
+
+    Example
+    -------
+    >>> import dgl
+    >>> from dgl import SVDPE
+
+    >>> transform = SVDPE(k=2, feat_name="svd_pe")
+    >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
+    >>> g_ = transform(g)
+    >>> print(g_.ndata['svd_pe'])
+    tensor([[-6.3246e-01, -1.1373e-07, -6.3246e-01,  0.0000e+00],
+            [-6.3246e-01,  7.6512e-01, -6.3246e-01, -7.6512e-01],
+            [ 6.3246e-01,  4.7287e-01,  6.3246e-01, -4.7287e-01],
+            [-6.3246e-01, -7.6512e-01, -6.3246e-01,  7.6512e-01],
+            [ 6.3246e-01, -4.7287e-01,  6.3246e-01,  4.7287e-01]])
+    """
+    def __init__(self, k, feat_name="svd_pe", padding=False, random_flip=True):
+        self.k = k
+        self.feat_name = feat_name
+        self.padding = padding
+        self.random_flip = random_flip
+
+    def __call__(self, g):
+        encoding = functional.svd_pe(
+            g, k=self.k, padding=self.padding, random_flip=self.random_flip
+        )
+        g.ndata[self.feat_name] = F.copy_to(encoding, g.device)
+
+        return g
