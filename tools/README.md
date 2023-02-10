@@ -175,7 +175,7 @@ In the upcoming DGL v1.0, we will require the partition configuration file to co
 ### Sample Usage
 
 ```
-python tools/change_etype_to_canonical_etype.py --part-config "{configuration file path}"
+python tools/change_etype_to_canonical_etype.py --part_config "{configuration file path}"
 ```
 
 ### Requirement
@@ -196,7 +196,7 @@ For more information about partition algorithm, see https://docs.dgl.ai/en/lates
 
 ### Input arguments
 
-1. *part-config*: The path of partition json file. < **Required**>
+1. *part_config*: The path of partition json file. < **Required**>
 
 ### Result
 
