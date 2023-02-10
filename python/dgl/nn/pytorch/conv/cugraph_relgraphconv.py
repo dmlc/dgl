@@ -78,6 +78,7 @@ class CuGraphRelGraphConv(nn.Module):
             [-1.4335, -2.3758],
             [-1.4331, -2.3295]], device='cuda:0', grad_fn=<AddBackward0>)
     """
+    MAX_IN_DEGREE_MFG = 500
 
     def __init__(
         self,
@@ -93,8 +94,8 @@ class CuGraphRelGraphConv(nn.Module):
     ):
         if has_pylibcugraphops is False:
             raise ModuleNotFoundError(
-                "dgl.nn.CuGraphRelGraphConv requires pylibcugraphops >= 23.02 "
-                "to be installed."
+                f"{self.__class__.__name__} requires pylibcugraphops >= 23.02 "
+                f"to be installed."
             )
         super().__init__()
         self.in_feat = in_feat
@@ -183,18 +184,37 @@ class CuGraphRelGraphConv(nn.Module):
         if g.is_block:
             if max_in_degree is None:
                 max_in_degree = g.in_degrees().max().item()
-            _graph = make_mfg_csr_hg(
-                g.dstnodes(),
-                offsets,
-                indices,
-                max_in_degree,
-                g.num_src_nodes(),
-                n_node_types=0,
-                n_edge_types=self.num_rels,
-                out_node_types=None,
-                in_node_types=None,
-                edge_types=edge_types_perm,
-            )
+
+            if max_in_degree < self.MAX_IN_DEGREE_MFG:
+                _graph = make_mfg_csr_hg(
+                    g.dstnodes(),
+                    offsets,
+                    indices,
+                    max_in_degree,
+                    g.num_src_nodes(),
+                    n_node_types=0,
+                    n_edge_types=self.num_rels,
+                    out_node_types=None,
+                    in_node_types=None,
+                    edge_types=edge_types_perm,
+                )
+            else:
+                offsets_fg = torch.empty(
+                    g.num_src_nodes() + 1,
+                    dtype=offsets.dtype,
+                    device=offsets.device,
+                )
+                offsets_fg[: offsets.numel()] = offsets
+                offsets_fg[offsets.numel() :] = offsets[-1]
+
+                _graph = make_fg_csr_hg(
+                    offsets_fg,
+                    indices,
+                    n_node_types=0,
+                    n_edge_types=self.num_rels,
+                    node_types=None,
+                    edge_types=edge_types_perm,
+                )
         else:
             _graph = make_fg_csr_hg(
                 offsets,
@@ -211,7 +231,7 @@ class CuGraphRelGraphConv(nn.Module):
             _graph,
             concat_own=self.self_loop,
             norm_by_out_degree=self.apply_norm,
-        )
+        )[: g.num_dst_nodes()]
         h = h @ self.W.view(-1, self.out_feat)
         if self.bias is not None:
             h = h + self.bias

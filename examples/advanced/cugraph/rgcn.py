@@ -51,7 +51,7 @@ class RGCN(nn.Module):
         return h
 
 
-def evaluate(model, labels, dataloader, inv_target, num_classes):
+def evaluate(model, labels, dataloader, inv_target):
     model.eval()
     eval_logits = []
     eval_seeds = []
@@ -61,6 +61,7 @@ def evaluate(model, labels, dataloader, inv_target, num_classes):
             logits = model(blocks)
             eval_logits.append(logits.cpu().detach())
             eval_seeds.append(output_nodes.cpu().detach())
+    num_classes = eval_logits[0].shape[1]
     eval_logits = torch.cat(eval_logits)
     eval_seeds = torch.cat(eval_seeds)
     return accuracy(
@@ -71,9 +72,7 @@ def evaluate(model, labels, dataloader, inv_target, num_classes):
     ).item()
 
 
-def train(
-    device, g, target_idx, labels, train_mask, model, fanouts, num_classes
-):
+def train(device, g, target_idx, labels, train_mask, model, fanouts):
     # Define train idx, loss function and optimizer.
     train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
     loss_fcn = nn.CrossEntropyLoss()
@@ -108,7 +107,7 @@ def train(
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        acc = evaluate(model, labels, val_loader, inv_target, num_classes)
+        acc = evaluate(model, labels, val_loader, inv_target)
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (it+1):.4f} | "
             f"Val. Accuracy {acc:.4f}"
@@ -177,10 +176,9 @@ if __name__ == "__main__":
         train_mask,
         model,
         fanouts,
-        data.num_classes,
     )
     test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
-    test_sampler = MultiLayerNeighborSampler([500, 500])
+    test_sampler = MultiLayerNeighborSampler([-1, -1])
     test_loader = DataLoader(
         g,
         target_idx[test_idx].type(g.idtype),
@@ -189,5 +187,5 @@ if __name__ == "__main__":
         batch_size=32,
         shuffle=False,
     )
-    acc = evaluate(model, labels, test_loader, inv_target, data.num_classes)
+    acc = evaluate(model, labels, test_loader, inv_target)
     print(f"Test accuracy {acc:.4f}")
