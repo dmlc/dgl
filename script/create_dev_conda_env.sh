@@ -6,6 +6,9 @@ TORCH_VERSION="1.12.0"
 usage() {
 cat << EOF
 usage: bash $0 OPTIONS
+examples:
+  bash $0 -c
+  bash $0 -g 11.7
 
 Created a developement environment for DGL developers.
 
@@ -52,7 +55,7 @@ while getopts "cg:h" flag; do
 done
 
 if [[ -n $gpu && $cpu -eq 1 ]]; then
-  echo "Either create dev environment in GPU or CPU mode."
+  echo "Only one mode can be specified."
   exit 1
 fi
 
