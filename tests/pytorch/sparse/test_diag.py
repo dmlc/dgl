@@ -7,10 +7,6 @@ import torch
 
 from dgl.sparse import diag, DiagMatrix, identity
 
-# TODO(#4818): Skipping tests on win.
-if not sys.platform.startswith("linux"):
-    pytest.skip("skipping tests on win", allow_module_level=True)
-
 
 @pytest.mark.parametrize("val_shape", [(3,), (3, 2)])
 @pytest.mark.parametrize("mat_shape", [None, (3, 5), (5, 3)])

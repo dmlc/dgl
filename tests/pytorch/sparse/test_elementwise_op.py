@@ -7,10 +7,6 @@ import dgl.sparse as dglsp
 import pytest
 import torch
 
-# TODO(#4818): Skipping tests on win.
-if not sys.platform.startswith("linux"):
-    pytest.skip("skipping tests on win", allow_module_level=True)
-
 
 @pytest.mark.parametrize("val_shape", [(), (2,)])
 @pytest.mark.parametrize("opname", ["add", "sub"])

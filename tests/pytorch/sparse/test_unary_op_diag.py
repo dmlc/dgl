@@ -1,7 +1,6 @@
 import sys
 
 import backend as F
-import pytest
 import torch
 
 from dgl.sparse import diag
