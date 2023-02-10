@@ -1,0 +1,22 @@
+name: __NAME__                                                                                             
+dependencies:                                                                                              
+  - python=3.7.0                                                                                           
+  - pip                                                                                                    
+  - pip:                                                                                                   
+    - --find-links https://download.pytorch.org/whl/torch_stable.html                                      
+    - torch==__TORCH_VERSION__                                                                             
+    - pytest                                                                                               
+    - nose                                                                                                 
+    - numpy                                                                                                
+    - cython                                                                                               
+    - scipy                                                                                                
+    - networkx                                                                                             
+    - matplotlib                                                                                           
+    - nltk                                                                                                 
+    - requests[security]                                                                                   
+    - tqdm                                                                                                 
+    - pandas                                                                                               
+    - scikit-learn                                                                                         
+    - ogb                                                                                                  
+variables:                                                                                                 
+  DGL_HOME: __DGL_HOME__
