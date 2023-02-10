@@ -12,7 +12,8 @@ Created a developement environment for DGL developers.
 OPTIONS:
   -h           Show this message.
   -c           Create dev environment in CPU mode.
-  -g           Create dev environment in GPU mode with specified CUDA version, supported: $CUDA_VERSIONS.
+  -g           Create dev environment in GPU mode with specified CUDA version,
+               supported: $CUDA_VERSIONS.
 EOF
 }
 
@@ -50,10 +51,6 @@ while getopts "cg:h" flag; do
   fi
 done
 
-echo "Make sure you are excuting the script from your DGL root directory."
-echo "Current working directory: $PWD"
-confirm
-
 if [[ -n $gpu && $cpu -eq 1 ]]; then
   echo "Either create dev environment in GPU or CPU mode."
   exit 1
@@ -80,6 +77,10 @@ if [[ -n $gpu ]]; then
   torchversion=${TORCH_VERSION}"+cu"${gpu//[-._]/}
   name="dgl-dev-gpu"
 fi
+
+echo "Make sure you are excuting the script from your DGL root directory."
+echo "Current working directory: $PWD"
+confirm
 
 # Prepare the conda environment yaml file.
 rand=$(echo "$RANDOM" | md5sum | head -c 20)
