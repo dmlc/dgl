@@ -5,7 +5,7 @@ TORCH_VERSION="1.12.0"
 
 usage() {
 cat << EOF
-usage: $0 OPTIONS
+usage: bash $0 OPTIONS
 
 Created a developement environment for DGL developers.
 
