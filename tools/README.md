@@ -196,7 +196,7 @@ For more information about partition algorithm, see https://docs.dgl.ai/en/lates
 
 ### Input arguments
 
-1. *part-config*: The path of partition json file. < **Required**>
+1. *part_config*: The path of partition json file. < **Required**>
 
 ### Result
 
