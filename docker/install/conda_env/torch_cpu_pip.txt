@@ -1,5 +1,6 @@
 --find-links https://download.pytorch.org/whl/torch_stable.html
 torch==1.12.0+cpu
+torchmetrics
 pytest
 nose
 numpy
@@ -9,7 +10,13 @@ networkx
 matplotlib
 nltk
 requests[security]
-tqdm  
+tqdm
 pandas
 scikit-learn
 ogb
+psutil
+pyyaml
+pydantic
+rdflib
+filelock
+pyarrow
