@@ -14,12 +14,18 @@ class EdgeGATConv(nn.Module):
     <https://arxiv.org/pdf/2301.03512.pdf>`__
 
     .. math::
-        \mathbf{v}_i^\prime = \mathbf{\Theta}_\mathrm{s} \cdot \mathbf{v}_i +  \sum\limits_{j \in \mathcal{N}(v_i)} \alpha_{j, i} \left( \mathbf{\Theta}_\mathrm{n} \cdot \mathbf{v}_j + \mathbf{\Theta}_\mathrm{e} \cdot \mathbf{e}_{j,i} \right)
+        \mathbf{v}_i^\prime = \mathbf{\Theta}_\mathrm{s} \cdot \mathbf{v}_i +
+        \sum\limits_{j \in \mathcal{N}(v_i)} \alpha_{j, i} \left( \mathbf{\Theta}_\mathrm{n}
+        \cdot \mathbf{v}_j + \mathbf{\Theta}_\mathrm{e} \cdot \mathbf{e}_{j,i} \right)
 
-    where :math:`\mathbf{\Theta}` is used to denote learnable weight matrices for the transformation of features of the node to update (s=self), neighboring nodes (n=neighbor) and edge features (e=edge).
+    where :math:`\mathbf{\Theta}` is used to denote learnable weight matrices
+    for the transformation of features of the node to update (s=self),
+    neighboring nodes (n=neighbor) and edge features (e=edge).
     Attention weights are obtained by
     .. math::
-        \alpha_{j, i} = \mathrm{softmax}_i \Big( \mathrm{LeakyReLU} \big( \mathbf{a}^T [ \mathbf{\Theta}_\mathrm{n} \cdot \mathbf{v}_i || \mathbf{\Theta}_\mathrm{n} \cdot \mathbf{v}_j || \mathbf{\Theta}_\mathrm{e} \cdot \mathbf{e}_{j,i} ] \big) \Big)    
+        \alpha_{j, i} = \mathrm{softmax}_i \Big( \mathrm{LeakyReLU} \big( \mathbf{a}^T
+        [ \mathbf{\Theta}_\mathrm{n} \cdot \mathbf{v}_i || \mathbf{\Theta}_\mathrm{n}
+        \cdot \mathbf{v}_j || \mathbf{\Theta}_\mathrm{e} \cdot \mathbf{e}_{j,i} ] \big) \Big)
     with :math:`\mathbf{a}` corresponding to a learnable vector.
     :math:`\mathrm{softmax_i}` stands for the normalization by all incoming edges of node :math:`i`.
 
@@ -172,7 +178,7 @@ class EdgeGATConv(nn.Module):
         self.activation = activation
 
     def reset_parameters(self):
-        """
+        r"""
 
         Description
         -----------
@@ -180,7 +186,7 @@ class EdgeGATConv(nn.Module):
 
         Note
         ----
-        The fc weights :math:`\mathbf{\Theta}` are and the 
+        The fc weights :math:`\mathbf{\Theta}` are and the
         attention weights are using xavier initialization method.
         """
         gain = nn.init.calculate_gain('relu')
@@ -230,8 +236,9 @@ class EdgeGATConv(nn.Module):
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, *, D_{in_{src}})` and :math:`(N_{out}, *, D_{in_{dst}})`.
         edge_feat : torch.Tensor
-            The input edge feature of shape :math:`(E, D_{in_{edge}})`, where :math:`E` is the number of
-            edges and :math:`D_{in_{edge}}` the size of the edge features.
+            The input edge feature of shape :math:`(E, D_{in_{edge}})`,
+            where :math:`E` is the number of edges and :math:`D_{in_{edge}}`
+            the size of the edge features.
         get_attention : bool, optional
             Whether to return the attention values. Default to False.
 
@@ -290,44 +297,44 @@ class EdgeGATConv(nn.Module):
                     dst_prefix_shape = (
                         graph.number_of_dst_nodes(),) + dst_prefix_shape[1:]
 
-            # Linearly tranform the edge features
+            # linearly tranform the edge features
             n_edges = edge_feat.shape[:-1]
             feat_edge = self.fc_edge(edge_feat).view(
                 *n_edges, self._num_heads, self._out_feats)
 
-            # Add edge features to graph
+            # add edge features to graph
             graph.edata["ft_edge"] = feat_edge
 
-            # Each head of each feature is multiplied with the left or the right attention weight vector
-            # A scalar for left and right for each head is resulting
             el = (feat_src * self.attn_l).sum(dim=-1).unsqueeze(-1)
             er = (feat_dst * self.attn_r).sum(dim=-1).unsqueeze(-1)
 
-            # Calculate scalar for each edge
+            # calculate scalar for each edge
             ee = (feat_edge * self.attn_edge).sum(dim=-1).unsqueeze(-1)
             graph.edata['ee'] = ee
 
             graph.srcdata.update({'ft': feat_src, 'el': el})
             graph.dstdata.update({'er': er})
-            # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
+            # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively
             graph.apply_edges(fn.u_add_v('el', 'er', 'e_tmp'))
 
             # e_tmp combines attention weights of source and destination node
-            # Here, the attention weight of the edge is added
+            # we also add the attention weight of the edge
             graph.edata['e'] = graph.edata['e_tmp'] + graph.edata['ee']
 
-            # Create new edges "ft_combined" that add the feature of the source node and the edge feature together
+            # create new edges features that combine the
+            # features of the source node and the edge features
             graph.apply_edges(fn.u_add_e('ft', 'ft_edge', 'ft_combined'))
 
             e = self.leaky_relu(graph.edata.pop('e'))
             # compute softmax
             graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
 
-            # For each edge, element-wise multiply the edge features with the attention coefficient
+            # for each edge, element-wise multiply the combined features with
+            # the attention coefficient
             graph.edata['m_combined'] = graph.edata['ft_combined'] * \
                 graph.edata['a']
 
-            # First take the edge features and then sum them up
+            # first copy the edge features and then sum them up
             graph.update_all(fn.copy_e('m_combined', 'm'),
                              fn.sum('m', 'ft'))
 
