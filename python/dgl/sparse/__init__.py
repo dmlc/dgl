@@ -34,7 +34,8 @@ def load_dgl_sparse():
     dirname = os.path.dirname(libinfo.find_lib_path()[0])
     path = os.path.join(dirname, "dgl_sparse", basename)
     if not os.path.exists(path):
-        raise FileNotFoundError("Cannot find DGL C++ sparse library at {path}")
+        raise FileNotFoundError(
+            f"Cannot find DGL C++ sparse library at {path}")
 
     try:
         torch.classes.load_library(path)
