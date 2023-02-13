@@ -23,6 +23,7 @@ SET PYTHONPATH=!CD!\python;!PYTHONPATH!
 SET DGL_DOWNLOAD_DIR=!CD!
 
 PUSHD !GCN_EXAMPLE_DIR!
+python3 -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests\examples || GOTO :FAIL
 python pagerank.py || GOTO :FAIL
 python gcn\train.py --dataset cora || GOTO :FAIL
 POPD
