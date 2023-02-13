@@ -1,5 +1,4 @@
 import os
-import time
 import unittest
 
 import backend as F
@@ -590,6 +589,86 @@ def test_multiprocess_sparse_adam_zero_step_cuda_tensor(num_workers):
     assert F.allclose(dgl_weight, torch_weight)
 
 
+def start_sparse_adam_state_dict_worker(
+    rank,
+    world_size,
+    init_weight,
+    backend,
+    num_embs,
+    emb_dim,
+):
+    print("start sparse worker for adam {}".format(rank))
+    dist_init_method = "tcp://{master_ip}:{master_port}".format(
+        master_ip="127.0.0.1", master_port="12345"
+    )
+
+    device = th.device(f"cuda:{rank}")
+    th.cuda.set_device(device)
+    tensor_dev = device if backend == "nccl" else th.device("cpu")
+
+    th.distributed.init_process_group(
+        backend=backend,
+        init_method=dist_init_method,
+        world_size=world_size,
+        rank=rank,
+    )
+
+    th.manual_seed(0)
+    dgl_emb = NodeEmbedding(
+        num_embs, emb_dim, "test", init_func=initializer, device=tensor_dev
+    )
+    dgl_emb.all_set_embedding(init_weight)
+
+    dgl_adam = SparseAdam(params=[dgl_emb], lr=0.01)
+
+    start = (num_embs // world_size) * rank
+    end = (num_embs // world_size) * (rank + 1)
+    th.manual_seed(rank)
+    idx = th.randint(start, end, size=(4,)).to(tensor_dev)
+    dgl_value = dgl_emb(idx, device)
+    labels = th.ones((4,)).long().to(device)
+    dgl_loss = th.nn.functional.cross_entropy(dgl_value, labels)
+    dgl_adam.zero_grad()
+    dgl_loss.backward()
+    dgl_adam.step()
+    th.distributed.barrier()
+
+    worker_state_dict = [t.detach().clone() for t in dgl_emb.optm_state]
+    state_dict = dgl_adam.state_dict()
+    for t in dgl_emb.optm_state:
+        t.zero_()
+    dgl_adam.load_state_dict(state_dict)
+
+    for i, j in zip(worker_state_dict, dgl_emb.optm_state):
+        F.allclose(i, j)
+
+    th.distributed.barrier()
+
+
+@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
+@unittest.skipIf(F.ctx().type == "cpu", reason="gpu only test")
+@pytest.mark.parametrize("num_workers", [1, 2, 4, 8])
+@pytest.mark.parametrize("backend", ["nccl", "gloo"])
+def test_multiprocess_sparse_adam_state_dict(num_workers, backend):
+    if F.ctx().type == "cuda" and th.cuda.device_count() < num_workers:
+        pytest.skip("Not enough GPUs to run test.")
+
+    num_embs = 128
+    emb_dim = 10
+    init_weight = th.rand((num_embs, emb_dim))
+    mp.spawn(
+        start_sparse_adam_state_dict_worker,
+        (
+            num_workers,
+            init_weight,
+            backend,
+            num_embs,
+            emb_dim,
+        ),
+        nprocs=num_workers,
+    )
+
+
 if __name__ == "__main__":
     test_sparse_adam(1)
     test_sparse_adam(4)
@@ -614,3 +693,6 @@ if __name__ == "__main__":
 
     test_multiprocess_sparse_adam_cuda_tensor(2)
     test_multiprocess_sparse_adam_zero_step_cuda_tensor(4)
+
+    test_multiprocess_sparse_adam_state_dict(2, "nccl")
+    test_multiprocess_sparse_adam_state_dict(2, "gloo")

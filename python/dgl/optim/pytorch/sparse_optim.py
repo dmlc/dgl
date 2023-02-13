@@ -453,11 +453,11 @@ class SparseGradOptimizer(abc.ABC):
         self._clean_grad = True
 
     def state_dict(self, **kwargs):
-        return {emb.name: emb.all_get_optim_state() for emb in self._params}
+        return {emb.name: emb.all_get_optm_state() for emb in self._params}
 
     def load_state_dict(self, state_dict, **kwargs):
         for emb in self._params:
-            emb.all_set_optim_state(state_dict[emb.name])
+            emb.all_set_optm_state(state_dict[emb.name])
 
 class SparseAdagrad(SparseGradOptimizer):
     r"""Node embedding optimizer using the Adagrad algorithm.

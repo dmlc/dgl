@@ -409,11 +409,11 @@ class NodeEmbedding:  # NodeEmbedding
         if self._partition:
             if self._world_size == 0:
                 # non-multiprocessing
-                return (
+                return tuple(
                     state.to(th.device("cpu")) for state in self._optm_state
                 )
             else:
-                return (
+                return tuple(
                     self._all_get_tensor(
                         f"state_gather_{i}",
                         state,
@@ -433,7 +433,7 @@ class NodeEmbedding:  # NodeEmbedding
                 ),
                 F.context(states[0]),
             )
-            self._optm_state = (
+            self._optm_state = tuple(
                 F.copy_to(
                     F.gather_row(state, idxs), ctx=F.context(self._tensor)
                 )
@@ -442,7 +442,7 @@ class NodeEmbedding:  # NodeEmbedding
         else:
             # stored in CPU memory
             if self._rank <= 0:
-                self._optm_state = (
+                self._optm_state = tuple(
                     F.copy_to(state, ctx=F.context(self._tensor))
                     for state in states
                 )
