@@ -88,7 +88,7 @@ interactions.head()
 #
 
 import os
-
+os.environ['DGLBACKEND'] = 'pytorch'
 import torch
 
 import dgl

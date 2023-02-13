@@ -1,11 +1,11 @@
 import unittest
 
 import backend as F
-import numpy as np
-from test_utils import parametrize_idtype
 
 import dgl
+import numpy as np
 from dgl.utils import Filter
+from test_utils import parametrize_idtype
 
 
 def test_graph_filter():
@@ -69,6 +69,28 @@ def test_array_filter(idtype):
     ye_act = f.find_excluded_indices(y)
     ye_exp = F.copy_to(F.tensor([1, 3, 4, 6], dtype=idtype), F.ctx())
     assert F.array_equal(ye_act, ye_exp)
+
+
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch",
+    reason="Multiple streams are only supported by pytorch backend",
+)
+@unittest.skipIf(
+    F._default_context_str == "cpu", reason="CPU not yet supported"
+)
+@parametrize_idtype
+def test_filter_multistream(idtype):
+    # this is a smoke test to ensure we do not trip any internal assertions
+    import torch
+
+    s = torch.cuda.Stream(device=F.ctx())
+    with torch.cuda.stream(s):
+        # we must do multiple runs such that the stream is busy as we launch
+        # work
+        for i in range(10):
+            f = Filter(F.arange(1000, 4000, dtype=idtype, ctx=F.ctx()))
+            x = F.randint([30000], dtype=idtype, ctx=F.ctx(), low=0, high=50000)
+            xi = f.find_included_indices(x)
 
 
 if __name__ == "__main__":

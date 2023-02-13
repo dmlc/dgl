@@ -8,7 +8,8 @@ DEVICE=${DGL_BENCH_DEVICE:-cpu}
 pip install -r /asv/torch_gpu_pip.txt
 
 # build
-CMAKE_VARS="-DUSE_OPENMP=ON -DBUILD_TORCH=ON -DBUILD_SPARSE=ON -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda"
+# 'CUDA_TOOLKIT_ROOT_DIR' is always required for sparse build as torch1.13.1+cu116 is installed.
+CMAKE_VARS="-DUSE_OPENMP=ON -DBUILD_TORCH=ON -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda"
 if [[ $DEVICE == "gpu" ]]; then
     CMAKE_VARS="-DUSE_CUDA=ON -DUSE_NCCL=ON $CMAKE_VARS"
 fi

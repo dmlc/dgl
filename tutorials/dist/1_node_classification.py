@@ -22,6 +22,8 @@ Here we store the node labels as node data in the DGL Graph.
 .. code-block:: python
 
 
+    import os
+    os.environ['DGLBACKEND'] = 'pytorch'
     import dgl
     import torch as th
     from ogb.nodeproppred import DglNodePropPredDataset

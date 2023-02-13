@@ -45,6 +45,8 @@ message passing APIs.
 # aggregation on a node :math:`u` only involves summing over the neighbors'
 # representations :math:`h_v`, we can simply use builtin functions:
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F

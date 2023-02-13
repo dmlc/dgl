@@ -4,6 +4,7 @@ from typing import Union
 
 from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix
+from .utils import Scalar
 
 __all__ = ["add", "sub", "mul", "div", "power"]
 
@@ -11,8 +12,8 @@ __all__ = ["add", "sub", "mul", "div", "power"]
 def add(
     A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
 ) -> Union[DiagMatrix, SparseMatrix]:
-    r"""Elementwise additions for ``DiagMatrix`` and ``SparseMatrix``,
-    equivalent to ``A + B``.
+    r"""Elementwise addition for ``DiagMatrix`` and ``SparseMatrix``, equivalent
+    to ``A + B``.
 
     The supported combinations are shown as follows.
 
@@ -41,21 +42,22 @@ def add(
 
     Examples
     --------
-    >>> row = torch.tensor([1, 0, 2])
-    >>> col = torch.tensor([0, 1, 2])
+    >>> indices = torch.tensor([[1, 0, 2], [0, 1, 2]])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
-    >>> B = diag(torch.arange(1, 4))
-    >>> add(A, B)
+    >>> A = dglsp.spmatrix(indices, val)
+    >>> B = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.add(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
                                  [0, 1, 0, 1, 2]]),
-                 values=tensor([ 1, 20, 10,  2, 33]),
+                 values=tensor([1, 20, 10,  2, 33]),
                  shape=(3, 3), nnz=5)
     """
     return A + B
 
 
-def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
+def sub(
+    A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
+) -> Union[DiagMatrix, SparseMatrix]:
     r"""Elementwise subtraction for ``DiagMatrix`` and ``SparseMatrix``,
     equivalent to ``A - B``.
 
@@ -64,39 +66,44 @@ def sub(A: Union[DiagMatrix], B: Union[DiagMatrix]) -> Union[DiagMatrix]:
     +--------------+------------+--------------+--------+
     |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
     +--------------+------------+--------------+--------+
-    |  DiagMatrix  |     ✅     |      🚫      |   🚫   |
+    |  DiagMatrix  |     ✅     |      ✅      |   🚫   |
     +--------------+------------+--------------+--------+
-    | SparseMatrix |     🚫     |      🚫      |   🚫   |
+    | SparseMatrix |     ✅     |      ✅      |   🚫   |
     +--------------+------------+--------------+--------+
     |    scalar    |     🚫     |      🚫      |   🚫   |
     +--------------+------------+--------------+--------+
 
     Parameters
     ----------
-    A : DiagMatrix
-        Diagonal matrix
-    B : DiagMatrix
-        Diagonal matrix
+    A : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
+    B : DiagMatrix or SparseMatrix
+        Diagonal matrix or sparse matrix
 
     Returns
     -------
-    DiagMatrix
-        Diagonal matrix
+    DiagMatrix or SparseMatrix
+        Diagonal matrix if both :attr:`A` and :attr:`B` are diagonal matrices,
+        sparse matrix otherwise
 
     Examples
     --------
-    >>> A = diag(torch.arange(1, 4))
-    >>> B = diag(torch.arange(10, 13))
-    >>> sub(A, B)
-    DiagMatrix(val=tensor([-9, -9, -9]),
-               shape=(3, 3))
+    >>> indices = torch.tensor([[1, 0, 2], [0, 1, 2]])
+    >>> val = torch.tensor([10, 20, 30])
+    >>> A = dglsp.spmatrix(indices, val)
+    >>> B = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.sub(A, B)
+    SparseMatrix(indices=tensor([[0, 0, 1, 1, 2],
+                                 [0, 1, 0, 1, 2]]),
+                 values=tensor([-1, 20, 10, -2, 27]),
+                 shape=(3, 3), nnz=5)
     """
     return A - B
 
 
 def mul(
-    A: Union[SparseMatrix, DiagMatrix, float, int],
-    B: Union[SparseMatrix, DiagMatrix, float, int],
+    A: Union[SparseMatrix, DiagMatrix, Scalar],
+    B: Union[SparseMatrix, DiagMatrix, Scalar],
 ) -> Union[SparseMatrix, DiagMatrix]:
     r"""Elementwise multiplication for ``DiagMatrix`` and ``SparseMatrix``,
     equivalent to ``A * B``.
@@ -115,9 +122,9 @@ def mul(
 
     Parameters
     ----------
-    A : SparseMatrix or DiagMatrix or float or int
+    A : SparseMatrix or DiagMatrix or Scalar
         Sparse matrix or diagonal matrix or scalar value
-    B : SparseMatrix or DiagMatrix or float or int
+    B : SparseMatrix or DiagMatrix or Scalar
         Sparse matrix or diagonal matrix or scalar value
 
     Returns
@@ -127,23 +134,22 @@ def mul(
 
     Examples
     --------
-    >>> row = torch.tensor([1, 0, 2])
-    >>> col = torch.tensor([0, 3, 2])
+    >>> indices = torch.tensor([[1, 0, 2], [0, 3, 2]])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
-    >>> mul(A, 2)
+    >>> A = dglsp.spmatrix(indices, val)
+    >>> dglsp.mul(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([20, 40, 60]),
                  shape=(3, 4), nnz=3)
 
-    >>> D = diag(torch.arange(1, 4))
-    >>> mul(D, 2)
+    >>> D = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.mul(D, 2)
     DiagMatrix(val=tensor([2, 4, 6]),
                shape=(3, 3))
 
-    >>> D = diag(torch.arange(1, 4))
-    >>> mul(D, D)
+    >>> D = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.mul(D, D)
     DiagMatrix(val=tensor([1, 4, 9]),
                shape=(3, 3))
     """
@@ -151,8 +157,8 @@ def mul(
 
 
 def div(
-    A: Union[DiagMatrix], B: Union[DiagMatrix, float, int]
-) -> Union[DiagMatrix]:
+    A: Union[SparseMatrix, DiagMatrix], B: Union[DiagMatrix, Scalar]
+) -> Union[SparseMatrix, DiagMatrix]:
     r"""Elementwise division for ``DiagMatrix`` and ``SparseMatrix``, equivalent
     to ``A / B``.
 
@@ -163,16 +169,16 @@ def div(
     +--------------+------------+--------------+--------+
     |  DiagMatrix  |     ✅     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+
-    | SparseMatrix |     🚫     |      🚫      |   🚫   |
+    | SparseMatrix |     🚫     |      🚫      |   ✅   |
     +--------------+------------+--------------+--------+
     |    scalar    |     🚫     |      🚫      |   🚫   |
     +--------------+------------+--------------+--------+
 
     Parameters
     ----------
-    A : DiagMatrix
-        Diagonal matrix
-    B : DiagMatrix or float or int
+    A : SparseMatrix or DiagMatrix
+        Sparse or diagonal matrix
+    B : DiagMatrix or Scalar
         Diagonal matrix or scalar value
 
     Returns
@@ -182,22 +188,31 @@ def div(
 
     Examples
     --------
-    >>> A = diag(torch.arange(1, 4))
-    >>> B = diag(torch.arange(10, 13))
-    >>> div(A, B)
+    >>> A = dglsp.diag(torch.arange(1, 4))
+    >>> B = dglsp.diag(torch.arange(10, 13))
+    >>> dglsp.div(A, B)
     DiagMatrix(val=tensor([0.1000, 0.1818, 0.2500]),
                shape=(3, 3))
 
-    >>> A = diag(torch.arange(1, 4))
-    >>> div(A, 2)
+    >>> A = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.div(A, 2)
     DiagMatrix(val=tensor([0.5000, 1.0000, 1.5000]),
                shape=(3, 3))
+
+    >>> indices = torch.tensor([[1, 0, 2], [0, 3, 2]])
+    >>> val = torch.tensor([1, 2, 3])
+    >>> A = dglsp.spmatrix(indices, val, shape=(3, 4))
+    >>> dglsp.div(A, 2)
+    SparseMatrix(indices=tensor([[1, 0, 2],
+                                 [0, 3, 2]]),
+                 values=tensor([0.5000, 1.0000, 1.5000]),
+                 shape=(3, 4), nnz=3)
     """
     return A / B
 
 
 def power(
-    A: Union[SparseMatrix, DiagMatrix], scalar: Union[float, int]
+    A: Union[SparseMatrix, DiagMatrix], scalar: Scalar
 ) -> Union[SparseMatrix, DiagMatrix]:
     r"""Elementwise exponentiation for ``DiagMatrix`` and ``SparseMatrix``,
     equivalent to ``A ** scalar``.
@@ -218,7 +233,7 @@ def power(
     ----------
     A : SparseMatrix or DiagMatrix
         Sparse matrix or diagonal matrix
-    scalar : float or int
+    scalar : Scalar
         Exponent
 
     Returns
@@ -228,18 +243,17 @@ def power(
 
     Examples
     --------
-    >>> row = torch.tensor([1, 0, 2])
-    >>> col = torch.tensor([0, 3, 2])
+    >>> indices = torch.tensor([[1, 0, 2], [0, 3, 2]])
     >>> val = torch.tensor([10, 20, 30])
-    >>> A = from_coo(row, col, val)
-    >>> power(A, 2)
+    >>> A = dglsp.spmatrix(indices, val)
+    >>> dglsp.power(A, 2)
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([100, 400, 900]),
                  shape=(3, 4), nnz=3)
 
-    >>> D = diag(torch.arange(1, 4))
-    >>> power(D, 2)
+    >>> D = dglsp.diag(torch.arange(1, 4))
+    >>> dglsp.power(D, 2)
     DiagMatrix(val=tensor([1, 4, 9]),
                shape=(3, 3))
     """

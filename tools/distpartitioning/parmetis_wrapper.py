@@ -52,6 +52,7 @@ def run_parmetis_wrapper(params):
         f"mpirun -np {num_partitions} -hostfile {params.hostfile} "
         f"python3 tools/distpartitioning/parmetis_preprocess.py "
         f"--schema_file {params.schema_file} "
+        f"--input_dir {params.preproc_input_dir}"
         f"--output_dir {params.preproc_output_dir}"
     )
     logging.info(f"Executing Preprocessing Step: {preproc_cmd}")
@@ -106,6 +107,11 @@ if __name__ == "__main__":
         required=True,
         type=str,
         help="The schema of the input graph",
+    )
+    parser.add_argument(
+        "--preproc_input_dir",
+        type=str,
+        help="The input directory for preprocess where the dataset is located",
     )
     parser.add_argument(
         "--preproc_output_dir",

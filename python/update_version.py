@@ -68,7 +68,7 @@ def main():
     for path in ["dgl"]:
         update(
             os.path.join(proj_root, "conda", path, "meta.yaml"),
-            '(?<=version: ")[.0-9a-z+_]+',
+            "(?<=version: )[.0-9a-z+_]+",
             __version__,
         )
 
