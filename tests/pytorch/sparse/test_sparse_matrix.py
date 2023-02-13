@@ -7,10 +7,6 @@ import torch
 
 from dgl.sparse import from_coo, from_csc, from_csr, val_like
 
-# TODO(#4818): Skipping tests on win.
-if not sys.platform.startswith("linux"):
-    pytest.skip("skipping tests on win", allow_module_level=True)
-
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("row", [(0, 0, 1, 2), (0, 1, 2, 4)])
@@ -104,7 +100,7 @@ def test_dense(val_shape):
     col = torch.tensor([2, 4, 3]).to(ctx)
     val = torch.randn(val_shape).to(ctx)
     A = from_coo(row, col, val)
-    A_dense = A.dense()
+    A_dense = A.to_dense()
 
     shape = A.shape + val.shape[1:]
     mat = torch.zeros(shape, device=ctx)

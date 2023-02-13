@@ -17,10 +17,11 @@ from .. import utils
 @utils.parametrize("fanout", [5, 20, 40])
 def track_time(graph_name, format, seed_nodes_num, fanout):
     device = utils.get_bench_device()
-    graph = utils.get_graph(graph_name, format)
+    graph = utils.get_graph(graph_name, format).to(device)
 
     edge_dir = "in"
     seed_nodes = np.random.randint(0, graph.num_nodes(), seed_nodes_num)
+    seed_nodes = torch.from_numpy(seed_nodes).to(device)
 
     # dry run
     for i in range(3):

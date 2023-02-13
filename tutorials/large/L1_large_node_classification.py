@@ -25,6 +25,8 @@ Sampling for GNN Training <L0_neighbor_sampling_overview>`.
 # OGB already prepared the data as DGL graph.
 #
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 import torch
 import numpy as np

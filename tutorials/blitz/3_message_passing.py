@@ -18,6 +18,8 @@ GNN for node classification <1_introduction>`.
 
 """
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
