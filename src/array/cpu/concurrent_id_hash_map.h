@@ -1,11 +1,11 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file array/cpu/id_hash_map.h
+ * @file array/cpu/concurrent_id_hash_map.h
  * @brief Class about id hash map
  */
 
-#ifndef DGL_ARRAY_CPU_ID_HASH_MAP_H_
-#define DGL_ARRAY_CPU_ID_HASH_MAP_H_
+#ifndef DGL_ARRAY_CPU_CONCURRENT_ID_HASH_MAP_H_
+#define DGL_ARRAY_CPU_CONCURRENT_ID_HASH_MAP_H_
 
 #include <dgl/aten/types.h>
 
@@ -29,7 +29,7 @@ namespace aten {
  * For example, for an array A with following entries:
  * [98, 98, 100, 99, 97, 99, 101, 100, 102]
  * Create the hashmap H with:
- * `H = CpuIdHashMap()` (1)
+ * `H = ConcurrentIdHashMap()` (1)
  * And Init it with:
  * `U = H.Init(A)` (2)  (U is an id array used to store the unqiue
  * ids in A).
@@ -51,7 +51,7 @@ namespace aten {
  * [0, 2, 5]
  **/
 template <typename IdType>
-class IdHashMap {
+class ConcurrentIdHashMap {
  public:
   /**
    * @brief An entry in the hashtable.
@@ -81,10 +81,10 @@ class IdHashMap {
    */
   static IdType CompareAndSwap(IdType* ptr, IdType old_val, IdType new_val);
 
-  IdHashMap();
+  ConcurrentIdHashMap();
 
-  IdHashMap(const IdHashMap& other) = delete;
-  IdHashMap& operator=(const IdHashMap& other) = delete;
+  ConcurrentIdHashMap(const ConcurrentIdHashMap& other) = delete;
+  ConcurrentIdHashMap& operator=(const ConcurrentIdHashMap& other) = delete;
 
   /**
    * @brief Init the hashmap with an array of ids.
@@ -179,4 +179,4 @@ class IdHashMap {
 }  // namespace aten
 }  // namespace dgl
 
-#endif  // DGL_ARRAY_CPU_ID_HASH_MAP_H_
+#endif  // DGL_ARRAY_CPU_CONCURRENT_ID_HASH_MAP_H_

@@ -1,10 +1,10 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file array/cpu/id_hash_map.cc
+ * @file array/cpu/concurrent_id_hash_map.cc
  * @brief Class about id hash map
  */
 
-#include "id_hash_map.h"
+#include "concurrent_id_hash_map.h"
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -35,7 +35,7 @@ namespace dgl {
 namespace aten {
 
 template <typename IdType>
-IdType IdHashMap<IdType>::CompareAndSwap(
+IdType ConcurrentIdHashMap<IdType>::CompareAndSwap(
     IdType* ptr, IdType old_val, IdType new_val) {
 #ifdef _MSC_VER
   if (sizeof(IdType) == 4) {
@@ -55,7 +55,7 @@ IdType IdHashMap<IdType>::CompareAndSwap(
 }
 
 template <typename IdType>
-IdHashMap<IdType>::IdHashMap() : mask_(0) {
+ConcurrentIdHashMap<IdType>::ConcurrentIdHashMap() : mask_(0) {
   // Used to deallocate the memory in hash_map_ with device api
   // when the pointer is freed.
   auto deleter = [](Mapping* mappings) {
@@ -69,7 +69,7 @@ IdHashMap<IdType>::IdHashMap() : mask_(0) {
 }
 
 template <typename IdType>
-IdArray IdHashMap<IdType>::Init(const IdArray& ids) {
+IdArray ConcurrentIdHashMap<IdType>::Init(const IdArray& ids) {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
   const size_t num_ids = static_cast<size_t>(ids->shape[0]);
@@ -125,7 +125,7 @@ IdArray IdHashMap<IdType>::Init(const IdArray& ids) {
 }
 
 template <typename IdType>
-IdArray IdHashMap<IdType>::MapIds(const IdArray& ids) const {
+IdArray ConcurrentIdHashMap<IdType>::MapIds(const IdArray& ids) const {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
   const size_t num_ids = static_cast<size_t>(ids->shape[0]);
@@ -144,14 +144,14 @@ IdArray IdHashMap<IdType>::MapIds(const IdArray& ids) const {
 }
 
 template <typename IdType>
-inline void IdHashMap<IdType>::Next(IdType* pos, IdType* delta) const {
+inline void ConcurrentIdHashMap<IdType>::Next(IdType* pos, IdType* delta) const {
   // Use Quadric probing.
   *pos = (*pos + (*delta) * (*delta)) & mask_;
   *delta = *delta + 1;
 }
 
 template <typename IdType>
-IdType IdHashMap<IdType>::MapId(IdType id) const {
+IdType ConcurrentIdHashMap<IdType>::MapId(IdType id) const {
   IdType pos = (id & mask_), delta = 1;
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   while (hash_map_[pos].key != empty_key && hash_map_[pos].key != id) {
@@ -161,7 +161,7 @@ IdType IdHashMap<IdType>::MapId(IdType id) const {
 }
 
 template <typename IdType>
-void IdHashMap<IdType>::Insert(
+void ConcurrentIdHashMap<IdType>::Insert(
     IdType id, std::vector<int16_t>* valid, size_t index) {
   IdType pos = (id & mask_), delta = 1;
   while (!AttemptInsertAt(pos, id, valid, index)) {
@@ -170,7 +170,7 @@ void IdHashMap<IdType>::Insert(
 }
 
 template <typename IdType>
-void IdHashMap<IdType>::Set(IdType key, IdType value) {
+void ConcurrentIdHashMap<IdType>::Set(IdType key, IdType value) {
   IdType pos = (key & mask_), delta = 1;
   while (hash_map_[pos].key != key) {
     Next(&pos, &delta);
@@ -180,7 +180,7 @@ void IdHashMap<IdType>::Set(IdType key, IdType value) {
 }
 
 template <typename IdType>
-bool IdHashMap<IdType>::AttemptInsertAt(
+bool ConcurrentIdHashMap<IdType>::AttemptInsertAt(
     int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index) {
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType old_val = CompareAndSwap(&(hash_map_[pos].key), empty_key, key);
@@ -193,8 +193,8 @@ bool IdHashMap<IdType>::AttemptInsertAt(
   }
 }
 
-template class IdHashMap<int32_t>;
-template class IdHashMap<int64_t>;
+template class ConcurrentIdHashMap<int32_t>;
+template class ConcurrentIdHashMap<int64_t>;
 
 }  // namespace aten
 }  // namespace dgl

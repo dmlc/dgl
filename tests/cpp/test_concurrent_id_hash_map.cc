@@ -4,7 +4,7 @@
 
 #include <set>
 
-#include "../../src/array/cpu/id_hash_map.h"
+#include "../../src/array/cpu/concurrent_id_hash_map.h"
 #include "./common.h"
 
 using namespace dgl;
@@ -29,7 +29,7 @@ void _TestIdMap() {
   ConstructRandomSet(size, range, id_vec);
   std::set<IdType> id_set(id_vec.begin(), id_vec.end());
   IdArray ids = VecToIdArray(id_vec, sizeof(IdType) * 8, CTX);
-  IdHashMap<IdType> id_map;
+  ConcurrentIdHashMap<IdType> id_map;
   IdArray unique_ids = id_map.Init(ids);
   auto unique_num = static_cast<size_t>(unique_ids->shape[0]);
   IdType* unique_id_data = unique_ids.Ptr<IdType>();
