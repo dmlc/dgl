@@ -7,10 +7,6 @@ import torch
 
 from dgl.sparse import from_coo, from_csc, from_csr, val_like
 
-# TODO(#4818): Skipping tests on win.
-if not sys.platform.startswith("linux"):
-    pytest.skip("skipping tests on win", allow_module_level=True)
-
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("row", [(0, 0, 1, 2), (0, 1, 2, 4)])
