@@ -133,7 +133,11 @@ class NeighborSampler(BlockSampler):
                 replace=self.replace, output_device=self.output_device,
                 exclude_edges=exclude_eids)
             eid = frontier.edata[EID]
+            import time
+            s = time.time()
             block = to_block(frontier, seed_nodes)
+            e = time.time() - s
+            print(f'to_block: {e} seconds elpased.')
             block.edata[EID] = eid
             seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)

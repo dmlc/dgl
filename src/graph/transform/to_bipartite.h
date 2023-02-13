@@ -21,7 +21,7 @@
 #ifndef DGL_GRAPH_TRANSFORM_TO_BIPARTITE_H_
 #define DGL_GRAPH_TRANSFORM_TO_BIPARTITE_H_
 
-#include <dgl/array.h>P
+#include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 
 #include <tuple>
