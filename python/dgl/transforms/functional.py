@@ -3508,7 +3508,7 @@ def radius_graph(x, r, p=2, self_loop=False,
     distances = th.cdist(x, x, p=p, compute_mode=compute_mode)
 
     if not self_loop:
-        distances.fill_diagonal_(r + 1e-4)
+        distances.fill_diagonal_(r + 1)
 
     edges = th.nonzero(distances <= r, as_tuple=True)
 
