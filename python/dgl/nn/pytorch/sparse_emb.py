@@ -372,6 +372,7 @@ class NodeEmbedding:  # NodeEmbedding
         ).to(val.device)
         val[idxs] = tensor.to(val.device)
 
+        self._store.delete_key(shared_name)
         # wait for all processes to finish
         th.distributed.barrier()
         return val
@@ -403,3 +404,47 @@ class NodeEmbedding:  # NodeEmbedding
         else:
             # already stored in CPU memory
             return self._tensor
+
+    def all_get_optm_state(self):
+        if self._partition:
+            if self._world_size == 0:
+                # non-multiprocessing
+                return (
+                    state.to(th.device("cpu")) for state in self._optm_state
+                )
+            else:
+                return (
+                    self._all_get_tensor(
+                        f"state_gather_{i}",
+                        state,
+                        (self._num_embeddings, *state.shape[1:]),
+                    )
+                    for i, state in enumerate(self._optm_state)
+                )
+        else:
+            # already stored in CPU memory
+            return self._optm_state
+
+    def all_set_optm_state(self, states):
+        if self._partition:
+            idxs = F.copy_to(
+                self._partition.get_local_indices(
+                    self._comm.rank(), ctx=F.context(self._tensor)
+                ),
+                F.context(states[0]),
+            )
+            self._optm_state = (
+                F.copy_to(
+                    F.gather_row(state, idxs), ctx=F.context(self._tensor)
+                )
+                for state in states
+            )
+        else:
+            # stored in CPU memory
+            if self._rank <= 0:
+                self._optm_state = (
+                    F.copy_to(state, ctx=F.context(self._tensor))
+                    for state in states
+                )
+        if th.distributed.is_initialized():
+            th.distributed.barrier()

@@ -538,7 +538,7 @@ class SparseAdagrad(SparseGradOptimizer):
                     dtype=th.float32,
                     device=emb.weight.device,
                 ).zero_()
-            emb.set_optm_state(state)
+            emb.set_optm_state((state,))
 
     def update(self, idx, grad, emb):
         """Update embeddings in a sparse manner
@@ -568,7 +568,7 @@ class SparseAdagrad(SparseGradOptimizer):
         grad_values = grad_values / cnt.unsqueeze(1)
 
         grad_sum = grad_values * grad_values
-        state = emb.optm_state
+        state, = emb.optm_state
         state_dev = state.device
         state_idx = grad_indices.to(state_dev)
         grad_state = state[state_idx].to(grad.device)
