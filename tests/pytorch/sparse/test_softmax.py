@@ -8,10 +8,6 @@ import torch
 
 from dgl.sparse import from_coo, softmax
 
-# TODO(#4818): Skipping tests on win.
-if not sys.platform.startswith("linux"):
-    pytest.skip("skipping tests on win", allow_module_level=True)
-
 
 @pytest.mark.parametrize("val_D", [None, 2])
 @pytest.mark.parametrize("csr", [True, False])

@@ -84,6 +84,8 @@ def test_neighbor_nonuniform(idtype, mode, use_ddp, use_mask):
     if mode != 'cpu' and use_mask:
         pytest.skip('Masked sampling only works on CPU.')
     if use_ddp:
+        if os.name == 'nt':
+            pytest.skip('PyTorch 1.13.0+ has problems in Windows DDP...')
         dist.init_process_group('gloo' if F.ctx() == F.cpu() else 'nccl',
             'tcp://127.0.0.1:12347', world_size=1, rank=0)
     g = dgl.graph(([1, 2, 3, 4, 5, 6, 7, 8], [0, 0, 0, 0, 1, 1, 1, 1])).astype(idtype)
@@ -181,6 +183,8 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
     if mode != 'cpu' and F.ctx() == F.cpu():
         pytest.skip('UVA and GPU sampling require a GPU.')
     if use_ddp:
+        if os.name == 'nt':
+            pytest.skip('PyTorch 1.13.0+ has problems in Windows DDP...')
         dist.init_process_group('gloo' if F.ctx() == F.cpu() else 'nccl',
             'tcp://127.0.0.1:12347', world_size=1, rank=0)
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])).astype(idtype)
@@ -267,6 +271,8 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, mode, use_ddp):
     if mode == 'uva' and isinstance(neg_sampler, dgl.dataloading.negative_sampler.GlobalUniform):
         pytest.skip("GlobalUniform don't support UVA yet.")
     if use_ddp:
+        if os.name == 'nt':
+            pytest.skip('PyTorch 1.13.0+ has problems in Windows DDP...')
         dist.init_process_group('gloo' if F.ctx() == F.cpu() else 'nccl',
             'tcp://127.0.0.1:12347', world_size=1, rank=0)
     g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4])).astype(idtype)
