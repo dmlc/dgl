@@ -23,8 +23,12 @@ if [ $# -eq 0 ]; then
 	cp -v $CPSOURCE $BINDIR/dgl_sparse
 else
 	for PYTHON_INTERP in $@; do
-		$CMAKE_COMMAND $CMAKE_FLAGS -DPYTHON_INTERP=$PYTHON_INTERP ..
+		TORCH_VER=$($PYTHON_INTERP -c 'import torch; print(torch.__version__.split("+")[0])')
+		mkdir -p $TORCH_VER
+		cd $TORCH_VER
+		$CMAKE_COMMAND $CMAKE_FLAGS -DPYTHON_INTERP=$PYTHON_INTERP ../..
 		make -j
 		cp -v $CPSOURCE $BINDIR/dgl_sparse
+		cd ..
 	done
 fi
