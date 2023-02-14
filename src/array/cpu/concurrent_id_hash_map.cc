@@ -144,7 +144,8 @@ IdArray ConcurrentIdHashMap<IdType>::MapIds(const IdArray& ids) const {
 }
 
 template <typename IdType>
-inline void ConcurrentIdHashMap<IdType>::Next(IdType* pos, IdType* delta) const {
+inline void ConcurrentIdHashMap<IdType>::Next(
+    IdType* pos, IdType* delta) const {
   // Use Quadric probing.
   *pos = (*pos + (*delta) * (*delta)) & mask_;
   *delta = *delta + 1;
