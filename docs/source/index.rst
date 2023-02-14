@@ -25,6 +25,7 @@ Welcome to Deep Graph Library Tutorials and Documentation
    guide/index
    guide_cn/index
    guide_ko/index
+   notebooks/sparse/index
    tutorials/large/index
    tutorials/cpu/index
    tutorials/multi/index
@@ -51,11 +52,10 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.ops
    api/python/dgl.optim
    api/python/dgl.sampling
+   api/python/dgl.sparse_v0
    api/python/dgl.multiprocessing
-   api/python/dgl.contrib.UnifiedTensor
    api/python/transforms
    api/python/udf
-   api/python/dgl.sparse_v0
 
 .. toctree::
    :maxdepth: 1

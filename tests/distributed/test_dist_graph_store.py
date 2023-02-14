@@ -119,7 +119,7 @@ def run_client_empty(
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph_empty(g, num_clients, num_nodes, num_edges)
@@ -165,9 +165,11 @@ def check_server_client_empty(shared_mem, num_servers, num_clients):
 
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
 
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
     print("clients have terminated")
 
@@ -185,7 +187,7 @@ def run_client(
     os.environ["DGL_GROUP_ID"] = str(group_id)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph(g, num_clients, num_nodes, num_edges)
@@ -204,7 +206,7 @@ def run_emb_client(
     os.environ["DGL_GROUP_ID"] = str(group_id)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_emb(g, num_clients, num_nodes, num_edges)
@@ -228,7 +230,7 @@ def run_optim_client(
         backend="gloo", rank=rank, world_size=world_size
     )
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_optim_store(rank, num_nodes, optimizer_states, save)
@@ -277,7 +279,7 @@ def run_client_hierarchy(
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     node_mask = F.tensor(node_mask)
@@ -528,6 +530,7 @@ def check_dist_emb_server_client(
         dgl.distributed.shutdown_servers("kv_ip_config.txt", num_servers)
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
     print("clients have terminated")
 
@@ -585,6 +588,7 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
             cli_ps.append(p)
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
 
     if keep_alive:
         for p in serv_ps:
@@ -593,6 +597,7 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
         dgl.distributed.shutdown_servers("kv_ip_config.txt", num_servers)
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
     print("clients have terminated")
 
@@ -659,9 +664,10 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
 
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
     for p in serv_ps:
         p.join()
-
+        assert p.exitcode == 0
     nodes1 = []
     edges1 = []
     for n, e in return_dict.values():
@@ -681,7 +687,7 @@ def run_client_hetero(
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("kv_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     check_dist_graph_hetero(g, num_clients, num_nodes, num_edges)
@@ -889,9 +895,11 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
 
     for p in cli_ps:
         p.join()
+        assert p.exitcode == 0
 
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
     print("clients have terminated")
 
@@ -1022,6 +1030,7 @@ def check_dist_optim_server_client(
 
     for p in serv_ps:
         p.join()
+        assert p.exitcode == 0
 
 
 @unittest.skipIf(

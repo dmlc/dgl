@@ -121,6 +121,8 @@ Utility Modules
     ~dgl.nn.pytorch.graph_transformer.BiasedMultiheadAttention
     ~dgl.nn.pytorch.graph_transformer.GraphormerLayer
     ~dgl.nn.pytorch.graph_transformer.PathEncoder
+    ~dgl.nn.pytorch.graph_transformer.SpatialEncoder
+    ~dgl.nn.pytorch.graph_transformer.SpatialEncoder3d
 
 Network Embedding Modules
 ----------------------------------------

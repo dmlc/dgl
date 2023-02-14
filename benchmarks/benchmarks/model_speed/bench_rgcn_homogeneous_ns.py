@@ -239,7 +239,7 @@ def track_time(data):
 
     g = g.formats('csc')
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    loader = dgl.dataloading.NodeDataLoader(
+    loader = dgl.dataloading.DataLoader(
         g,
         target_nids[train_idx],
         sampler,

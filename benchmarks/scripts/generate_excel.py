@@ -23,13 +23,9 @@ def get_branch_name_from_hash(hash):
 def main():
     results_path = Path("../results")
     results_path.is_dir()
-    benchmark_json_path = results_path / "benchmarks.json"
-    with benchmark_json_path.open() as f:
-        benchmark_json = json.load(f)
     machines = [f for f in results_path.glob("*") if f.is_dir()]
     output_results_dict = {}
     for machine in machines:
-        # commit_results_dict = {}
         per_machine_result = {}
         commit_results_json_paths = [
             f for f in machine.glob("*") if f.name != "machine.json"

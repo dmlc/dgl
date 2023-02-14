@@ -40,15 +40,14 @@ inline static SparseFormat FindAnyExistingFormat(
 inline static void ElementwiseOpSanityCheck(
     const c10::intrusive_ptr<SparseMatrix>& A,
     const c10::intrusive_ptr<SparseMatrix>& B) {
-  CHECK(A->value().dtype() == B->value().dtype())
-      << "Elementwise operators do not support two sparse matrices with "
-         "different dtypes. ("
-      << A->value().dtype() << " vs " << B->value().dtype() << ")";
-  CHECK(A->shape()[0] == B->shape()[0] && A->shape()[1] == B->shape()[1])
-      << "Elementwise operator do not support two sparse matrices with "
-         "different shapes. (["
-      << A->shape()[0] << ", " << A->shape()[1] << "] vs [" << B->shape()[0]
-      << ", " << B->shape()[1] << "])";
+  TORCH_CHECK(
+      A->value().dtype() == B->value().dtype(),
+      "Elementwise operators"
+      " do not support two sparse matrices with different dtypes.");
+  TORCH_CHECK(
+      A->shape()[0] == B->shape()[0] && A->shape()[1] == B->shape()[1],
+      "Elementwise operators do not support two sparse matrices with different"
+      " shapes.");
 }
 
 /** @brief Convert a Torch tensor to a DGL array. */

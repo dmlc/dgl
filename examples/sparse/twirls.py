@@ -9,13 +9,14 @@ with attention.
 """
 
 import argparse
+
+import dgl.sparse as dglsp
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
-
 from dgl.data import CoraGraphDataset
-import dgl.mock_sparse as dglsp
+from torch.optim import Adam
 
 
 class MLP(nn.Module):
@@ -183,9 +184,9 @@ if __name__ == "__main__":
     X = g.ndata["feat"]
 
     # Create the sparse adjacency matrix A.
-    src, dst = g.edges()
+    indices = torch.stack(g.edges())
     N = g.num_nodes()
-    A = dglsp.create_from_coo(dst, src, shape=(N, N))
+    A = dglsp.spmatrix(indices, shape=(N, N))
 
     # Create the TWIRLS model.
     in_size = X.shape[1]

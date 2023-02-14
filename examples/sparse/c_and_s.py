@@ -2,13 +2,12 @@
 [Combining Label Propagation and Simple Models Out-performs
 Graph Neural Networks](https://arxiv.org/abs/2010.13993)
 """
+import dgl.sparse as dglsp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import create_from_coo, diag, identity
 from torch.optim import Adam
-
 
 ###############################################################################
 # (HIGHLIGHT) Compute Label Propagation with Sparse Matrix API
@@ -100,14 +99,14 @@ if __name__ == "__main__":
     g = dataset[0].to(dev)
 
     # Create the sparse adjacency matrix A.
-    src, dst = g.edges()
+    indices = torch.stack(g.edges())
     N = g.num_nodes()
-    A = create_from_coo(dst, src, shape=(N, N))
+    A = dglsp.spmatrix(indices, shape=(N, N))
 
     # Calculate the symmetrically normalized adjacency matrix.
-    I = identity(A.shape, device=dev)
+    I = dglsp.identity(A.shape, device=dev)
     A_hat = A + I
-    D_hat = diag(A_hat.sum(dim=1)) ** -0.5
+    D_hat = dglsp.diag(A_hat.sum(dim=1)) ** -0.5
     A_hat = D_hat @ A_hat @ D_hat
 
     # Create models.

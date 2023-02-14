@@ -2,7 +2,7 @@
 
 dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so, build/dgl_sparse/*.so'
 // Currently DGL on Windows is not working with Cython yet
-dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll"
+dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll, build\\dgl_sparse\\*.dll"
 
 def init_git() {
   sh 'rm -rf *'
@@ -134,6 +134,8 @@ def is_admin(name) {
   return (name in admins)
 }
 
+def regression_test_done = false
+
 pipeline {
   agent any
   triggers {
@@ -196,7 +198,6 @@ pipeline {
       }
       when { triggeredBy 'IssueCommentCause' }
       steps {
-        // container('dgl-ci-lint') {
           checkout scm
           script {
               def comment = env.GITHUB_COMMENT
@@ -229,12 +230,12 @@ pipeline {
               }
               pullRequest.comment("Finished the Regression test. Result table is at https://dgl-asv-data.s3-us-west-2.amazonaws.com/${env.GIT_COMMIT}_${instance_type}/results/result.csv. Jenkins job link is ${RUN_DISPLAY_URL}. ")
               currentBuild.result = 'SUCCESS'
-              return
+              regression_test_done = true
           }
-        // }
       }
     }
     stage('CI') {
+      when { expression { !regression_test_done } }
       stages {
         stage('Lint Check') {
           agent {
@@ -261,7 +262,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:v230210"
                   args "-u root"
                   alwaysPull true
                 }
@@ -279,7 +280,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
+                  image "dgllib/dgl-ci-gpu:cu102_v230210"
                   args "-u root"
                   alwaysPull true
                 }
@@ -334,7 +335,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:v230210"
                   alwaysPull true
                 }
               }
@@ -351,7 +352,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
+                  image "dgllib/dgl-ci-gpu:cu102_v230210"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -380,7 +381,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:v230210"
                   alwaysPull true
                 }
               }
@@ -401,7 +402,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
+                  image "dgllib/dgl-ci-gpu:cu101_v230210"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -423,7 +424,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:v230210"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -475,7 +476,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v220816"
+                  image "dgllib/dgl-ci-gpu:cu102_v230210"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -503,7 +504,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:ssh_v220818"
+                  image "dgllib/dgl-ci-cpu:v230210"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -548,7 +549,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v220816"
+                  image "dgllib/dgl-ci-cpu:v230210"
                   alwaysPull true
                 }
               }

@@ -3,7 +3,6 @@ from collections.abc import Mapping, Sequence
 from queue import Queue, Empty, Full
 import itertools
 import threading
-from distutils.version import LooseVersion
 import math
 import inspect
 import re
@@ -23,15 +22,14 @@ from .._ffi.base import is_tensor_adaptor_enabled
 from ..heterograph import DGLGraph
 from ..utils import (
     recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads, get_num_threads,
-    get_numa_nodes_cores, context_of, dtype_of)
+    get_numa_nodes_cores, dtype_of, version)
 from ..frame import LazyFeature
 from ..storages import wrap_storage
-from .base import BlockSampler, as_edge_prediction_sampler
 from .. import backend as F
 from ..distributed import DistGraph
 from ..multiprocessing import call_once_and_share
 
-PYTORCH_VER = LooseVersion(torch.__version__)
+PYTORCH_VER = version.parse(torch.__version__)
 PYTHON_EXIT_STATUS = False
 def _set_python_exit_flag():
     global PYTHON_EXIT_STATUS
@@ -76,7 +74,7 @@ class _TensorizedDatasetIter(object):
         # convert the type-ID pairs to dictionary
         type_ids = batch[:, 0]
         indices = batch[:, 1]
-        if PYTORCH_VER >= LooseVersion("1.10.0"):
+        if PYTORCH_VER >= version.parse("1.10.0"):
             _, type_ids_sortidx = torch.sort(type_ids, stable=True)
         else:
             if not self.shuffle:
@@ -968,87 +966,6 @@ class DataLoader(torch.utils.data.DataLoader):
         self.other_storages[name] = wrap_storage(data)
 
 
-# Alias
-class NodeDataLoader(DataLoader):
-    """(DEPRECATED) Sampled graph data loader over a set of nodes.
-
-    .. deprecated:: 0.8
-
-        The class is deprecated since v0.8, replaced by :class:`~dgl.dataloading.DataLoader`.
-    """
-
-
-class EdgeDataLoader(DataLoader):
-    """(DEPRECATED) Sampled graph data loader over a set of edges.
-
-    .. deprecated:: 0.8
-
-        The class is deprecated since v0.8 -- its function has been covered by
-        :class:`~dgl.dataloading.DataLoader` and :func:`~dgl.as_edge_prediction_sampler`.
-
-        To migrate, change the legacy usage like:
-
-        .. code:: python
-
-            sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-            dataloader = dgl.dataloading.EdgeDataLoader(
-                g, train_eid, sampler, exclude='reverse_id',
-                reverse_eids=reverse_eids,
-                negative_sampler=dgl.dataloading.negative_sampler.Uniform(5),
-                batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-
-        to:
-
-        .. code:: python
-
-            sampler = dgl.dataloading.MultiLayerNeighborSampler([15, 10, 5])
-            sampler = dgl.dataloading.as_edge_prediction_sampler(
-                sampler, exclude='reverse_id',
-                reverse_eids=reverse_eids,
-                negative_sampler=dgl.dataloading.negative_sampler.Uniform(5))
-            dataloader = dgl.dataloading.DataLoader(
-                g, train_eid, sampler,
-                batch_size=1024, shuffle=True, drop_last=False, num_workers=4)
-    """
-    def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
-                 ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 use_prefetch_thread=False, use_alternate_streams=True,
-                 pin_prefetcher=False,
-                 exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
-                 use_uva=False, **kwargs):
-
-        if device is None:
-            if use_uva:
-                device = torch.cuda.current_device()
-            else:
-                device = graph.device
-        device = _get_device(device)
-
-        if isinstance(graph_sampler, BlockSampler):
-            dgl_warning(
-                'EdgeDataLoader directly taking a BlockSampler will be deprecated '
-                'and it will not support feature prefetching. '
-                'Please use dgl.dataloading.as_edge_prediction_sampler to wrap it.')
-            if reverse_eids is not None:
-                if use_uva:
-                    reverse_eids = recursive_apply(reverse_eids, lambda x: x.to(device))
-                else:
-                    reverse_eids_device = context_of(reverse_eids)
-                    indices_device = context_of(indices)
-                    if indices_device != reverse_eids_device:
-                        raise ValueError('Expect the same device for indices and reverse_eids')
-            graph_sampler = as_edge_prediction_sampler(
-                graph_sampler, exclude=exclude, reverse_eids=reverse_eids,
-                reverse_etypes=reverse_etypes, negative_sampler=negative_sampler)
-
-        super().__init__(
-            graph, indices, graph_sampler, device=device, use_ddp=use_ddp, ddp_seed=ddp_seed,
-            batch_size=batch_size, drop_last=drop_last, shuffle=shuffle,
-            use_prefetch_thread=use_prefetch_thread, use_alternate_streams=use_alternate_streams,
-            pin_prefetcher=pin_prefetcher, use_uva=use_uva,
-            **kwargs)
-
-
 ######## Graph DataLoaders ########
 # GraphDataLoader loads a set of graphs so it's not relevant to the above.  They are currently
 # copied from the old DataLoader implementation.
@@ -1207,17 +1124,15 @@ class GraphDataLoader(torch.utils.data.DataLoader):
             else:
                 dataloader_kwargs[k] = v
 
-        if collate_fn is None:
-            self.collate = GraphCollator(**collator_kwargs).collate
-        else:
-            self.collate = collate_fn
-
         self.use_ddp = use_ddp
         if use_ddp:
             self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
             dataloader_kwargs['sampler'] = self.dist_sampler
 
-        super().__init__(dataset=dataset, collate_fn=self.collate, **dataloader_kwargs)
+        if collate_fn is None and kwargs.get('batch_size', 1) is not None:
+            collate_fn = GraphCollator(**collator_kwargs).collate
+
+        super().__init__(dataset=dataset, collate_fn=collate_fn, **dataloader_kwargs)
 
     def set_epoch(self, epoch):
         """Sets the epoch number for the underlying sampler which ensures all replicas

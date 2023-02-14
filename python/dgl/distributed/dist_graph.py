@@ -430,7 +430,7 @@ class DistGraph:
     The example shows the creation of ``DistGraph`` in the standalone mode.
 
     >>> dgl.distributed.partition_graph(g, 'graph_name', 1, num_hops=1, part_method='metis',
-    ...                                 out_path='output/', reshuffle=True)
+    ...                                 out_path='output/')
     >>> g = dgl.distributed.DistGraph('graph_name', part_config='output/graph_name.json')
 
     The example shows the creation of ``DistGraph`` in the distributed mode.
@@ -513,7 +513,7 @@ class DistGraph:
         assert self._client is not None, \
                 'Distributed module is not initialized. Please call dgl.distributed.initialize.'
         self._g = _get_graph_from_shared_mem(self.graph_name)
-        self._gpb = get_shared_mem_partition_book(self.graph_name, self._g)
+        self._gpb = get_shared_mem_partition_book(self.graph_name)
         if self._gpb is None:
             self._gpb = gpb
         self._client.map_shared_data(self._gpb)
@@ -652,7 +652,9 @@ class DistGraph:
         --------
         The following example uses PyTorch backend.
 
-        >>> g = dgl.bipartite(([0, 1, 1, 2], [0, 0, 2, 1]), 'user', 'plays', 'game')
+        >>> g = dgl.heterograph({
+        ...     ('user', 'plays', 'game'): ([0, 1, 1, 2], [0, 0, 2, 1])
+        ... })
         >>> print(g.device)
         device(type='cpu')
         >>> g = g.to('cuda:0')

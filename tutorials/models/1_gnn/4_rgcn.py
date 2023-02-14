@@ -136,6 +136,9 @@ multiple edges among any given pair.
 #    efficient :class:`builtin R-GCN layer module <dgl.nn.pytorch.conv.RelGraphConv>`.
 #
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
+import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -194,11 +197,11 @@ class RGCNLayer(nn.Module):
                 # for input layer, matrix multiply can be converted to be
                 # an embedding lookup using source node id
                 embed = weight.view(-1, self.out_feat)
-                index = edges.data['rel_type'] * self.in_feat + edges.src['id']
+                index = edges.data[dgl.ETYPE] * self.in_feat + edges.src['id']
                 return {'msg': embed[index] * edges.data['norm']}
         else:
             def message_func(edges):
-                w = weight[edges.data['rel_type']]
+                w = weight[edges.data[dgl.ETYPE]]
                 msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
                 msg = msg * edges.data['norm']
                 return {'msg': msg}
@@ -278,22 +281,20 @@ class Model(nn.Module):
 # This tutorial uses Institute for Applied Informatics and Formal Description Methods (AIFB) dataset from R-GCN paper.
 
 # load graph data
-from dgl.contrib.data import load_data
-data = load_data(dataset='aifb')
-num_nodes = data.num_nodes
-num_rels = data.num_rels
-num_classes = data.num_classes
-labels = data.labels
-train_idx = data.train_idx
-# split training and validation set
-val_idx = train_idx[:len(train_idx) // 5]
-train_idx = train_idx[len(train_idx) // 5:]
-
-# edge type and normalization factor
-edge_type = torch.from_numpy(data.edge_type)
-edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1)
-
-labels = torch.from_numpy(labels).view(-1)
+dataset = dgl.data.rdf.AIFBDataset()
+g = dataset[0]
+category = dataset.predict_category
+train_mask = g.nodes[category].data.pop('train_mask')
+test_mask = g.nodes[category].data.pop('test_mask')
+train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
+test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
+labels = g.nodes[category].data.pop('label')
+num_rels = len(g.canonical_etypes)
+num_classes = dataset.num_classes
+# normalization factor
+for cetype in g.canonical_etypes:
+    g.edges[cetype].data['norm'] = dgl.norm_by_dst(g, cetype).unsqueeze(1)
+category_id = g.ntypes.index(category)
 
 ###############################################################################
 # Create graph and model
@@ -308,8 +309,9 @@ lr = 0.01 # learning rate
 l2norm = 0 # L2 norm coefficient
 
 # create graph
-g = DGLGraph((data.edge_src, data.edge_dst))
-g.edata.update({'rel_type': edge_type, 'norm': edge_norm})
+g = dgl.to_homogeneous(g, edata=['norm'])
+node_ids = torch.arange(g.num_nodes())
+target_idx = node_ids[g.ndata[dgl.NTYPE] == category_id]
 
 # create model
 model = Model(g.num_nodes(),
@@ -331,6 +333,7 @@ model.train()
 for epoch in range(n_epochs):
     optimizer.zero_grad()
     logits = model.forward(g)
+    logits = logits[target_idx]
     loss = F.cross_entropy(logits[train_idx], labels[train_idx])
     loss.backward()
 
@@ -338,9 +341,9 @@ for epoch in range(n_epochs):
 
     train_acc = torch.sum(logits[train_idx].argmax(dim=1) == labels[train_idx])
     train_acc = train_acc.item() / len(train_idx)
-    val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
-    val_acc = torch.sum(logits[val_idx].argmax(dim=1) == labels[val_idx])
-    val_acc = val_acc.item() / len(val_idx)
+    val_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
+    val_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx])
+    val_acc = val_acc.item() / len(test_idx)
     print("Epoch {:05d} | ".format(epoch) +
           "Train Accuracy: {:.4f} | Train Loss: {:.4f} | ".format(
               train_acc, loss.item()) +

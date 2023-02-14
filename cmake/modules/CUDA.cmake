@@ -21,6 +21,9 @@ if (NOT CUDA_VERSION VERSION_LESS "11.8")
   list(APPEND dgl_known_gpu_archs "90")
   set(dgl_cuda_arch_ptx "90")
 endif()
+if (NOT CUDA_VERSION VERSION_LESS "12.0")
+  list(REMOVE_ITEM dgl_known_gpu_archs "35")
+endif()
 
 ################################################################################################
 # A function for automatic detection of GPUs installed  (if autodetection is enabled)
@@ -53,7 +56,7 @@ set(CUDA_gpu_detect_output "")
       #find vcvarsall.bat and run it building msvc environment
       get_filename_component(MY_COMPILER_DIR ${CMAKE_CXX_COMPILER} DIRECTORY)
       find_file(MY_VCVARSALL_BAT vcvarsall.bat "${MY_COMPILER_DIR}/.." "${MY_COMPILER_DIR}/../..")
-      execute_process(COMMAND ${MY_VCVARSALL_BAT} && ${CUDA_NVCC_EXECUTABLE} -arch sm_35 --run  ${__cufile}
+      execute_process(COMMAND ${MY_VCVARSALL_BAT} && ${CUDA_NVCC_EXECUTABLE} -arch native --run  ${__cufile}
                       WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/CMakeFiles/"
                       RESULT_VARIABLE __nvcc_res OUTPUT_VARIABLE __nvcc_out
                       OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -61,7 +64,7 @@ set(CUDA_gpu_detect_output "")
       if(CUDA_LIBRARY_PATH)
         set(CUDA_LINK_LIBRARY_PATH "-L${CUDA_LIBRARY_PATH}")
       endif()
-      execute_process(COMMAND ${CUDA_NVCC_EXECUTABLE} -arch sm_35 --run ${__cufile} ${CUDA_LINK_LIBRARY_PATH}
+      execute_process(COMMAND ${CUDA_NVCC_EXECUTABLE} -arch native --run ${__cufile} ${CUDA_LINK_LIBRARY_PATH}
                       WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/CMakeFiles/"
                       RESULT_VARIABLE __nvcc_res OUTPUT_VARIABLE __nvcc_out
                       OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -99,6 +102,9 @@ endfunction()
 function(dgl_select_nvcc_arch_flags out_variable)
   # List of arch names. Turing and Ada don't have a new major version, so they are not added to default build.
   set(__archs_names "Kepler" "Maxwell" "Pascal" "Volta" "Turing" "Ampere" "Ada" "Hopper" "All" "Manual")
+  if (NOT CUDA_VERSION VERSION_LESS "12.0")
+    list(REMOVE_ITEM __archs_names "Kepler")
+  endif()
   set(__archs_name_default "All")
   if(NOT CMAKE_CROSSCOMPILING)
     list(APPEND __archs_names "Auto")

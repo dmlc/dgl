@@ -15,6 +15,5 @@ API Reference
    nn-mxnet
    dgl.ops
    dgl.sampling
-   dgl.contrib.UnifiedTensor
    udf
    transforms

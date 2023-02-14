@@ -12,7 +12,12 @@ import re
 # current version
 # We use the version of the incoming release for code
 # that is under development
-__version__ = "0.10" + os.getenv("DGL_PRERELEASE", "")
+# The environment variable DGL_PRERELEASE is the prerelase suffix
+# (usually "aYYMMDD")
+# The environment variable DGL_VERSION_SUFFIX is the local version label
+# suffix for indicating CPU and CUDA versions as in PEP 440 (e.g. "+cu102")
+__version__ = "1.0" + os.getenv("DGL_PRERELEASE", "") 
+__version__ += os.getenv("DGL_VERSION_SUFFIX", "")
 print(__version__)
 
 # Implementations
@@ -50,20 +55,20 @@ def main():
     # python path
     update(
         os.path.join(proj_root, "python", "dgl", "_ffi", "libinfo.py"),
-        r"(?<=__version__ = \")[.0-9a-z]+",
+        r"(?<=__version__ = \")[.0-9a-z+_]+",
         __version__,
     )
     # C++ header
     update(
         os.path.join(proj_root, "include", "dgl", "runtime", "c_runtime_api.h"),
-        '(?<=DGL_VERSION ")[.0-9a-z]+',
+        '(?<=DGL_VERSION ")[.0-9a-z+_]+',
         __version__,
     )
     # conda
     for path in ["dgl"]:
         update(
             os.path.join(proj_root, "conda", path, "meta.yaml"),
-            '(?<=version: ")[.0-9a-z]+',
+            "(?<=version: )[.0-9a-z+_]+",
             __version__,
         )
 

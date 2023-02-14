@@ -48,7 +48,6 @@ class EntityClassify(nn.Module):
         num_hidden_layers=1,
         dropout=0,
         use_self_loop=False,
-        low_mem=True,
         layer_norm=False,
     ):
         super(EntityClassify, self).__init__()
@@ -61,7 +60,6 @@ class EntityClassify(nn.Module):
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
         self.use_self_loop = use_self_loop
-        self.low_mem = low_mem
         self.layer_norm = layer_norm
 
         self.layers = nn.ModuleList()
@@ -75,7 +73,6 @@ class EntityClassify(nn.Module):
                 self.num_bases,
                 activation=F.relu,
                 self_loop=self.use_self_loop,
-                low_mem=self.low_mem,
                 dropout=self.dropout,
                 layer_norm=layer_norm,
             )
@@ -91,7 +88,6 @@ class EntityClassify(nn.Module):
                     self.num_bases,
                     activation=F.relu,
                     self_loop=self.use_self_loop,
-                    low_mem=self.low_mem,
                     dropout=self.dropout,
                     layer_norm=layer_norm,
                 )
@@ -106,7 +102,6 @@ class EntityClassify(nn.Module):
                 self.num_bases,
                 activation=None,
                 self_loop=self.use_self_loop,
-                low_mem=self.low_mem,
                 layer_norm=layer_norm,
             )
         )
@@ -236,7 +231,6 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
         num_hidden_layers=args.n_layers - 2,
         dropout=args.dropout,
         use_self_loop=args.use_self_loop,
-        low_mem=args.low_mem,
         layer_norm=args.layer_norm,
     )
 
@@ -373,14 +367,12 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
 @utils.skip_if_not_4gpu()
 @utils.benchmark("time", timeout=600)
 @utils.parametrize("data", ["am", "ogbn-mag"])
-@utils.parametrize("low_mem", [True, False])
 @utils.parametrize("dgl_sparse", [True, False])
-def track_time(data, low_mem, dgl_sparse):
+def track_time(data, dgl_sparse):
     # load graph data
     dataset = utils.process_data(data)
     args = config()
     devices = [0, 1, 2, 3]
-    args.low_mem = low_mem
     args.dgl_sparse = dgl_sparse
     args.dataset = dataset
     ogb_dataset = False
@@ -572,49 +564,8 @@ def config():
         node_feats=False,
         num_workers=0,
         dgl_sparse=False,
-        low_mem=False,
     )
-    # parser.add_argument("--dropout", type=float, default=0,
-    #         help="dropout probability")
-    # parser.add_argument("--n-hidden", type=int, default=16,
-    #         help="number of hidden units")
-    # parser.add_argument("--gpu", type=str, default='0',
-    #         help="gpu")
-    # parser.add_argument("--lr", type=float, default=1e-2,
-    #         help="learning rate")
-    # parser.add_argument("--sparse-lr", type=float, default=2e-2,
-    #         help="sparse embedding learning rate")
-    # parser.add_argument("--n-bases", type=int, default=-1,
-    #         help="number of filter weight matrices, default: -1 [use all]")
-    # parser.add_argument("--n-layers", type=int, default=2,
-    #         help="number of propagation rounds")
-    # parser.add_argument("-e", "--n-epochs", type=int, default=50,
-    #         help="number of training epochs")
-    # parser.add_argument("-d", "--dataset", type=str, required=True,
-    #         help="dataset to use")
-    # parser.add_argument("--l2norm", type=float, default=0,
-    #         help="l2 norm coef")
-    # parser.add_argument("--fanout", type=str, default="4, 4",
-    #         help="Fan-out of neighbor sampling.")
-    # parser.add_argument("--use-self-loop", default=False, action='store_true',
-    #         help="include self feature as a special relation")
-    # fp = parser.add_mutually_exclusive_group(required=False)
-    # parser.add_argument("--batch-size", type=int, default=100,
-    #         help="Mini-batch size. ")
-    # parser.add_argument("--eval-batch-size", type=int, default=32,
-    #         help="Mini-batch size. ")
-    # parser.add_argument("--num-workers", type=int, default=0,
-    #         help="Number of workers for dataloader.")
-    # parser.add_argument("--low-mem", default=False, action='store_true',
-    #         help="Whether use low mem RelGraphCov")
-    # parser.add_argument("--dgl-sparse", default=False, action='store_true',
-    #         help='Use sparse embedding for node embeddings.')
-    # parser.add_argument('--node-feats', default=False, action='store_true',
-    #         help='Whether use node features')
-    # parser.add_argument('--layer-norm', default=False, action='store_true',
-    #         help='Use layer norm')
-    # parser.set_defaults(validation=True)
-    # args = parser.parse_args()
+
     return args
 
 

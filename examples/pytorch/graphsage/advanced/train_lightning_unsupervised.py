@@ -122,13 +122,14 @@ class DataModule(LightningDataModule):
         self.reverse_eids = reverse_eids
 
     def train_dataloader(self):
-        return dgl.dataloading.EdgeDataLoader(
+        sampler = dgl.dataloading.as_edge_prediction_sampler(
+            self.sampler, exclude='reverse_id',
+            reverse_eids=self.reverse_eids,
+            negative_sampler=NegativeSampler(self.g, args.num_negs, args.neg_share))
+        return dgl.dataloading.DataLoader(
             self.g,
             np.arange(self.g.num_edges()),
-            self.sampler,
-            exclude='reverse_id',
-            reverse_eids=self.reverse_eids,
-            negative_sampler=NegativeSampler(self.g, args.num_negs, args.neg_share),
+            sampler,
             device=self.device,
             batch_size=self.batch_size,
             shuffle=True,

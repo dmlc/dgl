@@ -124,7 +124,7 @@ class DenseSAGEConv(nn.Module):
             feat_dst = self.feat_drop(feat[1])
         else:
             feat_src = feat_dst = self.feat_drop(feat)
-        adj = adj.float().to(feat_src.device)
+        adj = adj.to(feat_src)
         in_degrees = adj.sum(dim=1, keepdim=True)
         h_neigh = (adj @ feat_src + feat_dst) / (in_degrees + 1)
         rst = self.fc(h_neigh)

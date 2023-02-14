@@ -23,5 +23,4 @@ popd
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
-python -m pip install psutil || fail "pip install"
-python3 -m pytest -v --junitxml=pytest_go.xml --durations=100 tests/go || fail "go"
+python3 -m pytest -v --junitxml=pytest_go.xml --durations=100 tests/go/test_model.py || fail "go"

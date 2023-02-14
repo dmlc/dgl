@@ -8,7 +8,12 @@
 // clang-format on
 
 #include <sparse/elementwise_op.h>
+#include <sparse/reduction.h>
+#include <sparse/sddmm.h>
+#include <sparse/softmax.h>
 #include <sparse/sparse_matrix.h>
+#include <sparse/spmm.h>
+#include <sparse/spspmm.h>
 #include <torch/custom_class.h>
 #include <torch/script.h>
 
@@ -24,12 +29,24 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("coo", &SparseMatrix::COOTensors)
       .def("csr", &SparseMatrix::CSRTensors)
       .def("csc", &SparseMatrix::CSCTensors)
-      .def("transpose", &SparseMatrix::Transpose);
-  m.def("create_from_coo", &CreateFromCOO)
-      .def("create_from_csr", &CreateFromCSR)
-      .def("create_from_csc", &CreateFromCSC)
+      .def("transpose", &SparseMatrix::Transpose)
+      .def("coalesce", &SparseMatrix::Coalesce)
+      .def("has_duplicate", &SparseMatrix::HasDuplicate);
+  m.def("from_coo", &SparseMatrix::FromCOO)
+      .def("from_csr", &SparseMatrix::FromCSR)
+      .def("from_csc", &SparseMatrix::FromCSC)
       .def("spsp_add", &SpSpAdd)
-      .def("val_like", &CreateValLike);
+      .def("reduce", &Reduce)
+      .def("sum", &ReduceSum)
+      .def("smean", &ReduceMean)
+      .def("smin", &ReduceMin)
+      .def("smax", &ReduceMax)
+      .def("sprod", &ReduceProd)
+      .def("val_like", &SparseMatrix::ValLike)
+      .def("spmm", &SpMM)
+      .def("sddmm", &SDDMM)
+      .def("softmax", &Softmax)
+      .def("spspmm", &SpSpMM);
 }
 
 }  // namespace sparse

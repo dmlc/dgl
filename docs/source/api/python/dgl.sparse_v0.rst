@@ -1,137 +1,84 @@
 .. _apibackend:
 
-dgl.mock_sparse
+🆕 dgl.sparse
 =================================
 
-`dgl_sparse` is a library for sparse operators that are commonly used in GNN models.
-
-.. warning::
-    This is an experimental package. The sparse operators provided in this library do not guarantee the same performance as their message-passing api counterparts.
+`dgl.sparse` is a library for sparse operators that are commonly used in GNN models.
 
 Sparse matrix class
 -------------------------
-.. currentmodule:: dgl.mock_sparse
+.. currentmodule:: dgl.sparse
 
 .. class:: SparseMatrix
 
-    Class for creating a sparse matrix representation. The row and column indices of the sparse matrix can be the source
-    (row) and destination (column) indices of a homogeneous or heterogeneous graph.
+    A SparseMatrix can be created from Coordinate format indices using the
+    :func:`spmatrix` constructor:
 
-    There are a few ways to create a sparse matrix:
-
-    * In COO format using row and col indices, use :func:`create_from_coo`.
-    * In CSR format using row pointers and col indices, use :func:`create_from_csr`.
-    * In CSC format using col pointers and row indices, use :func:`create_from_csc`.
-
-    For example, we can create COO matrix as follows:
-
-    Case1: Sparse matrix with row and column indices without values.
-
-        >>> src = torch.tensor([1, 1, 2])
-        >>> dst = torch.tensor([2, 4, 3])
-        >>> A = create_from_coo(src, dst)
-        >>> A
+        >>> indices = torch.tensor([[1, 1, 2],
+        >>>                         [2, 4, 3]])
+        >>> A = dglsp.spmatrix(indices)
         SparseMatrix(indices=tensor([[1, 1, 2],
                                      [2, 4, 3]]),
                      values=tensor([1., 1., 1.]),
                      shape=(3, 5), nnz=3)
 
-    Case2: Sparse matrix with scalar/vector values. Following example is with
-    vector data.
-
-        >>> val = torch.tensor([[1, 1], [2, 2], [3, 3]])
-        >>> A = create_from_coo(src, dst, val)
-        SparseMatrix(indices=tensor([[1, 1, 2],
-                                     [2, 4, 3]]),
-                     values=tensor([[1, 1],
-                                    [2, 2],
-                                    [3, 3]]),
-                     shape=(3, 5), nnz=3)
-
-    Similarly, we can create CSR matrix as follows:
-
-        >>> indptr = torch.tensor([0, 1, 2, 5])
-        >>> indices = torch.tensor([1, 2, 0, 1, 2])
-        >>> val = torch.tensor([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
-        >>> A = create_from_csr(indptr, indices, val)
-        >>> A
-        SparseMatrix(indices=tensor([[0, 1, 2, 2, 2],
-                [1, 2, 0, 1, 2]]),
-        values=tensor([[1, 1],
-                [2, 2],
-                [3, 3],
-                [4, 4],
-                [5, 5]]),
-        shape=(3, 3), nnz=5)
-
-Sparse matrix class attributes
-------------------------------
+Creation Ops
+````````
 
 .. autosummary::
+    :toctree: ../../generated/
+
+    spmatrix
+    val_like
+    from_coo
+    from_csr
+    from_csc
+
+Attributes and methods
+``````````````````````
+
+.. autosummary::
+    :toctree: ../../generated/
 
     SparseMatrix.shape
     SparseMatrix.nnz
     SparseMatrix.dtype
     SparseMatrix.device
+    SparseMatrix.val
     SparseMatrix.row
     SparseMatrix.col
-    SparseMatrix.val
-    __call__
-    SparseMatrix.indices
     SparseMatrix.coo
     SparseMatrix.csr
     SparseMatrix.csc
-    SparseMatrix.dense
+    SparseMatrix.coalesce
+    SparseMatrix.has_duplicate
+    SparseMatrix.to_dense
+    SparseMatrix.to
+    SparseMatrix.cuda
+    SparseMatrix.cpu
+    SparseMatrix.float
+    SparseMatrix.double
+    SparseMatrix.int
+    SparseMatrix.long
+    SparseMatrix.transpose
     SparseMatrix.t
     SparseMatrix.T
-    SparseMatrix.transpose
+    SparseMatrix.neg
     SparseMatrix.reduce
     SparseMatrix.sum
     SparseMatrix.smax
     SparseMatrix.smin
     SparseMatrix.smean
-    SparseMatrix.__neg__
-    SparseMatrix.inv
     SparseMatrix.softmax
-    SparseMatrix.__matmul__
-
-.. autosummary::
-    :toctree: ../../generated/
-
-    create_from_coo
-    create_from_csr
-    create_from_csc
 
 Diagonal matrix class
 -------------------------
-.. currentmodule:: dgl.mock_sparse
+.. currentmodule:: dgl.sparse
 
-.. autoclass:: DiagMatrix
+.. class:: DiagMatrix
 
-Diagonal matrix class attributes
---------------------------------
-
-.. autosummary::
-
-    DiagMatrix.val
-    DiagMatrix.shape
-    DiagMatrix.__call__
-    DiagMatrix.nnz
-    DiagMatrix.dtype
-    DiagMatrix.device
-    DiagMatrix.as_sparse
-    DiagMatrix.t
-    DiagMatrix.T
-    DiagMatrix.transpose
-    DiagMatrix.reduce
-    DiagMatrix.sum
-    DiagMatrix.smax
-    DiagMatrix.smin
-    DiagMatrix.smean
-    DiagMatrix.__neg__
-    DiagMatrix.inv
-    DiagMatrix.softmax
-    DiagMatrix.__matmul__
+Creators
+````````
 
 .. autosummary::
     :toctree: ../../generated/
@@ -139,15 +86,65 @@ Diagonal matrix class attributes
     diag
     identity
 
-Operators
----------
-.. currentmodule:: dgl.mock_sparse
+Attributes and methods
+``````````````````````
 
 .. autosummary::
     :toctree: ../../generated/
 
+    DiagMatrix.shape
+    DiagMatrix.nnz
+    DiagMatrix.dtype
+    DiagMatrix.device
+    DiagMatrix.val
+    DiagMatrix.to_sparse
+    DiagMatrix.to_dense
+    DiagMatrix.to
+    DiagMatrix.cuda
+    DiagMatrix.cpu
+    DiagMatrix.float
+    DiagMatrix.double
+    DiagMatrix.int
+    DiagMatrix.long
+    DiagMatrix.transpose
+    DiagMatrix.t
+    DiagMatrix.T
+    DiagMatrix.neg
+    DiagMatrix.inv
+
+Operators
+---------
+.. currentmodule:: dgl.sparse
+
+Elementwise Operators
+````````
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    add
+    sub
+    mul
+    div
+    power
+
+Matrix Multiplication
+````````
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    matmul
     spmm
-    spspmm
     bspmm
-    bspspmm
+    spspmm
     sddmm
+    bsddmm
+
+Non-linear activation functions
+````````
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    softmax

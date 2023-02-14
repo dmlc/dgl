@@ -33,7 +33,6 @@ fi
 
 conda activate ${DGLBACKEND}-ci
 
-python3 -m pip install pytest psutil pyyaml pydantic pandas rdflib ogb || fail "pip install"
 if [ $DGLBACKEND == "mxnet" ]
 then
   python3 -m pytest -v --junitxml=pytest_compute.xml --durations=100 --ignore=tests/compute/test_ffi.py tests/compute || fail "compute"

@@ -43,16 +43,12 @@ from .. import subgraph
 from .. import function
 from ..sampling.neighbor import sample_neighbors
 
-# TO BE DEPRECATED
-from .._deprecate.graph import DGLGraph as DGLGraphStale
-
 __all__ = [
     'line_graph',
     'khop_adj',
     'khop_graph',
     'reverse',
     'to_bidirected',
-    'to_bidirected_stale',
     'add_reverse_edges',
     'laplacian_lambda_max',
     'knn_graph',
@@ -85,6 +81,7 @@ __all__ = [
     'to_double',
     'double_radius_node_labeling',
     'shortest_dist',
+    'svd_pe'
     ]
 
 
@@ -1318,59 +1315,6 @@ def to_simple_graph(g):
     """
     dgl_warning('dgl.to_simple_graph is renamed to dgl.to_simple in v0.5.')
     return to_simple(g)
-
-def to_bidirected_stale(g, readonly=True):
-    """NOTE: this function only works on the deprecated
-    :class:`dgl.DGLGraphStale` object.
-
-    Convert the graph to a bidirected graph.
-
-    The function generates a new graph with no node/edge feature.
-    If g has an edge for ``(u, v)`` but no edge for ``(v, u)``, then the
-    returned graph will have both ``(u, v)`` and ``(v, u)``.
-
-    If the input graph is a multigraph (there are multiple edges from node u to node v),
-    the returned graph isn't well defined.
-
-    Parameters
-    ----------
-    g : DGLGraphStale
-        The input graph.
-    readonly : bool
-        Whether the returned bidirected graph is readonly or not.
-
-        (Default: True)
-
-    Notes
-    -----
-    Please make sure g is a simple graph, otherwise the return value is undefined.
-
-    This function discards the batch information. Please use
-    :func:`dgl.DGLGraph.set_batch_num_nodes`
-    and :func:`dgl.DGLGraph.set_batch_num_edges` on the transformed graph
-    to maintain the information.
-
-    Returns
-    -------
-    DGLGraph
-
-    Examples
-    --------
-    The following two examples use PyTorch backend, one for non-multi graph
-    and one for multi-graph.
-
-    >>> g = dgl._deprecate.graph.DGLGraph()
-    >>> g.add_nodes(2)
-    >>> g.add_edges([0, 0], [0, 1])
-    >>> bg1 = dgl.to_bidirected_stale(g)
-    >>> bg1.edges()
-    (tensor([0, 1, 0]), tensor([0, 0, 1]))
-    """
-    if readonly:
-        newgidx = _CAPI_DGLToBidirectedImmutableGraph(g._graph)
-    else:
-        newgidx = _CAPI_DGLToBidirectedMutableGraph(g._graph)
-    return DGLGraphStale(newgidx)
 
 def laplacian_lambda_max(g):
     """Return the largest eigenvalue of the normalized symmetric Laplacian of a graph.
@@ -3564,7 +3508,7 @@ def radius_graph(x, r, p=2, self_loop=False,
     distances = th.cdist(x, x, p=p, compute_mode=compute_mode)
 
     if not self_loop:
-        distances.fill_diagonal_(r + 1e-4)
+        distances.fill_diagonal_(r + 1)
 
     edges = th.nonzero(distances <= r, as_tuple=True)
 
@@ -3969,5 +3913,84 @@ def shortest_dist(g, root=None, return_paths=False):
 
     return F.copy_to(F.tensor(dist, dtype=F.int64), g.device), \
         F.copy_to(F.tensor(paths, dtype=F.int64), g.device)
+
+
+def svd_pe(g, k, padding=False, random_flip=True):
+    r"""SVD-based Positional Encoding, as introduced in
+    `Global Self-Attention as a Replacement for Graph Convolution
+    <https://arxiv.org/pdf/2108.03348.pdf>`__
+
+    This function computes the largest :math:`k` singular values and
+    corresponding left and right singular vectors to form positional encodings.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        A DGLGraph to be encoded, which must be a homogeneous one.
+    k : int
+        Number of largest singular values and corresponding singular vectors
+        used for positional encoding.
+    padding : bool, optional
+        If False, raise an error when :math:`k > N`,
+        where :math:`N` is the number of nodes in :attr:`g`.
+        If True, add zero paddings in the end of encoding vectors when
+        :math:`k > N`.
+        Default : False.
+    random_flip : bool, optional
+        If True, randomly flip the signs of encoding vectors.
+        Proposed to be activated during training for better generalization.
+        Default : True.
+
+    Returns
+    -------
+    Tensor
+        Return SVD-based positional encodings of shape :math:`(N, 2k)`.
+
+    Example
+    -------
+    >>> import dgl
+
+    >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
+    >>> dgl.svd_pe(g, k=2, padding=False, random_flip=True)
+    tensor([[-6.3246e-01, -1.1373e-07, -6.3246e-01,  0.0000e+00],
+            [-6.3246e-01,  7.6512e-01, -6.3246e-01, -7.6512e-01],
+            [ 6.3246e-01,  4.7287e-01,  6.3246e-01, -4.7287e-01],
+            [-6.3246e-01, -7.6512e-01, -6.3246e-01,  7.6512e-01],
+            [ 6.3246e-01, -4.7287e-01,  6.3246e-01,  4.7287e-01]])
+    """
+    n = g.num_nodes()
+    if not padding and n < k:
+        raise ValueError(
+            "The number of singular values k must be no greater than the "
+            "number of nodes n, but " +
+            f"got {k} and {n} respectively."
+        )
+    a = g.adj(ctx=g.device, scipy_fmt="coo").toarray()
+    u, d, vh = scipy.linalg.svd(a)
+    v = vh.transpose()
+    m = min(n, k)
+    topm_u = u[:, 0:m]
+    topm_v = v[:, 0:m]
+    topm_sqrt_d = sparse.diags(np.sqrt(d[0:m]))
+    encoding = np.concatenate(
+        ((topm_u @ topm_sqrt_d), (topm_v @ topm_sqrt_d)), axis=1
+    )
+    # randomly flip row vectors
+    if random_flip:
+        rand_sign = 2 * (np.random.rand(n) > 0.5) - 1
+        flipped_encoding = F.tensor(
+            rand_sign[:, np.newaxis] * encoding, dtype=F.float32
+        )
+    else:
+        flipped_encoding = F.tensor(encoding, dtype=F.float32)
+
+    if n < k:
+        zero_padding = F.zeros(
+            [n, 2 * (k - n)], dtype=F.float32, ctx=F.context(flipped_encoding)
+        )
+        flipped_encoding = F.cat([flipped_encoding, zero_padding], dim=1)
+
+    return flipped_encoding
+
 
 _init_api("dgl.transform", __name__)

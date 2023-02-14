@@ -639,7 +639,7 @@ N*P).
 template <DGLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   if (!coo.row_sorted) {
-    const int64_t num_threads = omp_get_num_threads();
+    const int64_t num_threads = omp_get_max_threads();
     const int64_t num_nodes = coo.num_rows;
     const int64_t num_edges = coo.row->shape[0];
     // Besides graph density, num_threads is also taken into account. Below

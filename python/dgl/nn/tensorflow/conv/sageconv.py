@@ -76,7 +76,7 @@ class SAGEConv(layers.Layer):
     >>> with tf.device("CPU:0"):
     >>>     u = [0, 1, 0, 0, 1]
     >>>     v = [0, 1, 2, 3, 2]
-    >>>     g = dgl.bipartite((u, v))
+    >>>     g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     >>>     u_fea = tf.convert_to_tensor(np.random.rand(2, 5))
     >>>     v_fea = tf.convert_to_tensor(np.random.rand(4, 5))
     >>>     conv = SAGEConv((5, 10), 2, 'mean')

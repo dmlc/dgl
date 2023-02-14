@@ -107,7 +107,7 @@ class DenseGraphConv(nn.Module):
             The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is size of output feature.
         """
-        adj = adj.float().to(feat.device)
+        adj = adj.to(feat)
         src_degrees = adj.sum(dim=0).clamp(min=1)
         dst_degrees = adj.sum(dim=1).clamp(min=1)
         feat_src = feat

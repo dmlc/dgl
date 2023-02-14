@@ -142,7 +142,7 @@ xs = np.arange(len(global_densities))
 fanouts = [args.knn_k - 1 for i in range(args.num_conv + 1)]
 sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
 # fix the number of edges
-test_loader = dgl.dataloading.NodeDataLoader(
+test_loader = dgl.dataloading.DataLoader(
     g, torch.arange(g.number_of_nodes()), sampler,
     batch_size=args.batch_size,
     shuffle=False,
@@ -213,7 +213,7 @@ for level in range(args.levels):
     g = dataset.gs[0]
     g.ndata['pred_den'] = torch.zeros((g.number_of_nodes()))
     g.edata['prob_conn'] = torch.zeros((g.number_of_edges(), 2))
-    test_loader = dgl.dataloading.NodeDataLoader(
+    test_loader = dgl.dataloading.DataLoader(
         g, torch.arange(g.number_of_nodes()), sampler,
         batch_size=args.batch_size,
         shuffle=False,

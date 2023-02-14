@@ -1,6 +1,6 @@
 /**
  *  Copyright (c) 2022 by Contributors
- * @file dgl_headers.h
+ * @file sparse/dgl_headers.h
  * @brief DGL headers used in the sparse library. This is a workaround to
  * avoid the macro naming conflict between dmlc/logging.h and torch logger. This
  * file includes all the DGL headers used in the sparse library and
@@ -14,6 +14,7 @@
 
 #include <dgl/aten/coo.h>
 #include <dgl/aten/csr.h>
+#include <dgl/kernel.h>
 #include <dgl/runtime/dlpack_convert.h>
 #include <dmlc/logging.h>
 
@@ -38,15 +39,5 @@
 #undef LOG
 #undef DLOG
 #undef LOG_IF
-
-// For Pytorch version later than 1.12, redefine CHECK_* to TORCH_CHECK_*.
-#if !(TORCH_VERSION_MAJOR == 1 && TORCH_VERSION_MINOR <= 12)
-#define CHECK_EQ(val1, val2) TORCH_CHECK_EQ(val1, val2)
-#define CHECK_NE(val1, val2) TORCH_CHECK_NE(val1, val2)
-#define CHECK_LE(val1, val2) TORCH_CHECK_LE(val1, val2)
-#define CHECK_LT(val1, val2) TORCH_CHECK_LT(val1, val2)
-#define CHECK_GE(val1, val2) TORCH_CHECK_GE(val1, val2)
-#define CHECK_GT(val1, val2) TORCH_CHECK_GT(val1, val2)
-#endif
 
 #endif  // SPARSE_DGL_HEADERS_H_

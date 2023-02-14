@@ -682,7 +682,7 @@ elif mode == "client":
     dgl.distributed.initialize(ip_config, net_type=net_type)
 
     gpb, graph_name, _, _ = load_partition_book(
-        graph_path + "/{}.json".format(graph_name), part_id, None
+        graph_path + "/{}.json".format(graph_name), part_id
     )
     g = dgl.distributed.DistGraph(graph_name, gpb=gpb)
 

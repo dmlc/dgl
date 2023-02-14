@@ -18,8 +18,8 @@ if os.name != "nt":
     import struct
 
 # Create an one-part Graph
-node_map = F.tensor([0, 0, 0, 0, 0, 0], F.int64)
-edge_map = F.tensor([0, 0, 0, 0, 0, 0, 0], F.int64)
+node_map = {'_N': F.tensor([[0, 6]], F.int64)}
+edge_map = {('_N','_E','_N'): F.tensor([[0, 7]], F.int64)}
 global_nid = F.tensor([0, 1, 2, 3, 4, 5], F.int64)
 global_eid = F.tensor([0, 1, 2, 3, 4, 5, 6], F.int64)
 
@@ -36,8 +36,10 @@ g.add_edges(2, 5)  # 6
 g.ndata[dgl.NID] = global_nid
 g.edata[dgl.EID] = global_eid
 
-gpb = dgl.distributed.graph_partition_book.BasicPartitionBook(
-    part_id=0, num_parts=1, node_map=node_map, edge_map=edge_map, part_graph=g
+gpb = dgl.distributed.graph_partition_book.RangePartitionBook(
+    part_id=0, num_parts=1, node_map=node_map, edge_map=edge_map,
+    ntypes={ntype: i for i, ntype in enumerate(g.ntypes)},
+    etypes={etype: i for i, etype in enumerate(g.canonical_etypes)}
 )
 
 node_policy = dgl.distributed.PartitionPolicy(
@@ -110,8 +112,8 @@ def test_partition_policy():
         F.asnumpy(eid_partid),
         F.asnumpy(F.tensor([0, 0, 0, 0, 0, 0, 0], F.int64)),
     )
-    assert node_policy.get_part_size() == len(node_map)
-    assert edge_policy.get_part_size() == len(edge_map)
+    assert node_policy.get_part_size() == len(local_nid)
+    assert edge_policy.get_part_size() == len(local_eid)
 
 
 def start_server(server_id, num_clients, num_servers):

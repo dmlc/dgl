@@ -92,7 +92,7 @@ def run_client(graph_name, cli_id, part_id, server_count):
     os.environ["DGL_NUM_SERVER"] = str(server_count)
     dgl.distributed.initialize("optim_ip_config.txt")
     gpb, graph_name, _, _ = load_partition_book(
-        "/tmp/dist_graph/{}.json".format(graph_name), part_id, None
+        "/tmp/dist_graph/{}.json".format(graph_name), part_id
     )
     g = DistGraph(graph_name, gpb=gpb)
     policy = dgl.distributed.PartitionPolicy("node", g.get_partition_book())

@@ -278,7 +278,7 @@ def track_time(data):
     sparse_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler([fanout] * n_layers)
-    loader = dgl.dataloading.NodeDataLoader(
+    loader = dgl.dataloading.DataLoader(
         hg, {category: train_idx}, sampler,
         batch_size=batch_size, shuffle=True, num_workers=4)
 

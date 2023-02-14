@@ -110,7 +110,7 @@ def set_train_sampler_loader(g, k):
     fanouts = [k-1 for i in range(args.num_conv + 1)]
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
     # fix the number of edges
-    train_dataloader = dgl.dataloading.NodeDataLoader(
+    train_dataloader = dgl.dataloading.DataLoader(
         g, torch.arange(g.number_of_nodes()), sampler,
         batch_size=args.batch_size,
         shuffle=True,

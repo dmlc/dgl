@@ -90,7 +90,7 @@ def run(result_queue, proc_id, n_gpus, args, devices, data):
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
-    dataloader = dgl.dataloading.NodeDataLoader(
+    dataloader = dgl.dataloading.DataLoader(
         train_g,
         train_nid,
         sampler,

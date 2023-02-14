@@ -162,7 +162,6 @@ def test_standalone():
             test_dir,
             num_hops=num_hops,
             part_method="metis",
-            reshuffle=True,
             return_mapping=True,
         )
         part_config = os.path.join(test_dir, "test_sampling.json")
@@ -262,7 +261,6 @@ def check_neg_dataloader(g, num_server, num_workers):
             test_dir,
             num_hops=num_hops,
             part_method="metis",
-            reshuffle=True,
             return_mapping=True,
         )
         part_config = os.path.join(test_dir, "test_sampling.json")
@@ -308,17 +306,18 @@ def check_neg_dataloader(g, num_server, num_workers):
 
         for p in pserver_list:
             p.join()
+            assert p.exitcode == 0
         for p in ptrainer_list:
             p.join()
+            assert p.exitcode == 0
 
 
 @pytest.mark.parametrize("num_server", [3])
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
-@pytest.mark.parametrize("reshuffle", [True, False])
 @pytest.mark.parametrize("num_groups", [1])
 def test_dist_dataloader(
-    num_server, num_workers, drop_last, reshuffle, num_groups
+    num_server, num_workers, drop_last, num_groups
 ):
     reset_envs()
     # No multiple partitions on single machine for
@@ -341,7 +340,6 @@ def test_dist_dataloader(
             test_dir,
             num_hops=num_hops,
             part_method="metis",
-            reshuffle=reshuffle,
             return_mapping=True,
         )
 
@@ -392,6 +390,7 @@ def test_dist_dataloader(
 
         for p in ptrainer_list:
             p.join()
+            assert p.exitcode == 0
         if keep_alive:
             for p in pserver_list:
                 assert p.is_alive()
@@ -399,6 +398,7 @@ def test_dist_dataloader(
             dgl.distributed.shutdown_servers("mp_ip_config.txt", 1)
         for p in pserver_list:
             p.join()
+            assert p.exitcode == 0
 
 
 def start_node_dataloader(
@@ -556,7 +556,6 @@ def check_dataloader(g, num_server, num_workers, dataloader_type):
             test_dir,
             num_hops=num_hops,
             part_method="metis",
-            reshuffle=True,
             return_mapping=True,
         )
         part_config = os.path.join(test_dir, "test_sampling.json")
@@ -619,8 +618,10 @@ def check_dataloader(g, num_server, num_workers, dataloader_type):
             ptrainer_list.append(p)
         for p in pserver_list:
             p.join()
+            assert p.exitcode == 0
         for p in ptrainer_list:
             p.join()
+            assert p.exitcode == 0
 
 
 def create_random_hetero():
@@ -757,7 +758,9 @@ def test_multiple_dist_dataloaders(
         p_client.start()
 
         p_client.join()
+        assert p_client.exitcode == 0
         for p in p_servers:
             p.join()
+            assert p.exitcode == 0
     reset_envs()
 

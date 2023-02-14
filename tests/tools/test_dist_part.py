@@ -5,6 +5,7 @@ import tempfile
 import numpy as np
 import pytest
 import torch
+import pyarrow.parquet as pq
 from utils import create_chunked_dataset
 
 from distpartitioning import array_readwriter
@@ -80,6 +81,8 @@ def _verify_graph_feats(
 def _test_chunk_graph(
     num_chunks,
     data_fmt = 'numpy',
+    edges_fmt = 'csv',
+    vector_rows = False,
     num_chunks_nodes = None,
     num_chunks_edges = None,
     num_chunks_node_data = None,
@@ -88,7 +91,8 @@ def _test_chunk_graph(
     with tempfile.TemporaryDirectory() as root_dir:
 
         g = create_chunked_dataset(root_dir, num_chunks,
-                data_fmt=data_fmt,
+                data_fmt=data_fmt, edges_fmt=edges_fmt,
+                vector_rows=vector_rows,
                 num_chunks_nodes=num_chunks_nodes,
                 num_chunks_edges=num_chunks_edges,
                 num_chunks_node_data=num_chunks_node_data,
@@ -117,11 +121,17 @@ def _test_chunk_graph(
                     output_edge_index_dir, f'{c_etype_str}{i}.txt'
                 )
                 assert os.path.isfile(fname)
-                with open(fname, "r") as f:
-                    header = f.readline()
-                    num1, num2 = header.rstrip().split(" ")
-                    assert isinstance(int(num1), int)
-                    assert isinstance(int(num2), int)
+                if edges_fmt == 'csv':
+                    with open(fname, "r") as f:
+                        header = f.readline()
+                        num1, num2 = header.rstrip().split(" ")
+                        assert isinstance(int(num1), int)
+                        assert isinstance(int(num2), int)
+                elif edges_fmt == 'parquet':
+                    metadata = pq.read_metadata(fname)
+                    assert metadata.num_columns == 2
+                else:
+                    assert False, f"Invalid edges_fmt: {edges_fmt}"
 
         # check node/edge_data
         suffix = 'npy' if data_fmt=='numpy' else 'parquet'
@@ -179,8 +189,14 @@ def _test_chunk_graph(
 
 @pytest.mark.parametrize("num_chunks", [1, 8])
 @pytest.mark.parametrize("data_fmt", ['numpy', 'parquet'])
-def test_chunk_graph_basics(num_chunks, data_fmt):
-    _test_chunk_graph(num_chunks, data_fmt=data_fmt)
+@pytest.mark.parametrize("edges_fmt", ['csv', 'parquet'])
+def test_chunk_graph_basics(num_chunks, data_fmt, edges_fmt):
+    _test_chunk_graph(num_chunks, data_fmt=data_fmt, edges_fmt=edges_fmt)
+
+@pytest.mark.parametrize("num_chunks", [1, 8])
+@pytest.mark.parametrize("vector_rows", [True, False])
+def test_chunk_graph_vector_rows(num_chunks, vector_rows):
+    _test_chunk_graph(num_chunks, data_fmt='parquet', edges_fmt='parquet', vector_rows=vector_rows)
 
 
 @pytest.mark.parametrize(

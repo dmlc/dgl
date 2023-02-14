@@ -6,7 +6,7 @@ from torch.nn import functional as F
 
 from .... import function as fn
 from ....base import DGLError
-from ....utils import expand_as_pair, check_eq_shape, dgl_warning
+from ....utils import expand_as_pair, check_eq_shape
 
 
 class SAGEConv(nn.Module):
@@ -83,7 +83,7 @@ class SAGEConv(nn.Module):
     >>> # Case 2: Unidirectional bipartite graph
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
-    >>> g = dgl.bipartite((u, v))
+    >>> g = dgl.heterograph({('_N', '_E', '_N'):(u, v)})
     >>> u_fea = th.rand(2, 5)
     >>> v_fea = th.rand(4, 10)
     >>> conv = SAGEConv((5, 10), 2, 'mean')
@@ -116,18 +116,22 @@ class SAGEConv(nn.Module):
         self.norm = norm
         self.feat_drop = nn.Dropout(feat_drop)
         self.activation = activation
+
         # aggregator type: mean/pool/lstm/gcn
         if aggregator_type == 'pool':
             self.fc_pool = nn.Linear(self._in_src_feats, self._in_src_feats)
         if aggregator_type == 'lstm':
             self.lstm = nn.LSTM(self._in_src_feats, self._in_src_feats, batch_first=True)
-        if aggregator_type != 'gcn':
-            self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=False)
+
         self.fc_neigh = nn.Linear(self._in_src_feats, out_feats, bias=False)
-        if bias:
+
+        if aggregator_type != 'gcn':
+            self.fc_self = nn.Linear(self._in_dst_feats, out_feats, bias=bias)
+        elif bias:
             self.bias = nn.parameter.Parameter(torch.zeros(self._out_feats))
         else:
-            self.register_buffer('bias', None)
+            self.register_buffer("bias", None)
+
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -150,19 +154,6 @@ class SAGEConv(nn.Module):
         if self._aggre_type != 'gcn':
             nn.init.xavier_uniform_(self.fc_self.weight, gain=gain)
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
-
-    def _compatibility_check(self):
-        """Address the backward compatibility issue brought by #2747"""
-        if not hasattr(self, 'bias'):
-            dgl_warning("You are loading a GraphSAGE model trained from a old version of DGL, "
-                        "DGL automatically convert it to be compatible with latest version.")
-            bias = self.fc_neigh.bias
-            self.fc_neigh.bias = None
-            if hasattr(self, 'fc_self'):
-                if bias is not None:
-                    bias = bias + self.fc_self.bias
-                    self.fc_self.bias = None
-            self.bias = bias
 
     def _lstm_reducer(self, nodes):
         """LSTM reducer
@@ -204,7 +195,6 @@ class SAGEConv(nn.Module):
             where :math:`N_{dst}` is the number of destination nodes in the input graph,
             :math:`D_{out}` is the size of the output feature.
         """
-        self._compatibility_check()
         with graph.local_scope():
             if isinstance(feat, tuple):
                 feat_src = self.feat_drop(feat[0])
@@ -266,12 +256,12 @@ class SAGEConv(nn.Module):
             # GraphSAGE GCN does not require fc_self.
             if self._aggre_type == 'gcn':
                 rst = h_neigh
+                # add bias manually for GCN
+                if self.bias is not None:
+                    rst = rst + self.bias
             else:
                 rst = self.fc_self(h_self) + h_neigh
 
-            # bias term
-            if self.bias is not None:
-                rst = rst + self.bias
 
             # activation
             if self.activation is not None:

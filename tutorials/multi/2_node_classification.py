@@ -33,6 +33,8 @@ models with multi-GPU with ``DistributedDataParallel``.
 # tutorial.
 # 
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import dgl
 import torch
 import numpy as np
@@ -120,7 +122,7 @@ def run(proc_id, devices):
     # data loading.
     sampler = dgl.dataloading.NeighborSampler([4, 4])
     train_dataloader = dgl.dataloading.DataLoader(
-        # The following arguments are specific to NodeDataLoader.
+        # The following arguments are specific to DataLoader.
         graph,              # The graph
         train_nids,         # The node IDs to iterate over in minibatches
         sampler,            # The neighbor sampler

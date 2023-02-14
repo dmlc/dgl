@@ -285,9 +285,11 @@ class AtomicConv(nn.Module):
             number of radial filters, and :math:`T` for the number of types of atomic numbers.
         """
         with graph.local_scope():
-            radial_pooled_values = self.radial_pooling(distances)  # (K, E, 1)
+            radial_pooled_values = self.radial_pooling(distances).to(
+                feat
+            )  # (K, E, 1)
             if self.features_to_use is not None:
-                feat = (feat == self.features_to_use).float()  # (V, T)
+                feat = (feat == self.features_to_use).to(feat)  # (V, T)
             graph.ndata["hv"] = feat
             graph.edata["he"] = radial_pooled_values.transpose(1, 0).squeeze(
                 -1

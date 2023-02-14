@@ -3,11 +3,11 @@
 (https://arxiv.org/abs/1810.05997)
 """
 
+import dgl.sparse as dglsp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.data import CoraGraphDataset
-from dgl.mock_sparse import create_from_coo, diag, identity
 from torch.optim import Adam
 
 
@@ -35,13 +35,10 @@ class APPNP(nn.Module):
         self.alpha = alpha
 
     def forward(self, A_hat, X):
-        A_val_0 = A_hat.val
         Z_0 = Z = self.f_theta(X)
         for _ in range(self.num_hops):
-            A_hat.val = self.A_dropout(A_val_0)
-            Z = (1 - self.alpha) * A_hat @ Z + self.alpha * Z_0
-        # Reset A_hat.val to avoid value corruption.
-        A_hat.val = A_val_0
+            A_drop = dglsp.val_like(A_hat, self.A_dropout(A_hat.val))
+            Z = (1 - self.alpha) * A_drop @ Z + self.alpha * Z_0
         return Z
 
 
@@ -97,14 +94,14 @@ if __name__ == "__main__":
     g = dataset[0].to(dev)
 
     # Create the sparse adjacency matrix A.
-    src, dst = g.edges()
+    indices = torch.stack(g.edges())
     N = g.num_nodes()
-    A = create_from_coo(dst, src, shape=(N, N))
+    A = dglsp.spmatrix(indices, shape=(N, N))
 
     # Calculate the symmetrically normalized adjacency matrix.
-    I = identity(A.shape, device=dev)
+    I = dglsp.identity(A.shape, device=dev)
     A_hat = A + I
-    D_hat = diag(A_hat.sum(dim=1)) ** -0.5
+    D_hat = dglsp.diag(A_hat.sum(dim=1)) ** -0.5
     A_hat = D_hat @ A_hat @ D_hat
 
     # Create APPNP model.

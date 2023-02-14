@@ -9,9 +9,13 @@ consumption. This feature requires DGL 0.9+.
 
 Message-Passing with Half Precision
 -----------------------------------
-DGL allows message-passing on ``float16 (fp16)`` / ``bfloat16 (bf16)`` (requires CUDA >= 11.0)
+DGL allows message-passing on ``float16 (fp16)`` / ``bfloat16 (bf16)``
 features for both UDFs (User Defined Functions) and built-in functions
 (e.g., ``dgl.function.sum``, ``dgl.function.copy_u``).
+
+.. note::
+   Please check bfloat16 support via ``torch.cuda.is_bf16_supported()`` before using it.
+   Typically it requires CUDA >= 11.0 and GPU compute capability >= 8.0.
 
 The following example shows how to use DGL's message-passing APIs on half-precision
 features:

@@ -232,7 +232,7 @@ class GCN2Conv(nn.Module):
 
             # normalize  to get smoothed representation
             if edge_weight is None:
-                degs = graph.in_degrees().float().clamp(min=1)
+                degs = graph.in_degrees().to(feat).clamp(min=1)
                 norm = th.pow(degs, -0.5)
                 norm = norm.to(feat.device).unsqueeze(1)
             else:

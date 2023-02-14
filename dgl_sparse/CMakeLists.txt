@@ -1,12 +1,15 @@
-# Find PyTorch cmake files and PyTorch versions with the python interpreter $TORCH_PYTHON_INTERPS
+cmake_minimum_required(VERSION 3.5)
+project(dgl_sparse C CXX)
+
+# Find PyTorch cmake files and PyTorch versions with the python interpreter $PYTHON_INTERP
 # ("python3" or "python" if empty)
-if(NOT TORCH_PYTHON_INTERPS)
-  find_program(TORCH_PYTHON_INTERPS NAMES python3 python)
+if(NOT PYTHON_INTERP)
+  find_program(PYTHON_INTERP NAMES python3 python)
 endif()
-message(STATUS "Using Python interpreter: ${TORCH_PYTHON_INTERPS}")
+message(STATUS "Using Python interpreter: ${PYTHON_INTERP}")
 file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/find_cmake.py FIND_CMAKE_PY)
 execute_process(
-  COMMAND ${TORCH_PYTHON_INTERPS} ${FIND_CMAKE_PY}
+  COMMAND ${PYTHON_INTERP} ${FIND_CMAKE_PY}
   OUTPUT_VARIABLE TORCH_PREFIX_VER
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "find_cmake.py output: ${TORCH_PREFIX_VER}")
@@ -24,6 +27,9 @@ endif()
 set(Torch_DIR "${TORCH_PREFIX}/Torch")
 message(STATUS "Setting directory to ${Torch_DIR}")
 find_package(Torch REQUIRED)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${TORCH_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
 
 set(LIB_DGL_SPARSE_NAME "dgl_sparse_pytorch_${TORCH_VER}")
 
@@ -41,9 +47,8 @@ target_compile_definitions(${LIB_DGL_SPARSE_NAME} PRIVATE TORCH_VERSION_MAJOR=${
 target_compile_definitions(${LIB_DGL_SPARSE_NAME} PRIVATE TORCH_VERSION_MINOR=${TORCH_VERSION_MINOR})
 
 target_include_directories(${LIB_DGL_SPARSE_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/third_party/dmlc-core/include")
-target_link_libraries(${LIB_DGL_SPARSE_NAME} dmlc)
+message(STATUS "DGL include directories: ${DGL_INCLUDE_DIRS}")
+target_include_directories(${LIB_DGL_SPARSE_NAME} PRIVATE ${DGL_INCLUDE_DIRS})
+target_link_directories(${LIB_DGL_SPARSE_NAME} PRIVATE ${DGL_BUILD_DIR} "${DGL_BUILD_DIR}/third_party/dmlc-core")
+target_link_libraries(${LIB_DGL_SPARSE_NAME} dmlc dgl)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
-
-
-target_include_directories(${LIB_DGL_SPARSE_NAME} PRIVATE ${DGL_INCLUDE})
-target_link_libraries(${LIB_DGL_SPARSE_NAME} dgl)
