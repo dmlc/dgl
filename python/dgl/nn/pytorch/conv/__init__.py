@@ -14,8 +14,8 @@ from .densesageconv import DenseSAGEConv
 from .dgnconv import DGNConv
 from .dotgatconv import DotGatConv
 from .edgeconv import EdgeConv
-from .egatconv import EGATConv
 from .edgegatconv import EdgeGATConv
+from .egatconv import EGATConv
 from .egnnconv import EGNNConv
 from .gatconv import GATConv
 from .gatedgraphconv import GatedGraphConv
