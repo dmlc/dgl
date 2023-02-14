@@ -51,13 +51,13 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
     bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr) {
   std::vector<IdArray> &lhs_nodes = *lhs_nodes_ptr;
   const bool generate_lhs_nodes = lhs_nodes.empty();
-  const auto& ctx = graph->Context();
+  const auto &ctx = graph->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
 
   const int64_t num_etypes = graph->NumEdgeTypes();
   const int64_t num_ntypes = graph->NumVertexTypes();
   std::vector<EdgeArray> edge_arrays(num_etypes);
-  
+
   CHECK(rhs_nodes.size() == static_cast<size_t>(num_ntypes))
       << "rhs_nodes not given for every node type";
 
@@ -129,7 +129,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
     }
   }
 
-  if (generate_lhs_nodes) lhs_nodes.resize(num_ntypes);
+  if (generate_lhs_nodes) lhs_nodes.reserve(num_ntypes);
 
   std::vector<int64_t> num_nodes_per_type(num_ntypes * 2);
   // Populate RHS nodes from what we already know.
@@ -140,14 +140,16 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
   std::vector<ConcurrentIdHashMap<IdType>> lhs_nodes_map(num_ntypes);
   std::vector<ConcurrentIdHashMap<IdType>> rhs_nodes_map(num_ntypes);
   for (int64_t ntype = 0; ntype < num_ntypes; ntype++) {
-    if (rhs_nodes[ntype]->shape[0] > 0) {
+    if (!aten::IsNullArray(rhs_nodes[ntype])) {
       rhs_nodes_map[ntype].Init(rhs_nodes[ntype]);
     }
-    if (src_nodes[ntype]->shape[0] > 0) {
-      auto unique_ids = lhs_nodes_map[ntype].Init(src_nodes[ntype]);
-      if (generate_lhs_nodes)
-        lhs_nodes[ntype] = unique_ids;
-      num_nodes_per_type[ntype] = lhs_nodes[ntype]->shape[0];
+    IdArray unique_ids = aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx);
+    if (!aten::IsNullArray(src_nodes[ntype])) {
+      unique_ids = lhs_nodes_map[ntype].Init(src_nodes[ntype]);
+    }
+    if (generate_lhs_nodes) {
+      num_nodes_per_type[ntype] = unique_ids->shape[0];
+      lhs_nodes.emplace_back(unique_ids);
     }
   }
 
@@ -179,8 +181,8 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
   new_rhs.reserve(edge_arrays.size());
   const int64_t num_edge_sets = static_cast<int64_t>(edge_arrays.size());
   for (int64_t etype = 0; etype < num_edge_sets; ++etype) {
-    const EdgeArray& edges = edge_arrays[etype];
-    if (edges.id.defined() && edges.src->shape[0] > 0) {
+    const EdgeArray &edges = edge_arrays[etype];
+    if (edges.id.defined() && !aten::IsNullArray(edges.src)) {
       const int64_t num_edges = edges.src->shape[0];
       const auto src_dst_types = graph->GetEndpointTypes(etype);
       const int src_type = src_dst_types.first;
