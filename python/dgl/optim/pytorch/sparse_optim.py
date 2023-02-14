@@ -453,11 +453,37 @@ class SparseGradOptimizer(abc.ABC):
         self._clean_grad = True
 
     def state_dict(self, **kwargs):
+        """Return a copy of the whole optimizer states stored in CPU memory.
+        If this is a multi-processing instance, the states will be returned in
+        shared memory. If the underlying embedding is currently stored on
+        multiple GPUs, all processes must call this method in the same order.
+
+        NOTE: This method must be called by all processes sharing the
+        underlying embedding, or it may result in a deadlock.
+
+        Returns
+        -------
+        dictionary of optimizer states
+            The optimizer states stored in CPU memory.
+        """
         return {emb.name: emb.all_get_optm_state() for emb in self._params}
 
     def load_state_dict(self, state_dict, **kwargs):
+        """Load the optimizer states. This method must be called by all
+        processes sharing the underlying embedding with identical
+        :attr:`state_dict`.
+
+        NOTE: This method must be called by all processes sharing the
+        underlying embedding, or it may result in a deadlock.
+
+        Parameters
+        ----------
+        state_dict : dictionary of optimizer states
+            The global states to pull values from.
+        """
         for emb in self._params:
             emb.all_set_optm_state(state_dict[emb.name])
+
 
 class SparseAdagrad(SparseGradOptimizer):
     r"""Node embedding optimizer using the Adagrad algorithm.
@@ -568,7 +594,7 @@ class SparseAdagrad(SparseGradOptimizer):
         grad_values = grad_values / cnt.unsqueeze(1)
 
         grad_sum = grad_values * grad_values
-        state, = emb.optm_state
+        (state,) = emb.optm_state
         state_dev = state.device
         state_idx = grad_indices.to(state_dev)
         grad_state = state[state_idx].to(grad.device)
@@ -578,6 +604,15 @@ class SparseAdagrad(SparseGradOptimizer):
         std_values = grad_state.add_(eps).sqrt_()
         tmp = clr * grad_values / std_values
         emb.weight[state_idx] -= tmp.to(state_dev)
+
+    @property
+    def param_groups(self):
+        """Emulate 'param_groups' of torch.optim.Optimizer.
+        Different from that, the returned 'param_groups' doesn't contain
+        parameters because getting the whole embedding is very expensive.
+        It contains other attributes, e.g., lr, eps, for debugging.
+        """
+        return [{"lr": self._lr, "eps": self._eps}]
 
 
 class SparseAdam(SparseGradOptimizer):
@@ -869,3 +904,18 @@ class SparseAdam(SparseGradOptimizer):
                 # can use it
                 std_event.wait()
             emb.weight[state_idx] -= std_values_dst
+
+    @property
+    def param_groups(self):
+        """Emulate 'param_groups' of torch.optim.Optimizer.
+        Different from that, the returned 'param_groups' doesn't contain
+        parameters because getting the whole embedding is very expensive.
+        It contains other attributes, e.g., lr, betas, eps, for debugging.
+        """
+        return [
+            {
+                "lr": self._lr,
+                "betas": (self._beta1, self._beta2),
+                "eps": self._eps,
+            }
+        ]

@@ -349,6 +349,7 @@ class NodeEmbedding:  # NodeEmbedding
             th.distributed.barrier()
 
     def _all_get_tensor(self, shared_name, tensor, shape):
+        """A helper function to get model-parallel tensors."""
         # create a shared memory tensor
         if self._rank == 0:
             # root process creates shared memory
@@ -406,6 +407,19 @@ class NodeEmbedding:  # NodeEmbedding
             return self._tensor
 
     def all_get_optm_state(self):
+        """Return a copy of the whole optimizer states stored in CPU memory.
+        If this is a multi-processing instance, the states will be returned in
+        shared memory. If the embedding is currently stored on multiple GPUs,
+        all processes must call this method in the same order.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
+
+        Returns
+        -------
+        tuple of torch.Tensor
+            The optimizer states stored in CPU memory.
+        """
         if self._partition:
             if self._world_size == 0:
                 # non-multiprocessing
@@ -426,6 +440,18 @@ class NodeEmbedding:  # NodeEmbedding
             return self._optm_state
 
     def all_set_optm_state(self, states):
+        """Set the optimizer states of the embedding. This method must be
+        called by all processes sharing the embedding with identical
+        :attr:`states`.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
+
+        Parameters
+        ----------
+        states : tuple of torch.Tensor
+            The global states to pull values from.
+        """
         if self._partition:
             idxs = F.copy_to(
                 self._partition.get_local_indices(
