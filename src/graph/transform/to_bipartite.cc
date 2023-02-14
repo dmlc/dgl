@@ -43,24 +43,109 @@ namespace transform {
 
 namespace {
 
+template <typename IdType>
+struct GetMappingIdsCPU {
+  std::tuple<std::vector<IdArray>, std::vector<IdArray>> operator() (
+    const HeteroGraphPtr& graph, int64_t num_ntypes, const DGLContext& ctx,
+    const std::vector<int64_t>& maxNodesPerType, const std::vector<EdgeArray>& edge_arrays,
+    const std::vector<IdArray>& src_nodes, const std::vector<IdArray>& rhs_nodes,
+    std::vector<IdArray>& lhs_nodes, std::vector<int64_t>& num_nodes_per_type) {
+      const bool generate_lhs_nodes = lhs_nodes.empty();
+
+      if (generate_lhs_nodes) lhs_nodes.reserve(num_ntypes);
+
+      std::vector<ConcurrentIdHashMap<IdType>> lhs_nodes_map(num_ntypes);
+      std::vector<ConcurrentIdHashMap<IdType>> rhs_nodes_map(num_ntypes);
+      for (int64_t ntype = 0; ntype < num_ntypes; ntype++) {
+        if (!aten::IsNullArray(rhs_nodes[ntype])) {
+          rhs_nodes_map[ntype].Init(rhs_nodes[ntype]);
+        }
+        IdArray unique_ids = aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx);
+        if (!aten::IsNullArray(src_nodes[ntype])) {
+          unique_ids = lhs_nodes_map[ntype].Init(src_nodes[ntype]);
+        }
+        if (generate_lhs_nodes) {
+          num_nodes_per_type[ntype] = unique_ids->shape[0];
+          lhs_nodes.emplace_back(unique_ids);
+        }
+      }
+
+      // Map node numberings from global to local, and build pointer for CSR.
+      std::vector<IdArray> new_lhs;
+      std::vector<IdArray> new_rhs;
+      new_lhs.reserve(edge_arrays.size());
+      new_rhs.reserve(edge_arrays.size());
+      const int64_t num_edge_sets = static_cast<int64_t>(edge_arrays.size());
+      for (int64_t etype = 0; etype < num_edge_sets; ++etype) {
+        const EdgeArray &edges = edge_arrays[etype];
+        if (edges.id.defined() && !aten::IsNullArray(edges.src)) {
+          const auto src_dst_types = graph->GetEndpointTypes(etype);
+          const int src_type = src_dst_types.first;
+          const int dst_type = src_dst_types.second;
+          new_lhs.emplace_back(lhs_nodes_map[src_type].MapIds(edges.src));
+          new_rhs.emplace_back(rhs_nodes_map[dst_type].MapIds(edges.dst));
+        } else {
+          new_lhs.emplace_back(
+              aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx));
+          new_rhs.emplace_back(
+              aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx));
+        }
+      }
+      return std::tuple<std::vector<IdArray>, std::vector<IdArray>>(
+      std::move(new_lhs), std::move(new_rhs));
+    }
+};
+
 // Since partial specialization is not allowed for functions, use this as an
 // intermediate for ToBlock where XPU = kDGLCPU.
 template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr) {
-  std::vector<IdArray> &lhs_nodes = *lhs_nodes_ptr;
+      return ToBlockProcess<IdType>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes_ptr, GetMappingIdsCPU<IdType>());
+}
+
+}  // namespace
+
+template <>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCPU, int32_t>(
+    HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
+    bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes) {
+  return ToBlockCPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
+}
+
+template <>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCPU, int64_t>(
+    HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
+    bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes) {
+  return ToBlockCPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
+}
+
+template <typename IdType>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
+    HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
+    const bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr,
+    MappingIdsFunc&& get_maping_ids) {
+  std::vector<IdArray>& lhs_nodes = *lhs_nodes_ptr;
   const bool generate_lhs_nodes = lhs_nodes.empty();
-  const auto &ctx = graph->Context();
+
+  const auto& ctx = graph->Context();
   auto device = runtime::DeviceAPI::Get(ctx);
+
+  // Since DST nodes are included in SRC nodes, a common requirement is to fetch
+  // the DST node features from the SRC nodes features. To avoid expensive
+  // sparse lookup, the function assures that the DST nodes in both SRC and DST
+  // sets have the same ids. As a result, given the node feature tensor ``X`` of
+  // type ``utype``, the following code finds the corresponding DST node
+  // features of type ``vtype``:
 
   const int64_t num_etypes = graph->NumEdgeTypes();
   const int64_t num_ntypes = graph->NumVertexTypes();
-  std::vector<EdgeArray> edge_arrays(num_etypes);
 
   CHECK(rhs_nodes.size() == static_cast<size_t>(num_ntypes))
       << "rhs_nodes not given for every node type";
 
+  std::vector<EdgeArray> edge_arrays(num_etypes);
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t dsttype = src_dst_types.second;
@@ -69,10 +154,11 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
     }
   }
 
-  // Count LHS and RHS nodes upper bound size.
+  // count lhs and rhs nodes
   std::vector<int64_t> maxNodesPerType(num_ntypes * 2, 0);
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
     maxNodesPerType[ntype + num_ntypes] += rhs_nodes[ntype]->shape[0];
+
     if (generate_lhs_nodes) {
       if (include_rhs_in_lhs) {
         maxNodesPerType[ntype] += rhs_nodes[ntype]->shape[0];
@@ -82,6 +168,8 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
     }
   }
   if (generate_lhs_nodes) {
+    // we don't have lhs_nodes, see we need to count inbound edges to get an
+    // upper bound
     for (int64_t etype = 0; etype < num_etypes; ++etype) {
       const auto src_dst_types = graph->GetEndpointTypes(etype);
       const dgl_type_t srctype = src_dst_types.first;
@@ -91,7 +179,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
     }
   }
 
-  // Gather duplicated LHS nodes.
+  // gather lhs_nodes
   std::vector<IdArray> src_nodes(num_ntypes);
   if (generate_lhs_nodes) {
     std::vector<int64_t> src_node_offsets(num_ntypes, 0);
@@ -99,7 +187,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
       src_nodes[ntype] =
           NewIdArray(maxNodesPerType[ntype], ctx, sizeof(IdType) * 8);
       if (include_rhs_in_lhs) {
-        // Place RHS nodes first.
+        // place rhs nodes first
         device->CopyDataFromTo(
             rhs_nodes[ntype].Ptr<IdType>(), 0, src_nodes[ntype].Ptr<IdType>(),
             src_node_offsets[ntype],
@@ -129,29 +217,18 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
     }
   }
 
-  if (generate_lhs_nodes) lhs_nodes.reserve(num_ntypes);
-
   std::vector<int64_t> num_nodes_per_type(num_ntypes * 2);
-  // Populate RHS nodes from what we already know.
+  // populate RHS nodes from what we already know
   for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
     num_nodes_per_type[num_ntypes + ntype] = rhs_nodes[ntype]->shape[0];
   }
-
-  std::vector<ConcurrentIdHashMap<IdType>> lhs_nodes_map(num_ntypes);
-  std::vector<ConcurrentIdHashMap<IdType>> rhs_nodes_map(num_ntypes);
-  for (int64_t ntype = 0; ntype < num_ntypes; ntype++) {
-    if (!aten::IsNullArray(rhs_nodes[ntype])) {
-      rhs_nodes_map[ntype].Init(rhs_nodes[ntype]);
-    }
-    IdArray unique_ids = aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx);
-    if (!aten::IsNullArray(src_nodes[ntype])) {
-      unique_ids = lhs_nodes_map[ntype].Init(src_nodes[ntype]);
-    }
-    if (generate_lhs_nodes) {
-      num_nodes_per_type[ntype] = unique_ids->shape[0];
-      lhs_nodes.emplace_back(unique_ids);
-    }
-  }
+  
+  std::vector<IdArray> new_lhs;
+  std::vector<IdArray> new_rhs;
+  std::tie(new_lhs, new_rhs) = get_maping_ids(
+          graph, num_ntypes, ctx,
+          maxNodesPerType, edge_arrays, src_nodes,
+          rhs_nodes, lhs_nodes, num_nodes_per_type);
 
   std::vector<IdArray> induced_edges;
   induced_edges.reserve(num_etypes);
@@ -160,44 +237,22 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
       induced_edges.push_back(edge_arrays[etype].id);
     } else {
       induced_edges.push_back(
-          aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx));
+          aten::NullArray(DGLDataType{kDGLInt, sizeof(IdType) * 8, 1}, ctx));
     }
   }
 
-  // Build metagraph.
+  // build metagraph -- small enough to be done on CPU
   const auto meta_graph = graph->meta_graph();
   const EdgeArray etypes = meta_graph->Edges("eid");
   const IdArray new_dst = Add(etypes.dst, num_ntypes);
   const auto new_meta_graph =
       ImmutableGraph::CreateFromCOO(num_ntypes * 2, etypes.src, new_dst);
 
+  // allocate vector for graph relations while GPU is busy
   std::vector<HeteroGraphPtr> rel_graphs;
   rel_graphs.reserve(num_etypes);
 
-  // Map node numberings from global to local, and build pointer for CSR.
-  std::vector<IdArray> new_lhs;
-  std::vector<IdArray> new_rhs;
-  new_lhs.reserve(edge_arrays.size());
-  new_rhs.reserve(edge_arrays.size());
-  const int64_t num_edge_sets = static_cast<int64_t>(edge_arrays.size());
-  for (int64_t etype = 0; etype < num_edge_sets; ++etype) {
-    const EdgeArray &edges = edge_arrays[etype];
-    if (edges.id.defined() && !aten::IsNullArray(edges.src)) {
-      const int64_t num_edges = edges.src->shape[0];
-      const auto src_dst_types = graph->GetEndpointTypes(etype);
-      const int src_type = src_dst_types.first;
-      const int dst_type = src_dst_types.second;
-      new_lhs.emplace_back(lhs_nodes_map[src_type].MapIds(edges.src));
-      new_rhs.emplace_back(rhs_nodes_map[dst_type].MapIds(edges.dst));
-    } else {
-      new_lhs.emplace_back(
-          aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx));
-      new_rhs.emplace_back(
-          aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx));
-    }
-  }
-
-  // Build the heterograph.
+  // build the heterograph
   for (int64_t etype = 0; etype < num_etypes; ++etype) {
     const auto src_dst_types = graph->GetEndpointTypes(etype);
     const dgl_type_t srctype = src_dst_types.first;
@@ -207,8 +262,8 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
       // No rhs nodes are given for this edge type. Create an empty graph.
       rel_graphs.push_back(CreateFromCOO(
           2, lhs_nodes[srctype]->shape[0], rhs_nodes[dsttype]->shape[0],
-          aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx),
-          aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx)));
+          aten::NullArray(DGLDataType{kDGLInt, sizeof(IdType) * 8, 1}, ctx),
+          aten::NullArray(DGLDataType{kDGLInt, sizeof(IdType) * 8, 1}, ctx)));
     } else {
       rel_graphs.push_back(CreateFromCOO(
           2, lhs_nodes[srctype]->shape[0], rhs_nodes[dsttype]->shape[0],
@@ -219,24 +274,8 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
   HeteroGraphPtr new_graph =
       CreateHeteroGraph(new_meta_graph, rel_graphs, num_nodes_per_type);
 
-  // Return the new graph, the new src nodes, and new edges.
+  // return the new graph, the new src nodes, and new edges
   return std::make_tuple(new_graph, induced_edges);
-}
-
-}  // namespace
-
-template <>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCPU, int32_t>(
-    HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
-    bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes) {
-  return ToBlockCPU<int32_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
-}
-
-template <>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCPU, int64_t>(
-    HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
-    bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes) {
-  return ToBlockCPU<int64_t>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes);
 }
 
 #ifdef DGL_USE_CUDA

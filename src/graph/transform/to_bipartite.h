@@ -24,11 +24,21 @@
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
 
+#include <functional>
 #include <tuple>
 #include <vector>
 
 namespace dgl {
 namespace transform {
+
+/** @brief Type of the function which maps left and right Id arrays
+ * in a MFG to new ones.
+ */
+using MappingIdsFunc =  std::function<std::tuple<std::vector<IdArray>, std::vector<IdArray>>(
+  const HeteroGraphPtr&, int64_t, const DGLContext&,
+  const std::vector<int64_t>&, const std::vector<EdgeArray>&,
+  const std::vector<IdArray>&, const std::vector<IdArray>&,
+  std::vector<IdArray>&, std::vector<int64_t>&)>;
 
 /**
  * @brief Create a graph block from the set of
@@ -48,6 +58,26 @@ template <DGLDeviceType XPU, typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray>* lhs_nodes);
+
+/**
+ * @brief A warpper function shared by CPU and GPU ```ToBlock```
+ * which deal with the common preprocess and postprocess work of them.
+ *
+ * @tparam IdType The type to use as an index.
+ * @param graph The graph from which to extract the block.
+ * @param rhs_nodes The destination nodes of the block.
+ * @param include_rhs_in_lhs Whether or not to include the
+ * destination nodes of the block in the sources nodes.
+ * @param [in/out] lhs_nodes The source nodes of the block.
+ * @param MappingIdsFunc  The function to get mapped ids from original ids.
+ *
+ * @return The block and the induced edges.
+ */
+template <typename IdType>
+std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
+    HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
+    const bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr,
+    MappingIdsFunc&& get_maping_ids);
 
 }  // namespace transform
 }  // namespace dgl
