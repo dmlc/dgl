@@ -137,18 +137,22 @@ class DeviceNodeMapMaker {
   IdType max_num_nodes_;
 };
 
-
 template <typename IdType>
 struct GetMappingIdsGPU {
-std::tuple<std::vector<IdArray>, std::vector<IdArray>> operator() (
-  const HeteroGraphPtr& graph, int64_t num_ntypes, const DGLContext& ctx,
-  const std::vector<int64_t>& maxNodesPerType, const std::vector<EdgeArray>& edge_arrays,
-  const std::vector<IdArray>& src_nodes, const std::vector<IdArray>& rhs_nodes,
-  std::vector<IdArray>& lhs_nodes, std::vector<int64_t>& num_nodes_per_type) {
+  std::tuple<std::vector<IdArray>, std::vector<IdArray>> operator()(
+      const HeteroGraphPtr& graph, int64_t num_ntypes, const DGLContext& ctx,
+      const std::vector<int64_t>& maxNodesPerType,
+      const std::vector<EdgeArray>& edge_arrays,
+      const std::vector<IdArray>& src_nodes,
+      const std::vector<IdArray>& rhs_nodes,
+      std::vector<IdArray>* const lhs_nodes_ptr,
+      std::vector<int64_t>* const num_nodes_per_type_ptr) {
+    std::vector<IdArray>& lhs_nodes = *lhs_nodes_ptr;
+    std::vector<int64_t>& num_nodes_per_type = *num_nodes_per_type_ptr;
     const bool generate_lhs_nodes = lhs_nodes.empty();
     auto device = runtime::DeviceAPI::Get(ctx);
     cudaStream_t stream = runtime::getCurrentCUDAStream();
-    
+
     // allocate space for map creation process
     DeviceNodeMapMaker<IdType> maker(maxNodesPerType);
     DeviceNodeMap<IdType> node_maps(maxNodesPerType, num_ntypes, ctx, stream);
@@ -165,7 +169,8 @@ std::tuple<std::vector<IdArray>, std::vector<IdArray>> operator() (
           device->AllocWorkspace(ctx, sizeof(int64_t) * num_ntypes * 2));
 
       maker.Make(
-          src_nodes, rhs_nodes, &node_maps, count_lhs_device, &lhs_nodes, stream);
+          src_nodes, rhs_nodes, &node_maps, count_lhs_device, &lhs_nodes,
+          stream);
 
       device->CopyDataFromTo(
           count_lhs_device, 0, num_nodes_per_type.data(), 0,
@@ -197,7 +202,9 @@ template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockGPU(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
     const bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr) {
-  return ToBlockProcess<IdType>(graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes_ptr, GetMappingIdsGPU<IdType>());
+  return ToBlockProcess<IdType>(
+      graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes_ptr,
+      GetMappingIdsGPU<IdType>());
 }
 
 }  // namespace
