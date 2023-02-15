@@ -140,8 +140,8 @@ class DeviceNodeMapMaker {
 template <typename IdType>
 struct GetMappingIdsGPU {
   std::tuple<std::vector<IdArray>, std::vector<IdArray>> operator()(
-      const HeteroGraphPtr& graph, int64_t num_ntypes, const DGLContext& ctx,
-      const std::vector<int64_t>& maxNodesPerType,
+      const HeteroGraphPtr& graph, bool include_rhs_in_lhs, int64_t num_ntypes,
+      const DGLContext& ctx, const std::vector<int64_t>& maxNodesPerType,
       const std::vector<EdgeArray>& edge_arrays,
       const std::vector<IdArray>& src_nodes,
       const std::vector<IdArray>& rhs_nodes,

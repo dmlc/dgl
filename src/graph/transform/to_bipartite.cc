@@ -46,8 +46,8 @@ namespace {
 template <typename IdType>
 struct GetMappingIdsCPU {
   std::tuple<std::vector<IdArray>, std::vector<IdArray>> operator()(
-      const HeteroGraphPtr &graph, int64_t num_ntypes, const DGLContext &ctx,
-      const std::vector<int64_t> &maxNodesPerType,
+      const HeteroGraphPtr &graph, bool include_rhs_in_lhs, int64_t num_ntypes,
+      const DGLContext &ctx, const std::vector<int64_t> &maxNodesPerType,
       const std::vector<EdgeArray> &edge_arrays,
       const std::vector<IdArray> &src_nodes,
       const std::vector<IdArray> &rhs_nodes,
@@ -60,20 +60,25 @@ struct GetMappingIdsCPU {
     if (generate_lhs_nodes) lhs_nodes.reserve(num_ntypes);
 
     std::vector<ConcurrentIdHashMap<IdType>> lhs_nodes_map(num_ntypes);
-    std::vector<ConcurrentIdHashMap<IdType>> rhs_nodes_map(num_ntypes);
+    std::vector<ConcurrentIdHashMap<IdType>> *rhs_nodes_map_ptr =
+        &lhs_nodes_map;
     for (int64_t ntype = 0; ntype < num_ntypes; ntype++) {
-      if (!aten::IsNullArray(rhs_nodes[ntype])) {
-        rhs_nodes_map[ntype].Init(rhs_nodes[ntype]);
-      }
       IdArray unique_ids =
           aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx);
-      if (!aten::IsNullArray(src_nodes[ntype])) {
+      if (!aten::IsNullArray(src_nodes[ntype]))
         unique_ids = lhs_nodes_map[ntype].Init(src_nodes[ntype]);
-      }
       if (generate_lhs_nodes) {
         num_nodes_per_type[ntype] = unique_ids->shape[0];
         lhs_nodes.emplace_back(unique_ids);
       }
+    }
+    std::vector<ConcurrentIdHashMap<IdType>> rhs_nodes_map(num_ntypes);
+    if (!include_rhs_in_lhs) {
+      for (int64_t ntype = 0; ntype < num_ntypes; ntype++) {
+        if (!aten::IsNullArray(rhs_nodes[ntype]))
+          rhs_nodes_map[ntype].Init(rhs_nodes[ntype]);
+      }
+      rhs_nodes_map_ptr = &rhs_nodes_map;
     }
 
     // Map node numberings from global to local, and build pointer for CSR.
@@ -89,7 +94,7 @@ struct GetMappingIdsCPU {
         const int src_type = src_dst_types.first;
         const int dst_type = src_dst_types.second;
         new_lhs.emplace_back(lhs_nodes_map[src_type].MapIds(edges.src));
-        new_rhs.emplace_back(rhs_nodes_map[dst_type].MapIds(edges.dst));
+        new_rhs.emplace_back((*rhs_nodes_map_ptr)[dst_type].MapIds(edges.dst));
       } else {
         new_lhs.emplace_back(
             aten::NullArray(DGLDataTypeTraits<IdType>::dtype, ctx));
@@ -234,8 +239,8 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
   std::vector<IdArray> new_lhs;
   std::vector<IdArray> new_rhs;
   std::tie(new_lhs, new_rhs) = get_maping_ids(
-      graph, num_ntypes, ctx, maxNodesPerType, edge_arrays, src_nodes,
-      rhs_nodes, lhs_nodes_ptr, &num_nodes_per_type);
+      graph, include_rhs_in_lhs, num_ntypes, ctx, maxNodesPerType, edge_arrays,
+      src_nodes, rhs_nodes, lhs_nodes_ptr, &num_nodes_per_type);
 
   std::vector<IdArray> induced_edges;
   induced_edges.reserve(num_etypes);

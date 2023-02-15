@@ -36,10 +36,11 @@ namespace transform {
  */
 using MappingIdsFunc =
     std::function<std::tuple<std::vector<IdArray>, std::vector<IdArray>>(
-        const HeteroGraphPtr&, int64_t, const DGLContext&,
-        const std::vector<int64_t>&, const std::vector<EdgeArray>&,
-        const std::vector<IdArray>&, const std::vector<IdArray>&,
-        std::vector<IdArray>* const, std::vector<int64_t>* const)>;
+        const HeteroGraphPtr&, bool include_rhs_in_lhs, int64_t,
+        const DGLContext&, const std::vector<int64_t>&,
+        const std::vector<EdgeArray>&, const std::vector<IdArray>&,
+        const std::vector<IdArray>&, std::vector<IdArray>* const,
+        std::vector<int64_t>* const)>;
 
 /**
  * @brief Create a graph block from the set of
