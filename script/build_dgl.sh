@@ -6,25 +6,29 @@ usage() {
 cat << EOF
 usage: bash $0 OPTIONS
 examples:
-  Clean and restart a CPU only build: bash $0 -c
-  Clean and restart a CUDA build: bash $0 -g
+  Start a CPU only build: bash $0 -c
+  Start a CUDA build: bash $0 -g
   Build incrementally: bash $0
+  Clean and restart a CPU only build: bash $0 -c -d
 
 Build DGL. By default, build incrementally on top of the current state.
 
 OPTIONS:
   -h           Show this message.
-  -c           Clean and restart CPU only build.
-  -g           Clean and restart CUDA build.
+  -c           Restart CPU only build.
+  -g           Restart CUDA build.
+  -d           Delete all the intermediate output.
 EOF
 }
 
 # Parse flags.
-while getopts "cgh" flag; do
+while getopts "cdgh" flag; do
   if [[ ${flag} == "c" ]]; then
     cuda="OFF"
   elif [[ ${flag} == "g" ]]; then
     cuda="ON"
+  elif [[ ${flag} == "d" ]]; then
+    clean="YES"
   elif [[ ${flag} == "h" ]]; then
     usage
     exit 0
@@ -46,6 +50,10 @@ if [[ ! ${PWD} == ${DGL_HOME} ]]; then
   exit 1
 fi
 
+if [[ ${clean} == "YES" ]]; then
+  rm -rf build
+fi
+
 if [[ -z ${cuda} ]]; then
   if [[ -d build ]]; then
     cd build
@@ -55,7 +63,6 @@ if [[ -z ${cuda} ]]; then
     exit 1
   fi
 else
-  rm -rf build
   mkdir -p build
   cd build
   cmake -DUSE_CUDA=${cuda} ..
