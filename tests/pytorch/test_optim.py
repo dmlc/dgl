@@ -186,7 +186,7 @@ def start_sparse_adam_worker(
     backend="gloo",
     num_embs=128,
     emb_dim=10,
-    zero_comm=True
+    zero_comm=True,
 ):
     print("start sparse worker for adam {}".format(rank))
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
@@ -244,8 +244,13 @@ def start_sparse_adam_worker(
 
 
 def start_torch_adam_worker(
-    rank, world_size, weight, has_zero_grad=False, num_embs=128, emb_dim=10,
-    zero_comm=True
+    rank,
+    world_size,
+    weight,
+    has_zero_grad=False,
+    num_embs=128,
+    emb_dim=10,
+    zero_comm=True,
 ):
     print("start sparse worker for adam {}".format(rank))
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
@@ -388,13 +393,15 @@ def test_multiprocess_sparse_adam(num_workers, backend, zero_comm):
     for i in range(num_workers):
         p = ctx.Process(
             target=start_torch_adam_worker,
-            args=(i,
-                  num_workers,
-                  torch_weight,
-                  False,
-                  num_embs,
-                  emb_dim,
-                  zero_comm),
+            args=(
+                i,
+                num_workers,
+                torch_weight,
+                False,
+                num_embs,
+                emb_dim,
+                zero_comm,
+            ),
         )
         p.start()
         worker_list.append(p)
