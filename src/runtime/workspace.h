@@ -20,9 +20,8 @@ class Workspace {
   Workspace(DeviceAPI* device, DGLContext ctx, const size_t size)
       : device_(device),
         ctx_(ctx),
-	size_(size * sizeof(T)),
-        ptr_(static_cast<T*>(device_->AllocWorkspace(ctx_, size_))) {
-  }
+        size_(size * sizeof(T)),
+        ptr_(static_cast<T*>(device_->AllocWorkspace(ctx_, size_))) {}
 
   ~Workspace() {
     if (*this) {
@@ -61,7 +60,7 @@ class Workspace<void> {
   Workspace(DeviceAPI* device, DGLContext ctx, const size_t size)
       : device_(device),
         ctx_(ctx),
-	size_(size),
+        size_(size),
         ptr_(static_cast<void*>(device_->AllocWorkspace(ctx_, size_))) {}
 
   ~Workspace() {
