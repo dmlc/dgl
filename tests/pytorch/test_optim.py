@@ -186,6 +186,7 @@ def start_sparse_adam_worker(
     backend="gloo",
     num_embs=128,
     emb_dim=10,
+    zero_comm=True
 ):
     print("start sparse worker for adam {}".format(rank))
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
@@ -218,10 +219,13 @@ def start_sparse_adam_worker(
     else:
         dgl_adam = SparseAdam(params=[dgl_emb], lr=0.01)
 
-    start = (num_embs // world_size) * rank
-    end = (num_embs // world_size) * (rank + 1)
     th.manual_seed(rank)
-    idx = th.randint(start, end, size=(4,)).to(tensor_dev)
+    if zero_comm:
+        start = (num_embs // world_size) * rank
+        end = (num_embs // world_size) * (rank + 1)
+        idx = th.randint(start, end, size=(4,)).to(tensor_dev)
+    else:
+        idx = th.randint(0, num_embs, size=(4,)).to(tensor_dev)
     dgl_value = dgl_emb(idx, device)
     labels = th.ones((4,)).long().to(device)
     dgl_loss = th.nn.functional.cross_entropy(dgl_value, labels)
@@ -241,6 +245,7 @@ def start_sparse_adam_worker(
 
 def start_torch_adam_worker(
     rank, world_size, weight, has_zero_grad=False, num_embs=128, emb_dim=10
+    zero_comm=True
 ):
     print("start sparse worker for adam {}".format(rank))
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
@@ -275,10 +280,13 @@ def start_torch_adam_worker(
             list(torch_emb.module.parameters()), lr=0.01
         )
 
-    start = (num_embs // world_size) * rank
-    end = (num_embs // world_size) * (rank + 1)
     th.manual_seed(rank)
-    idx = th.randint(start, end, size=(4,))
+    if zero_comm:
+        start = (num_embs // world_size) * rank
+        end = (num_embs // world_size) * (rank + 1)
+        idx = th.randint(start, end, size=(4,)).to(tensor_dev)
+    else:
+        idx = th.randint(0, num_embs, size=(4,)).to(tensor_dev)
     labels = th.ones((4,)).long()
     torch_value = torch_emb(idx)
     torch_loss = th.nn.functional.cross_entropy(torch_value, labels)
@@ -340,7 +348,8 @@ def test_multiprocess_cpu_sparse_adam(num_workers):
 @unittest.skipIf(F.ctx().type == "cpu", reason="gpu only test")
 @pytest.mark.parametrize("num_workers", [2, 4, 8])
 @pytest.mark.parametrize("backend", ["nccl", "gloo"])
-def test_multiprocess_sparse_adam(num_workers, backend):
+@pytest.mark.parametrize("zero_comm", [True, False])
+def test_multiprocess_sparse_adam(num_workers, backend, zero_comm):
     if F.ctx().type == "cuda" and th.cuda.device_count() < num_workers:
         pytest.skip("Not enough GPUs to run test.")
 
@@ -364,6 +373,9 @@ def test_multiprocess_sparse_adam(num_workers, backend):
                 th.device("cpu"),
                 True,
                 backend,
+                num_embs,
+                emb_dim,
+                zero_comm,
             ),
         )
         p.start()
@@ -376,7 +388,13 @@ def test_multiprocess_sparse_adam(num_workers, backend):
     for i in range(num_workers):
         p = ctx.Process(
             target=start_torch_adam_worker,
-            args=(i, num_workers, torch_weight, False),
+            args=(i,
+                  num_workers,
+                  torch_weight,
+                  False,
+                  num_embs,
+                  emb_dim,
+                  zero_comm),
         )
         p.start()
         worker_list.append(p)
