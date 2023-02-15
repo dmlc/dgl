@@ -4,18 +4,17 @@ set -e
 
 usage() {
 cat << EOF
-usage: bash $0 OPTIONS
+usage: bash $0 OPTIONS TARGETS
 examples:
-  Clean and restart a CPU only build: bash $0 -c
-  Clean and restart a CUDA build: bash $0 -g
-  Build incrementally: bash $0
+  Run python tests on CPU: bash $0 -c tests/compute/test_subgraph.py
+  Run python tests on GPU: bash $0 -g tests/compute/test_subgraph.py
 
-Build DGL. By default, build incrementally on top of the current state.
+Run DGL python tests.
 
 OPTIONS:
   -h           Show this message.
-  -c           Clean and restart CPU only build.
-  -g           Clean and restart CUDA build.
+  -c           Run python tests on CPU.
+  -g           Run python tests on GPU.
 EOF
 }
 
@@ -33,6 +32,8 @@ while getopts "cgh" flag; do
     exit 1
   fi
 done
+
+# Reset the index for non-option arguments.
 shift $(($OPTIND-1))
 
 if [[ -z ${DGL_HOME} ]]; then
@@ -52,5 +53,11 @@ export DGL_LIBRARY_PATH=${DGL_HOME}/build
 export PYTHONPATH=${DGL_HOME}/python:${DGL_HOME}/tests:$PYTHONPATH
 export DGLTESTDEV=${device}
 export DGL_DOWNLOAD_DIR=${DGL_HOME}/build
+
+if [[ -z $@ ]]; then
+  echo "ERROR: Missing test targets"
+  usage
+  exit 1
+fi
 
 python3 -m pytest -v $@
