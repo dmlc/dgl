@@ -33,9 +33,6 @@ while getopts "cgh" flag; do
   fi
 done
 
-# Reset the index for non-option arguments.
-shift $(($OPTIND-1))
-
 if [[ -z ${DGL_HOME} ]]; then
   echo "ERROR: Please make sure environment variable DGL_HOME is set correctly."
   exit 1
@@ -48,6 +45,15 @@ if [[ ! ${PWD} == ${DGL_HOME} ]]; then
   exit 1
 fi
 
+if [[ -z ${device} ]]; then
+  echo "ERROR: Test device unspecified."
+  usage
+  exit 1
+fi
+
+# Reset the index for non-option arguments.
+shift $(($OPTIND-1))
+
 export DGLBACKEND=pytorch
 export DGL_LIBRARY_PATH=${DGL_HOME}/build
 export PYTHONPATH=${DGL_HOME}/python:${DGL_HOME}/tests:$PYTHONPATH
@@ -55,7 +61,7 @@ export DGLTESTDEV=${device}
 export DGL_DOWNLOAD_DIR=${DGL_HOME}/build
 
 if [[ -z $@ ]]; then
-  echo "ERROR: Missing test targets"
+  echo "ERROR: Missing test targets."
   usage
   exit 1
 fi
