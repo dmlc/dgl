@@ -14,7 +14,6 @@ namespace dgl {
 namespace runtime {
 
 Config::Config() {
-
 #if !defined(_WIN32) && defined(USE_LIBXSMM)
   int cpu_id = libxsmm_cpuid_x86();
   // Enable libxsmm on AVX machines by default
