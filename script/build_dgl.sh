@@ -1,5 +1,7 @@
 #!/bin/bash
-  
+
+set -e
+
 usage() {
 cat << EOF
 usage: bash $0 OPTIONS
@@ -33,20 +35,25 @@ while getopts "cgh" flag; do
 done
 
 if [[ -z ${DGL_HOME} ]]; then
-  echo "Please make sure environment variable DGL_HOME is set correctly."
+  echo "ERROR: Please make sure environment variable DGL_HOME is set correctly."
   exit 1
 fi
 
-if [[ ! ${DGL_HOME} == ${PWD} ]]; then
-  echo "This script only works properly from DGL root directory."
-  echo "DGL_HOME: ${DGL_HOME}"
+if [[ ! ${PWD} == ${DGL_HOME} ]]; then
+  echo "ERROR: This script only works properly from DGL root directory."
   echo " Current: ${PWD}"
+  echo "DGL_HOME: ${DGL_HOME}"
   exit 1
 fi
 
 if [[ -z ${cuda} ]]; then
-  cd build
-  echo ${PWD}
+  if [[ -d build ]]; then
+    cd build
+  else
+    echo "ERROR: No existing build status found, unable to build incrementally."
+    usage
+    exit 1
+  fi
 else
   rm -rf build
   mkdir -p build
@@ -54,5 +61,11 @@ else
   cmake -DUSE_CUDA=${cuda} ..
 fi
 
-make -j4
+if [[ ${PWD} == "${DGL_HOME}/build" ]]; then
+  make -j
+else
+  echo "ERROR: unexpected working directory."
+  echo " Current: ${PWD}"
+  echo "Expected: ${DGL_HOME}/build"
+fi
 exit 0
