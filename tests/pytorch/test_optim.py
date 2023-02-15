@@ -244,7 +244,7 @@ def start_sparse_adam_worker(
 
 
 def start_torch_adam_worker(
-    rank, world_size, weight, has_zero_grad=False, num_embs=128, emb_dim=10
+    rank, world_size, weight, has_zero_grad=False, num_embs=128, emb_dim=10,
     zero_comm=True
 ):
     print("start sparse worker for adam {}".format(rank))
@@ -284,9 +284,9 @@ def start_torch_adam_worker(
     if zero_comm:
         start = (num_embs // world_size) * rank
         end = (num_embs // world_size) * (rank + 1)
-        idx = th.randint(start, end, size=(4,)).to(tensor_dev)
+        idx = th.randint(start, end, size=(4,))
     else:
-        idx = th.randint(0, num_embs, size=(4,)).to(tensor_dev)
+        idx = th.randint(0, num_embs, size=(4,))
     labels = th.ones((4,)).long()
     torch_value = torch_emb(idx)
     torch_loss = th.nn.functional.cross_entropy(torch_value, labels)
