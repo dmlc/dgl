@@ -91,7 +91,7 @@ class SubgraphX(nn.Module):
         model,
         num_hops,
         coef=10.0,
-        high2low=False,
+        high2low=True,
         num_child=12,
         num_rollouts=20,
         node_min=3,
@@ -206,6 +206,7 @@ class SubgraphX(nn.Module):
                 max(nx.weakly_connected_components(nx_graph), key=len)
             )
             # Map to the original node IDs.
+            largest_cc_nids = new_subg.ndata[NID][largest_cc_nids]
             largest_cc_nids = subg.ndata[NID][largest_cc_nids].sort().values
             if str(largest_cc_nids) not in self.mcts_node_maps:
                 child_mcts_node = MCTSNode(largest_cc_nids)
