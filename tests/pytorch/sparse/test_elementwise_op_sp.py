@@ -6,10 +6,6 @@ import torch
 
 from dgl.sparse import from_coo, power
 
-# TODO(#4818): Skipping tests on win.
-if not sys.platform.startswith("linux"):
-    pytest.skip("skipping tests on win", allow_module_level=True)
-
 
 def all_close_sparse(A, row, col, val, shape):
     rowA, colA = A.coo()

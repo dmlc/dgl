@@ -17,10 +17,6 @@ from .utils import (
     sparse_matrix_to_torch_sparse,
 )
 
-# TODO(#4818): Skipping tests on win.
-if not sys.platform.startswith("linux"):
-    pytest.skip("skipping tests on win", allow_module_level=True)
-
 
 @pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
 @pytest.mark.parametrize("shape", [(2, 7), (5, 2)])
