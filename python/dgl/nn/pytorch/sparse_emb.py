@@ -429,7 +429,7 @@ class NodeEmbedding:  # NodeEmbedding
             else:
                 return tuple(
                     self._all_get_tensor(
-                        f"state_gather_{i}",
+                        f"state_gather_{self._name}_{i}",
                         state,
                         (self._num_embeddings, *state.shape[1:]),
                     )
