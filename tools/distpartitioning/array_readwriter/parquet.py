@@ -30,7 +30,9 @@ class ParquetArrayParser(object):
         # Spark ML feature processing produces single-column parquet files where each row is a vector object
         if len(data_types) == 1 and isinstance(data_types[0], pyarrow.ListType):
             arr = np.array(table.to_pandas().iloc[:, 0].to_list())
-            logging.debug(f"Parquet data under {path} converted from single vector per row to ndarray")
+            logging.debug(
+                f"Parquet data under {path} converted from single vector per row to ndarray"
+            )
         else:
             arr = table.to_pandas().to_numpy()
         if not shape:
@@ -49,8 +51,8 @@ class ParquetArrayParser(object):
             array = array.reshape(shape[0], -1)
         if vector_rows:
             table = pyarrow.table(
-                [pyarrow.array(array.tolist())],
-                names=["vector"])
+                [pyarrow.array(array.tolist())], names=["vector"]
+            )
             logging.info("Writing to %s using single-vector rows..." % path)
         else:
             table = pyarrow.Table.from_pandas(pd.DataFrame(array))
