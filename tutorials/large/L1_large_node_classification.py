@@ -299,7 +299,6 @@ for epoch in range(10):
 
     with tqdm.tqdm(train_dataloader) as tq:
         for step, (input_nodes, output_nodes, mfgs) in enumerate(tq):
-            # feature copy from CPU to GPU takes place here
             inputs = mfgs[0].srcdata["feat"]
             labels = mfgs[-1].dstdata["label"]
 
