@@ -70,7 +70,7 @@ class SubgraphX(nn.Module):
         If True, it will use the "High2low" strategy for pruning actions,
         expanding children nodes from high degree to low degree when extending
         the children nodes in the search tree. Otherwise, it will use the
-        "Low2high" strategy. Default: False
+        "Low2high" strategy. Default: True
     num_child : int, optional
         This is the number of children nodes to expand when extending the
         children nodes in the search tree. Default: 12
