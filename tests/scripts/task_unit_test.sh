@@ -39,4 +39,5 @@ then
 else
   python3 -m pytest -v --junitxml=pytest_compute.xml --durations=100 tests/compute || fail "compute"
 fi
+python3 -m pytest -v --junitxml=pytest_common.xml --durations=100 tests/python/common || fail "common"
 python3 -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests/$DGLBACKEND || fail "backend-specific"
