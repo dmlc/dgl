@@ -3,8 +3,8 @@ import logging
 import os
 import platform
 import sys
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 from timeit import default_timer as timer
 
 import constants
@@ -14,7 +14,7 @@ import pyarrow
 import pyarrow.csv as csv
 import pyarrow.parquet as pq
 import torch
-from utils import get_idranges, get_node_types, read_json, generate_read_list
+from utils import generate_read_list, get_idranges, get_node_types, read_json
 
 
 def get_proc_info():
@@ -63,7 +63,12 @@ def gen_edge_files(schema_map, params):
     rank = get_proc_info()
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        dict(zip(schema_map[constants.STR_NODE_TYPE],schema_map[constants.STR_NODE_TYPE_COUNTS]))
+        dict(
+            zip(
+                schema_map[constants.STR_NODE_TYPE],
+                schema_map[constants.STR_NODE_TYPE_COUNTS],
+            )
+        ),
     )
 
     # Regenerate edge files here.
@@ -136,6 +141,7 @@ def gen_edge_files(schema_map, params):
 
     return edge_files
 
+
 def gen_node_weights_files(schema_map, params):
     """Function to create node weight files for ParMETIS along with the edge files.
 
@@ -169,7 +175,12 @@ def gen_node_weights_files(schema_map, params):
     ntypes_ntypeid_map, ntypes, ntid_ntype_map = get_node_types(schema_map)
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        dict(zip(schema_map[constants.STR_NODE_TYPE], schema_map[constants.STR_NODE_TYPE_COUNTS]))
+        dict(
+            zip(
+                schema_map[constants.STR_NODE_TYPE],
+                schema_map[constants.STR_NODE_TYPE_COUNTS],
+            )
+        ),
     )
 
     node_files = []
@@ -178,10 +189,12 @@ def gen_node_weights_files(schema_map, params):
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
 
-        # This ntype does not have any train/test/val masks... 
+        # This ntype does not have any train/test/val masks...
         # Each rank will generate equal no. of rows for this node type.
         total_count = schema_map[constants.STR_NODE_TYPE_COUNTS][ntype_id]
-        per_rank_range = np.ones((params.num_parts,), dtype=np.int64) * (total_count // params.num_parts)
+        per_rank_range = np.ones((params.num_parts,), dtype=np.int64) * (
+            total_count // params.num_parts
+        )
         for i in range(total_count % params.num_parts):
             per_rank_range[i] += 1
 
@@ -189,7 +202,7 @@ def gen_node_weights_files(schema_map, params):
         tid_end = np.cumsum(list(per_rank_range))
         local_tid_start = tid_start[rank]
         local_tid_end = tid_end[rank]
-        sz = (local_tid_end - local_tid_start)
+        sz = local_tid_end - local_tid_start
 
         cols = []
         col_names = []
@@ -260,7 +273,12 @@ def gen_parmetis_input_args(params, schema_map):
     ntypes_ntypeid_map, ntypes, ntid_ntype_map = get_node_types(schema_map)
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        dict(zip(schema_map[constants.STR_NODE_TYPE],schema_map[constants.STR_NODE_TYPE_COUNTS]))
+        dict(
+            zip(
+                schema_map[constants.STR_NODE_TYPE],
+                schema_map[constants.STR_NODE_TYPE_COUNTS],
+            )
+        ),
     )
 
     # Check if <graph-name>_stats.txt exists, if not create one using metadata.
@@ -274,12 +292,8 @@ def gen_parmetis_input_args(params, schema_map):
     ), "Graph name is not present in the json file"
     graph_name = schema_map[constants.STR_GRAPH_NAME]
     if not os.path.isfile(f"{graph_name}_stats.txt"):
-        num_nodes = np.sum(
-            schema_map[constants.STR_NODE_TYPE_COUNTS]
-        )
-        num_edges = np.sum(
-            schema_map[constants.STR_EDGE_TYPE_COUNTS]
-        )
+        num_nodes = np.sum(schema_map[constants.STR_NODE_TYPE_COUNTS])
+        num_edges = np.sum(schema_map[constants.STR_EDGE_TYPE_COUNTS])
         num_ntypes = len(schema_map[constants.STR_NODE_TYPE])
 
         num_constraints = num_ntypes
@@ -293,13 +307,15 @@ def gen_parmetis_input_args(params, schema_map):
     for ntype_id, ntype_name in ntid_ntype_map.items():
         global_nid_offset = ntype_gnid_offset[ntype_name][0, 0]
         total_count = schema_map[constants.STR_NODE_TYPE_COUNTS][ntype_id]
-        per_rank_range = np.ones((params.num_parts,), dtype=np.int64) * (total_count // params.num_parts)
+        per_rank_range = np.ones((params.num_parts,), dtype=np.int64) * (
+            total_count // params.num_parts
+        )
         for i in range(total_count % params.num_parts):
             per_rank_range[i] += 1
         tid_start = np.cumsum([0] + list(per_rank_range[:-1]))
         tid_end = np.cumsum(per_rank_range)
-        logging.info(f' tid-start = {tid_start}, tid-end = {tid_end}')
-        logging.info(f' per_rank_range - {per_rank_range}')
+        logging.info(f" tid-start = {tid_start}, tid-end = {tid_end}")
+        logging.info(f" per_rank_range - {per_rank_range}")
 
         for rank in range(params.num_parts):
             local_tid_start = tid_start[rank]
@@ -390,10 +406,10 @@ if __name__ == "__main__":
         help="The output directory for the node weights files and auxiliary files for ParMETIS.",
     )
     parser.add_argument(
-        "--num_parts", 
+        "--num_parts",
         required=True,
         type=int,
-        help="Total no. of output graph partitions."
+        help="Total no. of output graph partitions.",
     )
     params = parser.parse_args()
 

@@ -108,7 +108,9 @@ class DistLookupService:
             # Explicitly release the array read from the file.
             del ntype_partids
 
-        logging.info(f'[Rank: {rank}] ntypeid begin - {type_nid_begin} - {type_nid_end}')
+        logging.info(
+            f"[Rank: {rank}] ntypeid begin - {type_nid_begin} - {type_nid_end}"
+        )
 
         # Store all the information in the object instance variable.
         self.type_nid_begin = np.array(type_nid_begin, dtype=np.int64)
@@ -169,7 +171,9 @@ class DistLookupService:
             # The no. of these mappings stored by each process, in the lookup service, are
             # equally split among all the processes in the lookup service, deterministically.
             typeid_counts = self.ntype_count[ntype_ids]
-            chunk_sizes = np.ceil(typeid_counts / self.world_size).astype(np.int64)
+            chunk_sizes = np.ceil(typeid_counts / self.world_size).astype(
+                np.int64
+            )
             service_owners = np.floor_divide(type_nids, chunk_sizes).astype(
                 np.int64
             )
@@ -179,7 +183,6 @@ class DistLookupService:
             type_id_counts = np.array([], dtype=np.int64)
             chunk_sizes = np.array([], dtype=np.int64)
             service_owners = np.array([], dtype=np.int64)
-            
 
         # Now `service_owners` is a list of ranks (process-ids) which own the corresponding
         # global-nid <-> partition-id mapping.

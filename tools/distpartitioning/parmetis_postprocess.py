@@ -49,7 +49,12 @@ def post_process(params):
     ntypes_ntypeid_map, ntypes, ntid_ntype_map = get_node_types(schema)
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema[constants.STR_NODE_TYPE],
-        dict(zip(schema[constants.STR_NODE_TYPE], schema[constants.STR_NODE_TYPE_COUNTS]))
+        dict(
+            zip(
+                schema[constants.STR_NODE_TYPE],
+                schema[constants.STR_NODE_TYPE_COUNTS],
+            )
+        ),
     )
 
     outdir = Path(params.partitions_dir)

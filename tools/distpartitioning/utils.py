@@ -168,6 +168,7 @@ def get_node_types(schema_map):
     ntypeid_ntype_map = {i: e for i, e in enumerate(ntypes)}
     return ntype_ntypeid_map, ntypes, ntypeid_ntype_map
 
+
 def get_gid_offsets(typenames, typecounts):
     """
     Builds a map where the key-value pairs are typnames and respective
@@ -184,16 +185,16 @@ def get_gid_offsets(typenames, typecounts):
     Returns:
     --------
     dictionary :
-        a dictionary where keys are node_type names and values are 
+        a dictionary where keys are node_type names and values are
         global_nid range, which is a tuple.
 
     """
-    assert(
-            len(typenames) == len(typecounts)
+    assert len(typenames) == len(
+        typecounts
     ), f"No. of typenames does not match with its type counts names = {typenames}, counts = {typecounts}"
 
     counts = []
-    for name in typenames: 
+    for name in typenames:
         counts.append(typecounts[name])
     starts = np.cumsum([0] + counts[:-1])
     ends = np.cumsum(counts)
@@ -203,7 +204,7 @@ def get_gid_offsets(typenames, typecounts):
         gid_offsets[name] = [starts[idx], ends[idx]]
     return gid_offsets
 
-    '''
+    """
     starts = np.cumsum([0] + type_counts[:-1])
     ends = np.cumsum(type_counts)
     gid_offsets = {}
@@ -211,7 +212,7 @@ def get_gid_offsets(typenames, typecounts):
         gid_offsets[name] = [start[idx], ends[idx]]
 
     return gid_offsets
-    '''
+    """
 
 
 def get_gnid_range_map(node_tids):
@@ -358,7 +359,7 @@ def augment_edge_data(
     offset = 0
     for etype_name, tid_range in edge_tids.items():
         # assert int(tid_range[0][0]) == 0, f'tid_range = {tid_range}'
-        # assert len(tid_range) == num_parts, no longer needed. 
+        # assert len(tid_range) == num_parts, no longer needed.
         etype_offset[etype_name] = offset + int(tid_range[0][0])
         offset += int(tid_range[-1][1])
 
@@ -372,7 +373,11 @@ def augment_edge_data(
                     end = global_eid_start + int(tid_range[idx][1])
                     global_eids.append(np.arange(begin, end, dtype=np.int64))
 
-    global_eids = np.concatenate(global_eids) if len(global_eids) > 0 else np.array([], dtype=np.int64)
+    global_eids = (
+        np.concatenate(global_eids)
+        if len(global_eids) > 0
+        else np.array([], dtype=np.int64)
+    )
     assert global_eids.shape[0] == edge_data[constants.ETYPE_ID].shape[0]
     edge_data[constants.GLOBAL_EID] = global_eids
 
@@ -565,7 +570,7 @@ def write_dgl_objects(
 
 def get_idranges(names, counts, num_chunks=None):
     """
-    counts will be a list of numbers of a dictionary. 
+    counts will be a list of numbers of a dictionary.
     Length is less than or equal to the num_parts variable.
     """
     gnid_start = 0
@@ -580,6 +585,7 @@ def get_idranges(names, counts, num_chunks=None):
         gnid_start = gnid_end
 
     return tid_dict, gid_dict
+
 
 def get_typecounts(ntypes, ntype_counts):
     """

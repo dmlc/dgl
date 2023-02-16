@@ -11,7 +11,12 @@ import pyarrow.parquet as pq
 import torch
 import torch.distributed as dist
 from gloo_wrapper import alltoallv_cpu
-from utils import generate_read_list, get_idranges, map_partid_rank, get_gid_offsets
+from utils import (
+    generate_read_list,
+    get_gid_offsets,
+    get_idranges,
+    map_partid_rank,
+)
 
 
 DATA_TYPE_ID = {
@@ -34,6 +39,7 @@ DATA_TYPE_ID = {
 
 REV_DATA_TYPE_ID = {id: data_type for data_type, id in DATA_TYPE_ID.items()}
 
+
 def _broadcast_shape(data, rank, world_size, num_parts, isfeatdata, featname):
     assert len(data.shape) in [
         1,
@@ -52,25 +58,33 @@ def _broadcast_shape(data, rank, world_size, num_parts, isfeatdata, featname):
         torch.zeros_like(data_shape) for _ in range(world_size)
     ]
     dist.all_gather(data_shape_output, data_shape)
-    logging.info(f'[Rank: {rank} Received shapes from all ranks: {data_shape_output}')
+    logging.info(
+        f"[Rank: {rank} Received shapes from all ranks: {data_shape_output}"
+    )
     shapes = [x.numpy() for x in data_shape_output if x[0] != 0]
     shapes = np.vstack(shapes)
 
     if isfeatdata:
-        logging.info(f'shapes: {shapes}, condition: {all(shapes[0,2] == s for s in shapes[:,2])}')
-        assert all(shapes[0,2] == s for s in shapes[:,2]), f'dtypes for {featname} does not match on all ranks'
+        logging.info(
+            f"shapes: {shapes}, condition: {all(shapes[0,2] == s for s in shapes[:,2])}"
+        )
+        assert all(
+            shapes[0, 2] == s for s in shapes[:, 2]
+        ), f"dtypes for {featname} does not match on all ranks"
 
     # compute tids here.
-    type_counts = list(shapes[:,0])
+    type_counts = list(shapes[:, 0])
     tid_start = np.cumsum([0] + type_counts[:-1])
     tid_end = np.cumsum(type_counts)
     tid_ranges = list(zip(tid_start, tid_end))
-    logging.info(f'starts -> {tid_start} ... end -> {tid_end}')
+    logging.info(f"starts -> {tid_start} ... end -> {tid_end}")
 
     return tid_ranges
 
 
-def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, ntype_counts):
+def get_dataset(
+    input_dir, graph_name, rank, world_size, num_parts, schema_map, ntype_counts
+):
     """
     Function to read the multiple file formatted dataset.
 
@@ -192,17 +206,18 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, 
     """
 
     # read my nodes for each node type
-    '''
+    """
     node_tids, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
         schema_map[constants.STR_NUM_NODES_PER_CHUNK],
         num_chunks=num_parts,
     )
-    '''
-    logging.info(f'[Rank: {rank} ntype_counts: {ntype_counts}')
-    ntype_gnid_offset = get_gid_offsets(schema_map[constants.STR_NODE_TYPE], ntype_counts)
-    logging.info(f'[Rank: {rank} - ntype_gnid_offset = {ntype_gnid_offset}')
-
+    """
+    logging.info(f"[Rank: {rank} ntype_counts: {ntype_counts}")
+    ntype_gnid_offset = get_gid_offsets(
+        schema_map[constants.STR_NODE_TYPE], ntype_counts
+    )
+    logging.info(f"[Rank: {rank} - ntype_gnid_offset = {ntype_gnid_offset}")
 
     # iterate over the "node_data" dictionary in the schema_map
     # read the node features if exists
@@ -239,18 +254,27 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, 
                 else:
                     node_data = np.array([])
                 node_data = torch.from_numpy(node_data)
-                cur_tids = _broadcast_shape(node_data, rank, world_size, num_parts, True, f'{ntype_name}/{feat_name}')
-                logging.info(f'[Rank: {rank} - cur_tids: {cur_tids}')
+                cur_tids = _broadcast_shape(
+                    node_data,
+                    rank,
+                    world_size,
+                    num_parts,
+                    True,
+                    f"{ntype_name}/{feat_name}",
+                )
+                logging.info(f"[Rank: {rank} - cur_tids: {cur_tids}")
 
                 # collect data on current rank.
                 for local_part_id in range(num_parts):
-                    data_key = f"{ntype_name}/{feat_name}/{local_part_id//world_size}"
+                    data_key = (
+                        f"{ntype_name}/{feat_name}/{local_part_id//world_size}"
+                    )
                     if map_partid_rank(local_part_id, world_size) == rank:
                         if len(cur_tids) > local_part_id:
                             start, end = cur_tids[local_part_id]
-                            assert (
-                                node_data.shape[0] == (end - start)
-                                ), f'Node feature data, {data_key}, shape = {node_data.shape} does not match with tids = ({start},{end})'
+                            assert node_data.shape[0] == (
+                                end - start
+                            ), f"Node feature data, {data_key}, shape = {node_data.shape} does not match with tids = ({start},{end})"
                             node_features[data_key] = node_data
                             node_feature_tids[data_key] = [(start, end)]
                         else:
@@ -369,17 +393,26 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, 
                 edge_data = torch.from_numpy(edge_data)
 
                 # exchange the amount of data read from the disk.
-                edge_tids = _broadcast_shape(edge_data, rank, world_size, num_parts, True, f'{etype_name}/{feat_name}')
+                edge_tids = _broadcast_shape(
+                    edge_data,
+                    rank,
+                    world_size,
+                    num_parts,
+                    True,
+                    f"{etype_name}/{feat_name}",
+                )
 
                 # collect data on current rank.
                 for local_part_id in range(num_parts):
-                    data_key = f"{etype_name}/{feat_name}/{local_part_id//world_size}"
+                    data_key = (
+                        f"{etype_name}/{feat_name}/{local_part_id//world_size}"
+                    )
                     if map_partid_rank(local_part_id, world_size) == rank:
                         if len(edge_tids) > local_part_id:
                             start, end = edge_tids[local_part_id]
-                            assert (
-                                edge_data.shape[0] == (end - start)
-                            ), f'Edge Feature data, for {data_key}, of shape = {edge_data.shape} does not match with tids = ({start}, {end})'
+                            assert edge_data.shape[0] == (
+                                end - start
+                            ), f"Edge Feature data, for {data_key}, of shape = {edge_data.shape} does not match with tids = ({start}, {end})"
                             edge_features[data_key] = edge_data
                             edge_feature_tids[data_key] = [(start, end)]
                         else:
@@ -476,7 +509,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, 
         dst_ntype_name = tokens[2]
 
         num_chunks = len(edge_info)
-        #read_list = generate_read_list(num_chunks, num_parts)
+        # read_list = generate_read_list(num_chunks, num_parts)
         read_list = generate_read_list(num_chunks, world_size)
         src_ids = []
         dst_ids = []
@@ -494,7 +527,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, 
             if not os.path.isabs(edge_file):
                 edge_file = os.path.join(input_dir, edge_file)
             logging.info(
-                    f"[Rank: {rank}] Loading edges of etype[{etype_name}] from {edge_file}"
+                f"[Rank: {rank}] Loading edges of etype[{etype_name}] from {edge_file}"
             )
 
             if (
@@ -533,7 +566,7 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, 
                 )
 
         if len(src_ids) > 0:
-            src_ids = np.concatenate(src_ids) 
+            src_ids = np.concatenate(src_ids)
             dst_ids = np.concatenate(dst_ids)
 
             # currently these are just type_edge_ids... which will be converted to global ids
@@ -547,11 +580,13 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, 
                 etype_name_idmap[etype_name]
                 * np.ones(shape=(src_ids.shape), dtype=np.int64)
             )
-        else: 
+        else:
             src_ids = np.array([])
 
         # broadcast shape to compute the etype_id, and global_eid's later.
-        cur_tids = _broadcast_shape(src_ids, rank, world_size, num_parts, False, None)
+        cur_tids = _broadcast_shape(
+            src_ids, rank, world_size, num_parts, False, None
+        )
         edge_typecounts[etype_name] = cur_tids[-1][1]
         edge_tids[etype_name] = cur_tids
 
@@ -566,10 +601,9 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, 
                         )
                     )
                     # edge_tids[etype_name] = [(cur_tids[local_part_id][0], cur_tids[local_part_id][1])]
-                    assert (
-                        len(edge_datadict[constants.GLOBAL_SRC_ID]) == len(edge_datadict[constants.GLOBAL_TYPE_EID])
-                    ), f'Error while reading edges from the disk, local_part_id = {local_part_id}, num_parts = {num_parts}, world_size = {world_size} cur_tids = {cur_tids}'
-
+                    assert len(edge_datadict[constants.GLOBAL_SRC_ID]) == len(
+                        edge_datadict[constants.GLOBAL_TYPE_EID]
+                    ), f"Error while reading edges from the disk, local_part_id = {local_part_id}, num_parts = {num_parts}, world_size = {world_size} cur_tids = {cur_tids}"
 
     # stitch together to create the final data on the local machine
     for col in [
@@ -598,9 +632,9 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map, 
             f"[Rank: {rank}] Done reading edge_file: {len(edge_datadict)}, {edge_datadict[constants.GLOBAL_SRC_ID].shape}"
         )
     else:
-        assert(edge_datadict[constants.GLOBAL_SRC_ID] == [])
-        assert(edge_datadict[constants.GLOBAL_DST_ID] == [])
-        assert(edge_datadict[constants.GLOBAL_TYPE_EID] == [])
+        assert edge_datadict[constants.GLOBAL_SRC_ID] == []
+        assert edge_datadict[constants.GLOBAL_DST_ID] == []
+        assert edge_datadict[constants.GLOBAL_TYPE_EID] == []
 
         edge_datadict[constants.GLOBAL_SRC_ID] = np.array([], dtype=np.int64)
         edge_datadict[constants.GLOBAL_DST_ID] = np.array([], dtype=np.int64)

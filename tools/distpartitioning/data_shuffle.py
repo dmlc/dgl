@@ -26,8 +26,8 @@ from utils import (
     augment_edge_data,
     get_edge_types,
     get_etype_featnames,
-    get_gnid_range_map,
     get_gid_offsets,
+    get_gnid_range_map,
     get_idranges,
     get_node_types,
     get_ntype_featnames,
@@ -124,7 +124,10 @@ def gen_node_data(
     # dictionary and range of global-nids in the second dictionary.
     type_nid_dict, global_nid_dict = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        get_typecounts(schema_map[constants.STR_NODE_TYPE], schema_map[constants.STR_NODE_TYPE_COUNTS]),
+        get_typecounts(
+            schema_map[constants.STR_NODE_TYPE],
+            schema_map[constants.STR_NODE_TYPE_COUNTS],
+        ),
         num_chunks=num_parts,
     )
 
@@ -191,7 +194,6 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
 
     # Prepare data for each rank in the cluster.
     start = timer()
-
 
     CHUNK_SIZE = 100 * 1000 * 1000  # 100 * 8 * 5 = 1 * 4 = 8 GB/message/node
     num_edges = edge_data[constants.GLOBAL_SRC_ID].shape[0]
@@ -393,7 +395,9 @@ def exchange_feature(
     assert len(tokens) == 3
     local_feat_key = "/".join(tokens[:-1]) + "/" + str(local_part_id)
 
-    logging.info(f'[Rank: {rank} feature: {feat_key}, data_key: {featdata_key} gid_start - {gid_start} and gid_end - {gid_end}')
+    logging.info(
+        f"[Rank: {rank} feature: {feat_key}, data_key: {featdata_key} gid_start - {gid_start} and gid_end - {gid_end}"
+    )
 
     # Get the partition ids for the range of global nids.
     if feat_type == constants.STR_NODE_FEATURES:
@@ -407,7 +411,9 @@ def exchange_feature(
         # Ownership is determined by the destination node.
         assert data is not None
         global_eids = np.arange(gid_start, gid_end, dtype=np.int64)
-        logging.info(f'[Rank: {rank} disk read global eids - min - {np.amin(data[constants.GLOBAL_EID])}, max - {np.amax(data[constants.GLOBAL_EID])}, count - {data[constants.GLOBAL_EID].shape}')
+        logging.info(
+            f"[Rank: {rank} disk read global eids - min - {np.amin(data[constants.GLOBAL_EID])}, max - {np.amax(data[constants.GLOBAL_EID])}, count - {data[constants.GLOBAL_EID].shape}"
+        )
 
         # Now use `data` to extract destination nodes' global id
         # and use that to get the ownership
@@ -436,7 +442,9 @@ def exchange_feature(
                 torch.from_numpy(gids_per_partid).type(torch.int64)
             )
     for idx, tt in enumerate(feats_per_rank):
-        logging.info(f'[Rank: {rank} features shape - {tt.shape} and ids - {global_id_per_rank[idx].shape}')
+        logging.info(
+            f"[Rank: {rank} features shape - {tt.shape} and ids - {global_id_per_rank[idx].shape}"
+        )
 
     # features (and global nids) per rank to be sent out are ready
     # for transmission, perform alltoallv here.
@@ -570,44 +578,44 @@ def exchange_features(
         logging.info(f"[Rank: {rank}] processing feature: {feat_key}")
 
         for feat_info in type_info:
-           # Compute the global_id range for this feature data
-           type_id_start = int(feat_info[0])
-           type_id_end = int(feat_info[1])
-           begin_global_id = type_id_map[type_name][0]
-           gid_start = begin_global_id + type_id_start
-           gid_end = begin_global_id + type_id_end
+            # Compute the global_id range for this feature data
+            type_id_start = int(feat_info[0])
+            type_id_end = int(feat_info[1])
+            begin_global_id = type_id_map[type_name][0]
+            gid_start = begin_global_id + type_id_start
+            gid_end = begin_global_id + type_id_end
 
-           # Check if features exist for this type_name + feat_name.
-           # This check should always pass, because feature_tids are built
-           # by reading the input metadata json file for existing features.
-           assert feat_key in feature_data
+            # Check if features exist for this type_name + feat_name.
+            # This check should always pass, because feature_tids are built
+            # by reading the input metadata json file for existing features.
+            assert feat_key in feature_data
 
-           for local_part_id in range(num_parts // world_size):
-               featdata_key = feature_data[feat_key]
-               own_features, own_global_ids = exchange_feature(
-                   rank,
-                   data,
-                   id_lookup,
-                   feat_type,
-                   feat_key,
-                   featdata_key,
-                   gid_start,
-                   gid_end,
-                   type_id_start,
-                   type_id_end,
-                   local_part_id,
-                   world_size,
-                   num_parts,
-                   own_features,
-                   own_global_ids,
-               )
+            for local_part_id in range(num_parts // world_size):
+                featdata_key = feature_data[feat_key]
+                own_features, own_global_ids = exchange_feature(
+                    rank,
+                    data,
+                    id_lookup,
+                    feat_type,
+                    feat_key,
+                    featdata_key,
+                    gid_start,
+                    gid_end,
+                    type_id_start,
+                    type_id_end,
+                    local_part_id,
+                    world_size,
+                    num_parts,
+                    own_features,
+                    own_global_ids,
+                )
 
     end = timer()
     logging.info(
         f"[Rank: {rank}] Total time for feature exchange: {timedelta(seconds = end - start)}"
     )
     for k, v in own_features.items():
-        logging.info(f'Rank: {rank}] Key - {k} Value - {v.shape}')
+        logging.info(f"Rank: {rank}] Key - {k} Value - {v.shape}")
     return own_features, own_global_ids
 
 
@@ -693,7 +701,7 @@ def exchange_graph_data(
         was performed in the `exchange_features` function call
     """
     memory_snapshot("ShuffleNodeFeaturesBegin: ", rank)
-    logging.info(f'[Rank: {rank} - node_feat_tids - {node_feat_tids}')
+    logging.info(f"[Rank: {rank} - node_feat_tids - {node_feat_tids}")
     rcvd_node_features, rcvd_global_nids = exchange_features(
         rank,
         world_size,
@@ -806,12 +814,12 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map, ntype_counts):
         ntype_counts,
     )
     logging.info(f"[Rank: {rank}] Done reading dataset {params.input_dir}")
-    dist.barrier () # SYNCH
+    dist.barrier()  # SYNCH
 
     edge_data = augment_edge_data(
         edge_data, id_lookup, edge_tids, rank, world_size, params.num_parts
     )
-    dist.barrier () # SYNCH
+    dist.barrier()  # SYNCH
     logging.info(
         f"[Rank: {rank}] Done augmenting edge_data: {len(edge_data)}, {edge_data[constants.GLOBAL_SRC_ID].shape}"
     )
@@ -980,7 +988,10 @@ def gen_dist_partitions(rank, world_size, params):
     # for global-nids
     _, global_nid_ranges = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        get_typecounts(schema_map[constants.STR_NODE_TYPE], schema_map[constants.STR_NODE_TYPE_COUNTS])
+        get_typecounts(
+            schema_map[constants.STR_NODE_TYPE],
+            schema_map[constants.STR_NODE_TYPE_COUNTS],
+        ),
     )
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
     id_lookup.set_idMap(id_map)
@@ -994,7 +1005,17 @@ def gen_dist_partitions(rank, world_size, params):
         edge_typecounts,
         edge_features,
         edge_feat_tids,
-    ) = read_dataset(rank, world_size, id_lookup, params, schema_map, get_typecounts(schema_map[constants.STR_NODE_TYPE], schema_map[constants.STR_NODE_TYPE_COUNTS]))
+    ) = read_dataset(
+        rank,
+        world_size,
+        id_lookup,
+        params,
+        schema_map,
+        get_typecounts(
+            schema_map[constants.STR_NODE_TYPE],
+            schema_map[constants.STR_NODE_TYPE_COUNTS],
+        ),
+    )
     logging.info(
         f"[Rank: {rank}] Done augmenting file input data with auxilary columns"
     )
@@ -1005,8 +1026,16 @@ def gen_dist_partitions(rank, world_size, params):
     # and return the aggregated data
     # ntypes_gnid_range_map = get_gnid_range_map(node_tids)
     # etypes_geid_range_map = get_gnid_range_map(edge_tids)
-    ntypes_gnid_range_map = get_gid_offsets(schema_map[constants.STR_NODE_TYPE], get_typecounts(schema_map[constants.STR_NODE_TYPE], schema_map[constants.STR_NODE_TYPE_COUNTS]))
-    etypes_geid_range_map = get_gid_offsets(schema_map[constants.STR_EDGE_TYPE], edge_typecounts)
+    ntypes_gnid_range_map = get_gid_offsets(
+        schema_map[constants.STR_NODE_TYPE],
+        get_typecounts(
+            schema_map[constants.STR_NODE_TYPE],
+            schema_map[constants.STR_NODE_TYPE_COUNTS],
+        ),
+    )
+    etypes_geid_range_map = get_gid_offsets(
+        schema_map[constants.STR_EDGE_TYPE], edge_typecounts
+    )
 
     (
         node_data,
@@ -1175,10 +1204,13 @@ def gen_dist_partitions(rank, world_size, params):
             local_node_data,
             local_edge_data,
             num_edges,
-            get_typecounts(schema_map[constants.STR_NODE_TYPE], schema_map[constants.STR_NODE_TYPE_COUNTS]),
+            get_typecounts(
+                schema_map[constants.STR_NODE_TYPE],
+                schema_map[constants.STR_NODE_TYPE_COUNTS],
+            ),
             edge_typecounts,
             params.save_orig_nids,
-            params.save_orig_eids
+            params.save_orig_eids,
         )
         sort_etypes = len(etypes_map) > 1
         local_node_features = prepare_local_data(
