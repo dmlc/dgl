@@ -9,7 +9,7 @@ examples:
   Start a CPU only build: bash $0 -c
   Start a CUDA build: bash $0 -g
   Build incrementally: bash $0
-  Clean and restart a CPU only build: bash $0 -c -d
+  Remove all intermediate output and restart a CPU only build: bash $0 -c -r
 
 Build DGL. By default, build incrementally on top of the current state.
 
@@ -17,18 +17,18 @@ OPTIONS:
   -h           Show this message.
   -c           Restart CPU only build.
   -g           Restart CUDA build.
-  -d           Delete all the intermediate output.
+  -r           Remove all intermediate output.
 EOF
 }
 
 # Parse flags.
-while getopts "cdgh" flag; do
+while getopts "cghr" flag; do
   if [[ ${flag} == "c" ]]; then
     cuda="OFF"
   elif [[ ${flag} == "g" ]]; then
     cuda="ON"
-  elif [[ ${flag} == "d" ]]; then
-    clean="YES"
+  elif [[ ${flag} == "r" ]]; then
+    remove="YES"
   elif [[ ${flag} == "h" ]]; then
     usage
     exit 0
@@ -50,7 +50,7 @@ if [[ ! ${PWD} == ${DGL_HOME} ]]; then
   exit 1
 fi
 
-if [[ ${clean} == "YES" ]]; then
+if [[ ${remove} == "YES" ]]; then
   rm -rf build
 fi
 
