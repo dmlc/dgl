@@ -24,6 +24,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/packed_func_ext.h>
 #include <dgl/runtime/container.h>
+#include <dgl/runtime/device_api.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/transform.h>
 
