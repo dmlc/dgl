@@ -44,16 +44,11 @@ def submit_jobs(args) -> str:
     graph_name = schema_map["graph_name"]
 
     # retrieve num_parts
-    num_chunks = len(schema_map["num_nodes_per_chunk"][0])
-    num_parts = num_chunks
+    num_parts = args.num_parts
     partition_path = os.path.join(args.partitions_dir, "partition_meta.json")
     if os.path.isfile(partition_path):
         part_meta = load_partition_meta(partition_path)
         num_parts = part_meta.num_parts
-    if num_parts > num_chunks:
-        raise Exception(
-            "Number of partitions should be less/equal than number of chunks."
-        )
 
     # verify ip_config
     with open(args.ip_config, "r") as f:
@@ -128,6 +123,12 @@ def main():
         type=str,
         default="info",
         help="To enable log level for debugging purposes. Available options: (Critical, Error, Warning, Info, Debug, Notset)",
+    )
+    parser.add_argument(
+        "--num-parts",
+        type=int,
+        default=1,
+        help="Total no. of partitions to be performed",
     )
     parser.add_argument(
         "--python-path",

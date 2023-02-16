@@ -47,7 +47,7 @@ class DistLookupService:
         integer indicating the total no. of processes
     """
 
-    def __init__(self, input_dir, ntype_names, id_map, rank, world_size):
+    def __init__(self, input_dir, ntype_names, rank, world_size):
         assert os.path.isdir(input_dir)
         assert ntype_names is not None
         assert len(ntype_names) > 0
@@ -57,6 +57,7 @@ class DistLookupService:
         type_nid_end = []
         partid_list = []
         ntype_count = []
+        ntypes = []
 
         # Iterate over the node types and extract the partition id mappings.
         for ntype in ntype_names:
@@ -87,6 +88,7 @@ class DistLookupService:
             ntype_partids = np.concatenate(ntype_partids)
             count = len(ntype_partids)
             ntype_count.append(count)
+            ntypes.append(ntype)
 
             # Each rank assumes a contiguous set of partition-ids which are equally split
             # across all the processes.
@@ -106,14 +108,22 @@ class DistLookupService:
             # Explicitly release the array read from the file.
             del ntype_partids
 
+        logging.info(f'[Rank: {rank}] ntypeid begin - {type_nid_begin} - {type_nid_end}')
+
         # Store all the information in the object instance variable.
-        self.id_map = id_map
         self.type_nid_begin = np.array(type_nid_begin, dtype=np.int64)
         self.type_nid_end = np.array(type_nid_end, dtype=np.int64)
         self.partid_list = partid_list
         self.ntype_count = np.array(ntype_count, dtype=np.int64)
+        self.ntypes = ntypes
         self.rank = rank
         self.world_size = world_size
+
+    def set_idMap(self, id_map):
+        self.id_map = id_map
+
+    def get_typecounts(self):
+        return dict(zip(self.ntypes, self.ntype_count))
 
     def get_partition_ids(self, global_nids):
         """
@@ -148,20 +158,28 @@ class DistLookupService:
             function argument)
         """
 
-        # Find the process where global_nid --> partition-id(owner) is stored.
-        ntype_ids, type_nids = self.id_map(global_nids)
-        ntype_ids, type_nids = ntype_ids.numpy(), type_nids.numpy()
-        assert len(ntype_ids) == len(global_nids)
+        if global_nids.shape[0] > 0:
+            # Find the process where global_nid --> partition-id(owner) is stored.
+            ntype_ids, type_nids = self.id_map(global_nids)
+            ntype_ids, type_nids = ntype_ids.numpy(), type_nids.numpy()
+            assert len(ntype_ids) == len(global_nids)
 
-        # For each node-type, the per-type-node-id <-> partition-id mappings are
-        # stored as contiguous chunks by this lookup service.
-        # The no. of these mappings stored by each process, in the lookup service, are
-        # equally split among all the processes in the lookup service, deterministically.
-        typeid_counts = self.ntype_count[ntype_ids]
-        chunk_sizes = np.ceil(typeid_counts / self.world_size).astype(np.int64)
-        service_owners = np.floor_divide(type_nids, chunk_sizes).astype(
-            np.int64
-        )
+            # For each node-type, the per-type-node-id <-> partition-id mappings are
+            # stored as contiguous chunks by this lookup service.
+            # The no. of these mappings stored by each process, in the lookup service, are
+            # equally split among all the processes in the lookup service, deterministically.
+            typeid_counts = self.ntype_count[ntype_ids]
+            chunk_sizes = np.ceil(typeid_counts / self.world_size).astype(np.int64)
+            service_owners = np.floor_divide(type_nids, chunk_sizes).astype(
+                np.int64
+            )
+        else:
+            ntype_ids = np.array([], dtype=np.int64)
+            type_nids = np.array([], dtype=np.int64)
+            type_id_counts = np.array([], dtype=np.int64)
+            chunk_sizes = np.array([], dtype=np.int64)
+            service_owners = np.array([], dtype=np.int64)
+            
 
         # Now `service_owners` is a list of ranks (process-ids) which own the corresponding
         # global-nid <-> partition-id mapping.
@@ -196,6 +214,7 @@ class DistLookupService:
             if owner_req_list[idx] is None:
                 out_list.append(torch.empty((0,), dtype=torch.int64))
                 continue
+            temp = owner_req_list[idx].numpy()
             # Get the node_type_ids and per_type_nids for the incoming global_nids.
             ntype_ids, type_nids = self.id_map(owner_req_list[idx].numpy())
             ntype_ids, type_nids = ntype_ids.numpy(), type_nids.numpy()
@@ -245,6 +264,9 @@ class DistLookupService:
 
         # Order according to the requesting order.
         # Owner_resp_list is the list of owner-ids for global_nids (function argument).
+        if global_nids.shape[0] == 0:
+            return np.array([], dtype=np.int64)
+
         owner_ids = torch.cat(
             [x for x in owner_resp_list if x is not None]
         ).numpy()

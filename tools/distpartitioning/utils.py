@@ -168,6 +168,51 @@ def get_node_types(schema_map):
     ntypeid_ntype_map = {i: e for i, e in enumerate(ntypes)}
     return ntype_ntypeid_map, ntypes, ntypeid_ntype_map
 
+def get_gid_offsets(typenames, typecounts):
+    """
+    Builds a map where the key-value pairs are typnames and respective
+    global-id offsets.
+
+    Parameters:
+    -----------
+    typenames : list of strings
+        a list of strings which can be either node typenames or edge typenames
+    typecounts : list of integers
+        a list of integers indicating the total number of nodes/edges for its
+        typeid which is the index in this list
+
+    Returns:
+    --------
+    dictionary :
+        a dictionary where keys are node_type names and values are 
+        global_nid range, which is a tuple.
+
+    """
+    assert(
+            len(typenames) == len(typecounts)
+    ), f"No. of typenames does not match with its type counts names = {typenames}, counts = {typecounts}"
+
+    counts = []
+    for name in typenames: 
+        counts.append(typecounts[name])
+    starts = np.cumsum([0] + counts[:-1])
+    ends = np.cumsum(counts)
+
+    gid_offsets = {}
+    for idx, name in enumerate(typenames):
+        gid_offsets[name] = [starts[idx], ends[idx]]
+    return gid_offsets
+
+    '''
+    starts = np.cumsum([0] + type_counts[:-1])
+    ends = np.cumsum(type_counts)
+    gid_offsets = {}
+    for idx, name in enumerate(typenames):
+        gid_offsets[name] = [start[idx], ends[idx]]
+
+    return gid_offsets
+    '''
+
 
 def get_gnid_range_map(node_tids):
     """
@@ -312,8 +357,8 @@ def augment_edge_data(
     etype_offset = {}
     offset = 0
     for etype_name, tid_range in edge_tids.items():
-        assert int(tid_range[0][0]) == 0
-        assert len(tid_range) == num_parts
+        # assert int(tid_range[0][0]) == 0, f'tid_range = {tid_range}'
+        # assert len(tid_range) == num_parts, no longer needed. 
         etype_offset[etype_name] = offset + int(tid_range[0][0])
         offset += int(tid_range[-1][1])
 
@@ -321,14 +366,20 @@ def augment_edge_data(
     for etype_name, tid_range in edge_tids.items():
         for idx in range(num_parts):
             if map_partid_rank(idx, world_size) == rank:
-                global_eid_start = etype_offset[etype_name]
-                begin = global_eid_start + int(tid_range[idx][0])
-                end = global_eid_start + int(tid_range[idx][1])
-                global_eids.append(np.arange(begin, end, dtype=np.int64))
-    global_eids = np.concatenate(global_eids)
+                if len(tid_range) > idx:
+                    global_eid_start = etype_offset[etype_name]
+                    begin = global_eid_start + int(tid_range[idx][0])
+                    end = global_eid_start + int(tid_range[idx][1])
+                    global_eids.append(np.arange(begin, end, dtype=np.int64))
+
+    global_eids = np.concatenate(global_eids) if len(global_eids) > 0 else np.array([], dtype=np.int64)
     assert global_eids.shape[0] == edge_data[constants.ETYPE_ID].shape[0]
     edge_data[constants.GLOBAL_EID] = global_eids
 
+    # assign the owner process/rank for each edge
+    edge_data[constants.OWNER_PROCESS] = lookup_service.get_partition_ids(
+        edge_data[constants.GLOBAL_DST_ID]
+    )
     return edge_data
 
 
@@ -514,6 +565,33 @@ def write_dgl_objects(
 
 def get_idranges(names, counts, num_chunks=None):
     """
+    counts will be a list of numbers of a dictionary. 
+    Length is less than or equal to the num_parts variable.
+    """
+    gnid_start = 0
+    gnid_end = gnid_start
+    tid_dict = {}
+    gid_dict = {}
+
+    for idx, typename in enumerate(names):
+        gnid_end += counts[typename]
+        tid_dict[typename] = [[0, counts[typename]]]
+        gid_dict[typename] = np.array([gnid_start, gnid_end]).reshape([1, 2])
+        gnid_start = gnid_end
+
+    return tid_dict, gid_dict
+
+def get_typecounts(ntypes, ntype_counts):
+    """
+    Return a dictionary with key, value pairs as node type names and no. of
+    nodes of a particular type in the input graph.
+    """
+    return dict(zip(ntypes, ntype_counts))
+
+
+'''
+def get_idranges(names, counts, num_chunks=None):
+    """
     Utility function to compute typd_id/global_id ranges for both nodes and edges.
 
     Parameters:
@@ -574,6 +652,7 @@ def get_idranges(names, counts, num_chunks=None):
         tid_dict[typename] = tid_ranges
 
     return tid_dict, gid_dict
+'''
 
 
 def memory_snapshot(tag, rank):
