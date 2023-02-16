@@ -1,10 +1,10 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file array/cpu/id_hash_map.cc
+ * @file array/cpu/concurrent_id_hash_map.cc
  * @brief Class about id hash map
  */
 
-#include "id_hash_map.h"
+#include "concurrent_id_hash_map.h"
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -35,7 +35,7 @@ namespace dgl {
 namespace aten {
 
 template <typename IdType>
-IdType IdHashMap<IdType>::CompareAndSwap(
+IdType ConcurrentIdHashMap<IdType>::CompareAndSwap(
     IdType* ptr, IdType old_val, IdType new_val) {
 #ifdef _MSC_VER
   if (sizeof(IdType) == 4) {
@@ -55,7 +55,7 @@ IdType IdHashMap<IdType>::CompareAndSwap(
 }
 
 template <typename IdType>
-IdHashMap<IdType>::IdHashMap() : mask_(0) {
+ConcurrentIdHashMap<IdType>::ConcurrentIdHashMap() : mask_(0) {
   // Used to deallocate the memory in hash_map_ with device api
   // when the pointer is freed.
   auto deleter = [](Mapping* mappings) {
@@ -69,22 +69,37 @@ IdHashMap<IdType>::IdHashMap() : mask_(0) {
 }
 
 template <typename IdType>
-IdArray IdHashMap<IdType>::Init(const IdArray& ids) {
+IdArray ConcurrentIdHashMap<IdType>::Init(
+    const IdArray& ids, size_t num_seeds) {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
   const size_t num_ids = static_cast<size_t>(ids->shape[0]);
   // Make sure `ids` is not 0 dim.
-  CHECK_GT(num_ids, 0);
+  CHECK_GE(num_seeds, 0);
+  CHECK_GE(num_ids, num_seeds);
   size_t capacity = GetMapSize(num_ids);
   mask_ = static_cast<IdType>(capacity - 1);
 
   auto ctx = DGLContext{kDGLCPU, 0};
+  auto device = DeviceAPI::Get(ctx);
   hash_map_.reset(static_cast<Mapping*>(
-      DeviceAPI::Get(ctx)->AllocWorkspace(ctx, sizeof(Mapping) * capacity)));
+      device->AllocWorkspace(ctx, sizeof(Mapping) * capacity)));
   memset(hash_map_.get(), -1, sizeof(Mapping) * capacity);
 
   // This code block is to fill the ids into hash_map_.
   IdArray unique_ids = NewIdArray(num_ids, ctx, sizeof(IdType) * 8);
+  IdType* unique_ids_data = unique_ids.Ptr<IdType>();
+  // Fill in the first `num_seeds` ids.
+  parallel_for(0, num_seeds, kGrainSize, [&](int64_t s, int64_t e) {
+    for (int64_t i = s; i < e; i++) {
+      InsertAndSet(ids_data[i], static_cast<IdType>(i));
+    }
+  });
+  // Place the first `num_seeds` ids.
+  device->CopyDataFromTo(
+      ids_data, 0, unique_ids_data, 0, sizeof(IdType) * num_seeds, ctx, ctx,
+      ids->dtype);
+
   // An auxiliary array indicates whether the corresponding elements
   // are inserted into hash map or not. Use `int16_t` instead of `bool` as
   // vector<bool> is unsafe when updating different elements from different
@@ -92,10 +107,8 @@ IdArray IdHashMap<IdType>::Init(const IdArray& ids) {
   std::vector<int16_t> valid(num_ids);
   auto thread_num = compute_num_threads(0, num_ids, kGrainSize);
   std::vector<size_t> block_offset(thread_num + 1, 0);
-  IdType* unique_ids_data = unique_ids.Ptr<IdType>();
-
   // Insert all elements in this loop.
-  parallel_for(0, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
+  parallel_for(num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
     size_t count = 0;
     for (int64_t i = s; i < e; i++) {
       Insert(ids_data[i], &valid, i);
@@ -107,12 +120,12 @@ IdArray IdHashMap<IdType>::Init(const IdArray& ids) {
   // Get ExclusiveSum of each block.
   std::partial_sum(
       block_offset.begin() + 1, block_offset.end(), block_offset.begin() + 1);
-  unique_ids->shape[0] = block_offset.back();
+  unique_ids->shape[0] = num_seeds + block_offset.back();
 
   // Get unique array from ids and set value for hash map.
-  parallel_for(0, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
+  parallel_for(num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
     auto tid = omp_get_thread_num();
-    auto pos = block_offset[tid];
+    auto pos = block_offset[tid] + num_seeds;
     for (int64_t i = s; i < e; i++) {
       if (valid[i]) {
         unique_ids_data[pos] = ids_data[i];
@@ -125,7 +138,7 @@ IdArray IdHashMap<IdType>::Init(const IdArray& ids) {
 }
 
 template <typename IdType>
-IdArray IdHashMap<IdType>::MapIds(const IdArray& ids) const {
+IdArray ConcurrentIdHashMap<IdType>::MapIds(const IdArray& ids) const {
   CHECK_EQ(ids.defined(), true);
   const IdType* ids_data = ids.Ptr<IdType>();
   const size_t num_ids = static_cast<size_t>(ids->shape[0]);
@@ -144,14 +157,15 @@ IdArray IdHashMap<IdType>::MapIds(const IdArray& ids) const {
 }
 
 template <typename IdType>
-inline void IdHashMap<IdType>::Next(IdType* pos, IdType* delta) const {
+inline void ConcurrentIdHashMap<IdType>::Next(
+    IdType* pos, IdType* delta) const {
   // Use Quadric probing.
   *pos = (*pos + (*delta) * (*delta)) & mask_;
   *delta = *delta + 1;
 }
 
 template <typename IdType>
-IdType IdHashMap<IdType>::MapId(IdType id) const {
+IdType ConcurrentIdHashMap<IdType>::MapId(IdType id) const {
   IdType pos = (id & mask_), delta = 1;
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   while (hash_map_[pos].key != empty_key && hash_map_[pos].key != id) {
@@ -161,7 +175,7 @@ IdType IdHashMap<IdType>::MapId(IdType id) const {
 }
 
 template <typename IdType>
-void IdHashMap<IdType>::Insert(
+void ConcurrentIdHashMap<IdType>::Insert(
     IdType id, std::vector<int16_t>* valid, size_t index) {
   IdType pos = (id & mask_), delta = 1;
   while (!AttemptInsertAt(pos, id, valid, index)) {
@@ -170,7 +184,7 @@ void IdHashMap<IdType>::Insert(
 }
 
 template <typename IdType>
-void IdHashMap<IdType>::Set(IdType key, IdType value) {
+void ConcurrentIdHashMap<IdType>::Set(IdType key, IdType value) {
   IdType pos = (key & mask_), delta = 1;
   while (hash_map_[pos].key != key) {
     Next(&pos, &delta);
@@ -180,7 +194,25 @@ void IdHashMap<IdType>::Set(IdType key, IdType value) {
 }
 
 template <typename IdType>
-bool IdHashMap<IdType>::AttemptInsertAt(
+inline void ConcurrentIdHashMap<IdType>::InsertAndSet(IdType id, IdType value) {
+  IdType pos = (id & mask_), delta = 1;
+  while (!AttemptInsertAt(pos, id)) {
+    Next(&pos, &delta);
+  }
+
+  hash_map_[pos].value = value;
+}
+
+template <typename IdType>
+inline bool ConcurrentIdHashMap<IdType>::AttemptInsertAt(
+    int64_t pos, IdType key) {
+  IdType empty_key = static_cast<IdType>(kEmptyKey);
+  IdType old_val = CompareAndSwap(&(hash_map_[pos].key), empty_key, key);
+  return old_val == empty_key;
+}
+
+template <typename IdType>
+bool ConcurrentIdHashMap<IdType>::AttemptInsertAt(
     int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index) {
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType old_val = CompareAndSwap(&(hash_map_[pos].key), empty_key, key);
@@ -193,8 +225,8 @@ bool IdHashMap<IdType>::AttemptInsertAt(
   }
 }
 
-template class IdHashMap<int32_t>;
-template class IdHashMap<int64_t>;
+template class ConcurrentIdHashMap<int32_t>;
+template class ConcurrentIdHashMap<int64_t>;
 
 }  // namespace aten
 }  // namespace dgl
