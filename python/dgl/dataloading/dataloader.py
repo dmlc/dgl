@@ -245,7 +245,8 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             self.batch_size
 
 
-def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, device, pin_prefetcher):
+def _prefetch_update_feats(feats, frames, types, get_storage_func,
+    extern_storage, id_name, device, pin_prefetcher):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
         default_id = frame.get(id_name, None)
@@ -257,7 +258,11 @@ def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, devi
                     raise DGLError(
                         'Found a LazyFeature with no ID specified, '
                         'and the graph does not have dgl.NID or dgl.EID columns')
-                feats[tid, key] = get_storage_func(parent_key, type_).fetch(
+                if (parent_key, type_) in extern_storage:
+                    storage_func = extern_storage[(parent_key, type_)]
+                else:
+                    storage_func = get_storage_func(parent_key, type_)
+                feats[tid, key] = storage_func.fetch(
                     column.id_ or default_id, device, pin_prefetcher)
 
 
@@ -273,10 +278,12 @@ class _PrefetchedGraphFeatures(object):
 def _prefetch_for_subgraph(subg, dataloader):
     node_feats, edge_feats = {}, {}
     _prefetch_update_feats(
-        node_feats, subg._node_frames, subg.ntypes, dataloader.graph.get_node_storage,
+        node_feats, subg._node_frames, subg.ntypes,
+        dataloader.graph.get_node_storage, dataloader.extern_ndata,
         NID, dataloader.device, dataloader.pin_prefetcher)
     _prefetch_update_feats(
-        edge_feats, subg._edge_frames, subg.canonical_etypes, dataloader.graph.get_edge_storage,
+        edge_feats, subg._edge_frames, subg.canonical_etypes,
+        dataloader.graph.get_edge_storage, dataloader.extern_edata,
         EID, dataloader.device, dataloader.pin_prefetcher)
     return _PrefetchedGraphFeatures(node_feats, edge_feats)
 
@@ -853,6 +860,8 @@ class DataLoader(torch.utils.data.DataLoader):
         worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
 
         self.other_storages = {}
+        self.extern_ndata = {}
+        self.extern_edata = {}
 
         super().__init__(
             self.dataset,
@@ -964,6 +973,43 @@ class DataLoader(torch.utils.data.DataLoader):
     def attach_data(self, name, data):
         """Add a data other than node and edge features for prefetching."""
         self.other_storages[name] = wrap_storage(data)
+
+    def attach_ndata(self, key, feature_storage, ntype='_N'):
+        """Attach a :class:`dgl.storages.FeatureStorage` to node type
+        :attr:`ntype` with name :attr:`key`.
+
+        Parameters
+        ----------
+        key : str
+            Name of the attached node feature.
+        feature_storage : :class:`dgl.storages.FeatureStorage` or types
+        registered by ``register_storage_wrapper()``, e.g., torch.Tensor,
+        np.memmap, etc.
+            The feature source to be attached.
+        ntype : str, optional
+            Node type to attach feature to. Default is ``'_N'`` for homographs.
+            For heterographs, users usually have to specify it manually.
+        """
+        self.extern_ndata[(key, ntype)] = wrap_storage(feature_storage)
+
+    def attach_edata(self, key, feature_storage, etype='_E'):
+        """Attach a :class:`dgl.storages.FeatureStorage` to edge type
+        :attr:`etype` with name :attr:`key`.
+
+        Parameters
+        ----------
+        key : str
+            Name of the attached edge feature.
+        feature_storage : :class:`dgl.storages.FeatureStorage` or types
+        registered by ``register_storage_wrapper()``, e.g., torch.Tensor,
+        np.memmap, etc.
+            The feature source to be attached.
+        ntype : str, optional
+            Edge type to attach feature to. Default is ``'_E'`` for homographs.
+            For heterographs, users usually have to specify it manually.
+        """
+        etype = self.graph.to_canonical_etype(etype)
+        self.extern_edata[(key, etype)] = wrap_storage(feature_storage)
 
 
 ######## Graph DataLoaders ########

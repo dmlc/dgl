@@ -257,6 +257,103 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
     if use_ddp:
         dist.destroy_process_group()
 
+@pytest.mark.parametrize('mode', ['cpu', 'uva', 'pure_gpu'])
+def test_external_feature_storage(mode):
+    if mode != "cpu" and F.ctx() == F.cpu():
+        pytest.skip("UVA and GPU sampling require a GPU.")
+
+    def _random_tensor(num):
+        t = torch.randn(num, 8)
+        if mode == "uva":
+            t = t.pin_memory()
+        elif mode == "pure_gpu":
+            t = t.to(F.cuda())
+        return t
+
+    # 1. homogenous graph
+    g1 = dgl.graph(([0, 0, 0, 1, 1], [1, 2, 3, 3, 4]))
+    g1.ndata["feat"] = F.copy_to(F.randn((5, 8)), F.cpu())
+    g1.ndata["label"] = F.copy_to(F.randn((g1.num_nodes(),)), F.cpu())
+    indices = F.copy_to(F.arange(0, g1.num_nodes()), F.cpu())
+    if mode == "pure_gpu":
+        g1 = g1.to(F.cuda())
+        indices = F.copy_to(indices, F.cuda())
+
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(
+        [3, 3], prefetch_node_feats=["feat", "feat2"], prefetch_edge_feats=["e"]
+    )
+    dataloader = dgl.dataloading.DataLoader(
+        g1,
+        indices,
+        sampler,
+        device=F.ctx(),
+        batch_size=g1.num_nodes(),
+        use_uva=mode == "uva",
+    )
+    dataloader.attach_ndata("feat2", _random_tensor(5))
+    dataloader.attach_edata("e", _random_tensor(5))
+    for input_nodes, output_nodes, blocks in dataloader:
+        _check_device(input_nodes)
+        _check_device(output_nodes)
+        _check_device(blocks)
+        _check_device(blocks[0].srcdata["feat"])
+        _check_device(blocks[0].srcdata["feat2"])
+        assert blocks[0].srcdata["feat"].shape == (5, 8)
+        assert blocks[0].srcdata["feat2"].shape == (5, 8)
+        _check_device(blocks[0].edata["e"])
+
+    # 2. heterogenous graph
+    g2 = dgl.heterograph(
+        {
+            ("user", "follow", "user"): (
+                [0, 0, 0, 1, 1, 1, 2],
+                [1, 2, 3, 0, 2, 3, 0],
+            ),
+            ("user", "followed-by", "user"): (
+                [1, 2, 3, 0, 2, 3, 0],
+                [0, 0, 0, 1, 1, 1, 2],
+            ),
+            ("user", "play", "game"): ([0, 1, 1, 3, 5], [0, 1, 2, 0, 2]),
+            ("game", "played-by", "user"): ([0, 1, 2, 0, 2], [0, 1, 1, 3, 5]),
+        }
+    )
+    g2.nodes["game"].data["feat"] = F.copy_to(
+        F.randn((g2.num_nodes("game"), 8)), F.cpu()
+    )
+    catagory = "user"
+    indices = {catagory: g2.nodes(catagory)}
+    batch_size = g2.num_nodes(catagory)
+    if mode == "pure_gpu":
+        g2 = g2.to(F.cuda())
+        indices = {k: F.copy_to(v, F.cuda()) for k, v in indices.items()}
+
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(
+        [{etype: 4 - i for i, etype in enumerate(g2.etypes)}] * 2,
+        prefetch_node_feats={k: ["feat"] for k in g2.ntypes},
+        prefetch_edge_feats={e: ["e"] for e in g2.etypes},
+    )
+    dataloader = dgl.dataloading.DataLoader(
+        g2,
+        indices,
+        sampler,
+        device=F.ctx(),
+        batch_size=batch_size,
+        use_uva=(mode == "uva"),
+    )
+    # feature of "game" is Frame while "user"'s is TensorStorage
+    dataloader.attach_ndata(
+        "feat", _random_tensor(g2.num_nodes(catagory)), catagory
+    )
+    for e in g2.canonical_etypes:
+        dataloader.attach_edata("e", _random_tensor(g2.num_edges(e)), e)
+    for input_nodes, output_nodes, blocks in dataloader:
+        _check_device(input_nodes)
+        _check_device(output_nodes)
+        _check_device(blocks)
+        _check_device(blocks[0].srcdata["feat"])
+        assert blocks[0].srcdata["feat"][catagory].shape == (6, 8)
+        _check_device(blocks[0].edata["e"])
+
 @parametrize_idtype
 @pytest.mark.parametrize('sampler_name', ['full', 'neighbor'])
 @pytest.mark.parametrize('neg_sampler', [
