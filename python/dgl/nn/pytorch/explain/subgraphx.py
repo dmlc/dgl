@@ -206,7 +206,7 @@ class SubgraphX(nn.Module):
                 max(nx.weakly_connected_components(nx_graph), key=len)
             )
             # Map to the original node IDs.
-            largest_cc_nids = new_subg.ndata[NID][largest_cc_nids]
+            largest_cc_nids = new_subg.ndata[NID][largest_cc_nids].long()
             largest_cc_nids = subg.ndata[NID][largest_cc_nids].sort().values
             if str(largest_cc_nids) not in self.mcts_node_maps:
                 child_mcts_node = MCTSNode(largest_cc_nids)
