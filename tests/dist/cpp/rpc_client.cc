@@ -47,7 +47,6 @@ class RPCClient {
         ++recv_id;
       }
     }
-    const int num_machines = ips_.size();
     for (int i = 0; i < kNumMessage; ++i) {
       for (int n = 0; n < recv_id; ++n) {
         dgl::rpc::RPCMessage msg;
