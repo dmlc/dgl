@@ -81,6 +81,7 @@ __all__ = [
     'to_double',
     'double_radius_node_labeling',
     'shortest_dist',
+    'svd_pe'
     ]
 
 
@@ -3507,7 +3508,7 @@ def radius_graph(x, r, p=2, self_loop=False,
     distances = th.cdist(x, x, p=p, compute_mode=compute_mode)
 
     if not self_loop:
-        distances.fill_diagonal_(r + 1e-4)
+        distances.fill_diagonal_(r + 1)
 
     edges = th.nonzero(distances <= r, as_tuple=True)
 
@@ -3912,5 +3913,84 @@ def shortest_dist(g, root=None, return_paths=False):
 
     return F.copy_to(F.tensor(dist, dtype=F.int64), g.device), \
         F.copy_to(F.tensor(paths, dtype=F.int64), g.device)
+
+
+def svd_pe(g, k, padding=False, random_flip=True):
+    r"""SVD-based Positional Encoding, as introduced in
+    `Global Self-Attention as a Replacement for Graph Convolution
+    <https://arxiv.org/pdf/2108.03348.pdf>`__
+
+    This function computes the largest :math:`k` singular values and
+    corresponding left and right singular vectors to form positional encodings.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        A DGLGraph to be encoded, which must be a homogeneous one.
+    k : int
+        Number of largest singular values and corresponding singular vectors
+        used for positional encoding.
+    padding : bool, optional
+        If False, raise an error when :math:`k > N`,
+        where :math:`N` is the number of nodes in :attr:`g`.
+        If True, add zero paddings in the end of encoding vectors when
+        :math:`k > N`.
+        Default : False.
+    random_flip : bool, optional
+        If True, randomly flip the signs of encoding vectors.
+        Proposed to be activated during training for better generalization.
+        Default : True.
+
+    Returns
+    -------
+    Tensor
+        Return SVD-based positional encodings of shape :math:`(N, 2k)`.
+
+    Example
+    -------
+    >>> import dgl
+
+    >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
+    >>> dgl.svd_pe(g, k=2, padding=False, random_flip=True)
+    tensor([[-6.3246e-01, -1.1373e-07, -6.3246e-01,  0.0000e+00],
+            [-6.3246e-01,  7.6512e-01, -6.3246e-01, -7.6512e-01],
+            [ 6.3246e-01,  4.7287e-01,  6.3246e-01, -4.7287e-01],
+            [-6.3246e-01, -7.6512e-01, -6.3246e-01,  7.6512e-01],
+            [ 6.3246e-01, -4.7287e-01,  6.3246e-01,  4.7287e-01]])
+    """
+    n = g.num_nodes()
+    if not padding and n < k:
+        raise ValueError(
+            "The number of singular values k must be no greater than the "
+            "number of nodes n, but " +
+            f"got {k} and {n} respectively."
+        )
+    a = g.adj(ctx=g.device, scipy_fmt="coo").toarray()
+    u, d, vh = scipy.linalg.svd(a)
+    v = vh.transpose()
+    m = min(n, k)
+    topm_u = u[:, 0:m]
+    topm_v = v[:, 0:m]
+    topm_sqrt_d = sparse.diags(np.sqrt(d[0:m]))
+    encoding = np.concatenate(
+        ((topm_u @ topm_sqrt_d), (topm_v @ topm_sqrt_d)), axis=1
+    )
+    # randomly flip row vectors
+    if random_flip:
+        rand_sign = 2 * (np.random.rand(n) > 0.5) - 1
+        flipped_encoding = F.tensor(
+            rand_sign[:, np.newaxis] * encoding, dtype=F.float32
+        )
+    else:
+        flipped_encoding = F.tensor(encoding, dtype=F.float32)
+
+    if n < k:
+        zero_padding = F.zeros(
+            [n, 2 * (k - n)], dtype=F.float32, ctx=F.context(flipped_encoding)
+        )
+        flipped_encoding = F.cat([flipped_encoding, zero_padding], dim=1)
+
+    return flipped_encoding
+
 
 _init_api("dgl.transform", __name__)

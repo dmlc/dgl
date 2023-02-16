@@ -22,8 +22,7 @@ class EGATConv(nn.Module):
         f_{ij}^{\prime} &= \mathrm{LeakyReLU}\left(A [ h_{i} \| f_{ij} \| h_{j}]\right)
 
     where :math:`f_{ij}^{\prime}` are edge features, :math:`\mathrm{A}` is weight matrix and
-
-    :math: `\vec{F}` is weight vector. After that, resulting node features
+    :math:`\vec{F}` is weight vector. After that, resulting node features
     :math:`h_{i}^{\prime}` are updated in the same way as in regular GAT.
 
     Parameters

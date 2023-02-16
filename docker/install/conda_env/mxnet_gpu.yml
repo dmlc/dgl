@@ -14,3 +14,9 @@ dependencies:
     - nltk
     - requests[security]
     - tqdm
+    - psutil
+    - pyyaml
+    - pydantic
+    - pandas
+    - rdflib
+    - ogb

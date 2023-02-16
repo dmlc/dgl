@@ -7,10 +7,6 @@ from dgl.sparse import bsddmm, sddmm
 
 from .utils import clone_detach_and_grad, rand_coo, rand_csc, rand_csr
 
-# TODO(#4818): Skipping tests on win.
-if not sys.platform.startswith("linux"):
-    pytest.skip("skipping tests on win", allow_module_level=True)
-
 
 @pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
 @pytest.mark.parametrize("shape", [(5, 5), (5, 4)])
