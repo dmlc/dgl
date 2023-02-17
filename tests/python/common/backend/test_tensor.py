@@ -5,7 +5,6 @@ import numpy as np
 
 import dgl
 import dgl.ndarray as nd
-from dgl.utils import toindex
 
 
 @unittest.skipIf(
