@@ -143,6 +143,8 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
   return std::make_tuple(new_graph, induced_edges);
 }
 
+}  // namespace
+
 template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
@@ -298,8 +300,6 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
   // Return the new graph, the new src nodes, and new edges.
   return std::make_tuple(new_graph, induced_edges);
 }
-
-}  // namespace
 
 template <>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCPU, int32_t>(

@@ -36,7 +36,7 @@ namespace transform {
  */
 using MappingIdsFunc =
     std::function<std::tuple<std::vector<IdArray>, std::vector<IdArray>>(
-        const HeteroGraphPtr&, int64_t, const DGLContext&,
+        const HeteroGraphPtr&, bool, int64_t, const DGLContext&,
         const std::vector<int64_t>&, const std::vector<EdgeArray>&,
         const std::vector<IdArray>&, const std::vector<IdArray>&,
         std::vector<IdArray>* const, std::vector<int64_t>* const)>;
