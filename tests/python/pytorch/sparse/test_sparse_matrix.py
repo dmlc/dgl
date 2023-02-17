@@ -480,3 +480,26 @@ def test_to_dtype(dtype):
     mat2 = getattr(mat, func_name[dtype])()
     assert mat2.shape == mat.shape
     assert torch.allclose(mat2.val, target_val)
+
+
+@pytest.mark.parametrize("dense_dim", [None, 2])
+@pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
+@pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
+@pytest.mark.parametrize("extra_shape", [(0, 1), (2, 1)])
+def test_sparse_matrix_transpose(dense_dim, row, col, extra_shape):
+    mat_shape = (max(row) + 1 + extra_shape[0], max(col) + 1 + extra_shape[1])
+    val_shape = (len(row),)
+    if dense_dim is not None:
+        val_shape += (dense_dim,)
+    ctx = F.ctx()
+    val = torch.randn(val_shape).to(ctx)
+    row = torch.tensor(row).to(ctx)
+    col = torch.tensor(col).to(ctx)
+    mat = from_coo(row, col, val, mat_shape).transpose()
+    mat_row, mat_col = mat.coo()
+    mat_val = mat.val
+
+    assert mat.shape == mat_shape[::-1]
+    assert torch.allclose(mat_val, val)
+    assert torch.allclose(mat_row, col)
+    assert torch.allclose(mat_col, row)

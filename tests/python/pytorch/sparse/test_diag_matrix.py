@@ -126,3 +126,16 @@ def test_to_dtype(dtype):
     mat2 = getattr(mat, func_name[dtype])()
     assert mat2.shape == mat.shape
     assert torch.allclose(mat2.val, target_val)
+
+
+@pytest.mark.parametrize("val_shape", [(3,), (3, 2)])
+@pytest.mark.parametrize("mat_shape", [None, (3, 5), (5, 3)])
+def test_diag_matrix_transpose(val_shape, mat_shape):
+    ctx = F.ctx()
+    val = torch.randn(val_shape).to(ctx)
+    mat = diag(val, mat_shape).transpose()
+
+    assert torch.allclose(mat.val, val)
+    if mat_shape is None:
+        mat_shape = (val_shape[0], val_shape[0])
+    assert mat.shape == mat_shape[::-1]
