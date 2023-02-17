@@ -250,8 +250,8 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
   std::vector<IdArray> new_lhs;
   std::vector<IdArray> new_rhs;
   std::tie(new_lhs, new_rhs) = get_maping_ids(
-      graph, num_ntypes, ctx, maxNodesPerType, edge_arrays, src_nodes,
-      rhs_nodes, lhs_nodes_ptr, &num_nodes_per_type);
+      graph, include_rhs_in_lhs, num_ntypes, ctx, maxNodesPerType, edge_arrays,
+      src_nodes, rhs_nodes, lhs_nodes_ptr, &num_nodes_per_type);
 
   std::vector<IdArray> induced_edges;
   induced_edges.reserve(num_etypes);
