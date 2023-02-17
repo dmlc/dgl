@@ -737,7 +737,7 @@ def exchange_graph_data(
     memory_snapshot("NodeDataGenerationComplete: ", rank)
 
     edge_data = exchange_edge_data(
-	rank, world_size, num_parts, edge_data, id_lookup)
+	rank, world_size, num_parts, edge_data, id_lookup
     )
     memory_snapshot("ShuffleEdgeDataComplete: ", rank)
     return (
