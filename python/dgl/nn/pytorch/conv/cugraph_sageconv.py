@@ -2,6 +2,7 @@
 cugraph-ops"""
 # pylint: disable=no-member, arguments-differ, invalid-name, too-many-arguments
 
+import torch
 from torch import nn
 
 try:
@@ -59,6 +60,7 @@ class CuGraphSAGEConv(nn.Module):
             [-1.1690,  0.1952],
             [-1.1690,  0.1952]], device='cuda:0', grad_fn=<AddmmBackward0>)
     """
+    MAX_IN_DEGREE_MFG = 500
 
     def __init__(
         self,
@@ -70,21 +72,22 @@ class CuGraphSAGEConv(nn.Module):
     ):
         if has_pylibcugraphops is False:
             raise ModuleNotFoundError(
-                "dgl.nn.CuGraphSAGEConv requires pylibcugraphops >= 23.02 "
-                "to be installed."
+                f"{self.__class__.__name__} requires pylibcugraphops >= 23.02 "
+                f"to be installed."
             )
-        super().__init__()
-        self.in_feats = in_feats
-        self.out_feats = out_feats
+
         valid_aggr_types = {"max", "min", "mean", "sum"}
         if aggregator_type not in valid_aggr_types:
             raise ValueError(
                 f"Invalid aggregator_type. Must be one of {valid_aggr_types}. "
                 f"But got '{aggregator_type}' instead."
             )
+
+        super().__init__()
+        self.in_feats = in_feats
+        self.out_feats = out_feats
         self.aggr = aggregator_type
         self.feat_drop = nn.Dropout(feat_drop)
-
         self.linear = nn.Linear(2 * in_feats, out_feats, bias=bias)
 
     def reset_parameters(self):
@@ -118,14 +121,29 @@ class CuGraphSAGEConv(nn.Module):
             if max_in_degree is None:
                 max_in_degree = g.in_degrees().max().item()
 
-            _graph = make_mfg_csr(
-                g.dstnodes(), offsets, indices, max_in_degree, g.num_src_nodes()
-            )
+            if max_in_degree < self.MAX_IN_DEGREE_MFG:
+                _graph = make_mfg_csr(
+                    g.dstnodes(),
+                    offsets,
+                    indices,
+                    max_in_degree,
+                    g.num_src_nodes(),
+                )
+            else:
+                offsets_fg = torch.empty(
+                    g.num_src_nodes() + 1,
+                    dtype=offsets.dtype,
+                    device=offsets.device,
+                )
+                offsets_fg[: offsets.numel()] = offsets
+                offsets_fg[offsets.numel() :] = offsets[-1]
+
+                _graph = make_fg_csr(offsets_fg, indices)
         else:
             _graph = make_fg_csr(offsets, indices)
 
         feat = self.feat_drop(feat)
-        h = SAGEConvAgg(feat, _graph, self.aggr)
+        h = SAGEConvAgg(feat, _graph, self.aggr)[: g.num_dst_nodes()]
         h = self.linear(h)
 
         return h
