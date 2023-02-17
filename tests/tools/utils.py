@@ -138,7 +138,9 @@ def _chunk_graph(
 
     metadata["edge_type"] = [etypestrs[etype] for etype in g.canonical_etypes]
     # add edge_type_counts here.
-    metadata["edge_type_counts"] = [g.num_edges(etype) for etype in g.canonical_etypes]
+    metadata["edge_type_counts"] = [
+        g.num_edges(etype) for etype in g.canonical_etypes
+    ]
 
     # Compute the number of edges per chunk per edge type
     metadata["num_edges_per_chunk"] = num_edges_per_chunk = []
