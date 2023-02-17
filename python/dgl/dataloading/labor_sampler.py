@@ -28,7 +28,7 @@ class LaborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
     labor sampling for multilayer GNN from
     `(LA)yer-neigh(BOR) Sampling: Defusing Neighborhood Explosion in GNNs
-    <https://arxiv.org/abs/2210.13339>`
+    <https://arxiv.org/abs/2210.13339>`__
 
     This sampler will make every node gather messages from a fixed number of
     neighbors per edge type. The neighbors are picked uniformly with default
@@ -47,18 +47,22 @@ class LaborSampler(BlockSampler):
         If -1 is provided for one edge type on one layer, then all inbound edges
         of that edge type will be included.
     edge_dir : str, default ``'in'``
-        Can be either ``'in' `` where the neighbors will be sampled according to
+        Can be either ``'in'`` where the neighbors will be sampled according to
         incoming edges, or ``'out'`` otherwise, same as
         :func:`dgl.sampling.sample_neighbors`.
     prob : str, optional
         If given, the probability of each neighbor being sampled is proportional
         to the edge feature value with the given name in ``g.edata``.
-        The feature must be a scalar on each edge.
+        The feature must be a scalar on each edge. In this case, the returned
+        blocks edata include ``'edge_weights'`` that needs to be used in the
+        message passing operation.
     importance_sampling : int, default ``0``
         Whether to use importance sampling or uniform sampling, use of negative
         values optimizes importance sampling probabilities until convergence
         while use of positive values runs optimization steps that many times.
-        If the value is i, then LABOR-i variant is used.
+        If the value is i, then LABOR-i variant is used. When used with a
+        nonzero parameter, the returned blocks edata include ``'edge_weights'``
+        that needs to be used in the message passing operation.
     layer_dependency : bool, default ``False``
         Specifies whether different layers should use same random variates.
         Results into a reduction in the number of vertices sampled, but may

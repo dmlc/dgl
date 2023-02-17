@@ -86,6 +86,8 @@ Line Graph Neural Network
 # The following code snippet verifies that there are more intra-class edges
 # than inter-class.
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import torch
 import torch as th
 import torch.nn as nn

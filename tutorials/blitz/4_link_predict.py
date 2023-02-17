@@ -18,6 +18,8 @@ By the end of this tutorial you will be able to
 """
 
 import itertools
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 
 import numpy as np
 import scipy.sparse as sp

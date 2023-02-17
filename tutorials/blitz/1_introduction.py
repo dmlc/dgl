@@ -21,6 +21,8 @@ networks with PyTorch.
 
 """
 
+import os
+os.environ['DGLBACKEND'] = 'pytorch'
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
