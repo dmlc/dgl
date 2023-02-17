@@ -2,14 +2,14 @@ import random
 import unittest
 
 import backend as F
-
-import dgl
 import numpy as np
 import pytest
 import torch
-from dgl.ops import gather_mm, gsddmm, gspmm, segment_reduce
 from test_utils import parametrize_idtype
 from test_utils.graph_cases import get_cases
+
+import dgl
+from dgl.ops import gather_mm, gsddmm, gspmm, segment_reduce
 
 random.seed(42)
 np.random.seed(42)

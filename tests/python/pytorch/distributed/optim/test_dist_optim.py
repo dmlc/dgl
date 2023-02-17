@@ -16,13 +16,8 @@ from scipy import sparse as spsp
 
 import dgl
 from dgl import function as fn
-from dgl.distributed import (
-    DistEmbedding,
-    DistGraph,
-    DistGraphServer,
-    load_partition_book,
-    partition_graph,
-)
+from dgl.distributed import (DistEmbedding, DistGraph, DistGraphServer,
+                             load_partition_book, partition_graph)
 from dgl.distributed.optim import SparseAdagrad, SparseAdam
 
 

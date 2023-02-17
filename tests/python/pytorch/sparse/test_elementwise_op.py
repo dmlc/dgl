@@ -2,10 +2,10 @@ import operator
 import sys
 
 import backend as F
-
-import dgl.sparse as dglsp
 import pytest
 import torch
+
+import dgl.sparse as dglsp
 
 
 @pytest.mark.parametrize("val_shape", [(), (2,)])

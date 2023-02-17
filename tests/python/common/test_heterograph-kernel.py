@@ -1,54 +1,61 @@
-import dgl
-import dgl.function as fn
+from itertools import product
+
+import backend as F
 import networkx as nx
 import numpy as np
-import backend as F
-from itertools import product
-from test_utils import parametrize_idtype, get_cases
 import pytest
+from test_utils import get_cases, parametrize_idtype
+
+import dgl
+import dgl.function as fn
+
 
 def udf_copy_src(edges):
-    return {'m': edges.src['u']}
+    return {"m": edges.src["u"]}
+
 
 def udf_copy_edge(edges):
-    return {'m': edges.data['e']}
+    return {"m": edges.data["e"]}
+
 
 def udf_mean(nodes):
-    return {'r2': F.mean(nodes.mailbox['m'], 1)}
+    return {"r2": F.mean(nodes.mailbox["m"], 1)}
+
 
 def udf_sum(nodes):
-    return {'r2': F.sum(nodes.mailbox['m'], 1)}
+    return {"r2": F.sum(nodes.mailbox["m"], 1)}
+
 
 def udf_max(nodes):
-    return {'r2': F.max(nodes.mailbox['m'], 1)}
+    return {"r2": F.max(nodes.mailbox["m"], 1)}
 
 
 D1 = 5
 D2 = 3
 D3 = 4
-D4 = 10 # NOTE(xiang): used to dot feature vector
-builtin = {'sum': fn.sum, 'max': fn.max, 'mean': fn.mean}
-udf_reduce = {'sum': udf_sum, 'max': udf_max, 'mean': udf_mean}
-fill_value = {'sum': 0, 'max': float("-inf")}
+D4 = 10  # NOTE(xiang): used to dot feature vector
+builtin = {"sum": fn.sum, "max": fn.max, "mean": fn.mean}
+udf_reduce = {"sum": udf_sum, "max": udf_max, "mean": udf_mean}
+fill_value = {"sum": 0, "max": float("-inf")}
 
 
-def generate_feature(g, broadcast='none', binary_op='none'):
+def generate_feature(g, broadcast="none", binary_op="none"):
     """Create graph with src, edge, dst feature. broadcast can be 'u',
     'e', 'v', 'none'
     """
     np.random.seed(31)
     nv = g.number_of_nodes()
     ne = g.number_of_edges()
-    if binary_op == 'dot':
-        if broadcast == 'e':
+    if binary_op == "dot":
+        if broadcast == "e":
             u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
             e = F.tensor(np.random.uniform(-1, 1, (ne, D2, 1, D4)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
-        elif broadcast == 'u':
+        elif broadcast == "u":
             u = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1, D4)))
             e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3, D4)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
-        elif broadcast == 'v':
+        elif broadcast == "v":
             u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
             e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3, D4)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1, D4)))
@@ -57,15 +64,15 @@ def generate_feature(g, broadcast='none', binary_op='none'):
             e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3, D4)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
     else:
-        if broadcast == 'e':
+        if broadcast == "e":
             u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
             e = F.tensor(np.random.uniform(-1, 1, (ne, D2, 1)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
-        elif broadcast == 'u':
+        elif broadcast == "u":
             u = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1)))
             e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
-        elif broadcast == 'v':
+        elif broadcast == "v":
             u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
             e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D2, 1)))
@@ -73,7 +80,11 @@ def generate_feature(g, broadcast='none', binary_op='none'):
             u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
             e = F.tensor(np.random.uniform(-1, 1, (ne, D1, D2, D3)))
             v = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3)))
-    return F.astype(u, F.float32), F.astype(v, F.float32), F.astype(e, F.float32)
+    return (
+        F.astype(u, F.float32),
+        F.astype(v, F.float32),
+        F.astype(e, F.float32),
+    )
 
 
 def test_copy_src_reduce():
@@ -83,60 +94,65 @@ def test_copy_src_reduce():
         # https://github.com/dmlc/dgl/issues/761
         g.add_edges(g.nodes(), g.nodes())
         g = g.to(F.ctx())
-        hu, hv, he = generate_feature(g, 'none', 'none')
+        hu, hv, he = generate_feature(g, "none", "none")
         if partial:
             nid = F.tensor(list(range(0, 100, 2)), g.idtype)
 
-        g.ndata['u'] = F.attach_grad(F.clone(hu))
-        g.ndata['v'] = F.attach_grad(F.clone(hv))
-        g.edata['e'] = F.attach_grad(F.clone(he))
+        g.ndata["u"] = F.attach_grad(F.clone(hu))
+        g.ndata["v"] = F.attach_grad(F.clone(hv))
+        g.edata["e"] = F.attach_grad(F.clone(he))
 
         with F.record_grad():
             if partial:
-                g.pull(nid, fn.copy_u(u='u', out='m'),
-                       builtin[red](msg='m', out='r1'))
+                g.pull(
+                    nid,
+                    fn.copy_u(u="u", out="m"),
+                    builtin[red](msg="m", out="r1"),
+                )
             else:
-                g.update_all(fn.copy_u(u='u', out='m'),
-                             builtin[red](msg='m', out='r1'))
-            r1 = g.ndata['r1']
+                g.update_all(
+                    fn.copy_u(u="u", out="m"), builtin[red](msg="m", out="r1")
+                )
+            r1 = g.ndata["r1"]
             F.backward(F.reduce_sum(r1))
-            n_grad1 = F.grad(g.ndata['u'])
+            n_grad1 = F.grad(g.ndata["u"])
 
         # reset grad
-        g.ndata['u'] = F.attach_grad(F.clone(hu))
-        g.ndata['v'] = F.attach_grad(F.clone(hv))
-        g.edata['e'] = F.attach_grad(F.clone(he))
+        g.ndata["u"] = F.attach_grad(F.clone(hu))
+        g.ndata["v"] = F.attach_grad(F.clone(hv))
+        g.edata["e"] = F.attach_grad(F.clone(he))
 
         with F.record_grad():
             if partial:
                 g.pull(nid, udf_copy_src, udf_reduce[red])
             else:
                 g.update_all(udf_copy_src, udf_reduce[red])
-            r2 = g.ndata['r2']
+            r2 = g.ndata["r2"]
             F.backward(F.reduce_sum(r2))
-            n_grad2 = F.grad(g.ndata['u'])
+            n_grad2 = F.grad(g.ndata["u"])
 
         def _print_error(a, b):
-            print("ERROR: Test copy_src_{} partial: {}".
-                  format(red, partial))
-            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+            print("ERROR: Test copy_src_{} partial: {}".format(red, partial))
+            for i, (x, y) in enumerate(
+                zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())
+            ):
                 if not np.allclose(x, y):
-                    print('@{} {} v.s. {}'.format(i, x, y))
+                    print("@{} {} v.s. {}".format(i, x, y))
 
         if not F.allclose(r1, r2):
             _print_error(r1, r2)
         assert F.allclose(r1, r2)
         if not F.allclose(n_grad1, n_grad2):
-            print('node grad')
+            print("node grad")
             _print_error(n_grad1, n_grad2)
-        assert(F.allclose(n_grad1, n_grad2))
+        assert F.allclose(n_grad1, n_grad2)
 
-    _test('sum', False)
-    _test('max', False)
-    _test('mean', False)
-    _test('sum', True)
-    _test('max', True)
-    _test('mean', True)
+    _test("sum", False)
+    _test("max", False)
+    _test("mean", False)
+    _test("sum", True)
+    _test("max", True)
+    _test("mean", True)
 
 
 def test_copy_edge_reduce():
@@ -145,80 +161,85 @@ def test_copy_edge_reduce():
         # NOTE(zihao): add self-loop to avoid zero-degree nodes.
         g.add_edges(g.nodes(), g.nodes())
         g = g.to(F.ctx())
-        hu, hv, he = generate_feature(g, 'none', 'none')
+        hu, hv, he = generate_feature(g, "none", "none")
         if partial:
             nid = F.tensor(list(range(0, 100, 2)), g.idtype)
 
-        g.ndata['u'] = F.attach_grad(F.clone(hu))
-        g.ndata['v'] = F.attach_grad(F.clone(hv))
-        g.edata['e'] = F.attach_grad(F.clone(he))
+        g.ndata["u"] = F.attach_grad(F.clone(hu))
+        g.ndata["v"] = F.attach_grad(F.clone(hv))
+        g.edata["e"] = F.attach_grad(F.clone(he))
 
         with F.record_grad():
             if partial:
-                g.pull(nid, fn.copy_e(e='e', out='m'),
-                       builtin[red](msg='m', out='r1'))
+                g.pull(
+                    nid,
+                    fn.copy_e(e="e", out="m"),
+                    builtin[red](msg="m", out="r1"),
+                )
             else:
-                g.update_all(fn.copy_e(e='e', out='m'),
-                             builtin[red](msg='m', out='r1'))
-            r1 = g.ndata['r1']
+                g.update_all(
+                    fn.copy_e(e="e", out="m"), builtin[red](msg="m", out="r1")
+                )
+            r1 = g.ndata["r1"]
             F.backward(F.reduce_sum(r1))
-            e_grad1 = F.grad(g.edata['e'])
+            e_grad1 = F.grad(g.edata["e"])
 
         # reset grad
-        g.ndata['u'] = F.attach_grad(F.clone(hu))
-        g.ndata['v'] = F.attach_grad(F.clone(hv))
-        g.edata['e'] = F.attach_grad(F.clone(he))
+        g.ndata["u"] = F.attach_grad(F.clone(hu))
+        g.ndata["v"] = F.attach_grad(F.clone(hv))
+        g.edata["e"] = F.attach_grad(F.clone(he))
 
         with F.record_grad():
             if partial:
                 g.pull(nid, udf_copy_edge, udf_reduce[red])
             else:
                 g.update_all(udf_copy_edge, udf_reduce[red])
-            r2 = g.ndata['r2']
+            r2 = g.ndata["r2"]
             F.backward(F.reduce_sum(r2))
-            e_grad2 = F.grad(g.edata['e'])
+            e_grad2 = F.grad(g.edata["e"])
 
         def _print_error(a, b):
-            print("ERROR: Test copy_edge_{} partial: {}".
-                  format(red, partial))
+            print("ERROR: Test copy_edge_{} partial: {}".format(red, partial))
             return
-            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+            for i, (x, y) in enumerate(
+                zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())
+            ):
                 if not np.allclose(x, y):
-                    print('@{} {} v.s. {}'.format(i, x, y))
+                    print("@{} {} v.s. {}".format(i, x, y))
 
         if not F.allclose(r1, r2):
             _print_error(r1, r2)
         assert F.allclose(r1, r2)
         if not F.allclose(e_grad1, e_grad2):
-            print('edge gradient')
+            print("edge gradient")
             _print_error(e_grad1, e_grad2)
-        assert(F.allclose(e_grad1, e_grad2))
+        assert F.allclose(e_grad1, e_grad2)
 
-    _test('sum', False)
-    _test('max', False)
-    _test('mean', False)
-    _test('sum', True)
-    _test('max', True)
-    _test('mean', True)
+    _test("sum", False)
+    _test("max", False)
+    _test("mean", False)
+    _test("sum", True)
+    _test("max", True)
+    _test("mean", True)
 
 
 def test_all_binary_builtins():
-    def _test(g, lhs, rhs, binary_op, reducer, partial, nid, broadcast='none'):
+    def _test(g, lhs, rhs, binary_op, reducer, partial, nid, broadcast="none"):
         # initialize node/edge features with uniform(-1, 1)
         hu, hv, he = generate_feature(g, broadcast, binary_op)
-        if binary_op == 'div':
+        if binary_op == "div":
             # op = div
             # lhs range: [-1, 1]
             # rhs range: [1, 2]
             # result range: [-1, 1]
-            if rhs == 'u':
+            if rhs == "u":
                 hu = (hu + 3) / 2
-            elif rhs == 'v':
+            elif rhs == "v":
                 hv = (hv + 3) / 2
-            elif rhs == 'e':
+            elif rhs == "e":
                 he = (he + 3) / 2
 
-        if binary_op == 'add' or binary_op == 'sub':
+        if binary_op == "add" or binary_op == "sub":
             # op = add, sub
             # lhs range: [-1/2, 1/2]
             # rhs range: [-1/2, 1/2]
@@ -227,9 +248,9 @@ def test_all_binary_builtins():
             hv = hv / 2
             he = he / 2
 
-        g.ndata['u'] = F.attach_grad(F.clone(hu))
-        g.ndata['v'] = F.attach_grad(F.clone(hv))
-        g.edata['e'] = F.attach_grad(F.clone(he))
+        g.ndata["u"] = F.attach_grad(F.clone(hu))
+        g.ndata["v"] = F.attach_grad(F.clone(hv))
+        g.edata["e"] = F.attach_grad(F.clone(he))
 
         builtin_msg_name = "{}_{}_{}".format(lhs, binary_op, rhs)
         builtin_msg = getattr(fn, builtin_msg_name)
@@ -245,18 +266,18 @@ def test_all_binary_builtins():
 
         with F.record_grad():
             if partial:
-                g.pull(nid, builtin_msg(lhs, rhs, 'm'), builtin_red('m', 'r1'))
+                g.pull(nid, builtin_msg(lhs, rhs, "m"), builtin_red("m", "r1"))
             else:
-                g.update_all(builtin_msg(lhs, rhs, 'm'), builtin_red('m', 'r1'))
-            r1 = g.ndata.pop('r1')
+                g.update_all(builtin_msg(lhs, rhs, "m"), builtin_red("m", "r1"))
+            r1 = g.ndata.pop("r1")
             F.backward(F.reduce_sum(r1))
             lhs_grad_1 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_1 = F.grad(target_feature_switch(g, rhs))
 
         # reset grad
-        g.ndata['u'] = F.attach_grad(F.clone(hu))
-        g.ndata['v'] = F.attach_grad(F.clone(hv))
-        g.edata['e'] = F.attach_grad(F.clone(he))
+        g.ndata["u"] = F.attach_grad(F.clone(hu))
+        g.ndata["v"] = F.attach_grad(F.clone(hv))
+        g.edata["e"] = F.attach_grad(F.clone(he))
 
         def target_switch(edges, target):
             if target == "u":
@@ -266,7 +287,7 @@ def test_all_binary_builtins():
             elif target == "e":
                 return edges.data
             else:
-                assert(0), "Unknown target {}".format(target)
+                assert 0, "Unknown target {}".format(target)
 
         def mfunc(edges):
             op = getattr(F, binary_op)
@@ -282,15 +303,15 @@ def test_all_binary_builtins():
 
         def rfunc(nodes):
             op = getattr(F, reducer)
-            return {"r2": op(nodes.mailbox['m'], 1)}
+            return {"r2": op(nodes.mailbox["m"], 1)}
 
         with F.record_grad():
             if partial:
                 g.pull(nid, mfunc, rfunc)
             else:
                 g.update_all(mfunc, rfunc)
-            r2 = g.ndata.pop('r2')
-            F.backward(F.reduce_sum(r2), F.tensor([1.]))
+            r2 = g.ndata.pop("r2")
+            F.backward(F.reduce_sum(r2), F.tensor([1.0]))
             lhs_grad_2 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_2 = F.grad(target_feature_switch(g, rhs))
 
@@ -298,27 +319,32 @@ def test_all_binary_builtins():
         atol = 1e-4
 
         def _print_error(a, b):
-            print("ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".
-                  format(lhs, binary_op, rhs, reducer, broadcast, partial))
+            print(
+                "ERROR: Test {}_{}_{}_{} broadcast: {} partial: {}".format(
+                    lhs, binary_op, rhs, reducer, broadcast, partial
+                )
+            )
             return
-            if lhs == 'u':
+            if lhs == "u":
                 lhs_data = hu
-            elif lhs == 'v':
+            elif lhs == "v":
                 lhs_data = hv
-            elif lhs == 'e':
+            elif lhs == "e":
                 lhs_data = he
 
-            if rhs == 'u':
+            if rhs == "u":
                 rhs_data = hu
-            elif rhs == 'v':
+            elif rhs == "v":
                 rhs_data = hv
-            elif rhs == 'e':
+            elif rhs == "e":
                 rhs_data = he
             print("lhs", F.asnumpy(lhs_data).tolist())
             print("rhs", F.asnumpy(rhs_data).tolist())
-            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+            for i, (x, y) in enumerate(
+                zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())
+            ):
                 if not np.allclose(x, y, rtol, atol):
-                    print('@{} {} v.s. {}'.format(i, x, y))
+                    print("@{} {} v.s. {}".format(i, x, y))
 
         if not F.allclose(r1, r2, rtol, atol):
             _print_error(r1, r2)
@@ -327,12 +353,12 @@ def test_all_binary_builtins():
         if not F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol):
             print("left grad")
             _print_error(lhs_grad_1, lhs_grad_2)
-        assert(F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol))
+        assert F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol)
 
         if not F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol):
             print("right grad")
             _print_error(rhs_grad_1, rhs_grad_2)
-        assert(F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol))
+        assert F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol)
 
     g = dgl.DGLGraph()
     g.add_nodes(20)
@@ -359,20 +385,30 @@ def test_all_binary_builtins():
                 for broadcast in ["none", lhs, rhs]:
                     for partial in [False, True]:
                         print(lhs, rhs, binary_op, reducer, broadcast, partial)
-                        _test(g, lhs, rhs, binary_op, reducer, partial, nid,
-                              broadcast=broadcast)
+                        _test(
+                            g,
+                            lhs,
+                            rhs,
+                            binary_op,
+                            reducer,
+                            partial,
+                            nid,
+                            broadcast=broadcast,
+                        )
+
 
 @parametrize_idtype
-@pytest.mark.parametrize('g', get_cases(['homo-zero-degree']))
+@pytest.mark.parametrize("g", get_cases(["homo-zero-degree"]))
 def test_mean_zero_degree(g, idtype):
     g = g.astype(idtype).to(F.ctx())
-    g.ndata['h'] = F.ones((g.number_of_nodes(), 3))
-    g.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'x'))
+    g.ndata["h"] = F.ones((g.number_of_nodes(), 3))
+    g.update_all(fn.copy_u("h", "m"), fn.mean("m", "x"))
     deg = F.asnumpy(g.in_degrees())
     v = F.tensor(np.where(deg == 0)[0])
-    assert F.allclose(F.gather_row(g.ndata['x'], v), F.zeros((len(v), 3)))
+    assert F.allclose(F.gather_row(g.ndata["x"], v), F.zeros((len(v), 3)))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test_copy_src_reduce()
     test_copy_edge_reduce()
     test_all_binary_builtins()

@@ -13,13 +13,13 @@ from dgl.partition import NDArrayPartition
 )
 @parametrize_idtype
 def test_get_node_partition_from_book(idtype):
-    node_map = {'_N': F.tensor([[0, 3], [4, 5], [6, 10]], dtype=idtype)}
-    edge_map = {('_N', '_E', '_N'): F.tensor([[0, 9], [10, 15], [16, 25]], dtype=idtype)}
+    node_map = {"_N": F.tensor([[0, 3], [4, 5], [6, 10]], dtype=idtype)}
+    edge_map = {
+        ("_N", "_E", "_N"): F.tensor([[0, 9], [10, 15], [16, 25]], dtype=idtype)
+    }
     ntypes = {ntype: i for i, ntype in enumerate(node_map)}
     etypes = {etype: i for i, etype in enumerate(edge_map)}
-    book = gpb.RangePartitionBook(
-        0, 3, node_map, edge_map, ntypes, etypes
-    )
+    book = gpb.RangePartitionBook(0, 3, node_map, edge_map, ntypes, etypes)
     partition = gpb.get_node_partition_from_book(book, F.ctx())
     assert partition.num_parts() == 3
     assert partition.array_size() == 11

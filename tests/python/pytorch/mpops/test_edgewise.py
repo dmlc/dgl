@@ -20,7 +20,9 @@ def test_copy_u(idtype, feat_size):
     ctx = F.ctx()
     g = dgl.rand_graph(30, 100)
     g = g.astype(idtype).to(ctx)
-    x = torch.randn((g.num_nodes(),) + feat_size, requires_grad=True, device=ctx)
+    x = torch.randn(
+        (g.num_nodes(),) + feat_size, requires_grad=True, device=ctx
+    )
 
     y = dgl.copy_u(g, x)
     y.sum().backward()
@@ -48,7 +50,9 @@ def test_copy_u_hetero(idtype, feat_size):
     )
 
     hg = hg.astype(idtype).to(ctx)
-    x = torch.randn((hg.num_nodes("user"),) + feat_size, requires_grad=True, device=ctx)
+    x = torch.randn(
+        (hg.num_nodes("user"),) + feat_size, requires_grad=True, device=ctx
+    )
 
     y = dgl.copy_u(hg, x, etype="like")
     y.sum().backward()
@@ -70,7 +74,9 @@ def test_copy_v(idtype, feat_size):
     ctx = F.ctx()
     g = dgl.rand_graph(30, 100)
     g = g.astype(idtype).to(ctx)
-    x = torch.randn((g.num_nodes(),) + feat_size, requires_grad=True, device=ctx)
+    x = torch.randn(
+        (g.num_nodes(),) + feat_size, requires_grad=True, device=ctx
+    )
 
     y = dgl.copy_v(g, x)
     y.sum().backward()
@@ -98,7 +104,9 @@ def test_copy_v_hetero(idtype, feat_size):
     )
 
     hg = hg.astype(idtype).to(ctx)
-    x = torch.randn((hg.num_nodes("movie"),) + feat_size, requires_grad=True, device=ctx)
+    x = torch.randn(
+        (hg.num_nodes("movie"),) + feat_size, requires_grad=True, device=ctx
+    )
 
     y = dgl.copy_v(hg, x, etype="like")
     y.sum().backward()

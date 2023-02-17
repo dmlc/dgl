@@ -1,11 +1,11 @@
 import unittest
 
 import backend as F
+import numpy as np
+from test_utils import parametrize_idtype
 
 import dgl
-import numpy as np
 from dgl.utils import Filter
-from test_utils import parametrize_idtype
 
 
 def test_graph_filter():

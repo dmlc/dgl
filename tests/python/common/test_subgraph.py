@@ -1,13 +1,13 @@
 import unittest
 
 import backend as F
-
-import dgl
 import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
 from test_utils import parametrize_idtype
+
+import dgl
 
 D = 5
 

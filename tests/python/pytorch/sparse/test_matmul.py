@@ -7,15 +7,9 @@ import torch
 from dgl.sparse import bspmm, diag, from_coo, val_like
 from dgl.sparse.matmul import matmul
 
-from .utils import (
-    clone_detach_and_grad,
-    dense_mask,
-    rand_coo,
-    rand_csc,
-    rand_csr,
-    sparse_matrix_to_dense,
-    sparse_matrix_to_torch_sparse,
-)
+from .utils import (clone_detach_and_grad, dense_mask, rand_coo, rand_csc,
+                    rand_csr, sparse_matrix_to_dense,
+                    sparse_matrix_to_torch_sparse)
 
 
 @pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])

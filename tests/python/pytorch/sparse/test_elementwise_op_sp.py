@@ -55,8 +55,8 @@ def test_pow(val_shape):
     val = torch.randn(val_shape).to(ctx)
     A = from_coo(row, col, val, shape=(3, 4))
     exponent = 2
-    A_new = A**exponent
-    assert torch.allclose(A_new.val, val**exponent)
+    A_new = A ** exponent
+    assert torch.allclose(A_new.val, val ** exponent)
     assert A_new.shape == A.shape
     new_row, new_col = A_new.coo()
     assert torch.allclose(new_row, row)
@@ -64,7 +64,7 @@ def test_pow(val_shape):
 
     # power(A, v)
     A_new = power(A, exponent)
-    assert torch.allclose(A_new.val, val**exponent)
+    assert torch.allclose(A_new.val, val ** exponent)
     assert A_new.shape == A.shape
     new_row, new_col = A_new.coo()
     assert torch.allclose(new_row, row)

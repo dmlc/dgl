@@ -6,13 +6,13 @@ import tempfile
 import unittest
 
 import backend as F
-
-import dgl
-import dgl.data as data
 import numpy as np
 import pandas as pd
 import pytest
 import yaml
+
+import dgl
+import dgl.data as data
 from dgl import DGLError
 
 
@@ -397,11 +397,8 @@ def test_extract_archive():
 
 
 def _test_construct_graphs_node_ids():
-    from dgl.data.csv_dataset_base import (
-        DGLGraphConstructor,
-        EdgeData,
-        NodeData,
-    )
+    from dgl.data.csv_dataset_base import (DGLGraphConstructor, EdgeData,
+                                           NodeData)
 
     num_nodes = 100
     num_edges = 1000
@@ -479,11 +476,8 @@ def _test_construct_graphs_node_ids():
 
 
 def _test_construct_graphs_homo():
-    from dgl.data.csv_dataset_base import (
-        DGLGraphConstructor,
-        EdgeData,
-        NodeData,
-    )
+    from dgl.data.csv_dataset_base import (DGLGraphConstructor, EdgeData,
+                                           NodeData)
 
     # node_id could be non-sorted, non-numeric.
     num_nodes = 100
@@ -537,11 +531,8 @@ def _test_construct_graphs_homo():
 
 
 def _test_construct_graphs_hetero():
-    from dgl.data.csv_dataset_base import (
-        DGLGraphConstructor,
-        EdgeData,
-        NodeData,
-    )
+    from dgl.data.csv_dataset_base import (DGLGraphConstructor, EdgeData,
+                                           NodeData)
 
     # node_id/src_id/dst_id could be non-sorted, duplicated, non-numeric.
     num_nodes = 100
@@ -613,12 +604,8 @@ def _test_construct_graphs_hetero():
 
 
 def _test_construct_graphs_multiple():
-    from dgl.data.csv_dataset_base import (
-        DGLGraphConstructor,
-        EdgeData,
-        GraphData,
-        NodeData,
-    )
+    from dgl.data.csv_dataset_base import (DGLGraphConstructor, EdgeData,
+                                           GraphData, NodeData)
 
     num_nodes = 100
     num_edges = 1000
@@ -735,11 +722,7 @@ def _test_DefaultDataParser():
     # string consists of non-numeric values
     with tempfile.TemporaryDirectory() as test_dir:
         csv_path = os.path.join(test_dir, "nodes.csv")
-        df = pd.DataFrame(
-            {
-                "label": ["a", "b", "c"],
-            }
-        )
+        df = pd.DataFrame({"label": ["a", "b", "c"]})
         df.to_csv(csv_path, index=False)
         dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
@@ -752,11 +735,7 @@ def _test_DefaultDataParser():
     # csv has index column which is ignored as it's unnamed
     with tempfile.TemporaryDirectory() as test_dir:
         csv_path = os.path.join(test_dir, "nodes.csv")
-        df = pd.DataFrame(
-            {
-                "label": [1, 2, 3],
-            }
-        )
+        df = pd.DataFrame({"label": [1, 2, 3]})
         df.to_csv(csv_path)
         dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
@@ -1042,9 +1021,7 @@ def _test_load_edge_data_from_csv():
 
         # required headers are missing
         df = pd.DataFrame(
-            {
-                "src_id": np.random.randint(num_nodes, size=num_edges),
-            }
+            {"src_id": np.random.randint(num_nodes, size=num_edges)}
         )
         csv_path = os.path.join(test_dir, "edges.csv")
         df.to_csv(csv_path, index=False)
@@ -1056,9 +1033,7 @@ def _test_load_edge_data_from_csv():
             expect_except = True
         assert expect_except
         df = pd.DataFrame(
-            {
-                "dst_id": np.random.randint(num_nodes, size=num_edges),
-            }
+            {"dst_id": np.random.randint(num_nodes, size=num_edges)}
         )
         csv_path = os.path.join(test_dir, "edges.csv")
         df.to_csv(csv_path, index=False)
@@ -1072,11 +1047,8 @@ def _test_load_edge_data_from_csv():
 
 
 def _test_load_graph_data_from_csv():
-    from dgl.data.csv_dataset_base import (
-        DefaultDataParser,
-        GraphData,
-        MetaGraph,
-    )
+    from dgl.data.csv_dataset_base import (DefaultDataParser, GraphData,
+                                           MetaGraph)
 
     with tempfile.TemporaryDirectory() as test_dir:
         num_graphs = 100
