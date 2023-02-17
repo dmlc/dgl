@@ -1,4 +1,8 @@
 import backend as F
+
+import dgl
+import dgl.function as fn
+import dgl.nn.mxnet as nn
 import mxnet as mx
 import networkx as nx
 import numpy as np
@@ -12,10 +16,6 @@ from test_utils.graph_cases import (
     random_dglgraph,
     random_graph,
 )
-
-import dgl
-import dgl.function as fn
-import dgl.nn.mxnet as nn
 
 
 def check_close(a, b):
@@ -729,6 +729,7 @@ def test_rgcn(O):
 
 def test_sequential():
     ctx = F.ctx()
+
     # test single graph
     class ExampleLayer(gluon.nn.Block):
         def __init__(self, **kwargs):

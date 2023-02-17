@@ -3,15 +3,15 @@ import unittest
 from collections import Counter
 
 import backend as F
+
+import dgl
+import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
-from test_utils import parametrize_idtype
-
-import dgl
-import dgl.function as fn
 from dgl import DGLError
+from test_utils import parametrize_idtype
 
 
 def create_test_heterograph(num_nodes, num_adj, idtype):

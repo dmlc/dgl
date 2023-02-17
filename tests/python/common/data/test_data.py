@@ -735,11 +735,7 @@ def _test_DefaultDataParser():
     # string consists of non-numeric values
     with tempfile.TemporaryDirectory() as test_dir:
         csv_path = os.path.join(test_dir, "nodes.csv")
-        df = pd.DataFrame(
-            {
-                "label": ["a", "b", "c"],
-            }
-        )
+        df = pd.DataFrame({"label": ["a", "b", "c"]})
         df.to_csv(csv_path, index=False)
         dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
@@ -752,11 +748,7 @@ def _test_DefaultDataParser():
     # csv has index column which is ignored as it's unnamed
     with tempfile.TemporaryDirectory() as test_dir:
         csv_path = os.path.join(test_dir, "nodes.csv")
-        df = pd.DataFrame(
-            {
-                "label": [1, 2, 3],
-            }
-        )
+        df = pd.DataFrame({"label": [1, 2, 3]})
         df.to_csv(csv_path)
         dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
@@ -1042,9 +1034,7 @@ def _test_load_edge_data_from_csv():
 
         # required headers are missing
         df = pd.DataFrame(
-            {
-                "src_id": np.random.randint(num_nodes, size=num_edges),
-            }
+            {"src_id": np.random.randint(num_nodes, size=num_edges)}
         )
         csv_path = os.path.join(test_dir, "edges.csv")
         df.to_csv(csv_path, index=False)
@@ -1056,9 +1046,7 @@ def _test_load_edge_data_from_csv():
             expect_except = True
         assert expect_except
         df = pd.DataFrame(
-            {
-                "dst_id": np.random.randint(num_nodes, size=num_edges),
-            }
+            {"dst_id": np.random.randint(num_nodes, size=num_edges)}
         )
         csv_path = os.path.join(test_dir, "edges.csv")
         df.to_csv(csv_path, index=False)

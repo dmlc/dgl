@@ -1,7 +1,9 @@
-import pytest
 import backend as F
+
 import dgl
+import pytest
 from dgl.base import is_internal_column
+
 
 def check_fail(fn, *args, **kwargs):
     try:
@@ -10,10 +12,11 @@ def check_fail(fn, *args, **kwargs):
     except:
         return True
 
+
 def assert_is_identical(g, g2):
     assert g.number_of_nodes() == g2.number_of_nodes()
-    src, dst = g.all_edges(order='eid')
-    src2, dst2 = g2.all_edges(order='eid')
+    src, dst = g.all_edges(order="eid")
+    src2, dst2 = g2.all_edges(order="eid")
     assert F.array_equal(src, src2)
     assert F.array_equal(dst, dst2)
 
@@ -23,6 +26,7 @@ def assert_is_identical(g, g2):
         assert F.allclose(g.ndata[k], g2.ndata[k])
     for k in g.edata:
         assert F.allclose(g.edata[k], g2.edata[k])
+
 
 def assert_is_identical_hetero(g, g2, ignore_internal_data=False):
     assert g.ntypes == g2.ntypes
@@ -48,8 +52,8 @@ def assert_is_identical_hetero(g, g2, ignore_internal_data=False):
 
     # check if edge ID spaces and feature spaces are equal
     for etype in g.canonical_etypes:
-        src, dst = g.all_edges(etype=etype, order='eid')
-        src2, dst2 = g2.all_edges(etype=etype, order='eid')
+        src, dst = g.all_edges(etype=etype, order="eid")
+        src2, dst2 = g2.all_edges(etype=etype, order="eid")
         assert F.array_equal(src, src2)
         assert F.array_equal(dst, dst2)
         if ignore_internal_data:

@@ -1,8 +1,8 @@
 import backend as F
-import pytest
-import torch
 
 import dgl
+import pytest
+import torch
 
 
 @pytest.mark.skipif(

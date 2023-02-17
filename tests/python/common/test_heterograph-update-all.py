@@ -4,17 +4,17 @@ from collections import Counter
 from itertools import product
 
 import backend as F
+
+import dgl
+import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
 import test_utils
+from dgl import DGLError
 from scipy.sparse import rand
 from test_utils import get_cases, parametrize_idtype
-
-import dgl
-import dgl.function as fn
-from dgl import DGLError
 
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}
 feat_size = 2
@@ -48,7 +48,6 @@ def create_test_heterograph(idtype):
 
 
 def create_test_heterograph_2(idtype):
-
     src = np.random.randint(0, 50, 25)
     dst = np.random.randint(0, 50, 25)
     src1 = np.random.randint(0, 25, 10)
@@ -72,7 +71,6 @@ def create_test_heterograph_2(idtype):
 
 
 def create_test_heterograph_large(idtype):
-
     src = np.random.randint(0, 50, 2500)
     dst = np.random.randint(0, 50, 2500)
     g = dgl.heterograph(
@@ -163,7 +161,6 @@ def test_unary_copy_u(idtype):
 @parametrize_idtype
 def test_unary_copy_e(idtype):
     def _test(mfunc, rfunc):
-
         g = create_test_heterograph_large(idtype)
         g0 = create_test_heterograph_2(idtype)
         g1 = create_test_heterograph(idtype)
@@ -230,6 +227,7 @@ def test_unary_copy_e(idtype):
             e_grad6 = F.grad(g["plays"].edata["eid"])
             e_grad7 = F.grad(g["wishes"].edata["eid"])
             e_grad8 = F.grad(g["follows"].edata["eid"])
+
         # # correctness check
         def _print_error(a, b):
             for i, (x, y) in enumerate(
@@ -254,7 +252,6 @@ def test_unary_copy_e(idtype):
 @parametrize_idtype
 def test_binary_op(idtype):
     def _test(lhs, rhs, binary_op, reducer):
-
         g = create_test_heterograph(idtype)
 
         x1 = F.randn((g.num_nodes("user"), feat_size))
@@ -309,6 +306,7 @@ def test_binary_op(idtype):
         r2 = g.nodes["game"].data["y"]
         F.backward(r2, F.ones(r2.shape))
         n_grad2 = F.grad(r2)
+
         # correctness check
         def _print_error(a, b):
             for i, (x, y) in enumerate(

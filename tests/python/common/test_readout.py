@@ -1,13 +1,13 @@
 import unittest
 
 import backend as F
+
+import dgl
 import networkx as nx
 import numpy as np
 import pytest
 from test_utils import parametrize_idtype
 from test_utils.graph_cases import get_cases
-
-import dgl
 
 
 @parametrize_idtype

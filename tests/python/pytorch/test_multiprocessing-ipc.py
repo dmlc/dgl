@@ -1,10 +1,10 @@
 import os
 import unittest
 
+import dgl
+
 import torch as th
 import torch.multiprocessing as mp
-
-import dgl
 
 
 def sub_ipc(g):

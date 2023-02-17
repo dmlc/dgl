@@ -10,11 +10,10 @@ import time
 import unittest
 
 import backend as F
-import numpy as np
-import torch as th
-from scipy import sparse as spsp
 
 import dgl
+import numpy as np
+import torch as th
 from dgl import function as fn
 from dgl.distributed import (
     DistEmbedding,
@@ -24,6 +23,7 @@ from dgl.distributed import (
     partition_graph,
 )
 from dgl.distributed.optim import SparseAdagrad, SparseAdam
+from scipy import sparse as spsp
 
 
 def create_random_graph(n):

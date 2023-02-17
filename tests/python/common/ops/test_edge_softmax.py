@@ -4,18 +4,18 @@ import unittest
 from collections import Counter
 
 import backend as F
+
+import dgl
+import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
 import test_utils
-from scipy.sparse import rand
-from test_utils import get_cases, parametrize_idtype
-
-import dgl
-import dgl.function as fn
 from dgl import DGLError
 from dgl.ops import edge_softmax
+from scipy.sparse import rand
+from test_utils import get_cases, parametrize_idtype
 
 edge_softmax_shapes = [(1,), (1, 3), (3, 4, 5)]
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}

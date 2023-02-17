@@ -1,6 +1,10 @@
 from copy import deepcopy
 
 import backend as F
+
+import dgl
+import dgl.function as fn
+import dgl.nn.tensorflow as nn
 import networkx as nx
 import numpy as np
 import pytest
@@ -14,10 +18,6 @@ from test_utils.graph_cases import (
     random_dglgraph,
     random_graph,
 )
-
-import dgl
-import dgl.function as fn
-import dgl.nn.tensorflow as nn
 
 
 def _AXWb(A, X, W, b):

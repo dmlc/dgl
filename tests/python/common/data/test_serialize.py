@@ -4,12 +4,12 @@ import time
 import unittest
 
 import backend as F
-import numpy as np
-import pytest
-import scipy as sp
 
 import dgl
 import dgl.ndarray as nd
+import numpy as np
+import pytest
+import scipy as sp
 from dgl import DGLGraph
 from dgl.data.utils import load_labels, load_tensors, save_tensors
 

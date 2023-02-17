@@ -5,7 +5,6 @@ import backend as F
 import dgl
 import pytest
 import torch
-
 from dgl.sparse import from_coo, softmax
 
 

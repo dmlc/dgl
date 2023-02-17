@@ -1,14 +1,14 @@
 import unittest
 
 import backend as F
-from test_utils import parametrize_idtype
 
 import dgl
 from dgl.dataloading import (
-    NeighborSampler,
     as_edge_prediction_sampler,
     negative_sampler,
+    NeighborSampler,
 )
+from test_utils import parametrize_idtype
 
 
 def create_test_graph(idtype):

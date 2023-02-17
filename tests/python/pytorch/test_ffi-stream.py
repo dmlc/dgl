@@ -2,12 +2,12 @@ import unittest
 from statistics import mean
 
 import backend as F
-import numpy as np
-import torch
 
 import dgl
 import dgl.ndarray as nd
 import dgl.ops as OPS
+import numpy as np
+import torch
 from dgl import rand_graph
 from dgl._ffi.streams import _dgl_get_stream, to_dgl_stream_handle
 from dgl.utils import to_dgl_context
@@ -138,6 +138,7 @@ def test_record_stream_graph_positive():
 
     stream = torch.cuda.Stream()
     results2 = torch.zeros_like(result)
+
     # Performs the computing in a background stream
     def perform_computing():
         with torch.cuda.stream(stream):
@@ -172,6 +173,7 @@ def test_record_stream_graph_negative():
 
     stream = torch.cuda.Stream()
     results2 = torch.zeros_like(result)
+
     # Performs the computing in a background stream
     def perform_computing():
         with torch.cuda.stream(stream):
