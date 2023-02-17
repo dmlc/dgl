@@ -17,9 +17,44 @@ import dgl.function as fn
 from dgl import DGLError
 from dgl.ops import edge_softmax
 
+edge_softmax_shapes = [(1,), (1, 3), (3, 4, 5)]
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}
 fill_value = {"sum": 0, "max": float("-inf")}
 feat_size = 2
+
+
+@pytest.mark.parametrize("g", get_cases(["clique"]))
+@pytest.mark.parametrize("norm_by", ["src", "dst"])
+@pytest.mark.parametrize("shp", edge_softmax_shapes)
+@parametrize_idtype
+def test_edge_softmax(g, norm_by, shp, idtype):
+    g = g.astype(idtype).to(F.ctx())
+    edata = F.tensor(np.random.rand(g.number_of_edges(), *shp))
+    e1 = F.attach_grad(F.clone(edata))
+
+    with F.record_grad():
+        score1 = edge_softmax(g, e1, norm_by=norm_by)
+        F.backward(F.reduce_sum(score1))
+        grad_edata = F.grad(e1)
+
+    with F.record_grad():
+        e2 = F.attach_grad(F.clone(edata))
+        e2_2d = F.reshape(
+            e2,
+            (g.number_of_src_nodes(), g.number_of_dst_nodes(), *e2.shape[1:]),
+        )
+        if norm_by == "src":
+            score2 = F.softmax(e2_2d, 1)
+            score2 = F.reshape(score2, (-1, *e2.shape[1:]))
+        if norm_by == "dst":
+            score2 = F.softmax(e2_2d, 0)
+            score2 = F.reshape(score2, (-1, *e2.shape[1:]))
+        assert F.allclose(score1, score2)
+        print("forward passed")
+
+        F.backward(F.reduce_sum(score2))
+        assert F.allclose(F.grad(e2), grad_edata)
+        print("backward passed")
 
 
 def create_test_heterograph(idtype):

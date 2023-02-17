@@ -28,10 +28,47 @@ import pytest
 from test_utils.graph_cases import get_cases
 from test_utils import parametrize_idtype
 
-from test_heterograph import create_test_heterograph3, create_test_heterograph4, \
-    create_test_heterograph5
-
 D = 5
+
+def create_test_heterograph3(idtype):
+    g = dgl.heterograph({
+        ('user', 'plays', 'game'): (F.tensor([0, 1, 1, 2], dtype=idtype),
+                                    F.tensor([0, 0, 1, 1], dtype=idtype)),
+        ('developer', 'develops', 'game'): (F.tensor([0, 1], dtype=idtype),
+                                            F.tensor([0, 1], dtype=idtype))},
+        idtype=idtype, device=F.ctx())
+
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())
+    g.nodes['developer'].data['h'] = F.copy_to(F.tensor([3, 3], dtype=idtype), ctx=F.ctx())
+    g.edges['plays'].data['h'] = F.copy_to(F.tensor([1, 1, 1, 1], dtype=idtype), ctx=F.ctx())
+    return g
+
+def create_test_heterograph4(idtype):
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([0, 1, 1, 2, 2, 2], dtype=idtype),
+                                      F.tensor([0, 0, 1, 1, 2, 2], dtype=idtype)),
+        ('user', 'plays', 'game'): (F.tensor([0, 1], dtype=idtype),
+                                    F.tensor([0, 1], dtype=idtype))},
+        idtype=idtype, device=F.ctx())
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())
+    g.edges['follows'].data['h'] = F.copy_to(F.tensor([1, 2, 3, 4, 5, 6], dtype=idtype), ctx=F.ctx())
+    g.edges['plays'].data['h'] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
+    return g
+
+def create_test_heterograph5(idtype):
+    g = dgl.heterograph({
+        ('user', 'follows', 'user'): (F.tensor([1, 2], dtype=idtype),
+                                      F.tensor([0, 1], dtype=idtype)),
+        ('user', 'plays', 'game'): (F.tensor([0, 1], dtype=idtype),
+                                    F.tensor([0, 1], dtype=idtype))},
+        idtype=idtype, device=F.ctx())
+    g.nodes['user'].data['h'] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
+    g.nodes['game'].data['h'] = F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())
+    g.edges['follows'].data['h'] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
+    g.edges['plays'].data['h'] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
+    return g
 
 
 # line graph related

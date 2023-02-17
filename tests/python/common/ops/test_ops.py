@@ -7,7 +7,7 @@ import dgl
 import numpy as np
 import pytest
 import torch
-from dgl.ops import edge_softmax, gsddmm, gspmm, segment_reduce
+from dgl.ops import gather_mm, gsddmm, gspmm, segment_reduce
 from test_utils import parametrize_idtype
 from test_utils.graph_cases import get_cases
 
@@ -102,8 +102,6 @@ sddmm_shapes = [
     ((3,), (3,)),
     ((1,), (1,)),
 ]
-
-edge_softmax_shapes = [(1,), (1, 3), (3, 4, 5)]
 
 
 @pytest.mark.parametrize("g", graphs)
@@ -290,40 +288,6 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
         g.edata.pop("m")
 
 
-@pytest.mark.parametrize("g", get_cases(["clique"]))
-@pytest.mark.parametrize("norm_by", ["src", "dst"])
-@pytest.mark.parametrize("shp", edge_softmax_shapes)
-@parametrize_idtype
-def test_edge_softmax(g, norm_by, shp, idtype):
-    g = g.astype(idtype).to(F.ctx())
-    edata = F.tensor(np.random.rand(g.number_of_edges(), *shp))
-    e1 = F.attach_grad(F.clone(edata))
-
-    with F.record_grad():
-        score1 = edge_softmax(g, e1, norm_by=norm_by)
-        F.backward(F.reduce_sum(score1))
-        grad_edata = F.grad(e1)
-
-    with F.record_grad():
-        e2 = F.attach_grad(F.clone(edata))
-        e2_2d = F.reshape(
-            e2,
-            (g.number_of_src_nodes(), g.number_of_dst_nodes(), *e2.shape[1:]),
-        )
-        if norm_by == "src":
-            score2 = F.softmax(e2_2d, 1)
-            score2 = F.reshape(score2, (-1, *e2.shape[1:]))
-        if norm_by == "dst":
-            score2 = F.softmax(e2_2d, 0)
-            score2 = F.reshape(score2, (-1, *e2.shape[1:]))
-        assert F.allclose(score1, score2)
-        print("forward passed")
-
-        F.backward(F.reduce_sum(score2))
-        assert F.allclose(F.grad(e2), grad_edata)
-        print("backward passed")
-
-
 @pytest.mark.parametrize("reducer", ["sum", "max", "min", "mean"])
 def test_segment_reduce(reducer):
     ctx = F.ctx()
@@ -458,7 +422,7 @@ def test_gather_mm_idx_b(feat_size, dtype, tol):
     idx = torch.tensor(np.random.randint(0, 10, 100)).to(dev).long()
     dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev).to(dtype)
     # compute
-    c = dgl.ops.gather_mm(a, b, idx_b=idx)
+    c = gather_mm(a, b, idx_b=idx)
     c.backward(dc)
     da = a.grad.clone()
     db = b.grad.clone()
@@ -493,7 +457,7 @@ def _test_gather_mm_idx_a(idtype, feat_size):
     idx = torch.tensor(np.random.randint(0, 10, 100)).to(dev)
     dc = torch.tensor(np.random.rand(100, feat_size + 1)).to(dev)
     # compute
-    c = dgl.ops.gather_mm(a, b, idx_a=idx)
+    c = gather_mm(a, b, idx_a=idx)
     c.backward(dc)
     da = a.grad.clone()
     db = b.grad.clone()
