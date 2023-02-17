@@ -185,7 +185,7 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
         edge information, as a dicitonary which stores column names as keys and values
         as column data. This information is read from the edges.txt file.
     id_lookup : DistLookupService instance
-	this object will be used to retrieve ownership information of nodes
+        this object will be used to retrieve ownership information of nodes
 
     Returns:
     --------
@@ -736,7 +736,9 @@ def exchange_graph_data(
     )
     memory_snapshot("NodeDataGenerationComplete: ", rank)
 
-    edge_data = exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup)
+    edge_data = exchange_edge_data(
+	rank, world_size, num_parts, edge_data, id_lookup)
+    )
     memory_snapshot("ShuffleEdgeDataComplete: ", rank)
     return (
         node_data,
