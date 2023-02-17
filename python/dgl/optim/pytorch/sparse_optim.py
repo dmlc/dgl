@@ -452,7 +452,7 @@ class SparseGradOptimizer(abc.ABC):
         """clean grad cache"""
         self._clean_grad = True
 
-    def state_dict(self, **kwargs):
+    def state_dict(self, **kwargs):  # pylint: disable=unused-argument
         """Return a copy of the whole optimizer states stored in CPU memory.
         If this is a multi-processing instance, the states will be returned in
         shared memory. If the underlying embedding is currently stored on
@@ -468,7 +468,9 @@ class SparseGradOptimizer(abc.ABC):
         """
         return {emb.name: emb._all_get_optm_state() for emb in self._params}
 
-    def load_state_dict(self, state_dict, **kwargs):
+    def load_state_dict(
+        self, state_dict, **kwargs
+    ):  # pylint: disable=unused-argument
         """Load the optimizer states. This method must be called by all
         processes sharing the underlying embedding with identical
         :attr:`state_dict`.
