@@ -17,9 +17,14 @@ else:
 class CuGraphSAGEConv(nn.Module):
     r"""An accelerated GraphSAGE layer from `Inductive Representation Learning
     on Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__ that leverages the
-    highly-optimized aggregation primitives in cugraph-ops.
+    highly-optimized aggregation primitives in cugraph-ops:
 
-    See :class:`dgl.nn.pytorch.conv.SAGEConv` for mathematical model.
+    .. math::
+        h_{\mathcal{N}(i)}^{(l+1)} &= \mathrm{aggregate}
+        \left(\{h_{j}^{l}, \forall j \in \mathcal{N}(i) \}\right)
+
+        h_{i}^{(l+1)} &= W \cdot \mathrm{concat}
+        (h_{i}^{l}, h_{\mathcal{N}(i)}^{(l+1)})
 
     This module depends on :code:`pylibcugraphops` package, which can be
     installed via :code:`conda install -c nvidia pylibcugraphops>=23.02`.
@@ -45,7 +50,6 @@ class CuGraphSAGEConv(nn.Module):
     >>> import dgl
     >>> import torch
     >>> from dgl.nn import CuGraphSAGEConv
-    ...
     >>> device = 'cuda'
     >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3])).to(device)
     >>> g = dgl.add_self_loop(g)
@@ -72,8 +76,8 @@ class CuGraphSAGEConv(nn.Module):
     ):
         if has_pylibcugraphops is False:
             raise ModuleNotFoundError(
-                f"{self.__class__.__name__} requires pylibcugraphops >= 23.02 "
-                f"to be installed."
+                f"{self.__class__.__name__} requires pylibcugraphops >= 23.02. "
+                f"Install via `conda install -c nvidia 'pylibcugraphops>=23.02'`."
             )
 
         valid_aggr_types = {"max", "min", "mean", "sum"}
@@ -102,7 +106,7 @@ class CuGraphSAGEConv(nn.Module):
         g : DGLGraph
             The graph.
         feat : torch.Tensor
-            Node features. Shape: :math:`(|V|, D_{in})`.
+            Node features. Shape: :math:`(N, D_{in})`.
         max_in_degree : int
             Maximum in-degree of destination nodes. It is only effective when
             :attr:`g` is a :class:`DGLBlock`, i.e., bipartite graph. When
@@ -113,7 +117,7 @@ class CuGraphSAGEConv(nn.Module):
         Returns
         -------
         torch.Tensor
-            Output node features. Shape: :math:`(|V|, D_{out})`.
+            Output node features. Shape: :math:`(N, D_{out})`.
         """
         offsets, indices, _ = g.adj_sparse("csc")
 

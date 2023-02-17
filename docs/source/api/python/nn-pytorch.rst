@@ -14,14 +14,12 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GraphConv
     ~dgl.nn.pytorch.conv.EdgeWeightNorm
     ~dgl.nn.pytorch.conv.RelGraphConv
-    ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
     ~dgl.nn.pytorch.conv.TAGConv
     ~dgl.nn.pytorch.conv.GATConv
     ~dgl.nn.pytorch.conv.GATv2Conv
     ~dgl.nn.pytorch.conv.EGATConv
     ~dgl.nn.pytorch.conv.EdgeConv
     ~dgl.nn.pytorch.conv.SAGEConv
-    ~dgl.nn.pytorch.conv.CuGraphSAGEConv
     ~dgl.nn.pytorch.conv.SGConv
     ~dgl.nn.pytorch.conv.APPNPConv
     ~dgl.nn.pytorch.conv.GINConv
@@ -42,6 +40,11 @@ Conv Layers
     ~dgl.nn.pytorch.conv.EGNNConv
     ~dgl.nn.pytorch.conv.PNAConv
     ~dgl.nn.pytorch.conv.DGNConv
+
+CuGraph Conv Layers
+----------------------------------------
+    ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
+    ~dgl.nn.pytorch.conv.CuGraphSAGEConv
 
 Dense Conv Layers
 ----------------------------------------
