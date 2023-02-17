@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
  * @file array/cpu/concurrent_id_hash_map.h
- * @brief Class about id hash map
+ * @brief Class about concurrent id hash map
  */
 
 #ifndef DGL_ARRAY_CPU_CONCURRENT_ID_HASH_MAP_H_
@@ -26,9 +26,8 @@ namespace aten {
  * The hash map should be prepared in two phases before using. With the first
  * being creating the hashmap, and then initialize it with an id array which is
  * divided into 2 parts: [`seed ids`, `left ids`]. In result `seed ids` are
- * mapped to [0, num_seed_ids) and `left ids` to [num_seed_ids, num_unique_ids].
- * And notice that mapping order for `seed ids` is stable while not for `left
- *ids`.
+ * mapped to [0, num_seed_ids) and `left ids` to [num_seed_ids, num_unique_ids).
+ * Notice that mapping order is stable for `seed ids` while not for the left.
  *
  * For example, for an array A having 4 seed ids with following entries:
  * [99, 98, 100, 97, 97, 101, 101, 102, 101]
@@ -102,7 +101,7 @@ class ConcurrentIdHashMap {
   IdArray Init(const IdArray& ids, size_t num_seeds);
 
   /**
-   * @brief Find the mappings of given keys.
+   * @brief Find mappings of given keys.
    *
    * @param ids The keys to map for.
    *
@@ -124,7 +123,7 @@ class ConcurrentIdHashMap {
    *
    * @param id The key to map for.
    *
-   * @return Mapping result for the `id`.
+   * @return Mapping result corresponding to `id`.
    */
   IdType MapId(const IdType id) const;
 
@@ -150,13 +149,13 @@ class ConcurrentIdHashMap {
   void Set(IdType key, IdType value);
 
   /**
-   * @brief Insert an id into the hash map.
+   * @brief Insert a key into the hash map.
    *
-   * @param id The id to be inserted.
-   * @param value The value to be set for `id`.
+   * @param id The key to be inserted.
+   * @param value The value to be set for the `key`.
    *
    */
-  inline void InsertAndSet(IdType id, IdType value);
+  inline void InsertAndSet(IdType key, IdType value);
 
   /**
    * @brief Attempt to insert the key into the hash map at the given position.
@@ -166,8 +165,8 @@ class ConcurrentIdHashMap {
    * 3. If the key at `pos` is non-empty and not equal to `key` -> Return false.
    * @param pos The position in the hash map to be inserted at.
    * @param key The key to be inserted.
-   * @param valid The item at index will be set to indicate
-   * whether the `key` at `index` is inserted or not.
+   * @param valid The item at `index` will be set to indicate whether the `key`
+   * is inserted or not.
    * @param index The index of the `key`.
    *
    * @return Whether the key exists in the map after operation.
@@ -176,8 +175,8 @@ class ConcurrentIdHashMap {
       int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index);
 
   /**
-   * @brief A simpler version of `AttemptInsertAt` which assumes the inserted
-   * key is unique. The key is inserted just when the content in the given
+   * @brief A simpler version of `AttemptInsertAt` which assumes the given
+   * key is unique. The key will be inserted just when the content in the given
    * position is empty.
    * @param pos The position in the hash map to be inserted at.
    * @param key The key to be inserted.
