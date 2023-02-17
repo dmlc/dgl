@@ -5,12 +5,12 @@ import time
 import unittest
 
 import backend as F
+
+import dgl
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 from test_utils import parametrize_idtype
-
-import dgl
 
 np.random.seed(42)
 

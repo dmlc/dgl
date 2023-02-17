@@ -2,10 +2,10 @@ import unittest
 from collections import defaultdict
 
 import backend as F
-import numpy as np
-import pytest
 
 import dgl
+import numpy as np
+import pytest
 
 
 def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):

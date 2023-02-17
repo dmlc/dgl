@@ -1,13 +1,13 @@
 from itertools import product
 
 import backend as F
+
+import dgl
+import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
 from test_utils import get_cases, parametrize_idtype
-
-import dgl
-import dgl.function as fn
 
 
 def udf_copy_src(edges):

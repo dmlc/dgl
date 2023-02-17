@@ -1,10 +1,10 @@
 import unittest
 
 import backend as F
-import numpy as np
 
 import dgl
 import dgl.ndarray as nd
+import numpy as np
 
 
 @unittest.skipIf(

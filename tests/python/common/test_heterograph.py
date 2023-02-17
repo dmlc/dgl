@@ -4,18 +4,18 @@ import unittest
 from collections import Counter
 
 import backend as F
+
+import dgl
+import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
 import test_utils
+from dgl import DGLError
 from scipy.sparse import rand
 from test_utils import get_cases, parametrize_idtype
 from utils import assert_is_identical_hetero
-
-import dgl
-import dgl.function as fn
-from dgl import DGLError
 
 
 def create_test_heterograph(idtype):
@@ -303,6 +303,7 @@ def test_create(idtype):
             idtype=idtype,
             device=device,
         )
+
     # bipartite graph
     def _test_validate_bipartite(card):
         with pytest.raises(DGLError):

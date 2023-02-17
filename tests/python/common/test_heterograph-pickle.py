@@ -3,17 +3,17 @@ import pickle
 import unittest
 
 import backend as F
+
+import dgl
+import dgl.function as fn
 import networkx as nx
 import pytest
 import scipy.sparse as ssp
 import test_utils
-from test_utils import get_cases, parametrize_idtype
-from utils import assert_is_identical, assert_is_identical_hetero
-
-import dgl
-import dgl.function as fn
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
+from test_utils import get_cases, parametrize_idtype
+from utils import assert_is_identical, assert_is_identical_hetero
 
 
 def _assert_is_identical_nodeflow(nf1, nf2):

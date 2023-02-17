@@ -6,13 +6,13 @@ import tempfile
 import unittest
 
 import backend as F
+
+import dgl
+import dgl.data as data
 import numpy as np
 import pandas as pd
 import pytest
 import yaml
-
-import dgl
-import dgl.data as data
 from dgl import DGLError
 
 
@@ -397,8 +397,11 @@ def test_extract_archive():
 
 
 def _test_construct_graphs_node_ids():
-    from dgl.data.csv_dataset_base import (DGLGraphConstructor, EdgeData,
-                                           NodeData)
+    from dgl.data.csv_dataset_base import (
+        DGLGraphConstructor,
+        EdgeData,
+        NodeData,
+    )
 
     num_nodes = 100
     num_edges = 1000
@@ -476,8 +479,11 @@ def _test_construct_graphs_node_ids():
 
 
 def _test_construct_graphs_homo():
-    from dgl.data.csv_dataset_base import (DGLGraphConstructor, EdgeData,
-                                           NodeData)
+    from dgl.data.csv_dataset_base import (
+        DGLGraphConstructor,
+        EdgeData,
+        NodeData,
+    )
 
     # node_id could be non-sorted, non-numeric.
     num_nodes = 100
@@ -531,8 +537,11 @@ def _test_construct_graphs_homo():
 
 
 def _test_construct_graphs_hetero():
-    from dgl.data.csv_dataset_base import (DGLGraphConstructor, EdgeData,
-                                           NodeData)
+    from dgl.data.csv_dataset_base import (
+        DGLGraphConstructor,
+        EdgeData,
+        NodeData,
+    )
 
     # node_id/src_id/dst_id could be non-sorted, duplicated, non-numeric.
     num_nodes = 100
@@ -604,8 +613,12 @@ def _test_construct_graphs_hetero():
 
 
 def _test_construct_graphs_multiple():
-    from dgl.data.csv_dataset_base import (DGLGraphConstructor, EdgeData,
-                                           GraphData, NodeData)
+    from dgl.data.csv_dataset_base import (
+        DGLGraphConstructor,
+        EdgeData,
+        GraphData,
+        NodeData,
+    )
 
     num_nodes = 100
     num_edges = 1000
@@ -1047,8 +1060,11 @@ def _test_load_edge_data_from_csv():
 
 
 def _test_load_graph_data_from_csv():
-    from dgl.data.csv_dataset_base import (DefaultDataParser, GraphData,
-                                           MetaGraph)
+    from dgl.data.csv_dataset_base import (
+        DefaultDataParser,
+        GraphData,
+        MetaGraph,
+    )
 
     with tempfile.TemporaryDirectory() as test_dir:
         num_graphs = 100

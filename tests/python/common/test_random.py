@@ -1,9 +1,9 @@
 import unittest
 
 import backend as F
-import numpy as np
 
 import dgl
+import numpy as np
 
 
 @unittest.skipIf(

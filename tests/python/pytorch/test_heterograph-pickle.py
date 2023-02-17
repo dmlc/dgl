@@ -1,10 +1,10 @@
 import io
 import pickle
 
+import dgl
+
 import networkx as nx
 import torch
-
-import dgl
 
 
 def _reconstruct_pickle(obj):

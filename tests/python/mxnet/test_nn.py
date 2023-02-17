@@ -1,4 +1,8 @@
 import backend as F
+
+import dgl
+import dgl.function as fn
+import dgl.nn.mxnet as nn
 import mxnet as mx
 import networkx as nx
 import numpy as np
@@ -6,12 +10,12 @@ import pytest
 import scipy as sp
 from mxnet import autograd, gluon, nd
 from test_utils import parametrize_idtype
-from test_utils.graph_cases import (get_cases, random_bipartite,
-                                    random_dglgraph, random_graph)
-
-import dgl
-import dgl.function as fn
-import dgl.nn.mxnet as nn
+from test_utils.graph_cases import (
+    get_cases,
+    random_bipartite,
+    random_dglgraph,
+    random_graph,
+)
 
 
 def check_close(a, b):
@@ -725,6 +729,7 @@ def test_rgcn(O):
 
 def test_sequential():
     ctx = F.ctx()
+
     # test single graph
     class ExampleLayer(gluon.nn.Block):
         def __init__(self, **kwargs):

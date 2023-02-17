@@ -1,11 +1,11 @@
 import unittest
 
 import backend as F
-import pytest
-from test_utils import check_graph_equal, get_cases, parametrize_idtype
 
 import dgl
+import pytest
 from dgl.base import ALL
+from test_utils import check_graph_equal, get_cases, parametrize_idtype
 
 
 def check_equivalence_between_heterographs(

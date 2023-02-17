@@ -3,10 +3,10 @@ import operator
 import sys
 
 import backend as F
-import pytest
-import torch
 
 import dgl.sparse as dglsp
+import pytest
+import torch
 
 dgl_op_map = {
     "sum": "sum",

@@ -2,13 +2,13 @@ import unittest
 from collections import defaultdict as ddict
 
 import backend as F
+
+import dgl
 import networkx as nx
 import numpy as np
 import scipy.sparse as ssp
-from test_utils import parametrize_idtype
-
-import dgl
 from dgl import DGLGraph
+from test_utils import parametrize_idtype
 
 D = 5
 reduce_msg_shapes = set()
@@ -513,6 +513,7 @@ def test_local_var(idtype):
     g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.ndata["h"] = F.zeros((g.number_of_nodes(), 3))
     g.edata["w"] = F.zeros((g.number_of_edges(), 4))
+
     # test override
     def foo(g):
         g = g.local_var()
@@ -522,6 +523,7 @@ def test_local_var(idtype):
     foo(g)
     assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
     assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+
     # test out-place update
     def foo(g):
         g = g.local_var()
@@ -531,6 +533,7 @@ def test_local_var(idtype):
     foo(g)
     assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
     assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+
     # test out-place update 2
     def foo(g):
         g = g.local_var()
@@ -540,6 +543,7 @@ def test_local_var(idtype):
     foo(g)
     assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
     assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+
     # test auto-pop
     def foo(g):
         g = g.local_var()
@@ -560,6 +564,7 @@ def test_local_var(idtype):
         assert F.allclose(g.ndata["h"], F.tensor([[1.0], [0.0]]))
 
     foo(g)
+
     # test initializer2
     def foo_e_initializer(shape, dtype, ctx, id_range):
         return F.ones(shape)
@@ -581,6 +586,7 @@ def test_local_scope(idtype):
     g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
     g.ndata["h"] = F.zeros((g.number_of_nodes(), 3))
     g.edata["w"] = F.zeros((g.number_of_edges(), 4))
+
     # test override
     def foo(g):
         with g.local_scope():
@@ -590,6 +596,7 @@ def test_local_scope(idtype):
     foo(g)
     assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
     assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+
     # test out-place update
     def foo(g):
         with g.local_scope():
@@ -599,6 +606,7 @@ def test_local_scope(idtype):
     foo(g)
     assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
     assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+
     # test out-place update 2
     def foo(g):
         with g.local_scope():
@@ -608,6 +616,7 @@ def test_local_scope(idtype):
     foo(g)
     assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
     assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+
     # test auto-pop
     def foo(g):
         with g.local_scope():
@@ -643,6 +652,7 @@ def test_local_scope(idtype):
             assert F.allclose(g.ndata["h"], F.tensor([[1.0], [0.0]]))
 
     foo(g)
+
     # test initializer2
     def foo_e_initializer(shape, dtype, ctx, id_range):
         return F.ones(shape)

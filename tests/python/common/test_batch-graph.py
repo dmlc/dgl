@@ -1,10 +1,10 @@
 import unittest
 
 import backend as F
-import numpy as np
-from test_utils import parametrize_idtype
 
 import dgl
+import numpy as np
+from test_utils import parametrize_idtype
 
 
 def tree1(idtype):
@@ -120,7 +120,7 @@ def test_batch_unbatch_frame(idtype):
     assert not F.allclose(t2.edata["h"], F.zeros((E2, D)))
 
     g1, g2 = dgl.unbatch(b1)
-    _g2, = dgl.unbatch(b2)
+    (_g2,) = dgl.unbatch(b2)
     assert F.allclose(g1.ndata["h"], F.zeros((N1, D)))
     assert F.allclose(g1.edata["h"], F.zeros((E1, D)))
     assert F.allclose(g2.ndata["h"], t2.ndata["h"])

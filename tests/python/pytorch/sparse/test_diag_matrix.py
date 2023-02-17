@@ -5,7 +5,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import DiagMatrix, diag, identity
+from dgl.sparse import diag, DiagMatrix, identity
 
 
 @pytest.mark.parametrize("val_shape", [(3,), (3, 2)])

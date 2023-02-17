@@ -3,20 +3,24 @@ import pickle
 from copy import deepcopy
 
 import backend as F
+
+import dgl
+import dgl.function as fn
+import dgl.nn.pytorch as nn
 import networkx as nx
 import pytest
 import scipy as sp
 import torch
 import torch as th
 from test_utils import parametrize_idtype
-from test_utils.graph_cases import (get_cases, random_bipartite,
-                                    random_dglgraph, random_graph)
+from test_utils.graph_cases import (
+    get_cases,
+    random_bipartite,
+    random_dglgraph,
+    random_graph,
+)
 from torch.optim import Adam, SparseAdam
 from torch.utils.data import DataLoader
-
-import dgl
-import dgl.function as fn
-import dgl.nn.pytorch as nn
 
 tmp_buffer = io.BytesIO()
 
@@ -1175,6 +1179,7 @@ def test_dense_cheb_conv(out_dim):
 
 def test_sequential():
     ctx = F.ctx()
+
     # Test single graph
     class ExampleLayer(th.nn.Module):
         def __init__(self):

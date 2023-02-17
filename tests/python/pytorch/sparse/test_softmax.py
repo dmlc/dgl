@@ -1,10 +1,10 @@
 import sys
 
 import backend as F
-import pytest
-import torch
 
 import dgl
+import pytest
+import torch
 from dgl.sparse import from_coo, softmax
 
 

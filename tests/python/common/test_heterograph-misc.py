@@ -2,12 +2,12 @@ import math
 import numbers
 
 import backend as F
+
+import dgl
 import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as sp
-
-import dgl
 from dgl import DGLError
 
 

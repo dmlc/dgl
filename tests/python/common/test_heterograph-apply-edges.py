@@ -4,17 +4,17 @@ from collections import Counter
 from itertools import product
 
 import backend as F
+
+import dgl
+import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
 import test_utils
+from dgl import DGLError
 from scipy.sparse import rand
 from test_utils import get_cases, parametrize_idtype
-
-import dgl
-import dgl.function as fn
-from dgl import DGLError
 
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}
 fill_value = {"sum": 0, "max": float("-inf")}
@@ -51,7 +51,6 @@ def create_test_heterograph(idtype):
 @parametrize_idtype
 def test_unary_copy_u(idtype):
     def _test(mfunc):
-
         g = create_test_heterograph(idtype)
 
         x1 = F.randn((g.num_nodes("user"), feat_size))
@@ -108,7 +107,6 @@ def test_unary_copy_u(idtype):
 @parametrize_idtype
 def test_unary_copy_e(idtype):
     def _test(mfunc):
-
         g = create_test_heterograph(idtype)
         feat_size = 2
 
@@ -168,7 +166,6 @@ def test_unary_copy_e(idtype):
 @parametrize_idtype
 def test_binary_op(idtype):
     def _test(lhs, rhs, binary_op):
-
         g = create_test_heterograph(idtype)
 
         n1 = F.randn((g.num_nodes("user"), feat_size))
@@ -237,6 +234,7 @@ def test_binary_op(idtype):
             loss = F.sum(r2.view(-1), 0)
             F.backward(loss)
             n_grad2 = F.grad(g.nodes["game"].data["h"])
+
         # correctness check
         def _print_error(a, b):
             for i, (x, y) in enumerate(

@@ -1,7 +1,7 @@
 import backend as F
-import pytest
 
 import dgl
+import pytest
 from dgl.base import is_internal_column
 
 

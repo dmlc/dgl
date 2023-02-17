@@ -2,10 +2,10 @@ import os
 import unittest
 
 import backend as F
-import numpy as np
-import pytest
 
 import dgl
+import numpy as np
+import pytest
 
 
 @unittest.skipIf(os.name == "nt", reason="Cython only works on linux")

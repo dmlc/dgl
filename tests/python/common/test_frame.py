@@ -2,12 +2,12 @@ import pickle
 import unittest
 
 import backend as F
-import numpy as np
-from test_utils import parametrize_idtype
 
 import dgl
 import dgl.ndarray as nd
+import numpy as np
 from dgl.frame import Column
+from test_utils import parametrize_idtype
 
 
 def test_column_subcolumn():

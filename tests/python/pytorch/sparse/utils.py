@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from dgl.sparse import SparseMatrix, from_coo, from_csc, from_csr
+from dgl.sparse import from_coo, from_csc, from_csr, SparseMatrix
 
 np.random.seed(42)
 torch.random.manual_seed(42)

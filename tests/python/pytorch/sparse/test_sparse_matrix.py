@@ -264,7 +264,6 @@ def test_csc_to_csr(dense_dim, indptr, indices, shape):
 @pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
 @pytest.mark.parametrize("shape", [None, (5, 5), (5, 6)])
 def test_coo_to_csc(dense_dim, row, col, shape):
-
     val_shape = (len(row),)
     if dense_dim is not None:
         val_shape += (dense_dim,)

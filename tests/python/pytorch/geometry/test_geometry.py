@@ -1,15 +1,15 @@
 import backend as F
-import numpy as np
-import pytest
-import torch as th
-from test_utils import parametrize_idtype
-from test_utils.graph_cases import get_cases
 
 import dgl
 import dgl.nn
+import numpy as np
+import pytest
+import torch as th
 from dgl import DGLError
 from dgl.base import DGLWarning
 from dgl.geometry import farthest_point_sampler, neighbor_matching
+from test_utils import parametrize_idtype
+from test_utils.graph_cases import get_cases
 
 
 def test_fps():

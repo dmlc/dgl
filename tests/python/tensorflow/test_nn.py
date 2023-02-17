@@ -1,6 +1,10 @@
 from copy import deepcopy
 
 import backend as F
+
+import dgl
+import dgl.function as fn
+import dgl.nn.tensorflow as nn
 import networkx as nx
 import numpy as np
 import pytest
@@ -8,12 +12,12 @@ import scipy as sp
 import tensorflow as tf
 from tensorflow.keras import layers
 from test_utils import parametrize_idtype
-from test_utils.graph_cases import (get_cases, random_bipartite,
-                                    random_dglgraph, random_graph)
-
-import dgl
-import dgl.function as fn
-import dgl.nn.tensorflow as nn
+from test_utils.graph_cases import (
+    get_cases,
+    random_bipartite,
+    random_dglgraph,
+    random_graph,
+)
 
 
 def _AXWb(A, X, W, b):

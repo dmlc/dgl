@@ -4,14 +4,14 @@ from collections.abc import Iterator, Mapping
 from functools import partial
 
 import backend as F
+
+import dgl
+import dgl.ops as OPS
 import numpy as np
 import pytest
 import torch
 import torch.distributed as dist
 from test_utils import parametrize_idtype
-
-import dgl
-import dgl.ops as OPS
 
 
 @pytest.mark.parametrize("batch_size", [None, 16])

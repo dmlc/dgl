@@ -55,13 +55,13 @@ def test_diag_op_scalar(v_scalar):
 
     # D ^ v
     D1 = diag(torch.arange(1, 4).to(ctx))
-    D2 = D1 ** v_scalar
-    assert torch.allclose(D1.val ** v_scalar, D2.val, rtol=1e-4, atol=1e-4)
+    D2 = D1**v_scalar
+    assert torch.allclose(D1.val**v_scalar, D2.val, rtol=1e-4, atol=1e-4)
     assert D1.shape == D2.shape
 
     # pow(D, v)
     D2 = power(D1, v_scalar)
-    assert torch.allclose(D1.val ** v_scalar, D2.val, rtol=1e-4, atol=1e-4)
+    assert torch.allclose(D1.val**v_scalar, D2.val, rtol=1e-4, atol=1e-4)
     assert D1.shape == D2.shape
 
     with pytest.raises(TypeError):
