@@ -459,18 +459,17 @@ class NodeEmbedding:  # NodeEmbedding
                 ),
                 F.context(states[0]),
             )
-            self._optm_state = tuple(
-                F.copy_to(
-                    F.gather_row(state, idxs), ctx=F.context(self._tensor)
-                )
-                for state in states
-            )
+            for state, new_state in zip(self._optm_state, states):
+                state[:] = F.copy_to(
+                    F.gather_row(new_state, idxs), ctx=F.context(self._tensor)
+                )[:]
         else:
             # stored in CPU memory
             if self._rank <= 0:
-                self._optm_state = tuple(
-                    F.copy_to(state, ctx=F.context(self._tensor))
-                    for state in states
-                )
+                for state, new_state in zip(self._optm_state, states):
+                    print(state.shape, new_state.shape)
+                    state[:] = F.copy_to(
+                        new_state, ctx=F.context(self._tensor)
+                    )[:]
         if th.distributed.is_initialized():
             th.distributed.barrier()

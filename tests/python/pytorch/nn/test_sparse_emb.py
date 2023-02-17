@@ -33,6 +33,7 @@ def check_all_set_all_get_optm_state(
     emb_dim = state_mem.shape[1]
     dgl_emb = NodeEmbedding(num_embs, emb_dim, "test", device=device)
     optm = SparseAdam(params=[dgl_emb], lr=0.01)
+    optm.setup(optm._params)
 
     dgl_emb._all_set_optm_state((state_step, state_mem, state_power))
 
@@ -99,7 +100,7 @@ def test_multiprocess_sparse_emb_get_set_optm_state(num_workers):
     worker_list = []
 
     num_embs, emb_dim = 1000, 8
-    state_step = th.randint(1000, (num_embs, emb_dim))
+    state_step = th.randint(1000, (num_embs,))
     state_mem = th.rand((num_embs, emb_dim))
     state_power = th.rand((num_embs, emb_dim))
 
