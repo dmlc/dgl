@@ -114,6 +114,7 @@ Utility Modules
     ~dgl.nn.pytorch.sparse_emb.NodeEmbedding
     ~dgl.nn.pytorch.explain.GNNExplainer
     ~dgl.nn.pytorch.explain.HeteroGNNExplainer
+    ~dgl.nn.pytorch.explain.SubgraphXExplainer
     ~dgl.nn.pytorch.utils.LabelPropagation
     ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
     ~dgl.nn.pytorch.utils.LaplacianPosEnc
