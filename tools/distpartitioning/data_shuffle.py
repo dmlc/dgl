@@ -169,7 +169,7 @@ def gen_node_data(
     return local_node_data
 
 
-def exchange_edge_data(rank, world_size, num_parts, edge_data):
+def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
     """
     Exchange edge_data among processes in the world.
     Prepare list of sliced data targeting each process and trigger
@@ -184,6 +184,8 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
     edge_data : dictionary
         edge information, as a dicitonary which stores column names as keys and values
         as column data. This information is read from the edges.txt file.
+    id_lookup : DistLookupService instance
+	this object will be used to retrieve ownership information of nodes
 
     Returns:
     --------
@@ -734,7 +736,7 @@ def exchange_graph_data(
     )
     memory_snapshot("NodeDataGenerationComplete: ", rank)
 
-    edge_data = exchange_edge_data(rank, world_size, num_parts, edge_data)
+    edge_data = exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup)
     memory_snapshot("ShuffleEdgeDataComplete: ", rank)
     return (
         node_data,
