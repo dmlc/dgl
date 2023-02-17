@@ -39,4 +39,4 @@ then
 else
   python3 -m pytest -v --junitxml=pytest_common.xml --durations=100 tests/python/common || fail "common"
 fi
-python3 -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests/$DGLBACKEND || fail "backend-specific"
+python3 -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests/python/$DGLBACKEND || fail "backend-specific"
