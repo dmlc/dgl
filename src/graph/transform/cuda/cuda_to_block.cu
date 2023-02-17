@@ -201,7 +201,7 @@ struct GetMappingIdsGPU {
 template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockGPU(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
-    const bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr) {
+    bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr) {
   return ToBlockProcess<IdType>(
       graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes_ptr,
       GetMappingIdsGPU<IdType>());

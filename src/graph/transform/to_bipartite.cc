@@ -148,7 +148,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
 template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
-    const bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr,
+    bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr,
     MappingIdsFunc &&get_maping_ids) {
   std::vector<IdArray> &lhs_nodes = *lhs_nodes_ptr;
   const bool generate_lhs_nodes = lhs_nodes.empty();
