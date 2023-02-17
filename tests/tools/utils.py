@@ -118,6 +118,9 @@ def _chunk_graph(
     metadata["graph_name"] = name
     metadata["node_type"] = g.ntypes
 
+    # add node_type_counts
+    metadata["node_type_counts"] = [g.num_nodes(ntype) for ntype in g.ntypes]
+
     # Initialize num_chunks for each node/edge.
     num_chunks_details = _initialize_num_chunks(g, num_chunks, kwargs=kwargs)
 
@@ -134,6 +137,8 @@ def _chunk_graph(
         num_nodes_per_chunk.append(num_nodes_list)
 
     metadata["edge_type"] = [etypestrs[etype] for etype in g.canonical_etypes]
+    # add edge_type_counts here.
+    metadata["edge_type_counts"] = [g.num_edges(etype) for etype in g.canonical_etypes]
 
     # Compute the number of edges per chunk per edge type
     metadata["num_edges_per_chunk"] = num_edges_per_chunk = []
