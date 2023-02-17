@@ -34,9 +34,9 @@ def check_all_set_all_get_optm_state(
     dgl_emb = NodeEmbedding(num_embs, emb_dim, "test", device=device)
     optm = SparseAdam(params=[dgl_emb], lr=0.01)
 
-    dgl_emb.all_set_optm_state((state_step, state_mem, state_power))
+    dgl_emb._all_set_optm_state((state_step, state_mem, state_power))
 
-    out_step, out_mem, out_power = dgl_emb.all_get_optm_state()
+    out_step, out_mem, out_power = dgl_emb._all_get_optm_state()
 
     assert F.allclose(state_step, out_step)
     assert F.allclose(state_mem, out_mem)

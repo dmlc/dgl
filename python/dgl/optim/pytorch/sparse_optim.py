@@ -466,7 +466,7 @@ class SparseGradOptimizer(abc.ABC):
         dictionary of optimizer states
             The optimizer states stored in CPU memory.
         """
-        return {emb.name: emb.all_get_optm_state() for emb in self._params}
+        return {emb.name: emb._all_get_optm_state() for emb in self._params}
 
     def load_state_dict(self, state_dict, **kwargs):
         """Load the optimizer states. This method must be called by all
@@ -482,7 +482,7 @@ class SparseGradOptimizer(abc.ABC):
             The global states to pull values from.
         """
         for emb in self._params:
-            emb.all_set_optm_state(state_dict[emb.name])
+            emb._all_set_optm_state(state_dict[emb.name])
 
 
 class SparseAdagrad(SparseGradOptimizer):
