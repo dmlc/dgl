@@ -314,7 +314,6 @@ class SparseGradOptimizer(abc.ABC):
                                 ].shape[0]
                                 < idx_i.shape[0]
                             ):
-
                                 if (
                                     idx_shmem_name
                                     in self._shared_cache[emb_name]

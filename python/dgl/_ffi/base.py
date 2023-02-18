@@ -52,6 +52,7 @@ _LIB, _LIB_NAME, _DIR_NAME = _load_lib()
 # The FFI mode of DGL
 _FFI_MODE = os.environ.get("DGL_FFI", "auto")
 
+
 # ----------------------------
 # helper function in ctypes.
 # ----------------------------

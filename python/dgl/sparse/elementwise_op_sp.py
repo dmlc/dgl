@@ -79,7 +79,6 @@ def sp_sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
 
 
 def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
-
     """Elementwise multiplication
 
     Parameters

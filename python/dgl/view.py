@@ -69,7 +69,7 @@ class HeteroNodeDataView(MutableMapping):
     def __getitem__(self, key):
         if isinstance(self._ntype, list):
             ret = {}
-            for (i, ntype) in enumerate(self._ntype):
+            for i, ntype in enumerate(self._ntype):
                 value = self._graph._get_n_repr(self._ntid[i], self._nodes).get(
                     key, None
                 )
@@ -88,7 +88,7 @@ class HeteroNodeDataView(MutableMapping):
                 "please passing the node type and the corresponding data through a dict."
             )
 
-            for (ntype, data) in val.items():
+            for ntype, data in val.items():
                 ntid = self._graph.get_ntype_id(ntype)
                 self._graph._set_n_repr(ntid, self._nodes, {key: data})
         else:
@@ -110,7 +110,7 @@ class HeteroNodeDataView(MutableMapping):
     def _transpose(self, as_dict=False):
         if isinstance(self._ntype, list):
             ret = defaultdict(dict)
-            for (i, ntype) in enumerate(self._ntype):
+            for i, ntype in enumerate(self._ntype):
                 data = self._graph._get_n_repr(self._ntid[i], self._nodes)
                 for key in self._graph._node_frames[self._ntid[i]]:
                     ret[key][ntype] = data[key]
@@ -197,7 +197,7 @@ class HeteroEdgeDataView(MutableMapping):
     def __getitem__(self, key):
         if isinstance(self._etype, list):
             ret = {}
-            for (i, etype) in enumerate(self._etype):
+            for i, etype in enumerate(self._etype):
                 value = self._graph._get_e_repr(self._etid[i], self._edges).get(
                     key, None
                 )
@@ -216,7 +216,7 @@ class HeteroEdgeDataView(MutableMapping):
                 "please pass the edge type and the corresponding data through a dict."
             )
 
-            for (etype, data) in val.items():
+            for etype, data in val.items():
                 etid = self._graph.get_etype_id(etype)
                 self._graph._set_e_repr(etid, self._edges, {key: data})
         else:
@@ -238,7 +238,7 @@ class HeteroEdgeDataView(MutableMapping):
     def _transpose(self, as_dict=False):
         if isinstance(self._etype, list):
             ret = defaultdict(dict)
-            for (i, etype) in enumerate(self._etype):
+            for i, etype in enumerate(self._etype):
                 data = self._graph._get_e_repr(self._etid[i], self._edges)
                 for key in self._graph._edge_frames[self._etid[i]]:
                     ret[key][etype] = data[key]

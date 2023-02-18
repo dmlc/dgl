@@ -1843,7 +1843,6 @@ def segment_reduce(op, x, offsets):
 
 
 def scatter_add(x, idx, m):
-
     """Scatter add (on first dimension) operator.
 
     Math: y[idx[i], *] += x[i, *]

@@ -2,8 +2,10 @@
 import sys
 
 from .. import backend as F
-from ..backend import gspmm as gspmm_internal
-from ..backend import gspmm_hetero as gspmm_internal_hetero
+from ..backend import (
+    gspmm as gspmm_internal,
+    gspmm_hetero as gspmm_internal_hetero,
+)
 
 __all__ = ["gspmm"]
 
@@ -178,7 +180,6 @@ def _gen_spmm_func(binary_op, reduce_op):
 
 
 def _gen_copy_reduce_func(binary_op, reduce_op):
-
     name = "{}_{}".format(binary_op, reduce_op)
     binary_str = {
         "copy_u": "It copies node feature to edge as the message.",

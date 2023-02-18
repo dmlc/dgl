@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 
 from . import backend as F
-from .base import DGLError, dgl_warning
+from .base import dgl_warning, DGLError
 from .ops import segment
 
 __all__ = [

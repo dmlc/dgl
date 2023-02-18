@@ -296,9 +296,7 @@ def gather_row(data, row_index):
     if isinstance(row_index, nd.NDArray):
         return nd.take(data, row_index)
     else:
-        return data[
-            row_index,
-        ]
+        return data[row_index,]
 
 
 def slice_axis(data, axis, begin, end):
