@@ -6,7 +6,7 @@ import os
 from .. import backend as F
 from .._ffi.function import _init_api
 from .._ffi.object import ObjectBase, register_object
-from ..base import DGLError, dgl_warning
+from ..base import dgl_warning, DGLError
 from ..heterograph import DGLGraph
 from .heterograph_serialize import save_heterographs
 
@@ -141,9 +141,7 @@ def save_graphs(filename, g_list, labels=None, formats=None):
             os.makedirs(f_path)
 
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
-    if (
-        type(g_sample) == DGLGraph
-    ):  # Doesn't support DGLGraph's derived class
+    if type(g_sample) == DGLGraph:  # Doesn't support DGLGraph's derived class
         save_heterographs(filename, g_list, labels, formats)
     else:
         raise DGLError(
