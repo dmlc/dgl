@@ -2,6 +2,9 @@ import argparse
 import time
 from functools import partial
 
+import dgl
+import dgl.nn.pytorch as dglnn
+
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -11,9 +14,6 @@ import tqdm
 from ogb.nodeproppred import DglNodePropPredDataset
 from sampler import ClusterIter, subgraph_collate_fn
 from torch.utils.data import DataLoader
-
-import dgl
-import dgl.nn.pytorch as dglnn
 
 
 class GAT(nn.Module):

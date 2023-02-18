@@ -3,13 +3,13 @@ import os
 import pickle
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.optim as optim
 from dataset import LanderDataset
 from models import LANDER
-
-import dgl
 
 ###########
 # ArgParser
@@ -49,6 +49,7 @@ if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
+
 
 ##################
 # Data Preparation

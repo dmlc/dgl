@@ -7,11 +7,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset
 from model import JKNet
 from sklearn.model_selection import train_test_split
 from tqdm import trange
-
-from dgl.data import CiteseerGraphDataset, CoraGraphDataset
 
 
 def main(args):

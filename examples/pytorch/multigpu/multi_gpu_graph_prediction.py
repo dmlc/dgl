@@ -1,18 +1,18 @@
 import argparse
 
+import dgl
+import dgl.nn as dglnn
+
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from dgl.data import AsGraphPredDataset
+from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import DglGraphPropPredDataset, Evaluator
 from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
 from tqdm import tqdm
-
-import dgl
-import dgl.nn as dglnn
-from dgl.data import AsGraphPredDataset
-from dgl.dataloading import GraphDataLoader
 
 
 class MLP(nn.Module):

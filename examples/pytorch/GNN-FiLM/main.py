@@ -1,15 +1,15 @@
 import argparse
 import os
 
+import dgl
+import dgl.function as fn
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from data_loader import load_PPI
 from utils import evaluate_f1_score
-
-import dgl
-import dgl.function as fn
 
 
 class GNNFiLMLayer(nn.Module):

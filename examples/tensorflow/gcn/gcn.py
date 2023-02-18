@@ -6,9 +6,9 @@ References:
 - Code: https://github.com/tkipf/gcn
 """
 import tensorflow as tf
-from tensorflow.keras import layers
 
 from dgl.nn.tensorflow import GraphConv
+from tensorflow.keras import layers
 
 
 class GCN(tf.keras.Model):

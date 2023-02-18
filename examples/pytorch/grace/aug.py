@@ -1,9 +1,8 @@
 # Data augmentation on graphs via edge dropping and feature masking
 
+import dgl
 import numpy as np
 import torch as th
-
-import dgl
 
 
 def aug(graph, x, feat_drop_rate, edge_mask_rate):

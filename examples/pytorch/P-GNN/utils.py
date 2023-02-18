@@ -17,7 +17,7 @@ def get_communities(remove_feature):
 
     # Randomly rewire 1% edges
     node_list = list(graph.nodes)
-    for (u, v) in graph.edges():
+    for u, v in graph.edges():
         if random.random() < 0.01:
             x = random.choice(node_list)
             if graph.has_edge(u, x):

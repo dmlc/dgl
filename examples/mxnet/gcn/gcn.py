@@ -5,11 +5,10 @@ References:
 - Paper: https://arxiv.org/abs/1609.02907
 - Code: https://github.com/tkipf/gcn
 """
-import mxnet as mx
-from mxnet import gluon
-
 import dgl
+import mxnet as mx
 from dgl.nn.mxnet import GraphConv
+from mxnet import gluon
 
 
 class GCN(gluon.Block):

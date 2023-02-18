@@ -4,12 +4,12 @@ import urllib.request
 import zipfile
 from copy import copy
 
+import dgl
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.dataset import Dataset
-
-import dgl
 
 
 def _basic_sudoku_graph():

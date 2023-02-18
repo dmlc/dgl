@@ -10,7 +10,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.preprocessing import OneHotEncoder, normalize
+from sklearn.preprocessing import normalize, OneHotEncoder
 
 
 def repeat(n_times):

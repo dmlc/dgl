@@ -1,17 +1,18 @@
-import torch
-from torch.utils.data import Dataset
-
 import dgl
+import torch
 from dgl.data.utils import (
     _get_dgl_url,
     download,
     extract_archive,
     get_download_dir,
 )
+from torch.utils.data import Dataset
 
-from .jtmpn import ATOM_FDIM as ATOM_FDIM_DEC
-from .jtmpn import BOND_FDIM as BOND_FDIM_DEC
-from .jtmpn import mol2dgl_single as mol2dgl_dec
+from .jtmpn import (
+    ATOM_FDIM as ATOM_FDIM_DEC,
+    BOND_FDIM as BOND_FDIM_DEC,
+    mol2dgl_single as mol2dgl_dec,
+)
 from .mol_tree import Vocab
 from .mol_tree_nx import DGLMolTree
 from .mpn import mol2dgl_single as mol2dgl_enc

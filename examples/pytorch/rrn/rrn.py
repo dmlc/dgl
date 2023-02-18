@@ -7,10 +7,9 @@ References:
 - Original Code: https://github.com/rasmusbergpalm/recurrent-relational-networks
 """
 
+import dgl.function as fn
 import torch
 from torch import nn
-
-import dgl.function as fn
 
 
 class RRNLayer(nn.Module):
