@@ -1,7 +1,7 @@
 # NOTE(vibwu): Currently cugraph must be imported before torch to avoid a resource cleanup issue.
 #    See https://github.com/rapidsai/cugraph/issues/2718
-import cugraph
 import backend as F
+import cugraph
 
 import dgl
 
