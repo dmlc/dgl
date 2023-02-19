@@ -142,6 +142,7 @@ def gen_edge_files(schema_map, params):
 
     return edge_files
 
+
 def gen_node_weights_files(schema_map, params):
     """Function to create node weight files for ParMETIS along with the edge files.
 
