@@ -85,7 +85,6 @@ a_tree = tiny_sst[0]
 for token in a_tree.ndata["x"].tolist():
     if token != trainset.PAD_WORD:
         print(inv_vocab[token], end=" ")
-
 import matplotlib.pyplot as plt
 
 ##############################################################################
@@ -417,7 +416,6 @@ for epoch in range(epochs):
                 epoch, step, loss.item(), acc
             )
         )
-
 ##############################################################################
 # To train the model on a full dataset with different settings (such as CPU or GPU),
 # refer to the `PyTorch example <https://github.com/dmlc/dgl/tree/master/examples/pytorch/tree_lstm>`__.

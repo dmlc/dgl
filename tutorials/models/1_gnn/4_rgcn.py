@@ -172,7 +172,6 @@ class RGCNLayer(nn.Module):
         # sanity check
         if self.num_bases <= 0 or self.num_bases > self.num_rels:
             self.num_bases = self.num_rels
-
         # weight bases in equation (3)
         self.weight = nn.Parameter(
             torch.Tensor(self.num_bases, self.in_feat, self.out_feat)
@@ -182,11 +181,9 @@ class RGCNLayer(nn.Module):
             self.w_comp = nn.Parameter(
                 torch.Tensor(self.num_rels, self.num_bases)
             )
-
         # add bias
         if self.bias:
             self.bias = nn.Parameter(torch.Tensor(out_feat))
-
         # init trainable parameters
         nn.init.xavier_uniform_(
             self.weight, gain=nn.init.calculate_gain("relu")
@@ -211,7 +208,6 @@ class RGCNLayer(nn.Module):
             )
         else:
             weight = self.weight
-
         if self.is_input_layer:
 
             def message_func(edges):
@@ -403,7 +399,6 @@ for epoch in range(n_epochs):
             val_acc, val_loss.item()
         )
     )
-
 ###############################################################################
 # .. _link-prediction:
 #

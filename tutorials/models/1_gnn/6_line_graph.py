@@ -597,13 +597,11 @@ for i in range(20):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
     niters = len(all_loss)
     print(
         "Epoch %d | loss %.4f | accuracy %.4f"
         % (i, sum(all_loss) / niters, sum(all_acc) / niters)
     )
-
 #######################################################################################
 # Visualize training progress
 # -----------------------------

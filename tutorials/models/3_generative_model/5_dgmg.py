@@ -128,7 +128,6 @@ def forward_inference(self):
             num_trials += 1
             to_add_edge = self.add_edge_or_not()
         stop = self.add_node_and_update()
-
     return self.g
 
 
@@ -229,7 +228,6 @@ def forward_train(self, actions):
             self.choose_dest_and_update(a=actions[self.action_step])
             to_add_edge = self.add_edge_or_not(a=actions[self.action_step])
         stop = self.add_node_and_update(a=actions[self.action_step])
-
     return self.get_log_prob()
 
 
@@ -427,7 +425,6 @@ class GraphProp(nn.Module):
             node_update_funcs.append(
                 nn.GRUCell(self.node_activation_hidden_size, node_hidden_size)
             )
-
         self.message_funcs = nn.ModuleList(message_funcs)
         self.node_update_funcs = nn.ModuleList(node_update_funcs)
 
@@ -546,12 +543,10 @@ class AddNode(nn.Module):
         if not stop:
             g.add_nodes(1)
             self._initialize_node_repr(g, action, graph_embed)
-
         if self.training:
             sample_log_prob = bernoulli_action_log_prob(logit, action)
 
             self.log_prob.append(sample_log_prob)
-
         return stop
 
 
@@ -596,7 +591,6 @@ class AddEdge(nn.Module):
             self.log_prob.append(sample_log_prob)
         else:
             action = Bernoulli(prob).sample().item()
-
         to_add_edge = bool(action == 0)
         return to_add_edge
 
@@ -650,7 +644,6 @@ class ChooseDestAndUpdate(nn.Module):
 
         if not self.training:
             dest = Categorical(dests_probs).sample().item()
-
         if not g.has_edges_between(src, dest):
             # For undirected graphs, add edges for both directions
             # so that you can perform graph propagation.
@@ -661,7 +654,6 @@ class ChooseDestAndUpdate(nn.Module):
             self._initialize_edge_repr(g, src_list, dest_list)
 
             self.graph_op["prop"](g)
-
         if self.training:
             if dests_probs.nelement() > 1:
                 self.log_prob.append(
@@ -776,19 +768,15 @@ def is_valid(g):
 
     if size < 10 or size > 20:
         return False
-
     for node in range(size):
         neighbors = g.successors(node)
 
         if len(neighbors) != 2:
             return False
-
         if _get_previous(node, size - 1) not in neighbors:
             return False
-
         if _get_next(node, size - 1) not in neighbors:
             return False
-
     return True
 
 
@@ -796,7 +784,6 @@ num_valid = 0
 for i in range(100):
     g = model()
     num_valid += is_valid(g)
-
 del model
 print("Among 100 graphs generated, {}% are valid.".format(num_valid))
 

@@ -186,7 +186,6 @@ for i in range(10):
     entropy = (-dist_matrix * th.log(dist_matrix)).sum(dim=1)
     entropy_list.append(entropy.data.numpy())
     dist_list.append(dist_matrix.data.numpy())
-
 stds = np.std(entropy_list, axis=1)
 means = np.mean(entropy_list, axis=1)
 plt.errorbar(np.arange(len(entropy_list)), means, stds, marker="o")
