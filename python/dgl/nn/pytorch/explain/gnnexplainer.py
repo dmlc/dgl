@@ -1,15 +1,17 @@
 """Torch Module for GNNExplainer"""
 # pylint: disable= no-member, arguments-differ, invalid-name
 from math import sqrt
+
 import torch
 
 from torch import nn
 from tqdm import tqdm
 
-from ....base import NID, EID
+from ....base import EID, NID
 from ....subgraph import khop_in_subgraph
 
-__all__ = ['GNNExplainer', 'HeteroGNNExplainer']
+__all__ = ["GNNExplainer", "HeteroGNNExplainer"]
+
 
 class GNNExplainer(nn.Module):
     r"""GNNExplainer model from `GNNExplainer: Generating Explanations for
@@ -63,17 +65,19 @@ class GNNExplainer(nn.Module):
         If True, it will log the computation process, default to True.
     """
 
-    def __init__(self,
-                 model,
-                 num_hops,
-                 lr=0.01,
-                 num_epochs=100,
-                 *,
-                 alpha1=0.005,
-                 alpha2=1.0,
-                 beta1=1.0,
-                 beta2=0.1,
-                 log=True):
+    def __init__(
+        self,
+        model,
+        num_hops,
+        lr=0.01,
+        num_epochs=100,
+        *,
+        alpha1=0.005,
+        alpha2=1.0,
+        beta1=1.0,
+        beta2=0.1,
+        log=True,
+    ):
         super(GNNExplainer, self).__init__()
         self.model = model
         self.num_hops = num_hops
@@ -111,7 +115,7 @@ class GNNExplainer(nn.Module):
         std = 0.1
         feat_mask = nn.Parameter(torch.randn(1, feat_size, device=device) * std)
 
-        std = nn.init.calculate_gain('relu') * sqrt(2.0 / (2 * num_nodes))
+        std = nn.init.calculate_gain("relu") * sqrt(2.0 / (2 * num_nodes))
         edge_mask = nn.Parameter(torch.randn(num_edges, device=device) * std)
 
         return feat_mask, edge_mask
@@ -142,16 +146,18 @@ class GNNExplainer(nn.Module):
         # Edge mask sparsity regularization
         loss = loss + self.alpha1 * torch.sum(edge_mask)
         # Edge mask entropy regularization
-        ent = - edge_mask * torch.log(edge_mask + eps) - \
-            (1 - edge_mask) * torch.log(1 - edge_mask + eps)
+        ent = -edge_mask * torch.log(edge_mask + eps) - (
+            1 - edge_mask
+        ) * torch.log(1 - edge_mask + eps)
         loss = loss + self.alpha2 * ent.mean()
 
         feat_mask = feat_mask.sigmoid()
         # Feature mask sparsity regularization
         loss = loss + self.beta1 * torch.mean(feat_mask)
         # Feature mask entropy regularization
-        ent = - feat_mask * torch.log(feat_mask + eps) - \
-            (1 - feat_mask) * torch.log(1 - feat_mask + eps)
+        ent = -feat_mask * torch.log(feat_mask + eps) - (
+            1 - feat_mask
+        ) * torch.log(1 - feat_mask + eps)
         loss = loss + self.beta2 * ent.mean()
 
         return loss
@@ -285,13 +291,14 @@ class GNNExplainer(nn.Module):
 
         if self.log:
             pbar = tqdm(total=self.num_epochs)
-            pbar.set_description(f'Explain node {node_id}')
+            pbar.set_description(f"Explain node {node_id}")
 
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
             h = feat * feat_mask.sigmoid()
-            logits = self.model(graph=sg, feat=h,
-                                eweight=edge_mask.sigmoid(), **kwargs)
+            logits = self.model(
+                graph=sg, feat=h, eweight=edge_mask.sigmoid(), **kwargs
+            )
             log_probs = logits.log_softmax(dim=-1)
             loss = -log_probs[inverse_indices, pred_label[inverse_indices]]
             loss = self._loss_regularize(loss, feat_mask, edge_mask)
@@ -406,13 +413,14 @@ class GNNExplainer(nn.Module):
 
         if self.log:
             pbar = tqdm(total=self.num_epochs)
-            pbar.set_description('Explain graph')
+            pbar.set_description("Explain graph")
 
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
             h = feat * feat_mask.sigmoid()
-            logits = self.model(graph=graph, feat=h,
-                                eweight=edge_mask.sigmoid(), **kwargs)
+            logits = self.model(
+                graph=graph, feat=h, eweight=edge_mask.sigmoid(), **kwargs
+            )
             log_probs = logits.log_softmax(dim=-1)
             loss = -log_probs[0, pred_label[0]]
             loss = self._loss_regularize(loss, feat_mask, edge_mask)
@@ -429,6 +437,7 @@ class GNNExplainer(nn.Module):
         edge_mask = edge_mask.detach().sigmoid()
 
         return feat_mask, edge_mask
+
 
 class HeteroGNNExplainer(nn.Module):
     r"""GNNExplainer model from `GNNExplainer: Generating Explanations for
@@ -482,17 +491,19 @@ class HeteroGNNExplainer(nn.Module):
         If True, it will log the computation process, default to True.
     """
 
-    def __init__(self,
-                 model,
-                 num_hops,
-                 lr=0.01,
-                 num_epochs=100,
-                 *,
-                 alpha1=0.005,
-                 alpha2=1.0,
-                 beta1=1.0,
-                 beta2=0.1,
-                 log=True):
+    def __init__(
+        self,
+        model,
+        num_hops,
+        lr=0.01,
+        num_epochs=100,
+        *,
+        alpha1=0.005,
+        alpha2=1.0,
+        beta1=1.0,
+        beta2=0.1,
+        log=True,
+    ):
         super(HeteroGNNExplainer, self).__init__()
         self.model = model
         self.num_hops = num_hops
@@ -531,7 +542,9 @@ class HeteroGNNExplainer(nn.Module):
         std = 0.1
         for node_type, feature in feat.items():
             _, feat_size = feature.size()
-            feat_masks[node_type] = nn.Parameter(torch.randn(1, feat_size, device=device) * std)
+            feat_masks[node_type] = nn.Parameter(
+                torch.randn(1, feat_size, device=device) * std
+            )
 
         edge_masks = {}
         for canonical_etype in graph.canonical_etypes:
@@ -539,11 +552,12 @@ class HeteroGNNExplainer(nn.Module):
             dst_num_nodes = graph.num_nodes(canonical_etype[-1])
             num_nodes_sum = src_num_nodes + dst_num_nodes
             num_edges = graph.num_edges(canonical_etype)
-            std = nn.init.calculate_gain('relu')
+            std = nn.init.calculate_gain("relu")
             if num_nodes_sum > 0:
                 std *= sqrt(2.0 / num_nodes_sum)
             edge_masks[canonical_etype] = nn.Parameter(
-                torch.randn(num_edges, device=device) * std)
+                torch.randn(num_edges, device=device) * std
+            )
 
         return feat_masks, edge_masks
 
@@ -576,8 +590,9 @@ class HeteroGNNExplainer(nn.Module):
             # Edge mask sparsity regularization
             loss = loss + self.alpha1 * torch.sum(edge_mask)
             # Edge mask entropy regularization
-            ent = - edge_mask * torch.log(edge_mask + eps) - \
-                (1 - edge_mask) * torch.log(1 - edge_mask + eps)
+            ent = -edge_mask * torch.log(edge_mask + eps) - (
+                1 - edge_mask
+            ) * torch.log(1 - edge_mask + eps)
             loss = loss + self.alpha2 * ent.mean()
 
         for feat_mask in feat_masks.values():
@@ -585,8 +600,9 @@ class HeteroGNNExplainer(nn.Module):
             # Feature mask sparsity regularization
             loss = loss + self.beta1 * torch.mean(feat_mask)
             # Feature mask entropy regularization
-            ent = - feat_mask * torch.log(feat_mask + eps) - \
-                (1 - feat_mask) * torch.log(1 - feat_mask + eps)
+            ent = -feat_mask * torch.log(feat_mask + eps) - (
+                1 - feat_mask
+            ) * torch.log(1 - feat_mask + eps)
             loss = loss + self.beta2 * ent.mean()
 
         return loss
@@ -715,7 +731,9 @@ class HeteroGNNExplainer(nn.Module):
 
         # Extract node-centered k-hop subgraph and
         # its associated node and edge features.
-        sg, inverse_indices = khop_in_subgraph(graph, {ntype: node_id}, self.num_hops)
+        sg, inverse_indices = khop_in_subgraph(
+            graph, {ntype: node_id}, self.num_hops
+        )
         inverse_indices = inverse_indices[ntype]
         sg_nodes = sg.ndata[NID]
         sg_feat = {}
@@ -735,7 +753,7 @@ class HeteroGNNExplainer(nn.Module):
 
         if self.log:
             pbar = tqdm(total=self.num_epochs)
-            pbar.set_description(f'Explain node {node_id} with type {ntype}')
+            pbar.set_description(f"Explain node {node_id} with type {ntype}")
 
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
@@ -745,8 +763,9 @@ class HeteroGNNExplainer(nn.Module):
             eweight = {}
             for canonical_etype, canonical_etype_mask in edge_mask.items():
                 eweight[canonical_etype] = canonical_etype_mask.sigmoid()
-            logits = self.model(graph=sg, feat=h,
-                                eweight=eweight, **kwargs)[ntype]
+            logits = self.model(graph=sg, feat=h, eweight=eweight, **kwargs)[
+                ntype
+            ]
             log_probs = logits.log_softmax(dim=-1)
             loss = -log_probs[inverse_indices, pred_label[inverse_indices]]
             loss = self._loss_regularize(loss, feat_mask, edge_mask)
@@ -760,10 +779,14 @@ class HeteroGNNExplainer(nn.Module):
             pbar.close()
 
         for node_type in feat_mask:
-            feat_mask[node_type] = feat_mask[node_type].detach().sigmoid().squeeze()
+            feat_mask[node_type] = (
+                feat_mask[node_type].detach().sigmoid().squeeze()
+            )
 
         for canonical_etype in edge_mask:
-            edge_mask[canonical_etype] = edge_mask[canonical_etype].detach().sigmoid()
+            edge_mask[canonical_etype] = (
+                edge_mask[canonical_etype].detach().sigmoid()
+            )
 
         return inverse_indices, sg, feat_mask, edge_mask
 
@@ -882,7 +905,7 @@ class HeteroGNNExplainer(nn.Module):
 
         if self.log:
             pbar = tqdm(total=self.num_epochs)
-            pbar.set_description('Explain graph')
+            pbar.set_description("Explain graph")
 
         for _ in range(self.num_epochs):
             optimizer.zero_grad()
@@ -892,8 +915,7 @@ class HeteroGNNExplainer(nn.Module):
             eweight = {}
             for canonical_etype, canonical_etype_mask in edge_mask.items():
                 eweight[canonical_etype] = canonical_etype_mask.sigmoid()
-            logits = self.model(graph=graph, feat=h,
-                                eweight=eweight, **kwargs)
+            logits = self.model(graph=graph, feat=h, eweight=eweight, **kwargs)
             log_probs = logits.log_softmax(dim=-1)
             loss = -log_probs[0, pred_label[0]]
             loss = self._loss_regularize(loss, feat_mask, edge_mask)
@@ -907,9 +929,13 @@ class HeteroGNNExplainer(nn.Module):
             pbar.close()
 
         for node_type in feat_mask:
-            feat_mask[node_type] = feat_mask[node_type].detach().sigmoid().squeeze()
+            feat_mask[node_type] = (
+                feat_mask[node_type].detach().sigmoid().squeeze()
+            )
 
         for canonical_etype in edge_mask:
-            edge_mask[canonical_etype] = edge_mask[canonical_etype].detach().sigmoid()
+            edge_mask[canonical_etype] = (
+                edge_mask[canonical_etype].detach().sigmoid()
+            )
 
         return feat_mask, edge_mask

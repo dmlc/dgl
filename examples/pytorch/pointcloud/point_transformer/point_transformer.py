@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from helper import TransitionDown, TransitionUp, index_points, square_distance
+from helper import index_points, square_distance, TransitionDown, TransitionUp
 from torch import nn
 
 """

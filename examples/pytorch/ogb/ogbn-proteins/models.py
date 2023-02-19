@@ -17,12 +17,22 @@ from torch.utils.checkpoint import checkpoint
 
 
 class MWEConv(nn.Module):
-    def __init__(self, in_feats, out_feats, activation, bias=True, num_channels=8, aggr_mode="sum"):
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        activation,
+        bias=True,
+        num_channels=8,
+        aggr_mode="sum",
+    ):
         super(MWEConv, self).__init__()
         self.num_channels = num_channels
         self._in_feats = in_feats
         self._out_feats = out_feats
-        self.weight = nn.Parameter(torch.Tensor(in_feats, out_feats, num_channels))
+        self.weight = nn.Parameter(
+            torch.Tensor(in_feats, out_feats, num_channels)
+        )
 
         if bias:
             self.bias = nn.Parameter(torch.Tensor(out_feats, num_channels))
@@ -59,11 +69,14 @@ class MWEConv(nn.Module):
         for c in range(self.num_channels):
             node_state_c = node_state
             if self._out_feats < self._in_feats:
-                g.ndata["feat_" + str(c)] = torch.mm(node_state_c, self.weight[:, :, c])
+                g.ndata["feat_" + str(c)] = torch.mm(
+                    node_state_c, self.weight[:, :, c]
+                )
             else:
                 g.ndata["feat_" + str(c)] = node_state_c
             g.update_all(
-                fn.u_mul_e("feat_" + str(c), "feat_" + str(c), "m"), fn.sum("m", "feat_" + str(c) + "_new")
+                fn.u_mul_e("feat_" + str(c), "feat_" + str(c), "m"),
+                fn.sum("m", "feat_" + str(c) + "_new"),
             )
             node_state_c = g.ndata.pop("feat_" + str(c) + "_new")
             if self._out_feats >= self._in_feats:
@@ -83,15 +96,36 @@ class MWEConv(nn.Module):
 
 
 class MWE_GCN(nn.Module):
-    def __init__(self, n_input, n_hidden, n_output, n_layers, activation, dropout, aggr_mode="sum", device="cpu"):
+    def __init__(
+        self,
+        n_input,
+        n_hidden,
+        n_output,
+        n_layers,
+        activation,
+        dropout,
+        aggr_mode="sum",
+        device="cpu",
+    ):
         super(MWE_GCN, self).__init__()
         self.dropout = dropout
         self.activation = activation
         self.layers = nn.ModuleList()
 
-        self.layers.append(MWEConv(n_input, n_hidden, activation=activation, aggr_mode=aggr_mode))
+        self.layers.append(
+            MWEConv(
+                n_input, n_hidden, activation=activation, aggr_mode=aggr_mode
+            )
+        )
         for i in range(n_layers - 1):
-            self.layers.append(MWEConv(n_hidden, n_hidden, activation=activation, aggr_mode=aggr_mode))
+            self.layers.append(
+                MWEConv(
+                    n_hidden,
+                    n_hidden,
+                    activation=activation,
+                    aggr_mode=aggr_mode,
+                )
+            )
 
         self.pred_out = nn.Linear(n_hidden, n_output)
         self.device = device
@@ -100,7 +134,9 @@ class MWE_GCN(nn.Module):
         node_state = torch.ones(g.number_of_nodes(), 1).float().to(self.device)
 
         for layer in self.layers:
-            node_state = F.dropout(node_state, p=self.dropout, training=self.training)
+            node_state = F.dropout(
+                node_state, p=self.dropout, training=self.training
+            )
             node_state = layer(g, node_state)
             node_state = self.activation(node_state)
 
@@ -110,7 +146,16 @@ class MWE_GCN(nn.Module):
 
 class MWE_DGCN(nn.Module):
     def __init__(
-        self, n_input, n_hidden, n_output, n_layers, activation, dropout, residual=False, aggr_mode="sum", device="cpu"
+        self,
+        n_input,
+        n_hidden,
+        n_output,
+        n_layers,
+        activation,
+        dropout,
+        residual=False,
+        aggr_mode="sum",
+        device="cpu",
     ):
         super(MWE_DGCN, self).__init__()
         self.n_layers = n_layers
@@ -121,13 +166,26 @@ class MWE_DGCN(nn.Module):
         self.layers = nn.ModuleList()
         self.layer_norms = nn.ModuleList()
 
-        self.layers.append(MWEConv(n_input, n_hidden, activation=activation, aggr_mode=aggr_mode))
+        self.layers.append(
+            MWEConv(
+                n_input, n_hidden, activation=activation, aggr_mode=aggr_mode
+            )
+        )
 
         for i in range(n_layers - 1):
-            self.layers.append(MWEConv(n_hidden, n_hidden, activation=activation, aggr_mode=aggr_mode))
+            self.layers.append(
+                MWEConv(
+                    n_hidden,
+                    n_hidden,
+                    activation=activation,
+                    aggr_mode=aggr_mode,
+                )
+            )
 
         for i in range(n_layers):
-            self.layer_norms.append(nn.LayerNorm(n_hidden, elementwise_affine=True))
+            self.layer_norms.append(
+                nn.LayerNorm(n_hidden, elementwise_affine=True)
+            )
 
         self.pred_out = nn.Linear(n_hidden, n_output)
         self.device = device
@@ -140,7 +198,9 @@ class MWE_DGCN(nn.Module):
         for layer in range(1, self.n_layers):
             node_state_new = self.layer_norms[layer - 1](node_state)
             node_state_new = self.activation(node_state_new)
-            node_state_new = F.dropout(node_state_new, p=self.dropout, training=self.training)
+            node_state_new = F.dropout(
+                node_state_new, p=self.dropout, training=self.training
+            )
 
             if self.residual == "true":
                 node_state = node_state + self.layers[layer](g, node_state_new)
@@ -149,7 +209,9 @@ class MWE_DGCN(nn.Module):
 
         node_state = self.layer_norms[self.n_layers - 1](node_state)
         node_state = self.activation(node_state)
-        node_state = F.dropout(node_state, p=self.dropout, training=self.training)
+        node_state = F.dropout(
+            node_state, p=self.dropout, training=self.training
+        )
 
         out = self.pred_out(node_state)
 
@@ -180,7 +242,9 @@ class GATConv(nn.Module):
         self._use_symmetric_norm = use_symmetric_norm
 
         # feat fc
-        self.src_fc = nn.Linear(self._in_src_feats, out_feats * n_heads, bias=False)
+        self.src_fc = nn.Linear(
+            self._in_src_feats, out_feats * n_heads, bias=False
+        )
         if residual:
             self.dst_fc = nn.Linear(self._in_src_feats, out_feats * n_heads)
             self.bias = None
@@ -191,7 +255,9 @@ class GATConv(nn.Module):
         # attn fc
         self.attn_src_fc = nn.Linear(self._in_src_feats, n_heads, bias=False)
         if use_attn_dst:
-            self.attn_dst_fc = nn.Linear(self._in_src_feats, n_heads, bias=False)
+            self.attn_dst_fc = nn.Linear(
+                self._in_src_feats, n_heads, bias=False
+            )
         else:
             self.attn_dst_fc = None
         if edge_feats > 0:
@@ -243,8 +309,12 @@ class GATConv(nn.Module):
                 norm = torch.reshape(norm, shp)
                 feat_src = feat_src * norm
 
-            feat_src_fc = self.src_fc(feat_src).view(-1, self._n_heads, self._out_feats)
-            feat_dst_fc = self.dst_fc(feat_dst).view(-1, self._n_heads, self._out_feats)
+            feat_src_fc = self.src_fc(feat_src).view(
+                -1, self._n_heads, self._out_feats
+            )
+            feat_dst_fc = self.dst_fc(feat_dst).view(
+                -1, self._n_heads, self._out_feats
+            )
             attn_src = self.attn_src_fc(feat_src).view(-1, self._n_heads, 1)
 
             # NOTE: GAT paper uses "first concatenation then linear projection"
@@ -257,18 +327,24 @@ class GATConv(nn.Module):
             # save [Wh_i || Wh_j] on edges, which is not memory-efficient. Plus,
             # addition could be optimized with DGL's built-in function u_add_v,
             # which further speeds up computation and saves memory footprint.
-            graph.srcdata.update({"feat_src_fc": feat_src_fc, "attn_src": attn_src})
+            graph.srcdata.update(
+                {"feat_src_fc": feat_src_fc, "attn_src": attn_src}
+            )
 
             if self.attn_dst_fc is not None:
                 attn_dst = self.attn_dst_fc(feat_dst).view(-1, self._n_heads, 1)
                 graph.dstdata.update({"attn_dst": attn_dst})
-                graph.apply_edges(fn.u_add_v("attn_src", "attn_dst", "attn_node"))
+                graph.apply_edges(
+                    fn.u_add_v("attn_src", "attn_dst", "attn_node")
+                )
             else:
                 graph.apply_edges(fn.copy_u("attn_src", "attn_node"))
 
             e = graph.edata["attn_node"]
             if feat_edge is not None:
-                attn_edge = self.attn_edge_fc(feat_edge).view(-1, self._n_heads, 1)
+                attn_edge = self.attn_edge_fc(feat_edge).view(
+                    -1, self._n_heads, 1
+                )
                 graph.edata.update({"attn_edge": attn_edge})
                 e += graph.edata["attn_edge"]
             e = self.leaky_relu(e)
@@ -278,12 +354,16 @@ class GATConv(nn.Module):
                 bound = int(graph.number_of_edges() * self.edge_drop)
                 eids = perm[bound:]
                 graph.edata["a"] = torch.zeros_like(e)
-                graph.edata["a"][eids] = self.attn_drop(edge_softmax(graph, e[eids], eids=eids))
+                graph.edata["a"][eids] = self.attn_drop(
+                    edge_softmax(graph, e[eids], eids=eids)
+                )
             else:
                 graph.edata["a"] = self.attn_drop(edge_softmax(graph, e))
 
             # message passing
-            graph.update_all(fn.u_mul_e("feat_src_fc", "a", "m"), fn.sum("m", "feat_src_fc"))
+            graph.update_all(
+                fn.u_mul_e("feat_src_fc", "a", "m"), fn.sum("m", "feat_src_fc")
+            )
 
             rst = graph.dstdata["feat_src_fc"]
 

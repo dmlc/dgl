@@ -75,7 +75,6 @@ else:
     args.device = "cpu"
 
 if __name__ == "__main__":
-
     # Step 1: Load hyperparameters =================================================================== #
     lr = args.lr
     hid_dim = args.hid_dim

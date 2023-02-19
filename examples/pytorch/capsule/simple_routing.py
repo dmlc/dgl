@@ -1,9 +1,8 @@
+import dgl
 import torch as th
 import torch.nn as nn
 from DGLRoutingLayer import DGLRoutingLayer
 from torch.nn import functional as F
-
-import dgl
 
 g = dgl.DGLGraph()
 g.graph_data = {}

@@ -2,6 +2,8 @@ import argparse
 import os
 import random
 
+import dgl
+
 import numpy as np
 import torch
 from gnn import GNN
@@ -9,8 +11,6 @@ from ogb.lsc import PCQM4MDataset, PCQM4MEvaluator
 from ogb.utils import smiles2graph
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-import dgl
 
 
 def collate_dgl(graphs):

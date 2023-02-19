@@ -7,6 +7,8 @@ from datetime import timedelta
 from pathlib import Path
 from timeit import default_timer as timer
 
+import array_readwriter
+
 import constants
 
 import numpy as np
@@ -81,7 +83,6 @@ def gen_edge_files(schema_map, params):
     edge_files = []
     num_parts = params.num_parts
     for etype_name, etype_info in edge_data.items():
-
         edges_format = etype_info[constants.STR_FORMAT][constants.STR_NAME]
         edge_data_files = etype_info[constants.STR_DATA]
 
@@ -140,7 +141,6 @@ def gen_edge_files(schema_map, params):
             edge_files.append(out_file)
 
     return edge_files
-
 
 def gen_node_weights_files(schema_map, params):
     """Function to create node weight files for ParMETIS along with the edge files.

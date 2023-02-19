@@ -1,11 +1,10 @@
+import dgl.function as DGLF
 import numpy as np
 import torch
 import torch.nn as nn
-
-import dgl.function as DGLF
 from dgl import batch, bfs_edges_generator, line_graph
 
-from .nnutils import GRUUpdate, cuda, tocpu
+from .nnutils import cuda, GRUUpdate, tocpu
 
 MAX_NB = 8
 

@@ -8,7 +8,6 @@ import netlib as netlib
 import torch
 
 if __name__ == "__main__":
-
     ################## INPUT ARGUMENTS ###################
     parser = argparse.ArgumentParser()
     ####### Main Parameter: Dataset to use for Training

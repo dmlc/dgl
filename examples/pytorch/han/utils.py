@@ -5,13 +5,12 @@ import pickle
 import random
 from pprint import pprint
 
+import dgl
+
 import numpy as np
 import torch
-from scipy import io as sio
-from scipy import sparse
-
-import dgl
 from dgl.data.utils import _get_dgl_url, download, get_download_dir
+from scipy import io as sio, sparse
 
 
 def set_random_seed(seed=0):

@@ -2,9 +2,8 @@
 # <https://github.com/malllabiisc/CompGCN/blob/master/helper.py>.
 # It implements the operation of circular convolution in the ccorr function and an additional in_out_norm function for norm computation.
 
-import torch as th
-
 import dgl
+import torch as th
 
 
 def com_mult(a, b):

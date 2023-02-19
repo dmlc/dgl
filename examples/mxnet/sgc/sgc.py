@@ -9,15 +9,19 @@ import argparse
 import math
 import time
 
+import dgl
+
 import mxnet as mx
 import numpy as np
+from dgl.data import (
+    CiteseerGraphDataset,
+    CoraGraphDataset,
+    PubmedGraphDataset,
+    register_data_args,
+)
+from dgl.nn.mxnet.conv import SGConv
 from mxnet import gluon, nd
 from mxnet.gluon import nn
-
-import dgl
-from dgl.data import (CiteseerGraphDataset, CoraGraphDataset,
-                      PubmedGraphDataset, register_data_args)
-from dgl.nn.mxnet.conv import SGConv
 
 
 def evaluate(model, g, features, labels, mask):

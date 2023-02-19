@@ -2,11 +2,11 @@ import os
 import pickle as pkl
 import random
 
+import dgl
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
-
-import dgl
 
 
 # Split data into train/eval/test
@@ -301,7 +301,6 @@ def process_movielens(root_path):
 
 class MyDataset(Dataset):
     def __init__(self, triple):
-
         self.triple = triple
         self.len = self.triple.shape[0]
 

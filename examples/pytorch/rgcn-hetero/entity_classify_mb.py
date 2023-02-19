@@ -6,13 +6,13 @@ import argparse
 import itertools
 import time
 
+import dgl
+
 import numpy as np
 import torch as th
 import torch.nn.functional as F
-from model import EntityClassify, RelGraphEmbed
-
-import dgl
 from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
+from model import EntityClassify, RelGraphEmbed
 
 
 def extract_embed(node_embed, input_nodes):

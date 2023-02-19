@@ -1,10 +1,10 @@
 import argparse
 import pickle
 
+import dgl
+
 import numpy as np
 import torch
-
-import dgl
 
 
 def prec(recommendations, ground_truth):

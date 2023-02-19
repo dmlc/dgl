@@ -1,9 +1,9 @@
 import collections
 
-from torch.utils.data import DataLoader, Dataset
-
 import dgl
 from dgl.data import PPIDataset
+
+from torch.utils.data import DataLoader, Dataset
 
 # implement the collate_fn for dgl graph data class
 PPIBatch = collections.namedtuple("PPIBatch", ["graph", "label"])

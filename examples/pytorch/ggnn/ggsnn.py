@@ -4,9 +4,9 @@ Gated Graph Sequence Neural Network for sequence outputs
 
 import torch
 import torch.nn.functional as F
-from torch import nn
 
 from dgl.nn.pytorch import GatedGraphConv, GlobalAttentionPooling
+from torch import nn
 
 
 class GGSNN(nn.Module):

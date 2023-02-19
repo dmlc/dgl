@@ -1,8 +1,7 @@
+import dgl.function as fn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl.function as fn
 
 
 class NGCFLayer(nn.Module):
@@ -31,7 +30,6 @@ class NGCFLayer(nn.Module):
         self.norm_dict = norm_dict
 
     def forward(self, g, feat_dict):
-
         funcs = {}  # message and reduce functions dict
         # for each type of edges, compute messages and reduce them all
         for srctype, etype, dsttype in g.canonical_etypes:
