@@ -144,9 +144,9 @@ class HGTConv(nn.Module):
         self.presorted = presorted
         if g.is_block:
             x_src = x
-            x_dst = x[:g.num_dst_nodes()]
+            x_dst = x[: g.num_dst_nodes()]
             srcntype = ntype
-            dstntype = ntype[:g.num_dst_nodes()]
+            dstntype = ntype[: g.num_dst_nodes()]
         else:
             x_src = x
             x_dst = x
@@ -155,13 +155,13 @@ class HGTConv(nn.Module):
         with g.local_scope():
             k = self.linear_k(x_src, srcntype, presorted).view(
                 -1, self.num_heads, self.head_size
-                )
+            )
             q = self.linear_q(x_dst, dstntype, presorted).view(
                 -1, self.num_heads, self.head_size
-                )
+            )
             v = self.linear_v(x_src, srcntype, presorted).view(
                 -1, self.num_heads, self.head_size
-                )
+            )
             g.srcdata["k"] = k
             g.dstdata["q"] = q
             g.srcdata["v"] = v
