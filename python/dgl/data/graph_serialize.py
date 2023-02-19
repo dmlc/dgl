@@ -58,14 +58,12 @@ class GraphData(ObjectBase):
                 node_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
         else:
             node_tensors = None
-
         if len(g.edata) != 0:
             edge_tensors = dict()
             for key, value in g.edata.items():
                 edge_tensors[key] = F.zerocopy_to_dgl_ndarray(value)
         else:
             edge_tensors = None
-
         return _CAPI_MakeGraphData(ghandle, node_tensors, edge_tensors)
 
     def get_graph(self):
@@ -139,7 +137,6 @@ def save_graphs(filename, g_list, labels=None, formats=None):
         f_path = os.path.dirname(filename)
         if f_path and not os.path.exists(f_path):
             os.makedirs(f_path)
-
     g_sample = g_list[0] if isinstance(g_list, list) else g_list
     if type(g_sample) == DGLGraph:  # Doesn't support DGLGraph's derived class
         save_heterographs(filename, g_list, labels, formats)
@@ -219,7 +216,6 @@ def load_graph_v1(filename, idx_list=None):
     label_dict = {}
     for k, v in metadata.labels.items():
         label_dict[k] = F.zerocopy_from_dgl_ndarray(v)
-
     return [gdata.get_graph() for gdata in metadata.graph_data], label_dict
 
 
