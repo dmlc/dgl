@@ -398,7 +398,7 @@ def exchange_feature(
     local_feat_key = "/".join(tokens[:-1]) + "/" + str(local_part_id)
 
     logging.info(
-        f"[Rank: {rank} feature: {feat_key}, data_key: {featdata_key} gid_start - {gid_start} and gid_end - {gid_end}"
+        f"[Rank: {rank} feature: {feat_key}, data_key: {featdata_key.shape} gid_start - {gid_start} and gid_end - {gid_end}"
     )
 
     # Get the partition ids for the range of global nids.

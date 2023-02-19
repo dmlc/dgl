@@ -198,7 +198,13 @@ def test_chunk_graph_basics(num_chunks, data_fmt, edges_fmt):
 def test_chunk_graph_vector_rows(num_chunks, vector_rows):
     _test_chunk_graph(num_chunks, data_fmt='parquet', edges_fmt='parquet', vector_rows=vector_rows)
 
-
+"""
+TODO: This functionality is no longer supported. 
+This is resulting in data shuffling of edge features
+taking more than double the time for edge feature shuffling.
+When the requirements are clearly understood, and if there
+is a need for this then at that time we can rework on this.
+until then this code will be commented-out.
 @pytest.mark.parametrize(
     "num_chunks, "
     "num_chunks_nodes, "
@@ -228,6 +234,7 @@ def test_chunk_graph_arbitray_chunks(
         num_chunks_node_data=num_chunks_node_data,
         num_chunks_edge_data=num_chunks_edge_data
     )
+"""
 
 
 def _test_pipeline(
