@@ -23,7 +23,6 @@ g.graph_data["out_indx"] = out_indx
 # add edges use edge broadcasting
 for u in out_indx:
     g.add_edges(in_indx, u)
-
 # init states
 f_size = 4
 g.ndata["v"] = th.zeros(all_nodes, f_size)
