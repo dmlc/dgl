@@ -3,6 +3,9 @@ import os
 import random
 import time
 
+import dgl
+import dgl.function as fn
+
 import networkx as nx
 import numpy as np
 import torch
@@ -10,12 +13,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
 from data_utils import pre_process
-from model.encoder import DiffPool
-
-import dgl
-import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import tu
+from model.encoder import DiffPool
 
 global_train_time_per_epoch = []
 
@@ -261,8 +261,8 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
         total = 0
         print("\nEPOCH ###### {} ######".format(epoch))
         computation_time = 0.0
-        for (batch_idx, (batch_graph, graph_labels)) in enumerate(dataloader):
-            for (key, value) in batch_graph.ndata.items():
+        for batch_idx, (batch_graph, graph_labels) in enumerate(dataloader):
+            for key, value in batch_graph.ndata.items():
                 batch_graph.ndata[key] = value.float()
             graph_labels = graph_labels.long()
             if torch.cuda.is_available():
@@ -341,7 +341,7 @@ def evaluate(dataloader, model, prog_args, logger=None):
     correct_label = 0
     with torch.no_grad():
         for batch_idx, (batch_graph, graph_labels) in enumerate(dataloader):
-            for (key, value) in batch_graph.ndata.items():
+            for key, value in batch_graph.ndata.items():
                 batch_graph.ndata[key] = value.float()
             graph_labels = graph_labels.long()
             if torch.cuda.is_available():

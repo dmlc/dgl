@@ -2,18 +2,18 @@ import argparse
 import math
 import time
 
+import dgl
+
 import networkx as nx
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
-
-import dgl
 from dgl.data import (
     CiteseerGraphDataset,
     CoraGraphDataset,
     PubmedGraphDataset,
     register_data_args,
 )
+from tensorflow.keras import layers
 
 
 def gcn_msg(edge):

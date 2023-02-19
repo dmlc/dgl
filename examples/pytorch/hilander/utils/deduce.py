@@ -1,11 +1,10 @@
 """
 This file re-uses implementation from https://github.com/yl-1993/learn-to-cluster
 """
+import dgl
 import numpy as np
 import torch
 from sklearn import mixture
-
-import dgl
 
 from .density import density_to_peaks, density_to_peaks_vectorize
 

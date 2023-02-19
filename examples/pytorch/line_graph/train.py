@@ -16,9 +16,9 @@ import numpy as np
 import torch as th
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader
 
 from dgl.data import SBMMixtureDataset
+from torch.utils.data import DataLoader
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch-size", type=int, help="Batch size", default=1)

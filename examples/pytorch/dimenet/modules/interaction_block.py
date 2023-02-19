@@ -1,9 +1,8 @@
+import dgl.function as fn
 import torch
 import torch.nn as nn
 from modules.initializers import GlorotOrthogonal
 from modules.residual_layer import ResidualLayer
-
-import dgl.function as fn
 
 
 class InteractionBlock(nn.Module):

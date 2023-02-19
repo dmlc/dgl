@@ -7,23 +7,23 @@ import random
 import sys
 import time
 
+import dgl
+import dgl.function as fn
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from matplotlib.ticker import AutoMinorLocator, MultipleLocator
-from models import GAT
-from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-from torch import nn
-
-import dgl
-import dgl.function as fn
 from dgl.dataloading import (
     DataLoader,
     MultiLayerFullNeighborSampler,
     MultiLayerNeighborSampler,
 )
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator
+from models import GAT
+from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
+from torch import nn
 
 device = None
 dataset = "ogbn-proteins"

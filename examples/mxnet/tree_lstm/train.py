@@ -8,13 +8,12 @@ import zipfile
 os.environ["DGLBACKEND"] = "mxnet"
 os.environ["MXNET_GPU_MEM_POOL_TYPE"] = "Round"
 
+import dgl
+import dgl.data as data
 import mxnet as mx
 import numpy as np
 from mxnet import gluon
 from tree_lstm import TreeLSTM
-
-import dgl
-import dgl.data as data
 
 SSTBatch = collections.namedtuple(
     "SSTBatch", ["graph", "mask", "wordid", "label"]

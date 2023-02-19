@@ -1,9 +1,9 @@
 import time
 
+from dgl.sampling import node2vec_random_walk
+
 from model import Node2vecModel
 from utils import load_graph, parse_arguments
-
-from dgl.sampling import node2vec_random_walk
 
 
 def time_randomwalk(graph, args):
@@ -49,7 +49,6 @@ def train_node2vec(graph, eval_set, args):
 
 
 if __name__ == "__main__":
-
     args = parse_arguments()
     graph, eval_set = load_graph(args.dataset)
 
