@@ -2,8 +2,10 @@
 import sys
 
 from .. import backend as F
-from ..backend import gspmm as gspmm_internal
-from ..backend import gspmm_hetero as gspmm_internal_hetero
+from ..backend import (
+    gspmm as gspmm_internal,
+    gspmm_hetero as gspmm_internal_hetero,
+)
 
 __all__ = ["gspmm"]
 

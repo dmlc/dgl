@@ -200,7 +200,7 @@ if wheel_include_libs:
                 fo.write(
                     "include dgl/tensoradapter/%s/%s\n" % (backend, ta_name)
                 )
-            if backend == 'pytorch':
+            if backend == "pytorch":
                 for sparse_path in glob.glob(
                     os.path.join(dir_, "dgl_sparse", SPARSE_LIB_PATTERN)
                 ):
@@ -213,10 +213,7 @@ if wheel_include_libs:
                         os.path.join(dir_, "dgl_sparse", sparse_name),
                         os.path.join(CURRENT_DIR, "dgl", "dgl_sparse"),
                     )
-                    fo.write(
-                        "include dgl/dgl_sparse/%s\n" % sparse_name
-                    )
-
+                    fo.write("include dgl/dgl_sparse/%s\n" % sparse_name)
 
     setup_kwargs = {"include_package_data": True}
 
@@ -240,13 +237,15 @@ if include_libs:
                     ),
                 )
             )
-            if backend == 'pytorch':
+            if backend == "pytorch":
                 data_files.append(
                     (
                         "dgl/dgl_sparse",
                         glob.glob(
                             os.path.join(
-                                os.path.dirname(os.path.relpath(path, CURRENT_DIR)),
+                                os.path.dirname(
+                                    os.path.relpath(path, CURRENT_DIR)
+                                ),
                                 "dgl_sparse",
                                 SPARSE_LIB_PATTERN,
                             )
