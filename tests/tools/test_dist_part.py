@@ -95,7 +95,6 @@ def _test_chunk_graph(
     num_chunks_edge_data=None,
 ):
     with tempfile.TemporaryDirectory() as root_dir:
-
         g = create_chunked_dataset(
             root_dir,
             num_chunks,
@@ -240,24 +239,29 @@ until then this code will be commented-out.
         [1, None, None, None, None],
         [8, None, None, None, None],
         [4, 4, 4, 8, 12],
-        [4, 4, 4, {'paper': 10}, {('author', 'writes', 'paper'): 24}],
-        [4, 4, 4, {'paper': {'feat': 10}},
-            {('author', 'writes', 'paper'): {'year': 24}}],
-    ]
+        [4, 4, 4, {"paper": 10}, {("author", "writes", "paper"): 24}],
+        [
+            4,
+            4,
+            4,
+            {"paper": {"feat": 10}},
+            {("author", "writes", "paper"): {"year": 24}},
+        ],
+    ],
 )
 def test_chunk_graph_arbitray_chunks(
     num_chunks,
     num_chunks_nodes,
     num_chunks_edges,
     num_chunks_node_data,
-    num_chunks_edge_data
+    num_chunks_edge_data,
 ):
     _test_chunk_graph(
         num_chunks,
         num_chunks_nodes=num_chunks_nodes,
         num_chunks_edges=num_chunks_edges,
         num_chunks_node_data=num_chunks_node_data,
-        num_chunks_edge_data=num_chunks_edge_data
+        num_chunks_edge_data=num_chunks_edge_data,
     )
 """
 
@@ -282,7 +286,6 @@ def _test_pipeline(
         return
 
     with tempfile.TemporaryDirectory() as root_dir:
-
         g = create_chunked_dataset(
             root_dir,
             num_chunks,
