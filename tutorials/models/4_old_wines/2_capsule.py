@@ -68,14 +68,14 @@ offers a different perspective. The tutorial describes how to implement a Capsul
 # Here's how we set up the graph and initialize node and edge features.
 
 import os
-os.environ['DGLBACKEND'] = 'pytorch'
+
+os.environ["DGLBACKEND"] = "pytorch"
+import dgl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
 
 
 def init_graph(in_nodes, out_nodes, f_size):

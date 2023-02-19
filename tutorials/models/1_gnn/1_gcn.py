@@ -46,13 +46,13 @@ message passing APIs.
 # representations :math:`h_v`, we can simply use builtin functions:
 
 import os
-os.environ['DGLBACKEND'] = 'pytorch'
+
+os.environ["DGLBACKEND"] = "pytorch"
+import dgl
+import dgl.function as fn
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.function as fn
 from dgl import DGLGraph
 
 gcn_msg = fn.copy_u(u="h", out="m")

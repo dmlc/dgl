@@ -17,6 +17,8 @@ Tree-LSTM in DGL
 
 """
 
+import os
+
 ##############################################################################
 #
 # In this tutorial, you learn to use Tree-LSTM networks for sentiment analysis.
@@ -58,30 +60,33 @@ Tree-LSTM in DGL
 
 from collections import namedtuple
 
-import os
-os.environ['DGLBACKEND'] = 'pytorch'
+os.environ["DGLBACKEND"] = "pytorch"
 import dgl
 from dgl.data.tree import SSTDataset
 
 
-SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
+SSTBatch = namedtuple("SSTBatch", ["graph", "mask", "wordid", "label"])
 
 # Each sample in the dataset is a constituency tree. The leaf nodes
 # represent words. The word is an int value stored in the "x" field.
 # The non-leaf nodes have a special word PAD_WORD. The sentiment
 # label is stored in the "y" feature field.
-trainset = SSTDataset(mode='tiny')  # the "tiny" set has only five trees
+trainset = SSTDataset(mode="tiny")  # the "tiny" set has only five trees
 tiny_sst = [tr for tr in trainset]
 num_vocabs = trainset.vocab_size
 num_classes = trainset.num_classes
 
-vocab = trainset.vocab # vocabulary dict: key -> id
-inv_vocab = {v: k for k, v in vocab.items()} # inverted vocabulary dict: id -> word
+vocab = trainset.vocab  # vocabulary dict: key -> id
+inv_vocab = {
+    v: k for k, v in vocab.items()
+}  # inverted vocabulary dict: id -> word
 
 a_tree = tiny_sst[0]
-for token in a_tree.ndata['x'].tolist():
+for token in a_tree.ndata["x"].tolist():
     if token != trainset.PAD_WORD:
         print(inv_vocab[token], end=" ")
+
+import matplotlib.pyplot as plt
 
 ##############################################################################
 # Step 1: Batching
@@ -92,15 +97,23 @@ for token in a_tree.ndata['x'].tolist():
 #
 
 import networkx as nx
-import matplotlib.pyplot as plt
 
 graph = dgl.batch(tiny_sst)
+
+
 def plot_tree(g):
     # this plot requires pygraphviz package
-    pos = nx.nx_agraph.graphviz_layout(g, prog='dot')
-    nx.draw(g, pos, with_labels=False, node_size=10,
-            node_color=[[.5, .5, .5]], arrowsize=4)
+    pos = nx.nx_agraph.graphviz_layout(g, prog="dot")
+    nx.draw(
+        g,
+        pos,
+        with_labels=False,
+        node_size=10,
+        node_color=[[0.5, 0.5, 0.5]],
+        arrowsize=4,
+    )
     plt.show()
+
 
 plot_tree(graph.to_networkx())
 
@@ -173,6 +186,7 @@ plot_tree(graph.to_networkx())
 import torch as th
 import torch.nn as nn
 
+
 class TreeLSTMCell(nn.Module):
     def __init__(self, x_size, h_size):
         super(TreeLSTMCell, self).__init__()
@@ -182,27 +196,28 @@ class TreeLSTMCell(nn.Module):
         self.U_f = nn.Linear(2 * h_size, 2 * h_size)
 
     def message_func(self, edges):
-        return {'h': edges.src['h'], 'c': edges.src['c']}
+        return {"h": edges.src["h"], "c": edges.src["c"]}
 
     def reduce_func(self, nodes):
         # concatenate h_jl for equation (1), (2), (3), (4)
-        h_cat = nodes.mailbox['h'].view(nodes.mailbox['h'].size(0), -1)
+        h_cat = nodes.mailbox["h"].view(nodes.mailbox["h"].size(0), -1)
         # equation (2)
-        f = th.sigmoid(self.U_f(h_cat)).view(*nodes.mailbox['h'].size())
+        f = th.sigmoid(self.U_f(h_cat)).view(*nodes.mailbox["h"].size())
         # second term of equation (5)
-        c = th.sum(f * nodes.mailbox['c'], 1)
-        return {'iou': self.U_iou(h_cat), 'c': c}
+        c = th.sum(f * nodes.mailbox["c"], 1)
+        return {"iou": self.U_iou(h_cat), "c": c}
 
     def apply_node_func(self, nodes):
         # equation (1), (3), (4)
-        iou = nodes.data['iou'] + self.b_iou
+        iou = nodes.data["iou"] + self.b_iou
         i, o, u = th.chunk(iou, 3, 1)
         i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
         # equation (5)
-        c = i * u + nodes.data['c']
+        c = i * u + nodes.data["c"]
         # equation (6)
         h = o * th.tanh(c)
-        return {'h' : h, 'c' : c}
+        return {"h": h, "c": c}
+
 
 ##############################################################################
 # Step 3: Define traversal
@@ -228,12 +243,12 @@ class TreeLSTMCell(nn.Module):
 
 # to heterogenous graph
 trv_a_tree = dgl.graph(a_tree.edges())
-print('Traversing one tree:')
+print("Traversing one tree:")
 print(dgl.topological_nodes_generator(trv_a_tree))
 
 # to heterogenous graph
 trv_graph = dgl.graph(graph.edges())
-print('Traversing many trees at the same time:')
+print("Traversing many trees at the same time:")
 print(dgl.topological_nodes_generator(trv_graph))
 
 ##############################################################################
@@ -242,11 +257,13 @@ print(dgl.topological_nodes_generator(trv_graph))
 import dgl.function as fn
 import torch as th
 
-trv_graph.ndata['a'] = th.ones(graph.number_of_nodes(), 1)
+trv_graph.ndata["a"] = th.ones(graph.number_of_nodes(), 1)
 traversal_order = dgl.topological_nodes_generator(trv_graph)
-trv_graph.prop_nodes(traversal_order,
-                     message_func=fn.copy_u('a', 'a'),
-                     reduce_func=fn.sum('a', 'a'))
+trv_graph.prop_nodes(
+    traversal_order,
+    message_func=fn.copy_u("a", "a"),
+    reduce_func=fn.sum("a", "a"),
+)
 
 # the following is a syntax sugar that does the same
 # dgl.prop_nodes_topo(graph)
@@ -265,19 +282,22 @@ trv_graph.prop_nodes(traversal_order,
 # Here is the complete code that specifies the ``Tree-LSTM`` class.
 #
 
+
 class TreeLSTM(nn.Module):
-    def __init__(self,
-                 num_vocabs,
-                 x_size,
-                 h_size,
-                 num_classes,
-                 dropout,
-                 pretrained_emb=None):
+    def __init__(
+        self,
+        num_vocabs,
+        x_size,
+        h_size,
+        num_classes,
+        dropout,
+        pretrained_emb=None,
+    ):
         super(TreeLSTM, self).__init__()
         self.x_size = x_size
         self.embedding = nn.Embedding(num_vocabs, x_size)
         if pretrained_emb is not None:
-            print('Using glove')
+            print("Using glove")
             self.embedding.weight.data.copy_(pretrained_emb)
             self.embedding.weight.requires_grad = True
         self.dropout = nn.Dropout(dropout)
@@ -306,18 +326,25 @@ class TreeLSTM(nn.Module):
         g = dgl.graph(g.edges())
         # feed embedding
         embeds = self.embedding(batch.wordid * batch.mask)
-        g.ndata['iou'] = self.cell.W_iou(self.dropout(embeds)) * batch.mask.float().unsqueeze(-1)
-        g.ndata['h'] = h
-        g.ndata['c'] = c
+        g.ndata["iou"] = self.cell.W_iou(
+            self.dropout(embeds)
+        ) * batch.mask.float().unsqueeze(-1)
+        g.ndata["h"] = h
+        g.ndata["c"] = c
         # propagate
-        dgl.prop_nodes_topo(g,
-                            message_func=self.cell.message_func,
-                            reduce_func=self.cell.reduce_func,
-                            apply_node_func=self.cell.apply_node_func)
+        dgl.prop_nodes_topo(
+            g,
+            message_func=self.cell.message_func,
+            reduce_func=self.cell.reduce_func,
+            apply_node_func=self.cell.apply_node_func,
+        )
         # compute logits
-        h = self.dropout(g.ndata.pop('h'))
+        h = self.dropout(g.ndata.pop("h"))
         logits = self.linear(h)
         return logits
+
+
+import torch.nn.functional as F
 
 ##############################################################################
 # Main Loop
@@ -327,9 +354,8 @@ class TreeLSTM(nn.Module):
 #
 
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
 
-device = th.device('cpu')
+device = th.device("cpu")
 # hyper parameters
 x_size = 256
 h_size = 256
@@ -339,32 +365,37 @@ weight_decay = 1e-4
 epochs = 10
 
 # create the model
-model = TreeLSTM(trainset.vocab_size,
-                 x_size,
-                 h_size,
-                 trainset.num_classes,
-                 dropout)
+model = TreeLSTM(
+    trainset.vocab_size, x_size, h_size, trainset.num_classes, dropout
+)
 print(model)
 
 # create the optimizer
-optimizer = th.optim.Adagrad(model.parameters(),
-                          lr=lr,
-                          weight_decay=weight_decay)
+optimizer = th.optim.Adagrad(
+    model.parameters(), lr=lr, weight_decay=weight_decay
+)
+
 
 def batcher(dev):
     def batcher_dev(batch):
         batch_trees = dgl.batch(batch)
-        return SSTBatch(graph=batch_trees,
-                        mask=batch_trees.ndata['mask'].to(device),
-                        wordid=batch_trees.ndata['x'].to(device),
-                        label=batch_trees.ndata['y'].to(device))
+        return SSTBatch(
+            graph=batch_trees,
+            mask=batch_trees.ndata["mask"].to(device),
+            wordid=batch_trees.ndata["x"].to(device),
+            label=batch_trees.ndata["y"].to(device),
+        )
+
     return batcher_dev
 
-train_loader = DataLoader(dataset=tiny_sst,
-                          batch_size=5,
-                          collate_fn=batcher(device),
-                          shuffle=False,
-                          num_workers=0)
+
+train_loader = DataLoader(
+    dataset=tiny_sst,
+    batch_size=5,
+    collate_fn=batcher(device),
+    shuffle=False,
+    num_workers=0,
+)
 
 # training loop
 for epoch in range(epochs):
@@ -375,14 +406,17 @@ for epoch in range(epochs):
         c = th.zeros((n, h_size))
         logits = model(batch, h, c)
         logp = F.log_softmax(logits, 1)
-        loss = F.nll_loss(logp, batch.label, reduction='sum')
+        loss = F.nll_loss(logp, batch.label, reduction="sum")
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         pred = th.argmax(logits, 1)
         acc = float(th.sum(th.eq(batch.label, pred))) / len(batch.label)
-        print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} |".format(
-            epoch, step, loss.item(), acc))
+        print(
+            "Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} |".format(
+                epoch, step, loss.item(), acc
+            )
+        )
 
 ##############################################################################
 # To train the model on a full dataset with different settings (such as CPU or GPU),

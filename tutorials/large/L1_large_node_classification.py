@@ -26,10 +26,11 @@ Sampling for GNN Training <L0_neighbor_sampling_overview>`.
 #
 
 import os
-os.environ['DGLBACKEND'] = 'pytorch'
+
+os.environ["DGLBACKEND"] = "pytorch"
 import dgl
-import torch
 import numpy as np
+import torch
 from ogb.nodeproppred import DglNodePropPredDataset
 
 dataset = DglNodePropPredDataset("ogbn-arxiv")
@@ -284,13 +285,14 @@ valid_dataloader = dgl.dataloading.DataLoader(
 )
 
 
+import sklearn.metrics
+
 ######################################################################
 # The following is a training loop that performs validation every epoch.
 # It also saves the model with the best validation accuracy into a file.
 #
 
 import tqdm
-import sklearn.metrics
 
 best_accuracy = 0
 best_model_path = "model.pt"
