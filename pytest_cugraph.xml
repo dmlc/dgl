@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite errors="1" failures="0" hostname="ip-172-31-28-63" name="pytest" skipped="0" tests="1" time="0.086" timestamp="2023-02-19T00:45:34.799933"><testcase classname="" name="tests.cugraph.test_basics" time="0.000"><error message="collection failure">ImportError while importing test module '/home/ubuntu/github/dgl/tests/cugraph/test_basics.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/conda/envs/dgl-dev-gpu/lib/python3.7/importlib/__init__.py:127: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/cugraph/test_basics.py:3: in &lt;module&gt;
+    import cugraph
+E   ModuleNotFoundError: No module named 'cugraph'</error></testcase></testsuite></testsuites>
