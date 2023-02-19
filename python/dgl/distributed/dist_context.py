@@ -127,7 +127,7 @@ class CustomPool:
         # should be able to take infinite elements to avoid dead lock.
         self.queue_size = 0
         self.result_queue = ctx.Queue(self.queue_size)
-        self.results = {} # key is dataloader name, value is fetched batch.
+        self.results = {}  # key is dataloader name, value is fetched batch.
         self.task_queues = []
         self.process_list = []
         self.current_proc_id = 0
