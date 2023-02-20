@@ -25,18 +25,20 @@ namespace aten {
  *
  * The hash map should be prepared in two phases before using. With the first
  * being creating the hashmap, and then initialize it with an id array which is
- * divided into 2 parts: [`seed ids`, `left ids`]. In result `seed ids` are
- * mapped to [0, num_seed_ids) and `left ids` to [num_seed_ids, num_unique_ids).
- * Notice that mapping order is stable for `seed ids` while not for the left.
+ * divided into 2 parts: [`seed ids`, `left ids`]. `Seed ids` refer to
+ * a set ids chosen as the input for sampling process and `left ids` are the
+ * sampled ids from the process. In result `seed ids` are mapped to [0,
+ * num_seed_ids) and `left ids` to [num_seed_ids, num_unique_ids). Notice that
+ * mapping order is stable for `seed ids` while not for the left.
  *
- * For example, for an array A having 4 seed ids with following entries:
+ * For example, for an array `A` having 4 seed ids with following entries:
  * [99, 98, 100, 97, 97, 101, 101, 102, 101]
- * Create the hashmap H with:
+ * Create the hashmap `H` with:
  * `H = ConcurrentIdHashMap()` (1)
  * And Init it with:
  * `U = H.Init(A)` (2)  (U is an id array used to store the unqiue
  * ids in A).
- * Then U should be (U is not exclusive as the overall mapping is not stable):
+ * Then `U` should be (U is not exclusive as the overall mapping is not stable):
  * [99, 98, 100, 97, 102, 101]
  * And the hashmap should generate following mappings:
  *  * [
@@ -47,7 +49,7 @@ namespace aten {
  *   {key: 102, value: 4},
  *   {key: 101, value: 5}
  * ]
- * Search the hashmap with array I=[98, 99, 102]:
+ * Search the hashmap with array `I`=[98, 99, 102]:
  * R = H.Map(I) (3)
  * R should be:
  * [1, 0, 4]
@@ -90,7 +92,7 @@ class ConcurrentIdHashMap {
 
   /**
    * @brief Initialize the hashmap with an array of ids. The first `num_seeds`
-   * ids are unqiue and must be mapped to a contiguous array starting
+   * ids are unique and must be mapped to a contiguous array starting
    * from 0. The left can be duplicated and the mapping result is not stable.
    *
    * @param ids The array of the ids to be inserted.
