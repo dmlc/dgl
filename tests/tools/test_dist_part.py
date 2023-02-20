@@ -375,6 +375,13 @@ def test_pipeline_formats(graph_formats):
     _test_pipeline(4, 4, 4, graph_formats)
 
 
+"""
+TODO: This functionality is no longer supported. 
+This is resulting in data shuffling of edge features
+taking more than double the time for edge feature shuffling.
+When the requirements are clearly understood, and if there
+is a need for this then at that time we can rework on this.
+until then this code will be commented-out.
 @pytest.mark.parametrize(
     "num_chunks, "
     "num_parts, "
@@ -408,6 +415,7 @@ def test_pipeline_arbitray_chunks(
         num_chunks_node_data=num_chunks_node_data,
         num_chunks_edge_data=num_chunks_edge_data,
     )
+"""
 
 
 @pytest.mark.parametrize(
