@@ -25,5 +25,6 @@ dependencies:
     - torch==__TORCH_VERSION__
     - torchmetrics
     - tqdm
+    - boto3
 variables:
   DGL_HOME: __DGL_HOME__
