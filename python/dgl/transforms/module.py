@@ -513,8 +513,8 @@ class AddSelfLoop(BaseTransform):
      new_etypes : bool, optional
          If True, it will add an edge type 'self' per node type, which holds self-loops.
      edge_feat_names : list[str], optional
-         The names of the self-loop features to apply `fill_data`. If None, it will apply `fill_data`
-         to all self-loop features. Default: None.
+         The names of the self-loop features to apply `fill_data`. If None, it
+         will apply `fill_data` to all self-loop features. Default: None.
      fill_data : int, float or str, optional
          The value to fill the self-loop features. Default: 1.
 

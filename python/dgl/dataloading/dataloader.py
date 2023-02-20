@@ -1133,9 +1133,9 @@ class DataLoader(torch.utils.data.DataLoader):
                 self.cpu_affinity_enabled = True
                 if verbose:
                     print(
-                        "{} DL workers are assigned to cpus {}, main process will use cpus {}".format(
-                            self.num_workers, loader_cores, compute_cores
-                        )
+                        f"{self.num_workers} DL workers are assigned to cpus "
+                        f"{loader_cores}, main process will use cpus "
+                        f"{compute_cores}"
                     )
 
                 yield
