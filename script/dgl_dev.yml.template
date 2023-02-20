@@ -25,6 +25,6 @@ dependencies:
     - torch==__TORCH_VERSION__
     - torchmetrics
     - tqdm
-    - boto3
+    - boto3 # AWS SDK for python
 variables:
   DGL_HOME: __DGL_HOME__
