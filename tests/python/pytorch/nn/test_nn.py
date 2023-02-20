@@ -1591,10 +1591,10 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
 
-@pytest.mark.parametrize('g', get_cases(['homo'], exclude=['zero-degree']))
+@pytest.mark.parametrize("g", get_cases(["homo"], exclude=["zero-degree"]))
 @parametrize_idtype
-@pytest.mark.parametrize('n_classes', [2])
-@pytest.mark.parametrize('high2low ', [True, False])
+@pytest.mark.parametrize("n_classes", [2])
+@pytest.mark.parametrize("high2low ", [True, False])
 def test_subgraphx(g, idtype, n_classes, high2low):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
@@ -1614,8 +1614,9 @@ def test_subgraphx(g, idtype, n_classes, high2low):
 
     model = Model(feat.shape[1], n_classes)
     model = model.to(ctx)
-    explainer = nn.SubgraphX(model, num_hops=2, high2low=high2low,
-                             node_min=g.num_nodes() // 2)
+    explainer = nn.SubgraphX(
+        model, num_hops=2, high2low=high2low, node_min=g.num_nodes() // 2
+    )
     explainer.explain_graph(g, feat, target_class=0)
 
 
