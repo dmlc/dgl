@@ -71,7 +71,8 @@ process ID, which should be an integer from `0` to `world_size - 1`.
 """
 
 import os
-os.environ['DGLBACKEND'] = 'pytorch'
+
+os.environ["DGLBACKEND"] = "pytorch"
 import torch.distributed as dist
 
 

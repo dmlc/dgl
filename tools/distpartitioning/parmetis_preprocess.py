@@ -4,6 +4,8 @@ import os
 import sys
 from pathlib import Path
 
+import array_readwriter
+
 import constants
 
 import numpy as np
@@ -13,7 +15,6 @@ import pyarrow.parquet as pq
 import torch
 import torch.distributed as dist
 from utils import get_idranges, get_node_types, read_json
-import array_readwriter
 
 
 def get_proc_info():
@@ -79,7 +80,6 @@ def gen_edge_files(schema_map, output):
     edge_files = []
     num_parts = len(schema_map[constants.STR_NUM_EDGES_PER_CHUNK][0])
     for etype_name, etype_info in edge_data.items():
-
         edges_format = etype_info[constants.STR_FORMAT][constants.STR_NAME]
         edge_data_files = etype_info[constants.STR_DATA]
 
@@ -170,14 +170,19 @@ def read_node_features(schema_map, tgt_ntype_name, feat_names, input_dir):
                     if feat_name in feat_names:
                         feat_data_fname = feat_data[constants.STR_DATA][rank]
                         if not os.path.isabs(feat_data_fname):
-                            feat_data_fname = os.path.join(input_dir, feat_data_fname)
+                            feat_data_fname = os.path.join(
+                                input_dir, feat_data_fname
+                            )
                         logging.info(f"Reading: {feat_data_fname}")
                         file_suffix = Path(feat_data_fname).suffix
-                        reader_fmt_meta = {
-                            "name": file_suffix[1:]
-                        }
-                        node_features[feat_name] = array_readwriter.get_array_parser(
-                            **reader_fmt_meta).read(feat_data_fname)
+                        reader_fmt_meta = {"name": file_suffix[1:]}
+                        node_features[
+                            feat_name
+                        ] = array_readwriter.get_array_parser(
+                            **reader_fmt_meta
+                        ).read(
+                            feat_data_fname
+                        )
     return node_features
 
 
@@ -248,8 +253,10 @@ def gen_node_weights_files(schema_map, input_dir, output):
         # Add train/test/validation masks if present. node-degree will be added when this file
         # is read by ParMETIS to mimic the exisiting single process pipeline present in dgl.
         node_feats = read_node_features(
-            schema_map, ntype_name, set(["train_mask", "val_mask", "test_mask"]),
-            input_dir
+            schema_map,
+            ntype_name,
+            set(["train_mask", "val_mask", "test_mask"]),
+            input_dir,
         )
         for k, v in node_feats.items():
             assert sz == v.shape

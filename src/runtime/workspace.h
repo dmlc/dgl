@@ -20,8 +20,8 @@ class Workspace {
   Workspace(DeviceAPI* device, DGLContext ctx, const size_t size)
       : device_(device),
         ctx_(ctx),
-        ptr_(static_cast<T*>(device_->AllocWorkspace(ctx_, sizeof(T) * size))) {
-  }
+        size_(size * sizeof(T)),
+        ptr_(static_cast<T*>(device_->AllocWorkspace(ctx_, size_))) {}
 
   ~Workspace() {
     if (*this) {
@@ -32,17 +32,17 @@ class Workspace {
   operator bool() const { return ptr_ != nullptr; }
 
   T* get() {
-    assert(*this);
+    assert(size_ == 0 || *this);
     return ptr_;
   }
 
   T const* get() const {
-    assert(*this);
+    assert(size_ == 0 || *this);
     return ptr_;
   }
 
   void free() {
-    assert(*this);
+    assert(size_ == 0 || *this);
     device_->FreeWorkspace(ctx_, ptr_);
     ptr_ = nullptr;
   }
@@ -50,6 +50,7 @@ class Workspace {
  private:
   DeviceAPI* device_;
   DGLContext ctx_;
+  size_t size_;
   T* ptr_;
 };
 
@@ -59,7 +60,8 @@ class Workspace<void> {
   Workspace(DeviceAPI* device, DGLContext ctx, const size_t size)
       : device_(device),
         ctx_(ctx),
-        ptr_(static_cast<void*>(device_->AllocWorkspace(ctx_, size))) {}
+        size_(size),
+        ptr_(static_cast<void*>(device_->AllocWorkspace(ctx_, size_))) {}
 
   ~Workspace() {
     if (*this) {
@@ -70,17 +72,17 @@ class Workspace<void> {
   operator bool() const { return ptr_ != nullptr; }
 
   void* get() {
-    assert(*this);
+    assert(size_ == 0 || *this);
     return ptr_;
   }
 
   void const* get() const {
-    assert(*this);
+    assert(size_ == 0 || *this);
     return ptr_;
   }
 
   void free() {
-    assert(*this);
+    assert(size_ == 0 || *this);
     device_->FreeWorkspace(ctx_, ptr_);
     ptr_ = nullptr;
   }
@@ -88,6 +90,7 @@ class Workspace<void> {
  private:
   DeviceAPI* device_;
   DGLContext ctx_;
+  size_t size_;
   void* ptr_;
 };
 

@@ -3,6 +3,10 @@ import math
 import time
 import traceback
 
+import dgl
+import dgl.function as fn
+import dgl.nn.pytorch as dglnn
+
 import numpy as np
 import torch as th
 import torch.multiprocessing as mp
@@ -10,13 +14,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
+from dgl.data import RedditDataset
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
-
-import dgl
-import dgl.function as fn
-import dgl.nn.pytorch as dglnn
-from dgl.data import RedditDataset
 
 
 class SAGEConvWithCV(nn.Module):
