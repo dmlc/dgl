@@ -1,9 +1,8 @@
+import dgl
+import dgl.function as fn
 import numpy as np
 import torch
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-
-import dgl
-import dgl.function as fn
 
 
 def get_ogb_evaluator(dataset):

@@ -9,6 +9,7 @@ from .... import function as fn
 from ....base import DGLError
 from ....utils import expand_as_pair
 
+
 class GraphConv(gluon.Block):
     r"""Graph convolutional layer from `Semi-Supervised Classification with Graph Convolutional
     Networks <https://arxiv.org/abs/1609.02907>`__
@@ -133,18 +134,23 @@ class GraphConv(gluon.Block):
     [ 0.26967263  0.308129  ]]
     <NDArray 4x2 @cpu(0)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 norm='both',
-                 weight=True,
-                 bias=True,
-                 activation=None,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        norm="both",
+        weight=True,
+        bias=True,
+        activation=None,
+        allow_zero_in_degree=False,
+    ):
         super(GraphConv, self).__init__()
-        if norm not in ('none', 'both', 'right', 'left'):
-            raise DGLError('Invalid norm value. Must be either "none", "both", "right" or "left".'
-                           ' But got "{}".'.format(norm))
+        if norm not in ("none", "both", "right", "left"):
+            raise DGLError(
+                'Invalid norm value. Must be either "none", "both", "right" or "left".'
+                ' But got "{}".'.format(norm)
+            )
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
@@ -152,14 +158,18 @@ class GraphConv(gluon.Block):
 
         with self.name_scope():
             if weight:
-                self.weight = self.params.get('weight', shape=(in_feats, out_feats),
-                                              init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+                self.weight = self.params.get(
+                    "weight",
+                    shape=(in_feats, out_feats),
+                    init=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+                )
             else:
                 self.weight = None
 
             if bias:
-                self.bias = self.params.get('bias', shape=(out_feats,),
-                                            init=mx.init.Zero())
+                self.bias = self.params.get(
+                    "bias", shape=(out_feats,), init=mx.init.Zero()
+                )
             else:
                 self.bias = None
 
@@ -225,21 +235,27 @@ class GraphConv(gluon.Block):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if graph.in_degrees().min() == 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            if self._norm in ['both', 'left']:
-                degs = graph.out_degrees().as_in_context(feat_dst.context).astype('float32')
+            if self._norm in ["both", "left"]:
+                degs = (
+                    graph.out_degrees()
+                    .as_in_context(feat_dst.context)
+                    .astype("float32")
+                )
                 degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
-                if self._norm == 'both':
+                if self._norm == "both":
                     norm = mx.nd.power(degs, -0.5)
                 else:
                     norm = 1.0 / degs
@@ -247,12 +263,13 @@ class GraphConv(gluon.Block):
                 norm = norm.reshape(shp)
                 feat_src = feat_src * norm
 
-
             if weight is not None:
                 if self.weight is not None:
-                    raise DGLError('External weight is provided while at the same time the'
-                                   ' module has defined its own weight parameter. Please'
-                                   ' create the module with flag weight=False.')
+                    raise DGLError(
+                        "External weight is provided while at the same time the"
+                        " module has defined its own weight parameter. Please"
+                        " create the module with flag weight=False."
+                    )
             else:
                 weight = self.weight.data(feat_src.context)
 
@@ -260,23 +277,29 @@ class GraphConv(gluon.Block):
                 # mult W first to reduce the feature size for aggregation.
                 if weight is not None:
                     feat_src = mx.nd.dot(feat_src, weight)
-                graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_u(u='h', out='m'),
-                                 fn.sum(msg='m', out='h'))
-                rst = graph.dstdata.pop('h')
+                graph.srcdata["h"] = feat_src
+                graph.update_all(
+                    fn.copy_u(u="h", out="m"), fn.sum(msg="m", out="h")
+                )
+                rst = graph.dstdata.pop("h")
             else:
                 # aggregate first then mult W
-                graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_u(u='h', out='m'),
-                                 fn.sum(msg='m', out='h'))
-                rst = graph.dstdata.pop('h')
+                graph.srcdata["h"] = feat_src
+                graph.update_all(
+                    fn.copy_u(u="h", out="m"), fn.sum(msg="m", out="h")
+                )
+                rst = graph.dstdata.pop("h")
                 if weight is not None:
                     rst = mx.nd.dot(rst, weight)
 
-            if self._norm in ['both', 'right']:
-                degs = graph.in_degrees().as_in_context(feat_dst.context).astype('float32')
+            if self._norm in ["both", "right"]:
+                degs = (
+                    graph.in_degrees()
+                    .as_in_context(feat_dst.context)
+                    .astype("float32")
+                )
                 degs = mx.nd.clip(degs, a_min=1, a_max=float("inf"))
-                if self._norm == 'both':
+                if self._norm == "both":
                     norm = mx.nd.power(degs, -0.5)
                 else:
                     norm = 1.0 / degs
@@ -293,9 +316,9 @@ class GraphConv(gluon.Block):
             return rst
 
     def __repr__(self):
-        summary = 'GraphConv('
-        summary += 'in={:d}, out={:d}, normalization={}, activation={}'.format(
-            self._in_feats, self._out_feats,
-            self._norm, self._activation)
-        summary += ')'
+        summary = "GraphConv("
+        summary += "in={:d}, out={:d}, normalization={}, activation={}".format(
+            self._in_feats, self._out_feats, self._norm, self._activation
+        )
+        summary += ")"
         return summary

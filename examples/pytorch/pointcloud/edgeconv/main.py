@@ -8,11 +8,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
-from model import Model, compute_loss
-from modelnet import ModelNet
-from torch.utils.data import DataLoader
 
 from dgl.data.utils import download, get_download_dir
+from model import compute_loss, Model
+from modelnet import ModelNet
+from torch.utils.data import DataLoader
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset-path", type=str, default="")

@@ -275,8 +275,8 @@ if __name__ == "__main__":
         type=str,
         default="none",
         choices=["none", "input", "hidden", "output", "all"],
-        help="You can set this value from 'none', 'input', 'hidden' or 'all' " \
-             "to apply NGNN to different GNN layers.",
+        help="You can set this value from 'none', 'input', 'hidden' or 'all' "
+        "to apply NGNN to different GNN layers.",
     )
     parser.add_argument(
         "--num_ngnn_layers", type=int, default=1, choices=[1, 2]
@@ -320,8 +320,8 @@ if __name__ == "__main__":
         "--num_workers",
         type=int,
         default=24,
-        help="number of workers for dynamic dataloaders; " \
-             "using a larger value for dynamic dataloading is recommended",
+        help="number of workers for dynamic dataloaders; "
+        "using a larger value for dynamic dataloading is recommended",
     )
     # Testing settings
     parser.add_argument(
@@ -335,8 +335,8 @@ if __name__ == "__main__":
         type=int,
         nargs="*",
         default=[10],
-        help="hits@K for each eval step; " \
-             "only available for datasets with hits@xx as the eval metric",
+        help="hits@K for each eval step; "
+        "only available for datasets with hits@xx as the eval metric",
     )
     parser.add_argument(
         "--test_topk",
@@ -352,7 +352,7 @@ if __name__ == "__main__":
 
     args.res_dir = os.path.join(
         f'results{"_NoTest" if args.no_test else ""}',
-        f'{args.dataset.split("-")[1]}-{args.ngnn_type}+{time.strftime("%m%d%H%M%S")}'
+        f'{args.dataset.split("-")[1]}-{args.ngnn_type}+{time.strftime("%m%d%H%M%S")}',
     )
     print(f"Results will be saved in {args.res_dir}")
     if not os.path.exists(args.res_dir):
@@ -381,7 +381,7 @@ if __name__ == "__main__":
                     [src[:, None].repeat(1, tgt_neg.size(1)), tgt_neg], dim=-1
                 )  # [Ns, Nt, 2]
 
-    # Reconstruct the graph for ogbl-collab data 
+    # Reconstruct the graph for ogbl-collab data
     # for validation edge augmentation and coalesce.
     if args.dataset == "ogbl-collab":
         # Float edata for to_simple transformation.
@@ -503,7 +503,7 @@ if __name__ == "__main__":
         if args.dataset.startswith("ogbl-citation"):
             # For this dataset, subgraphs extracted around positive edges are
             # rather larger than negative edges. Thus we sample from 1000
-            # positive and 1000 negative edges to estimate the k (number of 
+            # positive and 1000 negative edges to estimate the k (number of
             # nodes to hold for each graph) used in SortPooling.
             # You can certainly set k manually, instead of estimating from
             # a percentage of sampled subgraphs.
@@ -554,25 +554,25 @@ if __name__ == "__main__":
             epo_train_etime = datetime.datetime.now()
             print_log(
                 f"[epoch: {epoch}]",
-                f"   <Train> starts: {epo_stime}, " \
-                f"ends: {epo_train_etime}, " \
-                f"spent time:{epo_train_etime - epo_stime}"
+                f"   <Train> starts: {epo_stime}, "
+                f"ends: {epo_train_etime}, "
+                f"spent time:{epo_train_etime - epo_stime}",
             )
             if epoch % args.eval_steps == 0:
                 epo_eval_stime = datetime.datetime.now()
                 results = test(val_loader, loggers.keys())
                 epo_eval_etime = datetime.datetime.now()
                 print_log(
-                    f"   <Validation> starts: {epo_eval_stime}, " \
-                    f"ends: {epo_eval_etime}, " \
+                    f"   <Validation> starts: {epo_eval_stime}, "
+                    f"ends: {epo_eval_etime}, "
                     f"spent time:{epo_eval_etime - epo_eval_stime}"
                 )
                 for key, valid_res in results.items():
                     loggers[key].add_result(run, valid_res)
                     to_print = (
-                        f"Run: {run + 1:02d}, " \
-                        f"Epoch: {epoch:02d}, " \
-                        f"Loss: {loss:.4f}, " \
+                        f"Run: {run + 1:02d}, "
+                        f"Epoch: {epoch:02d}, "
+                        f"Loss: {loss:.4f}, "
                         f"Valid ({args.val_percent}%) [{key}]: {valid_res:.4f}"
                     )
                     print_log(key, to_print)
@@ -590,17 +590,15 @@ if __name__ == "__main__":
         tested = dict()
         for eval_metric in loggers.keys():
             # Select models according to the eval_metric of the dataset.
-            res = torch.tensor(
-                loggers[eval_metric].results["valid"][run]
-            )
+            res = torch.tensor(loggers[eval_metric].results["valid"][run])
             if args.no_test:
                 epoch = torch.argmax(res).item() + 1
                 val_res = loggers[eval_metric].results["valid"][run][epoch - 1]
                 loggers[eval_metric].add_result(run, (epoch, val_res), "test")
                 print_log(
                     f"No Test; Best Valid:",
-                    f"   Run: {run + 1:02d}, " \
-                    f"Epoch: {epoch:02d}, " \
+                    f"   Run: {run + 1:02d}, "
+                    f"Epoch: {epoch:02d}, "
                     f"Valid ({args.val_percent}%) [{eval_metric}]: {val_res:.4f}",
                 )
                 continue
@@ -610,13 +608,13 @@ if __name__ == "__main__":
             ).tolist()  # indices of top k valid results
             print_log(
                 f"Eval Metric: {eval_metric}",
-                f"Run: {run + 1:02d}, " \
+                f"Run: {run + 1:02d}, "
                 f"Top {args.test_topk} Eval Points: {idx_to_test}",
             )
             for _idx, epoch in enumerate(idx_to_test):
                 print_log(
-                    f"Test Point[{_idx+1}]: " \
-                    f"Epoch {epoch:02d}, " \
+                    f"Test Point[{_idx+1}]: "
+                    f"Epoch {epoch:02d}, "
                     f"Test Metric: {dataset.eval_metric}"
                 )
                 if epoch not in tested:
@@ -643,11 +641,11 @@ if __name__ == "__main__":
                     run, (epoch, val_res, test_res), "test"
                 )
                 print_log(
-                    f"   Run: {run + 1:02d}, " \
-                    f"Epoch: {epoch:02d}, " \
-                    f"Valid ({args.val_percent}%) [{eval_metric}]: " \
-                    f"{loggers[eval_metric].results['valid'][run][epoch-1]:.4f}, " \
-                    f"Valid (final) [{dataset.eval_metric}]: {val_res:.4f}, " \
+                    f"   Run: {run + 1:02d}, "
+                    f"Epoch: {epoch:02d}, "
+                    f"Valid ({args.val_percent}%) [{eval_metric}]: "
+                    f"{loggers[eval_metric].results['valid'][run][epoch-1]:.4f}, "
+                    f"Valid (final) [{dataset.eval_metric}]: {val_res:.4f}, "
                     f"Test [{dataset.eval_metric}]: {test_res:.4f}"
                 )
 

@@ -4,16 +4,16 @@ import logging
 import os
 from time import time
 
+import dgl
+
 import torch
 import torch.nn
 import torch.nn.functional as F
+from dgl.data import LegacyTUDataset
+from dgl.dataloading import GraphDataLoader
 from network import get_sag_network
 from torch.utils.data import random_split
 from utils import get_stats
-
-import dgl
-from dgl.data import LegacyTUDataset
-from dgl.dataloading import GraphDataLoader
 
 
 def parse_args():

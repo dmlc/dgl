@@ -10,9 +10,9 @@ import dgl
 
 from .... import backend as F
 from ...dist_tensor import DistTensor
+from ...graph_partition_book import EDGE_PART_POLICY, NODE_PART_POLICY
 from ...nn.pytorch import DistEmbedding
 from .utils import alltoall_cpu, alltoallv_cpu
-from ...graph_partition_book import EDGE_PART_POLICY, NODE_PART_POLICY
 
 EMB_STATES = "emb_states"
 WORLD_SIZE = "world_size"

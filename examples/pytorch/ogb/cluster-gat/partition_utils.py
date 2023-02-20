@@ -1,8 +1,8 @@
 from time import time
 
-import numpy as np
-
 import dgl
+
+import numpy as np
 from dgl import backend as F
 from dgl.transforms import metis_partition
 

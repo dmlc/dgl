@@ -2,21 +2,24 @@
 
 import os
 
+from .. import backend as F, utils
+
 from .dist_context import is_initialized
 from .kvstore import get_kvstore
 from .role import get_role
-from .. import utils
-from .. import backend as F
 from .rpc import get_group_id
+
 
 def _default_init_data(shape, dtype):
     return F.zeros(shape, dtype, F.cpu())
 
+
 # These IDs can identify the anonymous distributed tensors.
 DIST_TENSOR_ID = 0
 
+
 class DistTensor:
-    ''' Distributed tensor.
+    """Distributed tensor.
 
     ``DistTensor`` references to a distributed tensor sharded and stored in a cluster of machines.
     It has the same interface as Pytorch Tensor to access its metadata (e.g., shape and data type).
@@ -103,12 +106,23 @@ class DistTensor:
     The creation of ``DistTensor`` is a synchronized operation. When a trainer process tries to
     create a ``DistTensor`` object, the creation succeeds only when all trainer processes
     do the same.
-    '''
-    def __init__(self, shape, dtype, name=None, init_func=None, part_policy=None,
-                 persistent=False, is_gdata=True, attach=True):
+    """
+
+    def __init__(
+        self,
+        shape,
+        dtype,
+        name=None,
+        init_func=None,
+        part_policy=None,
+        persistent=False,
+        is_gdata=True,
+        attach=True,
+    ):
         self.kvstore = get_kvstore()
-        assert self.kvstore is not None, \
-                'Distributed module is not initialized. Please call dgl.distributed.initialize.'
+        assert (
+            self.kvstore is not None
+        ), "Distributed module is not initialized. Please call dgl.distributed.initialize."
         self._shape = shape
         self._dtype = dtype
         self._attach = attach
@@ -124,18 +138,21 @@ class DistTensor:
                     # If multiple partition policies match the input shape, we cannot
                     # decide which is the right one automatically. We should ask users
                     # to provide one.
-                    assert part_policy is None, \
-                            'Multiple partition policies match the input shape. ' \
-                            + 'Please provide a partition policy explicitly.'
+                    assert part_policy is None, (
+                        "Multiple partition policies match the input shape. "
+                        + "Please provide a partition policy explicitly."
+                    )
                     part_policy = policy
-            assert part_policy is not None, \
-                    'Cannot find a right partition policy. It is either because ' \
-                    + 'its first dimension does not match the number of nodes or edges ' \
-                    + 'of a distributed graph or there does not exist a distributed graph.'
+            assert part_policy is not None, (
+                "Cannot find a right partition policy. It is either because "
+                + "its first dimension does not match the number of nodes or edges "
+                + "of a distributed graph or there does not exist a distributed graph."
+            )
 
         self._part_policy = part_policy
-        assert part_policy.get_size() == shape[0], \
-                'The partition policy does not match the input shape.'
+        assert (
+            part_policy.get_size() == shape[0]
+        ), "The partition policy does not match the input shape."
 
         if init_func is None:
             init_func = _default_init_data
@@ -143,13 +160,17 @@ class DistTensor:
         # If a user doesn't provide a name, we generate a name ourselves.
         # We need to generate the name in a deterministic way.
         if name is None:
-            assert not persistent, 'We cannot generate anonymous persistent distributed tensors'
+            assert (
+                not persistent
+            ), "We cannot generate anonymous persistent distributed tensors"
             global DIST_TENSOR_ID
             # All processes of the same role should create DistTensor synchronously.
             # Thus, all of them should have the same IDs.
-            name = 'anonymous-' + get_role() + '-' + str(DIST_TENSOR_ID)
+            name = "anonymous-" + get_role() + "-" + str(DIST_TENSOR_ID)
             DIST_TENSOR_ID += 1
-        assert isinstance(name, str), 'name {} is type {}'.format(name, type(name))
+        assert isinstance(name, str), "name {} is type {}".format(
+            name, type(name)
+        )
         name = self._attach_group_id(name)
         self._tensor_name = name
         data_name = part_policy.get_data_name(name)
@@ -157,16 +178,24 @@ class DistTensor:
         self._persistent = persistent
         if self._name not in exist_names:
             self._owner = True
-            self.kvstore.init_data(self._name, shape, dtype, part_policy, init_func, is_gdata)
+            self.kvstore.init_data(
+                self._name, shape, dtype, part_policy, init_func, is_gdata
+            )
         else:
             self._owner = False
             dtype1, shape1, _ = self.kvstore.get_data_meta(self._name)
-            assert dtype == dtype1, 'The dtype does not match with the existing tensor'
-            assert shape == shape1, 'The shape does not match with the existing tensor'
+            assert (
+                dtype == dtype1
+            ), "The dtype does not match with the existing tensor"
+            assert (
+                shape == shape1
+            ), "The shape does not match with the existing tensor"
 
     def __del__(self):
-        initialized = os.environ.get('DGL_DIST_MODE', 'standalone') == 'standalone' \
-                or is_initialized()
+        initialized = (
+            os.environ.get("DGL_DIST_MODE", "standalone") == "standalone"
+            or is_initialized()
+        )
         if not self._persistent and self._owner and initialized:
             self.kvstore.delete_data(self._name)
 
@@ -193,12 +222,12 @@ class DistTensor:
 
     def __or__(self, other):
         new_dist_tensor = DistTensor(
-                self._shape,
-                self._dtype,
-                part_policy=self._part_policy,
-                persistent=self._persistent,
-                is_gdata=self._is_gdata,
-                attach=self._attach
+            self._shape,
+            self._dtype,
+            part_policy=self._part_policy,
+            persistent=self._persistent,
+            is_gdata=self._is_gdata,
+            attach=self._attach,
         )
         kvstore = self.kvstore
         kvstore.union(self._name, other._name, new_dist_tensor._name)
@@ -209,67 +238,67 @@ class DistTensor:
 
     @property
     def part_policy(self):
-        '''Return the partition policy
+        """Return the partition policy
 
         Returns
         -------
         PartitionPolicy
             The partition policy of the distributed tensor.
-        '''
+        """
         return self._part_policy
 
     @property
     def shape(self):
-        '''Return the shape of the distributed tensor.
+        """Return the shape of the distributed tensor.
 
         Returns
         -------
         tuple
             The shape of the distributed tensor.
-        '''
+        """
         return self._shape
 
     @property
     def dtype(self):
-        '''Return the data type of the distributed tensor.
+        """Return the data type of the distributed tensor.
 
         Returns
         ------
         dtype
             The data type of the tensor.
-        '''
+        """
         return self._dtype
 
     @property
     def name(self):
-        '''Return the name of the distributed tensor
+        """Return the name of the distributed tensor
 
         Returns
         -------
         str
             The name of the tensor.
-        '''
+        """
         return self._detach_group_id(self._name)
 
     @property
     def tensor_name(self):
-        '''Return the tensor name
+        """Return the tensor name
 
         Returns
         -------
         str
             The name of the tensor.
-        '''
+        """
         return self._detach_group_id(self._tensor_name)
 
     def count_nonzero(self):
-        '''Count and return the number of nonzero value
+        """Count and return the number of nonzero value
 
         Returns
         -------
         int
             the number of nonzero value
-        '''
+        """
         return self.kvstore.count_nonzero(name=self._name)
 
     def _attach_group_id(self, name):
@@ -295,4 +324,4 @@ class DistTensor:
         if not self._attach:
             return name
         suffix = "_{}".format(get_group_id())
-        return name[:-len(suffix)]
+        return name[: -len(suffix)]
