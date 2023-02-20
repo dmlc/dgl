@@ -148,7 +148,6 @@ inline void SpMMCreateBlocks(
       free(my_cur_col_id);
     }
   } else {
-#pragma omp for
     for (IdType m = 0; m < num_M_blocks; m++) {
       const IdType M_start = m * M_block_size;
       const IdType M_end = std::min((m + 1) * M_block_size, M);
