@@ -129,7 +129,7 @@ class Logger(object):
                     f'   Final Test Point[1]: {self.results["test"][run][0][0]}',
                     f'   Final Valid: {self.results["test"][run][0][1]}',
                     f'   Final Test: {self.results["test"][run][0][2]}',
-                    sep='\n',
+                    sep="\n",
                     file=f,
                 )
         else:

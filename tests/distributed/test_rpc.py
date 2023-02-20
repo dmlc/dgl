@@ -5,11 +5,11 @@ import time
 import unittest
 
 import backend as F
+
+import dgl
 import pytest
 from numpy.testing import assert_array_equal
 from utils import generate_ip_config, reset_envs
-
-import dgl
 
 if os.name != "nt":
     import fcntl
@@ -305,8 +305,8 @@ def test_rpc_msg():
     reset_envs()
     os.environ["DGL_DIST_MODE"] = "distributed"
     from dgl.distributed.rpc import (
-        RPCMessage,
         deserialize_from_payload,
+        RPCMessage,
         serialize_to_payload,
     )
 

@@ -1,14 +1,14 @@
 """RGCN layer implementation"""
 from collections import defaultdict
 
+import dgl
+import dgl.function as fn
+import dgl.nn as dglnn
+
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
-
-import dgl
-import dgl.function as fn
-import dgl.nn as dglnn
 
 
 class RelGraphConvLayer(nn.Module):

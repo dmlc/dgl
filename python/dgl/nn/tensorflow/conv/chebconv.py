@@ -4,8 +4,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from .... import broadcast_nodes
-from .... import function as fn
+from .... import broadcast_nodes, function as fn
 from ....base import dgl_warning
 
 

@@ -1,9 +1,8 @@
+import dgl
 import torch as th
 import torch.nn as nn
 from DGLRoutingLayer import DGLRoutingLayer
 from torch.nn import functional as F
-
-import dgl
 
 g = dgl.DGLGraph()
 g.graph_data = {}
@@ -24,7 +23,6 @@ g.graph_data["out_indx"] = out_indx
 # add edges use edge broadcasting
 for u in out_indx:
     g.add_edges(in_indx, u)
-
 # init states
 f_size = 4
 g.ndata["v"] = th.zeros(all_nodes, f_size)

@@ -533,7 +533,6 @@ def exchange_features(
 
     # To iterate over the node_types and associated node_features
     for feat_key, type_info in feature_tids.items():
-
         # To iterate over the feature data, of a given (node or edge )type
         # type_info is a list of 3 elements (as shown below):
         #   [feature-name, starting-idx, ending-idx]

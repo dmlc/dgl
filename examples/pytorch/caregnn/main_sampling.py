@@ -1,13 +1,13 @@
 import argparse
 
+import dgl
+
 import torch as th
 import torch.optim as optim
-from model_sampling import CAREGNN, CARESampler, _l1_dist
+from model_sampling import _l1_dist, CAREGNN, CARESampler
 from sklearn.metrics import recall_score, roc_auc_score
 from torch.nn.functional import softmax
 from utils import EarlyStopping
-
-import dgl
 
 
 def evaluate(model, loss_fn, dataloader, device="cpu"):

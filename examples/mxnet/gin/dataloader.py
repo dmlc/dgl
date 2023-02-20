@@ -4,12 +4,12 @@ MxNet compatible dataloader
 
 import math
 
+import dgl
+
 import numpy as np
 from mxnet import nd
 from mxnet.gluon.data import DataLoader, Sampler
 from sklearn.model_selection import StratifiedKFold
-
-import dgl
 
 
 class SubsetRandomSampler(Sampler):
@@ -52,7 +52,6 @@ class GraphDataLoader:
         fold_idx=0,
         split_ratio=0.7,
     ):
-
         self.shuffle = shuffle
         self.seed = seed
 

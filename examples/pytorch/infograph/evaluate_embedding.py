@@ -70,7 +70,6 @@ def svc_classify(x, y, search):
     kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=None)
     accuracies = []
     for train_index, test_index in kf.split(x, y):
-
         x_train, x_test = x[train_index], x[test_index]
         y_train, y_test = y[train_index], y[test_index]
 

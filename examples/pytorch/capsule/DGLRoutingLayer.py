@@ -1,8 +1,7 @@
+import dgl
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
 
 
 class DGLRoutingLayer(nn.Module):
@@ -47,7 +46,6 @@ class DGLRoutingLayer(nn.Module):
                 self.g.nodes[self.out_indx].data["v"] = squash(
                     self.g.nodes[self.out_indx].data["s"], dim=1
                 )
-
             # step 4 (line 7)
             v = th.cat(
                 [self.g.nodes[self.out_indx].data["v"]] * self.in_nodes, dim=0
@@ -79,7 +77,6 @@ def init_graph(in_nodes, out_nodes, f_size, device="cpu"):
     # add edges use edge broadcasting
     for u in in_indx:
         g.add_edges(u, out_indx)
-
     g = g.to(device)
     g.edata["b"] = th.zeros(in_nodes * out_nodes, 1).to(device)
     return g

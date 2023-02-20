@@ -5,7 +5,7 @@ import numpy as np
 from .. import backend as F
 from ..base import DGLError
 from .dgl_dataset import DGLDataset
-from .utils import Subset, load_graphs, save_graphs
+from .utils import load_graphs, save_graphs, Subset
 
 
 class CSVDataset(DGLDataset):

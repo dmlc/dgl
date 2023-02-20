@@ -1,8 +1,7 @@
 """DataLoader utils."""
+import dgl
 from gluoncv.data.batchify import Pad
 from mxnet import nd
-
-import dgl
 
 
 def dgl_mp_batchify_fn(data):

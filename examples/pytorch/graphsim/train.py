@@ -2,6 +2,8 @@ import argparse
 import time
 import traceback
 
+import dgl
+
 import networkx as nx
 import numpy as np
 import torch
@@ -11,11 +13,9 @@ from dataloader import (
     MultiBodyTrainDataset,
     MultiBodyValidDataset,
 )
-from models import MLP, InteractionNet, PrepareLayer
+from models import InteractionNet, MLP, PrepareLayer
 from torch.utils.data import DataLoader
 from utils import make_video
-
-import dgl
 
 
 def train(

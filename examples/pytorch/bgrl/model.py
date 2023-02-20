@@ -1,12 +1,12 @@
 import copy
 
+import dgl
+
 import torch
+from dgl.nn.pytorch.conv import GraphConv, SAGEConv
 from torch import nn
 from torch.nn import BatchNorm1d, Parameter
 from torch.nn.init import ones_, zeros_
-
-import dgl
-from dgl.nn.pytorch.conv import GraphConv, SAGEConv
 
 
 class LayerNorm(nn.Module):
