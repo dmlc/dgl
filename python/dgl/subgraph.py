@@ -5,8 +5,7 @@ For stochastic subgraph extraction, please see functions under :mod:`dgl.samplin
 """
 from collections.abc import Mapping
 
-from . import backend as F
-from . import graph_index, heterograph_index, utils
+from . import backend as F, graph_index, heterograph_index, utils
 from ._ffi.function import _init_api
 from .base import DGLError
 from .heterograph import DGLGraph
@@ -177,12 +176,7 @@ DGLGraph.subgraph = utils.alias_func(node_subgraph)
 
 
 def edge_subgraph(
-    graph,
-    edges,
-    *,
-    relabel_nodes=True,
-    store_ids=True,
-    output_device=None
+    graph, edges, *, relabel_nodes=True, store_ids=True, output_device=None
 ):
     """Return a subgraph induced on the given edges.
 
