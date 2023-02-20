@@ -237,6 +237,14 @@ pipeline {
     stage('CI') {
       when { expression { !regression_test_done } }
       stages {
+        stage('Abort Previous CI') {
+          steps {
+            def buildNumber = env.BUILD_NUMBER as int
+            // if (buildNumber > 1) milestone(buildNumber - 1)
+            milestone(buildNumber)
+          }
+        }
+
         stage('Lint Check') {
           agent {
             docker {
