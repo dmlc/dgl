@@ -1590,6 +1590,7 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
     explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
+
 @parametrize_idtype
 @pytest.mark.parametrize("g", get_cases(["homo"], exclude=["zero-degree"]))
 @pytest.mark.parametrize("n_classes", [2])
