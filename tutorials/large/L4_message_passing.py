@@ -14,30 +14,33 @@ for stochastic GNN training. It assumes that
 """
 
 import os
-os.environ['DGLBACKEND'] = 'pytorch'
+
+os.environ["DGLBACKEND"] = "pytorch"
 import dgl
-import torch
 import numpy as np
+import torch
 from ogb.nodeproppred import DglNodePropPredDataset
 
-dataset = DglNodePropPredDataset('ogbn-arxiv')
-device = 'cpu'      # change to 'cuda' for GPU
+dataset = DglNodePropPredDataset("ogbn-arxiv")
+device = "cpu"  # change to 'cuda' for GPU
 
 graph, node_labels = dataset[0]
 # Add reverse edges since ogbn-arxiv is unidirectional.
 graph = dgl.add_reverse_edges(graph)
-graph.ndata['label'] = node_labels[:, 0]
+graph.ndata["label"] = node_labels[:, 0]
 idx_split = dataset.get_idx_split()
-train_nids = idx_split['train']
-node_features = graph.ndata['feat']
+train_nids = idx_split["train"]
+node_features = graph.ndata["feat"]
 
 sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
 train_dataloader = dgl.dataloading.DataLoader(
-    graph, train_nids, sampler,
+    graph,
+    train_nids,
+    sampler,
     batch_size=1024,
     shuffle=True,
     drop_last=False,
-    num_workers=0
+    num_workers=0,
 )
 
 input_nodes, output_nodes, mfgs = next(iter(train_dataloader))
@@ -75,8 +78,8 @@ print(mfg.num_src_nodes(), mfg.num_dst_nodes())
 # will do with ``ndata`` on the graphs you have seen earlier:
 #
 
-mfg.srcdata['x'] = torch.zeros(mfg.num_src_nodes(), mfg.num_dst_nodes())
-dst_feat = mfg.dstdata['feat']
+mfg.srcdata["x"] = torch.zeros(mfg.num_src_nodes(), mfg.num_dst_nodes())
+dst_feat = mfg.dstdata["feat"]
 
 
 ######################################################################
@@ -105,7 +108,11 @@ mfg.srcdata[dgl.NID], mfg.dstdata[dgl.NID]
 # .. |image1| image:: https://data.dgl.ai/tutorial/img/bipartite.gif
 #
 
-print(torch.equal(mfg.srcdata[dgl.NID][:mfg.num_dst_nodes()], mfg.dstdata[dgl.NID]))
+print(
+    torch.equal(
+        mfg.srcdata[dgl.NID][: mfg.num_dst_nodes()], mfg.dstdata[dgl.NID]
+    )
+)
 
 
 ######################################################################
@@ -113,7 +120,7 @@ print(torch.equal(mfg.srcdata[dgl.NID][:mfg.num_dst_nodes()], mfg.dstdata[dgl.NI
 # :math:`h_u^{(l-1)}`:
 #
 
-mfg.srcdata['h'] = torch.randn(mfg.num_src_nodes(), 10)
+mfg.srcdata["h"] = torch.randn(mfg.num_src_nodes(), 10)
 
 
 ######################################################################
@@ -132,8 +139,8 @@ mfg.srcdata['h'] = torch.randn(mfg.num_src_nodes(), 10)
 
 import dgl.function as fn
 
-mfg.update_all(message_func=fn.copy_u('h', 'm'), reduce_func=fn.mean('m', 'h'))
-m_v = mfg.dstdata['h']
+mfg.update_all(message_func=fn.copy_u("h", "m"), reduce_func=fn.mean("m", "h"))
+m_v = mfg.dstdata["h"]
 m_v
 
 
@@ -147,6 +154,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
 
+
 class SAGEConv(nn.Module):
     """Graph convolution module used by the GraphSAGE model.
 
@@ -157,6 +165,7 @@ class SAGEConv(nn.Module):
     out_feat : int
         Output feature size.
     """
+
     def __init__(self, in_feat, out_feat):
         super(SAGEConv, self).__init__()
         # A linear submodule for projecting the input and neighbor feature to the output.
@@ -174,13 +183,14 @@ class SAGEConv(nn.Module):
         """
         with g.local_scope():
             h_src, h_dst = h
-            g.srcdata['h'] = h_src                        # <---
-            g.dstdata['h'] = h_dst                        # <---
+            g.srcdata["h"] = h_src  # <---
+            g.dstdata["h"] = h_dst  # <---
             # update_all is a message passing API.
-            g.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h_N'))
-            h_N = g.dstdata['h_N']
-            h_total = torch.cat([h_dst, h_N], dim=1)      # <---
+            g.update_all(fn.copy_u("h", "m"), fn.mean("m", "h_N"))
+            h_N = g.dstdata["h_N"]
+            h_total = torch.cat([h_dst, h_N], dim=1)  # <---
             return self.linear(h_total)
+
 
 class Model(nn.Module):
     def __init__(self, in_feats, h_feats, num_classes):
@@ -189,28 +199,31 @@ class Model(nn.Module):
         self.conv2 = SAGEConv(h_feats, num_classes)
 
     def forward(self, mfgs, x):
-        h_dst = x[:mfgs[0].num_dst_nodes()]
+        h_dst = x[: mfgs[0].num_dst_nodes()]
         h = self.conv1(mfgs[0], (x, h_dst))
         h = F.relu(h)
-        h_dst = h[:mfgs[1].num_dst_nodes()]
+        h_dst = h[: mfgs[1].num_dst_nodes()]
         h = self.conv2(mfgs[1], (h, h_dst))
         return h
 
+
 sampler = dgl.dataloading.MultiLayerNeighborSampler([4, 4])
 train_dataloader = dgl.dataloading.DataLoader(
-    graph, train_nids, sampler,
+    graph,
+    train_nids,
+    sampler,
     device=device,
     batch_size=1024,
     shuffle=True,
     drop_last=False,
-    num_workers=0
+    num_workers=0,
 )
-model = Model(graph.ndata['feat'].shape[1], 128, dataset.num_classes).to(device)
+model = Model(graph.ndata["feat"].shape[1], 128, dataset.num_classes).to(device)
 
 with tqdm.tqdm(train_dataloader) as tq:
     for step, (input_nodes, output_nodes, mfgs) in enumerate(tq):
-        inputs = mfgs[0].srcdata['feat']
-        labels = mfgs[-1].dstdata['label']
+        inputs = mfgs[0].srcdata["feat"]
+        labels = mfgs[-1].dstdata["label"]
         predictions = model(mfgs, inputs)
 
 
@@ -232,6 +245,7 @@ with tqdm.tqdm(train_dataloader) as tq:
 # Say you start with a GNN module that works for full-graph training only:
 #
 
+
 class SAGEConv(nn.Module):
     """Graph convolution module used by the GraphSAGE model.
 
@@ -242,6 +256,7 @@ class SAGEConv(nn.Module):
     out_feat : int
         Output feature size.
     """
+
     def __init__(self, in_feat, out_feat):
         super().__init__()
         # A linear submodule for projecting the input and neighbor feature to the output.
@@ -258,10 +273,13 @@ class SAGEConv(nn.Module):
             The input node feature.
         """
         with g.local_scope():
-            g.ndata['h'] = h
+            g.ndata["h"] = h
             # update_all is a message passing API.
-            g.update_all(message_func=fn.copy_u('h', 'm'), reduce_func=fn.mean('m', 'h_N'))
-            h_N = g.ndata['h_N']
+            g.update_all(
+                message_func=fn.copy_u("h", "m"),
+                reduce_func=fn.mean("m", "h_N"),
+            )
+            h_N = g.ndata["h_N"]
             h_total = torch.cat([h, h_N], dim=1)
             return self.linear(h_total)
 
@@ -352,6 +370,7 @@ class SAGEConv(nn.Module):
 # to something like the following:
 #
 
+
 class SAGEConvForBoth(nn.Module):
     """Graph convolution module used by the GraphSAGE model.
 
@@ -362,6 +381,7 @@ class SAGEConvForBoth(nn.Module):
     out_feat : int
         Output feature size.
     """
+
     def __init__(self, in_feat, out_feat):
         super().__init__()
         # A linear submodule for projecting the input and neighbor feature to the output.
@@ -383,10 +403,13 @@ class SAGEConvForBoth(nn.Module):
             else:
                 h_src = h_dst = h
 
-            g.srcdata['h'] = h_src
+            g.srcdata["h"] = h_src
             # update_all is a message passing API.
-            g.update_all(message_func=fn.copy_u('h', 'm'), reduce_func=fn.mean('m', 'h_N'))
-            h_N = g.ndata['h_N']
+            g.update_all(
+                message_func=fn.copy_u("h", "m"),
+                reduce_func=fn.mean("m", "h_N"),
+            )
+            h_N = g.ndata["h_N"]
             h_total = torch.cat([h_dst, h_N], dim=1)
             return self.linear(h_total)
 

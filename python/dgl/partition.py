@@ -5,8 +5,7 @@ import time
 
 import numpy as np
 
-from . import backend as F
-from . import utils
+from . import backend as F, utils
 from ._ffi.function import _init_api
 from .base import EID, ETYPE, NID, NTYPE
 from .heterograph import DGLGraph
