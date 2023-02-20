@@ -7,8 +7,7 @@ from itertools import product
 from .base import BuiltinFunction, TargetCode
 
 
-__all__ = ["copy_u", "copy_e",
-           "BinaryMessageFunction", "CopyMessageFunction"]
+__all__ = ["copy_u", "copy_e", "BinaryMessageFunction", "CopyMessageFunction"]
 
 
 class MessageFunction(BuiltinFunction):
@@ -27,6 +26,7 @@ class BinaryMessageFunction(MessageFunction):
     --------
     u_mul_e
     """
+
     def __init__(self, binary_op, lhs, rhs, lhs_field, rhs_field, out_field):
         self.binary_op = binary_op
         self.lhs = lhs
@@ -49,6 +49,7 @@ class CopyMessageFunction(MessageFunction):
     --------
     copy_u
     """
+
     def __init__(self, target, in_field, out_field):
         self.target = target
         self.in_field = in_field
@@ -151,17 +152,25 @@ def _gen_message_builtin(lhs, rhs, binary_op):
     --------
     >>> import dgl
     >>> message_func = dgl.function.{}('h', 'h', 'm')
-    """.format(binary_op,
-               TargetCode.CODE2STR[_TARGET_MAP[lhs]],
-               TargetCode.CODE2STR[_TARGET_MAP[rhs]],
-               TargetCode.CODE2STR[_TARGET_MAP[lhs]],
-               TargetCode.CODE2STR[_TARGET_MAP[rhs]],
-               name)
+    """.format(
+        binary_op,
+        TargetCode.CODE2STR[_TARGET_MAP[lhs]],
+        TargetCode.CODE2STR[_TARGET_MAP[rhs]],
+        TargetCode.CODE2STR[_TARGET_MAP[lhs]],
+        TargetCode.CODE2STR[_TARGET_MAP[rhs]],
+        name,
+    )
 
     def func(lhs_field, rhs_field, out):
         return BinaryMessageFunction(
-            binary_op, _TARGET_MAP[lhs],
-            _TARGET_MAP[rhs], lhs_field, rhs_field, out)
+            binary_op,
+            _TARGET_MAP[lhs],
+            _TARGET_MAP[rhs],
+            lhs_field,
+            rhs_field,
+            out,
+        )
+
     func.__name__ = name
     func.__doc__ = docstring
     return func
@@ -176,5 +185,6 @@ def _register_builtin_message_func():
                 func = _gen_message_builtin(lhs, rhs, binary_op)
                 setattr(sys.modules[__name__], func.__name__, func)
                 __all__.append(func.__name__)
+
 
 _register_builtin_message_func()

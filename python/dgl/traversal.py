@@ -1,8 +1,7 @@
 """Module for graph traversal methods."""
 from __future__ import absolute_import
 
-from . import backend as F
-from . import utils
+from . import backend as F, utils
 from ._ffi.function import _init_api
 from .heterograph import DGLGraph
 
