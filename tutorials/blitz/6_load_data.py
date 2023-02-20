@@ -88,10 +88,10 @@ interactions.head()
 #
 
 import os
-os.environ['DGLBACKEND'] = 'pytorch'
-import torch
 
+os.environ["DGLBACKEND"] = "pytorch"
 import dgl
+import torch
 from dgl.data import DGLDataset
 
 

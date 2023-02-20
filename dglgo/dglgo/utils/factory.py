@@ -1,21 +1,24 @@
 import enum
-import logging
-from typing import Callable, Dict, Union, List, Tuple, Optional
-from typing_extensions import Literal
-from pathlib import Path
-from abc import ABC, abstractmethod, abstractstaticmethod
-from .base_model import DGLBaseModel
-import yaml
-from pydantic import create_model_from_typeddict, create_model, Field
-from dgl.dataloading.negative_sampler import GlobalUniform, PerSourceUniform
 import inspect
+import logging
+from abc import ABC, abstractmethod, abstractstaticmethod
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple, Union
+
+import yaml
+from dgl.dataloading.negative_sampler import GlobalUniform, PerSourceUniform
 from numpydoc import docscrape
+from pydantic import create_model, create_model_from_typeddict, Field
+from typing_extensions import Literal
+
+from .base_model import DGLBaseModel
+
 logger = logging.getLogger(__name__)
 
 ALL_PIPELINE = ["nodepred", "nodepred-ns", "linkpred", "graphpred"]
 
-class PipelineBase(ABC):
 
+class PipelineBase(ABC):
     @abstractmethod
     def __init__(self) -> None:
         super().__init__()
@@ -34,23 +37,24 @@ class PipelineBase(ABC):
 
 
 class DataFactoryClass:
-
     def __init__(self):
         self.registry = {}
         self.pipeline_name = None
         self.pipeline_allowed = {}
 
-    def register(self,
-                 name: str,
-                 import_code: str,
-                 class_name: str,
-                 allowed_pipeline: List[str],
-                 extra_args={}):
+    def register(
+        self,
+        name: str,
+        import_code: str,
+        class_name: str,
+        allowed_pipeline: List[str],
+        extra_args={},
+    ):
         self.registry[name] = {
             "name": name,
             "import_code": import_code,
             "class_name": class_name,
-            "extra_args": extra_args
+            "extra_args": extra_args,
         }
         for pipeline in allowed_pipeline:
             if pipeline in self.pipeline_allowed:
@@ -61,7 +65,8 @@ class DataFactoryClass:
 
     def get_dataset_enum(self):
         enum_class = enum.Enum(
-            "DatasetName", {v["name"]: k for k, v in self.registry.items()})
+            "DatasetName", {v["name"]: k for k, v in self.registry.items()}
+        )
         return enum_class
 
     def get_dataset_classname(self, name):
@@ -84,8 +89,13 @@ class DataFactoryClass:
             if "name" in type_annotation_dict:
                 del type_annotation_dict["name"]
             base = self.get_base_class(dataset_name, self.pipeline_name)
-            dataset_list.append(create_model(
-                f'{dataset_name}Config', **type_annotation_dict, __base__=base))
+            dataset_list.append(
+                create_model(
+                    f"{dataset_name}Config",
+                    **type_annotation_dict,
+                    __base__=base,
+                )
+            )
 
         output = dataset_list[0]
         for d in dataset_list[1:]:
@@ -116,7 +126,9 @@ class DataFactoryClass:
 
     def filter(self, pipeline_name):
         allowed_name = self.pipeline_allowed[pipeline_name]
-        new_registry = {k: v for k,v in self.registry.items() if k in allowed_name}
+        new_registry = {
+            k: v for k, v in self.registry.items() if k in allowed_name
+        }
         d = DataFactoryClass()
         d.registry = new_registry
         d.pipeline_name = pipeline_name
@@ -125,18 +137,20 @@ class DataFactoryClass:
     @staticmethod
     def get_base_class(dataset_name, pipeline_name):
         if pipeline_name == "linkpred":
+
             class EdgeBase(DGLBaseModel):
                 name: Literal[dataset_name]
                 split_ratio: Optional[Tuple[float, float, float]] = None
                 neg_ratio: Optional[int] = None
+
             return EdgeBase
         else:
+
             class NodeBase(DGLBaseModel):
                 name: Literal[dataset_name]
                 split_ratio: Optional[Tuple[float, float, float]] = None
+
             return NodeBase
-
-
 
 
 DataFactory = DataFactoryClass()
@@ -145,83 +159,96 @@ DataFactory.register(
     "cora",
     import_code="from dgl.data import CoraGraphDataset",
     class_name="CoraGraphDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"],
+)
 
 DataFactory.register(
     "citeseer",
     import_code="from dgl.data import CiteseerGraphDataset",
     class_name="CiteseerGraphDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"],
+)
 
 DataFactory.register(
     "pubmed",
     import_code="from dgl.data import PubmedGraphDataset",
     class_name="PubmedGraphDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"],
+)
 
 DataFactory.register(
     "csv",
     import_code="from dgl.data import CSVDataset",
     extra_args={"data_path": "./"},
     class_name="CSVDataset({})",
-    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred", "graphpred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred", "graphpred"],
+)
 
 DataFactory.register(
     "reddit",
     import_code="from dgl.data import RedditDataset",
     class_name="RedditDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"],
+)
 
 DataFactory.register(
     "co-buy-computer",
     import_code="from dgl.data import AmazonCoBuyComputerDataset",
     class_name="AmazonCoBuyComputerDataset()",
-    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"],
+)
 
 DataFactory.register(
     "ogbn-arxiv",
     import_code="from ogb.nodeproppred import DglNodePropPredDataset",
     extra_args={},
     class_name="DglNodePropPredDataset('ogbn-arxiv')",
-    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"],
+)
 
 DataFactory.register(
     "ogbn-products",
     import_code="from ogb.nodeproppred import DglNodePropPredDataset",
     extra_args={},
     class_name="DglNodePropPredDataset('ogbn-products')",
-    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"])
+    allowed_pipeline=["nodepred", "nodepred-ns", "linkpred"],
+)
 
 DataFactory.register(
     "ogbl-collab",
     import_code="from ogb.linkproppred import DglLinkPropPredDataset",
     extra_args={},
     class_name="DglLinkPropPredDataset('ogbl-collab')",
-    allowed_pipeline=["linkpred"])
+    allowed_pipeline=["linkpred"],
+)
 
 DataFactory.register(
     "ogbl-citation2",
     import_code="from ogb.linkproppred import DglLinkPropPredDataset",
     extra_args={},
     class_name="DglLinkPropPredDataset('ogbl-citation2')",
-    allowed_pipeline=["linkpred"])
+    allowed_pipeline=["linkpred"],
+)
 
 DataFactory.register(
     "ogbg-molhiv",
     import_code="from ogb.graphproppred import DglGraphPropPredDataset",
     extra_args={},
     class_name="DglGraphPropPredDataset(name='ogbg-molhiv')",
-    allowed_pipeline=["graphpred"])
+    allowed_pipeline=["graphpred"],
+)
 
 DataFactory.register(
     "ogbg-molpcba",
     import_code="from ogb.graphproppred import DglGraphPropPredDataset",
     extra_args={},
     class_name="DglGraphPropPredDataset(name='ogbg-molpcba')",
-    allowed_pipeline=["graphpred"])
+    allowed_pipeline=["graphpred"],
+)
+
 
 class PipelineFactory:
-    """ The factory class for creating executors"""
+    """The factory class for creating executors"""
 
     registry: Dict[str, PipelineBase] = {}
     default_config_registry = {}
@@ -229,11 +256,11 @@ class PipelineFactory:
 
     @classmethod
     def register(cls, name: str) -> Callable:
-
         def inner_wrapper(wrapped_class) -> Callable:
             if name in cls.registry:
                 logger.warning(
-                    'Executor %s already exists. Will replace it', name)
+                    "Executor %s already exists. Will replace it", name
+                )
             cls.registry[name] = wrapped_class()
             return wrapped_class
 
@@ -241,19 +268,23 @@ class PipelineFactory:
 
     @classmethod
     def register_default_config_generator(cls, name: str) -> Callable:
-
         def inner_wrapper(wrapped_class) -> Callable:
             if name in cls.registry:
                 logger.warning(
-                    'Executor %s already exists. Will replace it', name)
+                    "Executor %s already exists. Will replace it", name
+                )
             cls.default_config_registry[name] = wrapped_class
             return wrapped_class
 
         return inner_wrapper
 
     @classmethod
-    def call_default_config_generator(cls, generator_name, model_name, dataset_name):
-        return cls.default_config_registry[generator_name](model_name, dataset_name)
+    def call_default_config_generator(
+        cls, generator_name, model_name, dataset_name
+    ):
+        return cls.default_config_registry[generator_name](
+            model_name, dataset_name
+        )
 
     @classmethod
     def call_generator(cls, generator_name, cfg):
@@ -262,8 +293,10 @@ class PipelineFactory:
     @classmethod
     def get_pipeline_enum(cls):
         enum_class = enum.Enum(
-            "PipelineName", {k: k for k, v in cls.registry.items()})
+            "PipelineName", {k: k for k, v in cls.registry.items()}
+        )
         return enum_class
+
 
 class ApplyPipelineFactory:
     """The factory class for creating executors for inference"""
@@ -273,38 +306,41 @@ class ApplyPipelineFactory:
 
     @classmethod
     def register(cls, name: str) -> Callable:
-
         def inner_wrapper(wrapped_class) -> Callable:
             if name in cls.registry:
                 logger.warning(
-                    'Executor %s already exists. Will replace it', name)
+                    "Executor %s already exists. Will replace it", name
+                )
             cls.registry[name] = wrapped_class()
             return wrapped_class
 
         return inner_wrapper
 
+
 model_dir = Path(__file__).parent.parent / "model"
 
 
 class ModelFactory:
-    """ The factory class for creating executors"""
+    """The factory class for creating executors"""
 
     def __init__(self):
         self.registry = {}
         self.code_registry = {}
+
     """ Internal registry for available executors """
 
     def get_model_enum(self):
         enum_class = enum.Enum(
-            "ModelName", {k: k for k, v in self.registry.items()})
+            "ModelName", {k: k for k, v in self.registry.items()}
+        )
         return enum_class
 
     def register(self, model_name: str) -> Callable:
-
         def inner_wrapper(wrapped_class) -> Callable:
             if model_name in self.registry:
                 logger.warning(
-                    'Executor %s already exists. Will replace it', model_name)
+                    "Executor %s already exists. Will replace it", model_name
+                )
             self.registry[model_name] = wrapped_class
             # code_filename = model_dir / filename
             code_filename = Path(inspect.getfile(wrapped_class))
@@ -328,14 +364,19 @@ class ModelFactory:
         arg_dict = self.get_constructor_default_args(model_name)
         type_annotation_dict = {}
         # type_annotation_dict["name"] = Literal[""]
-        exempt_keys = ['self', 'in_size', 'out_size', 'data_info']
+        exempt_keys = ["self", "in_size", "out_size", "data_info"]
         for k, param in arg_dict.items():
             if k not in exempt_keys:
                 type_annotation_dict[k] = arg_dict[k]
 
         class Base(DGLBaseModel):
             name: Literal[model_name]
-        return create_model(f'{model_name.upper()}ModelConfig', **type_annotation_dict, __base__=Base)
+
+        return create_model(
+            f"{model_name.upper()}ModelConfig",
+            **type_annotation_dict,
+            __base__=Base,
+        )
 
     def get_constructor_doc_dict(self, name):
         model_class = self.registry[name]
@@ -375,22 +416,23 @@ class ModelFactory:
 
 
 class SamplerFactory:
-    """ The factory class for creating executors"""
+    """The factory class for creating executors"""
 
     def __init__(self):
         self.registry = {}
 
     def get_model_enum(self):
         enum_class = enum.Enum(
-            "NegativeSamplerName", {k: k for k, v in self.registry.items()})
+            "NegativeSamplerName", {k: k for k, v in self.registry.items()}
+        )
         return enum_class
 
     def register(self, sampler_name: str) -> Callable:
-
         def inner_wrapper(wrapped_class) -> Callable:
             if sampler_name in self.registry:
                 logger.warning(
-                    'Sampler %s already exists. Will replace it', sampler_name)
+                    "Sampler %s already exists. Will replace it", sampler_name
+                )
             self.registry[sampler_name] = wrapped_class
             return wrapped_class
 
@@ -408,17 +450,22 @@ class SamplerFactory:
         arg_dict = self.get_constructor_default_args(sampler_name)
         type_annotation_dict = {}
         # type_annotation_dict["name"] = Literal[""]
-        exempt_keys = ['self', 'in_size', 'out_size', 'redundancy']
+        exempt_keys = ["self", "in_size", "out_size", "redundancy"]
         for k, param in arg_dict.items():
             if k not in exempt_keys or param is None:
-                if k == 'k' or k == 'redundancy':
+                if k == "k" or k == "redundancy":
                     type_annotation_dict[k] = 3
                 else:
                     type_annotation_dict[k] = arg_dict[k]
 
         class Base(DGLBaseModel):
             name: Literal[sampler_name]
-        return create_model(f'{sampler_name.upper()}SamplerConfig', **type_annotation_dict, __base__=Base)
+
+        return create_model(
+            f"{sampler_name.upper()}SamplerConfig",
+            **type_annotation_dict,
+            __base__=Base,
+        )
 
     def get_pydantic_model_config(self):
         model_list = []
