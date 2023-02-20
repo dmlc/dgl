@@ -1590,33 +1590,27 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
     explainer = nn.explain.HeteroGNNExplainer(model, num_hops=1)
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
-
-@pytest.mark.parametrize("g", get_cases(["homo"], exclude=["zero-degree"]))
 @parametrize_idtype
+@pytest.mark.parametrize("g", get_cases(["homo"], exclude=["zero-degree"]))
 @pytest.mark.parametrize("n_classes", [2])
-@pytest.mark.parametrize("high2low ", [True, False])
-def test_subgraphx(g, idtype, n_classes, high2low):
+def test_subgraphx(g, idtype, n_classes):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
     feat = F.randn((g.num_nodes(), 5))
 
     class Model(th.nn.Module):
-        def __init__(self, in_dim, n_classes, hidden_dim=5):
+        def __init__(self, in_dim, n_classes):
             super().__init__()
-            self.conv1 = nn.GraphConv(in_dim, hidden_dim)
-            self.conv2 = nn.GraphConv(hidden_dim, n_classes)
+            self.conv = nn.GraphConv(in_dim, n_classes)
             self.pool = nn.AvgPooling()
 
         def forward(self, g, h):
-            h = th.nn.functional.relu(self.conv1(g, h))
-            h = self.conv2(g, h)
+            h = th.nn.functional.relu(self.conv(g, h))
             return self.pool(g, h)
 
     model = Model(feat.shape[1], n_classes)
     model = model.to(ctx)
-    explainer = nn.SubgraphX(
-        model, num_hops=2, high2low=high2low, node_min=g.num_nodes() // 2
-    )
+    explainer = nn.SubgraphX(model, num_hops=1)
     explainer.explain_graph(g, feat, target_class=0)
 
 
