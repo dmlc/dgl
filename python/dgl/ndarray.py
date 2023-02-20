@@ -15,14 +15,14 @@ import numpy as _np
 from . import backend as F
 from ._ffi.function import _init_api
 from ._ffi.ndarray import (
-    DGLContext,
-    DGLDataType,
-    NDArrayBase,
     _set_class_ndarray,
     context,
+    DGLContext,
+    DGLDataType,
     empty,
     empty_shared_mem,
     from_dlpack,
+    NDArrayBase,
     numpyasarray,
 )
 from ._ffi.object import ObjectBase, register_object
