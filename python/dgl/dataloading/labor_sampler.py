@@ -17,11 +17,11 @@
 #
 
 """Data loading components for labor sampling"""
-from ..base import NID, EID
+from .. import backend as F
+from ..base import EID, NID
+from ..random import choice
 from ..transforms import to_block
 from .base import BlockSampler
-from ..random import choice
-from .. import backend as F
 
 
 class LaborSampler(BlockSampler):
@@ -211,9 +211,7 @@ class LaborSampler(BlockSampler):
             )
             block.edata[EID] = eid
             if len(g.canonical_etypes) > 1:
-                for etype, importance in zip(
-                    g.canonical_etypes, importances
-                ):
+                for etype, importance in zip(g.canonical_etypes, importances):
                     if importance.shape[0] == block.num_edges(etype):
                         block.edata["edge_weights"][etype] = importance
             elif importances[0].shape[0] == block.num_edges():
