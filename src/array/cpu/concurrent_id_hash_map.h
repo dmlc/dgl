@@ -25,11 +25,13 @@ namespace aten {
  *
  * The hash map should be prepared in two phases before using. With the first
  * being creating the hashmap, and then initialize it with an id array which is
- * divided into 2 parts: [`seed ids`, `left ids`]. `Seed ids` refer to
- * a set ids chosen as the input for sampling process and `left ids` are the
- * sampled ids from the process. In result `seed ids` are mapped to [0,
- * num_seed_ids) and `left ids` to [num_seed_ids, num_unique_ids). Notice that
- * mapping order is stable for `seed ids` while not for the left.
+ * divided into 2 parts: [`seed ids`, `sampled ids`]. `Seed ids` refer to
+ * a set ids chosen as the input for sampling process and `sampled ids` are the
+ * ids new sampled from the process (note the the `seed ids` might also be
+ * sampled in the process and included in the `sampled ids`). In result `seed
+ * ids` are mapped to [0, num_seed_ids) and `sampled ids` to [num_seed_ids,
+ * num_unique_ids). Notice that mapping order is stable for `seed ids` while not
+ * for the `sampled ids`.
  *
  * For example, for an array `A` having 4 seed ids with following entries:
  * [99, 98, 100, 97, 97, 101, 101, 102, 101]
@@ -57,6 +59,18 @@ namespace aten {
 template <typename IdType>
 class ConcurrentIdHashMap {
  public:
+  /**
+   * @brief The result state of an attempt to insert.
+   */
+  enum class InsertState {
+    OCCUPIED,  // Indicates that the space where an insertion is being
+               // attempted is already occupied by another element.
+    EXISTED,  // Indicates that the element being inserted already exists in the
+              // map, and thus no insertion is performed.
+    INSERTED  // Indicates that the insertion was successful and a new element
+              // was added to the map.
+  };
+
   /**
    * @brief An entry in the hashtable.
    */
@@ -118,7 +132,7 @@ class ConcurrentIdHashMap {
    * @param[in,out] pos Calculate the next position with quadric probing.
    * @param[in,out] delta Calculate the next delta by adding 1.
    */
-  void Next(IdType* pos, IdType* delta) const;
+  inline void Next(IdType* pos, IdType* delta) const;
 
   /**
    * @brief Find the mapping of a given key.
@@ -127,18 +141,16 @@ class ConcurrentIdHashMap {
    *
    * @return Mapping result corresponding to `id`.
    */
-  IdType MapId(const IdType id) const;
+  inline IdType MapId(const IdType id) const;
 
   /**
    * @brief Insert an id into the hash map.
    *
    * @param id The id to be inserted.
-   * @param valid The item at index will be set to indicate
-   * whether the `id` at `index` is inserted or not.
-   * @param index The index of the `id`.
    *
+   * @return Whether the `id` is inserted or not.
    */
-  void Insert(IdType id, std::vector<int16_t>* valid, size_t index);
+  inline bool Insert(IdType id);
 
   /**
    * @brief Set the value for the key in the hash map.
@@ -148,7 +160,7 @@ class ConcurrentIdHashMap {
    *
    * @warning Key must exist.
    */
-  void Set(IdType key, IdType value);
+  inline void Set(IdType key, IdType value);
 
   /**
    * @brief Insert a key into the hash map.
@@ -161,31 +173,13 @@ class ConcurrentIdHashMap {
 
   /**
    * @brief Attempt to insert the key into the hash map at the given position.
-   * 1. If the key at `pos` is empty -> Set the key, return true and set
-   * `valid[index]` to true.
-   * 2. If the key at `pos` is equal to `key` -> Return true.
-   * 3. If the key at `pos` is non-empty and not equal to `key` -> Return false.
-   * @param pos The position in the hash map to be inserted at.
-   * @param key The key to be inserted.
-   * @param valid The item at `index` will be set to indicate whether the `key`
-   * is inserted or not.
-   * @param index The index of the `key`.
    *
-   * @return Whether the key exists in the map after operation.
-   */
-  bool AttemptInsertAt(
-      int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index);
-
-  /**
-   * @brief A simpler version of `AttemptInsertAt` which assumes the given
-   * key is unique. The key will be inserted just when the content in the given
-   * position is empty.
    * @param pos The position in the hash map to be inserted at.
    * @param key The key to be inserted.
    *
-   * @return Whether the key exists in the map after operation.
+   * @return The state of the insertion.
    */
-  inline bool AttemptInsertAt(int64_t pos, IdType key);
+  inline InsertState AttemptInsertAt(int64_t pos, IdType key);
 
  private:
   /**

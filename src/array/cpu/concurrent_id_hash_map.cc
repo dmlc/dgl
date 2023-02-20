@@ -111,7 +111,9 @@ IdArray ConcurrentIdHashMap<IdType>::Init(
   parallel_for(num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
     size_t count = 0;
     for (int64_t i = s; i < e; i++) {
-      Insert(ids_data[i], &valid, i);
+      if (Insert(ids_data[i])) {
+        valid[i] = true;
+      }
       count += valid[i];
     }
     block_offset[omp_get_thread_num() + 1] = count;
@@ -165,7 +167,7 @@ inline void ConcurrentIdHashMap<IdType>::Next(
 }
 
 template <typename IdType>
-IdType ConcurrentIdHashMap<IdType>::MapId(IdType id) const {
+inline IdType ConcurrentIdHashMap<IdType>::MapId(IdType id) const {
   IdType pos = (id & mask_), delta = 1;
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   while (hash_map_[pos].key != empty_key && hash_map_[pos].key != id) {
@@ -175,16 +177,19 @@ IdType ConcurrentIdHashMap<IdType>::MapId(IdType id) const {
 }
 
 template <typename IdType>
-void ConcurrentIdHashMap<IdType>::Insert(
-    IdType id, std::vector<int16_t>* valid, size_t index) {
+bool ConcurrentIdHashMap<IdType>::Insert(IdType id) {
   IdType pos = (id & mask_), delta = 1;
-  while (!AttemptInsertAt(pos, id, valid, index)) {
+  InsertState state = AttemptInsertAt(pos, id);
+  while (state == InsertState::OCCUPIED) {
     Next(&pos, &delta);
+    state = AttemptInsertAt(pos, id);
   }
+
+  return state == InsertState::INSERTED;
 }
 
 template <typename IdType>
-void ConcurrentIdHashMap<IdType>::Set(IdType key, IdType value) {
+inline void ConcurrentIdHashMap<IdType>::Set(IdType key, IdType value) {
   IdType pos = (key & mask_), delta = 1;
   while (hash_map_[pos].key != key) {
     Next(&pos, &delta);
@@ -196,7 +201,7 @@ void ConcurrentIdHashMap<IdType>::Set(IdType key, IdType value) {
 template <typename IdType>
 inline void ConcurrentIdHashMap<IdType>::InsertAndSet(IdType id, IdType value) {
   IdType pos = (id & mask_), delta = 1;
-  while (!AttemptInsertAt(pos, id)) {
+  while (AttemptInsertAt(pos, id) == InsertState::OCCUPIED) {
     Next(&pos, &delta);
   }
 
@@ -204,24 +209,16 @@ inline void ConcurrentIdHashMap<IdType>::InsertAndSet(IdType id, IdType value) {
 }
 
 template <typename IdType>
-inline bool ConcurrentIdHashMap<IdType>::AttemptInsertAt(
-    int64_t pos, IdType key) {
+inline typename ConcurrentIdHashMap<IdType>::InsertState
+ConcurrentIdHashMap<IdType>::AttemptInsertAt(int64_t pos, IdType key) {
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType old_val = CompareAndSwap(&(hash_map_[pos].key), empty_key, key);
-  return old_val == empty_key;
-}
-
-template <typename IdType>
-bool ConcurrentIdHashMap<IdType>::AttemptInsertAt(
-    int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index) {
-  IdType empty_key = static_cast<IdType>(kEmptyKey);
-  IdType old_val = CompareAndSwap(&(hash_map_[pos].key), empty_key, key);
-
-  if (old_val != empty_key && old_val != key) {
-    return false;
+  if (old_val == empty_key) {
+    return InsertState::INSERTED;
+  } else if (old_val == key) {
+    return InsertState::EXISTED;
   } else {
-    if (old_val == empty_key) (*valid)[index] = true;
-    return true;
+    return InsertState::OCCUPIED;
   }
 }
 
