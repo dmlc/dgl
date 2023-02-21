@@ -2,5 +2,3 @@
 from .function import _init_api
 
 __all__ = _init_api("dgl.capi", __name__)
-
-print(__all__)
