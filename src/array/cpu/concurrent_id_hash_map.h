@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
  * @file array/cpu/concurrent_id_hash_map.h
- * @brief Class about id hash map
+ * @brief Class about concurrent id hash map
  */
 
 #ifndef DGL_ARRAY_CPU_CONCURRENT_ID_HASH_MAP_H_
@@ -25,19 +25,22 @@ namespace aten {
  *
  * The hash map should be prepared in two phases before using. With the first
  * being creating the hashmap, and then initialize it with an id array which is
- * divided into 2 parts: [`seed ids`, `left ids`]. In result `seed ids` are
- * mapped to [0, num_seed_ids) and `left ids` to [num_seed_ids, num_unique_ids].
- * And notice that mapping order for `seed ids` is stable while not for `left
- *ids`.
+ * divided into 2 parts: [`seed ids`, `sampled ids`]. `Seed ids` refer to
+ * a set ids chosen as the input for sampling process and `sampled ids` are the
+ * ids new sampled from the process (note the the `seed ids` might also be
+ * sampled in the process and included in the `sampled ids`). In result `seed
+ * ids` are mapped to [0, num_seed_ids) and `sampled ids` to [num_seed_ids,
+ * num_unique_ids). Notice that mapping order is stable for `seed ids` while not
+ * for the `sampled ids`.
  *
- * For example, for an array A having 4 seed ids with following entries:
+ * For example, for an array `A` having 4 seed ids with following entries:
  * [99, 98, 100, 97, 97, 101, 101, 102, 101]
- * Create the hashmap H with:
+ * Create the hashmap `H` with:
  * `H = ConcurrentIdHashMap()` (1)
  * And Init it with:
  * `U = H.Init(A)` (2)  (U is an id array used to store the unqiue
  * ids in A).
- * Then U should be (U is not exclusive as the overall mapping is not stable):
+ * Then `U` should be (U is not exclusive as the overall mapping is not stable):
  * [99, 98, 100, 97, 102, 101]
  * And the hashmap should generate following mappings:
  *  * [
@@ -48,13 +51,26 @@ namespace aten {
  *   {key: 102, value: 4},
  *   {key: 101, value: 5}
  * ]
- * Search the hashmap with array I=[98, 99, 102]:
+ * Search the hashmap with array `I`=[98, 99, 102]:
  * R = H.Map(I) (3)
  * R should be:
  * [1, 0, 4]
  **/
 template <typename IdType>
 class ConcurrentIdHashMap {
+ private:
+  /**
+   * @brief The result state of an attempt to insert.
+   */
+  enum class InsertState {
+    OCCUPIED,  // Indicates that the space where an insertion is being
+               // attempted is already occupied by another element.
+    EXISTED,  // Indicates that the element being inserted already exists in the
+              // map, and thus no insertion is performed.
+    INSERTED  // Indicates that the insertion was successful and a new element
+              // was added to the map.
+  };
+
  public:
   /**
    * @brief An entry in the hashtable.
@@ -91,7 +107,7 @@ class ConcurrentIdHashMap {
 
   /**
    * @brief Initialize the hashmap with an array of ids. The first `num_seeds`
-   * ids are unqiue and must be mapped to a contiguous array starting
+   * ids are unique and must be mapped to a contiguous array starting
    * from 0. The left can be duplicated and the mapping result is not stable.
    *
    * @param ids The array of the ids to be inserted.
@@ -102,7 +118,7 @@ class ConcurrentIdHashMap {
   IdArray Init(const IdArray& ids, size_t num_seeds);
 
   /**
-   * @brief Find the mappings of given keys.
+   * @brief Find mappings of given keys.
    *
    * @param ids The keys to map for.
    *
@@ -117,27 +133,25 @@ class ConcurrentIdHashMap {
    * @param[in,out] pos Calculate the next position with quadric probing.
    * @param[in,out] delta Calculate the next delta by adding 1.
    */
-  void Next(IdType* pos, IdType* delta) const;
+  inline void Next(IdType* pos, IdType* delta) const;
 
   /**
    * @brief Find the mapping of a given key.
    *
    * @param id The key to map for.
    *
-   * @return Mapping result for the `id`.
+   * @return Mapping result corresponding to `id`.
    */
-  IdType MapId(const IdType id) const;
+  inline IdType MapId(const IdType id) const;
 
   /**
    * @brief Insert an id into the hash map.
    *
    * @param id The id to be inserted.
-   * @param valid The item at index will be set to indicate
-   * whether the `id` at `index` is inserted or not.
-   * @param index The index of the `id`.
    *
+   * @return Whether the `id` is inserted or not.
    */
-  void Insert(IdType id, std::vector<int16_t>* valid, size_t index);
+  inline bool Insert(IdType id);
 
   /**
    * @brief Set the value for the key in the hash map.
@@ -147,44 +161,26 @@ class ConcurrentIdHashMap {
    *
    * @warning Key must exist.
    */
-  void Set(IdType key, IdType value);
+  inline void Set(IdType key, IdType value);
 
   /**
-   * @brief Insert an id into the hash map.
+   * @brief Insert a key into the hash map.
    *
-   * @param id The id to be inserted.
-   * @param value The value to be set for `id`.
+   * @param id The key to be inserted.
+   * @param value The value to be set for the `key`.
    *
    */
-  inline void InsertAndSet(IdType id, IdType value);
+  inline void InsertAndSet(IdType key, IdType value);
 
   /**
    * @brief Attempt to insert the key into the hash map at the given position.
-   * 1. If the key at `pos` is empty -> Set the key, return true and set
-   * `valid[index]` to true.
-   * 2. If the key at `pos` is equal to `key` -> Return true.
-   * 3. If the key at `pos` is non-empty and not equal to `key` -> Return false.
-   * @param pos The position in the hash map to be inserted at.
-   * @param key The key to be inserted.
-   * @param valid The item at index will be set to indicate
-   * whether the `key` at `index` is inserted or not.
-   * @param index The index of the `key`.
    *
-   * @return Whether the key exists in the map after operation.
-   */
-  bool AttemptInsertAt(
-      int64_t pos, IdType key, std::vector<int16_t>* valid, size_t index);
-
-  /**
-   * @brief A simpler version of `AttemptInsertAt` which assumes the inserted
-   * key is unique. The key is inserted just when the content in the given
-   * position is empty.
    * @param pos The position in the hash map to be inserted at.
    * @param key The key to be inserted.
    *
-   * @return Whether the key exists in the map after operation.
+   * @return The state of the insertion.
    */
-  inline bool AttemptInsertAt(int64_t pos, IdType key);
+  inline InsertState AttemptInsertAt(int64_t pos, IdType key);
 
  private:
   /**
