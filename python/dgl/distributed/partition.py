@@ -190,7 +190,14 @@ def load_partition(part_config, part_id, load_feats=True):
     assert (
         "part_graph" in part_files
     ), "the partition does not contain graph structure."
-    graph = load_graphs(relative_to_config(part_files["part_graph"]))[0][0]
+    partition_path = relative_to_config(part_files["part_graph"])
+    print(
+        f"Start to load partition from {partition_path} which is "
+        f"{os.path.getsize(partition_path)} bytes. It may take non-trivial "
+        "time for large partition."
+    )
+    graph = load_graphs()[0][0]
+    print("Finished loading partition...")
 
     assert (
         NID in graph.ndata
@@ -294,10 +301,24 @@ def load_partition_feats(
     ), "the partition does not contain edge feature."
     node_feats = None
     if load_nodes:
-        node_feats = load_tensors(relative_to_config(part_files["node_feats"]))
+        feat_path = relative_to_config(part_files["node_feats"])
+        print(
+            f"Start to load node data from {feat_path} which is "
+            f"{os.path.getsize(feat_path)} bytes. It may take non-trivial "
+            "time for large data."
+        )
+        node_feats = load_tensors()
+        print("Finished loading node data...")
     edge_feats = None
     if load_edges:
-        edge_feats = load_tensors(relative_to_config(part_files["edge_feats"]))
+        feat_path = relative_to_config(part_files["edge_feats"])
+        print(
+            f"Start to load edge data from {feat_path} which is "
+            f"{os.path.getsize(feat_path)} bytes. It may take non-trivial "
+            "time for large data."
+        )
+        edge_feats = load_tensors(feat_path)
+        print("Finished loading node data...")
     # In the old format, the feature name doesn't contain node/edge type.
     # For compatibility, let's add node/edge types to the feature names.
     if node_feats is not None:
