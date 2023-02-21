@@ -159,12 +159,8 @@ class DistLookupService:
             [local_rows], self.world_size, self.num_parts, return_sizes=True
         )
         max_count = np.amax(all_sizes)
-        num_splits = (max_count // CHUNK_SIZE) + (
-            0 if (max_count % CHUNK_SIZE == 0) else 1
-        )
-        LOCAL_CHUNK_SIZE = (local_rows // num_splits) + (
-            0 if (local_rows % num_splits == 0) else 1
-        )
+        num_splits = np.ceil(max_count / CHUNK_SIZE)
+        LOCAL_CHUNK_SIZE = np.ceil(local_rows / num_splits)
         agg_partition_ids = []
 
         logging.info(
