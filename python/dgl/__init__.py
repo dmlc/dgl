@@ -11,6 +11,9 @@ import socket
 
 from distutils.version import LooseVersion
 
+# Should import backend before importing anything else
+from .backend import backend_name, load_backend  # usort: skip
+
 from . import (
     container,
     cuda,
@@ -31,9 +34,6 @@ from ._ffi.function import (
 )
 
 from ._ffi.runtime_ctypes import TypeCode
-
-# Should import backend before importing anything else
-from .backend import backend_name, load_backend
 
 from .base import ALL, EID, ETYPE, NID, NTYPE
 
