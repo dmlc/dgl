@@ -17,7 +17,7 @@ for stage in response["stages"]:
     # https://javadoc.jenkins.io/plugin/pipeline-graph-analysis/org/jenkinsci/plugins/workflow/pipelinegraphanalysis/GenericStatus.html
     if stage["status"] in ["FAILED", "ABORTED"]:
         stage_name = stage["name"]
-        status_output = f"❌ CI test [{status}] in Stage [{stage_name}]."
+        status_output = f"❌ CI test failed in Stage [{stage_name}]."
         break
 
 comment = f"""
