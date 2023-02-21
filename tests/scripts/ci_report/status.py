@@ -6,9 +6,8 @@ JOB_NAME = os.getenv("JOB_NAME")
 BUILD_NUMBER = os.getenv("BUILD_NUMBER")
 BUILD_ID = os.getenv("BUILD_ID")
 COMMIT = os.getenv("GIT_COMMIT")
-
-job_link = os.environ["BUILD_URL"]
-response = requests.get("{}wfapi".format(job_link), verify=False).json()
+JOB_LINK = os.environ["BUILD_URL"]
+response = requests.get("{}wfapi".format(JOB_LINK), verify=False).json()
 
 # List of status of entire job.
 # https://javadoc.jenkins.io/hudson/model/Result.html
@@ -18,12 +17,12 @@ if status == "SUCCESS":
 elif status == "ABORTED":
     status_output = "⚪️ CI test aborted"
 else:
-    for v in response["stages"]:
+    for stage in response["stages"]:
         # List of status of individual stage.
         # https://javadoc.jenkins.io/plugin/pipeline-graph-analysis/org/jenkinsci/plugins/workflow/pipelinegraphanalysis/GenericStatus.html
-        if v["status"] in ["FAILED", "ABORTED"]:
-            stage = v["name"]
-            status_output = f"❌ CI test [{status}] in Stage [{name}]."
+        if stage["status"] in ["FAILED", "ABORTED"]:
+            stage_name = stage["name"]
+            status_output = f"❌ CI test [{status}] in Stage [{stage_name}]."
             break
 
 comment = f"""
