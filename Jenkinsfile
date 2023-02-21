@@ -240,8 +240,10 @@ pipeline {
         stage('Abort Previous CI') {
           steps {
             script {
+              // Jenkins will abort an older build if a newer build already
+              // passed a higher milestone.
+              // https://www.jenkins.io/doc/pipeline/steps/pipeline-milestone-step/
               def buildNumber = env.BUILD_NUMBER as int
-              // if (buildNumber > 1) milestone(buildNumber - 1)
               for (int i = 1; i <= buildNumber; i++) {
                 milestone(i)
               }
