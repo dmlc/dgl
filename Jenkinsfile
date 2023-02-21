@@ -240,12 +240,14 @@ pipeline {
         stage('Abort Previous CI') {
           steps {
             script {
-              // https://www.jenkins.io/doc/pipeline/steps/pipeline-milestone-step/
-              // Note: incorrect "success" status might be shown for the old
-              // runs in the PR.
-              def buildNumber = env.BUILD_NUMBER as int
-              for (int i = 1; i <= buildNumber; i++) {
-                milestone(i)
+              if (env.BRANCH_NAME != "master") {
+                // Jenkins will abort an older build if a newer build already
+                // passed a higher milestone.
+                // https://www.jenkins.io/doc/pipeline/steps/pipeline-milestone-step/
+                def buildNumber = env.BUILD_NUMBER as int
+                for (int i = 1; i <= buildNumber; i++) {
+                  milestone(i)
+                }
               }
             }
           }
