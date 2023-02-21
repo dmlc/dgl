@@ -58,7 +58,7 @@ namespace aten {
  **/
 template <typename IdType>
 class ConcurrentIdHashMap {
- public:
+ private:
   /**
    * @brief The result state of an attempt to insert.
    */
@@ -71,6 +71,7 @@ class ConcurrentIdHashMap {
               // was added to the map.
   };
 
+ public:
   /**
    * @brief An entry in the hashtable.
    */

@@ -111,9 +111,7 @@ IdArray ConcurrentIdHashMap<IdType>::Init(
   parallel_for(num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
     size_t count = 0;
     for (int64_t i = s; i < e; i++) {
-      if (Insert(ids_data[i])) {
-        valid[i] = true;
-      }
+      valid[i] = Insert(ids_data[i]);
       count += valid[i];
     }
     block_offset[omp_get_thread_num() + 1] = count;
