@@ -213,11 +213,10 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
         in the world.
     """
 
-
     # Synchronize at the beginning of this function
     dist.barrier()
 
-    # Prepare data for each rank in the cluster. 
+    # Prepare data for each rank in the cluster.
     start = timer()
 
     CHUNK_SIZE = 100 * 1000 * 1000  # 100 * 8 * 5 = 1 * 4 = 8 GB/message/node
@@ -606,8 +605,8 @@ def exchange_features(
             for local_part_id in range(num_parts // world_size):
                 featdata_key = feature_data[feat_key]
 
-		        # Synchronize for each feature
-                dist.barrier ()
+                # Synchronize for each feature
+                dist.barrier()
                 own_features, own_global_ids = exchange_feature(
                     rank,
                     data,
@@ -726,7 +725,7 @@ def exchange_graph_data(
         constants.STR_NODE_FEATURES,
         None,
     )
-    dist.barrier ()
+    dist.barrier()
     memory_snapshot("ShuffleNodeFeaturesComplete: ", rank)
     logging.info(f"[Rank: {rank}] Done with node features exchange.")
 
@@ -741,19 +740,19 @@ def exchange_graph_data(
         constants.STR_EDGE_FEATURES,
         edge_data,
     )
-    dist.barrier ()
+    dist.barrier()
     logging.info(f"[Rank: {rank}] Done with edge features exchange.")
 
     node_data = gen_node_data(
         rank, world_size, num_parts, id_lookup, ntid_ntype_map, schema_map
     )
-    dist.barrier ()
+    dist.barrier()
     memory_snapshot("NodeDataGenerationComplete: ", rank)
 
     edge_data = exchange_edge_data(
         rank, world_size, num_parts, edge_data, id_lookup
     )
-    dist.barrier ()
+    dist.barrier()
     memory_snapshot("ShuffleEdgeDataComplete: ", rank)
     return (
         node_data,
@@ -831,7 +830,7 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map):
         schema_map,
     )
     # Synchronize so that everybody completes reading dataset from disk
-    dist.barrier ()
+    dist.barrier()
     logging.info(f"[Rank: {rank}] Done reading dataset {params.input_dir}")
 
     edge_data = augment_edge_data(
@@ -1072,7 +1071,7 @@ def gen_dist_partitions(rank, world_size, params):
 
     # resolve global_ids for nodes
     # Synchronize before assigning shuffle-global-ids to nodes
-    dist.barrier ()
+    dist.barrier()
     assign_shuffle_global_nids_nodes(
         rank, world_size, params.num_parts, node_data
     )
@@ -1121,7 +1120,7 @@ def gen_dist_partitions(rank, world_size, params):
     gc.collect()
 
     # Synchronize before assigning shuffle-global-nids for edges end points.
-    dist.barrier ()
+    dist.barrier()
     shuffle_global_eid_offsets = assign_shuffle_global_nids_edges(
         rank, world_size, params.num_parts, edge_data
     )
@@ -1156,7 +1155,7 @@ def gen_dist_partitions(rank, world_size, params):
 
     # determine global-ids for edge end-points
     # Synchronize before retrieving shuffle-global-nids for edges end points.
-    dist.barrier ()    
+    dist.barrier()
     edge_data = lookup_shuffle_global_nids_edges(
         rank, world_size, params.num_parts, edge_data, id_lookup, node_data
     )
@@ -1182,8 +1181,8 @@ def gen_dist_partitions(rank, world_size, params):
         graph_formats = params.graph_formats.split(",")
 
     for local_part_id in range(params.num_parts // world_size):
-        # Synchronize for each local partition of the graph object. 
-        dist.barrier ()    
+        # Synchronize for each local partition of the graph object.
+        dist.barrier()
 
         num_edges = shuffle_global_eid_offsets[local_part_id]
         node_count = len(
