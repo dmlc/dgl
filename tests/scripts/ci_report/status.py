@@ -32,6 +32,9 @@ Build ID: {BUILD_ID}\n
 Status: {status_output}\n
 Report path: [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/report.html)\n
 Full logs path: [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/cireport.log)
+Note: A new CI run will cancel previous CI runs, but an incorrect "success"
+status might be shown for the previous runs. Please double check the report
+before merging the PR.
 """
 
 print(comment)
