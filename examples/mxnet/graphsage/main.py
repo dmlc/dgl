@@ -7,16 +7,20 @@ Simple reference implementation of GraphSAGE.
 import argparse
 import time
 
+import dgl
+
 import mxnet as mx
 import networkx as nx
 import numpy as np
+from dgl.data import (
+    CiteseerGraphDataset,
+    CoraGraphDataset,
+    PubmedGraphDataset,
+    register_data_args,
+)
+from dgl.nn.mxnet.conv import SAGEConv
 from mxnet import gluon, nd
 from mxnet.gluon import nn
-
-import dgl
-from dgl.data import (CiteseerGraphDataset, CoraGraphDataset,
-                      PubmedGraphDataset, register_data_args)
-from dgl.nn.mxnet.conv import SAGEConv
 
 
 class GraphSAGE(nn.Block):

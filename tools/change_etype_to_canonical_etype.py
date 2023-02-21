@@ -4,9 +4,9 @@ import logging
 import os
 import time
 
-import torch
-
 import dgl
+
+import torch
 from dgl._ffi.base import DGLError
 from dgl.data.utils import load_graphs
 from dgl.utils import toindex

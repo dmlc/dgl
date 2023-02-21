@@ -41,7 +41,6 @@ def get_negative_expectation(q_samples, average=True):
 
 
 def local_global_loss_(l_enc, g_enc, graph_id):
-
     num_graphs = g_enc.shape[0]
     num_nodes = l_enc.shape[0]
 
@@ -51,7 +50,6 @@ def local_global_loss_(l_enc, g_enc, graph_id):
     neg_mask = th.ones((num_nodes, num_graphs)).to(device)
 
     for nodeidx, graphidx in enumerate(graph_id):
-
         pos_mask[nodeidx][graphidx] = 1.0
         neg_mask[nodeidx][graphidx] = 0.0
 
@@ -66,7 +64,6 @@ def local_global_loss_(l_enc, g_enc, graph_id):
 
 
 def global_global_loss_(sup_enc, unsup_enc):
-
     num_graphs = sup_enc.shape[0]
     device = sup_enc.device
 

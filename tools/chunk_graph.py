@@ -5,11 +5,12 @@ import os
 import pathlib
 from contextlib import contextmanager
 
+import dgl
+
 import torch
 from distpartitioning import array_readwriter
 from files import setdir
 
-import dgl
 
 def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
     paths = []
@@ -26,7 +27,9 @@ def chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt):
     return paths
 
 
-def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path, data_fmt):
+def _chunk_graph(
+    g, name, ndata_paths, edata_paths, num_chunks, output_path, data_fmt
+):
     # First deal with ndata and edata that are homogeneous (i.e. not a dict-of-dict)
     if len(g.ntypes) == 1 and not isinstance(
         next(iter(ndata_paths.values())), dict
@@ -96,7 +99,7 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path, dat
 
     # Chunk node data
     reader_fmt_meta, writer_fmt_meta = {"name": "numpy"}, {"name": data_fmt}
-    file_suffix = 'npy' if data_fmt == 'numpy' else 'parquet'
+    file_suffix = "npy" if data_fmt == "numpy" else "parquet"
     metadata["node_data"] = {}
     with setdir("node_data"):
         for ntype, ndata_per_type in ndata_paths.items():
@@ -154,7 +157,9 @@ def _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path, dat
     logging.info("Saved metadata in %s" % os.path.abspath(metadata_path))
 
 
-def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path, data_fmt='numpy'):
+def chunk_graph(
+    g, name, ndata_paths, edata_paths, num_chunks, output_path, data_fmt="numpy"
+):
     """
     Split the graph into multiple chunks.
 
@@ -185,7 +190,9 @@ def chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path, data
         for key in edata.keys():
             edata[key] = os.path.abspath(edata[key])
     with setdir(output_path):
-        _chunk_graph(g, name, ndata_paths, edata_paths, num_chunks, output_path, data_fmt)
+        _chunk_graph(
+            g, name, ndata_paths, edata_paths, num_chunks, output_path, data_fmt
+        )
 
 
 if __name__ == "__main__":

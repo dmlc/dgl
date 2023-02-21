@@ -9,12 +9,12 @@ import numpy as np
 
 from .base import _FFI_MODE, _LIB, c_array, c_str, check_call, string_types
 from .runtime_ctypes import (
+    dgl_shape_index_t,
     DGLArray,
     DGLArrayHandle,
     DGLContext,
     DGLDataType,
     TypeCode,
-    dgl_shape_index_t,
 )
 
 IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
@@ -24,29 +24,29 @@ try:
     if _FFI_MODE == "ctypes":
         raise ImportError()
     if sys.version_info >= (3, 0):
-        from ._cy3.core import NDArrayBase as _NDArrayBase
         from ._cy3.core import (
             _from_dlpack,
             _make_array,
             _reg_extension,
             _set_class_ndarray,
+            NDArrayBase as _NDArrayBase,
         )
     else:
-        from ._cy2.core import NDArrayBase as _NDArrayBase
         from ._cy2.core import (
             _from_dlpack,
             _make_array,
             _reg_extension,
             _set_class_ndarray,
+            NDArrayBase as _NDArrayBase,
         )
 except IMPORT_EXCEPT:
     # pylint: disable=wrong-import-position
-    from ._ctypes.ndarray import NDArrayBase as _NDArrayBase
     from ._ctypes.ndarray import (
         _from_dlpack,
         _make_array,
         _reg_extension,
         _set_class_ndarray,
+        NDArrayBase as _NDArrayBase,
     )
 
 

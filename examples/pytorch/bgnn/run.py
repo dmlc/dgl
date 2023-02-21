@@ -7,15 +7,17 @@ import torch
 import torch.nn.functional as F
 from BGNN import BGNNPredictor
 from category_encoders import CatBoostEncoder
-from sklearn import preprocessing
-from torch.nn import ELU, Dropout, Linear, ReLU, Sequential
 
 from dgl.data.utils import load_graphs
-from dgl.nn.pytorch import AGNNConv as AGNNConvDGL
-from dgl.nn.pytorch import APPNPConv
-from dgl.nn.pytorch import ChebConv as ChebConvDGL
-from dgl.nn.pytorch import GATConv as GATConvDGL
-from dgl.nn.pytorch import GraphConv
+from dgl.nn.pytorch import (
+    AGNNConv as AGNNConvDGL,
+    APPNPConv,
+    ChebConv as ChebConvDGL,
+    GATConv as GATConvDGL,
+    GraphConv,
+)
+from sklearn import preprocessing
+from torch.nn import Dropout, ELU, Linear, ReLU, Sequential
 
 
 class GNNModelDGL(torch.nn.Module):

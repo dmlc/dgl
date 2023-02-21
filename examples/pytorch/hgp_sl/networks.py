@@ -1,9 +1,9 @@
 import torch
 import torch.nn
 import torch.nn.functional as F
-from layers import ConvPoolReadout
 
 from dgl.nn import AvgPooling, MaxPooling
+from layers import ConvPoolReadout
 
 
 class HGPSLModel(torch.nn.Module):

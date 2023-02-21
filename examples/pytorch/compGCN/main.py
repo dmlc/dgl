@@ -1,6 +1,8 @@
 import argparse
 from time import time
 
+import dgl.function as fn
+
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -9,8 +11,6 @@ import torch.optim as optim
 from data_loader import Data
 from models import CompGCN_ConvE
 from utils import in_out_norm
-
-import dgl.function as fn
 
 
 # predict the tail for (head, rel, -1) or head for (-1, rel, tail)
@@ -96,7 +96,6 @@ def evaluate(model, graph, device, data_iter, split="valid"):
 
 
 def main(args):
-
     # Step 1: Prepare graph data and retrieve train/validation/test index ============================= #
     # check cuda
     if args.gpu >= 0 and th.cuda.is_available():

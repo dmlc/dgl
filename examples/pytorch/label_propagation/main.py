@@ -1,8 +1,8 @@
 import argparse
 
-import torch
-
 import dgl
+
+import torch
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from dgl.nn import LabelPropagation
 

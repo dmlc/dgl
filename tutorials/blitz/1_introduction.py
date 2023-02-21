@@ -22,13 +22,13 @@ networks with PyTorch.
 """
 
 import os
-os.environ['DGLBACKEND'] = 'pytorch'
+
+os.environ["DGLBACKEND"] = "pytorch"
+import dgl
+import dgl.data
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.data
 
 ######################################################################
 # Overview of Node Classification with GNN

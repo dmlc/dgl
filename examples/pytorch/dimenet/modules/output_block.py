@@ -1,8 +1,7 @@
-import torch.nn as nn
-from modules.initializers import GlorotOrthogonal
-
 import dgl
 import dgl.function as fn
+import torch.nn as nn
+from modules.initializers import GlorotOrthogonal
 
 
 class OutputBlock(nn.Module):

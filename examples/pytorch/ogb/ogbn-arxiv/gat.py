@@ -7,6 +7,8 @@ import os
 import random
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -15,8 +17,6 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 from models import GAT
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-
-import dgl
 
 epsilon = 1 - math.log(2)
 

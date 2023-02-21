@@ -3,18 +3,18 @@ import pickle
 import random
 import time
 
+import dgl
+
 import numpy as np
 import scipy.sparse as sp
 import torch
-from torch.utils.data import DataLoader
-
-import dgl
 from dgl.data.utils import (
     _get_dgl_url,
     download,
     extract_archive,
     get_download_dir,
 )
+from torch.utils.data import DataLoader
 
 
 def ReadTxtNet(file_path="", undirected=True):

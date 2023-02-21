@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from dgl.data import CoraGraphDataset
 from torch.optim import Adam
 
+
 ################################################################################
 # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the feature
 # diffusion in SIGN laconically.

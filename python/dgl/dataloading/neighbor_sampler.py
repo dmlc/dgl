@@ -1,7 +1,8 @@
 """Data loading components for neighbor sampling"""
-from ..base import NID, EID
+from ..base import EID, NID
 from ..transforms import to_block
 from .base import BlockSampler
+
 
 class NeighborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
@@ -107,20 +108,33 @@ class NeighborSampler(BlockSampler):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, fanouts, edge_dir='in', prob=None, mask=None, replace=False,
-                 prefetch_node_feats=None, prefetch_labels=None, prefetch_edge_feats=None,
-                 output_device=None):
-        super().__init__(prefetch_node_feats=prefetch_node_feats,
-                         prefetch_labels=prefetch_labels,
-                         prefetch_edge_feats=prefetch_edge_feats,
-                         output_device=output_device)
+
+    def __init__(
+        self,
+        fanouts,
+        edge_dir="in",
+        prob=None,
+        mask=None,
+        replace=False,
+        prefetch_node_feats=None,
+        prefetch_labels=None,
+        prefetch_edge_feats=None,
+        output_device=None,
+    ):
+        super().__init__(
+            prefetch_node_feats=prefetch_node_feats,
+            prefetch_labels=prefetch_labels,
+            prefetch_edge_feats=prefetch_edge_feats,
+            output_device=output_device,
+        )
         self.fanouts = fanouts
         self.edge_dir = edge_dir
         if mask is not None and prob is not None:
             raise ValueError(
-                    'Mask and probability arguments are mutually exclusive. '
-                    'Consider multiplying the probability with the mask '
-                    'to achieve the same goal.')
+                "Mask and probability arguments are mutually exclusive. "
+                "Consider multiplying the probability with the mask "
+                "to achieve the same goal."
+            )
         self.prob = prob or mask
         self.replace = replace
 
@@ -129,9 +143,14 @@ class NeighborSampler(BlockSampler):
         blocks = []
         for fanout in reversed(self.fanouts):
             frontier = g.sample_neighbors(
-                seed_nodes, fanout, edge_dir=self.edge_dir, prob=self.prob,
-                replace=self.replace, output_device=self.output_device,
-                exclude_edges=exclude_eids)
+                seed_nodes,
+                fanout,
+                edge_dir=self.edge_dir,
+                prob=self.prob,
+                replace=self.replace,
+                output_device=self.output_device,
+                exclude_edges=exclude_eids,
+            )
             eid = frontier.edata[EID]
             block = to_block(frontier, seed_nodes)
             block.edata[EID] = eid
@@ -140,7 +159,9 @@ class NeighborSampler(BlockSampler):
 
         return seed_nodes, output_nodes, blocks
 
+
 MultiLayerNeighborSampler = NeighborSampler
+
 
 class MultiLayerFullNeighborSampler(NeighborSampler):
     """Sampler that builds computational dependency of node representations by taking messages
@@ -174,5 +195,6 @@ class MultiLayerFullNeighborSampler(NeighborSampler):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
+
     def __init__(self, num_layers, **kwargs):
         super().__init__([-1] * num_layers, **kwargs)

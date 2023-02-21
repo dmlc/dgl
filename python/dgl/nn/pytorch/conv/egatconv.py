@@ -5,9 +5,10 @@ from torch import nn
 from torch.nn import init
 
 from .... import function as fn
-from ...functional import edge_softmax
 from ....base import DGLError
 from ....utils import expand_as_pair
+from ...functional import edge_softmax
+
 
 # pylint: enable=W0235
 class EGATConv(nn.Module):
@@ -22,8 +23,7 @@ class EGATConv(nn.Module):
         f_{ij}^{\prime} &= \mathrm{LeakyReLU}\left(A [ h_{i} \| f_{ij} \| h_{j}]\right)
 
     where :math:`f_{ij}^{\prime}` are edge features, :math:`\mathrm{A}` is weight matrix and
-
-    :math: `\vec{F}` is weight vector. After that, resulting node features
+    :math:`\vec{F}` is weight vector. After that, resulting node features
     :math:`h_{i}^{\prime}` are updated in the same way as in regular GAT.
 
     Parameters
@@ -95,47 +95,63 @@ class EGATConv(nn.Module):
     >>> new_node_feats.shape, new_edge_feats.shape, attentions.shape
     (torch.Size([4, 3, 10]), torch.Size([5, 3, 5]), torch.Size([5, 3, 1]))
     """
-    def __init__(self,
-                 in_node_feats,
-                 in_edge_feats,
-                 out_node_feats,
-                 out_edge_feats,
-                 num_heads,
-                 bias=True):
 
+    def __init__(
+        self,
+        in_node_feats,
+        in_edge_feats,
+        out_node_feats,
+        out_edge_feats,
+        num_heads,
+        bias=True,
+    ):
         super().__init__()
         self._num_heads = num_heads
-        self._in_src_node_feats, self._in_dst_node_feats = expand_as_pair(in_node_feats)
+        self._in_src_node_feats, self._in_dst_node_feats = expand_as_pair(
+            in_node_feats
+        )
         self._out_node_feats = out_node_feats
         self._out_edge_feats = out_edge_feats
         if isinstance(in_node_feats, tuple):
             self.fc_node_src = nn.Linear(
-                self._in_src_node_feats, out_node_feats * num_heads, bias=False)
+                self._in_src_node_feats, out_node_feats * num_heads, bias=False
+            )
             self.fc_ni = nn.Linear(
-                self._in_src_node_feats, out_edge_feats*num_heads, bias=False)
+                self._in_src_node_feats, out_edge_feats * num_heads, bias=False
+            )
             self.fc_nj = nn.Linear(
-                self._in_dst_node_feats, out_edge_feats*num_heads, bias=False)
+                self._in_dst_node_feats, out_edge_feats * num_heads, bias=False
+            )
         else:
             self.fc_node_src = nn.Linear(
-                self._in_src_node_feats, out_node_feats * num_heads, bias=False)
+                self._in_src_node_feats, out_node_feats * num_heads, bias=False
+            )
             self.fc_ni = nn.Linear(
-                self._in_src_node_feats, out_edge_feats*num_heads, bias=False)
+                self._in_src_node_feats, out_edge_feats * num_heads, bias=False
+            )
             self.fc_nj = nn.Linear(
-                self._in_src_node_feats, out_edge_feats*num_heads, bias=False)
+                self._in_src_node_feats, out_edge_feats * num_heads, bias=False
+            )
 
-        self.fc_fij = nn.Linear(in_edge_feats, out_edge_feats*num_heads, bias=False)
-        self.attn = nn.Parameter(th.FloatTensor(size=(1, num_heads, out_edge_feats)))
+        self.fc_fij = nn.Linear(
+            in_edge_feats, out_edge_feats * num_heads, bias=False
+        )
+        self.attn = nn.Parameter(
+            th.FloatTensor(size=(1, num_heads, out_edge_feats))
+        )
         if bias:
-            self.bias = nn.Parameter(th.FloatTensor(size=(num_heads * out_edge_feats,)))
+            self.bias = nn.Parameter(
+                th.FloatTensor(size=(num_heads * out_edge_feats,))
+            )
         else:
-            self.register_buffer('bias', None)
+            self.register_buffer("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
         """
         Reinitialize learnable parameters.
         """
-        gain = init.calculate_gain('relu')
+        gain = init.calculate_gain("relu")
         init.xavier_normal_(self.fc_node_src.weight, gain=gain)
         init.xavier_normal_(self.fc_ni.weight, gain=gain)
         init.xavier_normal_(self.fc_fij.weight, gain=gain)
@@ -184,13 +200,15 @@ class EGATConv(nn.Module):
 
         with graph.local_scope():
             if (graph.in_degrees() == 0).any():
-                raise DGLError('There are 0-in-degree nodes in the graph, '
-                               'output for those nodes will be invalid. '
-                               'This is harmful for some applications, '
-                               'causing silent performance regression. '
-                               'Adding self-loop on the input graph by '
-                               'calling `g = dgl.add_self_loop(g)` will resolve '
-                               'the issue.')
+                raise DGLError(
+                    "There are 0-in-degree nodes in the graph, "
+                    "output for those nodes will be invalid. "
+                    "This is harmful for some applications, "
+                    "causing silent performance regression. "
+                    "Adding self-loop on the input graph by "
+                    "calling `g = dgl.add_self_loop(g)` will resolve "
+                    "the issue."
+                )
 
             # calc edge attention
             # same trick way as in dgl.nn.pytorch.GATConv, but also includes edge feats
@@ -204,27 +222,31 @@ class EGATConv(nn.Module):
             f_nj = self.fc_nj(nfeats_dst)
             f_fij = self.fc_fij(efeats)
 
-            graph.srcdata.update({'f_ni': f_ni})
-            graph.dstdata.update({'f_nj': f_nj})
+            graph.srcdata.update({"f_ni": f_ni})
+            graph.dstdata.update({"f_nj": f_nj})
             # add ni, nj factors
-            graph.apply_edges(fn.u_add_v('f_ni', 'f_nj', 'f_tmp'))
+            graph.apply_edges(fn.u_add_v("f_ni", "f_nj", "f_tmp"))
             # add fij to node factor
-            f_out = graph.edata.pop('f_tmp') + f_fij
+            f_out = graph.edata.pop("f_tmp") + f_fij
             if self.bias is not None:
                 f_out = f_out + self.bias
             f_out = nn.functional.leaky_relu(f_out)
             f_out = f_out.view(-1, self._num_heads, self._out_edge_feats)
             # compute attention factor
             e = (f_out * self.attn).sum(dim=-1).unsqueeze(-1)
-            graph.edata['a'] = edge_softmax(graph, e)
-            graph.srcdata['h_out'] = self.fc_node_src(nfeats_src).view(-1, self._num_heads,
-                                                             self._out_node_feats)
+            graph.edata["a"] = edge_softmax(graph, e)
+            graph.srcdata["h_out"] = self.fc_node_src(nfeats_src).view(
+                -1, self._num_heads, self._out_node_feats
+            )
             # calc weighted sum
-            graph.update_all(fn.u_mul_e('h_out', 'a', 'm'),
-                             fn.sum('m', 'h_out'))
+            graph.update_all(
+                fn.u_mul_e("h_out", "a", "m"), fn.sum("m", "h_out")
+            )
 
-            h_out = graph.dstdata['h_out'].view(-1, self._num_heads, self._out_node_feats)
+            h_out = graph.dstdata["h_out"].view(
+                -1, self._num_heads, self._out_node_feats
+            )
             if get_attention:
-                return h_out, f_out, graph.edata.pop('a')
+                return h_out, f_out, graph.edata.pop("a")
             else:
                 return h_out, f_out

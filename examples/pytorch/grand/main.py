@@ -1,21 +1,20 @@
 import argparse
 import warnings
 
+import dgl
+
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from model import GRAND
-
-import dgl
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
+from model import GRAND
 
 warnings.filterwarnings("ignore")
 
 
 def argument():
-
     parser = argparse.ArgumentParser(description="GRAND")
 
     # data source params
@@ -111,7 +110,6 @@ def consis_loss(logps, temp, lam):
 
 
 if __name__ == "__main__":
-
     # Step 1: Prepare graph data and retrieve train/validation/test index ============================= #
     # Load from DGL dataset
     args = argument()
@@ -175,7 +173,6 @@ if __name__ == "__main__":
 
     # Step 4: training epoches =============================================================== #
     for epoch in range(args.epochs):
-
         """Training"""
         model.train()
 
@@ -204,7 +201,6 @@ if __name__ == "__main__":
         """ Validating """
         model.eval()
         with th.no_grad():
-
             val_logits = model(graph, feats, False)
 
             loss_val = F.nll_loss(val_logits[val_idx], labels[val_idx])
