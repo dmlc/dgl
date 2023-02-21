@@ -1096,8 +1096,7 @@ def gen_dist_partitions(rank, world_size, params):
                 ][feature_idx]
     memory_snapshot("ReorderNodeFeaturesComplete: ", rank)
 
-
-    #sort edge_data by etype
+    # Sort edge_data by etype
     edge_data = reorder_data(params, world_size, edge_data, constants.ETYPE_ID)
     logging.info(f"[Rank: {rank}] Sorted edge_data by edge_type")
     memory_snapshot("EdgeDataSortComplete: ", rank)
