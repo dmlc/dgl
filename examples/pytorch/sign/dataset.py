@@ -1,7 +1,6 @@
+import dgl
 import numpy as np
 import torch
-
-import dgl
 
 
 def load_dataset(name):

@@ -13,19 +13,19 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 import argparse
 import time
 
+import dgl
+
 import networkx as nx
 import numpy as np
 import tensorflow as tf
-from gat import GAT
-from utils import EarlyStopping
-
-import dgl
 from dgl.data import (
     CiteseerGraphDataset,
     CoraGraphDataset,
     PubmedGraphDataset,
     register_data_args,
 )
+from gat import GAT
+from utils import EarlyStopping
 
 
 def accuracy(logits, labels):
@@ -174,7 +174,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="GAT")
     register_data_args(parser)
     parser.add_argument(

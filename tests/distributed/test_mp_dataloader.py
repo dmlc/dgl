@@ -316,9 +316,7 @@ def check_neg_dataloader(g, num_server, num_workers):
 @pytest.mark.parametrize("num_workers", [0, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
 @pytest.mark.parametrize("num_groups", [1])
-def test_dist_dataloader(
-    num_server, num_workers, drop_last, num_groups
-):
+def test_dist_dataloader(num_server, num_workers, drop_last, num_groups):
     reset_envs()
     # No multiple partitions on single machine for
     # multiple client groups in case of race condition.
@@ -763,4 +761,3 @@ def test_multiple_dist_dataloaders(
             p.join()
             assert p.exitcode == 0
     reset_envs()
-

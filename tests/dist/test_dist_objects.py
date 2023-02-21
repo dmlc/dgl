@@ -1,21 +1,23 @@
 import multiprocessing as mp
 import os
+import shutil
 import subprocess
 import unittest
+
+import dgl
+import dgl.backend as F
 
 import numpy as np
 import pytest
 import utils
-import shutil
-
-import dgl
-import dgl.backend as F
 from dgl.distributed import partition_graph
 
 graph_name = os.environ.get("DIST_DGL_TEST_GRAPH_NAME", "random_test_graph")
 target = os.environ.get("DIST_DGL_TEST_OBJECT_TYPE", "")
 blacklist = os.environ.get("DIST_DGL_TEST_OBJECT_TYPE_BLACKLIST", "")
-shared_workspace = os.environ.get('DIST_DGL_TEST_WORKSPACE', '/shared_workspace/dgl_dist_tensor_test/')
+shared_workspace = os.environ.get(
+    "DIST_DGL_TEST_WORKSPACE", "/shared_workspace/dgl_dist_tensor_test/"
+)
 
 
 def create_graph(num_part, dist_graph_path, hetero):
@@ -32,13 +34,18 @@ def create_graph(num_part, dist_graph_path, hetero):
         g.edges[etype].data["edge_u"] = edge_u
         g.edges[etype].data["edge_v"] = edge_v
 
-        orig_nid, orig_eid = partition_graph(g, graph_name, num_part, dist_graph_path, return_mapping=True)
+        orig_nid, orig_eid = partition_graph(
+            g, graph_name, num_part, dist_graph_path, return_mapping=True
+        )
 
-        orig_nid_f = os.path.join(dist_graph_path, f"orig_nid_array_{ntype}.npy")
+        orig_nid_f = os.path.join(
+            dist_graph_path, f"orig_nid_array_{ntype}.npy"
+        )
         np.save(orig_nid_f, orig_nid.numpy())
-        orig_eid_f = os.path.join(dist_graph_path, f"orig_eid_array_{etype}.npy")
+        orig_eid_f = os.path.join(
+            dist_graph_path, f"orig_eid_array_{etype}.npy"
+        )
         np.save(orig_eid_f, orig_eid.numpy())
-
 
     else:
         from scipy import sparse as spsp
@@ -65,20 +72,28 @@ def create_graph(num_part, dist_graph_path, hetero):
             F.arange(0, g.number_of_edges("r1")), 1
         )
 
-
         for _, etype, _ in etypes:
-            edge_u, edge_v = g.find_edges(F.arange(0, g.number_of_edges(etype)), etype=etype)
+            edge_u, edge_v = g.find_edges(
+                F.arange(0, g.number_of_edges(etype)), etype=etype
+            )
             g.edges[etype].data["edge_u"] = edge_u
             g.edges[etype].data["edge_v"] = edge_v
 
-        orig_nid, orig_eid = partition_graph(g, graph_name, num_part, dist_graph_path, return_mapping=True)
+        orig_nid, orig_eid = partition_graph(
+            g, graph_name, num_part, dist_graph_path, return_mapping=True
+        )
 
         for n_type, tensor in orig_nid.items():
-            orig_nid_f = os.path.join(dist_graph_path, f"orig_nid_array_{n_type}.npy")
+            orig_nid_f = os.path.join(
+                dist_graph_path, f"orig_nid_array_{n_type}.npy"
+            )
             np.save(orig_nid_f, tensor.numpy())
         for e_type, tensor in orig_eid.items():
-            orig_eid_f = os.path.join(dist_graph_path, f"orig_eid_array_{e_type}.npy")
+            orig_eid_f = os.path.join(
+                dist_graph_path, f"orig_eid_array_{e_type}.npy"
+            )
             np.save(orig_eid_f, tensor.numpy())
+
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
 @pytest.mark.parametrize("net_type", ["tensorpipe", "socket"])
@@ -148,8 +163,9 @@ def test_dist_objects(net_type, num_servers, num_clients, hetero, shared_mem):
         p.join()
         assert p.exitcode == 0
 
+
 def teardown():
-    for name in ['dist_graph', 'hetero_dist_graph']:
+    for name in ["dist_graph", "hetero_dist_graph"]:
         path = os.path.join(shared_workspace, name)
         if os.path.exists(path):
             print(f"Removing {path}...")

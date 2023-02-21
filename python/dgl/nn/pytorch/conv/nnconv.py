@@ -5,8 +5,8 @@ from torch import nn
 from torch.nn import init
 
 from .... import function as fn
-from ..utils import Identity
 from ....utils import expand_as_pair
+from ..utils import Identity
 
 
 class NNConv(nn.Module):
@@ -84,37 +84,44 @@ class NNConv(nn.Module):
             [ 0.1261, -0.0155],
             [-0.6568,  0.5042]], grad_fn=<AddBackward0>)
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 edge_func,
-                 aggregator_type='mean',
-                 residual=False,
-                 bias=True):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        edge_func,
+        aggregator_type="mean",
+        residual=False,
+        bias=True,
+    ):
         super(NNConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self.edge_func = edge_func
-        if aggregator_type == 'sum':
+        if aggregator_type == "sum":
             self.reducer = fn.sum
-        elif aggregator_type == 'mean':
+        elif aggregator_type == "mean":
             self.reducer = fn.mean
-        elif aggregator_type == 'max':
+        elif aggregator_type == "max":
             self.reducer = fn.max
         else:
-            raise KeyError('Aggregator type {} not recognized: '.format(aggregator_type))
+            raise KeyError(
+                "Aggregator type {} not recognized: ".format(aggregator_type)
+            )
         self._aggre_type = aggregator_type
         if residual:
             if self._in_dst_feats != out_feats:
-                self.res_fc = nn.Linear(self._in_dst_feats, out_feats, bias=False)
+                self.res_fc = nn.Linear(
+                    self._in_dst_feats, out_feats, bias=False
+                )
             else:
                 self.res_fc = Identity()
         else:
-            self.register_buffer('res_fc', None)
+            self.register_buffer("res_fc", None)
         if bias:
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
-            self.register_buffer('bias', None)
+            self.register_buffer("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -129,7 +136,7 @@ class NNConv(nn.Module):
         The model parameters are initialized using Glorot uniform initialization
         and the bias is initialized to be zero.
         """
-        gain = init.calculate_gain('relu')
+        gain = init.calculate_gain("relu")
         if self.bias is not None:
             nn.init.zeros_(self.bias)
         if isinstance(self.res_fc, nn.Linear):
@@ -161,12 +168,16 @@ class NNConv(nn.Module):
             feat_src, feat_dst = expand_as_pair(feat, graph)
 
             # (n, d_in, 1)
-            graph.srcdata['h'] = feat_src.unsqueeze(-1)
+            graph.srcdata["h"] = feat_src.unsqueeze(-1)
             # (n, d_in, d_out)
-            graph.edata['w'] = self.edge_func(efeat).view(-1, self._in_src_feats, self._out_feats)
+            graph.edata["w"] = self.edge_func(efeat).view(
+                -1, self._in_src_feats, self._out_feats
+            )
             # (n, d_in, d_out)
-            graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
-            rst = graph.dstdata['neigh'].sum(dim=1) # (n, d_out)
+            graph.update_all(
+                fn.u_mul_e("h", "w", "m"), self.reducer("m", "neigh")
+            )
+            rst = graph.dstdata["neigh"].sum(dim=1)  # (n, d_out)
             # residual connection
             if self.res_fc is not None:
                 rst = rst + self.res_fc(feat_dst)

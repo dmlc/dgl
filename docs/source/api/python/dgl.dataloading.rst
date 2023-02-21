@@ -5,7 +5,7 @@ dgl.dataloading
 
 .. currentmodule:: dgl.dataloading
 
-The ``dgl.dataloading`` package provides two privimitives to compose a data pipeline
+The ``dgl.dataloading`` package provides two primitives to compose a data pipeline
 for loading from graph data. ``Sampler`` represents algorithms
 to generate subgraph samples from the original graph, and ``DataLoader``
 represents the iterable over these samples.
@@ -26,8 +26,6 @@ DataLoaders
 
     DataLoader
     GraphDataLoader
-    NodeDataLoader
-    EdgeDataLoader
     DistNodeDataLoader
     DistEdgeDataLoader
 

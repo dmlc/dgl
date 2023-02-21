@@ -1,6 +1,5 @@
-import torch as th
-
 import dgl
+import torch as th
 
 
 def load_reddit(self_loop=True):

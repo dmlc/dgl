@@ -1,7 +1,6 @@
 """Define utility functions for shared memory."""
 
-from .. import backend as F
-from .. import ndarray as nd
+from .. import backend as F, ndarray as nd
 from .._ffi.ndarray import empty_shared_mem
 
 DTYPE_DICT = F.data_type_dict

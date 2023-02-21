@@ -2,7 +2,7 @@
 import numpy as np
 
 from .. import backend as F
-from .base import FeatureStorage, ThreadedFuture, register_storage_wrapper
+from .base import FeatureStorage, register_storage_wrapper, ThreadedFuture
 
 
 @register_storage_wrapper(np.memmap)

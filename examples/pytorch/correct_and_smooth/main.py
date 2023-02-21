@@ -2,13 +2,13 @@ import argparse
 import copy
 import os
 
+import dgl
+
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from model import MLP, CorrectAndSmooth, MLPLinear
+from model import CorrectAndSmooth, MLP, MLPLinear
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-
-import dgl
 
 
 def evaluate(y_pred, y_true, idx, evaluator):
@@ -104,7 +104,6 @@ def main():
         # training
         print("---------- Training ----------")
         for i in range(args.epochs):
-
             model.train()
             opt.zero_grad()
 

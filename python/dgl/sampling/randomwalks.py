@@ -1,9 +1,7 @@
 """Random walk routines
 """
 
-from .. import backend as F
-from .. import ndarray as nd
-from .. import utils
+from .. import backend as F, ndarray as nd, utils
 from .._ffi.function import _init_api
 from ..base import DGLError
 

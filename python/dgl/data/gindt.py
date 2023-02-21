@@ -99,7 +99,6 @@ class GINDataset(DGLBuiltinDataset):
         verbose=False,
         transform=None,
     ):
-
         self._name = name  # MUTAG
         gin_url = "https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip"
         self.ds_name = "nig"

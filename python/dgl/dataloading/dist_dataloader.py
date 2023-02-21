@@ -1,12 +1,11 @@
 """Distributed dataloaders.
 """
 import inspect
+from abc import ABC, abstractmethod, abstractproperty
 from collections.abc import Mapping
-from abc import ABC, abstractproperty, abstractmethod
-from .. import transforms
-from ..base import NID, EID
-from .. import backend as F
-from .. import utils
+
+from .. import backend as F, transforms, utils
+from ..base import EID, NID
 from ..convert import heterograph
 from ..distributed import DistDataLoader
 
@@ -20,18 +19,24 @@ def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
         eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
         exclude_eids = {
             k: F.cat([v, F.gather_row(reverse_eid_map[k], v)], 0)
-            for k, v in eids.items()}
+            for k, v in eids.items()
+        }
     else:
         exclude_eids = F.cat([eids, F.gather_row(reverse_eid_map, eids)], 0)
     return exclude_eids
+
 
 def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
     exclude_eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
     reverse_etype_map = {
         g.to_canonical_etype(k): g.to_canonical_etype(v)
-        for k, v in reverse_etype_map.items()}
-    exclude_eids.update({reverse_etype_map[k]: v for k, v in exclude_eids.items()})
+        for k, v in reverse_etype_map.items()
+    }
+    exclude_eids.update(
+        {reverse_etype_map[k]: v for k, v in exclude_eids.items()}
+    )
     return exclude_eids
+
 
 def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     """Find all edge IDs to exclude according to :attr:`exclude_mode`.
@@ -77,14 +82,18 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     """
     if exclude_mode is None:
         return None
-    elif exclude_mode == 'self':
+    elif exclude_mode == "self":
         return eids
-    elif exclude_mode == 'reverse_id':
-        return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
-    elif exclude_mode == 'reverse_types':
-        return _find_exclude_eids_with_reverse_types(g, eids, kwargs['reverse_etype_map'])
+    elif exclude_mode == "reverse_id":
+        return _find_exclude_eids_with_reverse_id(
+            g, eids, kwargs["reverse_eid_map"]
+        )
+    elif exclude_mode == "reverse_types":
+        return _find_exclude_eids_with_reverse_types(
+            g, eids, kwargs["reverse_etype_map"]
+        )
     else:
-        raise ValueError('unsupported mode {}'.format(exclude_mode))
+        raise ValueError("unsupported mode {}".format(exclude_mode))
 
 
 class Collator(ABC):
@@ -100,6 +109,7 @@ class Collator(ABC):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
+
     @abstractproperty
     def dataset(self):
         """Returns the dataset object of the collator."""
@@ -121,6 +131,7 @@ class Collator(ABC):
         :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
         """
         raise NotImplementedError
+
 
 class NodeCollator(Collator):
     """DGL collator to combine nodes and their computation dependencies within a minibatch for
@@ -155,14 +166,16 @@ class NodeCollator(Collator):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
+
     def __init__(self, g, nids, graph_sampler):
         self.g = g
         if not isinstance(nids, Mapping):
-            assert len(g.ntypes) == 1, \
-                "nids should be a dict of node type and ids for graph with multiple node types"
+            assert (
+                len(g.ntypes) == 1
+            ), "nids should be a dict of node type and ids for graph with multiple node types"
         self.graph_sampler = graph_sampler
 
-        self.nids = utils.prepare_tensor_or_dict(g, nids, 'nids')
+        self.nids = utils.prepare_tensor_or_dict(g, nids, "nids")
         self._dataset = utils.maybe_flatten_dict(self.nids)
 
     @property
@@ -197,11 +210,14 @@ class NodeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-        items = utils.prepare_tensor_or_dict(self.g, items, 'items')
+        items = utils.prepare_tensor_or_dict(self.g, items, "items")
 
-        input_nodes, output_nodes, blocks = self.graph_sampler.sample_blocks(self.g, items)
+        input_nodes, output_nodes, blocks = self.graph_sampler.sample_blocks(
+            self.g, items
+        )
 
         return input_nodes, output_nodes, blocks
+
 
 class EdgeCollator(Collator):
     """DGL collator to combine edges and their computation dependencies within a minibatch for
@@ -380,12 +396,23 @@ class EdgeCollator(Collator):
     :ref:`User Guide Section 6 <guide-minibatch>` and
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
-    def __init__(self, g, eids, graph_sampler, g_sampling=None, exclude=None,
-                 reverse_eids=None, reverse_etypes=None, negative_sampler=None):
+
+    def __init__(
+        self,
+        g,
+        eids,
+        graph_sampler,
+        g_sampling=None,
+        exclude=None,
+        reverse_eids=None,
+        reverse_etypes=None,
+        negative_sampler=None,
+    ):
         self.g = g
         if not isinstance(eids, Mapping):
-            assert len(g.etypes) == 1, \
-                "eids should be a dict of etype and ids for graph with multiple etypes"
+            assert (
+                len(g.etypes) == 1
+            ), "eids should be a dict of etype and ids for graph with multiple etypes"
         self.graph_sampler = graph_sampler
 
         # One may wish to iterate over the edges in one graph while perform sampling in
@@ -404,7 +431,7 @@ class EdgeCollator(Collator):
         self.reverse_etypes = reverse_etypes
         self.negative_sampler = negative_sampler
 
-        self.eids = utils.prepare_tensor_or_dict(g, eids, 'eids')
+        self.eids = utils.prepare_tensor_or_dict(g, eids, "eids")
         self._dataset = utils.maybe_flatten_dict(self.eids)
 
     @property
@@ -415,7 +442,7 @@ class EdgeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-        items = utils.prepare_tensor_or_dict(self.g_sampling, items, 'items')
+        items = utils.prepare_tensor_or_dict(self.g_sampling, items, "items")
 
         pair_graph = self.g.edge_subgraph(items)
         seed_nodes = pair_graph.ndata[NID]
@@ -425,10 +452,12 @@ class EdgeCollator(Collator):
             self.exclude,
             items,
             reverse_eid_map=self.reverse_eids,
-            reverse_etype_map=self.reverse_etypes)
+            reverse_etype_map=self.reverse_etypes,
+        )
 
         input_nodes, _, blocks = self.graph_sampler.sample_blocks(
-            self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
+            self.g_sampling, seed_nodes, exclude_eids=exclude_eids
+        )
 
         return input_nodes, pair_graph, blocks
 
@@ -436,28 +465,39 @@ class EdgeCollator(Collator):
         if isinstance(items[0], tuple):
             # returns a list of pairs: group them by node types into a dict
             items = utils.group_as_dict(items)
-        items = utils.prepare_tensor_or_dict(self.g_sampling, items, 'items')
+        items = utils.prepare_tensor_or_dict(self.g_sampling, items, "items")
 
         pair_graph = self.g.edge_subgraph(items, relabel_nodes=False)
         induced_edges = pair_graph.edata[EID]
 
         neg_srcdst = self.negative_sampler(self.g, items)
         if not isinstance(neg_srcdst, Mapping):
-            assert len(self.g.etypes) == 1, \
-                'graph has multiple or no edge types; '\
-                'please return a dict in negative sampler.'
+            assert len(self.g.etypes) == 1, (
+                "graph has multiple or no edge types; "
+                "please return a dict in negative sampler."
+            )
             neg_srcdst = {self.g.canonical_etypes[0]: neg_srcdst}
         # Get dtype from a tuple of tensors
         dtype = F.dtype(list(neg_srcdst.values())[0][0])
         ctx = F.context(pair_graph)
         neg_edges = {
-            etype: neg_srcdst.get(etype, (F.copy_to(F.tensor([], dtype), ctx),
-                                          F.copy_to(F.tensor([], dtype), ctx)))
-            for etype in self.g.canonical_etypes}
+            etype: neg_srcdst.get(
+                etype,
+                (
+                    F.copy_to(F.tensor([], dtype), ctx),
+                    F.copy_to(F.tensor([], dtype), ctx),
+                ),
+            )
+            for etype in self.g.canonical_etypes
+        }
         neg_pair_graph = heterograph(
-            neg_edges, {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes})
+            neg_edges,
+            {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes},
+        )
 
-        pair_graph, neg_pair_graph = transforms.compact_graphs([pair_graph, neg_pair_graph])
+        pair_graph, neg_pair_graph = transforms.compact_graphs(
+            [pair_graph, neg_pair_graph]
+        )
         pair_graph.edata[EID] = induced_edges
 
         seed_nodes = pair_graph.ndata[NID]
@@ -467,10 +507,12 @@ class EdgeCollator(Collator):
             self.exclude,
             items,
             reverse_eid_map=self.reverse_eids,
-            reverse_etype_map=self.reverse_etypes)
+            reverse_etype_map=self.reverse_etypes,
+        )
 
         input_nodes, _, blocks = self.graph_sampler.sample_blocks(
-            self.g_sampling, seed_nodes, exclude_eids=exclude_eids)
+            self.g_sampling, seed_nodes, exclude_eids=exclude_eids
+        )
 
         return input_nodes, pair_graph, neg_pair_graph, blocks
 
@@ -517,12 +559,13 @@ class EdgeCollator(Collator):
 
 
 def _remove_kwargs_dist(kwargs):
-    if 'num_workers' in kwargs:
-        del kwargs['num_workers']
-    if 'pin_memory' in kwargs:
-        del kwargs['pin_memory']
-        print('Distributed DataLoaders do not support pin_memory.')
+    if "num_workers" in kwargs:
+        del kwargs["num_workers"]
+    if "pin_memory" in kwargs:
+        del kwargs["pin_memory"]
+        print("Distributed DataLoaders do not support pin_memory.")
     return kwargs
+
 
 class DistNodeDataLoader(DistDataLoader):
     """Sampled graph data loader over nodes for distributed graph storage.
@@ -547,6 +590,7 @@ class DistNodeDataLoader(DistDataLoader):
     --------
     dgl.dataloading.DataLoader
     """
+
     def __init__(self, g, nids, graph_sampler, device=None, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
@@ -558,16 +602,21 @@ class DistNodeDataLoader(DistDataLoader):
                 dataloader_kwargs[k] = v
         if device is None:
             # for the distributed case default to the CPU
-            device = 'cpu'
-        assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
+            device = "cpu"
+        assert (
+            device == "cpu"
+        ), "Only cpu is supported in the case of a DistGraph."
         # Distributed DataLoader currently does not support heterogeneous graphs
         # and does not copy features.  Fallback to normal solution
         self.collator = NodeCollator(g, nids, graph_sampler, **collator_kwargs)
         _remove_kwargs_dist(dataloader_kwargs)
-        super().__init__(self.collator.dataset,
-                         collate_fn=self.collator.collate,
-                         **dataloader_kwargs)
+        super().__init__(
+            self.collator.dataset,
+            collate_fn=self.collator.collate,
+            **dataloader_kwargs
+        )
         self.device = device
+
 
 class DistEdgeDataLoader(DistDataLoader):
     """Sampled graph data loader over edges for distributed graph storage.
@@ -593,6 +642,7 @@ class DistEdgeDataLoader(DistDataLoader):
     --------
     dgl.dataloading.DataLoader
     """
+
     def __init__(self, g, eids, graph_sampler, device=None, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
@@ -605,14 +655,18 @@ class DistEdgeDataLoader(DistDataLoader):
 
         if device is None:
             # for the distributed case default to the CPU
-            device = 'cpu'
-        assert device == 'cpu', 'Only cpu is supported in the case of a DistGraph.'
+            device = "cpu"
+        assert (
+            device == "cpu"
+        ), "Only cpu is supported in the case of a DistGraph."
         # Distributed DataLoader currently does not support heterogeneous graphs
         # and does not copy features.  Fallback to normal solution
         self.collator = EdgeCollator(g, eids, graph_sampler, **collator_kwargs)
         _remove_kwargs_dist(dataloader_kwargs)
-        super().__init__(self.collator.dataset,
-                         collate_fn=self.collator.collate,
-                         **dataloader_kwargs)
+        super().__init__(
+            self.collator.dataset,
+            collate_fn=self.collator.collate,
+            **dataloader_kwargs
+        )
 
         self.device = device

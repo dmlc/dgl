@@ -27,7 +27,9 @@ dgl_option(USE_NCCL "Build with NCCL support" OFF)
 dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" OFF)
-dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
+# LIBXSMM requires Intel MKL installed. If it has not been installed, check the following page:
+# https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html
+dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" OFF)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
@@ -36,7 +38,7 @@ dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if
 dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
 dgl_option(TP_BUILD_LIBUV "Build libuv together with tensorpipe (only impacts Linux)" ON)
-dgl_option(BUILD_SPARSE "Build DGL sparse library" OFF)
+dgl_option(BUILD_SPARSE "Build DGL sparse library" ON)
 dgl_option(TORCH_PYTHON_INTERPS "Python interpreter used to build tensoradapter and DGL sparse library" python3)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG

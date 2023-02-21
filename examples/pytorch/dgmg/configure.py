@@ -4,7 +4,6 @@ and will be loaded when setting up."""
 
 
 def dataset_based_configure(opts):
-
     if opts["dataset"] == "cycles":
         ds_configure = cycles_configure
     else:

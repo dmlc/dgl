@@ -6,11 +6,11 @@ Author's implementation: https://github.com/weihua916/powerful-gnns
 """
 
 import mxnet as mx
-from mxnet import gluon, nd
-from mxnet.gluon import nn
 
 from dgl.nn.mxnet.conv import GINConv
 from dgl.nn.mxnet.glob import AvgPooling, MaxPooling, SumPooling
+from mxnet import gluon, nd
+from mxnet.gluon import nn
 
 
 class ApplyNodeFunc(nn.Block):

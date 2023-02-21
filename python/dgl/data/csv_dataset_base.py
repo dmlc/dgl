@@ -8,7 +8,7 @@ import pydantic as dt
 import yaml
 
 from .. import backend as F
-from ..base import DGLError, dgl_warning
+from ..base import dgl_warning, DGLError
 from ..convert import heterograph as dgl_heterograph
 
 

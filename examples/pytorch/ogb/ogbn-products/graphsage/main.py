@@ -1,6 +1,9 @@
 import argparse
 import time
 
+import dgl
+import dgl.nn.pytorch as dglnn
+
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -8,9 +11,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
 from ogb.nodeproppred import DglNodePropPredDataset
-
-import dgl
-import dgl.nn.pytorch as dglnn
 
 
 class SAGE(nn.Module):

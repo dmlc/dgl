@@ -9,12 +9,12 @@ import argparse
 import math
 import time
 
+import dgl.function as fn
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import load_data, register_data_args
 from dgl.nn.pytorch.conv import SGConv

@@ -7,7 +7,7 @@ import numpy as np
 from data import *
 from gluoncv.data.batchify import Pad
 from gluoncv.utils import makedirs
-from model import RelDN, faster_rcnn_resnet101_v1d_custom
+from model import faster_rcnn_resnet101_v1d_custom, RelDN
 from mxnet import gluon, nd
 from utils import *
 

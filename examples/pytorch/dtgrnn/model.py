@@ -1,11 +1,10 @@
+import dgl
+import dgl.function as fn
+import dgl.nn as dglnn
 import numpy as np
 import scipy.sparse as sparse
 import torch
 import torch.nn as nn
-
-import dgl
-import dgl.function as fn
-import dgl.nn as dglnn
 from dgl.base import DGLError
 from dgl.nn.functional import edge_softmax
 

@@ -1,6 +1,5 @@
-import torch
-
 import dgl
+import torch
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset
 
 

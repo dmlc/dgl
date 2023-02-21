@@ -1,7 +1,8 @@
+from copy import deepcopy
+from heapq import heapify, heappop, heappush, nsmallest
+
 import dgl
 import numpy as np
-from heapq import heappush, heappop, heapify, nsmallest
-from copy import deepcopy
 
 # We use lapjv implementation (https://github.com/src-d/lapjv) to solve assignment problem, because of its scalability
 # Also see https://github.com/berhane/LAP-solvers for benchmarking of LAP solvers
@@ -247,7 +248,6 @@ class search_tree_node:
         cost_matrix_nodes,
         cost_matrix_edges,
     ):
-
         self.matched_cost = parent_matched_cost
         self.future_approximate_cost = 0.0
         self.matched_nodes = deepcopy(parent_matched_nodes)
@@ -1156,7 +1156,6 @@ def graph_edit_distance(
     algorithm="bipartite",
     max_beam_size=100,
 ):
-
     """Returns GED (graph edit distance) between DGLGraphs G1 and G2.
 
 
