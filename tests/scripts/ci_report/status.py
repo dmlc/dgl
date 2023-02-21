@@ -23,7 +23,7 @@ if args.result == "SUCCESS":
 elif args.result == "NOT_BUILT":
     status_output = "⚪️ CI test cancelled due to overrun."
 elif args.result in ["FAILURE", "ABORTED"]:
-    status_output == "❌ CI test failed."
+    status_output = "❌ CI test failed."
     JOB_LINK = os.environ["BUILD_URL"]
     response = requests.get("{}wfapi".format(JOB_LINK), verify=False).json()
     for stage in response["stages"]:
