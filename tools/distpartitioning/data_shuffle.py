@@ -815,14 +815,14 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map):
     )
 
 
-def reorder_data(params, world_size, data, key):
+def reorder_data(num_parts, world_size, data, key):
     """
     Auxiliary function used to sort node and edge data for the input graph.
 
     Parameters:
     -----------
-    params : argparser object
-        object which stores the input arguments to the command line
+    num_parts : int
+        total no. of partitions
     world_size : int
         total number of nodes used in this execution
     data : dictionary
@@ -838,7 +838,7 @@ def reorder_data(params, world_size, data, key):
         the dictionary), as per the np.argsort results on the column specified
         by the ``key`` column
     """
-    for local_part_id in range(params.num_parts // world_size):
+    for local_part_id in range(num_parts // world_size):
         sorted_idx = data[key + "/" + str(local_part_id)].argsort()
         for k, v in data.items():
             tokens = k.split("/")
@@ -1057,7 +1057,9 @@ def gen_dist_partitions(rank, world_size, params):
     memory_snapshot("DataShuffleComplete: ", rank)
 
     # sort node_data by ntype
-    node_data = reorder_data(params, world_size, node_data, constants.NTYPE_ID)
+    node_data = reorder_data(
+        params.num_parts, world_size, node_data, constants.NTYPE_ID
+    )
     logging.info(f"[Rank: {rank}] Sorted node_data by node_type")
     memory_snapshot("NodeDataSortComplete: ", rank)
 
@@ -1097,7 +1099,9 @@ def gen_dist_partitions(rank, world_size, params):
     memory_snapshot("ReorderNodeFeaturesComplete: ", rank)
 
     # Sort edge_data by etype
-    edge_data = reorder_data(params, world_size, edge_data, constants.ETYPE_ID)
+    edge_data = reorder_data(
+        params.num_parts, world_size, edge_data, constants.ETYPE_ID
+    )
     logging.info(f"[Rank: {rank}] Sorted edge_data by edge_type")
     memory_snapshot("EdgeDataSortComplete: ", rank)
 
