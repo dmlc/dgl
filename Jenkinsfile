@@ -243,7 +243,7 @@ pipeline {
               def buildNumber = env.BUILD_NUMBER as int
               // if (buildNumber > 1) milestone(buildNumber - 1)
               for (int i = 1; i <= buildNumber; i++) {
-                milestone(buildNumber)
+                milestone(i)
               }
             }
           }
