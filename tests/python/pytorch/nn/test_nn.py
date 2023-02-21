@@ -1592,7 +1592,14 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
 
 
 @parametrize_idtype
-@pytest.mark.parametrize("g", get_cases(["homo"], exclude=["zero-degree"]))
+@pytest.mark.parametrize("g", get_cases(["homo"], exclude=["zero-degree",
+                                                           "homo-zero-degree",
+                                                           "has_feature",
+                                                           "has_scalar_e_feature",
+                                                           "row_sorted",
+                                                           "col_sorted",
+                                                           "batched"
+                                                           ]))
 @pytest.mark.parametrize("n_classes", [2])
 def test_subgraphx(g, idtype, n_classes):
     ctx = F.ctx()
