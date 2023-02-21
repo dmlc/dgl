@@ -11,44 +11,55 @@ import socket
 
 from distutils.version import LooseVersion
 
-# setup logging before everything
-from .logging import enable_verbose_logging
+# Backend and logging should be imported before other modules.
+from .logging import enable_verbose_logging  # usort: skip
+from .backend import backend_name, load_backend  # usort: skip
 
-# Should import backend before importing anything else
-from .backend import load_backend, backend_name
-
-from . import function
-from . import container
-from . import distributed
-from . import random
-from . import sampling
-from . import storages
-from . import dataloading
-from . import ops
-from . import cuda
+from . import (
+    container,
+    cuda,
+    dataloading,
+    distributed,
+    function,
+    ops,
+    random,
+    sampling,
+    storages,
+)
+from ._ffi.base import __version__, DGLError
+from ._ffi.function import (
+    extract_ext_funcs,
+    get_global_func,
+    list_global_func_names,
+    register_func,
+)
 
 from ._ffi.runtime_ctypes import TypeCode
-from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs
-from ._ffi.base import DGLError, __version__
 
-from .base import ALL, NTYPE, NID, ETYPE, EID
+from .base import ALL, EID, ETYPE, NID, NTYPE
 from .readout import *
 from .batch import *
 from .convert import *
 from .generators import *
-from .heterograph import DGLGraph
-from .heterograph import DGLGraph as DGLHeteroGraph  # pylint: disable=reimported
-from .dataloading import set_src_lazy_features, set_dst_lazy_features, set_edge_lazy_features, \
-    set_node_lazy_features
+from .dataloading import (
+    set_dst_lazy_features,
+    set_edge_lazy_features,
+    set_node_lazy_features,
+    set_src_lazy_features,
+)
+from .heterograph import (  # pylint: disable=reimported
+    DGLGraph,
+    DGLGraph as DGLHeteroGraph,
+)
 from .merge import *
 from .subgraph import *
 from .traversal import *
 from .transforms import *
 from .propagate import *
 from .random import *
-from .data.utils import save_graphs, load_graphs
 from . import optim
+from .data.utils import load_graphs, save_graphs
 from .frame import LazyFeature
-from .utils import apply_each
 from .global_config import is_libxsmm_enabled, use_libxsmm
+from .utils import apply_each
 from .mpops import *
