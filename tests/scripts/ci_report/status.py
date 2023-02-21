@@ -11,20 +11,14 @@ response = requests.get("{}wfapi".format(JOB_LINK), verify=False).json()
 
 # List of status of entire job.
 # https://javadoc.jenkins.io/hudson/model/Result.html
-status = response["status"]
-status_output = f"[Debug Only] {status}"
-if status == "SUCCESS":
-    status_output = "✅ CI test succeeded"
-elif status == "ABORTED":
-    status_output = "⚪️ CI test aborted"
-else:
-    for stage in response["stages"]:
-        # List of status of individual stage.
-        # https://javadoc.jenkins.io/plugin/pipeline-graph-analysis/org/jenkinsci/plugins/workflow/pipelinegraphanalysis/GenericStatus.html
-        if stage["status"] in ["FAILED", "ABORTED"]:
-            stage_name = stage["name"]
-            status_output = f"❌ CI test [{status}] in Stage [{stage_name}]."
-            break
+status_output = "✅ CI test succeeded"
+for stage in response["stages"]:
+    # List of status of individual stage.
+    # https://javadoc.jenkins.io/plugin/pipeline-graph-analysis/org/jenkinsci/plugins/workflow/pipelinegraphanalysis/GenericStatus.html
+    if stage["status"] in ["FAILED", "ABORTED"]:
+        stage_name = stage["name"]
+        status_output = f"❌ CI test [{status}] in Stage [{stage_name}]."
+        break
 
 comment = f"""
 Commit ID: {COMMIT}\n
