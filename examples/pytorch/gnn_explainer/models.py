@@ -1,7 +1,8 @@
+import dgl.function as fn
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl.function as fn
+
 
 class Layer(nn.Module):
     def __init__(self, in_dim, out_dim):
@@ -10,17 +11,18 @@ class Layer(nn.Module):
 
     def forward(self, graph, feat, eweight=None):
         with graph.local_scope():
-            graph.ndata['h'] = feat
+            graph.ndata["h"] = feat
 
             if eweight is None:
-                graph.update_all(fn.copy_u('h', 'm'), fn.mean('m', 'h'))
+                graph.update_all(fn.copy_u("h", "m"), fn.mean("m", "h"))
             else:
-                graph.edata['ew'] = eweight
-                graph.update_all(fn.u_mul_e('h', 'ew', 'm'), fn.mean('m', 'h'))
+                graph.edata["ew"] = eweight
+                graph.update_all(fn.u_mul_e("h", "ew", "m"), fn.mean("m", "h"))
 
-            h = self.layer(th.cat([graph.ndata['h'], feat], dim=-1))
+            h = self.layer(th.cat([graph.ndata["h"], feat], dim=-1))
 
             return h
+
 
 class Model(nn.Module):
     def __init__(self, in_dim, out_dim, hid_dim=40):

@@ -5,11 +5,10 @@ import networkx as nx
 import numpy as np
 import scipy
 
-from . import backend as F
-from . import utils
+from . import backend as F, utils
 from ._ffi.function import _init_api
 from ._ffi.object import ObjectBase, register_object
-from .base import DGLError, dgl_warning
+from .base import dgl_warning, DGLError
 
 
 class BoolFlag(object):

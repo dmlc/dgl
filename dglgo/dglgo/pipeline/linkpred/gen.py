@@ -1,16 +1,26 @@
-from pathlib import Path
-from jinja2 import Template
 import copy
-import typer
-from pydantic import BaseModel, Field
+from pathlib import Path
 from typing import Optional
+
+import ruamel.yaml
+import typer
 import yaml
-from ...utils.factory import PipelineFactory, NodeModelFactory, PipelineBase, DataFactory, EdgeModelFactory, NegativeSamplerFactory
-from ...utils.base_model import EarlyStopConfig, DeviceEnum
+from jinja2 import Template
+from pydantic import BaseModel, Field
+from ruamel.yaml.comments import CommentedMap
+
+from ...utils.base_model import DeviceEnum, EarlyStopConfig
+from ...utils.factory import (
+    DataFactory,
+    EdgeModelFactory,
+    NegativeSamplerFactory,
+    NodeModelFactory,
+    PipelineBase,
+    PipelineFactory,
+)
 
 from ...utils.yaml_dump import deep_convert_dict, merge_comment
-import ruamel.yaml
-from ruamel.yaml.comments import CommentedMap
+
 
 class LinkpredPipelineCfg(BaseModel):
     hidden_size: int = 256
@@ -42,23 +52,25 @@ class LinkpredPipeline(PipelineBase):
     pipeline_name = "linkpred"
 
     def __init__(self):
-        self.pipeline = {
-            "name": "linkpred",
-            "mode": "train"
-        }
+        self.pipeline = {"name": "linkpred", "mode": "train"}
 
     @classmethod
     def setup_user_cfg_cls(cls):
         from ...utils.enter_config import UserConfig
 
         class LinkPredUserConfig(UserConfig):
-            data: DataFactory.filter("linkpred").get_pydantic_config() = Field(..., discriminator="name")
-            node_model: NodeModelFactory.get_pydantic_model_config() = Field(...,
-                                                                             discriminator="name")
-            edge_model: EdgeModelFactory.get_pydantic_model_config() = Field(...,
-                                                                             discriminator="name")
-            neg_sampler: NegativeSamplerFactory.get_pydantic_model_config() = Field(...,
-                                                                                    discriminator="name")
+            data: DataFactory.filter("linkpred").get_pydantic_config() = Field(
+                ..., discriminator="name"
+            )
+            node_model: NodeModelFactory.get_pydantic_model_config() = Field(
+                ..., discriminator="name"
+            )
+            edge_model: EdgeModelFactory.get_pydantic_model_config() = Field(
+                ..., discriminator="name"
+            )
+            neg_sampler: NegativeSamplerFactory.get_pydantic_model_config() = (
+                Field(..., discriminator="name")
+            )
             general_pipeline: LinkpredPipelineCfg = LinkpredPipelineCfg()
 
         cls.user_cfg_cls = LinkPredUserConfig
@@ -69,15 +81,21 @@ class LinkpredPipeline(PipelineBase):
 
     def get_cfg_func(self):
         def config(
-            data: DataFactory.filter("linkpred").get_dataset_enum() = typer.Option(..., help="input data name"),
+            data: DataFactory.filter(
+                "linkpred"
+            ).get_dataset_enum() = typer.Option(..., help="input data name"),
             cfg: str = typer.Option(
-                "cfg.yaml", help="output configuration path"),
-            node_model: NodeModelFactory.get_model_enum() = typer.Option(...,
-                                                                         help="Model name"),
-            edge_model: EdgeModelFactory.get_model_enum() = typer.Option(...,
-                                                                         help="Model name"),
+                "cfg.yaml", help="output configuration path"
+            ),
+            node_model: NodeModelFactory.get_model_enum() = typer.Option(
+                ..., help="Model name"
+            ),
+            edge_model: EdgeModelFactory.get_model_enum() = typer.Option(
+                ..., help="Model name"
+            ),
             neg_sampler: NegativeSamplerFactory.get_model_enum() = typer.Option(
-                "persource", help="Negative sampler name"),
+                "persource", help="Negative sampler name"
+            ),
         ):
             self.__class__.setup_user_cfg_cls()
             generated_cfg = {
@@ -94,21 +112,41 @@ class LinkpredPipeline(PipelineBase):
             comment_dict = {
                 "device": "Torch device name, e.g., cpu or cuda or cuda:0",
                 "general_pipeline": pipeline_comments,
-                "node_model": NodeModelFactory.get_constructor_doc_dict(node_model.value),
-                "edge_model": EdgeModelFactory.get_constructor_doc_dict(edge_model.value),
-                "neg_sampler": NegativeSamplerFactory.get_constructor_doc_dict(neg_sampler.value),
+                "node_model": NodeModelFactory.get_constructor_doc_dict(
+                    node_model.value
+                ),
+                "edge_model": EdgeModelFactory.get_constructor_doc_dict(
+                    edge_model.value
+                ),
+                "neg_sampler": NegativeSamplerFactory.get_constructor_doc_dict(
+                    neg_sampler.value
+                ),
                 "data": {
-                    "split_ratio": 'List of float, e.q. [0.8, 0.1, 0.1]. Split ratios for training, validation and test sets. Must sum to one. Leave blank to use builtin split in original dataset',
-                    "neg_ratio": 'Int, e.q. 2. Indicate how much negative samples to be sampled per positive samples. Leave blank to use builtin split in original dataset'
+                    "split_ratio": "List of float, e.q. [0.8, 0.1, 0.1]. Split ratios for training, validation and test sets. Must sum to one. Leave blank to use builtin split in original dataset",
+                    "neg_ratio": "Int, e.q. 2. Indicate how much negative samples to be sampled per positive samples. Leave blank to use builtin split in original dataset",
                 },
             }
             comment_dict = merge_comment(output_cfg, comment_dict)
 
             if cfg is None:
-                cfg = "_".join(["linkpred", data.value, node_model.value, edge_model.value]) + ".yaml"
+                cfg = (
+                    "_".join(
+                        [
+                            "linkpred",
+                            data.value,
+                            node_model.value,
+                            edge_model.value,
+                        ]
+                    )
+                    + ".yaml"
+                )
             yaml = ruamel.yaml.YAML()
             yaml.dump(comment_dict, Path(cfg).open("w"))
-            print("Configuration file is generated at {}".format(Path(cfg).absolute()))
+            print(
+                "Configuration file is generated at {}".format(
+                    Path(cfg).absolute()
+                )
+            )
 
         return config
 
@@ -123,18 +161,33 @@ class LinkpredPipeline(PipelineBase):
 
         render_cfg = copy.deepcopy(user_cfg_dict)
         render_cfg["node_model_code"] = NodeModelFactory.get_source_code(
-            user_cfg_dict["node_model"]["name"])
+            user_cfg_dict["node_model"]["name"]
+        )
         render_cfg["edge_model_code"] = EdgeModelFactory.get_source_code(
-            user_cfg_dict["edge_model"]["name"])
-        render_cfg["node_model_class_name"] = NodeModelFactory.get_model_class_name(
-            user_cfg_dict["node_model"]["name"])
-        render_cfg["edge_model_class_name"] = EdgeModelFactory.get_model_class_name(
-            user_cfg_dict["edge_model"]["name"])
-        render_cfg["neg_sampler_name"] = NegativeSamplerFactory.get_model_class_name(
-            user_cfg_dict["neg_sampler"]["name"])
+            user_cfg_dict["edge_model"]["name"]
+        )
+        render_cfg[
+            "node_model_class_name"
+        ] = NodeModelFactory.get_model_class_name(
+            user_cfg_dict["node_model"]["name"]
+        )
+        render_cfg[
+            "edge_model_class_name"
+        ] = EdgeModelFactory.get_model_class_name(
+            user_cfg_dict["edge_model"]["name"]
+        )
+        render_cfg[
+            "neg_sampler_name"
+        ] = NegativeSamplerFactory.get_model_class_name(
+            user_cfg_dict["neg_sampler"]["name"]
+        )
         render_cfg["loss"] = user_cfg_dict["general_pipeline"]["loss"]
         # update import and initialization code
-        render_cfg.update(DataFactory.get_generated_code_dict(user_cfg_dict["data"]["name"], '**cfg["data"]'))
+        render_cfg.update(
+            DataFactory.get_generated_code_dict(
+                user_cfg_dict["data"]["name"], '**cfg["data"]'
+            )
+        )
         generated_user_cfg = copy.deepcopy(user_cfg_dict)
         if len(generated_user_cfg["data"]) == 1:
             generated_user_cfg.pop("data")
@@ -150,10 +203,17 @@ class LinkpredPipeline(PipelineBase):
         generated_train_cfg = copy.deepcopy(user_cfg_dict["general_pipeline"])
         generated_train_cfg["optimizer"].pop("name")
 
-
         if user_cfg_dict["data"].get("split_ratio", None) is not None:
-            assert user_cfg_dict["data"].get("neg_ratio", None) is not None, "Please specify both split_ratio and neg_ratio"
-            render_cfg["data_initialize_code"] = "{}, split_ratio={}, neg_ratio={}".format(render_cfg["data_initialize_code"], user_cfg_dict["data"]["split_ratio"], user_cfg_dict["data"]["neg_ratio"])
+            assert (
+                user_cfg_dict["data"].get("neg_ratio", None) is not None
+            ), "Please specify both split_ratio and neg_ratio"
+            render_cfg[
+                "data_initialize_code"
+            ] = "{}, split_ratio={}, neg_ratio={}".format(
+                render_cfg["data_initialize_code"],
+                user_cfg_dict["data"]["split_ratio"],
+                user_cfg_dict["data"]["neg_ratio"],
+            )
             generated_user_cfg["data"].pop("split_ratio")
             generated_user_cfg["data"].pop("neg_ratio")
 

@@ -1,12 +1,12 @@
 from typing import Optional
 
+import dgl
+
 import torch
 import torch.nn
-from torch import Tensor
-
-import dgl
 from dgl import DGLGraph
 from dgl.nn import GraphConv
+from torch import Tensor
 
 
 class GraphConvWithDropout(GraphConv):

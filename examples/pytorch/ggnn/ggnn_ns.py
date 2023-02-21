@@ -1,11 +1,10 @@
 """
 Gated Graph Neural Network module for node selection tasks
 """
-import torch
-from torch import nn
-
 import dgl
+import torch
 from dgl.nn.pytorch import GatedGraphConv
+from torch import nn
 
 
 class NodeSelectionGGNN(nn.Module):

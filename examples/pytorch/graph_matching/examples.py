@@ -1,7 +1,6 @@
+import dgl
 import numpy as np
 from ged import graph_edit_distance
-
-import dgl
 
 src1 = [0, 1, 2, 3, 4, 5]
 dst1 = [1, 2, 3, 4, 5, 6]

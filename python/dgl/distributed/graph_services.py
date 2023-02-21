@@ -6,16 +6,17 @@ import numpy as np
 from .. import backend as F
 from ..base import EID, NID
 from ..convert import graph, heterograph
-from ..sampling import sample_etype_neighbors as local_sample_etype_neighbors
-from ..sampling import sample_neighbors as local_sample_neighbors
+from ..sampling import (
+    sample_etype_neighbors as local_sample_etype_neighbors,
+    sample_neighbors as local_sample_neighbors,
+)
 from ..subgraph import in_subgraph as local_in_subgraph
 from ..utils import toindex
-from .. import backend as F
 from .rpc import (
-    Request,
-    Response,
     recv_responses,
     register_service,
+    Request,
+    Response,
     send_requests_to_machine,
 )
 
@@ -206,6 +207,7 @@ def _in_subgraph(local_g, partition_book, seed_nodes):
 # neighbor nodes (hence the data) may not belong to the current partition.
 # This is a limitation of the current DistDGL design.  We should improve it
 # later.
+
 
 class SamplingRequest(Request):
     """Sampling Request"""
@@ -798,9 +800,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
 
     def local_access(local_g, partition_book, local_nids):
         # See NOTE 1
-        _prob = (
-            [g.edata[prob].local_partition] if prob is not None else None
-        )
+        _prob = [g.edata[prob].local_partition] if prob is not None else None
         return _sample_neighbors(
             local_g,
             partition_book,

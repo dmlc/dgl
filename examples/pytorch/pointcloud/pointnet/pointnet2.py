@@ -1,14 +1,13 @@
+import dgl
+import dgl.function as fn
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
-
-import dgl
-import dgl.function as fn
 from dgl.geometry import (
     farthest_point_sampler,
 )  # dgl.geometry.pytorch -> dgl.geometry
+from torch.autograd import Variable
 
 """
 Part of the code are adapted from

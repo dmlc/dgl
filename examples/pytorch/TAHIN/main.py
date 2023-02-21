@@ -1,6 +1,8 @@
 import argparse
 import pickle as pkl
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -13,8 +15,6 @@ from utils import (
     evaluate_f1_score,
     evaluate_logloss,
 )
-
-import dgl
 
 
 def main(args):

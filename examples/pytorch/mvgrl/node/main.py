@@ -8,7 +8,7 @@ import torch.nn as nn
 warnings.filterwarnings("ignore")
 
 from dataset import process_dataset
-from model import MVGRL, LogReg
+from model import LogReg, MVGRL
 
 parser = argparse.ArgumentParser(description="mvgrl")
 
