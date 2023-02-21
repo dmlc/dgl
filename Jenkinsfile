@@ -240,8 +240,6 @@ pipeline {
         stage('Abort Previous CI') {
           steps {
             script {
-              // Jenkins will abort an older build if a newer build already
-              // passed a higher milestone.
               // https://www.jenkins.io/doc/pipeline/steps/pipeline-milestone-step/
               // Note: incorrect "success" status might be shown for the old
               // runs in the PR.
