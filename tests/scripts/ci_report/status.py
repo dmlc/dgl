@@ -12,6 +12,7 @@ response = requests.get("{}wfapi".format(JOB_LINK), verify=False).json()
 # List of status of entire job.
 # https://javadoc.jenkins.io/hudson/model/Result.html
 status = response["status"]
+status_output = f"[Debug Only] {status}"
 if status == "SUCCESS":
     status_output = "✅ CI test succeeded"
 elif status == "ABORTED":
