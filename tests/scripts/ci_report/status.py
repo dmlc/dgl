@@ -9,6 +9,7 @@ COMMIT = os.getenv("GIT_COMMIT")
 
 job_link = os.environ["BUILD_URL"]
 response = requests.get("{}wfapi".format(job_link), verify=False).json()
+print(response)
 status = "✅ CI test succeeded"
 for v in response["stages"]:
     # https://javadoc.jenkins.io/plugin/pipeline-graph-analysis/org/jenkinsci/plugins/workflow/pipelinegraphanalysis/GenericStatus.html
