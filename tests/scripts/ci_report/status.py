@@ -22,7 +22,7 @@ if args.result == "SUCCESS":
     status_output = "✅ CI test succeeded."
 elif args.result == "NOT_BUILT":
     status_output = "⚪️ CI test cancelled due to overrun."
-elif args.result == "FAILURE":
+elif args.result in ["FAILURE", "ABORTED"]:
     status_output == "❌ CI test failed."
     JOB_LINK = os.environ["BUILD_URL"]
     response = requests.get("{}wfapi".format(JOB_LINK), verify=False).json()
