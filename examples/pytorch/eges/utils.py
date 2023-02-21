@@ -2,11 +2,11 @@ import argparse
 import random
 from datetime import datetime
 
+import dgl
+
 import networkx as nx
 import numpy as np
 import torch as th
-
-import dgl
 
 
 def init_args():

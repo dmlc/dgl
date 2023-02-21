@@ -1,10 +1,10 @@
 import argparse
 import warnings
 
+import dgl
+
 import torch as th
 from dataset import load
-
-import dgl
 from dgl.dataloading import GraphDataLoader
 
 warnings.filterwarnings("ignore")
@@ -66,7 +66,6 @@ def collate(samples):
 
 
 if __name__ == "__main__":
-
     # Step 1: Prepare data =================================================================== #
     dataset = load(args.dataname)
 

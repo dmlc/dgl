@@ -1,13 +1,13 @@
 """Graph builder from pandas dataframes"""
 from collections import namedtuple
 
+import dgl
+
 from pandas.api.types import (
     is_categorical,
     is_categorical_dtype,
     is_numeric_dtype,
 )
-
-import dgl
 
 __all__ = ["PandasGraphBuilder"]
 

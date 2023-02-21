@@ -18,12 +18,14 @@ GNN for node classification <1_introduction>`.
 
 """
 
+import os
+
+os.environ["DGLBACKEND"] = "pytorch"
+import dgl
+import dgl.function as fn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.function as fn
 
 ######################################################################
 # Message passing and GNNs

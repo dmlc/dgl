@@ -338,6 +338,7 @@ class RadiusGraph(nn.Module):
             [0.7000],
             [0.2828]])
     """
+
     # pylint: disable=invalid-name
     def __init__(
         self,

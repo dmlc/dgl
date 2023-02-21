@@ -18,15 +18,17 @@ By the end of this tutorial you will be able to
 """
 
 import itertools
+import os
 
+os.environ["DGLBACKEND"] = "pytorch"
+
+import dgl
+import dgl.data
 import numpy as np
 import scipy.sparse as sp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.data
 
 ######################################################################
 # Overview of Link Prediction with GNN

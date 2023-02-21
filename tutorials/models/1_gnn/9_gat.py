@@ -104,8 +104,9 @@ structure-free normalization, in the style of attention.
 # DGL provides an off-the-shelf implementation of the GAT layer under the ``dgl.nn.<backend>``
 # subpackage. Simply import the ``GATConv`` as the follows.
 
-from dgl.nn.pytorch import GATConv
+import os
 
+os.environ["DGLBACKEND"] = "pytorch"
 ###############################################################
 # Readers can skip the following step-by-step explanation of the implementation and
 # jump to the `Put everything together`_ for training and visualization results.
@@ -123,6 +124,7 @@ from dgl.nn.pytorch import GATConv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from dgl.nn.pytorch import GATConv
 
 
 class GATLayer(nn.Module):
@@ -137,37 +139,38 @@ class GATLayer(nn.Module):
 
     def reset_parameters(self):
         """Reinitialize learnable parameters."""
-        gain = nn.init.calculate_gain('relu')
+        gain = nn.init.calculate_gain("relu")
         nn.init.xavier_normal_(self.fc.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_fc.weight, gain=gain)
 
     def edge_attention(self, edges):
         # edge UDF for equation (2)
-        z2 = torch.cat([edges.src['z'], edges.dst['z']], dim=1)
+        z2 = torch.cat([edges.src["z"], edges.dst["z"]], dim=1)
         a = self.attn_fc(z2)
-        return {'e': F.leaky_relu(a)}
+        return {"e": F.leaky_relu(a)}
 
     def message_func(self, edges):
         # message UDF for equation (3) & (4)
-        return {'z': edges.src['z'], 'e': edges.data['e']}
+        return {"z": edges.src["z"], "e": edges.data["e"]}
 
     def reduce_func(self, nodes):
         # reduce UDF for equation (3) & (4)
         # equation (3)
-        alpha = F.softmax(nodes.mailbox['e'], dim=1)
+        alpha = F.softmax(nodes.mailbox["e"], dim=1)
         # equation (4)
-        h = torch.sum(alpha * nodes.mailbox['z'], dim=1)
-        return {'h': h}
+        h = torch.sum(alpha * nodes.mailbox["z"], dim=1)
+        return {"h": h}
 
     def forward(self, h):
         # equation (1)
         z = self.fc(h)
-        self.g.ndata['z'] = z
+        self.g.ndata["z"] = z
         # equation (2)
         self.g.apply_edges(self.edge_attention)
         # equation (3) & (4)
         self.g.update_all(self.message_func, self.reduce_func)
-        return self.g.ndata.pop('h')
+        return self.g.ndata.pop("h")
+
 
 ##################################################################
 # Equation (1)
@@ -193,11 +196,13 @@ class GATLayer(nn.Module):
 # ``apply_edges`` API. The argument to the ``apply_edges`` is an **Edge UDF**,
 # which is defined as below:
 
+
 def edge_attention(self, edges):
     # edge UDF for equation (2)
-    z2 = torch.cat([edges.src['z'], edges.dst['z']], dim=1)
+    z2 = torch.cat([edges.src["z"], edges.dst["z"]], dim=1)
     a = self.attn_fc(z2)
-    return {'e' : F.leaky_relu(a)}
+    return {"e": F.leaky_relu(a)}
+
 
 ########################################################################3
 # Here, the dot product with the learnable weight vector :math:`\vec{a^{(l)}}`
@@ -227,13 +232,15 @@ def edge_attention(self, edges):
 # Both tasks first fetch data from the mailbox and then manipulate it on the
 # second dimension (``dim=1``), on which the messages are batched.
 
+
 def reduce_func(self, nodes):
     # reduce UDF for equation (3) & (4)
     # equation (3)
-    alpha = F.softmax(nodes.mailbox['e'], dim=1)
+    alpha = F.softmax(nodes.mailbox["e"], dim=1)
     # equation (4)
-    h = torch.sum(alpha * nodes.mailbox['z'], dim=1)
-    return {'h' : h}
+    h = torch.sum(alpha * nodes.mailbox["z"], dim=1)
+    return {"h": h}
+
 
 #####################################################################
 # Multi-head attention
@@ -256,8 +263,9 @@ def reduce_func(self, nodes):
 # Use the above defined single-head ``GATLayer`` as the building block
 # for the ``MultiHeadGATLayer`` below:
 
+
 class MultiHeadGATLayer(nn.Module):
-    def __init__(self, g, in_dim, out_dim, num_heads, merge='cat'):
+    def __init__(self, g, in_dim, out_dim, num_heads, merge="cat"):
         super(MultiHeadGATLayer, self).__init__()
         self.heads = nn.ModuleList()
         for i in range(num_heads):
@@ -266,18 +274,20 @@ class MultiHeadGATLayer(nn.Module):
 
     def forward(self, h):
         head_outs = [attn_head(h) for attn_head in self.heads]
-        if self.merge == 'cat':
+        if self.merge == "cat":
             # concat on the output feature dimension (dim=1)
             return torch.cat(head_outs, dim=1)
         else:
             # merge using average
             return torch.mean(torch.stack(head_outs))
 
+
 ###########################################################################
 # Put everything together
 # ^^^^^^^^^^^^^^^^^^^^^^^
 #
 # Now, you can define a two-layer GAT model.
+
 
 class GAT(nn.Module):
     def __init__(self, g, in_dim, hidden_dim, out_dim, num_heads):
@@ -294,33 +304,34 @@ class GAT(nn.Module):
         h = self.layer2(h)
         return h
 
+
+import networkx as nx
+
 #############################################################################
 # We then load the Cora dataset using DGL's built-in data module.
 
 from dgl import DGLGraph
 from dgl.data import citation_graph as citegrh
-import networkx as nx
+
 
 def load_cora_data():
     data = citegrh.load_cora()
     g = data[0]
-    mask = torch.BoolTensor(g.ndata['train_mask'])
-    return g, g.ndata['feat'], g.ndata['label'], mask
+    mask = torch.BoolTensor(g.ndata["train_mask"])
+    return g, g.ndata["feat"], g.ndata["label"], mask
+
 
 ##############################################################################
 # The training loop is exactly the same as in the GCN tutorial.
 
 import time
+
 import numpy as np
 
 g, features, labels, mask = load_cora_data()
 
 # create the model, 2 heads, each head has hidden size 8
-net = GAT(g,
-          in_dim=features.size()[1],
-          hidden_dim=8,
-          out_dim=7,
-          num_heads=2)
+net = GAT(g, in_dim=features.size()[1], hidden_dim=8, out_dim=7, num_heads=2)
 
 # create optimizer
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
@@ -342,8 +353,11 @@ for epoch in range(30):
     if epoch >= 3:
         dur.append(time.time() - t0)
 
-    print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f}".format(
-        epoch, loss.item(), np.mean(dur)))
+    print(
+        "Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f}".format(
+            epoch, loss.item(), np.mean(dur)
+        )
+    )
 
 #########################################################################
 # Visualizing and understanding attention learned

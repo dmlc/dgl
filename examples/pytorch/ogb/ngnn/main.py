@@ -1,15 +1,15 @@
 import argparse
 import math
 
+import dgl
+
 import torch
 import torch.nn.functional as F
+from dgl.dataloading.negative_sampler import GlobalUniform
+from dgl.nn.pytorch import GraphConv, SAGEConv
 from ogb.linkproppred import DglLinkPropPredDataset, Evaluator
 from torch.nn import Linear
 from torch.utils.data import DataLoader
-
-import dgl
-from dgl.dataloading.negative_sampler import GlobalUniform
-from dgl.nn.pytorch import GraphConv, SAGEConv
 
 
 class Logger(object):

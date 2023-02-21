@@ -3,14 +3,14 @@ import os
 import pickle
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.optim as optim
 from dataset import LanderDataset
 from models import LANDER
 from utils import build_next_level, decode, evaluation, stop_iterating
-
-import dgl
 
 ###########
 # ArgParser

@@ -2,8 +2,9 @@
 # pylint: disable= no-member, arguments-differ, invalid-name
 from torch import nn
 
-from ....base import DGLError
 from .... import function as fn
+
+from ....base import DGLError
 from ....utils import expand_as_pair
 
 
@@ -92,11 +93,10 @@ class EdgeConv(nn.Module):
             [ 0.2101,  1.3466],
             [ 0.2342, -0.9868]], grad_fn=<CopyReduceBackward>)
     """
-    def __init__(self,
-                 in_feat,
-                 out_feat,
-                 batch_norm=False,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self, in_feat, out_feat, batch_norm=False, allow_zero_in_degree=False
+    ):
         super(EdgeConv, self).__init__()
         self.batch_norm = batch_norm
         self._allow_zero_in_degree = allow_zero_in_degree
@@ -155,26 +155,28 @@ class EdgeConv(nn.Module):
         with g.local_scope():
             if not self._allow_zero_in_degree:
                 if (g.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             h_src, h_dst = expand_as_pair(feat, g)
-            g.srcdata['x'] = h_src
-            g.dstdata['x'] = h_dst
-            g.apply_edges(fn.v_sub_u('x', 'x', 'theta'))
-            g.edata['theta'] = self.theta(g.edata['theta'])
-            g.dstdata['phi'] = self.phi(g.dstdata['x'])
+            g.srcdata["x"] = h_src
+            g.dstdata["x"] = h_dst
+            g.apply_edges(fn.v_sub_u("x", "x", "theta"))
+            g.edata["theta"] = self.theta(g.edata["theta"])
+            g.dstdata["phi"] = self.phi(g.dstdata["x"])
             if not self.batch_norm:
-                g.update_all(fn.e_add_v('theta', 'phi', 'e'), fn.max('e', 'x'))
+                g.update_all(fn.e_add_v("theta", "phi", "e"), fn.max("e", "x"))
             else:
-                g.apply_edges(fn.e_add_v('theta', 'phi', 'e'))
+                g.apply_edges(fn.e_add_v("theta", "phi", "e"))
                 # Although the official implementation includes a per-edge
                 # batch norm within EdgeConv, I choose to replace it with a
                 # global batch norm for a number of reasons:
@@ -194,6 +196,6 @@ class EdgeConv(nn.Module):
                 #     In this case, the learned statistics of each position
                 #     by batch norm is not as meaningful as those learned from
                 #     images.
-                g.edata['e'] = self.bn(g.edata['e'])
-                g.update_all(fn.copy_e('e', 'e'), fn.max('e', 'x'))
-            return g.dstdata['x']
+                g.edata["e"] = self.bn(g.edata["e"])
+                g.update_all(fn.copy_e("e", "e"), fn.max("e", "x"))
+            return g.dstdata["x"]

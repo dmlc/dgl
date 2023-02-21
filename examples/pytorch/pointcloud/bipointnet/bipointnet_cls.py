@@ -1,15 +1,12 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
-import numpy as np
 from basic import BiLinear
+from torch.autograd import Variable
 
-offset_map = {
-    1024: -3.2041,
-    2048: -3.4025,
-    4096: -3.5836
-}
+offset_map = {1024: -3.2041, 2048: -3.4025, 4096: -3.5836}
+
 
 class Conv1d(nn.Module):
     def __init__(self, inplane, outplane, Linear):
@@ -38,9 +35,16 @@ class EmaMaxPool(nn.Module):
             x = torch.max(x, 2, keepdim=True)[0] - 0.3
         return x
 
+
 class BiPointNetCls(nn.Module):
-    def __init__(self, output_classes, input_dims=3, conv1_dim=64,
-                 use_transform=True, Linear=BiLinear):
+    def __init__(
+        self,
+        output_classes,
+        input_dims=3,
+        conv1_dim=64,
+        use_transform=True,
+        Linear=BiLinear,
+    ):
         super(BiPointNetCls, self).__init__()
         self.input_dims = input_dims
         self.conv1 = nn.ModuleList()
@@ -119,6 +123,7 @@ class BiPointNetCls(nn.Module):
         out = self.mlp_out(h)
         return out
 
+
 class TransformNet(nn.Module):
     def __init__(self, input_dims=3, conv1_dim=64, Linear=BiLinear):
         super(TransformNet, self).__init__()
@@ -153,7 +158,7 @@ class TransformNet(nn.Module):
             h = conv(h)
             h = bn(h)
             h = F.relu(h)
-        
+
         h = self.maxpool(h).view(-1, self.pool_feat_len)
         for mlp, bn in zip(self.mlp2, self.bn2):
             h = mlp(h)
@@ -162,8 +167,14 @@ class TransformNet(nn.Module):
 
         out = self.mlp_out(h)
 
-        iden = Variable(torch.from_numpy(np.eye(self.input_dims).flatten().astype(np.float32)))
-        iden = iden.view(1, self.input_dims * self.input_dims).repeat(batch_size, 1)
+        iden = Variable(
+            torch.from_numpy(
+                np.eye(self.input_dims).flatten().astype(np.float32)
+            )
+        )
+        iden = iden.view(1, self.input_dims * self.input_dims).repeat(
+            batch_size, 1
+        )
         if out.is_cuda:
             iden = iden.cuda()
         out = out + iden

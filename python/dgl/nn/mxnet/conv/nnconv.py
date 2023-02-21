@@ -89,24 +89,29 @@ class NNConv(nn.Block):
     [ 0.24425688  0.3238042 ]]
     <NDArray 4x2 @cpu(0)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 edge_func,
-                 aggregator_type,
-                 residual=False,
-                 bias=True):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        edge_func,
+        aggregator_type,
+        residual=False,
+        bias=True,
+    ):
         super(NNConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
-        if aggregator_type == 'sum':
+        if aggregator_type == "sum":
             self.reducer = fn.sum
-        elif aggregator_type == 'mean':
+        elif aggregator_type == "mean":
             self.reducer = fn.mean
-        elif aggregator_type == 'max':
+        elif aggregator_type == "max":
             self.reducer = fn.max
         else:
-            raise KeyError('Aggregator type {} not recognized: '.format(aggregator_type))
+            raise KeyError(
+                "Aggregator type {} not recognized: ".format(aggregator_type)
+            )
         self._aggre_type = aggregator_type
 
         with self.name_scope():
@@ -114,17 +119,20 @@ class NNConv(nn.Block):
             if residual:
                 if self._in_dst_feats != out_feats:
                     self.res_fc = nn.Dense(
-                        out_feats, in_units=self._in_dst_feats,
-                        use_bias=False, weight_initializer=mx.init.Xavier())
+                        out_feats,
+                        in_units=self._in_dst_feats,
+                        use_bias=False,
+                        weight_initializer=mx.init.Xavier(),
+                    )
                 else:
                     self.res_fc = Identity()
             else:
                 self.res_fc = None
 
             if bias:
-                self.bias = self.params.get('bias',
-                                            shape=(out_feats,),
-                                            init=mx.init.Zero())
+                self.bias = self.params.get(
+                    "bias", shape=(out_feats,), init=mx.init.Zero()
+                )
             else:
                 self.bias = None
 
@@ -153,12 +161,16 @@ class NNConv(nn.Block):
             feat_src, feat_dst = expand_as_pair(feat, graph)
 
             # (n, d_in, 1)
-            graph.srcdata['h'] = feat_src.expand_dims(-1)
+            graph.srcdata["h"] = feat_src.expand_dims(-1)
             # (n, d_in, d_out)
-            graph.edata['w'] = self.edge_nn(efeat).reshape(-1, self._in_src_feats, self._out_feats)
+            graph.edata["w"] = self.edge_nn(efeat).reshape(
+                -1, self._in_src_feats, self._out_feats
+            )
             # (n, d_in, d_out)
-            graph.update_all(fn.u_mul_e('h', 'w', 'm'), self.reducer('m', 'neigh'))
-            rst = graph.dstdata.pop('neigh').sum(axis=1) # (n, d_out)
+            graph.update_all(
+                fn.u_mul_e("h", "w", "m"), self.reducer("m", "neigh")
+            )
+            rst = graph.dstdata.pop("neigh").sum(axis=1)  # (n, d_out)
             # residual connection
             if self.res_fc is not None:
                 rst = rst + self.res_fc(feat_dst)

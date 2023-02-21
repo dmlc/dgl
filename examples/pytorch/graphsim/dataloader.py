@@ -1,12 +1,12 @@
 import copy
 import os
 
+import dgl
+
 import networkx as nx
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
-
-import dgl
 
 
 def build_dense_graph(n_particles):

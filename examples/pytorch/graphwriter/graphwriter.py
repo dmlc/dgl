@@ -1,5 +1,5 @@
 import torch
-from modules import MSA, BiLSTM, GraphTrans
+from modules import BiLSTM, GraphTrans, MSA
 from torch import nn
 from utlis import *
 

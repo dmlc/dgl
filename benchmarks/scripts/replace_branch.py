@@ -20,7 +20,6 @@ def json_minify(string, strip_space=True):
     index = 0
 
     for match in re.finditer(tokenizer, string):
-
         if not (in_multi or in_single):
             tmp = string[index : match.start()]
             if not in_string and strip_space:

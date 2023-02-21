@@ -1,7 +1,6 @@
+import dgl.nn.pytorch as dglnn
 import torch
 import torch.nn as nn
-
-import dgl.nn.pytorch as dglnn
 from dgl import function as fn
 from dgl.ops import edge_softmax
 from dgl.utils import expand_as_pair

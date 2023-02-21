@@ -1,10 +1,9 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 import dgl
 import dgl.function as fn
 import dgl.nn.pytorch as dglnn
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 
 def disable_grad(module):

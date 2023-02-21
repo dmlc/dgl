@@ -1,14 +1,14 @@
 import os.path as osp
 from copy import deepcopy
 
+import dgl
+
 import torch
+from dgl import add_self_loop, DGLGraph, NID
+from dgl.dataloading.negative_sampler import Uniform
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from utils import drnl_node_labeling
-
-import dgl
-from dgl import NID, DGLGraph, add_self_loop
-from dgl.dataloading.negative_sampler import Uniform
 
 
 class GraphDataSet(Dataset):
@@ -48,7 +48,6 @@ class PosNegEdgesGenerator(object):
         self.shuffle = shuffle
 
     def __call__(self, split_type):
-
         if split_type == "train":
             subsample_ratio = self.subsample_ratio
         else:
@@ -177,7 +176,6 @@ class SEALSampler(object):
         return subgraph
 
     def _collate(self, batch):
-
         batch_graphs, batch_labels = map(list, zip(*batch))
 
         batch_graphs = dgl.batch(batch_graphs)
@@ -272,7 +270,6 @@ class SEALData(object):
         )
 
     def __call__(self, split_type):
-
         if split_type == "train":
             subsample_ratio = self.subsample_ratio
         else:

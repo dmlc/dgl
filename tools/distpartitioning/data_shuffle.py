@@ -164,7 +164,7 @@ def gen_node_data(
     return local_node_data
 
 
-def exchange_edge_data(rank, world_size, num_parts, edge_data):
+def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
     """
     Exchange edge_data among processes in the world.
     Prepare list of sliced data targeting each process and trigger
@@ -179,6 +179,7 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
     edge_data : dictionary
         edge information, as a dicitonary which stores column names as keys and values
         as column data. This information is read from the edges.txt file.
+    id_lookup : DistLookService object
 
     Returns:
     --------
@@ -189,52 +190,108 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
 
     # Prepare data for each rank in the cluster.
     start = timer()
+
+    CHUNK_SIZE = 100 * 1000 * 1000  # 100 * 8 * 5 = 1 * 4 = 8 GB/message/node
+    num_edges = edge_data[constants.GLOBAL_SRC_ID].shape[0]
+    all_counts = allgather_sizes(
+        [num_edges], world_size, num_parts, return_sizes=True
+    )
+    max_edges = np.amax(all_counts)
+    all_edges = np.sum(all_counts)
+    num_chunks = (max_edges // CHUNK_SIZE) + (
+        0 if (max_edges % CHUNK_SIZE == 0) else 1
+    )
+    LOCAL_CHUNK_SIZE = (num_edges // num_chunks) + (
+        0 if (num_edges % num_chunks == 0) else 1
+    )
+    logging.info(
+        f"[Rank: {rank} Edge Data Shuffle - max_edges: {max_edges}, \
+                        local_edges: {num_edges} and num_chunks: {num_chunks} \
+                        Total edges: {all_edges} Local_CHUNK_SIZE: {LOCAL_CHUNK_SIZE}"
+    )
+
+    # Start sending the chunks to the rest of the processes
     for local_part_id in range(num_parts // world_size):
+        local_src_ids = []
+        local_dst_ids = []
+        local_type_eids = []
+        local_etype_ids = []
+        local_eids = []
 
-        input_list = []
-        for idx in range(world_size):
-            send_idx = edge_data[constants.OWNER_PROCESS] == (
-                idx + local_part_id * world_size
+        for chunk in range(num_chunks):
+            start = chunk * LOCAL_CHUNK_SIZE
+            end = (chunk + 1) * LOCAL_CHUNK_SIZE
+
+            logging.info(
+                f"[Rank: {rank}] EdgeData Shuffle: processing \
+                    local_part_id: {local_part_id} and chunkid: {chunk}"
             )
-            send_idx = send_idx.reshape(
-                edge_data[constants.GLOBAL_SRC_ID].shape[0]
-            )
-            filt_data = np.column_stack(
-                (
-                    edge_data[constants.GLOBAL_SRC_ID][send_idx == 1],
-                    edge_data[constants.GLOBAL_DST_ID][send_idx == 1],
-                    edge_data[constants.GLOBAL_TYPE_EID][send_idx == 1],
-                    edge_data[constants.ETYPE_ID][send_idx == 1],
-                    edge_data[constants.GLOBAL_EID][send_idx == 1],
+            cur_src_id = edge_data[constants.GLOBAL_SRC_ID][start:end]
+            cur_dst_id = edge_data[constants.GLOBAL_DST_ID][start:end]
+            cur_type_eid = edge_data[constants.GLOBAL_TYPE_EID][start:end]
+            cur_etype_id = edge_data[constants.ETYPE_ID][start:end]
+            cur_eid = edge_data[constants.GLOBAL_EID][start:end]
+
+            input_list = []
+            owner_ids = id_lookup.get_partition_ids(cur_dst_id)
+            for idx in range(world_size):
+                send_idx = owner_ids == (idx + local_part_id * world_size)
+                send_idx = send_idx.reshape(cur_src_id.shape[0])
+                filt_data = np.column_stack(
+                    (
+                        cur_src_id[send_idx == 1],
+                        cur_dst_id[send_idx == 1],
+                        cur_type_eid[send_idx == 1],
+                        cur_etype_id[send_idx == 1],
+                        cur_eid[send_idx == 1],
+                    )
                 )
+                if filt_data.shape[0] <= 0:
+                    input_list.append(torch.empty((0, 5), dtype=torch.int64))
+                else:
+                    input_list.append(torch.from_numpy(filt_data))
+
+            # Now send newly formed chunk to others.
+            dist.barrier()
+            output_list = alltoallv_cpu(
+                rank, world_size, input_list, retain_nones=False
             )
-            if filt_data.shape[0] <= 0:
-                input_list.append(torch.empty((0, 5), dtype=torch.int64))
-            else:
-                input_list.append(torch.from_numpy(filt_data))
 
-        dist.barrier()
-        output_list = alltoallv_cpu(
-            rank, world_size, input_list, retain_nones=False
-        )
+            # Replace the values of the edge_data, with the received data from all the other processes.
+            rcvd_edge_data = torch.cat(output_list).numpy()
+            local_src_ids.append(rcvd_edge_data[:, 0])
+            local_dst_ids.append(rcvd_edge_data[:, 1])
+            local_type_eids.append(rcvd_edge_data[:, 2])
+            local_etype_ids.append(rcvd_edge_data[:, 3])
+            local_eids.append(rcvd_edge_data[:, 4])
 
-        # Replace the values of the edge_data, with the received data from all the other processes.
-        rcvd_edge_data = torch.cat(output_list).numpy()
         edge_data[
             constants.GLOBAL_SRC_ID + "/" + str(local_part_id)
-        ] = rcvd_edge_data[:, 0]
+        ] = np.concatenate(local_src_ids)
         edge_data[
             constants.GLOBAL_DST_ID + "/" + str(local_part_id)
-        ] = rcvd_edge_data[:, 1]
+        ] = np.concatenate(local_dst_ids)
         edge_data[
             constants.GLOBAL_TYPE_EID + "/" + str(local_part_id)
-        ] = rcvd_edge_data[:, 2]
+        ] = np.concatenate(local_type_eids)
         edge_data[
             constants.ETYPE_ID + "/" + str(local_part_id)
-        ] = rcvd_edge_data[:, 3]
+        ] = np.concatenate(local_etype_ids)
         edge_data[
             constants.GLOBAL_EID + "/" + str(local_part_id)
-        ] = rcvd_edge_data[:, 4]
+        ] = np.concatenate(local_eids)
+
+    # Check if the data was exchanged correctly
+    local_edge_count = 0
+    for local_part_id in range(num_parts // world_size):
+        local_edge_count += edge_data[
+            constants.GLOBAL_SRC_ID + "/" + str(local_part_id)
+        ].shape[0]
+    shuffle_edge_counts = allgather_sizes(
+        [local_edge_count], world_size, num_parts, return_sizes=True
+    )
+    shuffle_edge_total = np.sum(shuffle_edge_counts)
+    assert shuffle_edge_total == all_edges
 
     end = timer()
     logging.info(
@@ -242,7 +299,6 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data):
     )
 
     # Clean up.
-    edge_data.pop(constants.OWNER_PROCESS)
     edge_data.pop(constants.GLOBAL_SRC_ID)
     edge_data.pop(constants.GLOBAL_DST_ID)
     edge_data.pop(constants.GLOBAL_TYPE_EID)
@@ -334,32 +390,33 @@ def exchange_feature(
 
     tokens = feat_key.split("/")
     assert len(tokens) == 3
+
     local_feat_key = "/".join(tokens[:-1]) + "/" + str(local_part_id)
+    # Get the partition ids for the range of global nids.
+    if feat_type == constants.STR_NODE_FEATURES:
+        # Retrieve the partition ids for the node features.
+        # Each partition id will be in the range [0, num_parts).
+        partid_slice = id_lookup.get_partition_ids(
+            np.arange(gid_start, gid_end, dtype=np.int64)
+        )
+    else:
+        # Edge data case.
+        # Ownership is determined by the destination node.
+        assert data is not None
+        global_eids = np.arange(gid_start, gid_end, dtype=np.int64)
+
+        # Now use `data` to extract destination nodes' global id
+        # and use that to get the ownership
+        common, idx1, idx2 = np.intersect1d(
+            data[constants.GLOBAL_EID], global_eids, return_indices=True
+        )
+        assert common.shape[0] == idx2.shape[0]
+
+        global_dst_nids = data[constants.GLOBAL_DST_ID][idx1]
+        assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
+        partid_slice = id_lookup.get_partition_ids(global_dst_nids)
+
     for idx in range(world_size):
-        # Get the partition ids for the range of global nids.
-        if feat_type == constants.STR_NODE_FEATURES:
-            # Retrieve the partition ids for the node features.
-            # Each partition id will be in the range [0, num_parts).
-            partid_slice = id_lookup.get_partition_ids(
-                np.arange(gid_start, gid_end, dtype=np.int64)
-            )
-        else:
-            # Edge data case.
-            # Ownership is determined by the destination node.
-            assert data is not None
-            global_eids = np.arange(gid_start, gid_end, dtype=np.int64)
-
-            # Now use `data` to extract destination nodes' global id
-            # and use that to get the ownership
-            common, idx1, idx2 = np.intersect1d(
-                data[constants.GLOBAL_EID], global_eids, return_indices=True
-            )
-            assert common.shape[0] == idx2.shape[0]
-
-            global_dst_nids = data[constants.GLOBAL_DST_ID][idx1]
-            assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
-            partid_slice = id_lookup.get_partition_ids(global_dst_nids)
-
         cond = partid_slice == (idx + local_part_id * world_size)
         gids_per_partid = gids_feat[cond]
         tids_per_partid = tids_feat[cond]
@@ -476,7 +533,6 @@ def exchange_features(
 
     # To iterate over the node_types and associated node_features
     for feat_key, type_info in feature_tids.items():
-
         # To iterate over the feature data, of a given (node or edge )type
         # type_info is a list of 3 elements (as shown below):
         #   [feature-name, starting-idx, ending-idx]
@@ -659,7 +715,9 @@ def exchange_graph_data(
     )
     memory_snapshot("NodeDataGenerationComplete: ", rank)
 
-    edge_data = exchange_edge_data(rank, world_size, num_parts, edge_data)
+    edge_data = exchange_edge_data(
+        rank, world_size, num_parts, edge_data, id_lookup
+    )
     memory_snapshot("ShuffleEdgeDataComplete: ", rank)
     return (
         node_data,
@@ -1038,7 +1096,8 @@ def gen_dist_partitions(rank, world_size, params):
                 ][feature_idx]
     memory_snapshot("ReorderNodeFeaturesComplete: ", rank)
 
-    # sort edge_data by etype
+
+    #sort edge_data by etype
     edge_data = reorder_data(params, world_size, edge_data, constants.ETYPE_ID)
     logging.info(f"[Rank: {rank}] Sorted edge_data by edge_type")
     memory_snapshot("EdgeDataSortComplete: ", rank)

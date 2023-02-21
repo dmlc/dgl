@@ -3,8 +3,10 @@ import sys
 from itertools import product
 
 from .. import backend as F
-from ..backend import gsddmm as gsddmm_internal
-from ..backend import gsddmm_hetero as gsddmm_internal_hetero
+from ..backend import (
+    gsddmm as gsddmm_internal,
+    gsddmm_hetero as gsddmm_internal_hetero,
+)
 
 __all__ = ["gsddmm", "copy_u", "copy_v", "copy_e"]
 
