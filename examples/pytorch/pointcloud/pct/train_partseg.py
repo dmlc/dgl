@@ -2,6 +2,8 @@ import argparse
 import time
 from functools import partial
 
+import dgl
+
 import numpy as np
 import provider
 import torch
@@ -10,8 +12,6 @@ import tqdm
 from pct import PartSegLoss, PointTransformerSeg
 from ShapeNet import ShapeNet
 from torch.utils.data import DataLoader
-
-import dgl
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset-path", type=str, default="")

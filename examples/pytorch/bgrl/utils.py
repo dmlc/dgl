@@ -3,9 +3,14 @@ import copy
 import numpy as np
 import torch
 
-from dgl.data import (AmazonCoBuyComputerDataset, AmazonCoBuyPhotoDataset,
-                      CoauthorCSDataset, CoauthorPhysicsDataset, PPIDataset,
-                      WikiCSDataset)
+from dgl.data import (
+    AmazonCoBuyComputerDataset,
+    AmazonCoBuyPhotoDataset,
+    CoauthorCSDataset,
+    CoauthorPhysicsDataset,
+    PPIDataset,
+    WikiCSDataset,
+)
 from dgl.dataloading import GraphDataLoader
 from dgl.transforms import Compose, DropEdge, FeatMask, RowFeatNormalizer
 

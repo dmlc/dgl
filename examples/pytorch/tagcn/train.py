@@ -6,10 +6,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from tagcn import TAGCN
 
 from dgl import DGLGraph
 from dgl.data import load_data, register_data_args
+from tagcn import TAGCN
 
 
 def evaluate(model, features, labels, mask):

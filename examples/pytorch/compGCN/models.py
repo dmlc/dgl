@@ -1,11 +1,10 @@
+import dgl
+import dgl.function as fn
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from utils import ccorr
-
-import dgl
-import dgl.function as fn
 
 
 class CompGraphConv(nn.Module):
@@ -41,7 +40,6 @@ class CompGraphConv(nn.Module):
         nn.init.xavier_normal_(self.loop_rel)
 
     def forward(self, g, n_in_feats, r_feats):
-
         with g.local_scope():
             # Assign values to source nodes. In a homogeneous graph, this is equal to
             # assigning them to all nodes.

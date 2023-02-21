@@ -1,12 +1,11 @@
+import dgl
+import dgl.nn as dglnn
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
 import torch as th
 import torch.functional as F
 import torch.nn as nn
 import tqdm
-
-import dgl
-import dgl.nn as dglnn
 
 
 class SAGE(nn.Module):

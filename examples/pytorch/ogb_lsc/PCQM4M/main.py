@@ -2,6 +2,8 @@ import argparse
 import os
 import random
 
+import dgl
+
 import numpy as np
 import torch
 import torch.optim as optim
@@ -11,8 +13,6 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-
-import dgl
 
 reg_criterion = torch.nn.L1Loss()
 

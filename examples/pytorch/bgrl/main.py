@@ -2,19 +2,26 @@ import copy
 import os
 import warnings
 
+import dgl
+
 import numpy as np
 import torch
-from eval_function import (fit_logistic_regression,
-                           fit_logistic_regression_preset_splits,
-                           fit_ppi_linear)
-from model import (BGRL, GCN, GraphSAGE_GCN, MLP_Predictor,
-                   compute_representations)
+from eval_function import (
+    fit_logistic_regression,
+    fit_logistic_regression_preset_splits,
+    fit_ppi_linear,
+)
+from model import (
+    BGRL,
+    compute_representations,
+    GCN,
+    GraphSAGE_GCN,
+    MLP_Predictor,
+)
 from torch.nn.functional import cosine_similarity
 from torch.optim import AdamW
 from tqdm import tqdm
 from utils import CosineDecayScheduler, get_dataset, get_graph_drop_transform
-
-import dgl
 
 warnings.filterwarnings("ignore")
 

@@ -12,14 +12,14 @@ import argparse
 import time
 from functools import partial
 
+import dgl
+
 import numpy as np
 import tensorflow as tf
-from model import BaseRGCN
-from tensorflow.keras import layers
-
-import dgl
 from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
 from dgl.nn.tensorflow import RelGraphConv
+from model import BaseRGCN
+from tensorflow.keras import layers
 
 
 class EntityClassify(BaseRGCN):

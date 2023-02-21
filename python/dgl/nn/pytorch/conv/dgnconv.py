@@ -5,7 +5,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 
-from .pnaconv import AGGREGATORS, SCALERS, PNAConv, PNAConvTower
+from .pnaconv import AGGREGATORS, PNAConv, PNAConvTower, SCALERS
 
 
 def aggregate_dir_av(h, eig_s, eig_d, eig_idx):

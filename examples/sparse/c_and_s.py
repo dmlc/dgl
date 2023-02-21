@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from dgl.data import CoraGraphDataset
 from torch.optim import Adam
 
+
 ###############################################################################
 # (HIGHLIGHT) Compute Label Propagation with Sparse Matrix API
 ###############################################################################

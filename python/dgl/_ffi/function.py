@@ -14,26 +14,26 @@ try:
     if _FFI_MODE == "ctypes":
         raise ImportError()
     if sys.version_info >= (3, 0):
-        from ._cy3.core import FunctionBase as _FunctionBase
         from ._cy3.core import (
             _set_class_function,
             _set_class_module,
             convert_to_dgl_func,
+            FunctionBase as _FunctionBase,
         )
     else:
-        from ._cy2.core import FunctionBase as _FunctionBase
         from ._cy2.core import (
             _set_class_function,
             _set_class_module,
             convert_to_dgl_func,
+            FunctionBase as _FunctionBase,
         )
 except IMPORT_EXCEPT:
     # pylint: disable=wrong-import-position
-    from ._ctypes.function import FunctionBase as _FunctionBase
     from ._ctypes.function import (
         _set_class_function,
         _set_class_module,
         convert_to_dgl_func,
+        FunctionBase as _FunctionBase,
     )
 
 FunctionHandle = ctypes.c_void_p

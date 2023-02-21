@@ -1,11 +1,11 @@
 from collections import defaultdict as ddict
 
+import dgl
+
 import numpy as np
 import torch
 from ordered_set import OrderedSet
 from torch.utils.data import DataLoader, Dataset
-
-import dgl
 
 
 class TrainDataset(Dataset):

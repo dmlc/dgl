@@ -31,11 +31,11 @@ By the end of this tutorial you will be able to:
 #
 
 import os
-os.environ['DGLBACKEND'] = 'pytorch'
+
+os.environ["DGLBACKEND"] = "pytorch"
+import dgl
 import numpy as np
 import torch
-
-import dgl
 
 g = dgl.graph(([0, 0, 0, 0, 0], [1, 2, 3, 4, 5]), num_nodes=6)
 # Equivalently, PyTorch LongTensors also work.

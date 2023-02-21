@@ -3,19 +3,19 @@ import os
 import urllib
 from functools import partial
 
+import dgl
+
 import provider
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
+from dgl.data.utils import download, get_download_dir
 from ModelNetDataLoader import ModelNetDataLoader
 from pointnet2 import PointNet2MSGCls, PointNet2SSGCls
 from pointnet_cls import PointNetCls
 from torch.utils.data import DataLoader
-
-import dgl
-from dgl.data.utils import download, get_download_dir
 
 torch.backends.cudnn.enabled = False
 
@@ -62,7 +62,6 @@ CustomDataLoader = partial(
 
 
 def train(net, opt, scheduler, train_loader, dev):
-
     net.train()
 
     total_loss = 0

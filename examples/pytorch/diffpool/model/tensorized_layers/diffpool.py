@@ -1,8 +1,9 @@
 import torch
+from torch import nn as nn
+
 from model.loss import EntropyLoss, LinkPredLoss
 from model.tensorized_layers.assignment import DiffPoolAssignment
 from model.tensorized_layers.graphsage import BatchedGraphSAGE
-from torch import nn as nn
 
 
 class BatchedDiffPool(nn.Module):

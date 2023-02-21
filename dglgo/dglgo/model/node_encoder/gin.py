@@ -1,15 +1,17 @@
 import torch.nn as nn
-from dgl.nn import GINConv
 from dgl.base import dgl_warning
+from dgl.nn import GINConv
 
 
 class GIN(nn.Module):
-    def __init__(self,
-                 data_info: dict,
-                 embed_size: int = -1,
-                 hidden_size=64,
-                 num_layers=3,
-                 aggregator_type='sum'):
+    def __init__(
+        self,
+        data_info: dict,
+        embed_size: int = -1,
+        hidden_size=64,
+        num_layers=3,
+        aggregator_type="sum",
+    ):
         """Graph Isomophism Networks
 
         Edge feature is ignored in this model.
@@ -39,9 +41,13 @@ class GIN(nn.Module):
             in_size = data_info["in_size"]
         for i in range(num_layers):
             input_dim = in_size if i == 0 else hidden_size
-            mlp = nn.Sequential(nn.Linear(input_dim, hidden_size),
-                                nn.BatchNorm1d(hidden_size), nn.ReLU(),
-                                nn.Linear(hidden_size, hidden_size), nn.ReLU())
+            mlp = nn.Sequential(
+                nn.Linear(input_dim, hidden_size),
+                nn.BatchNorm1d(hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(),
+            )
 
             self.conv_list.append(GINConv(mlp, aggregator_type, 1e-5, True))
         self.out_mlp = nn.Linear(hidden_size, data_info["out_size"])
@@ -49,7 +55,8 @@ class GIN(nn.Module):
     def forward(self, graph, node_feat, edge_feat=None):
         if self.embed_size > 0:
             dgl_warning(
-                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
+                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size."
+            )
             h = self.embed.weight
         else:
             h = node_feat

@@ -2,18 +2,20 @@
 # pylint: disable= invalid-name
 
 import random
+
 import torch
-from torch import nn
-from torch.nn import init
 import torch.nn.functional as F
 import tqdm
+from torch import nn
+from torch.nn import init
 
 from ...base import NID
-from ...convert import to_homogeneous, to_heterogeneous
+from ...convert import to_heterogeneous, to_homogeneous
 from ...random import choice
 from ...sampling import random_walk
 
-__all__ = ['DeepWalk', 'MetaPath2Vec']
+__all__ = ["DeepWalk", "MetaPath2Vec"]
+
 
 class DeepWalk(nn.Module):
     """DeepWalk module from `DeepWalk: Online Learning of Social Representations
@@ -81,19 +83,23 @@ class DeepWalk(nn.Module):
     >>> clf = LogisticRegression().fit(X[train_mask].numpy(), y[train_mask].numpy())
     >>> clf.score(X[test_mask].numpy(), y[test_mask].numpy())
     """
-    def __init__(self,
-                 g,
-                 emb_dim=128,
-                 walk_length=40,
-                 window_size=5,
-                 neg_weight=1,
-                 negative_size=5,
-                 fast_neg=True,
-                 sparse=True):
+
+    def __init__(
+        self,
+        g,
+        emb_dim=128,
+        walk_length=40,
+        window_size=5,
+        neg_weight=1,
+        negative_size=5,
+        fast_neg=True,
+        sparse=True,
+    ):
         super().__init__()
 
-        assert walk_length >= window_size + 1, \
-            f'Expect walk_length >= window_size + 1, got {walk_length} and {window_size + 1}'
+        assert (
+            walk_length >= window_size + 1
+        ), f"Expect walk_length >= window_size + 1, got {walk_length} and {window_size + 1}"
 
         self.g = g
         self.emb_dim = emb_dim
@@ -172,7 +178,9 @@ class DeepWalk(nn.Module):
         device = batch_walk.device
 
         batch_node_embed = self.node_embed(batch_walk).view(-1, self.emb_dim)
-        batch_context_embed = self.context_embed(batch_walk).view(-1, self.emb_dim)
+        batch_context_embed = self.context_embed(batch_walk).view(
+            -1, self.emb_dim
+        )
 
         batch_idx_list_offset = torch.arange(batch_size) * self.walk_length
         batch_idx_list_offset = batch_idx_list_offset.unsqueeze(1)
@@ -185,19 +193,23 @@ class DeepWalk(nn.Module):
         pos_dst_emb = batch_context_embed[idx_list_dst]
 
         neg_idx_list_src = idx_list_dst.unsqueeze(1) + torch.zeros(
-            self.negative_size).unsqueeze(0).to(device)
+            self.negative_size
+        ).unsqueeze(0).to(device)
         neg_idx_list_src = neg_idx_list_src.view(-1)
         neg_src_emb = batch_node_embed[neg_idx_list_src.long()]
 
         if self.fast_neg:
-            neg_idx_list_dst = list(range(batch_size * self.walk_length)) \
-                * (self.negative_size * self.window_size * 2)
+            neg_idx_list_dst = list(range(batch_size * self.walk_length)) * (
+                self.negative_size * self.window_size * 2
+            )
             random.shuffle(neg_idx_list_dst)
-            neg_idx_list_dst = neg_idx_list_dst[:len(neg_idx_list_src)]
+            neg_idx_list_dst = neg_idx_list_dst[: len(neg_idx_list_src)]
             neg_idx_list_dst = torch.LongTensor(neg_idx_list_dst).to(device)
             neg_dst_emb = batch_context_embed[neg_idx_list_dst]
         else:
-            neg_dst = choice(self.g.num_nodes(), size=len(neg_src_emb), prob=self.neg_prob)
+            neg_dst = choice(
+                self.g.num_nodes(), size=len(neg_src_emb), prob=self.neg_prob
+            )
             neg_dst_emb = self.context_embed(neg_dst.to(device))
 
         pos_score = torch.sum(torch.mul(pos_src_emb, pos_dst_emb), dim=1)
@@ -206,9 +218,14 @@ class DeepWalk(nn.Module):
 
         neg_score = torch.sum(torch.mul(neg_src_emb, neg_dst_emb), dim=1)
         neg_score = torch.clamp(neg_score, max=6, min=-6)
-        neg_score = torch.mean(-F.logsigmoid(-neg_score)) * self.negative_size * self.neg_weight
+        neg_score = (
+            torch.mean(-F.logsigmoid(-neg_score))
+            * self.negative_size
+            * self.neg_weight
+        )
 
         return torch.mean(pos_score + neg_score)
+
 
 class MetaPath2Vec(nn.Module):
     r"""metapath2vec module from `metapath2vec: Scalable Representation Learning for
@@ -280,17 +297,21 @@ class MetaPath2Vec(nn.Module):
     >>> user_nids = torch.LongTensor(model.local_to_global_nid['user'])
     >>> user_emb = model.node_embed(user_nids)
     """
-    def __init__(self,
-                 g,
-                 metapath,
-                 window_size,
-                 emb_dim=128,
-                 negative_size=5,
-                 sparse=True):
+
+    def __init__(
+        self,
+        g,
+        metapath,
+        window_size,
+        emb_dim=128,
+        negative_size=5,
+        sparse=True,
+    ):
         super().__init__()
 
-        assert len(metapath) + 1 >= window_size, \
-            f'Expect len(metapath) >= window_size - 1, got {metapath} and {window_size}'
+        assert (
+            len(metapath) + 1 >= window_size
+        ), f"Expect len(metapath) >= window_size - 1, got {metapath} and {window_size}"
 
         self.hg = g
         self.emb_dim = emb_dim
@@ -323,15 +344,21 @@ class MetaPath2Vec(nn.Module):
             traces, _ = random_walk(g=hg, nodes=[idx], metapath=metapath)
             for tr in traces.cpu().numpy():
                 tr_nids = [
-                    self.local_to_global_nid[node_metapath[i]][tr[i]] for i in range(len(tr))]
+                    self.local_to_global_nid[node_metapath[i]][tr[i]]
+                    for i in range(len(tr))
+                ]
                 node_frequency[torch.LongTensor(tr_nids)] += 1
 
         neg_prob = node_frequency.pow(0.75)
         self.neg_prob = neg_prob / neg_prob.sum()
 
         # center node embedding
-        self.node_embed = nn.Embedding(num_nodes_total, self.emb_dim, sparse=sparse)
-        self.context_embed = nn.Embedding(num_nodes_total, self.emb_dim, sparse=sparse)
+        self.node_embed = nn.Embedding(
+            num_nodes_total, self.emb_dim, sparse=sparse
+        )
+        self.context_embed = nn.Embedding(
+            num_nodes_total, self.emb_dim, sparse=sparse
+        )
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -357,21 +384,30 @@ class MetaPath2Vec(nn.Module):
         torch.Tensor
             Negative context nodes
         """
-        traces, _ = random_walk(g=self.hg, nodes=indices, metapath=self.metapath)
+        traces, _ = random_walk(
+            g=self.hg, nodes=indices, metapath=self.metapath
+        )
         u_list = []
         v_list = []
         for tr in traces.cpu().numpy():
             tr_nids = [
-                self.local_to_global_nid[self.node_metapath[i]][tr[i]] for i in range(len(tr))]
+                self.local_to_global_nid[self.node_metapath[i]][tr[i]]
+                for i in range(len(tr))
+            ]
             for i, u in enumerate(tr_nids):
-                for j, v in enumerate(tr_nids[max(i - self.window_size, 0):i + self.window_size]):
+                for j, v in enumerate(
+                    tr_nids[max(i - self.window_size, 0) : i + self.window_size]
+                ):
                     if i == j:
                         continue
                     u_list.append(u)
                     v_list.append(v)
 
-        neg_v = choice(self.hg.num_nodes(), size=len(u_list) * self.negative_size,
-                       prob=self.neg_prob).reshape(len(u_list), self.negative_size)
+        neg_v = choice(
+            self.hg.num_nodes(),
+            size=len(u_list) * self.negative_size,
+            prob=self.neg_prob,
+        ).reshape(len(u_list), self.negative_size)
 
         return torch.LongTensor(u_list), torch.LongTensor(v_list), neg_v
 
