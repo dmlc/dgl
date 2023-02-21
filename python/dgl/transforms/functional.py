@@ -17,7 +17,6 @@
 # pylint: disable= too-many-lines
 
 import copy
-from collections import defaultdict
 from collections.abc import Iterable, Mapping
 
 import numpy as np
@@ -41,7 +40,7 @@ from .. import (
 from .._ffi.function import _init_api
 from ..base import dgl_warning, DGLError, EID, NID
 from ..frame import Frame
-from ..heterograph import DGLBlock, DGLGraph
+from ..heterograph import DGLGraph
 from ..heterograph_index import (
     create_heterograph_from_relations,
     create_metagraph_index,

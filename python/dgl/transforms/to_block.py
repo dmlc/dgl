@@ -15,13 +15,11 @@
 #
 """Implementation for to block."""
 
-import dgl
-from .._ffi.function import _init_api
 from collections import defaultdict
 from collections.abc import Mapping
 from ..base import DGLError
 from .. import (backend as F, utils)
-from ..heterograph import DGLBlock, DGLGraph
+from ..heterograph import DGLBlock
 from .._ffi.capi import *
 
 __all__ = ["to_block"]

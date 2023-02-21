@@ -305,7 +305,7 @@ def _init_api(namespace, target_module_name=None):
 def _init_api_prefix(module_name, prefix):
     module = sys.modules[module_name]
     name_list = []
-    
+
     for name in list_global_func_names():
         if name.startswith("_") and not name.startswith("_deprecate"):
             # internal APIs are ignored
