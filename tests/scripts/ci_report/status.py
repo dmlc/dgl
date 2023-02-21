@@ -12,7 +12,7 @@ response = requests.get("{}wfapi".format(job_link), verify=False).json()
 status = "✅ CI test succeeded"
 for v in response["stages"]:
     # https://javadoc.jenkins.io/plugin/pipeline-graph-analysis/org/jenkinsci/plugins/workflow/pipelinegraphanalysis/GenericStatus.html
-    if v["status"] in ["FAILED", "ABORTED", "NOT_EXECUTED"]:
+    if v["status"] in ["FAILED", "ABORTED"]:
         status = "❌ CI test failed in Stage [{}].".format(v["name"])
         break
 
@@ -20,7 +20,8 @@ comment = f""" Commit ID: {COMMIT}\n
 Build ID: {BUILD_ID}\n
 Status: {status} \n
 Report path: [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/report.html) \n
-Full logs path: [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/cireport.log)
+Full logs path: [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/cireport.log) \n
+Build URL: {job_link}
 """
 
 print(comment)
