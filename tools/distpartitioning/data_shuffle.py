@@ -127,9 +127,9 @@ def gen_node_data(
     )
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
-	    # No. of nodes in each process can differ significantly in lopsided distributions
-	    # Synchronize on a per ntype basis
-	    dist.barrier()
+        # No. of nodes in each process can differ significantly in lopsided distributions
+        # Synchronize on a per ntype basis
+        dist.barrier()
 
         type_start, type_end = (
             type_nid_dict[ntype_name][0][0],
