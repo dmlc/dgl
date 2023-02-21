@@ -140,13 +140,8 @@ class DeviceNodeMapMaker {
 template <typename IdType>
 struct GetMappingIdsGPU {
   std::tuple<std::vector<IdArray>, std::vector<IdArray>> operator()(
-<<<<<<< HEAD
-      const HeteroGraphPtr& graph, int64_t num_ntypes, const DGLContext& ctx,
-      const std::vector<int64_t>& maxNodesPerType,
-=======
       const HeteroGraphPtr& graph, bool include_rhs_in_lhs, int64_t num_ntypes,
       const DGLContext& ctx, const std::vector<int64_t>& maxNodesPerType,
->>>>>>> peizhou/ToBlockGPU
       const std::vector<EdgeArray>& edge_arrays,
       const std::vector<IdArray>& src_nodes,
       const std::vector<IdArray>& rhs_nodes,
@@ -206,13 +201,8 @@ struct GetMappingIdsGPU {
 template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockGPU(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
-<<<<<<< HEAD
-    const bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr) {
-  return ToBlockProcess<IdType>(
-=======
     bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr) {
   return dgl::transform::ToBlockProcess<IdType>(
->>>>>>> peizhou/ToBlockGPU
       graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes_ptr,
       GetMappingIdsGPU<IdType>());
 }
