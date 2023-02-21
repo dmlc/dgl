@@ -109,9 +109,9 @@ def gen_node_data(rank, world_size, num_parts, id_lookup, ntid_ntype_map, schema
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
 
-	# No. of nodes in each process can differ significantly in lopsided distributions
-	# Synchronize on a per ntype basis
-	dist.barrier()
+        # No. of nodes in each process can differ significantly in lopsided distributions
+        # Synchronize on a per ntype basis
+        dist.barrier()
 
         type_start, type_end = type_nid_dict[ntype_name][0][0], type_nid_dict[ntype_name][-1][1]
         gnid_start, gnid_end = global_nid_dict[ntype_name][0, 0], global_nid_dict[ntype_name][0, 1]
@@ -438,8 +438,8 @@ def exchange_features(rank, world_size, num_parts, feature_tids, type_id_map, id
             for local_part_id in range(num_parts//world_size):
                 featdata_key = feature_data[feat_key]
 
-		# Synchronize for each feature
-		dist.barrier ()
+                # Synchronize for each feature
+                dist.barrier ()
                 own_features, own_global_ids = exchange_feature(rank, data, id_lookup,
                         feat_type, feat_key, featdata_key, gid_start, gid_end, type_id_start, 
                         type_id_end, local_part_id, world_size, num_parts, own_features, 
