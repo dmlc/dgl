@@ -281,7 +281,6 @@ _ = model.to(opt.device)
 # Place trainable parameter in list of parameters to train:
 
 if "fc_lr_mul" in vars(opt).keys() and opt.fc_lr_mul != 0:
-
     all_but_fc_params = list(
         filter(lambda x: "last_linear" not in x[0], model.named_parameters())
     )

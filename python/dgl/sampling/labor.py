@@ -19,14 +19,12 @@
 
 """Labor sampling APIs"""
 
+from .. import backend as F, ndarray as nd, utils
 from .._ffi.function import _init_api
-from .. import backend as F
 from ..base import DGLError
 from ..heterograph import DGLGraph
-from .. import ndarray as nd
-from .. import utils
-from .utils import EidExcluder
 from ..random import choice
+from .utils import EidExcluder
 
 __all__ = ["sample_labors"]
 
@@ -230,7 +228,10 @@ def sample_labors(
     if output_device is None:
         return (frontier, importances)
     else:
-        return (frontier.to(output_device), list(map(lambda x: x.to(output_device), importances)))
+        return (
+            frontier.to(output_device),
+            list(map(lambda x: x.to(output_device), importances)),
+        )
 
 
 def _sample_labors(

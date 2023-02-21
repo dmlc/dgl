@@ -1,14 +1,13 @@
 """ Code adapted from https://github.com/kavehhassani/mvgrl """
+import dgl
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 import torch as th
-from scipy.linalg import fractional_matrix_power, inv
-from sklearn.preprocessing import MinMaxScaler
-
-import dgl
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from dgl.nn import APPNPConv
+from scipy.linalg import fractional_matrix_power, inv
+from sklearn.preprocessing import MinMaxScaler
 
 
 def preprocess_features(features):

@@ -4,6 +4,10 @@
 import argparse
 import time
 
+import dgl
+import dgl.function as fn
+import dgl.nn as dglnn
+
 import numpy as np
 import ogb
 import torch
@@ -11,10 +15,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
 from ogb.lsc import MAG240MDataset, MAG240MEvaluator
-
-import dgl
-import dgl.function as fn
-import dgl.nn as dglnn
 
 
 class RGAT(nn.Module):

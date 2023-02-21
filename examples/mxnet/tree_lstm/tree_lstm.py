@@ -5,12 +5,12 @@ https://arxiv.org/abs/1503.00075
 import itertools
 import time
 
+import dgl
+
 import mxnet as mx
 import networkx as nx
 import numpy as np
 from mxnet import gluon
-
-import dgl
 
 
 class _TreeLSTMCellNodeFunc(gluon.HybridBlock):

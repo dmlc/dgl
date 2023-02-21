@@ -1,4 +1,3 @@
-
 from ruamel.yaml.comments import CommentedMap
 
 
@@ -14,7 +13,9 @@ def deep_convert_dict(layer):
 
     return to_ret
 
+
 import collections.abc
+
 
 def merge_comment(d, comment_dict, column=30):
     for k, v in comment_dict.items():

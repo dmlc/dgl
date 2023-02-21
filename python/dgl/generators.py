@@ -1,7 +1,6 @@
 """Module for various graph generator functions."""
 
-from . import backend as F
-from . import convert, random
+from . import backend as F, convert, random
 
 __all__ = ["rand_graph", "rand_bipartite"]
 

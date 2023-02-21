@@ -20,7 +20,6 @@ def _transform_log_level(str_level):
 
 class LightLogging(object):
     def __init__(self, log_path=None, log_name="lightlog", log_level="debug"):
-
         log_level = _transform_log_level(log_level)
 
         if log_path:

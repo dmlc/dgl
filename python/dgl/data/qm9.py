@@ -1,13 +1,16 @@
 """QM9 dataset for graph property prediction (regression)."""
 import os
+
 import numpy as np
 import scipy.sparse as sp
 
-from .dgl_dataset import DGLDataset
-from .utils import download, _get_dgl_url
+from .. import backend as F
 from ..convert import graph as dgl_graph
 from ..transforms import to_bidirected
-from .. import backend as F
+
+from .dgl_dataset import DGLDataset
+from .utils import _get_dgl_url, download
+
 
 class QM9Dataset(DGLDataset):
     r"""QM9 dataset for graph property prediction (regression)
@@ -103,39 +106,44 @@ class QM9Dataset(DGLDataset):
     >>>
     """
 
-    def __init__(self,
-                 label_keys,
-                 cutoff=5.0,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=False,
-                 transform=None):
-
+    def __init__(
+        self,
+        label_keys,
+        cutoff=5.0,
+        raw_dir=None,
+        force_reload=False,
+        verbose=False,
+        transform=None,
+    ):
         self.cutoff = cutoff
         self.label_keys = label_keys
-        self._url = _get_dgl_url('dataset/qm9_eV.npz')
+        self._url = _get_dgl_url("dataset/qm9_eV.npz")
 
-        super(QM9Dataset, self).__init__(name='qm9',
-                                         url=self._url,
-                                         raw_dir=raw_dir,
-                                         force_reload=force_reload,
-                                         verbose=verbose,
-                                         transform=transform)
+        super(QM9Dataset, self).__init__(
+            name="qm9",
+            url=self._url,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def process(self):
-        npz_path = f'{self.raw_dir}/qm9_eV.npz'
+        npz_path = f"{self.raw_dir}/qm9_eV.npz"
         data_dict = np.load(npz_path, allow_pickle=True)
         # data_dict['N'] contains the number of atoms in each molecule.
         # Atomic properties (Z and R) of all molecules are concatenated as single tensors,
         # so you need this value to select the correct atoms for each molecule.
-        self.N = data_dict['N']
-        self.R = data_dict['R']
-        self.Z = data_dict['Z']
-        self.label = np.stack([data_dict[key] for key in self.label_keys], axis=1)
+        self.N = data_dict["N"]
+        self.R = data_dict["R"]
+        self.Z = data_dict["Z"]
+        self.label = np.stack(
+            [data_dict[key] for key in self.label_keys], axis=1
+        )
         self.N_cumsum = np.concatenate([[0], np.cumsum(self.N)])
 
     def download(self):
-        file_path = f'{self.raw_dir}/qm9_eV.npz'
+        file_path = f"{self.raw_dir}/qm9_eV.npz"
         if not os.path.exists(file_path):
             download(self._url, path=file_path)
 
@@ -160,7 +168,7 @@ class QM9Dataset(DGLDataset):
         return self.label.shape[1]
 
     def __getitem__(self, idx):
-        r""" Get graph and label by index
+        r"""Get graph and label by index
 
         Parameters
         ----------
@@ -178,18 +186,22 @@ class QM9Dataset(DGLDataset):
         Tensor
             Property values of molecular graphs
         """
-        label = F.tensor(self.label[idx], dtype=F.data_type_dict['float32'])
+        label = F.tensor(self.label[idx], dtype=F.data_type_dict["float32"])
         n_atoms = self.N[idx]
-        R = self.R[self.N_cumsum[idx]:self.N_cumsum[idx + 1]]
+        R = self.R[self.N_cumsum[idx] : self.N_cumsum[idx + 1]]
         dist = np.linalg.norm(R[:, None, :] - R[None, :, :], axis=-1)
-        adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(n_atoms, dtype=np.bool_)
+        adj = sp.csr_matrix(dist <= self.cutoff) - sp.eye(
+            n_atoms, dtype=np.bool_
+        )
         adj = adj.tocoo()
         u, v = F.tensor(adj.row), F.tensor(adj.col)
         g = dgl_graph((u, v))
         g = to_bidirected(g)
-        g.ndata['R'] = F.tensor(R, dtype=F.data_type_dict['float32'])
-        g.ndata['Z'] = F.tensor(self.Z[self.N_cumsum[idx]:self.N_cumsum[idx + 1]],
-                                dtype=F.data_type_dict['int64'])
+        g.ndata["R"] = F.tensor(R, dtype=F.data_type_dict["float32"])
+        g.ndata["Z"] = F.tensor(
+            self.Z[self.N_cumsum[idx] : self.N_cumsum[idx + 1]],
+            dtype=F.data_type_dict["int64"],
+        )
 
         if self._transform is not None:
             g = self._transform(g)
@@ -204,5 +216,6 @@ class QM9Dataset(DGLDataset):
         int
         """
         return self.label.shape[0]
+
 
 QM9 = QM9Dataset

@@ -23,11 +23,11 @@ import io
 import os
 import warnings
 
+import dgl
+
 import numpy as np
 import scipy as sp
 import torch
-
-import dgl
 
 try:
     from functools import cached_property

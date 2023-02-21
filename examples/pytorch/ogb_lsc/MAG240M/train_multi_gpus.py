@@ -5,6 +5,9 @@ import math
 import sys
 from collections import OrderedDict
 
+import dgl
+import dgl.nn as dglnn
+
 import numpy as np
 import torch
 import torch.multiprocessing as mp
@@ -13,9 +16,6 @@ import torch.nn.functional as F
 import tqdm
 from ogb.lsc import MAG240MDataset, MAG240MEvaluator
 from torch.nn.parallel import DistributedDataParallel
-
-import dgl
-import dgl.nn as dglnn
 
 
 class RGAT(nn.Module):

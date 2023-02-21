@@ -1,13 +1,13 @@
 import copy
 from functools import partial
 
-import torch
-import torch.nn as nn
-from torch.nn import functional as F
-
 import dgl
 import dgl.function as fn
 import dgl.nn as dglnn
+
+import torch
+import torch.nn as nn
+from torch.nn import functional as F
 
 
 class MLP(nn.Module):

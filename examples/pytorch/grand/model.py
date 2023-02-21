@@ -1,18 +1,15 @@
+import dgl.function as fn
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-import dgl.function as fn
-
 
 def drop_node(feats, drop_rate, training):
-
     n = feats.shape[0]
     drop_rates = th.FloatTensor(np.ones(n) * drop_rate)
 
     if training:
-
         masks = th.bernoulli(1.0 - drop_rates).unsqueeze(1)
         feats = masks.to(feats.device) * feats
 
@@ -42,7 +39,6 @@ class MLP(nn.Module):
         self.layer2.reset_parameters()
 
     def forward(self, x):
-
         if self.use_bn:
             x = self.bn1(x)
         x = self.input_dropout(x)
@@ -68,7 +64,6 @@ def GRANDConv(graph, feats, order):
         Propagation Steps
     """
     with graph.local_scope():
-
         """Calculate Symmetric normalized adjacency matrix   \hat{A}"""
         degs = graph.in_degrees().float().clamp(min=1)
         norm = th.pow(degs, -0.5).to(feats.device).unsqueeze(1)
@@ -127,7 +122,6 @@ class GRAND(nn.Module):
         hidden_droprate=0.0,
         batchnorm=False,
     ):
-
         super(GRAND, self).__init__()
         self.in_dim = in_dim
         self.hid_dim = hid_dim
@@ -143,7 +137,6 @@ class GRAND(nn.Module):
         self.node_dropout = nn.Dropout(node_dropout)
 
     def forward(self, graph, feats, training=True):
-
         X = feats
         S = self.S
 

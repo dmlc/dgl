@@ -7,15 +7,14 @@ for detailed description.
 Here we implement a graph-edge version of sparsemax where we perform sparsemax for all edges
 with the same node as end-node in graphs.
 """
-import torch
-from torch import Tensor
-from torch.autograd import Function
-
 import dgl
+import torch
 from dgl.backend import astype
 from dgl.base import ALL, is_all
 from dgl.heterograph_index import HeteroGraphIndex
 from dgl.sparse import _gsddmm, _gspmm
+from torch import Tensor
+from torch.autograd import Function
 
 
 def _neighbor_sort(
