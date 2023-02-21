@@ -240,8 +240,6 @@ pipeline {
         stage('Abort Previous CI') {
           steps {
             script {
-              // Jenkins will abort an older build if a newer build already
-              // passed a higher milestone.
               // https://www.jenkins.io/doc/pipeline/steps/pipeline-milestone-step/
               // Note: incorrect "success" status might be shown for the old
               // runs in the PR.
@@ -603,7 +601,7 @@ pipeline {
               sh("aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/  --exclude '*' --include '*.log' --acl public-read --content-type text/plain")
               sh("aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/  --exclude '*.log' --acl public-read")
 
-              def comment = sh(returnStdout: true, script: "python3 status.py").trim()
+              def comment = sh(returnStdout: true, script: "python3 status.py --result ${currentBuild.currentResult}").trim()
               echo(comment)
               if ((env.BRANCH_NAME).startsWith('PR-')) {
                 pullRequest.comment(comment)
