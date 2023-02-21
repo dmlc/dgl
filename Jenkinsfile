@@ -256,7 +256,7 @@ pipeline {
         stage('Lint Check') {
           agent {
             docker {
-              label "linux-cpu-node"
+              label "linux-benchmark-node"
               image "dgllib/dgl-ci-lint"
               alwaysPull true
             }
