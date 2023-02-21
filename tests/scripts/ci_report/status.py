@@ -28,8 +28,8 @@ else:
 comment = f"""
 Commit ID: {COMMIT}\n
 Build ID: {BUILD_ID}\n
-Status: {status_output} \n
-Report path: [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/report.html) \n
+Status: {status_output}\n
+Report path: [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/report.html)\n
 Full logs path: [link](https://dgl-ci-result.s3.us-west-2.amazonaws.com/{JOB_NAME}/{BUILD_NUMBER}/{BUILD_ID}/logs/cireport.log)
 """
 
