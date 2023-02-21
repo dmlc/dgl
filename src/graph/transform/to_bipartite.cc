@@ -301,6 +301,16 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
   return std::make_tuple(new_graph, induced_edges);
 }
 
+template std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess<int32_t>(
+    HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
+    bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr,
+    MappingIdsFunc&& get_maping_ids);
+
+template std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess<int64_t>(
+    HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
+    bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr,
+    MappingIdsFunc&& get_maping_ids);
+
 template <>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCPU, int32_t>(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
