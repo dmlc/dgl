@@ -3,13 +3,13 @@ import os
 import re
 from collections import Counter
 
+import dgl
+
 import networkx as nx
 import numpy as np
 import torch as th
-from scipy.linalg import fractional_matrix_power, inv
-
-import dgl
 from dgl.data import DGLDataset
+from scipy.linalg import fractional_matrix_power, inv
 
 """ Compute Personalized Page Ranking"""
 
@@ -137,7 +137,6 @@ def process(dataset):
 
 
 def load(dataset):
-
     basedir = os.path.dirname(os.path.abspath(__file__))
     datadir = os.path.join(basedir, "data", dataset)
 

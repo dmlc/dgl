@@ -7,10 +7,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from model import ARMA4NC
-from tqdm import trange
 
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
+from model import ARMA4NC
+from tqdm import trange
 
 
 def main(args):

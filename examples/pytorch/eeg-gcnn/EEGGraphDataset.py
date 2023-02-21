@@ -1,11 +1,11 @@
 import math
 from itertools import product
 
+import dgl
+
 import numpy as np
 import pandas as pd
 import torch
-
-import dgl
 from dgl.data import DGLDataset
 
 
@@ -84,7 +84,6 @@ class EEGGraphDataset(DGLDataset):
     def get_geodesic_distance(
         self, montage_sensor1_idx, montage_sensor2_idx, coords_1010
     ):
-
         # get the reference sensor in the 10-10 system for the current montage pair in 10-20 system
         ref_sensor1 = self.ref_names[montage_sensor1_idx]
         ref_sensor2 = self.ref_names[montage_sensor2_idx]

@@ -1,10 +1,10 @@
 import dask.dataframe as dd
+
+import dgl
 import numpy as np
 import scipy.sparse as ssp
 import torch
 import tqdm
-
-import dgl
 
 
 # This is the train-test split method most of the recommender system papers running on MovieLens

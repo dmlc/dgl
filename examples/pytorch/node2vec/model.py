@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from sklearn.linear_model import LogisticRegression
-from torch.utils.data import DataLoader
 
 from dgl.sampling import node2vec_random_walk
+from sklearn.linear_model import LogisticRegression
+from torch.utils.data import DataLoader
 
 
 class Node2vec(nn.Module):
@@ -255,7 +255,6 @@ class Node2vecModel(object):
         eval_steps=-1,
         device="cpu",
     ):
-
         self.model = Node2vec(
             g,
             embedding_dim,

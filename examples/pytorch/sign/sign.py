@@ -2,13 +2,13 @@ import argparse
 import os
 import time
 
+import dgl
+import dgl.function as fn
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dataset import load_dataset
-
-import dgl
-import dgl.function as fn
 
 
 class FeedForwardNet(nn.Module):

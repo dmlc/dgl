@@ -5,7 +5,7 @@ import mxnet as mx
 from data import *
 from gluoncv.data.transforms import presets
 from gluoncv.utilz import download
-from model import RelDN, faster_rcnn_resnet101_v1d_custom
+from model import faster_rcnn_resnet101_v1d_custom, RelDN
 from utils import *
 
 import dgl

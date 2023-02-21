@@ -1,7 +1,6 @@
+import dgl
 import numpy as np
 import torch as th
-
-import dgl
 
 
 class Sampler:

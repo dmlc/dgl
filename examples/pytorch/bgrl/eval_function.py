@@ -2,10 +2,9 @@ import numpy as np
 import torch
 from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import (GridSearchCV, ShuffleSplit,
-                                     train_test_split)
+from sklearn.model_selection import GridSearchCV, ShuffleSplit, train_test_split
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.preprocessing import OneHotEncoder, normalize
+from sklearn.preprocessing import normalize, OneHotEncoder
 
 
 def fit_logistic_regression(X, y, data_random_seed=1, repeat=1):

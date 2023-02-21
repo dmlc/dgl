@@ -20,6 +20,8 @@ from torch import nn
 from tqdm import tqdm
 
 """============================================================================================================="""
+
+
 ################### TensorBoard Settings ###################
 def args2exp_name(args):
     exp_name = f"{args.dataset}_{args.loss}_{args.lr}_bs{args.bs}_spc{args.samples_per_class}_embed{args.embed_dim}_arch{args.arch}_decay{args.decay}_fclr{args.fc_lr_mul}_anneal{args.sigmoid_temperature}"
@@ -381,6 +383,8 @@ def eval_metrics_query_and_gallery_dataset(
 
 
 """============================================================================================================="""
+
+
 ####### RECOVER CLOSEST EXAMPLE IMAGES #######
 def recover_closest_one_dataset(
     feature_matrix_all, image_paths, save_path, n_image_samples=10, n_closest=3
@@ -489,6 +493,8 @@ def recover_closest_inshop(
 
 
 """============================================================================================================="""
+
+
 ################## SET NETWORK TRAINING CHECKPOINT #####################
 def set_checkpoint(model, opt, progress_saver, savepath):
     """
@@ -514,6 +520,8 @@ def set_checkpoint(model, opt, progress_saver, savepath):
 
 
 """============================================================================================================="""
+
+
 ################## WRITE TO CSV FILE #####################
 class CSV_Writer:
     """

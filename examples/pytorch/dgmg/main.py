@@ -65,7 +65,6 @@ def main(opts):
         optimizer.zero_grad()
 
         for i, data in enumerate(data_loader):
-
             log_prob = model(actions=data)
             prob = log_prob.detach().exp()
 

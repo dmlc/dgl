@@ -1,18 +1,18 @@
 import argparse
 import time
 
+import dgl
+import dgl.function as fn
+import dgl.nn.pytorch as dglnn
+
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
-from torch.utils.data import DataLoader
-
-import dgl
-import dgl.function as fn
-import dgl.nn.pytorch as dglnn
 from dgl.data import RedditDataset
+from torch.utils.data import DataLoader
 
 
 class SAGEConvWithCV(nn.Module):

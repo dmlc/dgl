@@ -36,7 +36,7 @@ namespace transform {
  */
 using MappingIdsFunc =
     std::function<std::tuple<std::vector<IdArray>, std::vector<IdArray>>(
-        const HeteroGraphPtr&, int64_t, const DGLContext&,
+        const HeteroGraphPtr&, bool, int64_t, const DGLContext&,
         const std::vector<int64_t>&, const std::vector<EdgeArray>&,
         const std::vector<IdArray>&, const std::vector<IdArray>&,
         std::vector<IdArray>* const, std::vector<int64_t>* const)>;
@@ -77,7 +77,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock(
 template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
-    const bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr,
+    bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr,
     MappingIdsFunc&& get_maping_ids);
 
 }  // namespace transform
