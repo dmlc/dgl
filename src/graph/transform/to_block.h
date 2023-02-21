@@ -13,13 +13,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * @file graph/transform/to_bipartite.h
+ * @file graph/transform/to_block.h
  * @brief Functions to convert a set of edges into a graph block with local
  * ids.
  */
 
-#ifndef DGL_GRAPH_TRANSFORM_TO_BIPARTITE_H_
-#define DGL_GRAPH_TRANSFORM_TO_BIPARTITE_H_
+#ifndef DGL_GRAPH_TRANSFORM_TO_BLOCK_H_
+#define DGL_GRAPH_TRANSFORM_TO_BLOCK_H_
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
@@ -83,4 +83,4 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
 }  // namespace transform
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_TRANSFORM_TO_BIPARTITE_H_
+#endif  // DGL_GRAPH_TRANSFORM_TO_BLOCK_H_

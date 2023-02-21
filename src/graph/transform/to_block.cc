@@ -17,7 +17,7 @@
  * @brief Convert a graph to a bipartite-structured graph.
  */
 
-#include "to_bipartite.h"
+#include "to_block.h"
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
@@ -358,6 +358,8 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCUDA, int64_t>(
 
 #endif  // DGL_USE_CUDA
 
+// This code is called in `dgl.transform.to_block`, which is tested in
+// `test_to_block.py`.
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
     .set_body([](DGLArgs args, DGLRetValue *rv) {
       const HeteroGraphRef graph_ref = args[0];
