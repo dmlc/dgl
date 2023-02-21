@@ -248,4 +248,3 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
     )
 
     return new_graph
-
