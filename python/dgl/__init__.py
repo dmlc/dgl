@@ -11,7 +11,8 @@ import socket
 
 from distutils.version import LooseVersion
 
-# Should import backend before importing anything else
+# Backend and logging should be imported before other modules.
+from .logging import enable_verbose_logging  # usort: skip
 from .backend import backend_name, load_backend  # usort: skip
 
 from . import (
@@ -36,9 +37,6 @@ from ._ffi.function import (
 from ._ffi.runtime_ctypes import TypeCode
 
 from .base import ALL, EID, ETYPE, NID, NTYPE
-
-# setup logging before everything
-from .logging import enable_verbose_logging
 from .readout import *
 from .batch import *
 from .convert import *
