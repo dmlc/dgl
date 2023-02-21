@@ -11,7 +11,8 @@ job_link = os.environ["BUILD_URL"]
 response = requests.get("{}wfapi".format(job_link), verify=False).json()
 status = "✅ CI test succeeded"
 for v in response["stages"]:
-    if v["status"] in ["FAILED", "ABORTED"]:
+    # https://javadoc.jenkins.io/plugin/pipeline-graph-analysis/org/jenkinsci/plugins/workflow/pipelinegraphanalysis/GenericStatus.html
+    if v["status"] in ["FAILED", "ABORTED", "NOT_EXECUTED"]:
         status = "❌ CI test failed in Stage [{}].".format(v["name"])
         break
 
