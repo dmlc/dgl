@@ -237,10 +237,26 @@ pipeline {
     stage('CI') {
       when { expression { !regression_test_done } }
       stages {
+        stage('Abort Previous CI') {
+          steps {
+            script {
+              if (env.BRANCH_NAME != "master") {
+                // Jenkins will abort an older build if a newer build already
+                // passed a higher milestone.
+                // https://www.jenkins.io/doc/pipeline/steps/pipeline-milestone-step/
+                def buildNumber = env.BUILD_NUMBER as int
+                for (int i = 1; i <= buildNumber; i++) {
+                  milestone(i)
+                }
+              }
+            }
+          }
+        }
+
         stage('Lint Check') {
           agent {
             docker {
-              label "linux-cpu-node"
+              label "linux-benchmark-node"
               image "dgllib/dgl-ci-lint"
               alwaysPull true
             }
@@ -587,7 +603,7 @@ pipeline {
               sh("aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/  --exclude '*' --include '*.log' --acl public-read --content-type text/plain")
               sh("aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/  --exclude '*.log' --acl public-read")
 
-              def comment = sh(returnStdout: true, script: "python3 status.py").trim()
+              def comment = sh(returnStdout: true, script: "python3 status.py --result ${currentBuild.currentResult}").trim()
               echo(comment)
               if ((env.BRANCH_NAME).startsWith('PR-')) {
                 pullRequest.comment(comment)
