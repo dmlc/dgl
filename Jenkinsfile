@@ -256,7 +256,7 @@ pipeline {
         stage('Lint Check') {
           agent {
             docker {
-              label "linux-benchmark-node"
+              label "linux-cpu-node"
               image "dgllib/dgl-ci-lint"
               alwaysPull true
             }
@@ -268,6 +268,319 @@ pipeline {
           post {
             always {
               cleanWs disableDeferredWipeout: true, deleteDirs: true
+            }
+          }
+        }
+
+        stage('Build') {
+          parallel {
+            stage('CPU Build') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-cpu:v230210"
+                  args "-u root"
+                  alwaysPull true
+                }
+              }
+              steps {
+                build_dgl_linux('cpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('GPU Build') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-gpu:cu102_v230210"
+                  args "-u root"
+                  alwaysPull true
+                }
+              }
+              steps {
+                // sh "nvidia-smi"
+                build_dgl_linux('gpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('PyTorch Cugraph GPU Build') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.12"
+                  args "-u root"
+                  alwaysPull true
+                }
+              }
+              steps {
+                build_dgl_linux('cugraph')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('CPU Build (Win64)') {
+              // Windows build machines are manually added to Jenkins master with
+              // "windows" label as permanent agents.
+              agent { label 'windows' }
+              steps {
+                build_dgl_win64('cpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+          // Currently we don't have Windows GPU build machines
+          }
+        }
+        stage('Test') {
+          parallel {
+            stage('C++ CPU') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-cpu:v230210"
+                  alwaysPull true
+                }
+              }
+              steps {
+                cpp_unit_test_linux('cpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('C++ GPU') {
+              agent {
+                docker {
+                  label "linux-gpu-node"
+                  image "dgllib/dgl-ci-gpu:cu102_v230210"
+                  args "--runtime nvidia"
+                  alwaysPull true
+                }
+              }
+              steps {
+                cpp_unit_test_linux('gpu')
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('C++ CPU (Win64)') {
+              agent { label 'windows' }
+              steps {
+                cpp_unit_test_win64()
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('Tensorflow CPU') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-cpu:v230210"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('Tensorflow CPU Unit test') {
+                  steps {
+                    unit_test_linux('tensorflow', 'cpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('Tensorflow GPU') {
+              agent {
+                docker {
+                  label "linux-gpu-node"
+                  image "dgllib/dgl-ci-gpu:cu101_v230210"
+                  args "--runtime nvidia"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('Tensorflow GPU Unit test') {
+                  steps {
+                    unit_test_linux('tensorflow', 'gpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('Torch CPU') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-cpu:v230210"
+                  args "--shm-size=4gb"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('Torch CPU Unit test') {
+                  steps {
+                    unit_test_linux('pytorch', 'cpu')
+                  }
+                }
+                stage('Torch CPU Example test') {
+                  steps {
+                    example_test_linux('pytorch', 'cpu')
+                  }
+                }
+                stage('Torch CPU Tutorial test') {
+                  steps {
+                    tutorial_test_linux('pytorch')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('Torch CPU (Win64)') {
+              agent { label 'windows' }
+              stages {
+                stage('Torch CPU (Win64) Unit test') {
+                  steps {
+                    unit_test_win64('pytorch', 'cpu')
+                  }
+                }
+                stage('Torch CPU (Win64) Example test') {
+                  steps {
+                    example_test_win64('pytorch', 'cpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('Torch GPU') {
+              agent {
+                docker {
+                  label "linux-gpu-node"
+                  image "dgllib/dgl-ci-gpu:cu102_v230210"
+                  args "--runtime nvidia --shm-size=8gb"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('Torch GPU Unit test') {
+                  steps {
+                    sh 'nvidia-smi'
+                    unit_test_linux('pytorch', 'gpu')
+                  }
+                }
+                stage('Torch GPU Example test') {
+                  steps {
+                    example_test_linux('pytorch', 'gpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('Distributed') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-cpu:v230210"
+                  args "--shm-size=4gb"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('Distributed Torch CPU Unit test') {
+                  steps {
+                    unit_distributed_linux('pytorch', 'cpu')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('PyTorch Cugraph GPU') {
+              agent {
+                docker {
+                  label "linux-gpu-node"
+                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.12"
+                  args "--runtime nvidia --shm-size=8gb"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('PyTorch Cugraph GPU Unit test') {
+                  steps {
+                    sh 'nvidia-smi'
+                    unit_test_cugraph('pytorch', 'cugraph')
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
+            }
+            stage('DGL-Go') {
+              agent {
+                docker {
+                  label "linux-cpu-node"
+                  image "dgllib/dgl-ci-cpu:v230210"
+                  alwaysPull true
+                }
+              }
+              stages {
+                stage('DGL-Go CPU test') {
+                  steps {
+                    go_test_linux()
+                  }
+                }
+              }
+              post {
+                always {
+                  cleanWs disableDeferredWipeout: true, deleteDirs: true
+                }
+              }
             }
           }
         }
