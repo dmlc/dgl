@@ -7,10 +7,10 @@ import ctypes
 from ..base import _LIB, c_str, check_call
 from ..runtime_ctypes import DGLArrayHandle
 from .types import (
-    C_TO_PY_ARG_SWITCH,
-    RETURN_SWITCH,
     _return_handle,
     _wrap_arg_func,
+    C_TO_PY_ARG_SWITCH,
+    RETURN_SWITCH,
 )
 
 DGLPyCapsuleDestructor = ctypes.CFUNCTYPE(None, ctypes.c_void_p)

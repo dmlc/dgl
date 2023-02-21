@@ -1,7 +1,9 @@
 """dgl edge_softmax operator module."""
-from ..backend import astype
-from ..backend import edge_softmax as edge_softmax_internal
-from ..backend import edge_softmax_hetero as edge_softmax_hetero_internal
+from ..backend import (
+    astype,
+    edge_softmax as edge_softmax_internal,
+    edge_softmax_hetero as edge_softmax_hetero_internal,
+)
 from ..base import ALL, is_all
 
 __all__ = ["edge_softmax"]

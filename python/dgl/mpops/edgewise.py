@@ -10,7 +10,7 @@ __all__ = ["copy_u", "copy_v"]
 #######################################################
 
 
-def copy_u(g, x_node, etype = None):
+def copy_u(g, x_node, etype=None):
     """Compute new edge data by fetching from source node data.
 
     Given an input graph :math:`G(V, E)` (or a unidirectional bipartite graph
@@ -64,7 +64,7 @@ def copy_u(g, x_node, etype = None):
     return ops.gsddmm(etype_subg, "copy_lhs", x_node, None)
 
 
-def copy_v(g, x_node, etype = None):
+def copy_v(g, x_node, etype=None):
     """Compute new edge data by fetching from destination node data.
 
     Given an input graph :math:`G(V, E)` (or a unidirectional bipartite graph
@@ -212,9 +212,11 @@ Examples
 (500, 5)
 """
 
-    def func(g, x_node, y_node, etype = None):
+    def func(g, x_node, y_node, etype=None):
         etype_subg = g if etype is None else g[etype]
-        return ops.gsddmm(etype_subg, op, x_node, y_node, lhs_target="u", rhs_target="v")
+        return ops.gsddmm(
+            etype_subg, op, x_node, y_node, lhs_target="u", rhs_target="v"
+        )
 
     func.__name__ = name
     func.__doc__ = docstring
