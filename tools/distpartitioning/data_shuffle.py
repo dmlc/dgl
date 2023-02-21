@@ -146,27 +146,6 @@ def gen_node_data(
 
         for local_part_id in range(num_parts // world_size):
             cond = node_partid_slice == (rank + local_part_id * world_size)
-
-        # No. of nodes in each process can differ significantly in lopsided distributions
-        # Synchronize on a per ntype basis
-        dist.barrier()
-
-        type_start, type_end = (
-            type_nid_dict[ntype_name][0][0],
-            type_nid_dict[ntype_name][-1][1],
-        )
-        gnid_start, gnid_end = (
-            global_nid_dict[ntype_name][0, 0],
-            global_nid_dict[ntype_name][0, 1],
-        )
-
-        node_partid_slice = id_lookup.get_partition_ids(
-            np.arange(gnid_start, gnid_end, dtype=np.int64)
-        )  # exclusive
-
-        for local_part_id in range(num_parts // world_size):
-            cond = node_partid_slice == (rank + local_part_id * world_size)
-
             own_gnids = np.arange(gnid_start, gnid_end, dtype=np.int64)
             own_gnids = own_gnids[cond]
 
