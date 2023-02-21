@@ -1,8 +1,7 @@
+import dgl.function as fn
 import numpy as np
 import torch as th
 import torch.nn as nn
-
-import dgl.function as fn
 
 
 class CAREConv(nn.Module):

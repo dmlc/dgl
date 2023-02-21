@@ -4,11 +4,10 @@ References:
 - Topology Adaptive Graph Convolutional Networks
 - Paper: https://arxiv.org/abs/1710.10370
 """
-import mxnet as mx
-from mxnet import gluon
-
 import dgl
+import mxnet as mx
 from dgl.nn.mxnet import TAGConv
+from mxnet import gluon
 
 
 class TAGCN(gluon.Block):

@@ -2,13 +2,13 @@ import json
 import os
 from zipfile import ZipFile
 
+import dgl
+
 import numpy as np
 import tqdm
+from dgl.data.utils import download, get_download_dir
 from scipy.sparse import csr_matrix
 from torch.utils.data import Dataset
-
-import dgl
-from dgl.data.utils import download, get_download_dir
 
 
 class ShapeNet(object):

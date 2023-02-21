@@ -1,11 +1,10 @@
+import dgl.function as fn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from modules import MLP, MessageNorm
-from ogb.graphproppred.mol_encoder import BondEncoder
-
-import dgl.function as fn
 from dgl.nn.functional import edge_softmax
+from modules import MessageNorm, MLP
+from ogb.graphproppred.mol_encoder import BondEncoder
 
 
 class GENConv(nn.Module):

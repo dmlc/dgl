@@ -104,7 +104,7 @@ Transformer as a Graph Neural Network
 # -  ``get_o`` maps the updated value after attention to the output
 #    :math:`o` for post-processing.
 #
-# .. code:: 
+# .. code::
 #
 #    class MultiHeadAttention(nn.Module):
 #        "Multi-Head Attention"
@@ -146,14 +146,14 @@ Transformer as a Graph Neural Network
 #
 # Construct the graph by mapping tokens of the source and target
 # sentence to nodes. The complete Transformer graph is made up of three
-# subgraphs:   
-# 
+# subgraphs:
+#
 # **Source language graph**. This is a complete graph, each
 # token :math:`s_i` can attend to any other token :math:`s_j` (including
-# self-loops). |image0|    
+# self-loops). |image0|
 # **Target language graph**. The graph is
 # half-complete, in that :math:`t_i` attends only to :math:`t_j` if
-# :math:`i > j` (an output token can not depend on future words). |image1|    
+# :math:`i > j` (an output token can not depend on future words). |image1|
 # **Cross-language graph**. This is a bi-partitie graph, where there is
 # an edge from every source token :math:`s_i` to every target token
 # :math:`t_j`, meaning every target token can attend on source tokens.
@@ -191,7 +191,7 @@ Transformer as a Graph Neural Network
 #
 # Compute ``score`` and send source node’s ``v`` to destination’s mailbox
 #
-# .. code:: 
+# .. code::
 #
 #    def message_func(edges):
 #        return {'score': ((edges.src['k'] * edges.dst['q'])
@@ -203,7 +203,7 @@ Transformer as a Graph Neural Network
 #
 # Normalize over all in-edges and weighted sum to get output
 #
-# .. code:: 
+# .. code::
 #
 #    import torch as th
 #    import torch.nn.functional as F
@@ -216,7 +216,7 @@ Transformer as a Graph Neural Network
 # Execute on specific edges
 # '''''''''''''''''''''''''
 #
-# .. code:: 
+# .. code::
 #
 #    import functools.partial as partial
 #    def naive_propagate_attention(self, g, eids):
@@ -269,7 +269,7 @@ Transformer as a Graph Neural Network
 #
 # The normalization of :math:`\textrm{wv}` is left to post processing.
 #
-# .. code:: 
+# .. code::
 #
 #    def src_dot_dst(src_field, dst_field, out_field):
 #        def func(edges):
@@ -338,7 +338,7 @@ Transformer as a Graph Neural Network
 #
 #    where :math:`\textrm{FFN}` refers to the feed forward function.
 #
-# .. code:: 
+# .. code::
 #
 #    class Encoder(nn.Module):
 #        def __init__(self, layer, N):
@@ -501,7 +501,7 @@ Transformer as a Graph Neural Network
 # Task and the dataset
 # ~~~~~~~~~~~~~~~~~~~~
 #
-# The Transformer is a general framework for a variety of NLP tasks. This tutorial focuses 
+# The Transformer is a general framework for a variety of NLP tasks. This tutorial focuses
 # on the sequence to sequence learning: it’s a typical case to illustrate how it works.
 #
 # As for the dataset, there are two example tasks: copy and sort, together
@@ -729,7 +729,7 @@ Transformer as a Graph Neural Network
 # with this nodes. The following code shows the Universal Transformer
 # class in DGL:
 #
-# .. code:: 
+# .. code::
 #
 #    class UTransformer(nn.Module):
 #        "Universal Transformer(https://arxiv.org/pdf/1807.03819.pdf) with ACT(https://arxiv.org/pdf/1603.08983.pdf)."
@@ -849,10 +849,10 @@ Transformer as a Graph Neural Network
 # that are still active:
 #
 # .. note::
-# 
+#
 #    - :func:`~dgl.DGLGraph.filter_nodes` takes a predicate and a node
 #      ID list/tensor as input, then returns a tensor of node IDs that satisfy
-#      the given predicate.     
+#      the given predicate.
 #    - :func:`~dgl.DGLGraph.filter_edges` takes a predicate
 #      and an edge ID list/tensor as input, then returns a tensor of edge IDs
 #      that satisfy the given predicate.
@@ -883,6 +883,6 @@ Transformer as a Graph Neural Network
 #
 # .. note::
 #     The notebook itself is not executable due to many dependencies.
-#     Download `7_transformer.py <https://data.dgl.ai/tutorial/7_transformer.py>`__, 
-#     and copy the python script to directory ``examples/pytorch/transformer`` 
+#     Download `7_transformer.py <https://data.dgl.ai/tutorial/7_transformer.py>`__,
+#     and copy the python script to directory ``examples/pytorch/transformer``
 #     then run ``python 7_transformer.py`` to see how it works.

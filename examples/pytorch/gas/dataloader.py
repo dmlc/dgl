@@ -1,10 +1,10 @@
 import os
 
+import dgl
+
 import numpy as np
 import scipy.io as sio
 import torch as th
-
-import dgl
 from dgl.data import DGLBuiltinDataset
 from dgl.data.utils import _get_dgl_url, load_graphs, save_graphs
 

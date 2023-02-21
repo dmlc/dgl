@@ -3,6 +3,8 @@ import os
 import random
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.multiprocessing as mp
@@ -10,8 +12,6 @@ from model import SkipGramModel
 from reading_data import LineDataset
 from torch.utils.data import DataLoader
 from utils import check_args, sum_up_params
-
-import dgl
 
 
 class LineTrainer:

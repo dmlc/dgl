@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from models import DeeperGCN
-from ogb.graphproppred import DglGraphPropPredDataset, Evaluator, collate_dgl
+from ogb.graphproppred import collate_dgl, DglGraphPropPredDataset, Evaluator
 from torch.utils.data import DataLoader
 
 

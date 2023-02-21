@@ -2,8 +2,7 @@
 
 import numpy as np
 
-from .. import backend as F
-from .. import convert, utils
+from .. import backend as F, convert, utils
 from .._ffi.function import _init_api
 from .randomwalks import random_walk
 

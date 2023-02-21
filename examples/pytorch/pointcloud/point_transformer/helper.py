@@ -1,8 +1,7 @@
+import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
 from dgl.geometry import farthest_point_sampler
 
 """
@@ -270,7 +269,6 @@ class TransitionUp(nn.Module):
     """
 
     def __init__(self, dim1, dim2, dim_out):
-
         super(TransitionUp, self).__init__()
         self.fc1 = nn.Sequential(
             nn.Linear(dim1, dim_out),

@@ -2,16 +2,16 @@ import argparse
 import random
 import warnings
 
+import dgl
+
 import numpy as np
 import torch as th
 import torch.nn as nn
 
-import dgl
-
 warnings.filterwarnings("ignore")
 
 from dataset import process_dataset, process_dataset_appnp
-from model import MVGRL, LogReg
+from model import LogReg, MVGRL
 
 parser = argparse.ArgumentParser(description="mvgrl")
 

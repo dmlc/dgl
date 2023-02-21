@@ -1,12 +1,13 @@
 """Define sparse embedding and optimizer."""
 
 import torch as th
-from .... import backend as F
-from .... import utils
+
+from .... import backend as F, utils
 from ...dist_tensor import DistTensor
 
+
 class DistEmbedding:
-    '''Distributed node embeddings.
+    """Distributed node embeddings.
 
     DGL provides a distributed embedding to support models that require learnable embeddings.
     DGL's distributed embeddings are mainly used for learning node embeddings of graph models.
@@ -63,11 +64,23 @@ class DistEmbedding:
     the forward computation, users have to invoke
     py:meth:`~dgl.distributed.optim.SparseAdagrad.step` afterwards. Otherwise, there will be
     some memory leak.
-    '''
-    def __init__(self, num_embeddings, embedding_dim, name=None,
-                 init_func=None, part_policy=None):
-        self._tensor = DistTensor((num_embeddings, embedding_dim), F.float32, name,
-                                  init_func=init_func, part_policy=part_policy)
+    """
+
+    def __init__(
+        self,
+        num_embeddings,
+        embedding_dim,
+        name=None,
+        init_func=None,
+        part_policy=None,
+    ):
+        self._tensor = DistTensor(
+            (num_embeddings, embedding_dim),
+            F.float32,
+            name,
+            init_func=init_func,
+            part_policy=part_policy,
+        )
         self._trace = []
         self._name = name
         self._num_embeddings = num_embeddings
@@ -81,10 +94,10 @@ class DistEmbedding:
         # actually fails unit test.  ???
         # else:
         #     assert 'th.distributed should be initialized'
-        self._optm_state = None # track optimizer state
+        self._optm_state = None  # track optimizer state
         self._part_policy = part_policy
 
-    def __call__(self, idx, device=th.device('cpu')):
+    def __call__(self, idx, device=th.device("cpu")):
         """
         node_ids : th.tensor
             Index of the embeddings to collect.
@@ -104,8 +117,7 @@ class DistEmbedding:
         return emb
 
     def reset_trace(self):
-        '''Reset the traced data.
-        '''
+        """Reset the traced data."""
         self._trace = []
 
     @property

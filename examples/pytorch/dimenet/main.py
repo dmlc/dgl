@@ -2,11 +2,14 @@ import copy
 from pathlib import Path
 
 import click
+
+import dgl
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from dgl.data.utils import Subset
 from logzero import logger
 from modules.dimenet import DimeNet
 from modules.dimenet_pp import DimeNetPP
@@ -15,9 +18,6 @@ from qm9 import QM9
 from ruamel.yaml import YAML
 from sklearn.metrics import mean_absolute_error
 from torch.utils.data import DataLoader
-
-import dgl
-from dgl.data.utils import Subset
 
 
 def split_dataset(

@@ -5,9 +5,9 @@ from functools import partial
 
 import torch as th
 import torch.nn.functional as F
-from entity_classify import EntityClassify
 
 from dgl.data.rdf import AIFB, AM, BGS, MUTAG
+from entity_classify import EntityClassify
 
 
 def main(args):
