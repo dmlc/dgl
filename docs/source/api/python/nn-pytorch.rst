@@ -43,6 +43,12 @@ Conv Layers
 
 CuGraph Conv Layers
 ----------------------------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
     ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
     ~dgl.nn.pytorch.conv.CuGraphSAGEConv
 

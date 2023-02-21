@@ -30,7 +30,7 @@ class SAGE(nn.Module):
     def forward(self, blocks, x):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h, max_in_degree=10)
+            h = layer(block, h)
             if l != len(self.layers) - 1:
                 h = F.relu(h)
                 h = self.dropout(h)
@@ -169,8 +169,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         default="mixed",
-        choices=["cpu", "mixed", "puregpu"],
-        help="Training mode. 'cpu' for CPU training, 'mixed' for CPU-GPU mixed training, "
+        choices=["mixed", "puregpu"],
+        help="Training mode. 'mixed' for CPU-GPU mixed training, "
         "'puregpu' for pure-GPU training.",
     )
     args = parser.parse_args()
