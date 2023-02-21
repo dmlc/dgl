@@ -290,12 +290,10 @@ pipeline {
               sh("aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/  --exclude '*' --include '*.log' --acl public-read --content-type text/plain")
               sh("aws s3 sync ./ s3://dgl-ci-result/${JOB_NAME}/${BUILD_NUMBER}/${BUILD_ID}/logs/  --exclude '*.log' --acl public-read")
 
-              def comment = sh(returnStdout: true, script: "python3 status.py").trim()
+              def comment = sh(returnStdout: true, script: "python3 status.py --result ${currentBuild.currentResult}").trim()
               echo(comment)
               if ((env.BRANCH_NAME).startsWith('PR-')) {
                 pullRequest.comment(comment)
-                pullRequest.comment(currentBuild.result)
-                pullRequest.comment(currentBuild.currentResult)
               }
             }
           }
