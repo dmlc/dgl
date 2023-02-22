@@ -5,10 +5,10 @@ import os
 import numpy as np
 import pyarrow
 import torch
+from distpartitioning.utils import map_partid_rank
 from gloo_wrapper import alltoallv_cpu
 
 from pyarrow import csv
-from distpartitioning.utils import map_partid_rank
 
 
 class DistLookupService:
