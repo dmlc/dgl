@@ -1275,6 +1275,8 @@ def test_pin_memory(idtype):
 
     # pin a CPU graph
     g._graph.pin_memory()
+    assert not g.is_pinned()
+    g._graph = g._graph.pin_memory()
     assert g.is_pinned()
     assert g.device == F.cpu()
 
@@ -1293,14 +1295,14 @@ def test_pin_memory(idtype):
 
     # test pin empty homograph
     g2 = dgl.graph(([], []))
-    g2._graph.pin_memory()
+    g2._graph = g2._graph.pin_memory()
     assert g2.is_pinned()
 
     # test pin heterograph with 0 edge of one relation type
     g3 = dgl.heterograph(
         {("a", "b", "c"): ([0, 1], [1, 2]), ("c", "d", "c"): ([], [])}
     ).astype(idtype)
-    g3._graph.pin_memory()
+    g3._graph = g3._graph.pin_memory()
     assert g3.is_pinned()
 
 
