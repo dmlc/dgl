@@ -326,7 +326,8 @@ def _init_api_prefix(module_name, prefix):
         ff.__doc__ = "DGL PackedFunc %s. " % fname
         setattr(target_module, ff.__name__, ff)
         name_list.append(fname)
-        return name_list
+
+    return name_list
 
 
 def _init_internal_api():
