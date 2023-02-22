@@ -8,6 +8,7 @@ from .cfconv import CFConv
 from .chebconv import ChebConv
 from .cugraph_gatconv import CuGraphGATConv
 from .cugraph_relgraphconv import CuGraphRelGraphConv
+from .cugraph_sageconv import CuGraphSAGEConv
 from .densechebconv import DenseChebConv
 from .densegraphconv import DenseGraphConv
 from .densesageconv import DenseSAGEConv
@@ -67,6 +68,7 @@ __all__ = [
     "EGNNConv",
     "PNAConv",
     "DGNConv",
-    "CuGraphRelGraphConv",
     "CuGraphGATConv",
+    "CuGraphRelGraphConv",
+    "CuGraphSAGEConv",
 ]
