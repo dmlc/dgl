@@ -44,11 +44,15 @@ def submit_jobs(args) -> str:
     graph_name = schema_map["graph_name"]
 
     # retrieve num_parts
-    num_parts = args.num_parts
+    num_parts = 0
     partition_path = os.path.join(args.partitions_dir, "partition_meta.json")
     if os.path.isfile(partition_path):
         part_meta = load_partition_meta(partition_path)
         num_parts = part_meta.num_parts
+
+    assert (
+        num_parts != 0
+    ), f"Invalid value for no. of partitions. Please check partition_meta.json file."
 
     # verify ip_config
     with open(args.ip_config, "r") as f:
@@ -123,12 +127,6 @@ def main():
         type=str,
         default="info",
         help="To enable log level for debugging purposes. Available options: (Critical, Error, Warning, Info, Debug, Notset)",
-    )
-    parser.add_argument(
-        "--num-parts",
-        type=int,
-        default=1,
-        help="Total no. of partitions to be performed",
     )
     parser.add_argument(
         "--python-path",
