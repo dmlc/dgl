@@ -35,8 +35,13 @@ class CuGraphGATConv(nn.Module):
         Output feature size.
     num_heads : int
         Number of heads in Multi-Head Attention.
+    feat_drop : float, optional
+        Dropout rate on feature. Defaults: ``0``.
     negative_slope : float, optional
         LeakyReLU angle of negative slope. Defaults: ``0.2``.
+    activation : callable activation function/layer or None, optional.
+        If not None, applies an activation function to the updated node features.
+        Default: ``None``.
     bias : bool, optional
         If True, learns a bias term. Defaults: ``True``.
 
@@ -78,7 +83,9 @@ class CuGraphGATConv(nn.Module):
         in_feats,
         out_feats,
         num_heads,
+        feat_drop=0.0,
         negative_slope=0.2,
+        activation=None,
         bias=True,
     ):
         if has_pylibcugraphops is False:
@@ -90,7 +97,9 @@ class CuGraphGATConv(nn.Module):
         self.in_feats = in_feats
         self.out_feats = out_feats
         self.num_heads = num_heads
+        self.feat_drop = nn.Dropout(feat_drop)
         self.negative_slope = negative_slope
+        self.activation = activation
 
         self.fc = nn.Linear(in_feats, out_feats * num_heads, bias=False)
         self.attn_weights = nn.Parameter(
@@ -165,6 +174,7 @@ class CuGraphGATConv(nn.Module):
         else:
             _graph = make_fg_csr(offsets, indices)
 
+        feat = self.feat_drop(feat)
         feat_transformed = self.fc(feat)
         out = GATConvAgg(
             feat_transformed,
@@ -178,6 +188,9 @@ class CuGraphGATConv(nn.Module):
         )[: g.num_dst_nodes()].view(-1, self.num_heads, self.out_feats)
 
         if self.bias is not None:
-            out = out + self.bias
+            out = out + self.bias.view(-1, self.num_heads, self.out_feats)
+
+        if self.activation is not None:
+            out = self.activation(out)
 
         return out
