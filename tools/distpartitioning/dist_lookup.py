@@ -8,7 +8,7 @@ import torch
 from gloo_wrapper import alltoallv_cpu
 
 from pyarrow import csv
-from utils import map_partid_rank
+from distpartitioning.utils import map_partid_rank
 
 
 class DistLookupService:
@@ -60,6 +60,7 @@ class DistLookupService:
 
         # Iterate over the node types and extract the partition id mappings.
         for ntype in ntype_names:
+
             filename = f"{ntype}.txt"
             logging.info(
                 f"[Rank: {rank}] Reading file: {os.path.join(input_dir, filename)}"
