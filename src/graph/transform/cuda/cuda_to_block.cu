@@ -28,7 +28,7 @@
 
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../heterograph.h"
-#include "../to_bipartite.h"
+#include "../to_block.h"
 #include "cuda_map_edges.cuh"
 
 using namespace dgl::aten;

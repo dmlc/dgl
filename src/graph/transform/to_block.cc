@@ -13,7 +13,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * @file graph/transform/to_bipartite.cc
+ * @file graph/transform/to_block.cc
  * @brief Convert a graph to a bipartite-structured graph.
  */
 
