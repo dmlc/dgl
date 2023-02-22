@@ -3,13 +3,13 @@ from parser import Parser
 
 import mxnet as mx
 import numpy as np
-from dataloader import GraphDataLoader, collate
+from dataloader import collate, GraphDataLoader
+
+from dgl.data.gindt import GINDataset
 from gin import GIN
 from mxnet import gluon, nd
 from mxnet.gluon import nn
 from tqdm import tqdm
-
-from dgl.data.gindt import GINDataset
 
 
 def train(args, net, trainloader, trainer, criterion, epoch):
@@ -71,7 +71,6 @@ def eval_net(args, net, dataloader, criterion):
 
 
 def main(args):
-
     # set up seeds, args.seed supported
     mx.random.seed(0)
     np.random.seed(seed=0)

@@ -8,20 +8,19 @@ import traceback
 from numbers import Integral, Number
 
 from ..base import _LIB, c_str, check_call, string_types
-from ..object_generic import ObjectGeneric, convert_to_object
+from ..object_generic import convert_to_object, ObjectGeneric
 from ..runtime_ctypes import DGLByteArray, DGLContext, DGLDataType
-from . import ndarray as _nd
-from . import object as _object
-from .ndarray import NDArrayBase, _make_array
+from . import ndarray as _nd, object as _object
+from .ndarray import _make_array, NDArrayBase
 from .object import ObjectBase
 from .types import (
+    _wrap_arg_func,
     C_TO_PY_ARG_SWITCH,
-    RETURN_SWITCH,
     DGLCFuncFinalizer,
     DGLPackedCFunc,
     DGLValue,
+    RETURN_SWITCH,
     TypeCode,
-    _wrap_arg_func,
 )
 
 FunctionHandle = ctypes.c_void_p

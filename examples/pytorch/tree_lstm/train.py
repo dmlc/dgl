@@ -2,16 +2,16 @@ import argparse
 import collections
 import time
 
+import dgl
+
 import numpy as np
 import torch as th
 import torch.nn.functional as F
 import torch.nn.init as INIT
 import torch.optim as optim
+from dgl.data.tree import SSTDataset
 from torch.utils.data import DataLoader
 from tree_lstm import TreeLSTM
-
-import dgl
-from dgl.data.tree import SSTDataset
 
 SSTBatch = collections.namedtuple(
     "SSTBatch", ["graph", "mask", "wordid", "label"]

@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from train import device
 
 from dgl.nn.pytorch import GraphConv
+from train import device
 
 
 class VGAEModel(nn.Module):

@@ -1,6 +1,8 @@
 import argparse
 import os
 
+import dgl.nn as dglnn
+
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -8,10 +10,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
 import tqdm
-from ogb.nodeproppred import DglNodePropPredDataset
-from torch.nn.parallel import DistributedDataParallel
-
-import dgl.nn as dglnn
 from dgl.data import AsNodePredDataset
 from dgl.dataloading import (
     DataLoader,
@@ -19,6 +17,8 @@ from dgl.dataloading import (
     NeighborSampler,
 )
 from dgl.multiprocessing import shared_tensor
+from ogb.nodeproppred import DglNodePropPredDataset
+from torch.nn.parallel import DistributedDataParallel
 
 
 class SAGE(nn.Module):

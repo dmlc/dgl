@@ -1,19 +1,19 @@
 import argparse
 import random
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import Evaluator
 from ogb.graphproppred.mol_encoder import AtomEncoder
 from preprocessing import prepare_dataset
 from torch.utils.data import Dataset
 from tqdm import tqdm
-
-import dgl
-from dgl.dataloading import GraphDataLoader
 
 
 def aggregate_mean(h, vector_field, h_in):
@@ -116,7 +116,6 @@ class DGNLayer(nn.Module):
         return {"h": h}
 
     def forward(self, g, h, snorm_n):
-
         g.ndata["h"] = h
 
         # pretransformation
@@ -284,7 +283,6 @@ def evaluate_network(model, device, data_loader):
 
 
 def train(dataset, params):
-
     trainset, valset, testset = dataset.train, dataset.val, dataset.test
     device = params.device
 

@@ -130,7 +130,6 @@ void SpMMSumCsr(
   const IdType* edges = csr.data.Ptr<IdType>();
   const DType* X = ufeat.Ptr<DType>();
   const DType* W = efeat.Ptr<DType>();
-  int64_t dim = bcast.out_len;
   DType* O = out.Ptr<DType>();
   CHECK_NOTNULL(indptr);
   CHECK_NOTNULL(O);
@@ -160,7 +159,7 @@ void SpMMSumCsr(
     ElemWiseUpd* cpu_spec = (asm_kernel_ptr && asm_kernel_ptr->applicable())
                                 ? asm_kernel_ptr.get()
                                 : nullptr;
-    if (cpu_spec && dim > 16 && !bcast.use_bcast) {
+    if (cpu_spec && bcast.out_len > 16 && !bcast.use_bcast) {
       SpMMSumCsrXbyak<IdType, DType, Op>(cpu_spec, bcast, csr, X, W, O);
     } else {
 #endif  // USE_AVX

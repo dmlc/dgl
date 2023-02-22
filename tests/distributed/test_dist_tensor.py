@@ -3,10 +3,10 @@ import os
 import unittest
 
 import backend as F
-import pytest
-from utils import create_random_graph, generate_ip_config, reset_envs
 
 import dgl
+import pytest
+from utils import create_random_graph, generate_ip_config, reset_envs
 
 dist_g = None
 

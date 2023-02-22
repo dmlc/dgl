@@ -45,12 +45,14 @@ message passing APIs.
 # aggregation on a node :math:`u` only involves summing over the neighbors'
 # representations :math:`h_v`, we can simply use builtin functions:
 
+import os
+
+os.environ["DGLBACKEND"] = "pytorch"
+import dgl
+import dgl.function as fn
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.function as fn
 from dgl import DGLGraph
 
 gcn_msg = fn.copy_u(u="h", out="m")
@@ -154,7 +156,6 @@ dur = []
 for epoch in range(50):
     if epoch >= 3:
         t0 = time.time()
-
     net.train()
     logits = net(g, features)
     logp = F.log_softmax(logits, 1)
@@ -166,14 +167,12 @@ for epoch in range(50):
 
     if epoch >= 3:
         dur.append(time.time() - t0)
-
     acc = evaluate(net, g, features, labels, test_mask)
     print(
         "Epoch {:05d} | Loss {:.4f} | Test Acc {:.4f} | Time(s) {:.4f}".format(
             epoch, loss.item(), acc, np.mean(dur)
         )
     )
-
 ###############################################################################
 # .. _math:
 #

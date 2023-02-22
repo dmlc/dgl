@@ -5,8 +5,7 @@ import torch as th
 import torch.nn.functional as F
 from torch import nn
 
-from ... import DGLGraph
-from ... import function as fn
+from ... import DGLGraph, function as fn
 from ...base import dgl_warning
 
 

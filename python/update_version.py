@@ -16,7 +16,7 @@ import re
 # (usually "aYYMMDD")
 # The environment variable DGL_VERSION_SUFFIX is the local version label
 # suffix for indicating CPU and CUDA versions as in PEP 440 (e.g. "+cu102")
-__version__ = "1.0" + os.getenv("DGL_PRERELEASE", "") 
+__version__ = "1.1" + os.getenv("DGL_PRERELEASE", "")
 __version__ += os.getenv("DGL_VERSION_SUFFIX", "")
 print(__version__)
 
@@ -68,7 +68,7 @@ def main():
     for path in ["dgl"]:
         update(
             os.path.join(proj_root, "conda", path, "meta.yaml"),
-            '(?<=version: ")[.0-9a-z+_]+',
+            "(?<=version: )[.0-9a-z+_]+",
             __version__,
         )
 

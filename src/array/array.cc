@@ -426,6 +426,18 @@ NDArray CSRGetData(
   return ret;
 }
 
+runtime::NDArray CSRGetFloatingData(
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    runtime::NDArray weights, double filler) {
+  if (weights->dtype.bits == 64) {
+    return CSRGetData<double>(csr, rows, cols, weights, filler);
+  } else {
+    CHECK(weights->dtype.bits == 32)
+        << "CSRGetFloatingData only supports 32 or 64 bits floaring number";
+    return CSRGetData<float>(csr, rows, cols, weights, filler);
+  }
+}
+
 template NDArray CSRGetData<float>(
     CSRMatrix csr, NDArray rows, NDArray cols, NDArray weights, float filler);
 template NDArray CSRGetData<double>(

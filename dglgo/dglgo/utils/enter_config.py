@@ -1,17 +1,16 @@
-from typing import Optional
-import yaml
-import jinja2
-from jinja2 import Template
-from enum import Enum, IntEnum
 import copy
-from pydantic import create_model, BaseModel as PydanticBaseModel, Field
-# from ..pipeline import nodepred, nodepred_sample
-from .factory import ModelFactory, PipelineFactory, DataFactory
+from enum import Enum, IntEnum
+from typing import Optional
+
+import jinja2
+import yaml
+from jinja2 import Template
+from pydantic import BaseModel as PydanticBaseModel, create_model, Field
+
 from .base_model import DGLBaseModel
 
-
-
-
+# from ..pipeline import nodepred, nodepred_sample
+from .factory import DataFactory, ModelFactory, PipelineFactory
 
 
 class PipelineConfig(DGLBaseModel):
@@ -21,6 +20,7 @@ class PipelineConfig(DGLBaseModel):
     eval_period: int = 5
     optimizer: dict = {"name": "Adam", "lr": 0.005}
     loss: str = "CrossEntropyLoss"
+
 
 class UserConfig(DGLBaseModel):
     version: Optional[str] = "0.0.2"

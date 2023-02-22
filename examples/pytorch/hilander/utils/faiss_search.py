@@ -101,7 +101,6 @@ def faiss_search_knn(
     sort=True,
     verbose=False,
 ):
-
     dists, nbrs = faiss_search_approx_knn(
         query=feat, target=feat, k=k, nprobe=nprobe, verbose=verbose
     )

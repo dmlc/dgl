@@ -1,12 +1,12 @@
 import argparse
 import time
 
+import dgl
+
 import numpy as np
 import tensorflow as tf
-from gcn import GCN
-
-import dgl
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
+from gcn import GCN
 
 
 def evaluate(model, features, labels, mask):

@@ -1,14 +1,14 @@
 import argparse
 import os
 
+import dgl
+import dgl.function as fn
+
 import numpy as np
 import ogb
 import torch
 import tqdm
 from ogb.lsc import MAG240MDataset
-
-import dgl
-import dgl.function as fn
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

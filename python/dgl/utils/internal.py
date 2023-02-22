@@ -9,10 +9,9 @@ from functools import wraps
 
 import numpy as np
 
-from .. import backend as F
-from .. import ndarray as nd
+from .. import backend as F, ndarray as nd
 from .._ffi.function import _init_api
-from ..base import EID, NID, DGLError, dgl_warning
+from ..base import dgl_warning, DGLError, EID, NID
 
 
 def is_listlike(data):

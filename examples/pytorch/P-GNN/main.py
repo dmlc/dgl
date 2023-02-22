@@ -1,14 +1,14 @@
 import os
 import warnings
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn as nn
 from model import PGNN
 from sklearn.metrics import roc_auc_score
 from utils import get_dataset, preselect_anchor
-
-import dgl
 
 warnings.filterwarnings("ignore")
 

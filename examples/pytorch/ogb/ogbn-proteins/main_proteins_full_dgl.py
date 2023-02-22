@@ -1,6 +1,8 @@
 import os
 import time
 
+import dgl.function as fn
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -11,8 +13,6 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from utils import load_model, set_random_seed
-
-import dgl.function as fn
 
 
 def normalize_edge_weights(graph, device, num_ew_channels):

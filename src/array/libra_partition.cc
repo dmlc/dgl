@@ -41,6 +41,7 @@ int32_t Ver2partition(IdType in_val, int64_t *node_map, int32_t num_parts) {
     pos = pos + 1;
   }
   LOG(FATAL) << "Error: Unexpected output in Ver2partition!";
+  return -1;
 }
 
 /**

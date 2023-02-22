@@ -13,17 +13,17 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
+import dgl
+
 import numpy as np
 import torch as th
 import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
+from dgl.nn import RelGraphConv
 from torch.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
-
-import dgl
-from dgl.nn import RelGraphConv
 
 from .. import utils
 

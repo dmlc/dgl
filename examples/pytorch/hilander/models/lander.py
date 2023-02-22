@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import dgl
+import dgl.function as fn
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.function as fn
 
 from .focal_loss import FocalLoss
 from .graphconv import GraphConv
