@@ -7,12 +7,11 @@ import sys
 import numpy as np
 import scipy
 
-from . import backend as F
-from . import utils
+from . import backend as F, utils
 from ._ffi.function import _init_api
 from ._ffi.object import ObjectBase, register_object
 from ._ffi.streams import to_dgl_stream_handle
-from .base import DGLError, dgl_warning
+from .base import dgl_warning, DGLError
 from .graph_index import from_coo
 
 

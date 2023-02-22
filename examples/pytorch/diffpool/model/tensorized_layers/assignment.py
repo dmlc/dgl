@@ -1,8 +1,9 @@
 import torch
-from model.tensorized_layers.graphsage import BatchedGraphSAGE
 from torch import nn as nn
 from torch.autograd import Variable
 from torch.nn import functional as F
+
+from model.tensorized_layers.graphsage import BatchedGraphSAGE
 
 
 class DiffPoolAssignment(nn.Module):

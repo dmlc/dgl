@@ -1,3 +1,4 @@
+import dgl
 import torch as th
 import torch.optim as optim
 import utils
@@ -5,8 +6,6 @@ from model import EGES
 from sampler import Sampler
 from sklearn import metrics
 from torch.utils.data import DataLoader
-
-import dgl
 
 
 def train(args, train_g, sku_info, num_skus, num_brands, num_shops, num_cates):

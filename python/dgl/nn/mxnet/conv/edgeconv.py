@@ -98,20 +98,21 @@ class EdgeConv(nn.Block):
     [-1.015364    0.78919804]]
     <NDArray 4x2 @cpu(0)>
     """
-    def __init__(self,
-                 in_feat,
-                 out_feat,
-                 batch_norm=False,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self, in_feat, out_feat, batch_norm=False, allow_zero_in_degree=False
+    ):
         super(EdgeConv, self).__init__()
         self.batch_norm = batch_norm
         self._allow_zero_in_degree = allow_zero_in_degree
 
         with self.name_scope():
-            self.theta = nn.Dense(out_feat, in_units=in_feat,
-                                  weight_initializer=mx.init.Xavier())
-            self.phi = nn.Dense(out_feat, in_units=in_feat,
-                                weight_initializer=mx.init.Xavier())
+            self.theta = nn.Dense(
+                out_feat, in_units=in_feat, weight_initializer=mx.init.Xavier()
+            )
+            self.phi = nn.Dense(
+                out_feat, in_units=in_feat, weight_initializer=mx.init.Xavier()
+            )
 
             if batch_norm:
                 self.bn = nn.BatchNorm(in_channels=out_feat)
@@ -164,26 +165,28 @@ class EdgeConv(nn.Block):
         with g.local_scope():
             if not self._allow_zero_in_degree:
                 if g.in_degrees().min() == 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             h_src, h_dst = expand_as_pair(h, g)
-            g.srcdata['x'] = h_src
-            g.dstdata['x'] = h_dst
-            g.apply_edges(fn.v_sub_u('x', 'x', 'theta'))
-            g.edata['theta'] = self.theta(g.edata['theta'])
-            g.dstdata['phi'] = self.phi(g.dstdata['x'])
+            g.srcdata["x"] = h_src
+            g.dstdata["x"] = h_dst
+            g.apply_edges(fn.v_sub_u("x", "x", "theta"))
+            g.edata["theta"] = self.theta(g.edata["theta"])
+            g.dstdata["phi"] = self.phi(g.dstdata["x"])
             if not self.batch_norm:
-                g.update_all(fn.e_add_v('theta', 'phi', 'e'), fn.max('e', 'x'))
+                g.update_all(fn.e_add_v("theta", "phi", "e"), fn.max("e", "x"))
             else:
-                g.apply_edges(fn.e_add_v('theta', 'phi', 'e'))
-                g.edata['e'] = self.bn(g.edata['e'])
-                g.update_all(fn.copy_e('e', 'm'), fn.max('m', 'x'))
-            return g.dstdata['x']
+                g.apply_edges(fn.e_add_v("theta", "phi", "e"))
+                g.edata["e"] = self.bn(g.edata["e"])
+                g.update_all(fn.copy_e("e", "m"), fn.max("m", "x"))
+            return g.dstdata["x"]

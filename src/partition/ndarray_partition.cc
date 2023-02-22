@@ -183,11 +183,13 @@ class RangePartition : public NDArrayPartition {
                                   << ") for "
                                      "partition of size "
                                   << NumParts() << ".";
+    int64_t part_size = -1;
     ATEN_ID_TYPE_SWITCH(range_cpu_->dtype, RangeType, {
       const RangeType* const ptr =
           static_cast<const RangeType*>(range_cpu_->data);
-      return ptr[part_id + 1] - ptr[part_id];
+      part_size = ptr[part_id + 1] - ptr[part_id];
     });
+    return part_size;
   }
 
  private:

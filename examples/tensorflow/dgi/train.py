@@ -1,19 +1,19 @@
 import argparse
 import time
 
+import dgl
+
 import networkx as nx
 import numpy as np
 import tensorflow as tf
-from dgi import DGI, Classifier
-from tensorflow.keras import layers
-
-import dgl
+from dgi import Classifier, DGI
 from dgl.data import (
     CiteseerGraphDataset,
     CoraGraphDataset,
     PubmedGraphDataset,
     register_data_args,
 )
+from tensorflow.keras import layers
 
 
 def evaluate(model, features, labels, mask):

@@ -1,7 +1,6 @@
+import dgl
 import numpy as np
 from mxnet import nd
-
-import dgl
 
 
 def bbox_improve(bbox):

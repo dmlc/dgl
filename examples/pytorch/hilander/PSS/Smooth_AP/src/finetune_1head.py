@@ -280,7 +280,6 @@ _ = model.to(opt.device)
 # Place trainable parameter in list of parameters to train:
 
 if "fc_lr_mul" in vars(opt).keys() and opt.fc_lr_mul != 0:
-
     all_but_fc_params = list(
         filter(lambda x: "last_linear" not in x[0], model.named_parameters())
     )
@@ -376,6 +375,8 @@ def same_model(model1, model2):
 
 
 """============================================================================"""
+
+
 #################### TRAINER FUNCTION ############################
 def train_one_epoch_finetune(
     train_dataloader, model, optimizer, criterion, opt, epoch
@@ -403,7 +404,6 @@ def train_one_epoch_finetune(
         train_dataloader, desc="Epoch {} Training gt labels...".format(epoch)
     )
     for i, (class_labels, input) in enumerate(data_iterator):
-
         # Compute embeddings for input batch
         features = model(input.to(opt.device))
 

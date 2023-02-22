@@ -23,7 +23,6 @@ def load_graph(name):
         eval_set = [(nodes_train, y_train), (nodes_val, y_val)]
 
     elif name.startswith("ogbn"):
-
         dataset = DglNodePropPredDataset(name)
         graph, y = dataset[0]
         split_nodes = dataset.get_idx_split()

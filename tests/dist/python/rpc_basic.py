@@ -1,9 +1,9 @@
 import os
 
 import backend as F
-from numpy.testing import assert_array_equal
 
 import dgl
+from numpy.testing import assert_array_equal
 
 INTEGER = 2
 STR = "hello world!"

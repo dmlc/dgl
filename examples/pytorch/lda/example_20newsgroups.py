@@ -20,17 +20,17 @@
 import warnings
 from time import time
 
+import dgl
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as ss
 import torch
+from dgl import function as fn
 from lda_model import LatentDirichletAllocation as LDAModel
 from sklearn.datasets import fetch_20newsgroups
-from sklearn.decomposition import NMF, LatentDirichletAllocation
+from sklearn.decomposition import LatentDirichletAllocation, NMF
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-
-import dgl
-from dgl import function as fn
 
 n_samples = 2000
 n_features = 1000

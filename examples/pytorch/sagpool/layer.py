@@ -1,9 +1,8 @@
+import dgl
 import torch
 import torch.nn.functional as F
-from utils import get_batch_id, topk
-
-import dgl
 from dgl.nn import AvgPooling, GraphConv, MaxPooling
+from utils import get_batch_id, topk
 
 
 class SAGPool(torch.nn.Module):

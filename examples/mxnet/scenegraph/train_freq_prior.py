@@ -28,6 +28,7 @@ use_overlap = args.overlap
 PATH_TO_DATASETS = os.path.expanduser(args.json_path)
 path_to_json = os.path.join(PATH_TO_DATASETS, "rel_annotations_train.json")
 
+
 # format in y1y2x1x2
 def with_overlap(boxA, boxB):
     xA = max(boxA[2], boxB[2])

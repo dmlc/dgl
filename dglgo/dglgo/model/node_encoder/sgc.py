@@ -1,16 +1,13 @@
-import torch.nn as nn
 import dgl.function as fn
+import torch.nn as nn
 import torch.nn.functional as F
-from dgl.nn import SGConv
 from dgl.base import dgl_warning
+from dgl.nn import SGConv
 
 
 class SGC(nn.Module):
-    def __init__(self,
-                 data_info: dict,
-                 embed_size: int = -1,
-                 bias=True, k=2):
-        """ Simplifying Graph Convolutional Networks
+    def __init__(self, data_info: dict, embed_size: int = -1, bias=True, k=2):
+        """Simplifying Graph Convolutional Networks
 
         Edge feature is ignored in this model.
 
@@ -34,12 +31,20 @@ class SGC(nn.Module):
             in_size = embed_size
         else:
             in_size = data_info["in_size"]
-        self.sgc = SGConv(in_size, self.out_size, k=k, cached=True,
-                          bias=bias, norm=self.normalize)
+        self.sgc = SGConv(
+            in_size,
+            self.out_size,
+            k=k,
+            cached=True,
+            bias=bias,
+            norm=self.normalize,
+        )
 
     def forward(self, g, node_feat, edge_feat=None):
         if self.embed_size > 0:
-            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
+            dgl_warning(
+                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size."
+            )
             h = self.embed.weight
         else:
             h = node_feat
@@ -47,4 +52,4 @@ class SGC(nn.Module):
 
     @staticmethod
     def normalize(h):
-        return (h-h.mean(0))/(h.std(0) + 1e-5)
+        return (h - h.mean(0)) / (h.std(0) + 1e-5)

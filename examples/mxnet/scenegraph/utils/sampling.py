@@ -1,7 +1,6 @@
+import dgl
 import mxnet as mx
 import numpy as np
-
-import dgl
 from dgl.utils import toindex
 
 

@@ -2,10 +2,10 @@ import json
 import pickle
 import random
 
+import dgl
+
 import numpy as np
 import torch
-
-import dgl
 
 NODE_TYPE = {"entity": 0, "root": 1, "relation": 2}
 

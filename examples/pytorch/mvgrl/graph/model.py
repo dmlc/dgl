@@ -1,9 +1,9 @@
 import torch as th
 import torch.nn as nn
-from utils import local_global_loss_
 
 from dgl.nn.pytorch import GraphConv
 from dgl.nn.pytorch.glob import SumPooling
+from utils import local_global_loss_
 
 
 class MLP(nn.Module):
