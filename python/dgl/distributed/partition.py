@@ -196,7 +196,7 @@ def load_partition(part_config, part_id, load_feats=True):
         f"{os.path.getsize(partition_path)} bytes. It may take non-trivial "
         "time for large partition."
     )
-    graph = load_graphs()[0][0]
+    graph = load_graphs(partition_path)[0][0]
     print("Finished loading partition...")
 
     assert (
@@ -307,7 +307,7 @@ def load_partition_feats(
             f"{os.path.getsize(feat_path)} bytes. It may take non-trivial "
             "time for large data."
         )
-        node_feats = load_tensors()
+        node_feats = load_tensors(feat_path)
         print("Finished loading node data...")
     edge_feats = None
     if load_edges:
