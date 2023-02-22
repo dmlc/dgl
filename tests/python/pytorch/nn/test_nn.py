@@ -1625,7 +1625,9 @@ def test_subgraphx(g, idtype, n_classes):
 
     model = Model(feat.shape[1], n_classes)
     model = model.to(ctx)
-    explainer = nn.SubgraphX(model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0)
+    explainer = nn.SubgraphX(
+        model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
+    )
     explainer.explain_graph(g, feat, target_class=0)
 
 
