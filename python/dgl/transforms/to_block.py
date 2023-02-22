@@ -13,7 +13,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-"""Implementation for to block."""
+"""To block method."""
 
 from collections import defaultdict
 from collections.abc import Mapping
