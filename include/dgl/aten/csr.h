@@ -53,14 +53,15 @@ struct CSRMatrix {
   /** @brief constructor */
   CSRMatrix(
       int64_t nrows, int64_t ncols, IdArray parr, IdArray iarr,
-      IdArray darr = NullArray(), bool sorted_flag = false, bool pinned_mem = false)
+      IdArray darr = NullArray(), bool sorted_flag = false,
+      bool pinned_mem = false)
       : num_rows(nrows),
         num_cols(ncols),
         indptr(parr),
         indices(iarr),
         data(darr),
         sorted(sorted_flag),
-        is_pinned(pinned_mem){
+        is_pinned(pinned_mem) {
     CheckValidity();
   }
 
@@ -140,8 +141,7 @@ struct CSRMatrix {
     return CSRMatrix(
         num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
         aten::IsNullArray(data) ? data : data.PinMemory(), sorted, true);
-
-   }
+  }
 
   inline void PinMemory_() {
     if (is_pinned) return;

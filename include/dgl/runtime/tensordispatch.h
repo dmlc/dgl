@@ -151,10 +151,12 @@ class TensorDispatcher {
     (ptr, static_cast<cudaStream_t>(stream), device_id);
 #endif  // DGL_USE_CUDA
   }
-  inline void* CUDAAllocHostWorkspace(size_t nbytes, void*& ctx, void*& deleter) {
+  inline void* CUDAAllocHostWorkspace(
+      size_t nbytes, void*& ctx, void*& deleter) {
 #ifdef DGL_USE_CUDA
     auto entry = entrypoints_[Op::kCUDARawHostAlloc];
-    return FUNCCAST(tensoradapter::CUDARawHostAlloc, entry)(nbytes, ctx, deleter);
+    return FUNCCAST(tensoradapter::CUDARawHostAlloc, entry)(
+        nbytes, ctx, deleter);
 #endif  // DGL_USE_CUDA
   }
 
@@ -166,9 +168,11 @@ class TensorDispatcher {
   }
 
 #ifdef DGL_USE_CUDA
-  inline void CUDARecordHostAlloc(void* data, void* ctx, cudaStream_t stream, int device_id) {
+  inline void CUDARecordHostAlloc(
+      void* data, void* ctx, cudaStream_t stream, int device_id) {
     auto entry = entrypoints_[Op::kCUDARecordHostAlloc];
-    FUNCCAST(tensoradapter::CUDARecordHostAlloc, entry)(data, ctx, stream, device_id);
+    FUNCCAST(tensoradapter::CUDARecordHostAlloc, entry)
+    (data, ctx, stream, device_id);
   }
 #endif  // DGL_USE_CUDA
 
@@ -191,10 +195,12 @@ class TensorDispatcher {
    * Must match the functions in tensoradapter/include/tensoradapter.h.
    */
   static constexpr const char* names_[] = {
-      "CPURawAlloc",  "CPURawDelete",
+      "CPURawAlloc",         "CPURawDelete",
 #ifdef DGL_USE_CUDA
-      "CUDARawAlloc", "CUDARawDelete", "CUDACurrentStream", "RecordStream", "CUDARawHostAlloc",
-      "CUDARawHostDelete", "CUDARecordHostAlloc", "CUDAHostAllocEmptyCache",
+      "CUDARawAlloc",        "CUDARawDelete",
+      "CUDACurrentStream",   "RecordStream",
+      "CUDARawHostAlloc",    "CUDARawHostDelete",
+      "CUDARecordHostAlloc", "CUDAHostAllocEmptyCache",
 #endif  // DGL_USE_CUDA
   };
 
@@ -222,8 +228,7 @@ class TensorDispatcher {
   void* entrypoints_[num_entries_] = {
       nullptr, nullptr,
 #ifdef DGL_USE_CUDA
-      nullptr, nullptr, nullptr,
-      nullptr,nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 #endif  // DGL_USE_CUDA
   };
 

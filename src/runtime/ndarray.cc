@@ -224,25 +224,26 @@ void NDArray::RecordedCopyFromTo(DGLArray* from, DGLArray* to, void* pyt_ctx) {
   // Use the context that is *not* a cpu context to get the correct device
   // api manager.
   DGLContext ctx = from->ctx.device_type != kDGLCPU ? from->ctx : to->ctx;
-  CHECK(ctx.device_type == kDGLCUDA ) << "Can not record event if not cuda device";
+  CHECK(ctx.device_type == kDGLCUDA)
+      << "Can not record event if not cuda device";
   DeviceAPI::Get(kDGLCUDA)->RecordedCopyDataFromTo(
-        from->data, static_cast<size_t>(from->byte_offset), to->data,
-        static_cast<size_t>(to->byte_offset), from_size, from->ctx, to->ctx,
-        from->dtype, pyt_ctx);
+      from->data, static_cast<size_t>(from->byte_offset), to->data,
+      static_cast<size_t>(to->byte_offset), from_size, from->ctx, to->ctx,
+      from->dtype, pyt_ctx);
 }
 
 NDArray NDArray::PinnedEmpty(
     std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
-  CHECK_EQ(ctx.device_type, kDGLCPU)
-      << "Only NDArray on CPU can be pinned";
+  CHECK_EQ(ctx.device_type, kDGLCPU) << "Only NDArray on CPU can be pinned";
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   // size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   if (size > 0) {
-    ret.data_->dl_tensor.data =
-        DeviceAPI::Get(kDGLCUDA)->AllocPinnedDataSpace(size, ret.data_->pyt_ctx, ret.data_->pyt_raw_deleter);
-    CHECK( ret.data_->pyt_ctx != nullptr && ret.data_->pyt_raw_deleter != nullptr )
+    ret.data_->dl_tensor.data = DeviceAPI::Get(kDGLCUDA)->AllocPinnedDataSpace(
+        size, ret.data_->pyt_ctx, ret.data_->pyt_raw_deleter);
+    CHECK(
+        ret.data_->pyt_ctx != nullptr && ret.data_->pyt_raw_deleter != nullptr)
         << "Can not return proper CachingHostAllocator";
     ret.data_->pinned_by_pyt_ = true;
   }
@@ -257,7 +258,6 @@ void NDArray::PinContainer(NDArray::Container* ptr) {
   ptr->pinned_by_dgl_ =
       DeviceAPI::Get(kDGLCUDA)->PinData(tensor->data, GetDataSize(*tensor));
 }
-
 
 void NDArray::UnpinContainer(NDArray::Container* ptr) {
   auto container_is_pinned = IsContainerPinned(ptr);

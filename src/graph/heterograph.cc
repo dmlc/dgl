@@ -278,14 +278,13 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DGLContext& ctx) {
 }
 
 HeteroGraphPtr HeteroGraph::PinMemory(HeteroGraphPtr g) {
-
   bool allpinned = true;
   std::vector<HeteroGraphPtr> rel_graphs;
 
   auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(g);
   CHECK_NOTNULL(hgindex);
   for (auto subg : hgindex->relation_graphs_) {
-    if(!subg->IsPinned()) {
+    if (!subg->IsPinned()) {
       rel_graphs.push_back(subg->PinMemoryOutPlace());
       allpinned = false;
     } else {

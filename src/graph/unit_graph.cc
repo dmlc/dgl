@@ -1269,7 +1269,7 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DGLContext& ctx) {
   }
 }
 
-HeteroGraphPtr UnitGraph::PinMemoryOutPlace(){
+HeteroGraphPtr UnitGraph::PinMemoryOutPlace() {
   CSRPtr new_incsr, new_outcsr;
   COOPtr new_coo;
   if (this->in_csr_->defined() && !this->in_csr_->IsPinned()) {
@@ -1296,8 +1296,8 @@ HeteroGraphPtr UnitGraph::PinMemoryOutPlace(){
     new_coo = nullptr;
   }
 
-  return HeteroGraphPtr(
-      new UnitGraph(meta_graph(), new_incsr, new_outcsr, new_coo, this->formats_));
+  return HeteroGraphPtr(new UnitGraph(
+      meta_graph(), new_incsr, new_outcsr, new_coo, this->formats_));
 }
 
 void UnitGraph::PinMemory_() {

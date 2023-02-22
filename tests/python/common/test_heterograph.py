@@ -1254,6 +1254,7 @@ def test_pin_memory_(idtype):
     g3.unpin_memory_()
     assert not g3.is_pinned()
 
+
 @unittest.skipIf(
     F._default_context_str == "cpu", reason="Need gpu for this test"
 )
@@ -1280,10 +1281,10 @@ def test_pin_memory(idtype):
     # it's fine to clone with new formats, but new graphs are not pinned
     # >>> g.formats()
     # {'created': ['coo'], 'not created': ['csr', 'csc']}
-    assert not g.formats('csc').is_pinned()
-    assert not g.formats('csr').is_pinned()
+    assert not g.formats("csc").is_pinned()
+    assert not g.formats("csr").is_pinned()
     # 'coo' formats is already created and thus not cloned
-    assert g.formats('coo').is_pinned()
+    assert g.formats("coo").is_pinned()
 
     g1 = g.to(F.cuda())
     # error pinning a GPU graph
@@ -1296,11 +1297,12 @@ def test_pin_memory(idtype):
     assert g2.is_pinned()
 
     # test pin heterograph with 0 edge of one relation type
-    g3 = dgl.heterograph({
-        ('a','b','c'): ([0, 1], [1, 2]),
-        ('c','d','c'): ([], [])}).astype(idtype)
+    g3 = dgl.heterograph(
+        {("a", "b", "c"): ([0, 1], [1, 2]), ("c", "d", "c"): ([], [])}
+    ).astype(idtype)
     g3._graph.pin_memory()
     assert g3.is_pinned()
+
 
 @parametrize_idtype
 def test_convert_bound(idtype):

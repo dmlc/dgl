@@ -164,10 +164,9 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   void RecordedCopyDataFromTo(
-      void* from, size_t from_offset, void* to, size_t to_offset,
-      size_t size, DGLContext ctx_from, DGLContext ctx_to,
-      DGLDataType type_hint, void* pyt_ctx) final {
-
+      void* from, size_t from_offset, void* to, size_t to_offset, size_t size,
+      DGLContext ctx_from, DGLContext ctx_to, DGLDataType type_hint,
+      void* pyt_ctx) final {
     auto stream = GetStream();
     CopyDataFromTo(
         from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint,
@@ -176,7 +175,8 @@ class CUDADeviceAPI final : public DeviceAPI {
     if (td->IsAvailable()) {
       auto custream = static_cast<cudaStream_t>(stream);
       void* ptr = ctx_to.device_type == kDGLCPU ? to : from;
-      int  id = ctx_to.device_type == kDGLCPU ? ctx_from.device_id : ctx_to.device_id;
+      int id =
+          ctx_to.device_type == kDGLCPU ? ctx_from.device_id : ctx_to.device_id;
       td->CUDARecordHostAlloc(ptr, pyt_ctx, custream, id);
     }
   }
@@ -242,11 +242,13 @@ class CUDADeviceAPI final : public DeviceAPI {
     return true;
   }
 
-  void* AllocPinnedDataSpace(size_t nbytes, void*& ctx, void*& deleter) override {
+  void* AllocPinnedDataSpace(
+      size_t nbytes, void*& ctx, void*& deleter) override {
     // prevent users from pinning empty tensors or graphs
     if (nbytes == 0) return nullptr;
     TensorDispatcher* td = TensorDispatcher::Global();
-    CHECK(td->IsAvailable()) << "CachingHost allocator only available with TensorAdatpor";
+    CHECK(td->IsAvailable())
+        << "CachingHost allocator only available with TensorAdatpor";
     return td->CUDAAllocHostWorkspace(nbytes, ctx, deleter);
   }
 

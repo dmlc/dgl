@@ -65,7 +65,7 @@ struct COOMatrix {
         data(darr),
         row_sorted(rsorted),
         col_sorted(csorted),
-        is_pinned(pinned_mem){
+        is_pinned(pinned_mem) {
     CheckValidity();
   }
 
@@ -149,7 +149,6 @@ struct COOMatrix {
         num_rows, num_cols, row.PinMemory(), col.PinMemory(),
         aten::IsNullArray(data) ? data : data.PinMemory(), row_sorted,
         col_sorted, true);
-
   }
 
   inline void PinMemory_() {
