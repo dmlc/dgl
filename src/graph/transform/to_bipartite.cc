@@ -189,7 +189,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCUDA, int64_t>(
 
 #endif  // DGL_USE_CUDA
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
+DGL_REGISTER_GLOBAL("capi._CAPI_DGLToBlock")
     .set_body([](DGLArgs args, DGLRetValue *rv) {
       const HeteroGraphRef graph_ref = args[0];
       const std::vector<IdArray> &rhs_nodes =
