@@ -152,7 +152,7 @@ class TensorDispatcher {
 #endif  // DGL_USE_CUDA
   }
   inline void* CUDAAllocHostWorkspace(
-      size_t nbytes, void*& ctx, void*& deleter) {
+      size_t nbytes, void** ctx, void** deleter) {
 #ifdef DGL_USE_CUDA
     auto entry = entrypoints_[Op::kCUDARawHostAlloc];
     return FUNCCAST(tensoradapter::CUDARawHostAlloc, entry)(
@@ -160,7 +160,7 @@ class TensorDispatcher {
 #endif  // DGL_USE_CUDA
   }
 
-  inline void CUDAFreeHostWorkspace(void*& deleter) {
+  inline void CUDAFreeHostWorkspace(void** deleter) {
 #ifdef DGL_USE_CUDA
     auto entry = entrypoints_[Op::kCUDARawHostDelete];
     FUNCCAST(tensoradapter::CUDARawHostDelete, entry)(deleter);

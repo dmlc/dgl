@@ -127,12 +127,12 @@ bool DeviceAPI::PinData(void* ptr, size_t nbytes) {
 }
 
 void* DeviceAPI::AllocPinnedDataSpace(
-    size_t nbytes, void*& ctx, void*& deleter) {
+    size_t nbytes, void** ctx, void** deleter) {
   LOG(FATAL) << "Device does not support cudaHostAlloc api.";
   return nullptr;
 }
 
-void DeviceAPI::FreePinnedDataSpace(void*& deleter) {
+void DeviceAPI::FreePinnedDataSpace(void** deleter) {
   LOG(FATAL) << "Device does not support cudaHostFree api.";
 }
 

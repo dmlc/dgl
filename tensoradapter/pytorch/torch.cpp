@@ -67,24 +67,23 @@ class CUDAHostDeleter {
 };
 
 TA_EXPORTS void* CUDARawHostAlloc(
-    size_t nbytes, void*& ctx, void*& raw_deleter) {
+    size_t nbytes, void** ctx, void** raw_deleter) {
   auto data_ptr = at::cuda::getCachingHostAllocator()->allocate(nbytes);
   auto raw = data_ptr.get();
-  ctx = data_ptr.get_context();  // raw  ctx ptr for record event
+  *ctx = data_ptr.get_context();  // raw  ctx ptr for record event
 
   auto* data_deleter = new CUDAHostDeleter(
       data_ptr.move_context());  // transfer ownership to raw_deleter
-  raw_deleter = static_cast<void*>(data_deleter);
+  *raw_deleter = static_cast<void*>(data_deleter);
   return raw;
 }
 
 // every single CUDARawHostAlloc has an unique CUDAHostDeleter obj
-TA_EXPORTS void CUDARawHostDelete(void*& raw_deleter) {
-  delete static_cast<CUDAHostDeleter*>(raw_deleter);
+TA_EXPORTS void CUDARawHostDelete(void** raw_deleter) {
+  delete static_cast<CUDAHostDeleter*>(*raw_deleter);
   raw_deleter = nullptr;
 }
 
-// every single CUDARawHostAlloc has an unique CUDAHostDeleter obj
 TA_EXPORTS void CUDARecordHostAlloc(
     void* ptr, void* ctx, cudaStream_t stream, int device_id) {
   at::cuda::CachingHostAllocator_recordEvent(

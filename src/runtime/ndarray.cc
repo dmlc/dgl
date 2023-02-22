@@ -69,7 +69,8 @@ void NDArray::Internal::DefaultDeleter(NDArray::Container* ptr) {
     // if the array is still pinned before freeing, unpin it.
     if (ptr->pinned_by_dgl_) UnpinContainer(ptr);
     if (ptr->pinned_by_pyt_) {
-      DeviceAPI::Get(kDGLCUDA)->FreePinnedDataSpace(ptr->pyt_raw_deleter);
+      DeviceAPI::Get(kDGLCUDA)->FreePinnedDataSpace(&(ptr->pyt_raw_deleter));
+      CHECK(ptr->pyt_raw_deleter == nullptr);
     } else {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)
           ->FreeDataSpace(ptr->dl_tensor.ctx, ptr->dl_tensor.data);
@@ -241,7 +242,7 @@ NDArray NDArray::PinnedEmpty(
   // size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   if (size > 0) {
     ret.data_->dl_tensor.data = DeviceAPI::Get(kDGLCUDA)->AllocPinnedDataSpace(
-        size, ret.data_->pyt_ctx, ret.data_->pyt_raw_deleter);
+        size, &(ret.data_->pyt_ctx), &(ret.data_->pyt_raw_deleter));
     CHECK(
         ret.data_->pyt_ctx != nullptr && ret.data_->pyt_raw_deleter != nullptr)
         << "Can not return proper CachingHostAllocator";

@@ -243,7 +243,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   }
 
   void* AllocPinnedDataSpace(
-      size_t nbytes, void*& ctx, void*& deleter) override {
+      size_t nbytes, void** ctx, void** deleter) override {
     // prevent users from pinning empty tensors or graphs
     if (nbytes == 0) return nullptr;
     TensorDispatcher* td = TensorDispatcher::Global();
@@ -252,7 +252,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     return td->CUDAAllocHostWorkspace(nbytes, ctx, deleter);
   }
 
-  void FreePinnedDataSpace(void*& deleter) override {
+  void FreePinnedDataSpace(void** deleter) override {
     TensorDispatcher* td = TensorDispatcher::Global();
     if (td->IsAvailable()) {
       td->CUDAFreeHostWorkspace(deleter);

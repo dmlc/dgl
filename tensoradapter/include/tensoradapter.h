@@ -66,8 +66,8 @@ cudaStream_t CUDACurrentStream();
  */
 void RecordStream(void* ptr, cudaStream_t stream, int device_id);
 
-void* CUDARawHostAlloc(size_t nbytes, void*& ctx, void*& raw_deleter);
-void CUDARawHostDelete(void*& raw_deleter);
+void* CUDARawHostAlloc(size_t nbytes, void** ctx, void** raw_deleter);
+void CUDARawHostDelete(void** raw_deleter);
 void CUDARecordHostAlloc(
     void* data, void* ctx, cudaStream_t stream, int device_id);
 void CUDAHostAllocEmptyCache();

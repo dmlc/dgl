@@ -158,8 +158,8 @@ class DeviceAPI {
    */
   DGL_DLL virtual bool PinData(void* ptr, size_t nbytes);
   DGL_DLL virtual void* AllocPinnedDataSpace(
-      size_t nbytes, void*& ctx, void*& deleter);
-  DGL_DLL virtual void FreePinnedDataSpace(void*& deleter);
+      size_t nbytes, void** ctx, void** deleter);
+  DGL_DLL virtual void FreePinnedDataSpace(void** deleter);
 
   /**
    * @brief Unpin host memory using cudaHostUnregister().
