@@ -328,6 +328,7 @@ def _init_api_prefix(module_name, prefix):
         name_list.append(fname)
         return name_list
 
+
 def _init_internal_api():
     for name in list_global_func_names():
         if not name.startswith("_") or name.startswith("_deprecate"):

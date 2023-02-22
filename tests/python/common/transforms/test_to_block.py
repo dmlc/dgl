@@ -20,6 +20,7 @@ import dgl
 import dgl.partition
 from test_utils import parametrize_idtype
 
+
 @parametrize_idtype
 def test_to_block(idtype):
     def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
@@ -189,4 +190,3 @@ def test_to_block(idtype):
     )
     checkall(g, bg, dst_nodes, False)
     check_features(g, bg)
-

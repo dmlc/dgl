@@ -17,8 +17,9 @@
 
 from collections import defaultdict
 from collections.abc import Mapping
+
+from .. import backend as F, utils
 from ..base import DGLError
-from .. import (backend as F, utils)
 from ..heterograph import DGLBlock
 from .._ffi.capi import *
 
@@ -225,7 +226,6 @@ def to_block(g, dst_nodes=None, include_dst_in_src=True, src_nodes=None):
     else:
         # use an empty list to signal we need to generate it
         src_node_ids_nd = []
-
 
     new_graph_index, src_nodes_ids_nd, induced_edges_nd = _CAPI_DGLToBlock(
         g._graph, dst_node_ids_nd, include_dst_in_src, src_node_ids_nd
