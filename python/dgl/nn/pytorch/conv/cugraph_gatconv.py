@@ -83,8 +83,8 @@ class CuGraphGATConv(nn.Module):
     ):
         if has_pylibcugraphops is False:
             raise ModuleNotFoundError(
-                "dgl.nn.CuGraphGATConv requires pylibcugraphops >= 23.02 "
-                "to be installed."
+                f"{self.__class__.__name__} requires pylibcugraphops >= 23.02. "
+                f"Install via `conda install -c nvidia 'pylibcugraphops>=23.02'`."
             )
         super().__init__()
         self.in_feats = in_feats
