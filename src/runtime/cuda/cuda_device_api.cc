@@ -163,6 +163,24 @@ class CUDADeviceAPI final : public DeviceAPI {
         stream);
   }
 
+  void RecordedCopyDataFromTo(
+      void* from, size_t from_offset, void* to, size_t to_offset,
+      size_t size, DGLContext ctx_from, DGLContext ctx_to,
+      DGLDataType type_hint, void* pyt_ctx) final {
+
+    auto stream = GetStream();
+    CopyDataFromTo(
+        from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint,
+        stream);
+    auto td = TensorDispatcher::Global();
+    if (td->IsAvailable()) {
+      auto custream = static_cast<cudaStream_t>(stream);
+      void* ptr = ctx_to.device_type == kDGLCPU ? to : from;
+      int  id = ctx_to.device_type == kDGLCPU ? ctx_from.device_id : ctx_to.device_id;
+      td->CUDARecordHostAlloc(ptr, pyt_ctx, custream, id);
+    }
+  }
+
   DGLStreamHandle CreateStream(DGLContext ctx) {
     CUDA_CALL(cudaSetDevice(ctx.device_id));
     cudaStream_t retval;
@@ -214,8 +232,29 @@ class CUDADeviceAPI final : public DeviceAPI {
   bool PinData(void* ptr, size_t nbytes) override {
     // prevent users from pinning empty tensors or graphs
     if (ptr == nullptr || nbytes == 0) return false;
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable()) {
+      // if using cudaHostRegister, make sure the memory
+      // caching pool (alloc. with cudaHostAlloc) is clean
+      td->CUDAHostAllocEmptyCache();
+    }
     CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
     return true;
+  }
+
+  void* AllocPinnedDataSpace(size_t nbytes, void*& ctx, void*& deleter) override {
+    // prevent users from pinning empty tensors or graphs
+    if (nbytes == 0) return nullptr;
+    TensorDispatcher* td = TensorDispatcher::Global();
+    CHECK(td->IsAvailable()) << "CachingHost allocator only available with TensorAdatpor";
+    return td->CUDAAllocHostWorkspace(nbytes, ctx, deleter);
+  }
+
+  void FreePinnedDataSpace(void*& deleter) override {
+    TensorDispatcher* td = TensorDispatcher::Global();
+    if (td->IsAvailable()) {
+      td->CUDAFreeHostWorkspace(deleter);
+    }
   }
 
   void UnpinData(void* ptr) {

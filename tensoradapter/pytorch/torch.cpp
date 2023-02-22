@@ -10,6 +10,7 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAStream.h>
+#include <ATen/cuda/CachingHostAllocator.h>
 #include <cuda_runtime.h>
 #endif  // DGL_USE_CUDA
 
@@ -54,6 +55,47 @@ TA_EXPORTS void RecordStream(void* ptr, cudaStream_t stream, int device_id) {
               c10::Device(c10::DeviceType::CUDA, device_id),
               reinterpret_cast<int64_t>(stream))));
   data_ptr.release_context();
+}
+
+class CUDAHostDeleter {
+   public:
+    explicit CUDAHostDeleter(std::unique_ptr<void, c10::DeleterFnPtr> ptr)
+        : ptr_(std::move(ptr)) {}
+
+   private:
+    std::unique_ptr<void, c10::DeleterFnPtr> ptr_;
+};
+
+TA_EXPORTS void* CUDARawHostAlloc(size_t nbytes, void*& ctx, void*& raw_deleter) {
+  auto data_ptr = at::cuda::getCachingHostAllocator()->allocate(nbytes);
+  auto raw = data_ptr.get();
+  ctx = data_ptr.get_context(); // raw  ctx ptr for record event
+
+  auto* data_deleter = new CUDAHostDeleter(data_ptr.move_context()); // transfer ownership to raw_deleter
+  raw_deleter = static_cast<void*>(data_deleter);
+  return raw;
+}
+
+// every single CUDARawHostAlloc has an unique CUDAHostDeleter obj
+TA_EXPORTS void CUDARawHostDelete(void*& raw_deleter) {
+  delete static_cast<CUDAHostDeleter*>(raw_deleter);
+  raw_deleter = nullptr;
+}
+
+// every single CUDARawHostAlloc has an unique CUDAHostDeleter obj
+TA_EXPORTS void CUDARecordHostAlloc(void* ptr, void* ctx, cudaStream_t stream, int device_id) {
+  at::cuda::CachingHostAllocator_recordEvent(
+      ptr, ctx,
+      c10::cuda::CUDAStream(
+          c10::cuda::CUDAStream::UNCHECKED,
+          c10::Stream(
+              c10::Stream::UNSAFE,
+              c10::Device(c10::DeviceType::CUDA, device_id),
+              reinterpret_cast<int64_t>(stream))));
+}
+
+TA_EXPORTS void CUDAHostAllocEmptyCache() {
+  at::cuda::CachingHostAllocator_emptyCache();
 }
 #endif  // DGL_USE_CUDA
 };

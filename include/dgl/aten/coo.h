@@ -56,14 +56,16 @@ struct COOMatrix {
   /** @brief constructor */
   COOMatrix(
       int64_t nrows, int64_t ncols, IdArray rarr, IdArray carr,
-      IdArray darr = NullArray(), bool rsorted = false, bool csorted = false)
+      IdArray darr = NullArray(), bool rsorted = false, bool csorted = false,
+      bool pinned_mem = false)
       : num_rows(nrows),
         num_cols(ncols),
         row(rarr),
         col(carr),
         data(darr),
         row_sorted(rsorted),
-        col_sorted(csorted) {
+        col_sorted(csorted),
+        is_pinned(pinned_mem){
     CheckValidity();
   }
 
@@ -141,6 +143,15 @@ struct COOMatrix {
    *       kDGLCUDA: invalid, will throw an error.
    *       The context check is deferred to pinning the NDArray.
    */
+  inline COOMatrix PinMemory() {
+    if (is_pinned) return *this;
+    return COOMatrix(
+        num_rows, num_cols, row.PinMemory(), col.PinMemory(),
+        aten::IsNullArray(data) ? data : data.PinMemory(), row_sorted,
+        col_sorted, true);
+
+  }
+
   inline void PinMemory_() {
     if (is_pinned) return;
     row.PinMemory_();

@@ -98,6 +98,11 @@ class DeviceAPI {
       const void* from, size_t from_offset, void* to, size_t to_offset,
       size_t num_bytes, DGLContext ctx_from, DGLContext ctx_to,
       DGLDataType type_hint) = 0;
+
+  virtual void RecordedCopyDataFromTo(
+      void* from, size_t from_offset, void* to, size_t to_offset,
+      size_t num_bytes, DGLContext ctx_from, DGLContext ctx_to,
+      DGLDataType type_hint, void* pyt_ctx) = 0;
   /**
    * @brief Create a new stream of execution.
    *
@@ -152,6 +157,8 @@ class DeviceAPI {
    * @return false when pinning an empty tensor. true otherwise.
    */
   DGL_DLL virtual bool PinData(void* ptr, size_t nbytes);
+  DGL_DLL virtual void* AllocPinnedDataSpace(size_t nbytes, void*& ctx, void*& deleter);
+  DGL_DLL virtual void FreePinnedDataSpace(void*& deleter);
 
   /**
    * @brief Unpin host memory using cudaHostUnregister().
@@ -201,7 +208,7 @@ class DeviceAPI {
   DGL_DLL static DeviceAPI* Get(DGLContext ctx, bool allow_missing = false);
 
   /**
-   * @brief Get device API based on context.
+   * @brief Get device API based on device type.
    * @param dev_type The device type
    * @param allow_missing Whether allow missing
    * @return The corresponding device API.

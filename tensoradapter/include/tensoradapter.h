@@ -65,6 +65,11 @@ cudaStream_t CUDACurrentStream();
  * @param device_id Device of the tensor.
  */
 void RecordStream(void* ptr, cudaStream_t stream, int device_id);
+
+void* CUDARawHostAlloc(size_t nbytes, void*& ctx, void*& raw_deleter);
+void CUDARawHostDelete(void*& raw_deleter);
+void CUDARecordHostAlloc(void* data, void* ctx, cudaStream_t stream, int device_id);
+void CUDAHostAllocEmptyCache();
 #endif  // DGL_USE_CUDA
 }
 

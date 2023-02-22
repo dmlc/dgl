@@ -151,6 +151,33 @@ class TensorDispatcher {
     (ptr, static_cast<cudaStream_t>(stream), device_id);
 #endif  // DGL_USE_CUDA
   }
+  inline void* CUDAAllocHostWorkspace(size_t nbytes, void*& ctx, void*& deleter) {
+#ifdef DGL_USE_CUDA
+    auto entry = entrypoints_[Op::kCUDARawHostAlloc];
+    return FUNCCAST(tensoradapter::CUDARawHostAlloc, entry)(nbytes, ctx, deleter);
+#endif  // DGL_USE_CUDA
+  }
+
+  inline void CUDAFreeHostWorkspace(void*& deleter) {
+#ifdef DGL_USE_CUDA
+    auto entry = entrypoints_[Op::kCUDARawHostDelete];
+    FUNCCAST(tensoradapter::CUDARawHostDelete, entry)(deleter);
+#endif  // DGL_USE_CUDA
+  }
+
+#ifdef DGL_USE_CUDA
+  inline void CUDARecordHostAlloc(void* data, void* ctx, cudaStream_t stream, int device_id) {
+    auto entry = entrypoints_[Op::kCUDARecordHostAlloc];
+    FUNCCAST(tensoradapter::CUDARecordHostAlloc, entry)(data, ctx, stream, device_id);
+  }
+#endif  // DGL_USE_CUDA
+
+  inline void CUDAHostAllocEmptyCache() {
+#ifdef DGL_USE_CUDA
+    auto entry = entrypoints_[Op::kCUDAHostAllocEmptyCache];
+    FUNCCAST(tensoradapter::CUDAHostAllocEmptyCache, entry)();
+#endif  // DGL_USE_CUDA
+  }
 
  private:
   /** @brief ctor */
@@ -166,7 +193,8 @@ class TensorDispatcher {
   static constexpr const char* names_[] = {
       "CPURawAlloc",  "CPURawDelete",
 #ifdef DGL_USE_CUDA
-      "CUDARawAlloc", "CUDARawDelete", "CUDACurrentStream", "RecordStream",
+      "CUDARawAlloc", "CUDARawDelete", "CUDACurrentStream", "RecordStream", "CUDARawHostAlloc",
+      "CUDARawHostDelete", "CUDARecordHostAlloc", "CUDAHostAllocEmptyCache",
 #endif  // DGL_USE_CUDA
   };
 
@@ -180,6 +208,10 @@ class TensorDispatcher {
     static constexpr int kCUDARawDelete = 3;
     static constexpr int kCUDACurrentStream = 4;
     static constexpr int kRecordStream = 5;
+    static constexpr int kCUDARawHostAlloc = 6;
+    static constexpr int kCUDARawHostDelete = 7;
+    static constexpr int kCUDARecordHostAlloc = 8;
+    static constexpr int kCUDAHostAllocEmptyCache = 8;
 #endif  // DGL_USE_CUDA
   };
 
@@ -190,7 +222,8 @@ class TensorDispatcher {
   void* entrypoints_[num_entries_] = {
       nullptr, nullptr,
 #ifdef DGL_USE_CUDA
-      nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr,
+      nullptr,nullptr, nullptr, nullptr, nullptr,
 #endif  // DGL_USE_CUDA
   };
 

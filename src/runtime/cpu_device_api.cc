@@ -63,6 +63,11 @@ class CPUDeviceAPI final : public DeviceAPI {
         static_cast<const char*>(from) + from_offset, size);
   }
 
+  void RecordedCopyDataFromTo (
+      void* from, size_t from_offset, void* to, size_t to_offset,
+      size_t size, DGLContext ctx_from, DGLContext ctx_to,
+      DGLDataType type_hint, void* pyt_ctx) final {}
+
   DGLStreamHandle CreateStream(DGLContext) final { return nullptr; }
 
   void StreamSync(DGLContext ctx, DGLStreamHandle stream) final {}

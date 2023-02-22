@@ -182,6 +182,8 @@ class NDArray {
    *       IsPinned: directly return;
    *       kDGLCUDA: invalid, will throw an error.
    */
+
+  inline NDArray PinMemory();
   inline void PinMemory_();
   /**
    * @brief In-place method to unpin the current array by calling UnpinContainer
@@ -228,6 +230,9 @@ class NDArray {
    * @return The created Array
    */
   DGL_DLL static NDArray Empty(
+      std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx);
+
+  DGL_DLL static NDArray PinnedEmpty(
       std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx);
   /**
    * @brief Create an empty NDArray with shared memory.
@@ -286,6 +291,7 @@ class NDArray {
   DGL_DLL static void CopyFromTo(DGLArray* from, DGLArray* to);
   DGL_DLL static void CopyFromTo(
       DGLArray* from, DGLArray* to, DGLStreamHandle stream);
+  DGL_DLL static void RecordedCopyFromTo(DGLArray* from, DGLArray* to, void* pyt_ctx);
 
   /**
    * @brief Function to pin the DGLArray of a Container.
@@ -428,6 +434,9 @@ struct NDArray::Container {
   std::atomic<int> ref_counter_{0};
 
   bool pinned_by_dgl_{false};
+  bool pinned_by_pyt_{false};
+  void* pyt_ctx{nullptr};
+  void* pyt_raw_deleter{nullptr};
 };
 
 // implementations of inline functions
@@ -441,9 +450,10 @@ inline NDArray::NDArray(const NDArray& other) : data_(other.data_) {
 }
 
 inline void NDArray::reset() {
+
   if (data_) {
-    data_->DecRef();
-    data_ = nullptr;
+      data_->DecRef();
+      data_ = nullptr;
   }
 }
 
@@ -454,8 +464,22 @@ inline void NDArray::CopyFrom(DGLArray* other) {
 
 inline void NDArray::CopyFrom(const NDArray& other) {
   CHECK(other.data_ != nullptr);
-  CopyFrom(&(other.data_->dl_tensor));
+  // only one NDArray is pinned
+  // they are on diff devices
+  if (other.data_->pinned_by_pyt_ != data_->pinned_by_pyt_ &&
+      data_->dl_tensor.ctx.device_type != other.data_->dl_tensor.ctx.device_type) {
+    CHECK(data_ != nullptr);
+    auto to_ctx_type = data_->dl_tensor.ctx.device_type;
+    auto ptr = (to_ctx_type == kDGLCPU ? data_ : other.data_);
+    void* pyt_ctx = ptr->pyt_ctx; // get the correct ctx
+    RecordedCopyFromTo(&(other.data_->dl_tensor), &(data_->dl_tensor),
+                       pyt_ctx);
+  } else {
+    CopyFrom(&(other.data_->dl_tensor));
+  }
 }
+
+
 
 inline void NDArray::CopyTo(DGLArray* other) const {
   CHECK(data_ != nullptr);
@@ -464,7 +488,18 @@ inline void NDArray::CopyTo(DGLArray* other) const {
 
 inline void NDArray::CopyTo(const NDArray& other) const {
   CHECK(other.data_ != nullptr);
-  CopyTo(&(other.data_->dl_tensor));
+  // only one NDArray is pinned and they are on diff devices
+  if (other.data_->pinned_by_pyt_ != data_->pinned_by_pyt_ &&
+      data_->dl_tensor.ctx.device_type != other.data_->dl_tensor.ctx.device_type) {
+    CHECK(data_ != nullptr);
+    auto from_ctx_type = data_->dl_tensor.ctx.device_type;
+    auto ptr = (from_ctx_type == kDGLCPU ? data_ : other.data_);
+    void* pyt_ctx = ptr->pyt_ctx; // get the correct ctx
+    RecordedCopyFromTo(&(data_->dl_tensor), &(other.data_->dl_tensor),
+                       pyt_ctx);
+  } else {
+    CopyTo(&(other.data_->dl_tensor));
+  }
 }
 
 inline NDArray NDArray::CopyTo(const DGLContext& ctx) const {
@@ -481,6 +516,18 @@ inline NDArray NDArray::Clone() const {
   CHECK(data_ != nullptr);
   const DGLArray* dptr = operator->();
   return this->CopyTo(dptr->ctx);
+}
+
+
+inline NDArray NDArray::PinMemory() {
+  CHECK(data_ != nullptr);
+  const DGLArray* dptr = operator->();
+  auto ctx = dptr->ctx;
+  NDArray ret = PinnedEmpty(
+      std::vector<int64_t>(dptr->shape, dptr->shape + dptr->ndim), dptr->dtype,
+      ctx);
+  this->CopyTo(ret);
+  return ret;
 }
 
 inline void NDArray::PinMemory_() {

@@ -241,6 +241,9 @@ class HeteroGraph : public BaseHeteroGraph {
    */
   void PinMemory_() override;
 
+  /** @brief Return a new pinned graph managed by backend allocator */
+  static HeteroGraphPtr PinMemory(HeteroGraphPtr g);
+
   /**
    * @brief Unpin all relation graphs of the current graph.
    * @note The graph will be unpinned inplace. Behavior depends on the current

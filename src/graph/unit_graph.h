@@ -214,6 +214,8 @@ class UnitGraph : public BaseHeteroGraph {
    */
   void PinMemory_() override;
 
+  HeteroGraphPtr PinMemoryOutPlace();
+
   /**
    * @brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
    * @note The graph will be unpinned inplace. Behavior depends on the current
