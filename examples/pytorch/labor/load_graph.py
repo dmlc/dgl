@@ -1,4 +1,5 @@
 import torch as th
+import dgl
 
 def load_data(data):
     g = data[0]
@@ -27,8 +28,50 @@ def load_reddit(self_loop=True):
     data = RedditDataset(self_loop=self_loop)
     return load_data(data)
 
+def load_mag240m(root="dataset"):
+    from ogb.lsc import MAG240MDataset
+    import numpy as np
+    from os.path import join
 
-def load_ogb(name, root="dataset"):
+    dataset = MAG240MDataset(root=root)
+
+    print("Loading graph")
+    (g,), _ = dgl.load_graphs(join(root, 'mag240m_kddcup2021/graph.dgl'))
+
+    print("Loading features")
+    paper_offset = dataset.num_authors + dataset.num_institutions
+    num_nodes = paper_offset + dataset.num_papers
+    num_features = dataset.num_paper_features
+    feats = th.from_numpy(np.memmap(
+        join(root, 'mag240m_kddcup2021/full.npy'),
+        mode="r",
+        dtype="float16",
+        shape=(num_nodes, num_features),
+        )).float()
+    g.ndata["features"] = feats
+    train_nid = th.LongTensor(dataset.get_idx_split("train")) + paper_offset
+    val_nid = th.LongTensor(dataset.get_idx_split("valid")) + paper_offset
+    test_nid = th.LongTensor(dataset.get_idx_split("test-dev")) + paper_offset
+    train_mask = th.zeros((g.number_of_nodes(),), dtype=th.bool)
+    train_mask[train_nid] = True
+    val_mask = th.zeros((g.number_of_nodes(),), dtype=th.bool)
+    val_mask[val_nid] = True
+    test_mask = th.zeros((g.number_of_nodes(),), dtype=th.bool)
+    test_mask[test_nid] = True
+    g.ndata["train_mask"] = train_mask
+    g.ndata["val_mask"] = val_mask
+    g.ndata["test_mask"] = test_mask
+    labels = th.tensor(dataset.paper_label)
+    num_labels = len(th.unique(labels[th.logical_not(th.isnan(labels))]))
+    g.ndata["labels"] = - th.ones(g.number_of_nodes(), dtype=th.int64)
+    g.ndata["labels"][train_nid] = labels[train_nid - paper_offset].long()
+    g.ndata["labels"][val_nid] = labels[val_nid - paper_offset].long()
+    return g, num_labels
+
+def load_ogb(name, root="/localscratch/ogb/"):
+    if name == "ogbn-mag240M":
+        return load_mag240m(root)
+
     from ogb.nodeproppred import DglNodePropPredDataset
 
     print("load", name)
@@ -68,7 +111,7 @@ def load_dataset(dataset_name):
         multilabel = dataset_name in ['yelp']
         if multilabel:
             g.ndata['labels'] = g.ndata['labels'].to(dtype=th.float32)
-    elif dataset_name in ['ogbn-products', 'ogbn-arxiv', 'ogbn-papers100M']:
+    elif dataset_name in ['ogbn-products', 'ogbn-arxiv', 'ogbn-papers100M', 'ogbn-mag240M']:
         g, n_classes = load_ogb(dataset_name)
     else:
         raise ValueError('unknown dataset')

@@ -37,7 +37,7 @@ from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback, EarlyStopping
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
-from model import SAGE
+from model import SAGE, RGAT
 
 class SAGELightning(LightningModule):
     def __init__(self,
@@ -51,7 +51,16 @@ class SAGELightning(LightningModule):
                  multilabel):
         super().__init__()
         self.save_hyperparameters()
-        self.module = SAGE(in_feats, n_hidden, n_classes, n_layers, activation, dropout)
+        self.module = SAGE(in_feats, n_hidden, n_classes, n_layers, activation, dropout) if in_feats != 768 else RGAT(
+            in_feats,
+            n_classes,
+            n_hidden,
+            5,
+            n_layers,
+            4,
+            args.dropout,
+            "paper",
+        )
         self.lr = lr
         f1score_class = MulticlassF1Score if not multilabel else MultilabelF1Score
         self.train_acc = f1score_class(n_classes, average='micro')
@@ -86,6 +95,7 @@ class SAGELightning(LightningModule):
         
         batch_inputs = mfgs[0].srcdata['features']
         batch_labels = mfgs[-1].dstdata['labels']
+        self.st = time.time()
         batch_pred = self.module(mfgs, batch_inputs)
         loss = self.loss_fn(batch_pred, batch_labels)
         self.train_acc(batch_pred, batch_labels.int())
@@ -95,6 +105,9 @@ class SAGELightning(LightningModule):
         self.log('iter_time', t - self.pt, prog_bar=True, on_step=True, on_epoch=False)
         self.pt = t
         return loss
+    
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        self.log('forward_backward_time', time.time() - self.st, prog_bar=True, on_step=True, on_epoch=False)
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         input_nodes, output_nodes, mfgs = batch
@@ -144,8 +157,8 @@ class DataModule(LightningDataModule):
         if sampler == 'neighbor':
             sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'], prefetch_labels=['labels'])
         else:
-            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'], prefetch_labels=['labels'])
-        unbiased_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'], prefetch_labels=['labels'])
+            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'], prefetch_edge_feats=['etype'], prefetch_labels=['labels'])
+        unbiased_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'], prefetch_edge_feats=['etype'], prefetch_labels=['labels'])
 
         dataloader_device = th.device('cpu')
         g = g.formats(['csc'])
@@ -196,8 +209,8 @@ class DataModule(LightningDataModule):
             shuffle=False,
             drop_last=False,
             num_workers=self.num_workers)
-            for sampler in [self.sampler, self.unbiased_sampler]]
-    
+            for sampler in [self.sampler]]#, self.unbiased_sampler]]
+
     def test_dataloader(self):
         return [dgl.dataloading.DataLoader(
             self.g,
@@ -209,7 +222,7 @@ class DataModule(LightningDataModule):
             shuffle=False,
             drop_last=False,
             num_workers=self.num_workers)
-            for sampler in [self.sampler, self.unbiased_sampler]]
+            for sampler in [self.sampler]]#, self.unbiased_sampler]]
 
 class BatchSizeCallback(Callback):
     def __init__(self, limit, factor=3):
