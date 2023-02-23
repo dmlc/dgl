@@ -1,14 +1,15 @@
 import numpy as np
 import torch
-from torch.utils.data import Dataset
 from download import AminerDataset
+from torch.utils.data import Dataset
+
 np.random.seed(12345)
+
 
 class DataReader:
     NEGATIVE_TABLE_SIZE = 1e8
 
     def __init__(self, dataset, min_count, care_type):
-
         self.negatives = []
         self.discards = []
         self.negpos = 0
@@ -35,7 +36,11 @@ class DataReader:
                         word_frequency[word] = word_frequency.get(word, 0) + 1
 
                         if self.token_count % 1000000 == 0:
-                            print("Read " + str(int(self.token_count / 1000000)) + "M words.")
+                            print(
+                                "Read "
+                                + str(int(self.token_count / 1000000))
+                                + "M words."
+                            )
 
         wid = 0
         for w, c in word_frequency.items():
@@ -71,14 +76,17 @@ class DataReader:
 
     def getNegatives(self, target, size):  # TODO check equality with target
         if self.care_type == 0:
-            response = self.negatives[self.negpos:self.negpos + size]
+            response = self.negatives[self.negpos : self.negpos + size]
             self.negpos = (self.negpos + size) % len(self.negatives)
             if len(response) != size:
-                return np.concatenate((response, self.negatives[0:self.negpos]))
+                return np.concatenate(
+                    (response, self.negatives[0 : self.negpos])
+                )
         return response
 
 
 # -----------------------------------------------------------------------------------------------------------------
+
 
 class Metapath2vecDataset(Dataset):
     def __init__(self, data, window_size):
@@ -103,25 +111,44 @@ class Metapath2vecDataset(Dataset):
                 words = line.split()
 
                 if len(words) > 1:
-                    word_ids = [self.data.word2id[w] for w in words if
-                                w in self.data.word2id and np.random.rand() < self.data.discards[self.data.word2id[w]]]
+                    word_ids = [
+                        self.data.word2id[w]
+                        for w in words
+                        if w in self.data.word2id
+                        and np.random.rand()
+                        < self.data.discards[self.data.word2id[w]]
+                    ]
 
                     pair_catch = []
                     for i, u in enumerate(word_ids):
                         for j, v in enumerate(
-                                word_ids[max(i - self.window_size, 0):i + self.window_size]):
+                            word_ids[
+                                max(i - self.window_size, 0) : i
+                                + self.window_size
+                            ]
+                        ):
                             assert u < self.data.word_count
                             assert v < self.data.word_count
                             if i == j:
                                 continue
-                            pair_catch.append((u, v, self.data.getNegatives(v,5)))
+                            pair_catch.append(
+                                (u, v, self.data.getNegatives(v, 5))
+                            )
                     return pair_catch
-
 
     @staticmethod
     def collate(batches):
         all_u = [u for batch in batches for u, _, _ in batch if len(batch) > 0]
         all_v = [v for batch in batches for _, v, _ in batch if len(batch) > 0]
-        all_neg_v = [neg_v for batch in batches for _, _, neg_v in batch if len(batch) > 0]
+        all_neg_v = [
+            neg_v
+            for batch in batches
+            for _, _, neg_v in batch
+            if len(batch) > 0
+        ]
 
-        return torch.LongTensor(all_u), torch.LongTensor(all_v), torch.LongTensor(all_neg_v)
+        return (
+            torch.LongTensor(all_u),
+            torch.LongTensor(all_v),
+            torch.LongTensor(all_neg_v),
+        )

@@ -4,9 +4,9 @@ import glob
 import numpy as np
 import torch
 import torch.nn.functional as F
-from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
 from dgl import function as fn
+from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
 device = None
 

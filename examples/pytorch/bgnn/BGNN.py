@@ -188,7 +188,6 @@ class BGNNPredictor:
     def init_optimizer(
         self, node_features, optimize_node_features, learning_rate
     ):
-
         params = [self.model.parameters()]
         if optimize_node_features:
             params.append([node_features])

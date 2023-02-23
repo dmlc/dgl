@@ -85,24 +85,28 @@ class GINConv(nn.Module):
             [2.5011, 0.0000, 0.0089, 2.0541, 0.8262, 0.0000, 0.0000, 0.1371, 0.0000,
              0.0000]], grad_fn=<ReluBackward0>)
     """
-    def __init__(self,
-                 apply_func=None,
-                 aggregator_type='sum',
-                 init_eps=0,
-                 learn_eps=False,
-                 activation=None):
+
+    def __init__(
+        self,
+        apply_func=None,
+        aggregator_type="sum",
+        init_eps=0,
+        learn_eps=False,
+        activation=None,
+    ):
         super(GINConv, self).__init__()
         self.apply_func = apply_func
         self._aggregator_type = aggregator_type
         self.activation = activation
-        if aggregator_type not in ('sum', 'max', 'mean'):
+        if aggregator_type not in ("sum", "max", "mean"):
             raise KeyError(
-                'Aggregator type {} not recognized.'.format(aggregator_type))
+                "Aggregator type {} not recognized.".format(aggregator_type)
+            )
         # to specify whether eps is trainable or not.
         if learn_eps:
             self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
         else:
-            self.register_buffer('eps', th.FloatTensor([init_eps]))
+            self.register_buffer("eps", th.FloatTensor([init_eps]))
 
     def forward(self, graph, feat, edge_weight=None):
         r"""
@@ -136,16 +140,16 @@ class GINConv(nn.Module):
         """
         _reducer = getattr(fn, self._aggregator_type)
         with graph.local_scope():
-            aggregate_fn = fn.copy_u('h', 'm')
+            aggregate_fn = fn.copy_u("h", "m")
             if edge_weight is not None:
                 assert edge_weight.shape[0] == graph.number_of_edges()
-                graph.edata['_edge_weight'] = edge_weight
-                aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
+                graph.edata["_edge_weight"] = edge_weight
+                aggregate_fn = fn.u_mul_e("h", "_edge_weight", "m")
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = feat_src
-            graph.update_all(aggregate_fn, _reducer('m', 'neigh'))
-            rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
+            graph.srcdata["h"] = feat_src
+            graph.update_all(aggregate_fn, _reducer("m", "neigh"))
+            rst = (1 + self.eps) * feat_dst + graph.dstdata["neigh"]
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
             # activation

@@ -29,10 +29,9 @@ def spmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     Examples
     --------
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([1, 0, 1])
+    >>> indices = torch.tensor([[0, 1, 1], [1, 0, 1]])
     >>> val = torch.randn(len(row))
-    >>> A = dglsp.from_coo(row, col, val)
+    >>> A = dglsp.spmatrix(indices, val)
     >>> X = torch.randn(2, 3)
     >>> result = dglsp.spmm(A, X)
     >>> type(result)
@@ -72,10 +71,9 @@ def bspmm(A: Union[SparseMatrix, DiagMatrix], X: torch.Tensor) -> torch.Tensor:
     Examples
     --------
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([1, 0, 2])
+    >>> indices = torch.tensor([[0, 1, 1], [1, 0, 2]])
     >>> val = torch.randn(len(row), 2)
-    >>> A = dglsp.from_coo(row, col, val, shape=(3, 3))
+    >>> A = dglsp.spmatrix(indices, val, shape=(3, 3))
     >>> X = torch.randn(3, 3, 2)
     >>> result = dglsp.bspmm(A, X)
     >>> type(result)
@@ -197,14 +195,12 @@ def spspmm(
     Examples
     --------
 
-    >>> row1 = torch.tensor([0, 1, 1])
-    >>> col1 = torch.tensor([1, 0, 1])
+    >>> indices1 = torch.tensor([[0, 1, 1], [1, 0, 1]])
     >>> val1 = torch.ones(len(row1))
-    >>> A = dglsp.from_coo(row1, col1, val1)
-    >>> row2 = torch.tensor([0, 1, 1])
-    >>> col2 = torch.tensor([0, 2, 1])
+    >>> A = dglsp.spmatrix(indices1, val1)
+    >>> indices2 = torch.tensor([[0, 1, 1], [0, 2, 1]])
     >>> val2 = torch.ones(len(row2))
-    >>> B = dglsp.from_coo(row2, col2, val2)
+    >>> B = dglsp.spmatrix(indices2, val2)
     >>> dglsp.spspmm(A, B)
     SparseMatrix(indices=tensor([[0, 0, 1, 1, 1],
                                  [1, 2, 0, 1, 2]]),
@@ -258,10 +254,9 @@ def matmul(
 
     * The operator supports batched sparse-dense matrix multiplication. In \
         this case, the sparse or diagonal matrix :attr:`A` should have shape \
-        :math:`(L, M)`, where the non-zero values have a batch dimension \
-        :math:`K`. The dense matrix :attr:`B` should have shape \
-        :math:`(M, N, K)`. The output is a dense matrix of shape \
-        :math:`(L, N, K)`.
+        ``(L, M)``, where the non-zero values have a batch dimension ``K``. \
+        The dense matrix :attr:`B` should have shape ``(M, N, K)``. The output \
+        is a dense matrix of shape ``(L, N, K)``.
 
     * Sparse-sparse matrix multiplication does not support batched computation.
 
@@ -293,10 +288,9 @@ def matmul(
 
     Multiplies a sparse matrix with a dense matrix.
 
-    >>> row = torch.tensor([0, 1, 1])
-    >>> col = torch.tensor([1, 0, 1])
+    >>> indices = torch.tensor([[0, 1, 1], [1, 0, 1]])
     >>> val = torch.randn(len(row))
-    >>> A = dglsp.from_coo(row, col, val)
+    >>> A = dglsp.spmatrix(indices, val)
     >>> X = torch.randn(2, 3)
     >>> result = dglsp.matmul(A, X)
     >>> type(result)
@@ -306,14 +300,12 @@ def matmul(
 
     Multiplies a sparse matrix with a sparse matrix.
 
-    >>> row1 = torch.tensor([0, 1, 1])
-    >>> col1 = torch.tensor([1, 0, 1])
+    >>> indices1 = torch.tensor([[0, 1, 1], [1, 0, 1]])
     >>> val1 = torch.ones(len(row1))
-    >>> A = dglsp.from_coo(row1, col1, val1)
-    >>> row2 = torch.tensor([0, 1, 1])
-    >>> col2 = torch.tensor([0, 2, 1])
+    >>> A = dglsp.spmatrix(indices1, val1)
+    >>> indices2 = torch.tensor([[0, 1, 1], [0, 2, 1]])
     >>> val2 = torch.ones(len(row2))
-    >>> B = dglsp.from_coo(row2, col2, val2)
+    >>> B = dglsp.spmatrix(indices2, val2)
     >>> result = dglsp.matmul(A, B)
     >>> type(result)
     <class 'dgl.sparse.sparse_matrix.SparseMatrix'>

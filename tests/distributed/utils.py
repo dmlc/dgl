@@ -2,10 +2,10 @@ import os
 import random
 import socket
 
+import dgl
+
 import numpy as np
 import scipy.sparse as spsp
-
-import dgl
 
 
 def generate_ip_config(file_name, num_machines, num_servers):

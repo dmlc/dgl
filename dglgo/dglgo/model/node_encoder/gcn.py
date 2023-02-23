@@ -1,18 +1,21 @@
+import dgl
 import torch
 import torch.nn as nn
-import dgl
 from dgl.base import dgl_warning
 
+
 class GCN(nn.Module):
-    def __init__(self,
-                 data_info: dict,
-                 embed_size: int = -1,
-                 hidden_size: int = 16,
-                 num_layers: int = 1,
-                 norm: str = "both",
-                 activation: str = "relu",
-                 dropout: float = 0.5,
-                 use_edge_weight: bool = False):
+    def __init__(
+        self,
+        data_info: dict,
+        embed_size: int = -1,
+        hidden_size: int = 16,
+        num_layers: int = 1,
+        norm: str = "both",
+        activation: str = "relu",
+        dropout: float = 0.5,
+        use_edge_weight: bool = False,
+    ):
         """Graph Convolutional Networks
 
         Parameters
@@ -47,28 +50,36 @@ class GCN(nn.Module):
 
         for i in range(num_layers):
             in_hidden = hidden_size if i > 0 else in_size
-            out_hidden = hidden_size if i < num_layers - 1 else data_info["out_size"]
+            out_hidden = (
+                hidden_size if i < num_layers - 1 else data_info["out_size"]
+            )
 
-            self.layers.append(dgl.nn.GraphConv(in_hidden, out_hidden, norm=norm, allow_zero_in_degree=True))
+            self.layers.append(
+                dgl.nn.GraphConv(
+                    in_hidden, out_hidden, norm=norm, allow_zero_in_degree=True
+                )
+            )
 
         self.dropout = nn.Dropout(p=dropout)
         self.act = getattr(torch, activation)
 
-    def forward(self, g, node_feat, edge_feat = None):
+    def forward(self, g, node_feat, edge_feat=None):
         if self.embed_size > 0:
-            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
+            dgl_warning(
+                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size."
+            )
             h = self.embed.weight
         else:
             h = node_feat
         edge_weight = edge_feat if self.use_edge_weight else None
         for l, layer in enumerate(self.layers):
             h = layer(g, h, edge_weight=edge_weight)
-            if l != len(self.layers) -1:
+            if l != len(self.layers) - 1:
                 h = self.act(h)
                 h = self.dropout(h)
         return h
 
-    def forward_block(self, blocks, node_feat, edge_feat = None):
+    def forward_block(self, blocks, node_feat, edge_feat=None):
         h = node_feat
         edge_weight = edge_feat if self.use_edge_weight else None
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):

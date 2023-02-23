@@ -1,12 +1,14 @@
 """ QM9 dataset for graph property prediction (regression) """
 
 import os
+
 import numpy as np
 
-from .dgl_dataset import DGLDataset
-from .utils import download, extract_archive, _get_dgl_url
-from ..convert import graph as dgl_graph
 from .. import backend as F
+from ..convert import graph as dgl_graph
+
+from .dgl_dataset import DGLDataset
+from .utils import _get_dgl_url, download, extract_archive
 
 
 class QM9EdgeDataset(DGLDataset):
@@ -129,19 +131,40 @@ class QM9EdgeDataset(DGLDataset):
     >>>
     """
 
-    keys = ['mu', 'alpha', 'homo', 'lumo', 'gap', 'r2', 'zpve', 'U0', 'U', 'H', 'G', 'Cv', 'U0_atom',
-            'U_atom', 'H_atom', 'G_atom', 'A', 'B', 'C']
+    keys = [
+        "mu",
+        "alpha",
+        "homo",
+        "lumo",
+        "gap",
+        "r2",
+        "zpve",
+        "U0",
+        "U",
+        "H",
+        "G",
+        "Cv",
+        "U0_atom",
+        "U_atom",
+        "H_atom",
+        "G_atom",
+        "A",
+        "B",
+        "C",
+    ]
     map_dict = {}
 
     for i, key in enumerate(keys):
         map_dict[key] = i
 
-    def __init__(self,
-                 label_keys=None,
-                 raw_dir=None,
-                 force_reload=False,
-                 verbose=True,
-                 transform=None):
+    def __init__(
+        self,
+        label_keys=None,
+        raw_dir=None,
+        force_reload=False,
+        verbose=True,
+        transform=None,
+    ):
         if label_keys is None:
             self.label_keys = None
             self.num_labels = 19
@@ -149,18 +172,19 @@ class QM9EdgeDataset(DGLDataset):
             self.label_keys = [self.map_dict[i] for i in label_keys]
             self.num_labels = len(label_keys)
 
+        self._url = _get_dgl_url("dataset/qm9_edge.npz")
 
-        self._url = _get_dgl_url('dataset/qm9_edge.npz')
-
-        super(QM9EdgeDataset, self).__init__(name='qm9Edge',
-                                             raw_dir=raw_dir,
-                                             url=self._url,
-                                             force_reload=force_reload,
-                                             verbose=verbose,
-                                             transform=transform)
+        super(QM9EdgeDataset, self).__init__(
+            name="qm9Edge",
+            raw_dir=raw_dir,
+            url=self._url,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def download(self):
-        file_path = f'{self.raw_dir}/qm9_edge.npz'
+        file_path = f"{self.raw_dir}/qm9_edge.npz"
         if not os.path.exists(file_path):
             download(self._url, path=file_path)
 
@@ -168,39 +192,41 @@ class QM9EdgeDataset(DGLDataset):
         self.load()
 
     def has_cache(self):
-        npz_path = f'{self.raw_dir}/qm9_edge.npz'
+        npz_path = f"{self.raw_dir}/qm9_edge.npz"
         return os.path.exists(npz_path)
 
     def save(self):
-        np.savez_compressed(f'{self.raw_dir}/qm9_edge.npz',
-                            n_node=self.n_node,
-                            n_edge=self.n_edge,
-                            node_attr=self.node_attr,
-                            node_pos=self.node_pos,
-                            edge_attr=self.edge_attr,
-                            src=self.src,
-                            dst=self.dst,
-                            targets=self.targets)
+        np.savez_compressed(
+            f"{self.raw_dir}/qm9_edge.npz",
+            n_node=self.n_node,
+            n_edge=self.n_edge,
+            node_attr=self.node_attr,
+            node_pos=self.node_pos,
+            edge_attr=self.edge_attr,
+            src=self.src,
+            dst=self.dst,
+            targets=self.targets,
+        )
 
     def load(self):
-        npz_path = f'{self.raw_dir}/qm9_edge.npz'
+        npz_path = f"{self.raw_dir}/qm9_edge.npz"
         data_dict = np.load(npz_path, allow_pickle=True)
 
-        self.n_node = data_dict['n_node']
-        self.n_edge = data_dict['n_edge']
-        self.node_attr = data_dict['node_attr']
-        self.node_pos = data_dict['node_pos']
-        self.edge_attr = data_dict['edge_attr']
-        self.targets = data_dict['targets']
+        self.n_node = data_dict["n_node"]
+        self.n_edge = data_dict["n_edge"]
+        self.node_attr = data_dict["node_attr"]
+        self.node_pos = data_dict["node_pos"]
+        self.edge_attr = data_dict["edge_attr"]
+        self.targets = data_dict["targets"]
 
-        self.src = data_dict['src']
-        self.dst = data_dict['dst']
+        self.src = data_dict["src"]
+        self.dst = data_dict["dst"]
 
         self.n_cumsum = np.concatenate([[0], np.cumsum(self.n_node)])
         self.ne_cumsum = np.concatenate([[0], np.cumsum(self.n_edge)])
 
     def __getitem__(self, idx):
-        r""" Get graph and label by index
+        r"""Get graph and label by index
 
         Parameters
         ----------
@@ -220,18 +246,26 @@ class QM9EdgeDataset(DGLDataset):
             Property values of molecular graphs
         """
 
-        pos = self.node_pos[self.n_cumsum[idx]:self.n_cumsum[idx+1]]
-        src = self.src[self.ne_cumsum[idx]:self.ne_cumsum[idx+1]]
-        dst = self.dst[self.ne_cumsum[idx]:self.ne_cumsum[idx+1]]
+        pos = self.node_pos[self.n_cumsum[idx] : self.n_cumsum[idx + 1]]
+        src = self.src[self.ne_cumsum[idx] : self.ne_cumsum[idx + 1]]
+        dst = self.dst[self.ne_cumsum[idx] : self.ne_cumsum[idx + 1]]
 
         g = dgl_graph((src, dst))
 
-        g.ndata['pos'] = F.tensor(pos, dtype=F.data_type_dict['float32'])
-        g.ndata['attr'] = F.tensor(self.node_attr[self.n_cumsum[idx]:self.n_cumsum[idx+1]], dtype=F.data_type_dict['float32'])
-        g.edata['edge_attr'] = F.tensor(self.edge_attr[self.ne_cumsum[idx]:self.ne_cumsum[idx+1]], dtype=F.data_type_dict['float32'])
+        g.ndata["pos"] = F.tensor(pos, dtype=F.data_type_dict["float32"])
+        g.ndata["attr"] = F.tensor(
+            self.node_attr[self.n_cumsum[idx] : self.n_cumsum[idx + 1]],
+            dtype=F.data_type_dict["float32"],
+        )
+        g.edata["edge_attr"] = F.tensor(
+            self.edge_attr[self.ne_cumsum[idx] : self.ne_cumsum[idx + 1]],
+            dtype=F.data_type_dict["float32"],
+        )
 
-
-        label = F.tensor(self.targets[idx][self.label_keys], dtype=F.data_type_dict['float32'])
+        label = F.tensor(
+            self.targets[idx][self.label_keys],
+            dtype=F.data_type_dict["float32"],
+        )
 
         if self._transform is not None:
             g = self._transform(g)
@@ -239,7 +273,7 @@ class QM9EdgeDataset(DGLDataset):
         return g, label
 
     def __len__(self):
-        r""" Number of graphs in the dataset.
+        r"""Number of graphs in the dataset.
 
         Returns
         -------

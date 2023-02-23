@@ -14,8 +14,13 @@ import torch as th
 import torch.nn as nn
 from data import MovieLens
 from model import BiDecoder, GCMCLayer
-from utils import (MetricLogger, get_activation, get_optimizer, torch_net_info,
-                   torch_total_param_num)
+from utils import (
+    get_activation,
+    get_optimizer,
+    MetricLogger,
+    torch_net_info,
+    torch_total_param_num,
+)
 
 
 class Net(nn.Module):

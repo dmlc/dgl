@@ -1,15 +1,19 @@
 import argparse
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from appnp import APPNP
-
-import dgl
-from dgl.data import (CiteseerGraphDataset, CoraGraphDataset,
-                      PubmedGraphDataset, register_data_args)
+from dgl.data import (
+    CiteseerGraphDataset,
+    CoraGraphDataset,
+    PubmedGraphDataset,
+    register_data_args,
+)
 
 
 def evaluate(model, features, labels, mask):

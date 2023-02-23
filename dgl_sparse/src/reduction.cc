@@ -51,10 +51,10 @@ torch::Tensor ReduceAlong(
   torch::Tensor idx;
   if (dim == 0) {
     output_shape[0] = coo->num_cols;
-    idx = coo->col.view(view_dims).expand_as(value);
+    idx = coo->indices.index({1}).view(view_dims).expand_as(value);
   } else if (dim == 1) {
     output_shape[0] = coo->num_rows;
-    idx = coo->row.view(view_dims).expand_as(value);
+    idx = coo->indices.index({0}).view(view_dims).expand_as(value);
   }
   torch::Tensor out = torch::zeros(output_shape, value.options());
 

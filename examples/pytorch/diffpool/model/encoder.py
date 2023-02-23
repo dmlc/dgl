@@ -1,13 +1,13 @@
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from scipy.linalg import block_diag
 from torch.nn import init
-
-import dgl
 
 from .dgl_layers import DiffPoolBatchedGraphLayer, GraphSage, GraphSageLayer
 from .model_utils import batch2tensor
@@ -91,7 +91,6 @@ class DiffPool(nn.Module):
             # and return pool_embedding_dim node embedding
             pool_embedding_dim = hidden_dim * (n_layers - 1) + embedding_dim
         else:
-
             pool_embedding_dim = embedding_dim
 
         self.first_diffpool_layer = DiffPoolBatchedGraphLayer(

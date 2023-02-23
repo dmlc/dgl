@@ -5,13 +5,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from sklearn.model_selection import StratifiedKFold
-from torch.utils.data.sampler import SubsetRandomSampler
 
 from dgl.data import GINDataset
 from dgl.dataloading import GraphDataLoader
 from dgl.nn.pytorch.conv import GINConv
 from dgl.nn.pytorch.glob import SumPooling
+from sklearn.model_selection import StratifiedKFold
+from torch.utils.data.sampler import SubsetRandomSampler
 
 
 class MLP(nn.Module):

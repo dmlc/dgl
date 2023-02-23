@@ -4,19 +4,19 @@ import time
 import urllib
 from functools import partial
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
+from dgl.data.utils import download, get_download_dir
 from pointnet2_partseg import PointNet2MSGPartSeg, PointNet2SSGPartSeg
 from pointnet_partseg import PartSegLoss, PointNetPartSeg
 from ShapeNet import ShapeNet
 from torch.utils.data import DataLoader
-
-import dgl
-from dgl.data.utils import download, get_download_dir
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="pointnet")
@@ -260,6 +260,8 @@ color_map = torch.tensor(
         [255, 105, 180],
     ]
 )
+
+
 # paint each point according to its pred
 def paint(batched_points):
     B, N = batched_points.shape

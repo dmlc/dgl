@@ -8,13 +8,15 @@ import pickle
 import warnings
 from collections import Counter
 
+import dgl
+
 import mxnet as mx
 import numpy as np
 from gluoncv.data.base import VisionDataset
 from gluoncv.data.transforms.presets.rcnn import (
-    FasterRCNNDefaultTrainTransform, FasterRCNNDefaultValTransform)
-
-import dgl
+    FasterRCNNDefaultTrainTransform,
+    FasterRCNNDefaultValTransform,
+)
 
 
 class VGRelation(VisionDataset):

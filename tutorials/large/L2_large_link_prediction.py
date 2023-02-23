@@ -53,10 +53,11 @@ Sampling for Node Classification <L1_large_node_classification>`.
 #
 
 import os
-os.environ['DGLBACKEND'] = 'pytorch'
+
+os.environ["DGLBACKEND"] = "pytorch"
 import dgl
-import torch
 import numpy as np
+import torch
 from ogb.nodeproppred import DglNodePropPredDataset
 
 dataset = DglNodePropPredDataset("ogbn-arxiv")
@@ -339,6 +340,8 @@ predictor = DotPredictor().to(device)
 opt = torch.optim.Adam(list(model.parameters()) + list(predictor.parameters()))
 
 
+import sklearn.metrics
+
 ######################################################################
 # The following is the training loop for link prediction and
 # evaluation, and also saves the model that performs the best on the
@@ -346,7 +349,6 @@ opt = torch.optim.Adam(list(model.parameters()) + list(predictor.parameters()))
 #
 
 import tqdm
-import sklearn.metrics
 
 best_accuracy = 0
 best_model_path = "model.pt"

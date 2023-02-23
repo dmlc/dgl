@@ -2,10 +2,8 @@
 # pylint: disable=not-callable
 import numpy as np
 
-from . import backend as F
-from . import function as fn
-from . import ops
-from .base import ALL, EID, NID, DGLError, dgl_warning, is_all
+from . import backend as F, function as fn, ops
+from .base import ALL, dgl_warning, DGLError, EID, is_all, NID
 from .frame import Frame
 from .udf import EdgeBatch, NodeBatch
 

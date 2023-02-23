@@ -4,14 +4,14 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+
+from dgl.dataloading import GraphDataLoader
 from EEGGraphDataset import EEGGraphDataset
 from joblib import load
 from sklearn import preprocessing
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from torch.utils.data import WeightedRandomSampler
-
-from dgl.dataloading import GraphDataLoader
 
 if __name__ == "__main__":
     # argparse commandline args

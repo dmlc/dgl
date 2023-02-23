@@ -2,12 +2,12 @@ import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.nn import GINEConv, AvgPooling, SumPooling
+from dgl.nn import AvgPooling, GINEConv, SumPooling
 from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
 
+
 class MLP(nn.Module):
-    def __init__(self,
-                 feat_size: int):
+    def __init__(self, feat_size: int):
         """Multilayer Perceptron (MLP)"""
         super(MLP, self).__init__()
         self.mlp = nn.Sequential(
@@ -15,19 +15,22 @@ class MLP(nn.Module):
             nn.BatchNorm1d(2 * feat_size),
             nn.ReLU(),
             nn.Linear(2 * feat_size, feat_size),
-            nn.BatchNorm1d(feat_size)
+            nn.BatchNorm1d(feat_size),
         )
 
     def forward(self, h):
         return self.mlp(h)
 
+
 class OGBGGIN(nn.Module):
-    def __init__(self,
-                 data_info: dict,
-                 embed_size: int = 300,
-                 num_layers: int = 5,
-                 dropout: float = 0.5,
-                 virtual_node : bool = False):
+    def __init__(
+        self,
+        data_info: dict,
+        embed_size: int = 300,
+        num_layers: int = 5,
+        dropout: float = 0.5,
+        virtual_node: bool = False,
+    ):
         """Graph Isomorphism Network (GIN) variant introduced in baselines
         for OGB graph property prediction datasets
 
@@ -50,21 +53,30 @@ class OGBGGIN(nn.Module):
         self.num_layers = num_layers
         self.virtual_node = virtual_node
 
-        if data_info['name'] in ['ogbg-molhiv', 'ogbg-molpcba']:
+        if data_info["name"] in ["ogbg-molhiv", "ogbg-molpcba"]:
             self.node_encoder = AtomEncoder(embed_size)
-            self.edge_encoders = nn.ModuleList([
-                BondEncoder(embed_size) for _ in range(num_layers)])
+            self.edge_encoders = nn.ModuleList(
+                [BondEncoder(embed_size) for _ in range(num_layers)]
+            )
         else:
             # Handle other datasets
-            self.node_encoder = nn.Linear(data_info['node_feat_size'], embed_size)
-            self.edge_encoders = nn.ModuleList([nn.Linear(data_info['edge_feat_size'], embed_size)
-                                                for _ in range(num_layers)])
+            self.node_encoder = nn.Linear(
+                data_info["node_feat_size"], embed_size
+            )
+            self.edge_encoders = nn.ModuleList(
+                [
+                    nn.Linear(data_info["edge_feat_size"], embed_size)
+                    for _ in range(num_layers)
+                ]
+            )
 
-        self.conv_layers = nn.ModuleList([GINEConv(MLP(embed_size)) for _ in range(num_layers)])
+        self.conv_layers = nn.ModuleList(
+            [GINEConv(MLP(embed_size)) for _ in range(num_layers)]
+        )
 
         self.dropout = nn.Dropout(dropout)
         self.pool = AvgPooling()
-        self.pred = nn.Linear(embed_size, data_info['out_size'])
+        self.pred = nn.Linear(embed_size, data_info["out_size"])
 
         if virtual_node:
             self.virtual_emb = nn.Embedding(1, embed_size)

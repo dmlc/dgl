@@ -6,18 +6,18 @@ so we sampled twice as many neighbors during val/test than training.
 """
 import argparse
 
+import dgl
+
 import numpy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from dgl.nn.pytorch import GATConv
+from dgl.sampling import RandomWalkNeighborSampler
 from model_hetero import SemanticAttention
 from sklearn.metrics import f1_score
 from torch.utils.data import DataLoader
 from utils import EarlyStopping, set_random_seed
-
-import dgl
-from dgl.nn.pytorch import GATConv
-from dgl.sampling import RandomWalkNeighborSampler
 
 
 class HANLayer(torch.nn.Module):

@@ -2,13 +2,13 @@
 import argparse
 import time
 
+import dgl
+
 import mxnet as mx
 import numpy as np
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from gcn import GCN
 from mxnet import gluon
-
-import dgl
-from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 # from gcn_mp import GCN
 # from gcn_spmv import GCN

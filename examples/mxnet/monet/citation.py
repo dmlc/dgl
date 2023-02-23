@@ -1,16 +1,20 @@
 import argparse
 import time
 
+import dgl
+
 import mxnet as mx
 import networkx as nx
 import numpy as np
+from dgl.data import (
+    CiteseerGraphDataset,
+    CoraGraphDataset,
+    PubmedGraphDataset,
+    register_data_args,
+)
+from dgl.nn.mxnet.conv import GMMConv
 from mxnet import gluon, nd
 from mxnet.gluon import nn
-
-import dgl
-from dgl.data import (CiteseerGraphDataset, CoraGraphDataset,
-                      PubmedGraphDataset, register_data_args)
-from dgl.nn.mxnet.conv import GMMConv
 
 
 class MoNet(nn.Block):

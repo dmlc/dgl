@@ -1,14 +1,14 @@
 import time
 
+import dgl
+import dgl.nn as dglnn
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
 from ogb.nodeproppred import DglNodePropPredDataset
-
-import dgl
-import dgl.nn as dglnn
 
 
 class SAGE(nn.Module):

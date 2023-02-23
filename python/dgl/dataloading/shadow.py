@@ -1,8 +1,9 @@
 """ShaDow-GNN subgraph samplers."""
-from ..sampling.utils import EidExcluder
 from .. import transforms
 from ..base import NID
-from .base import set_node_lazy_features, set_edge_lazy_features, Sampler
+from ..sampling.utils import EidExcluder
+from .base import Sampler, set_edge_lazy_features, set_node_lazy_features
+
 
 class ShaDowKHopSampler(Sampler):
     """K-hop subgraph sampler from `Deep Graph Neural Networks with Shallow
@@ -68,8 +69,16 @@ class ShaDowKHopSampler(Sampler):
     >>> g.edata['p'] = torch.rand(g.num_edges())   # any non-negative 1D vector works
     >>> sampler = dgl.dataloading.ShaDowKHopSampler([5, 10, 15], prob='p')
     """
-    def __init__(self, fanouts, replace=False, prob=None, prefetch_node_feats=None,
-                 prefetch_edge_feats=None, output_device=None):
+
+    def __init__(
+        self,
+        fanouts,
+        replace=False,
+        prob=None,
+        prefetch_node_feats=None,
+        prefetch_edge_feats=None,
+        output_device=None,
+    ):
         super().__init__()
         self.fanouts = fanouts
         self.replace = replace
@@ -78,7 +87,9 @@ class ShaDowKHopSampler(Sampler):
         self.prefetch_edge_feats = prefetch_edge_feats
         self.output_device = output_device
 
-    def sample(self, g, seed_nodes, exclude_eids=None):     # pylint: disable=arguments-differ
+    def sample(
+        self, g, seed_nodes, exclude_eids=None
+    ):  # pylint: disable=arguments-differ
         """Sampling function.
 
         Parameters
@@ -99,12 +110,19 @@ class ShaDowKHopSampler(Sampler):
         output_nodes = seed_nodes
         for fanout in reversed(self.fanouts):
             frontier = g.sample_neighbors(
-                seed_nodes, fanout, output_device=self.output_device,
-                replace=self.replace, prob=self.prob, exclude_edges=exclude_eids)
+                seed_nodes,
+                fanout,
+                output_device=self.output_device,
+                replace=self.replace,
+                prob=self.prob,
+                exclude_edges=exclude_eids,
+            )
             block = transforms.to_block(frontier, seed_nodes)
             seed_nodes = block.srcdata[NID]
 
-        subg = g.subgraph(seed_nodes, relabel_nodes=True, output_device=self.output_device)
+        subg = g.subgraph(
+            seed_nodes, relabel_nodes=True, output_device=self.output_device
+        )
         if exclude_eids is not None:
             subg = EidExcluder(exclude_eids)(subg)
 

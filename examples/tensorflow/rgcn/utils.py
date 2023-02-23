@@ -5,10 +5,9 @@ https://github.com/MichSchli/RelationPrediction
 
 """
 
+import dgl
 import numpy as np
 import tensorflow as tf
-
-import dgl
 
 #######################################################################
 #

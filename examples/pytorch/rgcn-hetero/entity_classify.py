@@ -9,9 +9,9 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-from model import EntityClassify
 
 from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
+from model import EntityClassify
 
 
 def main(args):

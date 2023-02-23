@@ -7,7 +7,7 @@ import sys
 
 from .. import _api_internal
 from .base import _FFI_MODE, _LIB, c_str, check_call, py_str
-from .object_generic import ObjectGeneric, convert_to_object
+from .object_generic import convert_to_object, ObjectGeneric
 
 # pylint: disable=invalid-name
 IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
@@ -16,15 +16,12 @@ try:
     if _FFI_MODE == "ctypes":
         raise ImportError()
     if sys.version_info >= (3, 0):
-        from ._cy3.core import ObjectBase as _ObjectBase
-        from ._cy3.core import _register_object
+        from ._cy3.core import _register_object, ObjectBase as _ObjectBase
     else:
-        from ._cy2.core import ObjectBase as _ObjectBase
-        from ._cy2.core import _register_object
+        from ._cy2.core import _register_object, ObjectBase as _ObjectBase
 except IMPORT_EXCEPT:
     # pylint: disable=wrong-import-position
-    from ._ctypes.object import ObjectBase as _ObjectBase
-    from ._ctypes.object import _register_object
+    from ._ctypes.object import _register_object, ObjectBase as _ObjectBase
 
 
 def _new_object(cls):

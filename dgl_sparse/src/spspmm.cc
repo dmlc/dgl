@@ -64,18 +64,9 @@ torch::Tensor _CSRMask(
     const c10::intrusive_ptr<SparseMatrix>& sub_mat) {
   auto csr = CSRToOldDGLCSR(mat->CSRPtr());
   auto val = TorchTensorToDGLArray(value);
-  auto row = TorchTensorToDGLArray(sub_mat->COOPtr()->row);
-  auto col = TorchTensorToDGLArray(sub_mat->COOPtr()->col);
-  runtime::NDArray ret;
-  if (val->dtype.bits == 32) {
-    ret = aten::CSRGetData<float>(csr, row, col, val, 0.);
-  } else if (val->dtype.bits == 64) {
-    ret = aten::CSRGetData<double>(csr, row, col, val, 0.);
-  } else {
-    TORCH_CHECK(
-        false, "Dtype of value for SpSpMM should be 32 or 64 bits but got: " +
-                   std::to_string(val->dtype.bits));
-  }
+  auto row = TorchTensorToDGLArray(sub_mat->COOPtr()->indices.index({0}));
+  auto col = TorchTensorToDGLArray(sub_mat->COOPtr()->indices.index({1}));
+  runtime::NDArray ret = aten::CSRGetFloatingData(csr, row, col, val, 0.);
   return DGLArrayToTorchTensor(ret);
 }
 

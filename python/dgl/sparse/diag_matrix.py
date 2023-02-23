@@ -99,8 +99,8 @@ class DiagMatrix:
         SparseMatrix
             The copy in sparse matrix format
 
-        Example
-        -------
+        Examples
+        --------
 
         >>> import torch
         >>> val = torch.ones(5)
@@ -147,7 +147,7 @@ class DiagMatrix:
         DiagMatrix
             The transpose of the matrix
 
-        Example
+        Examples
         --------
 
         >>> val = torch.arange(1, 5).float()
@@ -176,12 +176,12 @@ class DiagMatrix:
         DiagMatrix
             The converted matrix
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
         >>> D = dglsp.diag(val)
-        >>> D.to(device='cuda:0', dtype=torch.int32)
+        >>> D.to(device="cuda:0", dtype=torch.int32)
         DiagMatrix(values=tensor([1, 1], device='cuda:0', dtype=torch.int32),
                    shape=(2, 2))
         """
@@ -198,14 +198,14 @@ class DiagMatrix:
     def cuda(self):
         """Moves the matrix to GPU. If the matrix is already on GPU, the
         original matrix will be returned. If multiple GPU devices exist,
-        'cuda:0' will be selected.
+        ``cuda:0`` will be selected.
 
         Returns
         -------
         DiagMatrix
             The matrix on GPU
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -225,7 +225,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix on CPU
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -237,15 +237,15 @@ class DiagMatrix:
         return self.to(device="cpu")
 
     def float(self):
-        """Converts the matrix values to float data type. If the matrix already
-        uses float data type, the original matrix will be returned.
+        """Converts the matrix values to float32 data type. If the matrix
+        already uses float data type, the original matrix will be returned.
 
         Returns
         -------
         DiagMatrix
             The matrix with float values
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -265,7 +265,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix with double values
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -277,7 +277,7 @@ class DiagMatrix:
         return self.to(dtype=torch.double)
 
     def int(self):
-        """Converts the matrix values to int data type. If the matrix already
+        """Converts the matrix values to int32 data type. If the matrix already
         uses int data type, the original matrix will be returned.
 
         Returns
@@ -285,7 +285,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix with int values
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -305,7 +305,7 @@ class DiagMatrix:
         DiagMatrix
             The matrix with long values
 
-        Example
+        Examples
         --------
 
         >>> val = torch.ones(2)
@@ -362,6 +362,9 @@ def diag(
     >>> D.nnz
     5
     """
+    assert (
+        val.dim() <= 2
+    ), "The values of a DiagMatrix can only be scalars or vectors."
     # NOTE(Mufei): this may not be needed if DiagMatrix is simple enough
     return DiagMatrix(val, shape)
 
@@ -380,7 +383,7 @@ def identity(
         Shape of the matrix.
     d : int, optional
         If None, the diagonal entries will be scaler 1. Otherwise, the diagonal
-        entries will be a 1-valued tensor of shape (d).
+        entries will be a 1-valued tensor of shape ``(d)``.
     dtype : torch.dtype, optional
         The data type of the matrix
     device : torch.device, optional
@@ -396,9 +399,11 @@ def identity(
 
     Case1: 3-by-3 matrix with scaler diagonal values
 
-    [[1, 0, 0],
-     [0, 1, 0],
-     [0, 0, 1]]
+    .. code::
+
+        [[1, 0, 0],
+         [0, 1, 0],
+         [0, 0, 1]]
 
     >>> dglsp.identity(shape=(3, 3))
     DiagMatrix(val=tensor([1., 1., 1.]),
@@ -406,9 +411,11 @@ def identity(
 
     Case2: 3-by-5 matrix with scaler diagonal values
 
-    [[1, 0, 0, 0, 0],
-     [0, 1, 0, 0, 0],
-     [0, 0, 1, 0, 0]]
+    .. code::
+
+        [[1, 0, 0, 0, 0],
+         [0, 1, 0, 0, 0],
+         [0, 0, 1, 0, 0]]
 
     >>> dglsp.identity(shape=(3, 5))
     DiagMatrix(val=tensor([1., 1., 1.]),

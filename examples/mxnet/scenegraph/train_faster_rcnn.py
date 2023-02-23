@@ -11,19 +11,26 @@ import gluoncv as gcv
 import mxnet as mx
 import numpy as np
 from data import *
-from gluoncv import data as gdata
-from gluoncv import utils as gutils
+from gluoncv import data as gdata, utils as gutils
 from gluoncv.data.batchify import Append, FasterRCNNTrainBatchify, Tuple
 from gluoncv.data.transforms.presets.rcnn import (
-    FasterRCNNDefaultTrainTransform, FasterRCNNDefaultValTransform)
+    FasterRCNNDefaultTrainTransform,
+    FasterRCNNDefaultValTransform,
+)
 from gluoncv.model_zoo import get_model
 from gluoncv.utils.metrics.coco_detection import COCODetectionMetric
-from gluoncv.utils.metrics.rcnn import (RCNNAccMetric, RCNNL1LossMetric,
-                                        RPNAccMetric, RPNL1LossMetric)
+from gluoncv.utils.metrics.rcnn import (
+    RCNNAccMetric,
+    RCNNL1LossMetric,
+    RPNAccMetric,
+    RPNL1LossMetric,
+)
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 from gluoncv.utils.parallel import Parallel, Parallelizable
-from model import (faster_rcnn_resnet50_v1b_custom,
-                   faster_rcnn_resnet101_v1d_custom)
+from model import (
+    faster_rcnn_resnet101_v1d_custom,
+    faster_rcnn_resnet50_v1b_custom,
+)
 from mxnet import autograd, gluon
 from mxnet.contrib import amp
 

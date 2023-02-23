@@ -3,11 +3,11 @@ import argparse
 import numpy as np
 import torch as th
 import torch.optim as optim
-from model import GeniePath, GeniePathLazy
-from sklearn.metrics import f1_score
 
 from dgl.data import PPIDataset
 from dgl.dataloading import GraphDataLoader
+from model import GeniePath, GeniePathLazy
+from sklearn.metrics import f1_score
 
 
 def evaluate(model, loss_fn, dataloader, device="cpu"):

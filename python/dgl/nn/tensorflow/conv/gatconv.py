@@ -1,8 +1,9 @@
 """Tensorflow modules for graph attention networks(GAT)."""
+import numpy as np
+
 # pylint: disable= no-member, arguments-differ, invalid-name
 import tensorflow as tf
 from tensorflow.keras import layers
-import numpy as np
 
 from .... import function as fn
 from ....base import DGLError
@@ -134,42 +135,60 @@ class GATConv(layers.Layer):
             [ 0.5088224 ,  0.10908248],
             [ 0.55670375, -0.6811229 ]]], dtype=float32)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 num_heads,
-                 feat_drop=0.,
-                 attn_drop=0.,
-                 negative_slope=0.2,
-                 residual=False,
-                 activation=None,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        num_heads,
+        feat_drop=0.0,
+        attn_drop=0.0,
+        negative_slope=0.2,
+        residual=False,
+        activation=None,
+        allow_zero_in_degree=False,
+    ):
         super(GATConv, self).__init__()
         self._num_heads = num_heads
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._allow_zero_in_degree = allow_zero_in_degree
-        xinit = tf.keras.initializers.VarianceScaling(scale=np.sqrt(
-            2), mode="fan_avg", distribution="untruncated_normal")
+        xinit = tf.keras.initializers.VarianceScaling(
+            scale=np.sqrt(2), mode="fan_avg", distribution="untruncated_normal"
+        )
         if isinstance(in_feats, tuple):
             self.fc_src = layers.Dense(
-                out_feats * num_heads, use_bias=False, kernel_initializer=xinit)
+                out_feats * num_heads, use_bias=False, kernel_initializer=xinit
+            )
             self.fc_dst = layers.Dense(
-                out_feats * num_heads, use_bias=False, kernel_initializer=xinit)
+                out_feats * num_heads, use_bias=False, kernel_initializer=xinit
+            )
         else:
             self.fc = layers.Dense(
-                out_feats * num_heads, use_bias=False, kernel_initializer=xinit)
-        self.attn_l = tf.Variable(initial_value=xinit(
-            shape=(1, num_heads, out_feats), dtype='float32'), trainable=True)
-        self.attn_r = tf.Variable(initial_value=xinit(
-            shape=(1, num_heads, out_feats), dtype='float32'), trainable=True)
+                out_feats * num_heads, use_bias=False, kernel_initializer=xinit
+            )
+        self.attn_l = tf.Variable(
+            initial_value=xinit(
+                shape=(1, num_heads, out_feats), dtype="float32"
+            ),
+            trainable=True,
+        )
+        self.attn_r = tf.Variable(
+            initial_value=xinit(
+                shape=(1, num_heads, out_feats), dtype="float32"
+            ),
+            trainable=True,
+        )
         self.feat_drop = layers.Dropout(rate=feat_drop)
         self.attn_drop = layers.Dropout(rate=attn_drop)
         self.leaky_relu = layers.LeakyReLU(alpha=negative_slope)
         if residual:
             if in_feats != out_feats:
                 self.res_fc = layers.Dense(
-                    num_heads * out_feats, use_bias=False, kernel_initializer=xinit)
+                    num_heads * out_feats,
+                    use_bias=False,
+                    kernel_initializer=xinit,
+                )
             else:
                 self.res_fc = Identity()
         else:
@@ -220,39 +239,47 @@ class GATConv(layers.Layer):
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
-                if  tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                if tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             if isinstance(feat, tuple):
                 src_prefix_shape = tuple(feat[0].shape[:-1])
                 dst_prefix_shape = tuple(feat[1].shape[:-1])
                 h_src = self.feat_drop(feat[0])
                 h_dst = self.feat_drop(feat[1])
-                if not hasattr(self, 'fc_src'):
+                if not hasattr(self, "fc_src"):
                     self.fc_src, self.fc_dst = self.fc, self.fc
                 feat_src = tf.reshape(
                     self.fc_src(h_src),
-                    src_prefix_shape + (self._num_heads, self._out_feats))
+                    src_prefix_shape + (self._num_heads, self._out_feats),
+                )
                 feat_dst = tf.reshape(
                     self.fc_dst(h_dst),
-                    dst_prefix_shape + (self._num_heads, self._out_feats))
+                    dst_prefix_shape + (self._num_heads, self._out_feats),
+                )
             else:
                 src_prefix_shape = dst_prefix_shape = tuple(feat.shape[:-1])
                 h_src = h_dst = self.feat_drop(feat)
                 feat_src = feat_dst = tf.reshape(
-                    self.fc(h_src), src_prefix_shape + (self._num_heads, self._out_feats))
+                    self.fc(h_src),
+                    src_prefix_shape + (self._num_heads, self._out_feats),
+                )
                 if graph.is_block:
-                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
-                    h_dst = h_dst[:graph.number_of_dst_nodes()]
-                    dst_prefix_shape = (graph.number_of_dst_nodes(),) + dst_prefix_shape[1:]
+                    feat_dst = feat_src[: graph.number_of_dst_nodes()]
+                    h_dst = h_dst[: graph.number_of_dst_nodes()]
+                    dst_prefix_shape = (
+                        graph.number_of_dst_nodes(),
+                    ) + dst_prefix_shape[1:]
             # NOTE: GAT paper uses "first concatenation then linear projection"
             # to compute attention scores, while ours is "first projection then
             # addition", the two approaches are mathematically equivalent:
@@ -265,27 +292,27 @@ class GATConv(layers.Layer):
             # which further speeds up computation and saves memory footprint.
             el = tf.reduce_sum(feat_src * self.attn_l, axis=-1, keepdims=True)
             er = tf.reduce_sum(feat_dst * self.attn_r, axis=-1, keepdims=True)
-            graph.srcdata.update({'ft': feat_src, 'el': el})
-            graph.dstdata.update({'er': er})
+            graph.srcdata.update({"ft": feat_src, "el": el})
+            graph.dstdata.update({"er": er})
             # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
-            graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
-            e = self.leaky_relu(graph.edata.pop('e'))
+            graph.apply_edges(fn.u_add_v("el", "er", "e"))
+            e = self.leaky_relu(graph.edata.pop("e"))
             # compute softmax
-            graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
+            graph.edata["a"] = self.attn_drop(edge_softmax(graph, e))
             # message passing
-            graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
-                             fn.sum('m', 'ft'))
-            rst = graph.dstdata['ft']
+            graph.update_all(fn.u_mul_e("ft", "a", "m"), fn.sum("m", "ft"))
+            rst = graph.dstdata["ft"]
             # residual
             if self.res_fc is not None:
-                resval = tf.reshape(self.res_fc(
-                    h_dst), dst_prefix_shape + (-1, self._out_feats))
+                resval = tf.reshape(
+                    self.res_fc(h_dst), dst_prefix_shape + (-1, self._out_feats)
+                )
                 rst = rst + resval
             # activation
             if self.activation:
                 rst = self.activation(rst)
 
             if get_attention:
-                return rst, graph.edata['a']
+                return rst, graph.edata["a"]
             else:
                 return rst
