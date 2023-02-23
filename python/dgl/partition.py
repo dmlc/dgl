@@ -604,7 +604,9 @@ class NDArrayPartition(object):
         ret = _CAPI_DGLNDArrayPartitionGeneratePermutation(
             self._partition, F.zerocopy_to_dgl_ndarray(idxs)
         )
-        return F.zerocopy_from_dgl_ndarray(ret(0)), \
-            F.zerocopy_from_dgl_ndarray(ret(1))
+        return F.zerocopy_from_dgl_ndarray(ret(0)), F.zerocopy_from_dgl_ndarray(
+            ret(1)
+        )
+
 
 _init_api("dgl.partition")
