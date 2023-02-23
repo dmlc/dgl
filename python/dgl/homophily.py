@@ -5,7 +5,7 @@ __all__ = ["node_homophily"]
 
 
 def node_homophily(graph, y):
-    """Homophily measure from `Geom-GCN: Geometric Graph Convolutional Networks
+    r"""Homophily measure from `Geom-GCN: Geometric Graph Convolutional Networks
     <https://arxiv.org/abs/2002.05287>`__
 
     We follow the practice of a later paper `Large Scale Learning on
