@@ -1,9 +1,12 @@
+import unittest
+
 import backend as F
 
 import dgl
 from test_utils import parametrize_idtype
 
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Skip TF")
 @parametrize_idtype
 def test_node_homophily(idtype):
     # NOTE: If you want to update this test case, remember to update the
