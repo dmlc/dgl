@@ -20,6 +20,7 @@ from dgl.distributed.partition import (
 )
 from distpartitioning.utils import get_idranges
 
+
 def read_file(fname, ftype):
     """Read a file from disk
     Parameters:
@@ -31,17 +32,14 @@ def read_file(fname, ftype):
 
     Returns:
     --------
-    numpy ndarray : 
+    numpy ndarray :
         file contents are returned as numpy array
     """
-    reader_fmt_meta = {
-        "name": ftype
-    }
-    array_readwriter.get_array_parser(
-        **reader_fmt_meta
-    ).read(fname)
+    reader_fmt_meta = {"name": ftype}
+    array_readwriter.get_array_parser(**reader_fmt_meta).read(fname)
 
     return data
+
 
 def verify_partition_data_types(part_g):
     """Validate the dtypes in the partitioned graphs are valid

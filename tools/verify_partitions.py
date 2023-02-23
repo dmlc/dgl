@@ -76,8 +76,8 @@ def _read_graph(schema):
                     f"Unknown edge format for {etype} - {schema[constants.STR_EDGES][etype][constants.STR_FORMAT]}"
                 )
 
-                src.append(data[:,0])
-            dst.append(data[:,1])
+                src.append(data[:, 0])
+            dst.append(data[:, 1])
         src = np.concatenate(src)
         dst = np.concatenate(dst)
         edges[_etype_str_to_tuple(etype)] = (src, dst)
@@ -91,7 +91,9 @@ def _read_graph(schema):
     # read features here.
     for ntype in schema[constants.STR_NODE_TYPE]:
         if ntype in schema[constants.STR_NODE_DATA]:
-            for featname, featdata in schema[constants.STR_NODE_DATA][ntype].items():
+            for featname, featdata in schema[constants.STR_NODE_DATA][
+                ntype
+            ].items():
                 files = fdata[constants.STR_DATA]
                 feats = []
                 for fname in files:
