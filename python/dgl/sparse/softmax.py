@@ -56,7 +56,7 @@ def softmax(input: SparseMatrix, dim: int = 1) -> SparseMatrix:
                                 [1.0000, 1.0000]]),
                  shape=(3, 3), nnz=4, val_size=(2,))
 
-    Case3: column-wise softmax on matrix with values of shape (nnz, D)
+    Case3: column-wise softmax on matrix with values of shape (nnz)
 
     >>> indices = torch.tensor([[0, 0, 1, 2], [1, 2, 2, 0]])
     >>> val = torch.tensor([0., 1., 2., 3.])
