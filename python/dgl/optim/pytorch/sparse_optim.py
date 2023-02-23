@@ -95,7 +95,6 @@ class SparseGradOptimizer(abc.ABC):
                 self._comm_setup()
             else:
                 self._shared_setup()
-            self.setup(self._params)
             self._first_step = False
 
         if self._comm:
@@ -103,6 +102,7 @@ class SparseGradOptimizer(abc.ABC):
         else:
             self._shared_step()
 
+    @abstractmethod
     def setup(self, params):
         """This is function where subclasses can perform any setup they need
         to. It will be called during the first step, and communicators or
@@ -466,7 +466,12 @@ class SparseGradOptimizer(abc.ABC):
         dictionary of optimizer states
             The optimizer states stored in CPU memory.
         """
-        return {emb.name: emb._all_get_optm_state() for emb in self._params}
+        return {
+            "state": {
+                emb.name: emb._all_get_optm_state() for emb in self._params
+            },
+            "param_groups": self.param_groups,
+        }
 
     def load_state_dict(
         self, state_dict, **kwargs
@@ -484,7 +489,21 @@ class SparseGradOptimizer(abc.ABC):
             The global states to pull values from.
         """
         for emb in self._params:
-            emb._all_set_optm_state(state_dict[emb.name])
+            emb._all_set_optm_state(state_dict["state"][emb.name])
+        self._set_param_groups(state_dict["param_groups"])
+
+    @property
+    @abstractmethod
+    def param_groups(self):
+        """Emulate 'param_groups' of torch.optim.Optimizer.
+        Different from that, the returned 'param_groups' doesn't contain
+        parameters because getting the whole embedding is very expensive.
+        It contains other attributes, e.g., lr, eps, for debugging.
+        """
+
+    @abstractmethod
+    def _set_param_groups(self, groups):
+        """A helper method to load param_groups from saved state_dict."""
 
 
 class SparseAdagrad(SparseGradOptimizer):
@@ -529,6 +548,9 @@ class SparseAdagrad(SparseGradOptimizer):
     def __init__(self, params, lr, eps=1e-10):
         super(SparseAdagrad, self).__init__(params, lr)
         self._eps = eps
+
+        # setup tensors for optimizer states
+        self.setup(self._params)
 
     def setup(self, params):
         # We need to register a state sum for each embedding in the kvstore.
@@ -616,6 +638,11 @@ class SparseAdagrad(SparseGradOptimizer):
         """
         return [{"lr": self._lr, "eps": self._eps}]
 
+    def _set_param_groups(self, groups):
+        """A helper method to load param_groups from saved state_dict."""
+        self._lr = groups[0]["lr"]
+        self._eps = groups[0]["eps"]
+
 
 class SparseAdam(SparseGradOptimizer):
     r"""Node embedding optimizer using the Adam algorithm.
@@ -695,6 +722,9 @@ class SparseAdam(SparseGradOptimizer):
             "and th.float32".format(dtype)
         )
         self._dtype = dtype
+
+        # setup tensors for optimizer states
+        self.setup(self._params)
 
     def _setup_uva(self, name, mem, power):
         self._is_using_uva[name] = True
@@ -921,3 +951,9 @@ class SparseAdam(SparseGradOptimizer):
                 "eps": self._eps,
             }
         ]
+
+    def _set_param_groups(self, groups):
+        """A helper method to load param_groups from saved state_dict."""
+        self._lr = groups[0]["lr"]
+        self._beta1, self._beta2 = groups[0]["betas"]
+        self._eps = groups[0]["eps"]

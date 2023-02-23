@@ -349,7 +349,12 @@ class NodeEmbedding:  # NodeEmbedding
             th.distributed.barrier()
 
     def _all_get_tensor(self, shared_name, tensor, shape):
-        """A helper function to get model-parallel tensors."""
+        """A helper function to get model-parallel tensors.
+
+        This method must and only need to be called in multi-GPU DDP training.
+        For now, it's only used in ``all_get_embedding`` and
+        ``_all_get_optm_state``.
+        """
         # create a shared memory tensor
         if self._rank == 0:
             # root process creates shared memory
@@ -467,7 +472,6 @@ class NodeEmbedding:  # NodeEmbedding
             # stored in CPU memory
             if self._rank <= 0:
                 for state, new_state in zip(self._optm_state, states):
-                    print(state.shape, new_state.shape)
                     state[:] = F.copy_to(
                         new_state, ctx=F.context(self._tensor)
                     )[:]
