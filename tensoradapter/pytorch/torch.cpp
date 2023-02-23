@@ -81,7 +81,7 @@ TA_EXPORTS void* CUDARawHostAlloc(
 // every single CUDARawHostAlloc has an unique CUDAHostDeleter obj
 TA_EXPORTS void CUDARawHostDelete(void** raw_deleter) {
   delete static_cast<CUDAHostDeleter*>(*raw_deleter);
-  raw_deleter = nullptr;
+  *raw_deleter = nullptr;
 }
 
 TA_EXPORTS void CUDARecordHostAlloc(

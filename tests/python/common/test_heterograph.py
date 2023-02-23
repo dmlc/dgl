@@ -1260,7 +1260,7 @@ def test_pin_memory_(idtype):
 )
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch",
-    reason="Pinning graph inplace only supported for PyTorch",
+    reason="Pinning graph outplace only supported for PyTorch",
 )
 @parametrize_idtype
 def test_pin_memory(idtype):
