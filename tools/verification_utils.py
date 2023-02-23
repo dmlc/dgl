@@ -20,86 +20,28 @@ from dgl.distributed.partition import (
 )
 from distpartitioning.utils import get_idranges
 
-
-def read_pq_file(ff):
-    """Read a parquet file.
-
+def read_file(fname, ftype):
+    """Read a file from disk
     Parameters:
     -----------
-    ff : string
-        absolute path of the file name to read
+    fname : string
+        specifying the absolute path to the file to read
+    ftype : string
+        supported formats are `numpy`, `parquet', `csv`
 
     Returns:
     --------
-    numpy ndarray:
-        contents of the file as numpy ndarray
+    numpy ndarray : 
+        file contents are returned as numpy array
     """
-    data_df = pq.read_table(ff)
-    data_df = data_df.rename_columns(["f0", "f1"])
-    return data_df["f0"].to_numpy(), data_df["f1"].to_numpy()
+    reader_fmt_meta = {
+        "name": ftype
+    }
+    array_readwriter.get_array_parser(
+        **reader_fmt_meta
+    ).read(fname)
 
-
-def read_npy_file(ff):
-    """Read a numpy file.
-
-    Parameters:
-    -----------
-    ff : string
-        absolute path of the file name to read
-
-    Returns:
-    --------
-    numpy ndarray:
-        contents of the file as numpy ndarray
-    """
-    return np.load(ff)
-
-
-def read_csv_file(ff, single_col=False):
-    """Read a csv file
-
-    Parameters:
-    -----------
-    ff : string
-        absolute path of the file name to read
-    single_col : boolean
-        flag to specify whether to read a single column or all the columns from
-        the input file
-
-    Returns:
-    --------
-    numpy ndarray :
-        contents of the file returned as numpy ndarray
-    """
-    read_options = pyarrow.csv.ReadOptions(
-        use_threads=True,
-        block_size=4096,
-        autogenerate_column_names=True,
-    )
-
-    src = []
-    dst = []
-
-    parse_options = pyarrow.csv.ParseOptions(delimiter=" ")
-    with pyarrow.csv.open_csv(
-        ff,
-        read_options=read_options,
-        parse_options=parse_options,
-    ) as reader:
-        for next_chunk in reader:
-            if next_chunk is None:
-                break
-
-            next_table = pyarrow.Table.from_batches([next_chunk])
-            src.append(next_table["f0"].to_numpy())
-            if not single_col:
-                dst.append(next_table["f1"].to_numpy())
-
-    if not single_col:
-        return np.concatenate(src), np.concatenate(dst)
-    else:
-        return np.concatenate(src)
-
+    return data
 
 def verify_partition_data_types(part_g):
     """Validate the dtypes in the partitioned graphs are valid

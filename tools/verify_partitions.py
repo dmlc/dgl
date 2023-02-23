@@ -56,28 +56,28 @@ def _read_graph(schema):
         efiles = schema[constants.STR_EDGES][etype][constants.STR_DATA]
         src = []
         dst = []
-        for ff in efiles:
+        for fname in efiles:
             if (
                 schema[constants.STR_EDGES][etype][constants.STR_FORMAT][
                     constants.STR_NAME
                 ]
                 == constants.STR_CSV
             ):
-                a, b = read_csv_file(ff)
+                data = read_file(fname, constants.STR_CSV)
             elif (
                 schema[constants.STR_EDGES][etype][constants.STR_FORMAT][
                     constants.STR_NAME
                 ]
                 == constants.STR_PARQUET
             ):
-                a, b = read_pq_file(ff)
+                data = read_file(fname)
             else:
                 raise ValueError(
                     f"Unknown edge format for {etype} - {schema[constants.STR_EDGES][etype][constants.STR_FORMAT]}"
                 )
 
-            src.append(a)
-            dst.append(b)
+                src.append(data[:,0])
+            dst.append(data[:,1])
         src = np.concatenate(src)
         dst = np.concatenate(dst)
         edges[_etype_str_to_tuple(etype)] = (src, dst)
@@ -91,26 +91,26 @@ def _read_graph(schema):
     # read features here.
     for ntype in schema[constants.STR_NODE_TYPE]:
         if ntype in schema[constants.STR_NODE_DATA]:
-            for fname, fdata in schema[constants.STR_NODE_DATA][ntype].items():
+            for featname, featdata in schema[constants.STR_NODE_DATA][ntype].items():
                 files = fdata[constants.STR_DATA]
                 feats = []
-                for ff in files:
-                    feats.append(read_npy_file(ff))
+                for fname in files:
+                    feats.append(read_file(fname, constants.STR_NUMPY))
                 if len(feats) > 0:
-                    g.nodes[ntype].data[fname] = th.from_numpy(
+                    g.nodes[ntype].data[featname] = th.from_numpy(
                         np.concatenate(feats)
                     )
 
     # read edge features here.
     for etype in schema[constants.STR_EDGE_TYPE]:
         if etype in schema[constants.STR_EDGE_DATA]:
-            for fname, fdata in schema[constants.STR_EDGE_DATA][etype]:
+            for featname, fdata in schema[constants.STR_EDGE_DATA][etype]:
                 files = fdata[constants.STR_DATA]
                 feats = []
-                for ff in files:
-                    feats.append(read_npy_file(ff))
+                for fname in files:
+                    feats.append(read_file(fname))
                 if len(feats) > 0:
-                    g.edges[etype].data[fname] = th.from_numpy(
+                    g.edges[etype].data[featname] = th.from_numpy(
                         np.concatenate(feats)
                     )
 
