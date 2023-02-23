@@ -1,7 +1,7 @@
 """Utils for tacking graph homophily and heterophily"""
 from . import backend as F, function as fn
 
-__all__ = ['node_homophily']
+__all__ = ["node_homophily"]
 
 
 def node_homophily(graph, y):
@@ -50,8 +50,8 @@ def node_homophily(graph, y):
         src = F.astype(src, F.int64)
         dst = F.astype(dst, F.int64)
         # Compute y_v = y_u for all edges.
-        graph.edata['same_class'] = F.astype(y[src] == y[dst], F.float32)
+        graph.edata["same_class"] = F.astype(y[src] == y[dst], F.float32)
         graph.update_all(
-            fn.copy_e('same_class', 'm'), fn.mean('m', 'node_value')
+            fn.copy_e("same_class", "m"), fn.mean("m", "node_value")
         )
-        return graph.ndata['node_value'].mean().item()
+        return graph.ndata["node_value"].mean().item()
