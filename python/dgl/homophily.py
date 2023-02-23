@@ -1,8 +1,8 @@
 """Utils for tacking graph homophily and heterophily"""
-from . import backend as F
-from . import function as fn
+from . import backend as F, function as fn
 
 __all__ = ['node_homophily']
+
 
 def node_homophily(graph, y):
     """Homophily measure from `Geom-GCN: Geometric Graph Convolutional Networks
@@ -51,6 +51,7 @@ def node_homophily(graph, y):
         dst = F.astype(dst, F.int64)
         # Compute y_v = y_u for all edges.
         graph.edata['same_class'] = F.astype(y[src] == y[dst], F.float32)
-        graph.update_all(fn.copy_e('same_class', 'm'),
-                         fn.mean('m', 'node_value'))
+        graph.update_all(
+            fn.copy_e('same_class', 'm'), fn.mean('m', 'node_value')
+        )
         return graph.ndata['node_value'].mean().item()
