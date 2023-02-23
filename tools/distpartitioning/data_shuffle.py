@@ -1000,6 +1000,7 @@ def gen_dist_partitions(rank, world_size, params):
         id_map,
         rank,
         world_size,
+        params.num_parts,
     )
 
     ntypes_ntypeid_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
