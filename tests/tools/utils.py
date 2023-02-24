@@ -125,6 +125,7 @@ def _chunk_graph(
     num_chunks_details = _initialize_num_chunks(g, num_chunks, kwargs=kwargs)
 
     # Compute the number of nodes per chunk per node type
+    metadata["num_nodes_per_chunk"] = num_nodes_per_chunk = []
     num_chunks_nodes = num_chunks_details["num_chunks_nodes"]
     for ntype in g.ntypes:
         num_nodes = g.num_nodes(ntype)

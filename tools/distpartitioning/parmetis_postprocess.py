@@ -52,7 +52,7 @@ def post_process(params):
         dict(
             zip(
                 schema[constants.STR_NODE_TYPE],
-                schema[constants.STR_NODE_TYPE_COUNTS],
+                schema[constants.STR_NUM_NODES_PER_TYPE],
             )
         ),
     )

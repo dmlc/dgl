@@ -50,7 +50,7 @@ class DistLookupService:
     """
 
     def __init__(
-        self, input_dir, ntype_names, id_map, rank, world_size, num_parts
+        self, input_dir, ntype_names, rank, world_size, num_parts
     ):
         assert os.path.isdir(input_dir)
         assert ntype_names is not None
@@ -128,7 +128,7 @@ class DistLookupService:
     def set_idMap(self, id_map):
         self.id_map = id_map
 
-    def get_partition_ids(self, global_nids):
+    def get_partition_ids(self, agg_global_nids):
         """
         This function is used to get the partition-ids for a given set of global node ids
 
@@ -311,7 +311,10 @@ class DistLookupService:
             agg_partition_ids.append(owner_ids)
 
         # Stitch the list of partition-ids and return to the caller
-        agg_partition_ids = np.concatenate(agg_partition_ids)
+        if len(agg_partition_ids) > 0:
+            agg_partition_ids = np.concatenate(agg_partition_ids)
+        else:
+            agg_partition_ids = np.array([], dtype=np.int64)
         assert agg_global_nids.shape[0] == agg_partition_ids.shape[0]
 
         # Now the owner_ids (partition-ids) which corresponding to the  global_nids.

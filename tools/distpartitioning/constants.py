@@ -37,7 +37,7 @@ STR_GRAPH_NAME = "graph_name"
 STR_NODE_FEATURES = "node_features"
 STR_EDGE_FEATURES = "edge_features"
 
-STR_NODE_TYPE_COUNTS = "num_nodes_per_type"
-STR_EDGE_TYPE_COUNTS = "num_edges_per_type"
+STR_NUM_NODES_PER_TYPE = "num_nodes_per_type"
+STR_NUM_EDGES_PER_TYPE = "num_edges_per_type"
 
 STR_NTYPES = "ntypes"

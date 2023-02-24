@@ -68,7 +68,7 @@ def gen_edge_files(schema_map, params):
         dict(
             zip(
                 schema_map[constants.STR_NODE_TYPE],
-                schema_map[constants.STR_NODE_TYPE_COUNTS],
+                schema_map[constants.STR_NUM_NODES_PER_TYPE],
             )
         ),
     )
@@ -167,7 +167,7 @@ def gen_node_weights_files(schema_map, params):
         dict(
             zip(
                 schema_map[constants.STR_NODE_TYPE],
-                schema_map[constants.STR_NODE_TYPE_COUNTS],
+                schema_map[constants.STR_NUM_NODES_PER_TYPE],
             )
         ),
     )
@@ -180,7 +180,7 @@ def gen_node_weights_files(schema_map, params):
 
         # This ntype does not have any train/test/val masks...
         # Each rank will generate equal no. of rows for this node type.
-        total_count = schema_map[constants.STR_NODE_TYPE_COUNTS][ntype_id]
+        total_count = schema_map[constants.STR_NUM_NODES_PER_TYPE][ntype_id]
         per_rank_range = np.ones((params.num_parts,), dtype=np.int64) * (
             total_count // params.num_parts
         )
@@ -265,7 +265,7 @@ def gen_parmetis_input_args(params, schema_map):
         dict(
             zip(
                 schema_map[constants.STR_NODE_TYPE],
-                schema_map[constants.STR_NODE_TYPE_COUNTS],
+                schema_map[constants.STR_NUM_NODES_PER_TYPE],
             )
         ),
     )
@@ -281,8 +281,8 @@ def gen_parmetis_input_args(params, schema_map):
     ), "Graph name is not present in the json file"
     graph_name = schema_map[constants.STR_GRAPH_NAME]
     if not os.path.isfile(f"{graph_name}_stats.txt"):
-        num_nodes = np.sum(schema_map[constants.STR_NODE_TYPE_COUNTS])
-        num_edges = np.sum(schema_map[constants.STR_EDGE_TYPE_COUNTS])
+        num_nodes = np.sum(schema_map[constants.STR_NUM_NODES_PER_TYPE])
+        num_edges = np.sum(schema_map[constants.STR_NUM_EDGES_PER_TYPE])
         num_ntypes = len(schema_map[constants.STR_NODE_TYPE])
 
         num_constraints = num_ntypes
@@ -295,7 +295,7 @@ def gen_parmetis_input_args(params, schema_map):
     os.makedirs(outdir, exist_ok=True)
     for ntype_id, ntype_name in ntid_ntype_map.items():
         global_nid_offset = ntype_gnid_offset[ntype_name][0, 0]
-        total_count = schema_map[constants.STR_NODE_TYPE_COUNTS][ntype_id]
+        total_count = schema_map[constants.STR_NUM_NODES_PER_TYPE][ntype_id]
         per_rank_range = np.ones((params.num_parts,), dtype=np.int64) * (
             total_count // params.num_parts
         )

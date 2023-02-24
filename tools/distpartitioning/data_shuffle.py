@@ -126,7 +126,7 @@ def gen_node_data(
         schema_map[constants.STR_NODE_TYPE],
         get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
-            schema_map[constants.STR_NODE_TYPE_COUNTS],
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
         ),
         num_chunks=num_parts,
     )
@@ -1044,7 +1044,7 @@ def gen_dist_partitions(rank, world_size, params):
         schema_map[constants.STR_NODE_TYPE],
         get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
-            schema_map[constants.STR_NODE_TYPE_COUNTS],
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
         ),
     )
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
@@ -1067,7 +1067,7 @@ def gen_dist_partitions(rank, world_size, params):
         schema_map,
         get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
-            schema_map[constants.STR_NODE_TYPE_COUNTS],
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
         ),
     )
     logging.info(
@@ -1084,7 +1084,7 @@ def gen_dist_partitions(rank, world_size, params):
         schema_map[constants.STR_NODE_TYPE],
         get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
-            schema_map[constants.STR_NODE_TYPE_COUNTS],
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
         ),
     )
     etypes_geid_range_map = get_gid_offsets(
@@ -1259,7 +1259,7 @@ def gen_dist_partitions(rank, world_size, params):
             num_edges,
             get_ntype_counts_map(
                 schema_map[constants.STR_NODE_TYPE],
-                schema_map[constants.STR_NODE_TYPE_COUNTS],
+                schema_map[constants.STR_NUM_NODES_PER_TYPE],
             ),
             edge_typecounts,
             params.save_orig_nids,
