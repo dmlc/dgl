@@ -30,12 +30,10 @@ SparseMatrix::SparseMatrix(
   // device. Do we allow the graph structure and values are on different
   // devices?
   if (coo != nullptr) {
-    TORCH_CHECK(coo->row.dim() == 1);
-    TORCH_CHECK(coo->col.dim() == 1);
-    TORCH_CHECK(coo->row.size(0) == coo->col.size(0));
-    TORCH_CHECK(coo->row.size(0) == value.size(0));
-    TORCH_CHECK(coo->row.device() == value.device());
-    TORCH_CHECK(coo->col.device() == value.device());
+    TORCH_CHECK(coo->indices.dim() == 2);
+    TORCH_CHECK(coo->indices.size(0) == 2);
+    TORCH_CHECK(coo->indices.size(1) == value.size(0));
+    TORCH_CHECK(coo->indices.device() == value.device());
   }
   if (csr != nullptr) {
     TORCH_CHECK(csr->indptr.dim() == 1);
@@ -76,8 +74,8 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSCPointer(
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCOO(
     torch::Tensor row, torch::Tensor col, torch::Tensor value,
     const std::vector<int64_t>& shape) {
-  auto coo =
-      std::make_shared<COO>(COO{shape[0], shape[1], row, col, false, false});
+  auto coo = std::make_shared<COO>(
+      COO{shape[0], shape[1], torch::stack({row, col}), false, false});
   return SparseMatrix::FromCOOPointer(coo, value, shape);
 }
 
@@ -141,7 +139,7 @@ std::shared_ptr<CSR> SparseMatrix::CSCPtr() {
 std::tuple<torch::Tensor, torch::Tensor> SparseMatrix::COOTensors() {
   auto coo = COOPtr();
   auto val = value();
-  return std::make_tuple(coo->row, coo->col);
+  return std::make_tuple(coo->indices.index({0}), coo->indices.index({1}));
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
