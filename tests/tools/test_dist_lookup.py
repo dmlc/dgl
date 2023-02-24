@@ -36,13 +36,14 @@ def _init_process_group(rank, world_size):
     print(f"[Rank: {rank}] Done with process group initialization...")
 
 
-def _create_lookup_service(partitions_dir, ntypes, id_map, rank, world_size):
+def _create_lookup_service(partitions_dir, ntypes, id_map, rank, world_size, num_parts):
     id_lookup = dist_lookup.DistLookupService(
         partitions_dir,
         ntypes,
         id_map,
         rank,
         world_size,
+        num_parts
     )
 
     # invoke the main function here.
@@ -66,7 +67,7 @@ def _run(
 
     _init_process_group(rank, world_size)
     lookup = _create_lookup_service(
-        partitions_dir, ntypes, id_map, rank, world_size
+        partitions_dir, ntypes, id_map, rank, world_size, num_parts
     )
 
     tests_exec = 0
@@ -154,6 +155,7 @@ def _prepare_test_data(partitions_dir, ntypes, gid_ranges, world_size):
             + gid_ranges[ntypes[ntype_id]][0, 0]
         )
         response = ntype_partids[ntype_id]
+
         test_data[f"rank-{rank}"] = [("getpartitionids", request, response)]
 
     # randomly shuffle the global-nids and retrieve their partition-ids.
@@ -161,9 +163,12 @@ def _prepare_test_data(partitions_dir, ntypes, gid_ranges, world_size):
         ntype_id = np.random.randint(0, len(ntypes) - 1)
         ntype = ntypes[ntype_id]
         idx = np.arange(len(ntype_partids[ntype_id]))
-        np.random.shuffle(idx)
         request = idx + gid_ranges[ntypes[ntype_id]][0, 0]
+
+        np.random.shuffle(idx)
+        request = request[idx]
         response = ntype_partids[ntype_id][idx]
+
         test_data[f"rank-{rank}"] = [("getpartitionids", request, response)]
 
     # one final test
@@ -172,8 +177,8 @@ def _prepare_test_data(partitions_dir, ntypes, gid_ranges, world_size):
     response = []
     for idx in range(len(ntype_partids)):
         request.append(
-            np.arange(len(ntype_partids[ntype_id]))
-            + gid_ranges[ntypes[ntype_id]][0, 0]
+            np.arange(len(ntype_partids[idx]))
+            + gid_ranges[ntypes[idx]][0, 0]
         )
         response.append(ntype_partids[idx])
 
