@@ -9,8 +9,8 @@ from test_utils import parametrize_idtype
 @unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Skip TF")
 @parametrize_idtype
 def test_node_homophily(idtype):
-    # NOTE: If you want to update this test case, remember to update the
-    # docstring example too.
+    # IfChangeThenChange: python/dgl/homophily.py
+    # Update the docstring example.
     device = F.ctx()
     graph = dgl.graph(
         ([1, 2, 0, 4], [0, 1, 2, 3]), idtype=idtype, device=device
