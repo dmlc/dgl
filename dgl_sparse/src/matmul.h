@@ -57,68 +57,76 @@ torch::Tensor SDDMMNoAutoGrad(
 
 /**
  * @brief Broadcast the dense feature to the nonzero entries and then compute
- * x_e = \phi(x_e, x_v), where x_e is the nonzero value, x_v is the dense
- * feature, and \phi is add, sub, mul, or div.
+ * x_e = \phi(x_e, x_v) on the dimension dim, where x_e is the nonzero value,
+ * x_v is the dense feature, and \phi is add, sub, mul, or div. dim = 0 or 1
+ * means column-wise or row-wise broadcast respectively.
  *
  * This function does not take care of autograd.
  *
  * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
  * @param dense_mat Dense feature of shape (N, D)
  * @param op Operator, can be add, sub, mul, or div
+ * @param dim The dimension to broadcast.
  *
  * @return Dense tensor of shape (nnz, D)
  */
 torch::Tensor BroadcastOpNoAutoGrad(
     const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor dense_mat,
-    const std::string& op);
+    const std::string& op, int64_t dim);
 
 /**
  * @brief Broadcast the dense feature to the nonzero entries and then compute
- * x_e = x_e - x_v, where x_e is the nonzero value, x_v is the dense
- * feature.
+ * x_e = x_e - x_v on the dimension dim, where x_e is the nonzero value, x_v is
+ * the dense feature. dim = 0 or 1 means column-wise or row-wise broadcast
+ * respectively.
  *
  * This function does not take care of autograd.
  *
  * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
  * @param dense_mat Dense feature of shape (N, D)
+ * @param dim The dimension to broadcast.
  *
  * @return Dense tensor of shape (nnz, D)
  */
 torch::Tensor BroadcastSubNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
-    torch::Tensor dense_mat);
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor dense_mat,
+    int64_t dim);
 
 /**
  * @brief Broadcast the dense feature to the nonzero entries and then compute
- * x_e = x_e / x_v, where x_e is the nonzero value, x_v is the dense
- * feature.
+ * x_e = x_e / x_v on the dimension dim, where x_e is the nonzero value, x_v is
+ * the dense feature. dim = 0 or 1 means column-wise or row-wise broadcast
+ * respectively.
  *
  * This function does not take care of autograd.
  *
  * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
  * @param dense_mat Dense feature of shape (N, D)
+ * @param dim The dimension to broadcast.
  *
  * @return Dense tensor of shape (nnz, D)
  */
 torch::Tensor BroadcastDivNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
-    torch::Tensor dense_mat);
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor dense_mat,
+    int64_t dim);
 
 /**
  * @brief Broadcast the dense feature to the nonzero entries and then compute
- * x_e = x_e * x_v, where x_e is the nonzero value, x_v is the dense
- * feature.
+ * x_e = x_e * x_v on the dimension dim, where x_e is the nonzero value, x_v is
+ * the dense feature. dim = 0 or 1 means column-wise or row-wise broadcast
+ * respectively.
  *
  * This function does not take care of autograd.
  *
  * @param sparse_mat The sparse matrix with N rows and (nnz, D) nonzero values
  * @param dense_mat Dense feature of shape (N, D)
+ * @param dim The dimension to broadcast.
  *
  * @return Dense tensor of shape (nnz, D)
  */
 torch::Tensor BroadcastMulNoAutoGrad(
-    const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
-    torch::Tensor dense_mat);
+    const c10::intrusive_ptr<SparseMatrix>& sparse_mat, torch::Tensor dense_mat,
+    int64_t dim);
 
 /**
  * @brief Perform a sparse-sparse matrix multiplication with possibly different
