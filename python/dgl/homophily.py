@@ -171,25 +171,26 @@ def linkx_homophily(graph, y):
         class_graph = create_graph((src, dst))
         # Add placeholder values for the class nodes.
         class_placeholder = torch.zeros(
-            (num_classes), dtype=deg.dtype, device=class_graph.device)
+            (num_classes), dtype=deg.dtype, device=class_graph.device
+        )
         class_graph.ndata["same_class_deg"] = torch.cat(
-            [graph.ndata["same_class_deg"], class_placeholder], dim=0)
+            [graph.ndata["same_class_deg"], class_placeholder], dim=0
+        )
         class_graph.update_all(
             fn.copy_u("same_class_deg", "m"), fn.sum("m", "class_deg_aggr")
         )
 
         # Similarly, compute \sum_{v\in C_k}|N(v)| for all k in parallel.
         class_graph.ndata["deg"] = torch.cat([deg, class_placeholder], dim=0)
-        class_graph.update_all(
-            fn.copy_u("deg", "m"), fn.sum("m", "deg_aggr")
-        )
+        class_graph.update_all(fn.copy_u("deg", "m"), fn.sum("m", "deg_aggr"))
 
         # Compute class_deg_aggr / deg_aggr for all classes.
         num_nodes = graph.num_nodes()
         class_deg_aggr = class_graph.ndata["class_deg_aggr"][num_nodes:]
         deg_aggr = torch.clamp(class_graph.ndata["deg_aggr"][num_nodes:], min=1)
-        fraction = class_deg_aggr / deg_aggr - \
-            torch.bincount(y).float() / num_nodes
+        fraction = (
+            class_deg_aggr / deg_aggr - torch.bincount(y).float() / num_nodes
+        )
         fraction = torch.clamp(fraction, min=0)
 
         return fraction.sum().item() / (num_classes - 1)
