@@ -52,7 +52,14 @@ def _create_lookup_service(partitions_dir, ntypes, id_map, rank, world_size):
 
 
 def _run(
-    port_num, rank, num_parts, world_size, partitions_dir, ntypes, id_map, test_data
+    port_num,
+    rank,
+    num_parts,
+    world_size,
+    partitions_dir,
+    ntypes,
+    id_map,
+    test_data,
 ):
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = str(port_num)
@@ -86,7 +93,7 @@ def _single_machine_run(
     num_parts, world_size, partitions_dir, ntypes, id_map, test_data
 ):
     port_num = np.random.randint(10000, 20000, size=(1,), dtype=int)
-    ctx = mp.get_context('spawn')
+    ctx = mp.get_context("spawn")
     processes = []
     for rank in range(world_size):
         p = ctx.Process(
