@@ -19,69 +19,13 @@ from dgl.distributed.partition import (
 
 from distpartitioning import array_readwriter
 from distpartitioning.utils import generate_read_list
+
+from tools.verification_utils import (
+    verify_graph_feats,
+    verify_partition_data_types,
+    verify_partition_formats,
+)
 from utils import create_chunked_dataset
-
-
-def _verify_partition_data_types(part_g):
-    for k, dtype in RESERVED_FIELD_DTYPE.items():
-        if k in part_g.ndata:
-            assert part_g.ndata[k].dtype == dtype
-        if k in part_g.edata:
-            assert part_g.edata[k].dtype == dtype
-
-
-def _verify_partition_formats(part_g, formats):
-    # Verify saved graph formats
-    if formats is None:
-        assert "coo" in part_g.formats()["created"]
-    else:
-        formats = formats.split(",")
-        for format in formats:
-            assert format in part_g.formats()["created"]
-
-
-def _verify_graph_feats(
-    g, gpb, part, node_feats, edge_feats, orig_nids, orig_eids
-):
-    for ntype in g.ntypes:
-        ntype_id = g.get_ntype_id(ntype)
-        inner_node_mask = _get_inner_node_mask(part, ntype_id)
-        inner_nids = part.ndata[dgl.NID][inner_node_mask]
-        ntype_ids, inner_type_nids = gpb.map_to_per_ntype(inner_nids)
-        partid = gpb.nid2partid(inner_type_nids, ntype)
-        assert np.all(ntype_ids.numpy() == ntype_id)
-        assert np.all(partid.numpy() == gpb.partid)
-
-        orig_id = orig_nids[ntype][inner_type_nids]
-        local_nids = gpb.nid2localnid(inner_type_nids, gpb.partid, ntype)
-
-        for name in g.nodes[ntype].data:
-            if name in [dgl.NID, "inner_node"]:
-                continue
-            true_feats = g.nodes[ntype].data[name][orig_id]
-            ndata = node_feats[ntype + "/" + name][local_nids]
-            assert np.array_equal(ndata.numpy(), true_feats.numpy())
-
-    for etype in g.canonical_etypes:
-        etype_id = g.get_etype_id(etype)
-        inner_edge_mask = _get_inner_edge_mask(part, etype_id)
-        inner_eids = part.edata[dgl.EID][inner_edge_mask]
-        etype_ids, inner_type_eids = gpb.map_to_per_etype(inner_eids)
-        partid = gpb.eid2partid(inner_type_eids, etype)
-        assert np.all(etype_ids.numpy() == etype_id)
-        assert np.all(partid.numpy() == gpb.partid)
-
-        orig_id = orig_eids[_etype_tuple_to_str(etype)][inner_type_eids]
-        local_eids = gpb.eid2localeid(inner_type_eids, gpb.partid, etype)
-
-        for name in g.edges[etype].data:
-            if name in [dgl.EID, "inner_edge"]:
-                continue
-            true_feats = g.edges[etype].data[name][orig_id]
-            edata = edge_feats[_etype_tuple_to_str(etype) + "/" + name][
-                local_eids
-            ]
-            assert np.array_equal(edata.numpy(), true_feats.numpy())
 
 
 def _test_chunk_graph(
@@ -231,6 +175,7 @@ def _test_pipeline(
     num_chunks_edges=None,
     num_chunks_node_data=None,
     num_chunks_edge_data=None,
+    use_verify_partitions=False,
 ):
     if num_chunks < num_parts:
         # num_parts should less/equal than num_chunks
@@ -286,6 +231,15 @@ def _test_pipeline(
         cmd += f" --graph-formats {graph_formats}" if graph_formats else ""
         os.system(cmd)
 
+        # check if verify_partitions.py is used for validation.
+        if use_verify_partitions:
+            cmd = "python3 tools/verify_partitions.py "
+            cmd += f" --orig-dataset-dir {in_dir}"
+            cmd += f" --part-graph {out_dir}"
+            cmd += f" --partitions-dir {output_dir}"
+            os.system(cmd)
+            return
+
         # read original node/edge IDs
         def read_orig_ids(fname):
             orig_ids = {}
@@ -308,9 +262,9 @@ def _test_pipeline(
             part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
                 part_config, i
             )
-            _verify_partition_data_types(part_g)
-            _verify_partition_formats(part_g, graph_formats)
-            _verify_graph_feats(
+            verify_partition_data_types(part_g)
+            verify_partition_formats(part_g, graph_formats)
+            verify_graph_feats(
                 g, gpb, part_g, node_feats, edge_feats, orig_nids, orig_eids
             )
 
@@ -321,6 +275,9 @@ def _test_pipeline(
 )
 def test_pipeline_basics(num_chunks, num_parts, world_size):
     _test_pipeline(num_chunks, num_parts, world_size)
+    _test_pipeline(
+        num_chunks, num_parts, world_size, use_verify_partitions=True
+    )
 
 
 @pytest.mark.parametrize(
