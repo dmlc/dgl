@@ -212,6 +212,7 @@ Utilities for measuring homophily of a graph
 .. autosummary::
     :toctree: ../../generated/
 
+    edge_homophily
     node_homophily
 
 Utilities

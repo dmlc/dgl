@@ -1,7 +1,7 @@
 """Utils for tacking graph homophily and heterophily"""
 from . import backend as F, function as fn
 
-__all__ = ["node_homophily"]
+__all__ = ["node_homophily", "edge_homophily"]
 
 
 def node_homophily(graph, y):
@@ -54,4 +54,50 @@ def node_homophily(graph, y):
         graph.update_all(
             fn.copy_e("same_class", "m"), fn.mean("m", "node_value")
         )
-        return graph.ndata["node_value"].mean().item()
+        return F.as_scalar(F.mean(graph.ndata["node_value"], dim=0))
+
+
+def edge_homophily(graph, y):
+    r"""Homophily measure from `Beyond Homophily in Graph Neural Networks:
+    Current Limitations and Effective Designs
+    <https://arxiv.org/abs/2006.11468>`__
+
+    Mathematically it is defined as follows:
+
+    .. math::
+      \frac{| \{ (u,v) : (u,v) \in \mathcal{E} \wedge y_u = y_v \} | }
+      {|\mathcal{E}|}
+
+    where :math:`\mathcal{E}` is the set of edges, and :math:`y_u` is the class
+    of node :math:`u`.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph
+    y : Tensor
+        The node labels, which is a tensor of shape (|V|)
+
+    Returns
+    -------
+    float
+        The edge homophily ratio value
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch
+
+    >>> graph = dgl.graph(([1, 2, 0, 4], [0, 1, 2, 3]))
+    >>> y = torch.tensor([0, 0, 0, 0, 1])
+    >>> dgl.edge_homophily(graph, y)
+    0.75
+    """
+    with graph.local_scope():
+        src, dst = graph.edges()
+        # Handle the case where graph is of dtype int32.
+        src = F.astype(src, F.int64)
+        dst = F.astype(dst, F.int64)
+        # Compute y_v = y_u for all edges.
+        edge_indicator = F.astype(y[src] == y[dst], F.float32)
+        return F.as_scalar(F.mean(edge_indicator, dim=0))
