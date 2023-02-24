@@ -6,6 +6,7 @@ import dgl
 from test_utils import parametrize_idtype
 
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Skip TF")
 @parametrize_idtype
 def test_node_homophily(idtype):
     # IfChangeThenChange: python/dgl/homophily.py
@@ -18,6 +19,7 @@ def test_node_homophily(idtype):
     assert dgl.node_homophily(graph, y) == 0.6000000238418579
 
 
+@unittest.skipIf(dgl.backend.backend_name == "tensorflow", reason="Skip TF")
 @parametrize_idtype
 def test_edge_homophily(idtype):
     # IfChangeThenChange: python/dgl/homophily.py
