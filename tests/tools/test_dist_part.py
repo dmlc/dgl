@@ -165,6 +165,7 @@ def test_chunk_graph_vector_rows(num_chunks, vector_rows):
         vector_rows=vector_rows,
     )
 
+
 def _test_pipeline(
     num_chunks,
     num_parts,
