@@ -94,9 +94,9 @@ def gen_edge_files(schema_map, params):
         rel_name = tokens[1]
         dst_ntype_name = tokens[2]
 
-        def convert_to_numpy_and_write_back(data_df, idx):
-            data_f0 = data_df["f0"].to_numpy()
-            data_f1 = data_df["f1"].to_numpy()
+        def process_and_write_back(data_df, idx):
+            data_f0 = data_df[:, 0]
+            data_f1 = data_df[:, 1]
 
             global_src_id = data_f0 + ntype_gnid_offset[src_ntype_name][0, 0]
             global_dst_id = data_f1 + ntype_gnid_offset[dst_ntype_name][0, 0]
@@ -118,26 +118,14 @@ def gen_edge_files(schema_map, params):
 
         # handle any no. of files case here.
         file_idxes = generate_read_list(len(edge_data_files), params.num_parts)
-
         for idx in file_idxes[rank]:
-            if edges_format == constants.STR_CSV:
-                delimiter = etype_info[constants.STR_FORMAT][
-                    constants.STR_FORMAT_DELIMITER
-                ]
-                data_df = csv.read_csv(
-                    edge_data_files[idx],
-                    read_options=pyarrow.csv.ReadOptions(
-                        autogenerate_column_names=True
-                    ),
-                    parse_options=pyarrow.csv.ParseOptions(delimiter=delimiter),
-                )
-            elif edges_format == constants.STR_PARQUET:
-                data_df = pq.read_table(edge_data_files[idx])
-                data_df = data_df.rename_columns(["f0", "f1"])
-            else:
-                raise NotImplementedError(f"Unknown edge format {edges_format}")
-
-            out_file = convert_to_numpy_and_write_back(data_df, idx)
+            reader_fmt_meta = {
+                "name": etype_info[constants.STR_FORMAT][constants.STR_NAME]
+            }
+            data_df = array_readwriter.get_array_parser(**reader_fmt_meta).read(
+                edge_data_files[idx]
+            )
+            out_file = process_and_write_back(data_df, idx)
             edge_files.append(out_file)
 
     return edge_files

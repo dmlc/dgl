@@ -123,9 +123,6 @@ class DistLookupService:
     def set_idMap(self, id_map):
         self.id_map = id_map
 
-    def get_typecounts(self):
-        return dict(zip(self.ntypes, self.ntype_count))
-
     def get_partition_ids(self, global_nids):
         """
         This function is used to get the partition-ids for a given set of global node ids

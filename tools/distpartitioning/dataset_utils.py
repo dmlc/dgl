@@ -40,7 +40,33 @@ DATA_TYPE_ID = {
 REV_DATA_TYPE_ID = {id: data_type for data_type, id in DATA_TYPE_ID.items()}
 
 
-def _broadcast_shape(data, rank, world_size, num_parts, isfeatdata, featname):
+def _broadcast_shape(
+    data, rank, world_size, num_parts, is_feat_data, feat_name
+):
+    """Auxiliary function to broadcast the shape of a feature data.
+    This information is used to figure out the type-ids for the
+    local features.
+
+    Parameters:
+    -----------
+    data : numpy array
+        which is the feature data read from the disk
+    rank : integer
+        which represents the id of the process in the process group
+    world_size : integer
+        represents the total no. of process in the process group
+    num_parts : integer
+        specifying the no. of partitions
+    is_feat_data : bool
+        flag used to seperate feature data and edge data
+    feat_name : string
+        name of the feature
+
+    Returns:
+    -------
+    list of tuples :
+        which represents the range of type-ids for the data array.
+    """
     assert len(data.shape) in [
         1,
         2,
@@ -50,7 +76,7 @@ def _broadcast_shape(data, rank, world_size, num_parts, isfeatdata, featname):
     if len(data_shape) == 1:
         data_shape.append(1)
 
-    if isfeatdata:
+    if is_feat_data:
         data_shape.append(DATA_TYPE_ID[data.dtype])
 
     data_shape = torch.tensor(data_shape, dtype=torch.int64)
@@ -64,13 +90,13 @@ def _broadcast_shape(data, rank, world_size, num_parts, isfeatdata, featname):
     shapes = [x.numpy() for x in data_shape_output if x[0] != 0]
     shapes = np.vstack(shapes)
 
-    if isfeatdata:
+    if is_feat_data:
         logging.info(
             f"shapes: {shapes}, condition: {all(shapes[0,2] == s for s in shapes[:,2])}"
         )
         assert all(
             shapes[0, 2] == s for s in shapes[:, 2]
-        ), f"dtypes for {featname} does not match on all ranks"
+        ), f"dtypes for {feat_name} does not match on all ranks"
 
     # compute tids here.
     type_counts = list(shapes[:, 0])

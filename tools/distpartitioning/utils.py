@@ -358,8 +358,6 @@ def augment_edge_data(
     etype_offset = {}
     offset = 0
     for etype_name, tid_range in edge_tids.items():
-        # assert int(tid_range[0][0]) == 0, f'tid_range = {tid_range}'
-        # assert len(tid_range) == num_parts, no longer needed.
         etype_offset[etype_name] = offset + int(tid_range[0][0])
         offset += int(tid_range[-1][1])
 
@@ -567,45 +565,16 @@ def get_idranges(names, counts, num_chunks=None):
     """
     counts will be a list of numbers of a dictionary.
     Length is less than or equal to the num_parts variable.
-    """
-    gnid_start = 0
-    gnid_end = gnid_start
-    tid_dict = {}
-    gid_dict = {}
-
-    for idx, typename in enumerate(names):
-        gnid_end += counts[typename]
-        tid_dict[typename] = [[0, counts[typename]]]
-        gid_dict[typename] = np.array([gnid_start, gnid_end]).reshape([1, 2])
-        gnid_start = gnid_end
-
-    return tid_dict, gid_dict
-
-
-def get_typecounts(ntypes, ntype_counts):
-    """
-    Return a dictionary with key, value pairs as node type names and no. of
-    nodes of a particular type in the input graph.
-    """
-    return dict(zip(ntypes, ntype_counts))
-
-
-'''
-def get_idranges(names, counts, num_chunks=None):
-    """
-    Utility function to compute typd_id/global_id ranges for both nodes and edges.
 
     Parameters:
     -----------
     names : list of strings
-        list of node/edge types as strings
-    counts : list of lists
-        each list contains no. of nodes/edges in a given chunk
+        which are either node-types or edge-types
+    counts : list of integers
+        which are total no. of nodes or edges for a give node
+        or edge type
     num_chunks : int, optional
-        In distributed partition pipeline, ID ranges are grouped into chunks.
-        In some scenarios, we'd like to merge ID ranges into specific number
-        of chunks. This parameter indicates the expected number of chunks.
-        If not specified, no merge is applied.
+        specifying the no. of chunks
 
     Returns:
     --------
@@ -621,39 +590,35 @@ def get_idranges(names, counts, num_chunks=None):
     gnid_end = gnid_start
     tid_dict = {}
     gid_dict = {}
-    orig_num_chunks = 0
+
     for idx, typename in enumerate(names):
-        type_counts = counts[idx]
-        tid_start = np.cumsum([0] + type_counts[:-1])
-        tid_end = np.cumsum(type_counts)
-        tid_ranges = list(zip(tid_start, tid_end))
-
-        gnid_end += tid_ranges[-1][1]
-
-        tid_dict[typename] = tid_ranges
+        gnid_end += counts[typename]
+        tid_dict[typename] = [[0, counts[typename]]]
         gid_dict[typename] = np.array([gnid_start, gnid_end]).reshape([1, 2])
-
         gnid_start = gnid_end
-        orig_num_chunks = len(tid_start)
-
-    if num_chunks is None:
-        return tid_dict, gid_dict
-
-    assert (
-        num_chunks <= orig_num_chunks
-    ), "Specified number of chunks should be less/euqual than original numbers of ID ranges."
-    chunk_list = np.array_split(np.arange(orig_num_chunks), num_chunks)
-    for typename in tid_dict:
-        orig_tid_ranges = tid_dict[typename]
-        tid_ranges = []
-        for idx in chunk_list:
-            tid_ranges.append(
-                (orig_tid_ranges[idx[0]][0], orig_tid_ranges[idx[-1]][-1])
-            )
-        tid_dict[typename] = tid_ranges
 
     return tid_dict, gid_dict
-'''
+
+
+def get_ntype_counts_map(ntypes, ntype_counts):
+    """
+    Return a dictionary with key, value pairs as node type names and no. of
+    nodes of a particular type in the input graph.
+
+    Parameters:
+    -----------
+    ntypes : list of strings
+        where each string is a node-type name
+    ntype_counts : list of integers
+        where each integer is the total no. of nodes for that, idx, node type
+
+    Returns:
+    --------
+    dictinary :
+        a dictionary where node-type names are keys and values are total no.
+        of nodes for a given node-type name (which is also the key)
+    """
+    return dict(zip(ntypes, ntype_counts))
 
 
 def memory_snapshot(tag, rank):

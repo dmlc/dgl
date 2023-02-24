@@ -221,51 +221,6 @@ def test_chunk_graph_vector_rows(num_chunks, vector_rows):
         vector_rows=vector_rows,
     )
 
-
-"""
-TODO: This functionality is no longer supported. 
-This is resulting in data shuffling of edge features
-taking more than double the time for edge feature shuffling.
-When the requirements are clearly understood, and if there
-is a need for this then at that time we can rework on this.
-until then this code will be commented-out.
-@pytest.mark.parametrize(
-    "num_chunks, "
-    "num_chunks_nodes, "
-    "num_chunks_edges, "
-    "num_chunks_node_data, "
-    "num_chunks_edge_data",
-    [
-        [1, None, None, None, None],
-        [8, None, None, None, None],
-        [4, 4, 4, 8, 12],
-        [4, 4, 4, {"paper": 10}, {("author", "writes", "paper"): 24}],
-        [
-            4,
-            4,
-            4,
-            {"paper": {"feat": 10}},
-            {("author", "writes", "paper"): {"year": 24}},
-        ],
-    ],
-)
-def test_chunk_graph_arbitray_chunks(
-    num_chunks,
-    num_chunks_nodes,
-    num_chunks_edges,
-    num_chunks_node_data,
-    num_chunks_edge_data,
-):
-    _test_chunk_graph(
-        num_chunks,
-        num_chunks_nodes=num_chunks_nodes,
-        num_chunks_edges=num_chunks_edges,
-        num_chunks_node_data=num_chunks_node_data,
-        num_chunks_edge_data=num_chunks_edge_data,
-    )
-"""
-
-
 def _test_pipeline(
     num_chunks,
     num_parts,
@@ -373,49 +328,6 @@ def test_pipeline_basics(num_chunks, num_parts, world_size):
 )
 def test_pipeline_formats(graph_formats):
     _test_pipeline(4, 4, 4, graph_formats)
-
-
-"""
-TODO: This functionality is no longer supported. 
-This is resulting in data shuffling of edge features
-taking more than double the time for edge feature shuffling.
-When the requirements are clearly understood, and if there
-is a need for this then at that time we can rework on this.
-until then this code will be commented-out.
-@pytest.mark.parametrize(
-    "num_chunks, "
-    "num_parts, "
-    "world_size, "
-    "num_chunks_node_data, "
-    "num_chunks_edge_data",
-    [
-        [8, 4, 2, 20, 25],
-        [9, 7, 5, 3, 11],
-        [8, 8, 4, 3, 5],
-        [
-            8,
-            4,
-            2,
-            {"paper": {"feat": 11, "year": 1}},
-            {("author", "writes", "paper"): {"year": 24}},
-        ],
-    ],
-)
-def test_pipeline_arbitray_chunks(
-    num_chunks,
-    num_parts,
-    world_size,
-    num_chunks_node_data,
-    num_chunks_edge_data,
-):
-    _test_pipeline(
-        num_chunks,
-        num_parts,
-        world_size,
-        num_chunks_node_data=num_chunks_node_data,
-        num_chunks_edge_data=num_chunks_edge_data,
-    )
-"""
 
 
 @pytest.mark.parametrize(

@@ -31,7 +31,7 @@ from utils import (
     get_idranges,
     get_node_types,
     get_ntype_featnames,
-    get_typecounts,
+    get_ntype_counts_map,
     map_partid_rank,
     memory_snapshot,
     read_json,
@@ -124,7 +124,7 @@ def gen_node_data(
     # dictionary and range of global-nids in the second dictionary.
     type_nid_dict, global_nid_dict = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        get_typecounts(
+        get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
             schema_map[constants.STR_NODE_TYPE_COUNTS],
         ),
@@ -1026,7 +1026,7 @@ def gen_dist_partitions(rank, world_size, params):
     # for global-nids
     _, global_nid_ranges = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        get_typecounts(
+        get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
             schema_map[constants.STR_NODE_TYPE_COUNTS],
         ),
@@ -1049,7 +1049,7 @@ def gen_dist_partitions(rank, world_size, params):
         id_lookup,
         params,
         schema_map,
-        get_typecounts(
+        get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
             schema_map[constants.STR_NODE_TYPE_COUNTS],
         ),
@@ -1066,7 +1066,7 @@ def gen_dist_partitions(rank, world_size, params):
     # etypes_geid_range_map = get_gnid_range_map(edge_tids)
     ntypes_gnid_range_map = get_gid_offsets(
         schema_map[constants.STR_NODE_TYPE],
-        get_typecounts(
+        get_ntype_counts_map(
             schema_map[constants.STR_NODE_TYPE],
             schema_map[constants.STR_NODE_TYPE_COUNTS],
         ),
@@ -1231,7 +1231,7 @@ def gen_dist_partitions(rank, world_size, params):
             local_node_data,
             local_edge_data,
             num_edges,
-            get_typecounts(
+            get_ntype_counts_map(
                 schema_map[constants.STR_NODE_TYPE],
                 schema_map[constants.STR_NODE_TYPE_COUNTS],
             ),
