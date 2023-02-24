@@ -39,6 +39,8 @@ class CuGraphGATConv(nn.Module):
         Dropout rate on feature. Defaults: ``0``.
     negative_slope : float, optional
         LeakyReLU angle of negative slope. Defaults: ``0.2``.
+    residual : bool, optional
+        If True, use residual connection. Defaults: ``False``.
     activation : callable activation function/layer or None, optional.
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
@@ -85,6 +87,7 @@ class CuGraphGATConv(nn.Module):
         num_heads,
         feat_drop=0.0,
         negative_slope=0.2,
+        residual=False,
         activation=None,
         bias=True,
     ):
@@ -110,6 +113,16 @@ class CuGraphGATConv(nn.Module):
             self.bias = nn.Parameter(torch.Tensor(num_heads * out_feats))
         else:
             self.register_buffer("bias", None)
+
+        if residual:
+            if in_feats == out_feats * num_heads:
+                self.res_fc = nn.Identity()
+            else:
+                self.res_fc = nn.Linear(
+                    in_feats, out_feats * num_heads, bias=False
+                )
+        else:
+            self.register_buffer("res_fc", None)
 
         self.reset_parameters()
 
@@ -186,6 +199,12 @@ class CuGraphGATConv(nn.Module):
             add_own_node=False,
             concat_heads=True,
         )[: g.num_dst_nodes()].view(-1, self.num_heads, self.out_feats)
+
+        feat_dst = feat[: g.num_dst_nodes()]
+        if self.res_fc is not None:
+            out = out + self.res_fc(feat_dst).view(
+                -1, self.num_heads, self.out_feats
+            )
 
         if self.bias is not None:
             out = out + self.bias.view(-1, self.num_heads, self.out_feats)
