@@ -214,6 +214,7 @@ Utilities for measuring homophily of a graph
 
     edge_homophily
     node_homophily
+    linkx_homophily
 
 Utilities
 -----------------------------------------------

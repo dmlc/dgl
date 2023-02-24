@@ -28,3 +28,16 @@ def test_edge_homophily(idtype):
     )
     y = F.tensor([0, 0, 0, 0, 1])
     assert dgl.edge_homophily(graph, y) == 0.75
+
+
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="Only support PyTorch for now"
+)
+@parametrize_idtype
+def test_linkx_homophily(idtype):
+    # IfChangeThenChange: python/dgl/homophily.py
+    # Update the docstring example.
+    device = F.ctx()
+    graph = dgl.graph(([0, 1, 2, 3], [1, 2, 0, 4]))
+    y = F.tensor([0, 0, 0, 0, 1])
+    assert dgl.linkx_homophily(graph, y) == 0.19999998807907104
