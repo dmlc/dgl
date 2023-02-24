@@ -132,6 +132,10 @@ def gen_node_data(
     )
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
+        # No. of nodes in each process can differ significantly in lopsided distributions
+        # Synchronize on a per ntype basis
+        dist.barrier()
+
         type_start, type_end = (
             type_nid_dict[ntype_name][0][0],
             type_nid_dict[ntype_name][-1][1],
@@ -193,6 +197,9 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
         the input argument, edge_data, is updated with the edge data received by other processes
         in the world.
     """
+
+    # Synchronize at the beginning of this function
+    dist.barrier()
 
     # Prepare data for each rank in the cluster.
     start = timer()
@@ -593,6 +600,9 @@ def exchange_features(
 
             for local_part_id in range(num_parts // world_size):
                 featdata_key = feature_data[feat_key]
+
+                # Synchronize for each feature
+                dist.barrier()
                 own_features, own_global_ids = exchange_feature(
                     rank,
                     data,
@@ -714,6 +724,7 @@ def exchange_graph_data(
         constants.STR_NODE_FEATURES,
         None,
     )
+    dist.barrier()
     memory_snapshot("ShuffleNodeFeaturesComplete: ", rank)
     logging.info(f"[Rank: {rank}] Done with node features exchange.")
 
@@ -728,16 +739,19 @@ def exchange_graph_data(
         constants.STR_EDGE_FEATURES,
         edge_data,
     )
+    dist.barrier()
     logging.info(f"[Rank: {rank}] Done with edge features exchange.")
 
     node_data = gen_node_data(
         rank, world_size, num_parts, id_lookup, ntid_ntype_map, schema_map
     )
+    dist.barrier()
     memory_snapshot("NodeDataGenerationComplete: ", rank)
 
     edge_data = exchange_edge_data(
         rank, world_size, num_parts, edge_data, id_lookup
     )
+    dist.barrier()
     memory_snapshot("ShuffleEdgeDataComplete: ", rank)
     return (
         node_data,
@@ -798,7 +812,6 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map, ntype_counts):
         read by the current process. Note that each edge-type may have several edge-features.
     """
     edge_features = {}
-    # node_tids, node_features, edge_datadict, edge_tids
     (
         node_features,
         node_feat_tids,
@@ -816,6 +829,8 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map, ntype_counts):
         schema_map,
         ntype_counts,
     )
+    # Synchronize so that everybody completes reading dataset from disk
+    dist.barrier()
     logging.info(f"[Rank: {rank}] Done reading dataset {params.input_dir}")
     dist.barrier()  # SYNCH
 
@@ -1013,6 +1028,7 @@ def gen_dist_partitions(rank, world_size, params):
         schema_map[constants.STR_NODE_TYPE],
         rank,
         world_size,
+        params.num_parts,
     )
 
     # get the id to name mappings here.
@@ -1110,6 +1126,8 @@ def gen_dist_partitions(rank, world_size, params):
     memory_snapshot("NodeDataSortComplete: ", rank)
 
     # resolve global_ids for nodes
+    # Synchronize before assigning shuffle-global-ids to nodes
+    dist.barrier()
     assign_shuffle_global_nids_nodes(
         rank, world_size, params.num_parts, node_data
     )
@@ -1151,10 +1169,13 @@ def gen_dist_partitions(rank, world_size, params):
     logging.info(f"[Rank: {rank}] Sorted edge_data by edge_type")
     memory_snapshot("EdgeDataSortComplete: ", rank)
 
+    # Synchronize before assigning shuffle-global-nids for edges end points.
+    dist.barrier()
     shuffle_global_eid_offsets = assign_shuffle_global_nids_edges(
         rank, world_size, params.num_parts, edge_data
     )
     logging.info(f"[Rank: {rank}] Done assigning global_ids to edges ...")
+
     memory_snapshot("ShuffleGlobalID_Edges_Complete: ", rank)
 
     # Shuffle edge features according to the edge order on each rank.
@@ -1183,6 +1204,8 @@ def gen_dist_partitions(rank, world_size, params):
                 ][feature_idx]
 
     # determine global-ids for edge end-points
+    # Synchronize before retrieving shuffle-global-nids for edges end points.
+    dist.barrier()
     edge_data = lookup_shuffle_global_nids_edges(
         rank, world_size, params.num_parts, edge_data, id_lookup, node_data
     )
@@ -1208,6 +1231,9 @@ def gen_dist_partitions(rank, world_size, params):
         graph_formats = params.graph_formats.split(",")
 
     for local_part_id in range(params.num_parts // world_size):
+        # Synchronize for each local partition of the graph object.
+        dist.barrier()
+
         num_edges = shuffle_global_eid_offsets[local_part_id]
         node_count = len(
             node_data[constants.NTYPE_ID + "/" + str(local_part_id)]
