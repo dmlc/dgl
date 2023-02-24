@@ -92,7 +92,7 @@ def _run(
 def _single_machine_run(
     num_parts, world_size, partitions_dir, ntypes, id_map, test_data
 ):
-    port_num = np.random.randint(10000, 20000, size=(1,), dtype=int)
+    port_num = np.random.randint(10000, 20000, size=(1,), dtype=int)[0]
     ctx = mp.get_context("spawn")
     processes = []
     for rank in range(world_size):
