@@ -52,10 +52,10 @@ def _create_lookup_service(partitions_dir, ntypes, id_map, rank, world_size):
 
 
 def _run(
-    rank, num_parts, world_size, partitions_dir, ntypes, id_map, test_data
+    port_num, rank, num_parts, world_size, partitions_dir, ntypes, id_map, test_data
 ):
     os.environ["MASTER_ADDR"] = "127.0.0.1"
-    os.environ["MASTER_PORT"] = "29500"
+    os.environ["MASTER_PORT"] = str(port_num)
 
     _init_process_group(rank, world_size)
     lookup = _create_lookup_service(
@@ -85,11 +85,14 @@ def _run(
 def _single_machine_run(
     num_parts, world_size, partitions_dir, ntypes, id_map, test_data
 ):
+    port_num = np.random.randint(10000, 20000, size=(1,), dtype=int)
+    ctx = mp.get_context('spawn')
     processes = []
     for rank in range(world_size):
-        p = mp.Process(
+        p = ctx.Process(
             target=_run,
             args=(
+                port_num,
                 rank,
                 num_parts,
                 world_size,
@@ -104,6 +107,7 @@ def _single_machine_run(
 
     for p in processes:
         p.join()
+        p.close()
 
 
 def _prepare_test_data(partitions_dir, ntypes, gid_ranges, world_size):
@@ -219,7 +223,7 @@ def test_lookup_service(
         orig_schema = read_json(orig_config)
         ntypes = orig_schema[constants.STR_NODE_TYPE]
 
-        type_nid_dict, global_nid_ranges = get_idranges(
+        _, global_nid_ranges = get_idranges(
             orig_schema[constants.STR_NODE_TYPE],
             orig_schema[constants.STR_NUM_NODES_PER_CHUNK],
             num_chunks=num_parts,
