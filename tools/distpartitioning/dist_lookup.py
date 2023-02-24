@@ -49,9 +49,7 @@ class DistLookupService:
         interger representing the no. of partitions
     """
 
-    def __init__(
-        self, input_dir, ntype_names, rank, world_size, num_parts
-    ):
+    def __init__(self, input_dir, ntype_names, rank, world_size, num_parts):
         assert os.path.isdir(input_dir)
         assert ntype_names is not None
         assert len(ntype_names) > 0
