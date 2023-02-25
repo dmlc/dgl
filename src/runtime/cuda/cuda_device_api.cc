@@ -107,9 +107,10 @@ class CUDADeviceAPI final : public DeviceAPI {
       DGLDataType type_hint) final {
     SetDevice(ctx);
     // Redirect to PyTorch's allocator when available.
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable())
-      return td->CUDAAllocWorkspace(nbytes, getCurrentCUDAStream());
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable())
+      return tensor_dispatcher->CUDAAllocWorkspace(
+          nbytes, getCurrentCUDAStream());
 
     CHECK_EQ(256 % alignment, 0U) << "CUDA space is aligned at 256 bytes";
     void* ret;
@@ -119,8 +120,9 @@ class CUDADeviceAPI final : public DeviceAPI {
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
     SetDevice(ctx);
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable()) return td->CUDAFreeWorkspace(ptr);
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable())
+      return tensor_dispatcher->CUDAFreeWorkspace(ptr);
 
     CUDA_CALL(cudaFree(ptr));
   }
@@ -171,13 +173,13 @@ class CUDADeviceAPI final : public DeviceAPI {
     CopyDataFromTo(
         from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint,
         stream);
-    auto td = TensorDispatcher::Global();
-    if (td->IsAvailable()) {
+    auto tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable()) {
       auto custream = static_cast<cudaStream_t>(stream);
       void* ptr = ctx_to.device_type == kDGLCPU ? to : from;
       int id =
           ctx_to.device_type == kDGLCPU ? ctx_from.device_id : ctx_to.device_id;
-      td->CUDARecordHostAlloc(ptr, pyt_ctx, custream, id);
+      tensor_dispatcher->CUDARecordHostAlloc(ptr, pyt_ctx, custream, id);
     }
   }
 
@@ -232,11 +234,11 @@ class CUDADeviceAPI final : public DeviceAPI {
   bool PinData(void* ptr, size_t nbytes) override {
     // prevent users from pinning empty tensors or graphs
     if (ptr == nullptr || nbytes == 0) return false;
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable()) {
-      // if using cudaHostRegister, make sure the memory
-      // caching pool (alloc. with cudaHostAlloc) is clean
-      td->CUDAHostAllocEmptyCache();
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    // Minimize the pinned memory pool allocated by backend (via tensoradapter)
+    // to preserve enough memory for DGL inherited in-place pin-memory operation
+    if (tensor_dispatcher->IsAvailable()) {
+      tensor_dispatcher->CUDAHostAllocEmptyCache();
     }
     CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
     return true;
@@ -244,18 +246,18 @@ class CUDADeviceAPI final : public DeviceAPI {
 
   void* AllocPinnedDataSpace(
       size_t nbytes, void** ctx, void** deleter) override {
-    // prevent users from pinning empty tensors or graphs
+    // prevent pinning empty tensors or graphs
     if (nbytes == 0) return nullptr;
-    TensorDispatcher* td = TensorDispatcher::Global();
-    CHECK(td->IsAvailable())
-        << "CachingHost allocator only available with TensorAdatpor";
-    return td->CUDAAllocHostWorkspace(nbytes, ctx, deleter);
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    CHECK(tensor_dispatcher->IsAvailable())
+        << "CachingHost allocator only available with TensorAdapter.";
+    return tensor_dispatcher->CUDAAllocHostWorkspace(nbytes, ctx, deleter);
   }
 
   void FreePinnedDataSpace(void** deleter) override {
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable()) {
-      td->CUDAFreeHostWorkspace(deleter);
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable()) {
+      tensor_dispatcher->CUDAFreeHostWorkspace(deleter);
     }
   }
 
@@ -305,17 +307,19 @@ class CUDADeviceAPI final : public DeviceAPI {
       DGLContext ctx, size_t size, DGLDataType type_hint) final {
     SetDevice(ctx);
     // Redirect to PyTorch's allocator when available.
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable())
-      return td->CUDAAllocWorkspace(size, getCurrentCUDAStream());
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable())
+      return tensor_dispatcher->CUDAAllocWorkspace(
+          size, getCurrentCUDAStream());
 
     return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
 
   void FreeWorkspace(DGLContext ctx, void* data) final {
     SetDevice(ctx);
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable()) return td->CUDAFreeWorkspace(data);
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable())
+      return tensor_dispatcher->CUDAFreeWorkspace(data);
 
     CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
   }
@@ -350,9 +354,9 @@ CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {
 }
 
 cudaStream_t getCurrentCUDAStream() {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable())
-    return td->CUDAGetCurrentStream();
+  TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+  if (tensor_dispatcher->IsAvailable())
+    return tensor_dispatcher->CUDAGetCurrentStream();
   else  // return the default stream when TA is not available
     return nullptr;
 }

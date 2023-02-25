@@ -267,7 +267,6 @@ class HeteroGraphIndex(ObjectBase):
         HeteroGraphIndex
             The pinned graph index.
         """
-        # if bool(_CAPI_DGLHeteroIsPinned(self)) : return self
         return _CAPI_DGLHeteroPinMemory(self)
 
     def pin_memory_(self):

@@ -164,7 +164,8 @@ NDArray NDArray::EmptyShared(
     const std::string& name, std::vector<int64_t> shape, DGLDataType dtype,
     DGLContext ctx, bool is_create) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content
+  // setup memory content (i.e., allocation), other infos are setup in
+  // Internal::Create
   size_t size = GetDataSize(ret.data_->dl_tensor);
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
@@ -180,7 +181,8 @@ NDArray NDArray::EmptyShared(
 NDArray NDArray::Empty(
     std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content
+  // setup memory content (i.e., allocation), other infos are setup in
+  // Internal::Create
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   if (size > 0)
@@ -215,18 +217,18 @@ void NDArray::RecordedCopyFromTo(DGLArray* from, DGLArray* to, void* pyt_ctx) {
   size_t from_size = GetDataSize(*from);
   size_t to_size = GetDataSize(*to);
   CHECK_EQ(from_size, to_size)
-      << "DGLArrayCopyFromTo: The size must exactly match";
+      << "DGLArrayCopyFromTo: The size must exactly match.";
 
   CHECK(
       from->ctx.device_type == to->ctx.device_type ||
       from->ctx.device_type == kDGLCPU || to->ctx.device_type == kDGLCPU)
-      << "Can not copy across different ctx types directly";
+      << "Can not copy across different ctx types directly.";
 
   // Use the context that is *not* a cpu context to get the correct device
   // api manager.
   DGLContext ctx = from->ctx.device_type != kDGLCPU ? from->ctx : to->ctx;
   CHECK(ctx.device_type == kDGLCUDA)
-      << "Can not record event if not cuda device";
+      << "Can not record event if not cuda device.";
   DeviceAPI::Get(kDGLCUDA)->RecordedCopyDataFromTo(
       from->data, static_cast<size_t>(from->byte_offset), to->data,
       static_cast<size_t>(to->byte_offset), from_size, from->ctx, to->ctx,
@@ -237,15 +239,15 @@ NDArray NDArray::PinnedEmpty(
     std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
   CHECK_EQ(ctx.device_type, kDGLCPU) << "Only NDArray on CPU can be pinned";
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content
+  // setup memory content (i.e., allocation), other infos are setup in
+  // Internal::Create
   size_t size = GetDataSize(ret.data_->dl_tensor);
-  // size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   if (size > 0) {
     ret.data_->dl_tensor.data = DeviceAPI::Get(kDGLCUDA)->AllocPinnedDataSpace(
         size, &(ret.data_->pyt_ctx), &(ret.data_->pyt_raw_deleter));
     CHECK(
         ret.data_->pyt_ctx != nullptr && ret.data_->pyt_raw_deleter != nullptr)
-        << "Can not return proper CachingHostAllocator";
+        << "Failed to allocate memory from PyTorch's CUDACachingAllocator.";
     ret.data_->pinned_by_pyt_ = true;
   }
   return ret;
@@ -274,13 +276,13 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
 }
 
 void NDArray::RecordStream(DGLArray* tensor, DGLStreamHandle stream) {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  CHECK(td->IsAvailable())
-      << "RecordStream only works when TensorAdaptor is available.";
+  TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+  CHECK(tensor_dispatcher->IsAvailable())
+      << "RecordStream only works when TensorAdapter is available.";
   CHECK_EQ(tensor->ctx.device_type, kDGLCUDA)
       << "RecordStream only works with GPU tensors.";
 
-  td->RecordStream(tensor->data, stream, tensor->ctx.device_id);
+  tensor_dispatcher->RecordStream(tensor->data, stream, tensor->ctx.device_id);
 }
 
 template <typename T>

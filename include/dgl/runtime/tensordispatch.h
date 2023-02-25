@@ -151,6 +151,7 @@ class TensorDispatcher {
     (ptr, static_cast<cudaStream_t>(stream), device_id);
 #endif  // DGL_USE_CUDA
   }
+
   inline void* CUDAAllocHostWorkspace(
       size_t nbytes, void** ctx, void** deleter) {
 #ifdef DGL_USE_CUDA

@@ -241,7 +241,7 @@ class HeteroGraph : public BaseHeteroGraph {
    */
   void PinMemory_() override;
 
-  /** @brief Return a new pinned graph managed by backend allocator */
+  /** @brief Return a new pinned graph managed by backend allocator. */
   static HeteroGraphPtr PinMemory(HeteroGraphPtr g);
 
   /**

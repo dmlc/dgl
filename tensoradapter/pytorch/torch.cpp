@@ -70,15 +70,16 @@ TA_EXPORTS void* CUDARawHostAlloc(
     size_t nbytes, void** ctx, void** raw_deleter) {
   auto data_ptr = at::cuda::getCachingHostAllocator()->allocate(nbytes);
   auto raw = data_ptr.get();
-  *ctx = data_ptr.get_context();  // raw  ctx ptr for record event
+  // Return the raw ctx ptr for recording event.
+  *ctx = data_ptr.get_context();
 
-  auto* data_deleter = new CUDAHostDeleter(
-      data_ptr.move_context());  // transfer ownership to raw_deleter
+  // Transfer ownership to raw_deleter
+  auto* data_deleter = new CUDAHostDeleter(data_ptr.move_context());
   *raw_deleter = static_cast<void*>(data_deleter);
   return raw;
 }
 
-// every single CUDARawHostAlloc has an unique CUDAHostDeleter obj
+// Designated CUDAHostDeleter for CUDARawHostAlloc.
 TA_EXPORTS void CUDARawHostDelete(void** raw_deleter) {
   delete static_cast<CUDAHostDeleter*>(*raw_deleter);
   *raw_deleter = nullptr;

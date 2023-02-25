@@ -1270,34 +1270,34 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DGLContext& ctx) {
 }
 
 HeteroGraphPtr UnitGraph::PinMemoryOutPlace() {
-  CSRPtr new_incsr, new_outcsr;
-  COOPtr new_coo;
+  CSRPtr pinned_in_csr, pinned_out_csr;
+  COOPtr pinned_coo;
   if (this->in_csr_->defined() && !this->in_csr_->IsPinned()) {
-    new_incsr = CSRPtr(new CSR(this->in_csr_->PinMemoryOutPlace()));
+    pinned_in_csr = CSRPtr(new CSR(this->in_csr_->PinMemoryOutPlace()));
   } else if (this->in_csr_->defined()) {
-    new_incsr = this->in_csr_;
+    pinned_in_csr = this->in_csr_;
   } else {
-    new_incsr = nullptr;
+    pinned_in_csr = nullptr;
   }
 
   if (this->out_csr_->defined() && !this->out_csr_->IsPinned()) {
-    new_outcsr = CSRPtr(new CSR(this->out_csr_->PinMemoryOutPlace()));
+    pinned_out_csr = CSRPtr(new CSR(this->out_csr_->PinMemoryOutPlace()));
   } else if (this->out_csr_->defined()) {
-    new_outcsr = this->out_csr_;
+    pinned_out_csr = this->out_csr_;
   } else {
-    new_outcsr = nullptr;
+    pinned_out_csr = nullptr;
   }
 
   if (this->coo_->defined() && !this->coo_->IsPinned()) {
-    new_coo = COOPtr(new COO(this->coo_->PinMemoryOutPlace()));
+    pinned_coo = COOPtr(new COO(this->coo_->PinMemoryOutPlace()));
   } else if (this->coo_->defined()) {
-    new_coo = this->coo_;
+    pinned_coo = this->coo_;
   } else {
-    new_coo = nullptr;
+    pinned_coo = nullptr;
   }
 
   return HeteroGraphPtr(new UnitGraph(
-      meta_graph(), new_incsr, new_outcsr, new_coo, this->formats_));
+      meta_graph(), pinned_in_csr, pinned_out_csr, pinned_coo, this->formats_));
 }
 
 void UnitGraph::PinMemory_() {

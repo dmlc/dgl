@@ -19,7 +19,6 @@ from utils import assert_is_identical_hetero
 
 
 def create_test_heterograph(idtype):
-    # test heterograph from the docstring, plus a user -- wishes -- game relation
     # 3 users, 2 games, 2 developers
     # metagraph:
     #    ('user', 'follows', 'user'),
@@ -51,8 +50,6 @@ def create_test_heterograph(idtype):
 )
 @parametrize_idtype
 def test_pin_memory(idtype):
-    # TODO: rewrite this test case to accept different graphs so we
-    #  can test reverse graph and batched graph
     g = create_test_heterograph(idtype)
     g.nodes["user"].data["h"] = F.ones((3, 5))
     g.nodes["game"].data["i"] = F.ones((2, 5))
@@ -60,32 +57,31 @@ def test_pin_memory(idtype):
     g = g.to(F.cpu())
     assert not g.is_pinned()
 
-    # pin a CPU graph
+    # Test pinning a CPU graph
     g._graph.pin_memory()
     assert not g.is_pinned()
     g._graph = g._graph.pin_memory()
     assert g.is_pinned()
     assert g.device == F.cpu()
 
-    # it's fine to clone with new formats, but new graphs are not pinned
-    # >>> g.formats()
-    # {'created': ['coo'], 'not created': ['csr', 'csc']}
+    # when clone with a new (different) formats, e.g., g.formats("csc")
+    # ensure the new graphs are not pinned
     assert not g.formats("csc").is_pinned()
     assert not g.formats("csr").is_pinned()
-    # 'coo' formats is already created and thus not cloned
+    # 'coo' formats is the default and thus not cloned
     assert g.formats("coo").is_pinned()
 
+    # Test pinning a GPU graph will cause error raised.
     g1 = g.to(F.cuda())
-    # error pinning a GPU graph
     with pytest.raises(DGLError):
         g1._graph.pin_memory()
 
-    # test pin empty homograph
+    # Test pinning an empty homograph
     g2 = dgl.graph(([], []))
     g2._graph = g2._graph.pin_memory()
     assert g2.is_pinned()
 
-    # test pin heterograph with 0 edge of one relation type
+    # Test pinning heterograph with 0 edge of one relation type
     g3 = dgl.heterograph(
         {("a", "b", "c"): ([0, 1], [1, 2]), ("c", "d", "c"): ([], [])}
     ).astype(idtype)
