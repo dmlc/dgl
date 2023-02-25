@@ -49,9 +49,7 @@ class DistLookupService:
         interger representing the no. of partitions
     """
 
-    def __init__(
-        self, input_dir, ntype_names, id_map, rank, world_size, num_parts
-    ):
+    def __init__(self, input_dir, ntype_names, rank, world_size, num_parts):
         assert os.path.isdir(input_dir)
         assert ntype_names is not None
         assert len(ntype_names) > 0
@@ -61,6 +59,7 @@ class DistLookupService:
         type_nid_end = []
         partid_list = []
         ntype_count = []
+        ntypes = []
 
         # Iterate over the node types and extract the partition id mappings.
         for ntype in ntype_names:
@@ -90,6 +89,7 @@ class DistLookupService:
             ntype_partids = np.concatenate(ntype_partids)
             count = len(ntype_partids)
             ntype_count.append(count)
+            ntypes.append(ntype)
 
             # Each rank assumes a contiguous set of partition-ids which are equally split
             # across all the processes.
@@ -109,15 +109,22 @@ class DistLookupService:
             # Explicitly release the array read from the file.
             del ntype_partids
 
+        logging.info(
+            f"[Rank: {rank}] ntypeid begin - {type_nid_begin} - {type_nid_end}"
+        )
+
         # Store all the information in the object instance variable.
-        self.id_map = id_map
         self.type_nid_begin = np.array(type_nid_begin, dtype=np.int64)
         self.type_nid_end = np.array(type_nid_end, dtype=np.int64)
         self.partid_list = partid_list
         self.ntype_count = np.array(ntype_count, dtype=np.int64)
+        self.ntypes = ntypes
         self.rank = rank
         self.world_size = world_size
         self.num_parts = num_parts
+
+    def set_idMap(self, id_map):
+        self.id_map = id_map
 
     def get_partition_ids(self, agg_global_nids):
         """
@@ -302,7 +309,10 @@ class DistLookupService:
             agg_partition_ids.append(owner_ids)
 
         # Stitch the list of partition-ids and return to the caller
-        agg_partition_ids = np.concatenate(agg_partition_ids)
+        if len(agg_partition_ids) > 0:
+            agg_partition_ids = np.concatenate(agg_partition_ids)
+        else:
+            agg_partition_ids = np.array([], dtype=np.int64)
         assert agg_global_nids.shape[0] == agg_partition_ids.shape[0]
 
         # Now the owner_ids (partition-ids) which corresponding to the  global_nids.

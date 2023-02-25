@@ -1,8 +1,11 @@
 import argparse
 import logging
 import os
+import platform
 import sys
+from datetime import timedelta
 from pathlib import Path
+from timeit import default_timer as timer
 
 import array_readwriter
 
@@ -13,8 +16,7 @@ import pyarrow
 import pyarrow.csv as csv
 import pyarrow.parquet as pq
 import torch
-import torch.distributed as dist
-from utils import get_idranges, get_node_types, read_json
+from utils import generate_read_list, get_idranges, get_node_types, read_json
 
 
 def get_proc_info():
@@ -41,7 +43,7 @@ def get_proc_info():
         return 0
 
 
-def gen_edge_files(schema_map, output):
+def gen_edge_files(schema_map, params):
     """Function to create edges files to be consumed by ParMETIS
     for partitioning purposes.
 
@@ -63,22 +65,23 @@ def gen_edge_files(schema_map, output):
     rank = get_proc_info()
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        schema_map[constants.STR_NUM_NODES_PER_CHUNK],
+        dict(
+            zip(
+                schema_map[constants.STR_NODE_TYPE],
+                schema_map[constants.STR_NUM_NODES_PER_TYPE],
+            )
+        ),
     )
 
     # Regenerate edge files here.
     edge_data = schema_map[constants.STR_EDGES]
     etype_names = schema_map[constants.STR_EDGE_TYPE]
     etype_name_idmap = {e: idx for idx, e in enumerate(etype_names)}
-    edge_tids, _ = get_idranges(
-        schema_map[constants.STR_EDGE_TYPE],
-        schema_map[constants.STR_NUM_EDGES_PER_CHUNK],
-    )
 
-    outdir = Path(output)
+    outdir = Path(params.output_dir)
     os.makedirs(outdir, exist_ok=True)
     edge_files = []
-    num_parts = len(schema_map[constants.STR_NUM_EDGES_PER_CHUNK][0])
+    num_parts = params.num_parts
     for etype_name, etype_info in edge_data.items():
         edges_format = etype_info[constants.STR_FORMAT][constants.STR_NAME]
         edge_data_files = etype_info[constants.STR_DATA]
@@ -91,16 +94,16 @@ def gen_edge_files(schema_map, output):
         rel_name = tokens[1]
         dst_ntype_name = tokens[2]
 
-        def convert_to_numpy_and_write_back(data_df):
-            data_f0 = data_df["f0"].to_numpy()
-            data_f1 = data_df["f1"].to_numpy()
+        def process_and_write_back(data_df, idx):
+            data_f0 = data_df[:, 0]
+            data_f1 = data_df[:, 1]
 
             global_src_id = data_f0 + ntype_gnid_offset[src_ntype_name][0, 0]
             global_dst_id = data_f1 + ntype_gnid_offset[dst_ntype_name][0, 0]
             cols = [global_src_id, global_dst_id]
             col_names = ["global_src_id", "global_dst_id"]
 
-            out_file = edge_data_files[rank].split("/")[-1]
+            out_file = edge_data_files[idx].split("/")[-1]
             out_file = os.path.join(outdir, "edges_{}".format(out_file))
 
             # TODO(thvasilo): We should support writing to the same format as the input
@@ -113,80 +116,22 @@ def gen_edge_files(schema_map, output):
             )
             return out_file
 
-        if edges_format == constants.STR_CSV:
-            delimiter = etype_info[constants.STR_FORMAT][
-                constants.STR_FORMAT_DELIMITER
-            ]
-            data_df = csv.read_csv(
-                edge_data_files[rank],
-                read_options=pyarrow.csv.ReadOptions(
-                    autogenerate_column_names=True
-                ),
-                parse_options=pyarrow.csv.ParseOptions(delimiter=delimiter),
+        # handle any no. of files case here.
+        file_idxes = generate_read_list(len(edge_data_files), params.num_parts)
+        for idx in file_idxes[rank]:
+            reader_fmt_meta = {
+                "name": etype_info[constants.STR_FORMAT][constants.STR_NAME]
+            }
+            data_df = array_readwriter.get_array_parser(**reader_fmt_meta).read(
+                edge_data_files[idx]
             )
-        elif edges_format == constants.STR_PARQUET:
-            data_df = pq.read_table(edge_data_files[rank])
-            data_df = data_df.rename_columns(["f0", "f1"])
-        else:
-            raise NotImplementedError(f"Unknown edge format {edges_format}")
-
-        out_file = convert_to_numpy_and_write_back(data_df)
-        edge_files.append(out_file)
+            out_file = process_and_write_back(data_df, idx)
+            edge_files.append(out_file)
 
     return edge_files
 
 
-def read_node_features(schema_map, tgt_ntype_name, feat_names, input_dir):
-    """Helper function to read the node features.
-    Only node features which are requested are read from the input dataset.
-
-    Parameters:
-    -----------
-    schema_map : json dictionary
-        Dictionary created by reading the metadata.json file for the input dataset.
-    tgt_ntype_name : string
-        node-type name, for which node features will be read from the input dataset.
-    feat_names : set
-        A set of strings, feature names, which will be read for a given node type.
-    input_dir : str
-        The input directory where the dataset is located.
-
-    Returns:
-    --------
-    dictionary :
-        A dictionary where key is the feature-name and value is the numpy array.
-    """
-    rank = get_proc_info()
-    node_features = {}
-    if constants.STR_NODE_DATA in schema_map:
-        dataset_features = schema_map[constants.STR_NODE_DATA]
-        if dataset_features and (len(dataset_features) > 0):
-            for ntype_name, ntype_feature_data in dataset_features.items():
-                if ntype_name != tgt_ntype_name:
-                    continue
-                # ntype_feature_data is a dictionary
-                # where key: feature_name, value: dictionary in which keys are "format", "data".
-                for feat_name, feat_data in ntype_feature_data.items():
-                    if feat_name in feat_names:
-                        feat_data_fname = feat_data[constants.STR_DATA][rank]
-                        if not os.path.isabs(feat_data_fname):
-                            feat_data_fname = os.path.join(
-                                input_dir, feat_data_fname
-                            )
-                        logging.info(f"Reading: {feat_data_fname}")
-                        file_suffix = Path(feat_data_fname).suffix
-                        reader_fmt_meta = {"name": file_suffix[1:]}
-                        node_features[
-                            feat_name
-                        ] = array_readwriter.get_array_parser(
-                            **reader_fmt_meta
-                        ).read(
-                            feat_data_fname
-                        )
-    return node_features
-
-
-def gen_node_weights_files(schema_map, input_dir, output):
+def gen_node_weights_files(schema_map, params):
     """Function to create node weight files for ParMETIS along with the edge files.
 
     This function generates node-data files, which will be read by the ParMETIS
@@ -205,8 +150,6 @@ def gen_node_weights_files(schema_map, input_dir, output):
     -----------
     schema_map : json dictionary
         Dictionary created by reading the metadata.json file for the input dataset.
-    input_dir : str
-        The input directory where the dataset is located.
     output : string
         Location of storing the node-weights and edge files for ParMETIS.
 
@@ -221,28 +164,45 @@ def gen_node_weights_files(schema_map, input_dir, output):
     ntypes_ntypeid_map, ntypes, ntid_ntype_map = get_node_types(schema_map)
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        schema_map[constants.STR_NUM_NODES_PER_CHUNK],
+        dict(
+            zip(
+                schema_map[constants.STR_NODE_TYPE],
+                schema_map[constants.STR_NUM_NODES_PER_TYPE],
+            )
+        ),
     )
 
     node_files = []
-    outdir = Path(output)
+    outdir = Path(params.output_dir)
     os.makedirs(outdir, exist_ok=True)
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
-        type_start, type_end = (
-            type_nid_dict[ntype_name][rank][0],
-            type_nid_dict[ntype_name][rank][1],
+
+        # This ntype does not have any train/test/val masks...
+        # Each rank will generate equal no. of rows for this node type.
+        total_count = schema_map[constants.STR_NUM_NODES_PER_TYPE][ntype_id]
+        per_rank_range = np.ones((params.num_parts,), dtype=np.int64) * (
+            total_count // params.num_parts
         )
-        count = type_end - type_start
-        sz = (count,)
+        for i in range(total_count % params.num_parts):
+            per_rank_range[i] += 1
+
+        tid_start = np.cumsum([0] + list(per_rank_range[:-1]))
+        tid_end = np.cumsum(list(per_rank_range))
+        local_tid_start = tid_start[rank]
+        local_tid_end = tid_end[rank]
+        sz = local_tid_end - local_tid_start
 
         cols = []
         col_names = []
+
+        # ntype-id
         cols.append(
             pyarrow.array(np.ones(sz, dtype=np.int64) * np.int64(ntype_id))
         )
         col_names.append("ntype")
 
+        # one-hot vector for ntype-id here.
         for i in range(len(ntypes)):
             if i == ntype_id:
                 cols.append(pyarrow.array(np.ones(sz, dtype=np.int64)))
@@ -250,23 +210,10 @@ def gen_node_weights_files(schema_map, input_dir, output):
                 cols.append(pyarrow.array(np.zeros(sz, dtype=np.int64)))
             col_names.append("w{}".format(i))
 
-        # Add train/test/validation masks if present. node-degree will be added when this file
-        # is read by ParMETIS to mimic the exisiting single process pipeline present in dgl.
-        node_feats = read_node_features(
-            schema_map,
-            ntype_name,
-            set(["train_mask", "val_mask", "test_mask"]),
-            input_dir,
-        )
-        for k, v in node_feats.items():
-            assert sz == v.shape
-            cols.append(pyarrow.array(v))
-            col_names.append(k)
-
         # `type_nid` should be the very last column in the node weights files.
         cols.append(
             pyarrow.array(
-                np.arange(count, dtype=np.int64) + np.int64(type_start)
+                np.arange(local_tid_start, local_tid_end, dtype=np.int64)
             )
         )
         col_names.append("type_nid")
@@ -282,8 +229,8 @@ def gen_node_weights_files(schema_map, input_dir, output):
         )
         node_files.append(
             (
-                ntype_gnid_offset[ntype_name][0, 0] + type_start,
-                ntype_gnid_offset[ntype_name][0, 0] + type_end,
+                ntype_gnid_offset[ntype_name][0, 0] + local_tid_start,
+                ntype_gnid_offset[ntype_name][0, 0] + local_tid_end,
                 out_file,
             )
         )
@@ -311,13 +258,16 @@ def gen_parmetis_input_args(params, schema_map):
         Dictionary object created after reading the graph metadata.json file.
     """
 
-    num_nodes_per_chunk = schema_map[constants.STR_NUM_NODES_PER_CHUNK]
     # TODO: This makes the assumption that all node files have the same number of chunks
-    num_node_parts = len(num_nodes_per_chunk[0])
     ntypes_ntypeid_map, ntypes, ntid_ntype_map = get_node_types(schema_map)
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        schema_map[constants.STR_NUM_NODES_PER_CHUNK],
+        dict(
+            zip(
+                schema_map[constants.STR_NODE_TYPE],
+                schema_map[constants.STR_NUM_NODES_PER_TYPE],
+            )
+        ),
     )
 
     # Check if <graph-name>_stats.txt exists, if not create one using metadata.
@@ -331,27 +281,11 @@ def gen_parmetis_input_args(params, schema_map):
     ), "Graph name is not present in the json file"
     graph_name = schema_map[constants.STR_GRAPH_NAME]
     if not os.path.isfile(f"{graph_name}_stats.txt"):
-        num_nodes = np.sum(
-            np.concatenate(schema_map[constants.STR_NUM_NODES_PER_CHUNK])
-        )
-        num_edges = np.sum(
-            np.concatenate(schema_map[constants.STR_NUM_EDGES_PER_CHUNK])
-        )
+        num_nodes = np.sum(schema_map[constants.STR_NUM_NODES_PER_TYPE])
+        num_edges = np.sum(schema_map[constants.STR_NUM_EDGES_PER_TYPE])
         num_ntypes = len(schema_map[constants.STR_NODE_TYPE])
 
-        train_mask = test_mask = val_mask = 0
-        node_feats = schema_map[constants.STR_NODE_DATA]
-        for ntype, ntype_data in node_feats.items():
-            if "train_mask" in ntype_data:
-                train_mask += 1
-            if "test_mask" in ntype_data:
-                test_mask += 1
-            if "val_mask" in ntype_data:
-                val_mask += 1
-        train_mask = train_mask // num_ntypes
-        test_mask = test_mask // num_ntypes
-        val_mask = val_mask // num_ntypes
-        num_constraints = num_ntypes + train_mask + test_mask + val_mask
+        num_constraints = num_ntypes
 
         with open(f"{graph_name}_stats.txt", "w") as sf:
             sf.write(f"{num_nodes} {num_edges} {num_constraints}")
@@ -361,19 +295,28 @@ def gen_parmetis_input_args(params, schema_map):
     os.makedirs(outdir, exist_ok=True)
     for ntype_id, ntype_name in ntid_ntype_map.items():
         global_nid_offset = ntype_gnid_offset[ntype_name][0, 0]
-        for r in range(num_node_parts):
-            type_start, type_end = (
-                type_nid_dict[ntype_name][r][0],
-                type_nid_dict[ntype_name][r][1],
-            )
+        total_count = schema_map[constants.STR_NUM_NODES_PER_TYPE][ntype_id]
+        per_rank_range = np.ones((params.num_parts,), dtype=np.int64) * (
+            total_count // params.num_parts
+        )
+        for i in range(total_count % params.num_parts):
+            per_rank_range[i] += 1
+        tid_start = np.cumsum([0] + list(per_rank_range[:-1]))
+        tid_end = np.cumsum(per_rank_range)
+        logging.info(f" tid-start = {tid_start}, tid-end = {tid_end}")
+        logging.info(f" per_rank_range - {per_rank_range}")
+
+        for rank in range(params.num_parts):
+            local_tid_start = tid_start[rank]
+            local_tid_end = tid_end[rank]
             out_file = os.path.join(
-                outdir, "node_weights_{}_{}.txt".format(ntype_name, r)
+                outdir, "node_weights_{}_{}.txt".format(ntype_name, rank)
             )
             node_files.append(
                 (
                     out_file,
-                    global_nid_offset + type_start,
-                    global_nid_offset + type_end,
+                    global_nid_offset + local_tid_start,
+                    global_nid_offset + local_tid_end,
                 )
             )
 
@@ -409,15 +352,12 @@ def run_preprocess_data(params):
         An instance of argparser class which stores command line arguments.
     """
     logging.info(f"Starting to generate ParMETIS files...")
-
     rank = get_proc_info()
     schema_map = read_json(params.schema_file)
-    num_nodes_per_chunk = schema_map[constants.STR_NUM_NODES_PER_CHUNK]
-    num_parts = len(num_nodes_per_chunk[0])
-    gen_node_weights_files(schema_map, params.input_dir, params.output_dir)
+    gen_node_weights_files(schema_map, params)
     logging.info(f"Done with node weights....")
 
-    gen_edge_files(schema_map, params.output_dir)
+    gen_edge_files(schema_map, params)
     logging.info(f"Done with edge weights...")
 
     if rank == 0:
@@ -444,8 +384,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--input_dir",
+        required=True,
         type=str,
-        help="The input directory where the dataset is located",
+        help="This directory will be used as the relative directory to locate files, if absolute paths are not used",
     )
     parser.add_argument(
         "--output_dir",
@@ -453,7 +394,20 @@ if __name__ == "__main__":
         type=str,
         help="The output directory for the node weights files and auxiliary files for ParMETIS.",
     )
+    parser.add_argument(
+        "--num_parts",
+        required=True,
+        type=int,
+        help="Total no. of output graph partitions.",
+    )
     params = parser.parse_args()
+
+    # Configure logging.
+    logging.basicConfig(
+        level="INFO",
+        format=f"[{platform.node()} \
+        %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
+    )
 
     # Invoke the function to generate files for parmetis
     run_preprocess_data(params)
