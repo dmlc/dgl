@@ -193,8 +193,7 @@ def _prepare_test_data(partitions_dir, ntypes, gid_ranges, world_size):
 
 @pytest.mark.parametrize(
     "num_chunks, num_parts, world_size",
-    # [[4, 4, 4], [8, 4, 2], [8, 4, 4], [9, 6, 3], [11, 11, 1], [11, 4, 1]],
-    [[4, 4, 4]],
+    [[4, 4, 4], [8, 4, 2], [8, 4, 4], [9, 6, 3], [11, 11, 1], [11, 4, 1]],
 )
 def test_lookup_service(
     num_chunks,
