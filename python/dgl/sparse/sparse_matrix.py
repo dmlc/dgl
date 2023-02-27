@@ -890,8 +890,8 @@ def from_torch_sparse(torch_sparse_tensor: torch.Tensor) -> SparseMatrix:
         torch.sparse_csr,
         torch.sparse_csc,
     ), (
-        f"Cannot convert Pytorch sparse tensor"
-        f"{torch_sparse_tensor} to DGL sparse."
+        f"Cannot convert Pytorch sparse tensor with layout "
+        f"{torch_sparse_tensor.layout} to DGL sparse."
     )
     if torch_sparse_tensor.layout == torch.sparse_coo:
         # Use ._indices() and ._values() to access uncoalesced indices and

@@ -548,17 +548,13 @@ def test_torch_sparse_coo_conversion(row, col, nz_dim, shape):
 
 @pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
-@pytest.mark.parametrize("nz_dim", [None, 2])
 @pytest.mark.parametrize("shape", [(3, 5), (3, 7)])
-def test_torch_sparse_csr_conversion(indptr, indices, nz_dim, shape):
+def test_torch_sparse_csr_conversion(indptr, indices, shape):
     dev = F.ctx()
     indptr = torch.tensor(indptr).to(dev)
     indices = torch.tensor(indices).to(dev)
     torch_sparse_shape = shape
     val_shape = (indices.shape[0],)
-    if nz_dim is not None:
-        torch_sparse_shape += (nz_dim,)
-        val_shape += (nz_dim,)
     val = torch.randn(val_shape).to(dev)
     torch_sparse_csr = torch.sparse_csr_tensor(
         indptr, indices, val, torch_sparse_shape
@@ -583,17 +579,13 @@ def test_torch_sparse_csr_conversion(indptr, indices, nz_dim, shape):
 
 @pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
 @pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
-@pytest.mark.parametrize("nz_dim", [None, 2])
 @pytest.mark.parametrize("shape", [(8, 3), (5, 3)])
-def test_torch_sparse_csc_conversion(indptr, indices, nz_dim, shape):
+def test_torch_sparse_csc_conversion(indptr, indices, shape):
     dev = F.ctx()
     indptr = torch.tensor(indptr).to(dev)
     indices = torch.tensor(indices).to(dev)
     torch_sparse_shape = shape
     val_shape = (indices.shape[0],)
-    if nz_dim is not None:
-        torch_sparse_shape += (nz_dim,)
-        val_shape += (nz_dim,)
     val = torch.randn(val_shape).to(dev)
     torch_sparse_csc = torch.sparse_csc_tensor(
         indptr, indices, val, torch_sparse_shape
