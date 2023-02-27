@@ -15,6 +15,8 @@
  *
  * @file graph/transform/to_block.cc
  * @brief Convert a graph to a bipartite-structured graph.
+ *
+ * Tested via python wrapper: python/dgl/path/to/to_block.py
  */
 
 #include "to_block.h"
@@ -146,10 +148,10 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
 }  // namespace
 
 template <typename IdType>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
+std::tuple<HeteroGraphPtr, std::vector<IdArray>> ProcessToBlock(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr,
-    MappingIdsFunc &&get_maping_ids) {
+    IdsMapper &&ids_mapper) {
   std::vector<IdArray> &lhs_nodes = *lhs_nodes_ptr;
   const bool generate_lhs_nodes = lhs_nodes.empty();
 
@@ -249,7 +251,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
 
   std::vector<IdArray> new_lhs;
   std::vector<IdArray> new_rhs;
-  std::tie(new_lhs, new_rhs) = get_maping_ids(
+  std::tie(new_lhs, new_rhs) = ids_mapper(
       graph, include_rhs_in_lhs, num_ntypes, ctx, maxNodesPerType, edge_arrays,
       src_nodes, rhs_nodes, lhs_nodes_ptr, &num_nodes_per_type);
 
@@ -302,16 +304,16 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
 }
 
 template std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlockProcess<int32_t>(
+ProcessToBlock<int32_t>(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr,
-    MappingIdsFunc &&get_maping_ids);
+    IdsMapper &&get_maping_ids);
 
 template std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlockProcess<int64_t>(
+ProcessToBlock<int64_t>(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr,
-    MappingIdsFunc &&get_maping_ids);
+    IdsMapper &&get_maping_ids);
 
 template <>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCPU, int32_t>(
@@ -358,9 +360,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCUDA, int64_t>(
 
 #endif  // DGL_USE_CUDA
 
-// This code is called in `dgl.transform.to_block`, which is tested in
-// `test_to_block.py`.
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
+DGL_REGISTER_GLOBAL("capi._CAPI_DGLToBlock")
     .set_body([](DGLArgs args, DGLRetValue *rv) {
       const HeteroGraphRef graph_ref = args[0];
       const std::vector<IdArray> &rhs_nodes =

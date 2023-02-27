@@ -1591,6 +1591,46 @@ def test_heterognnexplainer(g, idtype, input_dim, output_dim):
     feat_mask, edge_mask = explainer.explain_graph(g, feat)
 
 
+@parametrize_idtype
+@pytest.mark.parametrize(
+    "g",
+    get_cases(
+        ["homo"],
+        exclude=[
+            "zero-degree",
+            "homo-zero-degree",
+            "has_feature",
+            "has_scalar_e_feature",
+            "row_sorted",
+            "col_sorted",
+            "batched",
+        ],
+    ),
+)
+@pytest.mark.parametrize("n_classes", [2])
+def test_subgraphx(g, idtype, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    feat = F.randn((g.num_nodes(), 5))
+
+    class Model(th.nn.Module):
+        def __init__(self, in_dim, n_classes):
+            super().__init__()
+            self.conv = nn.GraphConv(in_dim, n_classes)
+            self.pool = nn.AvgPooling()
+
+        def forward(self, g, h):
+            h = th.nn.functional.relu(self.conv(g, h))
+            return self.pool(g, h)
+
+    model = Model(feat.shape[1], n_classes)
+    model = model.to(ctx)
+    explainer = nn.SubgraphX(
+        model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
+    )
+    explainer.explain_graph(g, feat, target_class=0)
+
+
 def test_jumping_knowledge():
     ctx = F.ctx()
     num_layers = 2

@@ -31,10 +31,10 @@
 namespace dgl {
 namespace transform {
 
-/** @brief Type of the function which maps left and right Id arrays
- * in a MFG to new ones.
+/** @brief Mapper used in block generation which maps left and right Id arrays
+ * in the original MFG to new arrays with continuous numbers.
  */
-using MappingIdsFunc =
+using IdsMapper =
     std::function<std::tuple<std::vector<IdArray>, std::vector<IdArray>>(
         const HeteroGraphPtr&, bool, int64_t, const DGLContext&,
         const std::vector<int64_t>&, const std::vector<EdgeArray>&,
@@ -75,10 +75,10 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock(
  * @return The block and the induced edges.
  */
 template <typename IdType>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
+std::tuple<HeteroGraphPtr, std::vector<IdArray>> ProcessToBlock(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr,
-    MappingIdsFunc&& get_maping_ids);
+    IdsMapper&& get_maping_ids);
 
 }  // namespace transform
 }  // namespace dgl
