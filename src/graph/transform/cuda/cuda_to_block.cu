@@ -206,7 +206,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockGPU(
     bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr) {
   return dgl::transform::ProcessToBlock<IdType>(
       graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes_ptr,
-      GetMappingIdsGPU<IdType>());
+      CUDAIdsMapper<IdType>());
 }
 
 }  // namespace
