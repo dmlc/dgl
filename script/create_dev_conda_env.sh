@@ -54,13 +54,13 @@ while getopts "cdfg:ho:p:s" flag; do
       cpu=1
       ;;
     d)
-     dry_run=1
-     ;;
+      dry_run=1
+      ;;
     f)
       force_create=1
       ;;
     g)
-      gpu=${OPTARG}
+      cuda_version=${OPTARG}
       ;;
     h)
       usage
@@ -86,12 +86,12 @@ while getopts "cdfg:ho:p:s" flag; do
   esac
 done
 
-if [[ -n ${gpu} && ${cpu} -eq 1 ]]; then
+if [[ -n ${cuda_version} && ${cpu} -eq 1 ]]; then
   echo "Only one mode can be specified."
   exit 1
 fi
 
-if [[ -z ${gpu} && -z ${cpu} ]]; then
+if [[ -z ${cuda_version} && -z ${cpu} ]]; then
   usage
   exit 1
 fi
@@ -103,8 +103,8 @@ if [[ ${cpu} -eq 1 ]]; then
 fi
 
 # Set up GPU mode.
-if [[ -n ${gpu} ]]; then
-  if ! validate ${CUDA_VERSIONS} ${gpu}; then
+if [[ -n ${cuda_version} ]]; then
+  if ! validate ${CUDA_VERSIONS} ${cuda_version}; then
     echo "Error: Invalid CUDA version."
     usage
     exit 1
@@ -113,7 +113,7 @@ if [[ -n ${gpu} ]]; then
   echo "Confirm the installed CUDA version matches the specified one."
   [[ -n "${always_yes}" ]] || confirm
 
-  torchversion=${TORCH_VERSION}"+cu"${gpu//[-._]/}
+  torchversion=${TORCH_VERSION}"+cu"${cuda_version//[-._]/}
   name="dgl-dev-gpu"
 fi
 
