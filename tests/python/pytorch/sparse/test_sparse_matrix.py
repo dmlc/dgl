@@ -5,7 +5,16 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import from_coo, from_csc, from_csr, val_like
+from dgl.sparse import (
+    from_coo,
+    from_csc,
+    from_csr,
+    from_torch_sparse,
+    to_torch_sparse_coo,
+    to_torch_sparse_csc,
+    to_torch_sparse_csr,
+    val_like,
+)
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
@@ -502,3 +511,106 @@ def test_sparse_matrix_transpose(dense_dim, row, col, extra_shape):
     assert torch.allclose(mat_val, val)
     assert torch.allclose(mat_row, col)
     assert torch.allclose(mat_col, row)
+
+
+@pytest.mark.parametrize("row", [[0, 0, 1, 2], (0, 1, 2, 4)])
+@pytest.mark.parametrize("col", [(0, 1, 2, 2), (1, 3, 3, 4)])
+@pytest.mark.parametrize("nz_dim", [None, 2])
+@pytest.mark.parametrize("shape", [(5, 5), (6, 7)])
+def test_torch_sparse_coo_conversion(row, col, nz_dim, shape):
+    dev = F.ctx()
+    row = torch.tensor(row).to(dev)
+    col = torch.tensor(col).to(dev)
+    indices = torch.stack([row, col])
+    torch_sparse_shape = shape
+    val_shape = (row.shape[0],)
+    if nz_dim is not None:
+        torch_sparse_shape += (nz_dim,)
+        val_shape += (nz_dim,)
+    val = torch.randn(val_shape).to(dev)
+    torch_sparse_coo = torch.sparse_coo_tensor(indices, val, torch_sparse_shape)
+    spmat = from_torch_sparse(torch_sparse_coo)
+
+    def _assert_spmat_equal_to_torch_sparse_coo(spmat, torch_sparse_coo):
+        assert torch_sparse_coo.layout == torch.sparse_coo
+        # Use .data_ptr() to check whether indices and values are on the same
+        # memory address
+        assert (
+            spmat.indices().data_ptr() == torch_sparse_coo._indices().data_ptr()
+        )
+        assert spmat.val.data_ptr() == torch_sparse_coo._values().data_ptr()
+        assert spmat.shape == torch_sparse_coo.shape[:2]
+
+    _assert_spmat_equal_to_torch_sparse_coo(spmat, torch_sparse_coo)
+    torch_sparse_coo = to_torch_sparse_coo(spmat)
+    _assert_spmat_equal_to_torch_sparse_coo(spmat, torch_sparse_coo)
+
+
+@pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
+@pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
+@pytest.mark.parametrize("nz_dim", [None, 2])
+@pytest.mark.parametrize("shape", [(3, 5), (3, 7)])
+def test_torch_sparse_csr_conversion(indptr, indices, nz_dim, shape):
+    dev = F.ctx()
+    indptr = torch.tensor(indptr).to(dev)
+    indices = torch.tensor(indices).to(dev)
+    torch_sparse_shape = shape
+    val_shape = (indices.shape[0],)
+    if nz_dim is not None:
+        torch_sparse_shape += (nz_dim,)
+        val_shape += (nz_dim,)
+    val = torch.randn(val_shape).to(dev)
+    torch_sparse_csr = torch.sparse_csr_tensor(
+        indptr, indices, val, torch_sparse_shape
+    )
+    spmat = from_torch_sparse(torch_sparse_csr)
+
+    def _assert_spmat_equal_to_torch_sparse_csr(spmat, torch_sparse_csr):
+        indptr, indices, value_indices = spmat.csr()
+        assert torch_sparse_csr.layout == torch.sparse_csr
+        assert value_indices is None
+        # Use .data_ptr() to check whether indices and values are on the same
+        # memory address
+        assert indptr.data_ptr() == torch_sparse_csr.crow_indices().data_ptr()
+        assert indices.data_ptr() == torch_sparse_csr.col_indices().data_ptr()
+        assert spmat.val.data_ptr() == torch_sparse_csr.values().data_ptr()
+        assert spmat.shape == torch_sparse_csr.shape[:2]
+
+    _assert_spmat_equal_to_torch_sparse_csr(spmat, torch_sparse_csr)
+    torch_sparse_csr = to_torch_sparse_csr(spmat)
+    _assert_spmat_equal_to_torch_sparse_csr(spmat, torch_sparse_csr)
+
+
+@pytest.mark.parametrize("indptr", [(0, 0, 1, 4), (0, 1, 2, 4)])
+@pytest.mark.parametrize("indices", [(0, 1, 2, 3), (1, 2, 3, 4)])
+@pytest.mark.parametrize("nz_dim", [None, 2])
+@pytest.mark.parametrize("shape", [(8, 3), (5, 3)])
+def test_torch_sparse_csc_conversion(indptr, indices, nz_dim, shape):
+    dev = F.ctx()
+    indptr = torch.tensor(indptr).to(dev)
+    indices = torch.tensor(indices).to(dev)
+    torch_sparse_shape = shape
+    val_shape = (indices.shape[0],)
+    if nz_dim is not None:
+        torch_sparse_shape += (nz_dim,)
+        val_shape += (nz_dim,)
+    val = torch.randn(val_shape).to(dev)
+    torch_sparse_csc = torch.sparse_csc_tensor(
+        indptr, indices, val, torch_sparse_shape
+    )
+    spmat = from_torch_sparse(torch_sparse_csc)
+
+    def _assert_spmat_equal_to_torch_sparse_csc(spmat, torch_sparse_csc):
+        indptr, indices, value_indices = spmat.csc()
+        assert torch_sparse_csc.layout == torch.sparse_csc
+        assert value_indices is None
+        # Use .data_ptr() to check whether indices and values are on the same
+        # memory address
+        assert indptr.data_ptr() == torch_sparse_csc.ccol_indices().data_ptr()
+        assert indices.data_ptr() == torch_sparse_csc.row_indices().data_ptr()
+        assert spmat.val.data_ptr() == torch_sparse_csc.values().data_ptr()
+        assert spmat.shape == torch_sparse_csc.shape[:2]
+
+    _assert_spmat_equal_to_torch_sparse_csc(spmat, torch_sparse_csc)
+    torch_sparse_csc = to_torch_sparse_csc(spmat)
+    _assert_spmat_equal_to_torch_sparse_csc(spmat, torch_sparse_csc)

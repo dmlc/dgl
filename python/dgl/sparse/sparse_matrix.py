@@ -109,11 +109,34 @@ class SparseMatrix:
         --------
 
         >>> indices = torch.tensor([[1, 2, 1], [2, 4, 3]])
-        >>> A = from_coo(dst, src)
+        >>> A = dglsp.spmatrix(indices)
         >>> A.coo()
         (tensor([1, 2, 1]), tensor([2, 4, 3]))
         """
         return self.c_sparse_matrix.coo()
+
+    def indices(self) -> torch.Tensor:
+        r"""Returns the coordinate list (COO) representation in one tensor with
+        shape ``(2, nnz)``.
+
+        See `COO in Wikipedia <https://en.wikipedia.org/wiki/
+        Sparse_matrix#Coordinate_list_(COO)>`_.
+
+        Returns
+        -------
+        torch.Tensor
+            Stacked COO tensor with shape ``(2, nnz)``.
+
+        Examples
+        --------
+
+        >>> indices = torch.tensor([[1, 2, 1], [2, 4, 3]])
+        >>> A = dglsp.spmatrix(indices)
+        >>> A.indices()
+        tensor([[1, 2, 1],
+                [2, 4, 3]])
+        """
+        return self.c_sparse_matrix.indices()
 
     def csr(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         r"""Returns the compressed sparse row (CSR) representation of the sparse
@@ -140,7 +163,7 @@ class SparseMatrix:
         --------
 
         >>> indices = torch.tensor([[1, 2, 1], [2, 4, 3]])
-        >>> A = from_coo(dst, src)
+        >>> A = dglsp.spmatrix(indices)
         >>> A.csr()
         (tensor([0, 0, 2, 3]), tensor([2, 3, 4]), tensor([0, 2, 1]))
         """
@@ -171,7 +194,7 @@ class SparseMatrix:
         --------
 
         >>> indices = torch.tensor([[1, 2, 1], [2, 4, 3]])
-        >>> A = from_coo(dst, src)
+        >>> A = dglsp.spmatrix(indices)
         >>> A.csc()
         (tensor([0, 0, 0, 1, 2, 3]), tensor([1, 1, 2]), tensor([0, 2, 1]))
         """
@@ -521,7 +544,18 @@ def spmatrix(
                                 [3., 3.]]),
                  shape=(3, 5), nnz=3, val_size=(2,))
     """
-    return from_coo(indices[0], indices[1], val, shape)
+    if shape is None:
+        shape = (
+            torch.max(indices[0]).item() + 1,
+            torch.max(indices[1]).item() + 1,
+        )
+    if val is None:
+        val = torch.ones(indices.shape[1]).to(indices.device)
+
+    assert (
+        val.dim() <= 2
+    ), "The values of a SparseMatrix can only be scalars or vectors."
+    return SparseMatrix(torch.ops.dgl_sparse.from_coo(indices, val, shape))
 
 
 def from_coo(
@@ -599,16 +633,8 @@ def from_coo(
                                 [3., 3.]]),
                  shape=(3, 5), nnz=3, val_size=(2,))
     """
-    if shape is None:
-        shape = (torch.max(row).item() + 1, torch.max(col).item() + 1)
-    if val is None:
-        val = torch.ones(row.shape[0]).to(row.device)
-
-    assert (
-        val.dim() <= 2
-    ), "The values of a SparseMatrix can only be scalars or vectors."
-
-    return SparseMatrix(torch.ops.dgl_sparse.from_coo(row, col, val, shape))
+    assert row.shape[0] == col.shape[0]
+    return spmatrix(torch.stack([row, col]), val, shape)
 
 
 def from_csr(
@@ -831,6 +857,171 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     ), "The values of a SparseMatrix can only be scalars or vectors."
 
     return SparseMatrix(torch.ops.dgl_sparse.val_like(mat.c_sparse_matrix, val))
+
+
+def from_torch_sparse(torch_sparse_tensor: torch.Tensor) -> SparseMatrix:
+    """Creates a sparse matrix from a torch sparse tensor, which can have coo,
+    csr, or csc layout.
+
+    Parameters
+    ----------
+    torch_sparse_tensor : torch.Tensor
+        Torch sparse tensor
+
+    Returns
+    -------
+    SparseMatrix
+        Sparse matrix
+
+    Examples
+    --------
+
+    >>> indices = torch.tensor([[1, 1, 2], [2, 4, 3]])
+    >>> val = torch.ones(3)
+    >>> torch_coo = torch.sparse_coo_tensor(indices, val)
+    >>> dglsp.from_torch_sparse(torch_coo)
+    SparseMatrix(indices=tensor([[1, 1, 2],
+                                 [2, 4, 3]]),
+                 values=tensor([1., 1., 1.]),
+                 shape=(3, 5), nnz=3)
+    """
+    assert torch_sparse_tensor.layout in (
+        torch.sparse_coo,
+        torch.sparse_csr,
+        torch.sparse_csc,
+    ), (
+        f"Cannot convert Pytorch sparse tensor"
+        f"{torch_sparse_tensor} to DGL sparse."
+    )
+    if torch_sparse_tensor.layout == torch.sparse_coo:
+        # Use ._indices() and ._values() to access uncoalesced indices and
+        # values.
+        return spmatrix(
+            torch_sparse_tensor._indices(),
+            torch_sparse_tensor._values(),
+            torch_sparse_tensor.shape[:2],
+        )
+    elif torch_sparse_tensor.layout == torch.sparse_csr:
+        return from_csr(
+            torch_sparse_tensor.crow_indices(),
+            torch_sparse_tensor.col_indices(),
+            torch_sparse_tensor.values(),
+            torch_sparse_tensor.shape[:2],
+        )
+    else:
+        return from_csc(
+            torch_sparse_tensor.ccol_indices(),
+            torch_sparse_tensor.row_indices(),
+            torch_sparse_tensor.values(),
+            torch_sparse_tensor.shape[:2],
+        )
+
+
+def to_torch_sparse_coo(spmat: SparseMatrix) -> torch.Tensor:
+    """Creates a torch sparse coo tensor from a sparse matrix.
+
+    Parameters
+    ----------
+    spmat : SparseMatrix
+        Sparse matrix
+
+    Returns
+    -------
+    torch.Tensor
+        torch tensor with torch.sparse_coo layout
+
+    Examples
+    --------
+
+    >>> indices = torch.tensor([[1, 1, 2], [2, 4, 3]])
+    >>> val = torch.ones(3)
+    >>> spmat = dglsp.spmatrix(indices, val)
+    >>> dglsp.to_torch_sparse_coo(spmat)
+    tensor(indices=tensor([[1, 1, 2],
+                           [2, 4, 3]]),
+           values=tensor([1., 1., 1.]),
+           size=(3, 5), nnz=3, layout=torch.sparse_coo)
+    """
+    shape = spmat.shape
+    if spmat.val.dim() > 1:
+        shape += spmat.val.shape[1:]
+    return torch.sparse_coo_tensor(spmat.indices(), spmat.val, shape)
+
+
+def to_torch_sparse_csr(spmat: SparseMatrix) -> torch.Tensor:
+    """Creates a torch sparse csr tensor from a sparse matrix.
+
+    Note that converting a sparse matrix to torch csr tensor could change the
+    order of non-zero values.
+
+    Parameters
+    ----------
+    spmat : SparseMatrix
+        Sparse matrix
+
+    Returns
+    -------
+    torch.Tensor
+        Torch tensor with torch.sparse_csr layout
+
+    Examples
+    --------
+
+    >>> indices = torch.tensor([[1, 2, 1], [2, 4, 3]])
+    >>> val = torch.arange(3)
+    >>> spmat = dglsp.spmatrix(indices, val)
+    >>> dglsp.to_torch_sparse_csr(spmat)
+    tensor(crow_indices=tensor([0, 0, 2, 3]),
+           col_indices=tensor([2, 3, 4]),
+           values=tensor([0, 2, 1]), size=(3, 5), nnz=3,
+           layout=torch.sparse_csr)
+    """
+    shape = spmat.shape
+    if spmat.val.dim() > 1:
+        shape += spmat.val.shape[1:]
+    indptr, indices, value_indices = spmat.csr()
+    val = spmat.val
+    if value_indices is not None:
+        val = val[value_indices]
+    return torch.sparse_csr_tensor(indptr, indices, val, shape)
+
+
+def to_torch_sparse_csc(spmat: SparseMatrix) -> torch.Tensor:
+    """Creates a torch sparse csc tensor from a sparse matrix.
+
+    Note that converting a sparse matrix to torch csc tensor could change the
+    order of non-zero values.
+
+    Parameters
+    ----------
+    spmat : SparseMatrix
+        Sparse matrix
+
+    Returns
+    -------
+    torch.Tensor
+        Torch tensor with torch.sparse_csc layout
+
+    Examples
+    --------
+
+    >>> indices = torch.tensor([[1, 2, 1], [2, 4, 3]])
+    >>> val = torch.arange(3)
+    >>> spmat = dglsp.spmatrix(indices, val)
+    >>> dglsp.to_torch_sparse_csc(spmat)
+    tensor(ccol_indices=tensor([0, 0, 0, 1, 2, 3]),
+           row_indices=tensor([1, 1, 2]),
+           values=tensor([0, 2, 1]), size=(3, 5), nnz=3,
+           layout=torch.sparse_csc)
+    """
+    shape = spmat.shape
+    if spmat.val.dim() > 1:
+        shape += spmat.val.shape[1:]
+    indptr, indices, value_indices = spmat.csc()
+    val = spmat.val
+    if value_indices is not None:
+        val = val[value_indices]
+    return torch.sparse_csc_tensor(indptr, indices, val, shape)
 
 
 def _sparse_matrix_str(spmat: SparseMatrix) -> str:
