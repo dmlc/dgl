@@ -17,6 +17,7 @@ OPTIONS:
   -c           Create dev environment in CPU mode.
   -g           Create dev environment in GPU mode with specified CUDA version,
                supported: ${CUDA_VERSIONS}.
+  -s           Run silently which indicates always 'yes' for any confirmation.
 EOF
 }
 
@@ -40,11 +41,13 @@ confirm() {
 }
 
 # Parse flags.
-while getopts "cg:h" flag; do
+while getopts "cg:sh" flag; do
   if [[ ${flag} == "c" ]]; then
     cpu=1
   elif [[ ${flag} == "g" ]]; then
     gpu=${OPTARG}
+  elif [[ ${flag} == "s" ]]; then
+    ALWAYS_YES=1
   elif [[ ${flag} == "h" ]]; then
     usage
     exit 0
@@ -79,7 +82,7 @@ if [[ -n ${gpu} ]]; then
   fi
 
   echo "Confirm the installed CUDA version matches the specified one."
-  confirm
+  [[ -n "${ALWAYS_YES}" ]] || confirm
 
   torchversion=${TORCH_VERSION}"+cu"${gpu//[-._]/}
   name="dgl-dev-gpu"
@@ -87,7 +90,7 @@ fi
 
 echo "Confirm you are excuting the script from your DGL root directory."
 echo "Current working directory: ${PWD}"
-confirm
+[[ -n "${ALWAYS_YES}" ]] || confirm
 
 # Prepare the conda environment yaml file.
 rand=$(echo "${RANDOM}" | md5sum | head -c 20)
@@ -102,7 +105,7 @@ echo "--------------------------------------------------"
 cat /tmp/${rand}/dgl_dev.yml
 echo "--------------------------------------------------"
 echo "Create a conda enviroment with the config?"
-confirm
+[[ -n "${ALWAYS_YES}" ]] || confirm
 
 # Create conda environment.
 conda env create -f /tmp/${rand}/dgl_dev.yml
