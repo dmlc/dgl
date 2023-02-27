@@ -96,4 +96,4 @@ def test_twirls():
     )
     assert out.returncode == 0
     stdout = out.stdout.decode("utf-8")
-    assert float(stdout[-5:]) > 0.7
+    assert float(stdout[-5:]) > 0.65

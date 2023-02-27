@@ -13,11 +13,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- * @file graph/transform/to_bipartite.cc
+ * @file graph/transform/to_block.cc
  * @brief Convert a graph to a bipartite-structured graph.
+ *
+ * Tested via python wrapper: python/dgl/path/to/to_block.py
  */
 
-#include "to_bipartite.h"
+#include "to_block.h"
 
 #include <dgl/array.h>
 #include <dgl/base_heterograph.h>
@@ -44,7 +46,7 @@ namespace transform {
 namespace {
 
 template <typename IdType>
-struct GetMappingIdsCPU {
+struct CPUIdsMapper {
   std::tuple<std::vector<IdArray>, std::vector<IdArray>> operator()(
       const HeteroGraphPtr &graph, bool include_rhs_in_lhs, int64_t num_ntypes,
       const DGLContext &ctx, const std::vector<int64_t> &max_nodes_per_type,
@@ -123,18 +125,19 @@ template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr) {
-  return dgl::transform::ToBlockProcess<IdType>(
+  return dgl::transform::ProcessToBlock<IdType>(
       graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes_ptr,
-      GetMappingIdsCPU<IdType>());
+      CPUIdsMapper<IdType>());
 }
 
 }  // namespace
 
+
 template <typename IdType>
-std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
+std::tuple<HeteroGraphPtr, std::vector<IdArray>> ProcessToBlock(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr,
-    MappingIdsFunc &&get_maping_ids) {
+    IdsMapper &&ids_mapper) {
   std::vector<IdArray> &lhs_nodes = *lhs_nodes_ptr;
   const bool generate_lhs_nodes = lhs_nodes.empty();
 
@@ -234,7 +237,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
 
   std::vector<IdArray> new_lhs;
   std::vector<IdArray> new_rhs;
-  std::tie(new_lhs, new_rhs) = get_maping_ids(
+  std::tie(new_lhs, new_rhs) = ids_mapper(
       graph, include_rhs_in_lhs, num_ntypes, ctx, maxNodesPerType, edge_arrays,
       src_nodes, rhs_nodes, lhs_nodes_ptr, &num_nodes_per_type);
 
@@ -287,16 +290,16 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockProcess(
 }
 
 template std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlockProcess<int32_t>(
+ProcessToBlock<int32_t>(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr,
-    MappingIdsFunc &&get_maping_ids);
+    IdsMapper &&get_maping_ids);
 
 template std::tuple<HeteroGraphPtr, std::vector<IdArray>>
-ToBlockProcess<int64_t>(
+ProcessToBlock<int64_t>(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray> *const lhs_nodes_ptr,
-    MappingIdsFunc &&get_maping_ids);
+    IdsMapper &&get_maping_ids);
 
 template <>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCPU, int32_t>(
@@ -343,7 +346,7 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlock<kDGLCUDA, int64_t>(
 
 #endif  // DGL_USE_CUDA
 
-DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBlock")
+DGL_REGISTER_GLOBAL("capi._CAPI_DGLToBlock")
     .set_body([](DGLArgs args, DGLRetValue *rv) {
       const HeteroGraphRef graph_ref = args[0];
       const std::vector<IdArray> &rhs_nodes =

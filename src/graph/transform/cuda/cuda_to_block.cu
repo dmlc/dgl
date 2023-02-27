@@ -16,6 +16,8 @@
  * @file graph/transform/cuda/cuda_to_block.cu
  * @brief Functions to convert a set of edges into a graph block with local
  * ids.
+ *
+ * Tested via python wrapper: python/dgl/path/to/to_block.py
  */
 
 #include <cuda_runtime.h>
@@ -28,7 +30,7 @@
 
 #include "../../../runtime/cuda/cuda_common.h"
 #include "../../heterograph.h"
-#include "../to_bipartite.h"
+#include "../to_block.h"
 #include "cuda_map_edges.cuh"
 
 using namespace dgl::aten;
@@ -138,7 +140,7 @@ class DeviceNodeMapMaker {
 };
 
 template <typename IdType>
-struct GetMappingIdsGPU {
+struct CUDAIdsMapper {
   std::tuple<std::vector<IdArray>, std::vector<IdArray>> operator()(
       const HeteroGraphPtr& graph, bool include_rhs_in_lhs, int64_t num_ntypes,
       const DGLContext& ctx, const std::vector<int64_t>& maxNodesPerType,
@@ -153,7 +155,7 @@ struct GetMappingIdsGPU {
     auto device = runtime::DeviceAPI::Get(ctx);
     cudaStream_t stream = runtime::getCurrentCUDAStream();
 
-    // allocate space for map creation process
+    // Allocate space for map creation process.
     DeviceNodeMapMaker<IdType> maker(maxNodesPerType);
     DeviceNodeMap<IdType> node_maps(maxNodesPerType, num_ntypes, ctx, stream);
     if (generate_lhs_nodes) {
@@ -163,7 +165,7 @@ struct GetMappingIdsGPU {
             NewIdArray(maxNodesPerType[ntype], ctx, sizeof(IdType) * 8));
       }
     }
-    // populate the mappings
+    // Populate the mappings.
     if (generate_lhs_nodes) {
       int64_t* count_lhs_device = static_cast<int64_t*>(
           device->AllocWorkspace(ctx, sizeof(int64_t) * num_ntypes * 2));
@@ -178,7 +180,7 @@ struct GetMappingIdsGPU {
           DGLContext{kDGLCPU, 0}, DGLDataType{kDGLInt, 64, 1});
       device->StreamSync(ctx, stream);
 
-      // wait for the node counts to finish transferring
+      // Wait for the node counts to finish transferring.
       device->FreeWorkspace(ctx, count_lhs_device);
     } else {
       maker.Make(lhs_nodes, rhs_nodes, &node_maps, stream);
@@ -187,13 +189,13 @@ struct GetMappingIdsGPU {
         num_nodes_per_type[ntype] = lhs_nodes[ntype]->shape[0];
       }
     }
-    // resize lhs nodes
+    // Resize lhs nodes.
     if (generate_lhs_nodes) {
       for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
         lhs_nodes[ntype]->shape[0] = num_nodes_per_type[ntype];
       }
     }
-    // map node numberings from global to local, and build pointer for CSR
+    // Map node numberings from global to local, and build pointer for CSR.
     return MapEdges(graph, edge_arrays, node_maps, stream);
   }
 };
@@ -202,9 +204,9 @@ template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockGPU(
     HeteroGraphPtr graph, const std::vector<IdArray>& rhs_nodes,
     bool include_rhs_in_lhs, std::vector<IdArray>* const lhs_nodes_ptr) {
-  return dgl::transform::ToBlockProcess<IdType>(
+  return dgl::transform::ProcessToBlock<IdType>(
       graph, rhs_nodes, include_rhs_in_lhs, lhs_nodes_ptr,
-      GetMappingIdsGPU<IdType>());
+      CUDAIdsMapper<IdType>());
 }
 
 }  // namespace
