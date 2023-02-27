@@ -188,8 +188,7 @@ def linkx_homophily(graph, y):
         # Compute class_deg_aggr / deg_aggr for all classes.
         num_nodes = graph.num_nodes()
         class_deg_aggr = class_graph.ndata["class_deg_aggr"][num_nodes:]
-        deg_aggr = torch.clamp(
-            class_graph.ndata["deg_aggr"][num_nodes:], min=1)
+        deg_aggr = torch.clamp(class_graph.ndata["deg_aggr"][num_nodes:], min=1)
         fraction = (
             class_deg_aggr / deg_aggr - torch.bincount(y).float() / num_nodes
         )
