@@ -132,7 +132,6 @@ std::tuple<HeteroGraphPtr, std::vector<IdArray>> ToBlockCPU(
 
 }  // namespace
 
-
 template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>> ProcessToBlock(
     HeteroGraphPtr graph, const std::vector<IdArray> &rhs_nodes,
