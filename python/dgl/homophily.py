@@ -10,9 +10,16 @@ except ImportError:
 __all__ = ["node_homophily", "edge_homophily", "linkx_homophily"]
 
 
+def get_long_edges(graph):
+    src, dst = graph.edges()
+    src = F.astype(src, F.int64)
+    dst = F.astype(dst, F.int64)
+    return src, dst
+
+
 def node_homophily(graph, y):
-    r"""Homophily measure from `Geom-GCN: Geometric Graph Convolutional Networks
-    <https://arxiv.org/abs/2002.05287>`__
+    r"""Homophily measure from `Geom-GCN: Geometric Graph Convolutional
+    Networks <https://arxiv.org/abs/2002.05287>`__
 
     We follow the practice of a later paper `Large Scale Learning on
     Non-Homophilous Graphs: New Benchmarks and Strong Simple Methods
@@ -51,10 +58,8 @@ def node_homophily(graph, y):
     0.6000000238418579
     """
     with graph.local_scope():
-        src, dst = graph.edges()
         # Handle the case where graph is of dtype int32.
-        src = F.astype(src, F.int64)
-        dst = F.astype(dst, F.int64)
+        src, dst = get_long_edges(graph)
         # Compute y_v = y_u for all edges.
         graph.edata["same_class"] = F.astype(y[src] == y[dst], F.float32)
         graph.update_all(
@@ -100,10 +105,8 @@ def edge_homophily(graph, y):
     0.75
     """
     with graph.local_scope():
-        src, dst = graph.edges()
         # Handle the case where graph is of dtype int32.
-        src = F.astype(src, F.int64)
-        dst = F.astype(dst, F.int64)
+        src, dst = get_long_edges(graph)
         # Compute y_v = y_u for all edges.
         edge_indicator = F.astype(y[src] == y[dst], F.float32)
         return F.as_scalar(F.mean(edge_indicator, dim=0))
@@ -122,8 +125,8 @@ def linkx_homophily(graph, y):
       \frac{|\mathcal{C}_k|}{|\mathcal{V}|} \right)
 
     where :math:`C` is the number of node classes, :math:`C_k` is the set of
-    nodes that belong to class k, :math:`\mathcal{N}(v)` is the predecessors of
-    node :math:`v`, :math:`y_v` is the class of node :math:`v`, and
+    nodes that belong to class k, :math:`\mathcal{N}(v)` are the predecessors
+    of node :math:`v`, :math:`y_v` is the class of node :math:`v`, and
     :math:`\mathcal{V}` is the set of nodes.
 
     Parameters
@@ -150,10 +153,8 @@ def linkx_homophily(graph, y):
     """
     with graph.local_scope():
         # Compute |{u\in N(v): y_v = y_u}| for each node v.
-        src, dst = graph.edges()
         # Handle the case where graph is of dtype int32.
-        src = src.long()
-        dst = dst.long()
+        src, dst = get_long_edges(graph)
         # Compute y_v = y_u for all edges.
         graph.edata["same_class"] = (y[src] == y[dst]).float()
         graph.update_all(
@@ -187,7 +188,8 @@ def linkx_homophily(graph, y):
         # Compute class_deg_aggr / deg_aggr for all classes.
         num_nodes = graph.num_nodes()
         class_deg_aggr = class_graph.ndata["class_deg_aggr"][num_nodes:]
-        deg_aggr = torch.clamp(class_graph.ndata["deg_aggr"][num_nodes:], min=1)
+        deg_aggr = torch.clamp(
+            class_graph.ndata["deg_aggr"][num_nodes:], min=1)
         fraction = (
             class_deg_aggr / deg_aggr - torch.bincount(y).float() / num_nodes
         )
