@@ -142,7 +142,7 @@ class CuGraphGATConv(nn.Module):
 
         Parameters
         ----------
-        graph : DGLGraph
+        g : DGLGraph
             The graph.
         feat : torch.Tensor
             Input features of shape :math:`(N, D_{in})`.
