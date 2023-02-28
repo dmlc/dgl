@@ -443,7 +443,7 @@ def get_dataset(
                             edge_feature_tids[data_key] = [(start, end)]
                         else:
                             edge_features[data_key] = None
-                            edge_feature_tids[data_key] = []
+                            edge_feature_tids[data_key] = [(0, 0)]
 
     # Done with building node_features locally.
     if len(edge_features) <= 0:
