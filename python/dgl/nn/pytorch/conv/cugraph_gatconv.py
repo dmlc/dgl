@@ -137,6 +137,9 @@ class CuGraphGATConv(nn.Module):
         if self.bias is not None:
             nn.init.zeros_(self.bias)
 
+        if isinstance(self.res_fc, nn.Linear):
+            self.res_fc.reset_parameters()
+
     def forward(self, g, feat, max_in_degree=None):
         r"""Forward computation.
 
