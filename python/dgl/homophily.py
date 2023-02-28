@@ -11,6 +11,7 @@ __all__ = ["node_homophily", "edge_homophily", "linkx_homophily"]
 
 
 def get_long_edges(graph):
+    """Internal function for getting the edges of a graph as long tensors"""
     src, dst = graph.edges()
     src = F.astype(src, F.int64)
     dst = F.astype(dst, F.int64)
