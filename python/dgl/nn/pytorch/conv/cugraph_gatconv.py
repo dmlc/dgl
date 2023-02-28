@@ -15,7 +15,7 @@ else:
 
 
 class CuGraphGATConv(nn.Module):
-    r"""Graph attention layer from `Graph Attention Network
+    r"""Graph attention layer from `Graph Attention Networks
     <https://arxiv.org/pdf/1710.10903.pdf>`__, with the sparse aggregation
     accelerated by cugraph-ops.
 
