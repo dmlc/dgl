@@ -94,8 +94,8 @@ struct CPUIdsMapper {
     std::vector<IdArray> new_rhs;
     new_lhs.reserve(edge_arrays.size());
     new_rhs.reserve(edge_arrays.size());
-    const int64_t num_edge_sets = static_cast<int64_t>(edge_arrays.size());
-    for (int64_t etype = 0; etype < num_edge_sets; ++etype) {
+    const int64_t num_etypes = static_cast<int64_t>(edge_arrays.size());
+    for (int64_t etype = 0; etype < num_etypes; ++etype) {
       const EdgeArray &edges = edge_arrays[etype];
       if (edges.id.defined() && !aten::IsNullArray(edges.src)) {
         const auto src_dst_types = graph->GetEndpointTypes(etype);
