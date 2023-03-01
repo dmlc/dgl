@@ -21,55 +21,92 @@ from pyarrow import csv
 from utils import get_idranges, memory_snapshot, read_json
 
 
-def _get_unique_invidx(first, second, third):
-    mask = np.isin(first, third, invert=True, kind="table")
-    uniq_fst = first[mask]
+def _get_unique_invidx(srcids, dstids, uniq_nids):
+    """This function is used to compute a list of unique elements,
+    and their indices in the input list, which is the concatenation
+    of srcids, dstids and uniq_nids. In addition, this function will also
+    compute inverse indices for the elements in srcids and dstids arrays.
+    In the process srcids, dstids will be over-written to contain the
+    inverse indices, which will the indices in the unique elements list.
+    Basically, this function is mimicing the functionality of numpy's
+    unique function call. The problem with numpy's unique function call
+    is its high memory requirement. For an input list of 3 billion edges
+    it consumes about 550GB of systems memory, which is limiting the
+    capability of the partitioning pipeline.
+
+    Parameters:
+    -----------
+    srcids : numpy array
+        a list of numbers, and in our use-case this will be src-ids of
+        the edges
+    dstids : numpy array
+        a list of numbers, and in our use-case this will be dst-ids of
+        the edges
+    uniq_nids : numpy array
+        a list of numbers, and in our use-case this will be a list of
+        unique shuffle-global-nids on a given rank
+
+    Returns:
+    --------
+    numpy array :
+        a list of unique, sorted elements, computed from the input arguments
+    numpy array :
+        a list of integers. These are indices in the concatenated list
+        [srcids, dstids, uniq_nids], which are the input arguments to this function
+    numpy array :
+        a list of integers. These are inverse indices, which will be indices
+        from the unique elements list specifying the elements from the
+        input array, srcids
+    numpy array :
+        a list of integers. These are inverse indices, which will be indices
+        from the unique elements list specifying the elements from the
+        input array, dstids
+
+    """
+    mask = np.isin(srcids, dstids, invert=True, kind="table")
+    uniq_fst = srcids[mask]
 
     idxes = np.where(mask == 1)[0]
-    local_range = np.arange(len(third)) + len(idxes)
+    local_range = np.arange(len(uniq_nids)) + len(idxes)
     idxes = np.concatenate([idxes, local_range])
 
-    uniques = np.concatenate([uniq_fst, third])
+    uniques = np.concatenate([uniq_fst, uniq_nids])
     sort_idx = np.argsort(uniques)
     uniques = uniques[sort_idx]
     idxes = idxes[sort_idx]
     assert len(idxes) == len(uniques)
 
     # Now compute the inverse-idxes.
-    sortIdx = np.argsort(first)
-    first = first[sortIdx]
+    sortIdx = np.argsort(srcids)
+    srcids = srcids[sortIdx]
 
     idx1 = 0
     idx2 = 0
-    while (idx1 < len(first)) and (idx2 < len(uniques)):
-        if first[idx1] == uniques[idx2]:
-            first[idx1] = idx2
+    while (idx1 < len(srcids)) and (idx2 < len(uniques)):
+        if srcids[idx1] == uniques[idx2]:
+            srcids[idx1] = idx2
             idx1 += 1
-        elif first[idx1] < uniques[idx2]:
+        elif srcids[idx1] < uniques[idx2]:
             idx1 += 1
         else:
             idx2 += 1
 
     assert idx1 == len(
-        first
-    ), f"All the elements in the first array are not mapped to uniques"
-    """ 
-    assert idx1 >= len(first), (
-        f"Problem here idx1 = {idx1}, idx2 = {idx2}, "
-        f"first = {len(first)}, uniques = {len(uniques)}"
-    )
-    """
-    first[sortIdx] = first
+        srcids
+    ), f"All the elements in the arr1 array are not mapped to uniques"
+    srcids[sortIdx] = srcids
 
-    # find the third[0] in the uniques
-    offset = np.searchsorted(uniques, third[0], side="left")
+    # find the arr3[0] in the uniques
+    offset = np.searchsorted(uniques, uniq_nids[0], side="left")
     assert (offset >= 0) and (offset < len(uniques)), (
         f"Could not locate the list of unique elements (input) "
         f"in the output uniques` list"
     )
-    second = second - third[0] + offset
+    # it is guaranteed that the dstids will be in the uniq_nids list
+    # this is guaranteed by the structure of the problem
+    dstids = dstids - uniq_nids[0] + offset
 
-    return uniques, idxes, first, second
+    return uniques, idxes, srcids, dstids
 
 
 def create_dgl_object(
@@ -281,6 +318,30 @@ def create_dgl_object(
         )
         edge_id_start += np.sum(etype_ids == etype_id)
     memory_snapshot("CreateDGLObj_UniqueNodeIds: ", part_id)
+
+    # get the edge list in some order and then reshuffle.
+    # Here the order of nodes is defined by the `np.unique` function
+    # node order is as listed in the uniq_ids array
+    """
+    ids = np.concatenate(
+        [
+            shuffle_global_src_id,
+            shuffle_global_dst_id,
+            np.arange(
+                shuffle_global_nid_range[0], shuffle_global_nid_range[1] + 1
+            ),
+        ]
+    )
+    uniq_ids, idx, inverse_idx = np.unique(
+        ids, return_index=True, return_inverse=True
+    )
+    assert len(uniq_ids) == len(idx)
+
+    # We get the edge list with their node IDs mapped to a contiguous ID range.
+    part_local_src_id, part_local_dst_id = np.split(
+        inverse_idx[: len(shuffle_global_src_id) * 2], 2
+    )
+    """
 
     # This is the new implementation of unique method
     # to overcome numpy's excessive usage of memory
