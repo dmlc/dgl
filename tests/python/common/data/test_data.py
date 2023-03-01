@@ -369,6 +369,28 @@ def test_flickr():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_pattern():
+    mode_n_graphs = {
+        "train": 10000,
+        "valid": 2000,
+        "test": 2000,
+    }
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    for mode, n_graphs in mode_n_graphs.items():
+        ds = data.PATTERNDataset(mode=mode)
+        assert len(ds) == n_graphs, (len(ds), mode)
+        g1 = ds[0]
+        ds = data.PATTERNDataset(mode=mode, transform=transform)
+        g2 = ds[0]
+        assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+        assert ds.num_classes == 2
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_extract_archive():
     # gzip
     with tempfile.TemporaryDirectory() as src_dir:

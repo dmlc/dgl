@@ -54,6 +54,8 @@ from .tu import LegacyTUDataset, TUDataset
 from .utils import *
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
+from .cluster import CLUSTERDataset
+from .pattern import PATTERNDataset
 
 
 def register_data_args(parser):
