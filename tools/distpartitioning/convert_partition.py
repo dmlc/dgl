@@ -21,6 +21,57 @@ from pyarrow import csv
 from utils import get_idranges, memory_snapshot, read_json
 
 
+def _get_unique_invidx(first, second, third):
+    mask = np.isin(first, third, invert=True, kind="table")
+    uniq_fst = first[mask]
+
+    idxes = np.where(mask == 1)[0]
+    local_range = np.arange(len(third)) + len(idxes)
+    idxes = np.concatenate([idxes, local_range])
+
+    uniques = np.concatenate([uniq_fst, third])
+    sort_idx = np.argsort(uniques)
+    uniques = uniques[sort_idx]
+    idxes = idxes[sort_idx]
+    assert len(idxes) == len(uniques)
+
+    # Now compute the inverse-idxes.
+    sortIdx = np.argsort(first)
+    first = first[sortIdx]
+
+    idx1 = 0
+    idx2 = 0
+    while (idx1 < len(first)) and (idx2 < len(uniques)):
+        if first[idx1] == uniques[idx2]:
+            first[idx1] = idx2
+            idx1 += 1
+        elif first[idx1] < uniques[idx2]:
+            idx1 += 1
+        else:
+            idx2 += 1
+
+    assert idx1 == len(
+        first
+    ), f"All the elements in the first array are not mapped to uniques"
+    """ 
+    assert idx1 >= len(first), (
+        f"Problem here idx1 = {idx1}, idx2 = {idx2}, "
+        f"first = {len(first)}, uniques = {len(uniques)}"
+    )
+    """
+    first[sortIdx] = first
+
+    # find the third[0] in the uniques
+    offset = np.searchsorted(uniques, third[0], side="left")
+    assert (offset >= 0) and (offset < len(uniques)), (
+        f"Could not locate the list of unique elements (input) "
+        f"in the output uniques` list"
+    )
+    second = second - third[0] + offset
+
+    return uniques, idxes, first, second
+
+
 def create_dgl_object(
     schema,
     part_id,
@@ -231,27 +282,14 @@ def create_dgl_object(
         edge_id_start += np.sum(etype_ids == etype_id)
     memory_snapshot("CreateDGLObj_UniqueNodeIds: ", part_id)
 
-    # get the edge list in some order and then reshuffle.
-    # Here the order of nodes is defined by the `np.unique` function
-    # node order is as listed in the uniq_ids array
-    ids = np.concatenate(
-        [
-            shuffle_global_src_id,
-            shuffle_global_dst_id,
-            np.arange(
-                shuffle_global_nid_range[0], shuffle_global_nid_range[1] + 1
-            ),
-        ]
+    # This is the new implementation of unique method
+    # to overcome numpy's excessive usage of memory
+    uniq_ids, idx, part_local_src_id, part_local_dst_id = _get_unique_invidx(
+        shuffle_global_src_id,
+        shuffle_global_dst_id,
+        np.arange(shuffle_global_nid_range[0], shuffle_global_nid_range[1] + 1),
     )
-    uniq_ids, idx, inverse_idx = np.unique(
-        ids, return_index=True, return_inverse=True
-    )
-    assert len(uniq_ids) == len(idx)
 
-    # We get the edge list with their node IDs mapped to a contiguous ID range.
-    part_local_src_id, part_local_dst_id = np.split(
-        inverse_idx[: len(shuffle_global_src_id) * 2], 2
-    )
     inner_nodes = th.as_tensor(
         np.logical_and(
             uniq_ids >= shuffle_global_nid_range[0],
