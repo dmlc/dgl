@@ -17,10 +17,8 @@ namespace sparse {
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::Coalesce() {
   auto torch_coo = COOToTorchCOO(this->COOPtr(), this->value());
   auto coalesced_coo = torch_coo.coalesce();
-  torch::Tensor indices = coalesced_coo.indices();
-  torch::Tensor row = indices[0];
-  torch::Tensor col = indices[1];
-  return SparseMatrix::FromCOO(row, col, coalesced_coo.values(), this->shape());
+  return SparseMatrix::FromCOO(
+      coalesced_coo.indices(), coalesced_coo.values(), this->shape());
 }
 
 bool SparseMatrix::HasDuplicate() {
