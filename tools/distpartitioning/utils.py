@@ -8,10 +8,10 @@ import dgl
 import numpy as np
 import psutil
 import pyarrow
-from dgl.distributed.partition import _dump_part_config
-from pyarrow import csv
 
 import torch
+from dgl.distributed.partition import _dump_part_config
+from pyarrow import csv
 
 DATA_TYPE_ID = {
     data_type: id
@@ -31,6 +31,7 @@ DATA_TYPE_ID = {
 }
 
 REV_DATA_TYPE_ID = {id: data_type for data_type, id in DATA_TYPE_ID.items()}
+
 
 def read_ntype_partition_files(schema_map, input_dir):
     """
