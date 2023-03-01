@@ -6,12 +6,12 @@ from .utils import _get_dgl_url, load_graphs
 
 
 class CLUSTERDataset(DGLBuiltinDataset):
-    r"""CLUSTER dataset for inductive semi-supervised clustering task.
+    r"""CLUSTER dataset for semi-supervised clustering task.
 
     Each graph contains 6 SBM clusters with sizes randomly selected between
     [5, 35] and probabilities p = 0.55, q = 0.25. The graphs are of sizes 40
     -190 nodes. Each node can take an input feature value in {0, 1, 2, ..., 6}
-    and value 1~6 corresponds to class 0~5 respectively, while value 0 means
+    and values 1~6 correspond to classes 0~5 respectively, while value 0 means
     that the class of the node is unknown. There is only one labeled node that
     is randomly assigned to each community and most node features are set to 0.
 
@@ -46,7 +46,7 @@ class CLUSTERDataset(DGLBuiltinDataset):
     Attributes
     ----------
     num_classes : int
-        Number of classes for each node
+        Number of classes for each node.
 
     Examples
     —-------
@@ -67,7 +67,7 @@ class CLUSTERDataset(DGLBuiltinDataset):
 
     def __init__(
         self,
-        mode,
+        mode="train",
         raw_dir=None,
         force_reload=False,
         verbose=False,
