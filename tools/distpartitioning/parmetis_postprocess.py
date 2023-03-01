@@ -34,7 +34,9 @@ def post_process(params):
         os.path.join(params.postproc_input_dir, params.schema_file)
     )
     assert os.path.isfile(params.parmetis_output_file)
-    schema = read_json(params.schema_file)
+    schema = read_json(
+        os.path.join(params.postproc_input_dir, params.schema_file)
+    )
 
     metis_df = csv.read_csv(
         params.parmetis_output_file,
