@@ -27,9 +27,7 @@ dgl_option(USE_NCCL "Build with NCCL support" OFF)
 dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" OFF)
-# LIBXSMM requires Intel MKL installed. If it has not been installed, check the following page:
-# https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html
-dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" OFF)
+dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)

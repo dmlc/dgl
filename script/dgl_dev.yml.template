@@ -1,6 +1,6 @@
 name: __NAME__
 dependencies:
-  - python=3.7.0
+  - python=__PYTHON_VERSION__
   - pip
   - pip:
     - --find-links https://download.pytorch.org/whl/torch_stable.html
