@@ -12,11 +12,11 @@ import torch
 import torch.distributed as dist
 from gloo_wrapper import alltoallv_cpu
 from utils import (
+    DATA_TYPE_ID,
     generate_read_list,
     get_gid_offsets,
     get_idranges,
     map_partid_rank,
-    DATA_TYPE_ID,
     REV_DATA_TYPE_ID,
 )
 
