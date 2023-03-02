@@ -167,7 +167,7 @@ def linkx_homophily(graph, y):
 
         for k in range(num_classes):
             # Get the nodes that belong to class k.
-            class_mask = (y == k)
+            class_mask = y == k
             same_class_deg_k = graph.ndata["same_class_deg"][class_mask].sum()
             deg_k = deg[class_mask].sum()
             # Value for a null model.
