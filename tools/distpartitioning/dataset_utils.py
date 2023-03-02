@@ -20,6 +20,7 @@ from utils import (
     REV_DATA_TYPE_ID,
 )
 
+
 def _broadcast_shape(
     data, rank, world_size, num_parts, is_feat_data, feat_name
 ):
