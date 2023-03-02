@@ -18,10 +18,14 @@ from dgl.distributed.partition import (
     RESERVED_FIELD_DTYPE,
 )
 from pyarrow import csv
-from utils import get_idranges, memory_snapshot, read_json
+from tools.distpartitioning.utils import (
+    get_idranges,
+    memory_snapshot,
+    read_json,
+)
 
 
-def _get_unique_invidx(srcids, dstids, uniq_nids):
+def _get_unique_invidx(srcids, dstids, nids):
     """This function is used to compute a list of unique elements,
     and their indices in the input list, which is the concatenation
     of srcids, dstids and uniq_nids. In addition, this function will also
@@ -42,7 +46,7 @@ def _get_unique_invidx(srcids, dstids, uniq_nids):
     dstids : numpy array
         a list of numbers, and in our use-case this will be dst-ids of
         the edges
-    uniq_nids : numpy array
+    nids : numpy array
         a list of numbers, and in our use-case this will be a list of
         unique shuffle-global-nids on a given rank
 
@@ -63,22 +67,56 @@ def _get_unique_invidx(srcids, dstids, uniq_nids):
         input array, dstids
 
     """
-    mask = np.isin(srcids, dstids, invert=True, kind="table")
-    uniq_fst = srcids[mask]
+    mask = np.in1d(srcids, nids, invert=True, kind="table")
+    srcids_only = srcids[mask]
+    srcids_idxes = np.where(mask == 1)[0]
 
-    idxes = np.where(mask == 1)[0]
-    local_range = np.arange(len(uniq_nids)) + len(idxes)
-    idxes = np.concatenate([idxes, local_range])
+    # sort the array
+    uniques, unique_srcids_idx = np.unique(srcids_only, return_index=True)
+    idxes = srcids_idxes[unique_srcids_idx]
 
-    uniques = np.concatenate([uniq_fst, uniq_nids])
+    # store this for testing
+    gold_uniques = np.concatenate([uniques, nids])
+
+    # compute the idxes return parameter
+    # Remaining elements in the srcids array
+    srcids_int_nids, comm1, _ = np.intersect1d(
+        srcids, nids, return_indices=True
+    )
+    idxes = np.concatenate([idxes, comm1])
+    uniques = np.concatenate([uniques, srcids_int_nids])
+
+    # Remaining elements in the dstids array
+    dstids_int_nids, comm1, _ = np.intersect1d(
+        dstids, nids, return_indices=True
+    )
+    idxes = np.concatenate([idxes, comm1])
+    uniques = np.concatenate([uniques, dstids_int_nids])
+    assert len(dstids_int_nids) <= len(nids), (
+        f"node-ids array does not meet the requirements "
+        f"It is not a super-set. "
+        f"len(dstids_int_nids) = {len(dstids_int_nids)}, len(nids) = {len(nids)}"
+    )
+
+    # validation check here.
+    assert np.all(gold_uniques.sort() == uniques.sort()), (
+        f"Our assumption about gold_unique is NOT right. "
+        f"len(gold_uniques) == {len(gold_uniques)} "
+        f"len(uniques) == {len(uniques)}"
+    )
+
+    # sort and idxes
     sort_idx = np.argsort(uniques)
     uniques = uniques[sort_idx]
     idxes = idxes[sort_idx]
-    assert len(idxes) == len(uniques)
 
-    # Now compute the inverse-idxes.
-    sortIdx = np.argsort(srcids)
-    srcids = srcids[sortIdx]
+    # uniques and idxes are built
+    assert len(uniques) == len(idxes), f"Error building the idxes array."
+
+    # build inverse idxes for srcids, dstids and nids
+    # over-write the srcids and dstids arrays.
+    sort_ids = np.argsort(srcids)
+    srcids = srcids[sort_ids]
 
     idx1 = 0
     idx2 = 0
@@ -91,20 +129,16 @@ def _get_unique_invidx(srcids, dstids, uniq_nids):
         else:
             idx2 += 1
 
-    assert idx1 == len(
-        srcids
-    ), f"All the elements in the arr1 array are not mapped to uniques"
-    srcids[sortIdx] = srcids
-
-    # find the arr3[0] in the uniques
-    offset = np.searchsorted(uniques, uniq_nids[0], side="left")
-    assert (offset >= 0) and (offset < len(uniques)), (
-        f"Could not locate the list of unique elements (input) "
-        f"in the output uniques` list"
+    assert idx1 >= len(srcids), (
+        f"Failed to locate all srcids in the uniques array "
+        f" len(srcids) = {len(srcids)}, idx1 = {idx1} "
+        f" len(uniques) = {len(uniques)}, idx2 = {idx2}"
     )
-    # it is guaranteed that the dstids will be in the uniq_nids list
-    # this is guaranteed by the structure of the problem
-    dstids = dstids - uniq_nids[0] + offset
+    srcids[sort_ids] = srcids
+
+    # process dstids now.
+    offset = np.searchsorted(uniques, nids[0], side="left")
+    dstids = dstids - nids[0] + offset
 
     return uniques, idxes, srcids, dstids
 
@@ -320,31 +354,7 @@ def create_dgl_object(
     memory_snapshot("CreateDGLObj_UniqueNodeIds: ", part_id)
 
     # get the edge list in some order and then reshuffle.
-    # Here the order of nodes is defined by the `np.unique` function
-    # node order is as listed in the uniq_ids array
-    """
-    ids = np.concatenate(
-        [
-            shuffle_global_src_id,
-            shuffle_global_dst_id,
-            np.arange(
-                shuffle_global_nid_range[0], shuffle_global_nid_range[1] + 1
-            ),
-        ]
-    )
-    uniq_ids, idx, inverse_idx = np.unique(
-        ids, return_index=True, return_inverse=True
-    )
-    assert len(uniq_ids) == len(idx)
-
-    # We get the edge list with their node IDs mapped to a contiguous ID range.
-    part_local_src_id, part_local_dst_id = np.split(
-        inverse_idx[: len(shuffle_global_src_id) * 2], 2
-    )
-    """
-
-    # This is the new implementation of unique method
-    # to overcome numpy's excessive usage of memory
+    # Here the order of nodes is defined by the sorted order.
     uniq_ids, idx, part_local_src_id, part_local_dst_id = _get_unique_invidx(
         shuffle_global_src_id,
         shuffle_global_dst_id,
