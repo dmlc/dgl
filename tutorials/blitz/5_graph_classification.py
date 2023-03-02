@@ -13,12 +13,14 @@ By the end of this tutorial, you will be able to
 (Time estimate: 18 minutes)
 """
 
+import os
+
+os.environ["DGLBACKEND"] = "pytorch"
+import dgl
+import dgl.data
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.data
 
 ######################################################################
 # Overview of Graph Classification with GNN
@@ -52,6 +54,8 @@ print("Node feature dimensionality:", dataset.dim_nfeats)
 print("Number of graph categories:", dataset.gclasses)
 
 
+from dgl.dataloading import GraphDataLoader
+
 ######################################################################
 # Defining Data Loader
 # --------------------
@@ -71,8 +75,6 @@ print("Number of graph categories:", dataset.gclasses)
 #
 
 from torch.utils.data.sampler import SubsetRandomSampler
-
-from dgl.dataloading import GraphDataLoader
 
 num_examples = len(dataset)
 num_train = int(num_examples * 0.8)

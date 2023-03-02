@@ -5,13 +5,13 @@ import platform
 import sys
 from pathlib import Path
 
+import constants
+
 import numpy as np
 import pyarrow
 import pyarrow.csv as csv
-
-import constants
+from partition_algo.base import dump_partition_meta, PartitionMeta
 from utils import get_idranges, get_node_types, read_json
-from partition_algo.base import PartitionMeta, dump_partition_meta
 
 
 def post_process(params):
@@ -49,7 +49,12 @@ def post_process(params):
     ntypes_ntypeid_map, ntypes, ntid_ntype_map = get_node_types(schema)
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema[constants.STR_NODE_TYPE],
-        schema[constants.STR_NUM_NODES_PER_CHUNK],
+        dict(
+            zip(
+                schema[constants.STR_NODE_TYPE],
+                schema[constants.STR_NUM_NODES_PER_TYPE],
+            )
+        ),
     )
 
     outdir = Path(params.partitions_dir)

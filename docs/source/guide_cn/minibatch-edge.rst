@@ -106,7 +106,7 @@
             self.W = nn.Linear(2 * in_features, num_classes)
     
         def apply_edges(self, edges):
-            data = torch.cat([edges.src['x'], edges.dst['x']])
+            data = torch.cat([edges.src['x'], edges.dst['x']], 1)
             return {'score': self.W(data)}
     
         def forward(self, edge_subgraph, x):
@@ -191,7 +191,7 @@ DGL保证边子图中的节点与生成的块列表中最后一个块的输出�
             self.W = nn.Linear(2 * in_features, num_classes)
     
         def apply_edges(self, edges):
-            data = torch.cat([edges.src['x'], edges.dst['x']])
+            data = torch.cat([edges.src['x'], edges.dst['x']], 1)
             return {'score': self.W(data)}
     
         def forward(self, edge_subgraph, x):

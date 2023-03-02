@@ -3,12 +3,12 @@ import os
 import tempfile
 from collections import Counter
 
+import dgl
+
 import pytest
 from change_etype_to_canonical_etype import convert_conf, is_old_version
-from scipy import sparse as spsp
-
-import dgl
 from dgl.distributed import partition_graph
+from scipy import sparse as spsp
 
 
 def create_random_hetero(type_n, node_n):

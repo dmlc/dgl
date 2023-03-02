@@ -2,11 +2,14 @@ import argparse
 import os
 import time
 
+import dgl
+
 import model
 import numpy as np
 import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from input_data import load_data
 from preprocess import (
     mask_test_edges,
@@ -15,9 +18,6 @@ from preprocess import (
     sparse_to_tuple,
 )
 from sklearn.metrics import average_precision_score, roc_auc_score
-
-import dgl
-from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 

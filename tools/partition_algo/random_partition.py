@@ -6,9 +6,10 @@ import os
 import sys
 
 import numpy as np
-from base import PartitionMeta, dump_partition_meta
+from base import dump_partition_meta, PartitionMeta
 from distpartitioning import array_readwriter
 from files import setdir
+
 
 def _random_partition(metadata, num_parts):
     num_nodes_per_type = [sum(_) for _ in metadata["num_nodes_per_chunk"]]

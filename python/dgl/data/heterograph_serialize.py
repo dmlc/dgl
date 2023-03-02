@@ -37,6 +37,7 @@ def save_heterographs(filename, g_list, labels, formats):
         filename, gdata_list, tensor_dict_to_ndarray_dict(labels), formats
     )
 
+
 @register_object("heterograph_serialize.HeteroGraphData")
 class HeteroGraphData(ObjectBase):
     """Object to hold the data to be stored for DGLGraph"""

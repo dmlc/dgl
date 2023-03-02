@@ -1,10 +1,10 @@
-import os
 import json
 import logging
-import numpy as np
-import torch
+import os
 
 import dgl
+import numpy as np
+import torch
 from distpartitioning import array_readwriter
 from distpartitioning.array_readwriter.parquet import ParquetArrayParser
 from files import setdir
@@ -16,12 +16,16 @@ def _chunk_numpy_array(arr, fmt_meta, chunk_sizes, path_fmt, vector_rows=False):
 
     for j, n in enumerate(chunk_sizes):
         path = os.path.abspath(path_fmt % j)
-        arr_chunk = arr[offset: offset + n]
+        arr_chunk = arr[offset : offset + n]
         shape = arr_chunk.shape
         logging.info("Chunking %d-%d" % (offset, offset + n))
         # If requested we write multi-column arrays as single-column vector Parquet files
         array_parser = array_readwriter.get_array_parser(**fmt_meta)
-        if isinstance(array_parser, ParquetArrayParser) and len(shape) > 1 and shape[1] > 1:
+        if (
+            isinstance(array_parser, ParquetArrayParser)
+            and len(shape) > 1
+            and shape[1] > 1
+        ):
             array_parser.write(path, arr_chunk, vector_rows=vector_rows)
         else:
             array_parser.write(path, arr_chunk)
@@ -83,8 +87,15 @@ def _initialize_num_chunks(g, num_chunks, kwargs=None):
 
 
 def _chunk_graph(
-    g, name, ndata_paths, edata_paths, num_chunks, data_fmt, edges_format,
-    vector_rows=False, **kwargs
+    g,
+    name,
+    ndata_paths,
+    edata_paths,
+    num_chunks,
+    data_fmt,
+    edges_format,
+    vector_rows=False,
+    **kwargs,
 ):
     # First deal with ndata and edata that are homogeneous
     # (i.e. not a dict-of-dict)
@@ -107,6 +118,9 @@ def _chunk_graph(
     metadata["graph_name"] = name
     metadata["node_type"] = g.ntypes
 
+    # add node_type_counts
+    metadata["num_nodes_per_type"] = [g.num_nodes(ntype) for ntype in g.ntypes]
+
     # Initialize num_chunks for each node/edge.
     num_chunks_details = _initialize_num_chunks(g, num_chunks, kwargs=kwargs)
 
@@ -123,6 +137,9 @@ def _chunk_graph(
         num_nodes_per_chunk.append(num_nodes_list)
 
     metadata["edge_type"] = [etypestrs[etype] for etype in g.canonical_etypes]
+    metadata["num_edges_per_type"] = [
+        g.num_edges(etype) for etype in g.canonical_etypes
+    ]
 
     # Compute the number of edges per chunk per edge type
     metadata["num_edges_per_chunk"] = num_edges_per_chunk = []
@@ -139,16 +156,24 @@ def _chunk_graph(
         k: v for k, v in zip(g.canonical_etypes, num_edges_per_chunk)
     }
 
+    idxes_etypestr = {
+        idx: (etype, etypestrs[etype])
+        for idx, etype in enumerate(g.canonical_etypes)
+    }
+    idxes = np.arange(len(idxes_etypestr))
+
     # Split edge index
     metadata["edges"] = {}
     with setdir("edge_index"):
-        for etype in g.canonical_etypes:
-            etypestr = etypestrs[etype]
+        np.random.shuffle(idxes)
+        for idx in idxes:
+            etype = idxes_etypestr[idx][0]
+            etypestr = idxes_etypestr[idx][1]
             logging.info("Chunking edge index for %s" % etypestr)
             edges_meta = {}
-            if edges_format == 'csv':
+            if edges_format == "csv":
                 fmt_meta = {"name": edges_format, "delimiter": " "}
-            elif edges_format == 'parquet':
+            elif edges_format == "parquet":
                 fmt_meta = {"name": edges_format}
             else:
                 raise RuntimeError(f"Invalid edges_fmt: {edges_format}")
@@ -259,7 +284,7 @@ def chunk_graph(
     num_chunks,
     output_path,
     data_fmt="numpy",
-    edges_fmt='csv',
+    edges_fmt="csv",
     vector_rows=False,
     **kwargs,
 ):
@@ -302,14 +327,26 @@ def chunk_graph(
             edata[key] = os.path.abspath(edata[key])
     with setdir(output_path):
         _chunk_graph(
-            g, name, ndata_paths, edata_paths, num_chunks, data_fmt, edges_fmt,
-            vector_rows, **kwargs
+            g,
+            name,
+            ndata_paths,
+            edata_paths,
+            num_chunks,
+            data_fmt,
+            edges_fmt,
+            vector_rows,
+            **kwargs,
         )
 
 
 def create_chunked_dataset(
-    root_dir, num_chunks, data_fmt="numpy", edges_fmt='csv',
-    vector_rows=False, **kwargs):
+    root_dir,
+    num_chunks,
+    data_fmt="numpy",
+    edges_fmt="csv",
+    vector_rows=False,
+    **kwargs,
+):
     """
     This function creates a sample dataset, based on MAG240 dataset.
 

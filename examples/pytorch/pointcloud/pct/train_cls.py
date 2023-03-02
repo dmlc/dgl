@@ -7,11 +7,11 @@ import provider
 import torch
 import torch.nn as nn
 import tqdm
+
+from dgl.data.utils import download, get_download_dir
 from ModelNetDataLoader import ModelNetDataLoader
 from pct import PointTransformerCLS
 from torch.utils.data import DataLoader
-
-from dgl.data.utils import download, get_download_dir
 
 torch.backends.cudnn.enabled = False
 
@@ -54,7 +54,6 @@ CustomDataLoader = partial(
 
 
 def train(net, opt, scheduler, train_loader, dev):
-
     net.train()
 
     total_loss = 0

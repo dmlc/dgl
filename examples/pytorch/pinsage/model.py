@@ -2,6 +2,8 @@ import argparse
 import os
 import pickle
 
+import dgl
+
 import evaluation
 import layers
 import numpy as np
@@ -13,8 +15,6 @@ import tqdm
 from torch.utils.data import DataLoader
 from torchtext.data.utils import get_tokenizer
 from torchtext.vocab import build_vocab_from_iterator
-
-import dgl
 
 
 class PinSAGEModel(nn.Module):

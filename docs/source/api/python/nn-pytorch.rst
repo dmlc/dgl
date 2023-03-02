@@ -14,7 +14,6 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GraphConv
     ~dgl.nn.pytorch.conv.EdgeWeightNorm
     ~dgl.nn.pytorch.conv.RelGraphConv
-    ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
     ~dgl.nn.pytorch.conv.TAGConv
     ~dgl.nn.pytorch.conv.GATConv
     ~dgl.nn.pytorch.conv.GATv2Conv
@@ -41,6 +40,17 @@ Conv Layers
     ~dgl.nn.pytorch.conv.EGNNConv
     ~dgl.nn.pytorch.conv.PNAConv
     ~dgl.nn.pytorch.conv.DGNConv
+
+CuGraph Conv Layers
+----------------------------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
+    ~dgl.nn.pytorch.conv.CuGraphSAGEConv
 
 Dense Conv Layers
 ----------------------------------------
@@ -114,6 +124,7 @@ Utility Modules
     ~dgl.nn.pytorch.sparse_emb.NodeEmbedding
     ~dgl.nn.pytorch.explain.GNNExplainer
     ~dgl.nn.pytorch.explain.HeteroGNNExplainer
+    ~dgl.nn.pytorch.explain.SubgraphX
     ~dgl.nn.pytorch.utils.LabelPropagation
     ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
     ~dgl.nn.pytorch.utils.LaplacianPosEnc

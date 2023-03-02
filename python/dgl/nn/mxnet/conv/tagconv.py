@@ -60,12 +60,8 @@ class TAGConv(gluon.Block):
     [ 0.32964635 -0.7669234 ]]
     <NDArray 6x2 @cpu(0)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 k=2,
-                 bias=True,
-                 activation=None):
+
+    def __init__(self, in_feats, out_feats, k=2, bias=True, activation=None):
         super(TAGConv, self).__init__()
         self.out_feats = out_feats
         self.k = k
@@ -74,11 +70,14 @@ class TAGConv(gluon.Block):
         self.in_feats = in_feats
 
         self.lin = self.params.get(
-            'weight', shape=(self.in_feats * (self.k + 1), self.out_feats),
-            init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+            "weight",
+            shape=(self.in_feats * (self.k + 1), self.out_feats),
+            init=mx.init.Xavier(magnitude=math.sqrt(2.0)),
+        )
         if self.bias:
-            self.h_bias = self.params.get('bias', shape=(out_feats,),
-                                          init=mx.init.Zero())
+            self.h_bias = self.params.get(
+                "bias", shape=(out_feats,), init=mx.init.Zero()
+            )
 
     def forward(self, graph, feat):
         r"""
@@ -102,21 +101,24 @@ class TAGConv(gluon.Block):
             is size of output feature.
         """
         with graph.local_scope():
-            assert graph.is_homogeneous, 'Graph is not homogeneous'
+            assert graph.is_homogeneous, "Graph is not homogeneous"
 
-            degs = graph.in_degrees().astype('float32')
-            norm = mx.nd.power(mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5)
+            degs = graph.in_degrees().astype("float32")
+            norm = mx.nd.power(
+                mx.nd.clip(degs, a_min=1, a_max=float("inf")), -0.5
+            )
             shp = norm.shape + (1,) * (feat.ndim - 1)
             norm = norm.reshape(shp).as_in_context(feat.context)
 
             rst = feat
             for _ in range(self.k):
                 rst = rst * norm
-                graph.ndata['h'] = rst
+                graph.ndata["h"] = rst
 
-                graph.update_all(fn.copy_u(u='h', out='m'),
-                                 fn.sum(msg='m', out='h'))
-                rst = graph.ndata['h']
+                graph.update_all(
+                    fn.copy_u(u="h", out="m"), fn.sum(msg="m", out="h")
+                )
+                rst = graph.ndata["h"]
                 rst = rst * norm
                 feat = mx.nd.concat(feat, rst, dim=-1)
 

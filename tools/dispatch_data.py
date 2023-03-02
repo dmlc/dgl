@@ -44,16 +44,15 @@ def submit_jobs(args) -> str:
     graph_name = schema_map["graph_name"]
 
     # retrieve num_parts
-    num_chunks = len(schema_map["num_nodes_per_chunk"][0])
-    num_parts = num_chunks
+    num_parts = 0
     partition_path = os.path.join(args.partitions_dir, "partition_meta.json")
     if os.path.isfile(partition_path):
         part_meta = load_partition_meta(partition_path)
         num_parts = part_meta.num_parts
-    if num_parts > num_chunks:
-        raise Exception(
-            "Number of partitions should be less/equal than number of chunks."
-        )
+
+    assert (
+        num_parts != 0
+    ), f"Invalid value for no. of partitions. Please check partition_meta.json file."
 
     # verify ip_config
     with open(args.ip_config, "r") as f:
@@ -64,7 +63,9 @@ def submit_jobs(args) -> str:
 
     argslist = ""
     argslist += "--world-size {} ".format(num_ips)
-    argslist += "--partitions-dir {} ".format(os.path.abspath(args.partitions_dir))
+    argslist += "--partitions-dir {} ".format(
+        os.path.abspath(args.partitions_dir)
+    )
     argslist += "--input-dir {} ".format(os.path.abspath(args.in_dir))
     argslist += "--graph-name {} ".format(graph_name)
     argslist += "--schema {} ".format(schema_path)
@@ -74,7 +75,9 @@ def submit_jobs(args) -> str:
     argslist += "--log-level {} ".format(args.log_level)
     argslist += "--save-orig-nids " if args.save_orig_nids else ""
     argslist += "--save-orig-eids " if args.save_orig_eids else ""
-    argslist += f"--graph-formats {args.graph_formats} " if args.graph_formats else ""
+    argslist += (
+        f"--graph-formats {args.graph_formats} " if args.graph_formats else ""
+    )
 
     # (BarclayII) Is it safe to assume all the workers have the Python executable at the same path?
     pipeline_cmd = os.path.join(INSTALL_DIR, PIPELINE_SCRIPT)
@@ -153,9 +156,9 @@ def main():
         type=str,
         default=None,
         help="Save partitions in specified formats. It could be any combination(joined with ``,``) "
-             "of ``coo``, ``csc`` and ``csr``. If not specified, save one format only according to "
-             "what format is available. If multiple formats are available, selection priority "
-             "from high to low is ``coo``, ``csc``, ``csr``.",
+        "of ``coo``, ``csc`` and ``csr``. If not specified, save one format only according to "
+        "what format is available. If multiple formats are available, selection priority "
+        "from high to low is ``coo``, ``csc``, ``csr``.",
     )
 
     args, udf_command = parser.parse_known_args()

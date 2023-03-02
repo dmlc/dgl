@@ -1,11 +1,11 @@
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import GRU, BatchNorm1d, Linear, ModuleList, ReLU, Sequential
-from utils import global_global_loss_, local_global_loss_
 
 from dgl.nn import GINConv, NNConv, Set2Set
 from dgl.nn.pytorch.glob import SumPooling
+from torch.nn import BatchNorm1d, GRU, Linear, ModuleList, ReLU, Sequential
+from utils import global_global_loss_, local_global_loss_
 
 """ Feedforward neural network"""
 
@@ -102,7 +102,6 @@ class GINEncoder(nn.Module):
         self.pool = SumPooling()
 
     def forward(self, graph, feat):
-
         xs = []
         x = feat
         for i in range(self.n_layer):
@@ -163,7 +162,6 @@ class InfoGraph(nn.Module):
         return global_emb
 
     def forward(self, graph, feat, graph_id):
-
         global_emb, local_emb = self.encoder(graph, feat)
 
         global_h = self.global_d(global_emb)  # global hidden representation
@@ -221,7 +219,6 @@ class NNConvEncoder(nn.Module):
         self.set2set = Set2Set(hid_dim, n_iters=3, n_layers=1)
 
     def forward(self, graph, nfeat, efeat):
-
         out = F.relu(self.lin0(nfeat))
         h = out.unsqueeze(0)
 
@@ -279,7 +276,6 @@ class InfoGraphS(nn.Module):
         self.unsup_d = FeedforwardNetwork(2 * hid_dim, hid_dim)
 
     def forward(self, graph, nfeat, efeat):
-
         sup_global_emb, sup_local_emb = self.sup_encoder(graph, nfeat, efeat)
 
         sup_global_pred = self.fc2(F.relu(self.fc1(sup_global_emb)))
@@ -288,7 +284,6 @@ class InfoGraphS(nn.Module):
         return sup_global_pred
 
     def unsup_forward(self, graph, nfeat, efeat, graph_id):
-
         sup_global_emb, sup_local_emb = self.sup_encoder(graph, nfeat, efeat)
         unsup_global_emb, unsup_local_emb = self.unsup_encoder(
             graph, nfeat, efeat

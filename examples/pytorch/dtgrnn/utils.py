@@ -1,9 +1,8 @@
+import dgl
 import numpy as np
 import scipy.sparse as sparse
 import torch
 import torch.nn as nn
-
-import dgl
 
 
 class NormalizationLayer(nn.Module):

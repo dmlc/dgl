@@ -1,8 +1,9 @@
 """Tensorflow modules for graph convolutions(GCN)."""
+import numpy as np
+
 # pylint: disable= no-member, arguments-differ, invalid-name
 import tensorflow as tf
 from tensorflow.keras import layers
-import numpy as np
 
 from .... import function as fn
 from ....base import DGLError
@@ -134,18 +135,23 @@ class GraphConv(layers.Layer):
         [ 2.1405895, -0.2574358],
         [ 1.3607183, -0.1636453]], dtype=float32)>
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 norm='both',
-                 weight=True,
-                 bias=True,
-                 activation=None,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        norm="both",
+        weight=True,
+        bias=True,
+        activation=None,
+        allow_zero_in_degree=False,
+    ):
         super(GraphConv, self).__init__()
-        if norm not in ('none', 'both', 'right', 'left'):
-            raise DGLError('Invalid norm value. Must be either "none", "both", "right" or "left".'
-                           ' But got "{}".'.format(norm))
+        if norm not in ("none", "both", "right", "left"):
+            raise DGLError(
+                'Invalid norm value. Must be either "none", "both", "right" or "left".'
+                ' But got "{}".'.format(norm)
+            )
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
@@ -153,15 +159,21 @@ class GraphConv(layers.Layer):
 
         if weight:
             xinit = tf.keras.initializers.glorot_uniform()
-            self.weight = tf.Variable(initial_value=xinit(
-                shape=(in_feats, out_feats), dtype='float32'), trainable=True)
+            self.weight = tf.Variable(
+                initial_value=xinit(
+                    shape=(in_feats, out_feats), dtype="float32"
+                ),
+                trainable=True,
+            )
         else:
             self.weight = None
 
         if bias:
             zeroinit = tf.keras.initializers.zeros()
-            self.bias = tf.Variable(initial_value=zeroinit(
-                shape=(out_feats), dtype='float32'), trainable=True)
+            self.bias = tf.Variable(
+                initial_value=zeroinit(shape=(out_feats), dtype="float32"),
+                trainable=True,
+            )
         else:
             self.bias = None
 
@@ -216,23 +228,27 @@ class GraphConv(layers.Layer):
         """
         with graph.local_scope():
             if not self._allow_zero_in_degree:
-                if  tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                if tf.math.count_nonzero(graph.in_degrees() == 0) > 0:
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            if self._norm in ['both', 'left']:
-                degs = tf.clip_by_value(tf.cast(graph.out_degrees(), tf.float32),
-                                        clip_value_min=1,
-                                        clip_value_max=np.inf)
-                if self._norm == 'both':
+            if self._norm in ["both", "left"]:
+                degs = tf.clip_by_value(
+                    tf.cast(graph.out_degrees(), tf.float32),
+                    clip_value_min=1,
+                    clip_value_max=np.inf,
+                )
+                if self._norm == "both":
                     norm = tf.pow(degs, -0.5)
                 else:
                     norm = 1.0 / degs
@@ -242,9 +258,11 @@ class GraphConv(layers.Layer):
 
             if weight is not None:
                 if self.weight is not None:
-                    raise DGLError('External weight is provided while at the same time the'
-                                   ' module has defined its own weight parameter. Please'
-                                   ' create the module with flag weight=False.')
+                    raise DGLError(
+                        "External weight is provided while at the same time the"
+                        " module has defined its own weight parameter. Please"
+                        " create the module with flag weight=False."
+                    )
             else:
                 weight = self.weight
 
@@ -252,24 +270,28 @@ class GraphConv(layers.Layer):
                 # mult W first to reduce the feature size for aggregation.
                 if weight is not None:
                     feat_src = tf.matmul(feat_src, weight)
-                graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_u(u='h', out='m'),
-                                 fn.sum(msg='m', out='h'))
-                rst = graph.dstdata['h']
+                graph.srcdata["h"] = feat_src
+                graph.update_all(
+                    fn.copy_u(u="h", out="m"), fn.sum(msg="m", out="h")
+                )
+                rst = graph.dstdata["h"]
             else:
                 # aggregate first then mult W
-                graph.srcdata['h'] = feat_src
-                graph.update_all(fn.copy_u(u='h', out='m'),
-                                 fn.sum(msg='m', out='h'))
-                rst = graph.dstdata['h']
+                graph.srcdata["h"] = feat_src
+                graph.update_all(
+                    fn.copy_u(u="h", out="m"), fn.sum(msg="m", out="h")
+                )
+                rst = graph.dstdata["h"]
                 if weight is not None:
                     rst = tf.matmul(rst, weight)
 
-            if self._norm in ['both', 'right']:
-                degs = tf.clip_by_value(tf.cast(graph.in_degrees(), tf.float32),
-                                        clip_value_min=1,
-                                        clip_value_max=np.inf)
-                if self._norm == 'both':
+            if self._norm in ["both", "right"]:
+                degs = tf.clip_by_value(
+                    tf.cast(graph.in_degrees(), tf.float32),
+                    clip_value_min=1,
+                    clip_value_max=np.inf,
+                )
+                if self._norm == "both":
                     norm = tf.pow(degs, -0.5)
                 else:
                     norm = 1.0 / degs
@@ -289,8 +311,8 @@ class GraphConv(layers.Layer):
         """Set the extra representation of the module,
         which will come into effect when printing the model.
         """
-        summary = 'in={_in_feats}, out={_out_feats}'
-        summary += ', normalization={_norm}'
-        if '_activation' in self.__dict__:
-            summary += ', activation={_activation}'
+        summary = "in={_in_feats}, out={_out_feats}"
+        summary += ", normalization={_norm}"
+        if "_activation" in self.__dict__:
+            summary += ", activation={_activation}"
         return summary.format(**self.__dict__)

@@ -1,10 +1,9 @@
+import dgl
+import dgl.function as DGLF
 import rdkit.Chem as Chem
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.function as DGLF
 from dgl import line_graph, mean_nodes
 
 from .chemutils import get_mol

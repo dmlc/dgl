@@ -4,15 +4,15 @@ import argparse
 import copy
 import random
 
+import dgl
+import dgl.function as fn
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from tqdm import trange
-
-import dgl
-import dgl.function as fn
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
+from tqdm import trange
 
 
 class MixHopConv(nn.Module):
@@ -83,7 +83,6 @@ class MixHopConv(nn.Module):
             max_j = max(self.p) + 1
             outputs = []
             for j in range(max_j):
-
                 if j in self.p:
                     output = self.weights[str(j)](feats)
                     outputs.append(output)

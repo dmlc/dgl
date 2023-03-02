@@ -5,16 +5,16 @@ Data utils for processing bAbI datasets
 import os
 import string
 
-import torch
-from torch.utils.data import DataLoader
-
 import dgl
+
+import torch
 from dgl.data.utils import (
     _get_dgl_url,
     download,
     extract_archive,
     get_download_dir,
 )
+from torch.utils.data import DataLoader
 
 
 def get_babi_dataloaders(batch_size, train_size=50, task_id=4, q_type=0):

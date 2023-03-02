@@ -1,6 +1,9 @@
 import glob
 import os
 
+import dgl
+import dgl.nn.pytorch as dglnn
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,9 +14,6 @@ from ogb.nodeproppred import DglNodePropPredDataset
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torchmetrics import Accuracy
-
-import dgl
-import dgl.nn.pytorch as dglnn
 
 
 class SAGE(LightningModule):

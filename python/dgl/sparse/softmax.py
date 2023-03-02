@@ -1,5 +1,5 @@
 """Softmax op for SparseMatrix"""
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, W0622
 
 import torch
 
@@ -8,17 +8,19 @@ from .sparse_matrix import SparseMatrix
 __all__ = ["softmax"]
 
 
-def softmax(A: SparseMatrix) -> SparseMatrix:
-    """Apply row-wise softmax to the non-zero entries of the sparse matrix.
+def softmax(input: SparseMatrix, dim: int = 1) -> SparseMatrix:
+    """Applies softmax to the non-zero elements of the sparse matrix on the
+    dimension :attr:``dim``. dim = 0 or 1 indicates column-wise or row-wise
+    softmax respectively.
 
-    If :attr:`A.val` takes shape :attr:`(nnz, D)`, then the output matrix
-    :attr:`A'` and :attr:`A'.val` take the same shape as :attr:`A` and
-    :attr:`A.val`. :attr:`A'.val[:, i]` is calculated based on
-    :attr:`A.val[:, i]`.
+    If :attr:`input.val` takes shape ``(nnz, D)``, then the output matrix
+    :attr:`output` and :attr:`output.val` take the same shape as :attr:`input`
+    and :attr:`input.val`. :attr:`output.val[:, i]` is calculated based on
+    :attr:`input.val[:, i]`.
 
     Parameters
     ----------
-    A : SparseMatrix
+    input : SparseMatrix
         The input sparse matrix
 
     Returns
@@ -29,33 +31,45 @@ def softmax(A: SparseMatrix) -> SparseMatrix:
     Examples
     --------
 
-    Case1: matrix with values of shape (nnz)
+    Case1: row-wise softmax on matrix with values of shape (nnz)
 
-    >>> row = torch.tensor([0, 0, 1, 2])
-    >>> col = torch.tensor([1, 2, 2, 0])
-    >>> nnz = len(row)
-    >>> val = torch.arange(nnz).float()
-    >>> A = from_coo(row, col, val)
-    >>> softmax(A)
+    >>> indices = torch.tensor([[0, 0, 1, 2], [1, 2, 2, 0]])
+    >>> val = torch.tensor([0., 1., 2., 3.])
+    >>> A = dglsp.spmatrix(indices, val)
+    >>> dglsp.softmax(A)
     SparseMatrix(indices=tensor([[0, 0, 1, 2],
-        [1, 2, 2, 0]]),
-    values=tensor([0.2689, 0.7311, 1.0000, 1.0000]),
-    shape=(3, 3), nnz=4)
+                                 [1, 2, 2, 0]]),
+                 values=tensor([0.2689, 0.7311, 1.0000, 1.0000]),
+                 shape=(3, 3), nnz=4)
 
-    Case2: matrix with values of shape (nnz, D)
+    Case2: row-wise softmax on matrix with values of shape (nnz, D)
 
+    >>> indices = torch.tensor([[0, 0, 1, 2], [1, 2, 2, 0]])
     >>> val = torch.tensor([[0., 7.], [1., 3.], [2., 2.], [3., 1.]])
-    >>> A = from_coo(row, col, val)
-    >>> softmax(A)
+    >>> A = dglsp.spmatrix(indices, val)
+    >>> dglsp.softmax(A)
     SparseMatrix(indices=tensor([[0, 0, 1, 2],
-        [1, 2, 2, 0]]),
-    values=tensor([[0.2689, 0.9820],
-        [0.7311, 0.0180],
-        [1.0000, 1.0000],
-        [1.0000, 1.0000]]),
-    shape=(3, 3), nnz=4)
+                                 [1, 2, 2, 0]]),
+                 values=tensor([[0.2689, 0.9820],
+                                [0.7311, 0.0180],
+                                [1.0000, 1.0000],
+                                [1.0000, 1.0000]]),
+                 shape=(3, 3), nnz=4, val_size=(2,))
+
+    Case3: column-wise softmax on matrix with values of shape (nnz)
+
+    >>> indices = torch.tensor([[0, 0, 1, 2], [1, 2, 2, 0]])
+    >>> val = torch.tensor([0., 1., 2., 3.])
+    >>> A = dglsp.spmatrix(indices, val)
+    >>> dglsp.softmax(A, 0)
+    SparseMatrix(indices=tensor([[0, 0, 1, 2],
+                                 [1, 2, 2, 0]]),
+                 values=tensor([1.0000, 0.2689, 0.7311, 1.0000]),
+                 shape=(3, 3), nnz=4)
     """
-    return SparseMatrix(torch.ops.dgl_sparse.softmax(A.c_sparse_matrix))
+    return SparseMatrix(
+        torch.ops.dgl_sparse.softmax(input.c_sparse_matrix, dim)
+    )
 
 
 SparseMatrix.softmax = softmax
