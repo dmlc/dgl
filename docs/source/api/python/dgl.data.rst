@@ -54,6 +54,7 @@ Datasets for node classification/regression tasks
     WikiCSDataset
     FlickrDataset
     YelpDataset
+    CLUSTERDataset
 
 Edge Prediction Datasets
 ---------------------------------------
