@@ -634,10 +634,11 @@ def test_dataloader_worker_init_fn():
         sampler,
         batch_size=4,
         num_workers=4,
-        worker_init_fn=dummy_worker_init_fn
+        worker_init_fn=dummy_worker_init_fn,
     )
     for _ in dataloader:
         pass
+
 
 if __name__ == "__main__":
     # test_node_dataloader(F.int32, 'neighbor', None)
