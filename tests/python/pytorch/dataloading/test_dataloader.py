@@ -625,6 +625,7 @@ def test_edge_dataloader_excludes(
 def dummy_worker_init_fn(worker_id):
     pass
 
+
 def test_dataloader_worker_init_fn():
     dataset = dgl.data.CoraFullDataset()
     g = dataset[0]
