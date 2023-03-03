@@ -5,16 +5,16 @@ from . import function as fn
 try:
     import torch
 except ImportError:
-    has_torch = False
+    HAS_TORCH = False
 else:
-    has_torch = True
+    HAS_TORCH = True
 
 __all__ = ["node_homophily", "edge_homophily", "linkx_homophily"]
 
 
 def check_pytorch():
     """Check if PyTorch is the backend."""
-    if has_torch is False:
+    if HAS_TORCH is False:
         raise ModuleNotFoundError(
             "This function requires PyTorch to be the backend."
         )
