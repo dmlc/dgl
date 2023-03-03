@@ -528,10 +528,11 @@ def mask_nodes_by_property(property_values, part_ratios, random_seed=None):
 
     node_indices = np.arange(num_nodes)[permutation]
     property_values = property_values[permutation]
+    in_distribution_size = np.sum(part_sizes[:3])
 
     node_indices_ordered = node_indices[np.argsort(property_values)]
-    node_indices_ordered[: part_sizes[0]] = generator.permutation(
-        node_indices_ordered[: part_sizes[0]]
+    node_indices_ordered[: in_distribution_size] = generator.permutation(
+        node_indices_ordered[: in_distribution_size]
     )
 
     sections = np.cumsum(part_sizes)
