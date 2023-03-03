@@ -1,13 +1,23 @@
 """Utils for tacking graph homophily and heterophily"""
+# pylint: disable=W0611
 from . import function as fn
-from .convert import graph as create_graph
 
 try:
     import torch
 except ImportError:
-    pass
+    has_torch = False
+else:
+    has_torch = True
 
 __all__ = ["node_homophily", "edge_homophily", "linkx_homophily"]
+
+
+def check_pytorch():
+    """Check if PyTorch is the backend."""
+    if has_torch is False:
+        raise ModuleNotFoundError(
+            "This function requires PyTorch to be the backend."
+        )
 
 
 def get_long_edges(graph):
@@ -56,6 +66,7 @@ def node_homophily(graph, y):
     >>> dgl.node_homophily(graph, y)
     0.6000000238418579
     """
+    check_pytorch()
     with graph.local_scope():
         # Handle the case where graph is of dtype int32.
         src, dst = get_long_edges(graph)
@@ -103,6 +114,7 @@ def edge_homophily(graph, y):
     >>> dgl.edge_homophily(graph, y)
     0.75
     """
+    check_pytorch()
     with graph.local_scope():
         # Handle the case where graph is of dtype int32.
         src, dst = get_long_edges(graph)
@@ -150,6 +162,7 @@ def linkx_homophily(graph, y):
     >>> dgl.linkx_homophily(graph, y)
     0.19999998807907104
     """
+    check_pytorch()
     with graph.local_scope():
         # Compute |{u\in N(v): y_v = y_u}| for each node v.
         # Handle the case where graph is of dtype int32.
