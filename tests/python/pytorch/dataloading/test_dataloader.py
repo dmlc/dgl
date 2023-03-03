@@ -91,6 +91,7 @@ def test_saint(num_workers, mode):
     for sg in dataloader:
         pass
 
+
 @parametrize_idtype
 @pytest.mark.parametrize(
     "mode", ["cpu", "uva_cuda_indices", "uva_cpu_indices", "pure_gpu"]
