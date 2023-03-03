@@ -38,7 +38,7 @@ def node_homophily(graph, y):
     ----------
     graph : DGLGraph
         The graph.
-    y : Tensor
+    y : torch.Tensor
         The node labels, which is a tensor of shape (|V|).
 
     Returns
@@ -85,7 +85,7 @@ def edge_homophily(graph, y):
     ----------
     graph : DGLGraph
         The graph.
-    y : Tensor
+    y : torch.Tensor
         The node labels, which is a tensor of shape (|V|).
 
     Returns
@@ -132,7 +132,7 @@ def linkx_homophily(graph, y):
     ----------
     graph : DGLGraph
         The graph.
-    y : Tensor
+    y : torch.Tensor
         The node labels, which is a tensor of shape (|V|).
 
     Returns
@@ -162,16 +162,15 @@ def linkx_homophily(graph, y):
 
         deg = graph.in_degrees().float()
         num_nodes = graph.num_nodes()
-        value = 0
         num_classes = y.max(dim=0).values.item() + 1
 
+        value = 0
         for k in range(num_classes):
             # Get the nodes that belong to class k.
             class_mask = y == k
             same_class_deg_k = graph.ndata["same_class_deg"][class_mask].sum()
             deg_k = deg[class_mask].sum()
-            # Value for a null model.
-            null_value = class_mask.sum() / num_nodes
-            value += max(0, same_class_deg_k / deg_k - null_value)
+            num_nodes_k = class_mask.sum()
+            value += max(0, same_class_deg_k / deg_k - num_nodes_k / num_nodes)
 
         return value.item() / (num_classes - 1)
