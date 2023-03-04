@@ -39,6 +39,13 @@ from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
 from model import SAGE, RGAT
 
+def cuda_index_tensor(tensor, idx):
+    assert(idx.device != th.device('cpu'))
+    if tensor.is_pinned():
+        return dgl.utils.gather_pinned_tensor_rows(tensor, idx)
+    else:
+        return tensor[idx.long()]
+
 class SAGELightning(LightningModule):
     def __init__(self,
                  in_feats,
@@ -155,10 +162,11 @@ class DataModule(LightningDataModule):
 
         fanouts = [int(_) for _ in fan_out]
         if sampler == 'neighbor':
-            sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'], prefetch_labels=['labels'])
+            sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
         else:
-            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'], prefetch_edge_feats=['etype'], prefetch_labels=['labels'])
-        unbiased_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'], prefetch_edge_feats=['etype'], prefetch_labels=['labels'])
+            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
+        # unbiased_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
+        unbiased_sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
 
         dataloader_device = th.device('cpu')
         g = g.formats(['csc'])
@@ -209,7 +217,7 @@ class DataModule(LightningDataModule):
             shuffle=False,
             drop_last=False,
             num_workers=self.num_workers)
-            for sampler in [self.sampler]]#, self.unbiased_sampler]]
+            for sampler in [self.sampler, self.unbiased_sampler]]
 
     def test_dataloader(self):
         return [dgl.dataloading.DataLoader(
@@ -222,7 +230,7 @@ class DataModule(LightningDataModule):
             shuffle=False,
             drop_last=False,
             num_workers=self.num_workers)
-            for sampler in [self.sampler]]#, self.unbiased_sampler]]
+            for sampler in [self.sampler, self.unbiased_sampler]]
 
 class BatchSizeCallback(Callback):
     def __init__(self, limit, factor=3):
@@ -255,7 +263,7 @@ class BatchSizeCallback(Callback):
         cache = trainer.datamodule.cache
         if cache is not None:
             values, missing_index, missing_keys = cache.query(input_nodes)
-            missing_values = trainer.datamodule.g.ndata['features'][missing_keys.long()]
+            missing_values = cuda_index_tensor(trainer.datamodule.g.ndata['features'], missing_keys.long())
             cache.replace(missing_keys, missing_values)
             cache_miss = missing_keys.shape[0] / input_nodes.shape[0]
             trainer.strategy.model.log('cache_miss', cache_miss, prog_bar=True, on_step=True, on_epoch=False)
@@ -322,9 +330,11 @@ if __name__ == '__main__':
     # Train
     callbacks = []
     if not args.disable_checkpoint:
-        callbacks.append(ModelCheckpoint(monitor='val_acc/dataloader_idx_0', save_top_k=1))
+        callbacks.append(ModelCheckpoint(monitor='val_acc/dataloader_idx_0', save_top_k=1, mode='max'))
+        # callbacks.append(ModelCheckpoint(monitor='val_acc', save_top_k=1, mode='max'))
     callbacks.append(BatchSizeCallback(args.vertex_limit))
     callbacks.append(EarlyStopping(monitor='val_acc/dataloader_idx_0', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
+    # callbacks.append(EarlyStopping(monitor='val_acc', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
     subdir = '{}_{}_{}_{}_{}_{}'.format(args.dataset, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.independent_batches)
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(gpus=[args.gpu] if args.gpu != -1 else None,

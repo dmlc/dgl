@@ -1,5 +1,7 @@
 """Feature storage classes for DataLoading"""
 from .. import backend as F
+# from .gpu_cache import GPUCachedTensorStorage
+
 from .base import *
 from .numpy import *
 
