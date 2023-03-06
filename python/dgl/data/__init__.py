@@ -53,9 +53,9 @@ from .tree import SST, SSTDataset
 from .tu import LegacyTUDataset, TUDataset
 from .utils import *
 from .cluster import CLUSTERDataset
+from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
-from .pattern import PATTERNDataset
 
 
 def register_data_args(parser):

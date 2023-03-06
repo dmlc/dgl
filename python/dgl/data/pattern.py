@@ -6,7 +6,7 @@ from .utils import _get_dgl_url, load_graphs
 
 
 class PATTERNDataset(DGLBuiltinDataset):
-    r""" PATTERN dataset for graph pattern recognition task.
+    r"""PATTERN dataset for graph pattern recognition task.
 
     Each graph G contains 5 communities with sizes randomly selected between [5, 35].
     The SBM of each community is p = 0.5, q = 0.35, and the node features on G are
@@ -64,7 +64,14 @@ class PATTERNDataset(DGLBuiltinDataset):
     edata_schemes={'feat': Scheme(shape=(1,), dtype=torch.float32)})
     """
 
-    def __init__(self, mode='train', raw_dir=None, force_reload=False, verbose=False, transform=None):
+    def __init__(
+        self,
+        mode='train',
+        raw_dir=None,
+        force_reload=False,
+        verbose=False,
+        transform=None
+    ):
         assert mode in ["train", "valid", "test"]
         self.mode = mode
         _url = _get_dgl_url("dataset/SBM_PATTERN.zip")
@@ -82,11 +89,15 @@ class PATTERNDataset(DGLBuiltinDataset):
         self.load()
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, "SBM_PATTERN_{}.bin".format(self.mode))
+        graph_path = os.path.join(
+            self.save_path, "SBM_PATTERN_{}.bin".format(self.mode)
+        )
         return os.path.exists(graph_path)
 
     def load(self):
-        graph_path = os.path.join(self.save_path, "SBM_PATTERN_{}.bin".format(self.mode))
+        graph_path = os.path.join(
+            self.save_path, "SBM_PATTERN_{}.bin".format(self.mode)
+        )
         self._graphs, _ = load_graphs(graph_path)
 
     @property
