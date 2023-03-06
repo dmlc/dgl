@@ -1,7 +1,7 @@
 #!/bin/bash
 
 readonly CUDA_VERSIONS="10.2,11.3,11.6,11.7"
-readonly TORCH_VERSION="1.12"
+readonly TORCH_VERSION="1.12.0"
 readonly PYTHON_VERSION="3.7"
 
 usage() {
