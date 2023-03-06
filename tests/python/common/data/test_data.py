@@ -390,6 +390,31 @@ def test_cluster():
     F._default_context_str == "gpu",
     reason="Datasets don't need to be tested on GPU.",
 )
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="only supports pytorch"
+)
+def test_zinc():
+    mode_n_graphs = {
+        "train": 10000,
+        "valid": 1000,
+        "test": 1000,
+    }
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    for mode, n_graphs in mode_n_graphs.items():
+        dataset1 = data.ZINCDataset(mode=mode)
+        g1, label = dataset1[0]
+        dataset2 = data.ZINCDataset(mode=mode, transform=transform)
+        g2, _ = dataset2[0]
+
+        assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+        assert dataset2.num_atom_types == 28
+        assert label.shape == 1
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_extract_archive():
     # gzip
