@@ -67,7 +67,10 @@ def _get_unique_invidx(srcids, dstids, nids):
         input array, dstids
 
     """
-    mask = np.in1d(srcids, nids, invert=True, kind="table")
+    # TODO: `kind=table` is not supported in the CI's numpy version
+    # when numpy version >= 1.24 replace this function with
+    # isin function.
+    mask = np.in1d(srcids, nids, invert=True)
     srcids_only = srcids[mask]
     srcids_idxes = np.where(mask == 1)[0]
 
