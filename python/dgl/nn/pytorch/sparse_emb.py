@@ -141,9 +141,7 @@ class NodeEmbedding:  # NodeEmbedding
                 )
 
             # create local tensors for the weights
-            local_size = self._partition.local_size(
-                self._rank if self._rank > 0 else 0
-            )
+            local_size = self._partition.local_size(max(self._rank, 0))
 
             # TODO(dlasalle): support 16-bit/half embeddings
             emb = th.empty(
@@ -170,9 +168,11 @@ class NodeEmbedding:  # NodeEmbedding
             Target device to put the collected embeddings.
         """
         if not self._comm:
+            # embeddings are stored on the CPU
             emb = self._tensor[node_ids].to(device)
         else:
-            # will handle self._world_size = 0 or 1
+            # embeddings are stored on the GPU
+            # the following method will handle self._world_size = 0 or 1
             emb = nccl.sparse_all_to_all_pull(
                 node_ids, self._tensor, self._partition
             )
@@ -329,7 +329,7 @@ class NodeEmbedding:  # NodeEmbedding
         if self._partition:
             idxs = F.copy_to(
                 self._partition.get_local_indices(
-                    self._rank if self._rank > 0 else 0,
+                    max(self._rank, 0),
                     ctx=F.context(self._tensor),
                 ),
                 F.context(values),
