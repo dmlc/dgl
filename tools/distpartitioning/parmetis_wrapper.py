@@ -24,7 +24,7 @@ def check_dependencies():
         mpi_install
     ), "Could not locate the following dependency: MPI. Please install it and try again."
 
-    dgl_path = os.environ.get("DGL_HOME")
+    dgl_path = os.environ.get("DGL_HOME", "")
     assert os.path.isdir(
         dgl_path
     ), "Environment variable DGL_HOME not found. Please define the DGL installation path"
