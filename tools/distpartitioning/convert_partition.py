@@ -18,7 +18,7 @@ from dgl.distributed.partition import (
     RESERVED_FIELD_DTYPE,
 )
 from pyarrow import csv
-from tools.distpartitioning.utils import (
+from utils import (
     get_idranges,
     memory_snapshot,
     read_json,
