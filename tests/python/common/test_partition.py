@@ -48,6 +48,6 @@ def test_get_node_partition_from_book(idtype):
     test_ids = F.copy_to(F.tensor([6, 0, 7, 2, 10], dtype=idtype), F.ctx())
     perm, split_sum = partition.generate_permutation(test_ids)
     exp_perm = F.copy_to(F.tensor([1, 3, 0, 2, 4], dtype=idtype), F.ctx())
-    exp_sum = F.copy_to(F.tensor([2, 0, 3], dtype=idtype), F.ctx())
+    exp_sum = F.copy_to(F.tensor([2, 0, 3]), F.ctx())
     assert F.array_equal(perm, exp_perm)
     assert F.array_equal(split_sum, exp_sum)
