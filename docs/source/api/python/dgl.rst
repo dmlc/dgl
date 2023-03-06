@@ -204,6 +204,18 @@ set at each iteration. ``prop_edges_YYY`` applies traversal algorithm ``YYY`` an
     prop_edges
     prop_edges_dfs
 
+Homophily Measures
+-------------------------
+
+Utilities for measuring homophily of a graph
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    edge_homophily
+    node_homophily
+    linkx_homophily
+
 Utilities
 -----------------------------------------------
 

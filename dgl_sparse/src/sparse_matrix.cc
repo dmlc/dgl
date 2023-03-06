@@ -72,10 +72,10 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSCPointer(
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCOO(
-    torch::Tensor row, torch::Tensor col, torch::Tensor value,
+    torch::Tensor indices, torch::Tensor value,
     const std::vector<int64_t>& shape) {
-  auto coo = std::make_shared<COO>(
-      COO{shape[0], shape[1], torch::stack({row, col}), false, false});
+  auto coo =
+      std::make_shared<COO>(COO{shape[0], shape[1], indices, false, false});
   return SparseMatrix::FromCOOPointer(coo, value, shape);
 }
 
@@ -138,8 +138,12 @@ std::shared_ptr<CSR> SparseMatrix::CSCPtr() {
 
 std::tuple<torch::Tensor, torch::Tensor> SparseMatrix::COOTensors() {
   auto coo = COOPtr();
-  auto val = value();
   return std::make_tuple(coo->indices.index({0}), coo->indices.index({1}));
+}
+
+torch::Tensor SparseMatrix::Indices() {
+  auto coo = COOPtr();
+  return coo->indices;
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
