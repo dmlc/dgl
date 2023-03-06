@@ -605,9 +605,11 @@ class NDArrayPartition(object):
         Return
         ------
         torch.Tensor.
-            A tensor with shape (`num_indices`,), representing the permutation to re-order the indices by partition.
+            A tensor with shape (`num_indices`,), representing the permutation
+            to re-order the indices by partition.
         torch.Tensor.
-            A tensor with shape (`num_partition`,), representing the number of indices per partition.
+            A tensor with shape (`num_partition`,), representing the number of
+            indices per partition.
 
         Examples
         --------
