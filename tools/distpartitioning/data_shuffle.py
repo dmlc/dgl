@@ -444,7 +444,7 @@ def exchange_feature(
     # should use the correct shape for sending the padded vector.
     # exchange length here.
     feat_dim_len = 0
-    if featdata_key != None:
+    if featdata_key is not None:
         feat_dim_len = len(featdata_key.shape)
     all_lens = allgather_sizes(
         [feat_dim_len], world_size, num_parts, return_sizes=True
@@ -482,7 +482,6 @@ def exchange_feature(
         local_idx_partid = local_idx[cond]
 
         if gids_per_partid.shape[0] == 0:
-            # feats_per_rank.append(torch.empty((0, 1), dtype=torch.float))
             assert len(all_dims_dtype) % world_size == 0
             dim_len = int(len(all_dims_dtype) / world_size)
             rank0_shape = tuple(list(np.zeros((dim_len - 1), dtype=np.int32)))
