@@ -55,6 +55,7 @@ from .utils import *
 from .cluster import CLUSTERDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
+from .zinc import ZINCDataset
 
 
 def register_data_args(parser):
