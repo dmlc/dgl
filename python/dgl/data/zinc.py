@@ -68,8 +68,12 @@ class ZINCDataset(DGLBuiltinDataset):
    """
 
     def __init__(
-            self, mode="train", raw_dir=None,
-            force_reload=False, verbose=False, transform=None,
+            self,
+            mode="train",
+            raw_dir=None,
+            force_reload=False,
+            verbose=False,
+            transform=None,
     ):
         self._url = _get_dgl_url("dataset/ZINK12k.zip")
         self.graph_path = os.path.join(
@@ -78,8 +82,12 @@ class ZINCDataset(DGLBuiltinDataset):
         self.mode = mode
 
         super(ZINCDataset, self).__init__(
-            name="zinc", url=self._url, raw_dir=raw_dir,
-            force_reload=force_reload, verbose=verbose, transform=transform,
+            name="zinc",
+            url=self._url,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
         )
 
     def process(self):
