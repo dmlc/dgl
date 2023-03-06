@@ -24,8 +24,8 @@ from dgl.distributed.partition import (
 from utils import get_idranges, read_json
 from verification_utils import (
     get_node_partids,
-    read_orig_ids,
     read_file,
+    read_orig_ids,
     verify_graph_feats,
     verify_metadata_counts,
     verify_node_partitionids,
