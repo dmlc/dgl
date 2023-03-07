@@ -26,7 +26,8 @@ OPTIONS:
   -o           Save environment YAML file to specified path.
   -p           Create dev environment based on specified python version.
   -s           Run silently which indicates always 'yes' for any confirmation.
-  -t           Create dev environment based on specified PyTorch version such as '1.13.0'.
+  -t           Create dev environment based on specified PyTorch version such
+                as '1.13.0'.
 EOF
 }
 
