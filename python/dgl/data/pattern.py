@@ -66,11 +66,11 @@ class PATTERNDataset(DGLBuiltinDataset):
 
     def __init__(
         self,
-        mode='train',
+        mode="train",
         raw_dir=None,
         force_reload=False,
         verbose=False,
-        transform=None
+        transform=None,
     ):
         assert mode in ["train", "valid", "test"]
         self.mode = mode
