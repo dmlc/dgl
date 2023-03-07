@@ -623,35 +623,39 @@ def test_edge_dataloader_excludes(
 
 
 def test_edge_dataloader_exclusion_without_all_reverses():
-    data_dict = {('A','AB','B'): (torch.tensor([0,1]),torch.tensor([0,1])),
-             ('B','BA','A'): (torch.tensor([0,1]),torch.tensor([0,1])),
-            ('B','BC','C'):(torch.tensor([0]),torch.tensor([0])),
-            ('C','CA','A'): (torch.tensor([0,1]),torch.tensor([0,1]))}
+    data_dict = {
+        ("A", "AB", "B"): (torch.tensor([0, 1]), torch.tensor([0, 1])),
+        ("B", "BA", "A"): (torch.tensor([0, 1]), torch.tensor([0, 1])),
+        ("B", "BC", "C"): (torch.tensor([0]), torch.tensor([0])),
+        ("C", "CA", "A"): (torch.tensor([0, 1]), torch.tensor([0, 1])),
+    }
     g = dgl.heterograph(data_dict=data_dict)
     block_sampler = dgl.dataloading.MultiLayerNeighborSampler(
-                fanouts=[1],
-                replace=True)
+        fanouts=[1], replace=True
+    )
     block_sampler = dgl.dataloading.as_edge_prediction_sampler(
-                block_sampler,
-                exclude="reverse_types",
-                reverse_etypes={'AB':'BA'},
-
-            )
+        block_sampler,
+        exclude="reverse_types",
+        reverse_etypes={"AB": "BA"},
+    )
     d = dgl.dataloading.DataLoader(
-                graph=g,
-                indices={'AB':torch.tensor([0]),'BC':torch.tensor([0]),},
-                graph_sampler=block_sampler,
-                batch_size=2,
-                shuffle=True,
-                drop_last=False,
-                num_workers=0,
-                device='cuda',
-                use_ddp=False,
-                use_uva=True,
-            )
+        graph=g,
+        indices={
+            "AB": torch.tensor([0]),
+            "BC": torch.tensor([0]),
+        },
+        graph_sampler=block_sampler,
+        batch_size=2,
+        shuffle=True,
+        drop_last=False,
+        num_workers=0,
+        device=F.ctx(),
+        use_ddp=False,
+    )
 
     next(iter(d))
-    
+
+
 def dummy_worker_init_fn(worker_id):
     pass
 
@@ -670,6 +674,7 @@ def test_dataloader_worker_init_fn():
     )
     for _ in dataloader:
         pass
+
 
 if __name__ == "__main__":
     # test_node_dataloader(F.int32, 'neighbor', None)
