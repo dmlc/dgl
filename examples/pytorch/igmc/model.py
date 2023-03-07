@@ -1,9 +1,9 @@
 """IGMC modules"""
 
-import math 
 import torch as th 
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.linalg import vector_norm
 
 from dgl.nn.pytorch import RelGraphConv
 
@@ -11,54 +11,37 @@ class IGMC(nn.Module):
     # The GNN model of Inductive Graph-based Matrix Completion. 
     # Use RGCN convolution + center-nodes readout.
     
-    def __init__(self, in_feats, gconv=RelGraphConv, latent_dim=(32, 32, 32, 32),
-                num_relations=5, num_bases=2, regression=False, edge_dropout=0.2, 
-                force_undirected=False, side_features=False, n_side_features=0, 
-                multiply_by=1):
+    def __init__(self, in_feats, latent_dim=(32, 32, 32, 32),
+                num_relations=5, num_bases=4, edge_dropout=0.2):
         super(IGMC, self).__init__()
 
-        self.regression = regression
         self.edge_dropout = edge_dropout
-        self.force_undirected = force_undirected
-        self.side_features = side_features
-        self.multiply_by = multiply_by
+        self.in_feats = in_feats
+        self.num_bases = num_bases
 
         self.convs = th.nn.ModuleList()
-        self.convs.append(gconv(in_feats, latent_dim[0], num_relations, 
-                                num_bases=num_bases, self_loop=True, low_mem=True))
+        self.convs.append(RelGraphConv(in_feats, latent_dim[0], num_relations, regularizer='basis',
+                                num_bases=num_bases))
         for i in range(0, len(latent_dim)-1):
-            self.convs.append(gconv(latent_dim[i], latent_dim[i+1], num_relations, 
-                                    num_bases=num_bases, self_loop=True, low_mem=True))
+            self.convs.append(RelGraphConv(latent_dim[i], latent_dim[i+1], num_relations, regularizer='basis',
+                                    num_bases=num_bases))
         
         self.lin1 = nn.Linear(2 * sum(latent_dim), 128)
-        if side_features:
-            self.lin1 = nn.Linear(2 * sum(latent_dim) + n_side_features, 128)
-        if self.regression:
-            self.lin2 = nn.Linear(128, 1)
-        else:
-            assert False
-        self.reset_parameters()
+        self.lin2 = nn.Linear(128, 1)
 
-    def reset_parameters(self):
-        for conv in self.convs:
-            size = conv.num_bases * conv.in_feat
-            uniform(size, conv.weight)
-            uniform(size, conv.w_comp)
-            uniform(size, conv.loop_weight)
-            uniform(size, conv.h_bias)
-        self.lin1.reset_parameters()
-        self.lin2.reset_parameters()
+    
 
     def forward(self, block):
         block = edge_drop(block, self.edge_dropout, self.training)
-
         concat_states = []
+        arr_loss = 0.0
         x = block.ndata['nlabel']
         for conv in self.convs:
             # edge mask zero denotes the edge dropped
             x = th.tanh(conv(block, x, block.edata['etype'], 
                              norm=block.edata['edge_mask'].unsqueeze(1)))
             concat_states.append(x)
+            arr_loss += adj_rating_reg(conv, self.training)
         concat_states = th.cat(concat_states, 1)
         
         users = block.ndata['nlabel'][:, 0] == 1
@@ -68,18 +51,20 @@ class IGMC(nn.Module):
         x = F.relu(self.lin1(x))
         x = F.dropout(x, p=0.5, training=self.training)
         x = self.lin2(x)
-        if self.regression:
-            return x[:, 0] * self.multiply_by
-        else:
-            assert False
+        return x[:, 0], arr_loss
 
     def __repr__(self):
         return self.__class__.__name__
-
-def uniform(size, tensor):
-    bound = 1.0 / math.sqrt(size)
-    if tensor is not None:
-        tensor.data.uniform_(-bound, bound)
+    
+def adj_rating_reg(conv, training):
+    if training:
+        coeff = conv.linear_r.coeff[:-1] - conv.linear_r.coeff[1:]
+        W = conv.linear_r.W.reshape(coeff.shape[1], -1)
+        W = th.matmul(coeff, W)
+        arr_loss = (vector_norm(W, dim=1) ** 2).sum()
+        return arr_loss
+    else:
+        return 0.0
 
 def edge_drop(graph, edge_dropout=0.2, training=True):
     assert (edge_dropout >= 0.0) and (edge_dropout <= 1.0), 'Invalid dropout rate.'
