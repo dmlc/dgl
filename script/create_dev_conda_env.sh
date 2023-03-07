@@ -27,7 +27,7 @@ OPTIONS:
   -p           Create dev environment based on specified python version.
   -s           Run silently which indicates always 'yes' for any confirmation.
   -t           Create dev environment based on specified PyTorch version such
-                as '1.13.0'.
+               as '1.13.0'.
 EOF
 }
 
