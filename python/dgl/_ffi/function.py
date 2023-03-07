@@ -14,26 +14,26 @@ try:
     if _FFI_MODE == "ctypes":
         raise ImportError()
     if sys.version_info >= (3, 0):
-        from ._cy3.core import FunctionBase as _FunctionBase
         from ._cy3.core import (
             _set_class_function,
             _set_class_module,
             convert_to_dgl_func,
+            FunctionBase as _FunctionBase,
         )
     else:
-        from ._cy2.core import FunctionBase as _FunctionBase
         from ._cy2.core import (
             _set_class_function,
             _set_class_module,
             convert_to_dgl_func,
+            FunctionBase as _FunctionBase,
         )
 except IMPORT_EXCEPT:
     # pylint: disable=wrong-import-position
-    from ._ctypes.function import FunctionBase as _FunctionBase
     from ._ctypes.function import (
         _set_class_function,
         _set_class_module,
         convert_to_dgl_func,
+        FunctionBase as _FunctionBase,
     )
 
 FunctionHandle = ctypes.c_void_p
@@ -297,13 +297,14 @@ def _init_api(namespace, target_module_name=None):
     """
     target_module_name = target_module_name if target_module_name else namespace
     if namespace.startswith("dgl."):
-        _init_api_prefix(target_module_name, namespace[4:])
+        return _init_api_prefix(target_module_name, namespace[4:])
     else:
-        _init_api_prefix(target_module_name, namespace)
+        return _init_api_prefix(target_module_name, namespace)
 
 
 def _init_api_prefix(module_name, prefix):
     module = sys.modules[module_name]
+    name_list = []
 
     for name in list_global_func_names():
         if name.startswith("_") and not name.startswith("_deprecate"):
@@ -324,6 +325,9 @@ def _init_api_prefix(module_name, prefix):
         ff.__name__ = fname
         ff.__doc__ = "DGL PackedFunc %s. " % fname
         setattr(target_module, ff.__name__, ff)
+        name_list.append(fname)
+
+    return name_list
 
 
 def _init_internal_api():

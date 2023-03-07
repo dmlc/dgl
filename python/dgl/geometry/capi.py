@@ -1,8 +1,7 @@
 """Python interfaces to DGL farthest point sampler."""
 import numpy as np
 
-from .. import backend as F
-from .. import ndarray as nd
+from .. import backend as F, ndarray as nd
 from .._ffi.base import DGLError
 from .._ffi.function import _init_api
 

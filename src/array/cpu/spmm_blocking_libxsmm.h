@@ -80,10 +80,16 @@ inline void SpMMCreateBlocks(
   if (num_K_blocks > 1) {
     IdType *indptr_block_buf = reinterpret_cast<IdType *>(aligned_alloc(
         64, (M_block_size + 1) * num_M_blocks * num_K_blocks * sizeof(IdType)));
-    IdType *indices_block_buf = reinterpret_cast<IdType *>(
-        aligned_alloc(64, indptr[M] * sizeof(IdType)));
-    IdType *edges_block_buf = reinterpret_cast<IdType *>(
-        aligned_alloc(64, indptr[M] * sizeof(IdType)));
+    IdType *indices_block_buf = nullptr;
+    if (use_lhs) {
+      indices_block_buf = reinterpret_cast<IdType *>(
+          aligned_alloc(64, indptr[M] * sizeof(IdType)));
+    }
+    IdType *edges_block_buf = nullptr;
+    if (use_rhs) {
+      edges_block_buf = reinterpret_cast<IdType *>(
+          aligned_alloc(64, indptr[M] * sizeof(IdType)));
+    }
 
 #pragma omp parallel
     {
@@ -148,7 +154,6 @@ inline void SpMMCreateBlocks(
       free(my_cur_col_id);
     }
   } else {
-#pragma omp for
     for (IdType m = 0; m < num_M_blocks; m++) {
       const IdType M_start = m * M_block_size;
       const IdType M_end = std::min((m + 1) * M_block_size, M);

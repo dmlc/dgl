@@ -27,6 +27,7 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("device", &SparseMatrix::device)
       .def("shape", &SparseMatrix::shape)
       .def("coo", &SparseMatrix::COOTensors)
+      .def("indices", &SparseMatrix::Indices)
       .def("csr", &SparseMatrix::CSRTensors)
       .def("csc", &SparseMatrix::CSCTensors)
       .def("transpose", &SparseMatrix::Transpose)
