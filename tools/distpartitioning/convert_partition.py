@@ -18,7 +18,7 @@ from dgl.distributed.partition import (
     RESERVED_FIELD_DTYPE,
 )
 from pyarrow import csv
-from utils import (
+from tools.distpartitioning.utils import (
     get_idranges,
     memory_snapshot,
     read_json,
@@ -29,12 +29,12 @@ def _get_unique_invidx(srcids, dstids, nids):
     """This function is used to compute a list of unique elements,
     and their indices in the input list, which is the concatenation
     of srcids, dstids and uniq_nids. In addition, this function will also
-    compute inverse indices for the elements in srcids and dstids arrays.
-    In the process srcids, dstids will be over-written to contain the
-    inverse indices, which will the indices in the unique elements list.
-    Basically, this function is mimicing the functionality of numpy's
-    unique function call. The problem with numpy's unique function call
-    is its high memory requirement. For an input list of 3 billion edges
+    compute inverse indices for the elements in srcids, dstids and nids arrays.
+    srcids, dstids will be over-written to contain the inverse indices,
+    which will be the indices in the unique elements list of an element in
+    those arrays. Basically, this function is mimicing the functionality
+    of numpy's unique function call. The problem with numpy's unique function
+    call is its high memory requirement. For an input list of 3 billion edges
     it consumes about 550GB of systems memory, which is limiting the
     capability of the partitioning pipeline.
 
@@ -48,7 +48,8 @@ def _get_unique_invidx(srcids, dstids, nids):
         the edges
     nids : numpy array
         a list of numbers, and in our use-case this will be a list of
-        unique shuffle-global-nids on a given rank
+        unique shuffle-global-nids on a given rank. This list is guaranteed
+        to be a list of sorted consecutive unique list of numbers
 
     Returns:
     --------
@@ -65,12 +66,22 @@ def _get_unique_invidx(srcids, dstids, nids):
         a list of integers. These are inverse indices, which will be indices
         from the unique elements list specifying the elements from the
         input array, dstids
-
     """
-    # TODO: `kind=table` is not supported in the CI's numpy version
-    # when numpy version >= 1.24 replace this function with
-    # isin function.
-    mask = np.in1d(srcids, nids, invert=True)
+    assert len(srcids) == len(
+        dstids
+    ), f"Please provide the correct input parameters"
+    assert len(srcids) != 0, f"Please provide a non-empty edge-list."
+
+    if np.__version__ < "1.24.0":
+        logging.warning(
+            f"Numpy version, {np.__version__}, is lower than expected."
+            f"Falling back to numpy's native function unique."
+            f"This functions memory overhead will limit size of the "
+            f"partitioned graph objects processed by each node in the cluster."
+        )
+        return np.unique(np.concatenate(srcids, dstids, nids))
+
+    mask = np.isin(srcids, nids, invert=True, kind="table")
     srcids_only = srcids[mask]
     srcids_idxes = np.where(mask == 1)[0]
 

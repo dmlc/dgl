@@ -16,13 +16,20 @@ from tools.distpartitioning.convert_partition import _get_unique_invidx
         [4000, 40000, 1000, 2000],
         [4000, 40000, 2000, 3000],
         [4000, 40000, 3000, 4000],
+        [1, 1, 0, 1],
     ],
 )
 def test_get_unique_invidx(num_nodes, num_edges, nid_begin, nid_end):
     # prepare data for the function
     # generate synthetic edges
-    srcids = np.random.randint(0, num_nodes, (num_edges,))
-    dstids = np.random.randint(nid_begin, nid_end, (num_edges,))
+    if num_edges > 0:
+        srcids = np.random.randint(0, num_nodes, (num_edges,))
+        dstids = np.random.randint(nid_begin, nid_end, (num_edges,))
+    else:
+        srcids = np.array([])
+        dstids = np.array([])
+
+    assert nid_begin <= nid_end
 
     # generate unique node-ids for any
     # partition. This list should be sorted.
