@@ -502,11 +502,11 @@ def mask_nodes_by_property(property_values, part_ratios, random_seed=None):
     Parameters
     ----------
     property_values : numpy ndarray
-        The node property (float) values to split the dataset by.
-        The length of array must be equal to the number of nodes in graph.
+        The node property (float) values by which the dataset will be split.
+        The length of the array must be equal to the number of nodes in graph.
     part_ratios : list
         A list of 5 ratios for training, ID validation, ID test,
-        OOD validation, OOD testing parts. The values in list must sum to one.
+        OOD validation, OOD testing parts. The values in the list must sum to one.
     random_seed : int, optional
         Random seed to fix for the initial permutation of nodes. It is
         used to create a random order for the nodes that have the same
@@ -556,9 +556,9 @@ def mask_nodes_by_property(property_values, part_ratios, random_seed=None):
 def add_node_property_split(
     dataset, part_ratios, property_name, ascending=True, random_seed=None
 ):
-    """Create a data split with a distributional shift based on some node property.
+    """Create a node split with a distributional shift based on a node property.
 
-    It splits each graph in the given dataset into training, ID and OOD validation, ID and OOD
+    It splits the nodes of each graph in the given dataset into training, ID and OOD validation, ID and OOD
     testing parts for transductive node prediction task with structural distributional shifts.
     As a result, it creates 5 associated node mask arrays for each graph:
         - 3 for the ID nodes: ``'in_train_mask'``, ``'in_valid_mask'``, ``'in_test_mask'``,
@@ -571,20 +571,20 @@ def add_node_property_split(
 
     Parameters
     ----------
-    dataset : DGLDataset or list of :class:`DGLGraph`
-        The dataset to induce structural distributional shift in.
+    dataset : DGLDataset or list of :class:`~dgl.DGLGraph`
+        The dataset to induce structural distributional shift.
     part_ratios : list
         A list of 5 ratio values for training, ID validation, ID test,
         OOD validation and OOD test parts. The values must sum to 1.0.
     property_name : str
-        The node property name to split the dataset by. Must be
+        The name of the node property to be used, which must be
         ``'popularity'``, ``'locality'`` or ``'density'``.
     ascending : bool, optional
-        Whether to sort nodes in the ascending order of a particular
+        Whether to sort nodes in the ascending order of the
         node property, so that more shifted OOD nodes have greater values
         of the computed property (default: True)
     random_seed : int, optional
-        Random seed to fix for the initial permutation of nodes. It is
+        Random seed to fix for the initial permutation of the nodes. It is
         used to create a random order for the nodes that have the same
         property values. (default: None)
 
@@ -608,7 +608,7 @@ def add_node_property_split(
 
     assert (
         len(part_ratios) == 5
-    ), "The list of part ratios must contain 5 values"
+    ), "part_ratios must contain 5 values"
 
     try:
         import graph_tool as gt
