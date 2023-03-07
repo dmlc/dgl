@@ -120,10 +120,13 @@ def gen_edge_files(schema_map, params):
         file_idxes = generate_read_list(len(edge_data_files), params.num_parts)
         for idx in file_idxes[rank]:
             reader_fmt_meta = {
-                "name": etype_info[constants.STR_FORMAT][constants.STR_NAME]
+                "name": etype_info[constants.STR_FORMAT][constants.STR_NAME],
+                "delimiter": etype_info[constants.STR_FORMAT][
+                    constants.STR_FORMAT_DELIMITER
+                ],
             }
             data_df = array_readwriter.get_array_parser(**reader_fmt_meta).read(
-                edge_data_files[idx]
+                os.path.join(params.input_dir, edge_data_files[idx])
             )
             out_file = process_and_write_back(data_df, idx)
             edge_files.append(out_file)
@@ -280,14 +283,18 @@ def gen_parmetis_input_args(params, schema_map):
         constants.STR_GRAPH_NAME in schema_map
     ), "Graph name is not present in the json file"
     graph_name = schema_map[constants.STR_GRAPH_NAME]
-    if not os.path.isfile(f"{graph_name}_stats.txt"):
+    if not os.path.isfile(
+        os.path.join(params.input_dir, f"{graph_name}_stats.txt")
+    ):
         num_nodes = np.sum(schema_map[constants.STR_NUM_NODES_PER_TYPE])
         num_edges = np.sum(schema_map[constants.STR_NUM_EDGES_PER_TYPE])
         num_ntypes = len(schema_map[constants.STR_NODE_TYPE])
 
         num_constraints = num_ntypes
 
-        with open(f"{graph_name}_stats.txt", "w") as sf:
+        with open(
+            os.path.join(params.input_dir, f"{graph_name}_stats.txt"), "w"
+        ) as sf:
             sf.write(f"{num_nodes} {num_edges} {num_constraints}")
 
     node_files = []
@@ -353,7 +360,12 @@ def run_preprocess_data(params):
     """
     logging.info(f"Starting to generate ParMETIS files...")
     rank = get_proc_info()
-    schema_map = read_json(params.schema_file)
+
+    assert os.path.isdir(
+        params.input_dir
+    ), f"Please check `input_dir` argument."
+
+    schema_map = read_json(os.path.join(params.input_dir, params.schema_file))
     gen_node_weights_files(schema_map, params)
     logging.info(f"Done with node weights....")
 

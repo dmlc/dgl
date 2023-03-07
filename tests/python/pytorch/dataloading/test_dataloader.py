@@ -652,6 +652,24 @@ def test_edge_dataloader_exclusion_without_all_reverses():
 
     next(iter(d))
     
+def dummy_worker_init_fn(worker_id):
+    pass
+
+
+def test_dataloader_worker_init_fn():
+    dataset = dgl.data.CoraFullDataset()
+    g = dataset[0]
+    sampler = dgl.dataloading.MultiLayerNeighborSampler([2])
+    dataloader = dgl.dataloading.DataLoader(
+        g,
+        torch.arange(100),
+        sampler,
+        batch_size=4,
+        num_workers=4,
+        worker_init_fn=dummy_worker_init_fn,
+    )
+    for _ in dataloader:
+        pass
 
 if __name__ == "__main__":
     # test_node_dataloader(F.int32, 'neighbor', None)
