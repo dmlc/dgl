@@ -8,11 +8,11 @@ import dgl
 import dgl.function as fn
 import networkx as nx
 import pytest
-import pytests_utils
+import utils
 import scipy.sparse as ssp
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
-from pytests_utils import (
+from utils import (
     assert_is_identical,
     assert_is_identical_hetero,
     get_cases,
@@ -114,7 +114,7 @@ def _global_message_func(nodes):
 def test_pickling_graph(g, idtype):
     g = g.astype(idtype)
     new_g = _reconstruct_pickle(g)
-    pytests_utils.check_graph_equal(g, new_g, check_feature=True)
+    utils.check_graph_equal(g, new_g, check_feature=True)
 
 
 @unittest.skipIf(F._default_context_str == "gpu", reason="GPU not implemented")
@@ -146,7 +146,7 @@ def test_pickling_batched_heterograph():
 
     bg = dgl.batch([g, g2])
     new_bg = _reconstruct_pickle(bg)
-    pytests_utils.check_graph_equal(bg, new_bg)
+    utils.check_graph_equal(bg, new_bg)
 
 
 @unittest.skipIf(

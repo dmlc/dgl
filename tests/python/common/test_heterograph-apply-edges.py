@@ -10,10 +10,10 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-import pytests_utils
+import utils
 import scipy.sparse as ssp
 from dgl import DGLError
-from pytests_utils import get_cases, parametrize_idtype
+from utils import get_cases, parametrize_idtype
 from scipy.sparse import rand
 
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}

@@ -10,10 +10,10 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-import pytests_utils
+import utils
 import scipy.sparse as ssp
 from dgl import DGLError
-from pytests_utils import (
+from utils import (
     assert_is_identical_hetero,
     get_cases,
     parametrize_idtype,
@@ -2422,7 +2422,7 @@ def test_dtype_cast(idtype):
     else:
         g_cast = g.int()
         assert g_cast.idtype == F.int32
-    pytests_utils.check_graph_equal(g, g_cast, check_idtype=False)
+    utils.check_graph_equal(g, g_cast, check_idtype=False)
 
 
 def test_float_cast():

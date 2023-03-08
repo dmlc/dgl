@@ -4,7 +4,7 @@ import backend as F
 
 import dgl
 import networkx as nx
-from pytests_utils import check_fail, parametrize_idtype
+from utils import check_fail, parametrize_idtype
 
 
 def create_graph(idtype):

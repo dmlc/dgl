@@ -10,11 +10,11 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-import pytests_utils
+import utils
 import scipy.sparse as ssp
 from dgl import DGLError
 from dgl.ops import edge_softmax
-from pytests_utils import get_cases, parametrize_idtype
+from utils import get_cases, parametrize_idtype
 from scipy.sparse import rand
 
 edge_softmax_shapes = [(1,), (1, 3), (3, 4, 5)]

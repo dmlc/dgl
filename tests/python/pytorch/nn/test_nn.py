@@ -12,8 +12,8 @@ import pytest
 import scipy as sp
 import torch
 import torch as th
-from pytests_utils import parametrize_idtype
-from pytests_utils.graph_cases import (
+from utils import parametrize_idtype
+from utils.graph_cases import (
     get_cases,
     random_bipartite,
     random_dglgraph,
