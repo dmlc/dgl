@@ -207,7 +207,13 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Transpose() const {
 
 void SparseMatrix::_CreateCOO() {
   if (HasCOO()) return;
-  if (HasCSR()) {
+  if (HasDiag()) {
+    auto indices_options = torch::TensorOptions()
+                               .dtype(torch::kInt64)
+                               .layout(torch::kStrided)
+                               .device(this->device());
+    coo_ = DiagToCOO(diag_, indices_options);
+  } else if (HasCSR()) {
     coo_ = CSRToCOO(csr_);
   } else if (HasCSC()) {
     coo_ = CSCToCOO(csc_);
@@ -218,7 +224,13 @@ void SparseMatrix::_CreateCOO() {
 
 void SparseMatrix::_CreateCSR() {
   if (HasCSR()) return;
-  if (HasCOO()) {
+  if (HasDiag()) {
+    auto indices_options = torch::TensorOptions()
+                               .dtype(torch::kInt64)
+                               .layout(torch::kStrided)
+                               .device(this->device());
+    csr_ = DiagToCSR(diag_, indices_options);
+  } else if (HasCOO()) {
     csr_ = COOToCSR(coo_);
   } else if (HasCSC()) {
     csr_ = CSCToCSR(csc_);
@@ -229,7 +241,13 @@ void SparseMatrix::_CreateCSR() {
 
 void SparseMatrix::_CreateCSC() {
   if (HasCSC()) return;
-  if (HasCOO()) {
+  if (HasDiag()) {
+    auto indices_options = torch::TensorOptions()
+                               .dtype(torch::kInt64)
+                               .layout(torch::kStrided)
+                               .device(this->device());
+    csc_ = DiagToCSC(diag_, indices_options);
+  } else if (HasCOO()) {
     csc_ = COOToCSC(coo_);
   } else if (HasCSR()) {
     csc_ = CSRToCSC(csr_);
