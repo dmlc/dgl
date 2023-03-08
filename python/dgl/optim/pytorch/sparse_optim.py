@@ -63,7 +63,6 @@ class SparseGradOptimizer(abc.ABC):
                 ), "MultiGPU world_size for each embedding should be same."
         assert not self._rank is None
         assert not self._world_size is None
-        self._nccl_root_id = "SparseGradOptimizer.nccl_root_id"
 
     def step(self):
         """The step function.
@@ -74,7 +73,7 @@ class SparseGradOptimizer(abc.ABC):
         if self._first_step:
             for emb in self._params:
                 for _, data in emb._trace:
-                    if data.grad.data.device.type == "cuda":
+                    if data.grad.device.type == "cuda":
                         # create a communicator
                         if self._device:
                             assert (
@@ -116,27 +115,7 @@ class SparseGradOptimizer(abc.ABC):
         """
 
     def _comm_setup(self):
-        # find a store to communicate the unique id through
-        if len(self._params) > 0:
-            store = self._params[0].store
-
-            if self._rank < 0:
-                self._comm = nccl.Communicator(1, 0, nccl.UniqueId())
-            else:
-                th.cuda.set_device(self._device)
-                if self._rank == 0:
-                    # root process broadcasts nccl id
-                    nccl_id = nccl.UniqueId()
-                    uid = str(nccl_id)
-                    store.set(self._nccl_root_id, uid)
-                else:
-                    uid = store.get(self._nccl_root_id)
-                    nccl_id = nccl.UniqueId(uid)
-                # needs to be set for nccl to work
-                self._comm = nccl.Communicator(
-                    self._world_size, self._rank, nccl_id
-                )
-                th.distributed.barrier()
+        self._comm = True
 
     def _shared_setup(self):
         for emb in self._params:
@@ -162,7 +141,6 @@ class SparseGradOptimizer(abc.ABC):
                 self._opt_meta[emb_name] = opt_meta
 
     def _comm_step(self):
-        comm = self._comm
         with th.no_grad():
             idx_in = {}
             grad_in = {}
@@ -203,7 +181,7 @@ class SparseGradOptimizer(abc.ABC):
                 (
                     idx_in[emb_name],
                     grad_in[emb_name],
-                ) = comm.sparse_all_to_all_push(idx, grad, partition=partition)
+                ) = nccl.sparse_all_to_all_push(idx, grad, partition=partition)
                 if emb.partition:
                     # if the embedding is partitioned, map back to indexes
                     # into the local tensor

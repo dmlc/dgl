@@ -592,5 +592,44 @@ class NDArrayPartition(object):
             )
         )
 
+    def generate_permutation(self, idxs):
+        """Produce a scheme that maps the given indices to separate partitions
+        and the counts of how many indices are in each partition.
+
+
+        Parameters
+        ----------
+        idxs: torch.Tensor.
+            A tensor with shape (`num_indices`,), representing global indices.
+
+        Return
+        ------
+        torch.Tensor.
+            A tensor with shape (`num_indices`,), representing the permutation
+            to re-order the indices by partition.
+        torch.Tensor.
+            A tensor with shape (`num_partition`,), representing the number of
+            indices per partition.
+
+        Examples
+        --------
+
+        >>> import torch
+        >>> from dgl.partition import NDArrayPartition
+        >>> part = NDArrayPartition(10, 2, mode="remainder")
+        >>> idx = torch.tensor([0, 2, 4, 5, 8, 8, 9], device="cuda:0")
+        >>> perm, splits_sum = part.generate_permutation(idx)
+        >>> perm
+        tensor([0, 1, 2, 4, 5, 3, 6], device='cuda:0')
+        >>> splits_sum
+        tensor([5, 2], device='cuda:0')
+        """
+        ret = _CAPI_DGLNDArrayPartitionGeneratePermutation(
+            self._partition, F.zerocopy_to_dgl_ndarray(idxs)
+        )
+        return F.zerocopy_from_dgl_ndarray(ret(0)), F.zerocopy_from_dgl_ndarray(
+            ret(1)
+        )
+
 
 _init_api("dgl.partition")
