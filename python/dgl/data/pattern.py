@@ -11,8 +11,8 @@ class PATTERNDataset(DGLBuiltinDataset):
     Each graph G contains 5 communities with sizes randomly selected between [5, 35].
     The SBM of each community is p = 0.5, q = 0.35, and the node features on G are
     generated with a uniform random distribution with a vocabulary of size 3, i.e. {0, 1, 2}.
-    Then randomly generate 100 patterns P composed of 20 nodes with intra-probability pp = 0.5
-    and extra-probability qp = 0.5 (i.e. 50% of nodes in P are connected to G). The node features
+    Then randomly generate 100 patterns P composed of 20 nodes with intra-probability :math:`p_P` = 0.5
+    and extra-probability :math:`q_P` = 0.5 (i.e. 50% of nodes in P are connected to G). The node features
     for P are also generated as a random signal with values {0, 1, 2}. The graphs are of sizes
     44-188 nodes. The output node labels have value 1 if the node belongs to P and value 0 if it is in G.
 
@@ -52,9 +52,7 @@ class PATTERNDataset(DGLBuiltinDataset):
     Examples
     —-------
     >>> from dgl.data import PATTERNDataset
-    >>>
     >>> data = PATTERNDataset(mode='train')
-    >>>
     >>> data.num_classes
     2
     >>> len(trainset)
