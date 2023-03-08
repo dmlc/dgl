@@ -348,6 +348,41 @@ class NodeEmbedding:  # NodeEmbedding
         if th.distributed.is_initialized():
             th.distributed.barrier()
 
+    def _all_get_tensor(self, shared_name, tensor, shape):
+        """A helper function to get model-parallel tensors.
+
+        This method must and only need to be called in multi-GPU DDP training.
+        For now, it's only used in ``all_get_embedding`` and
+        ``_all_get_optm_state``.
+        """
+        # create a shared memory tensor
+        if self._rank == 0:
+            # root process creates shared memory
+            val = create_shared_mem_array(
+                shared_name,
+                shape,
+                tensor.dtype,
+            )
+            self._store.set(shared_name, shared_name)
+        else:
+            self._store.wait([shared_name])
+            val = get_shared_mem_array(
+                shared_name,
+                shape,
+                tensor.dtype,
+            )
+        # need to map indices and slice into existing tensor
+        idxs = self._partition.map_to_global(
+            F.arange(0, tensor.shape[0], ctx=F.context(tensor)),
+            self._rank,
+        ).to(val.device)
+        val[idxs] = tensor.to(val.device)
+
+        self._store.delete_key(shared_name)
+        # wait for all processes to finish
+        th.distributed.barrier()
+        return val
+
     def all_get_embedding(self):
         """Return a copy of the embedding stored in CPU memory. If this is a
         multi-processing instance, the tensor will be returned in shared
@@ -367,35 +402,78 @@ class NodeEmbedding:  # NodeEmbedding
                 # non-multiprocessing
                 return self._tensor.to(th.device("cpu"))
             else:
-                # create a shared memory tensor
-                shared_name = self._name + "_gather"
-                if self._rank == 0:
-                    # root process creates shared memory
-                    emb = create_shared_mem_array(
-                        shared_name,
-                        (self._num_embeddings, self._embedding_dim),
-                        self._tensor.dtype,
-                    )
-                    self._store.set(shared_name, shared_name)
-                else:
-                    self._store.wait([shared_name])
-                    emb = get_shared_mem_array(
-                        shared_name,
-                        (self._num_embeddings, self._embedding_dim),
-                        self._tensor.dtype,
-                    )
-                # need to map indices and slice into existing tensor
-                idxs = self._partition.map_to_global(
-                    F.arange(
-                        0, self._tensor.shape[0], ctx=F.context(self._tensor)
-                    ),
-                    self._rank,
-                ).to(emb.device)
-                emb[idxs] = self._tensor.to(emb.device)
-
-                # wait for all processes to finish
-                th.distributed.barrier()
-                return emb
+                return self._all_get_tensor(
+                    f"{self._name}_gather",
+                    self._tensor,
+                    (self._num_embeddings, self._embedding_dim),
+                )
         else:
             # already stored in CPU memory
             return self._tensor
+
+    def _all_get_optm_state(self):
+        """Return a copy of the whole optimizer states stored in CPU memory.
+        If this is a multi-processing instance, the states will be returned in
+        shared memory. If the embedding is currently stored on multiple GPUs,
+        all processes must call this method in the same order.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
+
+        Returns
+        -------
+        tuple of torch.Tensor
+            The optimizer states stored in CPU memory.
+        """
+        if self._partition:
+            if self._world_size == 0:
+                # non-multiprocessing
+                return tuple(
+                    state.to(th.device("cpu")) for state in self._optm_state
+                )
+            else:
+                return tuple(
+                    self._all_get_tensor(
+                        f"state_gather_{self._name}_{i}",
+                        state,
+                        (self._num_embeddings, *state.shape[1:]),
+                    )
+                    for i, state in enumerate(self._optm_state)
+                )
+        else:
+            # already stored in CPU memory
+            return self._optm_state
+
+    def _all_set_optm_state(self, states):
+        """Set the optimizer states of the embedding. This method must be
+        called by all processes sharing the embedding with identical
+        :attr:`states`.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
+
+        Parameters
+        ----------
+        states : tuple of torch.Tensor
+            The global states to pull values from.
+        """
+        if self._partition:
+            idxs = F.copy_to(
+                self._partition.get_local_indices(
+                    max(self._rank, 0), ctx=F.context(self._tensor)
+                ),
+                F.context(states[0]),
+            )
+            for state, new_state in zip(self._optm_state, states):
+                state[:] = F.copy_to(
+                    F.gather_row(new_state, idxs), ctx=F.context(self._tensor)
+                )[:]
+        else:
+            # stored in CPU memory
+            if self._rank <= 0:
+                for state, new_state in zip(self._optm_state, states):
+                    state[:] = F.copy_to(
+                        new_state, ctx=F.context(self._tensor)
+                    )[:]
+        if th.distributed.is_initialized():
+            th.distributed.barrier()
