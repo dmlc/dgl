@@ -9,6 +9,7 @@ import sys
 import warnings
 
 import numpy as np
+import networkx.algorithms as A
 import requests
 
 from .. import backend as F
@@ -640,8 +641,6 @@ def add_node_property_split(
 
 
 def _compute_popularity_property(graph_nx, ascending=True):
-    import networkx.algorithms as A
-
     direction = -1 if ascending else 1
     property_values = direction * np.array(
         list(A.pagerank(graph_nx).values())
@@ -650,8 +649,6 @@ def _compute_popularity_property(graph_nx, ascending=True):
 
 
 def _compute_locality_property(graph_nx, ascending=True):
-    import networkx.algorithms as A
-
     num_nodes = graph_nx.number_of_nodes()
     pagerank_values = np.array(list(A.pagerank(graph_nx).values()))
 
@@ -666,8 +663,6 @@ def _compute_locality_property(graph_nx, ascending=True):
 
 
 def _compute_density_property(graph_nx, ascending=True):
-    import networkx.algorithms as A
-
     direction = -1 if ascending else 1
     property_values = direction * np.array(
         list(A.clustering(graph_nx).values())
