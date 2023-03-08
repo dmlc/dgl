@@ -174,7 +174,7 @@ PyTorch backend
 ```````````````
 
 Export ``DGLBACKEND`` as ``pytorch`` to specify PyTorch backend. The required PyTorch
-version is 1.9.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
+version is 1.12.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
 
 MXNet backend
 `````````````

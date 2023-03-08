@@ -79,15 +79,14 @@ class SparseMatrix : public torch::CustomClassHolder {
 
   /**
    * @brief Create a SparseMatrix from tensors in COO format.
-   * @param row Row indices of the COO.
-   * @param col Column indices of the COO.
+   * @param indices COO coordinates with shape (2, nnz).
    * @param value Values of the sparse matrix.
    * @param shape Shape of the sparse matrix.
    *
    * @return SparseMatrix
    */
   static c10::intrusive_ptr<SparseMatrix> FromCOO(
-      torch::Tensor row, torch::Tensor col, torch::Tensor value,
+      torch::Tensor indices, torch::Tensor value,
       const std::vector<int64_t>& shape);
 
   /**
@@ -153,6 +152,8 @@ class SparseMatrix : public torch::CustomClassHolder {
 
   /** @return {row, col} tensors in the COO format. */
   std::tuple<torch::Tensor, torch::Tensor> COOTensors();
+  /** @return Stacked row and col tensors in the COO format. */
+  torch::Tensor Indices();
   /** @return {row, col, value_indices} tensors in the CSR format. */
   std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
   CSRTensors();
