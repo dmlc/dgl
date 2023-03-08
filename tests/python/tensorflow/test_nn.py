@@ -10,7 +10,6 @@ import numpy as np
 import pytest
 import scipy as sp
 import tensorflow as tf
-from tensorflow.keras import layers
 from pytests_utils import parametrize_idtype
 from pytests_utils.graph_cases import (
     get_cases,
@@ -18,6 +17,7 @@ from pytests_utils.graph_cases import (
     random_dglgraph,
     random_graph,
 )
+from tensorflow.keras import layers
 
 
 def _AXWb(A, X, W, b):
