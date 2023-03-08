@@ -168,11 +168,14 @@ class NodeEmbedding:  # NodeEmbedding
             Target device to put the collected embeddings.
         """
         if not self._comm:
-            # embeddings are stored on the CPU
+            # For embeddings stored on the CPU.
             emb = self._tensor[node_ids].to(device)
         else:
-            # embeddings are stored on the GPU
-            # the following method also covers self._world_size = 0 or 1
+            # For embeddings stored on the GPU.
+            # The following method is designed to facilitate communication
+            # across multiple GPUs and can handle situations where only one GPU
+            # is present or no GPUs (a.k.a. self._world_size = 0 or 1) are
+            # available gracefully.
             emb = nccl.sparse_all_to_all_pull(
                 node_ids, self._tensor, self._partition
             )
