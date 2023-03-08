@@ -12,6 +12,8 @@ import pytest
 import scipy as sp
 import torch
 import torch as th
+from torch.optim import Adam, SparseAdam
+from torch.utils.data import DataLoader
 from utils import parametrize_idtype
 from utils.graph_cases import (
     get_cases,
@@ -19,8 +21,6 @@ from utils.graph_cases import (
     random_dglgraph,
     random_graph,
 )
-from torch.optim import Adam, SparseAdam
-from torch.utils.data import DataLoader
 
 tmp_buffer = io.BytesIO()
 
