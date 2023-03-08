@@ -23,13 +23,9 @@ endif()
 # and add set(OPTION VALUE) to override these build options.
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
-dgl_option(USE_NCCL "Build with NCCL support" OFF)
-dgl_option(USE_SYSTEM_NCCL "Build using system's NCCL library" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_AVX "Build with AVX optimization" OFF)
-# LIBXSMM requires Intel MKL installed. If it has not been installed, check the following page:
-# https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html
-dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" OFF)
+dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
 dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
@@ -173,25 +169,7 @@ list(APPEND DGL_SRC ${DGL_RPC_SRC})
 if(USE_CUDA)
   dgl_config_cuda(DGL_CUDA_SRC)
   list(APPEND DGL_SRC ${DGL_CUDA_SRC})
-  if(USE_NCCL)
-    add_definitions(-DDGL_USE_NCCL)
-    if (USE_SYSTEM_NCCL)
-      include(cmake/util/FindNccl.cmake)
-      include_directories(${NCCL_INCLUDE_DIR})
-    else()
-      include(cmake/modules/NCCL.cmake)
-      cuda_include_directories(BEFORE ${NCCL_INCLUDE_DIR})
-    endif()
-  endif(USE_NCCL)
-
-  list(APPEND DGL_LINKER_LIBS ${NCCL_LIBRARY})
-endif(USE_CUDA)
-
-if(USE_CUDA)
   cuda_add_library(dgl SHARED ${DGL_SRC})
-  if (USE_NCCL AND NOT USE_SYSTEM_NCCL)
-    add_dependencies(dgl nccl_external)
-  endif()
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
@@ -231,11 +209,11 @@ endif(NOT MSVC)
 # Compile LIBXSMM
 if((NOT MSVC) AND USE_LIBXSMM)
   if(REBUILD_LIBXSMM)
-    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j BLAS=0
+    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0
                       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                       )
   else(REBUILD_LIBXSMM)
-    add_custom_target(libxsmm COMMAND make -j BLAS=0
+    add_custom_target(libxsmm COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0
                       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                       )
   endif(REBUILD_LIBXSMM)
@@ -249,12 +227,21 @@ if(NOT MSVC)
   # Disable -Wall for third-party tensorpipe due to too many warnings
   string(REPLACE "-Wall" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
   string(REPLACE "-Wall" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+  set(WNOERROR_FLAGS "-Wno-error=sign-compare")
+  if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0)
+      set(WNOERROR_FLAGS "${WNOERROR_FLAGS} -Wno-error=dangling-pointer")
+  endif()
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WNOERROR_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WNOERROR_FLAGS}")
   set(TP_STATIC_OR_SHARED STATIC)
   add_subdirectory(third_party/tensorpipe)
   list(APPEND DGL_LINKER_LIBS tensorpipe)
   target_include_directories(dgl PRIVATE third_party/tensorpipe)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  string(REPLACE "${WNOERROR_FLAGS}" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+  string(REPLACE "${WNOERROR_FLAGS}" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+
   # Avoid exposing third-party symbols when using DGL as a library.
   if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")

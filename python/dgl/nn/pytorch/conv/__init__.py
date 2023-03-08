@@ -6,6 +6,7 @@ from .appnpconv import APPNPConv
 from .atomicconv import AtomicConv
 from .cfconv import CFConv
 from .chebconv import ChebConv
+from .cugraph_gatconv import CuGraphGATConv
 from .cugraph_relgraphconv import CuGraphRelGraphConv
 from .cugraph_sageconv import CuGraphSAGEConv
 from .densechebconv import DenseChebConv
@@ -67,6 +68,7 @@ __all__ = [
     "EGNNConv",
     "PNAConv",
     "DGNConv",
+    "CuGraphGATConv",
     "CuGraphRelGraphConv",
     "CuGraphSAGEConv",
 ]
