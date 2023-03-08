@@ -6,7 +6,7 @@ import numpy as np
 import pyarrow
 import torch
 
-from gloo_wrapper import allgather_sizes, alltoallv_cpu
+from tools.distpartitioning.gloo_wrapper import allgather_sizes, alltoallv_cpu
 
 from pyarrow import csv
 from tools.distpartitioning.utils import map_partid_rank, memory_snapshot
