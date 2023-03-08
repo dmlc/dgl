@@ -17,39 +17,51 @@ from dgl.distributed.partition import (
     _etype_tuple_to_str,
     RESERVED_FIELD_DTYPE,
 )
+from distpartitioning.utils import get_idranges, memory_snapshot, read_json
 from pyarrow import csv
-from tools.distpartitioning.utils import (
-    get_idranges,
-    memory_snapshot,
-    read_json,
-)
 
 
 def _get_unique_invidx(srcids, dstids, nids):
     """This function is used to compute a list of unique elements,
     and their indices in the input list, which is the concatenation
     of srcids, dstids and uniq_nids. In addition, this function will also
-    compute inverse indices for the elements in srcids, dstids and nids arrays.
-    srcids, dstids will be over-written to contain the inverse indices,
-    which will be the indices in the unique elements list of an element in
-    those arrays. Basically, this function is mimicing the functionality
-    of numpy's unique function call. The problem with numpy's unique function
-    call is its high memory requirement. For an input list of 3 billion edges
-    it consumes about 550GB of systems memory, which is limiting the
-    capability of the partitioning pipeline.
+    compute inverse indices, in the list of unique elements, for the
+    elements in srcids, dstids and nids arrays. srcids, dstids will be
+    over-written to contain the inverse indices. Basically, this function
+    is mimicing the functionality of numpy's unique function call.
+    The problem with numpy's unique function call is its high memory
+    requirement. For an input list of 3 billion edges it consumes about
+    550GB of systems memory, which is limiting the capability of the
+    partitioning pipeline.
+
+    Current numpy uniques function returns 3 return parameters, which are
+        . list of unique elements
+        . list of indices, in the input argument list, which are first
+            occurance of the corresponding element in the uniques list
+        . list of inverse indices, which are indices from the uniques list
+            and can be used to rebuild the original input array
+    Compared to the above numpy's return parameters, this work around
+    solution returns 4 values
+        . list of unique elements,
+        . list of indices, which may not be the first occurance of the
+            corresponding element from the uniques
+        . list of inverse indices, here we only build the inverse indices
+            for srcids and dstids input arguments. For the current use case,
+            only these two inverse indices are needed.
 
     Parameters:
     -----------
     srcids : numpy array
-        a list of numbers, and in our use-case this will be src-ids of
-        the edges
+        a list of numbers, which are the src-ids of the edges
     dstids : numpy array
-        a list of numbers, and in our use-case this will be dst-ids of
-        the edges
+        a list of numbers, which are the dst-ids of the edges
     nids : numpy array
-        a list of numbers, and in our use-case this will be a list of
-        unique shuffle-global-nids on a given rank. This list is guaranteed
-        to be a list of sorted consecutive unique list of numbers
+        a list of numbers, a list of unique shuffle-global-nids.
+        This list is guaranteed to be a list of sorted consecutive unique
+        list of numbers. Also, this list will be a `super set` for the
+        list of dstids. Current implementation of the pipeline guarantees
+        this assumption and is used to simplify the current implementation
+        of the workaround solution.
 
     Returns:
     --------
@@ -81,42 +93,19 @@ def _get_unique_invidx(srcids, dstids, nids):
         )
         return np.unique(np.concatenate(srcids, dstids, nids))
 
+    # find uniqes which appear only in the srcids list
     mask = np.isin(srcids, nids, invert=True, kind="table")
     srcids_only = srcids[mask]
     srcids_idxes = np.where(mask == 1)[0]
 
-    # sort the array
+    # sort
     uniques, unique_srcids_idx = np.unique(srcids_only, return_index=True)
     idxes = srcids_idxes[unique_srcids_idx]
 
-    # store this for testing
-    gold_uniques = np.concatenate([uniques, nids])
-
-    # compute the idxes return parameter
-    # Remaining elements in the srcids array
-    srcids_int_nids, comm1, _ = np.intersect1d(
-        srcids, nids, return_indices=True
-    )
-    idxes = np.concatenate([idxes, comm1])
-    uniques = np.concatenate([uniques, srcids_int_nids])
-
-    # Remaining elements in the dstids array
-    dstids_int_nids, comm1, _ = np.intersect1d(
-        dstids, nids, return_indices=True
-    )
-    idxes = np.concatenate([idxes, comm1])
-    uniques = np.concatenate([uniques, dstids_int_nids])
-    assert len(dstids_int_nids) <= len(nids), (
-        f"node-ids array does not meet the requirements "
-        f"It is not a super-set. "
-        f"len(dstids_int_nids) = {len(dstids_int_nids)}, len(nids) = {len(nids)}"
-    )
-
-    # validation check here.
-    assert np.all(gold_uniques.sort() == uniques.sort()), (
-        f"Our assumption about gold_unique is NOT right. "
-        f"len(gold_uniques) == {len(gold_uniques)} "
-        f"len(uniques) == {len(uniques)}"
+    # build uniques and idxes, first and second return parameters
+    uniques = np.concatenate([uniques, nids])
+    idxes = np.concatenate(
+        [idxes, len(srcids) + len(dstids) + np.arange(len(nids))]
     )
 
     # sort and idxes
@@ -132,6 +121,8 @@ def _get_unique_invidx(srcids, dstids, nids):
     sort_ids = np.argsort(srcids)
     srcids = srcids[sort_ids]
 
+    # TODO: check if wrapping this while loop in a c++ wrapper
+    # helps in speeding up the code
     idx1 = 0
     idx2 = 0
     while (idx1 < len(srcids)) and (idx2 < len(uniques)):
@@ -151,9 +142,24 @@ def _get_unique_invidx(srcids, dstids, nids):
     srcids[sort_ids] = srcids
 
     # process dstids now.
+    # dstids is guaranteed to be a subset of the `nids` list
+    # here we are computing index in the list of uniqes for
+    # each element in the list of dstids, in a two step process
+    # 1. locate the position of first element from nids in the
+    #       list of uniques - dstids cannot appear to the left
+    #       of this number, they are guaranteed to be on the right
+    #       side of this number.
+    # 2. dstids = dstids - nids[0]
+    #       By subtracting nids[0] from the list of dstids will make
+    #       the list of dstids to be in the range of [0, max(nids)-1]
+    # 3. dstids = dstids - nids[0] + offset
+    #       Now we move the list of dstids by `offset` which will be
+    #       the starting position of the nids[0] element. Note that
+    #       nids will ALWAYS be a SUPERSET of dstids.
     offset = np.searchsorted(uniques, nids[0], side="left")
     dstids = dstids - nids[0] + offset
 
+    # return the values
     return uniques, idxes, srcids, dstids
 
 
