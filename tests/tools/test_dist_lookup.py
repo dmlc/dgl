@@ -16,7 +16,11 @@ import torch.multiprocessing as mp
 
 from tools.distpartitioning import constants, dist_lookup
 from tools.distpartitioning.gloo_wrapper import allgather_sizes
-from tools.distpartitioning.utils import get_idranges, read_json, get_ntype_counts_map
+from tools.distpartitioning.utils import (
+    get_idranges,
+    get_ntype_counts_map,
+    read_json,
+)
 from utils import create_chunked_dataset
 
 try:
@@ -235,7 +239,7 @@ def test_lookup_service(
             orig_schema[constants.STR_NODE_TYPE],
             get_ntype_counts_map(
                 orig_schema[constants.STR_NODE_TYPE],
-                orig_schema[constants.STR_NUM_NODES_PER_TYPE]
+                orig_schema[constants.STR_NUM_NODES_PER_TYPE],
             ),
             num_chunks=num_parts,
         )
