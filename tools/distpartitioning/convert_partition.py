@@ -91,7 +91,11 @@ def _get_unique_invidx(srcids, dstids, nids):
             f"This functions memory overhead will limit size of the "
             f"partitioned graph objects processed by each node in the cluster."
         )
-        return np.unique(np.concatenate(srcids, dstids, nids))
+        return np.unique(
+            np.concatenate(srcids, dstids, nids),
+            return_index=True,
+            return_inverse=True,
+        )
 
     # find uniqes which appear only in the srcids list
     mask = np.isin(srcids, nids, invert=True, kind="table")
