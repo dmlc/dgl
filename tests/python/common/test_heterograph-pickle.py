@@ -8,8 +8,8 @@ import dgl
 import dgl.function as fn
 import networkx as nx
 import pytest
-import utils
 import scipy.sparse as ssp
+import utils
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
 from utils import (

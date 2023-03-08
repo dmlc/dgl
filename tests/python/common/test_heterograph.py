@@ -10,15 +10,11 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-import utils
 import scipy.sparse as ssp
+import utils
 from dgl import DGLError
-from utils import (
-    assert_is_identical_hetero,
-    get_cases,
-    parametrize_idtype,
-)
 from scipy.sparse import rand
+from utils import assert_is_identical_hetero, get_cases, parametrize_idtype
 
 
 def create_test_heterograph(idtype):

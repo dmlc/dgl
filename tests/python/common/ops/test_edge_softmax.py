@@ -10,12 +10,12 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-import utils
 import scipy.sparse as ssp
+import utils
 from dgl import DGLError
 from dgl.ops import edge_softmax
-from utils import get_cases, parametrize_idtype
 from scipy.sparse import rand
+from utils import get_cases, parametrize_idtype
 
 edge_softmax_shapes = [(1,), (1, 3), (3, 4, 5)]
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}
