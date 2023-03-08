@@ -460,7 +460,7 @@ class NodeEmbedding:  # NodeEmbedding
         if self._partition:
             idxs = F.copy_to(
                 self._partition.get_local_indices(
-                    self._comm.rank(), ctx=F.context(self._tensor)
+                    max(self._rank, 0), ctx=F.context(self._tensor)
                 ),
                 F.context(states[0]),
             )
