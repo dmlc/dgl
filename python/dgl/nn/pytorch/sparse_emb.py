@@ -172,10 +172,10 @@ class NodeEmbedding:  # NodeEmbedding
             emb = self._tensor[node_ids].to(device)
         else:
             # For embeddings stored on the GPU.
-            # The following method is designed to facilitate communication
+            # The following method is designed to perform communication
             # across multiple GPUs and can handle situations where only one GPU
-            # is present or no GPUs (a.k.a. self._world_size = 0 or 1) are
-            # available gracefully.
+            # is present gracefully, a.k.a. self._world_size == 1 or
+            # 0 (when th.distributed.is_initialized() is false).
             emb = nccl.sparse_all_to_all_pull(
                 node_ids, self._tensor, self._partition
             )
