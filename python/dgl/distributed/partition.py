@@ -197,7 +197,7 @@ def load_partition(part_config, part_id, load_feats=True):
         "time for large partition."
     )
     graph = load_graphs(partition_path)[0][0]
-    print("Finished loading partition...")
+    print("Finished loading partition.")
 
     assert (
         NID in graph.ndata
@@ -304,21 +304,19 @@ def load_partition_feats(
         feat_path = relative_to_config(part_files["node_feats"])
         print(
             f"Start to load node data from {feat_path} which is "
-            f"{os.path.getsize(feat_path)} bytes. It may take non-trivial "
-            "time for large data."
+            f"{os.path.getsize(feat_path)} bytes."
         )
         node_feats = load_tensors(feat_path)
-        print("Finished loading node data...")
+        print("Finished loading node data.")
     edge_feats = None
     if load_edges:
         feat_path = relative_to_config(part_files["edge_feats"])
         print(
             f"Start to load edge data from {feat_path} which is "
-            f"{os.path.getsize(feat_path)} bytes. It may take non-trivial "
-            "time for large data."
+            f"{os.path.getsize(feat_path)} bytes."
         )
         edge_feats = load_tensors(feat_path)
-        print("Finished loading node data...")
+        print("Finished loading edge data.")
     # In the old format, the feature name doesn't contain node/edge type.
     # For compatibility, let's add node/edge types to the feature names.
     if node_feats is not None:
