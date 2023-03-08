@@ -74,7 +74,6 @@ def sparse_all_to_all_push(idx, value, partition):
     # Use pinned memory to speedup D2H copy.
     recv_splits = recv_splits.to("cpu", non_blocking=True)
     send_splits = send_splits.to("cpu", non_blocking=True)
-    # TODO(Xin): Overlap D2H copy and index selection.
     send_idx = idx[perm]
     send_value = value[perm]
     # Wait D2H copy finish.
@@ -158,7 +157,6 @@ def sparse_all_to_all_pull(req_idx, value, partition):
     # Use pinned memory to speedup D2H copy.
     resp_splits = resp_splits.to("cpu", non_blocking=True)
     req_splits = req_splits.to("cpu", non_blocking=True)
-    # TODO(Xin): Overlap D2H copy and index selection.
     req_idx = req_idx[perm]
     # Wait D2H copy finish.
     torch.cuda.current_stream().synchronize()

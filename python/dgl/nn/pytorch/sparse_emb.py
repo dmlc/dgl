@@ -172,7 +172,7 @@ class NodeEmbedding:  # NodeEmbedding
             emb = self._tensor[node_ids].to(device)
         else:
             # embeddings are stored on the GPU
-            # the following method will handle self._world_size = 0 or 1
+            # the following method also covers self._world_size = 0 or 1
             emb = nccl.sparse_all_to_all_pull(
                 node_ids, self._tensor, self._partition
             )
