@@ -12,32 +12,13 @@ import torch
 import torch.distributed as dist
 from gloo_wrapper import alltoallv_cpu
 from utils import (
+    DATA_TYPE_ID,
     generate_read_list,
     get_gid_offsets,
     get_idranges,
     map_partid_rank,
+    REV_DATA_TYPE_ID,
 )
-
-
-DATA_TYPE_ID = {
-    data_type: id
-    for id, data_type in enumerate(
-        [
-            torch.float32,
-            torch.float64,
-            torch.float16,
-            torch.uint8,
-            torch.int8,
-            torch.int16,
-            torch.int32,
-            torch.int64,
-            torch.bool,
-        ]
-    )
-}
-
-
-REV_DATA_TYPE_ID = {id: data_type for data_type, id in DATA_TYPE_ID.items()}
 
 
 def _broadcast_shape(
@@ -443,7 +424,7 @@ def get_dataset(
                             edge_feature_tids[data_key] = [(start, end)]
                         else:
                             edge_features[data_key] = None
-                            edge_feature_tids[data_key] = []
+                            edge_feature_tids[data_key] = [(0, 0)]
 
     # Done with building node_features locally.
     if len(edge_features) <= 0:

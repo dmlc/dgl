@@ -24,6 +24,11 @@ def check_dependencies():
         mpi_install
     ), "Could not locate the following dependency: MPI. Please install it and try again."
 
+    dgl_path = os.environ.get("DGL_HOME", "")
+    assert os.path.isdir(
+        dgl_path
+    ), "Environment variable DGL_HOME not found. Please define the DGL installation path"
+
 
 def run_parmetis_wrapper(params):
     """Function to execute all the steps needed to run ParMETIS
@@ -33,12 +38,11 @@ def run_parmetis_wrapper(params):
     params : argparser object
         an instance of argparser class to capture command-line arguments
     """
-    assert os.path.isfile(params.schema_file)
-    assert os.path.isfile(params.hostfile)
-
-    schema = read_json(params.schema_file)
+    schema = read_json(
+        os.path.join(params.preproc_input_dir, params.schema_file)
+    )
     graph_name = schema[constants.STR_GRAPH_NAME]
-    num_partitions = len(schema[constants.STR_NUM_NODES_PER_CHUNK][0])
+    num_partitions = params.num_parts
 
     # Check if parmetis_preprocess.py exists.
     assert os.path.isfile(
@@ -50,10 +54,11 @@ def run_parmetis_wrapper(params):
     # Trigger pre-processing step to generate input files for ParMETIS.
     preproc_cmd = (
         f"mpirun -np {num_partitions} -hostfile {params.hostfile} "
-        f"python3 tools/distpartitioning/parmetis_preprocess.py "
+        f"python3 $DGL_HOME/tools/distpartitioning/parmetis_preprocess.py "
         f"--schema_file {params.schema_file} "
-        f"--input_dir {params.preproc_input_dir}"
-        f"--output_dir {params.preproc_output_dir}"
+        f"--input_dir {params.preproc_input_dir} "
+        f"--output_dir {params.preproc_output_dir} "
+        f"--num_parts {num_partitions}"
     )
     logging.info(f"Executing Preprocessing Step: {preproc_cmd}")
     os.system(preproc_cmd)
@@ -86,7 +91,8 @@ def run_parmetis_wrapper(params):
         os.getcwd(), f"{graph_name}_part.{num_partitions}"
     )
     postproc_cmd = (
-        f"python3 tools/distpartitioning/parmetis_postprocess.py "
+        f"python3 $DGL_HOME/tools/distpartitioning/parmetis_postprocess.py "
+        f"--postproc_input_dir {params.preproc_input_dir} "
         f"--schema_file {params.schema_file} "
         f"--parmetis_output_file {parmetis_output_file} "
         f"--partitions_dir {params.partitions_dir}"
@@ -125,6 +131,12 @@ if __name__ == "__main__":
         required=True,
         type=str,
         help="A text file with a list of ip addresses.",
+    )
+    parser.add_argument(
+        "--num_parts",
+        required=True,
+        type=int,
+        help="integer representing no. of partitions.",
     )
 
     # ParMETIS step.
