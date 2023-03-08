@@ -12,7 +12,12 @@ import pytests_utils
 import scipy.sparse as ssp
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
-from pytests_utils import get_cases, parametrize_idtype, assert_is_identical, assert_is_identical_hetero
+from pytests_utils import (
+    assert_is_identical,
+    assert_is_identical_hetero,
+    get_cases,
+    parametrize_idtype,
+)
 
 
 def _assert_is_identical_nodeflow(nf1, nf2):
