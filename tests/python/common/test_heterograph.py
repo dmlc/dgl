@@ -13,9 +13,8 @@ import pytest
 import pytests_utils
 import scipy.sparse as ssp
 from dgl import DGLError
-from pytests_utils import get_cases, parametrize_idtype
+from pytests_utils import get_cases, assert_is_identical_hetero, parametrize_idtype
 from scipy.sparse import rand
-from utils import assert_is_identical_hetero
 
 
 def create_test_heterograph(idtype):
