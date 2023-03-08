@@ -11,7 +11,6 @@ import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
-import utils
 from dgl import DGLError
 from scipy.sparse import rand
 from utils import get_cases, parametrize_idtype
