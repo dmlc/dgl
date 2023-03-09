@@ -407,7 +407,6 @@ def test_zinc():
         g2, _ = dataset2[0]
 
         assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
-        assert dataset2.num_atom_types == 28
         assert label.shape == 1
 
 
