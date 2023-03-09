@@ -26,9 +26,9 @@ import dgl.partition
 import networkx as nx
 import numpy as np
 import pytest
+from pytests_utils import parametrize_idtype
+from pytests_utils.graph_cases import get_cases
 from scipy import sparse as spsp
-from test_utils import parametrize_idtype
-from test_utils.graph_cases import get_cases
 
 D = 5
 

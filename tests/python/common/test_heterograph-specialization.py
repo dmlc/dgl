@@ -4,7 +4,7 @@ import dgl
 import dgl.function as fn
 import numpy as np
 import scipy.sparse as sp
-from test_utils import parametrize_idtype
+from pytests_utils import parametrize_idtype
 
 D = 5
 
