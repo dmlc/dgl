@@ -44,8 +44,9 @@ def _create_lookup_service(
     partitions_dir, ntypes, id_map, rank, world_size, num_parts
 ):
     id_lookup = dist_lookup.DistLookupService(
-        partitions_dir, ntypes, id_map, rank, world_size, num_parts
+        partitions_dir, ntypes, rank, world_size, num_parts
     )
+    id_lookup.set_idMap(id_map)
 
     # invoke the main function here.
     print(f"[Rank: {rank}] Done with Dist Lookup Service initialization...")
