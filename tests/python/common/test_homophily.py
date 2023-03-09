@@ -4,7 +4,7 @@ import unittest
 import backend as F
 
 import dgl
-from test_utils import parametrize_idtype
+from pytests_utils import parametrize_idtype
 
 
 @unittest.skipIf(

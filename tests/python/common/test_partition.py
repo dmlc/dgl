@@ -4,7 +4,7 @@ import backend as F
 
 from dgl.distributed import graph_partition_book as gpb
 from dgl.partition import NDArrayPartition
-from test_utils import parametrize_idtype
+from pytests_utils import parametrize_idtype
 
 
 @unittest.skipIf(
