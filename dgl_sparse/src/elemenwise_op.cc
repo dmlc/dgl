@@ -22,6 +22,10 @@ c10::intrusive_ptr<SparseMatrix> SpSpAdd(
     const c10::intrusive_ptr<SparseMatrix>& A,
     const c10::intrusive_ptr<SparseMatrix>& B) {
   ElementwiseOpSanityCheck(A, B);
+  if (A->HasDiag() && B->HasDiag()) {
+    return SparseMatrix::FromDiagPointer(
+        A->DiagPtr(), A->value() + B->value(), A->shape());
+  }
   auto torch_A = COOToTorchCOO(A->COOPtr(), A->value());
   auto torch_B = COOToTorchCOO(B->COOPtr(), B->value());
   auto sum = (torch_A + torch_B).coalesce();
