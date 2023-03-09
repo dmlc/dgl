@@ -119,32 +119,37 @@ tensor_list SpSpMMAutoGrad::backward(
 c10::intrusive_ptr<SparseMatrix> DiagSpSpMM(
     const c10::intrusive_ptr<SparseMatrix>& lhs_mat,
     const c10::intrusive_ptr<SparseMatrix>& rhs_mat) {
-  if (lhs_mat->HasDiag()) {
-    if (rhs_mat->HasDiag()) {
-      // Diag @ Diag
-      const int64_t m = lhs_mat->shape()[0];
-      const int64_t n = lhs_mat->shape()[1];
-      const int64_t p = rhs_mat->shape()[1];
-      const int64_t common_diag_len = std::min({m, n, p});
-      const int64_t new_diag_len = std::min(m, p);
-      auto slice = torch::indexing::Slice(0, common_diag_len);
-      auto new_val =
-          lhs_mat->value().index({slice}) * rhs_mat->value().index({slice});
-      new_val = torch::constant_pad_nd(
-          new_val, {0, new_diag_len - common_diag_len}, 0);
-      return SparseMatrix::FromDiag(new_val, {m, p});
-    } else {
-      // Diag @ Sparse
-      auto row = rhs_mat->Indices().index({0});
-      auto val = lhs_mat->value().index_select(0, row) * rhs_mat->value();
-      return SparseMatrix::ValLike(rhs_mat, val);
-    }
-  } else {
+  if (lhs_mat->HasDiag() && rhs_mat->HasDiag()) {
+    // Diag @ Diag
+    const int64_t m = lhs_mat->shape()[0];
+    const int64_t n = lhs_mat->shape()[1];
+    const int64_t p = rhs_mat->shape()[1];
+    const int64_t common_diag_len = std::min({m, n, p});
+    const int64_t new_diag_len = std::min(m, p);
+    auto slice = torch::indexing::Slice(0, common_diag_len);
+    auto new_val =
+        lhs_mat->value().index({slice}) * rhs_mat->value().index({slice});
+    new_val =
+        torch::constant_pad_nd(new_val, {0, new_diag_len - common_diag_len}, 0);
+    return SparseMatrix::FromDiag(new_val, {m, p});
+  }
+  if (lhs_mat->HasDiag() && !rhs_mat->HasDiag()) {
+    // Diag @ Sparse
+    auto row = rhs_mat->Indices().index({0});
+    auto val = lhs_mat->value().index_select(0, row) * rhs_mat->value();
+    return SparseMatrix::ValLike(rhs_mat, val);
+  }
+  if (!lhs_mat->HasDiag() && rhs_mat->HasDiag()) {
     // Sparse @ Diag
     auto col = lhs_mat->Indices().index({1});
     auto val = rhs_mat->value().index_select(0, col) * lhs_mat->value();
     return SparseMatrix::ValLike(lhs_mat, val);
   }
+  TORCH_CHECK(
+      false,
+      "For DiagSpSpMM, at least one of the sparse matries need to have kDiag "
+      "format");
+  return c10::intrusive_ptr<SparseMatrix>();
 }
 
 c10::intrusive_ptr<SparseMatrix> SpSpMM(
