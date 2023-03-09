@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 import scipy.sparse as ssp
 from dgl import DGLError
-from test_utils import parametrize_idtype
+from pytests_utils import parametrize_idtype
 
 
 def create_test_heterograph(num_nodes, num_adj, idtype):

@@ -27,11 +27,16 @@ def post_process(params):
     """
     logging.info("Starting to process parmetis output.")
 
+    logging.info(params.postproc_input_dir)
     logging.info(params.schema_file)
     logging.info(params.parmetis_output_file)
-    assert os.path.isfile(params.schema_file)
+    assert os.path.isfile(
+        os.path.join(params.postproc_input_dir, params.schema_file)
+    )
     assert os.path.isfile(params.parmetis_output_file)
-    schema = read_json(params.schema_file)
+    schema = read_json(
+        os.path.join(params.postproc_input_dir, params.schema_file)
+    )
 
     metis_df = csv.read_csv(
         params.parmetis_output_file,
@@ -105,6 +110,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="PostProcessing the ParMETIS\
         output for partitioning pipeline"
+    )
+    parser.add_argument(
+        "--postproc_input_dir",
+        required=True,
+        type=str,
+        help="Base directory for post processing step.",
     )
     parser.add_argument(
         "--schema_file",
