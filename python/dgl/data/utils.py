@@ -8,8 +8,9 @@ import pickle
 import sys
 import warnings
 
-import numpy as np
 import networkx.algorithms as A
+
+import numpy as np
 import requests
 
 from .. import backend as F
@@ -576,7 +577,7 @@ def add_node_property_split(
 
     It considers the in-distribution (ID) and out-of-distribution (OOD) subsets of nodes.
     The ID subset includes training, validation and testing parts, while the OOD subset
-    includes validation and testing parts. As a result, it creates 5 associated node mask 
+    includes validation and testing parts. As a result, it creates 5 associated node mask
     arrays for each graph:
         - 3 for the ID nodes: ``'in_train_mask'``, ``'in_valid_mask'``, ``'in_test_mask'``,
         - and 2 for the OOD nodes: ``'out_valid_mask'``, ``'out_test_mask'``.
@@ -642,9 +643,7 @@ def add_node_property_split(
 
 def _compute_popularity_property(graph_nx, ascending=True):
     direction = -1 if ascending else 1
-    property_values = direction * np.array(
-        list(A.pagerank(graph_nx).values())
-    )
+    property_values = direction * np.array(list(A.pagerank(graph_nx).values()))
     return property_values
 
 

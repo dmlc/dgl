@@ -76,7 +76,9 @@ def test_mask_nodes_by_property():
     num_nodes = 1000
     property_values = np.random.uniform(size=num_nodes)
     part_ratios = [0.3, 0.1, 0.1, 0.3, 0.2]
-    split_masks = data.utils.mask_nodes_by_property(property_values, part_ratios)
+    split_masks = data.utils.mask_nodes_by_property(
+        property_values, part_ratios
+    )
     assert "in_valid_mask" in split_masks
 
 
@@ -85,12 +87,12 @@ def test_mask_nodes_by_property():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
-def test_add_node_property_split():    
+def test_add_node_property_split():
     dataset = data.AmazonCoBuyComputerDataset()
     part_ratios = [0.3, 0.1, 0.1, 0.3, 0.2]
-    for property_name in ['popularity', 'locality', 'density']:
+    for property_name in ["popularity", "locality", "density"]:
         data.utils.add_node_property_split(dataset, part_ratios, property_name)
-        assert 'in_valid_mask' in dataset[0].ndata
+        assert "in_valid_mask" in dataset[0].ndata
 
 
 if __name__ == "__main__":
