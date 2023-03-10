@@ -175,6 +175,12 @@ class NDArray {
    */
   inline NDArray Clone() const;
   /**
+   * @brief Return a copy of the NDArray in pinned (page-locked) memory.
+   * @note This is an out-place method, and the current context has to be kDGLCPU.
+   *       Otherwise, it will throw an error.
+   */
+  inline NDArray PinMemory();
+  /**
    * @brief In-place method to pin the current array by calling PinContainer
    *        on the underlying NDArray:Container.
    * @note This is an in-place method. Behavior depends on the current context,
@@ -182,8 +188,6 @@ class NDArray {
    *       IsPinned: directly return;
    *       kDGLCUDA: invalid, will throw an error.
    */
-
-  inline NDArray PinMemory();
   inline void PinMemory_();
   /**
    * @brief In-place method to unpin the current array by calling UnpinContainer
@@ -232,6 +236,13 @@ class NDArray {
   DGL_DLL static NDArray Empty(
       std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx);
 
+  /**
+   * @brief Create an empty NDArray in pinned memory.
+   * @param shape The shape of the new array.
+   * @param dtype The data type of the new array.
+   * @param ctx The context of the Array.
+   * @return The created Array
+   */
   DGL_DLL static NDArray PinnedEmpty(
       std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx);
   /**
@@ -291,6 +302,14 @@ class NDArray {
   DGL_DLL static void CopyFromTo(DGLArray* from, DGLArray* to);
   DGL_DLL static void CopyFromTo(
       DGLArray* from, DGLArray* to, DGLStreamHandle stream);
+
+  /**
+   * @brief Function to copy data between device and CPU while record the event.
+   * @param from The source array.
+   * @param to The target array.
+   * @param pyt_ctx The context pointer from PyTorch's CachingHostAllocator.
+   * @note This function fuses data-copy and event recording to ensure CachingHostAllocator works properly
+   */
   DGL_DLL static void RecordedCopyFromTo(
       DGLArray* from, DGLArray* to, void* pyt_ctx);
 
@@ -434,9 +453,13 @@ struct NDArray::Container {
   /** @brief The internal array object */
   std::atomic<int> ref_counter_{0};
 
+  /** @brief Whether underlying dl_tensor is pinned by DGL */
   bool pinned_by_dgl_{false};
+  /** @brief Whether underlying dl_tensor is pinned by PyTorch (CachingHostAllocator) */
   bool pinned_by_pyt_{false};
+  /** @brief The PyTorch storage ctx ptr if pinned_by_pyt_ = True */
   void* pyt_ctx{nullptr};
+  /** @brief Pointer to the corresp. PyTorch deleter if pinned_by_pyt_ = True */
   void* pyt_raw_deleter{nullptr};
 };
 
@@ -464,16 +487,21 @@ inline void NDArray::CopyFrom(DGLArray* other) {
 
 inline void NDArray::CopyFrom(const NDArray& other) {
   CHECK(other.data_ != nullptr);
-  // only one NDArray is pinned
-  // they are on diff devices
-  if (other.data_->pinned_by_pyt_ != data_->pinned_by_pyt_ &&
-      data_->dl_tensor.ctx.device_type !=
-          other.data_->dl_tensor.ctx.device_type) {
+  // copy between two devices
+  if (data_->dl_tensor.ctx.device_type !=
+      other.data_->dl_tensor.ctx.device_type) {
     CHECK(data_ != nullptr);
     auto to_ctx_type = data_->dl_tensor.ctx.device_type;
-    auto ptr = (to_ctx_type == kDGLCPU ? data_ : other.data_);
-    void* pyt_ctx = ptr->pyt_ctx;  // get the correct ctx
-    RecordedCopyFromTo(&(other.data_->dl_tensor), &(data_->dl_tensor), pyt_ctx);
+    auto cpu_data_ = (to_ctx_type == kDGLCPU ? data_ : other.data_);
+    // pinned by PyTorch
+    if (cpu_data_->pinned_by_pyt_) {
+      // To ensure correct behavior, the event must be recorded after cudaMemcpyAsync
+      // as long as the memory is pinned by PyTorch.
+      void* pyt_ctx = cpu_data_->pyt_ctx;
+      RecordedCopyFromTo(&(other.data_->dl_tensor), &(data_->dl_tensor), pyt_ctx);
+    } else {
+      CopyFrom(&(other.data_->dl_tensor));
+    }
   } else {
     CopyFrom(&(other.data_->dl_tensor));
   }
@@ -486,15 +514,21 @@ inline void NDArray::CopyTo(DGLArray* other) const {
 
 inline void NDArray::CopyTo(const NDArray& other) const {
   CHECK(other.data_ != nullptr);
-  // only one NDArray is pinned and they are on diff devices
-  if (other.data_->pinned_by_pyt_ != data_->pinned_by_pyt_ &&
-      data_->dl_tensor.ctx.device_type !=
-          other.data_->dl_tensor.ctx.device_type) {
+  // copy between two devices
+  if (data_->dl_tensor.ctx.device_type !=
+      other.data_->dl_tensor.ctx.device_type) {
     CHECK(data_ != nullptr);
     auto from_ctx_type = data_->dl_tensor.ctx.device_type;
-    auto ptr = (from_ctx_type == kDGLCPU ? data_ : other.data_);
-    void* pyt_ctx = ptr->pyt_ctx;  // get the correct ctx
-    RecordedCopyFromTo(&(data_->dl_tensor), &(other.data_->dl_tensor), pyt_ctx);
+    auto cpu_data_ = (from_ctx_type == kDGLCPU ? data_ : other.data_);
+    // pinned by PyTorch
+    if (cpu_data_->pinned_by_pyt_) {
+      // To ensure correct behavior, the event must be recorded after cudaMemcpyAsync
+      // as long as the memory is pinned by PyTorch.
+      void* pyt_ctx = cpu_data_->pyt_ctx;
+      RecordedCopyFromTo(&(data_->dl_tensor), &(other.data_->dl_tensor), pyt_ctx);
+    } else {
+      CopyTo(&(other.data_->dl_tensor));
+    }
   } else {
     CopyTo(&(other.data_->dl_tensor));
   }

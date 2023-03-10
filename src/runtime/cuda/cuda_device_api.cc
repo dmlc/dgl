@@ -165,6 +165,10 @@ class CUDADeviceAPI final : public DeviceAPI {
         stream);
   }
 
+  // To ensure correct behavior, `record_event` must be invoked anytime a pointer from
+  // PyTorch CachingHostAllocator is used in a cudaMemcpyAsync call.
+  // It provides a way to re-use freed pinned (page-locked) memory allocations
+  // and avoid device sync due to cudaFreeHost calls.
   void RecordedCopyDataFromTo(
       void* from, size_t from_offset, void* to, size_t to_offset, size_t size,
       DGLContext ctx_from, DGLContext ctx_to, DGLDataType type_hint,

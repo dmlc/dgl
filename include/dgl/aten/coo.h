@@ -136,13 +136,7 @@ struct COOMatrix {
   }
 
   /**
-   * @brief Pin the row, col and data (if not Null) of the matrix.
-   * @note This is an in-place method. Behavior depends on the current context,
-   *       kDGLCPU: will be pinned;
-   *       IsPinned: directly return;
-   *       kDGLCUDA: invalid, will throw an error.
-   *       The context check is deferred to pinning the NDArray.
-   */
+   * @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline COOMatrix PinMemory() {
     if (is_pinned) return *this;
     return COOMatrix(
@@ -151,6 +145,14 @@ struct COOMatrix {
         col_sorted, true);
   }
 
+  /**
+   * @brief Pin the row, col and data (if not Null) of the matrix.
+   * @note This is an in-place method. Behavior depends on the current context,
+   *       kDGLCPU: will be pinned;
+   *       IsPinned: directly return;
+   *       kDGLCUDA: invalid, will throw an error.
+   *       The context check is deferred to pinning the NDArray.
+   */
   inline void PinMemory_() {
     if (is_pinned) return;
     row.PinMemory_();
