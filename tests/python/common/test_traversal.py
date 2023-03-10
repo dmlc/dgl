@@ -10,7 +10,7 @@ import dgl
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
-from test_utils import parametrize_idtype
+from pytests_utils import parametrize_idtype
 
 np.random.seed(42)
 

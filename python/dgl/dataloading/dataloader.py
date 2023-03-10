@@ -1018,7 +1018,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.use_prefetch_thread = use_prefetch_thread
         self.cpu_affinity_enabled = False
 
-        worker_init_fn = WorkerInitWrapper(kwargs.get("worker_init_fn", None))
+        worker_init_fn = WorkerInitWrapper(kwargs.pop("worker_init_fn", None))
 
         self.other_storages = {}
 

@@ -36,6 +36,7 @@ TORCH_LIBRARY(dgl_sparse, m) {
   m.def("from_coo", &SparseMatrix::FromCOO)
       .def("from_csr", &SparseMatrix::FromCSR)
       .def("from_csc", &SparseMatrix::FromCSC)
+      .def("from_diag", &SparseMatrix::FromDiag)
       .def("spsp_add", &SpSpAdd)
       .def("reduce", &Reduce)
       .def("sum", &ReduceSum)

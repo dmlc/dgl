@@ -210,8 +210,8 @@ def get_node_partids(partitions_dir, graph_schema):
     )
     node_partids = {}
     for ntype_id, ntype in enumerate(graph_schema[constants.STR_NODE_TYPE]):
-        node_partids[ntype] = read_csv_file(
-            os.path.join(partitions_dir, f"{ntype}.txt"), True
+        node_partids[ntype] = read_file(
+            os.path.join(partitions_dir, f"{ntype}.txt"), constants.STR_CSV
         )
         assert (
             len(node_partids[ntype])
