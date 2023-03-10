@@ -280,8 +280,7 @@ def load_partition_feats(
     config_path = os.path.dirname(part_config)
     relative_to_config = lambda path: os.path.join(config_path, path)
 
-    with open(part_config) as conf_f:
-        part_metadata = json.load(conf_f)
+    part_metadata = _load_part_config(part_config)
     assert (
         "part-{}".format(part_id) in part_metadata
     ), "part-{} does not exist".format(part_id)
@@ -310,10 +309,20 @@ def load_partition_feats(
         node_feats = new_feats
     if edge_feats is not None:
         new_feats = {}
+        etype2canonical = {
+            c_etype[1]: c_etype for c_etype in part_metadata["etypes"]
+        }
         for name in edge_feats:
             feat = edge_feats[name]
             if name.find("/") == -1:
                 name = _etype_tuple_to_str(DEFAULT_ETYPE) + "/" + name
+            # If etype is not canonical, convert it to canonical.
+            c_etype, feat_name = name.split("/")
+            try:
+                _etype_str_to_tuple(c_etype)
+            except AssertionError:
+                c_etype = etype2canonical[c_etype]
+                name = _etype_tuple_to_str(c_etype) + "/" + feat_name
             new_feats[name] = feat
         edge_feats = new_feats
 

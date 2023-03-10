@@ -16,6 +16,7 @@ from dgl.distributed import (
 )
 from dgl.distributed.graph_partition_book import (
     _etype_tuple_to_str,
+    _etype_str_to_tuple,
     DEFAULT_ETYPE,
     DEFAULT_NTYPE,
     EdgePartitionPolicy,
@@ -241,9 +242,10 @@ def check_hetero_partition(
     parts = []
     shuffled_labels = []
     shuffled_elabels = []
+    part_config = "/tmp/partition/test.json"
     for i in range(num_parts):
         part_g, node_feats, edge_feats, gpb, _, ntypes, etypes = load_partition(
-            "/tmp/partition/test.json", i, load_feats=load_feats
+            part_config, i, load_feats=load_feats
         )
         _verify_partition_data_types(part_g)
         _verify_partition_formats(part_g, graph_formats)
@@ -324,6 +326,38 @@ def check_hetero_partition(
     assert np.all(
         orig_elabels == F.asnumpy(hg.edges[test_etype].data["labels"])
     )
+
+    # Verify depreacated edge feats whose keys are etypes can be converted to
+    # canonical etypes when loading.
+    convert_edge_feats(part_config, num_parts)
+    c_etypes = hg.canonical_etypes
+    for part_id in range(num_parts):
+        _, edge_feats = load_partition_feats(
+            part_config, part_id, load_nodes=False, load_edges=True
+        )
+        for name in edge_feats:
+            c_etype, _ = name.split("/")
+            assert _etype_str_to_tuple(c_etype) in c_etypes, (
+                f"{c_etype} cannot be found in {c_etypes}."
+            )
+
+
+def convert_edge_feats(part_config, num_parts):
+    # Convert the keys from canonical etype to etype.
+    config_path = os.path.dirname(part_config)
+    relative_to_config = lambda path: os.path.join(config_path, path)
+    with open(part_config) as conf_f:
+        part_metadata = json.load(conf_f)
+    for part_id in range(num_parts):
+        part_files = part_metadata["part-{}".format(part_id)]
+        feat_path = relative_to_config(part_files["edge_feats"])
+        edge_feats = dgl.data.utils.load_tensors(feat_path)
+        new_edge_feats = {}
+        for name, data in edge_feats.items():
+            c_etype, feat_name = name.split("/")
+            etype = _etype_str_to_tuple(c_etype)[1]
+            new_edge_feats[etype + "/" + feat_name] = data
+        dgl.data.utils.save_tensors(feat_path, new_edge_feats)
 
 
 def check_partition(
