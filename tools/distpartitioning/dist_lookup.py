@@ -5,10 +5,8 @@ import os
 import numpy as np
 import pyarrow
 import torch
-
-from pyarrow import csv
-
 from gloo_wrapper import allgather_sizes, alltoallv_cpu
+from pyarrow import csv
 from utils import map_partid_rank
 
 
