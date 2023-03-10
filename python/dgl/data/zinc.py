@@ -5,7 +5,7 @@ from .utils import _get_dgl_url, load_graphs
 
 
 class ZINCDataset(DGLBuiltinDataset):
-    r""" ZINC dataset for the graph regression task.
+    r"""ZINC dataset for the graph regression task.
 
     A subset (12K) of ZINC molecular graphs (250K) dataset is used to
     regress a molecular property known as the constrained solubility.
