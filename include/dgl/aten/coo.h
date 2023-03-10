@@ -135,8 +135,7 @@ struct COOMatrix {
         col_sorted);
   }
 
-  /**
-   * @brief Return a copy of this matrix in pinned (page-locked) memory. */
+  /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline COOMatrix PinMemory() {
     if (is_pinned) return *this;
     return COOMatrix(

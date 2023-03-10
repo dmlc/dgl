@@ -304,7 +304,7 @@ class NDArray {
       DGLArray* from, DGLArray* to, DGLStreamHandle stream);
 
   /**
-   * @brief Function to copy data between device and CPU while record the event.
+   * @brief Function to copy data between device and CPU while recording the event.
    * @param from The source array.
    * @param to The target array.
    * @param pyt_ctx The context pointer from PyTorch's CachingHostAllocator.

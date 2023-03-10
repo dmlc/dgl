@@ -108,10 +108,10 @@ class CUDADeviceAPI final : public DeviceAPI {
     SetDevice(ctx);
     // Redirect to PyTorch's allocator when available.
     TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
-    if (tensor_dispatcher->IsAvailable())
+    if (tensor_dispatcher->IsAvailable()) {
       return tensor_dispatcher->CUDAAllocWorkspace(
           nbytes, getCurrentCUDAStream());
-
+    }
     CHECK_EQ(256 % alignment, 0U) << "CUDA space is aligned at 256 bytes";
     void* ret;
     CUDA_CALL(cudaMalloc(&ret, nbytes));
@@ -121,9 +121,9 @@ class CUDADeviceAPI final : public DeviceAPI {
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
     SetDevice(ctx);
     TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
-    if (tensor_dispatcher->IsAvailable())
+    if (tensor_dispatcher->IsAvailable()) {
       return tensor_dispatcher->CUDAFreeWorkspace(ptr);
-
+    }
     CUDA_CALL(cudaFree(ptr));
   }
 

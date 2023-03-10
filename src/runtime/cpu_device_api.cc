@@ -92,8 +92,9 @@ struct CPUWorkspacePool : public WorkspacePool {
 void* CPUDeviceAPI::AllocWorkspace(
     DGLContext ctx, size_t size, DGLDataType type_hint) {
   TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
-  if (tensor_dispatcher->IsAvailable())
+  if (tensor_dispatcher->IsAvailable()) {
     return tensor_dispatcher->CPUAllocWorkspace(size);
+  }
 
   return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->AllocWorkspace(
       ctx, size);
@@ -101,8 +102,9 @@ void* CPUDeviceAPI::AllocWorkspace(
 
 void CPUDeviceAPI::FreeWorkspace(DGLContext ctx, void* data) {
   TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
-  if (tensor_dispatcher->IsAvailable())
+  if (tensor_dispatcher->IsAvailable()) {
     return tensor_dispatcher->CPUFreeWorkspace(data);
+  }
 
   dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(ctx, data);
 }

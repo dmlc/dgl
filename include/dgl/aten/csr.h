@@ -128,6 +128,14 @@ struct CSRMatrix {
         aten::IsNullArray(data) ? data : data.CopyTo(ctx), sorted);
   }
 
+  /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
+  inline CSRMatrix PinMemory() {
+    if (is_pinned) return *this;
+    return CSRMatrix(
+        num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
+        aten::IsNullArray(data) ? data : data.PinMemory(), sorted, true);
+  }
+
   /**
    * @brief Pin the indptr, indices and data (if not Null) of the matrix.
    * @note This is an in-place method. Behavior depends on the current context,
@@ -136,13 +144,6 @@ struct CSRMatrix {
    *       kDGLCUDA: invalid, will throw an error.
    *       The context check is deferred to pinning the NDArray.
    */
-  inline CSRMatrix PinMemory() {
-    if (is_pinned) return *this;
-    return CSRMatrix(
-        num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
-        aten::IsNullArray(data) ? data : data.PinMemory(), sorted, true);
-  }
-
   inline void PinMemory_() {
     if (is_pinned) return;
     indptr.PinMemory_();

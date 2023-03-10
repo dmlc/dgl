@@ -98,7 +98,20 @@ class DeviceAPI {
       const void* from, size_t from_offset, void* to, size_t to_offset,
       size_t num_bytes, DGLContext ctx_from, DGLContext ctx_to,
       DGLDataType type_hint) = 0;
-
+  /**
+   * @brief copy data between device and CPU while recording the event.
+   * @param from The source array.
+   * @param from_offset The byte offeset in the from.
+   * @param to The target array.
+   * @param to_offset The byte offset in the to.
+   * @param num_bytes The size of the memory in bytes
+   * @param ctx_from The source context
+   * @param ctx_to The target context
+   * @param type_hint The type of elements, only neded by certain backends.
+   *                  can be useful for cross device endian converison.
+   * @param pyt_ctx The context pointer from PyTorch's CachingHostAllocator.
+   * @note This function only works when PyTorch CachingHostAllocator is available
+   */
   virtual void RecordedCopyDataFromTo(
       void* from, size_t from_offset, void* to, size_t to_offset,
       size_t num_bytes, DGLContext ctx_from, DGLContext ctx_to,
@@ -157,9 +170,6 @@ class DeviceAPI {
    * @return false when pinning an empty tensor. true otherwise.
    */
   DGL_DLL virtual bool PinData(void* ptr, size_t nbytes);
-  DGL_DLL virtual void* AllocPinnedDataSpace(
-      size_t nbytes, void** ctx, void** deleter);
-  DGL_DLL virtual void FreePinnedDataSpace(void** deleter);
 
   /**
    * @brief Unpin host memory using cudaHostUnregister().
@@ -167,6 +177,24 @@ class DeviceAPI {
    * @param ptr The host memory pointer to be unpinned.
    */
   DGL_DLL virtual void UnpinData(void* ptr);
+
+  /**
+   * @brief Pin host memory using PyTorch CachingHostAllocator.
+   *
+   * @param nbytes The size to be pinned.
+   * @param ctx Pointer to the context pointer from PyTorch's CachingHostAllocator.
+   * @param deleter Pointer to the deleter function from  PyTorch's CachingHostAllocator.
+   */
+  DGL_DLL virtual void* AllocPinnedDataSpace(
+      size_t nbytes, void** ctx, void** deleter);
+
+  /**
+   * @brief 'Deallocate' the pinned memory from PyTorch CachingHostAllocator.
+   *
+   * @param deleter Pointer to the deleter function from PyTorch's CachingHostAllocator.
+   * @note In fact, it avoids unnecessary cudaFreeHost calls and puts the memory block into CachingHostAllocator's free list.
+   */
+  DGL_DLL virtual void FreePinnedDataSpace(void** deleter);
 
   /**
    * @brief Check whether the memory is in pinned memory.
