@@ -17,8 +17,8 @@ from dgl.distributed.partition import (
     _etype_tuple_to_str,
     RESERVED_FIELD_DTYPE,
 )
-from distpartitioning.utils import get_idranges, memory_snapshot, read_json
 from pyarrow import csv
+from utils import get_idranges, memory_snapshot, read_json
 
 
 def _get_unique_invidx(srcids, dstids, nids):

@@ -4,9 +4,9 @@ import tempfile
 import numpy as np
 import pytest
 
-from convert_partition import _get_unique_invidx
+import utils
 
-from tools.distpartitioning import utils
+from convert_partition import _get_unique_invidx
 
 
 @pytest.mark.parametrize(
