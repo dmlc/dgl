@@ -15,8 +15,8 @@ from dgl.distributed import (
     partition_graph,
 )
 from dgl.distributed.graph_partition_book import (
-    _etype_tuple_to_str,
     _etype_str_to_tuple,
+    _etype_tuple_to_str,
     DEFAULT_ETYPE,
     DEFAULT_NTYPE,
     EdgePartitionPolicy,
@@ -337,9 +337,9 @@ def check_hetero_partition(
         )
         for name in edge_feats:
             c_etype, _ = name.split("/")
-            assert _etype_str_to_tuple(c_etype) in c_etypes, (
-                f"{c_etype} cannot be found in {c_etypes}."
-            )
+            assert (
+                _etype_str_to_tuple(c_etype) in c_etypes
+            ), f"{c_etype} cannot be found in {c_etypes}."
 
 
 def convert_edge_feats(part_config, num_parts):
