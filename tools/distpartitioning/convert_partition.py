@@ -92,7 +92,7 @@ def _get_unique_invidx(srcids, dstids, nids):
             f"partitioned graph objects processed by each node in the cluster."
         )
         uniques, idxes, inv_idxes = np.unique(
-            np.concatenate(srcids, dstids, nids),
+            np.concatenate([srcids, dstids, nids]),
             return_index=True,
             return_inverse=True,
         )
