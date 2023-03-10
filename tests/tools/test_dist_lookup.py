@@ -14,14 +14,14 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-from tools.distpartitioning import constants
+from tools.distpartitioning import constants, dist_lookup
 from tools.distpartitioning.gloo_wrapper import allgather_sizes
 from tools.distpartitioning.utils import (
     get_idranges,
     get_ntype_counts_map,
     read_json,
 )
-from utils import create_chunked_dataset
+from pytest_utils import create_chunked_dataset
 
 try:
     mp.set_start_method("spawn", force=True)
@@ -43,7 +43,7 @@ def _init_process_group(rank, world_size):
 def _create_lookup_service(
     partitions_dir, ntypes, id_map, rank, world_size, num_parts
 ):
-    id_lookup = tools.distpartitioning.dist_lookup.DistLookupService(
+    id_lookup = dist_lookup.DistLookupService(
         partitions_dir, ntypes, rank, world_size, num_parts
     )
     id_lookup.set_idMap(id_map)
