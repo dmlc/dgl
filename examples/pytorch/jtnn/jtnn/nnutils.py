@@ -1,9 +1,9 @@
 import os
 
+import dgl
+
 import torch
 import torch.nn as nn
-
-import dgl
 
 
 def cuda(x):

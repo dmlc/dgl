@@ -8,13 +8,13 @@ import zipfile
 from functools import partial, reduce, wraps
 from timeit import default_timer
 
+import dgl
+
 import numpy as np
 import pandas
 import requests
 import torch
 from ogb.nodeproppred import DglNodePropPredDataset
-
-import dgl
 
 
 def _download(url, path, filename):

@@ -1,19 +1,19 @@
 import argparse
 import time
 
+import dgl
+
 import networkx as nx
 import numpy as np
 import tensorflow as tf
-from dgi import DGI, Classifier
-from tensorflow.keras import layers
-
-import dgl
+from dgi import Classifier, DGI
 from dgl.data import (
     CiteseerGraphDataset,
     CoraGraphDataset,
     PubmedGraphDataset,
     register_data_args,
 )
+from tensorflow.keras import layers
 
 
 def evaluate(model, features, labels, mask):
@@ -51,7 +51,7 @@ def main(args):
         test_mask = g.ndata["test_mask"]
         in_feats = features.shape[1]
         n_classes = data.num_labels
-        n_edges = data.graph.number_of_edges()
+        n_edges = g.number_of_edges()
 
         # add self loop
         if args.self_loop:

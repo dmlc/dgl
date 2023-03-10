@@ -1,8 +1,7 @@
 """Python interfaces to DGL random number generators."""
 import numpy as np
 
-from . import backend as F
-from . import ndarray as nd
+from . import backend as F, ndarray as nd
 from ._ffi.function import _init_api
 
 __all__ = ["seed"]

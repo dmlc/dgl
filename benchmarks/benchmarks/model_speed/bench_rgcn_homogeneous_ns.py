@@ -1,19 +1,21 @@
-import dgl
 import itertools
+import time
+
+import dgl
+import dgl.nn.pytorch as dglnn
 import torch as th
+import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
-import dgl.nn.pytorch as dglnn
 from dgl.nn import RelGraphConv
-import time
+from torch.utils.data import DataLoader
 
 from .. import utils
 
+
 class EntityClassify(nn.Module):
-    """ Entity classification class for RGCN
+    """Entity classification class for RGCN
     Parameters
     ----------
     device : int
@@ -35,17 +37,20 @@ class EntityClassify(nn.Module):
     use_self_loop : bool
         Use self loop if True, default False.
     """
-    def __init__(self,
-                 device,
-                 num_nodes,
-                 h_dim,
-                 out_dim,
-                 num_rels,
-                 num_bases=None,
-                 num_hidden_layers=1,
-                 dropout=0,
-                 use_self_loop=False,
-                 layer_norm=False):
+
+    def __init__(
+        self,
+        device,
+        num_nodes,
+        h_dim,
+        out_dim,
+        num_rels,
+        num_bases=None,
+        num_hidden_layers=1,
+        dropout=0,
+        use_self_loop=False,
+        layer_norm=False,
+    ):
         super(EntityClassify, self).__init__()
         self.device = device
         self.num_nodes = num_nodes
@@ -60,22 +65,47 @@ class EntityClassify(nn.Module):
 
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RelGraphConv(
-            self.h_dim, self.h_dim, self.num_rels, "basis",
-            self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            dropout=self.dropout, layer_norm = layer_norm))
+        self.layers.append(
+            RelGraphConv(
+                self.h_dim,
+                self.h_dim,
+                self.num_rels,
+                "basis",
+                self.num_bases,
+                activation=F.relu,
+                self_loop=self.use_self_loop,
+                dropout=self.dropout,
+                layer_norm=layer_norm,
+            )
+        )
         # h2h
         for idx in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConv(
-                self.h_dim, self.h_dim, self.num_rels, "basis",
-                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout, layer_norm = layer_norm))
+            self.layers.append(
+                RelGraphConv(
+                    self.h_dim,
+                    self.h_dim,
+                    self.num_rels,
+                    "basis",
+                    self.num_bases,
+                    activation=F.relu,
+                    self_loop=self.use_self_loop,
+                    dropout=self.dropout,
+                    layer_norm=layer_norm,
+                )
+            )
         # h2o
-        self.layers.append(RelGraphConv(
-            self.h_dim, self.out_dim, self.num_rels, "basis",
-            self.num_bases, activation=None,
-            self_loop=self.use_self_loop,
-            layer_norm = layer_norm))
+        self.layers.append(
+            RelGraphConv(
+                self.h_dim,
+                self.out_dim,
+                self.num_rels,
+                "basis",
+                self.num_bases,
+                activation=None,
+                self_loop=self.use_self_loop,
+                layer_norm=layer_norm,
+            )
+        )
 
     def forward(self, blocks, feats, norm=None):
         if blocks is None:
@@ -84,8 +114,9 @@ class EntityClassify(nn.Module):
         h = feats
         for layer, block in zip(self.layers, blocks):
             block = block.to(self.device)
-            h = layer(block, h, block.edata['etype'], block.edata['norm'])
+            h = layer(block, h, block.edata["etype"], block.edata["norm"])
         return h
+
 
 class RelGraphEmbedLayer(nn.Module):
     r"""Embedding layer for featureless heterograph.
@@ -107,15 +138,18 @@ class RelGraphEmbedLayer(nn.Module):
     embed_name : str, optional
         Embed name
     """
-    def __init__(self,
-                 device,
-                 num_nodes,
-                 node_tids,
-                 num_of_ntype,
-                 input_size,
-                 embed_size,
-                 sparse_emb=False,
-                 embed_name='embed'):
+
+    def __init__(
+        self,
+        device,
+        num_nodes,
+        node_tids,
+        num_of_ntype,
+        input_size,
+        embed_size,
+        sparse_emb=False,
+        embed_name="embed",
+    ):
         super(RelGraphEmbedLayer, self).__init__()
         self.device = device
         self.embed_size = embed_size
@@ -135,7 +169,9 @@ class RelGraphEmbedLayer(nn.Module):
                 nn.init.xavier_uniform_(embed)
                 self.embeds[str(ntype)] = embed
 
-        self.node_embeds = th.nn.Embedding(node_tids.shape[0], self.embed_size, sparse=self.sparse_emb)
+        self.node_embeds = th.nn.Embedding(
+            node_tids.shape[0], self.embed_size, sparse=self.sparse_emb
+        )
         nn.init.uniform_(self.node_embeds.weight, -1.0, 1.0)
 
     def forward(self, node_ids, node_tids, type_ids, features):
@@ -157,35 +193,40 @@ class RelGraphEmbedLayer(nn.Module):
             embeddings as the input of the next layer
         """
         tsd_ids = node_ids.to(self.node_embeds.weight.device)
-        embeds = th.empty(node_ids.shape[0], self.embed_size, device=self.device)
+        embeds = th.empty(
+            node_ids.shape[0], self.embed_size, device=self.device
+        )
         for ntype in range(self.num_of_ntype):
             if features[ntype] is not None:
                 loc = node_tids == ntype
-                embeds[loc] = features[ntype][type_ids[loc]].to(self.device) @ self.embeds[str(ntype)].to(self.device)
+                embeds[loc] = features[ntype][type_ids[loc]].to(
+                    self.device
+                ) @ self.embeds[str(ntype)].to(self.device)
             else:
                 loc = node_tids == ntype
                 embeds[loc] = self.node_embeds(tsd_ids[loc]).to(self.device)
 
         return embeds
 
-@utils.benchmark('time', 600)
-@utils.parametrize('data', ['am', 'ogbn-mag'])
+
+@utils.benchmark("time", 600)
+@utils.parametrize("data", ["am", "ogbn-mag"])
 def track_time(data):
     dataset = utils.process_data(data)
     device = utils.get_bench_device()
 
-    if data == 'am':
+    if data == "am":
         batch_size = 64
         n_bases = 40
         l2norm = 5e-4
-    elif data == 'ogbn-mag':
+    elif data == "ogbn-mag":
         batch_size = 1024
         n_bases = 2
         l2norm = 0
     else:
         raise ValueError()
 
-    fanouts = [25,15]
+    fanouts = [25, 15]
     n_layers = 2
     n_hidden = 64
     dropout = 0.5
@@ -198,18 +239,18 @@ def track_time(data):
     hg = dataset[0]
     category = dataset.predict_category
     num_classes = dataset.num_classes
-    train_mask = hg.nodes[category].data.pop('train_mask')
+    train_mask = hg.nodes[category].data.pop("train_mask")
     train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
-    labels = hg.nodes[category].data.pop('labels').to(device)
+    labels = hg.nodes[category].data.pop("labels").to(device)
     num_of_ntype = len(hg.ntypes)
     num_rels = len(hg.canonical_etypes)
 
     node_feats = []
     for ntype in hg.ntypes:
-        if len(hg.nodes[ntype].data) == 0 or 'feat' not in hg.nodes[ntype].data:
+        if len(hg.nodes[ntype].data) == 0 or "feat" not in hg.nodes[ntype].data:
             node_feats.append(None)
         else:
-            feat = hg.nodes[ntype].data.pop('feat')
+            feat = hg.nodes[ntype].data.pop("feat")
             node_feats.append(feat.share_memory_())
 
     # get target category id
@@ -218,26 +259,28 @@ def track_time(data):
         if ntype == category:
             category_id = i
     g = dgl.to_homogeneous(hg)
-    u, v, eid = g.all_edges(form='all')
+    u, v, eid = g.all_edges(form="all")
 
     # global norm
-    _, inverse_index, count = th.unique(v, return_inverse=True, return_counts=True)
+    _, inverse_index, count = th.unique(
+        v, return_inverse=True, return_counts=True
+    )
     degrees = count[inverse_index]
     norm = th.ones(eid.shape[0]) / degrees
     norm = norm.unsqueeze(1)
-    g.edata['norm'] = norm
-    g.edata['etype'] = g.edata[dgl.ETYPE]
-    g.ndata['type_id'] = g.ndata[dgl.NID]
-    g.ndata['ntype'] = g.ndata[dgl.NTYPE]
+    g.edata["norm"] = norm
+    g.edata["etype"] = g.edata[dgl.ETYPE]
+    g.ndata["type_id"] = g.ndata[dgl.NID]
+    g.ndata["ntype"] = g.ndata[dgl.NTYPE]
 
     node_ids = th.arange(g.number_of_nodes())
     # find out the target node ids
     node_tids = g.ndata[dgl.NTYPE]
-    loc = (node_tids == category_id)
+    loc = node_tids == category_id
     target_nids = node_ids[loc]
     train_nids = target_nids[train_idx]
 
-    g = g.formats('csc')
+    g = g.formats("csc")
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
     loader = dgl.dataloading.DataLoader(
         g,
@@ -246,38 +289,47 @@ def track_time(data):
         batch_size=batch_size,
         shuffle=True,
         drop_last=False,
-        num_workers=num_workers)
+        num_workers=num_workers,
+    )
 
     # node features
     # None for one-hot feature, if not none, it should be the feature tensor.
     #
-    embed_layer = RelGraphEmbedLayer(device,
-                                     g.number_of_nodes(),
-                                     node_tids,
-                                     num_of_ntype,
-                                     node_feats,
-                                     n_hidden,
-                                     sparse_emb=True)
+    embed_layer = RelGraphEmbedLayer(
+        device,
+        g.number_of_nodes(),
+        node_tids,
+        num_of_ntype,
+        node_feats,
+        n_hidden,
+        sparse_emb=True,
+    )
 
     # create model
     # all model params are in device.
-    model = EntityClassify(device,
-                           g.number_of_nodes(),
-                           n_hidden,
-                           num_classes,
-                           num_rels,
-                           num_bases=n_bases,
-                           num_hidden_layers=n_layers - 2,
-                           dropout=dropout,
-                           use_self_loop=use_self_loop,
-                           layer_norm=False)
+    model = EntityClassify(
+        device,
+        g.number_of_nodes(),
+        n_hidden,
+        num_classes,
+        num_rels,
+        num_bases=n_bases,
+        num_hidden_layers=n_layers - 2,
+        dropout=dropout,
+        use_self_loop=use_self_loop,
+        layer_norm=False,
+    )
 
     embed_layer = embed_layer.to(device)
     model = model.to(device)
 
-    all_params = itertools.chain(model.parameters(), embed_layer.embeds.parameters())
+    all_params = itertools.chain(
+        model.parameters(), embed_layer.embeds.parameters()
+    )
     optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
-    emb_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
+    emb_optimizer = th.optim.SparseAdam(
+        list(embed_layer.node_embeds.parameters()), lr=lr
+    )
 
     print("start training...")
     model.train()
@@ -287,12 +339,14 @@ def track_time(data):
     with loader.enable_cpu_affinity():
         for step, sample_data in enumerate(loader):
             input_nodes, output_nodes, blocks = sample_data
-            feats = embed_layer(input_nodes,
-                                blocks[0].srcdata['ntype'],
-                                blocks[0].srcdata['type_id'],
-                                node_feats)
+            feats = embed_layer(
+                input_nodes,
+                blocks[0].srcdata["ntype"],
+                blocks[0].srcdata["type_id"],
+                node_feats,
+            )
             logits = model(blocks, feats)
-            seed_idx = blocks[-1].dstdata['type_id']
+            seed_idx = blocks[-1].dstdata["type_id"]
             loss = F.cross_entropy(logits, labels[seed_idx])
             optimizer.zero_grad()
             emb_optimizer.zero_grad()
@@ -300,11 +354,13 @@ def track_time(data):
             loss.backward()
             optimizer.step()
             emb_optimizer.step()
-            
+
             # start timer at before iter_start
             if step == iter_start - 1:
                 t0 = time.time()
-            elif step == iter_count + iter_start - 1:  # time iter_count iterations
+            elif (
+                step == iter_count + iter_start - 1
+            ):  # time iter_count iterations
                 break
 
     t1 = time.time()

@@ -9,8 +9,7 @@ import numpy as np
 import torch
 from gensim.models.keyedvectors import Vocab
 from six import iteritems
-from sklearn.metrics import (auc, f1_score, precision_recall_curve,
-                             roc_auc_score)
+from sklearn.metrics import auc, f1_score, precision_recall_curve, roc_auc_score
 
 
 def parse_args():

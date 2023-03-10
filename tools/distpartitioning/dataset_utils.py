@@ -11,123 +11,87 @@ import pyarrow.parquet as pq
 import torch
 import torch.distributed as dist
 from gloo_wrapper import alltoallv_cpu
-from utils import generate_read_list, get_idranges, map_partid_rank
+from utils import (
+    DATA_TYPE_ID,
+    generate_read_list,
+    get_gid_offsets,
+    get_idranges,
+    map_partid_rank,
+    REV_DATA_TYPE_ID,
+)
 
 
-DATA_TYPE_ID = {
-    data_type: id
-    for id, data_type in enumerate(
-        [
-            torch.float32,
-            torch.float64,
-            torch.float16,
-            torch.uint8,
-            torch.int8,
-            torch.int16,
-            torch.int32,
-            torch.int64,
-            torch.bool,
-        ]
-    )
-}
+def _broadcast_shape(
+    data, rank, world_size, num_parts, is_feat_data, feat_name
+):
+    """Auxiliary function to broadcast the shape of a feature data.
+    This information is used to figure out the type-ids for the
+    local features.
 
+    Parameters:
+    -----------
+    data : numpy array
+        which is the feature data read from the disk
+    rank : integer
+        which represents the id of the process in the process group
+    world_size : integer
+        represents the total no. of process in the process group
+    num_parts : integer
+        specifying the no. of partitions
+    is_feat_data : bool
+        flag used to seperate feature data and edge data
+    feat_name : string
+        name of the feature
 
-REV_DATA_TYPE_ID = {id: data_type for data_type, id in DATA_TYPE_ID.items()}
-
-
-def _shuffle_data(data, rank, world_size, tids, num_parts):
-    """Each process scatters loaded data to all processes in a group and
-    return gathered data.
-
-    Parameters
-    ----------
-
-    data: tensor
-        Loaded node or edge data.
-    rank: int
-        Rank of current process.
-    world_size: int
-        Total number of processes in group.
-    tids: list[tuple]
-        Type-wise node/edge IDs.
-    num_parts: int
-        Number of partitions.
-
-    Returns
+    Returns:
     -------
-
-    shuffled_data: tensor
-        Shuffled node or edge data.
+    list of tuples :
+        which represents the range of type-ids for the data array.
     """
-    # Broadcast basic information of loaded data:
-    #   1. number of data lines
-    #   2. data dimension
-    #   3. data type
     assert len(data.shape) in [
         1,
         2,
     ], f"Data is expected to be 1-D or 2-D but got {data.shape}."
     data_shape = list(data.shape)
+
     if len(data_shape) == 1:
         data_shape.append(1)
-    data_shape.append(DATA_TYPE_ID[data.dtype])
-    data_shape = torch.tensor(data_shape, dtype=torch.int64)
 
+    if is_feat_data:
+        data_shape.append(DATA_TYPE_ID[data.dtype])
+
+    data_shape = torch.tensor(data_shape, dtype=torch.int64)
     data_shape_output = [
         torch.zeros_like(data_shape) for _ in range(world_size)
     ]
     dist.all_gather(data_shape_output, data_shape)
+    logging.info(
+        f"[Rank: {rank} Received shapes from all ranks: {data_shape_output}"
+    )
+    shapes = [x.numpy() for x in data_shape_output if x[0] != 0]
+    shapes = np.vstack(shapes)
 
-    # Rank~0 always succeeds to load non-empty data, so we fetch info from it.
-    data_dim = data_shape_output[0][1].item()
-    data_type = REV_DATA_TYPE_ID[data_shape_output[0][2].item()]
-    data_lines = [data_shape[0].item() for data_shape in data_shape_output]
-    data_lines.insert(0, 0)
-    data_lines = np.cumsum(data_lines)
+    if is_feat_data:
+        logging.info(
+            f"shapes: {shapes}, condition: {all(shapes[0,2] == s for s in shapes[:,2])}"
+        )
+        assert all(
+            shapes[0, 2] == s for s in shapes[:, 2]
+        ), f"dtypes for {feat_name} does not match on all ranks"
 
-    # prepare for scatter
-    data_list = [None] * world_size
-    if data.shape[0] > 0:
-        for local_part_id in range(num_parts):
-            target_rank = map_partid_rank(local_part_id, world_size)
-            start, end = tids[local_part_id]
-            global_start = data_lines[rank]
-            global_end = data_lines[rank + 1]
-            if start >= global_end or end <= global_start:
-                continue
-            read_start = max(0, start - global_start)
-            read_end = min(data.shape[0], end - global_start)
-            if data_list[target_rank] is None:
-                data_list[target_rank] = []
-            data_list[target_rank].append(data[read_start:read_end])
-    data_input = [None] * world_size
-    for i, data in enumerate(data_list):
-        if data is None or len(data) == 0:
-            if data_dim == 1:
-                data_input[i] = torch.zeros((0,), dtype=data_type)
-            else:
-                data_input[i] = torch.zeros((0, data_dim), dtype=data_type)
-        else:
-            data_input[i] = torch.cat(data).to(dtype=data_type)
-    del data_list
-    gc.collect()
+    # compute tids here.
+    type_counts = list(shapes[:, 0])
+    tid_start = np.cumsum([0] + type_counts[:-1])
+    tid_end = np.cumsum(type_counts)
+    tid_ranges = list(zip(tid_start, tid_end))
+    logging.info(f"starts -> {tid_start} ... end -> {tid_end}")
 
-    local_data = data_input[rank]
-    if data_dim == 1:
-        data_input[rank] = torch.zeros((0,), dtype=data_type)
-    else:
-        data_input[rank] = torch.zeros((0, data_dim), dtype=data_type)
-
-    # scatter and gather data
-    data_output = alltoallv_cpu(rank, world_size, data_input)
-    data_output[rank] = local_data
-    data_output = [data for data in data_output if data is not None]
-    data_output = torch.cat(data_output)
-
-    return data_output
+    return tid_ranges
 
 
-def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
+def get_dataset(
+    input_dir, graph_name, rank, world_size, num_parts, schema_map, ntype_counts
+):
     """
     Function to read the multiple file formatted dataset.
 
@@ -249,11 +213,18 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     """
 
     # read my nodes for each node type
+    """
     node_tids, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
         schema_map[constants.STR_NUM_NODES_PER_CHUNK],
         num_chunks=num_parts,
     )
+    """
+    logging.info(f"[Rank: {rank} ntype_counts: {ntype_counts}")
+    ntype_gnid_offset = get_gid_offsets(
+        schema_map[constants.STR_NODE_TYPE], ntype_counts
+    )
+    logging.info(f"[Rank: {rank} - ntype_gnid_offset = {ntype_gnid_offset}")
 
     # iterate over the "node_data" dictionary in the schema_map
     # read the node features if exists
@@ -290,29 +261,32 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                 else:
                     node_data = np.array([])
                 node_data = torch.from_numpy(node_data)
-
-                # scatter and gather data.
-                node_data = _shuffle_data(
+                cur_tids = _broadcast_shape(
                     node_data,
                     rank,
                     world_size,
-                    node_tids[ntype_name],
                     num_parts,
+                    True,
+                    f"{ntype_name}/{feat_name}",
                 )
+                logging.info(f"[Rank: {rank} - cur_tids: {cur_tids}")
 
                 # collect data on current rank.
-                offset = 0
                 for local_part_id in range(num_parts):
+                    data_key = (
+                        f"{ntype_name}/{feat_name}/{local_part_id//world_size}"
+                    )
                     if map_partid_rank(local_part_id, world_size) == rank:
-                        nfeat = []
-                        nfeat_tids = []
-                        start, end = node_tids[ntype_name][local_part_id]
-                        nfeat = node_data[offset : offset + end - start]
-                        data_key = f"{ntype_name}/{feat_name}/{local_part_id//world_size}"
-                        node_features[data_key] = nfeat
-                        nfeat_tids.append(node_tids[ntype_name][local_part_id])
-                        node_feature_tids[data_key] = nfeat_tids
-                        offset += end - start
+                        if len(cur_tids) > local_part_id:
+                            start, end = cur_tids[local_part_id]
+                            assert node_data.shape[0] == (
+                                end - start
+                            ), f"Node feature data, {data_key}, shape = {node_data.shape} does not match with tids = ({start},{end})"
+                            node_features[data_key] = node_data
+                            node_feature_tids[data_key] = [(start, end)]
+                        else:
+                            node_features[data_key] = None
+                            node_feature_tids[data_key] = [(0, 0)]
 
     # done building node_features locally.
     if len(node_features) <= 0:
@@ -328,10 +302,12 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         #   local_part_id indicates the partition-id, in the context of current
         #   process which take the values 0, 1, 2, ....
         for feat_name, feat_info in node_features.items():
+            if feat_info == None:
+                continue
+
             logging.info(
                 f"[Rank: {rank}] node feature name: {feat_name}, feature data shape: {feat_info.size()}"
             )
-
             tokens = feat_name.split("/")
             assert len(tokens) == 3
 
@@ -385,13 +361,6 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     edge_features = {}
     edge_feature_tids = {}
 
-    # Read edges for each edge type that are processed by the currnet process.
-    edge_tids, _ = get_idranges(
-        schema_map[constants.STR_EDGE_TYPE],
-        schema_map[constants.STR_NUM_EDGES_PER_CHUNK],
-        num_parts,
-    )
-
     # Iterate over the "edge_data" dictionary in the schema_map.
     # Read the edge features if exists.
     # Also keep track of the type_eids for which the edge_features are read.
@@ -416,6 +385,9 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                     data_file = feat_data[constants.STR_DATA][idx]
                     if not os.path.isabs(data_file):
                         data_file = os.path.join(input_dir, data_file)
+                    logging.info(
+                        f"[Rank: {rank}] Loading edges-feats of {etype_name}[{feat_name}] from {data_file}"
+                    )
                     edge_data.append(
                         array_readwriter.get_array_parser(
                             **reader_fmt_meta
@@ -427,28 +399,32 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                     edge_data = np.array([])
                 edge_data = torch.from_numpy(edge_data)
 
-                # scatter and gather data.
-                edge_data = _shuffle_data(
+                # exchange the amount of data read from the disk.
+                edge_tids = _broadcast_shape(
                     edge_data,
                     rank,
                     world_size,
-                    edge_tids[etype_name],
                     num_parts,
+                    True,
+                    f"{etype_name}/{feat_name}",
                 )
 
                 # collect data on current rank.
-                offset = 0
                 for local_part_id in range(num_parts):
+                    data_key = (
+                        f"{etype_name}/{feat_name}/{local_part_id//world_size}"
+                    )
                     if map_partid_rank(local_part_id, world_size) == rank:
-                        efeats = []
-                        efeat_tids = []
-                        start, end = edge_tids[etype_name][local_part_id]
-                        efeats = edge_data[offset : offset + end - start]
-                        efeat_tids.append(edge_tids[etype_name][local_part_id])
-                        data_key = f"{etype_name}/{feat_name}/{local_part_id//world_size}"
-                        edge_features[data_key] = efeats
-                        edge_feature_tids[data_key] = efeat_tids
-                        offset += end - start
+                        if len(edge_tids) > local_part_id:
+                            start, end = edge_tids[local_part_id]
+                            assert edge_data.shape[0] == (
+                                end - start
+                            ), f"Edge Feature data, for {data_key}, of shape = {edge_data.shape} does not match with tids = ({start}, {end})"
+                            edge_features[data_key] = edge_data
+                            edge_feature_tids[data_key] = [(start, end)]
+                        else:
+                            edge_features[data_key] = None
+                            edge_feature_tids[data_key] = [(0, 0)]
 
     # Done with building node_features locally.
     if len(edge_features) <= 0:
@@ -459,6 +435,8 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         assert len(edge_features) == len(edge_feature_tids)
 
         for k, v in edge_features.items():
+            if v == None:
+                continue
             logging.info(
                 f"[Rank: {rank}] edge feature name: {k}, feature data shape: {v.shape}"
             )
@@ -511,12 +489,9 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     # read my edges for each edge type
     etype_names = schema_map[constants.STR_EDGE_TYPE]
     etype_name_idmap = {e: idx for idx, e in enumerate(etype_names)}
-    edge_tids, _ = get_idranges(
-        schema_map[constants.STR_EDGE_TYPE],
-        schema_map[constants.STR_NUM_EDGES_PER_CHUNK],
-        num_chunks=num_parts,
-    )
 
+    edge_tids = {}
+    edge_typecounts = {}
     edge_datadict = {}
     edge_data = schema_map[constants.STR_EDGES]
 
@@ -529,7 +504,8 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
     ]:
         edge_datadict[col] = []
 
-    for etype_name, etype_info in edge_data.items():
+    for etype_name, etype_id in etype_name_idmap.items():
+        etype_info = edge_data[etype_name]
         edge_info = etype_info[constants.STR_DATA]
 
         # edgetype strings are in canonical format, src_node_type:edge_type:dst_node_type
@@ -540,21 +516,25 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         dst_ntype_name = tokens[2]
 
         num_chunks = len(edge_info)
-        read_list = generate_read_list(num_chunks, num_parts)
+        # read_list = generate_read_list(num_chunks, num_parts)
+        read_list = generate_read_list(num_chunks, world_size)
         src_ids = []
         dst_ids = []
 
+        """
         curr_partids = []
         for part_id in range(num_parts):
             if map_partid_rank(part_id, world_size) == rank:
                 curr_partids.append(read_list[part_id])
 
         for idx in np.concatenate(curr_partids):
+        """
+        for idx in read_list[rank]:
             edge_file = edge_info[idx]
             if not os.path.isabs(edge_file):
                 edge_file = os.path.join(input_dir, edge_file)
             logging.info(
-                f"Loading edges of etype[{etype_name}] from {edge_file}"
+                f"[Rank: {rank}] Loading edges of etype[{etype_name}] from {edge_file}"
             )
 
             if (
@@ -592,30 +572,45 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
                     f"Unknown edge format {etype_info[constants.STR_FORMAT][constants.STR_NAME]} for edge type {etype_name}"
                 )
 
-        src_ids = np.concatenate(src_ids)
-        dst_ids = np.concatenate(dst_ids)
+        if len(src_ids) > 0:
+            src_ids = np.concatenate(src_ids)
+            dst_ids = np.concatenate(dst_ids)
 
-        # currently these are just type_edge_ids... which will be converted to global ids
-        edge_datadict[constants.GLOBAL_SRC_ID].append(
-            src_ids + ntype_gnid_offset[src_ntype_name][0, 0]
+            # currently these are just type_edge_ids... which will be converted to global ids
+            edge_datadict[constants.GLOBAL_SRC_ID].append(
+                src_ids + ntype_gnid_offset[src_ntype_name][0]
+            )
+            edge_datadict[constants.GLOBAL_DST_ID].append(
+                dst_ids + ntype_gnid_offset[dst_ntype_name][0]
+            )
+            edge_datadict[constants.ETYPE_ID].append(
+                etype_name_idmap[etype_name]
+                * np.ones(shape=(src_ids.shape), dtype=np.int64)
+            )
+        else:
+            src_ids = np.array([])
+
+        # broadcast shape to compute the etype_id, and global_eid's later.
+        cur_tids = _broadcast_shape(
+            src_ids, rank, world_size, num_parts, False, None
         )
-        edge_datadict[constants.GLOBAL_DST_ID].append(
-            dst_ids + ntype_gnid_offset[dst_ntype_name][0, 0]
-        )
-        edge_datadict[constants.ETYPE_ID].append(
-            etype_name_idmap[etype_name]
-            * np.ones(shape=(src_ids.shape), dtype=np.int64)
-        )
+        edge_typecounts[etype_name] = cur_tids[-1][1]
+        edge_tids[etype_name] = cur_tids
 
         for local_part_id in range(num_parts):
             if map_partid_rank(local_part_id, world_size) == rank:
-                edge_datadict[constants.GLOBAL_TYPE_EID].append(
-                    np.arange(
-                        edge_tids[etype_name][local_part_id][0],
-                        edge_tids[etype_name][local_part_id][1],
-                        dtype=np.int64,
+                if len(cur_tids) > local_part_id:
+                    edge_datadict[constants.GLOBAL_TYPE_EID].append(
+                        np.arange(
+                            cur_tids[local_part_id][0],
+                            cur_tids[local_part_id][1],
+                            dtype=np.int64,
+                        )
                     )
-                )
+                    # edge_tids[etype_name] = [(cur_tids[local_part_id][0], cur_tids[local_part_id][1])]
+                    assert len(edge_datadict[constants.GLOBAL_SRC_ID]) == len(
+                        edge_datadict[constants.GLOBAL_TYPE_EID]
+                    ), f"Error while reading edges from the disk, local_part_id = {local_part_id}, num_parts = {num_parts}, world_size = {world_size} cur_tids = {cur_tids}"
 
     # stitch together to create the final data on the local machine
     for col in [
@@ -624,30 +619,42 @@ def get_dataset(input_dir, graph_name, rank, world_size, num_parts, schema_map):
         constants.GLOBAL_TYPE_EID,
         constants.ETYPE_ID,
     ]:
-        edge_datadict[col] = np.concatenate(edge_datadict[col])
+        if len(edge_datadict[col]) > 0:
+            edge_datadict[col] = np.concatenate(edge_datadict[col])
 
-    assert (
-        edge_datadict[constants.GLOBAL_SRC_ID].shape
-        == edge_datadict[constants.GLOBAL_DST_ID].shape
-    )
-    assert (
-        edge_datadict[constants.GLOBAL_DST_ID].shape
-        == edge_datadict[constants.GLOBAL_TYPE_EID].shape
-    )
-    assert (
-        edge_datadict[constants.GLOBAL_TYPE_EID].shape
-        == edge_datadict[constants.ETYPE_ID].shape
-    )
-    logging.info(
-        f"[Rank: {rank}] Done reading edge_file: {len(edge_datadict)}, {edge_datadict[constants.GLOBAL_SRC_ID].shape}"
-    )
+    if len(edge_datadict[constants.GLOBAL_SRC_ID]) > 0:
+        assert (
+            edge_datadict[constants.GLOBAL_SRC_ID].shape
+            == edge_datadict[constants.GLOBAL_DST_ID].shape
+        )
+        assert (
+            edge_datadict[constants.GLOBAL_DST_ID].shape
+            == edge_datadict[constants.GLOBAL_TYPE_EID].shape
+        )
+        assert (
+            edge_datadict[constants.GLOBAL_TYPE_EID].shape
+            == edge_datadict[constants.ETYPE_ID].shape
+        )
+        logging.info(
+            f"[Rank: {rank}] Done reading edge_file: {len(edge_datadict)}, {edge_datadict[constants.GLOBAL_SRC_ID].shape}"
+        )
+    else:
+        assert edge_datadict[constants.GLOBAL_SRC_ID] == []
+        assert edge_datadict[constants.GLOBAL_DST_ID] == []
+        assert edge_datadict[constants.GLOBAL_TYPE_EID] == []
+
+        edge_datadict[constants.GLOBAL_SRC_ID] = np.array([], dtype=np.int64)
+        edge_datadict[constants.GLOBAL_DST_ID] = np.array([], dtype=np.int64)
+        edge_datadict[constants.GLOBAL_TYPE_EID] = np.array([], dtype=np.int64)
+        edge_datadict[constants.ETYPE_ID] = np.array([], dtype=np.int64)
+
     logging.info(f"Rank: {rank} edge_feat_tids: {edge_feature_tids}")
 
     return (
-        node_tids,
         node_features,
         node_feature_tids,
         edge_datadict,
+        edge_typecounts,
         edge_tids,
         edge_features,
         edge_feature_tids,

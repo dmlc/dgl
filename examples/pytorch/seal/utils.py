@@ -1,12 +1,12 @@
 import argparse
 
+import dgl
+
 import numpy as np
 import pandas as pd
 import torch
 from ogb.linkproppred import DglLinkPropPredDataset, Evaluator
 from scipy.sparse.csgraph import shortest_path
-
-import dgl
 
 
 def parse_arguments():

@@ -1,10 +1,10 @@
 import os
 
+import dgl
+
 import numpy
 import pandas
 import torch
-
-import dgl
 
 
 def process_raw_data(raw_dir, processed_dir):

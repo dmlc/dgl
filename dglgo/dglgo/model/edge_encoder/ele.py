@@ -4,11 +4,13 @@ import torch.nn.functional as F
 
 
 class ElementWiseProductPredictor(nn.Module):
-    def __init__(self,
-                 data_info: dict,
-                 hidden_size: int = 64,
-                 num_layers: int = 2,
-                 bias: bool = True):
+    def __init__(
+        self,
+        data_info: dict,
+        hidden_size: int = 64,
+        num_layers: int = 2,
+        bias: bool = True,
+    ):
         """Elementwise product model for edge scores
 
         Parameters
@@ -16,7 +18,7 @@ class ElementWiseProductPredictor(nn.Module):
         data_info : dict
             The information about the input dataset.
         hidden_size : int
-            Hidden size.        
+            Hidden size.
         num_layers : int
             Number of hidden layers.
         bias : bool

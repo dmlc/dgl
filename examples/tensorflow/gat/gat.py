@@ -7,11 +7,10 @@ Author's code: https://github.com/PetarV-/GAT
 Pytorch implementation: https://github.com/Diego999/pyGAT
 """
 
-import tensorflow as tf
-from tensorflow.keras import layers
-
 import dgl.function as fn
+import tensorflow as tf
 from dgl.nn import GATConv
+from tensorflow.keras import layers
 
 
 class GAT(tf.keras.Model):

@@ -7,10 +7,10 @@ import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.nn import AvgPooling, GraphConv, MaxPooling
 from dgl.ops import edge_softmax
-from torch import Tensor
-from torch.nn import Parameter
 
 from functions import edge_sparsemax
+from torch import Tensor
+from torch.nn import Parameter
 from utils import get_batch_id, topk
 
 
@@ -30,10 +30,11 @@ class WeightedGraphConv(GraphConv):
     e_feat : torch.Tensor, optional
         The edge features. Default: :obj:`None`
     """
-    def forward(self, graph:DGLGraph, n_feat, e_feat=None):
+
+    def forward(self, graph: DGLGraph, n_feat, e_feat=None):
         if e_feat is None:
             return super(WeightedGraphConv, self).forward(graph, n_feat)
-        
+
         with graph.local_scope():
             if self.weight is not None:
                 n_feat = torch.matmul(n_feat, self.weight)
@@ -44,8 +45,7 @@ class WeightedGraphConv(GraphConv):
             n_feat = n_feat * src_norm
             graph.ndata["h"] = n_feat
             graph.edata["e"] = e_feat
-            graph.update_all(fn.u_mul_e("h", "e", "m"),
-                             fn.sum("m", "h"))
+            graph.update_all(fn.u_mul_e("h", "e", "m"), fn.sum("m", "h"))
             n_feat = graph.ndata.pop("h")
             n_feat = n_feat * dst_norm
             if self.bias is not None:
@@ -77,35 +77,40 @@ class NodeInfoScoreLayer(nn.Module):
         The node features
     e_feat : torch.Tensor, optional
         The edge features. Default: :obj:`None`
-    
+
     Returns
     -------
     Tensor
         Score for each node.
     """
-    def __init__(self, sym_norm:bool=True):
+
+    def __init__(self, sym_norm: bool = True):
         super(NodeInfoScoreLayer, self).__init__()
         self.sym_norm = sym_norm
 
-    def forward(self, graph:dgl.DGLGraph, feat:Tensor, e_feat:Tensor):
+    def forward(self, graph: dgl.DGLGraph, feat: Tensor, e_feat: Tensor):
         with graph.local_scope():
             if self.sym_norm:
-                src_norm = torch.pow(graph.out_degrees().float().clamp(min=1), -0.5)
+                src_norm = torch.pow(
+                    graph.out_degrees().float().clamp(min=1), -0.5
+                )
                 src_norm = src_norm.view(-1, 1).to(feat.device)
-                dst_norm = torch.pow(graph.in_degrees().float().clamp(min=1), -0.5)
+                dst_norm = torch.pow(
+                    graph.in_degrees().float().clamp(min=1), -0.5
+                )
                 dst_norm = dst_norm.view(-1, 1).to(feat.device)
 
                 src_feat = feat * src_norm
-                
+
                 graph.ndata["h"] = src_feat
                 graph.edata["e"] = e_feat
                 graph = dgl.remove_self_loop(graph)
                 graph.update_all(fn.u_mul_e("h", "e", "m"), fn.sum("m", "h"))
-                
+
                 dst_feat = graph.ndata.pop("h") * dst_norm
                 feat = feat - dst_feat
             else:
-                dst_norm = 1. / graph.in_degrees().float().clamp(min=1)
+                dst_norm = 1.0 / graph.in_degrees().float().clamp(min=1)
                 dst_norm = dst_norm.view(-1, 1)
 
                 graph.ndata["h"] = feat
@@ -124,7 +129,7 @@ class HGPSLPool(nn.Module):
 
     Description
     -----------
-    The HGP-SL pooling layer from 
+    The HGP-SL pooling layer from
     `Hierarchical Graph Pooling with Structure Learning <https://arxiv.org/pdf/1911.05954.pdf>`
 
     Parameters
@@ -134,7 +139,7 @@ class HGPSLPool(nn.Module):
     ratio : float, optional
         Pooling ratio. Default: 0.8
     sample : bool, optional
-        Whether use k-hop union graph to increase efficiency. 
+        Whether use k-hop union graph to increase efficiency.
         Currently we only support full graph. Default: :obj:`False`
     sym_score_norm : bool, optional
         Use symmetric norm for adjacency or not. Default: :obj:`True`
@@ -147,7 +152,7 @@ class HGPSLPool(nn.Module):
         HGP-SL paper. Default: 1.0
     negative_slop : float, optional
         Negative slop for leaky_relu. Default: 0.2
-    
+
     Returns
     -------
     DGLGraph
@@ -159,9 +164,19 @@ class HGPSLPool(nn.Module):
     torch.Tensor
         Permutation index
     """
-    def __init__(self, in_feat:int, ratio=0.8, sample=True, 
-                 sym_score_norm=True, sparse=True, sl=True,
-                 lamb=1.0, negative_slop=0.2, k_hop=3):
+
+    def __init__(
+        self,
+        in_feat: int,
+        ratio=0.8,
+        sample=True,
+        sym_score_norm=True,
+        sparse=True,
+        sl=True,
+        lamb=1.0,
+        negative_slop=0.2,
+        k_hop=3,
+    ):
         super(HGPSLPool, self).__init__()
         self.in_feat = in_feat
         self.ratio = ratio
@@ -180,16 +195,17 @@ class HGPSLPool(nn.Module):
     def reset_parameters(self):
         nn.init.xavier_normal_(self.att.data)
 
-    def forward(self, graph:DGLGraph, feat:Tensor, e_feat=None):
+    def forward(self, graph: DGLGraph, feat: Tensor, e_feat=None):
         # top-k pool first
         if e_feat is None:
-            e_feat = torch.ones((graph.number_of_edges(),), 
-                                dtype=feat.dtype, device=feat.device)
+            e_feat = torch.ones(
+                (graph.number_of_edges(),), dtype=feat.dtype, device=feat.device
+            )
         batch_num_nodes = graph.batch_num_nodes()
         x_score = self.calc_info_score(graph, feat, e_feat)
-        perm, next_batch_num_nodes = topk(x_score, self.ratio, 
-                                          get_batch_id(batch_num_nodes),
-                                          batch_num_nodes)
+        perm, next_batch_num_nodes = topk(
+            x_score, self.ratio, get_batch_id(batch_num_nodes), batch_num_nodes
+        )
         feat = feat[perm]
         pool_graph = None
         if not self.sample or not self.sl:
@@ -210,36 +226,48 @@ class HGPSLPool(nn.Module):
             # pair of nodes is time consuming. To accelerate this process,
             # we sample it's K-Hop neighbors for each node and then learn the
             # edge weights between them.
-            
+
             # first build multi-hop graph
             row, col = graph.all_edges()
             num_nodes = graph.num_nodes()
 
-            scipy_adj = scipy.sparse.coo_matrix((e_feat.detach().cpu(), (row.detach().cpu(), col.detach().cpu())), shape=(num_nodes, num_nodes))
+            scipy_adj = scipy.sparse.coo_matrix(
+                (
+                    e_feat.detach().cpu(),
+                    (row.detach().cpu(), col.detach().cpu()),
+                ),
+                shape=(num_nodes, num_nodes),
+            )
             for _ in range(self.k_hop):
-                two_hop = scipy_adj ** 2
+                two_hop = scipy_adj**2
                 two_hop = two_hop * (1e-5 / two_hop.max())
                 scipy_adj = two_hop + scipy_adj
             row, col = scipy_adj.nonzero()
             row = torch.tensor(row, dtype=torch.long, device=graph.device)
             col = torch.tensor(col, dtype=torch.long, device=graph.device)
-            e_feat = torch.tensor(scipy_adj.data, dtype=torch.float, device=feat.device)
+            e_feat = torch.tensor(
+                scipy_adj.data, dtype=torch.float, device=feat.device
+            )
 
             # perform pooling on multi-hop graph
-            mask = perm.new_full((num_nodes, ), -1)
+            mask = perm.new_full((num_nodes,), -1)
             i = torch.arange(perm.size(0), dtype=torch.long, device=perm.device)
             mask[perm] = i
             row, col = mask[row], mask[col]
-            mask = (row >=0 ) & (col >= 0)
+            mask = (row >= 0) & (col >= 0)
             row, col = row[mask], col[mask]
             e_feat = e_feat[mask]
 
             # add remaining self loops
             mask = row != col
-            num_nodes = perm.size(0) # num nodes after pool
-            loop_index = torch.arange(0, num_nodes, dtype=row.dtype, device=row.device)
+            num_nodes = perm.size(0)  # num nodes after pool
+            loop_index = torch.arange(
+                0, num_nodes, dtype=row.dtype, device=row.device
+            )
             inv_mask = ~mask
-            loop_weight = torch.full((num_nodes, ), 0, dtype=e_feat.dtype, device=e_feat.device)
+            loop_weight = torch.full(
+                (num_nodes,), 0, dtype=e_feat.dtype, device=e_feat.device
+            )
             remaining_e_feat = e_feat[inv_mask]
             if remaining_e_feat.numel() > 0:
                 loop_weight[row[inv_mask]] = remaining_e_feat
@@ -249,16 +277,20 @@ class HGPSLPool(nn.Module):
             col = torch.cat([col, loop_index], dim=0)
 
             # attention scores
-            weights = (torch.cat([feat[row], feat[col]], dim=1) * self.att).sum(dim=-1)
-            weights = F.leaky_relu(weights, self.negative_slop) + e_feat * self.lamb
-            
+            weights = (torch.cat([feat[row], feat[col]], dim=1) * self.att).sum(
+                dim=-1
+            )
+            weights = (
+                F.leaky_relu(weights, self.negative_slop) + e_feat * self.lamb
+            )
+
             # sl and normalization
             sl_graph = dgl.graph((row, col))
             if self.sparse:
                 weights = edge_sparsemax(sl_graph, weights)
             else:
                 weights = edge_softmax(sl_graph, weights)
-            
+
             # get final graph
             mask = torch.abs(weights) > 0
             row, col, weights = row[mask], col[mask], weights[mask]
@@ -266,7 +298,7 @@ class HGPSLPool(nn.Module):
             pool_graph.set_batch_num_nodes(next_batch_num_nodes)
             e_feat = weights
 
-        else: 
+        else:
             # Learning the possible edge weights between each pair of
             # nodes in the pooled subgraph, relative slower.
 
@@ -274,19 +306,27 @@ class HGPSLPool(nn.Module):
             # use dense to build, then transform to sparse.
             # maybe there's more efficient way?
             batch_num_nodes = next_batch_num_nodes
-            block_begin_idx = torch.cat([batch_num_nodes.new_zeros(1), 
-                batch_num_nodes.cumsum(dim=0)[:-1]], dim=0)
+            block_begin_idx = torch.cat(
+                [
+                    batch_num_nodes.new_zeros(1),
+                    batch_num_nodes.cumsum(dim=0)[:-1],
+                ],
+                dim=0,
+            )
             block_end_idx = batch_num_nodes.cumsum(dim=0)
-            dense_adj = torch.zeros((pool_graph.num_nodes(),
-                                    pool_graph.num_nodes()),
-                                    dtype=torch.float, 
-                                    device=feat.device)
+            dense_adj = torch.zeros(
+                (pool_graph.num_nodes(), pool_graph.num_nodes()),
+                dtype=torch.float,
+                device=feat.device,
+            )
             for idx_b, idx_e in zip(block_begin_idx, block_end_idx):
-                dense_adj[idx_b:idx_e, idx_b:idx_e] = 1.
+                dense_adj[idx_b:idx_e, idx_b:idx_e] = 1.0
             row, col = torch.nonzero(dense_adj).t().contiguous()
 
             # compute weights for node-pairs
-            weights = (torch.cat([feat[row], feat[col]], dim=1) * self.att).sum(dim=-1)
+            weights = (torch.cat([feat[row], feat[col]], dim=1) * self.att).sum(
+                dim=-1
+            )
             weights = F.leaky_relu(weights, self.negative_slop)
             dense_adj[row, col] = weights
 
@@ -316,15 +356,30 @@ class HGPSLPool(nn.Module):
 
 class ConvPoolReadout(torch.nn.Module):
     """A helper class. (GraphConv -> Pooling -> Readout)"""
-    def __init__(self, in_feat:int, out_feat:int, pool_ratio=0.8,
-                 sample:bool=False, sparse:bool=True, sl:bool=True,
-                 lamb:float=1., pool:bool=True):
+
+    def __init__(
+        self,
+        in_feat: int,
+        out_feat: int,
+        pool_ratio=0.8,
+        sample: bool = False,
+        sparse: bool = True,
+        sl: bool = True,
+        lamb: float = 1.0,
+        pool: bool = True,
+    ):
         super(ConvPoolReadout, self).__init__()
         self.use_pool = pool
         self.conv = WeightedGraphConv(in_feat, out_feat)
         if pool:
-            self.pool = HGPSLPool(out_feat, ratio=pool_ratio, sparse=sparse,
-                                  sample=sample, sl=sl, lamb=lamb)
+            self.pool = HGPSLPool(
+                out_feat,
+                ratio=pool_ratio,
+                sparse=sparse,
+                sample=sample,
+                sl=sl,
+                lamb=lamb,
+            )
         else:
             self.pool = None
         self.avgpool = AvgPooling()
@@ -334,5 +389,7 @@ class ConvPoolReadout(torch.nn.Module):
         out = F.relu(self.conv(graph, feature, e_feat))
         if self.use_pool:
             graph, out, e_feat, _ = self.pool(graph, out, e_feat)
-        readout = torch.cat([self.avgpool(graph, out), self.maxpool(graph, out)], dim=-1)
+        readout = torch.cat(
+            [self.avgpool(graph, out), self.maxpool(graph, out)], dim=-1
+        )
         return graph, out, e_feat, readout

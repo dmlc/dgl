@@ -2,13 +2,13 @@ import json
 import os
 from functools import namedtuple
 
+import dgl
+
 import numpy as np
 import scipy.sparse
 import torch
 from sklearn.metrics import f1_score
 from sklearn.preprocessing import StandardScaler
-
-import dgl
 
 
 class Logger(object):

@@ -1,11 +1,10 @@
+import dgl
+import dgl.function as fn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
-
-import dgl
-import dgl.function as fn
 from dgl.nn.pytorch import SumPooling
+from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
 
 
 ### GIN convolution along the graph structure
@@ -128,7 +127,6 @@ class GNN_node(nn.Module):
         ### computing input node embedding
         h_list = [self.atom_encoder(x)]
         for layer in range(self.num_layers):
-
             h = self.convs[layer](g, h_list[layer], edge_attr)
             h = self.batch_norms[layer](h)
 

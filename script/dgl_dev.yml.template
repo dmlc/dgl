@@ -1,0 +1,30 @@
+name: __NAME__
+dependencies:
+  - python=__PYTHON_VERSION__
+  - pip
+  - pip:
+    - --find-links https://download.pytorch.org/whl/torch_stable.html
+    - cython
+    - filelock
+    - matplotlib
+    - networkx
+    - nltk
+    - nose
+    - numpy
+    - ogb
+    - pandas
+    - psutil
+    - pyarrow
+    - pydantic
+    - pytest
+    - pyyaml
+    - rdflib
+    - requests[security]
+    - scikit-learn
+    - scipy
+    - torch==__TORCH_VERSION__
+    - torchmetrics
+    - tqdm
+    - boto3 # AWS SDK for python
+variables:
+  DGL_HOME: __DGL_HOME__

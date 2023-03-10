@@ -3,14 +3,14 @@ import os
 import random
 import time
 
+import dgl
+import dgl.function as fn
+
 import numpy as np
 import scipy
 import torch as th
-from torch.utils.data import DataLoader
-
-import dgl
-import dgl.function as fn
 from dgl.sampling import pack_traces, random_walk
+from torch.utils.data import DataLoader
 
 
 # The base class of sampler
@@ -123,7 +123,6 @@ class SAINTSampler:
 
             t = time.perf_counter()
             for num_nodes, subgraphs_nids, subgraphs_eids in loader:
-
                 self.subgraphs.extend(subgraphs_nids)
                 sampled_nodes += num_nodes
 
@@ -214,7 +213,6 @@ class SAINTSampler:
         raise NotImplementedError
 
     def __compute_norm__(self):
-
         self.node_counter[self.node_counter == 0] = 1
         self.edge_counter[self.edge_counter == 0] = 1
 
@@ -231,7 +229,6 @@ class SAINTSampler:
         return aggr_norm.numpy(), loss_norm.numpy()
 
     def __compute_degree_norm(self):
-
         self.train_g.ndata[
             "train_D_norm"
         ] = 1.0 / self.train_g.in_degrees().float().clamp(min=1).unsqueeze(1)

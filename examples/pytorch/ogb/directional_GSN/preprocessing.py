@@ -5,10 +5,10 @@ import graph_tool.topology as gt_topology
 import networkx as nx
 import numpy as np
 import torch
-from ogb.graphproppred import DglGraphPropPredDataset
-from tqdm import tqdm
 
 from dgl.data.utils import load_graphs, save_graphs
+from ogb.graphproppred import DglGraphPropPredDataset
+from tqdm import tqdm
 
 
 def to_undirected(edge_index):
@@ -20,7 +20,6 @@ def to_undirected(edge_index):
 
 
 def induced_edge_automorphism_orbits(edge_list):
-
     ##### node automorphism orbits #####
     graph = gt.Graph(directed=False)
     graph.add_edge_list(edge_list)
@@ -98,7 +97,6 @@ def induced_edge_automorphism_orbits(edge_list):
 
 
 def subgraph_isomorphism_edge_counts(edge_index, subgraph_dict):
-
     ##### edge structural identifiers #####
 
     edge_index = edge_index.transpose(1, 0).cpu().numpy()
@@ -131,7 +129,6 @@ def subgraph_isomorphism_edge_counts(edge_index, subgraph_dict):
     for sub_iso_curr in sub_iso:
         mapping = sub_iso_curr.get_array()
         for i, edge in enumerate(subgraph_edges):
-
             # for every edge in the graph H, find the edge in the subgraph G_S to which it is mapped
             # (by finding where its endpoints are matched).
             # Then, increase the count of the matched edge w.r.t. the corresponding orbit
@@ -149,7 +146,6 @@ def subgraph_isomorphism_edge_counts(edge_index, subgraph_dict):
 
 
 def prepare_dataset(name):
-
     # maximum size of cycle graph
     k = 8
 
@@ -174,7 +170,6 @@ def prepare_dataset(name):
 
 
 def generate_dataset(path, name):
-
     ### compute the orbits of each substructure in the list, as well as the node automorphism count
     subgraph_dicts = []
 
@@ -218,7 +213,6 @@ def generate_dataset(path, name):
 
 
 def _prepare(g, subgraph_dicts):
-
     edge_index = torch.stack(g.edges())
 
     identifiers = None

@@ -1,7 +1,6 @@
+import dgl
 import numpy as np
 import rdkit.Chem as Chem
-
-import dgl
 
 from .chemutils import (
     decode_stereo,

@@ -1,6 +1,8 @@
 import argparse
 import time
 
+import dgl
+
 import networkx as nx
 import numpy as np
 import torch
@@ -8,14 +10,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from coarsening import coarsen
 from coordinate import get_coordinates, z2polar
-from grid_graph import grid_graph
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
-
-import dgl
 from dgl.data import load_data, register_data_args
 from dgl.nn.pytorch.conv import ChebConv, GMMConv
 from dgl.nn.pytorch.glob import MaxPooling
+from grid_graph import grid_graph
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
 
 argparser = argparse.ArgumentParser("MNIST")
 argparser.add_argument(
