@@ -9,11 +9,11 @@ import dgl
 import numpy as np
 import pyarrow
 import pytest
-import torch
 
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
+from pytest_utils import create_chunked_dataset
 from tools.distpartitioning import constants, dist_lookup
 from tools.distpartitioning.gloo_wrapper import allgather_sizes
 from tools.distpartitioning.utils import (
@@ -21,7 +21,6 @@ from tools.distpartitioning.utils import (
     get_ntype_counts_map,
     read_json,
 )
-from pytest_utils import create_chunked_dataset
 
 try:
     mp.set_start_method("spawn", force=True)
