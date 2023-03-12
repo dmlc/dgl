@@ -42,6 +42,8 @@ template <typename IdType, typename DType, typename Op>
 void SpMMSumCsrNaive(
     const BcastOff& bcast, const CSRMatrix& csr, const DType* X, const DType* W,
     DType* O) {
+  typedef typename std::conditional<
+      std::is_same<DType, BFloat16>::value, float, DType>::type AccType;
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
@@ -51,18 +53,20 @@ void SpMMSumCsrNaive(
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       DType* out_off = O + rid * dim;
-      for (IdType j = row_start; j < row_end; ++j) {
-        const IdType cid = indices[j];
-        const IdType eid = has_idx ? edges[j] : j;
-        for (int64_t k = 0; k < dim; ++k) {
+      for (int64_t k = 0; k < dim; ++k) {
+        AccType akk = 0.;
+        for (IdType j = row_start; j < row_end; ++j) {
+          const IdType cid = indices[j];
+          const IdType eid = has_idx ? edges[j] : j;
           const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
           const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
           const DType* lhs_off =
               Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
           const DType* rhs_off =
               Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
-          out_off[k] += Op::Call(lhs_off, rhs_off);
+          akk += Op::Call(lhs_off, rhs_off);
         }
+        out_off[k] += akk;
       }
     }
   });
@@ -129,7 +133,8 @@ void SpMMSumCsr(
  *       we use atomic operators in the reduction phase.
  */
 template <typename IdType, typename DType, typename Op>
-void SpMMSumCoo(
+typename std::enable_if<!std::is_same<DType, BFloat16>::value, void>::type
+SpMMSumCoo(
     const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
     NDArray out) {
   const bool has_idx = !IsNullArray(coo.data);
@@ -164,6 +169,14 @@ void SpMMSumCoo(
       }
     }
   }
+}
+
+template <typename IdType, typename DType, typename Op>
+typename std::enable_if<std::is_same<DType, BFloat16>::value, void>::type
+SpMMSumCoo(
+    const BcastOff& bcast, const COOMatrix& coo, NDArray ufeat, NDArray efeat,
+    NDArray out) {
+  LOG(FATAL) << "Unsupported CPU kernel for SpMMSumCoo for BF16.";
 }
 
 /**
@@ -433,6 +446,8 @@ template <typename IdType, typename DType, typename Op>
 void Edge_softmax_csr_forward(
     const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
     NDArray out) {
+  typedef typename std::conditional<
+      std::is_same<DType, BFloat16>::value, float, DType>::type AccType;
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* edges =
@@ -442,7 +457,7 @@ void Edge_softmax_csr_forward(
   runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-      std::vector<DType> data_e(row_end - row_start, 0);
+      std::vector<AccType> data_e(row_end - row_start, 0);
       std::vector<IdType> num(row_end - row_start, 0);
       for (int64_t k = 0; k < dim; ++k) {
         DType max_v = -std::numeric_limits<DType>::infinity();
@@ -481,6 +496,8 @@ template <typename IdType, typename DType, typename Op>
 void Edge_softmax_csr_backward(
     const BcastOff& bcast, const CSRMatrix& csr, NDArray out, NDArray sds,
     NDArray back_out) {
+  typedef typename std::conditional<
+      std::is_same<DType, BFloat16>::value, float, DType>::type AccType;
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* edges =
@@ -492,7 +509,7 @@ void Edge_softmax_csr_backward(
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       for (int64_t k = 0; k < dim; ++k) {
-        DType sum_sds = 0;
+        AccType sum_sds = 0;
         for (IdType j = row_start; j < row_end; ++j) {
           const IdType eid = has_idx ? edges[j] : j;
           const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;

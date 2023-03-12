@@ -152,8 +152,13 @@
         XPU == kDGLCUDA && (val).bits == 16 && (val).code == kDGLBfloat) {  \
       typedef __nv_bfloat16 FloatType;                                      \
       { __VA_ARGS__ }                                                       \
-    } else if (XPU == kDGLCPU) {                                            \
-      LOG(FATAL) << (val_name) << " can only be float32 or float64 on CPU"; \
+    } else if (                                                             \
+        XPU == kDGLCPU && (val).bits == 16 && (val).code == kDGLFloat) {    \
+      LOG(FATAL) << (val_name) << " can't be float16 on CPU";               \
+    } else if (                                                             \
+        XPU == kDGLCPU && (val).bits == 16 && (val).code == kDGLBfloat) {   \
+        typedef BFloat16 FloatType;                                         \
+      { __VA_ARGS__ }                                                       \
     } else {                                                                \
       LOG(FATAL) << (val_name)                                              \
                  << " can only be float16/bfloat16/float32/float64 on GPU"; \
@@ -177,8 +182,13 @@
     } else if (                                                             \
         XPU == kDGLCUDA && (val).bits == 16 && (val).code == kDGLBfloat) {  \
       LOG(FATAL) << "bfloat16 requires CUDA >= 11.0";                       \
-    } else if (XPU == kDGLCPU) {                                            \
-      LOG(FATAL) << (val_name) << " can only be float32 or float64 on CPU"; \
+    } else if (                                                             \
+        XPU == kDGLCPU && (val).bits == 16 && (val).code == kDGLFloat) {    \
+      LOG(FATAL) << (val_name) << " can't be float16 on CPU";               \
+    } else if (                                                             \
+        XPU == kDGLCPU && (val).bits == 16 && (val).code == kDGLBfloat) {   \
+        typedef BFloat16 FloatType;                                         \
+      { __VA_ARGS__ }                                                       \
     } else {                                                                \
       LOG(FATAL) << (val_name)                                              \
                  << " can only be float16/float32/float64 on GPU";          \
@@ -186,8 +196,25 @@
   } while (0)
 #endif  // BF16_ENABLED
 #else   // DGL_USE_CUDA
-#define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...) \
-  ATEN_FLOAT_TYPE_SWITCH(val, FloatType, val_name, {__VA_ARGS__})
+#define ATEN_FLOAT_TYPE_SWITCH_16BITS(val, FloatType, XPU, val_name, ...)   \
+  do {                                                                      \
+    CHECK((val).code == kDGLFloat || (val.code == kDGLBfloat))              \
+        << (val_name) << " must be float type";                             \
+    if ((val).bits == 32) {                                                 \
+      typedef float FloatType;                                              \
+      { __VA_ARGS__ }                                                       \
+    } else if ((val).bits == 64) {                                          \
+      typedef double FloatType;                                             \
+      { __VA_ARGS__ }                                                       \
+    } else if (                                                             \
+        XPU == kDGLCPU && (val).bits == 16 && (val).code == kDGLBfloat) {   \
+        typedef BFloat16 FloatType;                                         \
+      { __VA_ARGS__ }                                                       \
+    } else {                                                                \
+      LOG(FATAL) << (val_name)                                              \
+                 << " can only be bfloat16/float32/float64 on CPU";         \
+    }                                                                       \
+  } while (0)
 #endif  // DGL_USE_CUDA
 
 /**
