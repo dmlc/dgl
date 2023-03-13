@@ -3,10 +3,24 @@ import sys
 import backend as F
 import torch
 
-from dgl.sparse import diag
+from dgl.sparse import diag, from_coo
 
 
 def test_neg():
+    ctx = F.ctx()
+    row = torch.tensor([1, 1, 3]).to(ctx)
+    col = torch.tensor([1, 2, 3]).to(ctx)
+    val = torch.tensor([1.0, 1.0, 2.0]).to(ctx)
+    A = from_coo(row, col, val)
+    neg_A = -A
+    assert A.shape == neg_A.shape
+    assert A.nnz == neg_A.nnz
+    assert torch.allclose(-A.val, neg_A.val)
+    assert torch.allclose(torch.stack(A.coo()), torch.stack(neg_A.coo()))
+    assert A.val.device == neg_A.val.device
+
+
+def test_diag_neg():
     ctx = F.ctx()
     val = torch.arange(3).float().to(ctx)
     D = diag(val)
@@ -16,7 +30,7 @@ def test_neg():
     assert D.val.device == neg_D.val.device
 
 
-def test_inv():
+def test_diag_inv():
     ctx = F.ctx()
     val = torch.arange(1, 4).float().to(ctx)
     D = diag(val)

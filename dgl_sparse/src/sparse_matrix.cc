@@ -130,14 +130,20 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(
   TORCH_CHECK(
       mat->value().device() == value.device(), "The device of the ",
       "old values and the new values must be the same.");
-  auto shape = mat->shape();
+  const auto& shape = mat->shape();
+  if (mat->HasDiag()) {
+    return SparseMatrix::FromDiagPointer(mat->DiagPtr(), value, shape);
+  }
   if (mat->HasCOO()) {
     return SparseMatrix::FromCOOPointer(mat->COOPtr(), value, shape);
-  } else if (mat->HasCSR()) {
-    return SparseMatrix::FromCSRPointer(mat->CSRPtr(), value, shape);
-  } else {
-    return SparseMatrix::FromCSCPointer(mat->CSCPtr(), value, shape);
   }
+  if (mat->HasCSR()) {
+    return SparseMatrix::FromCSRPointer(mat->CSRPtr(), value, shape);
+  }
+  TORCH_CHECK(
+      mat->HasCSC(),
+      "SparseMatrix does not any sparse format for ValLike function.")
+  return SparseMatrix::FromCSCPointer(mat->CSCPtr(), value, shape);
 }
 
 std::shared_ptr<COO> SparseMatrix::COOPtr() {
@@ -195,7 +201,9 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Transpose() const {
   auto shape = shape_;
   std::swap(shape[0], shape[1]);
   auto value = value_;
-  if (HasCOO()) {
+  if (HasDiag()) {
+    return SparseMatrix::FromDiag(value, shape);
+  } else if (HasCOO()) {
     auto coo = COOTranspose(coo_);
     return SparseMatrix::FromCOOPointer(coo, value, shape);
   } else if (HasCSR()) {

@@ -1,5 +1,4 @@
 import operator
-import sys
 
 import backend as F
 
