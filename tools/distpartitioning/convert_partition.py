@@ -175,9 +175,7 @@ def _get_unique_invidx(srcids, dstids, nids):
     return uniques, idxes, srcids, dstids
 
 
-def _process_node_data(
-    schema, part_id, node_data, node_typecounts
-):
+def _process_node_data(schema, part_id, node_data, node_typecounts):
     """
     This is an auxiliary function used to process data relating to the nodes
     of the current partition and prepares the data needed to create the dgl
@@ -264,7 +262,7 @@ def _process_node_data(
             [int(type_nids[0]), int(type_nids[-1]) + 1]
         )
 
-    '''
+    """
     orig_nids = None
     if return_orig_nids:
         orig_nids = {}
@@ -274,7 +272,7 @@ def _process_node_data(
                 part_graph.ndata["inner_node"],
             )
             orig_nids[ntype] = th.as_tensor(per_type_ids[mask])
-    '''
+    """
 
     memory_snapshot("CreateDGLObj_ProcessNodeDataEnd", part_id)
     return (
@@ -477,7 +475,7 @@ def _process_edge_data(
         nid_map[part_local_src_id],
         nid_map[part_local_dst_id],
     )
-    '''
+    """
     orig_eids = None
     if return_orig_eids:
         orig_eids = {}
@@ -489,13 +487,13 @@ def _process_edge_data(
             orig_eids[_etype_tuple_to_str(etype)] = th.as_tensor(
                 global_edge_id[mask]
             )
-    '''
+    """
 
     shuffle_global_src_id = None
     shuffle_global_dst_id = None
     global_src_id = None
     global_dst_id = None
-    #global_edge_id = None
+    # global_edge_id = None
     memory_snapshot("CreateDGLObj_ProcessEdgesEnd: ", part_id)
 
     return (
@@ -669,9 +667,7 @@ def create_dgl_object(
         ntypes_map,
         global_homo_nid,
         id_map,
-    ) = _process_node_data(
-        schema, part_id, node_data, node_typecounts
-    )
+    ) = _process_node_data(schema, part_id, node_data, node_typecounts)
     node_data = None
     memory_snapshot("CreateDGLObj_NodesDone", part_id)
 
