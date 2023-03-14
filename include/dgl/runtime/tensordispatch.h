@@ -166,8 +166,8 @@ class TensorDispatcher {
 
   /**
    * @brief Insert the pinned memory block (allocated via PyTorch CachingHostAllocator)
-   *        back to the free list (ref:
-   *        pytorch/pytorch/blob/master/aten/src/ATen/cuda/CachingHostAllocator.cpp).
+   * back to the free list (ref:
+   * pytorch/pytorch/blob/master/aten/src/ATen/cuda/CachingHostAllocator.cpp).
    * Used in CUDADeviceAPI::FreePinnedDataSpace().
    * @param deleter Pointer to the delete function ptr returned from the allocator.
    */
@@ -178,12 +178,13 @@ class TensorDispatcher {
 
   /**
    * @brief Invoke the record_event function call from PyTorch CachingHostAllocator.
-   * @note Insert the given stream into the set of streams tracked by the
-   *       specified block. This set of streams is then consumed in free path (ref:
-   *       pytorch/pytorch/blob/master/aten/src/ATen/cuda/CachingHostAllocator.cpp).
+   * @note This function assoicates a CUDA stream (used by a copy kernel) to the pinned data.
+   * The set of recorded streams is then consumed in the free path of this data (ref:
+   * pytorch/pytorch/blob/master/aten/src/ATen/cuda/CachingHostAllocator.cpp).
    * Used in CUDADeviceAPI::RecordedCopyDataFromTo().
    *
    * @param data Pointer of the tensor to be recorded.
+   * @param ctx PyTorch storage ctx ptr returned from the allocator.
    * @param stream The stream that currently consumes this tensor.
    * @param device_id Device of the tensor.
    */
@@ -198,9 +199,9 @@ class TensorDispatcher {
    * @brief Release cached pinned memory allocations via cudaHostFree
    * Used in CUDADeviceAPI::PinData() before pinning any host memory by DGL.
    */
-  inline void CUDAHostAllocEmptyCache() {
-    auto entry = entrypoints_[Op::kCUDAHostAllocEmptyCache];
-    FUNCCAST(tensoradapter::CUDAHostAllocEmptyCache, entry)();
+  inline void CUDAHostAllocatorEmptyCache() {
+    auto entry = entrypoints_[Op::kCUDAHostAllocatorEmptyCache];
+    FUNCCAST(tensoradapter::CUDAHostAllocatorEmptyCache, entry)();
   }
 
 #endif  // DGL_USE_CUDA
@@ -222,7 +223,7 @@ class TensorDispatcher {
       "CUDARawAlloc",        "CUDARawDelete",
       "CUDACurrentStream",   "RecordStream",
       "CUDARawHostAlloc",    "CUDARawHostDelete",
-      "CUDARecordHostAlloc", "CUDAHostAllocEmptyCache",
+      "CUDARecordHostAlloc", "CUDAHostAllocatorEmptyCache",
 #endif  // DGL_USE_CUDA
   };
 
@@ -239,7 +240,7 @@ class TensorDispatcher {
     static constexpr int kCUDARawHostAlloc = 6;
     static constexpr int kCUDARawHostDelete = 7;
     static constexpr int kCUDARecordHostAlloc = 8;
-    static constexpr int kCUDAHostAllocEmptyCache = 9;
+    static constexpr int kCUDAHostAllocatorEmptyCache = 9;
 #endif  // DGL_USE_CUDA
   };
 

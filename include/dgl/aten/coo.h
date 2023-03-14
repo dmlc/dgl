@@ -64,8 +64,11 @@ struct COOMatrix {
         col(carr),
         data(darr),
         row_sorted(rsorted),
-        col_sorted(csorted),
-        is_pinned(pinned_mem) {
+        col_sorted(csorted) {
+    is_pinned = row.IsPinned() && col.IsPinned();
+    if (!aten::IsNullArray(data)) {
+      is_pinned = is_pinned && data.IsPinned();
+    }
     CheckValidity();
   }
 
@@ -138,10 +141,12 @@ struct COOMatrix {
   /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline COOMatrix PinMemory() {
     if (is_pinned) return *this;
-    return COOMatrix(
+    auto new_coo =  COOMatrix(
         num_rows, num_cols, row.PinMemory(), col.PinMemory(),
         aten::IsNullArray(data) ? data : data.PinMemory(), row_sorted,
-        col_sorted, true);
+        col_sorted);
+    CHECK(new_coo.is_pinned) << "The new allocated COOMatrix is not pinned correctly";
+    return new_coo;
   }
 
   /**

@@ -97,7 +97,7 @@ TA_EXPORTS void CUDARecordHostAlloc(
               reinterpret_cast<int64_t>(stream))));
 }
 
-TA_EXPORTS void CUDAHostAllocEmptyCache() {
+TA_EXPORTS void CUDAHostAllocatorEmptyCache() {
   at::cuda::CachingHostAllocator_emptyCache();
 }
 #endif  // DGL_USE_CUDA

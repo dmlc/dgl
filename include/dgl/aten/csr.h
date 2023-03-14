@@ -60,8 +60,11 @@ struct CSRMatrix {
         indptr(parr),
         indices(iarr),
         data(darr),
-        sorted(sorted_flag),
-        is_pinned(pinned_mem) {
+        sorted(sorted_flag) {
+    is_pinned = indptr.IsPinned() && indices.IsPinned();
+    if (!aten::IsNullArray(data)) {
+      is_pinned = is_pinned && data.IsPinned();
+    }
     CheckValidity();
   }
 
@@ -131,9 +134,11 @@ struct CSRMatrix {
   /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline CSRMatrix PinMemory() {
     if (is_pinned) return *this;
-    return CSRMatrix(
+    auto new_csr = CSRMatrix(
         num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
-        aten::IsNullArray(data) ? data : data.PinMemory(), sorted, true);
+        aten::IsNullArray(data) ? data : data.PinMemory(), sorted);
+    CHECK(new_csr.is_pinned) << "The new allocated CSRMatrix is not pinned correctly";
+    return new_csr;
   }
 
   /**

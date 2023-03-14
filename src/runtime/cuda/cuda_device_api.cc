@@ -242,7 +242,7 @@ class CUDADeviceAPI final : public DeviceAPI {
     // Minimize the pinned memory pool allocated by backend (via tensoradapter)
     // to preserve enough memory for DGL inherited in-place pin-memory operation
     if (tensor_dispatcher->IsAvailable()) {
-      tensor_dispatcher->CUDAHostAllocEmptyCache();
+      tensor_dispatcher->CUDAHostAllocatorEmptyCache();
     }
     CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
     return true;
@@ -259,15 +259,15 @@ class CUDADeviceAPI final : public DeviceAPI {
     if (nbytes == 0) return nullptr;
     TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
     CHECK(tensor_dispatcher->IsAvailable())
-        << "CachingHostAllocator allocator only available with TensorAdapter.";
+        << "CachingHostAllocator is not available in the current backend PyTorch. Please update the PyTorch version to 1.11+";
     return tensor_dispatcher->CUDAAllocHostWorkspace(nbytes, ctx, deleter);
   }
 
   void FreePinnedDataSpace(void** deleter) override {
     TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
-    if (tensor_dispatcher->IsAvailable()) {
-      tensor_dispatcher->CUDAFreeHostWorkspace(deleter);
-    }
+    CHECK(tensor_dispatcher->IsAvailable())
+        << "CachingHostAllocator is not available in the current backend PyTorch. Please update the PyTorch version to 1.11+";
+    tensor_dispatcher->CUDAFreeHostWorkspace(deleter);
   }
 
   bool IsPinned(const void* ptr) override {

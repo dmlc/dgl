@@ -71,6 +71,9 @@ void NDArray::Internal::DefaultDeleter(NDArray::Container* ptr) {
     if (ptr->pinned_by_pyt_) {
       DeviceAPI::Get(kDGLCUDA)->FreePinnedDataSpace(&(ptr->pyt_raw_deleter));
       CHECK(ptr->pyt_raw_deleter == nullptr);
+      // reset the flag and storage ctx ptr for completeness
+      ptr->pinned_by_pyt_ = false;
+      ptr->pyt_ctx = nullptr;
     } else {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)
           ->FreeDataSpace(ptr->dl_tensor.ctx, ptr->dl_tensor.data);
@@ -164,8 +167,7 @@ NDArray NDArray::EmptyShared(
     const std::string& name, std::vector<int64_t> shape, DGLDataType dtype,
     DGLContext ctx, bool is_create) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content (i.e., allocation), other infos are setup in
-  // Internal::Create
+  // setup memory content (i.e., allocation)
   size_t size = GetDataSize(ret.data_->dl_tensor);
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
@@ -181,8 +183,7 @@ NDArray NDArray::EmptyShared(
 NDArray NDArray::Empty(
     std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content (i.e., allocation), other infos are setup in
-  // Internal::Create
+  // setup memory content (i.e., allocation)
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   if (size > 0)
@@ -235,8 +236,7 @@ NDArray NDArray::PinnedEmpty(
     std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
   CHECK_EQ(ctx.device_type, kDGLCPU) << "Only NDArray on CPU can be pinned";
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content (i.e., allocation), other infos are setup in
-  // Internal::Create
+  // setup memory content (i.e., allocation)
   size_t size = GetDataSize(ret.data_->dl_tensor);
   if (size > 0) {
     ret.data_->dl_tensor.data = DeviceAPI::Get(kDGLCUDA)->AllocPinnedDataSpace(
@@ -343,7 +343,7 @@ std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
 }
 
 bool NDArray::IsContainerPinned(NDArray::Container* ptr) {
-  if (ptr->pinned_by_dgl_) return true;
+  if (ptr->pinned_by_dgl_ || ptr->pinned_by_pyt_) return true;
   auto* tensor = &(ptr->dl_tensor);
   // Can only be pinned if on CPU...
   if (tensor->ctx.device_type != kDGLCPU) return false;
