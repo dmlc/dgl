@@ -204,7 +204,7 @@ def get_node_partids(partitions_dir, graph_schema):
         dict(
             zip(
                 graph_schema[constants.STR_NODE_TYPE],
-                graph_schema[constants.STR_NODE_TYPE_COUNTS],
+                graph_schema[constants.STR_NUM_NODES_PER_TYPE],
             )
         ),
     )
@@ -215,8 +215,8 @@ def get_node_partids(partitions_dir, graph_schema):
         )
         assert (
             len(node_partids[ntype])
-            == graph_schema[constants.STR_NODE_TYPE_COUNTS][ntype_id]
-        ), f"Node count for {ntype} = {len(node_partids[ntype])} in the partitions_dir while it should be {graph_schema[constants.STR_NTYPE_COUNTS][ntype_id]} (from graph schema)."
+            == graph_schema[constants.STR_NUM_NODES_PER_TYPE][ntype_id]
+        ), f"Node count for {ntype} = {len(node_partids[ntype])} in the partitions_dir while it should be {graph_schema[constants.STR_NUM_NODES_PER_TYPE][ntype_id]} (from graph schema)."
 
     return node_partids
 
