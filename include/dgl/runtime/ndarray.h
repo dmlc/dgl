@@ -174,6 +174,7 @@ class NDArray {
    * @brief Return a new array with a copy of the content.
    */
   inline NDArray Clone() const;
+
   /**
    * @brief Return a copy of the NDArray in pinned (page-locked) memory.
    * @note This is an out-place method, and the current context has to be kDGLCPU.

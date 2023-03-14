@@ -140,7 +140,8 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return COO(meta_graph_, adj_.CopyTo(ctx));
   }
 
-  COO PinMemoryOutPlace() {
+  /** @brief Copy the adj_ to pinned memory: COOMatrix of the COO graph. */
+  COO PinMemory() {
     if (adj_.is_pinned) return *this;
     return COO(meta_graph_, adj_.PinMemory());
   }
@@ -540,7 +541,8 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  CSR PinMemoryOutPlace() {
+  /** @brief Copy the adj_ to pinned memory: CSRMatrix of the CSR graph. */
+  CSR PinMemory() {
     if (adj_.is_pinned) return *this;
     return CSR(meta_graph_, adj_.PinMemory());
   }
@@ -1269,11 +1271,11 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DGLContext& ctx) {
   }
 }
 
-HeteroGraphPtr UnitGraph::PinMemoryOutPlace() {
+HeteroGraphPtr UnitGraph::PinMemory() {
   CSRPtr pinned_in_csr, pinned_out_csr;
   COOPtr pinned_coo;
   if (this->in_csr_->defined() && !this->in_csr_->IsPinned()) {
-    pinned_in_csr = CSRPtr(new CSR(this->in_csr_->PinMemoryOutPlace()));
+    pinned_in_csr = CSRPtr(new CSR(this->in_csr_->PinMemory()));
   } else if (this->in_csr_->defined()) {
     pinned_in_csr = this->in_csr_;
   } else {
@@ -1281,7 +1283,7 @@ HeteroGraphPtr UnitGraph::PinMemoryOutPlace() {
   }
 
   if (this->out_csr_->defined() && !this->out_csr_->IsPinned()) {
-    pinned_out_csr = CSRPtr(new CSR(this->out_csr_->PinMemoryOutPlace()));
+    pinned_out_csr = CSRPtr(new CSR(this->out_csr_->PinMemory()));
   } else if (this->out_csr_->defined()) {
     pinned_out_csr = this->out_csr_;
   } else {
@@ -1289,7 +1291,7 @@ HeteroGraphPtr UnitGraph::PinMemoryOutPlace() {
   }
 
   if (this->coo_->defined() && !this->coo_->IsPinned()) {
-    pinned_coo = COOPtr(new COO(this->coo_->PinMemoryOutPlace()));
+    pinned_coo = COOPtr(new COO(this->coo_->PinMemory()));
   } else if (this->coo_->defined()) {
     pinned_coo = this->coo_;
   } else {

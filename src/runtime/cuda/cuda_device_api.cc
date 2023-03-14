@@ -248,13 +248,18 @@ class CUDADeviceAPI final : public DeviceAPI {
     return true;
   }
 
+  void UnpinData(void* ptr) {
+    if (ptr == nullptr) return;
+    CUDA_CALL(cudaHostUnregister(ptr));
+  }
+
   void* AllocPinnedDataSpace(
       size_t nbytes, void** ctx, void** deleter) override {
     // prevent pinning empty tensors or graphs
     if (nbytes == 0) return nullptr;
     TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
     CHECK(tensor_dispatcher->IsAvailable())
-        << "CachingHost allocator only available with TensorAdapter.";
+        << "CachingHostAllocator allocator only available with TensorAdapter.";
     return tensor_dispatcher->CUDAAllocHostWorkspace(nbytes, ctx, deleter);
   }
 
@@ -263,11 +268,6 @@ class CUDADeviceAPI final : public DeviceAPI {
     if (tensor_dispatcher->IsAvailable()) {
       tensor_dispatcher->CUDAFreeHostWorkspace(deleter);
     }
-  }
-
-  void UnpinData(void* ptr) {
-    if (ptr == nullptr) return;
-    CUDA_CALL(cudaHostUnregister(ptr));
   }
 
   bool IsPinned(const void* ptr) override {

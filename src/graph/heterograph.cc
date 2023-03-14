@@ -285,7 +285,7 @@ HeteroGraphPtr HeteroGraph::PinMemory(HeteroGraphPtr g) {
   CHECK_NOTNULL(hgindex);
   for (auto subg : hgindex->relation_graphs_) {
     if (!subg->IsPinned()) {
-      rel_graphs.push_back(subg->PinMemoryOutPlace());
+      rel_graphs.push_back(subg->PinMemory());
       allpinned = false;
     } else {
       auto hsubg = std::dynamic_pointer_cast<HeteroGraph>(subg);

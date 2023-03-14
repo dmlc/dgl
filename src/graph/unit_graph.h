@@ -214,8 +214,6 @@ class UnitGraph : public BaseHeteroGraph {
    */
   void PinMemory_() override;
 
-  HeteroGraphPtr PinMemoryOutPlace();
-
   /**
    * @brief Unpin the in_csr_, out_scr_ and coo_ of the current graph.
    * @note The graph will be unpinned inplace. Behavior depends on the current
@@ -223,6 +221,14 @@ class UnitGraph : public BaseHeteroGraph {
    * check is deferred to unpinning the NDArray.
    */
   void UnpinMemory_();
+
+  /**
+   * @brief Create a copy of the current graph in pinned memory.
+   * @note The graph will be pinned outplace through PyTorch CachingHostAllocator, if available.
+   * Otherwise, an error will be thrown. If any of the underlying structures (incsr, outcsr, coo)
+   * are already pinned, the function will simply use its original copy.
+   */
+  HeteroGraphPtr PinMemory();
 
   /**
    * @brief Record stream for this graph.

@@ -219,16 +219,12 @@ void NDArray::RecordedCopyFromTo(DGLArray* from, DGLArray* to, void* pyt_ctx) {
   CHECK_EQ(from_size, to_size)
       << "DGLArrayCopyFromTo: The size must exactly match.";
 
-  CHECK(
-      from->ctx.device_type == to->ctx.device_type ||
-      from->ctx.device_type == kDGLCPU || to->ctx.device_type == kDGLCPU)
-      << "Can not copy across different ctx types directly.";
+  CHECK(from->ctx.device_type != to->ctx.device_type)
+      << "Recoding event is only called for the copy between CPU and GPU";
 
-  // Use the context that is *not* a cpu context to get the correct device
-  // api manager.
-  DGLContext ctx = from->ctx.device_type != kDGLCPU ? from->ctx : to->ctx;
-  CHECK(ctx.device_type == kDGLCUDA)
-      << "Can not record event if not cuda device.";
+  CHECK(from->ctx.device_type == kDGLCUDA || to->ctx.device_type == kDGLCUDA)
+      << "At least one CUDA ctx needs to be involved.";
+
   DeviceAPI::Get(kDGLCUDA)->RecordedCopyDataFromTo(
       from->data, static_cast<size_t>(from->byte_offset), to->data,
       static_cast<size_t>(to->byte_offset), from_size, from->ctx, to->ctx,

@@ -241,9 +241,6 @@ class HeteroGraph : public BaseHeteroGraph {
    */
   void PinMemory_() override;
 
-  /** @brief Return a new pinned graph managed by backend allocator. */
-  static HeteroGraphPtr PinMemory(HeteroGraphPtr g);
-
   /**
    * @brief Unpin all relation graphs of the current graph.
    * @note The graph will be unpinned inplace. Behavior depends on the current
@@ -251,6 +248,14 @@ class HeteroGraph : public BaseHeteroGraph {
    * check is deferred to unpinning the NDArray.
    */
   void UnpinMemory_();
+
+  /**
+   * @brief Copy the current graph to pinned memory managed by
+   *        PyTorch CachingHostAllocator for each relation graph.
+   * @note If any of the underlying relation graphs are already pinned, the function
+   *       simply uses its original copy. If all pinned, it returns itself.
+   */
+  static HeteroGraphPtr PinMemory(HeteroGraphPtr g);
 
   /**
    * @brief Record stream for this graph.
