@@ -280,7 +280,6 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DGLContext& ctx) {
 HeteroGraphPtr HeteroGraph::PinMemory(HeteroGraphPtr g) {
   bool allpinned = true;
   std::vector<HeteroGraphPtr> rel_graphs;
-
   auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(g);
   CHECK_NOTNULL(hgindex);
   for (auto subg : hgindex->relation_graphs_) {
@@ -288,8 +287,7 @@ HeteroGraphPtr HeteroGraph::PinMemory(HeteroGraphPtr g) {
       rel_graphs.push_back(subg->PinMemory());
       allpinned = false;
     } else {
-      auto hsubg = std::dynamic_pointer_cast<HeteroGraph>(subg);
-      rel_graphs.push_back(hsubg);
+      rel_graphs.push_back(subg);
     }
   }
   if (allpinned) return g;

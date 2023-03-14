@@ -56,8 +56,7 @@ struct COOMatrix {
   /** @brief constructor */
   COOMatrix(
       int64_t nrows, int64_t ncols, IdArray rarr, IdArray carr,
-      IdArray darr = NullArray(), bool rsorted = false, bool csorted = false,
-      bool pinned_mem = false)
+      IdArray darr = NullArray(), bool rsorted = false, bool csorted = false)
       : num_rows(nrows),
         num_cols(ncols),
         row(rarr),
@@ -65,7 +64,10 @@ struct COOMatrix {
         data(darr),
         row_sorted(rsorted),
         col_sorted(csorted) {
-    is_pinned = row.IsPinned() && col.IsPinned();
+    is_pinned = aten::IsNullArray(row) ? true : row.IsPinned();
+    if (!aten::IsNullArray(col)) {
+      is_pinned = is_pinned && col.IsPinned();
+    }
     if (!aten::IsNullArray(data)) {
       is_pinned = is_pinned && data.IsPinned();
     }

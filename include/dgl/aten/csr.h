@@ -53,15 +53,17 @@ struct CSRMatrix {
   /** @brief constructor */
   CSRMatrix(
       int64_t nrows, int64_t ncols, IdArray parr, IdArray iarr,
-      IdArray darr = NullArray(), bool sorted_flag = false,
-      bool pinned_mem = false)
+      IdArray darr = NullArray(), bool sorted_flag = false)
       : num_rows(nrows),
         num_cols(ncols),
         indptr(parr),
         indices(iarr),
         data(darr),
         sorted(sorted_flag) {
-    is_pinned = indptr.IsPinned() && indices.IsPinned();
+    is_pinned = aten::IsNullArray(indptr) ? true : indptr.IsPinned();
+    if (!aten::IsNullArray(indices)) {
+      is_pinned = is_pinned && indices.IsPinned();
+    }
     if (!aten::IsNullArray(data)) {
       is_pinned = is_pinned && data.IsPinned();
     }

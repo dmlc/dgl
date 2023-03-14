@@ -1,21 +1,11 @@
-import itertools
-import multiprocessing as mp
 import unittest
-from collections import Counter
 
 import backend as F
 
 import dgl
-import dgl.function as fn
-import networkx as nx
-import numpy as np
 import pytest
-import scipy.sparse as ssp
-import test_utils
 from dgl import DGLError
-from scipy.sparse import rand
-from test_utils import get_cases, parametrize_idtype
-from utils import assert_is_identical_hetero
+from pytests_utils import parametrize_idtype
 
 
 def create_test_heterograph(idtype):
