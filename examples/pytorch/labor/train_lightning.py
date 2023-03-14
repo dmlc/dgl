@@ -26,10 +26,8 @@ import torch.nn.functional as F
 import argparse
 import glob
 import os
-import sys
 import time
 import math
-import itertools
 
 from load_graph import load_dataset
 
@@ -38,6 +36,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint, Callback, EarlyStopping
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
 from model import SAGE, RGAT
+
+from ladies_sampler import LadiesSampler, PoissonLadiesSampler, normalized_edata
 
 def cuda_index_tensor(tensor, idx):
     assert(idx.device != th.device('cpu'))
@@ -144,7 +144,7 @@ class SAGELightning(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, dataset_name, undirected, data_cpu=False, use_uva=False, fan_out=[10, 25],
+    def __init__(self, dataset_name, undirected, data_cpu=False, use_uva=False, fan_out=[10, 25], lad_out=[11000,5000],
                  device=th.device('cpu'), batch_size=1000, num_workers=4, sampler='labor', importance_sampling=0, layer_dependency=False, batch_dependency=1, cache_size=0):
         super().__init__()
 
@@ -161,11 +161,15 @@ class DataModule(LightningDataModule):
         test_nid = th.nonzero(g.ndata['test_mask'], as_tuple=True)[0]
 
         fanouts = [int(_) for _ in fan_out]
+        ladouts = [int(_) for _ in lad_out]
         if sampler == 'neighbor':
             sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
+        elif 'ladies' in sampler:
+            g.edata['w'] = normalized_edata(g)
+            sampler = (PoissonLadiesSampler if 'poisson' in sampler else LadiesSampler)(ladouts)
         else:
             sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
-        # unbiased_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
+        full_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
         unbiased_sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
 
         dataloader_device = th.device('cpu')
@@ -185,6 +189,7 @@ class DataModule(LightningDataModule):
             self.train_nid, self.val_nid, self.test_nid = train_nid, val_nid, test_nid
         self.sampler = sampler
         self.unbiased_sampler = unbiased_sampler
+        self.full_sampler = full_sampler
         self.device = dataloader_device
         self.use_uva = use_uva
         self.batch_size = batch_size
@@ -217,7 +222,7 @@ class DataModule(LightningDataModule):
             shuffle=False,
             drop_last=False,
             num_workers=self.num_workers)
-            for sampler in [self.sampler, self.unbiased_sampler]]
+            for sampler in [self.unbiased_sampler]]
 
     def test_dataloader(self):
         return [dgl.dataloading.DataLoader(
@@ -230,7 +235,7 @@ class DataModule(LightningDataModule):
             shuffle=False,
             drop_last=False,
             num_workers=self.num_workers)
-            for sampler in [self.sampler, self.unbiased_sampler]]
+            for sampler in [self.full_sampler]]
 
 class BatchSizeCallback(Callback):
     def __init__(self, limit, factor=3):
@@ -286,9 +291,11 @@ if __name__ == '__main__':
     argparser.add_argument('--dataset', type=str, default='reddit')
     argparser.add_argument('--num-epochs', type=int, default=-1)
     argparser.add_argument('--num-steps', type=int, default=-1)
+    argparser.add_argument('--min-steps', type=int, default=0)
     argparser.add_argument('--num-hidden', type=int, default=256)
     argparser.add_argument('--num-layers', type=int, default=3)
     argparser.add_argument('--fan-out', type=str, default='10,10,10')
+    argparser.add_argument('--lad-out', type=str, default='16000,11000,5000')
     argparser.add_argument('--batch-size', type=int, default=1024)
     argparser.add_argument('--lr', type=float, default=0.001)
     argparser.add_argument('--dropout', type=float, default=0.5)
@@ -321,7 +328,7 @@ if __name__ == '__main__':
 
     datamodule = DataModule(
         args.dataset, args.undirected, args.data_cpu, args.use_uva,
-        [int(_) for _ in args.fan_out.split(',')],
+        [int(_) for _ in args.fan_out.split(',')], [int(_) for _ in args.lad_out.split(',')],
         device, args.batch_size // args.independent_batches, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.cache_size)
     model = SAGELightning(
         datamodule.in_feats, args.num_hidden, datamodule.n_classes, args.num_layers,
@@ -330,17 +337,18 @@ if __name__ == '__main__':
     # Train
     callbacks = []
     if not args.disable_checkpoint:
-        callbacks.append(ModelCheckpoint(monitor='val_acc/dataloader_idx_0', save_top_k=1, mode='max'))
-        # callbacks.append(ModelCheckpoint(monitor='val_acc', save_top_k=1, mode='max'))
+        # callbacks.append(ModelCheckpoint(monitor='val_acc/dataloader_idx_0', save_top_k=1, mode='max'))
+        callbacks.append(ModelCheckpoint(monitor='val_acc', save_top_k=1, mode='max'))
     callbacks.append(BatchSizeCallback(args.vertex_limit))
-    callbacks.append(EarlyStopping(monitor='val_acc/dataloader_idx_0', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
-    # callbacks.append(EarlyStopping(monitor='val_acc', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
+    # callbacks.append(EarlyStopping(monitor='val_acc/dataloader_idx_0', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
+    callbacks.append(EarlyStopping(monitor='val_acc', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
     subdir = '{}_{}_{}_{}_{}_{}'.format(args.dataset, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.independent_batches)
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(gpus=[args.gpu] if args.gpu != -1 else None,
                       accumulate_grad_batches=args.independent_batches,
                       max_epochs=args.num_epochs,
                       max_steps=args.num_steps,
+                      min_steps=args.min_steps,
                       callbacks=callbacks,
                       logger=logger)
     trainer.fit(model, datamodule=datamodule)
