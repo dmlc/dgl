@@ -136,20 +136,6 @@ class TensorDispatcher {
   }
 
   /**
-   * @brief Record streams that are using this tensor.
-   * Used in NDArray::RecordStream().
-   *
-   * @param ptr Pointer of the tensor to be recorded.
-   * @param stream The stream that is using this tensor.
-   * @param device_id Device of the tensor.
-   */
-  inline void RecordStream(void* ptr, DGLStreamHandle stream, int device_id) {
-    auto entry = entrypoints_[Op::kRecordStream];
-    FUNCCAST(tensoradapter::RecordStream, entry)
-    (ptr, static_cast<cudaStream_t>(stream), device_id);
-  }
-
-  /**
    * @brief Allocate a piece of pinned CPU memory via PyTorch
    * CachingHostAllocator Used in CUDADeviceAPI::AllocPinnedDataSpace().
    * @param nbytes The size to be allocated.
@@ -208,8 +194,24 @@ class TensorDispatcher {
     auto entry = entrypoints_[Op::kCUDAHostAllocatorEmptyCache];
     FUNCCAST(tensoradapter::CUDAHostAllocatorEmptyCache, entry)();
   }
-
 #endif  // DGL_USE_CUDA
+
+  /**
+   * @brief Record streams that are using this tensor.
+   * Used in NDArray::RecordStream().
+   *
+   * @param ptr Pointer of the tensor to be recorded.
+   * @param stream The stream that is using this tensor.
+   * @param device_id Device of the tensor.
+   */
+    inline void RecordStream(void* ptr, DGLStreamHandle stream, int device_id) {
+#ifdef DGL_USE_CUDA
+    auto entry = entrypoints_[Op::kRecordStream];
+    FUNCCAST(tensoradapter::RecordStream, entry)
+    (ptr, static_cast<cudaStream_t>(stream), device_id);
+#endif
+
+  }
 
  private:
   /** @brief ctor */
