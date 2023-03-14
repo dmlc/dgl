@@ -2173,12 +2173,12 @@ def test_MetaPath2Vec(idtype):
     assert embeds.shape[0] == g.num_nodes()
 
 
-@pytest.mark.parametrize('num_layer', [1, 4])
-@pytest.mark.parametrize('k', [3, 5])
-@pytest.mark.parametrize('lpe_dim', [4, 16])
-@pytest.mark.parametrize('n_head', [1, 4])
-@pytest.mark.parametrize('batch_norm', [True, False])
-@pytest.mark.parametrize('num_post_layer', [0, 1, 2])
+@pytest.mark.parametrize("num_layer", [1, 4])
+@pytest.mark.parametrize("k", [3, 5])
+@pytest.mark.parametrize("lpe_dim", [4, 16])
+@pytest.mark.parametrize("n_head", [1, 4])
+@pytest.mark.parametrize("batch_norm", [True, False])
+@pytest.mark.parametrize("num_post_layer", [0, 1, 2])
 def test_LapPosEncoder(
     num_layer, k, lpe_dim, n_head, batch_norm, num_post_layer
 ):
@@ -2199,16 +2199,16 @@ def test_LapPosEncoder(
         k,
         lpe_dim,
         batch_norm=batch_norm,
-        num_post_layer=num_post_layer
+        num_post_layer=num_post_layer,
     ).to(ctx)
     assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
 
 
-@pytest.mark.parametrize('feat_size', [128, 512])
-@pytest.mark.parametrize('num_heads', [8, 16])
-@pytest.mark.parametrize('bias', [True, False])
-@pytest.mark.parametrize('attn_bias_type', ['add', 'mul'])
-@pytest.mark.parametrize('attn_drop', [0.1, 0.5])
+@pytest.mark.parametrize("feat_size", [128, 512])
+@pytest.mark.parametrize("num_heads", [8, 16])
+@pytest.mark.parametrize("bias", [True, False])
+@pytest.mark.parametrize("attn_bias_type", ["add", "mul"])
+@pytest.mark.parametrize("attn_drop", [0.1, 0.5])
 def test_BiasedMHA(feat_size, num_heads, bias, attn_bias_type, attn_drop):
     ndata = th.rand(16, 100, feat_size)
     attn_bias = th.rand(16, 100, 100, num_heads)

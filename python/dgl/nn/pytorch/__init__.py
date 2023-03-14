@@ -8,11 +8,6 @@ from .softmax import *
 from .factory import *
 from .hetero import *
 from .sparse_emb import NodeEmbedding
-from .utils import (
-    JumpingKnowledge,
-    LabelPropagation,
-    Sequential,
-    WeightBasis,
-)
+from .utils import JumpingKnowledge, LabelPropagation, Sequential, WeightBasis
 from .network_emb import *
 from .gt import *
