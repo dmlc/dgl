@@ -51,6 +51,7 @@ from .heterograph import (  # pylint: disable=reimported
     DGLGraph,
     DGLGraph as DGLHeteroGraph,
 )
+from .homophily import *
 from .merge import *
 from .subgraph import *
 from .traversal import *

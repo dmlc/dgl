@@ -18,14 +18,15 @@ std::shared_ptr<COO> COOFromOldDGLCOO(const aten::COOMatrix& dgl_coo) {
   auto row = DGLArrayToTorchTensor(dgl_coo.row);
   auto col = DGLArrayToTorchTensor(dgl_coo.col);
   TORCH_CHECK(aten::IsNullArray(dgl_coo.data));
+  auto indices = torch::stack({row, col});
   return std::make_shared<COO>(
-      COO{dgl_coo.num_rows, dgl_coo.num_cols, row, col, dgl_coo.row_sorted,
+      COO{dgl_coo.num_rows, dgl_coo.num_cols, indices, dgl_coo.row_sorted,
           dgl_coo.col_sorted});
 }
 
 aten::COOMatrix COOToOldDGLCOO(const std::shared_ptr<COO>& coo) {
-  auto row = TorchTensorToDGLArray(coo->row);
-  auto col = TorchTensorToDGLArray(coo->col);
+  auto row = TorchTensorToDGLArray(coo->indices.index({0}));
+  auto col = TorchTensorToDGLArray(coo->indices.index({1}));
   return aten::COOMatrix(
       coo->num_rows, coo->num_cols, row, col, aten::NullArray(),
       coo->row_sorted, coo->col_sorted);
@@ -50,14 +51,13 @@ aten::CSRMatrix CSRToOldDGLCSR(const std::shared_ptr<CSR>& csr) {
 
 torch::Tensor COOToTorchCOO(
     const std::shared_ptr<COO>& coo, torch::Tensor value) {
-  std::vector<torch::Tensor> indices = {coo->row, coo->col};
+  torch::Tensor indices = coo->indices;
   if (value.ndimension() == 2) {
     return torch::sparse_coo_tensor(
-        torch::stack(indices), value,
-        {coo->num_rows, coo->num_cols, value.size(1)});
+        indices, value, {coo->num_rows, coo->num_cols, value.size(1)});
   } else {
     return torch::sparse_coo_tensor(
-        torch::stack(indices), value, {coo->num_rows, coo->num_cols});
+        indices, value, {coo->num_rows, coo->num_cols});
   }
 }
 
@@ -97,6 +97,39 @@ std::shared_ptr<CSR> CSRToCSC(const std::shared_ptr<CSR>& csr) {
   auto dgl_csr = CSRToOldDGLCSR(csr);
   auto dgl_csc = aten::CSRTranspose(dgl_csr);
   return CSRFromOldDGLCSR(dgl_csc);
+}
+
+std::shared_ptr<COO> DiagToCOO(
+    const std::shared_ptr<Diag>& diag,
+    const c10::TensorOptions& indices_options) {
+  int64_t nnz = std::min(diag->num_rows, diag->num_cols);
+  auto indices = torch::arange(nnz, indices_options).repeat({2, 1});
+  return std::make_shared<COO>(
+      COO{diag->num_rows, diag->num_cols, indices, true, true});
+}
+
+std::shared_ptr<CSR> DiagToCSR(
+    const std::shared_ptr<Diag>& diag,
+    const c10::TensorOptions& indices_options) {
+  int64_t nnz = std::min(diag->num_rows, diag->num_cols);
+  auto indptr = torch::full(diag->num_rows + 1, nnz, indices_options);
+  torch::arange_out(indptr, nnz + 1);
+  auto indices = torch::arange(nnz, indices_options);
+  return std::make_shared<CSR>(
+      CSR{diag->num_rows, diag->num_cols, indptr, indices,
+          torch::optional<torch::Tensor>(), true});
+}
+
+std::shared_ptr<CSR> DiagToCSC(
+    const std::shared_ptr<Diag>& diag,
+    const c10::TensorOptions& indices_options) {
+  int64_t nnz = std::min(diag->num_rows, diag->num_cols);
+  auto indptr = torch::full(diag->num_cols + 1, nnz, indices_options);
+  torch::arange_out(indptr, nnz + 1);
+  auto indices = torch::arange(nnz, indices_options);
+  return std::make_shared<CSR>(
+      CSR{diag->num_cols, diag->num_rows, indptr, indices,
+          torch::optional<torch::Tensor>(), true});
 }
 
 std::shared_ptr<COO> COOTranspose(const std::shared_ptr<COO>& coo) {

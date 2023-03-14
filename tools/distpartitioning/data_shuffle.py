@@ -24,16 +24,20 @@ from globalids import (
 from gloo_wrapper import allgather_sizes, alltoallv_cpu, gather_metadata_json
 from utils import (
     augment_edge_data,
+    DATA_TYPE_ID,
     get_edge_types,
     get_etype_featnames,
+    get_gid_offsets,
     get_gnid_range_map,
     get_idranges,
     get_node_types,
+    get_ntype_counts_map,
     get_ntype_featnames,
     map_partid_rank,
     memory_snapshot,
     read_json,
     read_ntype_partition_files,
+    REV_DATA_TYPE_ID,
     write_dgl_objects,
     write_metadata_json,
 )
@@ -122,11 +126,18 @@ def gen_node_data(
     # dictionary and range of global-nids in the second dictionary.
     type_nid_dict, global_nid_dict = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
-        schema_map[constants.STR_NUM_NODES_PER_CHUNK],
+        get_ntype_counts_map(
+            schema_map[constants.STR_NODE_TYPE],
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
+        ),
         num_chunks=num_parts,
     )
 
     for ntype_id, ntype_name in ntid_ntype_map.items():
+        # No. of nodes in each process can differ significantly in lopsided distributions
+        # Synchronize on a per ntype basis
+        dist.barrier()
+
         type_start, type_end = (
             type_nid_dict[ntype_name][0][0],
             type_nid_dict[ntype_name][-1][1],
@@ -179,7 +190,8 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
     edge_data : dictionary
         edge information, as a dicitonary which stores column names as keys and values
         as column data. This information is read from the edges.txt file.
-    id_lookup : DistLookService object
+    id_lookup : DistLookupService instance
+        this object will be used to retrieve ownership information of nodes
 
     Returns:
     --------
@@ -187,6 +199,9 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
         the input argument, edge_data, is updated with the edge data received by other processes
         in the world.
     """
+
+    # Synchronize at the beginning of this function
+    dist.barrier()
 
     # Prepare data for each rank in the cluster.
     start = timer()
@@ -210,7 +225,6 @@ def exchange_edge_data(rank, world_size, num_parts, edge_data, id_lookup):
                         Total edges: {all_edges} Local_CHUNK_SIZE: {LOCAL_CHUNK_SIZE}"
     )
 
-    # Start sending the chunks to the rest of the processes
     for local_part_id in range(num_parts // world_size):
         local_src_ids = []
         local_dst_ids = []
@@ -390,8 +404,12 @@ def exchange_feature(
 
     tokens = feat_key.split("/")
     assert len(tokens) == 3
-
     local_feat_key = "/".join(tokens[:-1]) + "/" + str(local_part_id)
+
+    logging.info(
+        f"[Rank: {rank} feature: {feat_key}, gid_start - {gid_start} and gid_end - {gid_end}"
+    )
+
     # Get the partition ids for the range of global nids.
     if feat_type == constants.STR_NODE_FEATURES:
         # Retrieve the partition ids for the node features.
@@ -404,6 +422,10 @@ def exchange_feature(
         # Ownership is determined by the destination node.
         assert data is not None
         global_eids = np.arange(gid_start, gid_end, dtype=np.int64)
+        if data[constants.GLOBAL_EID].shape[0] > 0:
+            logging.info(
+                f"[Rank: {rank} disk read global eids - min - {np.amin(data[constants.GLOBAL_EID])}, max - {np.amax(data[constants.GLOBAL_EID])}, count - {data[constants.GLOBAL_EID].shape}"
+            )
 
         # Now use `data` to extract destination nodes' global id
         # and use that to get the ownership
@@ -411,10 +433,47 @@ def exchange_feature(
             data[constants.GLOBAL_EID], global_eids, return_indices=True
         )
         assert common.shape[0] == idx2.shape[0]
+        assert common.shape[0] == global_eids.shape[0]
 
         global_dst_nids = data[constants.GLOBAL_DST_ID][idx1]
         assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
         partid_slice = id_lookup.get_partition_ids(global_dst_nids)
+
+    # determine the shape of the feature-data
+    # this is needed to so that ranks where feature-data is not present
+    # should use the correct shape for sending the padded vector.
+    # exchange length here.
+    feat_dim_len = 0
+    if featdata_key is not None:
+        feat_dim_len = len(featdata_key.shape)
+    all_lens = allgather_sizes(
+        [feat_dim_len], world_size, num_parts, return_sizes=True
+    )
+    if all_lens[0] <= 0:
+        logging.info(
+            f"[Rank: {rank} No process has any feature data to shuffle for {local_feat_key}"
+        )
+        return cur_features, cur_global_ids
+
+    rank0_shape_len = all_lens[0]
+    for idx in range(1, world_size):
+        assert (all_lens[idx] == 0) or (all_lens[idx] == rank0_shape_len), (
+            f"feature: {local_feat_key} shapes does not match "
+            f"at rank - {idx} and rank - 0"
+        )
+
+    # exchange actual data here.
+    if featdata_key != None:
+        feat_dims_dtype = list(featdata_key.shape)
+        feat_dims_dtype.append(DATA_TYPE_ID[featdata_key.dtype])
+    else:
+        feat_dims_dtype = list(np.zeros((rank0_shape_len), dtype=np.int64))
+        feat_dims_dtype.append(DATA_TYPE_ID[torch.float32])
+
+    logging.info(f"Sending the feature shape information - {feat_dims_dtype}")
+    all_dims_dtype = allgather_sizes(
+        feat_dims_dtype, world_size, num_parts, return_sizes=True
+    )
 
     for idx in range(world_size):
         cond = partid_slice == (idx + local_part_id * world_size)
@@ -423,13 +482,24 @@ def exchange_feature(
         local_idx_partid = local_idx[cond]
 
         if gids_per_partid.shape[0] == 0:
-            feats_per_rank.append(torch.empty((0, 1), dtype=torch.float))
-            global_id_per_rank.append(torch.empty((0, 1), dtype=torch.int64))
+            assert len(all_dims_dtype) % world_size == 0
+            dim_len = int(len(all_dims_dtype) / world_size)
+            rank0_shape = tuple(list(np.zeros((dim_len - 1), dtype=np.int32)))
+            rank0_dtype = REV_DATA_TYPE_ID[
+                all_dims_dtype[(dim_len - 1) : (dim_len)][0]
+            ]
+            data = torch.empty(rank0_shape, dtype=rank0_dtype)
+            feats_per_rank.append(data)
+            global_id_per_rank.append(torch.empty((0,), dtype=torch.int64))
         else:
             feats_per_rank.append(featdata_key[local_idx_partid])
             global_id_per_rank.append(
                 torch.from_numpy(gids_per_partid).type(torch.int64)
             )
+    for idx, tt in enumerate(feats_per_rank):
+        logging.info(
+            f"[Rank: {rank} features shape - {tt.shape} and ids - {global_id_per_rank[idx].shape}"
+        )
 
     # features (and global nids) per rank to be sent out are ready
     # for transmission, perform alltoallv here.
@@ -438,6 +508,9 @@ def exchange_feature(
     )
     output_id_list = alltoallv_cpu(
         rank, world_size, global_id_per_rank, retain_nones=False
+    )
+    logging.info(
+        f"[Rank : {rank} feats - {output_feat_list}, ids - {output_id_list}"
     )
     assert len(output_feat_list) == len(output_id_list), (
         "Length of feature list and id list are expected to be equal while "
@@ -576,6 +649,9 @@ def exchange_features(
 
             for local_part_id in range(num_parts // world_size):
                 featdata_key = feature_data[feat_key]
+
+                # Synchronize for each feature
+                dist.barrier()
                 own_features, own_global_ids = exchange_feature(
                     rank,
                     data,
@@ -598,6 +674,8 @@ def exchange_features(
     logging.info(
         f"[Rank: {rank}] Total time for feature exchange: {timedelta(seconds = end - start)}"
     )
+    for k, v in own_features.items():
+        logging.info(f"Rank: {rank}] Key - {k} Value - {v.shape}")
     return own_features, own_global_ids
 
 
@@ -683,6 +761,7 @@ def exchange_graph_data(
         was performed in the `exchange_features` function call
     """
     memory_snapshot("ShuffleNodeFeaturesBegin: ", rank)
+    logging.info(f"[Rank: {rank} - node_feat_tids - {node_feat_tids}")
     rcvd_node_features, rcvd_global_nids = exchange_features(
         rank,
         world_size,
@@ -694,6 +773,7 @@ def exchange_graph_data(
         constants.STR_NODE_FEATURES,
         None,
     )
+    dist.barrier()
     memory_snapshot("ShuffleNodeFeaturesComplete: ", rank)
     logging.info(f"[Rank: {rank}] Done with node features exchange.")
 
@@ -708,16 +788,19 @@ def exchange_graph_data(
         constants.STR_EDGE_FEATURES,
         edge_data,
     )
+    dist.barrier()
     logging.info(f"[Rank: {rank}] Done with edge features exchange.")
 
     node_data = gen_node_data(
         rank, world_size, num_parts, id_lookup, ntid_ntype_map, schema_map
     )
+    dist.barrier()
     memory_snapshot("NodeDataGenerationComplete: ", rank)
 
     edge_data = exchange_edge_data(
         rank, world_size, num_parts, edge_data, id_lookup
     )
+    dist.barrier()
     memory_snapshot("ShuffleEdgeDataComplete: ", rank)
     return (
         node_data,
@@ -729,7 +812,7 @@ def exchange_graph_data(
     )
 
 
-def read_dataset(rank, world_size, id_lookup, params, schema_map):
+def read_dataset(rank, world_size, id_lookup, params, schema_map, ntype_counts):
     """
     This function gets the dataset and performs post-processing on the data which is read from files.
     Additional information(columns) are added to nodes metadata like owner_process, global_nid which
@@ -778,12 +861,11 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map):
         read by the current process. Note that each edge-type may have several edge-features.
     """
     edge_features = {}
-    # node_tids, node_features, edge_datadict, edge_tids
     (
-        node_tids,
         node_features,
         node_feat_tids,
         edge_data,
+        edge_typecounts,
         edge_tids,
         edge_features,
         edge_feat_tids,
@@ -794,25 +876,64 @@ def read_dataset(rank, world_size, id_lookup, params, schema_map):
         world_size,
         params.num_parts,
         schema_map,
+        ntype_counts,
     )
+    # Synchronize so that everybody completes reading dataset from disk
+    dist.barrier()
     logging.info(f"[Rank: {rank}] Done reading dataset {params.input_dir}")
+    dist.barrier()  # SYNCH
 
     edge_data = augment_edge_data(
         edge_data, id_lookup, edge_tids, rank, world_size, params.num_parts
     )
+    dist.barrier()  # SYNCH
     logging.info(
         f"[Rank: {rank}] Done augmenting edge_data: {len(edge_data)}, {edge_data[constants.GLOBAL_SRC_ID].shape}"
     )
 
     return (
-        node_tids,
         node_features,
         node_feat_tids,
         edge_data,
+        edge_typecounts,
         edge_features,
-        edge_tids,
         edge_feat_tids,
     )
+
+
+def reorder_data(num_parts, world_size, data, key):
+    """
+    Auxiliary function used to sort node and edge data for the input graph.
+
+    Parameters:
+    -----------
+    num_parts : int
+        total no. of partitions
+    world_size : int
+        total number of nodes used in this execution
+    data : dictionary
+        which is used to store the node and edge data for the input graph
+    key : string
+        specifies the column which is used to determine the sort order for
+        the remaining columns
+
+    Returns:
+    --------
+    dictionary
+        same as the input dictionary, but with reordered columns (values in
+        the dictionary), as per the np.argsort results on the column specified
+        by the ``key`` column
+    """
+    for local_part_id in range(num_parts // world_size):
+        sorted_idx = data[key + "/" + str(local_part_id)].argsort()
+        for k, v in data.items():
+            tokens = k.split("/")
+            assert len(tokens) == 2
+            if tokens[1] == str(local_part_id):
+                data[k] = v[sorted_idx]
+        sorted_idx = None
+    gc.collect()
+    return data
 
 
 def gen_dist_partitions(rank, world_size, params):
@@ -944,17 +1065,9 @@ def gen_dist_partitions(rank, world_size, params):
         f"[Rank: {rank}] Starting distributed data processing pipeline..."
     )
     memory_snapshot("Pipeline Begin: ", rank)
+
     # init processing
     schema_map = read_json(os.path.join(params.input_dir, params.schema))
-
-    # Initialize distributed lookup service for partition-id and shuffle-global-nids mappings
-    # for global-nids
-    _, global_nid_ranges = get_idranges(
-        schema_map[constants.STR_NODE_TYPE],
-        schema_map[constants.STR_NUM_NODES_PER_CHUNK],
-        params.num_parts,
-    )
-    id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
 
     # The resources, which are node-id to partition-id mappings, are split
     # into `world_size` number of parts, where each part can be mapped to
@@ -962,28 +1075,50 @@ def gen_dist_partitions(rank, world_size, params):
     id_lookup = DistLookupService(
         os.path.join(params.input_dir, params.partitions_dir),
         schema_map[constants.STR_NODE_TYPE],
-        id_map,
         rank,
         world_size,
+        params.num_parts,
     )
 
+    # get the id to name mappings here.
     ntypes_ntypeid_map, ntypes, ntypeid_ntypes_map = get_node_types(schema_map)
     etypes_etypeid_map, etypes, etypeid_etypes_map = get_edge_types(schema_map)
     logging.info(
         f"[Rank: {rank}] Initialized metis partitions and node_types map..."
     )
 
+    # Initialize distributed lookup service for partition-id and shuffle-global-nids mappings
+    # for global-nids
+    _, global_nid_ranges = get_idranges(
+        schema_map[constants.STR_NODE_TYPE],
+        get_ntype_counts_map(
+            schema_map[constants.STR_NODE_TYPE],
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
+        ),
+    )
+    id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
+    id_lookup.set_idMap(id_map)
+
     # read input graph files and augment these datastructures with
     # appropriate information (global_nid and owner process) for node and edge data
     (
-        node_tids,
         node_features,
         node_feat_tids,
         edge_data,
+        edge_typecounts,
         edge_features,
-        edge_tids,
         edge_feat_tids,
-    ) = read_dataset(rank, world_size, id_lookup, params, schema_map)
+    ) = read_dataset(
+        rank,
+        world_size,
+        id_lookup,
+        params,
+        schema_map,
+        get_ntype_counts_map(
+            schema_map[constants.STR_NODE_TYPE],
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
+        ),
+    )
     logging.info(
         f"[Rank: {rank}] Done augmenting file input data with auxilary columns"
     )
@@ -992,8 +1127,19 @@ def gen_dist_partitions(rank, world_size, params):
     # send out node and edge data --- and appropriate features.
     # this function will also stitch the data recvd from other processes
     # and return the aggregated data
-    ntypes_gnid_range_map = get_gnid_range_map(node_tids)
-    etypes_geid_range_map = get_gnid_range_map(edge_tids)
+    # ntypes_gnid_range_map = get_gnid_range_map(node_tids)
+    # etypes_geid_range_map = get_gnid_range_map(edge_tids)
+    ntypes_gnid_range_map = get_gid_offsets(
+        schema_map[constants.STR_NODE_TYPE],
+        get_ntype_counts_map(
+            schema_map[constants.STR_NODE_TYPE],
+            schema_map[constants.STR_NUM_NODES_PER_TYPE],
+        ),
+    )
+    etypes_geid_range_map = get_gid_offsets(
+        schema_map[constants.STR_EDGE_TYPE], edge_typecounts
+    )
+
     (
         node_data,
         rcvd_node_features,
@@ -1022,18 +1168,15 @@ def gen_dist_partitions(rank, world_size, params):
     memory_snapshot("DataShuffleComplete: ", rank)
 
     # sort node_data by ntype
-    for local_part_id in range(params.num_parts // world_size):
-        idx = node_data[constants.NTYPE_ID + "/" + str(local_part_id)].argsort()
-        for k, v in node_data.items():
-            tokens = k.split("/")
-            assert len(tokens) == 2
-            if tokens[1] == str(local_part_id):
-                node_data[k] = v[idx]
-        idx = None
-    gc.collect()
+    node_data = reorder_data(
+        params.num_parts, world_size, node_data, constants.NTYPE_ID
+    )
     logging.info(f"[Rank: {rank}] Sorted node_data by node_type")
+    memory_snapshot("NodeDataSortComplete: ", rank)
 
     # resolve global_ids for nodes
+    # Synchronize before assigning shuffle-global-ids to nodes
+    dist.barrier()
     assign_shuffle_global_nids_nodes(
         rank, world_size, params.num_parts, node_data
     )
@@ -1068,23 +1211,20 @@ def gen_dist_partitions(rank, world_size, params):
                 ][feature_idx]
     memory_snapshot("ReorderNodeFeaturesComplete: ", rank)
 
-    # sort edge_data by etype
-    for local_part_id in range(params.num_parts // world_size):
-        sorted_idx = edge_data[
-            constants.ETYPE_ID + "/" + str(local_part_id)
-        ].argsort()
-        for k, v in edge_data.items():
-            tokens = k.split("/")
-            assert len(tokens) == 2
-            if tokens[1] == str(local_part_id):
-                edge_data[k] = v[sorted_idx]
-        sorted_idx = None
-    gc.collect()
+    # Sort edge_data by etype
+    edge_data = reorder_data(
+        params.num_parts, world_size, edge_data, constants.ETYPE_ID
+    )
+    logging.info(f"[Rank: {rank}] Sorted edge_data by edge_type")
+    memory_snapshot("EdgeDataSortComplete: ", rank)
 
+    # Synchronize before assigning shuffle-global-nids for edges end points.
+    dist.barrier()
     shuffle_global_eid_offsets = assign_shuffle_global_nids_edges(
         rank, world_size, params.num_parts, edge_data
     )
     logging.info(f"[Rank: {rank}] Done assigning global_ids to edges ...")
+
     memory_snapshot("ShuffleGlobalID_Edges_Complete: ", rank)
 
     # Shuffle edge features according to the edge order on each rank.
@@ -1113,6 +1253,8 @@ def gen_dist_partitions(rank, world_size, params):
                 ][feature_idx]
 
     # determine global-ids for edge end-points
+    # Synchronize before retrieving shuffle-global-nids for edges end points.
+    dist.barrier()
     edge_data = lookup_shuffle_global_nids_edges(
         rank, world_size, params.num_parts, edge_data, id_lookup, node_data
     )
@@ -1138,6 +1280,9 @@ def gen_dist_partitions(rank, world_size, params):
         graph_formats = params.graph_formats.split(",")
 
     for local_part_id in range(params.num_parts // world_size):
+        # Synchronize for each local partition of the graph object.
+        dist.barrier()
+
         num_edges = shuffle_global_eid_offsets[local_part_id]
         node_count = len(
             node_data[constants.NTYPE_ID + "/" + str(local_part_id)]
@@ -1161,6 +1306,11 @@ def gen_dist_partitions(rank, world_size, params):
             local_node_data,
             local_edge_data,
             num_edges,
+            get_ntype_counts_map(
+                schema_map[constants.STR_NODE_TYPE],
+                schema_map[constants.STR_NUM_NODES_PER_TYPE],
+            ),
+            edge_typecounts,
             params.save_orig_nids,
             params.save_orig_eids,
         )

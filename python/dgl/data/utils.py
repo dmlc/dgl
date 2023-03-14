@@ -8,6 +8,8 @@ import pickle
 import sys
 import warnings
 
+import networkx.algorithms as A
+
 import numpy as np
 import requests
 
@@ -29,6 +31,8 @@ __all__ = [
     "save_tensors",
     "load_tensors",
     "add_nodepred_split",
+    "add_node_property_split",
+    "mask_nodes_by_property",
 ]
 
 
@@ -482,3 +486,191 @@ def add_nodepred_split(dataset, ratio, ntype=None):
         g.nodes[ntype].data["train_mask"] = train_mask
         g.nodes[ntype].data["val_mask"] = val_mask
         g.nodes[ntype].data["test_mask"] = test_mask
+
+
+def mask_nodes_by_property(property_values, part_ratios, random_seed=None):
+    """Provide the split masks for a node split with distributional shift based on a given
+    node property, as proposed in `Evaluating Robustness and Uncertainty of Graph Models
+    Under Structural Distributional Shifts <https://arxiv.org/abs/2302.13875v1>`__
+
+    It considers the in-distribution (ID) and out-of-distribution (OOD) subsets of nodes.
+    The ID subset includes training, validation and testing parts, while the OOD subset
+    includes validation and testing parts. It sorts the nodes in the ascending order of
+    their property values, splits them into 5 non-intersecting parts, and creates 5
+    associated node mask arrays:
+        - 3 for the ID nodes: ``'in_train_mask'``, ``'in_valid_mask'``, ``'in_test_mask'``,
+        - and 2 for the OOD nodes: ``'out_valid_mask'``, ``'out_test_mask'``.
+
+    Parameters
+    ----------
+    property_values : numpy ndarray
+        The node property (float) values by which the dataset will be split.
+        The length of the array must be equal to the number of nodes in graph.
+    part_ratios : list
+        A list of 5 ratios for training, ID validation, ID test,
+        OOD validation, OOD testing parts. The values in the list must sum to one.
+    random_seed : int, optional
+        Random seed to fix for the initial permutation of nodes. It is
+        used to create a random order for the nodes that have the same
+        property values or belong to the ID subset. (default: None)
+
+    Returns
+    ----------
+    split_masks : dict
+        A python dict storing the mask names as keys and the corresponding
+        node mask arrays as values.
+
+    Examples
+    --------
+    >>> num_nodes = 1000
+    >>> property_values = np.random.uniform(size=num_nodes)
+    >>> part_ratios = [0.3, 0.1, 0.1, 0.3, 0.2]
+    >>> split_masks = dgl.data.utils.mask_nodes_by_property(property_values, part_ratios)
+    >>> print('in_valid_mask' in split_masks)
+    True
+    """
+
+    num_nodes = len(property_values)
+    part_sizes = np.round(num_nodes * np.array(part_ratios)).astype(int)
+    part_sizes[-1] -= np.sum(part_sizes) - num_nodes
+
+    generator = np.random.RandomState(random_seed)
+    permutation = generator.permutation(num_nodes)
+
+    node_indices = np.arange(num_nodes)[permutation]
+    property_values = property_values[permutation]
+    in_distribution_size = np.sum(part_sizes[:3])
+
+    node_indices_ordered = node_indices[np.argsort(property_values)]
+    node_indices_ordered[:in_distribution_size] = generator.permutation(
+        node_indices_ordered[:in_distribution_size]
+    )
+
+    sections = np.cumsum(part_sizes)
+    node_split = np.split(node_indices_ordered, sections)[:-1]
+    mask_names = [
+        "in_train_mask",
+        "in_valid_mask",
+        "in_test_mask",
+        "out_valid_mask",
+        "out_test_mask",
+    ]
+    split_masks = {}
+
+    for mask_name, node_indices in zip(mask_names, node_split):
+        split_mask = idx2mask(node_indices, num_nodes)
+        split_masks[mask_name] = generate_mask_tensor(split_mask)
+
+    return split_masks
+
+
+def add_node_property_split(
+    dataset, part_ratios, property_name, ascending=True, random_seed=None
+):
+    """Create a node split with distributional shift based on a given node property,
+    as proposed in `Evaluating Robustness and Uncertainty of Graph Models Under
+    Structural Distributional Shifts <https://arxiv.org/abs/2302.13875v1>`__
+
+    It splits the nodes of each graph in the given dataset into 5 non-intersecting
+    parts based on their structural properties. This can be used for transductive node
+    prediction task with distributional shifts.
+
+    It considers the in-distribution (ID) and out-of-distribution (OOD) subsets of nodes.
+    The ID subset includes training, validation and testing parts, while the OOD subset
+    includes validation and testing parts. As a result, it creates 5 associated node mask
+    arrays for each graph:
+        - 3 for the ID nodes: ``'in_train_mask'``, ``'in_valid_mask'``, ``'in_test_mask'``,
+        - and 2 for the OOD nodes: ``'out_valid_mask'``, ``'out_test_mask'``.
+
+    This function implements 3 particular strategies for inducing distributional shifts
+    in graph — based on **popularity**, **locality** or **density**.
+
+    Parameters
+    ----------
+    dataset : :class:`~DGLDataset` or list of :class:`~dgl.DGLGraph`
+        The dataset to induce structural distributional shift.
+    part_ratios : list
+        A list of 5 ratio values for training, ID validation, ID test,
+        OOD validation and OOD test parts. The values must sum to 1.0.
+    property_name : str
+        The name of the node property to be used, which must be
+        ``'popularity'``, ``'locality'`` or ``'density'``.
+    ascending : bool, optional
+        Whether to sort nodes in the ascending order of the node property,
+        so that nodes with greater values of the property are considered
+        to be OOD (default: True)
+    random_seed : int, optional
+        Random seed to fix for the initial permutation of nodes. It is
+        used to create a random order for the nodes that have the same
+        property values or belong to the ID subset. (default: None)
+
+    Examples
+    --------
+    >>> dataset = dgl.data.AmazonCoBuyComputerDataset()
+    >>> print('in_valid_mask' in dataset[0].ndata)
+    False
+    >>> part_ratios = [0.3, 0.1, 0.1, 0.3, 0.2]
+    >>> property_name = 'popularity'
+    >>> dgl.data.utils.add_node_property_split(dataset, part_ratios, property_name)
+    >>> print('in_valid_mask' in dataset[0].ndata)
+    True
+    """
+
+    assert property_name in [
+        "popularity",
+        "locality",
+        "density",
+    ], "The name of property has to be 'popularity', 'locality', or 'density'"
+
+    assert len(part_ratios) == 5, "part_ratios must contain 5 values"
+
+    import networkx as nx
+
+    for idx in range(len(dataset)):
+        graph_dgl = dataset[idx]
+        graph_nx = nx.Graph(graph_dgl.to_networkx())
+
+        compute_property_fn = _property_name_to_compute_fn[property_name]
+        property_values = compute_property_fn(graph_nx, ascending)
+
+        node_masks = mask_nodes_by_property(
+            property_values, part_ratios, random_seed
+        )
+
+        for mask_name, node_mask in node_masks.items():
+            graph_dgl.ndata[mask_name] = node_mask
+
+
+def _compute_popularity_property(graph_nx, ascending=True):
+    direction = -1 if ascending else 1
+    property_values = direction * np.array(list(A.pagerank(graph_nx).values()))
+    return property_values
+
+
+def _compute_locality_property(graph_nx, ascending=True):
+    num_nodes = graph_nx.number_of_nodes()
+    pagerank_values = np.array(list(A.pagerank(graph_nx).values()))
+
+    personalization = dict(zip(range(num_nodes), [0.0] * num_nodes))
+    personalization[np.argmax(pagerank_values)] = 1.0
+
+    direction = -1 if ascending else 1
+    property_values = direction * np.array(
+        list(A.pagerank(graph_nx, personalization=personalization).values())
+    )
+    return property_values
+
+
+def _compute_density_property(graph_nx, ascending=True):
+    direction = -1 if ascending else 1
+    property_values = direction * np.array(
+        list(A.clustering(graph_nx).values())
+    )
+    return property_values
+
+
+_property_name_to_compute_fn = {
+    "popularity": _compute_popularity_property,
+    "locality": _compute_locality_property,
+    "density": _compute_density_property,
+}
