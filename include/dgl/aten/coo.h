@@ -141,11 +141,12 @@ struct COOMatrix {
   /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline COOMatrix PinMemory() {
     if (is_pinned) return *this;
-    auto new_coo =  COOMatrix(
+    auto new_coo = COOMatrix(
         num_rows, num_cols, row.PinMemory(), col.PinMemory(),
         aten::IsNullArray(data) ? data : data.PinMemory(), row_sorted,
         col_sorted);
-    CHECK(new_coo.is_pinned) << "The new allocated COOMatrix is not pinned correctly";
+    CHECK(new_coo.is_pinned)
+        << "The new allocated COOMatrix is not pinned correctly";
     return new_coo;
   }
 

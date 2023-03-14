@@ -116,7 +116,8 @@ class DeviceAPI {
    * @param type_hint The type of elements, only neded by certain backends.
    *                  can be useful for cross device endian converison.
    * @param pyt_ctx The context pointer from PyTorch's CachingHostAllocator.
-   * @note This function only works when PyTorch CachingHostAllocator is available
+   * @note This function only works when PyTorch CachingHostAllocator is
+   * available
    */
   virtual void RecordedCopyDataFromTo(
       void* from, size_t from_offset, void* to, size_t to_offset,
@@ -192,8 +193,10 @@ class DeviceAPI {
    * @brief Pin host memory using PyTorch CachingHostAllocator.
    *
    * @param nbytes The size to be pinned.
-   * @param ctx Pointer to the context pointer from PyTorch's CachingHostAllocator.
-   * @param deleter Pointer to the deleter function from  PyTorch's CachingHostAllocator.
+   * @param ctx Pointer to the context pointer from PyTorch's
+   * CachingHostAllocator.
+   * @param deleter Pointer to the deleter function from  PyTorch's
+   * CachingHostAllocator.
    */
   DGL_DLL virtual void* AllocPinnedDataSpace(
       size_t nbytes, void** ctx, void** deleter);
@@ -201,8 +204,10 @@ class DeviceAPI {
   /**
    * @brief 'Deallocate' the pinned memory from PyTorch CachingHostAllocator.
    *
-   * @param deleter Pointer to the deleter function from PyTorch's CachingHostAllocator.
-   * @note In fact, it avoids unnecessary cudaFreeHost calls and puts the memory block into CachingHostAllocator's free list.
+   * @param deleter Pointer to the deleter function from PyTorch's
+   * CachingHostAllocator.
+   * @note In fact, it avoids unnecessary cudaFreeHost calls and puts the memory
+   * block into CachingHostAllocator's free list.
    */
   DGL_DLL virtual void FreePinnedDataSpace(void** deleter);
 
@@ -255,7 +260,6 @@ class DeviceAPI {
    */
   DGL_DLL static DeviceAPI* Get(
       DGLDeviceType dev_type, bool allow_missing = false);
-
 };
 
 /** @brief The device type bigger than this is RPC device */

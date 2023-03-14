@@ -137,7 +137,8 @@ struct CSRMatrix {
     auto new_csr = CSRMatrix(
         num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
         aten::IsNullArray(data) ? data : data.PinMemory(), sorted);
-    CHECK(new_csr.is_pinned) << "The new allocated CSRMatrix is not pinned correctly";
+    CHECK(new_csr.is_pinned)
+        << "The new allocated CSRMatrix is not pinned correctly";
     return new_csr;
   }
 

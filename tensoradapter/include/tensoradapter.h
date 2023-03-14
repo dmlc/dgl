@@ -71,8 +71,10 @@ void RecordStream(void* ptr, cudaStream_t stream, int device_id);
  * PyTorch's CachingHostAllocator.
  *
  * @param nbytes The size to be allocated.
- * @param ctx Pointer to the PyTorch storage ctx ptr returned from the allocator.
- * @param deleter Pointer to the delete function ptr returned from the allocator.
+ * @param ctx Pointer to the PyTorch storage ctx ptr returned from the
+ * allocator.
+ * @param deleter Pointer to the delete function ptr returned from the
+ * allocator.
  * @return Raw pointer to the allocated memory.
  */
 void* CUDARawHostAlloc(size_t nbytes, void** ctx, void** raw_deleter);
@@ -81,13 +83,14 @@ void* CUDARawHostAlloc(size_t nbytes, void** ctx, void** raw_deleter);
  * @brief 'Free' the pinned CPU memory via
  * inserting the memory block back to the free list.
  *
- * @param deleter Pointer to the delete function ptr returned from the allocator.
+ * @param deleter Pointer to the delete function ptr returned from the
+ * allocator.
  */
 void CUDARawHostDelete(void** raw_deleter);
 
 /**
- * @brief 'Record' a CUDA stream (usually from a copy kernel) for the pinned memory
- * via PyTorch's CachingHostAllocator.
+ * @brief 'Record' a CUDA stream (usually from a copy kernel) for the pinned
+ * memory via PyTorch's CachingHostAllocator.
  *
  * @param data Pointer of the tensor to be recorded.
  * @param ctx PyTorch storage ctx ptr returned from the allocator.

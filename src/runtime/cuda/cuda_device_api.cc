@@ -165,10 +165,10 @@ class CUDADeviceAPI final : public DeviceAPI {
         stream);
   }
 
-  // To ensure correct behavior, `record_event` must be invoked anytime a pointer from
-  // PyTorch CachingHostAllocator is used in a cudaMemcpyAsync call.
-  // It provides a way to re-use freed pinned (page-locked) memory allocations
-  // and avoid device sync due to cudaFreeHost calls.
+  // To ensure correct behavior, `record_event` must be invoked anytime a
+  // pointer from PyTorch CachingHostAllocator is used in a cudaMemcpyAsync
+  // call. It provides a way to re-use freed pinned (page-locked) memory
+  // allocations and avoid device sync due to cudaFreeHost calls.
   void RecordedCopyDataFromTo(
       void* from, size_t from_offset, void* to, size_t to_offset, size_t size,
       DGLContext ctx_from, DGLContext ctx_to, DGLDataType type_hint,
@@ -259,14 +259,16 @@ class CUDADeviceAPI final : public DeviceAPI {
     if (nbytes == 0) return nullptr;
     TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
     CHECK(tensor_dispatcher->IsAvailable())
-        << "CachingHostAllocator is not available in the current backend PyTorch. Please update the PyTorch version to 1.11+";
+        << "CachingHostAllocator is not available in the current backend "
+           "PyTorch. Please update the PyTorch version to 1.11+";
     return tensor_dispatcher->CUDAAllocHostWorkspace(nbytes, ctx, deleter);
   }
 
   void FreePinnedDataSpace(void** deleter) override {
     TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
     CHECK(tensor_dispatcher->IsAvailable())
-        << "CachingHostAllocator is not available in the current backend PyTorch. Please update the PyTorch version to 1.11+";
+        << "CachingHostAllocator is not available in the current backend "
+           "PyTorch. Please update the PyTorch version to 1.11+";
     tensor_dispatcher->CUDAFreeHostWorkspace(deleter);
   }
 

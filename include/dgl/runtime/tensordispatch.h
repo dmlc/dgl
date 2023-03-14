@@ -150,11 +150,13 @@ class TensorDispatcher {
   }
 
   /**
-   * @brief Allocate a piece of pinned CPU memory via PyTorch CachingHostAllocator
-   * Used in CUDADeviceAPI::AllocPinnedDataSpace().
+   * @brief Allocate a piece of pinned CPU memory via PyTorch
+   * CachingHostAllocator Used in CUDADeviceAPI::AllocPinnedDataSpace().
    * @param nbytes The size to be allocated.
-   * @param ctx Pointer to the PyTorch storage ctx ptr returned from the allocator.
-   * @param deleter Pointer to the delete function ptr returned from the allocator.
+   * @param ctx Pointer to the PyTorch storage ctx ptr returned from the
+   * allocator.
+   * @param deleter Pointer to the delete function ptr returned from the
+   * allocator.
    * @return Raw pointer to the allocated memory.
    */
   inline void* CUDAAllocHostWorkspace(
@@ -165,11 +167,12 @@ class TensorDispatcher {
   }
 
   /**
-   * @brief Insert the pinned memory block (allocated via PyTorch CachingHostAllocator)
-   * back to the free list (ref:
+   * @brief Insert the pinned memory block (allocated via PyTorch
+   * CachingHostAllocator) back to the free list (ref:
    * pytorch/pytorch/blob/master/aten/src/ATen/cuda/CachingHostAllocator.cpp).
    * Used in CUDADeviceAPI::FreePinnedDataSpace().
-   * @param deleter Pointer to the delete function ptr returned from the allocator.
+   * @param deleter Pointer to the delete function ptr returned from the
+   * allocator.
    */
   inline void CUDAFreeHostWorkspace(void** deleter) {
     auto entry = entrypoints_[Op::kCUDARawHostDelete];
@@ -177,9 +180,11 @@ class TensorDispatcher {
   }
 
   /**
-   * @brief Invoke the record_event function call from PyTorch CachingHostAllocator.
-   * @note This function assoicates a CUDA stream (used by a copy kernel) to the pinned data.
-   * The set of recorded streams is then consumed in the free path of this data (ref:
+   * @brief Invoke the record_event function call from PyTorch
+   * CachingHostAllocator.
+   * @note This function assoicates a CUDA stream (used by a copy kernel) to the
+   * pinned data. The set of recorded streams is then consumed in the free path
+   * of this data (ref:
    * pytorch/pytorch/blob/master/aten/src/ATen/cuda/CachingHostAllocator.cpp).
    * Used in CUDADeviceAPI::RecordedCopyDataFromTo().
    *
@@ -195,7 +200,7 @@ class TensorDispatcher {
     (data, ctx, stream, device_id);
   }
 
- /**
+  /**
    * @brief Release cached pinned memory allocations via cudaHostFree
    * Used in CUDADeviceAPI::PinData() before pinning any host memory by DGL.
    */
