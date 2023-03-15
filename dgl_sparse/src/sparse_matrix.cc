@@ -140,9 +140,7 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(
   if (mat->HasCSR()) {
     return SparseMatrix::FromCSRPointer(mat->CSRPtr(), value, shape);
   }
-  TORCH_CHECK(
-      mat->HasCSC(),
-      "Invalid sparse format for ValLike.")
+  TORCH_CHECK(mat->HasCSC(), "Invalid sparse format for ValLike.")
   return SparseMatrix::FromCSCPointer(mat->CSCPtr(), value, shape);
 }
 
