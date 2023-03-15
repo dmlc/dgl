@@ -3,7 +3,7 @@ import sys
 import backend as F
 import torch
 
-from dgl.sparse import diag, from_coo
+from dgl.sparse import diag, spmatrix
 
 
 def test_neg():
@@ -11,7 +11,7 @@ def test_neg():
     row = torch.tensor([1, 1, 3]).to(ctx)
     col = torch.tensor([1, 2, 3]).to(ctx)
     val = torch.tensor([1.0, 1.0, 2.0]).to(ctx)
-    A = from_coo(row, col, val)
+    A = spmatrix(torch.stack([row, col]), val)
     neg_A = -A
     assert A.shape == neg_A.shape
     assert A.nnz == neg_A.nnz
