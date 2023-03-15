@@ -38,8 +38,8 @@ class SparseMatrix : public torch::CustomClassHolder {
    */
   SparseMatrix(
       const std::shared_ptr<COO>& coo, const std::shared_ptr<CSR>& csr,
-      const std::shared_ptr<CSR>& csc, torch::Tensor value,
-      const std::vector<int64_t>& shape);
+      const std::shared_ptr<CSR>& csc, const std::shared_ptr<Diag>& diag,
+      torch::Tensor value, const std::vector<int64_t>& shape);
 
   /**
    * @brief Construct a SparseMatrix from a COO format.
@@ -75,6 +75,18 @@ class SparseMatrix : public torch::CustomClassHolder {
    */
   static c10::intrusive_ptr<SparseMatrix> FromCSCPointer(
       const std::shared_ptr<CSR>& csc, torch::Tensor value,
+      const std::vector<int64_t>& shape);
+
+  /**
+   * @brief Construct a SparseMatrix from a Diag format.
+   * @param diag The Diag format
+   * @param value Values of the sparse matrix
+   * @param shape Shape of the sparse matrix
+   *
+   * @return SparseMatrix
+   */
+  static c10::intrusive_ptr<SparseMatrix> FromDiagPointer(
+      const std::shared_ptr<Diag>& diag, torch::Tensor value,
       const std::vector<int64_t>& shape);
 
   /**
@@ -116,6 +128,16 @@ class SparseMatrix : public torch::CustomClassHolder {
       const std::vector<int64_t>& shape);
 
   /**
+   * @brief Create a SparseMatrix with Diag format.
+   * @param value Values of the sparse matrix
+   * @param shape Shape of the sparse matrix
+   *
+   * @return SparseMatrix
+   */
+  static c10::intrusive_ptr<SparseMatrix> FromDiag(
+      torch::Tensor value, const std::vector<int64_t>& shape);
+
+  /**
    * @brief Create a SparseMatrix from a SparseMatrix using new values.
    * @param mat An existing sparse matrix
    * @param value New values of the sparse matrix
@@ -142,6 +164,11 @@ class SparseMatrix : public torch::CustomClassHolder {
   std::shared_ptr<CSR> CSRPtr();
   /** @return CSC of the sparse matrix. The CSC is created if not exists. */
   std::shared_ptr<CSR> CSCPtr();
+  /**
+   * @return Diagonal format of the sparse matrix. An error will be raised if
+   * it does not have a diagonal format.
+   */
+  std::shared_ptr<Diag> DiagPtr();
 
   /** @brief Check whether this sparse matrix has COO format. */
   inline bool HasCOO() const { return coo_ != nullptr; }
@@ -149,6 +176,8 @@ class SparseMatrix : public torch::CustomClassHolder {
   inline bool HasCSR() const { return csr_ != nullptr; }
   /** @brief Check whether this sparse matrix has CSC format. */
   inline bool HasCSC() const { return csc_ != nullptr; }
+  /** @brief Check whether this sparse matrix has Diag format. */
+  inline bool HasDiag() const { return diag_ != nullptr; }
 
   /** @return {row, col} tensors in the COO format. */
   std::tuple<torch::Tensor, torch::Tensor> COOTensors();
@@ -191,9 +220,10 @@ class SparseMatrix : public torch::CustomClassHolder {
   /** @brief Create the CSC format for the sparse matrix internally */
   void _CreateCSC();
 
-  // COO/CSC/CSR pointers. Nullptr indicates non-existence.
+  // COO/CSC/CSR/Diag pointers. Nullptr indicates non-existence.
   std::shared_ptr<COO> coo_;
   std::shared_ptr<CSR> csr_, csc_;
+  std::shared_ptr<Diag> diag_;
   // Value of the SparseMatrix
   torch::Tensor value_;
   // Shape of the SparseMatrix
