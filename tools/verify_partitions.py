@@ -104,15 +104,17 @@ def _read_graph(schema):
     # read edge features here.
     for etype in schema[constants.STR_EDGE_TYPE]:
         if etype in schema[constants.STR_EDGE_DATA]:
-            for featname, fdata in schema[constants.STR_EDGE_DATA][etype].items():
+            for featname, fdata in schema[constants.STR_EDGE_DATA][
+                etype
+            ].items():
                 files = fdata[constants.STR_DATA]
                 feats = []
                 for fname in files:
                     feats.append(read_file(fname, constants.STR_NUMPY))
                 if len(feats) > 0:
-                    g.edges[_etype_str_to_tuple(etype)].data[featname] = th.from_numpy(
-                        np.concatenate(feats)
-                    )
+                    g.edges[_etype_str_to_tuple(etype)].data[
+                        featname
+                    ] = th.from_numpy(np.concatenate(feats))
 
     # print from graph
     logging.info(f"|V|= {g.number_of_nodes()}")
