@@ -22,8 +22,8 @@ class Config {
   bool IsLibxsmmAvailable() const;
 
  private:
-  Config() = default;
-  bool libxsmm_ = true;
+  Config();
+  bool libxsmm_;
 };
 
 }  // namespace runtime
