@@ -11,7 +11,7 @@ import torch
 from dgl.data.utils import load_graphs, load_tensors
 from partition_algo.base import load_partition_meta
 
-from utils import create_chunked_dataset
+from pytest_utils import create_chunked_dataset
 
 """
 TODO: skipping this test case since the dependency, mpirun, is

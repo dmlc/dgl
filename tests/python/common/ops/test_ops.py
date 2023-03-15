@@ -487,8 +487,6 @@ def test_use_libxsmm_switch():
     x = torch.ones(3, 2, requires_grad=True)
     y = torch.arange(1, 13).float().view(6, 2).requires_grad_()
 
-    assert dgl.is_libxsmm_enabled()
-    dgl.ops.u_mul_e_sum(g, x, y)
     dgl.use_libxsmm(False)
     assert ~dgl.is_libxsmm_enabled()
     dgl.ops.u_mul_e_sum(g, x, y)

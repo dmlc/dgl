@@ -1,7 +1,9 @@
 """DGL elementwise operators for sparse matrix module."""
+from typing import Union
+
 import torch
 
-from .sparse_matrix import SparseMatrix, val_like
+from .sparse_matrix import diag, SparseMatrix, val_like
 from .utils import is_scalar, Scalar
 
 
@@ -78,15 +80,17 @@ def sp_sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     return spsp_add(A, -B) if isinstance(B, SparseMatrix) else NotImplemented
 
 
-def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
-
+def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     """Elementwise multiplication
+
+    If :attr:`B` is a sparse matrix, both :attr:`A` and :attr:`B` must be
+    diagonal matrices.
 
     Parameters
     ----------
     A : SparseMatrix
         First operand
-    B : Scalar
+    B : SparseMatrix or Scalar
         Second operand
 
     Returns
@@ -115,6 +119,12 @@ def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     """
     if is_scalar(B):
         return val_like(A, A.val * B)
+    if A.is_diag() and B.is_diag():
+        assert A.shape == B.shape, (
+            f"The shape of diagonal matrix A {A.shape} and B {B.shape} must"
+            f"match for elementwise multiplication."
+        )
+        return diag(A.val * B.val, A.shape)
     # Python falls back to B.__rmul__(A) then TypeError when NotImplemented is
     # returned.
     # So this also handles the case of scalar * SparseMatrix since we set
@@ -122,14 +132,17 @@ def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     return NotImplemented
 
 
-def sp_div(A: SparseMatrix, B: Scalar) -> SparseMatrix:
+def sp_div(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     """Elementwise division
+
+    If :attr:`B` is a sparse matrix, both :attr:`A` and :attr:`B` must be
+    diagonal matrices.
 
     Parameters
     ----------
     A : SparseMatrix
         First operand
-    B : Scalar
+    B : SparseMatrix or Scalar
         Second operand
 
     Returns
@@ -150,6 +163,12 @@ def sp_div(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     """
     if is_scalar(B):
         return val_like(A, A.val / B)
+    if A.is_diag() and B.is_diag():
+        assert A.shape == B.shape, (
+            f"The shape of diagonal matrix A {A.shape} and B {B.shape} must"
+            f"match for elementwise division."
+        )
+        return diag(A.val / B.val, A.shape)
     # Python falls back to B.__rtruediv__(A) then TypeError when NotImplemented
     # is returned.
     return NotImplemented
