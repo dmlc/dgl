@@ -475,6 +475,10 @@ class SparseMatrix:
         """
         return self.c_sparse_matrix.has_duplicate()
 
+    def is_diag(self):
+        """Returns whether the sparse matrix is a diagonal matrix."""
+        return self.c_sparse_matrix.is_diag()
+
 
 def spmatrix(
     indices: torch.Tensor,
@@ -857,6 +861,144 @@ def val_like(mat: SparseMatrix, val: torch.Tensor) -> SparseMatrix:
     ), "The values of a SparseMatrix can only be scalars or vectors."
 
     return SparseMatrix(torch.ops.dgl_sparse.val_like(mat.c_sparse_matrix, val))
+
+
+def diag(
+    val: torch.Tensor, shape: Optional[Tuple[int, int]] = None
+) -> SparseMatrix:
+    """Creates a sparse matrix based on the diagonal values.
+
+    Parameters
+    ----------
+    val : torch.Tensor
+        Diagonal of the matrix, in shape ``(N)`` or ``(N, D)``
+    shape : tuple[int, int], optional
+        If specified, :attr:`len(val)` must be equal to :attr:`min(shape)`,
+        otherwise, it will be inferred from :attr:`val`, i.e., ``(N, N)``
+
+    Returns
+    -------
+    SparseMatrix
+        Sparse matrix
+
+    Examples
+    --------
+
+    Case1: 5-by-5 diagonal matrix with scaler values on the diagonal
+
+    >>> import torch
+    >>> val = torch.ones(5)
+    >>> dglsp.diag(val)
+    SparseMatrix(indices=tensor([[0, 1, 2, 3, 4],
+                                 [0, 1, 2, 3, 4]]),
+                 values=tensor([1., 1., 1., 1., 1.]),
+                 shape=(5, 5), nnz=5)
+
+    Case2: 5-by-10 diagonal matrix with scaler values on the diagonal
+
+    >>> val = torch.ones(5)
+    >>> dglsp.diag(val, shape=(5, 10))
+    SparseMatrix(indices=tensor([[0, 1, 2, 3, 4],
+                                 [0, 1, 2, 3, 4]]),
+                 values=tensor([1., 1., 1., 1., 1.]),
+                 shape=(5, 10), nnz=5)
+
+    Case3: 5-by-5 diagonal matrix with vector values on the diagonal
+
+    >>> val = torch.randn(5, 3)
+    >>> D = dglsp.diag(val)
+    >>> D.shape
+    (5, 5)
+    >>> D.nnz
+    5
+    """
+    assert (
+        val.dim() <= 2
+    ), "The values of a DiagMatrix can only be scalars or vectors."
+    len_val = len(val)
+    if shape is not None:
+        assert len_val == min(shape), (
+            f"Expect len(val) to be min(shape) for a diagonal matrix, got"
+            f"{len_val} for len(val) and {shape} for shape."
+        )
+    else:
+        shape = (len_val, len_val)
+    return SparseMatrix(torch.ops.dgl_sparse.from_diag(val, shape))
+
+
+def identity(
+    shape: Tuple[int, int],
+    d: Optional[int] = None,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> SparseMatrix:
+    r"""Creates a sparse matrix with ones on the diagonal and zeros elsewhere.
+
+    Parameters
+    ----------
+    shape : tuple[int, int]
+        Shape of the matrix.
+    d : int, optional
+        If None, the diagonal entries will be scaler 1. Otherwise, the diagonal
+        entries will be a 1-valued tensor of shape ``(d)``.
+    dtype : torch.dtype, optional
+        The data type of the matrix
+    device : torch.device, optional
+        The device of the matrix
+
+    Returns
+    -------
+    SparseMatrix
+        Sparse matrix
+
+    Examples
+    --------
+
+    Case1: 3-by-3 matrix with scaler diagonal values
+
+    .. code::
+
+        [[1, 0, 0],
+         [0, 1, 0],
+         [0, 0, 1]]
+
+    >>> dglsp.identity(shape=(3, 3))
+    SparseMatrix(indices=tensor([[0, 1, 2],
+                                 [0, 1, 2]]),
+                 values=tensor([1., 1., 1.]),
+                 shape=(3, 3), nnz=3)
+
+    Case2: 3-by-5 matrix with scaler diagonal values
+
+    .. code::
+
+        [[1, 0, 0, 0, 0],
+         [0, 1, 0, 0, 0],
+         [0, 0, 1, 0, 0]]
+
+    >>> dglsp.identity(shape=(3, 5))
+    SparseMatrix(indices=tensor([[0, 1, 2],
+                                 [0, 1, 2]]),
+                 values=tensor([1., 1., 1.]),
+                 shape=(3, 5), nnz=3)
+
+    Case3: 3-by-3 matrix with vector diagonal values
+
+    >>> dglsp.identity(shape=(3, 3), d=2)
+    SparseMatrix(indices=tensor([[0, 1, 2],
+                                 [0, 1, 2]]),
+                 values=tensor([[1., 1.],
+                                [1., 1.],
+                                [1., 1.]]),
+                 shape=(3, 3), nnz=3, val_size=(2,))
+    """
+    len_val = min(shape)
+    if d is None:
+        val_shape = (len_val,)
+    else:
+        val_shape = (len_val, d)
+    val = torch.ones(val_shape, dtype=dtype, device=device)
+    return diag(val, shape)
 
 
 def from_torch_sparse(torch_sparse_tensor: torch.Tensor) -> SparseMatrix:
