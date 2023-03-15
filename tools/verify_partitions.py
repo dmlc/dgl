@@ -162,7 +162,9 @@ def _read_part_graphs(part_config, part_metafile):
     return part_graph_data
 
 
-def validate_results(part_graph_dir, orig_dataset_dir, partitions_dir, log_level="INFO"):
+def validate_results(
+    part_graph_dir, orig_dataset_dir, partitions_dir, log_level="INFO"
+):
     """Main function to verify the graph partitions
 
     Parameters:
@@ -255,6 +257,9 @@ if __name__ == "__main__":
         format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
     )
 
-    validate_results(params.part_graph_dir, params.orig_dataset_dir, params.partitions_dir, params.log_level.upper())
-
-
+    validate_results(
+        params.part_graph_dir,
+        params.orig_dataset_dir,
+        params.partitions_dir,
+        params.log_level.upper(),
+    )
