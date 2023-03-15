@@ -1,5 +1,4 @@
 #if !defined(_WIN32)
-#ifdef USE_AVX
 #include <../src/array/cpu/spmm.h>
 #include <dgl/array.h>
 #include <gtest/gtest.h>
@@ -75,27 +74,13 @@ void Div(T* exp, T* out, T* lhs, T* rhs, int dim) {
 }
 
 template <class T>
-void CheckResult(T* exp, T* out, T* out_intel_kernel, int dim) {
+void CheckResult(T* exp, T* out, int dim) {
   for (int i = 0; i < dim; i++) {
     ASSERT_TRUE(exp[i] == out[i]);
-    if (out_intel_kernel != nullptr) {
-      ASSERT_TRUE(out[i] == out_intel_kernel[i]);
-    }
   }
 }
 
 }  // namespace
-
-template <class ElemWiseUpd>
-ElemWiseUpd* generic_ElemWiseUpd() {
-  static std::unique_ptr<ElemWiseUpd> asm_kernel_ptr(
-      (dgl::IntelKernel<>::IsEnabled()) ? new ElemWiseUpd() : nullptr);
-  ElemWiseUpd* cpu_spec = (asm_kernel_ptr && asm_kernel_ptr->applicable())
-                              ? asm_kernel_ptr.get()
-                              : nullptr;
-
-  return cpu_spec;
-}
 
 template <typename IDX>
 void _TestSpmmCopyLhs() {
@@ -113,18 +98,7 @@ void _TestSpmmCopyLhs() {
       out[k] += ns_op::CopyLhs<IDX>::Call(lhs + k, nullptr);
     }
 
-    // Calculation of output using intel path - 'out_intel_kernel'
-    auto* cpu_spec =
-        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::CopyLhs<IDX>>>();
-    if (cpu_spec) {
-      IDX out_intel_kernel[dim];
-      GenerateZeroData(out_intel_kernel, dim);
-      cpu_spec->run(out_intel_kernel, lhs, nullptr, dim);
-      CheckResult(exp, out, out_intel_kernel, dim);
-    } else {
-      IDX* out_intel_kernel = nullptr;
-      CheckResult(exp, out, out_intel_kernel, dim);
-    }
+    CheckResult(exp, out, dim);
   }
 }
 
@@ -149,18 +123,7 @@ void _TestSpmmCopyRhs() {
       out[k] += ns_op::CopyRhs<IDX>::Call(nullptr, rhs + k);
     }
 
-    // Calculation of output using intel path - 'out_intel_kernel'
-    auto* cpu_spec =
-        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::CopyRhs<IDX>>>();
-    if (cpu_spec) {
-      IDX out_intel_kernel[dim];
-      GenerateZeroData(out_intel_kernel, dim);
-      cpu_spec->run(out_intel_kernel, nullptr, rhs, dim);
-      CheckResult(exp, out, out_intel_kernel, dim);
-    } else {
-      IDX* out_intel_kernel = nullptr;
-      CheckResult(exp, out, out_intel_kernel, dim);
-    }
+    CheckResult(exp, out, dim);
   }
 }
 
@@ -186,18 +149,7 @@ void _TestSpmmAdd() {
       out[k] += ns_op::Add<IDX>::Call(lhs + k, rhs + k);
     }
 
-    // Calculation of output using intel path - 'out_intel_kernel'
-    auto* cpu_spec =
-        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Add<IDX>>>();
-    if (cpu_spec) {
-      IDX out_intel_kernel[dim];
-      GenerateZeroData(out_intel_kernel, dim);
-      cpu_spec->run(out_intel_kernel, lhs, rhs, dim);
-      CheckResult(exp, out, out_intel_kernel, dim);
-    } else {
-      IDX* out_intel_kernel = nullptr;
-      CheckResult(exp, out, out_intel_kernel, dim);
-    }
+    CheckResult(exp, out, dim);
   }
 }
 
@@ -223,18 +175,7 @@ void _TestSpmmSub() {
       out[k] += ns_op::Sub<IDX>::Call(lhs + k, rhs + k);
     }
 
-    // Calculation of output using intel path - 'out_intel_kernel'
-    auto* cpu_spec =
-        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Sub<IDX>>>();
-    if (cpu_spec) {
-      IDX out_intel_kernel[dim];
-      GenerateZeroData(out_intel_kernel, dim);
-      cpu_spec->run(out_intel_kernel, lhs, rhs, dim);
-      CheckResult(exp, out, out_intel_kernel, dim);
-    } else {
-      IDX* out_intel_kernel = nullptr;
-      CheckResult(exp, out, out_intel_kernel, dim);
-    }
+    CheckResult(exp, out, dim);
   }
 }
 
@@ -260,18 +201,7 @@ void _TestSpmmMul() {
       out[k] += ns_op::Mul<IDX>::Call(lhs + k, rhs + k);
     }
 
-    // Calculation of output using intel path - 'out_intel_kernel'
-    auto* cpu_spec =
-        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Mul<IDX>>>();
-    if (cpu_spec) {
-      IDX out_intel_kernel[dim];
-      GenerateZeroData(out_intel_kernel, dim);
-      cpu_spec->run(out_intel_kernel, lhs, rhs, dim);
-      CheckResult(exp, out, out_intel_kernel, dim);
-    } else {
-      IDX* out_intel_kernel = nullptr;
-      CheckResult(exp, out, out_intel_kernel, dim);
-    }
+    CheckResult(exp, out, dim);
   }
 }
 
@@ -297,18 +227,7 @@ void _TestSpmmDiv() {
       out[k] += ns_op::Div<IDX>::Call(lhs + k, rhs + k);
     }
 
-    // Calculation of output using intel path - 'out_intel_kernel'
-    auto* cpu_spec =
-        generic_ElemWiseUpd<dgl::ElemWiseAddUpdate<ns_op::Div<IDX>>>();
-    if (cpu_spec) {
-      IDX out_intel_kernel[dim];
-      GenerateZeroData(out_intel_kernel, dim);
-      cpu_spec->run(out_intel_kernel, lhs, rhs, dim);
-      CheckResult(exp, out, out_intel_kernel, dim);
-    } else {
-      IDX* out_intel_kernel = nullptr;
-      CheckResult(exp, out, out_intel_kernel, dim);
-    }
+    CheckResult(exp, out, dim);
   }
 }
 
@@ -316,5 +235,4 @@ TEST(SpmmTest, TestSpmmDiv) {
   _TestSpmmDiv<float>();
   _TestSpmmDiv<double>();
 }
-#endif  // USE_AVX
 #endif  // _WIN32
