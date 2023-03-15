@@ -162,29 +162,41 @@ def _read_part_graphs(part_config, part_metafile):
     return part_graph_data
 
 
-def _validate_results(params):
+def validate_results(part_graph_dir, orig_dataset_dir, partitions_dir, log_level="INFO"):
     """Main function to verify the graph partitions
 
     Parameters:
     -----------
-    params : argparser object
-        to access the command line arguments
+    part_graph_dir : string
+        location where partitioned graph objects are stored
+    orig_dataset_dir : string
+        location where input dataset is stored
+    partitions_dir : string
+        location where node partitons files are stored
+    log_level : string [optional]
+        specify the logging level for debugging purposes
     """
+    numeric_level = getattr(logging, log_level, None)
+    logging.basicConfig(
+        level=numeric_level,
+        format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
+    )
+
     logging.info(f"loading config files...")
-    part_config = os.path.join(params.part_graph_dir, "metadata.json")
+    part_config = os.path.join(part_graph_dir, "metadata.json")
     part_schema = read_json(part_config)
     num_parts = part_schema["num_parts"]
 
     logging.info(f"loading config files of the original dataset...")
-    graph_config = os.path.join(params.orig_dataset_dir, "metadata.json")
+    graph_config = os.path.join(orig_dataset_dir, "metadata.json")
     graph_schema = read_json(graph_config)
 
     logging.info(f"loading original ids from the dgl files...")
-    orig_nids = read_orig_ids(params.part_graph_dir, "orig_nids.dgl", num_parts)
-    orig_eids = read_orig_ids(params.part_graph_dir, "orig_eids.dgl", num_parts)
+    orig_nids = read_orig_ids(part_graph_dir, "orig_nids.dgl", num_parts)
+    orig_eids = read_orig_ids(part_graph_dir, "orig_eids.dgl", num_parts)
 
     logging.info(f"loading node to partition-ids from files... ")
-    node_partids = get_node_partids(params.partitions_dir, graph_schema)
+    node_partids = get_node_partids(partitions_dir, graph_schema)
 
     logging.info(f"loading the original dataset...")
     g = _read_graph(graph_schema)
@@ -243,4 +255,6 @@ if __name__ == "__main__":
         format=f"[{platform.node()} %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
     )
 
-    _validate_results(params)
+    validate_results(params.part_graph_dir, params.orig_dataset_dir, params.partitions_dir, params.log_level.upper())
+
+

@@ -26,6 +26,7 @@ from tools.verification_utils import (
     verify_partition_data_types,
     verify_partition_formats,
 )
+from tools.verify_partitions import validate_results
 
 
 def _test_chunk_graph(
@@ -267,11 +268,7 @@ def _test_pipeline(
 
         # check if verify_partitions.py is used for validation.
         if use_verify_partitions:
-            cmd = "python3 tools/verify_partitions.py "
-            cmd += f" --orig-dataset-dir {in_dir}"
-            cmd += f" --part-graph {out_dir}"
-            cmd += f" --partitions-dir {output_dir}"
-            os.system(cmd)
+            validate_results(out_dir, in_dir, partition_dir)
             return
 
         # read original node/edge IDs
