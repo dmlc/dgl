@@ -1,6 +1,7 @@
 import json
 import os
 
+import array_readwriter
 import constants
 
 import dgl
@@ -21,7 +22,7 @@ from dgl.distributed.partition import (
 from distpartitioning.utils import get_idranges
 
 
-def read_file(fname, ftype):
+def read_file(fname, ftype, delimiter=" "):
     """Read a file from disk
     Parameters:
     -----------
@@ -36,9 +37,9 @@ def read_file(fname, ftype):
         file contents are returned as numpy array
     """
     reader_fmt_meta = {"name": ftype}
-    array_readwriter.get_array_parser(**reader_fmt_meta).read(fname)
-
-    return data
+    if ftype == constants.STR_CSV:
+        reader_fmt_meta["delimiter"] = delimiter
+    return array_readwriter.get_array_parser(**reader_fmt_meta).read(fname)
 
 
 def verify_partition_data_types(part_g):
