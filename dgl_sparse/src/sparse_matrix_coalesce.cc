@@ -23,6 +23,9 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Coalesce() {
 
 bool SparseMatrix::HasDuplicate() {
   aten::CSRMatrix dgl_csr;
+  if (HasDiag()) {
+    return false;
+  }
   // The format for calculation will be chosen in the following order: CSR,
   // CSC. CSR is created if the sparse matrix only has CSC format.
   if (HasCSR() || !HasCSC()) {
