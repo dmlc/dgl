@@ -35,7 +35,7 @@ from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback, EarlyStopping
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
-from model import SAGE, RGAT
+from model import SAGE, RGAT, GATv2
 
 from ladies_sampler import LadiesSampler, PoissonLadiesSampler, normalized_edata
 
@@ -52,22 +52,27 @@ class SAGELightning(LightningModule):
                  n_hidden,
                  n_classes,
                  n_layers,
+                 model,
                  activation,
                  dropout,
                  lr,
                  multilabel):
         super().__init__()
         self.save_hyperparameters()
-        self.module = SAGE(in_feats, n_hidden, n_classes, n_layers, activation, dropout) if in_feats != 768 else RGAT(
-            in_feats,
-            n_classes,
-            n_hidden,
-            5,
-            n_layers,
-            4,
-            args.dropout,
-            "paper",
-        )
+        if model in ['sage']:
+            self.module = SAGE(in_feats, n_hidden, n_classes, n_layers, activation, dropout) if in_feats != 768 else RGAT(
+                in_feats,
+                n_classes,
+                n_hidden,
+                5,
+                n_layers,
+                4,
+                args.dropout,
+                "paper",
+            )
+        else:
+            heads = ([8] * n_layers) + [1]
+            self.module = GATv2(n_layers, in_feats, n_hidden, n_classes, heads, activation, dropout, dropout, 0.2, True)
         self.lr = lr
         f1score_class = MulticlassF1Score if not multilabel else MultilabelF1Score
         self.train_acc = f1score_class(n_classes, average='micro')
@@ -170,7 +175,9 @@ class DataModule(LightningDataModule):
         else:
             sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
         full_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
-        unbiased_sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
+        unbiased_sampler = sampler
+        # full_sampler = dgl.dataloading.LaborSampler([30] * len(fanouts), prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
+        # unbiased_sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
 
         dataloader_device = th.device('cpu')
         g = g.formats(['csc'])
@@ -307,6 +314,7 @@ if __name__ == '__main__':
                                 "on GPU when using it to save time for data copy. This may "
                                 "be undesired if they cannot fit in GPU memory at once. "
                                 "This flag disables that.")
+    argparser.add_argument('--model', type=str, default='sage')
     argparser.add_argument('--sampler', type=str, default='labor')
     argparser.add_argument('--importance-sampling', type=int, default=0)
     argparser.add_argument('--layer-dependency', action='store_true')
@@ -331,7 +339,7 @@ if __name__ == '__main__':
         [int(_) for _ in args.fan_out.split(',')], [int(_) for _ in args.lad_out.split(',')],
         device, args.batch_size // args.independent_batches, args.num_workers, args.sampler, args.importance_sampling, args.layer_dependency, args.batch_dependency, args.cache_size)
     model = SAGELightning(
-        datamodule.in_feats, args.num_hidden, datamodule.n_classes, args.num_layers,
+        datamodule.in_feats, args.num_hidden, datamodule.n_classes, args.num_layers, args.model,
         F.relu, args.dropout, args.lr, datamodule.multilabel)
 
     # Train

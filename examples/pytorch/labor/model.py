@@ -3,10 +3,86 @@ import sklearn.metrics as skm
 import torch as th
 import torch.functional as F
 import torch.nn as nn
-import tqdm
 
 import dgl
 import dgl.nn as dglnn
+
+from dgl.nn import GATv2Conv
+
+class GATv2(nn.Module):
+    def __init__(
+        self,
+        num_layers,
+        in_dim,
+        num_hidden,
+        num_classes,
+        heads,
+        activation,
+        feat_drop,
+        attn_drop,
+        negative_slope,
+        residual,
+    ):
+        super(GATv2, self).__init__()
+        self.num_layers = num_layers
+        self.gatv2_layers = nn.ModuleList()
+        self.activation = activation
+        # input projection (no residual)
+        self.gatv2_layers.append(
+            GATv2Conv(
+                in_dim,
+                num_hidden,
+                heads[0],
+                feat_drop,
+                attn_drop,
+                negative_slope,
+                False,
+                self.activation,
+                True,
+                bias=False,
+                share_weights=True,
+            )
+        )
+        # hidden layers
+        for l in range(1, num_layers - 1):
+            # due to multi-head, the in_dim = num_hidden * num_heads
+            self.gatv2_layers.append(
+                GATv2Conv(
+                    num_hidden * heads[l - 1],
+                    num_hidden,
+                    heads[l],
+                    feat_drop,
+                    attn_drop,
+                    negative_slope,
+                    residual,
+                    self.activation,
+                    True,
+                    bias=False,
+                    share_weights=True,
+                )
+            )
+        # output projection
+        self.gatv2_layers.append(
+            GATv2Conv(
+                num_hidden * heads[-2],
+                num_classes,
+                heads[-1],
+                feat_drop,
+                attn_drop,
+                negative_slope,
+                residual,
+                None,
+                True,
+                bias=False,
+                share_weights=True,
+            )
+        )
+
+    def forward(self, mfgs, h):
+        for l, mfg in enumerate(mfgs):
+            h = self.gatv2_layers[l](mfg, h)
+            h = h.flatten(1) if l < self.num_layers - 1 else h.mean(1)
+        return h
 
 class SAGE(nn.Module):
     def __init__(
@@ -107,8 +183,6 @@ class RGAT(nn.Module):
         for i in range(len(mfgs)):
             mfg = mfgs[i]
             x_dst = x[mfg.dst_in_src]
-            n_src = mfg.num_src_nodes()
-            n_dst = mfg.num_dst_nodes()
             for data in [mfg.srcdata, mfg.dstdata]:
                 for k in list(data.keys()):
                     if k not in ['features', 'labels']:
