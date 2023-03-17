@@ -4,6 +4,7 @@ from typing import Union
 
 from .sparse_matrix import SparseMatrix
 from .utils import Scalar
+from .elementwise_op_sp import *
 
 __all__ = ["add", "sub", "mul", "div", "power"]
 
@@ -35,7 +36,7 @@ def add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
                  values=tensor([1, 20, 10,  2, 33]),
                  shape=(3, 3), nnz=5)
     """
-    return A + B
+    return sp_add(A, B)
 
 
 def sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
@@ -65,7 +66,7 @@ def sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
                  values=tensor([-1, 20, 10, -2, 27]),
                  shape=(3, 3), nnz=5)
     """
-    return A - B
+    return sp_sub(A, B)
 
 
 def mul(
@@ -114,7 +115,7 @@ def mul(
                  values=tensor([1, 4, 9]),
                  shape=(3, 3), nnz=3)
     """
-    return A * B
+    return sp_mul(A, B)
 
 
 def div(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
@@ -161,7 +162,7 @@ def div(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
                  values=tensor([0.5000, 1.0000, 1.5000]),
                  shape=(3, 4), nnz=3)
     """
-    return A / B
+    return sp_div(A, B)
 
 
 def power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
@@ -198,4 +199,4 @@ def power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
                  values=tensor([1, 4, 9]),
                  shape=(3, 3), nnz=3)
     """
-    return A**scalar
+    return sp_power(A, scalar)

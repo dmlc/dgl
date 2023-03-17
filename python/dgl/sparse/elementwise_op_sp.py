@@ -7,7 +7,7 @@ from .sparse_matrix import diag, SparseMatrix, val_like
 from .utils import is_scalar, Scalar
 
 
-def spsp_add(A, B):
+def spsp_add(A: SparseMatrix, B: SparseMatrix):
     """Invoke C++ sparse library for addition"""
     return SparseMatrix(
         torch.ops.dgl_sparse.spsp_add(A.c_sparse_matrix, B.c_sparse_matrix)
