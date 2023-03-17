@@ -345,6 +345,28 @@ def test_csr_to_csc(dense_dim, indptr, indices, shape):
     assert torch.allclose(mat_indices, indices)
 
 
+@pytest.mark.parametrize("shape", [(3, 5), (5, 5), (5, 4)])
+def test_diag_conversions(shape):
+    n_rows, n_cols = shape
+    nnz = min(shape)
+    ctx = F.ctx()
+    val = torch.randn(nnz).to(ctx)
+    D = diag(val, shape)
+    row, col = D.coo()
+    assert torch.allclose(row, torch.arange(nnz).to(ctx))
+    assert torch.allclose(col, torch.arange(nnz).to(ctx))
+
+    indptr, indices, _ = D.csr()
+    exp_indptr = list(range(0, nnz + 1)) + [nnz] * (n_rows - nnz)
+    assert torch.allclose(indptr, torch.tensor(exp_indptr).to(ctx))
+    assert torch.allclose(indices, torch.arange(nnz).to(ctx))
+
+    indptr, indices, _ = D.csc()
+    exp_indptr = list(range(0, nnz + 1)) + [nnz] * (n_cols - nnz)
+    assert torch.allclose(indptr, torch.tensor(exp_indptr).to(ctx))
+    assert torch.allclose(indices, torch.arange(nnz).to(ctx))
+
+
 @pytest.mark.parametrize("val_shape", [(3), (3, 2)])
 @pytest.mark.parametrize("shape", [(3, 5), (5, 5)])
 def test_val_like(val_shape, shape):
