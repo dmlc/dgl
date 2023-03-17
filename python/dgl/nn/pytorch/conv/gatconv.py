@@ -210,7 +210,7 @@ class GATConv(nn.Module):
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
-        if hasattr(self, 'bias'):
+        if hasattr(self, "bias"):
             nn.init.constant_(self.bias, 0)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
@@ -342,7 +342,7 @@ class GATConv(nn.Module):
                 )
                 rst = rst + resval
             # bias
-            if hasattr(self, 'bias'):
+            if hasattr(self, "bias"):
                 rst = rst + self.bias.view(
                     *((1,) * len(dst_prefix_shape)),
                     self._num_heads,
