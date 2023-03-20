@@ -256,7 +256,7 @@ void SegmentMMBackwardB(
   int64_t A_offset = 0, dC_offset = 0, dB_offset = 0;
   int64_t m, n, k;
   int64_t num_rel = seglen.NumElements();
-  DType alpha = 1., beta = 1.;
+  DType alpha = 1., beta = 0.;
 
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   if (!thr_entry->cublas_handle)
