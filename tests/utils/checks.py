@@ -76,7 +76,7 @@ def assert_is_identical_hetero(g, g2, ignore_internal_data=False):
 
 
 def check_graph_equal(g1, g2, *, check_idtype=True, check_feature=True):
-    assert g1.device == g1.device
+    assert g1.device == g2.device
     if check_idtype:
         assert g1.idtype == g2.idtype
     assert g1.ntypes == g2.ntypes
