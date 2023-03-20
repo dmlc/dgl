@@ -18,7 +18,7 @@ if [ "$1" != "cugraph" ]; then
     CMAKE_VARS="$CMAKE_VARS -DBUILD_TORCH=ON -DTORCH_PYTHON_INTERPS=/opt/conda/envs/pytorch-ci/bin/python"
 else
     # Disable sparse build as cugraph docker image lacks cuDNN.
-    CMAKE_VARS="$CMAKE_VARS -DBUILD_SPARSE=OFF"
+    CMAKE_VARS="$CMAKE_VARS -DBUILD_TORCH=OFF -DBUILD_SPARSE=OFF"
 fi
 
 if [[ $1 != "cpu" ]]; then
