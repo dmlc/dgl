@@ -10,12 +10,15 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-import pytests_utils
 import scipy.sparse as ssp
 from dgl import DGLError
-from pytests_utils import get_cases, parametrize_idtype
 from scipy.sparse import rand
-from utils import assert_is_identical_hetero
+from utils import (
+    assert_is_identical_hetero,
+    check_graph_equal,
+    get_cases,
+    parametrize_idtype,
+)
 
 
 def create_test_heterograph(idtype):
@@ -2419,7 +2422,7 @@ def test_dtype_cast(idtype):
     else:
         g_cast = g.int()
         assert g_cast.idtype == F.int32
-    pytests_utils.check_graph_equal(g, g_cast, check_idtype=False)
+    check_graph_equal(g, g_cast, check_idtype=False)
 
 
 def test_float_cast():
