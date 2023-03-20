@@ -55,6 +55,7 @@ from .utils import *
 from .cluster import CLUSTERDataset
 from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
+from .wiki_network import ChameleonDataset
 from .yelp import YelpDataset
 
 

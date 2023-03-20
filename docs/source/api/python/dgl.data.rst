@@ -56,6 +56,7 @@ Datasets for node classification/regression tasks
     YelpDataset
     PATTERNDataset
     CLUSTERDataset
+    ChameleonDataset
 
 Edge Prediction Datasets
 ---------------------------------------
