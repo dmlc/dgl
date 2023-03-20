@@ -21,12 +21,6 @@ else
     CMAKE_VARS="$CMAKE_VARS -DBUILD_SPARSE=OFF"
 fi
 
-#This is implemented to detect underlying architecture and enable arch specific optimization.
-arch=`uname -m`
-if [[ $arch == *"x86"* ]]; then
-  CMAKE_VARS="-DUSE_AVX=ON $CMAKE_VARS"
-fi
-
 if [[ $1 != "cpu" ]]; then
     CMAKE_VARS="-DUSE_CUDA=ON $CMAKE_VARS"
 fi
