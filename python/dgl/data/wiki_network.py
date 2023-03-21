@@ -34,11 +34,12 @@ class WikiNetworkDataset(DGLBuiltinDataset):
     """
 
     def __init__(self, name, raw_dir, force_reload, verbose, transform):
-        # TODO: provide url
+        url = _get_dgl_url(f"dataset/{name}.zip")
         super(WikiNetworkDataset, self).__init__(
             name=name,
-            url=_get_dgl_url(f"dataset/{name}.zip"),
+            url=url,
             raw_dir=raw_dir,
+            hash_key=(url),
             force_reload=force_reload,
             verbose=verbose,
             transform=transform,

@@ -6,7 +6,6 @@ from __future__ import absolute_import
 import abc
 import hashlib
 import os
-import sys
 import traceback
 
 from ..utils import retry_method_with_fix
@@ -221,6 +220,15 @@ class DGLDataset(object):
         hash_func.update(str(self._hash_key).encode("utf-8"))
         return hash_func.hexdigest()[:8]
 
+    def _get_hash_url(self):
+        """Compute the hash of the url"""
+        if self._url is None:
+            return ""
+        else:
+            hash_func = hashlib.sha1()
+            hash_func.update(str(self._url).encode("utf-8"))
+            return "_" + hash_func.hexdigest()[:8]
+
     @property
     def url(self):
         r"""Get url to download the raw dataset."""
@@ -241,7 +249,7 @@ class DGLDataset(object):
         r"""Directory contains the input data files.
         By default raw_path = os.path.join(self.raw_dir, self.name)
         """
-        return os.path.join(self.raw_dir, self.name)
+        return os.path.join(self.raw_dir, self.name + self._get_hash_url())
 
     @property
     def save_dir(self):
