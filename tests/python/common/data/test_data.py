@@ -429,7 +429,7 @@ def test_zinc():
         g2, _ = dataset2[0]
 
         assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
-        assert label.shape == 1
+        assert label.shape[0] == 1
 
 
 @unittest.skipIf(
