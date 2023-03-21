@@ -27,14 +27,17 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("device", &SparseMatrix::device)
       .def("shape", &SparseMatrix::shape)
       .def("coo", &SparseMatrix::COOTensors)
+      .def("indices", &SparseMatrix::Indices)
       .def("csr", &SparseMatrix::CSRTensors)
       .def("csc", &SparseMatrix::CSCTensors)
       .def("transpose", &SparseMatrix::Transpose)
       .def("coalesce", &SparseMatrix::Coalesce)
-      .def("has_duplicate", &SparseMatrix::HasDuplicate);
+      .def("has_duplicate", &SparseMatrix::HasDuplicate)
+      .def("is_diag", &SparseMatrix::HasDiag);
   m.def("from_coo", &SparseMatrix::FromCOO)
       .def("from_csr", &SparseMatrix::FromCSR)
       .def("from_csc", &SparseMatrix::FromCSC)
+      .def("from_diag", &SparseMatrix::FromDiag)
       .def("spsp_add", &SpSpAdd)
       .def("reduce", &Reduce)
       .def("sum", &ReduceSum)

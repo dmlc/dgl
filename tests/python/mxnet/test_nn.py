@@ -9,8 +9,8 @@ import numpy as np
 import pytest
 import scipy as sp
 from mxnet import autograd, gluon, nd
-from test_utils import parametrize_idtype
-from test_utils.graph_cases import (
+from utils import parametrize_idtype
+from utils.graph_cases import (
     get_cases,
     random_bipartite,
     random_dglgraph,

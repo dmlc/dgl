@@ -1,7 +1,7 @@
 import backend as F
 
 import dgl
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 @parametrize_idtype

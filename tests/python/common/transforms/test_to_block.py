@@ -18,7 +18,7 @@ import backend as F
 
 import dgl
 import dgl.partition
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 @parametrize_idtype

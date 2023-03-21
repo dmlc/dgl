@@ -7,7 +7,7 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-from test_utils import get_cases, parametrize_idtype
+from utils import get_cases, parametrize_idtype
 
 
 def udf_copy_src(edges):

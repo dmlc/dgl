@@ -12,7 +12,7 @@ import networkx as nx
 import scipy.sparse as ssp
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 def create_test_graph(idtype):

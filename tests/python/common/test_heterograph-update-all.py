@@ -11,10 +11,9 @@ import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
-import test_utils
 from dgl import DGLError
 from scipy.sparse import rand
-from test_utils import get_cases, parametrize_idtype
+from utils import get_cases, parametrize_idtype
 
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}
 feat_size = 2

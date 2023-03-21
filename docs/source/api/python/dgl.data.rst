@@ -54,6 +54,8 @@ Datasets for node classification/regression tasks
     WikiCSDataset
     FlickrDataset
     YelpDataset
+    PATTERNDataset
+    CLUSTERDataset
 
 Edge Prediction Datasets
 ---------------------------------------
@@ -121,4 +123,6 @@ Utilities
     utils.save_info
     utils.load_info
     utils.add_nodepred_split
+    utils.mask_nodes_by_property
+    utils.add_node_property_split
     utils.Subset

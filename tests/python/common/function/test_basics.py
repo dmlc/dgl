@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 import scipy.sparse as ssp
 from dgl import DGLGraph
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 D = 5
 reduce_msg_shapes = set()
