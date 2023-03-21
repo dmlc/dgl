@@ -157,7 +157,7 @@ def test_sparse_diag_mm(create_func, sparse_shape, nnz):
     B.val.backward(grad)
 
     torch_A = sparse_matrix_to_torch_sparse(A)
-    torch_D = sparse_matrix_to_torch_sparse(D.to_sparse())
+    torch_D = sparse_matrix_to_torch_sparse(D)
     torch_B = torch.sparse.mm(torch_A, torch_D)
     torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
     torch_B.backward(torch_B_grad)
@@ -190,7 +190,7 @@ def test_diag_sparse_mm(create_func, sparse_shape, nnz):
     B.val.backward(grad)
 
     torch_A = sparse_matrix_to_torch_sparse(A)
-    torch_D = sparse_matrix_to_torch_sparse(D.to_sparse())
+    torch_D = sparse_matrix_to_torch_sparse(D)
     torch_B = torch.sparse.mm(torch_D, torch_A)
     torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
     torch_B.backward(torch_B_grad)

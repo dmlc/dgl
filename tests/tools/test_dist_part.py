@@ -19,13 +19,13 @@ from dgl.distributed.partition import (
 
 from distpartitioning import array_readwriter
 from distpartitioning.utils import generate_read_list
+from pytest_utils import create_chunked_dataset
 
 from tools.verification_utils import (
     verify_graph_feats,
     verify_partition_data_types,
     verify_partition_formats,
 )
-from utils import create_chunked_dataset
 
 
 def _test_chunk_graph(

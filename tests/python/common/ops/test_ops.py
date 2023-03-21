@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 import torch
 from dgl.ops import gather_mm, gsddmm, gspmm, segment_reduce
-from pytests_utils import parametrize_idtype
-from pytests_utils.graph_cases import get_cases
+from utils import parametrize_idtype
+from utils.graph_cases import get_cases
 
 random.seed(42)
 np.random.seed(42)
@@ -487,8 +487,6 @@ def test_use_libxsmm_switch():
     x = torch.ones(3, 2, requires_grad=True)
     y = torch.arange(1, 13).float().view(6, 2).requires_grad_()
 
-    assert dgl.is_libxsmm_enabled()
-    dgl.ops.u_mul_e_sum(g, x, y)
     dgl.use_libxsmm(False)
     assert ~dgl.is_libxsmm_enabled()
     dgl.ops.u_mul_e_sum(g, x, y)

@@ -391,8 +391,13 @@ class DistGraphServer(KVServer):
                         self.client_g.edata[k], dtype
                     )
             # Create the graph formats specified the users.
+            print(
+                "Start to create specified graph formats which may take "
+                "non-trivial time."
+            )
             self.client_g = self.client_g.formats(graph_format)
             self.client_g.create_formats_()
+            print("Finished creating specified graph formats.")
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(
                     self.client_g, graph_name, graph_format
