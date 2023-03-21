@@ -68,12 +68,12 @@ class ZINCDataset(DGLBuiltinDataset):
     """
 
     def __init__(
-            self,
-            mode="train",
-            raw_dir=None,
-            force_reload=False,
-            verbose=False,
-            transform=None,
+        self,
+        mode="train",
+        raw_dir=None,
+        force_reload=False,
+        verbose=False,
+        transform=None,
     ):
         self._url = _get_dgl_url("dataset/ZINK12k.zip")
         self.mode = mode
