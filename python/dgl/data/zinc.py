@@ -125,11 +125,10 @@ class ZINCDataset(DGLBuiltinDataset):
             Each graph contains:
 
             - ``ndata['feat']``: Types of heavy atoms as node features
-            - ``edata['feat']``: Type of bonds as edge features
+            - ``edata['feat']``: Types of bonds as edge features
 
         Tensor
             Constrained solubility as graph label
-
         """
         labels = self._labels["g_label"]
         if self._transform is None:
