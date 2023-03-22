@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 import torch
 from dgl.ops import gather_mm, gsddmm, gspmm, segment_reduce
-from pytests_utils import parametrize_idtype
-from pytests_utils.graph_cases import get_cases
+from utils import parametrize_idtype
+from utils.graph_cases import get_cases
 
 random.seed(42)
 np.random.seed(42)

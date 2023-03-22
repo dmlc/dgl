@@ -8,8 +8,8 @@ import torch as th
 from dgl import DGLError
 from dgl.base import DGLWarning
 from dgl.geometry import farthest_point_sampler, neighbor_matching
-from pytests_utils import parametrize_idtype
-from pytests_utils.graph_cases import get_cases
+from utils import parametrize_idtype
+from utils.graph_cases import get_cases
 
 
 def test_fps():
