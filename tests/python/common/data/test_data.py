@@ -429,7 +429,8 @@ def test_zinc():
         g2, _ = dataset2[0]
 
         assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
-        assert label.shape[0] == 1
+        # return a scalar tensor
+        assert not label.shape
 
 
 @unittest.skipIf(
