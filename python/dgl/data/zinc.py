@@ -87,18 +87,20 @@ class ZINCDataset(DGLBuiltinDataset):
             transform=transform,
         )
 
-        self.graph_path = os.path.join(
-            self.save_path, "ZincDGL_{}.bin".format(self.mode)
-        )
-
     def process(self):
         self.load()
 
     def has_cache(self):
-        return os.path.exists(self.graph_path)
+        graph_path = os.path.join(
+            self.save_path, "ZincDGL_{}.bin".format(self.mode)
+        )
+        return os.path.exists(graph_path)
 
     def load(self):
-        self._graphs, self._labels = load_graphs(self.graph_path)
+        graph_path = os.path.join(
+            self.save_path, "ZincDGL_{}.bin".format(self.mode)
+        )
+        self._graphs, self._labels = load_graphs(graph_path)
 
     @property
     def num_atom_types(self):
