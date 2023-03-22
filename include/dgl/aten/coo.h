@@ -64,13 +64,9 @@ struct COOMatrix {
         data(darr),
         row_sorted(rsorted),
         col_sorted(csorted) {
-    is_pinned = aten::IsNullArray(row) ? true : row.IsPinned();
-    if (!aten::IsNullArray(col)) {
-      is_pinned = is_pinned && col.IsPinned();
-    }
-    if (!aten::IsNullArray(data)) {
-      is_pinned = is_pinned && data.IsPinned();
-    }
+    is_pinned = (aten::IsNullArray(row) || row.IsPinned()) &&
+                (aten::IsNullArray(col) || col.IsPinned()) &&
+                (aten::IsNullArray(data) || data.IsPinned());
     CheckValidity();
   }
 
@@ -148,7 +144,9 @@ struct COOMatrix {
         aten::IsNullArray(data) ? data : data.PinMemory(), row_sorted,
         col_sorted);
     CHECK(new_coo.is_pinned)
-        << "The new allocated COOMatrix is not pinned correctly";
+        << "An internal DGL error has occured while trying to pin a COO "
+           "matrix. Please file a bug at 'https://github.com/dmlc/dgl/issues' "
+           "with the above stacktrace.";
     return new_coo;
   }
 

@@ -140,7 +140,10 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return COO(meta_graph_, adj_.CopyTo(ctx));
   }
 
-  /** @brief Copy the adj_ to pinned memory: COOMatrix of the COO graph. */
+  /**
+   * @brief Copy the adj_ to pinned memory.
+   * @return COOMatrix of the COO graph.
+   */
   COO PinMemory() {
     if (adj_.is_pinned) return *this;
     return COO(meta_graph_, adj_.PinMemory());
@@ -541,7 +544,10 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     }
   }
 
-  /** @brief Copy the adj_ to pinned memory: CSRMatrix of the CSR graph. */
+  /**
+   * @brief Copy the adj_ to pinned memory.
+   * @return CSRMatrix of the CSR graph.
+   */
   CSR PinMemory() {
     if (adj_.is_pinned) return *this;
     return CSR(meta_graph_, adj_.PinMemory());

@@ -69,11 +69,11 @@ void NDArray::Internal::DefaultDeleter(NDArray::Container* ptr) {
     // if the array is still pinned before freeing, unpin it.
     if (ptr->pinned_by_dgl_) UnpinContainer(ptr);
     if (ptr->pinned_by_pyt_) {
-      DeviceAPI::Get(kDGLCUDA)->FreePinnedDataSpace(&(ptr->pyt_raw_deleter));
-      CHECK(ptr->pyt_raw_deleter == nullptr);
+      DeviceAPI::Get(kDGLCUDA)->FreePinnedDataSpace(&(ptr->pyt_raw_deleter_));
+      CHECK(ptr->pyt_raw_deleter_ == nullptr);
       // reset the flag and storage ctx ptr for completeness
       ptr->pinned_by_pyt_ = false;
-      ptr->pyt_ctx = nullptr;
+      ptr->pyt_ctx_ = nullptr;
     } else {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)
           ->FreeDataSpace(ptr->dl_tensor.ctx, ptr->dl_tensor.data);
@@ -167,7 +167,7 @@ NDArray NDArray::EmptyShared(
     const std::string& name, std::vector<int64_t> shape, DGLDataType dtype,
     DGLContext ctx, bool is_create) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content (i.e., allocation)
+  // allocate memory
   size_t size = GetDataSize(ret.data_->dl_tensor);
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
@@ -183,7 +183,7 @@ NDArray NDArray::EmptyShared(
 NDArray NDArray::Empty(
     std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content (i.e., allocation)
+  // allocate memory
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   if (size > 0)
@@ -221,7 +221,7 @@ void NDArray::RecordedCopyFromTo(DGLArray* from, DGLArray* to, void* pyt_ctx) {
       << "DGLArrayCopyFromTo: The size must exactly match.";
 
   CHECK(from->ctx.device_type != to->ctx.device_type)
-      << "Recoding event is only called for the copy between CPU and GPU";
+      << "Recoding event is only called for the copy between CPU and GPU.";
 
   CHECK(from->ctx.device_type == kDGLCUDA || to->ctx.device_type == kDGLCUDA)
       << "At least one CUDA ctx needs to be involved.";
@@ -240,10 +240,13 @@ NDArray NDArray::PinnedEmpty(
   size_t size = GetDataSize(ret.data_->dl_tensor);
   if (size > 0) {
     ret.data_->dl_tensor.data = DeviceAPI::Get(kDGLCUDA)->AllocPinnedDataSpace(
-        size, &(ret.data_->pyt_ctx), &(ret.data_->pyt_raw_deleter));
+        size, &(ret.data_->pyt_ctx_), &(ret.data_->pyt_raw_deleter_));
     CHECK(
-        ret.data_->pyt_ctx != nullptr && ret.data_->pyt_raw_deleter != nullptr)
-        << "Failed to allocate memory from PyTorch's CUDACachingAllocator.";
+        ret.data_->pyt_ctx_ != nullptr &&
+        ret.data_->pyt_raw_deleter_ != nullptr)
+        << "The allocation failed in PyTorch's CachingHostAllocator. "
+        << "The returned context pointer is " << ret.data_->pyt_ctx_
+        << " and the function deleter is " << ret.data_->pyt_raw_deleter_;
     ret.data_->pinned_by_pyt_ = true;
   }
   return ret;

@@ -93,11 +93,11 @@ class DeviceAPI {
    * @param from_offset The byte offeset in the from.
    * @param to The target array.
    * @param to_offset The byte offset in the to.
-   * @param num_bytes The size of the memory in bytes
-   * @param ctx_from The source context
-   * @param ctx_to The target context
-   * @param type_hint The type of elements, only neded by certain backends.
-   *                  can be useful for cross device endian converison.
+   * @param num_bytes The size of the memory in bytes.
+   * @param ctx_from The source context.
+   * @param ctx_to The target context.
+   * @param type_hint The type of elements, only needed by certain backends,
+   *     can be useful for cross device endian converison.
    */
   virtual void CopyDataFromTo(
       const void* from, size_t from_offset, void* to, size_t to_offset,
@@ -110,14 +110,14 @@ class DeviceAPI {
    * @param from_offset The byte offeset in the from.
    * @param to The target array.
    * @param to_offset The byte offset in the to.
-   * @param num_bytes The size of the memory in bytes
-   * @param ctx_from The source context
-   * @param ctx_to The target context
-   * @param type_hint The type of elements, only neded by certain backends.
-   *                  can be useful for cross device endian converison.
+   * @param num_bytes The size of the memory in bytes.
+   * @param ctx_from The source context.
+   * @param ctx_to The target context.
+   * @param type_hint The type of elements, only needed by certain backends,
+   *     can be useful for cross device endian converison.
    * @param pyt_ctx The context pointer from PyTorch's CachingHostAllocator.
    * @note This function only works when PyTorch CachingHostAllocator is
-   * available
+   *     available.
    */
   virtual void RecordedCopyDataFromTo(
       void* from, size_t from_offset, void* to, size_t to_offset,
@@ -190,24 +190,23 @@ class DeviceAPI {
   DGL_DLL virtual void UnpinData(void* ptr);
 
   /**
-   * @brief Pin host memory using PyTorch CachingHostAllocator.
+   * @brief Allocate the pinned memory using PyTorch CachingHostAllocator.
    *
    * @param nbytes The size to be pinned.
    * @param ctx Pointer to the context pointer from PyTorch's
-   * CachingHostAllocator.
-   * @param deleter Pointer to the deleter function from  PyTorch's
-   * CachingHostAllocator.
+   *     CachingHostAllocator.
+   * @param deleter Pointer to the deleter function from PyTorch's
+   *     CachingHostAllocator.
    */
   DGL_DLL virtual void* AllocPinnedDataSpace(
       size_t nbytes, void** ctx, void** deleter);
 
   /**
    * @brief 'Deallocate' the pinned memory from PyTorch CachingHostAllocator.
-   *
+   * @note It avoids unnecessary cudaFreeHost calls and puts the memory
+   *     block into CachingHostAllocator's free list.
    * @param deleter Pointer to the deleter function from PyTorch's
-   * CachingHostAllocator.
-   * @note In fact, it avoids unnecessary cudaFreeHost calls and puts the memory
-   * block into CachingHostAllocator's free list.
+   *     CachingHostAllocator.
    */
   DGL_DLL virtual void FreePinnedDataSpace(void** deleter);
 
