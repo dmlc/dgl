@@ -43,7 +43,7 @@ def get_proc_info():
         return 0
 
 
-def gen_edge_files(schema_map, params):
+def gen_edge_files(rank, schema_map, params):
     """Function to create edges files to be consumed by ParMETIS
     for partitioning purposes.
 
@@ -62,7 +62,7 @@ def gen_edge_files(schema_map, params):
     output : string
         Location of storing the node-weights and edge files for ParMETIS.
     """
-    rank = get_proc_info()
+    # rank = get_proc_info()
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
         dict(
@@ -121,10 +121,14 @@ def gen_edge_files(schema_map, params):
         for idx in file_idxes[rank]:
             reader_fmt_meta = {
                 "name": etype_info[constants.STR_FORMAT][constants.STR_NAME],
-                "delimiter": etype_info[constants.STR_FORMAT][
-                    constants.STR_FORMAT_DELIMITER
-                ],
             }
+            if (
+                etype_info[constants.STR_FORMAT][constants.STR_NAME]
+                == constants.STR_CSV
+            ):
+                reader_fmt_meta["delimiter"] = etype_info[constants.STR_FORMAT][
+                    constants.STR_FORMAT_DELIMITER
+                ]
             data_df = array_readwriter.get_array_parser(**reader_fmt_meta).read(
                 os.path.join(params.input_dir, edge_data_files[idx])
             )
@@ -369,7 +373,7 @@ def run_preprocess_data(params):
     gen_node_weights_files(schema_map, params)
     logging.info(f"Done with node weights....")
 
-    gen_edge_files(schema_map, params)
+    gen_edge_files(rank, schema_map, params)
     logging.info(f"Done with edge weights...")
 
     if rank == 0:
