@@ -49,7 +49,7 @@ class CLUSTERDataset(DGLBuiltinDataset):
         Number of classes for each node.
 
     Examples
-    —-------
+    --------
     >>> from dgl.data import CLUSTERDataset
     >>>
     >>> trainset = CLUSTERDataset(mode='train')
