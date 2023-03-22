@@ -75,7 +75,7 @@ class ZINCDataset(DGLBuiltinDataset):
         verbose=False,
         transform=None,
     ):
-        self._url = _get_dgl_url("dataset/ZINK12k.zip")
+        self._url = _get_dgl_url("dataset/ZINC12k.zip")
         self.mode = mode
 
         super(ZINCDataset, self).__init__(
