@@ -146,7 +146,7 @@ def main(args):
         t_epoch = time.time()
         for step, batch in enumerate(train_loader):
             g = batch.graph
-            n = g.number_of_nodes()
+            n = g.num_nodes()
 
             # TODO begin_states function?
             h = mx.nd.zeros((n, args.h_size), ctx=ctx)
@@ -169,7 +169,7 @@ def main(args):
                 acc = (batch.label == pred).sum()
                 root_ids = [
                     i
-                    for i in range(batch.graph.number_of_nodes())
+                    for i in range(batch.graph.num_nodes())
                     if batch.graph.out_degrees(i) == 0
                 ]
                 root_acc = np.sum(
@@ -197,7 +197,7 @@ def main(args):
         root_accs = []
         for step, batch in enumerate(dev_loader):
             g = batch.graph
-            n = g.number_of_nodes()
+            n = g.num_nodes()
             h = mx.nd.zeros((n, args.h_size), ctx=ctx)
             c = mx.nd.zeros((n, args.h_size), ctx=ctx)
             pred = model(batch, h, c).argmax(1).astype(batch.label.dtype)
@@ -206,7 +206,7 @@ def main(args):
             accs.append([acc, len(batch.label)])
             root_ids = [
                 i
-                for i in range(batch.graph.number_of_nodes())
+                for i in range(batch.graph.num_nodes())
                 if batch.graph.out_degrees(i) == 0
             ]
             root_acc = np.sum(
@@ -250,7 +250,7 @@ def main(args):
     root_accs = []
     for step, batch in enumerate(test_loader):
         g = batch.graph
-        n = g.number_of_nodes()
+        n = g.num_nodes()
         h = mx.nd.zeros((n, args.h_size), ctx=ctx)
         c = mx.nd.zeros((n, args.h_size), ctx=ctx)
         pred = model(batch, h, c).argmax(axis=1).astype(batch.label.dtype)
@@ -259,7 +259,7 @@ def main(args):
         accs.append([acc, len(batch.label)])
         root_ids = [
             i
-            for i in range(batch.graph.number_of_nodes())
+            for i in range(batch.graph.num_nodes())
             if batch.graph.out_degrees(i) == 0
         ]
         root_acc = np.sum(

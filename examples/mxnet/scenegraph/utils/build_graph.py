@@ -12,7 +12,7 @@ def bbox_improve(bbox):
 def extract_edge_bbox(g):
     """bbox encoding"""
     src, dst = g.edges(order="eid")
-    n = g.number_of_edges()
+    n = g.num_edges()
     src_bbox = g.ndata["pred_bbox"][src.asnumpy()]
     dst_bbox = g.ndata["pred_bbox"][dst.asnumpy()]
     edge_bbox = nd.zeros((n, 4), ctx=g.ndata["pred_bbox"].context)
@@ -103,7 +103,7 @@ def build_graph_train(
             h -= 1
             w -= 1
 
-        n_nodes = g_pred.number_of_nodes()
+        n_nodes = g_pred.num_nodes()
         triplet = []
         adjmat = np.zeros((n_nodes, n_nodes))
 
@@ -136,8 +136,8 @@ def build_graph_train(
         g_pred.add_edges(src, dst, data={"rel_class": rel_class})
 
         # other operations
-        n_nodes = g_pred.number_of_nodes()
-        n_edges = g_pred.number_of_edges()
+        n_nodes = g_pred.num_nodes()
+        n_edges = g_pred.num_edges()
         if bbox_improvement:
             g_pred.ndata["pred_bbox"] = bbox_improve(g_pred.ndata["pred_bbox"])
         g_pred.edata["rel_bbox"] = extract_edge_bbox(g_pred)
@@ -154,7 +154,7 @@ def build_graph_train(
                 eids = g_pred.edge_ids(cols, rows)[2].asnumpy().tolist()
                 if len(eids):
                     g_pred.remove_edges(eids)
-                    if g_pred.number_of_edges() == 0:
+                    if g_pred.num_edges() == 0:
                         g_pred = None
         g_pred_batch.append(g_pred)
 
@@ -203,8 +203,8 @@ def build_graph_validate_gt_obj(
         g_pred.add_edges(src, dst)
         g_pred.add_edges(dst, src)
 
-        n_nodes = g_pred.number_of_nodes()
-        n_edges = g_pred.number_of_edges()
+        n_nodes = g_pred.num_nodes()
+        n_edges = g_pred.num_edges()
         if bbox_improvement:
             g_pred.ndata["pred_bbox"] = bbox_improve(g_pred.ndata["pred_bbox"])
         g_pred.edata["rel_bbox"] = extract_edge_bbox(g_pred)
@@ -265,8 +265,8 @@ def build_graph_validate_gt_bbox(
         g_pred.add_edges(src, dst)
         g_pred.add_edges(dst, src)
 
-        n_nodes = g_pred.number_of_nodes()
-        n_edges = g_pred.number_of_edges()
+        n_nodes = g_pred.num_nodes()
+        n_edges = g_pred.num_edges()
         if bbox_improvement:
             g_pred.ndata["pred_bbox"] = bbox_improve(g_pred.ndata["pred_bbox"])
         g_pred.edata["rel_bbox"] = extract_edge_bbox(g_pred)
@@ -333,8 +333,8 @@ def build_graph_validate_pred(
         g_pred.add_edges(src, dst)
         g_pred.add_edges(dst, src)
 
-        n_nodes = g_pred.number_of_nodes()
-        n_edges = g_pred.number_of_edges()
+        n_nodes = g_pred.num_nodes()
+        n_edges = g_pred.num_edges()
         if bbox_improvement:
             g_pred.ndata["pred_bbox"] = bbox_improve(g_pred.ndata["pred_bbox"])
         g_pred.edata["rel_bbox"] = extract_edge_bbox(g_pred)

@@ -261,7 +261,7 @@ for i, (G_list, img_list) in enumerate(val_data):
         if not semantic_only:
             rel_bbox = g_pred_batch.edata["rel_bbox"]
             batch_id = g_pred_batch.edata["batch_id"].asnumpy()
-            n_sample_edges = g_pred_batch.number_of_edges()
+            n_sample_edges = g_pred_batch.num_edges()
             # g_pred_batch.edata['edge_feat'] = mx.nd.zeros((n_sample_edges, 49), ctx=cur_ctx)
             n_graph = len(G_slice)
             bbox_rel_list = []
@@ -290,7 +290,7 @@ for i, (G_list, img_list) in enumerate(val_data):
 
     for G_slice, G_pred, img_slice in zip(G_list, G_batch, img_list):
         for G_gt, G_pred_one in zip(G_slice, [G_pred]):
-            if G_pred_one is None or G_pred_one.number_of_nodes() == 0:
+            if G_pred_one is None or G_pred_one.num_nodes() == 0:
                 continue
             gt_objects, gt_triplet = extract_gt(G_gt, img_slice.shape[2:4])
             pred_objects, pred_triplet = extract_pred(G_pred, joint_preds=True)

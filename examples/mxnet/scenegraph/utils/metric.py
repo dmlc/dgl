@@ -265,7 +265,7 @@ class SGDetPlus(mx.metric.EvalMetric):
 
 def extract_gt(g, img_size):
     """extract prediction from ground truth graph"""
-    if g is None or g.number_of_nodes() == 0:
+    if g is None or g.num_nodes() == 0:
         return None, None
     gt_eids = np.where(g.edata["rel_class"].asnumpy() > 0)[0]
     if len(gt_eids) == 0:
@@ -307,7 +307,7 @@ def extract_gt(g, img_size):
 
 def extract_pred(g, topk=100, joint_preds=False):
     """extract prediction from prediction graph for validation and visualization"""
-    if g is None or g.number_of_nodes() == 0:
+    if g is None or g.num_nodes() == 0:
         return None, None
 
     pred_class = g.ndata["node_class_pred"].asnumpy()

@@ -112,7 +112,7 @@ def main(args):
     test_mask = g.ndata["test_mask"]
     in_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
+    n_edges = data.graph.num_edges()
     print(
         """----Data statistics------'
       #Edges %d
@@ -132,7 +132,7 @@ def main(args):
     # add self loop
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
 
     # create GraphSAGE model
     model = GraphSAGE(

@@ -94,7 +94,7 @@ def main(args):
     test_mask = g.ndata["test_mask"]
     in_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
+    n_edges = data.graph.num_edges()
     print(
         """----Data statistics------'
       #Edges %d
@@ -115,12 +115,12 @@ def main(args):
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
 
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     us, vs = g.edges()
     us = us.asnumpy()
     vs = vs.asnumpy()
     pseudo = []
-    for i in range(g.number_of_edges()):
+    for i in range(g.num_edges()):
         pseudo.append(
             [1 / np.sqrt(g.in_degrees(us[i])), 1 / np.sqrt(g.in_degrees(vs[i]))]
         )

@@ -139,7 +139,7 @@ def generate_sampled_graph_and_labels(
 
 def comp_deg_norm(g):
     g = g.local_var()
-    in_deg = g.in_degrees(range(g.number_of_nodes())).float().numpy()
+    in_deg = g.in_degrees(range(g.num_nodes())).float().numpy()
     norm = 1.0 / in_deg
     norm[np.isinf(norm)] = 0
     return norm

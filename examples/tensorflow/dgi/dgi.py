@@ -25,7 +25,7 @@ class Encoder(layers.Layer):
 
     def call(self, features, corrupt=False):
         if corrupt:
-            perm = np.random.permutation(self.g.number_of_nodes())
+            perm = np.random.permutation(self.g.num_nodes())
             features = tf.gather(features, perm)
         features = self.conv(features)
         return features

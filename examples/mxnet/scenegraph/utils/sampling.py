@@ -8,7 +8,7 @@ def l0_sample(g, positive_max=128, negative_ratio=3):
     """sampling positive and negative edges"""
     if g is None:
         return None
-    n_eids = g.number_of_edges()
+    n_eids = g.num_edges()
     pos_eids = np.where(g.edata["rel_class"].asnumpy() > 0)[0]
     neg_eids = np.where(g.edata["rel_class"].asnumpy() == 0)[0]
     if len(pos_eids) == 0:

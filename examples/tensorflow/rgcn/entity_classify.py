@@ -131,7 +131,7 @@ def main(args):
         device = "/gpu:{}".format(args.gpu)
         g = g.to(device)
         use_cuda = True
-    num_nodes = g.number_of_nodes()
+    num_nodes = g.num_nodes()
     node_ids = tf.range(num_nodes, dtype=tf.int64)
     edge_norm = g.edata["norm"]
     edge_type = tf.cast(g.edata[dgl.ETYPE], tf.int64)

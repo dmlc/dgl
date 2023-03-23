@@ -158,7 +158,7 @@ class RelDN(nn.Block):
         self.semantic_only = semantic_only
 
     def forward(self, g):
-        if g is None or g.number_of_nodes() == 0:
+        if g is None or g.num_nodes() == 0:
             return g
         # predictions
         g.apply_edges(self.freq_prior)

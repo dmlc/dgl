@@ -311,7 +311,7 @@ for epoch in range(nepoch):
                     continue
                 rel_bbox = g_batch.edata["rel_bbox"]
                 batch_id = g_batch.edata["batch_id"].asnumpy()
-                n_sample_edges = g_batch.number_of_edges()
+                n_sample_edges = g_batch.num_edges()
                 n_graph = len(G_slice)
                 bbox_rel_list = []
                 for j in range(n_graph):
@@ -343,7 +343,7 @@ for epoch in range(nepoch):
             G_batch = [net(G) for G in G_batch]
 
             for G_pred, img in zip(G_batch, img_list):
-                if G_pred is None or G_pred.number_of_nodes() == 0:
+                if G_pred is None or G_pred.num_nodes() == 0:
                     continue
                 loss_rel = L_rel(
                     G_pred.edata["preds"],
@@ -375,7 +375,7 @@ for epoch in range(nepoch):
                 for k, v in det_params.items():
                     v.zero_grad()
         for G_pred, img_slice in zip(G_batch, img_list):
-            if G_pred is None or G_pred.number_of_nodes() == 0:
+            if G_pred is None or G_pred.num_nodes() == 0:
                 continue
             link_ind = np.where(G_pred.edata["rel_class"].asnumpy() > 0)[0]
             if len(link_ind) == 0:

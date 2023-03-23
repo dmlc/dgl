@@ -34,7 +34,7 @@ def _sum_boolean_tensor(x):
 def describe_data(data):
     g = data[0]
 
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     num_classes = data.num_classes
 
     train_mask = g.ndata["train_mask"]
