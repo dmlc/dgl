@@ -967,6 +967,26 @@ def swapaxes(input, axis1, axis2):
     pass
 
 
+def empty(shape, dtype, ctx):
+    """Create a tensor filled with uninitialized data.
+
+    Parameters
+    ----------
+    shape : tuple of int
+        The tensor shape.
+    dtype : data type
+        It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
+
+    Returns
+    -------
+    Tensor
+        The emtpy tensor.
+    """
+    pass
+
+
 def zeros(shape, dtype, ctx):
     """Create a zero tensor.
 
