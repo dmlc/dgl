@@ -74,11 +74,11 @@ for key in edge_map:
 eid_map = dgl.distributed.id_map.IdMap(edge_map)
 
 for ntype in node_map:
-    assert hg.number_of_nodes(ntype) == th.sum(
+    assert hg.num_nodes(ntype) == th.sum(
         node_map[ntype][:, 1] - node_map[ntype][:, 0]
     )
 for etype in edge_map:
-    assert hg.number_of_edges(etype) == th.sum(
+    assert hg.num_edges(etype) == th.sum(
         edge_map[etype][:, 1] - edge_map[etype][:, 0]
     )
 
@@ -209,9 +209,9 @@ for partid in range(num_parts):
 for ntype in orig_node_ids:
     nids = th.cat(orig_node_ids[ntype])
     nids = th.sort(nids)[0]
-    assert np.all((nids == th.arange(hg.number_of_nodes(ntype))).numpy())
+    assert np.all((nids == th.arange(hg.num_nodes(ntype))).numpy())
 
 for etype in orig_edge_ids:
     eids = th.cat(orig_edge_ids[etype])
     eids = th.sort(eids)[0]
-    assert np.all((eids == th.arange(hg.number_of_edges(etype))).numpy())
+    assert np.all((eids == th.arange(hg.num_edges(etype))).numpy())

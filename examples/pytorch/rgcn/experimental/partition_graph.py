@@ -41,11 +41,11 @@ def load_ogb(dataset):
             if ntype == category:
                 category_id = i
 
-        train_mask = th.zeros((hg.number_of_nodes("paper"),), dtype=th.bool)
+        train_mask = th.zeros((hg.num_nodes("paper"),), dtype=th.bool)
         train_mask[train_idx] = True
-        val_mask = th.zeros((hg.number_of_nodes("paper"),), dtype=th.bool)
+        val_mask = th.zeros((hg.num_nodes("paper"),), dtype=th.bool)
         val_mask[val_idx] = True
-        test_mask = th.zeros((hg.number_of_nodes("paper"),), dtype=th.bool)
+        test_mask = th.zeros((hg.num_nodes("paper"),), dtype=th.bool)
         test_mask[test_idx] = True
         hg.nodes["paper"].data["train_mask"] = train_mask
         hg.nodes["paper"].data["val_mask"] = val_mask
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     print(
         "load {} takes {:.3f} seconds".format(args.dataset, time.time() - start)
     )
-    print("|V|={}, |E|={}".format(g.number_of_nodes(), g.number_of_edges()))
+    print("|V|={}, |E|={}".format(g.num_nodes(), g.num_edges()))
     print(
         "train: {}, valid: {}, test: {}".format(
             th.sum(g.nodes["paper"].data["train_mask"]),
