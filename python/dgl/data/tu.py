@@ -183,7 +183,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
         if "feat" not in g.ndata.keys():
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata["feat"] = F.ones(
-                    (g.number_of_nodes(), self.hidden_size), F.float32, F.cpu()
+                    (g.num_nodes(), self.hidden_size), F.float32, F.cpu()
                 )
             self.data_mode = "constant"
             if self.verbose:
@@ -201,7 +201,7 @@ class LegacyTUDataset(DGLBuiltinDataset):
             if self.verbose:
                 print("original dataset length : ", len(self.graph_lists))
             for i, g in enumerate(self.graph_lists):
-                if g.number_of_nodes() <= self.max_allow_node:
+                if g.num_nodes() <= self.max_allow_node:
                     preserve_idx.append(i)
             self.graph_lists = [self.graph_lists[i] for i in preserve_idx]
             if self.verbose:
