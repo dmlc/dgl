@@ -161,6 +161,27 @@ class GraphIndex(ObjectBase):
         state = (n_nodes, readonly_state, src, dst)
         self.__setstate__(state)
 
+    def num_nodes(self):
+        """Return the number of nodes.
+
+        Returns
+        -------
+        int
+            The number of nodes.
+        """
+        return _CAPI_DGLGraphNumVertices(self)
+
+    def num_edges(self):
+        """Return the number of edges.
+
+        Returns
+        -------
+        int
+            The number of edges.
+        """
+        return _CAPI_DGLGraphNumEdges(self)
+
+    # TODO(#5485): remove this method.
     def number_of_nodes(self):
         """Return the number of nodes.
 
@@ -171,6 +192,7 @@ class GraphIndex(ObjectBase):
         """
         return _CAPI_DGLGraphNumVertices(self)
 
+    # TODO(#5485): remove this method.
     def number_of_edges(self):
         """Return the number of edges.
 
