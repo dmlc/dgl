@@ -359,6 +359,37 @@ class HeteroGraphIndex(ObjectBase):
         """
         return bool(_CAPI_DGLHeteroIsReadonly(self))
 
+    def num_nodes(self, ntype):
+        """Return the number of nodes.
+
+        Parameters
+        ----------
+        ntype : int
+            Node type
+
+        Returns
+        -------
+        int
+            The number of nodes
+        """
+        return _CAPI_DGLHeteroNumVertices(self, int(ntype))
+
+    def num_edges(self, etype):
+        """Return the number of edges.
+
+        Parameters
+        ----------
+        etype : int
+            Edge type
+
+        Returns
+        -------
+        int
+            The number of edges
+        """
+        return _CAPI_DGLHeteroNumEdges(self, int(etype))
+
+    # TODO(#5485): remove this method.
     def number_of_nodes(self, ntype):
         """Return the number of nodes.
 
@@ -374,6 +405,7 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroNumVertices(self, int(ntype))
 
+    # TODO(#5485): remove this method.
     def number_of_edges(self, etype):
         """Return the number of edges.
 
