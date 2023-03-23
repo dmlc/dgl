@@ -23,14 +23,14 @@ shared_workspace = os.environ.get(
 def create_graph(num_part, dist_graph_path, hetero):
     if not hetero:
         g = dgl.rand_graph(10000, 42000)
-        g.ndata["feat"] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-        g.edata["feat"] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+        g.ndata["feat"] = F.unsqueeze(F.arange(0, g.num_nodes()), 1)
+        g.edata["feat"] = F.unsqueeze(F.arange(0, g.num_edges()), 1)
         g.ndata["in_degrees"] = g.in_degrees()
         g.ndata["out_degrees"] = g.out_degrees()
 
         etype = g.etypes[0]
         ntype = g.ntypes[0]
-        edge_u, edge_v = g.find_edges(F.arange(0, g.number_of_edges(etype)))
+        edge_u, edge_v = g.find_edges(F.arange(0, g.num_edges(etype)))
         g.edges[etype].data["edge_u"] = edge_u
         g.edges[etype].data["edge_v"] = edge_v
 
@@ -66,15 +66,15 @@ def create_graph(num_part, dist_graph_path, hetero):
         g = dgl.heterograph(edges, num_nodes)
 
         g.nodes["n1"].data["feat"] = F.unsqueeze(
-            F.arange(0, g.number_of_nodes("n1")), 1
+            F.arange(0, g.num_nodes("n1")), 1
         )
         g.edges["r1"].data["feat"] = F.unsqueeze(
-            F.arange(0, g.number_of_edges("r1")), 1
+            F.arange(0, g.num_edges("r1")), 1
         )
 
         for _, etype, _ in etypes:
             edge_u, edge_v = g.find_edges(
-                F.arange(0, g.number_of_edges(etype)), etype=etype
+                F.arange(0, g.num_edges(etype)), etype=etype
             )
             g.edges[etype].data["edge_u"] = edge_u
             g.edges[etype].data["edge_v"] = edge_v

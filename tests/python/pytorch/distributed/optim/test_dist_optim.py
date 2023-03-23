@@ -96,7 +96,7 @@ def run_client(graph_name, cli_id, part_id, server_count):
     )
     g = DistGraph(graph_name, gpb=gpb)
     policy = dgl.distributed.PartitionPolicy("node", g.get_partition_book())
-    num_nodes = g.number_of_nodes()
+    num_nodes = g.num_nodes()
     emb_dim = 4
     dgl_emb = DistEmbedding(
         num_nodes,

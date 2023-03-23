@@ -21,7 +21,7 @@ def check_fail(fn, *args, **kwargs):
 
 
 def assert_is_identical(g, g2):
-    assert g.number_of_nodes() == g2.number_of_nodes()
+    assert g.num_nodes() == g2.num_nodes()
     src, dst = g.all_edges(order="eid")
     src2, dst2 = g2.all_edges(order="eid")
     assert F.array_equal(src, src2)
@@ -45,7 +45,7 @@ def assert_is_identical_hetero(g, g2, ignore_internal_data=False):
 
     # check if node ID spaces and feature spaces are equal
     for ntype in g.ntypes:
-        assert g.number_of_nodes(ntype) == g2.number_of_nodes(ntype)
+        assert g.num_nodes(ntype) == g2.num_nodes(ntype)
         if ignore_internal_data:
             for k in list(g.nodes[ntype].data.keys()):
                 if is_internal_column(k):
@@ -91,10 +91,10 @@ def check_graph_equal(g1, g2, *, check_idtype=True, check_feature=True):
         assert g2.metagraph().edges(keys=True)[edges] == features
 
     for nty in g1.ntypes:
-        assert g1.number_of_nodes(nty) == g2.number_of_nodes(nty)
+        assert g1.num_nodes(nty) == g2.num_nodes(nty)
         assert F.allclose(g1.batch_num_nodes(nty), g2.batch_num_nodes(nty))
     for ety in g1.canonical_etypes:
-        assert g1.number_of_edges(ety) == g2.number_of_edges(ety)
+        assert g1.num_edges(ety) == g2.num_edges(ety)
         assert F.allclose(g1.batch_num_edges(ety), g2.batch_num_edges(ety))
         src1, dst1, eid1 = g1.edges(etype=ety, form="all")
         src2, dst2, eid2 = g2.edges(etype=ety, form="all")
@@ -109,14 +109,14 @@ def check_graph_equal(g1, g2, *, check_idtype=True, check_feature=True):
 
     if check_feature:
         for nty in g1.ntypes:
-            if g1.number_of_nodes(nty) == 0:
+            if g1.num_nodes(nty) == 0:
                 continue
             for feat_name in g1.nodes[nty].data.keys():
                 assert F.allclose(
                     g1.nodes[nty].data[feat_name], g2.nodes[nty].data[feat_name]
                 )
         for ety in g1.canonical_etypes:
-            if g1.number_of_edges(ety) == 0:
+            if g1.num_edges(ety) == 0:
                 continue
             for feat_name in g2.edges[ety].data.keys():
                 assert F.allclose(
