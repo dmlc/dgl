@@ -109,7 +109,7 @@ class APPNPConv(nn.Module):
                     feat = feat * src_norm
                 graph.ndata["h"] = feat
                 w = (
-                    th.ones(graph.number_of_edges(), 1)
+                    th.ones(graph.num_edges(), 1)
                     if edge_weight is None
                     else edge_weight
                 )
