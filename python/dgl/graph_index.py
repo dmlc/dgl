@@ -177,7 +177,7 @@ class GraphIndex(ObjectBase):
         Returns
         -------
         int
-            The number of edges
+            The number of edges.
         """
         return _CAPI_DGLGraphNumEdges(self)
 

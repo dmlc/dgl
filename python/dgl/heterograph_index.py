@@ -365,12 +365,12 @@ class HeteroGraphIndex(ObjectBase):
         Parameters
         ----------
         ntype : int
-            Node type
+            Node type.
 
         Returns
         -------
         int
-            The number of nodes
+            The number of nodes.
         """
         return _CAPI_DGLHeteroNumVertices(self, int(ntype))
 
@@ -380,12 +380,12 @@ class HeteroGraphIndex(ObjectBase):
         Parameters
         ----------
         etype : int
-            Edge type
+            Edge type.
 
         Returns
         -------
         int
-            The number of edges
+            The number of edges.
         """
         return _CAPI_DGLHeteroNumEdges(self, int(etype))
 
