@@ -125,6 +125,7 @@ def is_authorized(name) {
               'czkkkkkk',
               'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa',
               'kkranen',
+              'bgawrych',
               'VoVAllen',
               ]
   return (name in devs)
