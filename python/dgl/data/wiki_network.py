@@ -1,12 +1,10 @@
 """
-Wikipedia page-page networks on three topics: chameleons, crocodiles and
-squirrels
+Wikipedia page-page networks on the chameleon topic.
 """
 import os
 
 import numpy as np
 
-from .. import backend as F
 from ..convert import graph
 from .dgl_dataset import DGLBuiltinDataset
 from .utils import _get_dgl_url
@@ -39,7 +37,6 @@ class WikiNetworkDataset(DGLBuiltinDataset):
             name=name,
             url=url,
             raw_dir=raw_dir,
-            hash_key=(url),
             force_reload=force_reload,
             verbose=verbose,
             transform=transform,
@@ -47,46 +44,45 @@ class WikiNetworkDataset(DGLBuiltinDataset):
 
     def process(self):
         """Load and process the data."""
-        # node features and labels
+        try:
+            import torch
+        except ImportError:
+            raise ModuleNotFoundError(
+                "This dataset requires PyTorch to be the backend."
+            )
+
+        # Process node features and labels.
         with open(f"{self.raw_path}/out1_node_feature_label.txt", "r") as f:
             data = f.read().split("\n")[1:-1]
         features = [
             [float(v) for v in r.split("\t")[1].split(",")] for r in data
         ]
-        features = F.tensor(features, dtype=F.data_type_dict["float32"])
+        features = torch.tensor(features, dtype=torch.float)
         labels = [int(r.split("\t")[2]) for r in data]
         self._num_classes = max(labels) + 1
-        labels = F.tensor(labels, dtype=F.data_type_dict["int64"])
+        labels = torch.tensor(labels, dtype=torch.long)
 
-        # graph structure
+        # Process graph structure.
         with open(f"{self.raw_path}/out1_graph_edges.txt", "r") as f:
             data = f.read().split("\n")[1:-1]
             data = [[int(v) for v in r.split("\t")] for r in data]
-        COO = F.swapaxes(F.tensor(data, dtype=F.data_type_dict["int64"]), 0, 1)
-        dst = F.squeeze(F.narrow_row(COO, start=0, stop=1), dim=0)
-        src = F.squeeze(F.narrow_row(COO, start=1, stop=2), dim=0)
+        dst, src = torch.tensor(data, dtype=torch.long).t().contiguous()
 
-        self._g = graph((src, dst), num_nodes=F.shape(features)[0])
+        self._g = graph((src, dst), num_nodes=features.size(0))
         self._g.ndata["feat"] = features
         self._g.ndata["label"] = labels
 
-        # split
+        # Process 10 train/val/test node splits.
         train_masks, val_masks, test_masks = [], [], []
         for i in range(10):
             filepath = f"{self.raw_path}/{self.name}_split_0.6_0.2_{i}.npz"
             f = np.load(filepath)
-            train_masks += [F.zerocopy_from_numpy(f["train_mask"])]
-            val_masks += [F.zerocopy_from_numpy(f["val_mask"])]
-            test_masks += [F.zerocopy_from_numpy(f["test_mask"])]
-        self._g.ndata["train_mask"] = F.astype(
-            F.stack(train_masks, dim=1), F.data_type_dict["bool"]
-        )
-        self._g.ndata["val_mask"] = F.astype(
-            F.stack(val_masks, dim=1), F.data_type_dict["bool"]
-        )
-        self._g.ndata["test_mask"] = F.astype(
-            F.stack(test_masks, dim=1), F.data_type_dict["bool"]
-        )
+            train_masks += [torch.from_numpy(f["train_mask"])]
+            val_masks += [torch.from_numpy(f["val_mask"])]
+            test_masks += [torch.from_numpy(f["test_mask"])]
+        self._g.ndata["train_mask"] = torch.stack(train_masks, dim=1).bool()
+        self._g.ndata["val_mask"] = torch.stack(val_masks, dim=1).bool()
+        self._g.ndata["test_mask"] = torch.stack(test_masks, dim=1).bool()
 
     def has_cache(self):
         return os.path.exists(self.raw_path)

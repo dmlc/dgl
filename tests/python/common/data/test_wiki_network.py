@@ -9,6 +9,9 @@ import dgl
     F._default_context_str == "gpu",
     reason="Datasets don't need to be tested on GPU.",
 )
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="only supports pytorch"
+)
 def test_chameleon():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
 

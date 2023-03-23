@@ -220,8 +220,8 @@ class DGLDataset(object):
         hash_func.update(str(self._hash_key).encode("utf-8"))
         return hash_func.hexdigest()[:8]
 
-    def _get_hash_url(self):
-        """Compute the hash of the url"""
+    def _get_hash_url_suffix(self):
+        """Get the suffix based on the hash value of the url."""
         if self._url is None:
             return ""
         else:
@@ -249,7 +249,9 @@ class DGLDataset(object):
         r"""Directory contains the input data files.
         By default raw_path = os.path.join(self.raw_dir, self.name)
         """
-        return os.path.join(self.raw_dir, self.name + self._get_hash_url())
+        return os.path.join(
+            self.raw_dir, self.name + self._get_hash_url_suffix()
+        )
 
     @property
     def save_dir(self):
