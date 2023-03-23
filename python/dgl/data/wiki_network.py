@@ -11,8 +11,10 @@ from .utils import _get_dgl_url
 
 
 class WikiNetworkDataset(DGLBuiltinDataset):
-    r"""Wikipedia page-page networks from `Multi-scale Attributed Node
-    Embedding <https://arxiv.org/abs/1909.13021>`__
+    r"""Wikipedia page-page networks from `Multi-scale Attributed
+    Node Embedding <https://arxiv.org/abs/1909.13021>`__ and later modified by
+    `Geom-GCN: Geometric Graph Convolutional Networks
+    <https://arxiv.org/abs/2002.05287>`
 
     Parameters
     ----------
@@ -106,8 +108,8 @@ class WikiNetworkDataset(DGLBuiltinDataset):
 
 
 class ChameleonDataset(WikiNetworkDataset):
-    """Wikipedia page-page network on chameleons from `Multi-scale Attributed
-    Node Embedding <https://arxiv.org/abs/1909.13021>`__ and later processed by
+    r"""Wikipedia page-page network on chameleons from `Multi-scale Attributed
+    Node Embedding <https://arxiv.org/abs/1909.13021>`__ and later modified by
     `Geom-GCN: Geometric Graph Convolutional Networks
     <https://arxiv.org/abs/2002.05287>`
 
