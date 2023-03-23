@@ -261,7 +261,9 @@ class DGLDataset(object):
     @property
     def save_path(self):
         r"""Path to save the processed dataset."""
-        return os.path.join(self._save_dir, self.name)
+        return os.path.join(
+            self.save_dir, self.name + self._get_hash_url_suffix()
+        )
 
     @property
     def verbose(self):

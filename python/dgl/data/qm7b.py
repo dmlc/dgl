@@ -1,7 +1,6 @@
 """QM7b dataset for graph property prediction (regression)."""
 import os
 
-import numpy as np
 from scipy import io
 
 from .. import backend as F
@@ -10,7 +9,6 @@ from ..convert import graph as dgl_graph
 from .dgl_dataset import DGLDataset
 from .utils import (
     check_sha1,
-    deprecate_property,
     download,
     load_graphs,
     save_graphs,
@@ -93,7 +91,7 @@ class QM7bDataset(DGLDataset):
         )
 
     def process(self):
-        mat_path = self.raw_path + ".mat"
+        mat_path = os.path.join(self.raw_dir, self.name + ".mat")
         self.graphs, self.label = self._load_graph(mat_path)
 
     def _load_graph(self, filename):
