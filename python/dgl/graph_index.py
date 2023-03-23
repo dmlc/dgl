@@ -167,7 +167,7 @@ class GraphIndex(ObjectBase):
         Returns
         -------
         int
-            The number of nodes
+            The number of nodes.
         """
         return _CAPI_DGLGraphNumVertices(self)
 
