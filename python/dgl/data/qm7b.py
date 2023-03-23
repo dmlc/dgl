@@ -7,12 +7,7 @@ from .. import backend as F
 from ..convert import graph as dgl_graph
 
 from .dgl_dataset import DGLDataset
-from .utils import (
-    check_sha1,
-    download,
-    load_graphs,
-    save_graphs,
-)
+from .utils import check_sha1, download, load_graphs, save_graphs
 
 
 class QM7bDataset(DGLDataset):
