@@ -1,4 +1,4 @@
-'''
+"""
 Distributed Link Prediction
 ===============================
 
@@ -106,8 +106,8 @@ by invoking `node_split` and `edge_split`. We can also get the valid edges and t
 
 .. code-block:: python
 
-    train_eids = dgl.distributed.edge_split(th.ones((g.number_of_edges(),), dtype=th.bool), g.get_partition_book(), force_even=True)
-    train_nids = dgl.distributed.node_split(th.ones((g.number_of_nodes(),), dtype=th.bool), g.get_partition_book())
+    train_eids = dgl.distributed.edge_split(th.ones((g.num_edges(),), dtype=th.bool), g.get_partition_book(), force_even=True)
+    train_nids = dgl.distributed.node_split(th.ones((g.num_nodes(),), dtype=th.bool), g.get_partition_book())
     with open('4part_data/val.pkl', 'rb') as f:
         global_valid_eid = pickle.load(f)
     with open('4part_data/test.pkl', 'rb') as f:
@@ -150,7 +150,7 @@ The code below defines the GraphSage model.
             return x
 
     num_hidden = 256
-    num_labels = len(th.unique(g.ndata['labels'][0:g.number_of_nodes()]))
+    num_labels = len(th.unique(g.ndata['labels'][0:g.num_nodes()]))
     num_layers = 2
     lr = 0.001
     model = SAGE(g.ndata['feat'].shape[1], num_hidden, num_labels, num_layers)
@@ -243,7 +243,7 @@ In the inference stage, we use the model after training loop to get the embeddin
         with th.no_grad():
             sampler = dgl.dataloading.MultiLayerNeighborSampler([25,10])
             train_dataloader = dgl.dataloading.DistNodeDataLoader(
-                graph, th.arange(graph.number_of_nodes()), sampler,
+                graph, th.arange(graph.num_nodes()), sampler,
                 batch_size=1024,
                 shuffle=False,
                 drop_last=False)
@@ -288,4 +288,4 @@ Set up distributed training environment
 
 The distributed training environment set up is similar to the distributed node classification. Please refer here for more details:
 `Set up distributed training environment <https://docs.dgl.ai/en/latest/tutorials/dist/1_node_classification.html#set-up-distributed-training-environment>`_
-'''
+"""
