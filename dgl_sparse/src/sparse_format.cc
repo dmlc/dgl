@@ -113,7 +113,8 @@ std::shared_ptr<CSR> DiagToCSR(
     const c10::TensorOptions& indices_options) {
   int64_t nnz = std::min(diag->num_rows, diag->num_cols);
   auto indptr = torch::full(diag->num_rows + 1, nnz, indices_options);
-  torch::arange_out(indptr, nnz + 1);
+  auto nnz_range = torch::arange(nnz + 1, indices_options);
+  indptr.index_put_({nnz_range}, nnz_range);
   auto indices = torch::arange(nnz, indices_options);
   return std::make_shared<CSR>(
       CSR{diag->num_rows, diag->num_cols, indptr, indices,
@@ -125,7 +126,8 @@ std::shared_ptr<CSR> DiagToCSC(
     const c10::TensorOptions& indices_options) {
   int64_t nnz = std::min(diag->num_rows, diag->num_cols);
   auto indptr = torch::full(diag->num_cols + 1, nnz, indices_options);
-  torch::arange_out(indptr, nnz + 1);
+  auto nnz_range = torch::arange(nnz + 1, indices_options);
+  indptr.index_put_({nnz_range}, nnz_range);
   auto indices = torch::arange(nnz, indices_options);
   return std::make_shared<CSR>(
       CSR{diag->num_cols, diag->num_rows, indptr, indices,

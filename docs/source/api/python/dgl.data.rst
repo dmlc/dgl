@@ -94,6 +94,7 @@ Datasets for graph classification/regression tasks
     GINDataset
     FakeNewsDataset
     BA2MotifDataset
+    ZINCDataset
 
 Dataset adapters
 -------------------
