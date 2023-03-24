@@ -1,11 +1,13 @@
-"""Modeling Relational Data with Graph Convolutional Networks
-Paper: https://arxiv.org/abs/1703.06103
+"""
+[Modeling Relational Data with Graph Convolutional Networks]
+(https://arxiv.org/abs/1703.06103)
+
 Reference Code: https://github.com/tkipf/relational-gcn
 """
 import argparse
 
 import dgl.sparse as dglsp
-import torch as th
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -13,14 +15,14 @@ from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
 
 
 class RelGraphConvLayer(nn.Module):
-    def __init__(self, in_feat, out_feat, rel_names):
+    def __init__(self, in_size, out_size, relation_names):
         super(RelGraphConvLayer, self).__init__()
-        self.in_feat = in_feat
-        self.out_feat = out_feat
-        self.rel_names = rel_names
+        self.in_size = in_size
+        self.out_size = out_size
+        self.relation_names = relation_names
         self.weight = {
-            rel: nn.Parameter(th.Tensor(in_feat, out_feat))
-            for rel in self.rel_names
+            rel: nn.Parameter(torch.Tensor(in_size, out_size))
+            for rel in self.relation_names
         }
         for w in self.weight.values():
             nn.init.xavier_uniform_(w, gain=nn.init.calculate_gain("relu"))
@@ -30,7 +32,7 @@ class RelGraphConvLayer(nn.Module):
         for stype, etype, dtype in adjs.keys():
             h = x_dict[stype] @ self.weight[etype]  # dense mm
             h_dict[dtype] += adjs[(stype, etype, dtype)] @ h
-        h_dict = {ntype: th.relu(h) for ntype, h in h_dict.items()}
+        h_dict = {ntype: torch.relu(h) for ntype, h in h_dict.items()}
         return h_dict
 
 
@@ -40,20 +42,20 @@ class EntityClassify(nn.Module):
         self.adjs = adjs
         self.h_dim = h_dim
         self.out_dim = out_dim
-        self.rel_names = list(set(etype for _, etype, _ in adjs.keys()))
+        self.relation_names = list(set(etype for _, etype, _ in adjs.keys()))
 
         self.embeds = nn.ParameterDict()
         for ntype, num_nodes in ntype_to_num_nodes.items():
-            embed = nn.Parameter(th.Tensor(num_nodes, h_dim))
+            embed = nn.Parameter(torch.Tensor(num_nodes, h_dim))
             nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain("relu"))
             self.embeds[ntype] = embed
 
         self.layers = nn.ModuleList()
         self.layers.append(
-            RelGraphConvLayer(self.h_dim, self.h_dim, self.rel_names)
+            RelGraphConvLayer(self.h_dim, self.h_dim, self.relation_names)
         )
         self.layers.append(
-            RelGraphConvLayer(self.h_dim, self.out_dim, self.rel_names)
+            RelGraphConvLayer(self.h_dim, self.out_dim, self.relation_names)
         )
 
     def forward(self):
@@ -63,87 +65,48 @@ class EntityClassify(nn.Module):
         return h
 
 
-def main(args):
-    # load graph data
-    if args.dataset == "aifb":
-        dataset = AIFBDataset()
-    elif args.dataset == "mutag":
-        dataset = MUTAGDataset()
-    elif args.dataset == "bgs":
-        dataset = BGSDataset()
-    elif args.dataset == "am":
-        dataset = AMDataset()
-    else:
-        raise ValueError()
-
-    g = dataset[0]
-    category = dataset.predict_category
-    num_classes = dataset.num_classes
-    train_mask = g.nodes[category].data.pop("train_mask")
-    test_mask = g.nodes[category].data.pop("test_mask")
-    train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
-    test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
-    labels = g.nodes[category].data.pop("labels")
+def evaluate(g, logits, category):
+    labels = g.nodes[category].data["labels"]
+    train_mask = g.nodes[category].data["train_mask"]
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
+    test_mask = g.nodes[category].data["test_mask"]
+    test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
     val_idx = train_idx
 
-    def create_adjs(g):
-        adjs = {}
-        for rel in g.canonical_etypes:
-            stype, _, dtype = rel
-            row, col = g.edges(etype=rel)
-            adjs[rel] = dglsp.from_coo(
-                col,
-                row,
-                shape=(g.number_of_nodes(dtype), g.number_of_nodes(stype)),
-            )
-        return adjs
+    val_acc = torch.sum(
+        logits[val_idx].argmax(dim=1) == labels[val_idx]
+    ).item() / len(val_idx)
+    test_acc = torch.sum(
+        logits[test_idx].argmax(dim=1) == labels[test_idx]
+    ).item() / len(test_idx)
+    return val_acc, test_acc
 
-    # Dict: canonical_etype -> SparseMatrix
-    adjs = create_adjs(g)
-    ntype_to_num_nodes = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
-    model = EntityClassify(adjs, ntype_to_num_nodes, 16, num_classes)
 
-    optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
+def train(model, g, category):
 
-    print("start training...")
+    labels = g.nodes[category].data["labels"]
+    train_mask = g.nodes[category].data["train_mask"]
+    train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+
     model.train()
     for epoch in range(50):
-        optimizer.zero_grad()
+        # Forward
         logits = model()[category]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
+
+        # Backward
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        train_acc = th.sum(
-            logits[train_idx].argmax(dim=1) == labels[train_idx]
-        ).item() / len(train_idx)
-        val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
-        val_acc = th.sum(
-            logits[val_idx].argmax(dim=1) == labels[val_idx]
-        ).item() / len(val_idx)
+        # Compute prediction.
+        val_acc, test_acc = evaluate(g, logits, category)
         print(
-            "Epoch {:05d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Valid Acc: {:.4f} | Valid loss: {:.4f}".format(
-                epoch,
-                train_acc,
-                loss.item(),
-                val_acc,
-                val_loss.item(),
-            )
+            f"In epoch {epoch}, loss: {loss:.3f}, val acc: {val_acc:.3f}, test"
+            f" acc: {test_acc:.3f}"
         )
-    print()
-
-    model.eval()
-    logits = model.forward()[category]
-    test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
-    test_acc = th.sum(
-        logits[test_idx].argmax(dim=1) == labels[test_idx]
-    ).item() / len(test_idx)
-    print(
-        "Test Acc: {:.4f} | Test loss: {:.4f}".format(
-            test_acc, test_loss.item()
-        )
-    )
-    print()
 
 
 if __name__ == "__main__":
@@ -157,5 +120,38 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    print(args)
-    main(args)
+
+    # Load graph data
+    if args.dataset == "aifb":
+        dataset = AIFBDataset()
+    elif args.dataset == "mutag":
+        dataset = MUTAGDataset()
+    elif args.dataset == "bgs":
+        dataset = BGSDataset()
+    elif args.dataset == "am":
+        dataset = AMDataset()
+    else:
+        raise ValueError()
+
+    g = dataset[0]
+
+    # Create a matrix dictionary from a heterogeneous graph
+    def create_adjs(g):
+        adjs = {}
+        for rel in g.canonical_etypes:
+            stype, _, dtype = rel
+            row, col = g.edges(etype=rel)
+            adjs[rel] = dglsp.spmatrix(
+                torch.stack([col, row]),
+                shape=(g.num_nodes(dtype), g.num_nodes(stype)),
+            )
+        return adjs
+
+    # Dict: canonical_etype -> SparseMatrix
+    adjs = create_adjs(g)
+    ntype_to_num_nodes = {ntype: g.num_nodes(ntype) for ntype in g.ntypes}
+    model = EntityClassify(adjs, ntype_to_num_nodes, 16, dataset.num_classes)
+    print(dataset.predict_category)
+
+    # Kick off training
+    train(model, g, dataset.predict_category)
