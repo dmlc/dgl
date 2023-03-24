@@ -30,9 +30,9 @@ def construct_graph(n, is_hetero):
     g_list = []
     for i in range(n):
         g = generate_rand_graph(30, is_hetero)
-        g.edata["e1"] = F.randn((g.number_of_edges(), 32))
-        g.edata["e2"] = F.ones((g.number_of_edges(), 32))
-        g.ndata["n1"] = F.randn((g.number_of_nodes(), 64))
+        g.edata["e1"] = F.randn((g.num_edges(), 32))
+        g.edata["e2"] = F.ones((g.num_edges(), 32))
+        g.ndata["n1"] = F.randn((g.num_nodes(), 64))
         g_list.append(g)
     return g_list
 
