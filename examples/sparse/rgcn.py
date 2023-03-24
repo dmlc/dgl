@@ -115,7 +115,7 @@ if __name__ == "__main__":
         "-d",
         "--dataset",
         type=str,
-        required=True,
+        default="aifb",
         help="Dataset name ('aifb', 'mutag', 'bgs', 'am').",
     )
 
