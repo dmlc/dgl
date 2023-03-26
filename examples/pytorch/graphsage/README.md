@@ -10,7 +10,7 @@ Requirements
 ------------
 
 ```bash
-pip install requests torchmetrics
+pip install requests torchmetrics==0.10
 ```
 
 How to run
