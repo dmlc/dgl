@@ -1631,6 +1631,74 @@ def test_subgraphx(g, idtype, n_classes):
     explainer.explain_graph(g, feat, target_class=0)
 
 
+@pytest.mark.parametrize("g", get_cases(["hetero"], exclude=["zero-degree"]))
+@pytest.mark.parametrize("idtype", [F.int64])
+@pytest.mark.parametrize("n_classes", [2])
+def test_heterosubgraphx(g, idtype, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    device = g.device
+
+    # add self-loop and reverse edges
+    transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
+    g = transform1(g)
+    transform2 = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform2(g)
+
+    feat = {
+        ntype: th.zeros((g.num_nodes(ntype), 5), device=device)
+        for ntype in g.ntypes
+    }
+
+    class Model(th.nn.Module):
+        def __init__(self, in_dim, n_classes, canonical_etypes):
+            super(Model, self).__init__()
+            self.etype_weights = th.nn.ModuleDict(
+                {
+                    "_".join(c_etype): th.nn.Linear(in_dim, n_classes)
+                    for c_etype in canonical_etypes
+                }
+            )
+            self.conv = nn.GraphConv(in_dim, n_classes)
+            self.pool = nn.AvgPooling()
+
+        def forward(self, graph, feat, eweight=None):
+            with graph.local_scope():
+                c_etype_func_dict = {}
+                for c_etype in graph.canonical_etypes:
+                    src_type, etype, dst_type = c_etype
+                    wh = self.etype_weights["_".join(c_etype)](feat[src_type])
+                    graph.nodes[src_type].data[f"h_{c_etype}"] = wh
+                    if eweight is None:
+                        c_etype_func_dict[c_etype] = (
+                            fn.copy_u(f"h_{c_etype}", "m"),
+                            fn.mean("m", "h"),
+                        )
+                    else:
+                        graph.edges[c_etype].data["w"] = eweight[c_etype]
+                        c_etype_func_dict[c_etype] = (
+                            fn.u_mul_e(f"h_{c_etype}", "w", "m"),
+                            fn.mean("m", "h"),
+                        )
+                graph.multi_update_all(c_etype_func_dict, "sum")
+                if self.graph:
+                    hg = 0
+                    for ntype in graph.ntypes:
+                        if graph.num_nodes(ntype):
+                            hg = hg + dgl.mean_nodes(graph, "h", ntype=ntype)
+
+                    return hg
+                else:
+                    return graph.ndata["h"]
+
+    model = Model(feat.shape[1], n_classes, g.canonical_etypes)
+    model = model.to(ctx)
+    explainer = nn.explain.HeteroSubgraphX(
+        model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
+    )
+    feat_mask, edge_mask = explainer.explain_graph(g, feat, target_class=0)
+
+
 def test_jumping_knowledge():
     ctx = F.ctx()
     num_layers = 2
