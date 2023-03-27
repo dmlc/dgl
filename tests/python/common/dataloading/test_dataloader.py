@@ -8,7 +8,7 @@ from dgl.dataloading import (
     negative_sampler,
     NeighborSampler,
 )
-from pytests_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 def create_test_graph(idtype):

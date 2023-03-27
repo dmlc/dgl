@@ -15,8 +15,8 @@ def test_to_cugraph_conversion():
     g = dgl.graph((F.tensor([0, 1, 2, 3]), F.tensor([1, 0, 3, 2]))).to("cuda")
     cugraph_g = g.to_cugraph()
 
-    assert cugraph_g.number_of_nodes() == g.number_of_nodes()
-    assert cugraph_g.number_of_edges() == g.number_of_edges()
+    assert cugraph_g.number_of_nodes() == g.num_nodes()
+    assert cugraph_g.number_of_edges() == g.num_edges()
 
     assert cugraph_g.has_edge(0, 1)
     assert cugraph_g.has_edge(1, 0)
@@ -36,8 +36,8 @@ def test_from_cugraph_conversion():
     g = dgl.from_cugraph(cugraph_g)
 
     assert g.device.type == "cuda"
-    assert g.number_of_nodes() == cugraph_g.number_of_nodes()
-    assert g.number_of_edges() == cugraph_g.number_of_edges()
+    assert g.num_nodes() == cugraph_g.number_of_nodes()
+    assert g.num_edges() == cugraph_g.number_of_edges()
 
     # assert reverse edges are not present
     assert g.has_edges_between(0, 1)
@@ -55,7 +55,7 @@ def test_from_cugraph_conversion():
     g = dgl.from_cugraph(cugraph_g)
 
     assert g.device.type == "cuda"
-    assert g.number_of_nodes() == cugraph_g.number_of_nodes()
+    assert g.num_nodes() == cugraph_g.number_of_nodes()
     # assert reverse edges are present
     assert g.has_edges_between(0, 1)
     assert g.has_edges_between(1, 0)

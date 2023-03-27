@@ -549,7 +549,7 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target="u", rhs_target="v"):
     out_shp = (gidx.number_of_edges(0),) + infer_broadcast_shape(
         op, lhs_shp[1:], rhs_shp[1:]
     )
-    out = F.zeros(out_shp, dtype, ctx)
+    out = F.empty(out_shp, dtype, ctx)
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSDDMM(
             gidx,
@@ -615,7 +615,7 @@ def _gsddmm_hetero(
         out_shp = (gidx.number_of_edges(etid),) + infer_broadcast_shape(
             op, lhs_shp[1:], rhs_shp[1:]
         )
-        out_list[etid] = F.zeros(out_shp, dtype, ctx)
+        out_list[etid] = F.empty(out_shp, dtype, ctx)
     if gidx.number_of_edges(0) > 0:
         _CAPI_DGLKernelSDDMMHetero(
             gidx,

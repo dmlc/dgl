@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 import torch
 from dgl.ops import gather_mm, gsddmm, gspmm, segment_reduce
-from pytests_utils import parametrize_idtype
-from pytests_utils.graph_cases import get_cases
+from utils import parametrize_idtype
+from utils.graph_cases import get_cases
 
 random.seed(42)
 np.random.seed(42)
@@ -117,7 +117,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
     print(g.idtype)
 
     hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
-    he = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) + 1)
+    he = F.tensor(np.random.rand(*((g.num_edges(),) + shp[1])) + 1)
     print("u shape: {}, e shape: {}".format(F.shape(hu), F.shape(he)))
 
     g.srcdata["x"] = F.attach_grad(F.clone(hu))
@@ -130,7 +130,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
         v = gspmm(g, msg, reducer, u, e)
         if reducer in ["max", "min"]:
             v = F.replace_inf_with_zero(v)
-        if g.number_of_edges() > 0:
+        if g.num_edges() > 0:
             F.backward(F.reduce_sum(v))
             if msg != "copy_rhs":
                 grad_u = F.grad(u)
@@ -139,7 +139,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
 
     with F.record_grad():
         g.update_all(udf_msg[msg], udf_reduce[reducer])
-        if g.number_of_edges() > 0:
+        if g.num_edges() > 0:
             v1 = g.dstdata["v"]
             assert F.allclose(v, v1)
             print("forward passed")
@@ -224,7 +224,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
     if lhs_target == rhs_target:
         return
     g = g.astype(idtype).to(F.ctx())
-    if dgl.backend.backend_name == "mxnet" and g.number_of_edges() == 0:
+    if dgl.backend.backend_name == "mxnet" and g.num_edges() == 0:
         pytest.skip()  # mxnet do not support zero shape tensor
     print(g)
     print(g.idtype)
@@ -232,14 +232,14 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
     len_lhs = select(
         lhs_target,
         g.number_of_src_nodes(),
-        g.number_of_edges(),
+        g.num_edges(),
         g.number_of_dst_nodes(),
     )
     lhs_shp = (len_lhs,) + shp[0]
     len_rhs = select(
         rhs_target,
         g.number_of_src_nodes(),
-        g.number_of_edges(),
+        g.num_edges(),
         g.number_of_dst_nodes(),
     )
     rhs_shp = (len_rhs,) + shp[1]
@@ -270,7 +270,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
 
     with F.record_grad():
         g.apply_edges(udf_apply_edges[msg_func])
-        if g.number_of_edges() > 0:
+        if g.num_edges() > 0:
             e1 = g.edata["m"]
             assert F.allclose(e, e1)
             print("forward passed")

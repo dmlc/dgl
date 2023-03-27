@@ -54,8 +54,10 @@ from .tu import LegacyTUDataset, TUDataset
 from .utils import *
 from .cluster import CLUSTERDataset
 from .pattern import PATTERNDataset
+from .wiki_network import ChameleonDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
+from .zinc import ZINCDataset
 
 
 def register_data_args(parser):
