@@ -13,8 +13,8 @@ class BFloat16 {
 
  public:
   constexpr BFloat16() : val(0) {}
-  // disabling "explicit" warning in lint
-  // implicit usage on costructor is expected
+  // Disable lint "explicit" warning, since implicit usage on constructor is
+  // expected.
   BFloat16(float f) {  // NOLINT
     if (std::isnan(f)) {
       val = 0x7FC0;

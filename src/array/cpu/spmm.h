@@ -54,7 +54,7 @@ void SpMMSumCsrNaive(
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       DType* out_off = O + rid * dim;
       for (int64_t k = 0; k < dim; ++k) {
-        AccType akk = 0.;
+        AccType acc = 0.;
         for (IdType j = row_start; j < row_end; ++j) {
           const IdType cid = indices[j];
           const IdType eid = has_idx ? edges[j] : j;
@@ -64,9 +64,9 @@ void SpMMSumCsrNaive(
               Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
           const DType* rhs_off =
               Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
-          akk += Op::Call(lhs_off, rhs_off);
+          acc += Op::Call(lhs_off, rhs_off);
         }
-        out_off[k] += akk;
+        out_off[k] += acc;
       }
     }
   });
