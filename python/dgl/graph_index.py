@@ -1157,16 +1157,16 @@ def from_networkx(nx_graph, readonly):
             # to_directed creates a deep copy of the networkx graph even if
             # the original graph is already directed and we do not want to do it.
             nx_graph = nx_graph.to_directed()
-    num_nodes = nx_graph.num_nodes()
+    num_nodes = nx_graph.number_of_nodes()
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
-    if nx_graph.num_edges() > 0:
+    if nx_graph.number_of_edges() > 0:
         has_edge_id = "id" in next(iter(nx_graph.edges(data=True)))[-1]
     else:
         has_edge_id = False
 
     if has_edge_id:
-        num_edges = nx_graph.num_edges()
+        num_edges = nx_graph.number_of_edges()
         src = np.zeros((num_edges,), dtype=np.int64)
         dst = np.zeros((num_edges,), dtype=np.int64)
         for u, v, attr in nx_graph.edges(data=True):
@@ -1179,7 +1179,7 @@ def from_networkx(nx_graph, readonly):
         for e in nx_graph.edges:
             src.append(e[0])
             dst.append(e[1])
-    num_nodes = nx_graph.num_nodes()
+    num_nodes = nx_graph.number_of_nodes()
     # We store edge Ids as an edge attribute.
     src = utils.toindex(src)
     dst = utils.toindex(dst)
