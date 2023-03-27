@@ -408,6 +408,63 @@ def test_cluster():
         assert ds.num_classes == 6
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="only supports pytorch"
+)
+def test_zinc():
+    mode_n_graphs = {
+        "train": 10000,
+        "valid": 1000,
+        "test": 1000,
+    }
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    for mode, n_graphs in mode_n_graphs.items():
+        dataset1 = data.ZINCDataset(mode=mode)
+        g1, label = dataset1[0]
+        dataset2 = data.ZINCDataset(mode=mode, transform=transform)
+        g2, _ = dataset2[0]
+
+        assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+        # return a scalar tensor
+        assert not label.shape
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_extract_archive():
+    # gzip
+    with tempfile.TemporaryDirectory() as src_dir:
+        gz_file = "gz_archive"
+        gz_path = os.path.join(src_dir, gz_file + ".gz")
+        content = b"test extract archive gzip"
+        with gzip.open(gz_path, "wb") as f:
+            f.write(content)
+        with tempfile.TemporaryDirectory() as dst_dir:
+            data.utils.extract_archive(gz_path, dst_dir, overwrite=True)
+            assert os.path.exists(os.path.join(dst_dir, gz_file))
+
+    # tar
+    with tempfile.TemporaryDirectory() as src_dir:
+        tar_file = "tar_archive"
+        tar_path = os.path.join(src_dir, tar_file + ".tar")
+        # default encode to utf8
+        content = "test extract archive tar\n".encode()
+        info = tarfile.TarInfo(name="tar_archive")
+        info.size = len(content)
+        with tarfile.open(tar_path, "w") as f:
+            f.addfile(info, io.BytesIO(content))
+        with tempfile.TemporaryDirectory() as dst_dir:
+            data.utils.extract_archive(tar_path, dst_dir, overwrite=True)
+            assert os.path.exists(os.path.join(dst_dir, tar_file))
+
+
 def _test_construct_graphs_node_ids():
     from dgl.data.csv_dataset_base import (
         DGLGraphConstructor,

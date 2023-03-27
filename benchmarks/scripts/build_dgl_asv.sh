@@ -11,11 +11,7 @@ pip install -r /asv/torch_gpu_pip.txt
 # 'CUDA_TOOLKIT_ROOT_DIR' is always required for sparse build as torch1.13.1+cu116 is installed.
 CMAKE_VARS="-DUSE_OPENMP=ON -DBUILD_TORCH=ON -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda"
 if [[ $DEVICE == "gpu" ]]; then
-    CMAKE_VARS="-DUSE_CUDA=ON -DUSE_NCCL=ON $CMAKE_VARS"
-fi
-arch=`uname -m`
-if [[ $arch == *"x86"* ]]; then
-  CMAKE_VARS="-DUSE_AVX=ON $CMAKE_VARS"
+    CMAKE_VARS="-DUSE_CUDA=ON $CMAKE_VARS"
 fi
 mkdir -p build
 pushd build

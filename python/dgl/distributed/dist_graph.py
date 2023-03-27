@@ -121,7 +121,7 @@ def _get_shared_mem_ndata(g, graph_name, name):
     This is called by the DistGraph client to access the node data in the DistGraph server
     with shared memory.
     """
-    shape = (g.number_of_nodes(),)
+    shape = (g.num_nodes(),)
     dtype = RESERVED_FIELD_DTYPE[name]
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(
@@ -137,7 +137,7 @@ def _get_shared_mem_edata(g, graph_name, name):
     This is called by the DistGraph client to access the edge data in the DistGraph server
     with shared memory.
     """
-    shape = (g.number_of_edges(),)
+    shape = (g.num_edges(),)
     dtype = RESERVED_FIELD_DTYPE[name]
     dtype = DTYPE_DICT[dtype]
     data = empty_shared_mem(
@@ -1079,7 +1079,7 @@ class DistGraph:
         in_degrees
         """
         if is_all(u):
-            u = F.arange(0, self.number_of_nodes())
+            u = F.arange(0, self.num_nodes())
         return dist_out_degrees(self, u)
 
     def in_degrees(self, v=ALL):
@@ -1128,7 +1128,7 @@ class DistGraph:
         out_degrees
         """
         if is_all(v):
-            v = F.arange(0, self.number_of_nodes())
+            v = F.arange(0, self.num_nodes())
         return dist_in_degrees(self, v)
 
     def node_attr_schemes(self):
@@ -1281,16 +1281,14 @@ class DistGraph:
             for etype, edge in edges.items():
                 etype = self.to_canonical_etype(etype)
                 subg[etype] = self.find_edges(edge, etype)
-            num_nodes = {
-                ntype: self.number_of_nodes(ntype) for ntype in self.ntypes
-            }
+            num_nodes = {ntype: self.num_nodes(ntype) for ntype in self.ntypes}
             subg = dgl_heterograph(subg, num_nodes_dict=num_nodes)
             for etype in edges:
                 subg.edges[etype].data[EID] = edges[etype]
         else:
             assert len(self.etypes) == 1
             subg = self.find_edges(edges)
-            subg = dgl_graph(subg, num_nodes=self.number_of_nodes())
+            subg = dgl_graph(subg, num_nodes=self.num_nodes())
             subg.edata[EID] = edges
 
         if relabel_nodes:
