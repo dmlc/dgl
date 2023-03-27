@@ -57,12 +57,13 @@ def gen_edge_files(rank, schema_map, params):
 
     Parameters:
     -----------
+    rank : int
+        rank of the current process
     schema_map : json dictionary
         Dictionary created by reading the metadata.json file for the input dataset.
     output : string
         Location of storing the node-weights and edge files for ParMETIS.
     """
-    # rank = get_proc_info()
     type_nid_dict, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
         dict(
@@ -122,10 +123,7 @@ def gen_edge_files(rank, schema_map, params):
             reader_fmt_meta = {
                 "name": etype_info[constants.STR_FORMAT][constants.STR_NAME],
             }
-            if (
-                etype_info[constants.STR_FORMAT][constants.STR_NAME]
-                == constants.STR_CSV
-            ):
+            if reader_fmt_meta["name"] == constants.STR_CSV:
                 reader_fmt_meta["delimiter"] = etype_info[constants.STR_FORMAT][
                     constants.STR_FORMAT_DELIMITER
                 ]
