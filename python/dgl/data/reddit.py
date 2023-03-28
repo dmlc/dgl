@@ -168,8 +168,8 @@ class RedditDataset(DGLBuiltinDataset):
     def _print_info(self):
         if self.verbose:
             print("Finished data loading.")
-            print("  NumNodes: {}".format(self._graph.number_of_nodes()))
-            print("  NumEdges: {}".format(self._graph.number_of_edges()))
+            print("  NumNodes: {}".format(self._graph.num_nodes()))
+            print("  NumEdges: {}".format(self._graph.num_edges()))
             print("  NumFeats: {}".format(self._graph.ndata["feat"].shape[1]))
             print("  NumClasses: {}".format(self.num_classes))
             print(
