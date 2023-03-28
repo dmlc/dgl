@@ -1265,10 +1265,17 @@ def gen_dist_partitions(rank, world_size, params):
 
     def prepare_local_data(src_data, local_part_id):
         local_data = {}
+        keys = []
         for k, v in src_data.items():
             tokens = k.split("/")
             if tokens[len(tokens) - 1] == str(local_part_id):
+                keys.append(k)
                 local_data["/".join(tokens[:-1])] = v
+
+        for k in keys:
+            src_data[k] = None
+            src_data.pop(k)
+
         return local_data
 
     # create dgl objects here
