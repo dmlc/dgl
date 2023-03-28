@@ -27,6 +27,10 @@ namespace dgl {
 namespace aten {
 namespace cpu {
 
+template <typename DType>
+using AccType = typename std::conditional<
+    std::is_same<DType, BFloat16>::value, float, DType>::type;
+
 /**
  * @brief Naive CPU kernel of SpMM on Csr format.
  * @param cpu_spec JIT'ed kernel
@@ -42,8 +46,6 @@ template <typename IdType, typename DType, typename Op>
 void SpMMSumCsrNaive(
     const BcastOff& bcast, const CSRMatrix& csr, const DType* X, const DType* W,
     DType* O) {
-  typedef typename std::conditional<
-      std::is_same<DType, BFloat16>::value, float, DType>::type AccType;
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = csr.indptr.Ptr<IdType>();
   const IdType* indices = csr.indices.Ptr<IdType>();
@@ -54,7 +56,7 @@ void SpMMSumCsrNaive(
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
       DType* out_off = O + rid * dim;
       for (int64_t k = 0; k < dim; ++k) {
-        AccType acc = 0.;
+        AccType<DType> acc = 0.;
         for (IdType j = row_start; j < row_end; ++j) {
           const IdType cid = indices[j];
           const IdType eid = has_idx ? edges[j] : j;
@@ -446,8 +448,6 @@ template <typename IdType, typename DType, typename Op>
 void Edge_softmax_csr_forward(
     const BcastOff& bcast, const CSRMatrix& csr, NDArray ufeat, NDArray efeat,
     NDArray out) {
-  typedef typename std::conditional<
-      std::is_same<DType, BFloat16>::value, float, DType>::type AccType;
   const bool has_idx = !IsNullArray(csr.data);
   const IdType* indptr = static_cast<IdType*>(csr.indptr->data);
   const IdType* edges =
@@ -457,7 +457,7 @@ void Edge_softmax_csr_forward(
   runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
     for (auto rid = b; rid < e; ++rid) {
       const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
-      std::vector<AccType> data_e(row_end - row_start, 0);
+      std::vector<AccType<DType>> data_e(row_end - row_start, 0);
       std::vector<IdType> num(row_end - row_start, 0);
       for (int64_t k = 0; k < dim; ++k) {
         DType max_v = -std::numeric_limits<DType>::infinity();
