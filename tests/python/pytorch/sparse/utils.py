@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from dgl.sparse import from_coo, from_csc, from_csr, SparseMatrix
+from dgl.sparse import diag, from_coo, from_csc, from_csr, SparseMatrix
 
 np.random.seed(42)
 torch.random.manual_seed(42)
@@ -62,6 +62,15 @@ def rand_csc(shape, nnz, dev, nz_dim=None):
     col_sorted, col_sorted_idx = torch.sort(col)
     indices = row[col_sorted_idx]
     return from_csc(indptr, indices, val, shape=shape)
+
+
+def rand_diag(shape, nnz, dev, nz_dim=None):
+    nnz = min(shape)
+    if nz_dim is None:
+        val = torch.randn(nnz, device=dev, requires_grad=True)
+    else:
+        val = torch.randn(nnz, nz_dim, device=dev, requires_grad=True)
+    return diag(val, shape)
 
 
 def rand_coo_uncoalesced(shape, nnz, dev):

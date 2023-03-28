@@ -14,6 +14,13 @@ def spsp_add(A, B):
     )
 
 
+def spsp_mul(A, B):
+    """Invoke C++ sparse library for multiplication"""
+    return SparseMatrix(
+        torch.ops.dgl_sparse.spsp_mul(A.c_sparse_matrix, B.c_sparse_matrix)
+    )
+
+
 def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     """Elementwise addition
 
@@ -119,17 +126,7 @@ def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     """
     if is_scalar(B):
         return val_like(A, A.val * B)
-    if A.is_diag() and B.is_diag():
-        assert A.shape == B.shape, (
-            f"The shape of diagonal matrix A {A.shape} and B {B.shape} must"
-            f"match for elementwise multiplication."
-        )
-        return diag(A.val * B.val, A.shape)
-    # Python falls back to B.__rmul__(A) then TypeError when NotImplemented is
-    # returned.
-    # So this also handles the case of scalar * SparseMatrix since we set
-    # SparseMatrix.__rmul__ to be the same as SparseMatrix.__mul__.
-    return NotImplemented
+    return spsp_mul(A, B)
 
 
 def sp_div(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
