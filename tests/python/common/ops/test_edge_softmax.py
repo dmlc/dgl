@@ -28,7 +28,7 @@ feat_size = 2
 @parametrize_idtype
 def test_edge_softmax(g, norm_by, shp, idtype):
     g = g.astype(idtype).to(F.ctx())
-    edata = F.tensor(np.random.rand(g.number_of_edges(), *shp))
+    edata = F.tensor(np.random.rand(g.num_edges(), *shp))
     e1 = F.attach_grad(F.clone(edata))
 
     with F.record_grad():
