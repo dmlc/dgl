@@ -199,7 +199,7 @@ class HGPSLPool(nn.Module):
         # top-k pool first
         if e_feat is None:
             e_feat = torch.ones(
-                (graph.number_of_edges(),), dtype=feat.dtype, device=feat.device
+                (graph.num_edges(),), dtype=feat.dtype, device=feat.device
             )
         batch_num_nodes = graph.batch_num_nodes()
         x_score = self.calc_info_score(graph, feat, e_feat)

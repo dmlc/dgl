@@ -305,49 +305,49 @@ class MovieLens(object):
             rst = 0
             for r in self.possible_rating_values:
                 r = to_etype_name(r)
-                rst += graph.number_of_edges(str(r))
+                rst += graph.num_edges(str(r))
             return rst
 
         print(
             "Train enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-                self.train_enc_graph.number_of_nodes("user"),
-                self.train_enc_graph.number_of_nodes("movie"),
+                self.train_enc_graph.num_nodes("user"),
+                self.train_enc_graph.num_nodes("movie"),
                 _npairs(self.train_enc_graph),
             )
         )
         print(
             "Train dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-                self.train_dec_graph.number_of_nodes("user"),
-                self.train_dec_graph.number_of_nodes("movie"),
-                self.train_dec_graph.number_of_edges(),
+                self.train_dec_graph.num_nodes("user"),
+                self.train_dec_graph.num_nodes("movie"),
+                self.train_dec_graph.num_edges(),
             )
         )
         print(
             "Valid enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-                self.valid_enc_graph.number_of_nodes("user"),
-                self.valid_enc_graph.number_of_nodes("movie"),
+                self.valid_enc_graph.num_nodes("user"),
+                self.valid_enc_graph.num_nodes("movie"),
                 _npairs(self.valid_enc_graph),
             )
         )
         print(
             "Valid dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-                self.valid_dec_graph.number_of_nodes("user"),
-                self.valid_dec_graph.number_of_nodes("movie"),
-                self.valid_dec_graph.number_of_edges(),
+                self.valid_dec_graph.num_nodes("user"),
+                self.valid_dec_graph.num_nodes("movie"),
+                self.valid_dec_graph.num_edges(),
             )
         )
         print(
             "Test enc graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-                self.test_enc_graph.number_of_nodes("user"),
-                self.test_enc_graph.number_of_nodes("movie"),
+                self.test_enc_graph.num_nodes("user"),
+                self.test_enc_graph.num_nodes("movie"),
                 _npairs(self.test_enc_graph),
             )
         )
         print(
             "Test dec graph: \t#user:{}\t#movie:{}\t#pairs:{}".format(
-                self.test_dec_graph.number_of_nodes("user"),
-                self.test_dec_graph.number_of_nodes("movie"),
-                self.test_dec_graph.number_of_edges(),
+                self.test_dec_graph.num_nodes("user"),
+                self.test_dec_graph.num_nodes("movie"),
+                self.test_dec_graph.num_edges(),
             )
         )
 
@@ -398,7 +398,7 @@ class MovieLens(object):
         # sanity check
         assert (
             len(rating_pairs[0])
-            == sum([graph.number_of_edges(et) for et in graph.etypes]) // 2
+            == sum([graph.num_edges(et) for et in graph.etypes]) // 2
         )
 
         if add_support:

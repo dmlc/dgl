@@ -68,8 +68,8 @@ class DGLJTNNEncoder(nn.Module):
             np.insert(mol_tree_batch.batch_num_nodes().cpu().numpy(), 0, 0)
         )
         root_ids = node_offset[:-1]
-        n_nodes = mol_tree_batch.number_of_nodes()
-        n_edges = mol_tree_batch.number_of_edges()
+        n_nodes = mol_tree_batch.num_nodes()
+        n_edges = mol_tree_batch.num_edges()
 
         # Assign structure embeddings to tree nodes
         mol_tree_batch.ndata.update(

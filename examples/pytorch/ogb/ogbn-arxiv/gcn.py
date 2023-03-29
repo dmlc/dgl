@@ -341,9 +341,9 @@ def main():
     graph.add_edges(dsts, srcs)
 
     # add self-loop
-    print(f"Total edges before adding self-loop {graph.number_of_edges()}")
+    print(f"Total edges before adding self-loop {graph.num_edges()}")
     graph = graph.remove_self_loop().add_self_loop()
-    print(f"Total edges after adding self-loop {graph.number_of_edges()}")
+    print(f"Total edges after adding self-loop {graph.num_edges()}")
 
     in_feats = graph.ndata["feat"].shape[1]
     n_classes = (labels.max() + 1).item()

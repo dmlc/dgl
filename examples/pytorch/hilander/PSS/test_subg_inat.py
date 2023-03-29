@@ -132,14 +132,14 @@ dataset = LanderDataset(
     features=features, labels=labels, k=args.knn_k, levels=1, faiss_gpu=False
 )
 g = dataset.gs[0]
-g.ndata["pred_den"] = torch.zeros((g.number_of_nodes()))
-g.edata["prob_conn"] = torch.zeros((g.number_of_edges(), 2))
+g.ndata["pred_den"] = torch.zeros((g.num_nodes()))
+g.edata["prob_conn"] = torch.zeros((g.num_edges(), 2))
 global_labels = labels.copy()
-ids = np.arange(g.number_of_nodes())
+ids = np.arange(g.num_nodes())
 global_edges = ([], [])
 global_peaks = np.array([], dtype=np.long)
 global_edges_len = len(global_edges[0])
-global_num_nodes = g.number_of_nodes()
+global_num_nodes = g.num_nodes()
 
 global_densities = g.ndata["density"][:linsize]
 global_densities = np.sort(global_densities)
@@ -150,7 +150,7 @@ sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
 # fix the number of edges
 test_loader = dgl.dataloading.DataLoader(
     g,
-    torch.arange(g.number_of_nodes()),
+    torch.arange(g.num_nodes()),
     sampler,
     batch_size=args.batch_size,
     shuffle=False,
@@ -222,7 +222,7 @@ for level in range(args.levels):
     if level == 0:
         global_pred_densities = g.ndata["pred_den"]
         global_densities = g.ndata["density"]
-        g.edata["prob_conn"] = torch.zeros((g.number_of_edges(), 2))
+        g.edata["prob_conn"] = torch.zeros((g.num_edges(), 2))
 
     ids = ids[peaks]
     new_global_edges_len = len(global_edges[0])
@@ -258,11 +258,11 @@ for level in range(args.levels):
         cluster_features=cluster_features,
     )
     g = dataset.gs[0]
-    g.ndata["pred_den"] = torch.zeros((g.number_of_nodes()))
-    g.edata["prob_conn"] = torch.zeros((g.number_of_edges(), 2))
+    g.ndata["pred_den"] = torch.zeros((g.num_nodes()))
+    g.edata["prob_conn"] = torch.zeros((g.num_edges(), 2))
     test_loader = dgl.dataloading.DataLoader(
         g,
-        torch.arange(g.number_of_nodes()),
+        torch.arange(g.num_nodes()),
         sampler,
         batch_size=args.batch_size,
         shuffle=False,
