@@ -32,7 +32,7 @@ def get_communities(remove_feature):
     edge_index = np.concatenate((edge_index, edge_index[:, ::-1]), axis=0)
     edge_index = torch.from_numpy(edge_index).long().permute(1, 0)
 
-    n = graph.num_nodes()
+    n = graph.number_of_nodes()
     label = np.zeros((n, n), dtype=int)
     for u in node_list:
         # the node IDs are simply consecutive integers from 0
