@@ -147,7 +147,8 @@ def _get_test_data(edges_dir, num_chunks, edge_fmt="csv", edge_fmt_del=" "):
 @pytest.mark.parametrize("num_chunks, num_parts", [[4, 1], [4, 2], [4, 4]])
 @pytest.mark.parametrize("edges_fmt", ["csv", "parquet"])
 def test_gen_edge_files(num_chunks, num_parts, edges_fmt):
-    """Unit test case for the function `tools/distpartitioning/parmetis_preprocess.py::gen_edge_files
+    """Unit test case for the function
+    tools/distpartitioning/parmetis_preprocess.py::gen_edge_files
 
     Parameters:
     -----------
