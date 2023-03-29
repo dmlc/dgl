@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from .... import to_homogeneous, to_heterogeneous
 from ....base import NID
 from ....convert import to_networkx
 from ....subgraph import node_subgraph
@@ -519,32 +520,48 @@ class HeteroSubgraphX(nn.Module):
             return mcts_node.children
 
         subg = node_subgraph(self.graph, mcts_node.nodes)
-        # TODO: hetero semantics to get degrees of all nodes
-        node_degrees = subg.out_degrees() + subg.in_degrees()
+        # Choose k nodes based on the highest degree in the subgraph
+        node_degrees_map = {
+            ntype: torch.zeros(subg.num_nodes(ntype)) for ntype in subg.ntypes
+        }
+        for c_etype in subg.canonical_etypes:
+            out_ntype, _, in_type = c_etype
+            node_degrees_map[out_ntype] += subg.out_degrees(etype=c_etype)
+            node_degrees_map[in_type] += subg.in_degrees(etype=c_etype)
+
+        node_degrees_list = [
+            ((ntype, i), degree)
+            for ntype, node_degrees in node_degrees_map.items()
+            for i, degree in enumerate(node_degrees)
+        ]
+        node_degrees = torch.stack([v for _, v in node_degrees_list])
         k = min(subg.num_nodes(), self.num_child)
-        # TODO: hetero semantics
-        chosen_nodes = torch.topk(
+        chosen_node_indicies = torch.topk(
             node_degrees, k, largest=self.high2low
         ).indices
+        chosen_nodes = [node_degrees_list[i][0] for i in chosen_node_indicies]
 
         mcts_children_maps = dict()
 
-        for canonical_etype, node_id in chosen_nodes:
-            new_subg = remove_nodes(
-                subg, node_id.to(subg.idtype), canonical_etype, store_ids=True
-            )
+        for ntype, node in chosen_nodes:
+            new_subg = remove_nodes(subg, node, ntype, store_ids=True)
+            new_subg_homo = to_homogeneous(new_subg)
             # Get the largest weakly connected component in the subgraph.
-            nx_graph = to_networkx(new_subg.cpu())
+            nx_graph = to_networkx(new_subg_homo.cpu())
             largest_cc_nids = list(
                 max(nx.weakly_connected_components(nx_graph), key=len)
             )
-            # TODO: verify whether this works for hetero
-            # Map to the original node IDs.
-            largest_cc_nids = new_subg.ndata[NID][largest_cc_nids].long()
-            largest_cc_nids = subg.ndata[NID][largest_cc_nids].sort().values
+            largest_cc_homograph = node_subgraph(new_subg_homo, largest_cc_nids)
+            largest_cc_heterograph = to_heterogeneous(
+                largest_cc_homograph, new_subg.ntypes, new_subg.etypes
+            )
 
             if str(largest_cc_nids) not in self.mcts_node_maps:
-                child_mcts_node = MCTSNode(largest_cc_nids)
+                node_dict = {
+                    ntype: largest_cc_heterograph.nodes(ntype)
+                    for ntype in largest_cc_heterograph.ntypes
+                }
+                child_mcts_node = MCTSNode(node_dict)
                 self.mcts_node_maps[str(child_mcts_node)] = child_mcts_node
             else:
                 child_mcts_node = self.mcts_node_maps[str(largest_cc_nids)]
@@ -680,8 +697,8 @@ class HeteroSubgraphX(nn.Module):
         # book all nodes in MCTS
         self.mcts_node_maps = dict()
 
-        root_nodes = {ntype: graph.nodes(ntype) for ntype in graph.ntypes}
-        root = MCTSNode(root_nodes)
+        root_dict = {ntype: graph.nodes(ntype) for ntype in graph.ntypes}
+        root = MCTSNode(root_dict)
         self.mcts_node_maps[str(root)] = root
 
         for i in range(self.num_rollouts):
