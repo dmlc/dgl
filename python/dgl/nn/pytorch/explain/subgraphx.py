@@ -518,12 +518,7 @@ class HeteroSubgraphX(nn.Module):
         if len(mcts_node.children) > 0:
             return mcts_node.children
 
-        subg_node_map = {
-            ntype: mcts_node.nodes.nodes(ntype)
-            for ntype in mcts_node.nodes.ntypes
-        }
-        subg = node_subgraph(self.graph, subg_node_map)
-
+        subg = node_subgraph(self.graph, mcts_node.nodes)
         # TODO: hetero semantics to get degrees of all nodes
         node_degrees = subg.out_degrees() + subg.in_degrees()
         k = min(subg.num_nodes(), self.num_child)
@@ -579,7 +574,10 @@ class HeteroSubgraphX(nn.Module):
         float
             Reward for visiting the node this time
         """
-        if mcts_node.nodes.num_nodes() <= self.node_min:
+        if (
+            sum(len(nodes) for nodes in mcts_node.nodes.values())
+            <= self.node_min
+        ):
             return mcts_node.immediate_reward
 
         children_nodes = self.get_mcts_children(mcts_node)
@@ -682,7 +680,8 @@ class HeteroSubgraphX(nn.Module):
         # book all nodes in MCTS
         self.mcts_node_maps = dict()
 
-        root = MCTSNode(graph)
+        root_nodes = {ntype: graph.nodes(ntype) for ntype in graph.ntypes}
+        root = MCTSNode(root_nodes)
         self.mcts_node_maps[str(root)] = root
 
         for i in range(self.num_rollouts):
