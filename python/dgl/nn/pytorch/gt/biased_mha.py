@@ -76,7 +76,10 @@ class BiasedMHA(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Reset parameters of projection matrices, the same settings as that in Graphormer."""
+        """
+        Reset parameters of projection matrices, the same settings as that in
+        Graphormer.
+        """
         nn.init.xavier_uniform_(self.q_proj.weight, gain=2**-0.5)
         nn.init.xavier_uniform_(self.k_proj.weight, gain=2**-0.5)
         nn.init.xavier_uniform_(self.v_proj.weight, gain=2**-0.5)
@@ -97,8 +100,10 @@ class BiasedMHA(nn.Module):
             The attention bias used for attention modification. Shape:
             (batch_size, N, N, :attr:`num_heads`).
         attn_mask : torch.Tensor, optional
-            The attention mask used for avoiding computation on invalid positions, where
-            invalid positions are indicated by non-zero values. Shape: (batch_size, N, N).
+            The attention mask used for avoiding computation on invalid
+            positions, where invalid positions are indicated by `True` values.
+            Shape: (batch_size, N, N). Note: For rows corresponding to
+            unexisting nodes, make sure at least one value is set to `False`.
 
         Returns
         -------

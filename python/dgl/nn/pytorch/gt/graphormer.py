@@ -97,7 +97,9 @@ class GraphormerLayer(nn.Module):
             (batch_size, N, N, :attr:`num_heads`).
         attn_mask : torch.Tensor, optional
             The attention mask used for avoiding computation on invalid
-            positions. Shape: (batch_size, N, N).
+            positions, where invalid positions are indicated by `True` values.
+            Shape: (batch_size, N, N). Note: For rows corresponding to
+            unexisting nodes, make sure at least one value is set to `False`.
 
         Returns
         -------

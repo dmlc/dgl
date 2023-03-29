@@ -66,13 +66,15 @@ class PathEncoder(nn.Module):
             the input graph, :math:`N` is the maximum number of nodes, and
             :math:`H` is :attr:`num_heads`.
         """
-
+        device = g.device
         g_list = unbatch(g)
         sum_num_edges = 0
         max_num_nodes = th.max(g.batch_num_nodes())
-        path_encoding = []
+        path_encoding = th.zeros(
+            len(g_list), max_num_nodes, max_num_nodes, self.num_heads
+        ).to(device)
 
-        for ubg in g_list:
+        for i, ubg in enumerate(g_list):
             num_nodes = ubg.num_nodes()
             num_edges = ubg.num_edges()
             edata = edge_feat[sum_num_edges : (sum_num_edges + num_edges)]
@@ -94,15 +96,10 @@ class PathEncoder(nn.Module):
                 0 : path_len * self.num_heads
             ].reshape(path_len, self.num_heads, -1)
             # [n, n, l, d] einsum [l, h, d] -> [n, n, h]
-            # [n, n, h] -> [N, N, h], N = max_num_nodes, padded with -inf
-            sub_encoding = th.full(
-                (max_num_nodes, max_num_nodes, self.num_heads), float("-inf")
-            )
-            sub_encoding[0:num_nodes, 0:num_nodes] = th.div(
+            path_encoding[i, :num_nodes, :num_nodes] = th.div(
                 th.einsum("xyld,lhd->xyh", path_data, edge_embedding).permute(
                     2, 0, 1
                 ),
                 shortest_distance,
             ).permute(1, 2, 0)
-            path_encoding.append(sub_encoding)
-        return th.stack(path_encoding, dim=0)
+        return path_encoding

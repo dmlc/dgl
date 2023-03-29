@@ -70,9 +70,11 @@ class SpatialEncoder(nn.Module):
         device = g.device
         g_list = unbatch(g)
         max_num_nodes = th.max(g.batch_num_nodes())
-        spatial_encoding = []
+        spatial_encoding = th.zeros(
+            len(g_list), max_num_nodes, max_num_nodes, self.num_heads
+        ).to(device)
 
-        for ubg in g_list:
+        for i, ubg in enumerate(g_list):
             num_nodes = ubg.num_nodes()
             dist = (
                 th.clamp(
@@ -84,13 +86,8 @@ class SpatialEncoder(nn.Module):
             )
             # shape: [n, n, h], n = num_nodes, h = num_heads
             dist_embedding = self.embedding_table(dist)
-            # [n, n, h] -> [N, N, h], N = max_num_nodes, padded with -inf
-            padded_encoding = th.full(
-                (max_num_nodes, max_num_nodes, self.num_heads), float("-inf")
-            ).to(device)
-            padded_encoding[0:num_nodes, 0:num_nodes] = dist_embedding
-            spatial_encoding.append(padded_encoding)
-        return th.stack(spatial_encoding, dim=0)
+            spatial_encoding[i, :num_nodes, :num_nodes] = dist_embedding
+        return spatial_encoding
 
 
 class SpatialEncoder3d(nn.Module):
@@ -191,14 +188,16 @@ class SpatialEncoder3d(nn.Module):
         device = g.device
         g_list = unbatch(g)
         max_num_nodes = th.max(g.batch_num_nodes())
-        spatial_encoding = []
+        spatial_encoding = th.zeros(
+            len(g_list), max_num_nodes, max_num_nodes, self.num_heads
+        ).to(device)
         sum_num_nodes = 0
         if (self.max_node_type == 1) != (node_type is None):
             raise ValueError(
                 "input node_type should be None if and only if "
                 "max_node_type is 1."
             )
-        for ubg in g_list:
+        for i, ubg in enumerate(g_list):
             num_nodes = ubg.num_nodes()
             sub_coord = coord[sum_num_nodes : sum_num_nodes + num_nodes]
             # shape: [n, n], n = num_nodes
@@ -249,11 +248,6 @@ class SpatialEncoder3d(nn.Module):
             encoding = F.gelu(encoding)
             # [n, n, k] -> [n, n, a], a = num_heads
             encoding = self.linear_layer_2(encoding)
-            # [n, n, a] -> [N, N, a], N = max_num_nodes, padded with -inf
-            padded_encoding = th.full(
-                (max_num_nodes, max_num_nodes, self.num_heads), float("-inf")
-            ).to(device)
-            padded_encoding[0:num_nodes, 0:num_nodes] = encoding
-            spatial_encoding.append(padded_encoding)
+            spatial_encoding[i, :num_nodes, :num_nodes] = encoding
             sum_num_nodes += num_nodes
-        return th.stack(spatial_encoding, dim=0)
+        return spatial_encoding
