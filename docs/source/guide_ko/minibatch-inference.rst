@@ -43,13 +43,13 @@ GPU를 사용해서 GNN을 학습하는데 메모리와 걸리는 시간을 줄�
             """
             # Compute representations layer by layer
             for l, layer in enumerate([self.conv1, self.conv2]):
-                y = torch.zeros(g.number_of_nodes(),
+                y = torch.zeros(g.num_nodes(),
                                 self.hidden_features
                                 if l != self.n_layers - 1
                                 else self.out_features)
                 sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
                 dataloader = dgl.dataloading.NodeDataLoader(
-                    g, torch.arange(g.number_of_nodes()), sampler,
+                    g, torch.arange(g.num_nodes()), sampler,
                     batch_size=batch_size,
                     shuffle=True,
                     drop_last=False)
