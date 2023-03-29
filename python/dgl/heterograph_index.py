@@ -255,12 +255,13 @@ class HeteroGraphIndex(ObjectBase):
         return _CAPI_DGLHeteroCopyTo(self, ctx.device_type, ctx.device_id)
 
     def pin_memory(self):
-        """Pin this graph to the page-locked memory.
+        """Copies the graph index to pinned memory, if it's not already pinned.
 
-        NOTE: This is an outplace method using the backend pinned memory pool.
-              The graph structure must be on CPU to be pinned.
-              If the graph struture is already pinned, the function returns a graph
-              structure with the same storage.
+        NOTE: This is similar to PyTorch's Tensor.pin_memory() method but customized for DGL graph index.
+              Since it shares the pin_memory allocator with PyTorch, the lifecycle of the returned graph
+              is also managed by PyTorch.
+              Note that if a batch includes a DGL graph index (HeteroGraphIndex), PyTorch's DataLoader
+              memory pinning logic will recognize this function and automatically utilize it.
 
         Returns
         -------
@@ -272,7 +273,8 @@ class HeteroGraphIndex(ObjectBase):
     def pin_memory_(self):
         """Pin this graph to the page-locked memory.
 
-        NOTE: This is an inplace method.
+        NOTE: This is an inplace method to pin the current graph index, i.e., it does not
+              require new memory allocation but simply flags the existing graph structure to be page-locked.
               The graph structure must be on CPU to be pinned.
               If the graph struture is already pinned, the function directly returns it.
 

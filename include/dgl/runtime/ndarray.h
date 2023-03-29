@@ -153,6 +153,7 @@ class NDArray {
     else
       return static_cast<T*>(operator->()->data);
   }
+
   /**
    * @brief Copy data content from/into another array.
    * @param other The source array to be copied from.
@@ -170,26 +171,34 @@ class NDArray {
    * @return The array under another context.
    */
   inline NDArray CopyTo(const DGLContext& ctx) const;
+
   /**
    * @brief Return a new array with a copy of the content.
    */
   inline NDArray Clone() const;
 
   /**
-   * @brief Return a copy of the NDArray in pinned (page-locked) memory.
-   * @note This is an out-of-place method, and the current context has to be
-   *     kDGLCPU. Otherwise, it will throw an error.
+   * @brief Return a copy of the current instance of NDArray in pinned
+   *     (page-locked) memory.
+   * @note This is an out-of-place method, i.e., it utilizes PyTorch's
+   *     CachingHostAllocator to allocate pinned memory and copies data from the
+   *     current NDAarray. Therefore,  PyTorch manages the lifecycle of the
+   *     returned NDArray, including decisions such as when to flush the data
+   *     for reuse or call cudaFreeHost. The current context has to be kDGLCPU.
+   *     Otherwise, it will throw an error.
    */
   inline NDArray PinMemory();
+
   /**
    * @brief In-place method to pin the current array by calling PinContainer
    *        on the underlying NDArray:Container.
-   * @note This is an in-place method. Behavior depends on the current context,
-   *       kDGLCPU: will be pinned;
-   *       IsPinned: directly return;
-   *       kDGLCUDA: invalid, will throw an error.
+   * @note This is an in-place method that flags the memory as page-locked. It
+   *     uses cudaHostRegister at the underlying level to pin the current
+   *     instance of NDArray. The current context has to be kDGLCPU. Otherwise,
+   * it will throw an error.
    */
   inline void PinMemory_();
+
   /**
    * @brief In-place method to unpin the current array by calling UnpinContainer
    *        on the underlying NDArray:Container.
@@ -198,26 +207,31 @@ class NDArray {
    *       others: directly return.
    */
   inline void UnpinMemory_();
+
   /**
    * @brief Check if the array is pinned.
    */
   inline bool IsPinned() const;
+
   /**
    * @brief Record streams that are using the underlying tensor.
    * @param stream The stream that is using the underlying tensor.
    */
   inline void RecordStream(DGLStreamHandle stream) const;
+
   /**
    * @brief Load NDArray from stream
    * @param stream The input data stream
    * @return Whether load is successful
    */
   bool Load(dmlc::Stream* stream);
+
   /**
    * @brief Save NDArray to stream
    * @param stream The output data stream
    */
   void Save(dmlc::Stream* stream) const;
+
   /**
    * @brief Create a NDArray that shares the data memory with the current one.
    * @param shape The shape of the new array.
@@ -227,6 +241,7 @@ class NDArray {
    */
   DGL_DLL NDArray
   CreateView(std::vector<int64_t> shape, DGLDataType dtype, int64_t offset = 0);
+
   /**
    * @brief Create an empty NDArray.
    * @param shape The shape of the new array.
@@ -246,6 +261,7 @@ class NDArray {
    */
   DGL_DLL static NDArray PinnedEmpty(
       std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx);
+
   /**
    * @brief Create an empty NDArray with shared memory.
    * @param name The name of shared memory.
@@ -258,6 +274,7 @@ class NDArray {
   DGL_DLL static NDArray EmptyShared(
       const std::string& name, std::vector<int64_t> shape, DGLDataType dtype,
       DGLContext ctx, bool is_create);
+
   /**
    * @brief Get the size of the array in the number of bytes.
    */
