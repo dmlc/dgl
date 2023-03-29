@@ -449,6 +449,9 @@ class HeteroSubgraphX(nn.Module):
         float
             Shapley value
         """
+        # TODO: hetero semantics:
+        #   - take a hetero subgraph rather than a list of nodes?
+
         num_nodes = self.graph.num_nodes()
         subgraph_nodes = subgraph_nodes.tolist()
 
@@ -482,6 +485,7 @@ class HeteroSubgraphX(nn.Module):
             include_mask = exclude_mask.clone()
             include_mask[subgraph_nodes] = 1.0
 
+            # TODO: verify whether this works for hetero
             exclude_feat = self.feat * exclude_mask.unsqueeze(1).to(device)
             include_feat = self.feat * include_mask.unsqueeze(1).to(device)
 
@@ -514,25 +518,36 @@ class HeteroSubgraphX(nn.Module):
         if len(mcts_node.children) > 0:
             return mcts_node.children
 
-        subg = node_subgraph(self.graph, mcts_node.nodes)
+        subg_node_map = {
+            ntype: mcts_node.nodes.nodes(ntype)
+            for ntype in mcts_node.nodes.ntypes
+        }
+        subg = node_subgraph(self.graph, subg_node_map)
+
+        # TODO: hetero semantics to get degrees of all nodes
         node_degrees = subg.out_degrees() + subg.in_degrees()
         k = min(subg.num_nodes(), self.num_child)
+        # TODO: hetero semantics
         chosen_nodes = torch.topk(
             node_degrees, k, largest=self.high2low
         ).indices
 
         mcts_children_maps = dict()
 
-        for node in chosen_nodes:
-            new_subg = remove_nodes(subg, node.to(subg.idtype), store_ids=True)
+        for canonical_etype, node_id in chosen_nodes:
+            new_subg = remove_nodes(
+                subg, node_id.to(subg.idtype), canonical_etype, store_ids=True
+            )
             # Get the largest weakly connected component in the subgraph.
             nx_graph = to_networkx(new_subg.cpu())
             largest_cc_nids = list(
                 max(nx.weakly_connected_components(nx_graph), key=len)
             )
+            # TODO: verify whether this works for hetero
             # Map to the original node IDs.
             largest_cc_nids = new_subg.ndata[NID][largest_cc_nids].long()
             largest_cc_nids = subg.ndata[NID][largest_cc_nids].sort().values
+
             if str(largest_cc_nids) not in self.mcts_node_maps:
                 child_mcts_node = MCTSNode(largest_cc_nids)
                 self.mcts_node_maps[str(child_mcts_node)] = child_mcts_node
@@ -564,7 +579,7 @@ class HeteroSubgraphX(nn.Module):
         float
             Reward for visiting the node this time
         """
-        if len(mcts_node.nodes) <= self.node_min:
+        if mcts_node.nodes.num_nodes() <= self.node_min:
             return mcts_node.immediate_reward
 
         children_nodes = self.get_mcts_children(mcts_node)
@@ -667,7 +682,7 @@ class HeteroSubgraphX(nn.Module):
         # book all nodes in MCTS
         self.mcts_node_maps = dict()
 
-        root = MCTSNode(graph.nodes())
+        root = MCTSNode(graph)
         self.mcts_node_maps[str(root)] = root
 
         for i in range(self.num_rollouts):
