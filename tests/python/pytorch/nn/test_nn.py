@@ -1633,8 +1633,9 @@ def test_subgraphx(g, idtype, n_classes):
 
 @pytest.mark.parametrize("g", get_cases(["hetero"], exclude=["zero-degree"]))
 @pytest.mark.parametrize("idtype", [F.int64])
+@pytest.mark.parametrize("input_dim", [5])
 @pytest.mark.parametrize("n_classes", [2])
-def test_heterosubgraphx(g, idtype, n_classes):
+def test_heterosubgraphx(g, idtype, input_dim, n_classes):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
     device = g.device
@@ -1646,21 +1647,20 @@ def test_heterosubgraphx(g, idtype, n_classes):
     g = transform2(g)
 
     feat = {
-        ntype: th.zeros((g.num_nodes(ntype), 5), device=device)
+        ntype: th.zeros((g.num_nodes(ntype), input_dim), device=device)
         for ntype in g.ntypes
     }
 
     class Model(th.nn.Module):
-        def __init__(self, in_dim, n_classes, canonical_etypes):
+        def __init__(self, in_dim, n_classes, canonical_etypes, graph=False):
             super(Model, self).__init__()
+            self.graph = graph
             self.etype_weights = th.nn.ModuleDict(
                 {
                     "_".join(c_etype): th.nn.Linear(in_dim, n_classes)
                     for c_etype in canonical_etypes
                 }
             )
-            self.conv = nn.GraphConv(in_dim, n_classes)
-            self.pool = nn.AvgPooling()
 
         def forward(self, graph, feat, eweight=None):
             with graph.local_scope():
@@ -1691,12 +1691,12 @@ def test_heterosubgraphx(g, idtype, n_classes):
                 else:
                     return graph.ndata["h"]
 
-    model = Model(feat.shape[1], n_classes, g.canonical_etypes)
+    model = Model(input_dim, n_classes, g.canonical_etypes)
     model = model.to(ctx)
     explainer = nn.explain.HeteroSubgraphX(
         model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
     )
-    feat_mask, edge_mask = explainer.explain_graph(g, feat, target_class=0)
+    explainer.explain_graph(g, feat, target_class=0)
 
 
 def test_jumping_knowledge():
