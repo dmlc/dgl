@@ -74,7 +74,7 @@ Will not break old codes but will throw deprecation warning.
 1. Deprecated `DGLGraph` methods:
     - `DGLGraph.to_networkx` -> `dgl.to_networkx`
     - `DGLGraph.readonly` and `DGLGraph.is_readonly`. Before 0.5, this flag is a hint for more efficient implementation. From 0.5, the efficiency issue has been resolved so they become useless. 
-    - `DGLGraph.__len__` -> `DGLGraph.num_nodes`
+    - `DGLGraph.__len__` -> `DGLGraph.number_of_nodes`
     - `dgl.DGLGraph.__contains__` -> `DGLGraph.has_nodes`
     - `DGLGraph.add_node` -> `DGLGraph.add_nodes`
     - `DGLGraph.add_edge` -> `DGLGraph.add_edges`
