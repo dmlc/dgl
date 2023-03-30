@@ -1666,7 +1666,8 @@ def test_pgexplainer(g, idtype, n_classes):
     model = Model(feat.shape[1], n_classes)
     model = model.to(ctx)
 
-    explainer = nn.PGExplainer(fea, emb, adj, 1.0, label)
+    explainer = nn.PGExplainer(model, feat.shape[1])
+    explainer.train(dataset)
     explainer.explain_graph(g, feat, target_class=0)
 
 
