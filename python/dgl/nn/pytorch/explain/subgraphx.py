@@ -454,61 +454,86 @@ class HeteroSubgraphX(nn.Module):
         num_nodes = self.graph.num_nodes()
 
         # Obtain neighboring nodes of the subgraph g_i, P'.
-        local_region = {
+        local_region_map = {
             ntype: nodes.tolist() for ntype, nodes in subgraph_nodes.items()
         }
-        for _ in range(self.num_hops):
-            # collect neighboring nodes from each edge type
+        for _ in range(self.num_hops - 1):
             for c_etype in self.graph.canonical_etypes:
                 src_ntype, _, dst_ntype = c_etype
                 in_neighbors, _ = self.graph.in_edges(
-                    local_region[src_ntype], etype=c_etype
+                    local_region_map[dst_ntype], etype=c_etype
                 )
                 _, out_neighbors = self.graph.out_edges(
-                    local_region[src_ntype], etype=c_etype
+                    local_region_map[src_ntype], etype=c_etype
                 )
-                neighbors = torch.cat([in_neighbors, out_neighbors]).tolist()
-                local_region[dst_ntype] = list(
-                    set(local_region[dst_ntype] + neighbors)
+                local_region_map[src_ntype] = list(
+                    set(local_region_map[src_ntype] + in_neighbors.tolist())
+                )
+                local_region_map[dst_ntype] = list(
+                    set(local_region_map[dst_ntype] + out_neighbors.tolist())
                 )
 
+        split_point = num_nodes
         coalition_space = {
-            ntype: set(local_region[ntype])
-            - set(subgraph_nodes[ntype].tolist())
+            ntype: list(
+                set(local_region_map[ntype])
+                - set(subgraph_nodes[ntype].tolist())
+            )
+            + [num_nodes]
             for ntype in subgraph_nodes.keys()
         }
-        # TODO: refactor split-point method
 
         marginal_contributions = []
         for _ in range(self.shapley_steps):
-            # TODO: refactor to use dict[str, set(nodes)] coalition space
-            permuted_space = np.random.permutation(coalition_space)
-            split_idx = int(np.where(permuted_space == split_point)[0])
-
-            selected_nodes = permuted_space[:split_idx]
+            selected_node_map = dict()
+            for ntype, nodes in coalition_space.items():
+                permuted_space = np.random.permutation(nodes)
+                split_idx = int(np.where(permuted_space == split_point)[0])
+                selected_node_map[ntype] = permuted_space[:split_idx]
 
             # Mask for coalition set S_i
-            exclude_mask = torch.ones(num_nodes)
-            exclude_mask[local_region] = 0.0
-            exclude_mask[selected_nodes] = 1.0
+            exclude_mask = {
+                ntype: torch.ones(self.graph.num_nodes(ntype))
+                for ntype in self.graph.ntypes
+            }
+            for ntype, local_region in local_region_map.items():
+                exclude_mask[ntype][local_region] = 0.0
+            for ntype, selected_nodes in selected_node_map.items():
+                exclude_mask[ntype][selected_nodes] = 1.0
 
             # Mask for set S_i and g_i
-            include_mask = exclude_mask.clone()
-            include_mask[subgraph_nodes] = 1.0
+            include_mask = {
+                ntype: exclude_mask[ntype].clone()
+                for ntype in self.graph.ntypes
+            }
+            for ntype, subgn in subgraph_nodes.items():
+                exclude_mask[ntype][subgn] = 1.0
 
-            # TODO: verify whether this works for hetero
-            device = self.feat.device
-            exclude_feat = self.feat * exclude_mask.unsqueeze(1).to(device)
-            include_feat = self.feat * include_mask.unsqueeze(1).to(device)
+            exclude_feat = {
+                ntype: self.feat[ntype]
+                * exclude_mask[ntype].unsqueeze(1).to(self.feat[ntype].device)
+                for ntype in self.graph.ntypes
+            }
+            include_feat = {
+                ntype: self.feat[ntype]
+                * include_mask[ntype].unsqueeze(1).to(self.feat[ntype].device)
+                for ntype in self.graph.ntypes
+            }
 
             with torch.no_grad():
                 exclude_probs = self.model(
                     self.graph, exclude_feat, **self.kwargs
-                ).softmax(dim=-1)
+                )
+                exclude_probs = torch.cat(list(exclude_probs.values())).softmax(
+                    dim=-1
+                )
                 exclude_value = exclude_probs[:, self.target_class]
                 include_probs = self.model(
                     self.graph, include_feat, **self.kwargs
-                ).softmax(dim=-1)
+                )
+                include_probs = torch.cat(list(include_probs.values())).softmax(
+                    dim=-1
+                )
                 include_value = include_probs[:, self.target_class]
             marginal_contributions.append(include_value - exclude_value)
 
