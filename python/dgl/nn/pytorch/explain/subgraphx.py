@@ -441,37 +441,47 @@ class HeteroSubgraphX(nn.Module):
 
         Parameters
         ----------
-        subgraph_nodes : tensor
-            The tensor node ids of the subgraph that are associated with this
-            tree node
+        subgraph_nodes : dict[str, Tensor]
+            The dictionary that associates nodes (values) with respective
+            node types (keys) present in graph which are associated with
+            this tree node.
 
         Returns
         -------
         float
             Shapley value
         """
-        # TODO: hetero semantics:
-        #   - take a hetero subgraph rather than a list of nodes?
-
         num_nodes = self.graph.num_nodes()
-        subgraph_nodes = subgraph_nodes.tolist()
 
         # Obtain neighboring nodes of the subgraph g_i, P'.
-        local_region = subgraph_nodes
-        for _ in range(self.num_hops - 1):
-            in_neighbors, _ = self.graph.in_edges(local_region)
-            _, out_neighbors = self.graph.out_edges(local_region)
-            neighbors = torch.cat([in_neighbors, out_neighbors]).tolist()
-            local_region = list(set(local_region + neighbors))
+        local_region = {
+            ntype: nodes.tolist() for ntype, nodes in subgraph_nodes.items()
+        }
+        for _ in range(self.num_hops):
+            # collect neighboring nodes from each edge type
+            for c_etype in self.graph.canonical_etypes:
+                src_ntype, _, dst_ntype = c_etype
+                in_neighbors, _ = self.graph.in_edges(
+                    local_region[src_ntype], etype=c_etype
+                )
+                _, out_neighbors = self.graph.out_edges(
+                    local_region[src_ntype], etype=c_etype
+                )
+                neighbors = torch.cat([in_neighbors, out_neighbors]).tolist()
+                local_region[dst_ntype] = list(
+                    set(local_region[dst_ntype] + neighbors)
+                )
 
-        split_point = num_nodes
-        coalition_space = list(set(local_region) - set(subgraph_nodes)) + [
-            split_point
-        ]
+        coalition_space = {
+            ntype: set(local_region[ntype])
+            - set(subgraph_nodes[ntype].tolist())
+            for ntype in subgraph_nodes.keys()
+        }
+        # TODO: refactor split-point method
 
         marginal_contributions = []
-        device = self.feat.device
         for _ in range(self.shapley_steps):
+            # TODO: refactor to use dict[str, set(nodes)] coalition space
             permuted_space = np.random.permutation(coalition_space)
             split_idx = int(np.where(permuted_space == split_point)[0])
 
@@ -487,6 +497,7 @@ class HeteroSubgraphX(nn.Module):
             include_mask[subgraph_nodes] = 1.0
 
             # TODO: verify whether this works for hetero
+            device = self.feat.device
             exclude_feat = self.feat * exclude_mask.unsqueeze(1).to(device)
             include_feat = self.feat * include_mask.unsqueeze(1).to(device)
 
@@ -525,9 +536,9 @@ class HeteroSubgraphX(nn.Module):
             ntype: torch.zeros(subg.num_nodes(ntype)) for ntype in subg.ntypes
         }
         for c_etype in subg.canonical_etypes:
-            out_ntype, _, in_type = c_etype
-            node_degrees_map[out_ntype] += subg.out_degrees(etype=c_etype)
-            node_degrees_map[in_type] += subg.in_degrees(etype=c_etype)
+            src_ntype, _, dst_ntype = c_etype
+            node_degrees_map[src_ntype] += subg.out_degrees(etype=c_etype)
+            node_degrees_map[dst_ntype] += subg.in_degrees(etype=c_etype)
 
         node_degrees_list = [
             ((ntype, i), degree)
