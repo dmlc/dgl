@@ -657,10 +657,13 @@ class HeteroSubgraphX(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            A homogeneous graph
-        feat : Tensor
-            The input node feature of shape :math:`(N, D)`, :math:`N` is the
-            number of nodes, and :math:`D` is the feature size
+            A heterogeneous graph
+        feat : dict[str, Tensor]
+            The dictionary that associates input node features (values) with
+            the respective node types (keys) present in the graph.
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
+            number of nodes for node type :math:`t`, and :math:`D_t` is the feature size for
+            node type :math:`t`
         target_class : int
             The target class to explain
         kwargs : dict
