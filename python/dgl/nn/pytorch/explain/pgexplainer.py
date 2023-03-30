@@ -220,7 +220,9 @@ class PGExplainer(nn.Module):
                 self.reals.append(l)
                 self.preds.append(mask[r][c])
 
-    def explain_graph(self, fea, emb, adj, label, graphid, topk, node_label_lists, edge_lists, edge_label_lists):
+    def explain_graph(self, fea, emb, adj, label,
+                      graphid, topk, node_label_lists,
+                      edge_lists, edge_label_lists):
 
         explainer(fea, emb, adj, 1.0, label)
         self.acc(explainer, graphid, edge_lists, edge_label_lists)
@@ -263,4 +265,6 @@ class PGExplainer(nn.Module):
         g = dgl.graph((edge_index[0], edge_index[1]), num_nodes=nmb_nodes, device=self.device)
         g.edata['w'] = edge_weight
 
-        return g, fea, emb, adj, node_label, max_label, pos_edges, filter_edges, thres
+        return g, fea, emb, adj,\
+               node_label, max_label, pos_edges,\
+               filter_edges, thres
