@@ -75,7 +75,8 @@ class PGExplainer(nn.Module):
         sym_mask = (sym_mask + sym_mask.t()) / 2
 
         num_nodes = adj.shape[0]
-        indices = torch.cat([adj.row().unsqueeze(-1), adj.col().unsqueeze(-1)], dim=-1)
+        indices = torch.cat([adj.row().unsqueeze(-1),
+                             adj.col().unsqueeze(-1)], dim=-1)
         values = adj.data().float()
         sparseadj = torch.sparse.FloatTensor(indices.t(), values, size=(num_nodes, num_nodes))
         adj = sparseadj.to_dense()
@@ -229,8 +230,10 @@ class PGExplainer(nn.Module):
 
         after_adj_dense = explainer.masked_adj.detach().numpy()
         after_adj = coo_matrix(after_adj_dense)
+
         rcd = np.concatenate(
-            [np.expand_dims(after_adj.row, -1), np.expand_dims(after_adj.col, -1),
+            [np.expand_dims(after_adj.row, -1),
+             np.expand_dims(after_adj.col, -1),
              np.expand_dims(after_adj.data, -1)], -1)
         pos_edges = []
         filter_edges = []
