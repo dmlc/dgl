@@ -153,15 +153,12 @@ class PGExplainer(nn.Module):
 
         return loss, pred_loss, size_loss
 
-    def train(self, explainer,
-              selected_features,
-              selected_embs,
-              selected_adjs,
-              selected_labels,
-              selected_pred_label,
-              selected_edge_lists,
-              selected_edge_label_lists,
-              optimizer):
+    def train(self, dataset):
+
+        optimizer = Adam(self.parameters())
+
+        for param in self.model.parameters():
+            param.requires_grad = False
 
         clip_value_min = -0.01
         clip_value_max = 0.01
@@ -170,23 +167,17 @@ class PGExplainer(nn.Module):
         t0 = self.coeffs['t0']
         t1 = self.coeffs['t1']
 
-        explainer.train()
         for epoch in range(epochs):
             loss = 0
             tmp = t0 * pow(t1 / t0, epoch / epochs)
 
             for gid in range(selected_adjs.shape[0]):
-                fea, emb, adj, label, pred_label = selected_features[gid],\
-                                                   selected_embs[gid], \
-                                                   selected_adjs[gid],\
-                                                   selected_labels[gid], \
-                                                   selected_pred_label[gid]
-
-                adj_tensor = torch.from_numpy(adj.toarray().astype(np.float32))
+                # Load the graph batch from dataset
+                # fea, emb, adj_tensor, tmp, label = ...
 
                 optimizer.zero_grad()
-                pred = explainer(fea, emb, adj_tensor, tmp, label)
-                cl = explainer.loss(pred, pred_label, label)
+                pred = self((fea, emb, adj_tensor, tmp, label))
+                cl = self.loss(pred, pred_label, label)
 
                 loss += cl.item()
                 cl.backward()
@@ -197,11 +188,8 @@ class PGExplainer(nn.Module):
                 print('epoch', epoch, 'loss', loss)
 
                 for gid in range(int(selected_adjs.shape[0] / 10)):
-                    fea, emb, adj, label = selected_features[gid],\
-                                           selected_embs[gid], \
-                                           selected_adjs[gid],\
-                                           selected_labels[gid]
-
+                    # Load the graph batch from dataset
+                    # fea, emb, adj_tensor, tmp, label = ...
                     adj_tensor = torch.from_numpy(adj.toarray().astype(np.float32))
                     explainer.eval()
                     explainer((fea, emb, adj_tensor, 1.0, label), need_grad=False)
@@ -210,6 +198,9 @@ class PGExplainer(nn.Module):
 
                     explainer.train()
 
+        for param in self.model.parameters():
+            param.requires_grad = True
+        
     def acc(self, explainer, gid, edge_lists, edge_label_lists):
         mask = explainer.masked_adj.detach().numpy()
         edge_labels = edge_label_lists[gid]
@@ -224,7 +215,7 @@ class PGExplainer(nn.Module):
                       graphid, topk, node_label_lists,
                       edge_lists, edge_label_lists):
 
-        explainer(fea, emb, adj, 1.0, label)
+        self(fea, emb, adj, 1.0, label)
         self.acc(explainer, graphid, edge_lists, edge_label_lists)
 
         after_adj_dense = explainer.masked_adj.detach().numpy()
