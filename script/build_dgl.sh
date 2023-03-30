@@ -10,7 +10,7 @@ examples:
   Start a CUDA build: bash $0 -g
   Build incrementally: bash $0
   Remove all intermediate output and restart a CPU only build: bash $0 -c -r
-  Build with extra cmake arguments: bash $0 -c -e '-DUSE_AVX=ON'
+  Build with extra cmake arguments: bash $0 -c -e '-DBUILD_TORCH=ON'
 
 Build DGL. By default, build incrementally on top of the current state.
 

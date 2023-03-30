@@ -94,7 +94,7 @@ def generate_metapath():
 
     hg, author_names, conf_names, paper_names = construct_graph()
 
-    for conf_idx in tqdm.trange(hg.number_of_nodes("conf")):
+    for conf_idx in tqdm.trange(hg.num_nodes("conf")):
         traces, _ = dgl.sampling.random_walk(
             hg,
             [conf_idx] * num_walks_per_node,

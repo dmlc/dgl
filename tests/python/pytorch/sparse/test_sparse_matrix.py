@@ -6,10 +6,12 @@ import pytest
 import torch
 
 from dgl.sparse import (
+    diag,
     from_coo,
     from_csc,
     from_csr,
     from_torch_sparse,
+    identity,
     to_torch_sparse_coo,
     to_torch_sparse_csc,
     to_torch_sparse_csr,
@@ -343,6 +345,28 @@ def test_csr_to_csc(dense_dim, indptr, indices, shape):
     assert torch.allclose(mat_indices, indices)
 
 
+@pytest.mark.parametrize("shape", [(3, 5), (5, 5), (5, 4)])
+def test_diag_conversions(shape):
+    n_rows, n_cols = shape
+    nnz = min(shape)
+    ctx = F.ctx()
+    val = torch.randn(nnz).to(ctx)
+    D = diag(val, shape)
+    row, col = D.coo()
+    assert torch.allclose(row, torch.arange(nnz).to(ctx))
+    assert torch.allclose(col, torch.arange(nnz).to(ctx))
+
+    indptr, indices, _ = D.csr()
+    exp_indptr = list(range(0, nnz + 1)) + [nnz] * (n_rows - nnz)
+    assert torch.allclose(indptr, torch.tensor(exp_indptr).to(ctx))
+    assert torch.allclose(indices, torch.arange(nnz).to(ctx))
+
+    indptr, indices, _ = D.csc()
+    exp_indptr = list(range(0, nnz + 1)) + [nnz] * (n_cols - nnz)
+    assert torch.allclose(indptr, torch.tensor(exp_indptr).to(ctx))
+    assert torch.allclose(indices, torch.arange(nnz).to(ctx))
+
+
 @pytest.mark.parametrize("val_shape", [(3), (3, 2)])
 @pytest.mark.parametrize("shape", [(3, 5), (5, 5)])
 def test_val_like(val_shape, shape):
@@ -606,3 +630,69 @@ def test_torch_sparse_csc_conversion(indptr, indices, shape):
     _assert_spmat_equal_to_torch_sparse_csc(spmat, torch_sparse_csc)
     torch_sparse_csc = to_torch_sparse_csc(spmat)
     _assert_spmat_equal_to_torch_sparse_csc(spmat, torch_sparse_csc)
+
+
+### Diag foramt related tests ###
+
+
+@pytest.mark.parametrize("val_shape", [(3,), (3, 2)])
+@pytest.mark.parametrize("mat_shape", [None, (3, 5), (5, 3)])
+def test_diag(val_shape, mat_shape):
+    ctx = F.ctx()
+    # creation
+    val = torch.randn(val_shape).to(ctx)
+    mat = diag(val, mat_shape)
+
+    # val, shape attributes
+    assert torch.allclose(mat.val, val)
+    if mat_shape is None:
+        mat_shape = (val_shape[0], val_shape[0])
+    assert mat.shape == mat_shape
+
+    val = torch.randn(val_shape).to(ctx)
+
+    # nnz
+    assert mat.nnz == val.shape[0]
+    # dtype
+    assert mat.dtype == val.dtype
+    # device
+    assert mat.device == val.device
+
+    # row, col, val
+    edge_index = torch.arange(len(val)).to(mat.device)
+    row, col = mat.coo()
+    val = mat.val
+    assert torch.allclose(row, edge_index)
+    assert torch.allclose(col, edge_index)
+    assert torch.allclose(val, val)
+
+
+@pytest.mark.parametrize("shape", [(3, 3), (3, 5), (5, 3)])
+@pytest.mark.parametrize("d", [None, 2])
+def test_identity(shape, d):
+    ctx = F.ctx()
+    # creation
+    mat = identity(shape, d)
+    # shape
+    assert mat.shape == shape
+    # val
+    len_val = min(shape)
+    if d is None:
+        val_shape = len_val
+    else:
+        val_shape = (len_val, d)
+    val = torch.ones(val_shape)
+    assert torch.allclose(val, mat.val)
+
+
+@pytest.mark.parametrize("val_shape", [(3,), (3, 2)])
+@pytest.mark.parametrize("mat_shape", [None, (3, 5), (5, 3)])
+def test_diag_matrix_transpose(val_shape, mat_shape):
+    ctx = F.ctx()
+    val = torch.randn(val_shape).to(ctx)
+    mat = diag(val, mat_shape).transpose()
+
+    assert torch.allclose(mat.val, val)
+    if mat_shape is None:
+        mat_shape = (val_shape[0], val_shape[0])
+    assert mat.shape == mat_shape[::-1]

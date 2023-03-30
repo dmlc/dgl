@@ -266,10 +266,10 @@ class RDFGraphDataset(DGLBuiltinDataset):
         )
 
         train_mask = idx2mask(
-            train_idx, self._hg.number_of_nodes(self.predict_category)
+            train_idx, self._hg.num_nodes(self.predict_category)
         )
         test_mask = idx2mask(
-            test_idx, self._hg.number_of_nodes(self.predict_category)
+            test_idx, self._hg.num_nodes(self.predict_category)
         )
         labels = F.tensor(labels, F.data_type_dict["int64"])
 
@@ -313,8 +313,8 @@ class RDFGraphDataset(DGLBuiltinDataset):
         g.ndata[dgl.NTYPE] = F.tensor(ntid)
         g.edata[dgl.ETYPE] = F.tensor(etid)
         if self.verbose:
-            print("Total #nodes:", g.number_of_nodes())
-            print("Total #edges:", g.number_of_edges())
+            print("Total #nodes:", g.num_nodes())
+            print("Total #edges:", g.num_edges())
 
         # rename names such as 'type' so that they an be used as keys
         # to nn.ModuleDict
@@ -356,9 +356,7 @@ class RDFGraphDataset(DGLBuiltinDataset):
             Number of classes
         """
         label_dict = {}
-        labels = (
-            np.zeros((self._hg.number_of_nodes(self.predict_category),)) - 1
-        )
+        labels = np.zeros((self._hg.num_nodes(self.predict_category),)) - 1
         train_idx = self.parse_idx_file(
             os.path.join(root_path, "trainingSet.tsv"),
             ent2id,

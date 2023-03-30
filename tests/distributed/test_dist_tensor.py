@@ -32,12 +32,8 @@ def setup_module():
     # Partition the graph.
     num_parts = 1
     graph_name = "dist_graph_test_3"
-    dist_g.ndata["features"] = F.unsqueeze(
-        F.arange(0, dist_g.number_of_nodes()), 1
-    )
-    dist_g.edata["features"] = F.unsqueeze(
-        F.arange(0, dist_g.number_of_edges()), 1
-    )
+    dist_g.ndata["features"] = F.unsqueeze(F.arange(0, dist_g.num_nodes()), 1)
+    dist_g.edata["features"] = F.unsqueeze(F.arange(0, dist_g.num_edges()), 1)
     dgl.distributed.partition_graph(
         dist_g, graph_name, num_parts, "/tmp/dist_graph"
     )

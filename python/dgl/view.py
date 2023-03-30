@@ -48,7 +48,7 @@ class HeteroNodeView(object):
         ntid = self._typeid_getter(ntype)
         ret = F.arange(
             0,
-            self._graph._graph.number_of_nodes(ntid),
+            self._graph._graph.num_nodes(ntid),
             dtype=self._graph.idtype,
             ctx=self._graph.device,
         )

@@ -66,9 +66,9 @@
    :attr:`block.srcnodes <dgl.DGLGraph.srcnodes>`；对于输出节点特征，将
    :attr:`g.nodes <dgl.DGLGraph.nodes>` 替换为
    :attr:`block.dstnodes <dgl.DGLGraph.dstnodes>`。
--  对于输入节点数量，将 :meth:`g.number_of_nodes <dgl.DGLGraph.number_of_nodes>` 替换为
+-  对于输入节点数量，将 :meth:`g.num_nodes <dgl.DGLGraph.num_nodes>` 替换为
    :meth:`block.number_of_src_nodes <dgl.DGLGraph.number_of_src_nodes>` ；
-   对于输出节点数量，将 :meth:`g.number_of_nodes <dgl.DGLGraph.number_of_nodes>` 替换为
+   对于输出节点数量，将 :meth:`g.num_nodes <dgl.DGLGraph.num_nodes>` 替换为
    :meth:`block.number_of_dst_nodes <dgl.DGLGraph.number_of_dst_nodes>` 。
 
 异构图上的模型定制

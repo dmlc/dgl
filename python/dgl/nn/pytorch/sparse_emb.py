@@ -57,7 +57,7 @@ class NodeEmbedding:  # NodeEmbedding
 
     In each training process
 
-    >>> emb = dgl.nn.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> emb = dgl.nn.NodeEmbedding(g.num_nodes(), 10, 'emb', init_func=initializer)
     >>> optimizer = dgl.optim.SparseAdam([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     ...

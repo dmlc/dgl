@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 import scipy.sparse as ssp
 from dgl import DGLError
-from pytests_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 def create_test_heterograph(num_nodes, num_adj, idtype):
@@ -65,7 +65,7 @@ def check_sort(spm, tag_arr=None, tag_pos=None):
 def test_sort_with_tag(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 50], 5
     g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)
-    tag = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
+    tag = F.tensor(np.random.choice(num_tags, g.num_nodes()))
     src, dst = g.edges()
     edge_tag_dst = F.gather_row(tag, F.tensor(dst))
     edge_tag_src = F.gather_row(tag, F.tensor(src))
@@ -99,8 +99,8 @@ def test_sort_with_tag_bipartite(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 50], 5
     g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)
     g = dgl.heterograph({("_U", "_E", "_V"): g.edges()})
-    utag = F.tensor(np.random.choice(num_tags, g.number_of_nodes("_U")))
-    vtag = F.tensor(np.random.choice(num_tags, g.number_of_nodes("_V")))
+    utag = F.tensor(np.random.choice(num_tags, g.num_nodes("_U")))
+    vtag = F.tensor(np.random.choice(num_tags, g.num_nodes("_V")))
 
     new_g = dgl.sort_csr_by_tag(g, vtag)
     old_csr = g.adjacency_matrix(scipy_fmt="csr")
