@@ -9,6 +9,7 @@ import dgl
 import torch.nn.functional as F
 from scipy.sparse import coo_matrix
 import dgl.function as fn
+from torch.optim import Adam
 
 from ....base import NID
 from ....convert import to_networkx
@@ -78,7 +79,8 @@ class PGExplainer(nn.Module):
         indices = torch.cat([adj.row().unsqueeze(-1),
                              adj.col().unsqueeze(-1)], dim=-1)
         values = adj.data().float()
-        sparseadj = torch.sparse.FloatTensor(indices.t(), values, size=(num_nodes, num_nodes))
+        sparseadj = torch.sparse.FloatTensor(indices.t(), values,
+                                             size=(num_nodes, num_nodes))
         adj = sparseadj.to_dense()
 
         masked_adj = adj * sym_mask
@@ -102,14 +104,18 @@ class PGExplainer(nn.Module):
         return gate_inputs
 
     def forward(self, inputs, training=False):
-        x, adj, nodeid, embed, tmp = inputs
+
+        # @kunal: in input, what is nodeid?
+        x, embed, adj, tmp, label = inputs
 
         g = dgl.graph((adj.row(), adj.col()))
         g.ndata['x'] = embed
         f1 = dgl.function.copy_src('x', 'f1')
         f2 = dgl.function.copy_dst('x', 'f2')
         g.apply_edges(lambda edges: {'f1': f1(edges), 'f2': f2(edges)})
-        f12self = torch.cat([g.edata['f1'], g.edata['f2'], embed[nodeid].repeat(g.num_edges(), 1)],
+        f12self = torch.cat([g.edata['f1'],
+                             g.edata['f2'],
+                             embed[nodeid].repeat(g.num_edges(), 1)],
                             dim=-1)
 
         h = self.elayers(f12self)
@@ -117,7 +123,8 @@ class PGExplainer(nn.Module):
 
         values = self.concrete_sample(self.values, beta=tmp, training=training)
 
-        indices = torch.cat([adj.row().unsqueeze(-1), adj.col().unsqueeze(-1)], dim=-1)
+        indices = torch.cat([adj.row().unsqueeze(-1), adj.col().unsqueeze(-1)],
+                            dim=-1)
         sparsemask = torch.sparse.FloatTensor(indices.t(), values, size=adj.shape)
         mask = sparsemask.to_dense()
         masked_adj = self._masked_adj(mask, adj)
@@ -128,7 +135,7 @@ class PGExplainer(nn.Module):
         res = nn.functional.softmax(node_pred, dim=0)
         return res
 
-    def loss(self, pred, pred_label, node_idx, adj_tensor=None):
+    def loss(self, pred, pred_label, node_idx):
         """
         Args:
             pred: prediction made by current model
@@ -156,7 +163,7 @@ class PGExplainer(nn.Module):
 
     def train(self, dataset):
 
-        optimizer = Adam(self.parameters())
+        optimizer = Adam(self.elayers.parameters(), lr=self.lr)
 
         for param in self.model.parameters():
             param.requires_grad = False
@@ -172,38 +179,59 @@ class PGExplainer(nn.Module):
             loss = 0
             tmp = t0 * pow(t1 / t0, epoch / epochs)
 
-            for gid in range(selected_adjs.shape[0]):
-                # Load the graph batch from dataset
-                # fea, emb, adj_tensor, tmp, label = ...
+            for idx, (graph, label) in enumerate(dataset):
+                feat = graph.ndata.pop("attr")
+                _, pred_label = torch.max(self.model(graph, feat), 1)
+                # @kunal = how to get the node embedding
+                emb = self.model(graph, feat)
+
+                # @kunal = how to get the adj tensor
+                adj_tensor = ??
 
                 optimizer.zero_grad()
-                pred = self((fea, emb, adj_tensor, tmp, label))
+                pred = self((feat, emb, adj_tensor, tmp, label))
                 cl = self.loss(pred, pred_label, label)
 
                 loss += cl.item()
                 cl.backward()
-                torch.nn.utils.clip_grad_value_(explainer.parameters(), clip_value_min, clip_value_max)
+                torch.nn.utils.clip_grad_value_(self.parameters(),
+                                                clip_value_min,
+                                                clip_value_max)
                 optimizer.step()
 
-            if epoch % 1 == 0:
-                print('epoch', epoch, 'loss', loss)
-
-                for gid in range(int(selected_adjs.shape[0] / 10)):
-                    # Load the graph batch from dataset
-                    # fea, emb, adj_tensor, tmp, label = ...
-                    adj_tensor = torch.from_numpy(adj.toarray().astype(np.float32))
-                    explainer.eval()
-                    explainer((fea, emb, adj_tensor, 1.0, label), need_grad=False)
-
-                    self.acc(explainer, gid, selected_edge_lists, selected_edge_label_lists)
-
-                    explainer.train()
+            # for gid in range(selected_adjs.shape[0]):
+            #     # Load the graph batch from dataset
+            #     # fea, emb, adj_tensor, tmp, label = ...
+            #
+            #     optimizer.zero_grad()
+            #     pred = self((fea, emb, adj_tensor, tmp, label))
+            #     cl = self.loss(pred, pred_label, label)
+            #
+            #     loss += cl.item()
+            #     cl.backward()
+            #     torch.nn.utils.clip_grad_value_(self.parameters(), clip_value_min, clip_value_max)
+            #     optimizer.step()
+            #
+            # if epoch % 1 == 0:
+            #     print('epoch', epoch, 'loss', loss)
+            #
+            #     for gid in range(int(selected_adjs.shape[0] / 10)):
+            #         # Load the graph batch from dataset
+            #         # fea, emb, adj_tensor, tmp, label = ...
+            #
+            #         adj_tensor = torch.from_numpy(adj.toarray().astype(np.float32))
+            #         self.eval()
+            #         self((fea, emb, adj_tensor, 1.0, label), need_grad=False)
+            #
+            #         self.acc(gid, selected_edge_lists, selected_edge_label_lists)
+            #
+            #         self.train(dataset)
 
         for param in self.model.parameters():
             param.requires_grad = True
         
-    def acc(self, explainer, gid, edge_lists, edge_label_lists):
-        mask = explainer.masked_adj.detach().numpy()
+    def acc(self, gid, edge_lists, edge_label_lists):
+        mask = self.masked_adj.detach().numpy()
         edge_labels = edge_label_lists[gid]
         edge_list = edge_lists[gid]
 
@@ -217,9 +245,9 @@ class PGExplainer(nn.Module):
                       edge_lists, edge_label_lists):
 
         self(fea, emb, adj, 1.0, label)
-        self.acc(explainer, graphid, edge_lists, edge_label_lists)
+        self.acc(graphid, edge_lists, edge_label_lists)
 
-        after_adj_dense = explainer.masked_adj.detach().numpy()
+        after_adj_dense = self.masked_adj.detach().numpy()
         after_adj = coo_matrix(after_adj_dense)
 
         rcd = np.concatenate(
