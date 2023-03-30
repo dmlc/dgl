@@ -1631,6 +1631,45 @@ def test_subgraphx(g, idtype, n_classes):
     explainer.explain_graph(g, feat, target_class=0)
 
 
+@parametrize_idtype
+@pytest.mark.parametrize(
+    "g",
+    get_cases(
+        ["homo"],
+        exclude=[
+            "zero-degree",
+            "homo-zero-degree",
+            "has_feature",
+            "has_scalar_e_feature",
+            "row_sorted",
+            "col_sorted",
+            "batched",
+        ],
+    ),
+)
+@pytest.mark.parametrize("n_classes", [2])
+def test_pgexplainer(g, idtype, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    feat = F.randn((g.num_nodes(), 5))
+
+    class Model(th.nn.Module):
+        def __init__(self, in_dim, n_classes):
+            super().__init__()
+            self.conv = nn.GraphConv(in_dim, n_classes)
+            self.pool = nn.AvgPooling()
+
+        def forward(self, g, h):
+            h = th.nn.functional.relu(self.conv(g, h))
+            return self.pool(g, h)
+
+    model = Model(feat.shape[1], n_classes)
+    model = model.to(ctx)
+
+    explainer = nn.PGExplainer(fea, emb, adj, 1.0, label)
+    explainer.explain_graph(g, feat, target_class=0)
+
+
 def test_jumping_knowledge():
     ctx = F.ctx()
     num_layers = 2
