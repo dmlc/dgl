@@ -581,20 +581,20 @@ class HeteroSubgraphX(nn.Module):
             largest_cc_nids = list(
                 max(nx.weakly_connected_components(nx_graph), key=len)
             )
-            largest_cc_homograph = node_subgraph(new_subg_homo, largest_cc_nids)
-            largest_cc_heterograph = to_heterogeneous(
-                largest_cc_homograph, new_subg.ntypes, new_subg.etypes
+            largest_cc_homo = node_subgraph(new_subg_homo, largest_cc_nids)
+            largest_cc_hetero = to_heterogeneous(
+                largest_cc_homo, new_subg.ntypes, new_subg.etypes
             )
+            cc_nodes = {
+                ntype: largest_cc_hetero.nodes(ntype)
+                for ntype in largest_cc_hetero.ntypes
+            }
 
-            if str(largest_cc_nids) not in self.mcts_node_maps:
-                node_dict = {
-                    ntype: largest_cc_heterograph.nodes(ntype)
-                    for ntype in largest_cc_heterograph.ntypes
-                }
-                child_mcts_node = MCTSNode(node_dict)
+            if str(cc_nodes) not in self.mcts_node_maps:
+                child_mcts_node = MCTSNode(cc_nodes)
                 self.mcts_node_maps[str(child_mcts_node)] = child_mcts_node
             else:
-                child_mcts_node = self.mcts_node_maps[str(largest_cc_nids)]
+                child_mcts_node = self.mcts_node_maps[str(cc_nodes)]
 
             if str(child_mcts_node) not in mcts_children_maps:
                 mcts_children_maps[str(child_mcts_node)] = child_mcts_node
