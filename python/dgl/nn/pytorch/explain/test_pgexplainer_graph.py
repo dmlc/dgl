@@ -59,7 +59,7 @@ class GIN(nn.Module):
             MaxPooling()
         )  # change to mean readout (AvgPooling) on social network datasets
 
-    def forward(self, g, h):
+    def forward(self, g, h, graph=True):
         # list of hidden representation at each layer (including the input layer)
         hidden_rep = [h]
         for i, layer in enumerate(self.ginlayers):
@@ -68,11 +68,16 @@ class GIN(nn.Module):
             h = F.relu(h)
             hidden_rep.append(h)
         score_over_layer = 0
-        # perform graph sum pooling over all nodes in each layer
-        for i, h in enumerate(hidden_rep):
-            pooled_h = self.pool(g, h)
-            score_over_layer += self.drop(self.linear_prediction[i](pooled_h))
-        return score_over_layer
+
+        if graph:
+            # perform graph sum pooling over all nodes in each layer
+            for i, h in enumerate(hidden_rep):
+                pooled_h = self.pool(g, h)
+                score_over_layer += self.drop(self.linear_prediction[i](pooled_h))
+
+            return score_over_layer
+        else:
+            return hidden_rep[-1]
 
 
 def split_fold10(labels, fold_idx=0):
@@ -169,8 +174,9 @@ if __name__ == "__main__":
     # create GIN model
     in_size = dataset.dim_nfeats
     out_size = dataset.gclasses
+    hidden_size = 128
 
-    model = GIN(in_size, 128, out_size).to(device)
+    model = GIN(in_size, hidden_size, out_size).to(device)
 
     """
     # model training/validating
@@ -197,7 +203,7 @@ if __name__ == "__main__":
     import networkx as nx
     import matplotlib.pyplot as plt
 
-    explainer = PGExplainer(model, in_size, device='cpu')
+    explainer = PGExplainer(model, hidden_size, device='cpu')
     explainer.train(dataset)
 
     for idx, (graph, l) in enumerate(dataset):

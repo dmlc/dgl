@@ -6,10 +6,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 import dgl
+import copy
 import torch.nn.functional as F
 from scipy.sparse import coo_matrix, csr_matrix
 import dgl.function as fn
 from torch.optim import Adam
+from torch.utils.data import Dataset
 
 from ....base import NID
 from ....convert import to_networkx
@@ -17,7 +19,6 @@ from ....subgraph import node_subgraph
 from ....transforms.functional import remove_nodes
 
 __all__ = ["PGExplainer"]
-
 
 class PGExplainer(nn.Module):
 
@@ -29,7 +30,7 @@ class PGExplainer(nn.Module):
         self.model = model
         self.device = device
         self.model.to(self.device)
-        self.num_features = num_features
+        self.num_features = num_features * 2
 
         # training parameters for PGExplainer
         self.epochs = epochs
@@ -45,7 +46,8 @@ class PGExplainer(nn.Module):
 
         # Explanation model in PGExplainer
         self.elayers = nn.ModuleList()
-        self.elayers.append(nn.Sequential(nn.Linear(num_features, 64), nn.ReLU()))
+        self.elayers.append(nn.Sequential(nn.Linear(self.num_features, 64),
+                                          nn.ReLU()))
         self.elayers.append(nn.Linear(64, 1))
         self.elayers.to(self.device)
 
@@ -76,10 +78,12 @@ class PGExplainer(nn.Module):
         sym_mask = (sym_mask + sym_mask.t()) / 2
 
         num_nodes = adj.shape[0]
-        indices = torch.cat([adj.row().unsqueeze(-1),
-                             adj.col().unsqueeze(-1)], dim=-1)
-        values = adj.data().float()
-        sparseadj = torch.sparse.FloatTensor(indices.t(), values,
+        indices = torch.cat([adj.row.unsqueeze(-1),
+                             adj.col.unsqueeze(-1)], dim=-1)
+
+        values = torch.from_numpy(adj.data).float()
+        sparseadj = torch.sparse.FloatTensor(indices.t(),
+                                             values,
                                              size=(num_nodes, num_nodes))
         adj = sparseadj.to_dense()
 
@@ -105,7 +109,6 @@ class PGExplainer(nn.Module):
 
     def forward(self, inputs, training=False):
 
-        # @kunal: in input, what is nodeid?
         x, embed, adj, tmp, label = inputs
 
         adj = coo_matrix(adj)
@@ -113,32 +116,51 @@ class PGExplainer(nn.Module):
         g = dgl.graph((adj.row, adj.col))
 
         g.ndata['x'] = embed
-        f1 = dgl.function.copy_src('x', 'f1')
-        f2 = dgl.function.copy_dst('x', 'f2')
-        g.apply_edges(lambda edges: {'f1': f1(edges), 'f2': f2(edges)})
-        # For node classification:
-        # f12self = torch.cat([g.edata['f1'],
-        #                      g.edata['f2'],
-        #                      embed[nodeid].repeat(g.num_edges(), 1)],
-        #                     dim=-1)
 
-        f12self = torch.cat([g.edata['f1'],
-                             g.edata['f2']],
-                            dim=-1)
+        f1 = embed[adj.row]
+        f2 = embed[adj.col]
 
-        h = self.elayers(f12self)
+        f12self = torch.cat([f1, f2], dim=-1)
+
+        h = f12self
+        for layer in self.elayers:
+            h = layer(h)
+
         self.values = h.view(-1)
 
-        values = self.concrete_sample(self.values, beta=tmp, training=training)
+        values = self.concrete_sample(self.values,
+                                      beta=tmp,
+                                      training=training)
         self.sparse_mask_values = values
 
-        indices = torch.cat([adj.row().unsqueeze(-1), adj.col().unsqueeze(-1)],
-                            dim=-1)
-        sparsemask = torch.sparse.FloatTensor(indices.t(), values, size=adj.shape)
-        mask = sparsemask.to_dense()
-        masked_adj = self._masked_adj(mask, adj)
+        adj.row = torch.tensor(adj.row).long()
+        adj.col = torch.tensor(adj.col).long()
 
-        output = self.model((x, masked_adj))
+        indices = torch.cat([adj.row.unsqueeze(-1),
+                             adj.col.unsqueeze(-1)],
+                            dim=-1)
+        sparsemask = torch.sparse.FloatTensor(indices.t(),
+                                              values,
+                                              size=adj.shape)
+        mask = sparsemask.to_dense()
+        # @kunal: missing set mask
+        # edge weight for subgraph
+        # extract the edge mask in the set mask
+        self.__clear_masks__()
+        self.__set_masks__(x, edge_index, edge_mask)
+
+        # @kunal: using the set mask, get the masked adj matrix
+        # final edge mask used
+        masked_adj = self._masked_adj(self.__edge_mask__, adj)
+
+        # @kunal: using mask adj matrix
+        # constrct the whole graph
+        # set the edge weight = weight of the mask
+        # we will have a graph with 'weight' parameter set
+        mask_g = copy.deepcopy(g)
+        mask_g.edata['weight'] = masked_adj
+
+        output = self.model(mask_g, x)
 
         # For node classification:
         # node_pred = output[nodeid, :]
@@ -183,22 +205,29 @@ class PGExplainer(nn.Module):
         t0 = self.coeffs['t0']
         t1 = self.coeffs['t1']
 
+        # new add
         for epoch in range(epochs):
             loss = 0
             tmp = t0 * pow(t1 / t0, epoch / epochs)
 
             for idx, (graph, label) in enumerate(dataset):
-                feat = graph.ndata.pop("attr")
-                _, pred_label = torch.max(self.model(graph, feat), 1)
-                # @kunal = how to get the node embedding
-                with torch.no_grad():
-                    emb = self.model(graph, feat)
 
-                # @kunal = how to get the adj tensor
+                # input feature
+                feat = graph.ndata.pop("attr")
+                # predicted label
+                _, pred_label = torch.max(self.model(graph, feat), 1)
+
+                with torch.no_grad():
+                    # embedding for one model
+                    emb = self.model(graph, feat, graph=False)
+
                 adj_tensor = graph.adj().to_dense()
 
                 optimizer.zero_grad()
+
+                # forward function
                 pred = self((feat, emb, adj_tensor, tmp, label))
+                # loss function
                 cl = self.loss(pred, pred_label, label)
                 cl.backward()
 
