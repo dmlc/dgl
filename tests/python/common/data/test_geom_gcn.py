@@ -37,3 +37,20 @@ def test_squirrel():
     assert g.num_edges() == 217073
     g2 = dgl.data.SquirrelDataset(force_reload=True, transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="only supports pytorch"
+)
+def test_cornell():
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+
+    g = dgl.data.CornellDataset(force_reload=True)[0]
+    assert g.num_nodes() == 183
+    assert g.num_edges() == 298
+    g2 = dgl.data.SquirrelDataset(force_reload=True, transform=transform)[0]
+    assert g2.num_edges() - g.num_edges() == g.num_nodes()
