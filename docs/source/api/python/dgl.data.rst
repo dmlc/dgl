@@ -60,6 +60,7 @@ Datasets for node classification/regression tasks
     SquirrelDataset
     ActorDataset
     CornellDataset
+    TexasDataset
 
 Edge Prediction Datasets
 ---------------------------------------

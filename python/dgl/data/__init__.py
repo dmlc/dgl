@@ -54,8 +54,13 @@ from .tree import SST, SSTDataset
 from .tu import LegacyTUDataset, TUDataset
 from .utils import *
 from .cluster import CLUSTERDataset
+from .geom_gcn import (
+    ChameleonDataset,
+    CornellDataset,
+    SquirrelDataset,
+    TexasDataset,
+)
 from .pattern import PATTERNDataset
-from .geom_gcn import ChameleonDataset, SquirrelDataset, CornellDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
 from .zinc import ZINCDataset
