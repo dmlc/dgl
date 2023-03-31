@@ -523,17 +523,11 @@ class HeteroSubgraphX(nn.Module):
             with torch.no_grad():
                 exclude_probs = self.model(
                     self.graph, exclude_feat, **self.kwargs
-                )
-                exclude_probs = torch.cat(list(exclude_probs.values())).softmax(
-                    dim=-1
-                )
+                ).softmax(dim=-1)
                 exclude_value = exclude_probs[:, self.target_class]
                 include_probs = self.model(
                     self.graph, include_feat, **self.kwargs
-                )
-                include_probs = torch.cat(list(include_probs.values())).softmax(
-                    dim=-1
-                )
+                ).softmax(dim=-1)
                 include_value = include_probs[:, self.target_class]
             marginal_contributions.append(include_value - exclude_value)
 
