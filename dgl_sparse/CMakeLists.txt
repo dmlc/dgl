@@ -51,8 +51,9 @@ message(STATUS "DGL include directories: ${DGL_INCLUDE_DIRS}")
 target_include_directories(${LIB_DGL_SPARSE_NAME} PRIVATE ${DGL_INCLUDE_DIRS})
 target_link_directories(${LIB_DGL_SPARSE_NAME} PRIVATE ${DGL_BUILD_DIR} "${DGL_BUILD_DIR}/third_party/dmlc-core")
 
-# Torch CMake sets up MKL library path only for conda distribution
-# Workaround for standalone MKL installation.
+# The Torch CMake configuration only sets up the path for the MKL library when
+# using the conda distribution. The following is a workaround to address this
+# when using a standalone installation of MKL.
 if(DEFINED MKL_LIBRARIES)
   target_link_directories(${LIB_DGL_SPARSE_NAME} PRIVATE ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
