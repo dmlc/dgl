@@ -244,7 +244,7 @@ class GATConv(nn.Module):
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, *, D_{in_{src}})` and :math:`(N_{out}, *, D_{in_{dst}})`.
         edge_weight : torch.Tensor, optional
-            An 1D tensor of edge weight value.  Shape: :math:`(|E|,)`.
+            A 1D tensor of edge weight values.  Shape: :math:`(|E|,)`.
         get_attention : bool, optional
             Whether to return the attention values. Default to False.
 
