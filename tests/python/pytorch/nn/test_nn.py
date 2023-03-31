@@ -1652,9 +1652,8 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
     }
 
     class Model(th.nn.Module):
-        def __init__(self, in_dim, n_classes, canonical_etypes, graph=False):
+        def __init__(self, in_dim, n_classes, canonical_etypes):
             super(Model, self).__init__()
-            self.graph = graph
             self.etype_weights = th.nn.ModuleDict(
                 {
                     "_".join(c_etype): th.nn.Linear(in_dim, n_classes)
@@ -1681,19 +1680,16 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
                             fn.mean("m", "h"),
                         )
                 graph.multi_update_all(c_etype_func_dict, "sum")
-                if self.graph:
-                    hg = 0
-                    for ntype in graph.ntypes:
-                        if graph.num_nodes(ntype):
-                            hg = hg + dgl.mean_nodes(graph, "h", ntype=ntype)
+                hg = 0
+                for ntype in graph.ntypes:
+                    if graph.num_nodes(ntype):
+                        hg = hg + dgl.mean_nodes(graph, "h", ntype=ntype)
 
-                    return hg
-                else:
-                    return graph.ndata["h"]
+                return hg
 
     model = Model(input_dim, n_classes, g.canonical_etypes)
     model = model.to(ctx)
-    explainer = nn.explain.HeteroSubgraphX(
+    explainer = nn.HeteroSubgraphX(
         model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
     )
     explainer.explain_graph(g, feat, target_class=0)
