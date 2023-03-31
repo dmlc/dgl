@@ -16,7 +16,7 @@ class BiasedMHA(nn.Module):
 
         \text{Attn}=\text{softmax}(\dfrac{QK^T}{\sqrt{d}} \circ b)
 
-    :math:`Q` and :math:`K` are feature representation of nodes. :math:`d`
+    :math:`Q` and :math:`K` are feature representations of nodes. :math:`d`
     is the corresponding :attr:`feat_size`. :math:`b` is attention bias, which
     can be additive or multiplicative according to the operator :math:`\circ`.
 
@@ -25,7 +25,7 @@ class BiasedMHA(nn.Module):
     feat_size : int
         Feature size.
     num_heads : int
-        Number of attention heads, by which attr:`feat_size` is divisible.
+        Number of attention heads, by which :attr:`feat_size` is divisible.
     bias : bool, optional
         If True, it uses bias for linear projection. Default: True.
     attn_bias_type : str, optional
@@ -103,7 +103,8 @@ class BiasedMHA(nn.Module):
             The attention mask used for avoiding computation on invalid
             positions, where invalid positions are indicated by `True` values.
             Shape: (batch_size, N, N). Note: For rows corresponding to
-            unexisting nodes, make sure at least one value is set to `False`.
+            unexisting nodes, make sure at least one entry is set to `False` to
+            prevent obtaining NaNs with softmax.
 
         Returns
         -------

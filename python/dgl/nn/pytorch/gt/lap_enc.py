@@ -30,8 +30,7 @@ class LapPosEncoder(nn.Module):
         Default : False.
     num_post_layer : int, optional
         If num_post_layer > 0, apply an MLP of ``num_post_layer`` layers after
-        pooling.
-        Default : 0.
+        pooling. Default : 0.
 
     Example
     -------
@@ -43,12 +42,14 @@ class LapPosEncoder(nn.Module):
     >>> g = dgl.graph(([0,1,2,3,4,2,3,1,4,0], [2,3,1,4,0,0,1,2,3,4]))
     >>> g = transform(g)
     >>> eig_vals, eig_vecs = g.ndata['eigval'], g.ndata['eigvec']
-    >>> TransformerLPE = LapPosEncoder(model_type="Transformer", num_layer=3, k=5,
-                                       lpe_dim=16, n_head=4)
-    >>> pos_enc = TransformerLPE(eig_vals, eig_vecs)
-    >>> DeepSetLPE = LapPosEncoder(model_type="DeepSet", num_layer=3, k=5,
-                                   lpe_dim=16, num_post_layer=2)
-    >>> pos_enc = DeepSetLPE(eig_vals, eig_vecs)
+    >>> transformer_encoder = LapPosEncoder(
+            model_type="Transformer", num_layer=3, k=5, lpe_dim=16, n_head=4
+        )
+    >>> pos_enc = transformer_encoder(eig_vals, eig_vecs)
+    >>> deepset_encoder = LapPosEncoder(
+            model_type="DeepSet", num_layer=3, k=5, lpe_dim=16, num_post_layer=2
+        )
+    >>> pos_enc = deepset_encoder(eig_vals, eig_vecs)
     """
 
     def __init__(

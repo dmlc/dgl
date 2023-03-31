@@ -4,6 +4,7 @@ import torch as th
 import torch.nn as nn
 
 from .... import to_homogeneous
+from ..base import DGLError
 
 
 class DegreeEncoder(nn.Module):
@@ -58,18 +59,21 @@ class DegreeEncoder(nn.Module):
         Parameters
         ----------
         g : DGLGraph
-            A DGLGraph to be encoded. If it is a heterogeneous one,
-            it will be transformed into a homogeneous one first.
+            A DGLGraph to be encoded. Graphs with more than one type of edges
+            are not allowed.
 
         Returns
         -------
         Tensor
             Return degree embedding vectors of shape :math:`(N, d)`,
-            where :math:`N` is th number of nodes in the input graph and
+            where :math:`N` is the number of nodes in the input graph and
             :math:`d` is :attr:`embedding_dim`.
         """
-        if len(g.ntypes) > 1 or len(g.etypes) > 1:
-            g = to_homogeneous(g)
+        if len(g.etypes) > 1:
+            raise DGLError(
+                "The input graph should have no more than one type of edges."
+            )
+
         in_degree = th.clamp(g.in_degrees(), min=0, max=self.max_degree)
         out_degree = th.clamp(g.out_degrees(), min=0, max=self.max_degree)
 

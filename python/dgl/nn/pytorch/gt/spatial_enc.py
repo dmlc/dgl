@@ -15,7 +15,7 @@ class SpatialEncoder(nn.Module):
     `Do Transformers Really Perform Bad for Graph Representation?
     <https://proceedings.neurips.cc/paper/2021/file/f1c1592588411002af340cbaedd6fc33-Paper.pdf>`__
 
-    This module is a learnable spatial embedding module which encodes
+    This module is a learnable spatial embedding module, which encodes
     the shortest distance between each node pair for attention bias.
 
     Parameters
@@ -176,6 +176,7 @@ class SpatialEncoder3d(nn.Module):
               be a tensor in shape :math:`(N,)`. The scaling factors of
               each pair of nodes are determined by their node types.
             * Otherwise, :attr:`node_type` should be None.
+
         Returns
         -------
         torch.Tensor

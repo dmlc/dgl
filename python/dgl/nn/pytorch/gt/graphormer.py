@@ -99,7 +99,8 @@ class GraphormerLayer(nn.Module):
             The attention mask used for avoiding computation on invalid
             positions, where invalid positions are indicated by `True` values.
             Shape: (batch_size, N, N). Note: For rows corresponding to
-            unexisting nodes, make sure at least one value is set to `False`.
+            unexisting nodes, make sure at least one entry is set to `False` to
+            prevent obtaining NaNs with softmax.
 
         Returns
         -------
