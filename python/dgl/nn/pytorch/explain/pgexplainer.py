@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import dgl
 import torch.nn.functional as F
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, csr_matrix
 import dgl.function as fn
 from torch.optim import Adam
 
@@ -22,12 +22,12 @@ __all__ = ["PGExplainer"]
 class PGExplainer(nn.Module):
 
     def __init__(self, model, num_features,
-                 epochs= 20,lr = 0.005, coff_size = 0.01, coff_ent = 5e-4,
-                 t0 = 5.0, t1 = 1.0, sample_bias = 0.0, num_hops = None):
+                 epochs=20, lr=0.005, coff_size=0.01, coff_ent=5e-4,
+                 t0=5.0, t1=1.0, sample_bias=0.0, num_hops=None, device='cpu'):
         super(PGExplainer, self).__init__()
 
         self.model = model
-        self.device = model.device
+        self.device = device
         self.model.to(self.device)
         self.num_features = num_features
 
@@ -55,7 +55,7 @@ class PGExplainer(nn.Module):
             "size": coff_size,
             "ent": coff_ent,
             "t0": t0,
-            "t0": t1,
+            "t1": t1,
             "sample_bias": sample_bias,
         }
 
@@ -108,7 +108,10 @@ class PGExplainer(nn.Module):
         # @kunal: in input, what is nodeid?
         x, embed, adj, tmp, label = inputs
 
-        g = dgl.graph((adj.row(), adj.col()))
+        adj = coo_matrix(adj)
+
+        g = dgl.graph((adj.row, adj.col))
+
         g.ndata['x'] = embed
         f1 = dgl.function.copy_src('x', 'f1')
         f2 = dgl.function.copy_dst('x', 'f2')
@@ -118,7 +121,7 @@ class PGExplainer(nn.Module):
         #                      g.edata['f2'],
         #                      embed[nodeid].repeat(g.num_edges(), 1)],
         #                     dim=-1)
-        
+
         f12self = torch.cat([g.edata['f1'],
                              g.edata['f2']],
                             dim=-1)
@@ -127,6 +130,7 @@ class PGExplainer(nn.Module):
         self.values = h.view(-1)
 
         values = self.concrete_sample(self.values, beta=tmp, training=training)
+        self.sparse_mask_values = values
 
         indices = torch.cat([adj.row().unsqueeze(-1), adj.col().unsqueeze(-1)],
                             dim=-1)
@@ -135,42 +139,42 @@ class PGExplainer(nn.Module):
         masked_adj = self._masked_adj(mask, adj)
 
         output = self.model((x, masked_adj))
-        
+
         # For node classification:
         # node_pred = output[nodeid, :]
         node_pred = output
         res = nn.functional.softmax(node_pred, dim=0)
         return res
 
-    def loss(self, pred, pred_label, node_idx):
+    def loss(self, pred, ori_pred_label):
         """
         Args:
             pred: prediction made by current model
             pred_label: the label predicted by the original model.
         """
-        pred_label_node = pred_label[node_idx]
-        logit = pred[pred_label_node]
-
+        logit = pred[ori_pred_label]
         logit += 1e-6
         pred_loss = -torch.log(logit)
 
+        # size
+        edge_mask = self.sparse_mask_values
         if self.coeffs['size'] <= 0:
-            size_loss = self.coeffs["size"] * torch.sum(self.mask)
+            size_loss = self.coeffs["size"] * torch.sum(edge_mask)
         else:
-            size_loss = self.coeffs["size"] * F.relu(torch.sum(self.mask) - self.coeffs['size'])
+            size_loss = self.coeffs["size"] * F.relu(torch.sum(edge_mask) - self.coeffs['size'])
 
+        # entropy
         scale = 0.99
-        mask = self.mask * (2 * scale - 1.0) + (1.0 - scale)
-        mask_ent = -mask * torch.log(mask) - (1 - mask) * torch.log(1 - mask)
+        edge_mask = self.mask * (2 * scale - 1.0) + (1.0 - scale)
+        mask_ent = -edge_mask * torch.log(edge_mask) - (1 - edge_mask) * torch.log(1 - edge_mask)
         mask_ent_loss = self.coeffs["ent"] * torch.mean(mask_ent)
 
         loss = pred_loss + size_loss + mask_ent_loss
-
-        return loss, pred_loss, size_loss
+        return loss
 
     def train(self, dataset):
 
-        optimizer = Adam(self.elayers.parameters(), lr=self.lr)
+        optimizer = Adam(self.elayers.parameters(), lr=self.coeffs['lr'])
 
         clip_value_min = -0.01
         clip_value_max = 0.01
@@ -191,15 +195,15 @@ class PGExplainer(nn.Module):
                     emb = self.model(graph, feat)
 
                 # @kunal = how to get the adj tensor
-                adj_tensor = graph.adj()
+                adj_tensor = graph.adj().to_dense()
 
                 optimizer.zero_grad()
                 pred = self((feat, emb, adj_tensor, tmp, label))
                 cl = self.loss(pred, pred_label, label)
                 cl.backward()
-                
+
                 loss += cl.item()
-                
+
                 torch.nn.utils.clip_grad_value_(self.parameters(),
                                                 clip_value_min,
                                                 clip_value_max)
@@ -232,7 +236,7 @@ class PGExplainer(nn.Module):
             #         self.acc(gid, selected_edge_lists, selected_edge_label_lists)
             #
             #         self.train(dataset)
-        
+
     def acc(self, gid, edge_lists, edge_label_lists):
         mask = self.masked_adj.detach().numpy()
         edge_labels = edge_label_lists[gid]
@@ -290,6 +294,6 @@ class PGExplainer(nn.Module):
         g = dgl.graph((edge_index[0], edge_index[1]), num_nodes=nmb_nodes, device=self.device)
         g.edata['w'] = edge_weight
 
-        return g, fea, emb, adj,\
-               node_label, max_label, pos_edges,\
+        return g, fea, emb, adj, \
+               node_label, max_label, pos_edges, \
                filter_edges, thres

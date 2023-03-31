@@ -136,7 +136,7 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="MUTAG",
-        choices=["MUTAG", "PTC", "NCI1", "PROTEINS"],
+        choices=["MUTAG"],
         help="name of dataset (default: MUTAG)",
     )
     args = parser.parse_args()
@@ -186,15 +186,18 @@ if __name__ == "__main__":
     model = torch.load('model.dt')
     model.eval()
     ##########
-
+    # import pickle as pkl
+    # with open(r'C:\Users\kunmu\Downloads\Mutagenicity.pkl\Mutagenicity.pkl', 'rb') as fin:
+    #     original_adjs, original_features, original_labels = pkl.load(fin)
+    #
+    # exit()
     from dgl.nn import PGExplainer
     import dgl
     import os
     import networkx as nx
     import matplotlib.pyplot as plt
 
-
-    explainer = PGExplainer(model, in_size)
+    explainer = PGExplainer(model, in_size, device='cpu')
     explainer.train(dataset)
 
     for idx, (graph, l) in enumerate(dataset):
