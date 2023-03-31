@@ -62,7 +62,7 @@ def main(args):
     test_mask = g.ndata["test_mask"]
     in_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     print(
         """----Data statistics------'
       #Edges %d
@@ -83,7 +83,7 @@ def main(args):
     # add self loop
     if args.self_loop:
         g = g.remove_self_loop().add_self_loop()
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
 
     # normalization
     degs = g.in_degrees().float()

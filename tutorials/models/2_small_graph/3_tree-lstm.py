@@ -256,7 +256,7 @@ print(dgl.topological_nodes_generator(trv_graph))
 import dgl.function as fn
 import torch as th
 
-trv_graph.ndata["a"] = th.ones(graph.number_of_nodes(), 1)
+trv_graph.ndata["a"] = th.ones(graph.num_nodes(), 1)
 traversal_order = dgl.topological_nodes_generator(trv_graph)
 trv_graph.prop_nodes(
     traversal_order,
@@ -400,7 +400,7 @@ train_loader = DataLoader(
 for epoch in range(epochs):
     for step, batch in enumerate(train_loader):
         g = batch.graph
-        n = g.number_of_nodes()
+        n = g.num_nodes()
         h = th.zeros((n, h_size))
         c = th.zeros((n, h_size))
         logits = model(batch, h, c)

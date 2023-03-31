@@ -190,13 +190,11 @@ def batch(graphs, ndata=ALL, edata=ALL):
     # Batch node feature
     if ndata is not None:
         for ntype_id, ntype in zip(ntype_ids, ntypes):
-            all_empty = all(
-                g._graph.number_of_nodes(ntype_id) == 0 for g in graphs
-            )
+            all_empty = all(g._graph.num_nodes(ntype_id) == 0 for g in graphs)
             frames = [
                 g._node_frames[ntype_id]
                 for g in graphs
-                if g._graph.number_of_nodes(ntype_id) > 0 or all_empty
+                if g._graph.num_nodes(ntype_id) > 0 or all_empty
             ]
             # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
             # we allow empty graphs to have no features during batching.
@@ -208,13 +206,11 @@ def batch(graphs, ndata=ALL, edata=ALL):
     # Batch edge feature
     if edata is not None:
         for etype_id, etype in zip(relation_ids, relations):
-            all_empty = all(
-                g._graph.number_of_edges(etype_id) == 0 for g in graphs
-            )
+            all_empty = all(g._graph.num_edges(etype_id) == 0 for g in graphs)
             frames = [
                 g._edge_frames[etype_id]
                 for g in graphs
-                if g._graph.number_of_edges(etype_id) > 0 or all_empty
+                if g._graph.num_edges(etype_id) > 0 or all_empty
             ]
             # TODO: do we require graphs with no nodes/edges to have the same schema?  Currently
             # we allow empty graphs to have no features during batching.

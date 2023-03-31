@@ -97,7 +97,7 @@ sampling APIs to support mini-batch training (see `Distributed sampling`_).
 
 .. code:: python
 
-    print(g.number_of_nodes())
+    print(g.num_nodes())
 
 Access node/edge data
 ^^^^^^^^^^^^^^^^^^^^^
@@ -132,7 +132,7 @@ in the cluster even if the :class:`~dgl.distributed.DistTensor` object disappear
 
 .. code:: python
 
-    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name='test')
+    tensor = dgl.distributed.DistTensor((g.num_nodes(), 10), th.float32, name='test')
 
 .. note::
 
@@ -183,7 +183,7 @@ node embeddings. Creating distributed embeddings is very similar to creating dis
         arr = th.zeros(shape, dtype=dtype)
         arr.uniform_(-1, 1)
         return arr
-    emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10, init_func=initializer)
+    emb = dgl.distributed.DistEmbedding(g.num_nodes(), 10, init_func=initializer)
 
 Internally, distributed embeddings are built on top of distributed tensors,
 and, thus, has very similar behaviors to distributed tensors. For example, when

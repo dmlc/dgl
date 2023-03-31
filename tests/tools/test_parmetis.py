@@ -119,10 +119,10 @@ def test_parmetis_postprocessing():
         num_chunks = 2
         g = create_chunked_dataset(root_dir, num_chunks)
 
-        num_nodes = g.number_of_nodes()
-        num_institutions = g.number_of_nodes("institution")
-        num_authors = g.number_of_nodes("author")
-        num_papers = g.number_of_nodes("paper")
+        num_nodes = g.num_nodes()
+        num_institutions = g.num_nodes("institution")
+        num_authors = g.num_nodes("author")
+        num_papers = g.num_nodes("paper")
 
         # Generate random parmetis partition ids for the nodes in the graph.
         # Replace this code with actual ParMETIS executable when it is ready
@@ -192,9 +192,9 @@ def test_parmetis_wrapper():
         all_ntypes = g.ntypes
         all_etypes = g.etypes
         num_constraints = len(all_ntypes) + 3
-        num_institutions = g.number_of_nodes("institution")
-        num_authors = g.number_of_nodes("author")
-        num_papers = g.number_of_nodes("paper")
+        num_institutions = g.num_nodes("institution")
+        num_authors = g.num_nodes("author")
+        num_papers = g.num_nodes("paper")
 
         # Trigger ParMETIS.
         schema_file = os.path.join(root_dir, "chunked-data/metadata.json")
@@ -211,8 +211,8 @@ def test_parmetis_wrapper():
             f.write("127.0.0.1\n")
             f.write("127.0.0.1\n")
 
-        num_nodes = g.number_of_nodes()
-        num_edges = g.number_of_edges()
+        num_nodes = g.num_nodes()
+        num_edges = g.num_edges()
         stats_file = f"{graph_name}_stats.txt"
         with open(stats_file, "w") as f:
             f.write(f"{num_nodes} {num_edges} {num_constraints}")

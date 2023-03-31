@@ -131,7 +131,7 @@ class MWE_GCN(nn.Module):
         self.device = device
 
     def forward(self, g, node_state=None):
-        node_state = torch.ones(g.number_of_nodes(), 1).float().to(self.device)
+        node_state = torch.ones(g.num_nodes(), 1).float().to(self.device)
 
         for layer in self.layers:
             node_state = F.dropout(
@@ -191,7 +191,7 @@ class MWE_DGCN(nn.Module):
         self.device = device
 
     def forward(self, g, node_state=None):
-        node_state = torch.ones(g.number_of_nodes(), 1).float().to(self.device)
+        node_state = torch.ones(g.num_nodes(), 1).float().to(self.device)
 
         node_state = self.layers[0](g, node_state)
 
@@ -350,8 +350,8 @@ class GATConv(nn.Module):
             e = self.leaky_relu(e)
 
             if self.training and self.edge_drop > 0:
-                perm = torch.randperm(graph.number_of_edges(), device=e.device)
-                bound = int(graph.number_of_edges() * self.edge_drop)
+                perm = torch.randperm(graph.num_edges(), device=e.device)
+                bound = int(graph.num_edges() * self.edge_drop)
                 eids = perm[bound:]
                 graph.edata["a"] = torch.zeros_like(e)
                 graph.edata["a"][eids] = self.attn_drop(

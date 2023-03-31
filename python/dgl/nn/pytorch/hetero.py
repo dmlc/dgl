@@ -62,7 +62,7 @@ class HeteroGraphConv(nn.Module):
     ``'user'`` and ``'game'`` nodes.
 
     >>> import torch as th
-    >>> h1 = {'user' : th.randn((g.number_of_nodes('user'), 5))}
+    >>> h1 = {'user' : th.randn((g.num_nodes('user'), 5))}
     >>> h2 = conv(g, h1)
     >>> print(h2.keys())
     dict_keys(['user', 'game'])

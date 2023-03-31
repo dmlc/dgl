@@ -186,7 +186,7 @@ class DeepwalkDataset:
             self.save_mapping(map_file)
             self.G = net2graph(self.sm)
 
-        self.num_nodes = self.G.number_of_nodes()
+        self.num_nodes = self.G.num_nodes()
 
         # random walk seeds
         start = time.time()
