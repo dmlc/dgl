@@ -1,5 +1,5 @@
 """
-Wikipedia page-page networks on the chameleon topic.
+Wikipedia page-page networks on two topics: chameleons and squirrels.
 """
 import os
 
@@ -23,8 +23,7 @@ class WikiNetworkDataset(DGLBuiltinDataset):
     raw_dir : str
         Raw file directory to store the processed data.
     force_reload : bool
-        Whether to always generate the data from scratch rather than load a
-        cached version.
+        Whether to re-download the data source.
     verbose : bool
         Whether to print progress information.
     transform : callable
@@ -123,7 +122,7 @@ class ChameleonDataset(WikiNetworkDataset):
     - Nodes: 2277
     - Edges: 36101
     - Number of Classes: 5
-    - 10 splits with 60/20/20 train/val/test ratio
+    - 10 train/val/test splits
 
         - Train: 1092
         - Val: 729
@@ -134,8 +133,7 @@ class ChameleonDataset(WikiNetworkDataset):
     raw_dir : str, optional
         Raw file directory to store the processed data. Default: ~/.dgl/
     force_reload : bool, optional
-        Whether to always generate the data from scratch rather than load a
-        cached version. Default: False
+        Whether to re-download the data source. Default: False
     verbose : bool, optional
         Whether to print progress information. Default: True
     transform : callable, optional
@@ -177,6 +175,82 @@ class ChameleonDataset(WikiNetworkDataset):
     ):
         super(ChameleonDataset, self).__init__(
             name="chameleon",
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
+
+
+class SquirrelDataset(WikiNetworkDataset):
+    r"""Wikipedia page-page network on squirrels from `Multi-scale Attributed
+    Node Embedding <https://arxiv.org/abs/1909.13021>`__ and later modified by
+    `Geom-GCN: Geometric Graph Convolutional Networks
+    <https://arxiv.org/abs/2002.05287>`
+
+    Nodes represent articles from the English Wikipedia, edges reflect mutual
+    links between them. Node features indicate the presence of particular nouns
+    in the articles. The nodes were classified into 5 classes in terms of their
+    average monthly traffic.
+
+    Statistics:
+
+    - Nodes: 5201
+    - Edges: 217073
+    - Number of Classes: 5
+    - 10 train/val/test splits
+
+        - Train: 2496
+        - Val: 1664
+        - Test: 1041
+
+    Parameters
+    ----------
+    raw_dir : str, optional
+        Raw file directory to store the processed data. Default: ~/.dgl/
+    force_reload : bool, optional
+        Whether to re-download the data source. Default: False
+    verbose : bool, optional
+        Whether to print progress information. Default: True
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access. Default: None
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of node classes
+
+    Notes
+    -----
+    The graph does not come with edges for both directions.
+
+    Examples
+    --------
+
+    >>> from dgl.data import SquirrelDataset
+    >>> dataset = SquirrelDataset()
+    >>> g = dataset[0]
+    >>> num_classes = dataset.num_classes
+
+    >>> # get node features
+    >>> feat = g.ndata["feat"]
+
+    >>> # get data split
+    >>> train_mask = g.ndata["train_mask"]
+    >>> val_mask = g.ndata["val_mask"]
+    >>> test_mask = g.ndata["test_mask"]
+
+    >>> # get labels
+    >>> label = g.ndata['label']
+    """
+
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
+        super(SquirrelDataset, self).__init__(
+            name="squirrel",
             raw_dir=raw_dir,
             force_reload=force_reload,
             verbose=verbose,

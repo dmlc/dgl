@@ -492,7 +492,7 @@ class EdgeCollator(Collator):
         }
         neg_pair_graph = heterograph(
             neg_edges,
-            {ntype: self.g.number_of_nodes(ntype) for ntype in self.g.ntypes},
+            {ntype: self.g.num_nodes(ntype) for ntype in self.g.ntypes},
         )
 
         pair_graph, neg_pair_graph = transforms.compact_graphs(

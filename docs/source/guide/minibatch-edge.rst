@@ -73,7 +73,7 @@ and removing them.
 
 .. code:: python
 
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     sampler = dgl.dataloading.as_edge_prediction_sampler(
         sampler, exclude='reverse_id', reverse_eids=torch.cat([
             torch.arange(n_edges // 2, n_edges), torch.arange(0, n_edges // 2)]))

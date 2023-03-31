@@ -108,7 +108,7 @@ GNN 모델의 forward 패스(loss 계산 포함)를 ``torch.cuda.amp.autocast()`
     in_feats = features.shape[1]
     n_hidden = 256
     n_classes = data.num_classes
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     heads = [1, 1, 1]
     model = GAT(in_feats, n_hidden, n_classes, heads)
     model = model.to(device)

@@ -84,7 +84,7 @@ MFGs.
    :attr:`block.dstnodes <dgl.DGLGraph.dstnodes>` for features on output nodes,
    if the original graph has multiple node types.
 -  Replace
-   :meth:`g.number_of_nodes <dgl.DGLGraph.number_of_nodes>` with either
+   :meth:`g.num_nodes <dgl.DGLGraph.num_nodes>` with either
    :meth:`block.number_of_src_nodes <dgl.DGLGraph.number_of_src_nodes>` or
    :meth:`block.number_of_dst_nodes <dgl.DGLGraph.number_of_dst_nodes>` for the number of
    input nodes or output nodes respectively.
