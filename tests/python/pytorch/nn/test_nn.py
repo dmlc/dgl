@@ -540,8 +540,8 @@ def test_rgcn_default_nbasis(idtype, O):
 @pytest.mark.parametrize("out_dim", [1, 5])
 @pytest.mark.parametrize("num_heads", [1, 4])
 def test_gat_conv(g, idtype, out_dim, num_heads):
-    g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
     gat = nn.GATConv(5, out_dim, num_heads)
     feat = F.randn((g.number_of_src_nodes(), 5))
     gat = gat.to(ctx)
@@ -565,8 +565,8 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
 @pytest.mark.parametrize("out_dim", [1, 2])
 @pytest.mark.parametrize("num_heads", [1, 4])
 def test_gat_conv_bi(g, idtype, out_dim, num_heads):
-    g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
     gat = nn.GATConv(5, out_dim, num_heads)
     feat = (
         F.randn((g.number_of_src_nodes(), 5)),
@@ -584,8 +584,8 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
 @pytest.mark.parametrize("out_dim", [1, 2])
 @pytest.mark.parametrize("num_heads", [1, 4])
 def test_gat_conv_edge_weight(g, idtype, out_dim, num_heads):
-    g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
     gat = nn.GATConv(5, out_dim, num_heads)
     feat = (
         F.randn((g.number_of_src_nodes(), 5)),

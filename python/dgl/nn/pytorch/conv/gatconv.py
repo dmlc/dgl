@@ -332,7 +332,7 @@ class GATConv(nn.Module):
             if edge_weight is not None:
                 graph.edata["a"] = (
                     graph.edata["a"]
-                    * edge_weight.tile(self._out_feats, self._num_heads, 1).T
+                    * edge_weight.tile(1, self._num_heads, 1).transpose(0, 2)
                 )
             # message passing
             graph.update_all(fn.u_mul_e("ft", "a", "m"), fn.sum("m", "ft"))
