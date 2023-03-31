@@ -113,9 +113,14 @@ class PGExplainer(nn.Module):
         f1 = dgl.function.copy_src('x', 'f1')
         f2 = dgl.function.copy_dst('x', 'f2')
         g.apply_edges(lambda edges: {'f1': f1(edges), 'f2': f2(edges)})
+        # For node classification:
+        # f12self = torch.cat([g.edata['f1'],
+        #                      g.edata['f2'],
+        #                      embed[nodeid].repeat(g.num_edges(), 1)],
+        #                     dim=-1)
+        
         f12self = torch.cat([g.edata['f1'],
-                             g.edata['f2'],
-                             embed[nodeid].repeat(g.num_edges(), 1)],
+                             g.edata['f2']],
                             dim=-1)
 
         h = self.elayers(f12self)
@@ -130,8 +135,10 @@ class PGExplainer(nn.Module):
         masked_adj = self._masked_adj(mask, adj)
 
         output = self.model((x, masked_adj))
-
-        node_pred = output[nodeid, :]
+        
+        # For node classification:
+        # node_pred = output[nodeid, :]
+        node_pred = output
         res = nn.functional.softmax(node_pred, dim=0)
         return res
 
@@ -165,9 +172,6 @@ class PGExplainer(nn.Module):
 
         optimizer = Adam(self.elayers.parameters(), lr=self.lr)
 
-        for param in self.model.parameters():
-            param.requires_grad = False
-
         clip_value_min = -0.01
         clip_value_max = 0.01
 
@@ -183,17 +187,19 @@ class PGExplainer(nn.Module):
                 feat = graph.ndata.pop("attr")
                 _, pred_label = torch.max(self.model(graph, feat), 1)
                 # @kunal = how to get the node embedding
-                emb = self.model(graph, feat)
+                with torch.no_grad():
+                    emb = self.model(graph, feat)
 
                 # @kunal = how to get the adj tensor
-                adj_tensor = ??
+                adj_tensor = graph.adj()
 
                 optimizer.zero_grad()
                 pred = self((feat, emb, adj_tensor, tmp, label))
                 cl = self.loss(pred, pred_label, label)
-
-                loss += cl.item()
                 cl.backward()
+                
+                loss += cl.item()
+                
                 torch.nn.utils.clip_grad_value_(self.parameters(),
                                                 clip_value_min,
                                                 clip_value_max)
@@ -226,9 +232,6 @@ class PGExplainer(nn.Module):
             #         self.acc(gid, selected_edge_lists, selected_edge_label_lists)
             #
             #         self.train(dataset)
-
-        for param in self.model.parameters():
-            param.requires_grad = True
         
     def acc(self, gid, edge_lists, edge_label_lists):
         mask = self.masked_adj.detach().numpy()
