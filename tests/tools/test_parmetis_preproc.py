@@ -14,7 +14,10 @@ from distpartitioning.utils import generate_read_list, get_idranges, read_json
 
 
 def _get_edge_files(schema_map, rank, num_parts):
-    """Returns the edge files processed by each rank
+    """Returns the edge files processed by each rank.
+    This function returns only the file names, which are
+    expected to be created by the function (gen_edge_files())
+    from the tools/distpartitioning/parmetis_preproc.py module.
 
     Parameters:
     ----------
@@ -130,12 +133,13 @@ def _get_test_data(edges_dir, num_chunks, edge_fmt="csv", edge_fmt_del=" "):
         fmt_meta["delimiter"] = edge_fmt_del
 
     for idx in range(num_chunks):
-        path = os.path.join(edges_dir, f"test_edges_{idx}")
+        path = os.path.join(edges_dir, f"test_file_{idx}.{fmt_meta['name']}")
         array_parser = array_readwriter.get_array_parser(**fmt_meta)
         edge_data = (
             np.array([np.arange(10), np.arange(10)]).reshape(10, 2) + 10 * idx
         )
         array_parser.write(path, edge_data)
+        print(f"Creating file {path} - {fmt_meta} - {edge_data.shape}")
 
     edge_files = [path]
     edges["n1:e1:n1"]["data"] = edge_files
@@ -146,7 +150,8 @@ def _get_test_data(edges_dir, num_chunks, edge_fmt="csv", edge_fmt_del=" "):
 
 @pytest.mark.parametrize("num_chunks, num_parts", [[4, 1], [4, 2], [4, 4]])
 @pytest.mark.parametrize("edges_fmt", ["csv", "parquet"])
-def test_gen_edge_files(num_chunks, num_parts, edges_fmt):
+@pytest.mark.parametrize("edges_delimiter", [" ", ",", ":"])
+def test_gen_edge_files(num_chunks, num_parts, edges_fmt, edges_delimiter):
     """Unit test case for the function
     tools/distpartitioning/parmetis_preprocess.py::gen_edge_files
 
@@ -158,6 +163,8 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt):
         no. of partitions
     edges_fmt : string
         specifying the storage format for the edge files
+    edges_delimiter : string
+        specifying the delimiter used in the edge files
     """
 
     # Create the input dataset
@@ -174,7 +181,7 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt):
         fn_params.num_parts = num_parts
 
         # Read the input schema
-        schema_map = _get_test_data(input_dir, num_chunks)
+        schema_map = _get_test_data(input_dir, num_chunks, edges_fmt, edges_delimiter)
 
         # Get the global node id offsets for each node type
         # There is only one node-type in the test graph
@@ -198,8 +205,8 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt):
             assert len(baseline_results) == len(actual_results)
 
             # Test 2. Check the contents of each file and verify the
-            # file contents
-            for idx, fname in enumerate(baseline_results):
+            # file contents match with the expected results.
+            for idx, fname in enumerate(actual_results):
 
                 # Check the file exists
                 assert os.path.isfile(fname)
@@ -216,8 +223,8 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt):
 
                 # Read both files and compare the edges
                 # Here note that the src and dst end points are global_node_ids
-                target_file = os.path.join(output_dir, f"edges_{edge_file}")
-                target_data = _read_file(target_file, constants.STR_CSV, " ")
+                target_file = os.path.join(output_dir, f"{edge_file}")
+                target_data = _read_file(target_file, "csv", " ")
 
                 # Subtract the global node id offsets, so that we get type node ids
                 target_data[:, 0] -= ntype_gnid_offset[src_ntype_name][0, 0]
@@ -226,7 +233,10 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt):
                 # Now compare with the edge files from the input dataset
                 fmt_type = fmt_results[idx][0]
                 fmt_delimiter = fmt_results[idx][1]
-                source_file = os.path.join(input_dir, edge_file)
+                
+                # Extract the source file name here.
+                # it should have a prefix `edges_`<edge_file>
+                source_file = os.path.join(input_dir, "".join(edge_file.split("edges_")))
                 logging.info(
                     f"SourceFile: {source_file}, TargetFile: {target_file}"
                 )
