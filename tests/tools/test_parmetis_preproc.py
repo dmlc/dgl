@@ -181,7 +181,9 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt, edges_delimiter):
         fn_params.num_parts = num_parts
 
         # Read the input schema
-        schema_map = _get_test_data(input_dir, num_chunks, edges_fmt, edges_delimiter)
+        schema_map = _get_test_data(
+            input_dir, num_chunks, edges_fmt, edges_delimiter
+        )
 
         # Get the global node id offsets for each node type
         # There is only one node-type in the test graph
@@ -233,10 +235,12 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt, edges_delimiter):
                 # Now compare with the edge files from the input dataset
                 fmt_type = fmt_results[idx][0]
                 fmt_delimiter = fmt_results[idx][1]
-                
+
                 # Extract the source file name here.
                 # it should have a prefix `edges_`<edge_file>
-                source_file = os.path.join(input_dir, "".join(edge_file.split("edges_")))
+                source_file = os.path.join(
+                    input_dir, "".join(edge_file.split("edges_"))
+                )
                 logging.info(
                     f"SourceFile: {source_file}, TargetFile: {target_file}"
                 )
