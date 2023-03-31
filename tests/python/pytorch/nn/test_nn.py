@@ -580,6 +580,27 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
 
 
 @parametrize_idtype
+@pytest.mark.parametrize("g", get_cases(["bipartite"], exclude=["zero-degree"]))
+@pytest.mark.parametrize("out_dim", [1, 2])
+@pytest.mark.parametrize("num_heads", [1, 4])
+def test_gat_conv_edge_weight(g, idtype, out_dim, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    gat = nn.GATConv(5, out_dim, num_heads)
+    feat = (
+        F.randn((g.number_of_src_nodes(), 5)),
+        F.randn((g.number_of_dst_nodes(), 5)),
+    )
+    gat = gat.to(ctx)
+    ew = F.randn(g.num_edges())
+    h = gat(g, feat, edge_weight=ew)
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
+    _, a = gat(g, feat, get_attention=True)
+    assert a.shape[0] == ew.shape[0]
+    assert a.shape == (g.num_edges(), num_heads, 1)
+
+
+@parametrize_idtype
 @pytest.mark.parametrize(
     "g", get_cases(["homo", "block-bipartite"], exclude=["zero-degree"])
 )
