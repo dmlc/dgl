@@ -278,26 +278,28 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DGLContext& ctx) {
 }
 
 HeteroGraphPtr HeteroGraph::PinMemory(HeteroGraphPtr g) {
-  bool allpinned = true;
-  auto hgindex = std::dynamic_pointer_cast<HeteroGraph>(g);
-  CHECK_NOTNULL(hgindex);
-  auto rel_g = hgindex->relation_graphs_;
+  auto casted_ptr = std::dynamic_pointer_cast<HeteroGraph>(g);
+  CHECK_NOTNULL(casted_ptr);
+  auto relation_graphs = casted_ptr->relation_graphs_;
 
   auto it = std::find_if_not(
-      rel_g.begin(), rel_g.end(), [](auto& subg) { return subg->IsPinned(); });
-  // all pinned, return itself.
-  if (it == rel_g.end()) return g;
+      relation_graphs.begin(), relation_graphs.end(),
+      [](auto& underlying_g) { return underlying_g->IsPinned(); });
+  // All underlying relation graphs are pinned, return the input hetero-graph
+  // directly.
+  if (it == relation_graphs.end()) return g;
 
-  std::vector<HeteroGraphPtr> rel_graphs(rel_g.size());
-  for (size_t i = 0; i < rel_graphs.size(); ++i) {
-    if (!rel_g[i]->IsPinned()) {
-      rel_graphs[i] = rel_g[i]->PinMemory();
+  std::vector<HeteroGraphPtr> pinned_relation_graphs(relation_graphs.size());
+  for (size_t i = 0; i < pinned_relation_graphs.size(); ++i) {
+    if (!relation_graphs[i]->IsPinned()) {
+      pinned_relation_graphs[i] = relation_graphs[i]->PinMemory();
     } else {
-      rel_graphs[i] = rel_g[i];
+      pinned_relation_graphs[i] = relation_graphs[i];
     }
   }
   return HeteroGraphPtr(new HeteroGraph(
-      hgindex->meta_graph_, rel_graphs, hgindex->num_verts_per_type_));
+      casted_ptr->meta_graph_, pinned_relation_graphs,
+      casted_ptr->num_verts_per_type_));
 }
 
 void HeteroGraph::PinMemory_() {

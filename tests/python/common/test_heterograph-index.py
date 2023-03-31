@@ -5,7 +5,7 @@ import backend as F
 import dgl
 import pytest
 from dgl import DGLError
-from pytests_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 def create_test_heterograph(idtype):
@@ -47,7 +47,7 @@ def test_pin_memory(idtype):
     g = g.to(F.cpu())
     assert not g.is_pinned()
 
-    # Test pinning a CPU graph
+    # Test pinning a CPU graph.
     g._graph.pin_memory()
     assert not g.is_pinned()
     g._graph = g._graph.pin_memory()

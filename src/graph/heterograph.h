@@ -253,8 +253,9 @@ class HeteroGraph : public BaseHeteroGraph {
    * @brief Copy the current graph to pinned memory managed by
    *     PyTorch CachingHostAllocator for each relation graph.
    * @note If any of the underlying relation graphs are already pinned, the
-   *     function simply uses its original copy. If all pinned, it returns
-   *     itself.
+   *     function will utilize their existing copies. If all of them are
+   *     pinned, the function will return the original input hetero-graph
+   *     directly.
    */
   static HeteroGraphPtr PinMemory(HeteroGraphPtr g);
 

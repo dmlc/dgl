@@ -172,7 +172,7 @@ class CUDADeviceAPI final : public DeviceAPI {
   void RecordedCopyDataFromTo(
       void* from, size_t from_offset, void* to, size_t to_offset, size_t size,
       DGLContext ctx_from, DGLContext ctx_to, DGLDataType type_hint,
-      void* pyt_ctx) final {
+      void* pytorch_ctx) final {
     auto stream = GetStream();
     CopyDataFromTo(
         from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint,
@@ -183,7 +183,7 @@ class CUDADeviceAPI final : public DeviceAPI {
       void* ptr = ctx_to.device_type == kDGLCPU ? to : from;
       int id =
           ctx_to.device_type == kDGLCPU ? ctx_from.device_id : ctx_to.device_id;
-      tensor_dispatcher->CUDARecordHostAlloc(ptr, pyt_ctx, custream, id);
+      tensor_dispatcher->CUDARecordHostAlloc(ptr, pytorch_ctx, custream, id);
     }
   }
 

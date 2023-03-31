@@ -68,7 +68,7 @@ class CPUDeviceAPI final : public DeviceAPI {
   void RecordedCopyDataFromTo(
       void* from, size_t from_offset, void* to, size_t to_offset, size_t size,
       DGLContext ctx_from, DGLContext ctx_to, DGLDataType type_hint,
-      void* pyt_ctx) final {
+      void* pytorch_ctx) final {
     BUG_IF_FAIL(false) << "This piece of code should not be reached.";
   }
 

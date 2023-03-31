@@ -115,14 +115,14 @@ class DeviceAPI {
    * @param ctx_to The target context.
    * @param type_hint The type of elements, only needed by certain backends,
    *     can be useful for cross device endian converison.
-   * @param pyt_ctx The context pointer from PyTorch's CachingHostAllocator.
+   * @param pytorch_ctx The context pointer from PyTorch's CachingHostAllocator.
    * @note This function only works when PyTorch CachingHostAllocator is
    *     available.
    */
   virtual void RecordedCopyDataFromTo(
       void* from, size_t from_offset, void* to, size_t to_offset,
       size_t num_bytes, DGLContext ctx_from, DGLContext ctx_to,
-      DGLDataType type_hint, void* pyt_ctx) = 0;
+      DGLDataType type_hint, void* pytorch_ctx) = 0;
 
   /**
    * @brief Create a new stream of execution.

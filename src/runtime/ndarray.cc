@@ -68,12 +68,12 @@ void NDArray::Internal::DefaultDeleter(NDArray::Container* ptr) {
   } else if (ptr->dl_tensor.data != nullptr) {
     // if the array is still pinned before freeing, unpin it.
     if (ptr->pinned_by_dgl_) UnpinContainer(ptr);
-    if (ptr->pinned_by_pyt_) {
-      DeviceAPI::Get(kDGLCUDA)->FreePinnedDataSpace(&(ptr->pyt_raw_deleter_));
-      CHECK(ptr->pyt_raw_deleter_ == nullptr);
-      // reset the flag and storage ctx ptr for completeness
-      ptr->pinned_by_pyt_ = false;
-      ptr->pyt_ctx_ = nullptr;
+    if (ptr->pinned_by_pytorch_) {
+      DeviceAPI::Get(kDGLCUDA)->FreePinnedDataSpace(
+          &(ptr->pytorch_raw_deleter_));
+      CHECK(ptr->pytorch_raw_deleter_ == nullptr);
+      ptr->pinned_by_pytorch_ = false;
+      ptr->pytorch_ctx_ = nullptr;
     } else {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)
           ->FreeDataSpace(ptr->dl_tensor.ctx, ptr->dl_tensor.data);
@@ -167,7 +167,6 @@ NDArray NDArray::EmptyShared(
     const std::string& name, std::vector<int64_t> shape, DGLDataType dtype,
     DGLContext ctx, bool is_create) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // allocate memory
   size_t size = GetDataSize(ret.data_->dl_tensor);
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
@@ -183,7 +182,6 @@ NDArray NDArray::EmptyShared(
 NDArray NDArray::Empty(
     std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // allocate memory
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   if (size > 0)
@@ -214,7 +212,8 @@ void NDArray::CopyFromTo(DGLArray* from, DGLArray* to) {
       from->dtype);
 }
 
-void NDArray::RecordedCopyFromTo(DGLArray* from, DGLArray* to, void* pyt_ctx) {
+void NDArray::RecordedCopyFromTo(
+    DGLArray* from, DGLArray* to, void* pytorch_ctx) {
   size_t from_size = GetDataSize(*from);
   size_t to_size = GetDataSize(*to);
   CHECK_EQ(from_size, to_size)
@@ -229,25 +228,24 @@ void NDArray::RecordedCopyFromTo(DGLArray* from, DGLArray* to, void* pyt_ctx) {
   DeviceAPI::Get(kDGLCUDA)->RecordedCopyDataFromTo(
       from->data, static_cast<size_t>(from->byte_offset), to->data,
       static_cast<size_t>(to->byte_offset), from_size, from->ctx, to->ctx,
-      from->dtype, pyt_ctx);
+      from->dtype, pytorch_ctx);
 }
 
 NDArray NDArray::PinnedEmpty(
     std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
   CHECK_EQ(ctx.device_type, kDGLCPU) << "Only NDArray on CPU can be pinned";
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content (i.e., allocation)
   size_t size = GetDataSize(ret.data_->dl_tensor);
   if (size > 0) {
     ret.data_->dl_tensor.data = DeviceAPI::Get(kDGLCUDA)->AllocPinnedDataSpace(
-        size, &(ret.data_->pyt_ctx_), &(ret.data_->pyt_raw_deleter_));
+        size, &(ret.data_->pytorch_ctx_), &(ret.data_->pytorch_raw_deleter_));
     CHECK(
-        ret.data_->pyt_ctx_ != nullptr &&
-        ret.data_->pyt_raw_deleter_ != nullptr)
+        ret.data_->pytorch_ctx_ != nullptr &&
+        ret.data_->pytorch_raw_deleter_ != nullptr)
         << "The allocation failed in PyTorch's CachingHostAllocator. "
-        << "The returned context pointer is " << ret.data_->pyt_ctx_
-        << " and the function deleter is " << ret.data_->pyt_raw_deleter_;
-    ret.data_->pinned_by_pyt_ = true;
+        << "The returned context pointer is " << ret.data_->pytorch_ctx_
+        << " and the function deleter is " << ret.data_->pytorch_raw_deleter_;
+    ret.data_->pinned_by_pytorch_ = true;
   }
   return ret;
 }
@@ -346,7 +344,7 @@ std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
 }
 
 bool NDArray::IsContainerPinned(NDArray::Container* ptr) {
-  if (ptr->pinned_by_dgl_ || ptr->pinned_by_pyt_) return true;
+  if (ptr->pinned_by_dgl_ || ptr->pinned_by_pytorch_) return true;
   auto* tensor = &(ptr->dl_tensor);
   // Can only be pinned if on CPU...
   if (tensor->ctx.device_type != kDGLCPU) return false;

@@ -73,7 +73,7 @@ TA_EXPORTS void* CUDARawHostAlloc(
   // Return the raw ctx ptr for recording event.
   *ctx = data_ptr.get_context();
 
-  // Transfer ownership to raw_deleter
+  // Transfer ownership to raw_deleter.
   auto* data_deleter = new CUDAHostDeleter(data_ptr.move_context());
   *raw_deleter = static_cast<void*>(data_deleter);
   return raw;

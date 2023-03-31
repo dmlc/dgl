@@ -149,8 +149,9 @@ class TensorDispatcher {
   inline void* CUDAAllocHostWorkspace(
       size_t nbytes, void** ctx, void** deleter) {
     auto entry = entrypoints_[Op::kCUDARawHostAlloc];
-    return FUNCCAST(tensoradapter::CUDARawHostAlloc, entry)(
-        nbytes, ctx, deleter);
+
+    auto alloc_func = FUNCCAST(tensoradapter::CUDARawHostAlloc, entry);
+    return alloc_func(nbytes, ctx, deleter);
   }
 
   /**
@@ -170,9 +171,9 @@ class TensorDispatcher {
    * @brief Invoke the record_event function call from PyTorch
    *     CachingHostAllocator.
    * @note This function assoicates a CUDA stream (used by a copy kernel) to the
-   *     pinned data. In the free path of this data (with
-   *     CUDAFreeHostWorkspace), the set of associated streams is then consumed
-   *     to ensure proper functionlity. (ref:
+   *     pinned data. In the free path of this data, which is achieved by
+   *     calling CUDAFreeHostWorkspace, the set of associated streams is then
+   *     consumed to ensure proper functionlity. (ref:
    *     pytorch/pytorch/blob/master/aten/src/ATen/cuda/CachingHostAllocator.cpp).
    *     Used in CUDADeviceAPI::RecordedCopyDataFromTo().
    *
@@ -184,8 +185,8 @@ class TensorDispatcher {
   inline void CUDARecordHostAlloc(
       void* data, void* ctx, cudaStream_t stream, int device_id) {
     auto entry = entrypoints_[Op::kCUDARecordHostAlloc];
-    FUNCCAST(tensoradapter::CUDARecordHostAlloc, entry)
-    (data, ctx, stream, device_id);
+    auto recorded_alloc = FUNCCAST(tensoradapter::CUDARecordHostAlloc, entry);
+    recorded_alloc(data, ctx, stream, device_id);
   }
 
   /**
