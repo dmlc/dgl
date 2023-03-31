@@ -592,7 +592,7 @@ def test_gat_conv_edge_weight(g, idtype, out_dim, num_heads):
         F.randn((g.number_of_dst_nodes(), 5)),
     )
     gat = gat.to(ctx)
-    ew = F.randn(g.num_edges())
+    ew = F.randn((g.num_edges(),))
     h = gat(g, feat, edge_weight=ew)
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
