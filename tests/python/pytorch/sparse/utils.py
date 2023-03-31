@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from dgl.sparse import from_coo, from_csc, from_csr, SparseMatrix, spmatrix
+from dgl.sparse import from_csc, from_csr, SparseMatrix, spmatrix
 
 np.random.seed(42)
 torch.random.manual_seed(42)
@@ -15,7 +15,7 @@ def clone_detach_and_grad(t):
 
 def rand_stride(t):
     """Add stride to the last dimension of a tensor."""
-    stride = np.random.randint(1, 4)
+    stride = np.random.randint(2, 4)
     ret = torch.stack([t] * stride, dim=-1)[..., 0]
     ret = ret.detach()
     if torch.is_floating_point(t):
