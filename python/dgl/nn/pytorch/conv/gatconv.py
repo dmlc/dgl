@@ -330,10 +330,9 @@ class GATConv(nn.Module):
             # compute softmax
             graph.edata["a"] = self.attn_drop(edge_softmax(graph, e))
             if edge_weight is not None:
-                graph.edata["a"] = (
-                    graph.edata["a"]
-                    * edge_weight.tile(1, self._num_heads, 1).transpose(0, 2)
-                )
+                graph.edata["a"] = graph.edata["a"] * edge_weight.tile(
+                    1, self._num_heads, 1
+                ).transpose(0, 2)
             # message passing
             graph.update_all(fn.u_mul_e("ft", "a", "m"), fn.sum("m", "ft"))
             rst = graph.dstdata["ft"]
