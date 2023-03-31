@@ -97,7 +97,7 @@ def get_edge_dist(g, threshold):
 
 
 def tree_generation(ng):
-    ng.ndata["keep_eid"] = torch.zeros(ng.number_of_nodes()).long() - 1
+    ng.ndata["keep_eid"] = torch.zeros(ng.num_nodes()).long() - 1
 
     def message_func(edges):
         return {"mval": edges.data["edge_dist"], "meid": edges.data[dgl.EID]}
@@ -112,12 +112,12 @@ def tree_generation(ng):
     eids = ng.ndata["keep_eid"]
     eids = eids[eids > -1]
     edges = ng.find_edges(eids)
-    treeg = dgl.graph(edges, num_nodes=ng.number_of_nodes())
+    treeg = dgl.graph(edges, num_nodes=ng.num_nodes())
     return treeg
 
 
 def peak_propogation(treeg):
-    treeg.ndata["pred_labels"] = torch.zeros(treeg.number_of_nodes()).long() - 1
+    treeg.ndata["pred_labels"] = torch.zeros(treeg.num_nodes()).long() - 1
     peaks = torch.where(treeg.in_degrees() == 0)[0].cpu().numpy()
     treeg.ndata["pred_labels"][peaks] = torch.arange(peaks.shape[0])
 
@@ -157,7 +157,7 @@ def decode(
     ng = dgl.remove_edges(g, eids)
 
     # Tree generation
-    ng.edata[dgl.EID] = torch.arange(ng.number_of_edges())
+    ng.edata[dgl.EID] = torch.arange(ng.num_edges())
     treeg = tree_generation(ng)
     # Label propogation
     peaks, pred_labels = peak_propogation(treeg)

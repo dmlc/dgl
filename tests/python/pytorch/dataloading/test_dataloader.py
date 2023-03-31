@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 import torch
 import torch.distributed as dist
-from pytests_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 @pytest.mark.parametrize("batch_size", [None, 16])

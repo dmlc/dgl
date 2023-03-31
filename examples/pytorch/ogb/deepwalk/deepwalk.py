@@ -31,7 +31,7 @@ class DeepwalkTrainer:
             ogbl_name=args.ogbl_name,
             load_from_ogbl=args.load_from_ogbl,
         )
-        self.emb_size = self.dataset.G.number_of_nodes()
+        self.emb_size = self.dataset.G.num_nodes()
         self.emb_model = None
 
     def init_device_emb(self):

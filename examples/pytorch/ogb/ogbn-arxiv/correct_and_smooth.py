@@ -42,9 +42,9 @@ def preprocess(graph):
     graph.add_edges(dsts, srcs)
 
     # add self-loop
-    print(f"Total edges before adding self-loop {graph.number_of_edges()}")
+    print(f"Total edges before adding self-loop {graph.num_edges()}")
     graph = graph.remove_self_loop().add_self_loop()
-    print(f"Total edges after adding self-loop {graph.number_of_edges()}")
+    print(f"Total edges after adding self-loop {graph.num_edges()}")
 
     graph.create_formats_()
 
@@ -98,7 +98,7 @@ def run(args, graph, labels, pred, train_idx, val_idx, test_idx, evaluator):
 
     y = pred.clone()
     y[train_idx] = F.one_hot(labels[train_idx], n_classes).float().squeeze(1)
-    # dy = torch.zeros(graph.number_of_nodes(), n_classes, device=device)
+    # dy = torch.zeros(graph.num_nodes(), n_classes, device=device)
     # dy[train_idx] = F.one_hot(labels[train_idx], n_classes).float().squeeze(1) - pred[train_idx]
 
     _train_acc, val_acc, test_acc = evaluate(

@@ -1,4 +1,4 @@
-'''
+"""
 Distributed Node Classification
 ===============================
 
@@ -47,11 +47,11 @@ the boolean arrays will be stored with the graph partitions.
 
     splitted_idx = data.get_idx_split()
     train_nid, val_nid, test_nid = splitted_idx['train'], splitted_idx['valid'], splitted_idx['test']
-    train_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    train_mask = th.zeros((graph.num_nodes(),), dtype=th.bool)
     train_mask[train_nid] = True
-    val_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    val_mask = th.zeros((graph.num_nodes(),), dtype=th.bool)
     val_mask[val_nid] = True
-    test_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    test_mask = th.zeros((graph.num_nodes(),), dtype=th.bool)
     test_mask[test_nid] = True
     graph.ndata['train_mask'] = train_mask
     graph.ndata['val_mask'] = val_mask
@@ -245,7 +245,7 @@ The code below defines the GraphSage model.
             return x
 
     num_hidden = 256
-    num_labels = len(th.unique(g.ndata['labels'][0:g.number_of_nodes()]))
+    num_labels = len(th.unique(g.ndata['labels'][0:g.num_nodes()]))
     num_layers = 2
     lr = 0.001
     model = SAGE(g.ndata['feat'].shape[1], num_hidden, num_labels, num_layers)
@@ -436,4 +436,4 @@ If we split the graph into four partitions as demonstrated at the beginning of t
   ip_addr3
   ip_addr4
 
-'''
+"""

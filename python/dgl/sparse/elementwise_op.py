@@ -2,43 +2,26 @@
 """DGL elementwise operator module."""
 from typing import Union
 
-from .diag_matrix import DiagMatrix
 from .sparse_matrix import SparseMatrix
 from .utils import Scalar
 
 __all__ = ["add", "sub", "mul", "div", "power"]
 
 
-def add(
-    A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
-) -> Union[DiagMatrix, SparseMatrix]:
-    r"""Elementwise addition for ``DiagMatrix`` and ``SparseMatrix``, equivalent
-    to ``A + B``.
-
-    The supported combinations are shown as follows.
-
-    +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
-    +--------------+------------+--------------+--------+
-    |  DiagMatrix  |     ✅     |      ✅      |   🚫   |
-    +--------------+------------+--------------+--------+
-    | SparseMatrix |     ✅     |      ✅      |   🚫   |
-    +--------------+------------+--------------+--------+
-    |    scalar    |     🚫     |      🚫      |   🚫   |
-    +--------------+------------+--------------+--------+
+def add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
+    r"""Elementwise addition for ``SparseMatrix``, equivalent to ``A + B``.
 
     Parameters
     ----------
-    A : DiagMatrix or SparseMatrix
-        Diagonal matrix or sparse matrix
-    B : DiagMatrix or SparseMatrix
-        Diagonal matrix or sparse matrix
+    A : SparseMatrix
+        Sparse matrix
+    B : SparseMatrix
+        Sparse matrix
 
     Returns
     -------
-    DiagMatrix or SparseMatrix
-        Diagonal matrix if both :attr:`A` and :attr:`B` are diagonal matrices,
-        sparse matrix otherwise
+    SparseMatrix
+        Sparse matrix
 
     Examples
     --------
@@ -55,36 +38,20 @@ def add(
     return A + B
 
 
-def sub(
-    A: Union[DiagMatrix, SparseMatrix], B: Union[DiagMatrix, SparseMatrix]
-) -> Union[DiagMatrix, SparseMatrix]:
-    r"""Elementwise subtraction for ``DiagMatrix`` and ``SparseMatrix``,
-    equivalent to ``A - B``.
-
-    The supported combinations are shown as follows.
-
-    +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
-    +--------------+------------+--------------+--------+
-    |  DiagMatrix  |     ✅     |      ✅      |   🚫   |
-    +--------------+------------+--------------+--------+
-    | SparseMatrix |     ✅     |      ✅      |   🚫   |
-    +--------------+------------+--------------+--------+
-    |    scalar    |     🚫     |      🚫      |   🚫   |
-    +--------------+------------+--------------+--------+
+def sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
+    r"""Elementwise subtraction for ``SparseMatrix``, equivalent to ``A - B``.
 
     Parameters
     ----------
-    A : DiagMatrix or SparseMatrix
-        Diagonal matrix or sparse matrix
-    B : DiagMatrix or SparseMatrix
-        Diagonal matrix or sparse matrix
+    A : SparseMatrix
+        Sparse matrix
+    B : SparseMatrix
+        Sparse matrix
 
     Returns
     -------
-    DiagMatrix or SparseMatrix
-        Diagonal matrix if both :attr:`A` and :attr:`B` are diagonal matrices,
-        sparse matrix otherwise
+    SparseMatrix
+        Sparse matrix
 
     Examples
     --------
@@ -102,35 +69,25 @@ def sub(
 
 
 def mul(
-    A: Union[SparseMatrix, DiagMatrix, Scalar],
-    B: Union[SparseMatrix, DiagMatrix, Scalar],
-) -> Union[SparseMatrix, DiagMatrix]:
-    r"""Elementwise multiplication for ``DiagMatrix`` and ``SparseMatrix``,
-    equivalent to ``A * B``.
+    A: Union[SparseMatrix, Scalar], B: Union[SparseMatrix, Scalar]
+) -> SparseMatrix:
+    r"""Elementwise multiplication for ``SparseMatrix``, equivalent to
+    ``A * B``.
 
-    The supported combinations are shown as follows.
-
-    +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
-    +--------------+------------+--------------+--------+
-    |  DiagMatrix  |     ✅     |      🚫      |   ✅   |
-    +--------------+------------+--------------+--------+
-    | SparseMatrix |     🚫     |      🚫      |   ✅   |
-    +--------------+------------+--------------+--------+
-    |    scalar    |     ✅     |      ✅      |   🚫   |
-    +--------------+------------+--------------+--------+
+    If both :attr:`A` and :attr:`B` are sparse matrices, both of them should be
+    diagonal matrices.
 
     Parameters
     ----------
-    A : SparseMatrix or DiagMatrix or Scalar
-        Sparse matrix or diagonal matrix or scalar value
-    B : SparseMatrix or DiagMatrix or Scalar
-        Sparse matrix or diagonal matrix or scalar value
+    A : SparseMatrix or Scalar
+        Sparse matrix or scalar value
+    B : SparseMatrix or Scalar
+        Sparse matrix or scalar value
 
     Returns
     -------
-    SparseMatrix or DiagMatrix
-        Either sparse matrix or diagonal matrix
+    SparseMatrix
+        Sparse matrix
 
     Examples
     --------
@@ -145,59 +102,55 @@ def mul(
 
     >>> D = dglsp.diag(torch.arange(1, 4))
     >>> dglsp.mul(D, 2)
-    DiagMatrix(val=tensor([2, 4, 6]),
-               shape=(3, 3))
+    SparseMatrix(indices=tensor([[0, 1, 2],
+                                 [0, 1, 2]]),
+                 values=tensor([2, 4, 6]),
+                 shape=(3, 3), nnz=3)
 
     >>> D = dglsp.diag(torch.arange(1, 4))
     >>> dglsp.mul(D, D)
-    DiagMatrix(val=tensor([1, 4, 9]),
-               shape=(3, 3))
+    SparseMatrix(indices=tensor([[0, 1, 2],
+                                 [0, 1, 2]]),
+                 values=tensor([1, 4, 9]),
+                 shape=(3, 3), nnz=3)
     """
     return A * B
 
 
-def div(
-    A: Union[SparseMatrix, DiagMatrix], B: Union[DiagMatrix, Scalar]
-) -> Union[SparseMatrix, DiagMatrix]:
-    r"""Elementwise division for ``DiagMatrix`` and ``SparseMatrix``, equivalent
-    to ``A / B``.
+def div(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
+    r"""Elementwise division for ``SparseMatrix``, equivalent to ``A / B``.
 
-    The supported combinations are shown as follows.
-
-    +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
-    +--------------+------------+--------------+--------+
-    |  DiagMatrix  |     ✅     |      🚫      |   ✅   |
-    +--------------+------------+--------------+--------+
-    | SparseMatrix |     🚫     |      🚫      |   ✅   |
-    +--------------+------------+--------------+--------+
-    |    scalar    |     🚫     |      🚫      |   🚫   |
-    +--------------+------------+--------------+--------+
+    If both :attr:`A` and :attr:`B` are sparse matrices, both of them should be
+    diagonal matrices.
 
     Parameters
     ----------
-    A : SparseMatrix or DiagMatrix
-        Sparse or diagonal matrix
-    B : DiagMatrix or Scalar
-        Diagonal matrix or scalar value
+    A : SparseMatrix
+        Sparse matrix
+    B : SparseMatrix or Scalar
+        Sparse matrix or scalar value
 
     Returns
     -------
-    DiagMatrix
-        Diagonal matrix
+    SparseMatrix
+        Sparse matrix
 
     Examples
     --------
     >>> A = dglsp.diag(torch.arange(1, 4))
     >>> B = dglsp.diag(torch.arange(10, 13))
     >>> dglsp.div(A, B)
-    DiagMatrix(val=tensor([0.1000, 0.1818, 0.2500]),
-               shape=(3, 3))
+    SparseMatrix(indices=tensor([[0, 1, 2],
+                                 [0, 1, 2]]),
+                 values=tensor([0.1000, 0.1818, 0.2500]),
+                 shape=(3, 3), nnz=3)
 
     >>> A = dglsp.diag(torch.arange(1, 4))
     >>> dglsp.div(A, 2)
-    DiagMatrix(val=tensor([0.5000, 1.0000, 1.5000]),
-               shape=(3, 3))
+    SparseMatrix(indices=tensor([[0, 1, 2],
+                                 [0, 1, 2]]),
+                 values=tensor([0.5000, 1.0000, 1.5000]),
+                 shape=(3, 3), nnz=3)
 
     >>> indices = torch.tensor([[1, 0, 2], [0, 3, 2]])
     >>> val = torch.tensor([1, 2, 3])
@@ -211,35 +164,21 @@ def div(
     return A / B
 
 
-def power(
-    A: Union[SparseMatrix, DiagMatrix], scalar: Scalar
-) -> Union[SparseMatrix, DiagMatrix]:
-    r"""Elementwise exponentiation for ``DiagMatrix`` and ``SparseMatrix``,
-    equivalent to ``A ** scalar``.
-
-    The supported combinations are shown as follows.
-
-    +--------------+------------+--------------+--------+
-    |    A \\ B    | DiagMatrix | SparseMatrix | scalar |
-    +--------------+------------+--------------+--------+
-    |  DiagMatrix  |     🚫     |      🚫      |   ✅   |
-    +--------------+------------+--------------+--------+
-    | SparseMatrix |     🚫     |      🚫      |   ✅   |
-    +--------------+------------+--------------+--------+
-    |    scalar    |     🚫     |      🚫      |   🚫   |
-    +--------------+------------+--------------+--------+
+def power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
+    r"""Elementwise exponentiation ``SparseMatrix``, equivalent to
+    ``A ** scalar``.
 
     Parameters
     ----------
-    A : SparseMatrix or DiagMatrix
-        Sparse matrix or diagonal matrix
+    A : SparseMatrix
+        Sparse matrix
     scalar : Scalar
         Exponent
 
     Returns
     -------
-    SparseMatrix or DiagMatrix
-        Sparse matrix or diagonal matrix, same type as A
+    SparseMatrix
+        Sparse matrix
 
     Examples
     --------
@@ -254,7 +193,9 @@ def power(
 
     >>> D = dglsp.diag(torch.arange(1, 4))
     >>> dglsp.power(D, 2)
-    DiagMatrix(val=tensor([1, 4, 9]),
-               shape=(3, 3))
+    SparseMatrix(indices=tensor([[0, 1, 2],
+                                 [0, 1, 2]]),
+                 values=tensor([1, 4, 9]),
+                 shape=(3, 3), nnz=3)
     """
     return A**scalar

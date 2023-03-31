@@ -13,6 +13,7 @@ from .utils import (
     rand_coo,
     rand_csc,
     rand_csr,
+    rand_stride,
     sparse_matrix_to_dense,
     sparse_matrix_to_torch_sparse,
 )
@@ -30,6 +31,7 @@ def test_spmm(create_func, shape, nnz, out_dim):
     else:
         X = torch.randn(shape[1], requires_grad=True, device=dev)
 
+    X = rand_stride(X)
     sparse_result = matmul(A, X)
     grad = torch.randn_like(sparse_result)
     sparse_result.backward(grad)
@@ -56,6 +58,7 @@ def test_bspmm(create_func, shape, nnz):
     dev = F.ctx()
     A = create_func(shape, nnz, dev, 2)
     X = torch.randn(shape[1], 10, 2, requires_grad=True, device=dev)
+    X = rand_stride(X)
 
     sparse_result = matmul(A, X)
     grad = torch.randn_like(sparse_result)
@@ -157,7 +160,7 @@ def test_sparse_diag_mm(create_func, sparse_shape, nnz):
     B.val.backward(grad)
 
     torch_A = sparse_matrix_to_torch_sparse(A)
-    torch_D = sparse_matrix_to_torch_sparse(D.to_sparse())
+    torch_D = sparse_matrix_to_torch_sparse(D)
     torch_B = torch.sparse.mm(torch_A, torch_D)
     torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
     torch_B.backward(torch_B_grad)
@@ -190,7 +193,7 @@ def test_diag_sparse_mm(create_func, sparse_shape, nnz):
     B.val.backward(grad)
 
     torch_A = sparse_matrix_to_torch_sparse(A)
-    torch_D = sparse_matrix_to_torch_sparse(D.to_sparse())
+    torch_D = sparse_matrix_to_torch_sparse(D)
     torch_B = torch.sparse.mm(torch_D, torch_A)
     torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
     torch_B.backward(torch_B_grad)

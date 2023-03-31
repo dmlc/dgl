@@ -56,6 +56,9 @@ Datasets for node classification/regression tasks
     YelpDataset
     PATTERNDataset
     CLUSTERDataset
+    ChameleonDataset
+    SquirrelDataset
+    ActorDataset
 
 Edge Prediction Datasets
 ---------------------------------------
@@ -93,6 +96,7 @@ Datasets for graph classification/regression tasks
     GINDataset
     FakeNewsDataset
     BA2MotifDataset
+    ZINCDataset
 
 Dataset adapters
 -------------------

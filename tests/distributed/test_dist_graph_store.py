@@ -81,13 +81,13 @@ def rand_init(shape, dtype):
 
 def check_dist_graph_empty(g, num_clients, num_nodes, num_edges):
     # Test API
-    assert g.number_of_nodes() == num_nodes
-    assert g.number_of_edges() == num_edges
+    assert g.num_nodes() == num_nodes
+    assert g.num_edges() == num_edges
 
     # Test init node data
-    new_shape = (g.number_of_nodes(), 2)
+    new_shape = (g.num_nodes(), 2)
     g.ndata["test1"] = dgl.distributed.DistTensor(new_shape, F.int32)
-    nids = F.arange(0, int(g.number_of_nodes() / 2))
+    nids = F.arange(0, int(g.num_nodes() / 2))
     feats = g.ndata["test1"][nids]
     assert np.all(F.asnumpy(feats) == 0)
 
@@ -96,9 +96,7 @@ def check_dist_graph_empty(g, num_clients, num_nodes, num_edges):
         new_shape, F.float32, "test3", init_func=rand_init
     )
     del test3
-    test3 = dgl.distributed.DistTensor(
-        (g.number_of_nodes(), 3), F.float32, "test3"
-    )
+    test3 = dgl.distributed.DistTensor((g.num_nodes(), 3), F.float32, "test3")
     del test3
 
     # Test write data
@@ -156,8 +154,8 @@ def check_server_client_empty(shared_mem, num_servers, num_clients):
                 0,
                 num_servers,
                 num_clients,
-                g.number_of_nodes(),
-                g.number_of_edges(),
+                g.num_nodes(),
+                g.num_edges(),
             ),
         )
         p.start()
@@ -301,8 +299,8 @@ def run_client_hierarchy(
 def check_dist_emb(g, num_clients, num_nodes, num_edges):
     # Test sparse emb
     try:
-        emb = DistEmbedding(g.number_of_nodes(), 1, "emb1", emb_init)
-        nids = F.arange(0, int(g.number_of_nodes()))
+        emb = DistEmbedding(g.num_nodes(), 1, "emb1", emb_init)
+        nids = F.arange(0, int(g.num_nodes()))
         lr = 0.001
         optimizer = SparseAdagrad([emb], lr=lr)
         with F.record_grad():
@@ -314,13 +312,13 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
         feats = emb(nids)
         if num_clients == 1:
             assert_almost_equal(F.asnumpy(feats), np.ones((len(nids), 1)) * -lr)
-        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
+        rest = np.setdiff1d(np.arange(g.num_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
 
         policy = dgl.distributed.PartitionPolicy("node", g.get_partition_book())
         grad_sum = dgl.distributed.DistTensor(
-            (g.number_of_nodes(), 1), F.float32, "emb1_sum", policy
+            (g.num_nodes(), 1), F.float32, "emb1_sum", policy
         )
         if num_clients == 1:
             assert np.all(
@@ -329,7 +327,7 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
             )
         assert np.all(F.asnumpy(grad_sum[rest]) == np.zeros((len(rest), 1)))
 
-        emb = DistEmbedding(g.number_of_nodes(), 1, "emb2", emb_init)
+        emb = DistEmbedding(g.num_nodes(), 1, "emb2", emb_init)
         with F.no_grad():
             feats1 = emb(nids)
         assert np.all(F.asnumpy(feats1) == 0)
@@ -349,7 +347,7 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
             assert_almost_equal(
                 F.asnumpy(feats), np.ones((len(nids), 1)) * 1 * -lr
             )
-        rest = np.setdiff1d(np.arange(g.number_of_nodes()), F.asnumpy(nids))
+        rest = np.setdiff1d(np.arange(g.num_nodes()), F.asnumpy(nids))
         feats1 = emb(rest)
         assert np.all(F.asnumpy(feats1) == np.zeros((len(rest), 1)))
     except NotImplementedError as e:
@@ -361,17 +359,17 @@ def check_dist_emb(g, num_clients, num_nodes, num_edges):
 
 def check_dist_graph(g, num_clients, num_nodes, num_edges):
     # Test API
-    assert g.number_of_nodes() == num_nodes
-    assert g.number_of_edges() == num_edges
+    assert g.num_nodes() == num_nodes
+    assert g.num_edges() == num_edges
 
     # Test reading node data
-    nids = F.arange(0, int(g.number_of_nodes() / 2))
+    nids = F.arange(0, int(g.num_nodes() / 2))
     feats1 = g.ndata["features"][nids]
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == nids))
 
     # Test reading edge data
-    eids = F.arange(0, int(g.number_of_edges() / 2))
+    eids = F.arange(0, int(g.num_edges() / 2))
     feats1 = g.edata["features"][eids]
     feats = F.squeeze(feats1, 1)
     assert np.all(F.asnumpy(feats == eids))
@@ -382,7 +380,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     assert F.array_equal(sg.edata[dgl.EID], eids)
 
     # Test init node data
-    new_shape = (g.number_of_nodes(), 2)
+    new_shape = (g.num_nodes(), 2)
     test1 = dgl.distributed.DistTensor(new_shape, F.int32)
     g.ndata["test1"] = test1
     feats = g.ndata["test1"][nids]
@@ -406,9 +404,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     del test3
     assert test3_name not in g._client.data_name_list()
     assert test3_name not in g._client.gdata_name_list()
-    test3 = dgl.distributed.DistTensor(
-        (g.number_of_nodes(), 3), F.float32, "test3"
-    )
+    test3 = dgl.distributed.DistTensor((g.num_nodes(), 3), F.float32, "test3")
     del test3
 
     # add tests for anonymous distributed tensor.
@@ -432,7 +428,7 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     del test4
     try:
         test4 = dgl.distributed.DistTensor(
-            (g.number_of_nodes(), 3), F.float32, "test4"
+            (g.num_nodes(), 3), F.float32, "test4"
         )
         raise Exception("")
     except:
@@ -445,19 +441,19 @@ def check_dist_graph(g, num_clients, num_nodes, num_edges):
     assert np.all(F.asnumpy(feats) == 1)
 
     # Test metadata operations.
-    assert len(g.ndata["features"]) == g.number_of_nodes()
-    assert g.ndata["features"].shape == (g.number_of_nodes(), 1)
+    assert len(g.ndata["features"]) == g.num_nodes()
+    assert g.ndata["features"].shape == (g.num_nodes(), 1)
     assert g.ndata["features"].dtype == F.int64
     assert g.node_attr_schemes()["features"].dtype == F.int64
     assert g.node_attr_schemes()["test1"].dtype == F.int32
     assert g.node_attr_schemes()["features"].shape == (1,)
 
-    selected_nodes = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
+    selected_nodes = np.random.randint(0, 100, size=g.num_nodes()) > 30
     # Test node split
     nodes = node_split(selected_nodes, g.get_partition_book())
     nodes = F.asnumpy(nodes)
     # We only have one partition, so the local nodes are basically all nodes in the graph.
-    local_nids = np.arange(g.number_of_nodes())
+    local_nids = np.arange(g.num_nodes())
     for n in nodes:
         assert n in local_nids
 
@@ -475,8 +471,8 @@ def check_dist_emb_server_client(
     graph_name = (
         f"check_dist_emb_{shared_mem}_{num_servers}_{num_clients}_{num_groups}"
     )
-    g.ndata["features"] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-    g.edata["features"] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+    g.ndata["features"] = F.unsqueeze(F.arange(0, g.num_nodes()), 1)
+    g.edata["features"] = F.unsqueeze(F.arange(0, g.num_edges()), 1)
     partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
 
     # let's just test on one partition for now.
@@ -510,8 +506,8 @@ def check_dist_emb_server_client(
                     0,
                     num_servers,
                     num_clients,
-                    g.number_of_nodes(),
-                    g.number_of_edges(),
+                    g.num_nodes(),
+                    g.num_edges(),
                     group_id,
                 ),
             )
@@ -542,8 +538,8 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
     # Partition the graph
     num_parts = 1
     graph_name = f"check_server_client_{shared_mem}_{num_servers}_{num_clients}_{num_groups}"
-    g.ndata["features"] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-    g.edata["features"] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+    g.ndata["features"] = F.unsqueeze(F.arange(0, g.num_nodes()), 1)
+    g.edata["features"] = F.unsqueeze(F.arange(0, g.num_edges()), 1)
     partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
 
     # let's just test on one partition for now.
@@ -578,8 +574,8 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
                     0,
                     num_servers,
                     num_clients,
-                    g.number_of_nodes(),
-                    g.number_of_edges(),
+                    g.num_nodes(),
+                    g.num_edges(),
                     group_id,
                 ),
             )
@@ -609,8 +605,8 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
     # Partition the graph
     num_parts = 1
     graph_name = "dist_graph_test_2"
-    g.ndata["features"] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-    g.edata["features"] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+    g.ndata["features"] = F.unsqueeze(F.arange(0, g.num_nodes()), 1)
+    g.edata["features"] = F.unsqueeze(F.arange(0, g.num_edges()), 1)
     partition_graph(
         g,
         graph_name,
@@ -634,14 +630,10 @@ def check_server_client_hierarchy(shared_mem, num_servers, num_clients):
     cli_ps = []
     manager = mp.Manager()
     return_dict = manager.dict()
-    node_mask = np.zeros((g.number_of_nodes(),), np.int32)
-    edge_mask = np.zeros((g.number_of_edges(),), np.int32)
-    nodes = np.random.choice(
-        g.number_of_nodes(), g.number_of_nodes() // 10, replace=False
-    )
-    edges = np.random.choice(
-        g.number_of_edges(), g.number_of_edges() // 10, replace=False
-    )
+    node_mask = np.zeros((g.num_nodes(),), np.int32)
+    edge_mask = np.zeros((g.num_edges(),), np.int32)
+    nodes = np.random.choice(g.num_nodes(), g.num_nodes() // 10, replace=False)
+    edges = np.random.choice(g.num_edges(), g.num_edges() // 10, replace=False)
     node_mask[nodes] = 1
     edge_mask[edges] = 1
     nodes = np.sort(nodes)
@@ -729,17 +721,17 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     # Test API
     for ntype in num_nodes:
         assert ntype in g.ntypes
-        assert num_nodes[ntype] == g.number_of_nodes(ntype)
+        assert num_nodes[ntype] == g.num_nodes(ntype)
     for etype in num_edges:
         assert etype in g.etypes
-        assert num_edges[etype] == g.number_of_edges(etype)
+        assert num_edges[etype] == g.num_edges(etype)
     etypes = [("n1", "r1", "n2"), ("n1", "r2", "n3"), ("n2", "r3", "n3")]
     for i, etype in enumerate(g.canonical_etypes):
         assert etype[0] == etypes[i][0]
         assert etype[1] == etypes[i][1]
         assert etype[2] == etypes[i][2]
-    assert g.number_of_nodes() == sum([num_nodes[ntype] for ntype in num_nodes])
-    assert g.number_of_edges() == sum([num_edges[etype] for etype in num_edges])
+    assert g.num_nodes() == sum([num_nodes[ntype] for ntype in num_nodes])
+    assert g.num_edges() == sum([num_edges[etype] for etype in num_edges])
 
     # Test reading node data
     ntype = "n1"
@@ -786,7 +778,7 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     assert F.array_equal(sg.edata[dgl.EID], eids)
 
     # Test init node data
-    new_shape = (g.number_of_nodes("n1"), 2)
+    new_shape = (g.num_nodes("n1"), 2)
     g.nodes["n1"].data["test1"] = dgl.distributed.DistTensor(new_shape, F.int32)
     feats = g.nodes["n1"].data["test1"][nids]
     assert np.all(F.asnumpy(feats) == 0)
@@ -797,7 +789,7 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     )
     del test3
     test3 = dgl.distributed.DistTensor(
-        (g.number_of_nodes("n1"), 3), F.float32, "test3"
+        (g.num_nodes("n1"), 3), F.float32, "test3"
     )
     del test3
 
@@ -822,7 +814,7 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     del test4
     try:
         test4 = dgl.distributed.DistTensor(
-            (g.number_of_nodes("n1"), 3), F.float32, "test4"
+            (g.num_nodes("n1"), 3), F.float32, "test4"
         )
         raise Exception("")
     except:
@@ -835,18 +827,16 @@ def check_dist_graph_hetero(g, num_clients, num_nodes, num_edges):
     assert np.all(F.asnumpy(feats) == 1)
 
     # Test metadata operations.
-    assert len(g.nodes["n1"].data["feat"]) == g.number_of_nodes("n1")
-    assert g.nodes["n1"].data["feat"].shape == (g.number_of_nodes("n1"), 1)
+    assert len(g.nodes["n1"].data["feat"]) == g.num_nodes("n1")
+    assert g.nodes["n1"].data["feat"].shape == (g.num_nodes("n1"), 1)
     assert g.nodes["n1"].data["feat"].dtype == F.int64
 
-    selected_nodes = (
-        np.random.randint(0, 100, size=g.number_of_nodes("n1")) > 30
-    )
+    selected_nodes = np.random.randint(0, 100, size=g.num_nodes("n1")) > 30
     # Test node split
     nodes = node_split(selected_nodes, g.get_partition_book(), ntype="n1")
     nodes = F.asnumpy(nodes)
     # We only have one partition, so the local nodes are basically all nodes in the graph.
-    local_nids = np.arange(g.number_of_nodes("n1"))
+    local_nids = np.arange(g.num_nodes("n1"))
     for n in nodes:
         assert n in local_nids
 
@@ -875,8 +865,8 @@ def check_server_client_hetero(shared_mem, num_servers, num_clients):
         p.start()
 
     cli_ps = []
-    num_nodes = {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes}
-    num_edges = {etype: g.number_of_edges(etype) for etype in g.etypes}
+    num_nodes = {ntype: g.num_nodes(ntype) for ntype in g.ntypes}
+    num_edges = {etype: g.num_edges(etype) for etype in g.etypes}
     for cli_id in range(num_clients):
         print("start client", cli_id)
         p = ctx.Process(
@@ -981,8 +971,8 @@ def check_dist_optim_server_client(
 
         # Partition the graph
         num_parts = 1
-        g.ndata["features"] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-        g.edata["features"] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+        g.ndata["features"] = F.unsqueeze(F.arange(0, g.num_nodes()), 1)
+        g.edata["features"] = F.unsqueeze(F.arange(0, g.num_edges()), 1)
         partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
 
     # let's just test on one partition for now.
@@ -1048,15 +1038,15 @@ def test_standalone():
     # Partition the graph
     num_parts = 1
     graph_name = "dist_graph_test_3"
-    g.ndata["features"] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-    g.edata["features"] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+    g.ndata["features"] = F.unsqueeze(F.arange(0, g.num_nodes()), 1)
+    g.edata["features"] = F.unsqueeze(F.arange(0, g.num_edges()), 1)
     partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
 
     dgl.distributed.initialize("kv_ip_config.txt")
     dist_g = DistGraph(
         graph_name, part_config="/tmp/dist_graph/{}.json".format(graph_name)
     )
-    check_dist_graph(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
+    check_dist_graph(dist_g, 1, g.num_nodes(), g.num_edges())
     dgl.distributed.exit_client()  # this is needed since there's two test here in one process
 
 
@@ -1076,15 +1066,15 @@ def test_standalone_node_emb():
     # Partition the graph
     num_parts = 1
     graph_name = "dist_graph_test_3"
-    g.ndata["features"] = F.unsqueeze(F.arange(0, g.number_of_nodes()), 1)
-    g.edata["features"] = F.unsqueeze(F.arange(0, g.number_of_edges()), 1)
+    g.ndata["features"] = F.unsqueeze(F.arange(0, g.num_nodes()), 1)
+    g.edata["features"] = F.unsqueeze(F.arange(0, g.num_edges()), 1)
     partition_graph(g, graph_name, num_parts, "/tmp/dist_graph")
 
     dgl.distributed.initialize("kv_ip_config.txt")
     dist_g = DistGraph(
         graph_name, part_config="/tmp/dist_graph/{}.json".format(graph_name)
     )
-    check_dist_emb(dist_g, 1, g.number_of_nodes(), g.number_of_edges())
+    check_dist_emb(dist_g, 1, g.num_nodes(), g.num_edges())
     dgl.distributed.exit_client()  # this is needed since there's two test here in one process
 
 
@@ -1110,8 +1100,8 @@ def test_split(hetero):
         part_method="metis",
     )
 
-    node_mask = np.random.randint(0, 100, size=g.number_of_nodes(ntype)) > 30
-    edge_mask = np.random.randint(0, 100, size=g.number_of_edges(etype)) > 30
+    node_mask = np.random.randint(0, 100, size=g.num_nodes(ntype)) > 30
+    edge_mask = np.random.randint(0, 100, size=g.num_edges(etype)) > 30
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
 
@@ -1196,8 +1186,8 @@ def test_split_even():
         part_method="metis",
     )
 
-    node_mask = np.random.randint(0, 100, size=g.number_of_nodes()) > 30
-    edge_mask = np.random.randint(0, 100, size=g.number_of_edges()) > 30
+    node_mask = np.random.randint(0, 100, size=g.num_nodes()) > 30
+    edge_mask = np.random.randint(0, 100, size=g.num_edges()) > 30
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
     all_nodes1 = []

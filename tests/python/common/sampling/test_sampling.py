@@ -562,7 +562,7 @@ def _test_sample_neighbors(hypersparse, prob):
         subg = dgl.sampling.sample_neighbors(
             g, [0, 1], -1, prob=p, replace=replace
         )
-        assert subg.number_of_nodes() == g.number_of_nodes()
+        assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.in_edges([0, 1], form="all")
         if p is not None:
@@ -579,8 +579,8 @@ def _test_sample_neighbors(hypersparse, prob):
             subg = dgl.sampling.sample_neighbors(
                 g, [0, 1], 2, prob=p, replace=replace
             )
-            assert subg.number_of_nodes() == g.number_of_nodes()
-            assert subg.number_of_edges() == 4
+            assert subg.num_nodes() == g.num_nodes()
+            assert subg.num_edges() == 4
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(v))) == {0, 1}
             assert F.array_equal(
@@ -603,7 +603,7 @@ def _test_sample_neighbors(hypersparse, prob):
         subg = dgl.sampling.sample_neighbors(
             g, [0, 2], -1, prob=p, replace=replace
         )
-        assert subg.number_of_nodes() == g.number_of_nodes()
+        assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.in_edges([0, 2], form="all")
         if p is not None:
@@ -620,9 +620,9 @@ def _test_sample_neighbors(hypersparse, prob):
             subg = dgl.sampling.sample_neighbors(
                 g, [0, 2], 2, prob=p, replace=replace
             )
-            assert subg.number_of_nodes() == g.number_of_nodes()
+            assert subg.num_nodes() == g.num_nodes()
             num_edges = 4 if replace else 3
-            assert subg.number_of_edges() == num_edges
+            assert subg.num_edges() == num_edges
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(v))) == {0, 2}
             assert F.array_equal(
@@ -646,10 +646,10 @@ def _test_sample_neighbors(hypersparse, prob):
         )
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
-        assert subg["follow"].number_of_edges() == 6 if p is None else 4
-        assert subg["play"].number_of_edges() == 1
-        assert subg["liked-by"].number_of_edges() == 4
-        assert subg["flips"].number_of_edges() == 0
+        assert subg["follow"].num_edges() == 6 if p is None else 4
+        assert subg["play"].num_edges() == 1
+        assert subg["liked-by"].num_edges() == 4
+        assert subg["flips"].num_edges() == 0
 
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(
@@ -657,10 +657,10 @@ def _test_sample_neighbors(hypersparse, prob):
             )
             assert len(subg.ntypes) == 3
             assert len(subg.etypes) == 4
-            assert subg["follow"].number_of_edges() == 4
-            assert subg["play"].number_of_edges() == 2 if replace else 1
-            assert subg["liked-by"].number_of_edges() == 4 if replace else 3
-            assert subg["flips"].number_of_edges() == 0
+            assert subg["follow"].num_edges() == 4
+            assert subg["play"].num_edges() == 2 if replace else 1
+            assert subg["liked-by"].num_edges() == 4 if replace else 3
+            assert subg["flips"].num_edges() == 0
 
     _test3(prob, True)  # w/ replacement, uniform
     _test3(prob, False)  # w/o replacement, uniform
@@ -675,10 +675,10 @@ def _test_sample_neighbors(hypersparse, prob):
         )
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
-        assert subg["follow"].number_of_edges() == 2
-        assert subg["play"].number_of_edges() == 2
-        assert subg["liked-by"].number_of_edges() == 0
-        assert subg["flips"].number_of_edges() == 4
+        assert subg["follow"].num_edges() == 2
+        assert subg["play"].num_edges() == 2
+        assert subg["liked-by"].num_edges() == 0
+        assert subg["flips"].num_edges() == 4
 
 
 def _test_sample_neighbors_outedge(hypersparse):
@@ -688,7 +688,7 @@ def _test_sample_neighbors_outedge(hypersparse):
         subg = dgl.sampling.sample_neighbors(
             g, [0, 1], -1, prob=p, replace=replace, edge_dir="out"
         )
-        assert subg.number_of_nodes() == g.number_of_nodes()
+        assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.out_edges([0, 1], form="all")
         if p is not None:
@@ -705,8 +705,8 @@ def _test_sample_neighbors_outedge(hypersparse):
             subg = dgl.sampling.sample_neighbors(
                 g, [0, 1], 2, prob=p, replace=replace, edge_dir="out"
             )
-            assert subg.number_of_nodes() == g.number_of_nodes()
-            assert subg.number_of_edges() == 4
+            assert subg.num_nodes() == g.num_nodes()
+            assert subg.num_edges() == 4
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(u))) == {0, 1}
             assert F.array_equal(
@@ -731,7 +731,7 @@ def _test_sample_neighbors_outedge(hypersparse):
         subg = dgl.sampling.sample_neighbors(
             g, [0, 2], -1, prob=p, replace=replace, edge_dir="out"
         )
-        assert subg.number_of_nodes() == g.number_of_nodes()
+        assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.out_edges([0, 2], form="all")
         if p is not None:
@@ -748,9 +748,9 @@ def _test_sample_neighbors_outedge(hypersparse):
             subg = dgl.sampling.sample_neighbors(
                 g, [0, 2], 2, prob=p, replace=replace, edge_dir="out"
             )
-            assert subg.number_of_nodes() == g.number_of_nodes()
+            assert subg.num_nodes() == g.num_nodes()
             num_edges = 4 if replace else 3
-            assert subg.number_of_edges() == num_edges
+            assert subg.num_edges() == num_edges
             u, v = subg.edges()
             assert set(F.asnumpy(F.unique(u))) == {0, 2}
             assert F.array_equal(
@@ -781,10 +781,10 @@ def _test_sample_neighbors_outedge(hypersparse):
         )
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
-        assert subg["follow"].number_of_edges() == 6 if p is None else 4
-        assert subg["play"].number_of_edges() == 1
-        assert subg["liked-by"].number_of_edges() == 4
-        assert subg["flips"].number_of_edges() == 0
+        assert subg["follow"].num_edges() == 6 if p is None else 4
+        assert subg["play"].num_edges() == 1
+        assert subg["liked-by"].num_edges() == 4
+        assert subg["flips"].num_edges() == 0
 
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(
@@ -797,10 +797,10 @@ def _test_sample_neighbors_outedge(hypersparse):
             )
             assert len(subg.ntypes) == 3
             assert len(subg.etypes) == 4
-            assert subg["follow"].number_of_edges() == 4
-            assert subg["play"].number_of_edges() == 2 if replace else 1
-            assert subg["liked-by"].number_of_edges() == 4 if replace else 3
-            assert subg["flips"].number_of_edges() == 0
+            assert subg["follow"].num_edges() == 4
+            assert subg["play"].num_edges() == 2 if replace else 1
+            assert subg["liked-by"].num_edges() == 4 if replace else 3
+            assert subg["flips"].num_edges() == 0
 
     _test3(None, True)  # w/ replacement, uniform
     _test3(None, False)  # w/o replacement, uniform
@@ -813,7 +813,7 @@ def _test_sample_neighbors_topk(hypersparse):
 
     def _test1():
         subg = dgl.sampling.select_topk(g, -1, "weight", [0, 1])
-        assert subg.number_of_nodes() == g.number_of_nodes()
+        assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans = subg.in_edges([0, 1])
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
@@ -821,8 +821,8 @@ def _test_sample_neighbors_topk(hypersparse):
         assert uv == uv_ans
 
         subg = dgl.sampling.select_topk(g, 2, "weight", [0, 1])
-        assert subg.number_of_nodes() == g.number_of_nodes()
-        assert subg.number_of_edges() == 4
+        assert subg.num_nodes() == g.num_nodes()
+        assert subg.num_edges() == 4
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
         assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
@@ -832,7 +832,7 @@ def _test_sample_neighbors_topk(hypersparse):
 
     def _test2():  # k > #neighbors
         subg = dgl.sampling.select_topk(g, -1, "weight", [0, 2])
-        assert subg.number_of_nodes() == g.number_of_nodes()
+        assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans = subg.in_edges([0, 2])
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
@@ -840,8 +840,8 @@ def _test_sample_neighbors_topk(hypersparse):
         assert uv == uv_ans
 
         subg = dgl.sampling.select_topk(g, 2, "weight", [0, 2])
-        assert subg.number_of_nodes() == g.number_of_nodes()
-        assert subg.number_of_edges() == 3
+        assert subg.num_nodes() == g.num_nodes()
+        assert subg.num_edges() == 3
         u, v = subg.edges()
         assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
@@ -873,7 +873,7 @@ def _test_sample_neighbors_topk(hypersparse):
             hg["liked-by"].edge_ids(u, v), subg["liked-by"].edata[dgl.EID]
         )
         assert edge_set == {(2, 0), (2, 1), (1, 0)}
-        assert subg["flips"].number_of_edges() == 0
+        assert subg["flips"].num_edges() == 0
 
     _test3()
 
@@ -886,10 +886,10 @@ def _test_sample_neighbors_topk(hypersparse):
     )
     assert len(subg.ntypes) == 3
     assert len(subg.etypes) == 4
-    assert subg["follow"].number_of_edges() == 2
-    assert subg["play"].number_of_edges() == 1
-    assert subg["liked-by"].number_of_edges() == 0
-    assert subg["flips"].number_of_edges() == 4
+    assert subg["follow"].num_edges() == 2
+    assert subg["play"].num_edges() == 1
+    assert subg["liked-by"].num_edges() == 0
+    assert subg["flips"].num_edges() == 4
 
 
 def _test_sample_neighbors_topk_outedge(hypersparse):
@@ -897,7 +897,7 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
 
     def _test1():
         subg = dgl.sampling.select_topk(g, -1, "weight", [0, 1], edge_dir="out")
-        assert subg.number_of_nodes() == g.number_of_nodes()
+        assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans = subg.out_edges([0, 1])
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
@@ -905,8 +905,8 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
         assert uv == uv_ans
 
         subg = dgl.sampling.select_topk(g, 2, "weight", [0, 1], edge_dir="out")
-        assert subg.number_of_nodes() == g.number_of_nodes()
-        assert subg.number_of_edges() == 4
+        assert subg.num_nodes() == g.num_nodes()
+        assert subg.num_edges() == 4
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
         assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
@@ -916,7 +916,7 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
 
     def _test2():  # k > #neighbors
         subg = dgl.sampling.select_topk(g, -1, "weight", [0, 2], edge_dir="out")
-        assert subg.number_of_nodes() == g.number_of_nodes()
+        assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans = subg.out_edges([0, 2])
         uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
@@ -924,8 +924,8 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
         assert uv == uv_ans
 
         subg = dgl.sampling.select_topk(g, 2, "weight", [0, 2], edge_dir="out")
-        assert subg.number_of_nodes() == g.number_of_nodes()
-        assert subg.number_of_edges() == 3
+        assert subg.num_nodes() == g.num_nodes()
+        assert subg.num_edges() == 3
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
         assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
@@ -957,7 +957,7 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
             hg["liked-by"].edge_ids(u, v), subg["liked-by"].edata[dgl.EID]
         )
         assert edge_set == {(0, 2), (1, 2), (0, 1)}
-        assert subg["flips"].number_of_edges() == 0
+        assert subg["flips"].num_edges() == 0
 
     _test3()
 
@@ -1011,19 +1011,19 @@ def test_sample_neighbors_with_0deg():
     sg = dgl.sampling.sample_neighbors(
         g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="in", replace=False
     )
-    assert sg.number_of_edges() == 0
+    assert sg.num_edges() == 0
     sg = dgl.sampling.sample_neighbors(
         g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="in", replace=True
     )
-    assert sg.number_of_edges() == 0
+    assert sg.num_edges() == 0
     sg = dgl.sampling.sample_neighbors(
         g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="out", replace=False
     )
-    assert sg.number_of_edges() == 0
+    assert sg.num_edges() == 0
     sg = dgl.sampling.sample_neighbors(
         g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="out", replace=True
     )
-    assert sg.number_of_edges() == 0
+    assert sg.num_edges() == 0
 
 
 def create_test_graph(num_nodes, num_edges_per_node, bipartite=False):
@@ -1118,7 +1118,7 @@ def test_sample_neighbors_biased_homogeneous():
         check_num(subg.edges()[0], tag)
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert len(edge_set) == subg.number_of_edges()
+        assert len(edge_set) == subg.num_edges()
 
     # inedge / with replacement
     for _ in range(5):
@@ -1136,7 +1136,7 @@ def test_sample_neighbors_biased_homogeneous():
         check_num(subg.edges()[1], tag)
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert len(edge_set) == subg.number_of_edges()
+        assert len(edge_set) == subg.num_edges()
 
     # outedge / with replacement
     for _ in range(5):
@@ -1175,7 +1175,7 @@ def test_sample_neighbors_biased_bipartite():
         check_num(subg.edges()[0], tag)
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert len(edge_set) == subg.number_of_edges()
+        assert len(edge_set) == subg.num_edges()
 
     # inedge / with replacement
     for _ in range(5):
@@ -1194,7 +1194,7 @@ def test_sample_neighbors_biased_bipartite():
         check_num(subg.edges()[1], tag)
         u, v = subg.edges()
         edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
-        assert len(edge_set) == subg.number_of_edges()
+        assert len(edge_set) == subg.num_edges()
 
     # outedge / with replacement
     for _ in range(5):

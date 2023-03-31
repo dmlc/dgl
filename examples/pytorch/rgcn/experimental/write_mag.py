@@ -21,8 +21,8 @@ print(hg)
 g = dgl.to_homogeneous(hg)
 g.ndata["orig_id"] = g.ndata[dgl.NID]
 g.edata["orig_id"] = g.edata[dgl.EID]
-print("|V|=" + str(g.number_of_nodes()))
-print("|E|=" + str(g.number_of_edges()))
+print("|V|=" + str(g.num_nodes()))
+print("|E|=" + str(g.num_edges()))
 print("|NTYPE|=" + str(len(th.unique(g.ndata[dgl.NTYPE]))))
 
 # Store the metadata of nodes.
@@ -58,7 +58,7 @@ dst_id = dst_id[not_self_loop_idx]
 orig_id = g.edata["orig_id"][not_self_loop_idx]
 etype = g.edata[dgl.ETYPE][not_self_loop_idx]
 # Remove duplicated edges.
-ids = (src_id * g.number_of_nodes() + dst_id).numpy()
+ids = (src_id * g.num_nodes() + dst_id).numpy()
 uniq_ids, idx = np.unique(ids, return_index=True)
 duplicate_idx = np.setdiff1d(np.arange(len(ids)), idx)
 duplicate_src_id = src_id[duplicate_idx]
@@ -85,7 +85,7 @@ np.savetxt(
 )
 print(
     "There are {} edges, remove {} self-loops and {} duplicated edges".format(
-        g.number_of_edges(), len(self_loop_src_id), len(duplicate_src_id)
+        g.num_edges(), len(self_loop_src_id), len(duplicate_src_id)
     )
 )
 
@@ -97,7 +97,7 @@ for etype in hg.etypes:
 dgl.data.utils.save_tensors("edge_feat.dgl", edge_feats)
 
 # Store the basic metadata of the graph.
-graph_stats = [g.number_of_nodes(), len(src_id), num_node_weights]
+graph_stats = [g.num_nodes(), len(src_id), num_node_weights]
 with open("mag_stats.txt", "w") as filehandle:
     filehandle.writelines(
         "{} {} {}".format(graph_stats[0], graph_stats[1], graph_stats[2])

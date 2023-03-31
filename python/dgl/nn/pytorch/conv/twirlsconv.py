@@ -587,7 +587,7 @@ class TWIRLSUnfoldingAndAttention(nn.Module):
         """
         Y = X
 
-        g.edata["w"] = tc.ones(g.number_of_edges(), 1, device=g.device)
+        g.edata["w"] = tc.ones(g.num_edges(), 1, device=g.device)
         g.ndata["deg"] = g.in_degrees().to(X)
 
         if self.init_att:

@@ -50,7 +50,7 @@ class DistEmbedding:
             arr = th.zeros(shape, dtype=dtype)
             arr.uniform_(-1, 1)
             return arr
-    >>> emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10, init_func=initializer)
+    >>> emb = dgl.distributed.DistEmbedding(g.num_nodes(), 10, init_func=initializer)
     >>> optimizer = dgl.distributed.optim.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     feats = emb(nids)
