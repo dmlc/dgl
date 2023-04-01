@@ -474,7 +474,6 @@ void BruteForceKNNCuda(
   device->FreeWorkspace(ctx, dists);
 }
 
-
 /**
  * @brief Brute force kNN with shared memory.
  *  This function divides query points and data points into blocks. For each
@@ -531,7 +530,6 @@ void BruteForceKNNSharedCuda(
   CUDA_KERNEL_CALL(
       GetNumBlockPerSegment, temp_num_blocks, temp_block_size, 0, stream,
       query_offsets_data, num_block_per_segment, batch_size, block_size);
-
   size_t prefix_temp_size = 0;
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
       nullptr, prefix_temp_size, num_block_per_segment, num_block_prefixsum,
