@@ -13,6 +13,9 @@
 #include <limits>
 #include <string>
 #include <vector>
+// [DEBUG]
+// #include <fstream>
+// #include <iostream>
 
 #include "../../../array/cuda/dgl_cub.cuh"
 #include "../../../array/cuda/utils.h"
@@ -307,15 +310,16 @@ __global__ void BruteforceKnnShareKernel(
   FloatType* data_buff = SharedMemory<FloatType>();
   FloatType* query_buff = data_buff + block_size * feature_size;
   FloatType* dist_buff = query_buff + block_size * feature_size;
-  IdType* res_buff = reinterpret_cast<IdType*>(dist_buff + block_size * k);
+  IdType* res_buff = reinterpret_cast<IdType*>(dist_buff + block_size * k); // [DEBUG]: mem alignment?
   FloatType worst_dist = std::numeric_limits<FloatType>::max();
 
   // initialize dist buff with inf value
   for (auto i = 0; i < k; ++i) {
-    dist_buff[threadIdx.x * k + i] = std::numeric_limits<FloatType>::max();
+    dist_buff[threadIdx.x + i * block_size] = std::numeric_limits<FloatType>::max();
   }
 
   // load query data to shared memory
+  // [DEBUG]: could be better here
   if (query_idx < query_end) {
     for (auto i = 0; i < feature_size; ++i) {
       // to avoid bank conflict, we use transpose here
@@ -334,8 +338,26 @@ __global__ void BruteforceKnnShareKernel(
         data_buff[threadIdx.x * feature_size + i] =
             data_points[load_idx * feature_size + i];
       }
+
+      // [DEBUG]
+      // if (load_idx == 255) {
+      //     printf("Point 255 val Init: (");
+      //     for (int i = 0; i < feature_size; ++i) {
+      //       printf("%f, ", (float)(data_buff[threadIdx.x * feature_size + i]));
+      //     }
+      //     printf(")\n");
+      // }
     }
     __syncthreads();
+
+    // [DEBUG]
+    // if (threadIdx.x == 0 && blockIdx.x == 0) {
+    //       printf("Point 255 val mid check: (");
+    //       for (int i = 0; i < feature_size; ++i) {
+    //         printf("%f, ", (float)(data_buff[255 * feature_size + i]));
+    //       }
+    //       printf(")\n");
+    //   }
 
     // compute distance for one tile
     IdType true_block_size = min(data_end - tile_start, block_size);
@@ -344,6 +366,20 @@ __global__ void BruteforceKnnShareKernel(
         FloatType tmp_dist = 0;
         bool early_stop = false;
         IdType dim_idx = 0;
+
+        // [DEBUG]
+        // if (query_idx == 34 && (d_idx + tile_start) == 255) {
+        //   printf("Point 34 val: (");
+        //   for (int i = 0; i < feature_size; ++i) {
+        //     printf("%f, ", (float)(query_buff[threadIdx.x + block_size * i]));
+        //   }
+        //   printf(")\n");
+        //   printf("Point 255 val: (");
+        //   for (int i = 0; i < feature_size; ++i) {
+        //     printf("%f, ", (float)(data_buff[d_idx * feature_size + i]));
+        //   }
+        //   printf(")\n");
+        // }
 
         for (; dim_idx < feature_size - 3; dim_idx += 4) {
           FloatType diff0 = query_buff[threadIdx.x + block_size * (dim_idx)] -
@@ -360,6 +396,11 @@ __global__ void BruteforceKnnShareKernel(
 
           tmp_dist +=
               diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
+          
+          // [DEBUG]
+          // if (query_idx == 34 && (d_idx + tile_start) == 255) {
+          //   printf("Current Dist 34 -> 255: %f\n", tmp_dist);
+          // }
 
           if (tmp_dist > worst_dist) {
             early_stop = true;
@@ -380,14 +421,40 @@ __global__ void BruteforceKnnShareKernel(
           }
         }
 
+        // [DEBUG]
+        // if (query_idx == 34 && (d_idx + tile_start) == 255) {
+        //   printf("Dist 34 -> 255 (not correct): %f\n", tmp_dist);
+        // }
+
         if (early_stop) continue;
+
+        // [DEBUG]
+        // if (query_idx == 34) {
+        //   printf("\nIncoming point: %i, dist: %f\n", (int)(d_idx + tile_start), (float)(tmp_dist));
+        //   printf("Current heap: \n");
+        //   for (int i = 0; i < k; ++i) {
+        //     printf("(%i, %f), ", (int)(*(res_buff + threadIdx.x * k + i)), (float)(*(dist_buff + threadIdx.x * k + i)));
+        //   }
+        //   printf("\n");
+        // }
 
         HeapInsert<FloatType, IdType>(
             res_buff + threadIdx.x * k, dist_buff + threadIdx.x * k,
             d_idx + tile_start, tmp_dist, k);
         worst_dist = dist_buff[threadIdx.x * k];
+
+        // [DEBUG]
+        // if (query_idx == 34) {
+        //   printf("After insert worst dist: %f\n", worst_dist);
+        //   printf("heap after insert: \n");
+        //   for (int i = 0; i < k; ++i) {
+        //     printf("(%i, %f), ", (int)(*(res_buff + threadIdx.x * k + i)), (float)(*(dist_buff + threadIdx.x * k + i)));
+        //   }
+        //   printf("\n");
+        // }
       }
     }
+    __syncthreads();
   }
 
   // copy result to global memory
@@ -398,6 +465,20 @@ __global__ void BruteforceKnnShareKernel(
       query_out[query_idx * k + i] = query_idx;
     }
   }
+
+
+  // [DEBUG]
+  // for (int i = 0; i < k; ++i) {
+  //   res_buff[threadIdx.x * k + i] = 0;
+  // }
+
+  // if (query_idx == 34 && blockIdx.x == 0) {
+  //   printf("Point 255 val Final: (");
+  //   for (int i = 0; i < feature_size; ++i) {
+  //     printf("%f, ", (float)(data_buff[255 * feature_size + i]));
+  //   }
+  //   printf(")\n");
+  // }
 }
 
 /** @brief determine the number of blocks for each segment */
@@ -472,6 +553,27 @@ void BruteForceKNNCuda(
   device->FreeWorkspace(ctx, dists);
 }
 
+// [DEBUG]
+// template <typename DataType>
+// void DebugDumpAndCheck(const std::string& name, size_t len, const DataType* ptr, bool on_gpu = false) {
+//   DataType* dump_ptr = nullptr;
+//   if (on_gpu) {
+//     dump_ptr = new DataType[len];
+//     CUDA_CALL(cudaMemcpy(dump_ptr, ptr, len * sizeof(DataType), cudaMemcpyDeviceToHost));
+//   } else {
+//     dump_ptr = const_cast<DataType*>(ptr);
+//   }
+
+//   std::fstream fout(name, std::ios::out | std::ios::app);
+//   for (auto i = 0; i < len; ++i) {
+//     fout << dump_ptr[i] << " ";
+//   }
+//   fout << std::endl;
+//   if (on_gpu) {
+//     delete[] dump_ptr;
+//   }
+// }
+
 /**
  * @brief Brute force kNN with shared memory.
  *  This function divides query points and data points into blocks. For each
@@ -504,6 +606,9 @@ void BruteForceKNNSharedCuda(
   IdType* query_out = result.Ptr<IdType>();
   IdType* data_out = query_out + k * query_points->shape[0];
 
+  // [DEBUG]
+  // DebugDumpAndCheck<int64_t>("batch_size", 1, &batch_size, false);
+
   // get max shared memory per block in bytes
   // determine block size according to this value
   int max_sharedmem_per_block = 0;
@@ -514,6 +619,9 @@ void BruteForceKNNSharedCuda(
       (k + 2 * feature_size) * sizeof(FloatType) + k * sizeof(IdType);
   const int64_t block_size =
       cuda::FindNumThreads(max_sharedmem_per_block / single_shared_mem);
+  
+  // [DEBUG]
+  // std::cout << "Max Shared Mem per Block: " << max_sharedmem_per_block << ", " << "Block Size: " << block_size << std::endl;
 
   // Determine the number of blocks. We first get the number of blocks for each
   // segment. Then we get the block id offset via prefix sum.
@@ -528,6 +636,11 @@ void BruteForceKNNSharedCuda(
   CUDA_KERNEL_CALL(
       GetNumBlockPerSegment, temp_num_blocks, temp_block_size, 0, stream,
       query_offsets_data, num_block_per_segment, batch_size, block_size);
+  
+  // [DEBUG]
+  // DebugDumpAndCheck<IdType>("query_offsets_data", batch_size + 1, query_offsets_data, true);
+  // DebugDumpAndCheck<IdType>("num_block_per_segment", batch_size, num_block_per_segment, true);
+
   size_t prefix_temp_size = 0;
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
       nullptr, prefix_temp_size, num_block_per_segment, num_block_prefixsum,
@@ -537,6 +650,9 @@ void BruteForceKNNSharedCuda(
       prefix_temp, prefix_temp_size, num_block_per_segment, num_block_prefixsum,
       batch_size, stream));
   device->FreeWorkspace(ctx, prefix_temp);
+  
+  // wait for results
+  CUDA_CALL(cudaStreamSynchronize(stream));
 
   int64_t num_blocks = 0, final_elem = 0,
           copyoffset = (batch_size - 1) * sizeof(IdType);
@@ -548,7 +664,8 @@ void BruteForceKNNSharedCuda(
       DGLContext{kDGLCPU, 0}, query_offsets->dtype);
   num_blocks += final_elem;
   device->FreeWorkspace(ctx, num_block_per_segment);
-  device->FreeWorkspace(ctx, num_block_prefixsum);
+
+  // [DEBUG] std::cout << "Num Compute blocks: " << num_blocks << std::endl;
 
   // get batch id and local id in segment
   temp_block_size = cuda::FindNumThreads(num_blocks);
@@ -561,15 +678,20 @@ void BruteForceKNNSharedCuda(
       GetBlockInfo, temp_num_blocks, temp_block_size, 0, stream,
       num_block_prefixsum, block_batch_id, local_block_id, batch_size,
       num_blocks);
+  
+  // [DEBUG]
+  // DebugDumpAndCheck<IdType>("block_batch_id", num_blocks, block_batch_id, true);
+  // DebugDumpAndCheck<IdType>("local_block_id", num_blocks, local_block_id, true);
 
   FloatType* dists = static_cast<FloatType*>(device->AllocWorkspace(
       ctx, k * query_points->shape[0] * sizeof(FloatType)));
   CUDA_KERNEL_CALL(
       BruteforceKnnShareKernel, num_blocks, block_size,
-      single_shared_mem * block_size, stream, data_points_data,
+      single_shared_mem * block_size, stream, data_points_data, // [DEBUG]: shared memory may OOM?
       data_offsets_data, query_points_data, query_offsets_data, block_batch_id,
       local_block_id, k, dists, query_out, data_out, batch_size, feature_size);
 
+  device->FreeWorkspace(ctx, num_block_prefixsum);
   device->FreeWorkspace(ctx, dists);
   device->FreeWorkspace(ctx, local_block_id);
   device->FreeWorkspace(ctx, block_batch_id);
