@@ -307,12 +307,14 @@ __global__ void BruteforceKnnShareKernel(
   FloatType* data_buff = SharedMemory<FloatType>();
   FloatType* query_buff = data_buff + block_size * feature_size;
   FloatType* dist_buff = query_buff + block_size * feature_size;
-  IdType* res_buff = reinterpret_cast<IdType*>(dist_buff + block_size * k); // TODO: mem alignment?
+  IdType* res_buff = reinterpret_cast<IdType*>(
+      dist_buff + block_size * k);  // TODO: mem alignment?
   FloatType worst_dist = std::numeric_limits<FloatType>::max();
 
   // initialize dist buff with inf value
   for (auto i = 0; i < k; ++i) {
-    dist_buff[threadIdx.x + i * block_size] = std::numeric_limits<FloatType>::max();
+    dist_buff[threadIdx.x + i * block_size] =
+        std::numeric_limits<FloatType>::max();
   }
 
   // load query data to shared memory
