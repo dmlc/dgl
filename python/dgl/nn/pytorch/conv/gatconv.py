@@ -227,7 +227,7 @@ class GATConv(nn.Module):
         """
         self._allow_zero_in_degree = set_value
 
-    def forward(self, graph, feat, get_attention=False):
+    def forward(self, graph, feat, edge_weight=None, get_attention=False):
         r"""
 
         Description
@@ -243,6 +243,8 @@ class GATConv(nn.Module):
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, *, D_{in_{src}})` and :math:`(N_{out}, *, D_{in_{dst}})`.
+        edge_weight : torch.Tensor, optional
+            A 1D tensor of edge weight values.  Shape: :math:`(|E|,)`.
         get_attention : bool, optional
             Whether to return the attention values. Default to False.
 
@@ -327,6 +329,10 @@ class GATConv(nn.Module):
             e = self.leaky_relu(graph.edata.pop("e"))
             # compute softmax
             graph.edata["a"] = self.attn_drop(edge_softmax(graph, e))
+            if edge_weight is not None:
+                graph.edata["a"] = graph.edata["a"] * edge_weight.tile(
+                    1, self._num_heads, 1
+                ).transpose(0, 2)
             # message passing
             graph.update_all(fn.u_mul_e("ft", "a", "m"), fn.sum("m", "ft"))
             rst = graph.dstdata["ft"]
