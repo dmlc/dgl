@@ -1,6 +1,4 @@
-"""
-Wikipedia page-page networks on two topics: chameleons and squirrels.
-"""
+"""Datasets introduced in the Geom-GCN paper."""
 import os
 
 import numpy as np
@@ -10,11 +8,10 @@ from .dgl_dataset import DGLBuiltinDataset
 from .utils import _get_dgl_url
 
 
-class WikiNetworkDataset(DGLBuiltinDataset):
-    r"""Wikipedia page-page networks from `Multi-scale Attributed
-    Node Embedding <https://arxiv.org/abs/1909.13021>`__ and later modified by
+class GeomGCNDataset(DGLBuiltinDataset):
+    r"""Datasets introduced in
     `Geom-GCN: Geometric Graph Convolutional Networks
-    <https://arxiv.org/abs/2002.05287>`
+    <https://arxiv.org/abs/2002.05287>`__
 
     Parameters
     ----------
@@ -34,7 +31,7 @@ class WikiNetworkDataset(DGLBuiltinDataset):
 
     def __init__(self, name, raw_dir, force_reload, verbose, transform):
         url = _get_dgl_url(f"dataset/{name}.zip")
-        super(WikiNetworkDataset, self).__init__(
+        super(GeomGCNDataset, self).__init__(
             name=name,
             url=url,
             raw_dir=raw_dir,
@@ -106,11 +103,11 @@ class WikiNetworkDataset(DGLBuiltinDataset):
         return self._num_classes
 
 
-class ChameleonDataset(WikiNetworkDataset):
+class ChameleonDataset(GeomGCNDataset):
     r"""Wikipedia page-page network on chameleons from `Multi-scale Attributed
     Node Embedding <https://arxiv.org/abs/1909.13021>`__ and later modified by
     `Geom-GCN: Geometric Graph Convolutional Networks
-    <https://arxiv.org/abs/2002.05287>`
+    <https://arxiv.org/abs/2002.05287>`__
 
     Nodes represent articles from the English Wikipedia, edges reflect mutual
     links between them. Node features indicate the presence of particular nouns
@@ -182,11 +179,11 @@ class ChameleonDataset(WikiNetworkDataset):
         )
 
 
-class SquirrelDataset(WikiNetworkDataset):
+class SquirrelDataset(GeomGCNDataset):
     r"""Wikipedia page-page network on squirrels from `Multi-scale Attributed
     Node Embedding <https://arxiv.org/abs/1909.13021>`__ and later modified by
     `Geom-GCN: Geometric Graph Convolutional Networks
-    <https://arxiv.org/abs/2002.05287>`
+    <https://arxiv.org/abs/2002.05287>`__
 
     Nodes represent articles from the English Wikipedia, edges reflect mutual
     links between them. Node features indicate the presence of particular nouns
@@ -251,6 +248,158 @@ class SquirrelDataset(WikiNetworkDataset):
     ):
         super(SquirrelDataset, self).__init__(
             name="squirrel",
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
+
+
+class CornellDataset(GeomGCNDataset):
+    r"""Cornell subset of
+    `WebKB <http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-11/www/wwkb/>`__,
+    later modified by `Geom-GCN: Geometric Graph Convolutional Networks
+    <https://arxiv.org/abs/2002.05287>`__
+
+    Nodes represent web pages. Edges represent hyperlinks between them. Node
+    features are the bag-of-words representation of web pages. The web pages
+    are manually classified into the five categories, student, project, course,
+    staff, and faculty.
+
+    Statistics:
+
+    - Nodes: 183
+    - Edges: 298
+    - Number of Classes: 5
+    - 10 train/val/test splits
+
+        - Train: 87
+        - Val: 59
+        - Test: 37
+
+    Parameters
+    ----------
+    raw_dir : str, optional
+        Raw file directory to store the processed data. Default: ~/.dgl/
+    force_reload : bool, optional
+        Whether to re-download the data source. Default: False
+    verbose : bool, optional
+        Whether to print progress information. Default: True
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access. Default: None
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of node classes
+
+    Notes
+    -----
+    The graph does not come with edges for both directions.
+
+    Examples
+    --------
+
+    >>> from dgl.data import CornellDataset
+    >>> dataset = CornellDataset()
+    >>> g = dataset[0]
+    >>> num_classes = dataset.num_classes
+
+    >>> # get node features
+    >>> feat = g.ndata["feat"]
+
+    >>> # get data split
+    >>> train_mask = g.ndata["train_mask"]
+    >>> val_mask = g.ndata["val_mask"]
+    >>> test_mask = g.ndata["test_mask"]
+
+    >>> # get labels
+    >>> label = g.ndata['label']
+    """
+
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
+        super(CornellDataset, self).__init__(
+            name="cornell",
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
+
+
+class TexasDataset(GeomGCNDataset):
+    r"""Texas subset of
+    `WebKB <http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-11/www/wwkb/>`__,
+    later modified by `Geom-GCN: Geometric Graph Convolutional Networks
+    <https://arxiv.org/abs/2002.05287>`__
+
+    Nodes represent web pages. Edges represent hyperlinks between them. Node
+    features are the bag-of-words representation of web pages. The web pages
+    are manually classified into the five categories, student, project, course,
+    staff, and faculty.
+
+    Statistics:
+
+    - Nodes: 183
+    - Edges: 325
+    - Number of Classes: 5
+    - 10 train/val/test splits
+
+        - Train: 87
+        - Val: 59
+        - Test: 37
+
+    Parameters
+    ----------
+    raw_dir : str, optional
+        Raw file directory to store the processed data. Default: ~/.dgl/
+    force_reload : bool, optional
+        Whether to re-download the data source. Default: False
+    verbose : bool, optional
+        Whether to print progress information. Default: True
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access. Default: None
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of node classes
+
+    Notes
+    -----
+    The graph does not come with edges for both directions.
+
+    Examples
+    --------
+
+    >>> from dgl.data import TexasDataset
+    >>> dataset = TexasDataset()
+    >>> g = dataset[0]
+    >>> num_classes = dataset.num_classes
+
+    >>> # get node features
+    >>> feat = g.ndata["feat"]
+
+    >>> # get data split
+    >>> train_mask = g.ndata["train_mask"]
+    >>> val_mask = g.ndata["val_mask"]
+    >>> test_mask = g.ndata["test_mask"]
+
+    >>> # get labels
+    >>> label = g.ndata['label']
+    """
+
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
+        super(TexasDataset, self).__init__(
+            name="texas",
             raw_dir=raw_dir,
             force_reload=force_reload,
             verbose=verbose,
