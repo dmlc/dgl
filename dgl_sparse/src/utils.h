@@ -52,7 +52,7 @@ inline static void ElementwiseOpSanityCheck(
 
 /** @brief Convert a Torch tensor to a DGL array. */
 inline static runtime::NDArray TorchTensorToDGLArray(torch::Tensor tensor) {
-  return runtime::DLPackConvert::FromDLPack(at::toDLPack(tensor));
+  return runtime::DLPackConvert::FromDLPack(at::toDLPack(tensor.contiguous()));
 }
 
 /** @brief Convert a DGL array to a Torch tensor. */
