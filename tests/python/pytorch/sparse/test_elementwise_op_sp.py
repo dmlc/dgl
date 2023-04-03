@@ -4,7 +4,15 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import from_coo, power
+from dgl.sparse import from_coo, mul, power, val_like
+
+from .utils import (
+    rand_coo,
+    rand_csc,
+    rand_csr,
+    rand_diag,
+    sparse_matrix_to_dense,
+)
 
 
 def all_close_sparse(A, row, col, val, shape):
@@ -91,3 +99,39 @@ def test_error_op_scalar(op, v_scalar):
         A - v_scalar
     with pytest.raises(TypeError):
         v_scalar - A
+
+
+@pytest.mark.skipif(F.ctx().type == "cuda", reason="GPU not supported")
+@pytest.mark.parametrize(
+    "create_func1", [rand_coo, rand_csr, rand_csc, rand_diag]
+)
+@pytest.mark.parametrize(
+    "create_func2", [rand_coo, rand_csr, rand_csc, rand_diag]
+)
+@pytest.mark.parametrize("shape", [(5, 5), (5, 3)])
+@pytest.mark.parametrize("nnz1", [5, 15])
+@pytest.mark.parametrize("nnz2", [1, 14])
+@pytest.mark.parametrize("nz_dim", [None, 3])
+def test_spspmul(create_func1, create_func2, shape, nnz1, nnz2, nz_dim):
+    dev = F.ctx()
+    A = create_func1(shape, nnz1, dev, nz_dim)
+    B = create_func2(shape, nnz2, dev, nz_dim)
+    C = mul(A, B)
+    assert not C.has_duplicate()
+
+    DA = sparse_matrix_to_dense(A)
+    DB = sparse_matrix_to_dense(B)
+    DC = DA * DB
+
+    grad = torch.rand_like(C.val)
+    C.val.backward(grad)
+    DC_grad = sparse_matrix_to_dense(val_like(C, grad))
+    DC.backward(DC_grad)
+
+    assert torch.allclose(sparse_matrix_to_dense(C), DC, atol=1e-05)
+    assert torch.allclose(
+        val_like(A, A.val.grad).to_dense(), DA.grad, atol=1e-05
+    )
+    assert torch.allclose(
+        val_like(B, B.val.grad).to_dense(), DB.grad, atol=1e-05
+    )

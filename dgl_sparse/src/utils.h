@@ -15,6 +15,8 @@
 #include <torch/custom_class.h>
 #include <torch/script.h>
 
+#include <vector>
+
 namespace dgl {
 namespace sparse {
 
@@ -76,6 +78,15 @@ inline static torch::optional<torch::Tensor> DGLArrayToOptionalTorchTensor(
     return torch::optional<torch::Tensor>();
   }
   return torch::make_optional<torch::Tensor>(DGLArrayToTorchTensor(array));
+}
+
+template <typename T>
+torch::Tensor VectorToTorchTensor(const std::vector<T>& vec) {
+  auto dtype = torch::CppTypeToScalarType<T>();
+  return torch::from_blob(
+             const_cast<T*>(vec.data()), {static_cast<int64_t>(vec.size())},
+             torch::dtype(dtype))
+      .clone();
 }
 
 }  // namespace sparse
