@@ -52,7 +52,7 @@ def test_cornell():
     g = dgl.data.CornellDataset(force_reload=True)[0]
     assert g.num_nodes() == 183
     assert g.num_edges() == 298
-    g2 = dgl.data.SquirrelDataset(force_reload=True, transform=transform)[0]
+    g2 = dgl.data.CornellDataset(force_reload=True, transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 
@@ -69,5 +69,5 @@ def test_texas():
     g = dgl.data.TexasDataset(force_reload=True)[0]
     assert g.num_nodes() == 183
     assert g.num_edges() == 325
-    g2 = dgl.data.SquirrelDataset(force_reload=True, transform=transform)[0]
+    g2 = dgl.data.TexasDataset(force_reload=True, transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
