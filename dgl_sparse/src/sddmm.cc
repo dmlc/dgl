@@ -68,7 +68,7 @@ void _SDDMMSanityCheck(
 torch::Tensor SDDMMAutoGrad::forward(
     AutogradContext* ctx, const c10::intrusive_ptr<SparseMatrix>& sparse_mat,
     torch::Tensor mat1, torch::Tensor mat2) {
-  auto mat2_tr = mat2.transpose(0, 1).contiguous();
+  auto mat2_tr = mat2.transpose(0, 1);
   auto ret = SDDMMNoAutoGrad(sparse_mat, mat1, mat2_tr);
   torch::Tensor cache_mat1, cache_mat2;
   if (mat1.requires_grad()) {
@@ -94,13 +94,12 @@ tensor_list SDDMMAutoGrad::backward(
   torch::Tensor mat1_grad, mat2_grad;
   if (ctx->saved_data["mat1_requires_grad"].toBool()) {
     // SDDMM(M, A, B) = C. dA = SpMM(dC, B^T)
-    mat1_grad = SpMMNoAutoGrad(
-        sparse_mat, grad, mat2.transpose(0, 1).contiguous(), false);
+    mat1_grad = SpMMNoAutoGrad(sparse_mat, grad, mat2.transpose(0, 1), false);
   }
   if (ctx->saved_data["mat2_requires_grad"].toBool()) {
     // SDDMM(M, A, B) = C. dB = SpMM(dC^T, A)^T
     auto mat2_tr_grad = SpMMNoAutoGrad(sparse_mat, grad, mat1, true);
-    mat2_grad = mat2_tr_grad.transpose(0, 1).contiguous();
+    mat2_grad = mat2_tr_grad.transpose(0, 1);
   }
   return {torch::Tensor(), mat1_grad, mat2_grad};
 }
