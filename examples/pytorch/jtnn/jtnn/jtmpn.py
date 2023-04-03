@@ -225,8 +225,8 @@ class DGLJTMPN(nn.Module):
             cand_graphs, backtracking=False, shared=True
         )
 
-        n_nodes = cand_graphs.number_of_nodes()
-        n_edges = cand_graphs.number_of_edges()
+        n_nodes = cand_graphs.num_nodes()
+        n_edges = cand_graphs.num_edges()
 
         cand_graphs = self.run(
             cand_graphs,
@@ -255,7 +255,7 @@ class DGLJTMPN(nn.Module):
         tree_mess_tgt_nodes,
         mol_tree_batch,
     ):
-        n_nodes = cand_graphs.number_of_nodes()
+        n_nodes = cand_graphs.num_nodes()
 
         cand_graphs.apply_edges(
             func=lambda edges: {"src_x": edges.src["x"]},
@@ -282,7 +282,7 @@ class DGLJTMPN(nn.Module):
         )
 
         cand_graphs.edata["alpha"] = cuda(
-            torch.zeros(cand_graphs.number_of_edges(), self.hidden_size)
+            torch.zeros(cand_graphs.num_edges(), self.hidden_size)
         )
         cand_graphs.ndata["alpha"] = zero_node_state
         if tree_mess_src_edges.shape[0] > 0:

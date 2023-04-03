@@ -57,6 +57,10 @@ Datasets for node classification/regression tasks
     PATTERNDataset
     CLUSTERDataset
     ChameleonDataset
+    SquirrelDataset
+    ActorDataset
+    CornellDataset
+    TexasDataset
 
 Edge Prediction Datasets
 ---------------------------------------
