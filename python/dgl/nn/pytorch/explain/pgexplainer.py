@@ -35,8 +35,8 @@ class PGExplainer(nn.Module):
         # training parameters for PGExplainer
         self.epochs = epochs
         self.lr = lr
-        self.coff_size = coff_size
-        self.coff_ent = coff_ent
+        self.size = coff_size
+        self.ent = coff_ent
         self.t0 = t0
         self.t1 = t1
         self.sample_bias = sample_bias
@@ -61,36 +61,55 @@ class PGExplainer(nn.Module):
             "sample_bias": sample_bias,
         }
 
-        self.reals = []
-        self.preds = []
+    def set_masks(self, g, feat, edge_mask=None):
+        N, F = feat.shape
+        E = g.num_edges()
+
+        init_bias = self.init_bias
+        std = torch.nn.init.calculate_gain('relu') * math.sqrt(2.0 / (2 * N))
+
+        if edge_mask is None:
+            self.edge_mask = torch.randn(E) * std + init_bias
+        else:
+            self.edge_mask = edge_mask
+
+        self.edge_mask = self.edge_mask.to(g.device)
+
+    def clear_masks(self):
+        self.edge_mask = None
 
     def update_num_hops(self, num_hops):
         if num_hops is not None:
             return num_hops
 
+        # @kunal: Tianhao, what should we do here?
         k = 0
         for module in self.model.modules():
             k += 1
         return k
 
-    def _masked_adj(self, mask, adj):
-        sym_mask = mask
-        sym_mask = (sym_mask + sym_mask.t()) / 2
+    def loss(self, prob, ori_pred):
 
-        num_nodes = adj.shape[0]
-        indices = torch.cat([adj.row.unsqueeze(-1),
-                             adj.col.unsqueeze(-1)], dim=-1)
+        logit = prob[ori_pred]
+        logit += 1e-6
+        pred_loss = -torch.log(logit)
 
-        values = torch.from_numpy(adj.data).float()
-        sparseadj = torch.sparse.FloatTensor(indices.t(),
-                                             values,
-                                             size=(num_nodes, num_nodes))
-        adj = sparseadj.to_dense()
+        # size
+        edge_mask = self.sparse_mask_values
+        if self.coeffs['size'] <= 0:
+            size_loss = self.coeffs["size"] * torch.sum(edge_mask)
+        else:
+            size_loss = self.coeffs["size"] * F.relu(torch.sum(edge_mask) - self.coeffs['size'])
 
-        masked_adj = adj * sym_mask
-        diag_mask = torch.ones((num_nodes, num_nodes)) - torch.eye(num_nodes)
+        # entropy
+        scale = 0.99
+        edge_mask = self.edge_mask * (2 * scale - 1.0) + (1.0 - scale)
+        mask_ent = -edge_mask * torch.log(edge_mask) - (1 - edge_mask) * torch.log(1 - edge_mask)
+        mask_ent_loss = self.coeffs["ent"] * torch.mean(mask_ent)
 
-        return masked_adj * diag_mask
+        loss = pred_loss + size_loss + mask_ent_loss
+
+        return loss
 
     def concrete_sample(self, log_alpha, beta=1.0, training=True):
         """Uniform random numbers for the concrete distribution"""
@@ -107,15 +126,110 @@ class PGExplainer(nn.Module):
 
         return gate_inputs
 
+    def explain_graph(self, graph, feat, embed, tmp=1.0, training=False):
+
+        edge_idx = graph.edges()
+
+        node_size = embed.shape[0]
+        col, row = edge_idx
+        f1 = embed[col]
+        f2 = embed[row]
+        f12self = torch.cat([f1, f2], dim=-1)
+
+        # using the node embedding to calculate the edge weight
+        h = f12self.to(self.device)
+        for elayer in self.elayers:
+            h = elayer(h)
+        values = h.reshape(-1)
+
+        values = self.concrete_sample(values, beta=tmp, training=training)
+        self.sparse_mask_values = values
+
+        mask_sparse = torch.sparse_coo_tensor(
+            [edge_idx[0].tolist(),edge_idx[1].tolist()],
+            values.tolist(),
+            (node_size,node_size)
+        )
+        mask_sigmoid = mask_sparse.to_dense()
+        # set the symmetric edge weights
+        sym_mask = (mask_sigmoid + mask_sigmoid.transpose(0, 1)) / 2
+        edge_mask = sym_mask[edge_idx[0], edge_idx[1]]
+
+        # inverse the weights before sigmoid in MessagePassing Module
+        self.clear_masks()
+        self.set_masks(graph, feat, edge_mask)
+
+        # the model prediction with edge mask
+        logits = self.model(graph, feat, edge_idx)
+        probs = F.softmax(logits, dim=-1)
+
+        self.clear_masks()
+
+        return probs, edge_mask
+
+    def train_explanation_network(self, dataset):
+
+        optimizer = Adam(self.elayers.parameters(), lr=self.coeffs['lr'])
+
+        emb_dict = {}
+        ori_pred_dict = {}
+
+        with torch.no_grad():
+            for idx, (g, l) in enumerate(dataset):
+                feat = g.ndata["attr"]
+
+                self.model.eval()
+
+                logits = self.model(g, feat)
+                emb = self.model(g, feat, graph=False)
+                emb_dict[idx] = emb.data.cpu()
+                ori_pred_dict[idx] = logits.argmax(-1).data.cpu()
+
+        # train the mask generator
+        for epoch in range(self.epochs):
+            loss = 0.0
+            pred_list = []
+
+            tmp = float(self.t0 * np.power(self.t1 / self.t0, epoch / self.epochs))
+
+            self.elayers.train()
+            optimizer.zero_grad()
+
+            for idx, (g, l) in enumerate(dataset):
+
+                feat = g.ndata["attr"]
+                g = g.to(self.device)
+
+                node_idx = g.nodes()
+
+                prob, edge_mask = self.explain_graph(g,
+                                                     feat,
+                                                     embed=emb_dict[idx],
+                                                     tmp=tmp,
+                                                     training=True)
+
+                self.edge_mask = edge_mask
+
+                loss_tmp = self.loss(prob.squeeze(), ori_pred_dict[idx])
+                loss_tmp.backward()
+
+                loss += loss_tmp.item()
+                pred_label = prob.argmax(-1).item()
+                pred_list.append(pred_label)
+
+            optimizer.step()
+            print(f'Epoch: {epoch} | Loss: {loss}')
+
     def forward(self, inputs, training=False):
 
-        x, embed, adj, tmp, label = inputs
+        feat, embed, adj, tmp, label = inputs
 
         adj = coo_matrix(adj)
 
         g = dgl.graph((adj.row, adj.col))
+        edge_idx = g.edges()
 
-        g.ndata['x'] = embed
+        g.ndata['feat'] = embed
 
         f1 = embed[adj.row]
         f2 = embed[adj.col]
@@ -139,19 +253,22 @@ class PGExplainer(nn.Module):
         indices = torch.cat([adj.row.unsqueeze(-1),
                              adj.col.unsqueeze(-1)],
                             dim=-1)
-        sparsemask = torch.sparse.FloatTensor(indices.t(),
-                                              values,
-                                              size=adj.shape)
-        mask = sparsemask.to_dense()
+        mask_sparse = torch.sparse.FloatTensor(indices.t(),
+                                               values,
+                                               size=adj.shape)
+        mask_sigmoid = mask_sparse.to_dense()
+        # set the symmetric edge weights
+        sym_mask = (mask_sigmoid + mask_sigmoid.transpose(0, 1)) / 2
+        edge_mask = sym_mask[edge_idx[0], edge_idx[1]]
         # @kunal: missing set mask
         # edge weight for subgraph
         # extract the edge mask in the set mask
-        self.__clear_masks__()
-        self.__set_masks__(x, edge_index, edge_mask)
+        self.clear_masks()
+        self.set_masks(g, feat, edge_mask)
 
         # @kunal: using the set mask, get the masked adj matrix
         # final edge mask used
-        masked_adj = self._masked_adj(self.__edge_mask__, adj)
+        masked_adj = self.masked_adj(self.edge_mask, adj)
 
         # @kunal: using mask adj matrix
         # constrct the whole graph
@@ -160,169 +277,30 @@ class PGExplainer(nn.Module):
         mask_g = copy.deepcopy(g)
         mask_g.edata['weight'] = masked_adj
 
-        output = self.model(mask_g, x)
+        output = self.model(mask_g, feat)
 
         # For node classification:
         # node_pred = output[nodeid, :]
         node_pred = output
         res = nn.functional.softmax(node_pred, dim=0)
+
         return res
 
-    def loss(self, pred, ori_pred_label):
-        """
-        Args:
-            pred: prediction made by current model
-            pred_label: the label predicted by the original model.
-        """
-        logit = pred[ori_pred_label]
-        logit += 1e-6
-        pred_loss = -torch.log(logit)
+    def masked_adj(self, mask, adj):
+        sym_mask = mask
+        sym_mask = (sym_mask + sym_mask.t()) / 2
 
-        # size
-        edge_mask = self.sparse_mask_values
-        if self.coeffs['size'] <= 0:
-            size_loss = self.coeffs["size"] * torch.sum(edge_mask)
-        else:
-            size_loss = self.coeffs["size"] * F.relu(torch.sum(edge_mask) - self.coeffs['size'])
+        num_nodes = adj.shape[0]
+        indices = torch.cat([adj.row.unsqueeze(-1),
+                             adj.col.unsqueeze(-1)], dim=-1)
 
-        # entropy
-        scale = 0.99
-        edge_mask = self.mask * (2 * scale - 1.0) + (1.0 - scale)
-        mask_ent = -edge_mask * torch.log(edge_mask) - (1 - edge_mask) * torch.log(1 - edge_mask)
-        mask_ent_loss = self.coeffs["ent"] * torch.mean(mask_ent)
+        values = torch.from_numpy(adj.data).float()
+        sparseadj = torch.sparse.FloatTensor(indices.t(),
+                                             values,
+                                             size=(num_nodes, num_nodes))
+        adj = sparseadj.to_dense()
 
-        loss = pred_loss + size_loss + mask_ent_loss
-        return loss
+        masked_adj = adj * sym_mask
+        diag_mask = torch.ones((num_nodes, num_nodes)) - torch.eye(num_nodes)
 
-    def train(self, dataset):
-
-        optimizer = Adam(self.elayers.parameters(), lr=self.coeffs['lr'])
-
-        clip_value_min = -0.01
-        clip_value_max = 0.01
-
-        epochs = self.coeffs['epochs']
-        t0 = self.coeffs['t0']
-        t1 = self.coeffs['t1']
-
-        # new add
-        for epoch in range(epochs):
-            loss = 0
-            tmp = t0 * pow(t1 / t0, epoch / epochs)
-
-            for idx, (graph, label) in enumerate(dataset):
-
-                # input feature
-                feat = graph.ndata.pop("attr")
-                # predicted label
-                _, pred_label = torch.max(self.model(graph, feat), 1)
-
-                with torch.no_grad():
-                    # embedding for one model
-                    emb = self.model(graph, feat, graph=False)
-
-                adj_tensor = graph.adj().to_dense()
-
-                optimizer.zero_grad()
-
-                # forward function
-                pred = self((feat, emb, adj_tensor, tmp, label))
-                # loss function
-                cl = self.loss(pred, pred_label, label)
-                cl.backward()
-
-                loss += cl.item()
-
-                torch.nn.utils.clip_grad_value_(self.parameters(),
-                                                clip_value_min,
-                                                clip_value_max)
-                optimizer.step()
-
-            # for gid in range(selected_adjs.shape[0]):
-            #     # Load the graph batch from dataset
-            #     # fea, emb, adj_tensor, tmp, label = ...
-            #
-            #     optimizer.zero_grad()
-            #     pred = self((fea, emb, adj_tensor, tmp, label))
-            #     cl = self.loss(pred, pred_label, label)
-            #
-            #     loss += cl.item()
-            #     cl.backward()
-            #     torch.nn.utils.clip_grad_value_(self.parameters(), clip_value_min, clip_value_max)
-            #     optimizer.step()
-            #
-            # if epoch % 1 == 0:
-            #     print('epoch', epoch, 'loss', loss)
-            #
-            #     for gid in range(int(selected_adjs.shape[0] / 10)):
-            #         # Load the graph batch from dataset
-            #         # fea, emb, adj_tensor, tmp, label = ...
-            #
-            #         adj_tensor = torch.from_numpy(adj.toarray().astype(np.float32))
-            #         self.eval()
-            #         self((fea, emb, adj_tensor, 1.0, label), need_grad=False)
-            #
-            #         self.acc(gid, selected_edge_lists, selected_edge_label_lists)
-            #
-            #         self.train(dataset)
-
-    def acc(self, gid, edge_lists, edge_label_lists):
-        mask = self.masked_adj.detach().numpy()
-        edge_labels = edge_label_lists[gid]
-        edge_list = edge_lists[gid]
-
-        for (r, c), l in list(zip(edge_list, edge_labels)):
-            if r > c:
-                self.reals.append(l)
-                self.preds.append(mask[r][c])
-
-    def explain_graph(self, fea, emb, adj, label,
-                      graphid, topk, node_label_lists,
-                      edge_lists, edge_label_lists):
-
-        self(fea, emb, adj, 1.0, label)
-        self.acc(graphid, edge_lists, edge_label_lists)
-
-        after_adj_dense = self.masked_adj.detach().numpy()
-        after_adj = coo_matrix(after_adj_dense)
-
-        rcd = np.concatenate(
-            [np.expand_dims(after_adj.row, -1),
-             np.expand_dims(after_adj.col, -1),
-             np.expand_dims(after_adj.data, -1)], -1)
-        pos_edges = []
-        filter_edges = []
-        edge_weights = np.triu(after_adj_dense).flatten()
-
-        sorted_edge_weights = np.sort(edge_weights)
-        thres_index = max(int(edge_weights.shape[0] - topk), 0)
-        thres = sorted_edge_weights[thres_index]
-
-        for r, c, d in rcd:
-            r = int(r)
-            c = int(c)
-            d = float(d)
-            if r < c:
-                continue
-            if d >= thres:
-                pos_edges.append((r, c))
-            filter_edges.append((r, c))
-
-        node_label = node_label_lists[graphid]
-        max_label = np.max(node_label) + 1
-        nmb_nodes = len(node_label)
-
-        # Convert to PyTorch tensors and DGL graph
-        fea = torch.from_numpy(fea).float()
-        emb = torch.from_numpy(emb).float()
-        adj = torch.from_numpy(adj).float()
-        edge_index = np.stack((rcd[:, 0], rcd[:, 1]), axis=0)
-        edge_index = torch.from_numpy(edge_index).long()
-        edge_weight = torch.from_numpy(
-            after_adj_dense[np.triu_indices(after_adj_dense.shape[0], k=1)]).float()
-        g = dgl.graph((edge_index[0], edge_index[1]), num_nodes=nmb_nodes, device=self.device)
-        g.edata['w'] = edge_weight
-
-        return g, fea, emb, adj, \
-               node_label, max_label, pos_edges, \
-               filter_edges, thres
+        return masked_adj * diag_mask

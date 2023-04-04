@@ -204,61 +204,69 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     explainer = PGExplainer(model, hidden_size, device='cpu')
-    explainer.train(dataset)
+    explainer.train_explanation_network(dataset)
 
     for idx, (graph, l) in enumerate(dataset):
         if idx == 156:
                 print(f'{idx} / {len(dataset)}')
-                feat = graph.ndata.pop("attr")
-                explainer.explain_graph(graph, feat, target_class=0)
+                feat = graph.ndata["attr"]
+                emb = model(graph, feat, graph=False)
+                probs, edge_weight = explainer.explain_graph(graph, feat, emb.data.cpu())
+                print(probs)
+                print(edge_weight)
 
-    # for idx, (graph, l) in enumerate(dataset):
-    #     if idx == 156:
-    #         print(f'{idx} / {len(dataset)}')
-    #         feat = graph.ndata.pop("attr")
-    #
-    #         _, predicted = torch.max(model(graph, feat), 1)
-    #         if predicted == l:
-    #             print(f'Correct Prediction {l} {predicted}')
-    #
-    #         g_nodes_explain = explainer.explain_graph(graph,
-    #                                                   feat=feat,
-    #                                                   target_class=l)
-    #         g_explain = dgl.node_subgraph(graph, g_nodes_explain)
-    #
-    #         print(f'Subgraph: {g_explain}')
-    #         print(f'Important Subgraph: {g_explain.ndata}')
-    #
-    #         # visualize the MUTAG graph
-    #         G = dgl.to_networkx(graph)
-    #         plt.figure(figsize=[15, 15])
-    #
-    #         label_dict_nodes={
-    #             0: 'C',
-    #             1: 'N',
-    #             2: 'O',
-    #             3: 'F',
-    #             4: 'I',
-    #             5: 'Cl',
-    #             6: 'Br'
-    #         }
-    #
-    #         label_dict_edges = {
-    #             0: 'aromatic',
-    #             1: 'S',
-    #             2: 'D',
-    #             3: 'T',
-    #         }
-    #
-    #         nx.draw(G,
-    #                 with_labels=True,
-    #                 labels={indx: label_dict_nodes[graph.ndata['label'].tolist()[indx]] for indx in G.nodes()},
-    #                 # labels={indx: indx for indx in G.nodes()},
-    #                 font_size=22,
-    #                 font_color="yellow",
-    #                 node_size=[1000 for indx in range(graph.num_nodes())],
-    #                 node_color=['red' if indx in g_nodes_explain else 'blue' for indx in range(graph.num_nodes())],
-    #                 )
-    #
-    #         plt.savefig(os.path.join("mutag_img", f"{idx}_MUTAG_explain.png"), format="PNG")
-    #         plt.show()
+                top_k = 10
+                top_k_indices = np.argsort(-edge_weight)[:top_k]
+                edge_mask = np.zeros(graph.num_edges(), dtype=np.float32)
+                edge_mask[top_k_indices] = 1
+
+                _, predicted = torch.max(probs, 1)
+                if predicted == l:
+                    print(f'Correct Prediction {l} {predicted}')
+
+                print(edge_mask)
+                graph.edata['mask'] = torch.tensor(edge_mask,
+                                                   dtype=torch.float32,
+                                                   device=graph.device)
+                G = dgl.to_networkx(graph,
+                                    node_attrs=['label'],
+                                    edge_attrs=['mask'])
+                plt.figure(figsize=[15, 15])
+
+                label_dict_nodes = {
+                    0: 'C',
+                    1: 'N',
+                    2: 'O',
+                    3: 'F',
+                    4: 'I',
+                    5: 'Cl',
+                    6: 'Br'
+                }
+
+                label_dict_edges = {
+                    0: 'aromatic',
+                    1: 'S',
+                    2: 'D',
+                    3: 'T',
+                }
+
+                # Draw the graph with edge colors based on the mask feature
+                pos = nx.spring_layout(G)
+                edge_colors = ['r' if mask else 'k'
+                               for _, _, mask in G.edges(data='mask')]
+                edge_widths = [4.0 if mask else 1.0
+                               for _, _, mask in G.edges(data='mask')]
+                nx.draw(G,
+                        pos,
+                        width=edge_widths,
+                        edge_color=edge_colors,
+                        with_labels=True,
+                        labels={indx: label_dict_nodes[graph.ndata['label'].tolist()[indx]]
+                                for indx in G.nodes()},
+                        font_size=22,
+                        font_color="yellow",
+                        node_size=[1000 for _ in range(graph.num_nodes())],
+                        )
+
+                plt.savefig(os.path.join("mutag_img", f"{idx}_MUTAG_explain.png"), format="PNG")
+                plt.show()
