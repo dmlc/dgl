@@ -454,30 +454,35 @@ class HeteroSubgraphX(nn.Module):
         num_nodes = self.graph.num_nodes()
 
         # Obtain neighboring nodes of the subgraph g_i, P'.
-        local_region_map = {
+        local_regions = {
             ntype: nodes.tolist() for ntype, nodes in subgraph_nodes.items()
         }
         for _ in range(self.num_hops - 1):
             for c_etype in self.graph.canonical_etypes:
                 src_ntype, _, dst_ntype = c_etype
+                if (
+                    src_ntype not in local_regions
+                    or dst_ntype not in local_regions
+                ):
+                    continue
+
                 in_neighbors, _ = self.graph.in_edges(
-                    local_region_map[dst_ntype], etype=c_etype
+                    local_regions[dst_ntype], etype=c_etype
+                )
+                local_regions[src_ntype] = list(
+                    set(local_regions[src_ntype] + in_neighbors.tolist())
                 )
                 _, out_neighbors = self.graph.out_edges(
-                    local_region_map[src_ntype], etype=c_etype
+                    local_regions[src_ntype], etype=c_etype
                 )
-                local_region_map[src_ntype] = list(
-                    set(local_region_map[src_ntype] + in_neighbors.tolist())
-                )
-                local_region_map[dst_ntype] = list(
-                    set(local_region_map[dst_ntype] + out_neighbors.tolist())
+                local_regions[dst_ntype] = list(
+                    set(local_regions[dst_ntype] + out_neighbors.tolist())
                 )
 
         split_point = num_nodes
         coalition_space = {
             ntype: list(
-                set(local_region_map[ntype])
-                - set(subgraph_nodes[ntype].tolist())
+                set(local_regions[ntype]) - set(subgraph_nodes[ntype].tolist())
             )
             + [num_nodes]
             for ntype in subgraph_nodes.keys()
@@ -496,8 +501,8 @@ class HeteroSubgraphX(nn.Module):
                 ntype: torch.ones(self.graph.num_nodes(ntype))
                 for ntype in self.graph.ntypes
             }
-            for ntype, local_region in local_region_map.items():
-                exclude_mask[ntype][local_region] = 0.0
+            for ntype, region in local_regions.items():
+                exclude_mask[ntype][region] = 0.0
             for ntype, selected_nodes in selected_node_map.items():
                 exclude_mask[ntype][selected_nodes] = 1.0
 
@@ -575,20 +580,35 @@ class HeteroSubgraphX(nn.Module):
 
         for ntype, node in chosen_nodes:
             new_subg = remove_nodes(subg, node, ntype, store_ids=True)
-            new_subg_homo = to_homogeneous(new_subg)
-            # Get the largest weakly connected component in the subgraph.
-            nx_graph = to_networkx(new_subg_homo.cpu())
-            largest_cc_nids = list(
-                max(nx.weakly_connected_components(nx_graph), key=len)
-            )
-            largest_cc_homo = node_subgraph(new_subg_homo, largest_cc_nids)
-            largest_cc_hetero = to_heterogeneous(
-                largest_cc_homo, new_subg.ntypes, new_subg.etypes
-            )
-            cc_nodes = {
-                ntype: largest_cc_hetero.nodes(ntype)
-                for ntype in largest_cc_hetero.ntypes
-            }
+
+            if new_subg.num_edges() > 0:
+                new_subg_homo = to_homogeneous(new_subg)
+                # Get the largest weakly connected component in the subgraph.
+                nx_graph = to_networkx(new_subg_homo.cpu())
+                largest_cc_nids = list(
+                    max(nx.weakly_connected_components(nx_graph), key=len)
+                )
+                largest_cc_homo = node_subgraph(
+                    new_subg_homo, largest_cc_nids, store_ids=True
+                )
+                largest_cc_hetero = to_heterogeneous(
+                    largest_cc_homo, new_subg.ntypes, new_subg.etypes
+                )
+                cc_nodes = {
+                    ntype: largest_cc_hetero.nodes(ntype)
+                    for ntype in largest_cc_hetero.ntypes
+                }
+            else:
+                ntypes_available = [
+                    ntype
+                    for ntype in new_subg.ntypes
+                    if new_subg.nodes(ntype).nelement() > 0
+                ]
+                chosen_ntype = np.random.choice(ntypes_available)
+                chosen_node = np.random.choice(new_subg.nodes(chosen_ntype))
+                cc_nodes = {
+                    chosen_ntype: torch.tensor([chosen_node], dtype=torch.int64)
+                }
 
             if str(cc_nodes) not in self.mcts_node_maps:
                 child_mcts_node = MCTSNode(cc_nodes)
