@@ -181,12 +181,16 @@ class GATConv(nn.Module):
                 self.has_res_fc = True
             else:
                 self.res_fc = Identity()
+        else:
+            self.register_buffer("res_fc", None)
 
         if bias and not self.has_res_fc:
             self.bias = nn.Parameter(
                 th.FloatTensor(size=(num_heads * out_feats,))
             )
             self.has_bias = True
+        else:
+            self.register_buffer("bias", None)
 
         self.reset_parameters()
         self.activation = activation
