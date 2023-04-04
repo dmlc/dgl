@@ -1,8 +1,4 @@
-import json
-import logging
 import os
-import platform
-import sys
 import tempfile
 from collections import namedtuple
 
@@ -10,7 +6,7 @@ import numpy as np
 import pytest
 from distpartitioning import array_readwriter, constants
 from distpartitioning.parmetis_preprocess import gen_edge_files
-from distpartitioning.utils import generate_read_list, get_idranges, read_json
+from distpartitioning.utils import generate_read_list
 
 
 def _get_edge_files(schema_map, rank, num_parts):
@@ -40,7 +36,6 @@ def _get_edge_files(schema_map, rank, num_parts):
         specifying the edge type for each of the edge files
     """
     edge_data = schema_map[constants.STR_EDGES]
-    etype_names = schema_map[constants.STR_EDGE_TYPE]
 
     edge_files = []  # used for file names
     meta_files = []  # used for storing file types and delimiter
@@ -139,7 +134,6 @@ def _get_test_data(edges_dir, num_chunks, edge_fmt="csv", edge_fmt_del=" "):
             np.array([np.arange(10), np.arange(10)]).reshape(10, 2) + 10 * idx
         )
         array_parser.write(path, edge_data)
-        print(f"Creating file {path} - {fmt_meta} - {edge_data.shape}")
 
     edge_files = [path]
     edges["n1:e1:n1"]["data"] = edge_files
@@ -166,7 +160,6 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt, edges_delimiter):
     edges_delimiter : string
         specifying the delimiter used in the edge files
     """
-
     # Create the input dataset
     with tempfile.TemporaryDirectory() as root_dir:
 
@@ -220,7 +213,6 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt, edges_delimiter):
                 assert len(tokens) == 3
 
                 src_ntype_name = tokens[0]
-                rel_name = tokens[1]
                 dst_ntype_name = tokens[2]
 
                 # Read both files and compare the edges
