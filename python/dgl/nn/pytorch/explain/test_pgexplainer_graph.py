@@ -11,7 +11,9 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from dgl.data import GINDataset
 from dgl.dataloading import GraphDataLoader
 from dgl.nn.pytorch.conv import GINConv
+import dgl.function as fn
 from dgl.nn.pytorch.glob import SumPooling, MaxPooling
+import dgl
 
 # source: https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/train.py
 class MLP(nn.Module):
@@ -59,11 +61,11 @@ class GIN(nn.Module):
             MaxPooling()
         )  # change to mean readout (AvgPooling) on social network datasets
 
-    def forward(self, g, h, graph=True):
+    def forward(self, g, h, graph=True, eweight=None):
         # list of hidden representation at each layer (including the input layer)
         hidden_rep = [h]
         for i, layer in enumerate(self.ginlayers):
-            h = layer(g, h)
+            h = layer(g, h, edge_weight=eweight)
             h = self.batch_norms[i](h)
             h = F.relu(h)
             hidden_rep.append(h)
@@ -178,25 +180,18 @@ if __name__ == "__main__":
 
     model = GIN(in_size, hidden_size, out_size).to(device)
 
-    """
-    # model training/validating
-    print("Training...")
-    train(train_loader, val_loader, device, model)
-
-    print("Evaluating...")
-    print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
-
-    torch.save(model, 'model.dt')
-    """
+    # # model training/validating
+    # print("Training...")
+    # train(train_loader, val_loader, device, model)
+    #
+    # print("Evaluating...")
+    # print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
+    #
+    # torch.save(model, 'model.dt')
 
     model = torch.load('model.dt')
     model.eval()
-    ##########
-    # import pickle as pkl
-    # with open(r'C:\Users\kunmu\Downloads\Mutagenicity.pkl\Mutagenicity.pkl', 'rb') as fin:
-    #     original_adjs, original_features, original_labels = pkl.load(fin)
-    #
-    # exit()
+
     from dgl.nn import PGExplainer
     import dgl
     import os
