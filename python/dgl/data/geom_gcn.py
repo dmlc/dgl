@@ -405,3 +405,79 @@ class TexasDataset(GeomGCNDataset):
             verbose=verbose,
             transform=transform,
         )
+
+
+class WisconsinDataset(GeomGCNDataset):
+    r"""Wisconsin subset of
+    `WebKB <http://www.cs.cmu.edu/afs/cs.cmu.edu/project/theo-11/www/wwkb/>`__,
+    later modified by `Geom-GCN: Geometric Graph Convolutional Networks
+    <https://arxiv.org/abs/2002.05287>`__
+
+    Nodes represent web pages. Edges represent hyperlinks between them. Node
+    features are the bag-of-words representation of web pages. The web pages
+    are manually classified into the five categories, student, project, course,
+    staff, and faculty.
+
+    Statistics:
+
+    - Nodes: 251
+    - Edges: 515
+    - Number of Classes: 5
+    - 10 train/val/test splits
+
+        - Train: 120
+        - Val: 80
+        - Test: 51
+
+    Parameters
+    ----------
+    raw_dir : str, optional
+        Raw file directory to store the processed data. Default: ~/.dgl/
+    force_reload : bool, optional
+        Whether to re-download the data source. Default: False
+    verbose : bool, optional
+        Whether to print progress information. Default: True
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access. Default: None
+
+    Attributes
+    ----------
+    num_classes : int
+        Number of node classes
+
+    Notes
+    -----
+    The graph does not come with edges for both directions.
+
+    Examples
+    --------
+
+    >>> from dgl.data import WisconsinDataset
+    >>> dataset = WisconsinDataset()
+    >>> g = dataset[0]
+    >>> num_classes = dataset.num_classes
+
+    >>> # get node features
+    >>> feat = g.ndata["feat"]
+
+    >>> # get data split
+    >>> train_mask = g.ndata["train_mask"]
+    >>> val_mask = g.ndata["val_mask"]
+    >>> test_mask = g.ndata["test_mask"]
+
+    >>> # get labels
+    >>> label = g.ndata['label']
+    """
+
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
+        super(WisconsinDataset, self).__init__(
+            name="wisconsin",
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )

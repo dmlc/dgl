@@ -59,6 +59,7 @@ from .geom_gcn import (
     CornellDataset,
     SquirrelDataset,
     TexasDataset,
+    WisconsinDataset,
 )
 from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
