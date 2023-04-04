@@ -61,6 +61,7 @@ Datasets for node classification/regression tasks
     ActorDataset
     CornellDataset
     TexasDataset
+    WisconsinDataset
 
 Edge Prediction Datasets
 ---------------------------------------
