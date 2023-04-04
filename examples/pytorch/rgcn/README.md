@@ -6,12 +6,12 @@
 
 ### Dependencies
 - rdflib
-- torchmetrics
+- torchmetrics 0.11.4
 
 Install as follows:
 ```bash
 pip install rdflib
-pip install torchmetrics
+pip install torchmetrics==0.11.4
 ```
 
 How to run

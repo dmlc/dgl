@@ -10,7 +10,7 @@ Requirements
 ------------
 
 ```bash
-pip install requests torchmetrics
+pip install requests torchmetrics==0.11.4 ogb
 ```
 
 How to run
@@ -25,7 +25,7 @@ python3 train_full.py --dataset cora --gpu 0    # full graph
 
 Results:
 ```
-* cora: ~0.8330 
+* cora: ~0.8330
 * citeseer: ~0.7110
 * pubmed: ~0.7830
 ```
@@ -45,8 +45,7 @@ Test Accuracy: 0.7632
 
 ### PyTorch Lightning for node classification
 
-Train w/ mini-batch sampling for node classification with PyTorch Lightning on OGB-products.
-Works with both single GPU and multiple GPUs:
+Train w/ mini-batch sampling for node classification with PyTorch Lightning on OGB-products. It requires PyTorch Lightning 2.0.1. It works with both single GPU and multiple GPUs:
 
 ```bash
 python3 lightning/node_classification.py
