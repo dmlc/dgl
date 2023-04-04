@@ -9,77 +9,112 @@ from sklearn.model_selection import StratifiedKFold
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from dgl.data import GINDataset
+import dgl.nn as dglnn
 from dgl.dataloading import GraphDataLoader
 from dgl.nn.pytorch.conv import GINConv
 import dgl.function as fn
 from dgl.nn.pytorch.glob import SumPooling, MaxPooling
 import dgl
 
-# source: https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/train.py
-class MLP(nn.Module):
-    """Construct two-layer MLP-type aggreator for GIN model"""
+# # source: https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/train.py
+# class MLP(nn.Module):
+#     """Construct two-layer MLP-type aggreator for GIN model"""
+#
+#     def __init__(self, input_dim, hidden_dim, output_dim):
+#         super().__init__()
+#         self.linears = nn.ModuleList()
+#         # two-layer MLP
+#         self.linears.append(nn.Linear(input_dim, hidden_dim, bias=False))
+#         self.linears.append(nn.Linear(hidden_dim, output_dim, bias=False))
+#         self.batch_norm = nn.BatchNorm1d((hidden_dim))
+#
+#     def forward(self, x):
+#         h = x
+#         h = F.relu(self.batch_norm(self.linears[0](h)))
+#         return self.linears[1](h)
+#
+#
+# class GIN(nn.Module):
+#     def __init__(self, input_dim, hidden_dim, output_dim):
+#         super().__init__()
+#         self.ginlayers = nn.ModuleList()
+#         self.batch_norms = nn.ModuleList()
+#         num_layers = 5
+#         # five-layer GCN with two-layer MLP aggregator and sum-neighbor-pooling scheme
+#         for layer in range(num_layers - 1):  # excluding the input layer
+#             if layer == 0:
+#                 mlp = MLP(input_dim, hidden_dim, hidden_dim)
+#             else:
+#                 mlp = MLP(hidden_dim, hidden_dim, hidden_dim)
+#             self.ginlayers.append(
+#                 GINConv(mlp, learn_eps=False)
+#             )  # set to True if learning epsilon
+#             self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
+#         # linear functions for graph sum poolings of output of each layer
+#         self.linear_prediction = nn.ModuleList()
+#         for layer in range(num_layers):
+#             if layer == 0:
+#                 self.linear_prediction.append(nn.Linear(input_dim, output_dim))
+#             else:
+#                 self.linear_prediction.append(nn.Linear(hidden_dim, output_dim))
+#         self.drop = nn.Dropout(0.5)
+#         self.pool = (
+#             MaxPooling()
+#         )  # change to mean readout (AvgPooling) on social network datasets
+#
+#     def forward(self, g, h, graph=True, eweight=None):
+#         # list of hidden representation at each layer (including the input layer)
+#         hidden_rep = [h]
+#         for i, layer in enumerate(self.ginlayers):
+#             h = layer(g, h, edge_weight=eweight)
+#             h = self.batch_norms[i](h)
+#             h = F.relu(h)
+#             hidden_rep.append(h)
+#         score_over_layer = 0
+#
+#         if graph:
+#             # perform graph sum pooling over all nodes in each layer
+#             for i, h in enumerate(hidden_rep):
+#                 pooled_h = self.pool(g, h)
+#                 score_over_layer += self.drop(self.linear_prediction[i](pooled_h))
+#
+#             return score_over_layer
+#         else:
+#             return hidden_rep[-1]
 
-    def __init__(self, input_dim, hidden_dim, output_dim):
+class RGCN(nn.Module):
+    def __init__(self, in_feats, hid_feats, out_feats):
         super().__init__()
-        self.linears = nn.ModuleList()
-        # two-layer MLP
-        self.linears.append(nn.Linear(input_dim, hidden_dim, bias=False))
-        self.linears.append(nn.Linear(hidden_dim, output_dim, bias=False))
-        self.batch_norm = nn.BatchNorm1d((hidden_dim))
 
-    def forward(self, x):
-        h = x
-        h = F.relu(self.batch_norm(self.linears[0](h)))
-        return self.linears[1](h)
+        self.conv1 = dglnn.GraphConv(in_feats, hid_feats)
+        self.conv2 = dglnn.GraphConv(hid_feats, hid_feats)
+        self.conv3 = dglnn.GraphConv(hid_feats, hid_feats)
+        self.conv4 = dglnn.GraphConv(hid_feats, out_feats)
+        self.pool = (MaxPooling())
 
+    def forward(self, g, feat, eweight=None, graph=True):
+        # inputs are features of nodes
+        with g.local_scope():
+            feat = self.conv1(g, feat)
+            feat = F.relu(feat)
+            feat = self.conv2(g, feat)
+            feat = F.relu(feat)
+            feat = self.conv3(g, feat)
+            feat = F.relu(feat)
+            feat_n = feat
+            feat = self.conv4(g, feat)
+            g.ndata['h'] = feat
 
-class GIN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super().__init__()
-        self.ginlayers = nn.ModuleList()
-        self.batch_norms = nn.ModuleList()
-        num_layers = 5
-        # five-layer GCN with two-layer MLP aggregator and sum-neighbor-pooling scheme
-        for layer in range(num_layers - 1):  # excluding the input layer
-            if layer == 0:
-                mlp = MLP(input_dim, hidden_dim, hidden_dim)
+            if eweight is None:
+                g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
             else:
-                mlp = MLP(hidden_dim, hidden_dim, hidden_dim)
-            self.ginlayers.append(
-                GINConv(mlp, learn_eps=False)
-            )  # set to True if learning epsilon
-            self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-        # linear functions for graph sum poolings of output of each layer
-        self.linear_prediction = nn.ModuleList()
-        for layer in range(num_layers):
-            if layer == 0:
-                self.linear_prediction.append(nn.Linear(input_dim, output_dim))
+                g.edata['w'] = eweight
+                g.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
+
+            if graph:
+                return feat
             else:
-                self.linear_prediction.append(nn.Linear(hidden_dim, output_dim))
-        self.drop = nn.Dropout(0.5)
-        self.pool = (
-            MaxPooling()
-        )  # change to mean readout (AvgPooling) on social network datasets
-
-    def forward(self, g, h, graph=True, eweight=None):
-        # list of hidden representation at each layer (including the input layer)
-        hidden_rep = [h]
-        for i, layer in enumerate(self.ginlayers):
-            h = layer(g, h, edge_weight=eweight)
-            h = self.batch_norms[i](h)
-            h = F.relu(h)
-            hidden_rep.append(h)
-        score_over_layer = 0
-
-        if graph:
-            # perform graph sum pooling over all nodes in each layer
-            for i, h in enumerate(hidden_rep):
-                pooled_h = self.pool(g, h)
-                score_over_layer += self.drop(self.linear_prediction[i](pooled_h))
-
-            return score_over_layer
-        else:
-            return hidden_rep[-1]
+                return feat_n
 
 
 def split_fold10(labels, fold_idx=0):
@@ -118,15 +153,20 @@ def train(train_loader, val_loader, device, model, epochs=350, lr=0.005):
         model.train()
         total_loss = 0
         for batch, (batched_graph, labels) in enumerate(train_loader):
+
             batched_graph = batched_graph.to(device)
             labels = labels.to(device)
-            feat = batched_graph.ndata.pop("attr")
+
+            feat = batched_graph.ndata["attr"]
             logits = model(batched_graph, feat)
+
             loss = loss_fcn(logits, labels)
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+
         scheduler.step()
         train_acc = evaluate(train_loader, device, model)
         valid_acc = evaluate(val_loader, device, model)
@@ -178,16 +218,16 @@ if __name__ == "__main__":
     out_size = dataset.gclasses
     hidden_size = 128
 
-    model = GIN(in_size, hidden_size, out_size).to(device)
+    model = RGCN(in_size, hidden_size, out_size).to(device)
 
-    # # model training/validating
-    # print("Training...")
-    # train(train_loader, val_loader, device, model)
-    #
-    # print("Evaluating...")
-    # print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
-    #
-    # torch.save(model, 'model.dt')
+    # model training/validating
+    print("Training...")
+    train(train_loader, val_loader, device, model)
+
+    print("Evaluating...")
+    print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
+
+    torch.save(model, 'model.dt')
 
     model = torch.load('model.dt')
     model.eval()
