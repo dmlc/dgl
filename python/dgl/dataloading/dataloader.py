@@ -208,7 +208,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
 def _share_dist_seed(generator=None):
     _shared_seed = torch.empty((), dtype=torch.int32).random_(generator=generator)
     if dist.get_backend() == "nccl":
-        _shared_seed = _shared_tensor.cuda()
+        _shared_seed = _shared_seed.cuda()
     dist.broadcast(_shared_seed, src=0)
     return _shared_seed.item()
 
