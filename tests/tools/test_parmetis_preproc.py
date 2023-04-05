@@ -210,8 +210,6 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt, edges_delimiter):
                 # ``edgetype`` strings are in canonical format,
                 # src_node_type:edge_type:dst_node_type
                 tokens = edge_types[idx].split(":")
-                assert len(tokens) == 3
-
                 src_ntype_name = tokens[0]
                 dst_ntype_name = tokens[2]
 
@@ -221,6 +219,10 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt, edges_delimiter):
                 target_data = _read_file(target_file, "csv", " ")
 
                 # Subtract the global node id offsets, so that we get type node ids
+                # In the current unit test case, the graph has only one node-type.
+                # and this means that type-node-ids are same as the global-node-ids.
+                # Below two lines will take take into effect when the graphs have
+                # more than one node type.
                 target_data[:, 0] -= ntype_gnid_offset[src_ntype_name][0, 0]
                 target_data[:, 1] -= ntype_gnid_offset[dst_ntype_name][0, 0]
 
