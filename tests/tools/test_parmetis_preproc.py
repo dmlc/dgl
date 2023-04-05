@@ -235,9 +235,6 @@ def test_gen_edge_files(num_chunks, num_parts, edges_fmt, edges_delimiter):
                 source_file = os.path.join(
                     input_dir, "".join(edge_file.split("edges_"))
                 )
-                logging.info(
-                    f"SourceFile: {source_file}, TargetFile: {target_file}"
-                )
                 source_data = _read_file(source_file, fmt_type, fmt_delimiter)
 
                 # Verify that the contents are equal
