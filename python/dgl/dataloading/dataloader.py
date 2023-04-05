@@ -205,6 +205,12 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
             num_samples + (0 if self.drop_last else (self.batch_size - 1))
         ) // self.batch_size
 
+def _share_dist_seed(generator=None):
+    _shared_seed = torch.empty((), dtype=torch.int32).random_(generator=generator)
+    if dist.get_backend() == "nccl":
+        _shared_seed = _shared_tensor.cuda()
+    dist.broadcast(_shared_seed, src=0)
+    return _shared_seed.item()
 
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
@@ -214,7 +220,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     avoids duplicating the same index tensor during shuffling.
     """
 
-    def __init__(self, indices, batch_size, drop_last, ddp_seed, shuffle):
+    def __init__(self, indices, batch_size, drop_last, ddp_seed, shuffle, group=None):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
             len_indices = sum(len(v) for v in indices.values())
@@ -229,6 +235,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.drop_last = drop_last
         self._shuffle = shuffle
+        self.group = group
 
         if self.drop_last and len_indices % self.num_replicas != 0:
             self.num_samples = math.ceil(
@@ -253,14 +260,14 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
                     indices, self._device, self._mapping_keys
                 ),
                 (self.num_indices, 2),
-                dtype_of(indices),
+                dtype_of(indices), 0, group
             )
         else:
             self._id_tensor = indices
             self._device = self._id_tensor.device
 
         self._indices = call_once_and_share(
-            self._create_shared_indices, (self.shared_mem_size,), torch.int64
+            self._create_shared_indices, (self.shared_mem_size,), torch.int64, 0, group
         )
 
     def _create_shared_indices(self):
@@ -272,14 +279,28 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
 
     def shuffle(self):
         """Shuffles the dataset."""
-        # Only rank 0 does the actual shuffling.  The other ranks wait for it.
-        if self.rank == 0:
-            np.random.shuffle(self._indices[: self.num_indices].numpy())
-            if not self.drop_last:
-                # pad extra
-                self._indices[self.num_indices :] = self._indices[
-                    : self.total_size - self.num_indices
-                ]
+        if self.group is None:
+            # Only rank 0 does the actual shuffling.  The other ranks wait for it.
+            if self.rank == 0:
+                np.random.shuffle(self._indices[: self.num_indices].numpy())
+                if not self.drop_last:
+                    # pad extra
+                    self._indices[self.num_indices :] = self._indices[
+                        : self.total_size - self.num_indices
+                    ]
+        else:
+            shared_seed =  _share_dist_seed()
+
+            # Only local rank 0 in each group does the actual shuffling.
+            if dist.get_group_rank(self.group, self.rank) == 0:
+                np.random.seed(shared_seed)
+                np.random.shuffle(self._indices[: self.num_indices].numpy())
+                if not self.drop_last:
+                    # pad extra
+                    self._indices[self.num_indices :] = self._indices[
+                        : self.total_size - self.num_indices
+                    ]
+
         dist.barrier()
 
     def __iter__(self):
@@ -669,6 +690,7 @@ def create_tensorized_dataset(
     use_ddp,
     ddp_seed,
     shuffle,
+    group,
     use_shared_memory,
 ):
     """Converts a given indices tensor to a TensorizedDataset, an IterableDataset
@@ -678,7 +700,7 @@ def create_tensorized_dataset(
     if use_ddp:
         # DDP always uses shared memory
         return DDPTensorizedDataset(
-            indices, batch_size, drop_last, ddp_seed, shuffle
+            indices, batch_size, drop_last, ddp_seed, shuffle, group,
         )
     else:
         return TensorizedDataset(
@@ -834,6 +856,7 @@ class DataLoader(torch.utils.data.DataLoader):
         use_alternate_streams=None,
         pin_prefetcher=None,
         use_uva=False,
+        process_group=None,
         **kwargs,
     ):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
@@ -1002,6 +1025,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 use_ddp,
                 ddp_seed,
                 shuffle,
+                process_group,
                 kwargs.get("persistent_workers", False),
             )
         else:

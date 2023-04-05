@@ -60,7 +60,7 @@ def _get_shared_mem_name(id_):
     return "shared" + str(id_)
 
 
-def call_once_and_share(func, shape, dtype, rank=0):
+def call_once_and_share(func, shape, dtype, rank=0, group=None):
     """Invoke the function in a single process of the PyTorch distributed process group,
     and share the result with other processes.
 
@@ -76,6 +76,9 @@ def call_once_and_share(func, shape, dtype, rank=0):
         The process ID to actually execute the function.
     """
     current_rank = torch.distributed.get_rank()
+    if group is not None:
+       current_rank = torch.distributed.get_group_rank(group, current_rank)
+
     dist_buf = torch.LongTensor([1])
 
     if torch.distributed.get_backend() == "nccl":
@@ -95,8 +98,12 @@ def call_once_and_share(func, shape, dtype, rank=0):
         result[:] = func()
         dist_buf[0] = id_
 
-    # Broadcasts the name of the shared array to other processes.
-    torch.distributed.broadcast(dist_buf, rank)
+    if group is not None:
+        local_root = torch.distributed.get_process_group_ranks(group)[0]
+        torch.distributed.broadcast(dist_buf, local_root, group=group)
+    else:
+        torch.distributed.broadcast(dist_buf, rank)
+
     # If no exceptions, other processes open the same shared memory object.
     if current_rank != rank:
         id_ = dist_buf.item()
@@ -104,6 +111,7 @@ def call_once_and_share(func, shape, dtype, rank=0):
         result = get_shared_mem_array(name, shape, dtype)
 
     return result
+
 
 
 def shared_tensor(shape, dtype=torch.float32):
