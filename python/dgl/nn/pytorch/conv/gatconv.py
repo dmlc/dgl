@@ -171,24 +171,24 @@ class GATConv(nn.Module):
         self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
 
-        self.has_res_fc = False
-        self.has_bias = False
+        self.has_linear_res = False
+        self.has_explicit_bias = False
         if residual:
             if self._in_dst_feats != out_feats * num_heads:
                 self.res_fc = nn.Linear(
                     self._in_dst_feats, num_heads * out_feats, bias=bias
                 )
-                self.has_res_fc = True
+                self.has_linear_res = True
             else:
                 self.res_fc = Identity()
         else:
             self.register_buffer("res_fc", None)
 
-        if bias and not self.has_res_fc:
+        if bias and not self.has_linear_res:
             self.bias = nn.Parameter(
                 th.FloatTensor(size=(num_heads * out_feats,))
             )
-            self.has_bias = True
+            self.has_explicit_bias = True
         else:
             self.register_buffer("bias", None)
 
@@ -215,7 +215,7 @@ class GATConv(nn.Module):
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
-        if self.has_bias:
+        if self.has_explicit_bias:
             nn.init.constant_(self.bias, 0)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
@@ -353,7 +353,7 @@ class GATConv(nn.Module):
                 )
                 rst = rst + resval
             # bias
-            if self.has_bias:
+            if self.has_explicit_bias:
                 rst = rst + self.bias.view(
                     *((1,) * len(dst_prefix_shape)),
                     self._num_heads,
