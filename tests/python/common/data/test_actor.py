@@ -12,12 +12,11 @@ import dgl
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch", reason="only supports pytorch"
 )
-def test_chameleon():
+def test_actor():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
 
-    # chameleon
-    g = dgl.data.ChameleonDataset(force_reload=True)[0]
-    assert g.num_nodes() == 2277
-    assert g.num_edges() == 36101
-    g2 = dgl.data.ChameleonDataset(force_reload=True, transform=transform)[0]
+    g = dgl.data.ActorDataset(force_reload=True)[0]
+    assert g.num_nodes() == 7600
+    assert g.num_edges() == 33391
+    g2 = dgl.data.ActorDataset(force_reload=True, transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()

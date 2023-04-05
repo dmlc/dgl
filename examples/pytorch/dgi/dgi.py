@@ -24,7 +24,7 @@ class Encoder(nn.Module):
 
     def forward(self, features, corrupt=False):
         if corrupt:
-            perm = torch.randperm(self.g.number_of_nodes())
+            perm = torch.randperm(self.g.num_nodes())
             features = features[perm]
         features = self.conv(features)
         return features

@@ -49,8 +49,8 @@ for k, v in ds_list.items():
     num_edges = []
     for i in range(len(ds)):
         g = extract_graph(ds[i])
-        num_nodes.append(g.number_of_nodes())
-        num_edges.append(g.number_of_edges())
+        num_nodes.append(g.num_nodes())
+        num_edges.append(g.num_edges())
 
     gg = extract_graph(ds[0])
     dd = {

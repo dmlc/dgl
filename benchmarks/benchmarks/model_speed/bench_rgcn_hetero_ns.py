@@ -321,7 +321,7 @@ def track_time(data):
             if "feat" in hg.nodes[ntype].data
             else None
         )
-        num_nodes[ntype] = hg.number_of_nodes(ntype)
+        num_nodes[ntype] = hg.num_nodes(ntype)
 
     embed_layer = RelGraphEmbed(hg, device, n_hidden, num_nodes, node_feats)
     model = EntityClassify(

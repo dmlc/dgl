@@ -208,11 +208,11 @@ def load_ogb_product():
         splitted_idx["valid"],
         splitted_idx["test"],
     )
-    train_mask = torch.zeros((graph.number_of_nodes(),), dtype=torch.bool)
+    train_mask = torch.zeros((graph.num_nodes(),), dtype=torch.bool)
     train_mask[train_nid] = True
-    val_mask = torch.zeros((graph.number_of_nodes(),), dtype=torch.bool)
+    val_mask = torch.zeros((graph.num_nodes(),), dtype=torch.bool)
     val_mask[val_nid] = True
-    test_mask = torch.zeros((graph.number_of_nodes(),), dtype=torch.bool)
+    test_mask = torch.zeros((graph.num_nodes(),), dtype=torch.bool)
     test_mask[test_nid] = True
     graph.ndata["train_mask"] = train_mask
     graph.ndata["val_mask"] = val_mask
@@ -241,11 +241,11 @@ def load_ogb_mag():
     hg = dgl.heterograph(subgs)
     hg.nodes["paper"].data["feat"] = hg_orig.nodes["paper"].data["feat"]
     hg.nodes["paper"].data["labels"] = labels["paper"].squeeze()
-    train_mask = torch.zeros((hg.number_of_nodes("paper"),), dtype=torch.bool)
+    train_mask = torch.zeros((hg.num_nodes("paper"),), dtype=torch.bool)
     train_mask[train_idx] = True
-    val_mask = torch.zeros((hg.number_of_nodes("paper"),), dtype=torch.bool)
+    val_mask = torch.zeros((hg.num_nodes("paper"),), dtype=torch.bool)
     val_mask[val_idx] = True
-    test_mask = torch.zeros((hg.number_of_nodes("paper"),), dtype=torch.bool)
+    test_mask = torch.zeros((hg.num_nodes("paper"),), dtype=torch.bool)
     test_mask[test_idx] = True
     hg.nodes["paper"].data["train_mask"] = train_mask
     hg.nodes["paper"].data["val_mask"] = val_mask
@@ -294,13 +294,13 @@ def load_nowplaying_rs():
 
     # Assign user and movie IDs and use them as features (to learn an individual trainable
     # embedding for each entity)
-    g.nodes[user_ntype].data["id"] = torch.arange(g.number_of_nodes(user_ntype))
-    g.nodes[item_ntype].data["id"] = torch.arange(g.number_of_nodes(item_ntype))
+    g.nodes[user_ntype].data["id"] = torch.arange(g.num_nodes(user_ntype))
+    g.nodes[item_ntype].data["id"] = torch.arange(g.num_nodes(item_ntype))
 
     # Prepare torchtext dataset and vocabulary
     fields = {}
     examples = []
-    for i in range(g.number_of_nodes(item_ntype)):
+    for i in range(g.num_nodes(item_ntype)):
         example = torchtext.data.Example.fromlist([], [])
         examples.append(example)
     textset = torchtext.data.Dataset(examples, fields)

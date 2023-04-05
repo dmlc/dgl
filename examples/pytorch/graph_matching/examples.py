@@ -24,18 +24,18 @@ distance, node_mapping, edge_mapping = graph_edit_distance(
 print(distance)  # 1.0
 
 # With user-input cost matrices
-node_substitution_cost = np.empty((G1.number_of_nodes(), G2.number_of_nodes()))
-G1_node_deletion_cost = np.empty(G1.number_of_nodes())
-G2_node_insertion_cost = np.empty(G2.number_of_nodes())
+node_substitution_cost = np.empty((G1.num_nodes(), G2.num_nodes()))
+G1_node_deletion_cost = np.empty(G1.num_nodes())
+G2_node_insertion_cost = np.empty(G2.num_nodes())
 
-edge_substitution_cost = np.empty((G1.number_of_edges(), G2.number_of_edges()))
-G1_edge_deletion_cost = np.empty(G1.number_of_edges())
-G2_edge_insertion_cost = np.empty(G2.number_of_edges())
+edge_substitution_cost = np.empty((G1.num_edges(), G2.num_edges()))
+G1_edge_deletion_cost = np.empty(G1.num_edges())
+G2_edge_insertion_cost = np.empty(G2.num_edges())
 
 # Node substitution cost of 0 when node-ids are same, else 1
 node_substitution_cost.fill(1.0)
-for i in range(G1.number_of_nodes()):
-    for j in range(G2.number_of_nodes()):
+for i in range(G1.num_nodes()):
+    for j in range(G2.num_nodes()):
         node_substitution_cost[i, j] = 0.0
 
 # Node insertion/deletion cost of 1

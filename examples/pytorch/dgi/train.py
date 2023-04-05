@@ -38,7 +38,7 @@ def main(args):
         test_mask = torch.ByteTensor(g.ndata["test_mask"])
     in_feats = features.shape[1]
     n_classes = data.num_classes
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
 
     if args.gpu < 0:
         cuda = False
@@ -55,7 +55,7 @@ def main(args):
     if args.self_loop:
         g = dgl.remove_self_loop(g)
         g = dgl.add_self_loop(g)
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
 
     if args.gpu >= 0:
         g = g.to(args.gpu)
