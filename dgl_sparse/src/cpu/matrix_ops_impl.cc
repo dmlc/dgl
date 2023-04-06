@@ -1,9 +1,10 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file cpu/matrix_ops_impl_cpu.cc
- * @brief DGL C++ implementation of matrix operators.
+ * @file cpu/matrix_ops_impl.cc
+ * @brief DGL CPU implementation of matrix operators.
  */
 #include "../matrix_ops_impl.h"
+
 #include "../utils.h"
 
 namespace dgl {
@@ -33,8 +34,9 @@ COOIntersectionImpl(
   };
   std::unordered_map<std::pair<IdType, IdType>, IdType, decltype(pair_hash_fn)>
       pair_map(lhs_len, pair_hash_fn);
-  for (int64_t k = 0; k < lhs_len; ++k)
+  for (int64_t k = 0; k < lhs_len; ++k) {
     pair_map.emplace(std::make_pair(lhs_row_ptr[k], lhs_col_ptr[k]), k);
+  }
 
   for (int64_t i = 0; i < rhs_len; ++i) {
     const IdType row_id = rhs_row_ptr[i], col_id = rhs_col_ptr[i];

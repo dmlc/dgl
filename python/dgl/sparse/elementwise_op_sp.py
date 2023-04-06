@@ -90,8 +90,8 @@ def sp_sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
 def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     """Elementwise multiplication
 
-    Note that if both :attr:`A` and :attr:`B` are sparse matrices, it currently
-    only support multiplication on CPU.
+    Note that if both :attr:`A` and :attr:`B` are sparse matrices, both of them
+    need to be diagonal or on CPU.
 
     Parameters
     ----------
