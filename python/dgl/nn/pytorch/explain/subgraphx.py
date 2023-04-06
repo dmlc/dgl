@@ -442,9 +442,9 @@ class HeteroSubgraphX(nn.Module):
         Parameters
         ----------
         subgraph_nodes : dict[str, Tensor]
-            The dictionary that associates nodes (values) with respective
-            node types (keys) present in graph which are associated with
-            this tree node.
+            The dictionary that associates tensor node ids (values) with
+            respective node types (keys) present in graph which are associated
+            with this tree node.
 
         Returns
         -------
@@ -698,56 +698,79 @@ class HeteroSubgraphX(nn.Module):
 
         Returns
         -------
-        Tensor
-            Nodes that represent the most important subgraph
+        dict[str, Tensor]
+            The dictionary associating tensor node ids (values) to
+            node types (keys) that represents the most important subgraph
 
         Examples
         --------
 
-        >>> import torch
+        >>> import dgl
+        >>> import dgl.function as fn
+        >>> import torch as th
         >>> import torch.nn as nn
         >>> import torch.nn.functional as F
-        >>> from dgl.data import GINDataset
-        >>> from dgl.dataloading import GraphDataLoader
-        >>> from dgl.nn import GraphConv, AvgPooling, SubgraphX
+        >>> from dgl.nn import HeteroSubgraphX
 
-        >>> # Define the model
         >>> class Model(nn.Module):
-        ...     def __init__(self, in_dim, n_classes, hidden_dim=128):
-        ...         super().__init__()
-        ...         self.conv1 = GraphConv(in_dim, hidden_dim)
-        ...         self.conv2 = GraphConv(hidden_dim, n_classes)
-        ...         self.pool = AvgPooling()
+        ...     def __init__(self, in_dim, num_classes, canonical_etypes):
+        ...         super(Model, self).__init__()
+        ...         self.etype_weights = nn.ModuleDict(
+        ...             {
+        ...                 "_".join(c_etype): nn.Linear(in_dim, num_classes)
+        ...                 for c_etype in canonical_etypes
+        ...             }
+        ...         )
         ...
-        ...     def forward(self, g, h):
-        ...         h = F.relu(self.conv1(g, h))
-        ...         h = self.conv2(g, h)
-        ...         return self.pool(g, h)
+        ...     def forward(self, graph, feat, eweight=None):
+        ...         with graph.local_scope():
+        ...             c_etype_func_dict = {}
+        ...             for c_etype in graph.canonical_etypes:
+        ...                 src_type, etype, dst_type = c_etype
+        ...                 wh = self.etype_weights["_".join(c_etype)](feat[src_type])
+        ...                 graph.nodes[src_type].data[f"h_{c_etype}"] = wh
+        ...                 if eweight is None:
+        ...                     c_etype_func_dict[c_etype] = (
+        ...                         fn.copy_u(f"h_{c_etype}", "m"),
+        ...                         fn.mean("m", "h"),
+        ...                     )
+        ...                 else:
+        ...                     graph.edges[c_etype].data["w"] = eweight[c_etype]
+        ...                     c_etype_func_dict[c_etype] = (
+        ...                         fn.u_mul_e(f"h_{c_etype}", "w", "m"),
+        ...                         fn.mean("m", "h"),
+        ...                     )
+        ...             graph.multi_update_all(c_etype_func_dict, "sum")
+        ...             hg = 0
+        ...             for ntype in graph.ntypes:
+        ...                 if graph.num_nodes(ntype):
+        ...                     hg = hg + dgl.mean_nodes(graph, "h", ntype=ntype)
+        ...             return hg
 
-        >>> # Load dataset
-        >>> data = GINDataset('MUTAG', self_loop=True)
-        >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
+        >>> input_dim = 5
+        >>> num_classes = 2
+        >>> g = dgl.heterograph({("user", "plays", "game"): ([0, 1, 1, 2], [0, 0, 1, 1])})
+        >>> g.nodes["user"].data["h"] = th.randn(g.num_nodes("user"), input_dim)
+        >>> g.nodes["game"].data["h"] = th.randn(g.num_nodes("game"), input_dim)
 
-        >>> # Train the model
-        >>> feat_size = data[0][0].ndata['attr'].shape[1]
-        >>> model = Model(feat_size, data.gclasses)
-        >>> criterion = nn.CrossEntropyLoss()
-        >>> optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
-        >>> for bg, labels in dataloader:
-        ...     logits = model(bg, bg.ndata['attr'])
-        ...     loss = criterion(logits, labels)
+        >>> transform = dgl.transforms.AddReverse()
+        >>> g = transform(g)
+
+        >>> # define and train the model
+        >>> model = Model(input_dim, num_classes, g.canonical_etypes)
+        >>> feat = g.ndata["h"]
+        >>> optimizer = th.optim.Adam(model.parameters())
+        >>> for epoch in range(10):
+        ...     logits = model(g, feat)
+        ...     loss = F.cross_entropy(logits, th.tensor([1]))
         ...     optimizer.zero_grad()
         ...     loss.backward()
         ...     optimizer.step()
 
-        >>> # Initialize the explainer
-        >>> explainer = SubgraphX(model, num_hops=2)
-
-        >>> # Explain the prediction for graph 0
-        >>> graph, l = data[0]
-        >>> graph_feat = graph.ndata.pop("attr")
-        >>> g_nodes_explain = explainer.explain_graph(graph, graph_feat,
-        ...                                           target_class=l)
+        >>> # Explain for the graph
+        >>> explainer = HeteroSubgraphX(model, num_hops=1)
+        >>> explainer.explain_graph(g, feat, target_class=1)
+        {'game': tensor([0, 1]), 'user': tensor([1, 2])}
         """
         self.model.eval()
         assert (
