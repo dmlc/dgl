@@ -469,11 +469,11 @@ class HeteroSubgraphX(nn.Module):
                 in_neighbors, _ = self.graph.in_edges(
                     local_regions[dst_ntype], etype=c_etype
                 )
-                local_regions[src_ntype] = list(
-                    set(local_regions[src_ntype] + in_neighbors.tolist())
-                )
                 _, out_neighbors = self.graph.out_edges(
                     local_regions[src_ntype], etype=c_etype
+                )
+                local_regions[src_ntype] = list(
+                    set(local_regions[src_ntype] + in_neighbors.tolist())
                 )
                 local_regions[dst_ntype] = list(
                     set(local_regions[dst_ntype] + out_neighbors.tolist())
@@ -582,30 +582,43 @@ class HeteroSubgraphX(nn.Module):
             new_subg = remove_nodes(subg, node, ntype, store_ids=True)
 
             if new_subg.num_edges() > 0:
+                # Convert from heterograph to homogenous in order to compute largest connected component
                 new_subg_homo = to_homogeneous(new_subg)
                 # Get the largest weakly connected component in the subgraph.
                 nx_graph = to_networkx(new_subg_homo.cpu())
                 largest_cc_nids = list(
                     max(nx.weakly_connected_components(nx_graph), key=len)
                 )
-                largest_cc_homo = node_subgraph(
-                    new_subg_homo, largest_cc_nids, store_ids=True
-                )
+                largest_cc_homo = node_subgraph(new_subg_homo, largest_cc_nids)
                 largest_cc_hetero = to_heterogeneous(
                     largest_cc_homo, new_subg.ntypes, new_subg.etypes
                 )
+
+                # 1. backtrack from connected-component heterograph indicies to homograph indicies
+                # 2. backtrack from connected-component homograph indicies to original homograph indicies
+                # 3. backtrack from homograph indicies to original heterograph indicies
+                # 4. backtrack from subgraph node ids to entire graph
                 cc_nodes = {
-                    ntype: largest_cc_hetero.nodes(ntype)
-                    for ntype in largest_cc_hetero.ntypes
+                    ntype: subg.ndata[NID][ntype][
+                        new_subg.ndata[NID][ntype][
+                            new_subg_homo.ndata[NID][
+                                largest_cc_homo.ndata[NID][indicies]
+                            ]
+                        ]
+                    ]
+                    for ntype, indicies in largest_cc_hetero.ndata[NID].items()
                 }
             else:
-                ntypes_available = [
+                available_ntypes = [
                     ntype
                     for ntype in new_subg.ntypes
                     if new_subg.nodes(ntype).nelement() > 0
                 ]
-                chosen_ntype = np.random.choice(ntypes_available)
-                chosen_node = np.random.choice(new_subg.nodes(chosen_ntype))
+                chosen_ntype = np.random.choice(available_ntypes)
+                # backtrack from subgraph node ids to entire graph
+                chosen_node = subg.ndata[NID][chosen_ntype][
+                    np.random.choice(new_subg.nodes(chosen_ntype))
+                ]
                 cc_nodes = {
                     chosen_ntype: torch.tensor([chosen_node], dtype=torch.int64)
                 }
