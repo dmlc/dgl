@@ -6,8 +6,8 @@ import torch
 from torch import nn
 
 try:
-    from pylibcugraphops import make_fg_csr, make_mfg_csr
-    from pylibcugraphops.torch.autograd import agg_concat_n2n as SAGEConvAgg
+    from pylibcugraphops.pytorch import SampledCSC, StaticCSC
+    from pylibcugraphops.pytorch.operators import agg_concat_n2n as SAGEConvAgg
 except ImportError:
     has_pylibcugraphops = False
 else:
@@ -126,8 +126,7 @@ class CuGraphSAGEConv(nn.Module):
                 max_in_degree = g.in_degrees().max().item()
 
             if max_in_degree < self.MAX_IN_DEGREE_MFG:
-                _graph = make_mfg_csr(
-                    g.dstnodes(),
+                _graph = SampledCSC(
                     offsets,
                     indices,
                     max_in_degree,
@@ -142,9 +141,9 @@ class CuGraphSAGEConv(nn.Module):
                 offsets_fg[: offsets.numel()] = offsets
                 offsets_fg[offsets.numel() :] = offsets[-1]
 
-                _graph = make_fg_csr(offsets_fg, indices)
+                _graph = StaticCSC(offsets_fg, indices)
         else:
-            _graph = make_fg_csr(offsets, indices)
+            _graph = StaticCSC(offsets, indices)
 
         feat = self.feat_drop(feat)
         h = SAGEConvAgg(feat, _graph, self.aggr)[: g.num_dst_nodes()]

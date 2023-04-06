@@ -7,8 +7,8 @@ import torch
 from torch import nn
 
 try:
-    from pylibcugraphops import make_fg_csr_hg, make_mfg_csr_hg
-    from pylibcugraphops.torch.autograd import (
+    from pylibcugraphops.pytorch import SampledHeteroCSC, StaticHeteroCSC
+    from pylibcugraphops.pytorch.operators import (
         agg_hg_basis_n2n_post as RelGraphConvAgg,
     )
 except ImportError:
@@ -186,17 +186,13 @@ class CuGraphRelGraphConv(nn.Module):
                 max_in_degree = g.in_degrees().max().item()
 
             if max_in_degree < self.MAX_IN_DEGREE_MFG:
-                _graph = make_mfg_csr_hg(
-                    g.dstnodes(),
+                _graph = SampledHeteroCSC(
                     offsets,
                     indices,
+                    edge_types_perm,
                     max_in_degree,
                     g.num_src_nodes(),
-                    n_node_types=0,
-                    n_edge_types=self.num_rels,
-                    out_node_types=None,
-                    in_node_types=None,
-                    edge_types=edge_types_perm,
+                    self.num_rels,
                 )
             else:
                 offsets_fg = torch.empty(
@@ -207,22 +203,18 @@ class CuGraphRelGraphConv(nn.Module):
                 offsets_fg[: offsets.numel()] = offsets
                 offsets_fg[offsets.numel() :] = offsets[-1]
 
-                _graph = make_fg_csr_hg(
+                _graph = StaticHeteroCSC(
                     offsets_fg,
                     indices,
-                    n_node_types=0,
-                    n_edge_types=self.num_rels,
-                    node_types=None,
-                    edge_types=edge_types_perm,
+                    edge_types_perm,
+                    self.num_rels,
                 )
         else:
-            _graph = make_fg_csr_hg(
-                offsets,
+            _graph = StaticHeteroCSC(
+                offsets_fg,
                 indices,
-                n_node_types=0,
-                n_edge_types=self.num_rels,
-                node_types=None,
-                edge_types=edge_types_perm,
+                edge_types_perm,
+                self.num_rels,
             )
 
         h = RelGraphConvAgg(

@@ -6,8 +6,8 @@ import torch
 from torch import nn
 
 try:
-    from pylibcugraphops import make_fg_csr, make_mfg_csr
-    from pylibcugraphops.torch.autograd import mha_gat_n2n as GATConvAgg
+    from pylibcugraphops.pytorch import SampledCSC, StaticCSC
+    from pylibcugraphops.pytorch.operators import mha_gat_n2n as GATConvAgg
 except ImportError:
     has_pylibcugraphops = False
 else:
@@ -170,8 +170,7 @@ class CuGraphGATConv(nn.Module):
                 max_in_degree = g.in_degrees().max().item()
 
             if max_in_degree < self.MAX_IN_DEGREE_MFG:
-                _graph = make_mfg_csr(
-                    g.dstnodes(),
+                _graph = SampledCSC(
                     offsets,
                     indices,
                     max_in_degree,
@@ -186,9 +185,9 @@ class CuGraphGATConv(nn.Module):
                 offsets_fg[: offsets.numel()] = offsets
                 offsets_fg[offsets.numel() :] = offsets[-1]
 
-                _graph = make_fg_csr(offsets_fg, indices)
+                _graph = StaticCSC(offsets_fg, indices)
         else:
-            _graph = make_fg_csr(offsets, indices)
+            _graph = StaticCSC(offsets, indices)
 
         feat = self.feat_drop(feat)
         feat_transformed = self.fc(feat)
@@ -199,7 +198,6 @@ class CuGraphGATConv(nn.Module):
             self.num_heads,
             "LeakyReLU",
             self.negative_slope,
-            add_own_node=False,
             concat_heads=True,
         )[: g.num_dst_nodes()].view(-1, self.num_heads, self.out_feats)
 
