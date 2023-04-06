@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .... import to_homogeneous, to_heterogeneous
+from .... import to_heterogeneous, to_homogeneous
 from ....base import NID
 from ....convert import to_networkx
 from ....subgraph import node_subgraph
