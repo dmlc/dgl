@@ -211,7 +211,7 @@ class CuGraphRelGraphConv(nn.Module):
                 )
         else:
             _graph = StaticHeteroCSC(
-                offsets_fg,
+                offsets,
                 indices,
                 edge_types_perm,
                 self.num_rels,
