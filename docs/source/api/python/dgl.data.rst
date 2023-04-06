@@ -54,14 +54,7 @@ Datasets for node classification/regression tasks
     WikiCSDataset
     FlickrDataset
     YelpDataset
-    PATTERNDataset
     CLUSTERDataset
-    ChameleonDataset
-    SquirrelDataset
-    ActorDataset
-    CornellDataset
-    TexasDataset
-    WisconsinDataset
 
 Edge Prediction Datasets
 ---------------------------------------
@@ -99,7 +92,6 @@ Datasets for graph classification/regression tasks
     GINDataset
     FakeNewsDataset
     BA2MotifDataset
-    ZINCDataset
 
 Dataset adapters
 -------------------
@@ -130,6 +122,4 @@ Utilities
     utils.save_info
     utils.load_info
     utils.add_nodepred_split
-    utils.mask_nodes_by_property
-    utils.add_node_property_split
     utils.Subset

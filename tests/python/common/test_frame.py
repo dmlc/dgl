@@ -7,7 +7,7 @@ import dgl
 import dgl.ndarray as nd
 import numpy as np
 from dgl.frame import Column
-from utils import parametrize_idtype
+from test_utils import parametrize_idtype
 
 
 def test_column_subcolumn():

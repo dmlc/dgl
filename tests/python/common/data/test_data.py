@@ -369,28 +369,6 @@ def test_flickr():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
-def test_pattern():
-    mode_n_graphs = {
-        "train": 10000,
-        "valid": 2000,
-        "test": 2000,
-    }
-    transform = dgl.AddSelfLoop(allow_duplicate=True)
-    for mode, n_graphs in mode_n_graphs.items():
-        ds = data.PATTERNDataset(mode=mode)
-        assert len(ds) == n_graphs, (len(ds), mode)
-        g1 = ds[0]
-        ds = data.PATTERNDataset(mode=mode, transform=transform)
-        g2 = ds[0]
-        assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
-        assert ds.num_classes == 2
-
-
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Datasets don't need to be tested on GPU.",
-)
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_cluster():
     mode_n_graphs = {
         "train": 10000,
@@ -406,31 +384,6 @@ def test_cluster():
         g2 = ds[0]
         assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
         assert ds.num_classes == 6
-
-
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Datasets don't need to be tested on GPU.",
-)
-@unittest.skipIf(
-    dgl.backend.backend_name != "pytorch", reason="only supports pytorch"
-)
-def test_zinc():
-    mode_n_graphs = {
-        "train": 10000,
-        "valid": 1000,
-        "test": 1000,
-    }
-    transform = dgl.AddSelfLoop(allow_duplicate=True)
-    for mode, n_graphs in mode_n_graphs.items():
-        dataset1 = data.ZINCDataset(mode=mode)
-        g1, label = dataset1[0]
-        dataset2 = data.ZINCDataset(mode=mode, transform=transform)
-        g2, _ = dataset2[0]
-
-        assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
-        # return a scalar tensor
-        assert not label.shape
 
 
 @unittest.skipIf(
@@ -1689,6 +1642,25 @@ def test_csvdataset():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_add_nodepred_split():
+    dataset = data.AmazonCoBuyComputerDataset()
+    print("train_mask" in dataset[0].ndata)
+    data.utils.add_nodepred_split(dataset, [0.8, 0.1, 0.1])
+    assert "train_mask" in dataset[0].ndata
+
+    dataset = data.AIFBDataset()
+    print("train_mask" in dataset[0].nodes["Publikationen"].data)
+    data.utils.add_nodepred_split(
+        dataset, [0.8, 0.1, 0.1], ntype="Publikationen"
+    )
+    assert "train_mask" in dataset[0].nodes["Publikationen"].data
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_as_nodepred1():
     ds = data.AmazonCoBuyComputerDataset()
     print("train_mask" in ds[0].ndata)
@@ -2100,7 +2072,9 @@ if __name__ == "__main__":
     test_tudataset_regression()
     test_fraud()
     test_fakenews()
+    test_extract_archive()
     test_csvdataset()
+    test_add_nodepred_split()
     test_as_nodepred1()
     test_as_nodepred2()
     test_as_nodepred_csvdataset()

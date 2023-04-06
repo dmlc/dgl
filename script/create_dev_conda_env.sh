@@ -1,7 +1,7 @@
 #!/bin/bash
 
 readonly CUDA_VERSIONS="10.2,11.3,11.6,11.7"
-readonly TORCH_VERSION="1.12.0"
+readonly TORCH_VERSION="1.12"
 readonly PYTHON_VERSION="3.7"
 
 usage() {
@@ -11,7 +11,6 @@ examples:
   bash $0 -c
   bash $0 -g 11.7
   bash $0 -g 11.7 -p 3.8
-  bash $0 -g 11.7 -p 3.8 -t 1.13.0
 
 Create a developement environment for DGL developers.
 
@@ -26,8 +25,6 @@ OPTIONS:
   -o           Save environment YAML file to specified path.
   -p           Create dev environment based on specified python version.
   -s           Run silently which indicates always 'yes' for any confirmation.
-  -t           Create dev environment based on specified PyTorch version such
-               as '1.13.0'.
 EOF
 }
 
@@ -51,7 +48,7 @@ confirm() {
 }
 
 # Parse flags.
-while getopts "cdfg:ho:p:st:" flag; do
+while getopts "cdfg:ho:p:s" flag; do
   case "${flag}" in
     c)
       cpu=1
@@ -78,9 +75,6 @@ while getopts "cdfg:ho:p:st:" flag; do
     s)
       always_yes=1
       ;;
-    t)
-      torch_version=${OPTARG}
-      ;;
     :)
       echo "Error: -${OPTARG} requires an argument."
       exit 1
@@ -102,13 +96,9 @@ if [[ -z ${cuda_version} && -z ${cpu} ]]; then
   exit 1
 fi
 
-if [[ -z "${torch_version}" ]]; then
-  torch_version=${TORCH_VERSION}
-fi
-
 # Set up CPU mode.
 if [[ ${cpu} -eq 1 ]]; then
-  torchversion=${torch_version}"+cpu"
+  torchversion=${TORCH_VERSION}"+cpu"
   name="dgl-dev-cpu"
 fi
 
@@ -123,7 +113,7 @@ if [[ -n ${cuda_version} ]]; then
   echo "Confirm the installed CUDA version matches the specified one."
   [[ -n "${always_yes}" ]] || confirm
 
-  torchversion=${torch_version}"+cu"${cuda_version//[-._]/}
+  torchversion=${TORCH_VERSION}"+cu"${cuda_version//[-._]/}
   name="dgl-dev-gpu"
 fi
 

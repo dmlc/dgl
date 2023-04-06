@@ -148,7 +148,7 @@ class DiffPoolBatchedGraphLayer(nn.Module):
         if self.link_pred:
             current_lp_loss = torch.norm(
                 adj.to_dense() - torch.mm(assign_tensor, torch.t(assign_tensor))
-            ) / np.power(g.num_nodes(), 2)
+            ) / np.power(g.number_of_nodes(), 2)
             self.loss_log["LinkPredLoss"] = current_lp_loss
 
         for loss_layer in self.reg_loss:

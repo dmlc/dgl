@@ -279,10 +279,6 @@ def swapaxes(input, axis1, axis2):
     return th.transpose(input, axis1, axis2)
 
 
-def empty(shape, dtype, ctx):
-    return th.empty(shape, dtype=dtype, device=ctx)
-
-
 def zeros(shape, dtype, ctx):
     return th.zeros(shape, dtype=dtype, device=ctx)
 

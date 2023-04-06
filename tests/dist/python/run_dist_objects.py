@@ -72,7 +72,7 @@ def node_split_test(g, force_even, ntype="_N"):
     gpb = g.get_partition_book()
 
     selected_nodes_dist_tensor = dgl.distributed.DistTensor(
-        [g.num_nodes(ntype)], F.uint8, init_func=rand_init
+        [g.number_of_nodes(ntype)], F.uint8, init_func=rand_init
     )
 
     nodes = node_split(
@@ -86,7 +86,9 @@ def node_split_test(g, force_even, ntype="_N"):
     g.barrier()
 
     if g.rank() == 0:
-        batched_assert_zero(selected_nodes_dist_tensor, g.num_nodes(ntype))
+        batched_assert_zero(
+            selected_nodes_dist_tensor, g.number_of_nodes(ntype)
+        )
 
     g.barrier()
 
@@ -95,7 +97,7 @@ def edge_split_test(g, force_even, etype="_E"):
     gpb = g.get_partition_book()
 
     selected_edges_dist_tensor = dgl.distributed.DistTensor(
-        [g.num_edges(etype)], F.uint8, init_func=rand_init
+        [g.number_of_edges(etype)], F.uint8, init_func=rand_init
     )
 
     edges = edge_split(
@@ -109,7 +111,9 @@ def edge_split_test(g, force_even, etype="_E"):
     g.barrier()
 
     if g.rank() == 0:
-        batched_assert_zero(selected_edges_dist_tensor, g.num_edges(etype))
+        batched_assert_zero(
+            selected_edges_dist_tensor, g.number_of_edges(etype)
+        )
 
     g.barrier()
 
@@ -123,19 +127,19 @@ def test_dist_graph(g):
     num_nodes = part_metadata["num_nodes"]
     num_edges = part_metadata["num_edges"]
 
-    assert g.num_nodes() == num_nodes
-    assert g.num_edges() == num_edges
+    assert g.number_of_nodes() == num_nodes
+    assert g.number_of_edges() == num_edges
 
     num_nodes = {ntype: g.num_nodes(ntype) for ntype in g.ntypes}
     num_edges = {etype: g.num_edges(etype) for etype in g.etypes}
 
     for key, n_nodes in num_nodes.items():
-        assert g.num_nodes(key) == n_nodes
+        assert g.number_of_nodes(key) == n_nodes
         node_split_test(g, force_even=False, ntype=key)
         node_split_test(g, force_even=True, ntype=key)
 
     for key, n_edges in num_edges.items():
-        assert g.num_edges(key) == n_edges
+        assert g.number_of_edges(key) == n_edges
         edge_split_test(g, force_even=False, etype=key)
         edge_split_test(g, force_even=True, etype=key)
 
@@ -152,7 +156,7 @@ def find_edges_test(g, orig_nid_map):
     for u_type, etype, v_type in etypes:
         orig_u = g.edges[etype].data["edge_u"]
         orig_v = g.edges[etype].data["edge_v"]
-        eids = F.tensor(np.random.randint(g.num_edges(etype), size=100))
+        eids = F.tensor(np.random.randint(g.number_of_edges(etype), size=100))
         u, v = g.find_edges(eids, etype=etype)
         assert F.allclose(orig_nid_map[u_type][u], orig_u[eids])
         assert F.allclose(orig_nid_map[v_type][v], orig_v[eids])
@@ -168,7 +172,7 @@ def edge_subgraph_test(g, etype_eids_uv_map):
 
     sg = g.edge_subgraph(all_eids)
     for t in etypes:
-        assert sg.num_edges(t[1]) == len(all_eids[t])
+        assert sg.number_of_edges(t[1]) == len(all_eids[t])
         assert F.allclose(sg.edges[t].data[dgl.EID], all_eids[t])
 
     for u_type, etype, v_type in etypes:
@@ -193,7 +197,7 @@ def sample_neighbors_with_args(g, size, fanout):
     )
 
     for ntype, n in num_nodes.items():
-        assert sampled_graph.num_nodes(ntype) == n
+        assert sampled_graph.number_of_nodes(ntype) == n
     for t in etypes:
         src, dst = sampled_graph.edges(etype=t)
         eids = sampled_graph.edges[t].data[dgl.EID]
@@ -301,7 +305,7 @@ def dist_tensor_test_persistent(data_shape):
 
 def test_dist_tensor(g):
     first_type = g.ntypes[0]
-    data_shape = (g.num_nodes(first_type), 2)
+    data_shape = (g.number_of_nodes(first_type), 2)
     dist_tensor_test_sanity(data_shape)
     dist_tensor_test_sanity(data_shape, name="DistTensorSanity")
     dist_tensor_test_destroy_recreate(data_shape, name="DistTensorRecreate")
@@ -361,7 +365,7 @@ def dist_embedding_check_existing(num_nodes):
 
 
 def test_dist_embedding(g):
-    num_nodes = g.num_nodes(g.ntypes[0])
+    num_nodes = g.number_of_nodes(g.ntypes[0])
     dist_embedding_check_sanity(num_nodes, dgl.distributed.optim.SparseAdagrad)
     dist_embedding_check_sanity(
         num_nodes, dgl.distributed.optim.SparseAdagrad, name="SomeEmbedding"
@@ -379,7 +383,7 @@ def test_dist_embedding(g):
 
 
 def dist_optimizer_check_store(g):
-    num_nodes = g.num_nodes(g.ntypes[0])
+    num_nodes = g.number_of_nodes(g.ntypes[0])
     rank = g.rank()
     try:
         emb = dgl.distributed.DistEmbedding(

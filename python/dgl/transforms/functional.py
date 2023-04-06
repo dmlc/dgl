@@ -1039,7 +1039,9 @@ def add_reverse_edges(
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
                 eids.append(
-                    F.copy_to(F.arange(0, g.num_edges(c_etype)), new_g.device)
+                    F.copy_to(
+                        F.arange(0, g.number_of_edges(c_etype)), new_g.device
+                    )
                 )
             else:
                 eids.append(rev_eids[c_etype])
@@ -1233,7 +1235,7 @@ def khop_graph(g, k, copy_ndata=True):
              edata_schemes={})
     """
     assert g.is_homogeneous, "only homogeneous graph is supported"
-    n = g.num_nodes()
+    n = g.number_of_nodes()
     adj_k = g.adj(transpose=False, scipy_fmt=g.formats()["created"][0]) ** k
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
@@ -1445,7 +1447,7 @@ def laplacian_lambda_max(g):
     g_arr = batch.unbatch(g)
     rst = []
     for g_i in g_arr:
-        n = g_i.num_nodes()
+        n = g_i.number_of_nodes()
         adj = g_i.adj(
             transpose=True, scipy_fmt=g_i.formats()["created"][0]
         ).astype(float)
@@ -1719,10 +1721,10 @@ def add_edges(g, u, v, data=None, etype=None):
     ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
     ...                                         torch.tensor([0, 1]))
     ...     })
-    >>> g.num_edges('plays')
+    >>> g.number_of_edges('plays')
     4
     >>> g = dgl.add_edges(g, torch.tensor([3]), torch.tensor([3]), etype='plays')
-    >>> g.num_edges('plays')
+    >>> g.number_of_edges('plays')
     5
 
     See Also
@@ -2795,7 +2797,7 @@ def adj_sum_graph(graphs, weight_name):
     metagraph = graphs[0]._graph.metagraph
     num_nodes = utils.toindex(
         [
-            graphs[0]._graph.num_nodes(i)
+            graphs[0]._graph.number_of_nodes(i)
             for i in range(graphs[0]._graph.number_of_ntypes())
         ]
     )

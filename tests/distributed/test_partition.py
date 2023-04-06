@@ -98,18 +98,18 @@ def verify_hetero_graph(g, parts):
     for ntype in g.ntypes:
         print(
             "node {}: {}, {}".format(
-                ntype, g.num_nodes(ntype), num_nodes[ntype]
+                ntype, g.number_of_nodes(ntype), num_nodes[ntype]
             )
         )
-        assert g.num_nodes(ntype) == num_nodes[ntype]
+        assert g.number_of_nodes(ntype) == num_nodes[ntype]
     # Verify the number of edges are correct.
     for etype in g.canonical_etypes:
         print(
             "edge {}: {}, {}".format(
-                etype, g.num_edges(etype), num_edges[etype]
+                etype, g.number_of_edges(etype), num_edges[etype]
             )
         )
-        assert g.num_edges(etype) == num_edges[etype]
+        assert g.number_of_edges(etype) == num_edges[etype]
 
     nids = {ntype: [] for ntype in g.ntypes}
     eids = {etype: [] for etype in g.canonical_etypes}
@@ -149,11 +149,11 @@ def verify_hetero_graph(g, parts):
         nids_type = F.cat(nids[ntype], 0)
         uniq_ids = F.unique(nids_type)
         # We should get all nodes.
-        assert len(uniq_ids) == g.num_nodes(ntype)
+        assert len(uniq_ids) == g.number_of_nodes(ntype)
     for etype in eids:
         eids_type = F.cat(eids[etype], 0)
         uniq_ids = F.unique(eids_type)
-        assert len(uniq_ids) == g.num_edges(etype)
+        assert len(uniq_ids) == g.number_of_edges(etype)
     # TODO(zhengda) this doesn't check 'part_id'
 
 
@@ -235,9 +235,9 @@ def check_hetero_partition(
     assert len(orig_nids) == len(hg.ntypes)
     assert len(orig_eids) == len(hg.canonical_etypes)
     for ntype in hg.ntypes:
-        assert len(orig_nids[ntype]) == hg.num_nodes(ntype)
+        assert len(orig_nids[ntype]) == hg.number_of_nodes(ntype)
     for etype in hg.canonical_etypes:
-        assert len(orig_eids[etype]) == hg.num_edges(etype)
+        assert len(orig_eids[etype]) == hg.number_of_edges(etype)
     parts = []
     shuffled_labels = []
     shuffled_elabels = []
@@ -334,9 +334,13 @@ def check_partition(
     load_feats=True,
     graph_formats=None,
 ):
-    g.ndata["labels"] = F.arange(0, g.num_nodes())
-    g.ndata["feats"] = F.tensor(np.random.randn(g.num_nodes(), 10), F.float32)
-    g.edata["feats"] = F.tensor(np.random.randn(g.num_edges(), 10), F.float32)
+    g.ndata["labels"] = F.arange(0, g.number_of_nodes())
+    g.ndata["feats"] = F.tensor(
+        np.random.randn(g.number_of_nodes(), 10), F.float32
+    )
+    g.edata["feats"] = F.tensor(
+        np.random.randn(g.number_of_edges(), 10), F.float32
+    )
     g.update_all(fn.copy_u("feats", "msg"), fn.sum("msg", "h"))
     g.update_all(fn.copy_e("feats", "msg"), fn.sum("msg", "eh"))
     num_hops = 2
@@ -385,8 +389,8 @@ def check_partition(
                 assert np.all(F.asnumpy(part_ids) == i)
 
         # Check the metadata
-        assert gpb._num_nodes() == g.num_nodes()
-        assert gpb._num_edges() == g.num_edges()
+        assert gpb._num_nodes() == g.number_of_nodes()
+        assert gpb._num_edges() == g.number_of_edges()
 
         assert gpb.num_partitions() == num_parts
         gpb_meta = gpb.metadata()

@@ -232,10 +232,8 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
-/**
- * @brief Get data. The return type is an ndarray due to possible duplicate
- * entries.
- */
+/** @brief Get data. The return type is an ndarray due to possible duplicate
+ * entries. */
 inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
   IdArray rows =
       VecToIdArray<int64_t>({row}, mat.row->dtype.bits, mat.row->ctx);

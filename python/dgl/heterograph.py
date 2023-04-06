@@ -196,7 +196,9 @@ class DGLGraph(object):
         if node_frames is None:
             node_frames = [None] * len(self._ntypes)
         node_frames = [
-            Frame(num_rows=self._graph.num_nodes(i)) if frame is None else frame
+            Frame(num_rows=self._graph.number_of_nodes(i))
+            if frame is None
+            else frame
             for i, frame in enumerate(node_frames)
         ]
         self._node_frames = node_frames
@@ -204,7 +206,9 @@ class DGLGraph(object):
         if edge_frames is None:
             edge_frames = [None] * len(self._etypes)
         edge_frames = [
-            Frame(num_rows=self._graph.num_edges(i)) if frame is None else frame
+            Frame(num_rows=self._graph.number_of_edges(i))
+            if frame is None
+            else frame
             for i, frame in enumerate(edge_frames)
         ]
         self._edge_frames = edge_frames
@@ -246,8 +250,8 @@ class DGLGraph(object):
                 "      edata_schemes={edata})"
             )
             return ret.format(
-                node=self.num_nodes(),
-                edge=self.num_edges(),
+                node=self.number_of_nodes(),
+                edge=self.number_of_edges(),
                 ndata=str(self.node_attr_schemes()),
                 edata=str(self.edge_attr_schemes()),
             )
@@ -258,11 +262,11 @@ class DGLGraph(object):
                 "      metagraph={meta})"
             )
             nnode_dict = {
-                self.ntypes[i]: self._graph.num_nodes(i)
+                self.ntypes[i]: self._graph.number_of_nodes(i)
                 for i in range(len(self.ntypes))
             }
             nedge_dict = {
-                self.canonical_etypes[i]: self._graph.num_edges(i)
+                self.canonical_etypes[i]: self._graph.number_of_edges(i)
                 for i in range(len(self.etypes))
             }
             meta = str(self.metagraph().edges(keys=True))
@@ -389,9 +393,9 @@ class DGLGraph(object):
         num_nodes_per_type = []
         for c_ntype in self.ntypes:
             if self.get_ntype_id(c_ntype) == ntid:
-                num_nodes_per_type.append(self.num_nodes(c_ntype) + num)
+                num_nodes_per_type.append(self.number_of_nodes(c_ntype) + num)
             else:
-                num_nodes_per_type.append(self.num_nodes(c_ntype))
+                num_nodes_per_type.append(self.number_of_nodes(c_ntype))
 
         relation_graphs = []
         for c_etype in self.canonical_etypes:
@@ -403,9 +407,9 @@ class DGLGraph(object):
                 u, v = self.edges(form="uv", order="eid", etype=c_etype)
                 hgidx = heterograph_index.create_unitgraph_from_coo(
                     1 if c_etype[0] == c_etype[2] else 2,
-                    self.num_nodes(c_etype[0])
+                    self.number_of_nodes(c_etype[0])
                     + (num if self.get_ntype_id(c_etype[0]) == ntid else 0),
-                    self.num_nodes(c_etype[2])
+                    self.number_of_nodes(c_etype[2])
                     + (num if self.get_ntype_id(c_etype[2]) == ntid else 0),
                     u,
                     v,
@@ -525,10 +529,10 @@ class DGLGraph(object):
         >>> g.add_edges(torch.tensor([3]), torch.tensor([3]))
         DGLError: Edge type name must be specified
         if there are more than one edge types.
-        >>> g.num_edges('plays')
+        >>> g.number_of_edges('plays')
         4
         >>> g.add_edges(torch.tensor([3]), torch.tensor([3]), etype='plays')
-        >>> g.num_edges('plays')
+        >>> g.number_of_edges('plays')
         5
 
         See Also
@@ -569,8 +573,8 @@ class DGLGraph(object):
         u_type, e_type, v_type = self.to_canonical_etype(etype)
         # if end nodes of adding edges does not exists
         # use add_nodes to add new nodes first.
-        num_of_u = self.num_nodes(u_type)
-        num_of_v = self.num_nodes(v_type)
+        num_of_u = self.number_of_nodes(u_type)
+        num_of_v = self.number_of_nodes(v_type)
         u_max = F.as_scalar(F.max(u, dim=0)) + 1
         v_max = F.as_scalar(F.max(v, dim=0)) + 1
 
@@ -588,7 +592,7 @@ class DGLGraph(object):
         metagraph = self._graph.metagraph
         num_nodes_per_type = []
         for ntype in self.ntypes:
-            num_nodes_per_type.append(self.num_nodes(ntype))
+            num_nodes_per_type.append(self.number_of_nodes(ntype))
         # update graph idx
         relation_graphs = []
         for c_etype in self.canonical_etypes:
@@ -597,8 +601,8 @@ class DGLGraph(object):
                 old_u, old_v = self.edges(form="uv", order="eid", etype=c_etype)
                 hgidx = heterograph_index.create_unitgraph_from_coo(
                     1 if u_type == v_type else 2,
-                    self.num_nodes(u_type),
-                    self.num_nodes(v_type),
+                    self.number_of_nodes(u_type),
+                    self.number_of_nodes(v_type),
                     F.cat([old_u, u], dim=0),
                     F.cat([old_v, v], dim=0),
                     ["coo", "csr", "csc"],
@@ -714,10 +718,10 @@ class DGLGraph(object):
         if len(eids) == 0:
             # no edge to delete
             return
-        assert self.num_edges(etype) > F.as_scalar(
+        assert self.number_of_edges(etype) > F.as_scalar(
             F.max(eids, dim=0)
         ), "The input eid {} is out of the range [0:{})".format(
-            F.as_scalar(F.max(eids, dim=0)), self.num_edges(etype)
+            F.as_scalar(F.max(eids, dim=0)), self.number_of_edges(etype)
         )
 
         # edge_subgraph
@@ -856,10 +860,10 @@ class DGLGraph(object):
         if len(nids) == 0:
             # no node to delete
             return
-        assert self.num_nodes(ntype) > F.as_scalar(
+        assert self.number_of_nodes(ntype) > F.as_scalar(
             F.max(nids, dim=0)
         ), "The input nids {} is out of the range [0:{})".format(
-            F.as_scalar(F.max(nids, dim=0)), self.num_nodes(ntype)
+            F.as_scalar(F.max(nids, dim=0)), self.number_of_nodes(ntype)
         )
 
         ntid = self.get_ntype_id(ntype)
@@ -894,7 +898,7 @@ class DGLGraph(object):
             )
             # Record old num_edges to check later whether some edges were removed
             old_num_edges = {
-                c_etype: self._graph.num_edges(self.get_etype_id(c_etype))
+                c_etype: self._graph.number_of_edges(self.get_etype_id(c_etype))
                 for c_etype in self.canonical_etypes
             }
 
@@ -910,12 +914,12 @@ class DGLGraph(object):
             canonical_etypes = [
                 c_etype
                 for c_etype in self.canonical_etypes
-                if self._graph.num_edges(self.get_etype_id(c_etype))
+                if self._graph.number_of_edges(self.get_etype_id(c_etype))
                 != old_num_edges[c_etype]
             ]
 
             for c_etype in canonical_etypes:
-                if self._graph.num_edges(self.get_etype_id(c_etype)) == 0:
+                if self._graph.number_of_edges(self.get_etype_id(c_etype)) == 0:
                     self._batch_num_edges[c_etype] = F.zeros(
                         (self.batch_size,), F.int64, self.device
                     )
@@ -1511,7 +1515,7 @@ class DGLGraph(object):
             self._batch_num_nodes = {}
             for ty in self.ntypes:
                 bnn = F.copy_to(
-                    F.tensor([self.num_nodes(ty)], F.int64), self.device
+                    F.tensor([self.number_of_nodes(ty)], F.int64), self.device
                 )
                 self._batch_num_nodes[ty] = bnn
         if ntype is None:
@@ -1660,7 +1664,7 @@ class DGLGraph(object):
             self._batch_num_edges = {}
             for ty in self.canonical_etypes:
                 bne = F.copy_to(
-                    F.tensor([self.num_edges(ty)], F.int64), self.device
+                    F.tensor([self.number_of_edges(ty)], F.int64), self.device
                 )
                 self._batch_num_edges[ty] = bne
         if etype is None:
@@ -2529,12 +2533,12 @@ class DGLGraph(object):
         if ntype is None:
             return sum(
                 [
-                    self._graph.num_nodes(ntid)
+                    self._graph.number_of_nodes(ntid)
                     for ntid in range(len(self.ntypes))
                 ]
             )
         else:
-            return self._graph.num_nodes(self.get_ntype_id(ntype))
+            return self._graph.number_of_nodes(self.get_ntype_id(ntype))
 
     def number_of_src_nodes(self, ntype=None):
         """Alias of :meth:`num_src_nodes`"""
@@ -2599,12 +2603,14 @@ class DGLGraph(object):
         if ntype is None:
             return sum(
                 [
-                    self._graph.num_nodes(self.get_ntype_id_from_src(nty))
+                    self._graph.number_of_nodes(self.get_ntype_id_from_src(nty))
                     for nty in self.srctypes
                 ]
             )
         else:
-            return self._graph.num_nodes(self.get_ntype_id_from_src(ntype))
+            return self._graph.number_of_nodes(
+                self.get_ntype_id_from_src(ntype)
+            )
 
     def number_of_dst_nodes(self, ntype=None):
         """Alias of :func:`num_dst_nodes`"""
@@ -2669,12 +2675,14 @@ class DGLGraph(object):
         if ntype is None:
             return sum(
                 [
-                    self._graph.num_nodes(self.get_ntype_id_from_dst(nty))
+                    self._graph.number_of_nodes(self.get_ntype_id_from_dst(nty))
                     for nty in self.dsttypes
                 ]
             )
         else:
-            return self._graph.num_nodes(self.get_ntype_id_from_dst(ntype))
+            return self._graph.number_of_nodes(
+                self.get_ntype_id_from_dst(ntype)
+            )
 
     def number_of_edges(self, etype=None):
         """Alias of :func:`num_edges`"""
@@ -2733,12 +2741,12 @@ class DGLGraph(object):
         if etype is None:
             return sum(
                 [
-                    self._graph.num_edges(etid)
+                    self._graph.number_of_edges(etid)
                     for etid in range(len(self.canonical_etypes))
                 ]
             )
         else:
-            return self._graph.num_edges(self.get_etype_id(etype))
+            return self._graph.number_of_edges(self.get_etype_id(etype))
 
     @property
     def is_multigraph(self):
@@ -4264,7 +4272,7 @@ class DGLGraph(object):
             Node representation.
         """
         if is_all(u):
-            num_nodes = self._graph.num_nodes(ntid)
+            num_nodes = self._graph.number_of_nodes(ntid)
         else:
             u = utils.prepare_tensor(self, u, "u")
             num_nodes = len(u)
@@ -4378,7 +4386,7 @@ class DGLGraph(object):
             )
 
         if is_all(edges):
-            num_edges = self._graph.num_edges(etid)
+            num_edges = self._graph.number_of_edges(etid)
         else:
             num_edges = len(eid)
         for key, val in data.items():
@@ -5830,7 +5838,7 @@ class DGLGraph(object):
         metagraph = graph_index.from_edge_list(meta_edges, True)
         # rebuild graph idx
         num_nodes_per_type = [
-            self.num_nodes(c_ntype) for c_ntype in self.ntypes
+            self.number_of_nodes(c_ntype) for c_ntype in self.ntypes
         ]
         relation_graphs = [
             self._graph.get_relation_graph(self.get_etype_id(c_etype))
@@ -6298,18 +6306,18 @@ def make_canonical_etypes(etypes, ntypes, metagraph):
     list of tuples (srctype, etype, dsttype)
     """
     # sanity check
-    if len(etypes) != metagraph.num_edges():
+    if len(etypes) != metagraph.number_of_edges():
         raise DGLError(
             "Length of edge type list must match the number of "
             "edges in the metagraph. {} vs {}".format(
-                len(etypes), metagraph.num_edges()
+                len(etypes), metagraph.number_of_edges()
             )
         )
-    if len(ntypes) != metagraph.num_nodes():
+    if len(ntypes) != metagraph.number_of_nodes():
         raise DGLError(
             "Length of nodes type list must match the number of "
             "nodes in the metagraph. {} vs {}".format(
-                len(ntypes), metagraph.num_nodes()
+                len(ntypes), metagraph.number_of_nodes()
             )
         )
     if len(etypes) == 1 and len(ntypes) == 1:
@@ -6524,7 +6532,7 @@ class DGLBlock(DGLGraph):
             return ret.format(
                 srcnode=self.number_of_src_nodes(),
                 dstnode=self.number_of_dst_nodes(),
-                edge=self.num_edges(),
+                edge=self.number_of_edges(),
             )
         else:
             ret = (
@@ -6542,7 +6550,8 @@ class DGLBlock(DGLGraph):
                 for ntype in self.dsttypes
             }
             nedge_dict = {
-                etype: self.num_edges(etype) for etype in self.canonical_etypes
+                etype: self.number_of_edges(etype)
+                for etype in self.canonical_etypes
             }
             meta = str(self.metagraph().edges(keys=True))
             return ret.format(

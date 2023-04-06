@@ -280,11 +280,7 @@ def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
         for k, v in reverse_etype_map.items()
     }
     exclude_eids.update(
-        {
-            reverse_etype_map[k]: v
-            for k, v in exclude_eids.items()
-            if k in reverse_etype_map
-        }
+        {reverse_etype_map[k]: v for k, v in exclude_eids.items()}
     )
     return exclude_eids
 

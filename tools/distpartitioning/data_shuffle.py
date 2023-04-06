@@ -24,7 +24,6 @@ from globalids import (
 from gloo_wrapper import allgather_sizes, alltoallv_cpu, gather_metadata_json
 from utils import (
     augment_edge_data,
-    DATA_TYPE_ID,
     get_edge_types,
     get_etype_featnames,
     get_gid_offsets,
@@ -37,7 +36,6 @@ from utils import (
     memory_snapshot,
     read_json,
     read_ntype_partition_files,
-    REV_DATA_TYPE_ID,
     write_dgl_objects,
     write_metadata_json,
 )
@@ -422,10 +420,9 @@ def exchange_feature(
         # Ownership is determined by the destination node.
         assert data is not None
         global_eids = np.arange(gid_start, gid_end, dtype=np.int64)
-        if data[constants.GLOBAL_EID].shape[0] > 0:
-            logging.info(
-                f"[Rank: {rank} disk read global eids - min - {np.amin(data[constants.GLOBAL_EID])}, max - {np.amax(data[constants.GLOBAL_EID])}, count - {data[constants.GLOBAL_EID].shape}"
-            )
+        logging.info(
+            f"[Rank: {rank} disk read global eids - min - {np.amin(data[constants.GLOBAL_EID])}, max - {np.amax(data[constants.GLOBAL_EID])}, count - {data[constants.GLOBAL_EID].shape}"
+        )
 
         # Now use `data` to extract destination nodes' global id
         # and use that to get the ownership
@@ -439,42 +436,6 @@ def exchange_feature(
         assert np.all(global_eids == data[constants.GLOBAL_EID][idx1])
         partid_slice = id_lookup.get_partition_ids(global_dst_nids)
 
-    # determine the shape of the feature-data
-    # this is needed to so that ranks where feature-data is not present
-    # should use the correct shape for sending the padded vector.
-    # exchange length here.
-    feat_dim_len = 0
-    if featdata_key is not None:
-        feat_dim_len = len(featdata_key.shape)
-    all_lens = allgather_sizes(
-        [feat_dim_len], world_size, num_parts, return_sizes=True
-    )
-    if all_lens[0] <= 0:
-        logging.info(
-            f"[Rank: {rank} No process has any feature data to shuffle for {local_feat_key}"
-        )
-        return cur_features, cur_global_ids
-
-    rank0_shape_len = all_lens[0]
-    for idx in range(1, world_size):
-        assert (all_lens[idx] == 0) or (all_lens[idx] == rank0_shape_len), (
-            f"feature: {local_feat_key} shapes does not match "
-            f"at rank - {idx} and rank - 0"
-        )
-
-    # exchange actual data here.
-    if featdata_key != None:
-        feat_dims_dtype = list(featdata_key.shape)
-        feat_dims_dtype.append(DATA_TYPE_ID[featdata_key.dtype])
-    else:
-        feat_dims_dtype = list(np.zeros((rank0_shape_len), dtype=np.int64))
-        feat_dims_dtype.append(DATA_TYPE_ID[torch.float32])
-
-    logging.info(f"Sending the feature shape information - {feat_dims_dtype}")
-    all_dims_dtype = allgather_sizes(
-        feat_dims_dtype, world_size, num_parts, return_sizes=True
-    )
-
     for idx in range(world_size):
         cond = partid_slice == (idx + local_part_id * world_size)
         gids_per_partid = gids_feat[cond]
@@ -482,14 +443,7 @@ def exchange_feature(
         local_idx_partid = local_idx[cond]
 
         if gids_per_partid.shape[0] == 0:
-            assert len(all_dims_dtype) % world_size == 0
-            dim_len = int(len(all_dims_dtype) / world_size)
-            rank0_shape = tuple(list(np.zeros((dim_len - 1), dtype=np.int32)))
-            rank0_dtype = REV_DATA_TYPE_ID[
-                all_dims_dtype[(dim_len - 1) : (dim_len)][0]
-            ]
-            data = torch.empty(rank0_shape, dtype=rank0_dtype)
-            feats_per_rank.append(data)
+            feats_per_rank.append(torch.empty((0, 1), dtype=torch.float))
             global_id_per_rank.append(torch.empty((0,), dtype=torch.int64))
         else:
             feats_per_rank.append(featdata_key[local_idx_partid])
@@ -508,9 +462,6 @@ def exchange_feature(
     )
     output_id_list = alltoallv_cpu(
         rank, world_size, global_id_per_rank, retain_nones=False
-    )
-    logging.info(
-        f"[Rank : {rank} feats - {output_feat_list}, ids - {output_id_list}"
     )
     assert len(output_feat_list) == len(output_id_list), (
         "Length of feature list and id list are expected to be equal while "

@@ -99,41 +99,6 @@ std::shared_ptr<CSR> CSRToCSC(const std::shared_ptr<CSR>& csr) {
   return CSRFromOldDGLCSR(dgl_csc);
 }
 
-std::shared_ptr<COO> DiagToCOO(
-    const std::shared_ptr<Diag>& diag,
-    const c10::TensorOptions& indices_options) {
-  int64_t nnz = std::min(diag->num_rows, diag->num_cols);
-  auto indices = torch::arange(nnz, indices_options).repeat({2, 1});
-  return std::make_shared<COO>(
-      COO{diag->num_rows, diag->num_cols, indices, true, true});
-}
-
-std::shared_ptr<CSR> DiagToCSR(
-    const std::shared_ptr<Diag>& diag,
-    const c10::TensorOptions& indices_options) {
-  int64_t nnz = std::min(diag->num_rows, diag->num_cols);
-  auto indptr = torch::full(diag->num_rows + 1, nnz, indices_options);
-  auto nnz_range = torch::arange(nnz + 1, indices_options);
-  indptr.index_put_({nnz_range}, nnz_range);
-  auto indices = torch::arange(nnz, indices_options);
-  return std::make_shared<CSR>(
-      CSR{diag->num_rows, diag->num_cols, indptr, indices,
-          torch::optional<torch::Tensor>(), true});
-}
-
-std::shared_ptr<CSR> DiagToCSC(
-    const std::shared_ptr<Diag>& diag,
-    const c10::TensorOptions& indices_options) {
-  int64_t nnz = std::min(diag->num_rows, diag->num_cols);
-  auto indptr = torch::full(diag->num_cols + 1, nnz, indices_options);
-  auto nnz_range = torch::arange(nnz + 1, indices_options);
-  indptr.index_put_({nnz_range}, nnz_range);
-  auto indices = torch::arange(nnz, indices_options);
-  return std::make_shared<CSR>(
-      CSR{diag->num_cols, diag->num_rows, indptr, indices,
-          torch::optional<torch::Tensor>(), true});
-}
-
 std::shared_ptr<COO> COOTranspose(const std::shared_ptr<COO>& coo) {
   auto dgl_coo = COOToOldDGLCOO(coo);
   auto dgl_coo_tr = aten::COOTranspose(dgl_coo);

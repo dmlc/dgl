@@ -37,7 +37,7 @@ def get_launch_cmd(args) -> str:
 
 def submit_jobs(args) -> str:
     # read the json file and get the remaining argument here.
-    schema_path = args.metadata_filename
+    schema_path = "metadata.json"
     with open(os.path.join(args.in_dir, schema_path)) as schema:
         schema_map = json.load(schema)
 
@@ -100,12 +100,6 @@ def main():
         "--in-dir",
         type=str,
         help="Location of the input directory where the dataset is located",
-    )
-    parser.add_argument(
-        "--metadata-filename",
-        type=str,
-        default="metadata.json",
-        help="Filename for the metadata JSON file that describes the dataset to be dispatched.",
     )
     parser.add_argument(
         "--partitions-dir",

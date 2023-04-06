@@ -50,7 +50,6 @@ CuGraph Conv Layers
     :template: classtemplate.rst
 
     ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
-    ~dgl.nn.pytorch.conv.CuGraphGATConv
     ~dgl.nn.pytorch.conv.CuGraphSAGEConv
 
 Dense Conv Layers

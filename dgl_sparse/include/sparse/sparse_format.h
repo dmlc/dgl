@@ -19,7 +19,7 @@ namespace dgl {
 namespace sparse {
 
 /** @brief SparseFormat enumeration. */
-enum SparseFormat { kCOO, kCSR, kCSC, kDiag };
+enum SparseFormat { kCOO, kCSR, kCSC };
 
 /** @brief COO sparse structure. */
 struct COO {
@@ -48,11 +48,6 @@ struct CSR {
   torch::optional<torch::Tensor> value_indices;
   /** @brief Whether the column indices per row are sorted. */
   bool sorted = false;
-};
-
-struct Diag {
-  /** @brief The dense shape of the matrix. */
-  int64_t num_rows = 0, num_cols = 0;
 };
 
 /** @brief Convert an old DGL COO format to a COO in the sparse library. */
@@ -94,21 +89,6 @@ std::shared_ptr<CSR> COOToCSC(const std::shared_ptr<COO>& coo);
 
 /** @brief Convert a CSR format to CSC format. */
 std::shared_ptr<CSR> CSRToCSC(const std::shared_ptr<CSR>& csr);
-
-/** @brief Convert a Diag format to COO format. */
-std::shared_ptr<COO> DiagToCOO(
-    const std::shared_ptr<Diag>& diag,
-    const c10::TensorOptions& indices_options);
-
-/** @brief Convert a Diag format to CSR format. */
-std::shared_ptr<CSR> DiagToCSR(
-    const std::shared_ptr<Diag>& diag,
-    const c10::TensorOptions& indices_options);
-
-/** @brief Convert a Diag format to CSC format. */
-std::shared_ptr<CSR> DiagToCSC(
-    const std::shared_ptr<Diag>& diag,
-    const c10::TensorOptions& indices_options);
 
 /** @brief COO transposition. */
 std::shared_ptr<COO> COOTranspose(const std::shared_ptr<COO>& coo);

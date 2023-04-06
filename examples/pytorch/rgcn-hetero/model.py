@@ -291,7 +291,9 @@ class RelGraphEmbed(nn.Module):
         # create weight embeddings for each node for each relation
         self.embeds = nn.ParameterDict()
         for ntype in g.ntypes:
-            embed = nn.Parameter(th.Tensor(g.num_nodes(ntype), self.embed_size))
+            embed = nn.Parameter(
+                th.Tensor(g.number_of_nodes(ntype), self.embed_size)
+            )
             nn.init.xavier_uniform_(embed, gain=nn.init.calculate_gain("relu"))
             self.embeds[ntype] = embed
 
@@ -406,7 +408,7 @@ class EntityClassify(nn.Module):
         for l, layer in enumerate(self.layers):
             y = {
                 k: th.zeros(
-                    g.num_nodes(k),
+                    g.number_of_nodes(k),
                     self.h_dim if l != len(self.layers) - 1 else self.out_dim,
                 )
                 for k in g.ntypes
@@ -415,7 +417,7 @@ class EntityClassify(nn.Module):
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.DataLoader(
                 g,
-                {k: th.arange(g.num_nodes(k)) for k in g.ntypes},
+                {k: th.arange(g.number_of_nodes(k)) for k in g.ntypes},
                 sampler,
                 batch_size=batch_size,
                 shuffle=True,
@@ -532,7 +534,7 @@ class EntityClassify_HeteroAPI(nn.Module):
         for l, layer in enumerate(self.layers):
             y = {
                 k: th.zeros(
-                    g.num_nodes(k),
+                    g.number_of_nodes(k),
                     self.h_dim if l != len(self.layers) - 1 else self.out_dim,
                 )
                 for k in g.ntypes
@@ -541,7 +543,7 @@ class EntityClassify_HeteroAPI(nn.Module):
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.DataLoader(
                 g,
-                {k: th.arange(g.num_nodes(k)) for k in g.ntypes},
+                {k: th.arange(g.number_of_nodes(k)) for k in g.ntypes},
                 sampler,
                 batch_size=batch_size,
                 shuffle=True,

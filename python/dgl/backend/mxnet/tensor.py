@@ -347,10 +347,6 @@ def swapaxes(input, axis1, axis2):
     return nd.swapaxes(input, axis1, axis2)
 
 
-def empty(shape, dtype, ctx):
-    return nd.empty(shape, dtype=dtype, ctx=ctx)
-
-
 def zeros(shape, dtype, ctx):
     return nd.zeros(shape, dtype=dtype, ctx=ctx)
 

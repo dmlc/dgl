@@ -12,7 +12,6 @@
 #include <memory>
 #include <utility>
 
-#include "../c_api_common.h"
 #include "partition_op.h"
 
 using namespace dgl::runtime;
@@ -250,16 +249,6 @@ DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionMapToGlobal")
       const int part_id = args[2];
 
       *rv = part->MapToGlobal(idxs, part_id);
-    });
-
-DGL_REGISTER_GLOBAL("partition._CAPI_DGLNDArrayPartitionGeneratePermutation")
-    .set_body([](DGLArgs args, DGLRetValue* rv) {
-      NDArrayPartitionRef part = args[0];
-      IdArray idxs = args[1];
-
-      std::pair<IdArray, NDArray> part_perm = part->GeneratePermutation(idxs);
-      *rv =
-          ConvertNDArrayVectorToPackedFunc({part_perm.first, part_perm.second});
     });
 
 }  // namespace partition

@@ -171,7 +171,7 @@ class MultiLayerFullNeighborSampler(NeighborSampler):
 
     Parameters
     ----------
-    num_layers : int
+    n_layers : int
         The number of GNN layers to sample.
     kwargs :
         Passed to :class:`dgl.dataloading.NeighborSampler`.

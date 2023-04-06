@@ -88,7 +88,7 @@ def proteins_mtx2dgl():
 
     g.add_edges(u, v)
 
-    n = g.num_nodes()
+    n = g.number_of_nodes()
     feat_size = 128  ## arbitrary number
     feats = th.empty([n, feat_size], dtype=th.float32)
 

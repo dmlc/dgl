@@ -170,28 +170,21 @@ class GATConv(nn.Module):
         self.feat_drop = nn.Dropout(feat_drop)
         self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
-
-        self.has_linear_res = False
-        self.has_explicit_bias = False
+        if bias:
+            self.bias = nn.Parameter(
+                th.FloatTensor(size=(num_heads * out_feats,))
+            )
+        else:
+            self.register_buffer("bias", None)
         if residual:
             if self._in_dst_feats != out_feats * num_heads:
                 self.res_fc = nn.Linear(
-                    self._in_dst_feats, num_heads * out_feats, bias=bias
+                    self._in_dst_feats, num_heads * out_feats, bias=False
                 )
-                self.has_linear_res = True
             else:
                 self.res_fc = Identity()
         else:
             self.register_buffer("res_fc", None)
-
-        if bias and not self.has_linear_res:
-            self.bias = nn.Parameter(
-                th.FloatTensor(size=(num_heads * out_feats,))
-            )
-            self.has_explicit_bias = True
-        else:
-            self.register_buffer("bias", None)
-
         self.reset_parameters()
         self.activation = activation
 
@@ -215,12 +208,10 @@ class GATConv(nn.Module):
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
-        if self.has_explicit_bias:
+        if self.bias is not None:
             nn.init.constant_(self.bias, 0)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
-            if self.res_fc.bias is not None:
-                nn.init.constant_(self.res_fc.bias, 0)
 
     def set_allow_zero_in_degree(self, set_value):
         r"""
@@ -236,7 +227,7 @@ class GATConv(nn.Module):
         """
         self._allow_zero_in_degree = set_value
 
-    def forward(self, graph, feat, edge_weight=None, get_attention=False):
+    def forward(self, graph, feat, get_attention=False):
         r"""
 
         Description
@@ -252,8 +243,6 @@ class GATConv(nn.Module):
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, *, D_{in_{src}})` and :math:`(N_{out}, *, D_{in_{dst}})`.
-        edge_weight : torch.Tensor, optional
-            A 1D tensor of edge weight values.  Shape: :math:`(|E|,)`.
         get_attention : bool, optional
             Whether to return the attention values. Default to False.
 
@@ -338,10 +327,6 @@ class GATConv(nn.Module):
             e = self.leaky_relu(graph.edata.pop("e"))
             # compute softmax
             graph.edata["a"] = self.attn_drop(edge_softmax(graph, e))
-            if edge_weight is not None:
-                graph.edata["a"] = graph.edata["a"] * edge_weight.tile(
-                    1, self._num_heads, 1
-                ).transpose(0, 2)
             # message passing
             graph.update_all(fn.u_mul_e("ft", "a", "m"), fn.sum("m", "ft"))
             rst = graph.dstdata["ft"]
@@ -353,7 +338,7 @@ class GATConv(nn.Module):
                 )
                 rst = rst + resval
             # bias
-            if self.has_explicit_bias:
+            if self.bias is not None:
                 rst = rst + self.bias.view(
                     *((1,) * len(dst_prefix_shape)),
                     self._num_heads,

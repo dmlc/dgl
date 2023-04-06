@@ -115,7 +115,7 @@ install the Python binding for DGL.
 
    mkdir build
    cd build
-   cmake -DUSE_OPENMP=off -DCMAKE_C_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' -DCMAKE_CXX_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' -DUSE_LIBXSMM=OFF ..
+   cmake -DUSE_OPENMP=off -DCMAKE_C_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' -DCMAKE_CXX_FLAGS='-DXBYAK_DONT_USE_MAP_JIT' -DUSE_AVX=OFF -DUSE_LIBXSMM=OFF ..
    make -j4
    cd ../python
    python setup.py install
@@ -174,7 +174,7 @@ PyTorch backend
 ```````````````
 
 Export ``DGLBACKEND`` as ``pytorch`` to specify PyTorch backend. The required PyTorch
-version is 1.12.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
+version is 1.9.0 or later. See `pytorch.org <https://pytorch.org>`_ for installation instructions.
 
 MXNet backend
 `````````````

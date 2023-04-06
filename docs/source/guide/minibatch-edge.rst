@@ -73,7 +73,7 @@ and removing them.
 
 .. code:: python
 
-    n_edges = g.num_edges()
+    n_edges = g.number_of_edges()
     sampler = dgl.dataloading.as_edge_prediction_sampler(
         sampler, exclude='reverse_id', reverse_eids=torch.cat([
             torch.arange(n_edges // 2, n_edges), torch.arange(0, n_edges // 2)]))
@@ -130,7 +130,7 @@ layer.
             self.W = nn.Linear(2 * in_features, num_classes)
     
         def apply_edges(self, edges):
-            data = torch.cat([edges.src['x'], edges.dst['x']], 1)
+            data = torch.cat([edges.src['x'], edges.dst['x']])
             return {'score': self.W(data)}
     
         def forward(self, edge_subgraph, x):
@@ -222,7 +222,7 @@ over the edge types for :meth:`~dgl.DGLGraph.apply_edges`.
             self.W = nn.Linear(2 * in_features, num_classes)
     
         def apply_edges(self, edges):
-            data = torch.cat([edges.src['x'], edges.dst['x']], 1)
+            data = torch.cat([edges.src['x'], edges.dst['x']])
             return {'score': self.W(data)}
     
         def forward(self, edge_subgraph, x):
