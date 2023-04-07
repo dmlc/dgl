@@ -100,6 +100,16 @@ if __name__ == "__main__":
         type=str,
         help="Save partitions in specified formats.",
     )
+    parser.add_argument(
+        "--feature-mesg-size",
+        default=0,
+        type=int,
+        help="Defines the maximum (outgoing)message size [in MB], when shuffling "
+        "node and edge features. If the features size is more than the specified "
+        "then more than one message will be used to shuffle feature data. "
+        "If 0, default value, is specified then feature data will be shuffled "
+        "in one message, irrespective of the size of the outgoing message size.",
+    )
     params = parser.parse_args()
 
     # invoke the pipeline function

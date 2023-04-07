@@ -43,6 +43,38 @@ from utils import (
 )
 
 
+def _get_num_chunks(shapes, dtype_sz, rank, world_size, msg_size):
+    """
+    Computes the total no. of chunks each process/rank has to split its
+    local data during data shuffling phase
+
+    Parameters:
+    ----------
+    shapes : list
+        concatenation of numpy array shapes and each numpy array is
+        the shape of feature data on each rank
+    dtype_size : integer
+        indicating the size of each element in the feature data numpy array
+    rank : integer
+        rank of the current process
+    world_size : integer
+        total no. of processes
+    msg_size : integer
+        max. size of outgoing message
+    """
+    MB = 1024 * 1024
+    assert shapes[0] != 0
+    shapes = np.split(shapes, world_size)
+    sizes = [np.prod(s) * dtype_sz for s in shapes]
+
+    if msg_size == 0:
+        return 1
+
+    max_msg_size = 1 if np.amax(sizes) < MB else np.floor(np.amax(sizes) / MB).astype(np.int32)
+    num_chunks = np.ceil(max_msg_size / msg_size).astype(np.int32)
+    return num_chunks
+
+
 def gen_node_data(
     rank, world_size, num_parts, id_lookup, ntid_ntype_map, schema_map
 ):
@@ -537,6 +569,7 @@ def exchange_features(
     rank,
     world_size,
     num_parts,
+    feat_mesg_size,
     feature_tids,
     type_id_map,
     id_lookup,
@@ -568,6 +601,10 @@ def exchange_features(
         rank of the current process
     world_size : int
         total no. of participating processes.
+    num_parts : int
+        no. of output graph partitions
+    feat_mesg_size : int
+        maximum size of the outgoing message in MBs. Default value is 0.
     feature_tids : dictionary
         dictionary with keys as node-type names with suffixes as feature names
         and value is a dictionary. This dictionary contains information about
@@ -581,6 +618,8 @@ def exchange_features(
     id_lookup : instance of class DistLookupService
        Distributed lookup service used to map global-nids to respective
        partition-ids and shuffle-global-nids
+    feature_data : dict
+        where keys are feature names and values are numpy arrays as features
     feat_type : string
         this is used to distinguish which features are being exchanged. Please
         note that for nodes ownership is clearly defined and for edges it is
@@ -632,7 +671,7 @@ def exchange_features(
         assert len(tokens) == 3
         type_name = tokens[0]
         feat_name = tokens[1]
-        logging.info(f"[Rank: {rank}] processing feature: {feat_key}")
+        logging.info(f"[Rank: {rank}] processing feature: {feat_key}, msg_size = {feat_mesg_size}")
 
         for feat_info in type_info:
             # Compute the global_id range for this feature data
@@ -652,23 +691,74 @@ def exchange_features(
 
                 # Synchronize for each feature
                 dist.barrier()
-                own_features, own_global_ids = exchange_feature(
-                    rank,
-                    data,
-                    id_lookup,
-                    feat_type,
-                    feat_key,
-                    featdata_key,
-                    gid_start,
-                    gid_end,
-                    type_id_start,
-                    type_id_end,
-                    local_part_id,
-                    world_size,
-                    num_parts,
-                    own_features,
-                    own_global_ids,
+
+                # Get the shape of feature data, from everyone
+                # determine the maximum size on each node.
+                # determine the no. of chunks needed to shuffle this feature
+                feat_dims = [0]
+                if featdata_key != None:
+                    feat_dims = featdata_key.shape
+                all_dims = allgather_sizes(
+                    feat_dims, world_size, num_parts, return_sizes=True
                 )
+                if all_dims[0] <= 0:
+                    logging.info(
+                        f"[Rank: {rank} No process has any feature data to shuffle for {local_feat_key}"
+                    )
+                    continue
+
+                num_msg_chunks = _get_num_chunks(
+                    all_dims,
+                    featdata_key.element_size(),
+                    rank,
+                    world_size,
+                    feat_mesg_size,
+                )
+
+                start = 0
+                end = 0
+                rows = featdata_key.shape[0]
+                rows_per_chunk = rows if rows < num_msg_chunks else np.floor(rows/num_msg_chunks).astype(np.int32)
+                num_msg_chunks = np.ceil(rows/rows_per_chunk).astype(np.int32)
+
+                chunk_typeid_start = type_id_start
+                chunk_typeid_end = chunk_typeid_start
+
+                chunk_gid_start = gid_start
+                chunk_gid_end = chunk_gid_start
+                for _ in range(num_msg_chunks):
+                    end += rows_per_chunk
+                    chunk_typeid_end += rows_per_chunk
+                    chunk_gid_end += rows_per_chunk
+                    if end > rows:
+                        end = rows
+                        chunk_typeid_end = type_id_end
+                        chunk_gid_end = gid_end
+
+                    logging.info(f"[Rank: {rank} start={start}, end={end}")
+                    chunk_feat_data = featdata_key[
+                        start:end,
+                    ]
+                    own_features, own_global_ids = exchange_feature(
+                        rank,
+                        data,
+                        id_lookup,
+                        feat_type,
+                        feat_key,
+                        chunk_feat_data,
+                        chunk_gid_start,
+                        chunk_gid_end,
+                        chunk_typeid_start,
+                        chunk_typeid_end,
+                        local_part_id,
+                        world_size,
+                        num_parts,
+                        own_features,
+                        own_global_ids,
+                    )
+                    start = end
+                    chunk_typeid_start = chunk_typeid_end
+                    chunk_gid_start = chunk_gid_end
 
     end = timer()
     logging.info(
@@ -683,6 +773,7 @@ def exchange_graph_data(
     rank,
     world_size,
     num_parts,
+    feat_mesg_size,
     node_features,
     edge_features,
     node_feat_tids,
@@ -781,6 +872,7 @@ def exchange_graph_data(
         rank,
         world_size,
         num_parts,
+        feat_mesg_size,
         edge_feat_tids,
         etypes_geid_range_map,
         id_lookup,
@@ -1151,6 +1243,7 @@ def gen_dist_partitions(rank, world_size, params):
         rank,
         world_size,
         params.num_parts,
+        params.feature_mesg_size,
         node_features,
         edge_features,
         node_feat_tids,
