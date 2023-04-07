@@ -867,6 +867,7 @@ def exchange_graph_data(
         rank,
         world_size,
         num_parts,
+        feat_mesg_size,
         node_feat_tids,
         ntypes_gnid_range_map,
         id_lookup,
