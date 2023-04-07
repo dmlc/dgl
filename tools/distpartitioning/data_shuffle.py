@@ -70,7 +70,11 @@ def _get_num_chunks(shapes, dtype_sz, rank, world_size, msg_size):
     if msg_size == 0:
         return 1
 
-    max_msg_size = 1 if np.amax(sizes) < MB else np.floor(np.amax(sizes) / MB).astype(np.int32)
+    max_msg_size = (
+        1
+        if np.amax(sizes) < MB
+        else np.floor(np.amax(sizes) / MB).astype(np.int32)
+    )
     num_chunks = np.ceil(max_msg_size / msg_size).astype(np.int32)
     return num_chunks
 
@@ -671,7 +675,9 @@ def exchange_features(
         assert len(tokens) == 3
         type_name = tokens[0]
         feat_name = tokens[1]
-        logging.info(f"[Rank: {rank}] processing feature: {feat_key}, msg_size = {feat_mesg_size}")
+        logging.info(
+            f"[Rank: {rank}] processing feature: {feat_key}, msg_size = {feat_mesg_size}"
+        )
 
         for feat_info in type_info:
             # Compute the global_id range for this feature data
@@ -718,8 +724,12 @@ def exchange_features(
                 start = 0
                 end = 0
                 rows = featdata_key.shape[0]
-                rows_per_chunk = rows if rows < num_msg_chunks else np.floor(rows/num_msg_chunks).astype(np.int32)
-                num_msg_chunks = np.ceil(rows/rows_per_chunk).astype(np.int32)
+                rows_per_chunk = (
+                    rows
+                    if rows < num_msg_chunks
+                    else np.floor(rows / num_msg_chunks).astype(np.int32)
+                )
+                num_msg_chunks = np.ceil(rows / rows_per_chunk).astype(np.int32)
 
                 chunk_typeid_start = type_id_start
                 chunk_typeid_end = chunk_typeid_start

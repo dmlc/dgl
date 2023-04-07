@@ -9,14 +9,13 @@ import pytest
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-
-from distpartitioning.utils import DATA_TYPE_ID
-from distpartitioning import constants
-from distpartitioning import array_readwriter
+from distpartitioning import array_readwriter, constants
 from distpartitioning.data_shuffle import exchange_features
 from distpartitioning.dist_lookup import DistLookupService
 
-'''
+from distpartitioning.utils import DATA_TYPE_ID
+
+"""
 DATA_TYPE_ID = {
     data_type: id
     for id, data_type in enumerate(
@@ -33,7 +32,7 @@ DATA_TYPE_ID = {
         ]
     )
 }
-'''
+"""
 
 try:
     mp.set_start_method("spawn", force=True)
@@ -41,7 +40,9 @@ except RuntimeError:
     pass
 
 
-def _get_type_id_ranges(data, rank, world_size, num_parts, num_chunks, feat_name):
+def _get_type_id_ranges(
+    data, rank, world_size, num_parts, num_chunks, feat_name
+):
     """Function to generate type-id ranges for node/edge features
 
     Parameters:
@@ -61,8 +62,8 @@ def _get_type_id_ranges(data, rank, world_size, num_parts, num_chunks, feat_name
 
     Returns:
     --------
-    dict : 
-        where keys are feature names and values are list of tuples. 
+    dict :
+        where keys are feature names and values are list of tuples.
         No. of tuples is equal to the total no. of processes.
     """
     data_shape = list(data.shape)
@@ -106,6 +107,7 @@ def _init_process_group(rank, world_size):
         timeout=timedelta(seconds=180),
     )
 
+
 def _get_edges(input_dir, rank, num_chunks, num_parts, world_size, schema_map):
     """Function to create data structures which are the function arguments
     for the `exchange_features` function.
@@ -127,9 +129,9 @@ def _get_edges(input_dir, rank, num_chunks, num_parts, world_size, schema_map):
 
     Returns:
     --------
-    dict : 
-        where keys are the edge attributes and values are numpy arrays. 
-        This dictionary is the key input parameter to the 
+    dict :
+        where keys are the edge attributes and values are numpy arrays.
+        This dictionary is the key input parameter to the
         `exchange_features` function.
     """
     # read edge feats
@@ -156,21 +158,41 @@ def _get_edges(input_dir, rank, num_chunks, num_parts, world_size, schema_map):
 
         start = 0
         end = num_chunks * 10
-        edge_data[constants.GLOBAL_SRC_ID].append(data[:,0].astype(np.int64))
-        edge_data[constants.GLOBAL_DST_ID].append(data[:,1].astype(np.int64))
-        edge_data[constants.GLOBAL_TYPE_EID].append(np.arange(start, end, dtype=np.int64))
-        edge_data[constants.ETYPE_ID].append(np.ones((data.shape[0],), dtype=np.int64)*etype_etypeid_map[etype_name])
-        edge_data[constants.GLOBAL_EID].append(np.arange(start, end, dtype=np.int64))
+        edge_data[constants.GLOBAL_SRC_ID].append(data[:, 0].astype(np.int64))
+        edge_data[constants.GLOBAL_DST_ID].append(data[:, 1].astype(np.int64))
+        edge_data[constants.GLOBAL_TYPE_EID].append(
+            np.arange(start, end, dtype=np.int64)
+        )
+        edge_data[constants.ETYPE_ID].append(
+            np.ones((data.shape[0],), dtype=np.int64)
+            * etype_etypeid_map[etype_name]
+        )
+        edge_data[constants.GLOBAL_EID].append(
+            np.arange(start, end, dtype=np.int64)
+        )
 
-    edge_data[constants.GLOBAL_SRC_ID] = np.concatenate(edge_data[constants.GLOBAL_SRC_ID])
-    edge_data[constants.GLOBAL_DST_ID] = np.concatenate(edge_data[constants.GLOBAL_DST_ID])
-    edge_data[constants.GLOBAL_TYPE_EID] = np.concatenate(edge_data[constants.GLOBAL_TYPE_EID])
-    edge_data[constants.ETYPE_ID] = np.concatenate(edge_data[constants.ETYPE_ID])
-    edge_data[constants.GLOBAL_EID] = np.concatenate(edge_data[constants.GLOBAL_EID])
+    edge_data[constants.GLOBAL_SRC_ID] = np.concatenate(
+        edge_data[constants.GLOBAL_SRC_ID]
+    )
+    edge_data[constants.GLOBAL_DST_ID] = np.concatenate(
+        edge_data[constants.GLOBAL_DST_ID]
+    )
+    edge_data[constants.GLOBAL_TYPE_EID] = np.concatenate(
+        edge_data[constants.GLOBAL_TYPE_EID]
+    )
+    edge_data[constants.ETYPE_ID] = np.concatenate(
+        edge_data[constants.ETYPE_ID]
+    )
+    edge_data[constants.GLOBAL_EID] = np.concatenate(
+        edge_data[constants.GLOBAL_EID]
+    )
 
     return edge_data
 
-def _read_edge_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_map):
+
+def _read_edge_feats(
+    input_dir, rank, num_chunks, num_parts, world_size, schema_map
+):
     """Function to read edge feature from the disk.
 
     Parameters:
@@ -190,15 +212,15 @@ def _read_edge_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_
 
     Returns:
     -------
-    dict : 
+    dict :
         used to store edge features, after reading from the disk. Keys are
         edge feature names and values are numpy arrays
-    dict : 
+    dict :
         used to store type-ids for the edge features after reading from the
         disk. Keys are edge feature names and value is a list which has
-        one tuple in it. This tuple indicates the starting and ending 
+        one tuple in it. This tuple indicates the starting and ending
         type-id of the edge-features for this edge-type.
-    dict : 
+    dict :
         used to store global edge-id range for any give edge-type in the
         input graph
     """
@@ -207,8 +229,8 @@ def _read_edge_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_
 
     # geid offset
     etype_geid_offset = {}
-    etype_geid_offset["n1:e1:n1"] = [0, 10*num_chunks]
-    etype_geid_offset["n1:rev-e1:n1"] = [10*num_chunks, 2*10*num_chunks]
+    etype_geid_offset["n1:e1:n1"] = [0, 10 * num_chunks]
+    etype_geid_offset["n1:rev-e1:n1"] = [10 * num_chunks, 2 * 10 * num_chunks]
 
     # read edge feats
     input_edge_feats = schema_map["edge_data"]
@@ -231,7 +253,12 @@ def _read_edge_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_
 
             data = torch.from_numpy(data)
             type_ids = _get_type_id_ranges(
-                data, rank, world_size, num_parts, num_chunks, f"{etype_name}/{feat_name}"
+                data,
+                rank,
+                world_size,
+                num_parts,
+                num_chunks,
+                f"{etype_name}/{feat_name}",
             )
             data_key = f"{etype_name}/{feat_name}/0"
             if len(type_ids) > rank:
@@ -243,7 +270,10 @@ def _read_edge_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_
                 edge_feat_tids[data_key] = [(0, 0)]
     return edge_feats, edge_feat_tids, etype_geid_offset
 
-def _read_node_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_map):
+
+def _read_node_feats(
+    input_dir, rank, num_chunks, num_parts, world_size, schema_map
+):
     """Function to read node feature from the disk.
 
     Parameters:
@@ -263,15 +293,15 @@ def _read_node_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_
 
     Returns:
     -------
-    dict : 
+    dict :
         used to store node features, after reading from the disk. Keys are
         node feature names and values are numpy arrays
-    dict : 
+    dict :
         used to store type-ids for the node features after reading from the
         disk. Keys are node feature names and value is a list which has
-        one tuple in it. This tuple indicates the starting and ending 
+        one tuple in it. This tuple indicates the starting and ending
         type-id of the node-features for this node-type.
-    dict : 
+    dict :
         used to store global node-id range for any give node-type in the
         input graph
     """
@@ -280,7 +310,7 @@ def _read_node_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_
 
     # gnid offset
     ntype_gnid_offset = {}
-    ntype_gnid_offset["n1"] = [0, 10*num_chunks]
+    ntype_gnid_offset["n1"] = [0, 10 * num_chunks]
 
     # read node feats
     input_node_feats = schema_map["node_data"]
@@ -304,7 +334,12 @@ def _read_node_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_
             data = torch.from_numpy(data)
 
             type_ids = _get_type_id_ranges(
-                data, rank, world_size, num_parts, num_chunks, f"{ntype_name}/{feat_name}"
+                data,
+                rank,
+                world_size,
+                num_parts,
+                num_chunks,
+                f"{ntype_name}/{feat_name}",
             )
             data_key = f"{ntype_name}/{feat_name}/0"
             if len(type_ids) > rank:
@@ -316,6 +351,7 @@ def _read_node_feats(input_dir, rank, num_chunks, num_parts, world_size, schema_
                 node_feat_tids[data_key] = [(0, 0)]
 
     return node_feats, node_feat_tids, ntype_gnid_offset
+
 
 def _gen_expected_feats(num_chunks, feat_dim, feat_dtype):
     """Function to generate features, expected, for validating the test case
@@ -336,17 +372,25 @@ def _gen_expected_feats(num_chunks, feat_dim, feat_dtype):
     for idx in range(num_chunks):
         data = np.arange(feat_dim).astype(feat_dtype)
         for t in range(1, 10):
-            arr = (
-                np.arange(t, t + feat_dim).astype(feat_dtype)
-                + idx * 10
-            )
+            arr = np.arange(t, t + feat_dim).astype(feat_dtype) + idx * 10
             data = np.vstack((data, arr))
         data = data.astype(feat_dtype)
         expected_data.append(data)
     expected_data = np.concatenate(expected_data)
     return expected_data
 
-def _validate_shuffled_efeats(rank, world_size, num_chunks, num_parts, feats, global_ids, edge_feat_dim, edge_feat_dtype, edge_data):
+
+def _validate_shuffled_efeats(
+    rank,
+    world_size,
+    num_chunks,
+    num_parts,
+    feats,
+    global_ids,
+    edge_feat_dim,
+    edge_feat_dtype,
+    edge_data,
+):
     """Function used to compare expected and actual results for edge features
 
     Parameters:
@@ -372,7 +416,7 @@ def _validate_shuffled_efeats(rank, world_size, num_chunks, num_parts, feats, gl
         numpy dtype used when generating node features
     edge_data : dict
         where keys are the columns for edge attributes and values are numpy
-        arrays 
+        arrays
     """
     # Data to compare
     shuffled_efeats = feats["n1:e1:n1/edge_feat_1/0"].numpy()
@@ -401,12 +445,14 @@ def _validate_shuffled_efeats(rank, world_size, num_chunks, num_parts, feats, gl
 
     # condition to map partition-ids to ranks/workers
     dst_owners = part_ids[dst_ids]
-    condition = (dst_owners == rank)
+    condition = dst_owners == rank
     idxes = np.where(condition == 1)[0]
     local_edge_ids = global_eids[idxes]
 
     # expected edge feats
-    expected_data = _gen_expected_feats(num_chunks, edge_feat_dim, edge_feat_dtype)
+    expected_data = _gen_expected_feats(
+        num_chunks, edge_feat_dim, edge_feat_dtype
+    )
 
     sorted_idx = np.argsort(local_edge_ids)
     expected_feats = expected_data[local_edge_ids]
@@ -414,7 +460,16 @@ def _validate_shuffled_efeats(rank, world_size, num_chunks, num_parts, feats, gl
     # assert on the expected and actual results
     assert np.all(shuffled_efeats == expected_feats)
 
-def _validate_shuffled_nfeats(rank, world_size, num_chunks, feats, global_ids, node_feat_dim, node_feat_dtype):
+
+def _validate_shuffled_nfeats(
+    rank,
+    world_size,
+    num_chunks,
+    feats,
+    global_ids,
+    node_feat_dim,
+    node_feat_dtype,
+):
     """Function used to compare expected and actual results for node features
 
     Parameters:
@@ -439,13 +494,15 @@ def _validate_shuffled_nfeats(rank, world_size, num_chunks, feats, global_ids, n
     """
     # tensors to compare
     nfeats = feats["n1/node_feat_1/0"]
-    expected_data = _gen_expected_feats(num_chunks, node_feat_dim, node_feat_dtype)
+    expected_data = _gen_expected_feats(
+        num_chunks, node_feat_dim, node_feat_dtype
+    )
 
     # get the data for this rank
     rowids = []
     offset = rank
-    for idx in range(10*num_chunks):
-        if offset >= 10*num_chunks:
+    for idx in range(10 * num_chunks):
+        if offset >= 10 * num_chunks:
             break
         rowids.append(offset)
         offset += world_size
@@ -453,6 +510,7 @@ def _validate_shuffled_nfeats(rank, world_size, num_chunks, feats, global_ids, n
     # ranks' data
     expected_data = expected_data[rowids, :]
     assert np.all(expected_data == nfeats.numpy())
+
 
 def _run(
     rank,
@@ -465,9 +523,9 @@ def _run(
     port_num,
     feat_mesg_size,
     sh_dict,
-    node_feat_dim, 
-    node_feat_dtype, 
-    edge_feat_dim, 
+    node_feat_dim,
+    node_feat_dtype,
+    edge_feat_dim,
     edge_feat_dtype,
     feat_type,
 ):
@@ -543,10 +601,12 @@ def _run(
 
     # set id_map in dist_lookup service
     ntype_gnid_rangemap = {}
-    ntype_gnid_rangemap["n1"] = [0, 10*num_chunks]
+    ntype_gnid_rangemap["n1"] = [0, 10 * num_chunks]
 
     global_nid_ranges = {}
-    global_nid_ranges["n1"] = np.array(ntype_gnid_rangemap["n1"]).reshape([1, 2])
+    global_nid_ranges["n1"] = np.array(ntype_gnid_rangemap["n1"]).reshape(
+        [1, 2]
+    )
     id_map = dgl.distributed.id_map.IdMap(global_nid_ranges)
     id_lookup.set_idMap(id_map)
 
@@ -563,30 +623,49 @@ def _run(
                 id_lookup,
                 features,
                 feat_type,
-                edge_data
+                edge_data,
             )
         else:
             my_feats, my_global_ids = exchange_features(
-                rank, 
-                world_size, 
-                num_parts, 
+                rank,
+                world_size,
+                num_parts,
                 feat_mesg_size,
-                feature_tids, 
+                feature_tids,
                 type_gid_rangemap,
                 id_lookup,
                 features,
                 feat_type,
-                edge_data 
+                edge_data,
             )
 
         # test the results
         if feat_type == "node_features":
-            _validate_shuffled_nfeats(rank, world_size, num_chunks, my_feats, my_global_ids, node_feat_dim, node_feat_dtype)
+            _validate_shuffled_nfeats(
+                rank,
+                world_size,
+                num_chunks,
+                my_feats,
+                my_global_ids,
+                node_feat_dim,
+                node_feat_dtype,
+            )
         else:
-            _validate_shuffled_efeats(rank, world_size, num_chunks, num_parts, my_feats, my_global_ids, edge_feat_dim, edge_feat_dtype, edge_data)
+            _validate_shuffled_efeats(
+                rank,
+                world_size,
+                num_chunks,
+                num_parts,
+                my_feats,
+                my_global_ids,
+                edge_feat_dim,
+                edge_feat_dtype,
+                edge_data,
+            )
 
     except Exception as arg:
         sh_dict[f"RANK-{rank}"] = inst
+
 
 def _single_machine_run(
     schema_map,
@@ -596,14 +675,14 @@ def _single_machine_run(
     num_parts,
     world_size,
     feat_mesg_size,
-    node_feat_dim, 
-    node_feat_dtype, 
-    edge_feat_dim, 
+    node_feat_dim,
+    node_feat_dtype,
+    edge_feat_dim,
     edge_feat_dtype,
-    feat_type
+    feat_type,
 ):
     """Function used to spawn requested no. of process for unit testing
-    Each of the spawned processes stores errors, if any during its own 
+    Each of the spawned processes stores errors, if any during its own
     processing, in a shared dictionary. Assertion on this dictionary ensures
     success or failure of these unit test cases
 
@@ -659,11 +738,11 @@ def _single_machine_run(
                 port_num,
                 feat_mesg_size,
                 sh_dict,
-                node_feat_dim, 
-                node_feat_dtype, 
-                edge_feat_dim, 
+                node_feat_dim,
+                node_feat_dtype,
+                edge_feat_dim,
                 edge_feat_dtype,
-                feat_type
+                feat_type,
             ),
         )
         p.start()
@@ -678,6 +757,7 @@ def _single_machine_run(
     # not generate any errors or assertion failures
     assert len(sh_dict) == 0, f"Spawned processes reported some errors !!!"
 
+
 def _prepare_test_data(
     num_chunks,
     dataset_dir,
@@ -686,10 +766,10 @@ def _prepare_test_data(
     edge_feat_dim,
     edge_feat_dtype,
 ):
-    """ Function to generate unit test graph. This graph has one node-type 
-    and two edge-types. One of the edge-types and the only node-type has 
+    """Function to generate unit test graph. This graph has one node-type
+    and two edge-types. One of the edge-types and the only node-type has
     features which are used for testing
-    
+
     Parameters:
     -----------
     num_chunks : int
@@ -705,7 +785,7 @@ def _prepare_test_data(
 
     Returns:
     --------
-    dictionary : 
+    dictionary :
         schema dictionary describing the metadata for the unit test graph
     """
     schema = {}
@@ -749,7 +829,7 @@ def _prepare_test_data(
 
         src = np.arange(10)
         dst = np.arange(10)
-        edge_data = np.column_stack((src, dst)) + 10*idx
+        edge_data = np.column_stack((src, dst)) + 10 * idx
 
         array_parser.write(file_path, edge_data)
         edge_files.append(file_path)
@@ -800,9 +880,9 @@ def _prepare_test_data(
     node_data = {}
     node_data["n1"] = {}
     node_data["n1"]["node_feat_1"] = {}
-    node_data["n1"]["node_feat_1"]["format"] = edge_data["n1:e1:n1"]["edge_feat_1"][
-        "format"
-    ]
+    node_data["n1"]["node_feat_1"]["format"] = edge_data["n1:e1:n1"][
+        "edge_feat_1"
+    ]["format"]
 
     node_feat_files = []
     nodes_data_dir = os.path.join(dataset_dir, "node_data")
@@ -824,6 +904,7 @@ def _prepare_test_data(
     schema["node_data"] = node_data
 
     return schema
+
 
 def _prepare_data_lookupservice(partitions_dir, num_chunks, num_parts):
     """Function to generate node-id to partition-ig mappings
@@ -852,13 +933,14 @@ def _prepare_data_lookupservice(partitions_dir, num_chunks, num_parts):
     "num_chunks, num_parts, world_size", [[1, 1, 1], [4, 2, 2]]
 )
 @pytest.mark.parametrize("feat_mesg_size", [0, 10])
-@pytest.mark.parametrize("node_feat_dim, edge_feat_dim", [[256, 256], [1024*4, 1024*4]])
 @pytest.mark.parametrize(
-    "node_feat_dtype, edge_feat_dtype", [[np.int32, np.int32], [np.int64, np.int64]]
+    "node_feat_dim, edge_feat_dim", [[256, 256], [1024 * 4, 1024 * 4]]
 )
 @pytest.mark.parametrize(
-    "feat_type", ["node_features", "edge_features"]
+    "node_feat_dtype, edge_feat_dtype",
+    [[np.int32, np.int32], [np.int64, np.int64]],
 )
+@pytest.mark.parametrize("feat_type", ["node_features", "edge_features"])
 def test_exchange_node_feats(
     num_chunks,
     num_parts,
@@ -868,7 +950,7 @@ def test_exchange_node_feats(
     node_feat_dtype,
     edge_feat_dim,
     edge_feat_dtype,
-    feat_type
+    feat_type,
 ):
     """Unit test cases to test ``exchange_features`` function. Now this function
     splits large messages into multiple smaller messages to avoid OOM issues that
@@ -924,9 +1006,9 @@ def test_exchange_node_feats(
             num_parts,
             world_size,
             feat_mesg_size,
-            node_feat_dim, 
-            node_feat_dtype, 
-            edge_feat_dim, 
+            node_feat_dim,
+            node_feat_dtype,
+            edge_feat_dim,
             edge_feat_dtype,
-            feat_type
+            feat_type,
         )
