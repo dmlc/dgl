@@ -4,8 +4,12 @@
  * @brief CSR2COO
  */
 #include <dgl/array.h>
+#include <thrust/iterator/constant_iterator.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
 
 #include "../../runtime/cuda/cuda_common.h"
+#include "./dgl_cub.cuh"
 #include "./utils.h"
 
 namespace dgl {
@@ -73,6 +77,30 @@ __global__ void _RepeatKernel(
   }
 }
 
+struct RepeatIndex {
+  template <typename IdType>
+  __host__ __device__ auto operator()(IdType i) {
+    return thrust::make_constant_iterator(i);
+  }
+};
+
+template <typename IdType>
+struct OutputBufferIndexer {
+  const IdType *indptr;
+  const IdType *buffer;
+  __host__ __device__ auto operator()(IdType i) {
+    return buffer + indptr[i];
+  }
+};
+
+template <typename IdType>
+struct AdjacentDifference {
+  const IdType *indptr;
+  __host__ __device__ auto operator()(IdType i) {
+    return indptr[i + 1] - indptr[i];
+  }
+};
+
 template <>
 COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr) {
   const auto& ctx = csr.indptr->ctx;
@@ -83,11 +111,35 @@ COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr) {
   IdArray rowids = Range(0, csr.num_rows, nbits, ctx);
   IdArray ret_row = NewIdArray(nnz, ctx, nbits);
 
-  const int nt = 256;
-  const int nb = (nnz + nt - 1) / nt;
-  CUDA_KERNEL_CALL(
-      _RepeatKernel, nb, nt, 0, stream, rowids.Ptr<int64_t>(),
-      csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>(), csr.num_rows, nnz);
+  if (false) {
+    const int nt = 256;
+    const int nb = (nnz + nt - 1) / nt;
+    CUDA_KERNEL_CALL(
+        _RepeatKernel, nb, nt, 0, stream, rowids.Ptr<int64_t>(),
+        csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>(), csr.num_rows, nnz);
+  }
+  else {
+    runtime::CUDAWorkspaceAllocator allocator(csr.indptr->ctx);
+    thrust::counting_iterator<int64_t> iota(0);
+
+    auto input_buffer = thrust::make_transform_iterator(iota, RepeatIndex{});
+    auto output_buffer = thrust::make_transform_iterator(
+        iota, OutputBufferIndexer<int64_t>
+        {csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>()});
+    auto buffer_sizes = thrust::make_transform_iterator(
+        iota, AdjacentDifference<int64_t>{csr.indptr.Ptr<int64_t>()});
+
+    std::size_t temp_storage_bytes = 0;
+    CUDA_CALL(cub::DeviceMemcpy::Batched(
+        nullptr, temp_storage_bytes, input_buffer, output_buffer,
+        buffer_sizes, csr.num_rows, stream));
+
+    auto temp = allocator.alloc_unique<char>(temp_storage_bytes);
+
+    CUDA_CALL(cub::DeviceMemcpy::Batched(
+        temp.get(), temp_storage_bytes, input_buffer, ret_row.Ptr<int64_t>(),
+        buffer_sizes, csr.num_rows, stream));
+  }
 
   return COOMatrix(
       csr.num_rows, csr.num_cols, ret_row, csr.indices, csr.data, true,
