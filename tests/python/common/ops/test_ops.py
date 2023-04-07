@@ -176,17 +176,19 @@ def test_spmm(idtype, g, shp, msg, reducer):
     dgl.backend.backend_name != "pytorch",
     reason="Only support PyTorch for now.",
 )
-@unittest.skipIf(
-    F._default_context_str == "cpu",
-    reason="Don't support half precision on CPU.",
-)
 @parametrize_idtype
 @pytest.mark.parametrize(
     "dtype, rtol, atol",
     [(torch.float16, 1e-3, 0.5), (torch.bfloat16, 4e-3, 2.0)],
 )
 def test_half_spmm(idtype, dtype, rtol, atol):
-    if dtype == torch.bfloat16 and not torch.cuda.is_bf16_supported():
+    if F._default_context_str == "cpu" and dtype == torch.float16:
+        pytest.skip("float16 is not supported on CPU.")
+    if (
+        F._default_context_str == "gpu"
+        and dtype == torch.bfloat16
+        and not torch.cuda.is_bf16_supported()
+    ):
         pytest.skip("BF16 is not supported.")
 
     # make sure the spmm result is < 512 to match the rtol/atol we set.
@@ -195,7 +197,7 @@ def test_half_spmm(idtype, dtype, rtol, atol):
         idtype=idtype,
         device=F.ctx(),
     )
-    feat_fp32 = torch.rand((g.num_src_nodes(), 32)).to(0)
+    feat_fp32 = torch.rand((g.num_src_nodes(), 32)).to(F.ctx())
     feat_half = feat_fp32.to(dtype)
 
     # test SpMMCSR
@@ -337,11 +339,8 @@ def test_segment_reduce(reducer):
     ],
 )
 def test_segment_mm(idtype, feat_size, dtype, tol):
-    if F._default_context_str == "cpu" and dtype in (
-        torch.float16,
-        torch.bfloat16,
-    ):
-        pytest.skip("Only support float32 and float64 on CPU.")
+    if F._default_context_str == "cpu" and dtype == torch.float16:
+        pytest.skip("float16 is not supported on CPU.")
     if (
         F._default_context_str == "gpu"
         and dtype == torch.bfloat16
@@ -397,11 +396,8 @@ def test_segment_mm(idtype, feat_size, dtype, tol):
     ],
 )
 def test_gather_mm_idx_b(feat_size, dtype, tol):
-    if F._default_context_str == "cpu" and dtype in (
-        torch.float16,
-        torch.bfloat16,
-    ):
-        pytest.skip("Only support float32 and float64 on CPU.")
+    if F._default_context_str == "cpu" and dtype == torch.float16:
+        pytest.skip("float16 is not supported on CPU.")
     if (
         F._default_context_str == "gpu"
         and dtype == torch.bfloat16

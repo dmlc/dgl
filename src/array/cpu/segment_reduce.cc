@@ -56,6 +56,12 @@ void BackwardSegmentCmp(NDArray feat, NDArray arg, NDArray out) {
   cpu::BackwardSegmentCmp<IdType, DType>(feat, arg, out);
 }
 
+template void SegmentReduce<kDGLCPU, int32_t, BFloat16>(
+    const std::string& op, NDArray feat, NDArray offsets, NDArray out,
+    NDArray arg);
+template void SegmentReduce<kDGLCPU, int64_t, BFloat16>(
+    const std::string& op, NDArray feat, NDArray offsets, NDArray out,
+    NDArray arg);
 template void SegmentReduce<kDGLCPU, int32_t, float>(
     const std::string& op, NDArray feat, NDArray offsets, NDArray out,
     NDArray arg);
@@ -69,6 +75,16 @@ template void SegmentReduce<kDGLCPU, int64_t, double>(
     const std::string& op, NDArray feat, NDArray offsets, NDArray out,
     NDArray arg);
 
+template <>
+void ScatterAdd<kDGLCPU, int32_t, BFloat16>(
+    NDArray feat, NDArray idx, NDArray out) {
+  LOG(FATAL) << "Unsupported CPU kernel for ScatterAdd for BF16.";
+}
+template <>
+void ScatterAdd<kDGLCPU, int64_t, BFloat16>(
+    NDArray feat, NDArray idx, NDArray out) {
+  LOG(FATAL) << "Unsupported CPU kernel for ScatterAdd for BF16.";
+}
 template void ScatterAdd<kDGLCPU, int32_t, float>(
     NDArray feat, NDArray idx, NDArray out);
 template void ScatterAdd<kDGLCPU, int64_t, float>(
@@ -78,6 +94,20 @@ template void ScatterAdd<kDGLCPU, int32_t, double>(
 template void ScatterAdd<kDGLCPU, int64_t, double>(
     NDArray feat, NDArray arg, NDArray out);
 
+template <>
+void UpdateGradMinMax_hetero<kDGLCPU, int32_t, BFloat16>(
+    const HeteroGraphPtr& g, const std::string& op,
+    const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
+    const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out) {
+  LOG(FATAL) << "Unsupported CPU kernel for UpdateGradMinMax_hetero for BF16.";
+}
+template <>
+void UpdateGradMinMax_hetero<kDGLCPU, int64_t, BFloat16>(
+    const HeteroGraphPtr& g, const std::string& op,
+    const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
+    const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out) {
+  LOG(FATAL) << "Unsupported CPU kernel for UpdateGradMinMax_hetero for BF16.";
+}
 template void UpdateGradMinMax_hetero<kDGLCPU, int32_t, float>(
     const HeteroGraphPtr& g, const std::string& op,
     const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
@@ -95,6 +125,10 @@ template void UpdateGradMinMax_hetero<kDGLCPU, int64_t, double>(
     const std::vector<NDArray>& feat, const std::vector<NDArray>& idx,
     const std::vector<NDArray>& idx_etype, std::vector<NDArray>* out);
 
+template void BackwardSegmentCmp<kDGLCPU, int32_t, BFloat16>(
+    NDArray feat, NDArray arg, NDArray out);
+template void BackwardSegmentCmp<kDGLCPU, int64_t, BFloat16>(
+    NDArray feat, NDArray arg, NDArray out);
 template void BackwardSegmentCmp<kDGLCPU, int32_t, float>(
     NDArray feat, NDArray arg, NDArray out);
 template void BackwardSegmentCmp<kDGLCPU, int64_t, float>(
