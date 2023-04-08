@@ -279,16 +279,23 @@ def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
         g.to_canonical_etype(k): g.to_canonical_etype(v)
         for k, v in reverse_etype_map.items()
     }
-    reverse_exclude_eids = {
-        reverse_etype_map[k]: v for k, v in exclude_eids.items()
-    }
-    for etype, eid in reverse_exclude_eids.items():
-        if etype in exclude_eids:
-            exclude_eids[etype] = F.unique(
-                F.cat((exclude_eids[etype], eid), dim=0)
+    exclude_eids.update(
+        {
+            v: F.unique(
+                F.cat(
+                    (
+                        exclude_eids[k],
+                        exclude_eids.get(
+                            v, F.tensor([], dtype=exclude_eids[k].dtype)
+                        ),
+                    ),
+                    dim=0,
+                )
             )
-        else:
-            exclude_eids[etype] = eid
+            for k, v in reverse_etype_map.items()
+            if k in exclude_eids
+        }
+    )
     return exclude_eids
 
 
