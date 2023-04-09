@@ -13,6 +13,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <type_traits>
 
 #include "../../../array/cuda/dgl_cub.cuh"
 #include "../../../array/cuda/utils.h"
@@ -22,6 +23,14 @@
 namespace dgl {
 namespace transform {
 namespace impl {
+
+template <typename Type>
+static __host__ __device__ std::enable_if_t<std::is_unsigned_v<Type>, Type>
+Pow2Align(Type size, Type align) {
+  if (align <= 1 || size <= 0) return size;
+  return ((size - 1) | (align - 1)) + 1;
+}
+
 /**
  * @brief Utility class used to avoid linker errors with extern
  *  unsized shared memory arrays with templated type
@@ -308,7 +317,7 @@ __global__ void BruteforceKnnShareKernel(
   FloatType* query_buff = data_buff + block_size * feature_size;
   FloatType* dist_buff = query_buff + block_size * feature_size;
   IdType* res_buff = reinterpret_cast<IdType*>(
-      dist_buff + block_size * k);  // TODO: mem alignment?
+      Pow2Align<uint64_t>(reinterpret_cast<uint64_t>(dist_buff + block_size * k), sizeof(IdType)));
   FloatType worst_dist = std::numeric_limits<FloatType>::max();
 
   // initialize dist buff with inf value
@@ -507,6 +516,7 @@ void BruteForceKNNSharedCuda(
   const FloatType* query_points_data = query_points.Ptr<FloatType>();
   IdType* query_out = result.Ptr<IdType>();
   IdType* data_out = query_out + k * query_points->shape[0];
+  constexpr size_t smem_align = std::max(sizeof(IdType), sizeof(FloatType));
 
   // get max shared memory per block in bytes
   // determine block size according to this value
@@ -514,8 +524,13 @@ void BruteForceKNNSharedCuda(
   CUDA_CALL(cudaDeviceGetAttribute(
       &max_sharedmem_per_block, cudaDevAttrMaxSharedMemoryPerBlock,
       ctx.device_id));
-  const int64_t single_shared_mem =
-      (k + 2 * feature_size) * sizeof(FloatType) + k * sizeof(IdType);
+  const int64_t single_shared_mem = static_cast<int64_t>(
+    Pow2Align<size_t>(
+      (k + 2 * feature_size) * sizeof(FloatType) + k * sizeof(IdType),
+      smem_align
+    )
+  );
+
   const int64_t block_size =
       cuda::FindNumThreads(max_sharedmem_per_block / single_shared_mem);
 
