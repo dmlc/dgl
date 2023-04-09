@@ -295,6 +295,8 @@ Take the survey [here](https://forms.gle/Ej3jHCocACmb49Gp8) and leave any feedba
 
 1. [**How Attentive are Graph Attention Networks?**](https://arxiv.org/pdf/2105.14491.pdf), *Shaked Brody, Uri Alon, Eran Yahav*, [code](https://github.com/tech-srl/how_attentive_are_gats)
 
+1. [**SCENE: Reasoning about Traffic Scenes using Heterogeneous Graph Neural Networks**](https://arxiv.org/pdf/2301.03512.pdf), *Thomas Monninger\*, Julian Schmidt\*, Jan Rupprecht, David Raba, Julian Jordan, Daniel Frank, Steffen Staab, Klaus Dietmayer*, [code](https://github.com/schmidt-ju/scene), \*co-first authors
+
 </details>
 
 ## Contributing
