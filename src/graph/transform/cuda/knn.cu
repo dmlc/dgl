@@ -12,8 +12,8 @@
 #include <algorithm>
 #include <limits>
 #include <string>
-#include <vector>
 #include <type_traits>
+#include <vector>
 
 #include "../../../array/cuda/dgl_cub.cuh"
 #include "../../../array/cuda/utils.h"
@@ -316,8 +316,8 @@ __global__ void BruteforceKnnShareKernel(
   FloatType* data_buff = SharedMemory<FloatType>();
   FloatType* query_buff = data_buff + block_size * feature_size;
   FloatType* dist_buff = query_buff + block_size * feature_size;
-  IdType* res_buff = reinterpret_cast<IdType*>(
-      Pow2Align<uint64_t>(reinterpret_cast<uint64_t>(dist_buff + block_size * k), sizeof(IdType)));
+  IdType* res_buff = reinterpret_cast<IdType*>(Pow2Align<uint64_t>(
+      reinterpret_cast<uint64_t>(dist_buff + block_size * k), sizeof(IdType)));
   FloatType worst_dist = std::numeric_limits<FloatType>::max();
 
   // initialize dist buff with inf value
@@ -327,7 +327,8 @@ __global__ void BruteforceKnnShareKernel(
   }
 
   // load query data to shared memory
-  // TODO(tianqi): could be better here to exploit coalesce global memory access.
+  // TODO(tianqi): could be better here to exploit coalesce global memory
+  // access.
   if (query_idx < query_end) {
     for (auto i = 0; i < feature_size; ++i) {
       // to avoid bank conflict, we use transpose here
@@ -524,12 +525,9 @@ void BruteForceKNNSharedCuda(
   CUDA_CALL(cudaDeviceGetAttribute(
       &max_sharedmem_per_block, cudaDevAttrMaxSharedMemoryPerBlock,
       ctx.device_id));
-  const int64_t single_shared_mem = static_cast<int64_t>(
-    Pow2Align<size_t>(
+  const int64_t single_shared_mem = static_cast<int64_t>(Pow2Align<size_t>(
       (k + 2 * feature_size) * sizeof(FloatType) + k * sizeof(IdType),
-      smem_align
-    )
-  );
+      smem_align));
 
   const int64_t block_size =
       cuda::FindNumThreads(max_sharedmem_per_block / single_shared_mem);
