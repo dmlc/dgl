@@ -38,8 +38,8 @@ def test_fps_start_idx():
     assert th.any(res[:, 0] == 0)
 
 
-def _test_knn_common(device, algorithm, dist, exclude_self):
-    x = th.randn(8, 3).to(device)
+def _test_knn_common(device, algorithm, dist, num_points, exclude_self):
+    x = th.randn(num_points, 3).to(device)
     kg = dgl.nn.KNNGraph(3)
     if dist == "euclidean":
         d = th.cdist(x, x).to(F.cpu())
@@ -168,8 +168,9 @@ def _test_knn_common(device, algorithm, dist, exclude_self):
 )
 @pytest.mark.parametrize("dist", ["euclidean", "cosine"])
 @pytest.mark.parametrize("exclude_self", [False, True])
-def test_knn_cpu(algorithm, dist, exclude_self):
-    _test_knn_common(F.cpu(), algorithm, dist, exclude_self)
+@pytest.mark.parametrize("num_points", [8, 64, 256, 1024])
+def test_knn_cpu(algorithm, dist, num_points, exclude_self):
+    _test_knn_common(F.cpu(), algorithm, dist, num_points, exclude_self)
 
 
 @pytest.mark.parametrize(
@@ -177,10 +178,11 @@ def test_knn_cpu(algorithm, dist, exclude_self):
 )
 @pytest.mark.parametrize("dist", ["euclidean", "cosine"])
 @pytest.mark.parametrize("exclude_self", [False, True])
-def test_knn_cuda(algorithm, dist, exclude_self):
+@pytest.mark.parametrize("num_points", [8, 64, 256, 1024])
+def test_knn_cuda(algorithm, dist, num_points, exclude_self):
     if not th.cuda.is_available():
         return
-    _test_knn_common(F.cuda(), algorithm, dist, exclude_self)
+    _test_knn_common(F.cuda(), algorithm, dist, num_points, exclude_self)
 
 
 @parametrize_idtype
