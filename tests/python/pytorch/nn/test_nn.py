@@ -706,6 +706,56 @@ def test_egat_conv_bi(g, idtype, out_node_feats, out_edge_feats, num_heads):
 
 
 @parametrize_idtype
+@pytest.mark.parametrize("g", get_cases(["homo"], exclude=["zero-degree"]))
+@pytest.mark.parametrize("out_feats", [1, 5])
+@pytest.mark.parametrize("num_heads", [1, 4])
+def test_edgegat_conv(g, idtype, out_feats, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    edgegat = nn.EdgeGATConv(
+        in_feats=10, edge_feats=5, out_feats=out_feats, num_heads=num_heads
+    )
+    nfeat = F.randn((g.number_of_nodes(), 10))
+    efeat = F.randn((g.number_of_edges(), 5))
+    edgegat = edgegat.to(ctx)
+    h = edgegat(g, nfeat, efeat)
+
+    th.save(edgegat, tmp_buffer)
+
+    assert h.shape == (g.number_of_nodes(), num_heads, out_feats)
+    _, attn = edgegat(g, nfeat, efeat, True)
+    assert attn.shape == (g.number_of_edges(), num_heads, 1)
+
+
+@parametrize_idtype
+@pytest.mark.parametrize("g", get_cases(["bipartite"], exclude=["zero-degree"]))
+@pytest.mark.parametrize("out_feats", [1, 5])
+@pytest.mark.parametrize("num_heads", [1, 4])
+def test_edgegat_conv_bi(g, idtype, out_feats, num_heads):
+    g = g.astype(idtype).to(F.ctx())
+    ctx = F.ctx()
+    edgegat = nn.EdgeGATConv(
+        in_feats=(10, 15),
+        edge_feats=7,
+        out_feats=out_feats,
+        num_heads=num_heads,
+    )
+    nfeat = (
+        F.randn((g.number_of_src_nodes(), 10)),
+        F.randn((g.number_of_dst_nodes(), 15)),
+    )
+    efeat = F.randn((g.number_of_edges(), 7))
+    edgegat = edgegat.to(ctx)
+    h = edgegat(g, nfeat, efeat)
+
+    th.save(edgegat, tmp_buffer)
+
+    assert h.shape == (g.number_of_dst_nodes(), num_heads, out_feats)
+    _, attn = edgegat(g, nfeat, efeat, True)
+    assert attn.shape == (g.number_of_edges(), num_heads, 1)
+
+
+@parametrize_idtype
 @pytest.mark.parametrize("g", get_cases(["homo", "block-bipartite"]))
 @pytest.mark.parametrize("aggre_type", ["mean", "pool", "gcn", "lstm"])
 def test_sage_conv(idtype, g, aggre_type):
