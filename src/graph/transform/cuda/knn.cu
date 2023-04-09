@@ -327,7 +327,7 @@ __global__ void BruteforceKnnShareKernel(
   }
 
   // load query data to shared memory
-  // TODO: could be better here to exploit coalesce global memory access.
+  // TODO(tianqi): could be better here to exploit coalesce global memory access.
   if (query_idx < query_end) {
     for (auto i = 0; i < feature_size; ++i) {
       // to avoid bank conflict, we use transpose here
