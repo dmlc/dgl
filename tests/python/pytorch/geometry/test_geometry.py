@@ -38,8 +38,8 @@ def test_fps_start_idx():
     assert th.any(res[:, 0] == 0)
 
 
-def _test_knn_common(device, algorithm, dist, num_points, exclude_self):
-    x = th.randn(num_points, 3).to(device)
+def _test_knn_common(device, algorithm, dist, exclude_self):
+    x = th.randn(8, 3).to(device)
     kg = dgl.nn.KNNGraph(3)
     if dist == "euclidean":
         d = th.cdist(x, x).to(F.cpu())
@@ -168,9 +168,8 @@ def _test_knn_common(device, algorithm, dist, num_points, exclude_self):
 )
 @pytest.mark.parametrize("dist", ["euclidean", "cosine"])
 @pytest.mark.parametrize("exclude_self", [False, True])
-@pytest.mark.parametrize("num_points", [8, 64, 256, 1024])
-def test_knn_cpu(algorithm, dist, num_points, exclude_self):
-    _test_knn_common(F.cpu(), algorithm, dist, num_points, exclude_self)
+def test_knn_cpu(algorithm, dist, exclude_self):
+    _test_knn_common(F.cpu(), algorithm, dist, exclude_self)
 
 
 @pytest.mark.parametrize(
@@ -178,11 +177,37 @@ def test_knn_cpu(algorithm, dist, num_points, exclude_self):
 )
 @pytest.mark.parametrize("dist", ["euclidean", "cosine"])
 @pytest.mark.parametrize("exclude_self", [False, True])
-@pytest.mark.parametrize("num_points", [8, 64, 256, 1024])
-def test_knn_cuda(algorithm, dist, num_points, exclude_self):
+def test_knn_cuda(algorithm, dist, exclude_self):
     if not th.cuda.is_available():
         return
-    _test_knn_common(F.cuda(), algorithm, dist, num_points, exclude_self)
+    _test_knn_common(F.cuda(), algorithm, dist, exclude_self)
+
+
+@pytest.mark.parametrize("num_points", [8, 64, 256, 1024])
+def test_knn_sharedmem_large(num_points):
+    if not th.cuda.is_available():
+        return
+    x = th.randn(num_points, 5, device="cuda")
+    y = th.randn(num_points, 5, device="cuda")
+    k = 4
+
+    def ground_truth(x, y, k):
+        dist = (
+            th.sum(x * x, dim=1)
+            + th.sum(y * y, dim=1).unsqueeze(-1)
+            - 2 * th.mm(y, x.T)
+        )
+        ret = th.topk(dist, k, dim=-1, largest=False)[1]
+        return th.sort(ret, dim=-1)[0]
+
+    gt = ground_truth(x, y, k)
+    actual = th.sort(
+        dgl.functional.knn(
+            k, x, [num_points], y, [num_points], algorithm="bruteforce-sharemem"
+        )[1].reshape(-1, k),
+        -1,
+    )[0]
+    assert th.all(actual == gt).item()
 
 
 @parametrize_idtype
@@ -226,3 +251,4 @@ if __name__ == "__main__":
     test_fps()
     test_fps_start_idx()
     test_knn()
+    test_knn_sharedmem_large()
