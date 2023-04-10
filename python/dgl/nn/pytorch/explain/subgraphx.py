@@ -582,7 +582,6 @@ class HeteroSubgraphX(nn.Module):
             new_subg = remove_nodes(subg, node, ntype, store_ids=True)
 
             if new_subg.num_edges() > 0:
-                # Convert from heterograph to homogenous in order to compute largest connected component
                 new_subg_homo = to_homogeneous(new_subg)
                 # Get the largest weakly connected component in the subgraph.
                 nx_graph = to_networkx(new_subg_homo.cpu())
@@ -594,10 +593,11 @@ class HeteroSubgraphX(nn.Module):
                     largest_cc_homo, new_subg.ntypes, new_subg.etypes
                 )
 
-                # 1. backtrack from connected-component heterograph indicies to homograph indicies
-                # 2. backtrack from connected-component homograph indicies to original homograph indicies
-                # 3. backtrack from homograph indicies to original heterograph indicies
-                # 4. backtrack from subgraph node ids to entire graph
+                # Follow steps for backtracking to original graph node ids
+                # 1. retrieve instanced homograph from connected-component homograph
+                # 2. retrieve instanced heterograph from instanced homograph
+                # 3. retrieve hetero-subgraph from instanced heterograph
+                # 4. retrieve orignal graph ids from subgraph node ids
                 cc_nodes = {
                     ntype: subg.ndata[NID][ntype][
                         new_subg.ndata[NID][ntype][
