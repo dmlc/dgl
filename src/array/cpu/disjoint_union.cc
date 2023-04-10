@@ -86,10 +86,8 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   auto res_dat_data = result_dat.Ptr<IdType>();
 
   // 32 is a number obtained from experience. If a user set the grain size
-  // explicitly via env, use that value(`default_grain_size`) instead.
-  size_t grain_size = std::getenv("DGL_PARALLEL_FOR_GRAIN_SIZE")
-                          ? runtime::default_grain_size()
-                          : 32;
+  // explicitly via env, use that value instead.
+  size_t grain_size = DefaultGrainSizeT(32);
   dgl::runtime::parallel_for(
       0, coos.size(), grain_size, [&](IdType b, IdType e) {
         for (IdType i = b; i < e; ++i) {
