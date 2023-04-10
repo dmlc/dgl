@@ -95,8 +95,12 @@ def evaluate(model, g, num_classes, dataloader):
             x = blocks[0].srcdata["feat"]
             ys.append(blocks[-1].dstdata["label"])
             y_hats.append(model(blocks, x))
-    return MF.accuracy(torch.cat(y_hats), torch.cat(ys),
-                       task="multiclass", num_classes=num_classes)
+    return MF.accuracy(
+        torch.cat(y_hats),
+        torch.cat(ys),
+        task="multiclass",
+        num_classes=num_classes,
+    )
 
 
 def layerwise_infer(
@@ -108,13 +112,15 @@ def layerwise_infer(
         pred = pred[nid]
         labels = g.ndata["label"][nid].to(pred.device)
     if proc_id == 0:
-        acc = MF.accuracy(pred, labels,
-                          task="multiclass", num_classes=num_classes)
+        acc = MF.accuracy(
+            pred, labels, task="multiclass", num_classes=num_classes
+        )
         print("Test Accuracy {:.4f}".format(acc.item()))
 
 
-def train(proc_id, nprocs, device, g, num_classes,
-          train_idx, val_idx, model, use_uva):
+def train(
+    proc_id, nprocs, device, g, num_classes, train_idx, val_idx, model, use_uva
+):
     sampler = NeighborSampler(
         [10, 10, 10], prefetch_node_feats=["feat"], prefetch_labels=["label"]
     )
@@ -157,7 +163,9 @@ def train(proc_id, nprocs, device, g, num_classes,
             loss.backward()
             opt.step()
             total_loss += loss
-        acc = evaluate(model, g, num_classes, val_dataloader).to(device) / nprocs
+        acc = (
+            evaluate(model, g, num_classes, val_dataloader).to(device) / nprocs
+        )
         dist.reduce(acc, 0)
         if proc_id == 0:
             print(
@@ -190,8 +198,17 @@ def run(proc_id, nprocs, devices, g, data, mode):
     )
     # training + testing
     use_uva = mode == "mixed"
-    train(proc_id, nprocs, device, g, num_classes,
-          train_idx, val_idx, model, use_uva)
+    train(
+        proc_id,
+        nprocs,
+        device,
+        g,
+        num_classes,
+        train_idx,
+        val_idx,
+        model,
+        use_uva,
+    )
     layerwise_infer(proc_id, device, g, num_classes, test_idx, model, use_uva)
     # cleanup process group
     dist.destroy_process_group()

@@ -44,8 +44,12 @@ def evaluate(g, target_idx, labels, num_classes, test_mask, model):
     with torch.no_grad():
         logits = model(g)
     logits = logits[target_idx]
-    return accuracy(logits[test_idx].argmax(dim=1), labels[test_idx],
-                    task="multiclass", num_classes=num_classes).item()
+    return accuracy(
+        logits[test_idx].argmax(dim=1),
+        labels[test_idx],
+        task="multiclass",
+        num_classes=num_classes,
+    ).item()
 
 
 def train(g, target_idx, labels, num_classes, train_mask, model):
@@ -63,8 +67,10 @@ def train(g, target_idx, labels, num_classes, train_mask, model):
         loss.backward()
         optimizer.step()
         acc = accuracy(
-            logits[train_idx].argmax(dim=1), labels[train_idx],
-            task="multiclass", num_classes=num_classes
+            logits[train_idx].argmax(dim=1),
+            labels[train_idx],
+            task="multiclass",
+            num_classes=num_classes,
         ).item()
         print(
             "Epoch {:05d} | Loss {:.4f} | Train Accuracy {:.4f} ".format(

@@ -205,6 +205,7 @@ if __name__ == "__main__":
         pred = model.inference(graph, "cuda", 4096, 12, graph.device)
         pred = pred[test_idx]
         label = graph.ndata["label"][test_idx]
-        acc = MF.accuracy(pred, label, task="multiclass",
-                          num_classes=datamodule.n_classes)
+        acc = MF.accuracy(
+            pred, label, task="multiclass", num_classes=datamodule.n_classes
+        )
     print("Test accuracy:", acc)

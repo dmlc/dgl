@@ -55,8 +55,12 @@ def evaluate(model, labels, num_classes, dataloader, inv_target):
             eval_seeds.append(output_nodes.cpu().detach())
     eval_logits = torch.cat(eval_logits)
     eval_seeds = torch.cat(eval_seeds)
-    return accuracy(eval_logits.argmax(dim=1), labels[eval_seeds].cpu(),
-                    task="multiclass", num_classes=num_classes).item()
+    return accuracy(
+        eval_logits.argmax(dim=1),
+        labels[eval_seeds].cpu(),
+        task="multiclass",
+        num_classes=num_classes,
+    ).item()
 
 
 def train(device, g, target_idx, labels, train_mask, num_classes, model):

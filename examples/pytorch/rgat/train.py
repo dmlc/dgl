@@ -71,8 +71,9 @@ def evaluate(num_classes, model, dataloader, desc):
             labels.append(y.cpu())
         preds = torch.cat(preds, 0)
         labels = torch.cat(labels, 0)
-        acc = MF.accuracy(preds, labels,
-                          task="multiclass", num_classes=num_classes)
+        acc = MF.accuracy(
+            preds, labels, task="multiclass", num_classes=num_classes
+        )
         return acc
 
 
@@ -187,5 +188,4 @@ if __name__ == "__main__":
         use_uva=torch.cuda.is_available(),
     )
 
-    train(train_dataloader, val_dataloader, test_dataloader,
-          num_classes, model)
+    train(train_dataloader, val_dataloader, test_dataloader, num_classes, model)
