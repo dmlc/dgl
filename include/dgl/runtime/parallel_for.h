@@ -27,7 +27,9 @@ namespace {
 struct DefaultGrainSizeT {
   size_t grain_size;
 
-  DefaultGrainSizeT(size_t default_grain_size = 1) {
+  DefaultGrainSizeT() : DefaultGrainSizeT(1) {}
+
+  explicit DefaultGrainSizeT(size_t default_grain_size) {
     auto var = dgl::kDGLParallelForGrainSize;
 
     if (!var) {
