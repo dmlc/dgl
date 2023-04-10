@@ -281,17 +281,9 @@ def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
     }
     exclude_eids.update(
         {
-            v: F.unique(
-                F.cat(
-                    (
-                        exclude_eids[k],
-                        exclude_eids.get(
-                            v, F.tensor([], dtype=exclude_eids[k].dtype)
-                        ),
-                    ),
-                    dim=0,
-                )
-            )
+            v: F.unique(F.cat((exclude_eids[k], exclude_eids[v]), dim=0))
+            if v in exclude_eids
+            else exclude_eids[k]
             for k, v in reverse_etype_map.items()
             if k in exclude_eids
         }
