@@ -120,10 +120,10 @@ g.add_edges([2, 0], [0, 2])  # Add edges (2, 0), (0, 2)
 
 def forward_inference(self):
     stop = self.add_node_and_update()
-    while (not stop) and (self.g.number_of_nodes() < self.v_max + 1):
+    while (not stop) and (self.g.num_nodes() < self.v_max + 1):
         num_trials = 0
         to_add_edge = self.add_edge_or_not()
-        while to_add_edge and (num_trials < self.g.number_of_nodes() - 1):
+        while to_add_edge and (num_trials < self.g.num_nodes() - 1):
             self.choose_dest_and_update()
             num_trials += 1
             to_add_edge = self.add_edge_or_not()
@@ -174,7 +174,7 @@ def forward_inference(self):
 #             ax.cla()
 #             g_t = evolution[i]
 #             nx.draw_circular(g_t, with_labels=True, ax=ax,
-#                              node_color=['#FEBD69'] * g_t.number_of_nodes())
+#                              node_color=['#FEBD69'] * g_t.num_nodes())
 #
 #         fig, ax = plt.subplots()
 #         ani = animation.FuncAnimation(fig, animate,
@@ -347,7 +347,7 @@ class GraphEmbed(nn.Module):
         self.node_to_graph = nn.Linear(node_hidden_size, self.graph_hidden_size)
 
     def forward(self, g):
-        if g.number_of_nodes() == 0:
+        if g.num_nodes() == 0:
             return torch.zeros(1, self.graph_hidden_size)
         else:
             # Node features are stored as hv in ndata.
@@ -443,7 +443,7 @@ class GraphProp(nn.Module):
         return {"a": node_activation}
 
     def forward(self, g):
-        if g.number_of_edges() > 0:
+        if g.num_edges() > 0:
             for t in range(self.num_prop_rounds):
                 g.update_all(
                     message_func=self.dgmg_msg, reduce_func=self.reduce_funcs[t]
@@ -514,7 +514,7 @@ class AddNode(nn.Module):
 
     def _initialize_node_repr(self, g, node_type, graph_embed):
         """Whenver a node is added, initialize its representation."""
-        num_nodes = g.number_of_nodes()
+        num_nodes = g.num_nodes()
         hv_init = self.initialize_hv(
             torch.cat(
                 [
@@ -581,7 +581,7 @@ class AddEdge(nn.Module):
 
     def forward(self, g, action=None):
         graph_embed = self.graph_op["embed"](g)
-        src_embed = g.nodes[g.number_of_nodes() - 1].data["hv"]
+        src_embed = g.nodes[g.num_nodes() - 1].data["hv"]
 
         logit = self.add_edge(torch.cat([graph_embed, src_embed], dim=1))
         prob = torch.sigmoid(logit)
@@ -631,7 +631,7 @@ class ChooseDestAndUpdate(nn.Module):
         self.log_prob = []
 
     def forward(self, g, dest):
-        src = g.number_of_nodes() - 1
+        src = g.num_nodes() - 1
         possible_dests = range(src)
 
         src_embed_expand = g.nodes[src].data["hv"].expand(src, -1)
@@ -764,7 +764,7 @@ def is_valid(g):
         else:
             return i + 1
 
-    size = g.number_of_nodes()
+    size = g.num_nodes()
 
     if size < 10 or size > 20:
         return False

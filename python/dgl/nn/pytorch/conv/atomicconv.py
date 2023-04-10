@@ -297,5 +297,5 @@ class AtomicConv(nn.Module):
             graph.update_all(msg_func, reduce_func)
 
             return graph.ndata["hv_new"].view(
-                graph.number_of_nodes(), -1
+                graph.num_nodes(), -1
             )  # (V, K * T)

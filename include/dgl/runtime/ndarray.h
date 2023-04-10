@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "bfloat16.h"
 #include "c_runtime_api.h"
 #include "serializer.h"
 #include "shared_mem.h"

@@ -761,7 +761,7 @@ def select_topk(
     # Rectify nodes to a dictionary
     if nodes is None:
         nodes = {
-            ntype: F.astype(F.arange(0, g.number_of_nodes(ntype)), g.idtype)
+            ntype: F.astype(F.arange(0, g.num_nodes(ntype)), g.idtype)
             for ntype in g.ntypes
         }
     elif not isinstance(nodes, dict):

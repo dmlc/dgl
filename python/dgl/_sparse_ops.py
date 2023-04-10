@@ -221,7 +221,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
     u_shp = F.shape(u) if use_u else (0,)
     e_shp = F.shape(e) if use_e else (0,)
     _, dsttype = gidx.metagraph.find_edge(0)
-    v_shp = (gidx.number_of_nodes(dsttype),) + infer_broadcast_shape(
+    v_shp = (gidx.num_nodes(dsttype),) + infer_broadcast_shape(
         op, u_shp[1:], e_shp[1:]
     )
     v = F.zeros(v_shp, dtype, ctx)
@@ -235,7 +235,7 @@ def _gspmm(gidx, op, reduce_op, u, e):
             arg_e = F.zeros(v_shp, idtype, ctx)
     arg_u_nd = to_dgl_nd_for_write(arg_u)
     arg_e_nd = to_dgl_nd_for_write(arg_e)
-    if gidx.number_of_edges(0) > 0:
+    if gidx.num_edges(0) > 0:
         _CAPI_DGLKernelSpMM(
             gidx,
             op,
@@ -359,7 +359,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
         )  # TODO(Israt): Put outside of loop
         u_shp = F.shape(u) if use_u else (0,)
         e_shp = F.shape(e) if use_e else (0,)
-        v_shp = (gidx.number_of_nodes(dst_id),) + infer_broadcast_shape(
+        v_shp = (gidx.num_nodes(dst_id),) + infer_broadcast_shape(
             op, u_shp[1:], e_shp[1:]
         )
         list_v[dst_id] = F.zeros(v_shp, dtype, ctx)
@@ -379,7 +379,7 @@ def _gspmm_hetero(gidx, op, reduce_op, u_len, u_and_e_tuple):
             list_arg_e_etype[dst_id]
         )
 
-    if gidx.number_of_edges(0) > 0:
+    if gidx.num_edges(0) > 0:
         _CAPI_DGLKernelSpMMHetero(
             gidx,
             op,
@@ -546,11 +546,11 @@ def _gsddmm(gidx, op, lhs, rhs, lhs_target="u", rhs_target="v"):
     dtype = F.dtype(lhs) if use_lhs else F.dtype(rhs)
     lhs_shp = F.shape(lhs) if use_lhs else (0,)
     rhs_shp = F.shape(rhs) if use_rhs else (0,)
-    out_shp = (gidx.number_of_edges(0),) + infer_broadcast_shape(
+    out_shp = (gidx.num_edges(0),) + infer_broadcast_shape(
         op, lhs_shp[1:], rhs_shp[1:]
     )
-    out = F.zeros(out_shp, dtype, ctx)
-    if gidx.number_of_edges(0) > 0:
+    out = F.empty(out_shp, dtype, ctx)
+    if gidx.num_edges(0) > 0:
         _CAPI_DGLKernelSDDMM(
             gidx,
             op,
@@ -612,11 +612,11 @@ def _gsddmm_hetero(
         rhs_shp = F.shape(rhs) if use_rhs else (0,)
         lhs_list[lhs_id] = lhs if use_lhs else None
         rhs_list[rhs_id] = rhs if use_rhs else None
-        out_shp = (gidx.number_of_edges(etid),) + infer_broadcast_shape(
+        out_shp = (gidx.num_edges(etid),) + infer_broadcast_shape(
             op, lhs_shp[1:], rhs_shp[1:]
         )
-        out_list[etid] = F.zeros(out_shp, dtype, ctx)
-    if gidx.number_of_edges(0) > 0:
+        out_list[etid] = F.empty(out_shp, dtype, ctx)
+    if gidx.num_edges(0) > 0:
         _CAPI_DGLKernelSDDMMHetero(
             gidx,
             op,

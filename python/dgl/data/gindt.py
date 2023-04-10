@@ -261,7 +261,7 @@ class GINDataset(DGLBuiltinDataset):
                 if len(self.nlabel_dict) > 1:
                     self.nlabels_flag = True
 
-                assert g.number_of_nodes() == n_nodes
+                assert g.num_nodes() == n_nodes
 
                 # update statistics of graphs
                 self.n += n_nodes
@@ -308,9 +308,9 @@ class GINDataset(DGLBuiltinDataset):
                 label2idx = {nlabel_set[i]: i for i in range(len(nlabel_set))}
             # generate node attr by node label
             for g in self.graphs:
-                attr = np.zeros((g.number_of_nodes(), len(label2idx)))
+                attr = np.zeros((g.num_nodes(), len(label2idx)))
                 attr[
-                    range(g.number_of_nodes()),
+                    range(g.num_nodes()),
                     [
                         label2idx[nl]
                         for nl in F.asnumpy(g.ndata["label"]).tolist()

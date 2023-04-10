@@ -22,7 +22,7 @@ class CARESampler(dgl.dataloading.BlockSampler):
         with g.local_scope():
             new_edges_masks = {}
             for etype in g.canonical_etypes:
-                edge_mask = th.zeros(g.number_of_edges(etype))
+                edge_mask = th.zeros(g.num_edges(etype))
                 # extract each node from dict because of single node type
                 for node in seed_nodes:
                     edges = g.in_edges(node, form="eid", etype=etype)

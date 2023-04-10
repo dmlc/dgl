@@ -336,6 +336,11 @@ def swapaxes(input, axis1, axis2):
     return tf.transpose(input, perm=t)
 
 
+def empty(shape, dtype, ctx):
+    # tf doesn't have tf.empty(), use zeros() as a workaround
+    return zeros(shape, dtype, ctx)
+
+
 def zeros(shape, dtype, ctx):
     with tf.device(ctx):
         t = tf.zeros(shape, dtype=dtype)

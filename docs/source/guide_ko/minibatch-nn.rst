@@ -55,7 +55,7 @@ Homogeneous 그래프나 heterogeneous 그래프를 대상으로 전체 그래�
 - 첫 몇 행들(row)을 잘라서 입력 피쳐들로부터 출력 노드의 피처를 얻는다. 행의 개수는 :meth:`block.number_of_dst_nodes <dgl.DGLGraph.number_of_dst_nodes>` 로 얻는다.
 - 원본 그래프가 한 하나의 노드 타입을 갖는 경우, :attr:`g.ndata <dgl.DGLGraph.ndata>` 를 입력 노드의 피쳐의 경우 :attr:`block.srcdata <dgl.DGLGraph.srcdata>` 로 또는 출력 노드의 피쳐의 경우 :attr:`block.dstdata <dgl.DGLGraph.dstdata>` 로 교체한다.
 - 원본 그래프가 여러 종류의 노드 타입을 갖는 경우, :attr:`g.nodes <dgl.DGLGraph.nodes>` 를 입력 노드의 피쳐의 경우 :attr:`block.srcnodes <dgl.DGLGraph.srcnodes>` 로 또는 출력 노드의 피처의 경우 :attr:`block.dstnodes <dgl.DGLGraph.dstnodes>` 로 교체한다.
-- :meth:`g.number_of_nodes <dgl.DGLGraph.number_of_nodes>` 를 입력 노드의 개수는 :meth:`block.number_of_src_nodes <dgl.DGLGraph.number_of_src_nodes>` 로 출력 노드의 개수는 :meth:`block.number_of_dst_nodes <dgl.DGLGraph.number_of_dst_nodes>` 로 각각 교체한다.
+- :meth:`g.num_nodes <dgl.DGLGraph.num_nodes>` 를 입력 노드의 개수는 :meth:`block.number_of_src_nodes <dgl.DGLGraph.number_of_src_nodes>` 로 출력 노드의 개수는 :meth:`block.number_of_dst_nodes <dgl.DGLGraph.number_of_dst_nodes>` 로 각각 교체한다.
 
 Heterogeneous 그래프들
 ~~~~~~~~~~~~~~~~~~~~

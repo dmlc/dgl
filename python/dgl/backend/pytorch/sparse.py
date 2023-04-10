@@ -970,7 +970,7 @@ class SEGMENTMM(th.autograd.Function):
     def forward(ctx, A, B, seglen_A):
         if B.dim() != 3:
             raise ValueError("segment_mm expects B to be a 3D tensor.")
-        C = th.zeros((A.shape[0], B.shape[2]), device=A.device, dtype=A.dtype)
+        C = th.empty((A.shape[0], B.shape[2]), device=A.device, dtype=A.dtype)
         C = _segment_mm(A, B, C, seglen_A)
         ctx.backward_cache = A, B, seglen_A
         return C
@@ -981,11 +981,11 @@ class SEGMENTMM(th.autograd.Function):
         A_grad = B_grad = None
         if ctx.needs_input_grad[0]:
             #  Compute A_grad = Out_grad * B^T
-            A_grad = th.zeros(A.shape, device=A.device, dtype=A.dtype)
+            A_grad = th.empty(A.shape, device=A.device, dtype=A.dtype)
             A_grad = _segment_mm(dZ, B, A_grad, seglen_A, b_trans=True)
         if ctx.needs_input_grad[1]:
             #  Compute B_grad = A^T * Out_grad
-            B_grad = th.zeros(B.shape, device=B.device, dtype=B.dtype)
+            B_grad = th.empty(B.shape, device=B.device, dtype=B.dtype)
             B_grad = _segment_mm_backward_B(A, dZ, B_grad, seglen_A)
         return A_grad, B_grad, None
 
