@@ -369,7 +369,7 @@ class SubgraphX(nn.Module):
 
 class HeteroSubgraphX(nn.Module):
     r"""SubgraphX from `On Explainability of Graph Neural Networks via Subgraph
-    Explorations <https://arxiv.org/abs/2102.05152>`
+    Explorations <https://arxiv.org/abs/2102.05152>`__, adapted for heterogeneous graphs
 
     It identifies the most important subgraph from the original graph that
     plays a critical role in GNN-based graph classification.
