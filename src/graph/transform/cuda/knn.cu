@@ -24,6 +24,12 @@ namespace dgl {
 namespace transform {
 namespace impl {
 
+/**
+ * @brief Given input `size`, find the smallest value
+ * greater or equal to `size` that is a multiple of `align`.
+ *
+ * e.g. Pow2Align(17, 4) = 20, Pow2Align(17, 8) = 24
+ */
 template <typename Type>
 static __host__ __device__ std::enable_if_t<std::is_unsigned<Type>::value, Type>
 Pow2Align(Type size, Type align) {
