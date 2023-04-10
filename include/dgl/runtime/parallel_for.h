@@ -32,10 +32,10 @@ struct DefaultGrainSizeT {
   explicit DefaultGrainSizeT(size_t default_grain_size) {
     auto var = dgl::kDGLParallelForGrainSize;
 
-    if (!var) {
-      grain_size = default_grain_size;
-    } else {
+    if (var) {
       grain_size = std::stoul(var);
+    } else {
+      grain_size = default_grain_size;
     }
   }
 
