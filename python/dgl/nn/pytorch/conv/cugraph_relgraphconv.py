@@ -13,6 +13,7 @@ try:
     from pylibcugraphops.pytorch.operators import (
         agg_hg_basis_n2n_post as RelGraphConvAgg,
     )
+
     HAS_PYLIBCUGRAPHOPS = True
 except ImportError:
     HAS_PYLIBCUGRAPHOPS = False

@@ -2,6 +2,7 @@
 import torch
 from torch import nn
 
+
 class CuGraphBaseConv(nn.Module):
     r"""An abstract base class for cugraph-ops nn module."""
 

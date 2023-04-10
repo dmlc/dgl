@@ -10,6 +10,7 @@ from .cugraph_base import CuGraphBaseConv
 try:
     from pylibcugraphops.pytorch import SampledCSC, StaticCSC
     from pylibcugraphops.pytorch.operators import mha_gat_n2n as GATConvAgg
+
     HAS_PYLIBCUGRAPHOPS = True
 except ImportError:
     HAS_PYLIBCUGRAPHOPS = False

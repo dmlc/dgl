@@ -10,6 +10,7 @@ from .cugraph_base import CuGraphBaseConv
 try:
     from pylibcugraphops.pytorch import SampledCSC, StaticCSC
     from pylibcugraphops.pytorch.operators import agg_concat_n2n as SAGEConvAgg
+
     HAS_PYLIBCUGRAPHOPS = True
 except ImportError:
     HAS_PYLIBCUGRAPHOPS = False
