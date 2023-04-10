@@ -6,18 +6,19 @@ import math
 import torch
 from torch import nn
 
+from .cugraph_base import CuGraphBaseConv
+
 try:
     from pylibcugraphops.pytorch import SampledHeteroCSC, StaticHeteroCSC
     from pylibcugraphops.pytorch.operators import (
         agg_hg_basis_n2n_post as RelGraphConvAgg,
     )
+    HAS_PYLIBCUGRAPHOPS = True
 except ImportError:
-    has_pylibcugraphops = False
-else:
-    has_pylibcugraphops = True
+    HAS_PYLIBCUGRAPHOPS = False
 
 
-class CuGraphRelGraphConv(nn.Module):
+class CuGraphRelGraphConv(CuGraphBaseConv):
     r"""An accelerated relational graph convolution layer from `Modeling
     Relational Data with Graph Convolutional Networks
     <https://arxiv.org/abs/1703.06103>`__ that leverages the highly-optimized
@@ -26,7 +27,7 @@ class CuGraphRelGraphConv(nn.Module):
     See :class:`dgl.nn.pytorch.conv.RelGraphConv` for mathematical model.
 
     This module depends on :code:`pylibcugraphops` package, which can be
-    installed via :code:`conda install -c nvidia pylibcugraphops>=23.02`.
+    installed via :code:`conda install -c nvidia pylibcugraphops>=23.04`.
 
     .. note::
         This is an **experimental** feature.
@@ -92,10 +93,10 @@ class CuGraphRelGraphConv(nn.Module):
         dropout=0.0,
         apply_norm=False,
     ):
-        if has_pylibcugraphops is False:
+        if HAS_PYLIBCUGRAPHOPS is False:
             raise ModuleNotFoundError(
-                f"{self.__class__.__name__} requires pylibcugraphops >= 23.02 "
-                f"to be installed."
+                f"{self.__class__.__name__} requires pylibcugraphops>=23.04. "
+                f"Install via `conda install -c nvidia pylibcugraphops>=23.04`."
             )
         super().__init__()
         self.in_feat = in_feat
@@ -176,11 +177,9 @@ class CuGraphRelGraphConv(nn.Module):
         torch.Tensor
             New node features. Shape: :math:`(|V|, D_{out})`.
         """
-        # Create csc-representation and cast etypes to int32.
         offsets, indices, edge_ids = g.adj_sparse("csc")
         edge_types_perm = etypes[edge_ids.long()].int()
 
-        # Create cugraph-ops graph.
         if g.is_block:
             if max_in_degree is None:
                 max_in_degree = g.in_degrees().max().item()
@@ -195,14 +194,7 @@ class CuGraphRelGraphConv(nn.Module):
                     self.num_rels,
                 )
             else:
-                offsets_fg = torch.empty(
-                    g.num_src_nodes() + 1,
-                    dtype=offsets.dtype,
-                    device=offsets.device,
-                )
-                offsets_fg[: offsets.numel()] = offsets
-                offsets_fg[offsets.numel() :] = offsets[-1]
-
+                offsets_fg = self.pad_offsets(offsets, g.num_src_nodes() + 1)
                 _graph = StaticHeteroCSC(
                     offsets_fg,
                     indices,

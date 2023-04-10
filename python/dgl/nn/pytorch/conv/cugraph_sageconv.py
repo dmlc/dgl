@@ -5,16 +5,17 @@ cugraph-ops"""
 import torch
 from torch import nn
 
+from .cugraph_base import CuGraphBaseConv
+
 try:
     from pylibcugraphops.pytorch import SampledCSC, StaticCSC
     from pylibcugraphops.pytorch.operators import agg_concat_n2n as SAGEConvAgg
+    HAS_PYLIBCUGRAPHOPS = True
 except ImportError:
-    has_pylibcugraphops = False
-else:
-    has_pylibcugraphops = True
+    HAS_PYLIBCUGRAPHOPS = False
 
 
-class CuGraphSAGEConv(nn.Module):
+class CuGraphSAGEConv(CuGraphBaseConv):
     r"""An accelerated GraphSAGE layer from `Inductive Representation Learning
     on Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__ that leverages the
     highly-optimized aggregation primitives in cugraph-ops:
@@ -27,7 +28,7 @@ class CuGraphSAGEConv(nn.Module):
         (h_{i}^{l}, h_{\mathcal{N}(i)}^{(l+1)})
 
     This module depends on :code:`pylibcugraphops` package, which can be
-    installed via :code:`conda install -c nvidia pylibcugraphops>=23.02`.
+    installed via :code:`conda install -c nvidia pylibcugraphops>=23.04`.
 
     .. note::
         This is an **experimental** feature.
@@ -74,10 +75,10 @@ class CuGraphSAGEConv(nn.Module):
         feat_drop=0.0,
         bias=True,
     ):
-        if has_pylibcugraphops is False:
+        if HAS_PYLIBCUGRAPHOPS is False:
             raise ModuleNotFoundError(
-                f"{self.__class__.__name__} requires pylibcugraphops >= 23.02. "
-                f"Install via `conda install -c nvidia 'pylibcugraphops>=23.02'`."
+                f"{self.__class__.__name__} requires pylibcugraphops>=23.04. "
+                f"Install via `conda install -c nvidia pylibcugraphops>=23.04`."
             )
 
         valid_aggr_types = {"max", "min", "mean", "sum"}
@@ -133,14 +134,7 @@ class CuGraphSAGEConv(nn.Module):
                     g.num_src_nodes(),
                 )
             else:
-                offsets_fg = torch.empty(
-                    g.num_src_nodes() + 1,
-                    dtype=offsets.dtype,
-                    device=offsets.device,
-                )
-                offsets_fg[: offsets.numel()] = offsets
-                offsets_fg[offsets.numel() :] = offsets[-1]
-
+                offsets_fg = self.pad_offsets(offsets, g.num_src_nodes() + 1)
                 _graph = StaticCSC(offsets_fg, indices)
         else:
             _graph = StaticCSC(offsets, indices)
