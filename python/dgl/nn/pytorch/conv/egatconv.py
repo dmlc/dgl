@@ -159,7 +159,9 @@ class EGATConv(nn.Module):
         init.xavier_normal_(self.attn, gain=gain)
         init.constant_(self.bias, 0)
 
-    def forward(self, graph, nfeats, efeats, edge_weight=None, get_attention=False):
+    def forward(
+        self, graph, nfeats, efeats, edge_weight=None, get_attention=False
+    ):
         r"""
         Compute new node and edge features.
 

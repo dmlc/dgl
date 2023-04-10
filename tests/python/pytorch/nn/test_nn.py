@@ -710,7 +710,9 @@ def test_egat_conv_bi(g, idtype, out_node_feats, out_edge_feats, num_heads):
 @pytest.mark.parametrize("out_node_feats", [1, 5])
 @pytest.mark.parametrize("out_edge_feats", [1, 5])
 @pytest.mark.parametrize("num_heads", [1, 4])
-def test_egat_conv_edge_weight(g, idtype, out_node_feats, out_edge_feats, num_heads):
+def test_egat_conv_edge_weight(
+    g, idtype, out_node_feats, out_edge_feats, num_heads
+):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
     egat = nn.EGATConv(
@@ -722,10 +724,10 @@ def test_egat_conv_edge_weight(g, idtype, out_node_feats, out_edge_feats, num_he
     )
     nfeat = F.randn((g.num_nodes(), 10))
     efeat = F.randn((g.num_edges(), 5))
-    ew = F.randn(*(g.num_edges(), ))
-    
+    ew = F.randn(*(g.num_edges(),))
+
     h, f, attn = egat(g, nfeat, efeat, edge_weight=ew, get_attention=True)
-    
+
     assert h.shape == (g.num_nodes(), num_heads, out_node_feats)
     assert f.shape == (g.num_edges(), num_heads, out_edge_feats)
     assert attn.shape == (g.num_edges(), num_heads, 1)
