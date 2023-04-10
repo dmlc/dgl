@@ -10,8 +10,9 @@
 
 namespace dgl {
 
-static const char* kDGLParallelForGrainSize = std::getenv("DGL_PARALLEL_FOR_GRAIN_SIZE");
+static const char* kDGLParallelForGrainSize =
+    std::getenv("DGL_PARALLEL_FOR_GRAIN_SIZE");
 
-} // namespace dgl
+}  // namespace dgl
 
 #endif  // DGL_ENV_VARIABLE_H_
