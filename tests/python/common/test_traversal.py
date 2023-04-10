@@ -73,7 +73,7 @@ def test_topological_nodes(idtype, n=100):
     adjmat = g.adjacency_matrix(transpose=True)
 
     def tensor_topo_traverse():
-        n = g.number_of_nodes()
+        n = g.num_nodes()
         mask = F.copy_to(F.ones((n, 1)), F.cpu())
         degree = F.spmm(adjmat, mask)
         while F.reduce_sum(mask) != 0.0:

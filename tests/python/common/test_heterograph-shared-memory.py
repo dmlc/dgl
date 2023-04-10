@@ -40,7 +40,7 @@ def _assert_is_identical_hetero(g, g2):
 
     # check if node ID spaces and feature spaces are equal
     for ntype in g.ntypes:
-        assert g.number_of_nodes(ntype) == g2.number_of_nodes(ntype)
+        assert g.num_nodes(ntype) == g2.num_nodes(ntype)
 
     # check if edge ID spaces and feature spaces are equal
     for etype in g.canonical_etypes:

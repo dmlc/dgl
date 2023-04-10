@@ -6,7 +6,13 @@ import torch
 
 from dgl.sparse import bsddmm, sddmm
 
-from .utils import clone_detach_and_grad, rand_coo, rand_csc, rand_csr
+from .utils import (
+    clone_detach_and_grad,
+    rand_coo,
+    rand_csc,
+    rand_csr,
+    rand_stride,
+)
 
 
 @pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
@@ -22,6 +28,9 @@ def test_sddmm(create_func, shape, nnz, hidden):
     else:
         B = torch.rand(shape[0], requires_grad=True, device=dev)
         C = torch.rand(shape[1], requires_grad=True, device=dev)
+
+    B = rand_stride(B)
+    C = rand_stride(C)
 
     A_val_clone = clone_detach_and_grad(A.val)
     dense_B = clone_detach_and_grad(B)
@@ -57,6 +66,9 @@ def test_bsddmm(create_func, shape, nnz, nz_dim):
     A = create_func(shape, nnz, dev, nz_dim)
     B = torch.rand(shape[0], hidden, nz_dim, requires_grad=True, device=dev)
     C = torch.rand(hidden, shape[1], nz_dim, requires_grad=True, device=dev)
+
+    B = rand_stride(B)
+    C = rand_stride(C)
 
     A_val_clone = clone_detach_and_grad(A.val)
     dense_B = clone_detach_and_grad(B)

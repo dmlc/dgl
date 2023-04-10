@@ -83,9 +83,9 @@ torch::Tensor SDDMMNoAutoGrad(
   if (mat1.dim() >= 3) {
     shape.push_back(mat1.size(2));
     // (N, K, B) -> (N, B, K)
-    mat1 = mat1.transpose(1, 2).contiguous();
+    mat1 = mat1.transpose(1, 2);
     // (M, K, B) -> (M, B, K)
-    mat2_tr = mat2_tr.transpose(1, 2).contiguous();
+    mat2_tr = mat2_tr.transpose(1, 2);
   }
   auto ret = torch::zeros(shape, mat1.options());
   const std::string op = "dot";

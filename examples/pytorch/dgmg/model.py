@@ -21,7 +21,7 @@ class GraphEmbed(nn.Module):
         self.node_to_graph = nn.Linear(node_hidden_size, self.graph_hidden_size)
 
     def forward(self, g):
-        if g.number_of_nodes() == 0:
+        if g.num_nodes() == 0:
             return torch.zeros(1, self.graph_hidden_size)
         else:
             # Node features are stored as hv in ndata.
@@ -75,7 +75,7 @@ class GraphProp(nn.Module):
         return {"a": node_activation}
 
     def forward(self, g):
-        if g.number_of_edges() == 0:
+        if g.num_edges() == 0:
             return
         else:
             for t in range(self.num_prop_rounds):
@@ -115,7 +115,7 @@ class AddNode(nn.Module):
         self.init_node_activation = torch.zeros(1, 2 * node_hidden_size)
 
     def _initialize_node_repr(self, g, node_type, graph_embed):
-        num_nodes = g.number_of_nodes()
+        num_nodes = g.num_nodes()
         hv_init = self.initialize_hv(
             torch.cat(
                 [
@@ -166,7 +166,7 @@ class AddEdge(nn.Module):
 
     def forward(self, g, action=None):
         graph_embed = self.graph_op["embed"](g)
-        src_embed = g.nodes[g.number_of_nodes() - 1].data["hv"]
+        src_embed = g.nodes[g.num_nodes() - 1].data["hv"]
 
         logit = self.add_edge(torch.cat([graph_embed, src_embed], dim=1))
         prob = torch.sigmoid(logit)
@@ -200,7 +200,7 @@ class ChooseDestAndUpdate(nn.Module):
         self.log_prob = []
 
     def forward(self, g, dest):
-        src = g.number_of_nodes() - 1
+        src = g.num_nodes() - 1
         possible_dests = range(src)
 
         src_embed_expand = g.nodes[src].data["hv"].expand(src, -1)
@@ -320,10 +320,10 @@ class DGMG(nn.Module):
 
     def forward_inference(self):
         stop = self.add_node_and_update()
-        while (not stop) and (self.g.number_of_nodes() < self.v_max + 1):
+        while (not stop) and (self.g.num_nodes() < self.v_max + 1):
             num_trials = 0
             to_add_edge = self.add_edge_or_not()
-            while to_add_edge and (num_trials < self.g.number_of_nodes() - 1):
+            while to_add_edge and (num_trials < self.g.num_nodes() - 1):
                 self.choose_dest_and_update()
                 num_trials += 1
                 to_add_edge = self.add_edge_or_not()

@@ -461,8 +461,8 @@ class FB15k237Dataset(KnowledgeGraphDataset):
     >>> val_mask = g.edata['val_mask']
     >>> test_mask = g.edata['test_mask']
     >>>
-    >>> train_set = th.arange(g.number_of_edges())[train_mask]
-    >>> val_set = th.arange(g.number_of_edges())[val_mask]
+    >>> train_set = th.arange(g.num_edges())[train_mask]
+    >>> val_set = th.arange(g.num_edges())[val_mask]
     >>>
     >>> # build train_g
     >>> train_edges = train_set
@@ -577,8 +577,8 @@ class FB15kDataset(KnowledgeGraphDataset):
     >>> train_mask = g.edata['train_mask']
     >>> val_mask = g.edata['val_mask']
     >>>
-    >>> train_set = th.arange(g.number_of_edges())[train_mask]
-    >>> val_set = th.arange(g.number_of_edges())[val_mask]
+    >>> train_set = th.arange(g.num_edges())[train_mask]
+    >>> val_set = th.arange(g.num_edges())[val_mask]
     >>>
     >>> # build train_g
     >>> train_edges = train_set
@@ -693,8 +693,8 @@ class WN18Dataset(KnowledgeGraphDataset):
     >>> train_mask = g.edata['train_mask']
     >>> val_mask = g.edata['val_mask']
     >>>
-    >>> train_set = th.arange(g.number_of_edges())[train_mask]
-    >>> val_set = th.arange(g.number_of_edges())[val_mask]
+    >>> train_set = th.arange(g.num_edges())[train_mask]
+    >>> val_set = th.arange(g.num_edges())[val_mask]
     >>>
     >>> # build train_g
     >>> train_edges = train_set

@@ -54,7 +54,7 @@
 
 .. code:: python
 
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     dataloader = dgl.dataloading.EdgeDataLoader(
         g, train_eid_dict, sampler,
 

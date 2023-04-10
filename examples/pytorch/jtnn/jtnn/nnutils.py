@@ -50,4 +50,4 @@ def tocpu(g):
     src, dst = g.edges()
     src = src.cpu()
     dst = dst.cpu()
-    return dgl.graph((src, dst), num_nodes=g.number_of_nodes())
+    return dgl.graph((src, dst), num_nodes=g.num_nodes())

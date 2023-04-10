@@ -34,11 +34,11 @@ def load_ogb(name, root="dataset"):
         splitted_idx["valid"],
         splitted_idx["test"],
     )
-    train_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    train_mask = th.zeros((graph.num_nodes(),), dtype=th.bool)
     train_mask[train_nid] = True
-    val_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    val_mask = th.zeros((graph.num_nodes(),), dtype=th.bool)
     val_mask[val_nid] = True
-    test_mask = th.zeros((graph.number_of_nodes(),), dtype=th.bool)
+    test_mask = th.zeros((graph.num_nodes(),), dtype=th.bool)
     test_mask[test_nid] = True
     graph.ndata["train_mask"] = train_mask
     graph.ndata["val_mask"] = val_mask

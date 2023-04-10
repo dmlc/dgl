@@ -22,7 +22,7 @@ def get_next(i, v_max):
 
 
 def is_cycle(g):
-    size = g.number_of_nodes()
+    size = g.num_nodes()
 
     if size < 3:
         return False
@@ -102,7 +102,7 @@ class CycleDataset(Dataset):
 
 def dglGraph_to_adj_list(g):
     adj_list = {}
-    for node in range(g.number_of_nodes()):
+    for node in range(g.num_nodes()):
         # For undirected graph. successors and
         # predecessors are equivalent.
         adj_list[node] = g.successors(node).tolist()
@@ -141,7 +141,7 @@ class CycleModelEvaluation(object):
             sampled_adj_list = dglGraph_to_adj_list(sampled_graph)
             adj_lists_to_plot.append(sampled_adj_list)
 
-            graph_size = sampled_graph.number_of_nodes()
+            graph_size = sampled_graph.num_nodes()
             valid_size = self.v_min <= graph_size <= self.v_max
             cycle = is_cycle(sampled_graph)
 
