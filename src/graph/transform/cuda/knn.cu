@@ -25,7 +25,7 @@ namespace transform {
 namespace impl {
 
 template <typename Type>
-static __host__ __device__ std::enable_if_t<std::is_unsigned_v<Type>, Type>
+static __host__ __device__ std::enable_if_t<std::is_unsigned<Type>::value, Type>
 Pow2Align(Type size, Type align) {
   if (align <= 1 || size <= 0) return size;
   return ((size - 1) | (align - 1)) + 1;
