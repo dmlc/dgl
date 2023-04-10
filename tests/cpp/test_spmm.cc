@@ -105,6 +105,7 @@ void _TestSpmmCopyLhs() {
 TEST(SpmmTest, TestSpmmCopyLhs) {
   _TestSpmmCopyLhs<float>();
   _TestSpmmCopyLhs<double>();
+  _TestSpmmCopyLhs<BFloat16>();
 }
 
 template <typename IDX>
@@ -130,6 +131,7 @@ void _TestSpmmCopyRhs() {
 TEST(SpmmTest, TestSpmmCopyRhs) {
   _TestSpmmCopyRhs<float>();
   _TestSpmmCopyRhs<double>();
+  _TestSpmmCopyRhs<BFloat16>();
 }
 
 template <typename IDX>
@@ -156,6 +158,7 @@ void _TestSpmmAdd() {
 TEST(SpmmTest, TestSpmmAdd) {
   _TestSpmmAdd<float>();
   _TestSpmmAdd<double>();
+  _TestSpmmAdd<BFloat16>();
 }
 
 template <typename IDX>
@@ -182,6 +185,7 @@ void _TestSpmmSub() {
 TEST(SpmmTest, TestSpmmSub) {
   _TestSpmmSub<float>();
   _TestSpmmSub<double>();
+  _TestSpmmSub<BFloat16>();
 }
 
 template <typename IDX>
@@ -208,6 +212,7 @@ void _TestSpmmMul() {
 TEST(SpmmTest, TestSpmmMul) {
   _TestSpmmMul<float>();
   _TestSpmmMul<double>();
+  _TestSpmmMul<BFloat16>();
 }
 
 template <typename IDX>
@@ -234,5 +239,6 @@ void _TestSpmmDiv() {
 TEST(SpmmTest, TestSpmmDiv) {
   _TestSpmmDiv<float>();
   _TestSpmmDiv<double>();
+  _TestSpmmDiv<BFloat16>();
 }
 #endif  // _WIN32

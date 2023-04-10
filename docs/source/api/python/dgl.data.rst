@@ -56,6 +56,12 @@ Datasets for node classification/regression tasks
     YelpDataset
     PATTERNDataset
     CLUSTERDataset
+    ChameleonDataset
+    SquirrelDataset
+    ActorDataset
+    CornellDataset
+    TexasDataset
+    WisconsinDataset
 
 Edge Prediction Datasets
 ---------------------------------------

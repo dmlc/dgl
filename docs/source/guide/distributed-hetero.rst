@@ -179,7 +179,7 @@ and store it as node data of :math:`T0`.
 .. code:: python
 
     g.nodes['T0'].data['feat1'] = dgl.distributed.DistTensor(
-        (g.number_of_nodes('T0'), 1), th.float32, 'feat1',
+        (g.num_nodes('T0'), 1), th.float32, 'feat1',
         part_policy=g.get_node_partition_policy('T0'))
 
 The partition policies used for creating distributed tensors and embeddings are

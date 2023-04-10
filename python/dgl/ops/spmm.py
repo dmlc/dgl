@@ -109,9 +109,7 @@ def gspmm(g, op, reduce_op, lhs_data, rhs_data):
     if reduce_op == "mean":
         ret_shape = F.shape(ret)
         deg = g.in_degrees()
-        deg = F.astype(
-            F.clamp(deg, 1, max(g.number_of_edges(), 1)), F.dtype(ret)
-        )
+        deg = F.astype(F.clamp(deg, 1, max(g.num_edges(), 1)), F.dtype(ret))
         deg_shape = (ret_shape[0],) + (1,) * (len(ret_shape) - 1)
         return ret / F.reshape(deg, deg_shape)
     else:

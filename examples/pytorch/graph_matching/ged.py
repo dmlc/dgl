@@ -29,11 +29,11 @@ def validate_cost_functions(
     Parameters : see graph_edit_distance
 
     """
-    num_G1_nodes = G1.number_of_nodes()
-    num_G2_nodes = G2.number_of_nodes()
+    num_G1_nodes = G1.num_nodes()
+    num_G2_nodes = G2.num_nodes()
 
-    num_G1_edges = G1.number_of_edges()
-    num_G2_edges = G2.number_of_edges()
+    num_G1_edges = G1.num_edges()
+    num_G2_edges = G2.num_edges()
 
     # if any cost matrix is None, initialize it with default costs
     if node_substitution_cost is None:
@@ -96,11 +96,11 @@ def construct_cost_functions(
     Parameters : see graph_edit_distance
 
     """
-    num_G1_nodes = G1.number_of_nodes()
-    num_G2_nodes = G2.number_of_nodes()
+    num_G1_nodes = G1.num_nodes()
+    num_G2_nodes = G2.num_nodes()
 
-    num_G1_edges = G1.number_of_edges()
-    num_G2_edges = G2.number_of_edges()
+    num_G1_edges = G1.num_edges()
+    num_G2_edges = G2.num_edges()
 
     # cost matrix of node mappings
     cost_upper_bound = (
@@ -268,11 +268,11 @@ class search_tree_node:
             self.matched_cost += cost_matrix_nodes[node_G1, node_G2]
         elif node_G1 is not None:  # Delete node_G1
             self.matched_cost += cost_matrix_nodes[
-                node_G1, node_G1 + G2.number_of_nodes()
+                node_G1, node_G1 + G2.num_nodes()
             ]
         elif node_G2 is not None:  # Insert node_G2
             self.matched_cost += cost_matrix_nodes[
-                node_G2 + G1.number_of_nodes(), node_G2
+                node_G2 + G1.num_nodes(), node_G2
             ]
 
         # Add the cost of matching edges at this tree-node to the matched cost
@@ -299,8 +299,8 @@ class search_tree_node:
                 cost_matrix_edges,
                 incident_edges_G1,
                 incident_edges_G2,
-                G1.number_of_edges(),
-                G2.number_of_edges(),
+                G1.num_edges(),
+                G2.num_edges(),
             )
             max_sum = matched_edges_cost_matrix.sum()
             # take care of impossible assignments by assigning maximum cost
@@ -339,7 +339,7 @@ class search_tree_node:
             edge_deletion_cost = 0.0
             for edge in incident_edges_G1:
                 edge_deletion_cost += cost_matrix_edges[
-                    edge, G2.number_of_edges() + edge
+                    edge, G2.num_edges() + edge
                 ]
             # Update matched edges
             for edge in incident_edges_G1:
@@ -354,7 +354,7 @@ class search_tree_node:
             edge_insertion_cost = 0.0
             for edge in incident_edges_G2:
                 edge_insertion_cost += cost_matrix_edges[
-                    G1.number_of_edges() + edge, edge
+                    G1.num_edges() + edge, edge
                 ]
             # Update matched edges
             for edge in incident_edges_G2:
@@ -372,8 +372,8 @@ class search_tree_node:
                 cost_matrix_nodes,
                 self.unprocessed_nodes_G1,
                 self.unprocessed_nodes_G2,
-                G1.number_of_nodes(),
-                G2.number_of_nodes(),
+                G1.num_nodes(),
+                G2.num_nodes(),
             )
             # Match the edges as per the LAP solution
             row_ind, col_ind, _ = lapjv(unmatched_nodes_cost_matrix)
@@ -387,7 +387,7 @@ class search_tree_node:
             node_deletion_cost = 0.0
             for node in self.unprocessed_nodes_G1:
                 node_deletion_cost += cost_matrix_nodes[
-                    node, G2.number_of_nodes() + node
+                    node, G2.num_nodes() + node
                 ]
 
             self.future_approximate_cost += node_deletion_cost
@@ -396,7 +396,7 @@ class search_tree_node:
             node_insertion_cost = 0.0
             for node in self.unprocessed_nodes_G2:
                 node_insertion_cost += cost_matrix_nodes[
-                    G1.number_of_nodes() + node, node
+                    G1.num_nodes() + node, node
                 ]
 
             self.future_approximate_cost += node_insertion_cost
@@ -416,8 +416,8 @@ class search_tree_node:
                 cost_matrix_edges,
                 self.unprocessed_edges_G1,
                 self.unprocessed_edges_G2,
-                G1.number_of_edges(),
-                G2.number_of_edges(),
+                G1.num_edges(),
+                G2.num_edges(),
             )
             # Match the edges as per the LAP solution
             row_ind, col_ind, _ = lapjv(unmatched_edges_cost_matrix)
@@ -431,7 +431,7 @@ class search_tree_node:
             edge_deletion_cost = 0.0
             for edge in self.unprocessed_edges_G1:
                 edge_deletion_cost += cost_matrix_edges[
-                    edge, G2.number_of_edges() + edge
+                    edge, G2.num_edges() + edge
                 ]
 
             self.future_approximate_cost += edge_deletion_cost
@@ -440,7 +440,7 @@ class search_tree_node:
             edge_insertion_cost = 0.0
             for edge in self.unprocessed_edges_G2:
                 edge_insertion_cost += cost_matrix_edges[
-                    G1.number_of_edges() + edge, edge
+                    G1.num_edges() + edge, edge
                 ]
 
             self.future_approximate_cost += edge_insertion_cost
@@ -481,16 +481,16 @@ def edit_cost_from_node_matching(
     matched_nodes = ([], [])
     matched_edges = ([], [])
     # Add the cost of matching nodes
-    for i in range(G1.number_of_nodes()):
+    for i in range(G1.num_nodes()):
         matched_cost += cost_matrix_nodes[i, node_matching[i]]
         matched_nodes[0].append(i)
-        if node_matching[i] < G2.number_of_nodes():
+        if node_matching[i] < G2.num_nodes():
             matched_nodes[1].append(node_matching[i])
         else:
             matched_nodes[1].append(None)
-    for i in range(G1.number_of_nodes(), len(node_matching)):
+    for i in range(G1.num_nodes(), len(node_matching)):
         matched_cost += cost_matrix_nodes[i, node_matching[i]]
-        if node_matching[i] < G2.number_of_nodes():
+        if node_matching[i] < G2.num_nodes():
             matched_nodes[0].append(None)
             matched_nodes[1].append(node_matching[i])
 
@@ -519,8 +519,8 @@ def edit_cost_from_node_matching(
                 cost_matrix_edges,
                 incident_edges_G1,
                 incident_edges_G2,
-                G1.number_of_edges(),
-                G2.number_of_edges(),
+                G1.num_edges(),
+                G2.num_edges(),
             )
             max_sum = matched_edges_cost_matrix.sum()
             # take care of impossible assignments by assigning maximum cost
@@ -557,7 +557,7 @@ def edit_cost_from_node_matching(
             edge_deletion_cost = 0.0
             for edge in incident_edges_G1:
                 edge_deletion_cost += cost_matrix_edges[
-                    edge, G2.number_of_edges() + edge
+                    edge, G2.num_edges() + edge
                 ]
             # Update matched edges
             for edge in incident_edges_G1:
@@ -572,7 +572,7 @@ def edit_cost_from_node_matching(
             edge_insertion_cost = 0.0
             for edge in incident_edges_G2:
                 edge_insertion_cost += cost_matrix_edges[
-                    G1.number_of_edges() + edge, edge
+                    G1.num_edges() + edge, edge
                 ]
             # Update matched edges
             for edge in incident_edges_G2:
@@ -597,11 +597,11 @@ def contextual_cost_matrix_construction(
     # Calculates approximate GED using linear assignment on the nodes with bipartite algorithm
     # cost matrix of node mappings
 
-    num_G1_nodes = G1.number_of_nodes()
-    num_G2_nodes = G2.number_of_nodes()
+    num_G1_nodes = G1.num_nodes()
+    num_G2_nodes = G2.num_nodes()
 
-    num_G1_edges = G1.number_of_edges()
-    num_G2_edges = G2.number_of_edges()
+    num_G1_edges = G1.num_edges()
+    num_G2_edges = G2.num_edges()
 
     cost_upper_bound = 2 * (
         node_substitution_cost.sum()
@@ -681,7 +681,7 @@ def contextual_cost_matrix_construction(
                 )
             )
         ]
-        for i in range(G1.number_of_nodes())
+        for i in range(G1.num_nodes())
     ]
     selected_insertion_G2 = [
         G2_edge_insertion_cost[
@@ -693,7 +693,7 @@ def contextual_cost_matrix_construction(
                 )
             )
         ]
-        for i in range(G2.number_of_nodes())
+        for i in range(G2.num_nodes())
     ]
 
     # Add the cost of edge edition which are dependent of a node (see this as the cost associated with a substructure)
@@ -774,11 +774,11 @@ def hausdorff_matching(
     # Calculates approximate GED using hausdorff_matching
     # cost matrix of node mappings
 
-    num_G1_nodes = G1.number_of_nodes()
-    num_G2_nodes = G2.number_of_nodes()
+    num_G1_nodes = G1.num_nodes()
+    num_G2_nodes = G2.num_nodes()
 
-    num_G1_edges = G1.number_of_edges()
-    num_G2_edges = G2.number_of_edges()
+    num_G1_edges = G1.num_edges()
+    num_G2_edges = G2.num_edges()
 
     self_edge_list_G1 = [np.array([], dtype=int)] * num_G1_nodes
     self_edge_list_G2 = [np.array([], dtype=int)] * num_G2_nodes
@@ -816,29 +816,29 @@ def hausdorff_matching(
 
     selected_deletion_self_G1 = [
         G1_edge_deletion_cost[self_edge_list_G1[i]]
-        for i in range(G1.number_of_nodes())
+        for i in range(G1.num_nodes())
     ]
     selected_insertion_self_G2 = [
         G2_edge_insertion_cost[self_edge_list_G2[i]]
-        for i in range(G2.number_of_nodes())
+        for i in range(G2.num_nodes())
     ]
 
     selected_deletion_incoming_G1 = [
         G1_edge_deletion_cost[incoming_edges_G1[i]]
-        for i in range(G1.number_of_nodes())
+        for i in range(G1.num_nodes())
     ]
     selected_insertion_incoming_G2 = [
         G2_edge_insertion_cost[incoming_edges_G2[i]]
-        for i in range(G2.number_of_nodes())
+        for i in range(G2.num_nodes())
     ]
 
     selected_deletion_outgoing_G1 = [
         G1_edge_deletion_cost[outgoing_edges_G1[i]]
-        for i in range(G1.number_of_nodes())
+        for i in range(G1.num_nodes())
     ]
     selected_insertion_outgoing_G2 = [
         G2_edge_insertion_cost[outgoing_edges_G2[i]]
-        for i in range(G2.number_of_nodes())
+        for i in range(G2.num_nodes())
     ]
 
     selected_deletion_G1 = [
@@ -851,7 +851,7 @@ def hausdorff_matching(
                 )
             )
         ]
-        for i in range(G1.number_of_nodes())
+        for i in range(G1.num_nodes())
     ]
     selected_insertion_G2 = [
         G2_edge_insertion_cost[
@@ -863,7 +863,7 @@ def hausdorff_matching(
                 )
             )
         ]
-        for i in range(G2.number_of_nodes())
+        for i in range(G2.num_nodes())
     ]
 
     cost_G1 = np.array(
@@ -1001,16 +1001,16 @@ def a_star_search(G1, G2, cost_matrix_nodes, cost_matrix_edges, max_beam_size):
     matched_edges = ([], [])
     # No edges matched in the beginning
     unprocessed_nodes_G1 = [
-        i for i in range(G1.number_of_nodes())
+        i for i in range(G1.num_nodes())
     ]  # No nodes matched in the beginning
     unprocessed_nodes_G2 = [
-        i for i in range(G2.number_of_nodes())
+        i for i in range(G2.num_nodes())
     ]  # No nodes matched in the beginning
     unprocessed_edges_G1 = [
-        i for i in range(G1.number_of_edges())
+        i for i in range(G1.num_edges())
     ]  # No edges matched in the beginning
     unprocessed_edges_G2 = [
-        i for i in range(G2.number_of_edges())
+        i for i in range(G2.num_edges())
     ]  # No edges matched in the beginning
 
     for i in range(len(unprocessed_nodes_G2)):
@@ -1278,12 +1278,8 @@ def graph_edit_distance(
         )
         return (
             matched_cost,
-            get_sorted_mapping(
-                matched_nodes, G1.number_of_nodes(), G2.number_of_nodes()
-            ),
-            get_sorted_mapping(
-                matched_edges, G1.number_of_edges(), G2.number_of_edges()
-            ),
+            get_sorted_mapping(matched_nodes, G1.num_nodes(), G2.num_nodes()),
+            get_sorted_mapping(matched_edges, G1.num_edges(), G2.num_edges()),
         )
 
     elif algorithm == "hausdorff":
@@ -1324,10 +1320,6 @@ def graph_edit_distance(
 
         return (
             matched_cost,
-            get_sorted_mapping(
-                matched_nodes, G1.number_of_nodes(), G2.number_of_nodes()
-            ),
-            get_sorted_mapping(
-                matched_edges, G1.number_of_edges(), G2.number_of_edges()
-            ),
+            get_sorted_mapping(matched_nodes, G1.num_nodes(), G2.num_nodes()),
+            get_sorted_mapping(matched_edges, G1.num_edges(), G2.num_edges()),
         )

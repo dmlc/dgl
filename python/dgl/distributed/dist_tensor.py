@@ -90,7 +90,7 @@ class DistTensor:
     Examples
     --------
     >>> init = lambda shape, dtype: th.ones(shape, dtype=dtype)
-    >>> arr = dgl.distributed.DistTensor((g.number_of_nodes(), 2), th.int32, init_func=init)
+    >>> arr = dgl.distributed.DistTensor((g.num_nodes(), 2), th.int32, init_func=init)
     >>> print(arr[0:3])
     tensor([[1, 1],
             [1, 1],

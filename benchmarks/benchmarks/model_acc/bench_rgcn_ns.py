@@ -299,7 +299,7 @@ def track_acc(data):
     g.ndata["type_id"] = g.ndata[dgl.NID]
     g.ndata["ntype"] = g.ndata[dgl.NTYPE]
 
-    node_ids = th.arange(g.number_of_nodes())
+    node_ids = th.arange(g.num_nodes())
     # find out the target node ids
     node_tids = g.ndata[dgl.NTYPE]
     loc = node_tids == category_id
@@ -330,7 +330,7 @@ def track_acc(data):
     # None for one-hot feature, if not none, it should be the feature tensor.
     embed_layer = RelGraphEmbedLayer(
         device,
-        g.number_of_nodes(),
+        g.num_nodes(),
         node_tids,
         num_of_ntype,
         node_feats,
@@ -342,7 +342,7 @@ def track_acc(data):
     # all model params are in device.
     model = EntityClassify(
         device,
-        g.number_of_nodes(),
+        g.num_nodes(),
         n_hidden,
         num_classes,
         num_rels,
