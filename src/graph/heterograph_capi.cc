@@ -489,6 +489,13 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroCopyTo")
       *rv = HeteroGraphRef(hg_new);
     });
 
+DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPinMemory")
+    .set_body([](DGLArgs args, DGLRetValue* rv) {
+      HeteroGraphRef hg = args[0];
+      HeteroGraphPtr hg_new = HeteroGraph::PinMemory(hg.sptr());
+      *rv = HeteroGraphRef(hg_new);
+    });
+
 DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroPinMemory_")
     .set_body([](DGLArgs args, DGLRetValue* rv) {
       HeteroGraphRef hg = args[0];

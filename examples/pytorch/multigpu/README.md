@@ -5,7 +5,7 @@ Requirements
 ------------
 
 ```bash
-pip install torchmetrics
+pip install torchmetrics==0.11.4
 ```
 
 How to run
@@ -68,6 +68,6 @@ Eval F1-score: ~0.7999  Test F1-score: ~0.6383
 
 Notably,
 
-* The loss function is defined by predicting whether an edge exists between two nodes or not. 
+* The loss function is defined by predicting whether an edge exists between two nodes or not.
 * When computing the score of `(u, v)`, the connections between node `u` and `v` are removed from neighbor sampling.
 * The performance of the learned embeddings are measured by training a softmax regression with scikit-learn.

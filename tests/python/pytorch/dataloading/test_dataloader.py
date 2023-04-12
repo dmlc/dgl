@@ -515,6 +515,11 @@ def _create_heterogeneous():
     return g, reverse_etypes, always_exclude, seed_edges
 
 
+def _remove_duplicates(s, d):
+    s, d = list(zip(*list(set(zip(s.tolist(), d.tolist())))))
+    return torch.tensor(s, device=F.ctx()), torch.tensor(d, device=F.ctx())
+
+
 def _find_edges_to_exclude(g, exclude, always_exclude, pair_eids):
     if exclude == None:
         return always_exclude
@@ -620,6 +625,45 @@ def test_edge_dataloader_excludes(
 
         if i == 10:
             break
+
+
+def test_edge_dataloader_exclusion_with_reverse_seed_nodes():
+    utype, etype, vtype = ("A", "AB", "B")
+    s = torch.randint(0, 20, (500,), device=F.ctx())
+    d = torch.randint(0, 20, (500,), device=F.ctx())
+    s, d = _remove_duplicates(s, d)
+    g = dgl.heterograph({("A", "AB", "B"): (s, d), ("B", "BA", "A"): (d, s)})
+    sampler = dgl.dataloading.as_edge_prediction_sampler(
+        dgl.dataloading.NeighborSampler(fanouts=[2, 2, 2]),
+        exclude="reverse_types",
+        reverse_etypes={"AB": "BA", "BA": "AB"},
+    )
+    seed_edges = {
+        "AB": torch.arange(g.number_of_edges("AB"), device=F.ctx()),
+        "BA": torch.arange(g.number_of_edges("BA"), device=F.ctx()),
+    }
+    dataloader = dgl.dataloading.DataLoader(
+        g,
+        seed_edges,
+        sampler,
+        batch_size=2,
+        device=F.ctx(),
+        shuffle=True,
+        drop_last=False,
+    )
+    for _, pos_graph, mfgs in dataloader:
+        s, d = pos_graph["AB"].edges()
+        AB_pos = list(zip(s.tolist(), d.tolist()))
+        s, d = pos_graph["BA"].edges()
+        BA_pos = list(zip(s.tolist(), d.tolist()))
+
+        s, d = mfgs[-1]["AB"].edges()
+        AB_mfg = list(zip(s.tolist(), d.tolist()))
+        s, d = mfgs[-1]["BA"].edges()
+        BA_mfg = list(zip(s.tolist(), d.tolist()))
+
+        assert all(edge not in AB_mfg for edge in AB_pos)
+        assert all(edge not in BA_mfg for edge in BA_pos)
 
 
 def test_edge_dataloader_exclusion_without_all_reverses():
