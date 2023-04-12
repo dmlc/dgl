@@ -3,7 +3,7 @@
 import torch as th
 import torch.nn as nn
 
-from ..base import DGLError
+from ....base import DGLError
 
 
 class DegreeEncoder(nn.Module):
