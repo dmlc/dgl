@@ -1,17 +1,17 @@
 import argparse
 
 import numpy as np
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
+
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from dgl.data import GINDataset
 from dgl.dataloading import GraphDataLoader
 from dgl.nn.pytorch.conv import GraphConv
-import dgl
 
 
 class GraphConvNet(nn.Module):
@@ -40,12 +40,10 @@ class GraphConvNet(nn.Module):
 
 
 def train(train_loader, val_loader, device, model, epochs=350, lr=0.005):
-    # loss function, optimizer and scheduler
+
     loss_fcn = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
-    # training loop
     for epoch in range(epochs):
         model.train()
         total_loss = 0
@@ -167,7 +165,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     explainer = PGExplainer(model, hidden_size, device='cpu', epochs=40)
-    explainer.train_explanation_network(dataset)
+    explainer.train_explanation_network(dataset, lambda g: g.ndata["attr"])
 
     for idx, (graph, l) in enumerate(dataset):
         if idx == 156:

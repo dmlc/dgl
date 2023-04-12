@@ -1,39 +1,34 @@
 """Torch Module for PGExplainer"""
 import math
-
-import networkx as nx
 import numpy as np
 import torch
 import torch.nn as nn
-import dgl
-import copy
 import torch.nn.functional as F
-from scipy.sparse import coo_matrix, csr_matrix
-import dgl.function as fn
 from torch.optim import Adam
-from torch.utils.data import Dataset
 
-from ....base import NID
-from ....convert import to_networkx
-from ....subgraph import node_subgraph
-from ....transforms.functional import remove_nodes
 
 __all__ = ["PGExplainer"]
 
-class PGExplainer(nn.Module):
 
-    def __init__(self,
-                 model,
-                 num_features,
-                 epochs=10,
-                 lr=0.01,
-                 coff_size=0.01,
-                 coff_ent=5e-4,
-                 t0=5.0,
-                 t1=1.0,
-                 sample_bias=0.0,
-                 num_hops=None,
-                 device='cpu'):
+class PGExplainer(nn.Module):
+    r"""
+
+    """
+
+    def __init__(
+        self,
+        model,
+        num_features,
+        epochs=10,
+        lr=0.01,
+        coff_size=0.01,
+        coff_ent=5e-4,
+        t0=5.0,
+        t1=1.0,
+        sample_bias=0.0,
+        num_hops=None,
+        device="cpu",
+    ):
         super(PGExplainer, self).__init__()
 
         self.model = model
@@ -55,8 +50,9 @@ class PGExplainer(nn.Module):
 
         # Explanation model in PGExplainer
         self.elayers = nn.ModuleList()
-        self.elayers.append(nn.Sequential(nn.Linear(self.num_features, 64),
-                                          nn.ReLU()))
+        self.elayers.append(
+            nn.Sequential(nn.Linear(self.num_features, 64), nn.ReLU())
+        )
         self.elayers.append(nn.Linear(64, 1))
         self.elayers.to(self.device)
 
@@ -71,11 +67,14 @@ class PGExplainer(nn.Module):
         }
 
     def set_masks(self, g, feat, edge_mask=None):
+        r"""
+
+        """
         N, F = feat.shape
         E = g.num_edges()
 
         init_bias = self.init_bias
-        std = torch.nn.init.calculate_gain('relu') * math.sqrt(2.0 / (2 * N))
+        std = nn.init.calculate_gain("relu") * math.sqrt(2.0 / (2 * N))
 
         if edge_mask is None:
             self.edge_mask = torch.randn(E) * std + init_bias
@@ -85,19 +84,22 @@ class PGExplainer(nn.Module):
         self.edge_mask = self.edge_mask.to(g.device)
 
     def clear_masks(self):
+        r"""
+
+        """
         self.edge_mask = None
 
     def update_num_hops(self, num_hops):
+        r"""
+
+        """
         if num_hops is not None:
             return num_hops
 
-        # @kunal: Tianhao, what should we do here?
-        k = 0
-        for module in self.model.modules():
-            k += 1
-        return k
-
     def loss(self, prob, ori_pred):
+        r"""
+
+        """
 
         logit = prob[ori_pred]
         logit += 1e-6
@@ -105,15 +107,19 @@ class PGExplainer(nn.Module):
 
         # size
         edge_mask = self.sparse_mask_values
-        if self.coeffs['size'] <= 0:
+        if self.coeffs["size"] <= 0:
             size_loss = self.coeffs["size"] * torch.sum(edge_mask)
         else:
-            size_loss = self.coeffs["size"] * F.relu(torch.sum(edge_mask) - self.coeffs['size'])
+            size_loss = self.coeffs["size"] * F.relu(
+                torch.sum(edge_mask) - self.coeffs["size"]
+            )
 
         # entropy
         scale = 0.99
         edge_mask = self.edge_mask * (2 * scale - 1.0) + (1.0 - scale)
-        mask_ent = -edge_mask * torch.log(edge_mask) - (1 - edge_mask) * torch.log(1 - edge_mask)
+        mask_ent = -edge_mask * torch.log(edge_mask) - (
+            1 - edge_mask
+        ) * torch.log(1 - edge_mask)
         mask_ent_loss = self.coeffs["ent"] * torch.mean(mask_ent)
 
         loss = pred_loss + size_loss + mask_ent_loss
@@ -121,13 +127,17 @@ class PGExplainer(nn.Module):
         return loss
 
     def concrete_sample(self, log_alpha, beta=1.0, training=True):
-        """Uniform random numbers for the concrete distribution"""
+        r"""
+        Uniform random numbers for the concrete distribution
+        """
 
         if training:
             bias = self.coeffs["sample_bias"]
             random_noise = torch.rand(log_alpha.size()).to(log_alpha.device)
             random_noise = bias + (1 - 2 * bias) * random_noise
-            gate_inputs = torch.log(random_noise) - torch.log(1.0 - random_noise)
+            gate_inputs = torch.log(random_noise) - torch.log(
+                1.0 - random_noise
+            )
             gate_inputs = (gate_inputs + log_alpha) / beta
             gate_inputs = torch.sigmoid(gate_inputs)
         else:
@@ -135,8 +145,62 @@ class PGExplainer(nn.Module):
 
         return gate_inputs
 
-    def explain_graph(self, graph, feat, embed, tmp=1.0, training=False):
+    def train_explanation_network(self, dataset, func_extract_feat):
+        r"""
 
+        """
+
+        optimizer = Adam(self.elayers.parameters(), lr=self.coeffs["lr"])
+
+        emb_dict = {}
+        ori_pred_dict = {}
+
+        with torch.no_grad():
+            for idx, (g, l) in enumerate(dataset):
+                feat = func_extract_feat(g)
+
+                self.model.eval()
+
+                logits = self.model(g, feat)
+                emb = self.model(g, feat, graph=False)
+                emb_dict[idx] = emb.data.cpu()
+                ori_pred_dict[idx] = logits.argmax(-1).data.cpu()
+
+        # train the mask generator
+        for epoch in range(self.epochs):
+            loss = 0.0
+            pred_list = []
+
+            tmp = float(
+                self.t0 * np.power(self.t1 / self.t0, epoch / self.epochs)
+            )
+
+            self.elayers.train()
+            optimizer.zero_grad()
+
+            for idx, (g, l) in enumerate(dataset):
+                feat = func_extract_feat(g)
+                g = g.to(self.device)
+                prob, edge_mask = self.explain_graph(
+                    g, feat, embed=emb_dict[idx], tmp=tmp, training=True
+                )
+
+                self.edge_mask = edge_mask
+
+                loss_tmp = self.loss(prob.unsqueeze(dim=0), ori_pred_dict[idx])
+                loss_tmp.backward()
+
+                loss += loss_tmp.item()
+                pred_label = prob.argmax(-1).item()
+                pred_list.append(pred_label)
+
+            optimizer.step()
+            print(f"Epoch: {epoch} | Loss: {loss}")
+
+    def explain_graph(self, graph, feat, embed, tmp=1.0, training=False):
+        r"""
+
+        """
         edge_idx = graph.edges()
 
         node_size = embed.shape[0]
@@ -155,9 +219,9 @@ class PGExplainer(nn.Module):
         self.sparse_mask_values = values
 
         mask_sparse = torch.sparse_coo_tensor(
-            [edge_idx[0].tolist(),edge_idx[1].tolist()],
+            [edge_idx[0].tolist(), edge_idx[1].tolist()],
             values.tolist(),
-            (node_size,node_size)
+            (node_size, node_size),
         )
         mask_sigmoid = mask_sparse.to_dense()
         # set the symmetric edge weights
@@ -175,57 +239,3 @@ class PGExplainer(nn.Module):
         self.clear_masks()
 
         return probs, edge_mask
-
-    # supply a func that will take graph as input and
-    # return the feature as input
-    def train_explanation_network(self, dataset):
-
-        optimizer = Adam(self.elayers.parameters(), lr=self.coeffs['lr'])
-
-        emb_dict = {}
-        ori_pred_dict = {}
-
-        with torch.no_grad():
-            for idx, (g, l) in enumerate(dataset):
-                feat = g.ndata["attr"]
-
-                self.model.eval()
-
-                logits = self.model(g, feat)
-                emb = self.model(g, feat, graph=False)
-                emb_dict[idx] = emb.data.cpu()
-                ori_pred_dict[idx] = logits.argmax(-1).data.cpu()
-
-        # train the mask generator
-        for epoch in range(self.epochs):
-            loss = 0.0
-            pred_list = []
-
-            tmp = float(self.t0 * np.power(self.t1 / self.t0, epoch / self.epochs))
-
-            self.elayers.train()
-            optimizer.zero_grad()
-
-            for idx, (g, l) in enumerate(dataset):
-                feat = g.ndata["attr"]
-                g = g.to(self.device)
-
-                node_idx = g.nodes()
-
-                prob, edge_mask = self.explain_graph(g,
-                                                     feat,
-                                                     embed=emb_dict[idx],
-                                                     tmp=tmp,
-                                                     training=True)
-
-                self.edge_mask = edge_mask
-
-                loss_tmp = self.loss(prob.unsqueeze(dim=0), ori_pred_dict[idx])
-                loss_tmp.backward()
-
-                loss += loss_tmp.item()
-                pred_label = prob.argmax(-1).item()
-                pred_list.append(pred_label)
-
-            optimizer.step()
-            print(f'Epoch: {epoch} | Loss: {loss}')
