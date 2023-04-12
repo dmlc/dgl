@@ -4,11 +4,11 @@ This is an adaptation of RGCN where graph convolution is replaced with graph att
 
 Dependencies
 ------------
-- torchmetrics
+- torchmetrics 0.11.4
 
 Install as follows:
 ```bash
-pip install torchmetrics
+pip install torchmetrics==0.11.4
 ```
 
 How to Run

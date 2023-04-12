@@ -250,6 +250,16 @@ class HeteroGraph : public BaseHeteroGraph {
   void UnpinMemory_();
 
   /**
+   * @brief Copy the current graph to pinned memory managed by
+   *     PyTorch CachingHostAllocator for each relation graph.
+   * @note If any of the underlying relation graphs are already pinned, the
+   *     function will utilize their existing copies. If all of them are
+   *     pinned, the function will return the original input hetero-graph
+   *     directly.
+   */
+  static HeteroGraphPtr PinMemory(HeteroGraphPtr g);
+
+  /**
    * @brief Record stream for this graph.
    * @param stream The stream that is using the graph
    */

@@ -6,6 +6,7 @@
 #ifndef DGL_RUNTIME_PARALLEL_FOR_H_
 #define DGL_RUNTIME_PARALLEL_FOR_H_
 
+#include <dgl/env_variable.h>
 #include <dmlc/omp.h>
 
 #include <algorithm>
@@ -26,13 +27,15 @@ namespace {
 struct DefaultGrainSizeT {
   size_t grain_size;
 
-  DefaultGrainSizeT() {
-    auto var = std::getenv("DGL_PARALLEL_FOR_GRAIN_SIZE");
+  DefaultGrainSizeT() : DefaultGrainSizeT(1) {}
 
-    if (!var) {
-      grain_size = 1;
-    } else {
+  explicit DefaultGrainSizeT(size_t default_grain_size) {
+    auto var = dgl::kDGLParallelForGrainSize;
+
+    if (var) {
       grain_size = std::stoul(var);
+    } else {
+      grain_size = default_grain_size;
     }
   }
 
