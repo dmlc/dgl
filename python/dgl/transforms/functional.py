@@ -84,6 +84,7 @@ __all__ = [
     "radius_graph",
     "random_walk_pe",
     "laplacian_pe",
+    "lap_pe",
     "to_half",
     "to_float",
     "to_double",
@@ -3593,7 +3594,7 @@ def random_walk_pe(g, k, eweight_name=None):
     return PE
 
 
-def laplacian_pe(g, k, padding=False, return_eigval=False):
+def lap_pe(g, k, padding=False, return_eigval=False):
     r"""Laplacian Positional Encoding, as introduced in
     `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
@@ -3606,13 +3607,12 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     g : DGLGraph
         The input graph. Must be homogeneous and bidirected.
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding.
+        Number of smallest non-trivial eigenvectors to use for positional
+        encoding.
     padding : bool, optional
-        If False, raise an exception when k>=n.
-        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
-        in the end of eigenvalues when k>=n.
-        Default: False.
-        n is the number of nodes in the given graph.
+        If False, raise an exception when k>=n. Otherwise, add zero paddings
+        in the end of eigenvectors and 'nan' paddings in the end of eigenvalues
+        when k>=n. Default: False. n is the number of nodes in the given graph.
     return_eigval : bool, optional
         If True, return laplacian eigenvalues together with eigenvectors.
         Otherwise, return laplacian eigenvectors only.
@@ -3621,26 +3621,27 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     Returns
     -------
     Tensor or (Tensor, Tensor)
-        Return the laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
-        number of nodes in the input graph, when :attr:`return_eigval` is False. The eigenvalues
-        of shape :math:`N` is additionally returned as the second element when :attr:`return_eigval`
+        Return the laplacian positional encodings of shape :math:`(N, k)`,
+        where :math:`N` is the number of nodes in the input graph, when
+        :attr:`return_eigval` is False. The eigenvalues of shape :math:`N` is
+        additionally returned as the second element when :attr:`return_eigval`
         is True.
 
     Example
     -------
     >>> import dgl
     >>> g = dgl.graph(([0,1,2,3,1,2,3,0], [1,2,3,0,0,1,2,3]))
-    >>> dgl.laplacian_pe(g, 2)
+    >>> dgl.lap_pe(g, 2)
     tensor([[ 7.0711e-01, -6.4921e-17],
             [ 3.0483e-16, -7.0711e-01],
             [-7.0711e-01, -2.4910e-16],
             [ 9.9288e-17,  7.0711e-01]])
-    >>> dgl.laplacian_pe(g, 5, padding=True)
+    >>> dgl.lap_pe(g, 5, padding=True)
     tensor([[ 7.0711e-01, -6.4921e-17,  5.0000e-01,  0.0000e+00,  0.0000e+00],
             [ 3.0483e-16, -7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00],
             [-7.0711e-01, -2.4910e-16,  5.0000e-01,  0.0000e+00,  0.0000e+00],
             [ 9.9288e-17,  7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00]])
-    >>> dgl.laplacian_pe(g, 5, padding=True, return_eigval=True)
+    >>> dgl.lap_pe(g, 5, padding=True, return_eigval=True)
     (tensor([[-7.0711e-01,  6.4921e-17, -5.0000e-01,  0.0000e+00,  0.0000e+00],
              [-3.0483e-16,  7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00],
              [ 7.0711e-01,  2.4910e-16, -5.0000e-01,  0.0000e+00,  0.0000e+00],
@@ -3651,8 +3652,8 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     n = g.num_nodes()
     if not padding and n <= k:
         assert (
-            "the number of eigenvectors k must be smaller than the number of nodes n, "
-            + f"{k} and {n} detected."
+            "the number of eigenvectors k must be smaller than the number of "
+            + f"nodes n, {k} and {n} detected."
         )
 
     # get laplacian matrix as I - D^-0.5 * A * D^-0.5
@@ -3687,6 +3688,13 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     if return_eigval:
         return PE, eigvals
     return PE
+
+
+def laplacian_pe(g, k, padding=False, return_eigval=False):
+    r"""Alias of `dgl.lap_pe`.
+    """
+    dgl_warning("dgl.laplacian_pe will be deprecated. Use dgl.lap_pe please.")
+    return lap_pe(g, k, padding, return_eigval)
 
 
 def to_half(g):

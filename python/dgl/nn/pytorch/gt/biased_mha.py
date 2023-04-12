@@ -77,8 +77,8 @@ class BiasedMHA(nn.Module):
 
     def reset_parameters(self):
         """
-        Reset parameters of projection matrices, the same settings as that in
-        Graphormer.
+        Initialize parameters of projection matrices, the same settings as in
+        the original implementation of the paper.
         """
         nn.init.xavier_uniform_(self.q_proj.weight, gain=2**-0.5)
         nn.init.xavier_uniform_(self.k_proj.weight, gain=2**-0.5)

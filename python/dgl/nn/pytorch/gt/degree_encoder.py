@@ -3,7 +3,6 @@
 import torch as th
 import torch.nn as nn
 
-from .... import to_homogeneous
 from ..base import DGLError
 
 
@@ -42,14 +41,14 @@ class DegreeEncoder(nn.Module):
         super(DegreeEncoder, self).__init__()
         self.direction = direction
         if direction == "both":
-            self.degree_encoder_1 = nn.Embedding(
+            self.encoder1 = nn.Embedding(
                 max_degree + 1, embedding_dim, padding_idx=0
             )
-            self.degree_encoder_2 = nn.Embedding(
+            self.encoder2 = nn.Embedding(
                 max_degree + 1, embedding_dim, padding_idx=0
             )
         else:
-            self.degree_encoder = nn.Embedding(
+            self.encoder = nn.Embedding(
                 max_degree + 1, embedding_dim, padding_idx=0
             )
         self.max_degree = max_degree
@@ -78,13 +77,12 @@ class DegreeEncoder(nn.Module):
         out_degree = th.clamp(g.out_degrees(), min=0, max=self.max_degree)
 
         if self.direction == "in":
-            degree_embedding = self.degree_encoder(in_degree)
+            degree_embedding = self.encoder(in_degree)
         elif self.direction == "out":
-            degree_embedding = self.degree_encoder(out_degree)
+            degree_embedding = self.encoder(out_degree)
         elif self.direction == "both":
-            degree_embedding = self.degree_encoder_1(
-                in_degree
-            ) + self.degree_encoder_2(out_degree)
+            degree_embedding = self.encoder1(in_degree) + \
+                self.encoder2(out_degree)
         else:
             raise ValueError(
                 f'Supported direction options: "in", "out" and "both", '
