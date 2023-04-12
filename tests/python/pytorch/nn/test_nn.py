@@ -1652,23 +1652,35 @@ def test_pgexplainer(g, idtype, n_classes):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
     feat = F.randn((g.num_nodes(), 5))
+    g.ndata['attr'] = feat
 
     class Model(th.nn.Module):
-        def __init__(self, in_dim, n_classes):
-            super().__init__()
-            self.conv = nn.GraphConv(in_dim, n_classes)
-            self.pool = nn.AvgPooling()
+        def __init__(self, in_feats, out_feats):
+            super(Model, self).__init__()
+            self.conv = nn.GraphConv(in_feats, out_feats)
+            self.fc = th.nn.Linear(out_feats, 1)
+            th.nn.init.xavier_uniform_(self.fc.weight)
 
-        def forward(self, g, h):
-            h = th.nn.functional.relu(self.conv(g, h))
-            return self.pool(g, h)
+        def forward(self, g, h, graph=True, edge_weight=None):
+            h = self.conv(g, h, edge_weight=edge_weight)
+            if graph:
+                g.ndata['h'] = h
+                hg = dgl.mean_nodes(g, 'h')
+                return torch.sigmoid(self.fc(hg))
+            else:
+                return h
 
     model = Model(feat.shape[1], n_classes)
     model = model.to(ctx)
 
-    explainer = nn.PGExplainer(model, feat.shape[1])
-    explainer.train(dataset)
-    explainer.explain_graph(g, feat, target_class=0)
+    dataset = [(g, th.tensor([1]))]
+
+    explainer = nn.PGExplainer(model, n_classes, device=ctx)
+    explainer.train_explanation_network(dataset,
+                                        lambda g: g.ndata["attr"])
+
+    emb = model(g, feat, graph=False)
+    probs, edge_weight = explainer.explain_graph(g, feat, emb.data.cpu())
 
 
 def test_jumping_knowledge():

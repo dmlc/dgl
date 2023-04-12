@@ -33,8 +33,8 @@ class GraphConvNet(nn.Module):
         h = self.conv4(g, h, edge_weight=edge_weight)
         if graph:
             h = self.conv5(g, h, edge_weight=edge_weight)
-            g.ndata['h'] = h
-            hg = dgl.mean_nodes(g, 'h')
+            g.ndata["h"] = h
+            hg = dgl.mean_nodes(g, "h")
             return torch.sigmoid(self.fc(hg))
         else:
             return h
@@ -147,14 +147,14 @@ if __name__ == "__main__":
 
     model = GraphConvNet(in_size, hidden_size, out_size).to(device)
 
-    # model training/validating
+    """# model training/validating
     print("Training...")
     train(train_loader, val_loader, device, model)
 
     print("Evaluating...")
     print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
 
-    torch.save(model, 'model.dt')
+    torch.save(model, 'model.dt')"""
 
     # model = torch.load('model.dt')
     model.eval()
@@ -165,70 +165,80 @@ if __name__ == "__main__":
     import networkx as nx
     import matplotlib.pyplot as plt
 
-    explainer = PGExplainer(model, hidden_size, device='cpu', epochs=50)
+    explainer = PGExplainer(model, hidden_size, device="cpu", epochs=50)
     explainer.train_explanation_network(dataset, lambda g: g.ndata["attr"])
 
     for idx, (graph, l) in enumerate(dataset):
         if idx == 150:
-                print(f'{idx} / {len(dataset)}')
-                feat = graph.ndata["attr"]
-                emb = model(graph, feat, graph=False)
-                probs, edge_weight = explainer.explain_graph(graph, feat, emb.data.cpu())
-                print(probs)
-                print(edge_weight)
+            print(f"{idx} / {len(dataset)}")
+            feat = graph.ndata["attr"]
+            emb = model(graph, feat, graph=False)
+            probs, edge_weight = explainer.explain_graph(
+                graph, feat, emb.data.cpu()
+            )
+            print(probs)
+            print(edge_weight)
 
-                top_k = 20
-                top_k_indices = np.argsort(-edge_weight)[:top_k]
-                edge_mask = np.zeros(graph.num_edges(), dtype=np.float32)
-                edge_mask[top_k_indices] = 1
+            top_k = 20
+            top_k_indices = np.argsort(-edge_weight)[:top_k]
+            edge_mask = np.zeros(graph.num_edges(), dtype=np.float32)
+            edge_mask[top_k_indices] = 1
 
-                predicted = probs < 0.5
-                if predicted.squeeze(dim=0).item() == l.item():
-                    print(f'Correct Prediction {l} {predicted}')
+            predicted = probs < 0.5
+            if predicted.squeeze(dim=0).item() == l.item():
+                print(f"Correct Prediction {l} {predicted}")
 
-                print(edge_mask)
-                graph.edata['mask'] = torch.tensor(edge_mask,
-                                                   dtype=torch.float32,
-                                                   device=graph.device)
-                G = dgl.to_networkx(graph,
-                                    node_attrs=['label'],
-                                    edge_attrs=['mask'])
-                plt.figure(figsize=[15, 15])
+            print(edge_mask)
+            graph.edata["mask"] = torch.tensor(
+                edge_mask, dtype=torch.float32, device=graph.device
+            )
+            G = dgl.to_networkx(
+                graph, node_attrs=["label"], edge_attrs=["mask"]
+            )
+            plt.figure(figsize=[15, 15])
 
-                label_dict_nodes = {
-                    0: 'C',
-                    1: 'N',
-                    2: 'O',
-                    3: 'F',
-                    4: 'I',
-                    5: 'Cl',
-                    6: 'Br'
-                }
+            label_dict_nodes = {
+                0: "C",
+                1: "N",
+                2: "O",
+                3: "F",
+                4: "I",
+                5: "Cl",
+                6: "Br",
+            }
 
-                label_dict_edges = {
-                    0: 'aromatic',
-                    1: 'S',
-                    2: 'D',
-                    3: 'T',
-                }
+            label_dict_edges = {
+                0: "aromatic",
+                1: "S",
+                2: "D",
+                3: "T",
+            }
 
-                # Draw the graph with edge colors based on the mask feature
-                pos = nx.spring_layout(G)
-                edge_colors = ['r' if mask else 'b'
-                               for _, _, mask in G.edges(data='mask')]
-                edge_widths = [4.0 if mask else 1.0
-                               for _, _, mask in G.edges(data='mask')]
-                nx.draw(G,
-                        pos,
-                        width=edge_widths,
-                        edge_color=edge_colors,
-                        with_labels=True,
-                        labels={indx: label_dict_nodes[graph.ndata['label'].tolist()[indx]]
-                                for indx in G.nodes()},
-                        font_size=22,
-                        font_color="yellow",
-                        node_size=[1000 for _ in range(graph.num_nodes())],
-                        )
+            # Draw the graph with edge colors based on the mask feature
+            pos = nx.spring_layout(G)
+            edge_colors = [
+                "r" if mask else "b" for _, _, mask in G.edges(data="mask")
+            ]
+            edge_widths = [
+                4.0 if mask else 1.0 for _, _, mask in G.edges(data="mask")
+            ]
+            nx.draw(
+                G,
+                pos,
+                width=edge_widths,
+                edge_color=edge_colors,
+                with_labels=True,
+                labels={
+                    indx: label_dict_nodes[graph.ndata["label"].tolist()[indx]]
+                    for indx in G.nodes()
+                },
+                font_size=22,
+                font_color="yellow",
+                node_size=[1000 for _ in range(graph.num_nodes())],
+            )
 
-                plt.savefig(os.path.join("mutag_img", f"{idx}_MUTAG_explain.png"), format="PNG")
-                plt.show()
+            plt.savefig(
+                os.path.join("mutag_img", f"{idx}_MUTAG_explain.png"),
+                format="PNG",
+            )
+            plt.show()

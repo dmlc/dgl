@@ -6,7 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 
-
 __all__ = ["PGExplainer"]
 
 
@@ -258,8 +257,8 @@ class PGExplainer(nn.Module):
 
         node_size = embed.shape[0]
         col, row = edge_idx
-        f1 = embed[col]
-        f2 = embed[row]
+        f1 = embed[col.long()]
+        f2 = embed[row.long()]
         f12self = torch.cat([f1, f2], dim=-1)
 
         # using the node embedding to calculate the edge weight
@@ -279,7 +278,7 @@ class PGExplainer(nn.Module):
         mask_sigmoid = mask_sparse.to_dense()
         # set the symmetric edge weights
         sym_mask = (mask_sigmoid + mask_sigmoid.transpose(0, 1)) / 2
-        edge_mask = sym_mask[edge_idx[0], edge_idx[1]]
+        edge_mask = sym_mask[edge_idx[0].long(), edge_idx[1].long()]
 
         # inverse the weights before sigmoid in MessagePassing Module
         self.clear_masks()
