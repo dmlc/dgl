@@ -25,7 +25,7 @@ class PGExplainer(nn.Module):
     def __init__(self,
                  model,
                  num_features,
-                 epochs=20,
+                 epochs=10,
                  lr=0.01,
                  coff_size=0.01,
                  coff_ent=5e-4,
@@ -169,13 +169,15 @@ class PGExplainer(nn.Module):
         self.set_masks(graph, feat, edge_mask)
 
         # the model prediction with edge mask
-        logits = self.model(graph, feat, eweight=self.edge_mask)
+        logits = self.model(graph, feat, edge_weight=self.edge_mask)
         probs = F.softmax(logits, dim=-1)
 
         self.clear_masks()
 
         return probs, edge_mask
 
+    # supply a func that will take graph as input and
+    # return the feature as input
     def train_explanation_network(self, dataset):
 
         optimizer = Adam(self.elayers.parameters(), lr=self.coeffs['lr'])
@@ -218,7 +220,7 @@ class PGExplainer(nn.Module):
 
                 self.edge_mask = edge_mask
 
-                loss_tmp = self.loss(prob.squeeze(), ori_pred_dict[idx])
+                loss_tmp = self.loss(prob.unsqueeze(dim=0), ori_pred_dict[idx])
                 loss_tmp.backward()
 
                 loss += loss_tmp.item()

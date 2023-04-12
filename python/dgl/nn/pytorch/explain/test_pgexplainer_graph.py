@@ -9,144 +9,41 @@ from sklearn.model_selection import StratifiedKFold
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from dgl.data import GINDataset
-import dgl.nn as dglnn
 from dgl.dataloading import GraphDataLoader
-from dgl.nn.pytorch.conv import GINConv
-import dgl.function as fn
-from dgl.nn.pytorch.glob import SumPooling, MaxPooling
+from dgl.nn.pytorch.conv import GraphConv
 import dgl
 
-# # source: https://github.com/dmlc/dgl/blob/master/examples/pytorch/gin/train.py
-# class MLP(nn.Module):
-#     """Construct two-layer MLP-type aggreator for GIN model"""
-#
-#     def __init__(self, input_dim, hidden_dim, output_dim):
-#         super().__init__()
-#         self.linears = nn.ModuleList()
-#         # two-layer MLP
-#         self.linears.append(nn.Linear(input_dim, hidden_dim, bias=False))
-#         self.linears.append(nn.Linear(hidden_dim, output_dim, bias=False))
-#         self.batch_norm = nn.BatchNorm1d((hidden_dim))
-#
-#     def forward(self, x):
-#         h = x
-#         h = F.relu(self.batch_norm(self.linears[0](h)))
-#         return self.linears[1](h)
-#
-#
-# class GIN(nn.Module):
-#     def __init__(self, input_dim, hidden_dim, output_dim):
-#         super().__init__()
-#         self.ginlayers = nn.ModuleList()
-#         self.batch_norms = nn.ModuleList()
-#         num_layers = 5
-#         # five-layer GCN with two-layer MLP aggregator and sum-neighbor-pooling scheme
-#         for layer in range(num_layers - 1):  # excluding the input layer
-#             if layer == 0:
-#                 mlp = MLP(input_dim, hidden_dim, hidden_dim)
-#             else:
-#                 mlp = MLP(hidden_dim, hidden_dim, hidden_dim)
-#             self.ginlayers.append(
-#                 GINConv(mlp, learn_eps=False)
-#             )  # set to True if learning epsilon
-#             self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-#         # linear functions for graph sum poolings of output of each layer
-#         self.linear_prediction = nn.ModuleList()
-#         for layer in range(num_layers):
-#             if layer == 0:
-#                 self.linear_prediction.append(nn.Linear(input_dim, output_dim))
-#             else:
-#                 self.linear_prediction.append(nn.Linear(hidden_dim, output_dim))
-#         self.drop = nn.Dropout(0.5)
-#         self.pool = (
-#             MaxPooling()
-#         )  # change to mean readout (AvgPooling) on social network datasets
-#
-#     def forward(self, g, h, graph=True, eweight=None):
-#         # list of hidden representation at each layer (including the input layer)
-#         hidden_rep = [h]
-#         for i, layer in enumerate(self.ginlayers):
-#             h = layer(g, h, edge_weight=eweight)
-#             h = self.batch_norms[i](h)
-#             h = F.relu(h)
-#             hidden_rep.append(h)
-#         score_over_layer = 0
-#
-#         if graph:
-#             # perform graph sum pooling over all nodes in each layer
-#             for i, h in enumerate(hidden_rep):
-#                 pooled_h = self.pool(g, h)
-#                 score_over_layer += self.drop(self.linear_prediction[i](pooled_h))
-#
-#             return score_over_layer
-#         else:
-#             return hidden_rep[-1]
 
-class RGCN(nn.Module):
-    def __init__(self, in_feats, hid_feats, out_feats):
-        super().__init__()
+class GraphConvNet(nn.Module):
+    def __init__(self, in_feats, hidden_feats, out_feats):
+        super(GraphConvNet, self).__init__()
+        self.conv1 = GraphConv(in_feats, hidden_feats)
+        self.conv2 = GraphConv(hidden_feats, hidden_feats)
+        self.conv3 = GraphConv(hidden_feats, hidden_feats)
+        self.conv4 = GraphConv(hidden_feats, hidden_feats)
+        self.conv5 = GraphConv(hidden_feats, out_feats)
+        self.fc = nn.Linear(out_feats, 1)
+        nn.init.xavier_uniform_(self.fc.weight)
 
-        self.conv1 = dglnn.GraphConv(in_feats, hid_feats)
-        self.conv2 = dglnn.GraphConv(hid_feats, hid_feats)
-        self.conv3 = dglnn.GraphConv(hid_feats, hid_feats)
-        self.conv4 = dglnn.GraphConv(hid_feats, out_feats)
-        self.pool = (MaxPooling())
-
-    def forward(self, g, feat, eweight=None, graph=True):
-        # inputs are features of nodes
-        with g.local_scope():
-            feat = self.conv1(g, feat)
-            feat = F.relu(feat)
-            feat = self.conv2(g, feat)
-            feat = F.relu(feat)
-            feat = self.conv3(g, feat)
-            feat = F.relu(feat)
-            feat_n = feat
-            feat = self.conv4(g, feat)
-            g.ndata['h'] = feat
-
-            if eweight is None:
-                g.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
-            else:
-                g.edata['w'] = eweight
-                g.update_all(fn.u_mul_e('h', 'w', 'm'), fn.sum('m', 'h'))
-
-            if graph:
-                return feat
-            else:
-                return feat_n
-
-
-def split_fold10(labels, fold_idx=0):
-    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
-    idx_list = []
-    for idx in skf.split(np.zeros(len(labels)), labels):
-        idx_list.append(idx)
-    train_idx, valid_idx = idx_list[fold_idx]
-    return train_idx, valid_idx
-
-
-def evaluate(dataloader, device, model):
-    model.eval()
-    total = 0
-    total_correct = 0
-    for batched_graph, labels in dataloader:
-        batched_graph = batched_graph.to(device)
-        labels = labels.to(device)
-        feat = batched_graph.ndata.pop("attr")
-        total += len(labels)
-        logits = model(batched_graph, feat)
-        _, predicted = torch.max(logits, 1)
-        total_correct += (predicted == labels).sum().item()
-    acc = 1.0 * total_correct / total
-    return acc
+    def forward(self, g, h, graph=True, edge_weight=None):
+        h = self.conv1(g, h, edge_weight=edge_weight)
+        h = self.conv2(g, h, edge_weight=edge_weight)
+        h = self.conv3(g, h, edge_weight=edge_weight)
+        h = self.conv4(g, h, edge_weight=edge_weight)
+        if graph:
+            h = self.conv5(g, h, edge_weight=edge_weight)
+            g.ndata['h'] = h
+            hg = dgl.mean_nodes(g, 'h')
+            return torch.sigmoid(self.fc(hg))
+        else:
+            return h
 
 
 def train(train_loader, val_loader, device, model, epochs=350, lr=0.005):
     # loss function, optimizer and scheduler
-    loss_fcn = nn.CrossEntropyLoss()
+    loss_fcn = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
     # training loop
     for epoch in range(epochs):
@@ -160,21 +57,52 @@ def train(train_loader, val_loader, device, model, epochs=350, lr=0.005):
             feat = batched_graph.ndata["attr"]
             logits = model(batched_graph, feat)
 
-            loss = loss_fcn(logits, labels)
+            loss = loss_fcn(logits, labels.float().unsqueeze(1))
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
 
-        scheduler.step()
-        train_acc = evaluate(train_loader, device, model)
-        valid_acc = evaluate(val_loader, device, model)
+        # scheduler.step()
+        with torch.no_grad():
+            train_acc = evaluate(train_loader, device, model)
+            valid_acc = evaluate(val_loader, device, model)
         print(
             "Epoch {:05d} | Loss {:.4f} | Train Acc. {:.4f} | Validation Acc. {:.4f} ".format(
                 epoch, total_loss / (batch + 1), train_acc, valid_acc
             )
         )
+
+
+def split_fold10(labels, fold_idx=0):
+    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
+    idx_list = []
+    for idx in skf.split(np.zeros(len(labels)), labels):
+        idx_list.append(idx)
+    train_idx, valid_idx = idx_list[fold_idx]
+    return train_idx, valid_idx
+
+
+def evaluate(dataloader, device, model):
+    model.eval()
+
+    total = 0
+    total_correct = 0
+
+    for batched_graph, labels in dataloader:
+        batched_graph = batched_graph.to(device)
+        labels = labels.to(device)
+        feat = batched_graph.ndata.pop("attr")
+
+        total += len(labels)
+        logits = model(batched_graph, feat)
+
+        predicted = logits.squeeze(1) > 0.5
+        total_correct += (predicted == labels).sum().item()
+
+    acc = 1.0 * total_correct / total
+    return acc
 
 
 if __name__ == "__main__":
@@ -218,16 +146,16 @@ if __name__ == "__main__":
     out_size = dataset.gclasses
     hidden_size = 128
 
-    model = RGCN(in_size, hidden_size, out_size).to(device)
+    model = GraphConvNet(in_size, hidden_size, out_size).to(device)
 
-    # model training/validating
-    print("Training...")
-    train(train_loader, val_loader, device, model)
-
-    print("Evaluating...")
-    print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
-
-    torch.save(model, 'model.dt')
+    # # model training/validating
+    # print("Training...")
+    # train(train_loader, val_loader, device, model)
+    #
+    # print("Evaluating...")
+    # print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
+    #
+    # torch.save(model, 'model.dt')
 
     model = torch.load('model.dt')
     model.eval()
@@ -238,7 +166,7 @@ if __name__ == "__main__":
     import networkx as nx
     import matplotlib.pyplot as plt
 
-    explainer = PGExplainer(model, hidden_size, device='cpu')
+    explainer = PGExplainer(model, hidden_size, device='cpu', epochs=40)
     explainer.train_explanation_network(dataset)
 
     for idx, (graph, l) in enumerate(dataset):
@@ -250,12 +178,12 @@ if __name__ == "__main__":
                 print(probs)
                 print(edge_weight)
 
-                top_k = 10
+                top_k = 20
                 top_k_indices = np.argsort(-edge_weight)[:top_k]
                 edge_mask = np.zeros(graph.num_edges(), dtype=np.float32)
                 edge_mask[top_k_indices] = 1
 
-                _, predicted = torch.max(probs, 1)
+                predicted = probs < 0.5
                 if predicted == l:
                     print(f'Correct Prediction {l} {predicted}')
 
@@ -287,7 +215,7 @@ if __name__ == "__main__":
 
                 # Draw the graph with edge colors based on the mask feature
                 pos = nx.spring_layout(G)
-                edge_colors = ['r' if mask else 'k'
+                edge_colors = ['r' if mask else 'b'
                                for _, _, mask in G.edges(data='mask')]
                 edge_widths = [4.0 if mask else 1.0
                                for _, _, mask in G.edges(data='mask')]
