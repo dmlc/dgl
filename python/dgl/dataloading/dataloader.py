@@ -205,12 +205,16 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
             num_samples + (0 if self.drop_last else (self.batch_size - 1))
         ) // self.batch_size
 
+
 def _share_dist_seed(generator=None):
-    _shared_seed = torch.empty((), dtype=torch.int32).random_(generator=generator)
+    _shared_seed = torch.empty((), dtype=torch.int32).random_(
+        generator=generator
+    )
     if dist.get_backend() == "nccl":
         _shared_seed = _shared_seed.cuda()
     dist.broadcast(_shared_seed, src=0)
     return _shared_seed.item()
+
 
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
@@ -280,8 +284,12 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         """Shuffles the dataset."""
         # Only rank 0 does the actual shuffling.  The other ranks wait for it.
 
-        local_rank = int(os.environ['LOCAL_RANK']) if 'LOCAL_RANK' in os.environ else self.rank
-        shared_seed =  _share_dist_seed()
+        local_rank = (
+            int(os.environ["LOCAL_RANK"])
+            if "LOCAL_RANK" in os.environ
+            else self.rank
+        )
+        shared_seed = _share_dist_seed()
         if local_rank == 0:
             np.random.seed(shared_seed)
             np.random.shuffle(self._indices[: self.num_indices].numpy())

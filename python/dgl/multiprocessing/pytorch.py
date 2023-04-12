@@ -1,4 +1,5 @@
 """PyTorch multiprocessing wrapper."""
+import os
 import random
 import traceback
 from _thread import start_new_thread
@@ -8,7 +9,7 @@ import torch
 import torch.multiprocessing as mp
 
 from ..utils import create_shared_mem_array, get_shared_mem_array
-import os
+
 
 def thread_wrapped_func(func):
     """
@@ -59,7 +60,8 @@ class Process(mp.Process):
 def _get_shared_mem_name(id_):
     return "shared" + str(id_)
 
-def call_once_and_share(func, shape, dtype, rank=0, group=None):
+
+def call_once_and_share(func, shape, dtype, rank=0):
     """Invoke the function in a single process of the PyTorch distributed process group,
     and share the result with other processes.
 
@@ -88,8 +90,8 @@ def call_once_and_share(func, shape, dtype, rank=0, group=None):
     id_ = random_.getrandbits(32)
     dist_buf[0] = id_
 
-    if 'LOCAL_RANK' in os.environ:
-        local_rank = int(os.environ['LOCAL_RANK'])
+    if "LOCAL_RANK" in os.environ:
+        local_rank = int(os.environ["LOCAL_RANK"])
     else:
         local_rank = current_rank
 
@@ -107,6 +109,7 @@ def call_once_and_share(func, shape, dtype, rank=0, group=None):
     torch.distributed.barrier()
     result = get_shared_mem_array(name, shape, dtype)
     return result
+
 
 def shared_tensor(shape, dtype=torch.float32):
     """Create a tensor in shared memory accessible by all processes within the same
