@@ -557,7 +557,8 @@ class HeteroSubgraphX(nn.Module):
         subg = node_subgraph(self.graph, mcts_node.nodes)
         # Choose k nodes based on the highest degree in the subgraph
         node_degrees_map = {
-            ntype: torch.zeros(subg.num_nodes(ntype)) for ntype in subg.ntypes
+            ntype: torch.zeros(subg.num_nodes(ntype), device=subg.nodes(ntype).device)
+            for ntype in subg.ntypes
         }
         for c_etype in subg.canonical_etypes:
             src_ntype, _, dst_ntype = c_etype
@@ -620,7 +621,10 @@ class HeteroSubgraphX(nn.Module):
                     np.random.choice(new_subg.nodes(chosen_ntype))
                 ]
                 cc_nodes = {
-                    chosen_ntype: torch.tensor([chosen_node], dtype=torch.int64)
+                    chosen_ntype: torch.tensor(
+                        [chosen_node],
+                        device=subg.ndata[NID][chosen_ntype].device,
+                    )
                 }
 
             if str(cc_nodes) not in self.mcts_node_maps:
