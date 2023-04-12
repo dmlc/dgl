@@ -8,7 +8,7 @@ import torch
 import torch.multiprocessing as mp
 
 from ..utils import create_shared_mem_array, get_shared_mem_array
-
+import os
 
 def thread_wrapped_func(func):
     """
@@ -59,7 +59,6 @@ class Process(mp.Process):
 def _get_shared_mem_name(id_):
     return "shared" + str(id_)
 
-
 def call_once_and_share(func, shape, dtype, rank=0, group=None):
     """Invoke the function in a single process of the PyTorch distributed process group,
     and share the result with other processes.
@@ -75,10 +74,8 @@ def call_once_and_share(func, shape, dtype, rank=0, group=None):
     rank : int, optional
         The process ID to actually execute the function.
     """
-    current_rank = torch.distributed.get_rank()
-    if group is not None:
-       current_rank = torch.distributed.get_group_rank(group, current_rank)
 
+    current_rank = torch.distributed.get_rank()
     dist_buf = torch.LongTensor([1])
 
     if torch.distributed.get_backend() == "nccl":
@@ -87,32 +84,29 @@ def call_once_and_share(func, shape, dtype, rank=0, group=None):
         # torch.multiprocessing.spawn()
         dist_buf = dist_buf.cuda()
 
+    random_ = random.Random()
+    id_ = random_.getrandbits(32)
+    dist_buf[0] = id_
+
+    if 'LOCAL_RANK' in os.environ:
+        local_rank = int(os.environ['LOCAL_RANK'])
+    else:
+        local_rank = current_rank
+
+    torch.distributed.broadcast(dist_buf, rank)
+
+    id_ = dist_buf.item()
+    name = _get_shared_mem_name(id_)
+
     # Process with the given rank creates and populates the shared memory array.
-    if current_rank == rank:
+    if local_rank == rank:
         # PyTorch Lightning 1.6+ seems to set the random seed during process spawning
         # to the same seed value.
-        random_ = random.Random()
-        id_ = random_.getrandbits(32)
-        name = _get_shared_mem_name(id_)
         result = create_shared_mem_array(name, shape, dtype)
         result[:] = func()
-        dist_buf[0] = id_
-
-    if group is not None:
-        local_root = torch.distributed.get_process_group_ranks(group)[0]
-        torch.distributed.broadcast(dist_buf, local_root, group=group)
-    else:
-        torch.distributed.broadcast(dist_buf, rank)
-
-    # If no exceptions, other processes open the same shared memory object.
-    if current_rank != rank:
-        id_ = dist_buf.item()
-        name = _get_shared_mem_name(id_)
-        result = get_shared_mem_array(name, shape, dtype)
-
+    torch.distributed.barrier()
+    result = get_shared_mem_array(name, shape, dtype)
     return result
-
-
 
 def shared_tensor(shape, dtype=torch.float32):
     """Create a tensor in shared memory accessible by all processes within the same
