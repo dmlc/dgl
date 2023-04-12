@@ -670,7 +670,7 @@ def test_egat_conv(g, idtype, out_node_feats, out_edge_feats, num_heads):
 
     assert h.shape == (g.num_nodes(), num_heads, out_node_feats)
     assert f.shape == (g.num_edges(), num_heads, out_edge_feats)
-    _, _, attn = egat(g, nfeat, efeat, None, True)
+    _, _, attn = egat(g, nfeat, efeat, get_attention=True)
     assert attn.shape == (g.num_edges(), num_heads, 1)
 
 
