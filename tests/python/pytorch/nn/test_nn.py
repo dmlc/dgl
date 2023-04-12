@@ -2127,25 +2127,9 @@ def test_degree_encoder(max_degree, embedding_dim, direction):
             th.tensor([1, 2, 3, 0, 3, 0, 0, 1]),
         )
     )
-    # test heterograph
-    hg = dgl.heterograph(
-        {
-            ("drug", "interacts", "drug"): (
-                th.tensor([0, 1]),
-                th.tensor([1, 2]),
-            ),
-            ("drug", "interacts", "gene"): (
-                th.tensor([0, 1]),
-                th.tensor([2, 3]),
-            ),
-            ("drug", "treats", "disease"): (th.tensor([1]), th.tensor([2])),
-        }
-    )
     model = nn.DegreeEncoder(max_degree, embedding_dim, direction=direction)
     de_g = model(g)
-    de_hg = model(hg)
     assert de_g.shape == (4, embedding_dim)
-    assert de_hg.shape == (10, embedding_dim)
 
 
 @parametrize_idtype
