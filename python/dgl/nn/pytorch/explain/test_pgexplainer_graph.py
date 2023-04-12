@@ -9,6 +9,7 @@ import torch.optim as optim
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data.sampler import SubsetRandomSampler
 
+import dgl
 from dgl.data import GINDataset
 from dgl.dataloading import GraphDataLoader
 from dgl.nn.pytorch.conv import GraphConv
@@ -146,16 +147,16 @@ if __name__ == "__main__":
 
     model = GraphConvNet(in_size, hidden_size, out_size).to(device)
 
-    # # model training/validating
-    # print("Training...")
-    # train(train_loader, val_loader, device, model)
-    #
-    # print("Evaluating...")
-    # print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
-    #
-    # torch.save(model, 'model.dt')
+    # model training/validating
+    print("Training...")
+    train(train_loader, val_loader, device, model)
 
-    model = torch.load('model.dt')
+    print("Evaluating...")
+    print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
+
+    torch.save(model, 'model.dt')
+
+    # model = torch.load('model.dt')
     model.eval()
 
     from dgl.nn import PGExplainer
@@ -164,11 +165,11 @@ if __name__ == "__main__":
     import networkx as nx
     import matplotlib.pyplot as plt
 
-    explainer = PGExplainer(model, hidden_size, device='cpu', epochs=40)
+    explainer = PGExplainer(model, hidden_size, device='cpu', epochs=50)
     explainer.train_explanation_network(dataset, lambda g: g.ndata["attr"])
 
     for idx, (graph, l) in enumerate(dataset):
-        if idx == 156:
+        if idx == 150:
                 print(f'{idx} / {len(dataset)}')
                 feat = graph.ndata["attr"]
                 emb = model(graph, feat, graph=False)
@@ -182,7 +183,7 @@ if __name__ == "__main__":
                 edge_mask[top_k_indices] = 1
 
                 predicted = probs < 0.5
-                if predicted == l:
+                if predicted.squeeze(dim=0).item() == l.item():
                     print(f'Correct Prediction {l} {predicted}')
 
                 print(edge_mask)

@@ -69,6 +69,15 @@ class PGExplainer(nn.Module):
     def set_masks(self, g, feat, edge_mask=None):
         r"""
 
+        Parameters
+        ----------
+        g
+        feat
+        edge_mask
+
+        Returns
+        -------
+
         """
         N, F = feat.shape
         E = g.num_edges()
@@ -86,11 +95,21 @@ class PGExplainer(nn.Module):
     def clear_masks(self):
         r"""
 
+        Returns
+        -------
+
         """
         self.edge_mask = None
 
     def update_num_hops(self, num_hops):
         r"""
+
+        Parameters
+        ----------
+        num_hops
+
+        Returns
+        -------
 
         """
         if num_hops is not None:
@@ -99,8 +118,15 @@ class PGExplainer(nn.Module):
     def loss(self, prob, ori_pred):
         r"""
 
-        """
+        Parameters
+        ----------
+        prob
+        ori_pred
 
+        Returns
+        -------
+
+        """
         logit = prob[ori_pred]
         logit += 1e-6
         pred_loss = -torch.log(logit)
@@ -128,7 +154,16 @@ class PGExplainer(nn.Module):
 
     def concrete_sample(self, log_alpha, beta=1.0, training=True):
         r"""
-        Uniform random numbers for the concrete distribution
+
+        Parameters
+        ----------
+        log_alpha
+        beta
+        training
+
+        Returns
+        -------
+
         """
 
         if training:
@@ -148,8 +183,15 @@ class PGExplainer(nn.Module):
     def train_explanation_network(self, dataset, func_extract_feat):
         r"""
 
-        """
+        Parameters
+        ----------
+        dataset
+        func_extract_feat
 
+        Returns
+        -------
+
+        """
         optimizer = Adam(self.elayers.parameters(), lr=self.coeffs["lr"])
 
         emb_dict = {}
@@ -199,6 +241,17 @@ class PGExplainer(nn.Module):
 
     def explain_graph(self, graph, feat, embed, tmp=1.0, training=False):
         r"""
+
+        Parameters
+        ----------
+        graph
+        feat
+        embed
+        tmp
+        training
+
+        Returns
+        -------
 
         """
         edge_idx = graph.edges()
