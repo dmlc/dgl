@@ -4,6 +4,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 
 from sklearn.model_selection import StratifiedKFold
@@ -26,21 +27,25 @@ class GraphConvNet(nn.Module):
         self.fc = nn.Linear(out_feats, 1)
         nn.init.xavier_uniform_(self.fc.weight)
 
-    def forward(self, g, h, graph=True, edge_weight=None):
+    def forward(self, g, h, embed=False, edge_weight=None):
         h = self.conv1(g, h, edge_weight=edge_weight)
+        h = F.relu(h)
         h = self.conv2(g, h, edge_weight=edge_weight)
+        h = F.relu(h)
         h = self.conv3(g, h, edge_weight=edge_weight)
+        h = F.relu(h)
         h = self.conv4(g, h, edge_weight=edge_weight)
-        if graph:
+        if embed:
+            return h
+        else:
             h = self.conv5(g, h, edge_weight=edge_weight)
             g.ndata["h"] = h
             hg = dgl.mean_nodes(g, "h")
             return torch.sigmoid(self.fc(hg))
-        else:
-            return h
 
 
-def train(train_loader, val_loader, device, model, epochs=350, lr=0.005):
+
+def train(train_loader, val_loader, device, model, epochs=500, lr=0.0001):
 
     loss_fcn = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -143,20 +148,20 @@ if __name__ == "__main__":
     # create GIN model
     in_size = dataset.dim_nfeats
     out_size = dataset.gclasses
-    hidden_size = 128
+    hidden_size = 256
 
     model = GraphConvNet(in_size, hidden_size, out_size).to(device)
 
-    """# model training/validating
+    # model training/validating
     print("Training...")
     train(train_loader, val_loader, device, model)
 
     print("Evaluating...")
     print(f"acc: {round(evaluate(train_loader, device, model), 2)}")
 
-    torch.save(model, 'model.dt')"""
+    torch.save(model, 'model.dt')
 
-    # model = torch.load('model.dt')
+    model = torch.load('model.dt')
     model.eval()
 
     from dgl.nn import PGExplainer
@@ -165,17 +170,14 @@ if __name__ == "__main__":
     import networkx as nx
     import matplotlib.pyplot as plt
 
-    explainer = PGExplainer(model, hidden_size, device="cpu", epochs=50)
+    explainer = PGExplainer(model, hidden_size, epochs=50)
     explainer.train_explanation_network(dataset, lambda g: g.ndata["attr"])
 
     for idx, (graph, l) in enumerate(dataset):
-        if idx == 150:
+        if idx > -1 and l.item() == 1:
             print(f"{idx} / {len(dataset)}")
             feat = graph.ndata["attr"]
-            emb = model(graph, feat, graph=False)
-            probs, edge_weight = explainer.explain_graph(
-                graph, feat, emb.data.cpu()
-            )
+            probs, edge_weight = explainer.explain_graph(graph, feat)
             print(probs)
             print(edge_weight)
 
@@ -238,7 +240,7 @@ if __name__ == "__main__":
             )
 
             plt.savefig(
-                os.path.join("mutag_img", f"{idx}_MUTAG_explain.png"),
+                os.path.join("mutag_img", f"{idx}_MUTAG_explain_{l.item()}_{predicted.squeeze(dim=0).item()}.png"),
                 format="PNG",
             )
             plt.show()

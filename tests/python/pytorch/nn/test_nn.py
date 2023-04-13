@@ -1661,9 +1661,9 @@ def test_pgexplainer(g, idtype, n_classes):
             self.fc = th.nn.Linear(out_feats, 1)
             th.nn.init.xavier_uniform_(self.fc.weight)
 
-        def forward(self, g, h, graph=True, edge_weight=None):
+        def forward(self, g, h, embed=False, edge_weight=None):
             h = self.conv(g, h, edge_weight=edge_weight)
-            if graph:
+            if not embed:
                 g.ndata['h'] = h
                 hg = dgl.mean_nodes(g, 'h')
                 return torch.sigmoid(self.fc(hg))
@@ -1675,12 +1675,11 @@ def test_pgexplainer(g, idtype, n_classes):
 
     dataset = [(g, th.tensor([1]))]
 
-    explainer = nn.PGExplainer(model, n_classes, device=ctx)
+    explainer = nn.PGExplainer(model, n_classes)
     explainer.train_explanation_network(dataset,
                                         lambda g: g.ndata["attr"])
 
-    emb = model(g, feat, graph=False)
-    probs, edge_weight = explainer.explain_graph(g, feat, emb.data.cpu())
+    probs, edge_weight = explainer.explain_graph(g, feat)
 
 
 def test_jumping_knowledge():
