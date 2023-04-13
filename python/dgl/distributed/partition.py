@@ -1,6 +1,7 @@
 """Functions for partitions. """
 
 import json
+import logging
 import os
 import time
 
@@ -191,13 +192,13 @@ def load_partition(part_config, part_id, load_feats=True):
         "part_graph" in part_files
     ), "the partition does not contain graph structure."
     partition_path = relative_to_config(part_files["part_graph"])
-    print(
+    logging.info(
         f"Start to load partition from {partition_path} which is "
         f"{os.path.getsize(partition_path)} bytes. It may take non-trivial "
         "time for large partition."
     )
     graph = load_graphs(partition_path)[0][0]
-    print("Finished loading partition.")
+    logging.info("Finished loading partition.")
 
     assert (
         NID in graph.ndata
@@ -302,7 +303,7 @@ def load_partition_feats(
     node_feats = None
     if load_nodes:
         feat_path = relative_to_config(part_files["node_feats"])
-        print(
+        logging.debug(
             f"Start to load node data from {feat_path} which is "
             f"{os.path.getsize(feat_path)} bytes."
         )
@@ -311,12 +312,12 @@ def load_partition_feats(
     edge_feats = None
     if load_edges:
         feat_path = relative_to_config(part_files["edge_feats"])
-        print(
+        logging.debug(
             f"Start to load edge data from {feat_path} which is "
             f"{os.path.getsize(feat_path)} bytes."
         )
         edge_feats = load_tensors(feat_path)
-        print("Finished loading edge data.")
+        logging.debug("Finished loading edge data.")
     # In the old format, the feature name doesn't contain node/edge type.
     # For compatibility, let's add node/edge types to the feature names.
     if node_feats is not None:
