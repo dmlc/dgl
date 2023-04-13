@@ -87,7 +87,7 @@ struct RepeatIndex {
 template <typename IdType>
 struct OutputBufferIndexer {
   const IdType *indptr;
-  const IdType *buffer;
+  IdType *buffer;
   __host__ __device__ auto operator()(IdType i) {
     return buffer + indptr[i];
   }
@@ -130,14 +130,14 @@ COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr) {
         iota, AdjacentDifference<int64_t>{csr.indptr.Ptr<int64_t>()});
 
     std::size_t temp_storage_bytes = 0;
-    CUDA_CALL(cub::DeviceMemcpy::Batched(
+    CUDA_CALL(cub::DeviceCopy::Batched(
         nullptr, temp_storage_bytes, input_buffer, output_buffer,
         buffer_sizes, csr.num_rows, stream));
 
     auto temp = allocator.alloc_unique<char>(temp_storage_bytes);
 
-    CUDA_CALL(cub::DeviceMemcpy::Batched(
-        temp.get(), temp_storage_bytes, input_buffer, ret_row.Ptr<int64_t>(),
+    CUDA_CALL(cub::DeviceCopy::Batched(
+        temp.get(), temp_storage_bytes, input_buffer, output_buffer,
         buffer_sizes, csr.num_rows, stream));
   }
 
