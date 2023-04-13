@@ -60,25 +60,17 @@ For Fedora/RHEL/CentOS users, run:
 
    sudo yum install -y gcc-c++ python3-devel make cmake
 
-Build the shared library. Use the configuration template ``cmake/config.cmake``.
-Copy it to either the project directory or the build directory and change the
-configuration as you wish. For example, change ``USE_CUDA`` to ``ON`` will
-enable a CUDA build. You could also pass ``-DKEY=VALUE`` to the cmake command
-for the same purpose.
+Create conda environment for development, run:
 
-* CPU-only build::
+.. code:: bash
 
-     mkdir build
-     cd build
-     cmake ..
-     make -j4
+   bash script/create_dev_conda_env.sh -h
 
-* CUDA build::
+Build the shared library, run:
 
-     mkdir build
-     cd build
-     cmake -DUSE_CUDA=ON ..
-     make -j4
+.. code:: bash
+
+   bash script/build_dgl.sh -h
 
 Finally, install the Python binding.
 

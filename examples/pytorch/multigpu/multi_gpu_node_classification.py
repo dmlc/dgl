@@ -86,7 +86,7 @@ class SAGE(nn.Module):
         return y
 
 
-def evaluate(model, g, dataloader):
+def evaluate(model, g, num_classes, dataloader):
     model.eval()
     ys = []
     y_hats = []
@@ -95,11 +95,16 @@ def evaluate(model, g, dataloader):
             x = blocks[0].srcdata["feat"]
             ys.append(blocks[-1].dstdata["label"])
             y_hats.append(model(blocks, x))
-    return MF.accuracy(torch.cat(y_hats), torch.cat(ys))
+    return MF.accuracy(
+        torch.cat(y_hats),
+        torch.cat(ys),
+        task="multiclass",
+        num_classes=num_classes,
+    )
 
 
 def layerwise_infer(
-    proc_id, device, g, nid, model, use_uva, batch_size=2**16
+    proc_id, device, g, num_classes, nid, model, use_uva, batch_size=2**16
 ):
     model.eval()
     with torch.no_grad():
@@ -107,11 +112,15 @@ def layerwise_infer(
         pred = pred[nid]
         labels = g.ndata["label"][nid].to(pred.device)
     if proc_id == 0:
-        acc = MF.accuracy(pred, labels)
+        acc = MF.accuracy(
+            pred, labels, task="multiclass", num_classes=num_classes
+        )
         print("Test Accuracy {:.4f}".format(acc.item()))
 
 
-def train(proc_id, nprocs, device, g, train_idx, val_idx, model, use_uva):
+def train(
+    proc_id, nprocs, device, g, num_classes, train_idx, val_idx, model, use_uva
+):
     sampler = NeighborSampler(
         [10, 10, 10], prefetch_node_feats=["feat"], prefetch_labels=["label"]
     )
@@ -154,7 +163,9 @@ def train(proc_id, nprocs, device, g, train_idx, val_idx, model, use_uva):
             loss.backward()
             opt.step()
             total_loss += loss
-        acc = evaluate(model, g, val_dataloader).to(device) / nprocs
+        acc = (
+            evaluate(model, g, num_classes, val_dataloader).to(device) / nprocs
+        )
         dist.reduce(acc, 0)
         if proc_id == 0:
             print(
@@ -175,20 +186,30 @@ def run(proc_id, nprocs, devices, g, data, mode):
         world_size=nprocs,
         rank=proc_id,
     )
-    out_size, train_idx, val_idx, test_idx = data
+    num_classes, train_idx, val_idx, test_idx = data
     train_idx = train_idx.to(device)
     val_idx = val_idx.to(device)
     g = g.to(device if mode == "puregpu" else "cpu")
     # create GraphSAGE model (distributed)
     in_size = g.ndata["feat"].shape[1]
-    model = SAGE(in_size, 256, out_size).to(device)
+    model = SAGE(in_size, 256, num_classes).to(device)
     model = DistributedDataParallel(
         model, device_ids=[device], output_device=device
     )
     # training + testing
     use_uva = mode == "mixed"
-    train(proc_id, nprocs, device, g, train_idx, val_idx, model, use_uva)
-    layerwise_infer(proc_id, device, g, test_idx, model, use_uva)
+    train(
+        proc_id,
+        nprocs,
+        device,
+        g,
+        num_classes,
+        train_idx,
+        val_idx,
+        model,
+        use_uva,
+    )
+    layerwise_infer(proc_id, device, g, num_classes, test_idx, model, use_uva)
     # cleanup process group
     dist.destroy_process_group()
 

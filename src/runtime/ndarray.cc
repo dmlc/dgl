@@ -68,8 +68,16 @@ void NDArray::Internal::DefaultDeleter(NDArray::Container* ptr) {
   } else if (ptr->dl_tensor.data != nullptr) {
     // if the array is still pinned before freeing, unpin it.
     if (ptr->pinned_by_dgl_) UnpinContainer(ptr);
-    dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)
-        ->FreeDataSpace(ptr->dl_tensor.ctx, ptr->dl_tensor.data);
+    if (ptr->pinned_by_pytorch_) {
+      DeviceAPI::Get(kDGLCUDA)->FreePinnedDataSpace(
+          &(ptr->pytorch_raw_deleter_));
+      CHECK(ptr->pytorch_raw_deleter_ == nullptr);
+      ptr->pinned_by_pytorch_ = false;
+      ptr->pytorch_ctx_ = nullptr;
+    } else {
+      dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)
+          ->FreeDataSpace(ptr->dl_tensor.ctx, ptr->dl_tensor.data);
+    }
   }
   delete ptr;
 }
@@ -159,7 +167,6 @@ NDArray NDArray::EmptyShared(
     const std::string& name, std::vector<int64_t> shape, DGLDataType dtype,
     DGLContext ctx, bool is_create) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
@@ -175,7 +182,6 @@ NDArray NDArray::EmptyShared(
 NDArray NDArray::Empty(
     std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
-  // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
   if (size > 0)
@@ -206,6 +212,44 @@ void NDArray::CopyFromTo(DGLArray* from, DGLArray* to) {
       from->dtype);
 }
 
+void NDArray::RecordedCopyFromTo(
+    DGLArray* from, DGLArray* to, void* pytorch_ctx) {
+  size_t from_size = GetDataSize(*from);
+  size_t to_size = GetDataSize(*to);
+  CHECK_EQ(from_size, to_size)
+      << "DGLArrayCopyFromTo: The size must exactly match.";
+
+  CHECK(from->ctx.device_type != to->ctx.device_type)
+      << "Recoding event is only called for the copy between CPU and GPU.";
+
+  CHECK(from->ctx.device_type == kDGLCUDA || to->ctx.device_type == kDGLCUDA)
+      << "At least one CUDA ctx needs to be involved.";
+
+  DeviceAPI::Get(kDGLCUDA)->RecordedCopyDataFromTo(
+      from->data, static_cast<size_t>(from->byte_offset), to->data,
+      static_cast<size_t>(to->byte_offset), from_size, from->ctx, to->ctx,
+      from->dtype, pytorch_ctx);
+}
+
+NDArray NDArray::PinnedEmpty(
+    std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx) {
+  CHECK_EQ(ctx.device_type, kDGLCPU) << "Only NDArray on CPU can be pinned";
+  NDArray ret = Internal::Create(shape, dtype, ctx);
+  size_t size = GetDataSize(ret.data_->dl_tensor);
+  if (size > 0) {
+    ret.data_->dl_tensor.data = DeviceAPI::Get(kDGLCUDA)->AllocPinnedDataSpace(
+        size, &(ret.data_->pytorch_ctx_), &(ret.data_->pytorch_raw_deleter_));
+    CHECK(
+        ret.data_->pytorch_ctx_ != nullptr &&
+        ret.data_->pytorch_raw_deleter_ != nullptr)
+        << "The allocation failed in PyTorch's CachingHostAllocator. "
+        << "The returned context pointer is " << ret.data_->pytorch_ctx_
+        << " and the function deleter is " << ret.data_->pytorch_raw_deleter_;
+    ret.data_->pinned_by_pytorch_ = true;
+  }
+  return ret;
+}
+
 void NDArray::PinContainer(NDArray::Container* ptr) {
   if (IsContainerPinned(ptr)) return;
   auto* tensor = &(ptr->dl_tensor);
@@ -229,13 +273,13 @@ void NDArray::UnpinContainer(NDArray::Container* ptr) {
 }
 
 void NDArray::RecordStream(DGLArray* tensor, DGLStreamHandle stream) {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  CHECK(td->IsAvailable())
-      << "RecordStream only works when TensorAdaptor is available.";
+  TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+  CHECK(tensor_dispatcher->IsAvailable())
+      << "RecordStream only works when TensorAdapter is available.";
   CHECK_EQ(tensor->ctx.device_type, kDGLCUDA)
       << "RecordStream only works with GPU tensors.";
 
-  td->RecordStream(tensor->data, stream, tensor->ctx.device_id);
+  tensor_dispatcher->RecordStream(tensor->data, stream, tensor->ctx.device_id);
 }
 
 template <typename T>
@@ -300,7 +344,7 @@ std::shared_ptr<SharedMemory> NDArray::GetSharedMem() const {
 }
 
 bool NDArray::IsContainerPinned(NDArray::Container* ptr) {
-  if (ptr->pinned_by_dgl_) return true;
+  if (ptr->pinned_by_dgl_ || ptr->pinned_by_pytorch_) return true;
   auto* tensor = &(ptr->dl_tensor);
   // Can only be pinned if on CPU...
   if (tensor->ctx.device_type != kDGLCPU) return false;

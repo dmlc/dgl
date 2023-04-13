@@ -7,37 +7,46 @@ from .... import function as fn
 from ....base import DGLError
 from ....utils import expand_as_pair
 from ...functional import edge_softmax
-from ..utils import Identity
-
 
 # pylint: enable=W0235
-class GATConv(nn.Module):
-    r"""Graph attention layer from `Graph Attention Network
-    <https://arxiv.org/pdf/1710.10903.pdf>`__
+class EdgeGATConv(nn.Module):
+    r"""Graph attention layer with edge features from `SCENE
+    <https://arxiv.org/pdf/2301.03512.pdf>`__
 
     .. math::
-        h_i^{(l+1)} = \sum_{j\in \mathcal{N}(i)} \alpha_{i,j} W^{(l)} h_j^{(l)}
 
-    where :math:`\alpha_{ij}` is the attention score bewteen node :math:`i` and
-    node :math:`j`:
+        \mathbf{v}_i^\prime = \mathbf{\Theta}_\mathrm{s} \cdot \mathbf{v}_i +
+        \sum\limits_{j \in \mathcal{N}(v_i)} \alpha_{j, i} \left( \mathbf{\Theta}_\mathrm{n}
+        \cdot \mathbf{v}_j + \mathbf{\Theta}_\mathrm{e} \cdot \mathbf{e}_{j,i} \right)
+
+    where :math:`\mathbf{\Theta}` is used to denote learnable weight matrices
+    for the transformation of features of the node to update (s=self),
+    neighboring nodes (n=neighbor) and edge features (e=edge).
+    Attention weights are obtained by
 
     .. math::
-        \alpha_{ij}^{l} &= \mathrm{softmax_i} (e_{ij}^{l})
 
-        e_{ij}^{l} &= \mathrm{LeakyReLU}\left(\vec{a}^T [W h_{i} \| W h_{j}]\right)
+        \alpha_{j, i} = \mathrm{softmax}_i \Big( \mathrm{LeakyReLU} \big( \mathbf{a}^T
+        [ \mathbf{\Theta}_\mathrm{n} \cdot \mathbf{v}_i || \mathbf{\Theta}_\mathrm{n}
+        \cdot \mathbf{v}_j || \mathbf{\Theta}_\mathrm{e} \cdot \mathbf{e}_{j,i} ] \big) \Big)
+
+    with :math:`\mathbf{a}` corresponding to a learnable vector.
+    :math:`\mathrm{softmax_i}` stands for the normalization by all incoming edges of node :math:`i`.
 
     Parameters
     ----------
     in_feats : int, or pair of ints
-        Input feature size; i.e, the number of dimensions of :math:`h_i^{(l)}`.
+        Input feature size; i.e, the number of dimensions of :math:`\mathbf{v}_i`.
         GATConv can be applied on homogeneous graph and unidirectional
         `bipartite graph <https://docs.dgl.ai/generated/dgl.bipartite.html?highlight=bipartite>`__.
         If the layer is to be applied to a unidirectional bipartite graph, ``in_feats``
         specifies the input feature size on both the source and destination nodes.  If
         a scalar is given, the source and destination node feature size would take the
         same value.
+    edge_feats: int
+        Edge feature size; i.e., the number of dimensions of :math:\mathbf{e}_{j,i}`.
     out_feats : int
-        Output feature size; i.e, the number of dimensions of :math:`h_i^{(l+1)}`.
+        Output feature size; i.e, the number of dimensions of :math:`\mathbf{v}_i^\prime`.
     num_heads : int
         Number of heads in Multi-Head Attention.
     feat_drop : float, optional
@@ -77,75 +86,68 @@ class GATConv(nn.Module):
     after conv.
 
     Examples
-    --------
+    ----------
     >>> import dgl
     >>> import numpy as np
     >>> import torch as th
-    >>> from dgl.nn import GATConv
+    >>> from dgl.nn import EdgeGATConv
 
-    >>> # Case 1: Homogeneous graph
-    >>> g = dgl.graph(([0,1,2,3,2,5], [1,2,3,4,0,3]))
-    >>> g = dgl.add_self_loop(g)
-    >>> feat = th.ones(6, 10)
-    >>> gatconv = GATConv(10, 2, num_heads=3)
-    >>> res = gatconv(g, feat)
-    >>> res
-    tensor([[[ 3.4570,  1.8634],
-            [ 1.3805, -0.0762],
-            [ 1.0390, -1.1479]],
-            [[ 3.4570,  1.8634],
-            [ 1.3805, -0.0762],
-            [ 1.0390, -1.1479]],
-            [[ 3.4570,  1.8634],
-            [ 1.3805, -0.0762],
-            [ 1.0390, -1.1479]],
-            [[ 3.4570,  1.8634],
-            [ 1.3805, -0.0762],
-            [ 1.0390, -1.1479]],
-            [[ 3.4570,  1.8634],
-            [ 1.3805, -0.0762],
-            [ 1.0390, -1.1479]],
-            [[ 3.4570,  1.8634],
-            [ 1.3805, -0.0762],
-            [ 1.0390, -1.1479]]], grad_fn=<BinaryReduceBackward>)
+    >>> # Case 1: Homogeneous graph.
+    >>> num_nodes, num_edges = 8, 30
+    >>> # Generate a graph.
+    >>> graph = dgl.rand_graph(num_nodes,num_edges)
+    >>> node_feats = th.rand((num_nodes, 20))
+    >>> edge_feats = th.rand((num_edges, 12))
+    >>> edge_gat = EdgeGATConv(
+    ...     in_feats=20,
+    ...     edge_feats=12,
+    ...     out_feats=15,
+    ...     num_heads=3,
+    ... )
+    >>> # Forward pass.
+    >>> new_node_feats = edge_gat(graph, node_feats, edge_feats)
+    >>> new_node_feats.shape
+    torch.Size([8, 3, 15]) torch.Size([30, 3, 10])
 
-    >>> # Case 2: Unidirectional bipartite graph
+    >>> # Case 2: Unidirectional bipartite graph.
     >>> u = [0, 1, 0, 0, 1]
     >>> v = [0, 1, 2, 3, 2]
     >>> g = dgl.heterograph({('A', 'r', 'B'): (u, v)})
-    >>> u_feat = th.tensor(np.random.rand(2, 5).astype(np.float32))
-    >>> v_feat = th.tensor(np.random.rand(4, 10).astype(np.float32))
-    >>> gatconv = GATConv((5,10), 2, 3)
-    >>> res = gatconv(g, (u_feat, v_feat))
-    >>> res
-    tensor([[[-0.6066,  1.0268],
-            [-0.5945, -0.4801],
-            [ 0.1594,  0.3825]],
-            [[ 0.0268,  1.0783],
-            [ 0.5041, -1.3025],
-            [ 0.6568,  0.7048]],
-            [[-0.2688,  1.0543],
-            [-0.0315, -0.9016],
-            [ 0.3943,  0.5347]],
-            [[-0.6066,  1.0268],
-            [-0.5945, -0.4801],
-            [ 0.1594,  0.3825]]], grad_fn=<BinaryReduceBackward>)
+    >>> u_feat = th.tensor(np.random.rand(2, 25).astype(np.float32))
+    >>> v_feat = th.tensor(np.random.rand(4, 30).astype(np.float32))
+    >>> nfeats = (u_feat,v_feat)
+    >>> efeats = th.tensor(np.random.rand(5, 15).astype(np.float32))
+    >>> in_feats = (25,30)
+    >>> edge_feats = 15
+    >>> out_feats = 10
+    >>> num_heads = 3
+    >>> egat_model =  EdgeGATConv(
+    ...     in_feats,
+    ...     edge_feats,
+    ...     out_feats,
+    ...     num_heads,
+    ... )
+    >>> # Forward pass.
+    >>> new_node_feats, attention_weights = egat_model(g, nfeats, efeats, get_attention=True)
+    >>> new_node_feats.shape, attention_weights.shape
+    (torch.Size([4, 3, 10]), torch.Size([5, 3, 1]))
     """
 
     def __init__(
         self,
         in_feats,
+        edge_feats,
         out_feats,
         num_heads,
         feat_drop=0.0,
         attn_drop=0.0,
         negative_slope=0.2,
-        residual=False,
+        residual=True,
         activation=None,
         allow_zero_in_degree=False,
         bias=True,
     ):
-        super(GATConv, self).__init__()
+        super(EdgeGATConv, self).__init__()
         self._num_heads = num_heads
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
@@ -170,33 +172,30 @@ class GATConv(nn.Module):
         self.feat_drop = nn.Dropout(feat_drop)
         self.attn_drop = nn.Dropout(attn_drop)
         self.leaky_relu = nn.LeakyReLU(negative_slope)
-
-        self.has_linear_res = False
-        self.has_explicit_bias = False
-        if residual:
-            if self._in_dst_feats != out_feats * num_heads:
-                self.res_fc = nn.Linear(
-                    self._in_dst_feats, num_heads * out_feats, bias=bias
-                )
-                self.has_linear_res = True
-            else:
-                self.res_fc = Identity()
-        else:
-            self.register_buffer("res_fc", None)
-
-        if bias and not self.has_linear_res:
+        if bias:
             self.bias = nn.Parameter(
                 th.FloatTensor(size=(num_heads * out_feats,))
             )
-            self.has_explicit_bias = True
         else:
             self.register_buffer("bias", None)
+        if residual:
+            self.res_fc = nn.Linear(
+                self._in_dst_feats, num_heads * out_feats, bias=False
+            )
+        else:
+            self.register_buffer("res_fc", None)
+
+        self._edge_feats = edge_feats
+        self.fc_edge = nn.Linear(edge_feats, out_feats * num_heads, bias=False)
+        self.attn_edge = nn.Parameter(
+            th.FloatTensor(size=(1, num_heads, out_feats))
+        )
 
         self.reset_parameters()
         self.activation = activation
 
     def reset_parameters(self):
-        """
+        r"""
 
         Description
         -----------
@@ -204,8 +203,8 @@ class GATConv(nn.Module):
 
         Note
         ----
-        The fc weights :math:`W^{(l)}` are initialized using Glorot uniform initialization.
-        The attention weights are using xavier initialization method.
+        The fc weights :math:`\mathbf{\Theta}` are and the
+        attention weights are using xavier initialization method.
         """
         gain = nn.init.calculate_gain("relu")
         if hasattr(self, "fc"):
@@ -215,12 +214,13 @@ class GATConv(nn.Module):
             nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
         nn.init.xavier_normal_(self.attn_l, gain=gain)
         nn.init.xavier_normal_(self.attn_r, gain=gain)
-        if self.has_explicit_bias:
+
+        nn.init.xavier_normal_(self.fc_edge.weight, gain=gain)
+        nn.init.xavier_normal_(self.attn_edge, gain=gain)
+        if self.bias is not None:
             nn.init.constant_(self.bias, 0)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
-            if self.res_fc.bias is not None:
-                nn.init.constant_(self.res_fc.bias, 0)
 
     def set_allow_zero_in_degree(self, set_value):
         r"""
@@ -236,7 +236,7 @@ class GATConv(nn.Module):
         """
         self._allow_zero_in_degree = set_value
 
-    def forward(self, graph, feat, edge_weight=None, get_attention=False):
+    def forward(self, graph, feat, edge_feat, get_attention=False):
         r"""
 
         Description
@@ -252,8 +252,10 @@ class GATConv(nn.Module):
             :math:`D_{in}` is size of input feature, :math:`N` is the number of nodes.
             If a pair of torch.Tensor is given, the pair must contain two tensors of shape
             :math:`(N_{in}, *, D_{in_{src}})` and :math:`(N_{out}, *, D_{in_{dst}})`.
-        edge_weight : torch.Tensor, optional
-            A 1D tensor of edge weight values.  Shape: :math:`(|E|,)`.
+        edge_feat : torch.Tensor
+            The input edge feature of shape :math:`(E, D_{in_{edge}})`,
+            where :math:`E` is the number of edges and :math:`D_{in_{edge}}`
+            the size of the edge features.
         get_attention : bool, optional
             Whether to return the attention values. Default to False.
 
@@ -263,8 +265,8 @@ class GATConv(nn.Module):
             The output feature of shape :math:`(N, *, H, D_{out})` where :math:`H`
             is the number of heads, and :math:`D_{out}` is size of output feature.
         torch.Tensor, optional
-            The attention values of shape :math:`(E, *, H, 1)`, where :math:`E` is the number of
-            edges. This is returned only when :attr:`get_attention` is ``True``.
+            The attention values of shape :math:`(E, *, H, 1)`. This is returned only
+            when :attr:`get_attention` is ``True``.
 
         Raises
         ------
@@ -319,47 +321,65 @@ class GATConv(nn.Module):
                     dst_prefix_shape = (
                         graph.number_of_dst_nodes(),
                     ) + dst_prefix_shape[1:]
-            # NOTE: GAT paper uses "first concatenation then linear projection"
-            # to compute attention scores, while ours is "first projection then
-            # addition", the two approaches are mathematically equivalent:
-            # We decompose the weight vector a mentioned in the paper into
-            # [a_l || a_r], then
-            # a^T [Wh_i || Wh_j] = a_l Wh_i + a_r Wh_j
-            # Our implementation is much efficient because we do not need to
-            # save [Wh_i || Wh_j] on edges, which is not memory-efficient. Plus,
-            # addition could be optimized with DGL's built-in function u_add_v,
-            # which further speeds up computation and saves memory footprint.
+
+            # Linearly tranform the edge features.
+            n_edges = edge_feat.shape[:-1]
+            feat_edge = self.fc_edge(edge_feat).view(
+                *n_edges, self._num_heads, self._out_feats
+            )
+
+            # Add edge features to graph.
+            graph.edata["ft_edge"] = feat_edge
+
             el = (feat_src * self.attn_l).sum(dim=-1).unsqueeze(-1)
             er = (feat_dst * self.attn_r).sum(dim=-1).unsqueeze(-1)
+
+            # Calculate scalar for each edge.
+            ee = (feat_edge * self.attn_edge).sum(dim=-1).unsqueeze(-1)
+            graph.edata["ee"] = ee
+
             graph.srcdata.update({"ft": feat_src, "el": el})
             graph.dstdata.update({"er": er})
-            # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
-            graph.apply_edges(fn.u_add_v("el", "er", "e"))
+            # Compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
+            graph.apply_edges(fn.u_add_v("el", "er", "e_tmp"))
+
+            # e_tmp combines attention weights of source and destination node.
+            # Add the attention weight of the edge.
+            graph.edata["e"] = graph.edata["e_tmp"] + graph.edata["ee"]
+
+            # Create new edges features that combine the
+            # features of the source node and the edge features.
+            graph.apply_edges(fn.u_add_e("ft", "ft_edge", "ft_combined"))
+
             e = self.leaky_relu(graph.edata.pop("e"))
-            # compute softmax
+            # Compute softmax.
             graph.edata["a"] = self.attn_drop(edge_softmax(graph, e))
-            if edge_weight is not None:
-                graph.edata["a"] = graph.edata["a"] * edge_weight.tile(
-                    1, self._num_heads, 1
-                ).transpose(0, 2)
-            # message passing
-            graph.update_all(fn.u_mul_e("ft", "a", "m"), fn.sum("m", "ft"))
+
+            # For each edge, element-wise multiply the combined features with
+            # the attention coefficient.
+            graph.edata["m_combined"] = (
+                graph.edata["ft_combined"] * graph.edata["a"]
+            )
+
+            # First copy the edge features and then sum them up.
+            graph.update_all(fn.copy_e("m_combined", "m"), fn.sum("m", "ft"))
+
             rst = graph.dstdata["ft"]
-            # residual
+            # Residual.
             if self.res_fc is not None:
-                # Use -1 rather than self._num_heads to handle broadcasting
+                # Use -1 rather than self._num_heads to handle broadcasting.
                 resval = self.res_fc(h_dst).view(
                     *dst_prefix_shape, -1, self._out_feats
                 )
                 rst = rst + resval
-            # bias
-            if self.has_explicit_bias:
+            # Bias.
+            if self.bias is not None:
                 rst = rst + self.bias.view(
                     *((1,) * len(dst_prefix_shape)),
                     self._num_heads,
                     self._out_feats
                 )
-            # activation
+            # Activation.
             if self.activation:
                 rst = self.activation(rst)
 

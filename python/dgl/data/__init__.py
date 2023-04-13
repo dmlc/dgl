@@ -5,6 +5,7 @@ for downloading, processing, saving and loading data from external resources.
 from __future__ import absolute_import
 
 from . import citation_graph as citegrh
+from .actor import ActorDataset
 from .adapter import *
 from .bitcoinotc import BitcoinOTC, BitcoinOTCDataset
 from .citation_graph import (
@@ -53,8 +54,14 @@ from .tree import SST, SSTDataset
 from .tu import LegacyTUDataset, TUDataset
 from .utils import *
 from .cluster import CLUSTERDataset
+from .geom_gcn import (
+    ChameleonDataset,
+    CornellDataset,
+    SquirrelDataset,
+    TexasDataset,
+    WisconsinDataset,
+)
 from .pattern import PATTERNDataset
-from .wiki_network import ChameleonDataset, SquirrelDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
 from .zinc import ZINCDataset
