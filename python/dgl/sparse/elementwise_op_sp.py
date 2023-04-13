@@ -3,7 +3,7 @@ from typing import Union
 
 import torch
 
-from .sparse_matrix import diag, SparseMatrix, val_like
+from .sparse_matrix import SparseMatrix, val_like
 from .utils import is_scalar, Scalar
 
 
