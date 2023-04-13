@@ -1652,7 +1652,7 @@ def test_pgexplainer(g, idtype, n_classes):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
     feat = F.randn((g.num_nodes(), 5))
-    g.ndata['attr'] = feat
+    g.ndata["attr"] = feat
 
     class Model(th.nn.Module):
         def __init__(self, in_feats, out_feats):
@@ -1664,8 +1664,8 @@ def test_pgexplainer(g, idtype, n_classes):
         def forward(self, g, h, embed=False, edge_weight=None):
             h = self.conv(g, h, edge_weight=edge_weight)
             if not embed:
-                g.ndata['h'] = h
-                hg = dgl.mean_nodes(g, 'h')
+                g.ndata["h"] = h
+                hg = dgl.mean_nodes(g, "h")
                 return torch.sigmoid(self.fc(hg))
             else:
                 return h

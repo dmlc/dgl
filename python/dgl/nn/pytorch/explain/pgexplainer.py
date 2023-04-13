@@ -199,7 +199,7 @@ class PGExplainer(nn.Module):
         return gate_inputs
 
     def train_explanation_network(self, dataset, func_extract_feat):
-        r""" Training the explanation network by gradient descent(GD)
+        r"""Training the explanation network by gradient descent(GD)
          using Adam optimizer
 
         Parameters
