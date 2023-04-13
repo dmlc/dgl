@@ -11,10 +11,8 @@
 namespace dgl {
 namespace sparse {
 
-// TODO(zhenkun): support addition of matrices with different sparsity.
 /**
- * @brief Adds two sparse matrices. Currently does not support two matrices with
- * different sparsity.
+ * @brief Adds two sparse matrices possibly with different sparsities.
  *
  * @param A SparseMatrix
  * @param B SparseMatrix
@@ -24,6 +22,18 @@ namespace sparse {
 c10::intrusive_ptr<SparseMatrix> SpSpAdd(
     const c10::intrusive_ptr<SparseMatrix>& A,
     const c10::intrusive_ptr<SparseMatrix>& B);
+
+/**
+ * @brief Multiplies two sparse matrices possibly with different sparsities.
+ *
+ * @param A SparseMatrix
+ * @param B SparseMatrix
+ *
+ * @return SparseMatrix
+ */
+c10::intrusive_ptr<SparseMatrix> SpSpMul(
+    const c10::intrusive_ptr<SparseMatrix>& lhs_mat,
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat);
 
 }  // namespace sparse
 }  // namespace dgl
