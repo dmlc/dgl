@@ -21,6 +21,13 @@ def spsp_mul(A, B):
     )
 
 
+def spsp_div(A, B):
+    """Invoke C++ sparse library for division"""
+    return SparseMatrix(
+        torch.ops.dgl_sparse.spsp_div(A.c_sparse_matrix, B.c_sparse_matrix)
+    )
+
+
 def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     """Elementwise addition
 
@@ -141,8 +148,9 @@ def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
 def sp_div(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     """Elementwise division
 
-    If :attr:`B` is a sparse matrix, both :attr:`A` and :attr:`B` must be
-    diagonal matrices.
+    If :attr:`B` is a sparse matrix, both :attr:`A` and :attr:`B` must have the
+    same sparsity. And the returned matrix has the same order of non-zero
+    entries as :attr:`A`.
 
     Parameters
     ----------
@@ -169,15 +177,7 @@ def sp_div(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     """
     if is_scalar(B):
         return val_like(A, A.val / B)
-    if A.is_diag() and B.is_diag():
-        assert A.shape == B.shape, (
-            f"The shape of diagonal matrix A {A.shape} and B {B.shape} must"
-            f"match for elementwise division."
-        )
-        return diag(A.val / B.val, A.shape)
-    # Python falls back to B.__rtruediv__(A) then TypeError when NotImplemented
-    # is returned.
-    return NotImplemented
+    return spsp_div(A, B)
 
 
 def sp_power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:

@@ -14,24 +14,36 @@ namespace sparse {
 /**
  * @brief Adds two sparse matrices possibly with different sparsities.
  *
- * @param A SparseMatrix
- * @param B SparseMatrix
+ * @param lhs_mat SparseMatrix
+ * @param rhs_mat SparseMatrix
  *
  * @return SparseMatrix
  */
 c10::intrusive_ptr<SparseMatrix> SpSpAdd(
-    const c10::intrusive_ptr<SparseMatrix>& A,
-    const c10::intrusive_ptr<SparseMatrix>& B);
+    const c10::intrusive_ptr<SparseMatrix>& lhs_mat,
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat);
 
 /**
  * @brief Multiplies two sparse matrices possibly with different sparsities.
  *
- * @param A SparseMatrix
- * @param B SparseMatrix
+ * @param lhs_mat SparseMatrix
+ * @param rhs_mat SparseMatrix
  *
  * @return SparseMatrix
  */
 c10::intrusive_ptr<SparseMatrix> SpSpMul(
+    const c10::intrusive_ptr<SparseMatrix>& lhs_mat,
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat);
+
+/**
+ * @brief Divides two sparse matrices with the same sparsity.
+ *
+ * @param lhs_mat SparseMatrix
+ * @param rhs_mat SparseMatrix
+ *
+ * @return SparseMatrix
+ */
+c10::intrusive_ptr<SparseMatrix> SpSpDiv(
     const c10::intrusive_ptr<SparseMatrix>& lhs_mat,
     const c10::intrusive_ptr<SparseMatrix>& rhs_mat);
 
