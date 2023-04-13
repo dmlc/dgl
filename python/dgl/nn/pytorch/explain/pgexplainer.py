@@ -360,11 +360,11 @@ class PGExplainer(nn.Module):
         sym_mask = (mask_sigmoid + mask_sigmoid.transpose(0, 1)) / 2
         edge_mask = sym_mask[edge_idx[0].long(), edge_idx[1].long()]
 
-        # inverse the weights before sigmoid in MessagePassing Module
+        # inverse the weights before sigmoid
         self.clear_masks()
         self.set_masks(graph, feat, edge_mask)
 
-        # the model prediction with edge mask
+        # the model prediction with the updated edge mask
         logits = self.model(graph, feat, edge_weight=self.edge_mask)
         probs = F.softmax(logits, dim=-1)
 
