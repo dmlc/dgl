@@ -283,6 +283,7 @@ class PGExplainer(nn.Module):
         >>> import torch as th
         >>> import torch.nn as nn
         >>> import dgl
+
 		>>> from dgl.data import GINDataset
         >>> from dgl.dataloading import GraphDataLoader
         >>> from dgl.nn import GraphConv, PGExplainer
