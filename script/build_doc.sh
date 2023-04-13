@@ -59,7 +59,7 @@ fi
 cd ${DGL_HOME}/docs
 
 if [[ ${remove} == "YES" ]]; then
-  sh clean.sh
+  bash clean.sh
 fi
 
 export DGLBACKEND=$backend

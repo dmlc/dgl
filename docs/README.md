@@ -6,7 +6,7 @@ To build the doc:
 
 - Create the developer conda environment using the script [here](../script/create_dev_conda_env.sh).
 - Activate the developer conda environment.
-- [Build DGL from source](https://docs.dgl.ai/install/index.html#install-from-source).
+- Build DGL from source using the script [here](../script/build_dgl.sh).
 - Build the doc using the script [here](../script/build_doc.sh).
 
 To render locally:
