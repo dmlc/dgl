@@ -277,6 +277,57 @@ class PGExplainer(nn.Module):
             The classification probability for graph with edge mask,
             the probability mask for graph edges.
 
+        Examples
+        --------
+
+        >>> import torch as th
+        >>> import torch.nn as nn
+        >>> import dgl
+		>>> from dgl.data import GINDataset
+        >>> from dgl.dataloading import GraphDataLoader
+        >>> from dgl.nn import GraphConv, PGExplainer
+
+        >>> # Define the model
+        >>> class Model(th.nn.Module):
+        ...     def __init__(self, in_feats, out_feats):
+        ...         super().__init__()
+        ...         self.conv = GraphConv(in_feats, out_feats)
+        ...         self.fc = nn.Linear(out_feats, 1)
+        ...         th.nn.init.xavier_uniform_(self.fc.weight)
+        ...
+        ...     def forward(self, g, h, embed=False, edge_weight=None):
+        ...         h = self.conv(g, h, edge_weight=edge_weight)
+        ...         if not embed:
+        ...             g.ndata['h'] = h
+        ...             hg = dgl.mean_nodes(g, 'h')
+        ...             return th.sigmoid(self.fc(hg))
+        ...         else:
+        ...             return h
+
+        >>> # Load dataset
+        >>> data = GINDataset('MUTAG', self_loop=True)
+        >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
+
+        >>> # Train the model
+        >>> feat_size = data[0][0].ndata['attr'].shape[1]
+        >>> model = Model(feat_size, data.gclasses)
+        >>> criterion = nn.BCELoss()
+        >>> optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
+        >>> for bg, labels in dataloader:
+        ...     logits = model(bg, bg.ndata['attr'])
+        ...     loss = criterion(logits.squeeze(1).float(), labels.float())
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
+
+        >>> # Initialize the explainer
+        >>> explainer = PGExplainer(model, data.gclasses)
+        >>> explainer.train_explanation_network(data, lambda g: g.ndata["attr"])
+
+        >>> # Explain the prediction for graph 0
+        >>> graph, l = data[0]
+        >>> graph_feat = graph.ndata.pop("attr")
+        >>> probs, edge_weight = explainer.explain_graph(graph, graph_feat)
         """
         embed = self.model(graph, feat, embed=True)
         embed = embed.data.cpu()
