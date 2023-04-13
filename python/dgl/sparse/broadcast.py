@@ -71,7 +71,7 @@ def broadcast_op(A: SparseMatrix, v: torch.Tensor, op: str) -> SparseMatrix:
     if v.dim() == 1:
         v = v.view(1, -1)
 
-    shape_error_message =  (
+    shape_error_message = (
         f"Dimension mismatch for broadcasting. Got A.shape = {A.shape} and"
         f"v.shape = {v.shape}."
     )
