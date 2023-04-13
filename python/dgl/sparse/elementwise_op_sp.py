@@ -14,6 +14,13 @@ def spsp_add(A, B):
     )
 
 
+def spsp_mul(A, B):
+    """Invoke C++ sparse library for multiplication"""
+    return SparseMatrix(
+        torch.ops.dgl_sparse.spsp_mul(A.c_sparse_matrix, B.c_sparse_matrix)
+    )
+
+
 def sp_add(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     """Elementwise addition
 
@@ -83,8 +90,8 @@ def sp_sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
 def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     """Elementwise multiplication
 
-    If :attr:`B` is a sparse matrix, both :attr:`A` and :attr:`B` must be
-    diagonal matrices.
+    Note that if both :attr:`A` and :attr:`B` are sparse matrices, both of them
+    need to be diagonal or on CPU.
 
     Parameters
     ----------
@@ -108,28 +115,27 @@ def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     >>> A * 2
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
-    values=tensor([2, 4, 6]),
-    shape=(3, 4), nnz=3)
+                 values=tensor([2, 4, 6]),
+                 shape=(3, 4), nnz=3)
 
     >>> 2 * A
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
-    values=tensor([2, 4, 6]),
-    shape=(3, 4), nnz=3)
+                 values=tensor([2, 4, 6]),
+                 shape=(3, 4), nnz=3)
+
+    >>> indices2 = torch.tensor([[2, 0, 1], [0, 3, 2]])
+    >>> val2 = torch.tensor([3, 2, 1])
+    >>> B = dglsp.spmatrix(indices2, val2, shape=(3, 4))
+    >>> A * B
+    SparseMatrix(indices=tensor([[0],
+                                 [3]]),
+                 values=tensor([4]),
+                 shape=(3, 4), nnz=1)
     """
     if is_scalar(B):
         return val_like(A, A.val * B)
-    if A.is_diag() and B.is_diag():
-        assert A.shape == B.shape, (
-            f"The shape of diagonal matrix A {A.shape} and B {B.shape} must"
-            f"match for elementwise multiplication."
-        )
-        return diag(A.val * B.val, A.shape)
-    # Python falls back to B.__rmul__(A) then TypeError when NotImplemented is
-    # returned.
-    # So this also handles the case of scalar * SparseMatrix since we set
-    # SparseMatrix.__rmul__ to be the same as SparseMatrix.__mul__.
-    return NotImplemented
+    return spsp_mul(A, B)
 
 
 def sp_div(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
