@@ -3691,8 +3691,7 @@ def lap_pe(g, k, padding=False, return_eigval=False):
 
 
 def laplacian_pe(g, k, padding=False, return_eigval=False):
-    r"""Alias of `dgl.lap_pe`.
-    """
+    r"""Alias of `dgl.lap_pe`."""
     dgl_warning("dgl.laplacian_pe will be deprecated. Use dgl.lap_pe please.")
     return lap_pe(g, k, padding, return_eigval)
 

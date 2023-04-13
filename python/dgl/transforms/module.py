@@ -19,7 +19,7 @@
 from scipy.linalg import expm
 
 from .. import backend as F, convert, function as fn, utils
-from ..base import DGLError, dgl_warning
+from ..base import dgl_warning, DGLError
 from . import functional
 
 try:
@@ -500,8 +500,7 @@ class LapPE(BaseTransform):
 
 
 class LaplacianPE(LapPE):
-    r"""Alias of `LapPE`.
-    """
+    r"""Alias of `LapPE`."""
 
     def __init__(self, k, feat_name="PE", eigval_name=None, padding=False):
         super().__init__(k, feat_name, eigval_name, padding)

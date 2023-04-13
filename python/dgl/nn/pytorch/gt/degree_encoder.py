@@ -81,8 +81,9 @@ class DegreeEncoder(nn.Module):
         elif self.direction == "out":
             degree_embedding = self.encoder(out_degree)
         elif self.direction == "both":
-            degree_embedding = self.encoder1(in_degree) + \
-                self.encoder2(out_degree)
+            degree_embedding = self.encoder1(in_degree) + self.encoder2(
+                out_degree
+            )
         else:
             raise ValueError(
                 f'Supported direction options: "in", "out" and "both", '
