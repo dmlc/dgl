@@ -47,16 +47,16 @@ class PGExplainer(nn.Module):
     """
 
     def __init__(
-            self,
-            model,
-            num_features,
-            epochs=10,
-            lr=0.01,
-            coff_size=0.01,
-            coff_ent=5e-4,
-            t0=5.0,
-            t1=1.0,
-            sample_bias=0.0,
+        self,
+        model,
+        num_features,
+        epochs=10,
+        lr=0.01,
+        coff_size=0.01,
+        coff_ent=5e-4,
+        t0=5.0,
+        t1=1.0,
+        sample_bias=0.0,
     ):
         super(PGExplainer, self).__init__()
 
@@ -155,7 +155,7 @@ class PGExplainer(nn.Module):
         scale = 0.99
         edge_mask = self.edge_mask * (2 * scale - 1.0) + (1.0 - scale)
         mask_ent = -edge_mask * torch.log(edge_mask) - (
-                1 - edge_mask
+            1 - edge_mask
         ) * torch.log(1 - edge_mask)
         mask_ent_loss = self.coff_ent * torch.mean(mask_ent)
 
