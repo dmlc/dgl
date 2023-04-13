@@ -722,6 +722,7 @@ def test_egat_conv_edge_weight(
         out_edge_feats=out_edge_feats,
         num_heads=num_heads,
     )
+    egat = egat.to(ctx)
     nfeat = F.randn((g.num_nodes(), 10))
     efeat = F.randn((g.num_edges(), 5))
     ew = F.randn((g.num_edges(),))
