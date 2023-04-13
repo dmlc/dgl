@@ -86,16 +86,14 @@ struct RepeatIndex {
 
 template <typename IdType>
 struct OutputBufferIndexer {
-  const IdType *indptr;
-  IdType *buffer;
-  __host__ __device__ auto operator()(IdType i) {
-    return buffer + indptr[i];
-  }
+  const IdType* indptr;
+  IdType* buffer;
+  __host__ __device__ auto operator()(IdType i) { return buffer + indptr[i]; }
 };
 
 template <typename IdType>
 struct AdjacentDifference {
-  const IdType *indptr;
+  const IdType* indptr;
   __host__ __device__ auto operator()(IdType i) {
     return indptr[i + 1] - indptr[i];
   }
@@ -117,22 +115,21 @@ COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr) {
     CUDA_KERNEL_CALL(
         _RepeatKernel, nb, nt, 0, stream, rowids.Ptr<int64_t>(),
         csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>(), csr.num_rows, nnz);
-  }
-  else {
+  } else {
     runtime::CUDAWorkspaceAllocator allocator(csr.indptr->ctx);
     thrust::counting_iterator<int64_t> iota(0);
 
     auto input_buffer = thrust::make_transform_iterator(iota, RepeatIndex{});
     auto output_buffer = thrust::make_transform_iterator(
-        iota, OutputBufferIndexer<int64_t>
-        {csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>()});
+        iota, OutputBufferIndexer<int64_t>{
+                  csr.indptr.Ptr<int64_t>(), ret_row.Ptr<int64_t>()});
     auto buffer_sizes = thrust::make_transform_iterator(
         iota, AdjacentDifference<int64_t>{csr.indptr.Ptr<int64_t>()});
 
     std::size_t temp_storage_bytes = 0;
     CUDA_CALL(cub::DeviceCopy::Batched(
-        nullptr, temp_storage_bytes, input_buffer, output_buffer,
-        buffer_sizes, csr.num_rows, stream));
+        nullptr, temp_storage_bytes, input_buffer, output_buffer, buffer_sizes,
+        csr.num_rows, stream));
 
     auto temp = allocator.alloc_unique<char>(temp_storage_bytes);
 
