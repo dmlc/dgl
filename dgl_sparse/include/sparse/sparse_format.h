@@ -14,6 +14,7 @@
 #include <torch/script.h>
 
 #include <memory>
+#include <utility>
 
 namespace dgl {
 namespace sparse {
