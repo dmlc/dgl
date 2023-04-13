@@ -724,7 +724,7 @@ def test_egat_conv_edge_weight(
     )
     nfeat = F.randn((g.num_nodes(), 10))
     efeat = F.randn((g.num_edges(), 5))
-    ew = F.randn(*(g.num_edges(),))
+    ew = F.randn((g.num_edges(),))
 
     h, f, attn = egat(g, nfeat, efeat, edge_weight=ew, get_attention=True)
 
