@@ -2,6 +2,9 @@ name: __NAME__
 dependencies:
   - python=__PYTHON_VERSION__
   - pip
+  - graphviz
+  - pandoc
+  - pygraphviz
   - pip:
     - --find-links https://download.pytorch.org/whl/torch_stable.html
     - cython
@@ -26,5 +29,15 @@ dependencies:
     - torchmetrics
     - tqdm
     - boto3 # AWS SDK for python
+    - sphinx==4.2.0
+    - sphinx-gallery
+    - sphinx_rtd_theme
+    - sphinx_copybutton
+    - sphinxemoji
+    - nbsphinx>=0.8.11
+    - nbsphinx-link>=1.3.0
+    - pillow
+    - seaborn
+    - jupyter_http_over_ws
 variables:
   DGL_HOME: __DGL_HOME__
