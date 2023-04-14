@@ -216,12 +216,13 @@ class PGExplainer(nn.Module):
 
         with torch.no_grad():
             for idx, (g, _) in enumerate(dataset):
+                self.model = self.model.to(g.device)
                 feat = func_extract_feat(g)
 
                 self.model.eval()
 
                 logits = self.model(g, feat)
-                ori_pred_dict[idx] = logits.argmax(-1).data.cpu()
+                ori_pred_dict[idx] = logits.argmax(-1).data
 
         # train the mask generator
         for epoch in range(self.epochs):
@@ -233,6 +234,7 @@ class PGExplainer(nn.Module):
                 * np.power(self.final_tmp / self.init_tmp, epoch / self.epochs)
             )
 
+            self.elayers = self.elayers.to(self.model.device)
             self.elayers.train()
             optimizer.zero_grad()
 
@@ -331,8 +333,11 @@ class PGExplainer(nn.Module):
         >>> graph_feat = graph.ndata.pop("attr")
         >>> probs, edge_weight = explainer.explain_graph(graph, graph_feat)
         """
+        self.model = self.model.to(graph.device)
+        self.elayers = self.elayers.to(graph.device)
+
         embed = self.model(graph, feat, embed=True)
-        embed = embed.data.cpu()
+        embed = embed.data
 
         edge_idx = graph.edges()
 
