@@ -27,6 +27,9 @@ class RelGraphConvLayer(nn.Module):
         for w in self.weight.values():
             nn.init.xavier_uniform_(w, gain=nn.init.calculate_gain("relu"))
 
+    ###########################################################################
+    # (HIGHLIGHT) Leverage DGL sparse APIs for heterogeneous graph convolution.
+    ###########################################################################
     def forward(self, adjs, x_dict):
         h_dict = {ntype: 0 for ntype in x_dict.keys()}
         for stype, etype, dtype in adjs.keys():
