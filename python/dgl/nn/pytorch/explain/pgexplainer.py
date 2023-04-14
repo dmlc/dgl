@@ -32,15 +32,15 @@ class PGExplainer(nn.Module):
         Number of input feature for the explanation network.
     epochs : int, optional
         Number of epochs to train the explanation network. Default: 10.
-    lr : float, optional
+    learning_rate : float, optional
         Learning rate to train the explanation network. Default: 0.01.
     coff_size : float, optional
         Size regularization to constrain the explanation size. Default: 0.01.
     coff_ent : float, optional
         Entropy regularization to constrain the connectivity of explanation. Default: 5e-4.
-    t0 : float, optional
+    init_tmp : float, optional
         The temperature at the first epoch. Default: 5.0.
-    t1 : float, optional
+    final_tmp : float, optional
         The temperature at the final epoch. Default: 1.0.
     sample_bias : float, optional
         Some members of a population are systematically more likely to be selected
@@ -52,11 +52,11 @@ class PGExplainer(nn.Module):
         model,
         num_features,
         epochs=10,
-        lr=0.01,
+        learning_rate=0.01,
         coff_size=0.01,
         coff_ent=5e-4,
-        t0=5.0,
-        t1=1.0,
+        init_tmp=5.0,
+        final_tmp=1.0,
         sample_bias=0.0,
     ):
         super(PGExplainer, self).__init__()
@@ -66,11 +66,11 @@ class PGExplainer(nn.Module):
 
         # training parameters for PGExplainer
         self.epochs = epochs
-        self.lr = lr
+        self.learning_rate = learning_rate
         self.coff_size = coff_size
         self.coff_ent = coff_ent
-        self.t0 = t0
-        self.t1 = t1
+        self.init_tmp = init_tmp
+        self.final_tmp = final_tmp
         self.sample_bias = sample_bias
 
         self.init_bias = 0.0
@@ -100,14 +100,14 @@ class PGExplainer(nn.Module):
             graph. The values are within range :math:`(0, 1)`. The higher,
             the more important. Default: None.
         """
-        N, F = feat.shape
-        E = graph.num_edges()
+        num_nodes, _ = feat.shape
+        num_edges = graph.num_edges()
 
         init_bias = self.init_bias
-        std = nn.init.calculate_gain("relu") * math.sqrt(2.0 / (2 * N))
+        std = nn.init.calculate_gain("relu") * math.sqrt(2.0 / (2 * num_nodes))
 
         if edge_mask is None:
-            self.edge_mask = torch.randn(E) * std + init_bias
+            self.edge_mask = torch.randn(num_edges) * std + init_bias
         else:
             self.edge_mask = edge_mask
 
@@ -210,12 +210,12 @@ class PGExplainer(nn.Module):
         func_extract_feat : func
             A function that extracts the node embeddings for each individual graphs.
         """
-        optimizer = Adam(self.elayers.parameters(), lr=self.lr)
+        optimizer = Adam(self.elayers.parameters(), lr=self.learning_rate)
 
         ori_pred_dict = {}
 
         with torch.no_grad():
-            for idx, (g, l) in enumerate(dataset):
+            for idx, (g, _) in enumerate(dataset):
                 feat = func_extract_feat(g)
 
                 self.model.eval()
@@ -229,13 +229,14 @@ class PGExplainer(nn.Module):
             pred_list = []
 
             tmp = float(
-                self.t0 * np.power(self.t1 / self.t0, epoch / self.epochs)
+                self.init_tmp
+                * np.power(self.final_tmp / self.init_tmp, epoch / self.epochs)
             )
 
             self.elayers.train()
             optimizer.zero_grad()
 
-            for idx, (g, l) in enumerate(dataset):
+            for idx, (g, _) in enumerate(dataset):
                 feat = func_extract_feat(g)
 
                 prob, edge_mask = self.explain_graph(
@@ -297,13 +298,13 @@ class PGExplainer(nn.Module):
         ...         th.nn.init.xavier_uniform_(self.fc.weight)
         ...
         ...     def forward(self, g, h, embed=False, edge_weight=None):
-        ...         h = self.conv(g, h, edge_weight=edge_weight)
+        ...         h = self.conv(g, emb, edge_weight=edge_weight)
         ...         if not embed:
-        ...             g.ndata['h'] = h
+        ...             g.ndata['h'] = emb
         ...             hg = dgl.mean_nodes(g, 'h')
         ...             return th.sigmoid(self.fc(hg))
         ...         else:
-        ...             return h
+        ...             return emb
 
         >>> # Load dataset
         >>> data = GINDataset('MUTAG', self_loop=True)
@@ -337,15 +338,15 @@ class PGExplainer(nn.Module):
 
         node_size = embed.shape[0]
         col, row = edge_idx
-        f1 = embed[col.long()]
-        f2 = embed[row.long()]
-        f12self = torch.cat([f1, f2], dim=-1)
+        col_emb = embed[col.long()]
+        row_emb = embed[row.long()]
+        emb = torch.cat([col_emb, row_emb], dim=-1)
 
         # using the node embedding to calculate the edge weight
-        h = f12self.to(graph.device)
+        emb = emb.to(graph.device)
         for elayer in self.elayers:
-            h = elayer(h)
-        values = h.reshape(-1)
+            emb = elayer(emb)
+        values = emb.reshape(-1)
 
         values = self.concrete_sample(values, beta=tmp, training=training)
         self.sparse_mask_values = values
