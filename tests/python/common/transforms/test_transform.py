@@ -3065,7 +3065,7 @@ def test_module_random_walk_pe(idtype):
 
 
 @parametrize_idtype
-def test_module_laplacian_pe(idtype):
+def test_module_lap_pe(idtype):
     g = dgl.graph(
         ([2, 1, 0, 3, 1, 1], [3, 1, 1, 2, 1, 0]), idtype=idtype, device=F.ctx()
     )
@@ -3090,7 +3090,7 @@ def test_module_laplacian_pe(idtype):
     )
 
     # without padding (k<n)
-    transform = dgl.LaplacianPE(2, feat_name="lappe")
+    transform = dgl.LapPE(2, feat_name="lappe")
     new_g = transform(g)
     # tensorflow has no abs() api
     if dgl.backend.backend_name == "tensorflow":
@@ -3100,7 +3100,7 @@ def test_module_laplacian_pe(idtype):
         assert F.allclose(new_g.ndata["lappe"].abs(), tgt_pe[:, :2])
 
     # with padding (k>=n)
-    transform = dgl.LaplacianPE(5, feat_name="lappe", padding=True)
+    transform = dgl.LapPE(5, feat_name="lappe", padding=True)
     new_g = transform(g)
     # tensorflow has no abs() api
     if dgl.backend.backend_name == "tensorflow":
@@ -3110,7 +3110,7 @@ def test_module_laplacian_pe(idtype):
         assert F.allclose(new_g.ndata["lappe"].abs(), tgt_pe)
 
     # with eigenvalues
-    transform = dgl.LaplacianPE(
+    transform = dgl.LapPE(
         5, feat_name="lappe", eigval_name="eigval", padding=True
     )
     new_g = transform(g)

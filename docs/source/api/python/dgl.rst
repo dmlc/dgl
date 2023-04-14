@@ -111,7 +111,7 @@ Operators for generating positional encodings of each node.
     :toctree: ../../generated
 
     random_walk_pe
-    laplacian_pe
+    lap_pe
     double_radius_node_labeling
     shortest_dist
     svd_pe
