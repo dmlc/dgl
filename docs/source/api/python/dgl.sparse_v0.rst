@@ -148,3 +148,15 @@ Non-linear activation functions
     :toctree: ../../generated/
 
     softmax
+
+Broadcast operators
+````````
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    broadcast_op
+    broadcast_add
+    broadcast_sub
+    broadcast_mul
+    broadcast_div

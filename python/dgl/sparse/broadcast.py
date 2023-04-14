@@ -14,10 +14,12 @@ def broadcast_op(A: SparseMatrix, v: torch.Tensor, op: str) -> SparseMatrix:
     applied on the non-zero values of :attr:`A`.
 
     There are two cases regarding the shape of v:
-    1. v is a vector of shape (1, :attr:`A.shape[1]`) or (:attr:`A.shape[1]`).
+
+    1. :attr:`v` is a vector of shape ``(1, A.shape[1])`` or ``(A.shape[1])``.
     In this case, :attr:`v` is broadcasted on the row dimension of :attr:`A`.
-    2. v is a vector of shape (:attr:`A.shape[0]`, 1). In this case, :attr:`v`
-    is broadcasted on the column dimension of :attr:`A`.
+
+    2. :attr:`v` is a vector of shape ``(A.shape[0], 1)``. In this case,
+    :attr:`v` is broadcasted on the column dimension of :attr:`A`.
 
     If ``A.val`` takes shape ``(nnz, D)``, then :attr:`v` will be broadcasted on
     the ``D`` dimension.
@@ -77,13 +79,15 @@ def broadcast_op(A: SparseMatrix, v: torch.Tensor, op: str) -> SparseMatrix:
     )
     assert v.dim() <= 2 and (1 in v.shape), shape_error_message
     broadcast_dim = None
+    # v can be broadcasted to A if exactly one dimension of v is 1 and the other
+    # is the same as A.
     for d, (dim1, dim2) in enumerate(zip(A.shape, v.shape)):
         assert dim2 in (1, dim1), shape_error_message
         if dim1 != dim2:
             assert broadcast_dim is None, shape_error_message
             broadcast_dim = d
 
-    # A and v has the same shape of (1, *) or (*, 1)
+    # A and v has the same shape of (1, *) or (*, 1).
     if broadcast_dim is None:
         broadcast_dim = 0 if A.shape[0] == 1 else 1
 
