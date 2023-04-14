@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.sparse import from_coo, mul, power, val_like
+from dgl.sparse import div, from_coo, mul, power, spmatrix, val_like
 
 from .utils import (
     rand_coo,
@@ -134,3 +134,24 @@ def test_spspmul(create_func1, create_func2, shape, nnz1, nnz2, nz_dim):
     assert torch.allclose(
         val_like(B, B.val.grad).to_dense(), DB.grad, atol=1e-05
     )
+
+
+@pytest.mark.parametrize(
+    "create_func", [rand_coo, rand_csr, rand_csc, rand_diag]
+)
+@pytest.mark.parametrize("shape", [(5, 5), (5, 3)])
+@pytest.mark.parametrize("nnz", [1, 14])
+@pytest.mark.parametrize("nz_dim", [None, 3])
+def test_spspdiv(create_func, nnz, shape, nz_dim):
+    dev = F.ctx()
+    A = create_func(shape, nnz, dev, nz_dim)
+
+    perm = torch.randperm(A.nnz, device=dev)
+    rperm = torch.argsort(perm)
+    B = spmatrix(A.indices()[:, perm], A.val[perm], A.shape)
+    C = div(A, B)
+    assert not C.has_duplicate()
+    assert torch.allclose(C.val, A.val / B.val[rperm], atol=1e-05)
+    assert torch.allclose(C.indices(), A.indices(), atol=1e-05)
+
+    # No need to test backward here, since it is handled by Pytorch

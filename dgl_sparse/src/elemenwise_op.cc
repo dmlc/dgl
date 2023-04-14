@@ -19,17 +19,18 @@ namespace sparse {
 using namespace torch::autograd;
 
 c10::intrusive_ptr<SparseMatrix> SpSpAdd(
-    const c10::intrusive_ptr<SparseMatrix>& A,
-    const c10::intrusive_ptr<SparseMatrix>& B) {
-  ElementwiseOpSanityCheck(A, B);
-  if (A->HasDiag() && B->HasDiag()) {
+    const c10::intrusive_ptr<SparseMatrix>& lhs_mat,
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat) {
+  ElementwiseOpSanityCheck(lhs_mat, rhs_mat);
+  if (lhs_mat->HasDiag() && rhs_mat->HasDiag()) {
     return SparseMatrix::FromDiagPointer(
-        A->DiagPtr(), A->value() + B->value(), A->shape());
+        lhs_mat->DiagPtr(), lhs_mat->value() + rhs_mat->value(),
+        lhs_mat->shape());
   }
-  auto torch_A = COOToTorchCOO(A->COOPtr(), A->value());
-  auto torch_B = COOToTorchCOO(B->COOPtr(), B->value());
-  auto sum = (torch_A + torch_B).coalesce();
-  return SparseMatrix::FromCOO(sum.indices(), sum.values(), A->shape());
+  auto torch_lhs = COOToTorchCOO(lhs_mat->COOPtr(), lhs_mat->value());
+  auto torch_rhs = COOToTorchCOO(rhs_mat->COOPtr(), rhs_mat->value());
+  auto sum = (torch_lhs + torch_rhs).coalesce();
+  return SparseMatrix::FromCOO(sum.indices(), sum.values(), lhs_mat->shape());
 }
 
 class SpSpMulAutoGrad : public Function<SpSpMulAutoGrad> {
@@ -115,6 +116,35 @@ c10::intrusive_ptr<SparseMatrix> SpSpMul(
   const auto& indices = results[0];
   const auto& val = results[1];
   return SparseMatrix::FromCOO(indices, val, lhs_mat->shape());
+}
+
+c10::intrusive_ptr<SparseMatrix> SpSpDiv(
+    const c10::intrusive_ptr<SparseMatrix>& lhs_mat,
+    const c10::intrusive_ptr<SparseMatrix>& rhs_mat) {
+  ElementwiseOpSanityCheck(lhs_mat, rhs_mat);
+  if (lhs_mat->HasDiag() && rhs_mat->HasDiag()) {
+    return SparseMatrix::FromDiagPointer(
+        lhs_mat->DiagPtr(), lhs_mat->value() / rhs_mat->value(),
+        lhs_mat->shape());
+  }
+  std::shared_ptr<COO> sorted_lhs, sorted_rhs;
+  torch::Tensor lhs_sorted_perm, rhs_sorted_perm;
+  std::tie(sorted_lhs, lhs_sorted_perm) = COOSort(lhs_mat->COOPtr());
+  std::tie(sorted_rhs, rhs_sorted_perm) = COOSort(rhs_mat->COOPtr());
+  TORCH_CHECK(
+      !lhs_mat->HasDuplicate() && !rhs_mat->HasDuplicate(),
+      "Only support SpSpDiv on sparse matrices without duplicate values")
+  TORCH_CHECK(
+      torch::equal(sorted_lhs->indices, sorted_rhs->indices),
+      "Cannot divide two COO matrices with different sparsities.");
+  // This is to make sure the return matrix is in the same order as the lhs_mat
+  auto lhs_sorted_rperm = lhs_sorted_perm.argsort();
+  auto rhs_perm_on_lhs = rhs_sorted_perm.index_select(0, lhs_sorted_rperm);
+  auto lhs_value = lhs_mat->value();
+  auto rhs_value = rhs_mat->value().index_select(0, rhs_perm_on_lhs);
+  auto ret_val = lhs_value / rhs_value;
+  return SparseMatrix::FromCOOPointer(
+      lhs_mat->COOPtr(), ret_val, lhs_mat->shape());
 }
 
 }  // namespace sparse
