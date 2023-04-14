@@ -126,16 +126,21 @@ COOMatrix CSRToCOO<kDGLCUDA, int64_t>(CSRMatrix csr) {
     auto buffer_sizes = thrust::make_transform_iterator(
         iota, AdjacentDifference<int64_t>{csr.indptr.Ptr<int64_t>()});
 
-    std::size_t temp_storage_bytes = 0;
-    CUDA_CALL(cub::DeviceCopy::Batched(
-        nullptr, temp_storage_bytes, input_buffer, output_buffer, buffer_sizes,
-        csr.num_rows, stream));
+    constexpr int64_t max_copy_at_once = std::numeric_limits<int32_t>::max();
+    for (int64_t i = 0; i < csr.num_rows; i += max_copy_at_once) {
+      std::size_t temp_storage_bytes = 0;
+      CUDA_CALL(cub::DeviceCopy::Batched(
+          nullptr, temp_storage_bytes, input_buffer + i, output_buffer + i,
+          buffer_sizes + i, std::min(csr.num_rows - i, max_copy_at_once),
+          stream));
 
-    auto temp = allocator.alloc_unique<char>(temp_storage_bytes);
+      auto temp = allocator.alloc_unique<char>(temp_storage_bytes);
 
-    CUDA_CALL(cub::DeviceCopy::Batched(
-        temp.get(), temp_storage_bytes, input_buffer, output_buffer,
-        buffer_sizes, csr.num_rows, stream));
+      CUDA_CALL(cub::DeviceCopy::Batched(
+          temp.get(), temp_storage_bytes, input_buffer + i, output_buffer + i,
+          buffer_sizes + i, std::min(csr.num_rows - i, max_copy_at_once),
+          stream));
+    }
   }
 
   return COOMatrix(
