@@ -27,6 +27,7 @@ from .base import (
 )
 from .frame import Frame
 from .ops import segment
+from .sparse import spmatrix
 from .view import (
     HeteroEdgeDataView,
     HeteroEdgeView,
@@ -3754,14 +3755,87 @@ class DGLGraph(object):
         else:
             return deg
 
-    def adjacency_matrix(
+    def adjacency_matrix(self, etype=None):
+        """Alias of :meth:`adj`"""
+        return self.adj(etype)
+
+    def adj(self, etype=None, eweight_name=None):
+        """Get the adjacency matrix of the graph.
+
+        Parameters
+        ----------
+        etype : str or (str, str, str), optional
+            The type names of the edges. The allowed type name formats are:
+
+            * ``(str, str, str)`` for source node type, edge type and
+            destination node type.
+            * or one ``str`` edge type name if the name can uniquely identify a
+              triplet format in the graph.
+
+            Can be omitted if the graph has only one type of edges.
+
+        eweight_name : str, optional
+            The name of edge feature used as the non-zero values. If not given,
+            the non-zero values are all 1.
+
+        Returns
+        -------
+        SparseMatrix
+            The adjacency matrix.
+
+        Examples
+        --------
+
+        The following example uses PyTorch backend.
+
+        >>> import dgl
+        >>> import torch
+
+        >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
+        >>> g.adj()
+        SparseMatrix(indices=tensor([[0, 1, 2],
+                                     [1, 2, 3]]),
+                     values=tensor([1., 1., 1.]),
+                     shape=(4, 4), nnz=3)
+
+        >>> g = dgl.heterograph({
+        ...     ('user', 'follows', 'user'): ([0, 1], [0, 1]),
+        ...     ('developer', 'develops', 'game'): ([0, 1], [0, 2])
+        ... })
+
+        >>> g.adj(etype='develops')
+        SparseMatrix(indices=tensor([[0, 1],
+                                     [0, 2]]),
+                     values=tensor([1., 1.]),
+                     shape=(2, 3), nnz=2)
+        >>> g.edata['h'] = {('user', 'follows', 'user'): torch.tensor([3, 2])}
+        >>> g.adj(etype='follows', eweight_name='h')
+        SparseMatrix(indices=tensor([[0, 1],
+                                     [0, 1]]),
+                     values=tensor([3, 2]),
+                     shape=(2, 2), nnz=2)
+        """
+        # Temporal fix to introduce a dependency on torch
+        import torch
+
+        etype = self.to_canonical_etype(etype)
+        indices = torch.stack(self.all_edges(etype=etype))
+        shape = (self.num_nodes(etype[0]), self.number_of_nodes(etype[2]))
+        if eweight_name is not None:
+            val = self.edata[eweight_name][etype]
+        else:
+            val = None
+        return spmatrix(
+            indices,
+            val=val,
+            shape=shape,
+        )
+
+    def adj_external(
         self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None
     ):
-        """Alias of :meth:`adj`"""
-        return self.adj(transpose, ctx, scipy_fmt, etype)
-
-    def adj(self, transpose=False, ctx=F.cpu(), scipy_fmt=None, etype=None):
-        """Return the adjacency matrix of edges of the given edge type.
+        """Return the adjacency matrix in an external format, such as Scipy or
+        backend dependent sparse tensor.
 
         By default, a row of returned adjacency matrix represents the
         source of an edge and the column represents the destination.
@@ -3787,7 +3861,6 @@ class DGLGraph(object):
 
             Can be omitted if the graph has only one type of edges.
 
-
         Returns
         -------
         SparseTensor or scipy.sparse.spmatrix
@@ -3810,7 +3883,7 @@ class DGLGraph(object):
 
         Get a backend dependent sparse tensor. Here we use PyTorch for example.
 
-        >>> g.adj(etype='develops')
+        >>> g.adj_external(etype='develops')
         tensor(indices=tensor([[0, 1],
                                [0, 2]]),
                values=tensor([1., 1.]),
@@ -3818,7 +3891,7 @@ class DGLGraph(object):
 
         Get a scipy coo sparse matrix.
 
-        >>> g.adj(scipy_fmt='coo', etype='develops')
+        >>> g.adj_external(scipy_fmt='coo', etype='develops')
         <2x3 sparse matrix of type '<class 'numpy.int64'>'
            with 2 stored elements in COOrdinate format>
         """
@@ -3830,44 +3903,37 @@ class DGLGraph(object):
                 etid, transpose, scipy_fmt, False
             )
 
-    def adj_sparse(self, fmt, etype=None):
+    def adj_tensors(self, fmt, etype=None):
         """Return the adjacency matrix of edges of the given edge type as tensors of
         a sparse matrix representation.
-
         By default, a row of returned adjacency matrix represents the
         source of an edge and the column represents the destination.
-
         Parameters
         ----------
         fmt : str
             Either ``coo``, ``csr`` or ``csc``.
         etype : str or (str, str, str), optional
             The type names of the edges. The allowed type name formats are:
-
             * ``(str, str, str)`` for source node type, edge type and destination node type.
             * or one ``str`` edge type name if the name can uniquely identify a
               triplet format in the graph.
-
             Can be omitted if the graph has only one type of edges.
-
         Returns
         -------
         tuple[Tensor]
             If :attr:`fmt` is ``coo``, returns a pair of source and destination node ID
             tensors.
-
             If :attr:`fmt` is ``csr`` or ``csc``, return the CSR or CSC representation
             of the adjacency matrix as a triplet of tensors
             ``(indptr, indices, edge_ids)``.  Namely ``edge_ids`` could be an empty
             tensor with 0 elements, in which case the edge IDs are consecutive
             integers starting from 0.
-
         Examples
         --------
         >>> g = dgl.graph(([0, 1, 2], [1, 2, 3]))
-        >>> g.adj_sparse('coo')
+        >>> g.adj_tensors('coo')
         (tensor([0, 1, 2]), tensor([1, 2, 3]))
-        >>> g.adj_sparse('csr')
+        >>> g.adj_tensors('csr')
         (tensor([0, 1, 2, 3, 3]), tensor([1, 2, 3]), tensor([0, 1, 2]))
         """
         etid = self.get_etype_id(etype)
