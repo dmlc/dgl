@@ -10,7 +10,7 @@ import pytest
 
 @unittest.skipIf(os.name == "nt", reason="Cython only works on linux")
 def test_cython():
-    import dgl._ffi._cy3.core
+    import dgl._ffi._cy3
 
 
 @pytest.mark.parametrize("arg", [1, 2.3])
