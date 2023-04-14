@@ -155,8 +155,8 @@ Broadcast operators
 .. autosummary::
     :toctree: ../../generated/
 
-    broadcast_op
-    broadcast_add
-    broadcast_sub
-    broadcast_mul
-    broadcast_div
+    sp_broadcast_v
+    sp_add_v
+    sp_sub_v
+    sp_mul_v
+    sp_div_v

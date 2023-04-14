@@ -7,7 +7,7 @@ import torch
 from .sparse_matrix import SparseMatrix, val_like
 
 
-def broadcast_op(A: SparseMatrix, v: torch.Tensor, op: str) -> SparseMatrix:
+def sp_broadcast_v(A: SparseMatrix, v: torch.Tensor, op: str) -> SparseMatrix:
     """Broadcast operator for sparse matrix and vector.
 
     :attr:`v` is broadcasted to the shape of :attr:`A` and then the operator is
@@ -44,14 +44,14 @@ def broadcast_op(A: SparseMatrix, v: torch.Tensor, op: str) -> SparseMatrix:
     >>> val = torch.tensor([10, 20, 30])
     >>> A = dglsp.spmatrix(indices, val, shape=(3, 4))
     >>> v = torch.tensor([1, 2, 3, 4])
-    >>> dglsp.broadcast_op(A, v, "add")
+    >>> dglsp.sp_broadcast_v(A, v, "add")
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([11, 24, 33]),
                  shape=(3, 4), nnz=3)
 
     >>> v = torch.tensor([1, 2, 3]).view(-1, 1)
-    >>> dglsp.broadcast_op(A, v, "add")
+    >>> dglsp.sp_broadcast_v(A, v, "add")
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([12, 21, 33]),
@@ -61,7 +61,7 @@ def broadcast_op(A: SparseMatrix, v: torch.Tensor, op: str) -> SparseMatrix:
     >>> val = torch.tensor([[10, 20], [30, 40], [50, 60]])
     >>> A = dglsp.spmatrix(indices, val, shape=(3, 4))
     >>> v = torch.tensor([1, 2, 3]).view(-1, 1)
-    >>> dglsp.broadcast_op(A, v, "sub")
+    >>> dglsp.sp_broadcast_v(A, v, "sub")
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
                  values=tensor([[ 8, 18],
@@ -101,33 +101,33 @@ def broadcast_op(A: SparseMatrix, v: torch.Tensor, op: str) -> SparseMatrix:
     return val_like(A, ret_val)
 
 
-def broadcast_add(A: SparseMatrix, v: torch.Tensor) -> SparseMatrix:
+def sp_add_v(A: SparseMatrix, v: torch.Tensor) -> SparseMatrix:
     """Broadcast addition for sparse matrix and vector.
 
-    See the definition of :func:`broadcast_op` for details.
+    See the definition of :func:`sp_broadcast_v` for details.
     """
-    return broadcast_op(A, v, "add")
+    return sp_broadcast_v(A, v, "add")
 
 
-def broadcast_sub(A: SparseMatrix, v: torch.Tensor) -> SparseMatrix:
+def sp_sub_v(A: SparseMatrix, v: torch.Tensor) -> SparseMatrix:
     """Broadcast substraction for sparse matrix and vector.
 
-    See the definition of :func:`broadcast_op` for details.
+    See the definition of :func:`sp_broadcast_v` for details.
     """
-    return broadcast_op(A, v, "sub")
+    return sp_broadcast_v(A, v, "sub")
 
 
-def broadcast_mul(A: SparseMatrix, v: torch.Tensor) -> SparseMatrix:
+def sp_mul_v(A: SparseMatrix, v: torch.Tensor) -> SparseMatrix:
     """Broadcast multiply for sparse matrix and vector.
 
-    See the definition of :func:`broadcast_op` for details.
+    See the definition of :func:`sp_broadcast_v` for details.
     """
-    return broadcast_op(A, v, "mul")
+    return sp_broadcast_v(A, v, "mul")
 
 
-def broadcast_div(A: SparseMatrix, v: torch.Tensor) -> SparseMatrix:
+def sp_div_v(A: SparseMatrix, v: torch.Tensor) -> SparseMatrix:
     """Broadcast division for sparse matrix and vector.
 
-    See the definition of :func:`broadcast_op` for details.
+    See the definition of :func:`sp_broadcast_v` for details.
     """
-    return broadcast_op(A, v, "truediv")
+    return sp_broadcast_v(A, v, "truediv")
