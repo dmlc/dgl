@@ -25,6 +25,8 @@ namespace cpu {
  */
 template <typename IdType, typename DType>
 void SegmentSum(NDArray feat, NDArray offsets, NDArray out) {
+  if (std::is_same<DType, BFloat16>::value)
+    LOG(FATAL) << "Unsupported CPU kernel for SegmentSum for BF16.";
   int n = out->shape[0];
   int dim = 1;
   for (int i = 1; i < out->ndim; ++i) dim *= out->shape[i];

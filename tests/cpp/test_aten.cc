@@ -1426,3 +1426,12 @@ TEST(ArrayTest, Sort) {
   _TestSort<int64_t>(GPU);
 #endif
 }
+
+TEST(ArrayTest, BFloatCast) {
+  for (int i = -100; i < 100; ++i) {
+    float a = i;
+    BFloat16 b = a;
+    float a_casted = b;
+    ASSERT_FLOAT_EQ(a, a_casted);
+  }
+}

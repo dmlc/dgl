@@ -38,16 +38,21 @@ class RGCN(nn.Module):
         return h
 
 
-def evaluate(g, target_idx, labels, test_mask, model):
+def evaluate(g, target_idx, labels, num_classes, test_mask, model):
     test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
     model.eval()
     with torch.no_grad():
         logits = model(g)
     logits = logits[target_idx]
-    return accuracy(logits[test_idx].argmax(dim=1), labels[test_idx]).item()
+    return accuracy(
+        logits[test_idx].argmax(dim=1),
+        labels[test_idx],
+        task="multiclass",
+        num_classes=num_classes,
+    ).item()
 
 
-def train(g, target_idx, labels, train_mask, model):
+def train(g, target_idx, labels, num_classes, train_mask, model):
     # define train idx, loss function and optimizer
     train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
     loss_fcn = nn.CrossEntropyLoss()
@@ -62,7 +67,10 @@ def train(g, target_idx, labels, train_mask, model):
         loss.backward()
         optimizer.step()
         acc = accuracy(
-            logits[train_idx].argmax(dim=1), labels[train_idx]
+            logits[train_idx].argmax(dim=1),
+            labels[train_idx],
+            task="multiclass",
+            num_classes=num_classes,
         ).item()
         print(
             "Epoch {:05d} | Loss {:.4f} | Train Accuracy {:.4f} ".format(
@@ -112,9 +120,9 @@ if __name__ == "__main__":
     target_idx = node_ids[g.ndata[dgl.NTYPE] == category_id]
     # create RGCN model
     in_size = g.num_nodes()  # featureless with one-hot encoding
-    out_size = data.num_classes
-    model = RGCN(in_size, 16, out_size, num_rels).to(device)
+    num_classes = data.num_classes
+    model = RGCN(in_size, 16, num_classes, num_rels).to(device)
 
-    train(g, target_idx, labels, train_mask, model)
-    acc = evaluate(g, target_idx, labels, test_mask, model)
+    train(g, target_idx, labels, num_classes, train_mask, model)
+    acc = evaluate(g, target_idx, labels, num_classes, test_mask, model)
     print("Test accuracy {:.4f}".format(acc))

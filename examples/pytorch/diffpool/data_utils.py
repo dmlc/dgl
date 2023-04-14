@@ -26,7 +26,7 @@ def pre_process(dataset, prog_args):
         print("overwrite node attributes with DiffPool's preprocess setting")
         if prog_args.data_mode == "id":
             for g, _ in dataset:
-                id_list = np.arange(g.number_of_nodes())
+                id_list = np.arange(g.num_nodes())
                 g.ndata["feat"] = one_hotify(id_list, pad=dataset.max_num_node)
 
         elif prog_args.data_mode == "deg-num":

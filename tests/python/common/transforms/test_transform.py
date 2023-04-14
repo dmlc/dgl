@@ -132,7 +132,7 @@ def test_line_graph1():
     G = dgl.DGLGraph(nx.star_graph(N)).to(F.ctx())
     G.edata["h"] = F.randn((2 * N, D))
     L = G.line_graph(shared=True)
-    assert L.number_of_nodes() == 2 * N
+    assert L.num_nodes() == 2 * N
     assert F.allclose(L.ndata["h"], G.edata["h"])
     assert G.device == F.ctx()
 
@@ -144,15 +144,15 @@ def test_line_graph2(idtype):
         idtype=idtype,
     )
     lg = dgl.line_graph(g)
-    assert lg.number_of_nodes() == 5
-    assert lg.number_of_edges() == 8
+    assert lg.num_nodes() == 5
+    assert lg.num_edges() == 8
     row, col = lg.edges()
     assert np.array_equal(F.asnumpy(row), np.array([0, 0, 1, 2, 2, 3, 4, 4]))
     assert np.array_equal(F.asnumpy(col), np.array([3, 4, 0, 3, 4, 0, 1, 2]))
 
     lg = dgl.line_graph(g, backtracking=False)
-    assert lg.number_of_nodes() == 5
-    assert lg.number_of_edges() == 4
+    assert lg.num_nodes() == 5
+    assert lg.num_edges() == 4
     row, col = lg.edges()
     assert np.array_equal(F.asnumpy(row), np.array([0, 1, 2, 4]))
     assert np.array_equal(F.asnumpy(col), np.array([4, 0, 3, 1]))
@@ -161,8 +161,8 @@ def test_line_graph2(idtype):
         idtype=idtype,
     ).formats("csr")
     lg = dgl.line_graph(g)
-    assert lg.number_of_nodes() == 5
-    assert lg.number_of_edges() == 8
+    assert lg.num_nodes() == 5
+    assert lg.num_edges() == 8
     row, col = lg.edges()
     assert np.array_equal(F.asnumpy(row), np.array([0, 0, 1, 2, 2, 3, 4, 4]))
     assert np.array_equal(F.asnumpy(col), np.array([3, 4, 0, 3, 4, 0, 1, 2]))
@@ -172,8 +172,8 @@ def test_line_graph2(idtype):
         idtype=idtype,
     ).formats("csc")
     lg = dgl.line_graph(g)
-    assert lg.number_of_nodes() == 5
-    assert lg.number_of_edges() == 8
+    assert lg.num_nodes() == 5
+    assert lg.num_edges() == 8
     row, col, eid = lg.edges("all")
     row = F.asnumpy(row)
     col = F.asnumpy(col)
@@ -187,7 +187,7 @@ def test_no_backtracking():
     N = 5
     G = dgl.DGLGraph(nx.star_graph(N))
     L = G.line_graph(backtracking=False)
-    assert L.number_of_nodes() == 2 * N
+    assert L.num_nodes() == 2 * N
     for i in range(1, N):
         e1 = G.edge_ids(0, i)
         e2 = G.edge_ids(i, 0)
@@ -209,8 +209,8 @@ def test_reverse(idtype):
 
     assert g.is_multigraph == rg.is_multigraph
 
-    assert g.number_of_nodes() == rg.number_of_nodes()
-    assert g.number_of_edges() == rg.number_of_edges()
+    assert g.num_nodes() == rg.num_nodes()
+    assert g.num_edges() == rg.num_edges()
     assert F.allclose(
         F.astype(rg.has_edges_between([1, 2, 1], [0, 1, 2]), F.float32),
         F.ones((3,)),
@@ -225,8 +225,8 @@ def test_reverse(idtype):
     g.ndata["h"] = F.tensor([[0.0], [1.0], [2.0]])
     g.edata["h"] = F.tensor([[3.0], [4.0], [5.0]])
     g_r = dgl.reverse(g)
-    assert g.number_of_nodes() == g_r.number_of_nodes()
-    assert g.number_of_edges() == g_r.number_of_edges()
+    assert g.num_nodes() == g_r.num_nodes()
+    assert g.num_edges() == g_r.num_edges()
     u_g, v_g, eids_g = g.all_edges(form="all")
     u_rg, v_rg, eids_rg = g_r.all_edges(form="all")
     assert F.array_equal(u_g, v_rg)
@@ -237,15 +237,15 @@ def test_reverse(idtype):
 
     # without share ndata
     g_r = dgl.reverse(g, copy_ndata=False)
-    assert g.number_of_nodes() == g_r.number_of_nodes()
-    assert g.number_of_edges() == g_r.number_of_edges()
+    assert g.num_nodes() == g_r.num_nodes()
+    assert g.num_edges() == g_r.num_edges()
     assert len(g_r.ndata) == 0
     assert len(g_r.edata) == 0
 
     # with share ndata and edata
     g_r = dgl.reverse(g, copy_ndata=True, copy_edata=True)
-    assert g.number_of_nodes() == g_r.number_of_nodes()
-    assert g.number_of_edges() == g_r.number_of_edges()
+    assert g.num_nodes() == g_r.num_nodes()
+    assert g.num_edges() == g_r.num_edges()
     assert F.array_equal(g.ndata["h"], g_r.ndata["h"])
     assert F.array_equal(g.edata["h"], g_r.edata["h"])
 
@@ -286,9 +286,9 @@ def test_reverse(idtype):
         assert etype_g[0] == etype_gr[2]
         assert etype_g[1] == etype_gr[1]
         assert etype_g[2] == etype_gr[0]
-        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
+        assert g.num_edges(etype_g) == g_r.num_edges(etype_gr)
     for ntype in g.ntypes:
-        assert g.number_of_nodes(ntype) == g_r.number_of_nodes(ntype)
+        assert g.num_nodes(ntype) == g_r.num_nodes(ntype)
     assert F.array_equal(g.nodes["user"].data["h"], g_r.nodes["user"].data["h"])
     assert F.array_equal(
         g.nodes["user"].data["hh"], g_r.nodes["user"].data["hh"]
@@ -327,9 +327,9 @@ def test_reverse(idtype):
         assert etype_g[0] == etype_gr[2]
         assert etype_g[1] == etype_gr[1]
         assert etype_g[2] == etype_gr[0]
-        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
+        assert g.num_edges(etype_g) == g_r.num_edges(etype_gr)
     for ntype in g.ntypes:
-        assert g.number_of_nodes(ntype) == g_r.number_of_nodes(ntype)
+        assert g.num_nodes(ntype) == g_r.num_nodes(ntype)
     assert len(g_r.nodes["user"].data) == 0
     assert len(g_r.nodes["game"].data) == 0
 
@@ -339,7 +339,7 @@ def test_reverse(idtype):
         assert etype_g[0] == etype_gr[2]
         assert etype_g[1] == etype_gr[1]
         assert etype_g[2] == etype_gr[0]
-        assert g.number_of_edges(etype_g) == g_r.number_of_edges(etype_gr)
+        assert g.num_edges(etype_g) == g_r.num_edges(etype_gr)
     assert F.array_equal(
         g.edges["follows"].data["h"], g_r.edges["follows"].data["h"]
     )
@@ -384,7 +384,7 @@ def test_to_bidirected():
     elist.append((1, 2))
     elist = set(elist)
     big = dgl.to_bidirected(g)
-    assert big.number_of_edges() == num_edges
+    assert big.num_edges() == num_edges
     src, dst = big.edges()
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == set(elist)
@@ -404,8 +404,8 @@ def test_to_bidirected():
     elist2.append((1, 0))
     elist2 = set(elist2)
     big = dgl.to_bidirected(g)
-    assert big.number_of_edges("wins") == 7
-    assert big.number_of_edges("follows") == 3
+    assert big.num_edges("wins") == 7
+    assert big.num_edges("follows") == 3
     src, dst = big.edges(etype="wins")
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == set(elist1)
@@ -528,7 +528,7 @@ def test_add_reverse_edges():
     g.ndata["h"] = F.tensor([[0.0], [1.0], [2.0], [1.0], [1.0], [1.0]])
     g.edata["h"] = F.tensor([[3.0], [4.0], [5.0], [6.0]])
     bg = dgl.add_reverse_edges(g, copy_ndata=True, copy_edata=True)
-    assert g.number_of_nodes() == bg.number_of_nodes()
+    assert g.num_nodes() == bg.num_nodes()
     assert F.array_equal(g.ndata["h"], bg.ndata["h"])
     assert F.array_equal(
         F.cat([g.edata["h"], g.edata["h"]], dim=0), bg.edata["h"]
@@ -558,8 +558,8 @@ def test_add_reverse_edges():
     bg = dgl.add_reverse_edges(
         g, copy_ndata=True, copy_edata=True, ignore_bipartite=True
     )
-    assert g.number_of_nodes("user") == bg.number_of_nodes("user")
-    assert g.number_of_nodes("game") == bg.number_of_nodes("game")
+    assert g.num_nodes("user") == bg.num_nodes("user")
+    assert g.num_nodes("game") == bg.num_nodes("game")
     assert F.array_equal(
         g.nodes["game"].data["hv"], bg.nodes["game"].data["hv"]
     )
@@ -592,7 +592,7 @@ def test_simple_graph():
     assert g.is_multigraph
     sg = dgl.to_simple_graph(g)
     assert not sg.is_multigraph
-    assert sg.number_of_edges() == 3
+    assert sg.num_edges() == 3
     src, dst = sg.edges()
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == set(elist)
@@ -607,7 +607,7 @@ def _test_bidirected_graph():
         elist.append((1, 2))
         elist = set(elist)
         big = dgl.to_bidirected_stale(g, out_readonly)
-        assert big.number_of_edges() == num_edges
+        assert big.num_edges() == num_edges
         src, dst = big.edges()
         eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
         assert eset == set(elist)
@@ -697,7 +697,7 @@ def create_large_graph(num_nodes, idtype=F.int64):
 @unittest.skipIf(F._default_context_str == "gpu", reason="GPU not implemented")
 def test_partition_with_halo():
     g = create_large_graph(1000)
-    node_part = np.random.choice(4, g.number_of_nodes())
+    node_part = np.random.choice(4, g.num_nodes())
     subgs, _, _ = dgl.transforms.partition_graph_with_halo(
         g, node_part, 2, reshuffle=True
     )
@@ -739,9 +739,9 @@ def test_metis_partition(idtype):
 
 
 def check_metis_partition_with_constraint(g):
-    ntypes = np.zeros((g.number_of_nodes(),), dtype=np.int32)
-    ntypes[0 : int(g.number_of_nodes() / 4)] = 1
-    ntypes[int(g.number_of_nodes() * 3 / 4) :] = 2
+    ntypes = np.zeros((g.num_nodes(),), dtype=np.int32)
+    ntypes[0 : int(g.num_nodes() / 4)] = 1
+    ntypes[int(g.num_nodes() * 3 / 4) :] = 2
     subgs = dgl.transforms.metis_partition(
         g, 4, extra_cached_hops=1, balance_ntypes=ntypes
     )
@@ -779,8 +779,8 @@ def check_metis_partition(g, extra_hops):
             assert np.sum(F.asnumpy(subg.ndata["part_id"]) == part_id) == len(
                 lnode_ids
             )
-        assert num_inner_nodes == g.number_of_nodes()
-        print(g.number_of_edges() - num_inner_edges)
+        assert num_inner_nodes == g.num_nodes()
+        print(g.num_edges() - num_inner_edges)
 
     if extra_hops == 0:
         return
@@ -791,7 +791,7 @@ def check_metis_partition(g, extra_hops):
     )
     num_inner_nodes = 0
     num_inner_edges = 0
-    edge_cnts = np.zeros((g.number_of_edges(),))
+    edge_cnts = np.zeros((g.num_edges(),))
     if subgs is not None:
         for part_id, subg in subgs.items():
             lnode_ids = np.nonzero(F.asnumpy(subg.ndata["inner_node"]))[0]
@@ -816,7 +816,7 @@ def check_metis_partition(g, extra_hops):
 
             orig_ids = subg.ndata["orig_id"]
             inner_node = F.asnumpy(subg.ndata["inner_node"])
-            for nid in range(subg.number_of_nodes()):
+            for nid in range(subg.num_nodes()):
                 neighs = subg.predecessors(nid)
                 old_neighs1 = F.gather_row(orig_ids, neighs)
                 old_nid = F.asnumpy(orig_ids[nid])
@@ -830,8 +830,8 @@ def check_metis_partition(g, extra_hops):
         # Normally, local edges are only counted once.
         assert np.all(edge_cnts == 1)
 
-        assert num_inner_nodes == g.number_of_nodes()
-        print(g.number_of_edges() - num_inner_edges)
+        assert num_inner_nodes == g.num_nodes()
+        print(g.num_edges() - num_inner_edges)
 
 
 @unittest.skipIf(
@@ -839,7 +839,7 @@ def check_metis_partition(g, extra_hops):
 )
 def test_reorder_nodes():
     g = create_large_graph(1000)
-    new_nids = np.random.permutation(g.number_of_nodes())
+    new_nids = np.random.permutation(g.num_nodes())
     # TODO(zhengda) we need to test both CSR and COO.
     new_g = dgl.partition.reorder_nodes(g, new_nids)
     new_in_deg = new_g.in_degrees()
@@ -851,14 +851,14 @@ def test_reorder_nodes():
     assert np.all(F.asnumpy(new_in_deg == new_in_deg1))
     assert np.all(F.asnumpy(new_out_deg == new_out_deg1))
     orig_ids = F.asnumpy(new_g.ndata["orig_id"])
-    for nid in range(g.number_of_nodes()):
+    for nid in range(g.num_nodes()):
         neighs = F.asnumpy(g.successors(nid))
         new_neighs1 = new_nids[neighs]
         new_nid = new_nids[nid]
         new_neighs2 = new_g.successors(new_nid)
         assert np.all(np.sort(new_neighs1) == np.sort(F.asnumpy(new_neighs2)))
 
-    for nid in range(new_g.number_of_nodes()):
+    for nid in range(new_g.num_nodes()):
         neighs = F.asnumpy(new_g.successors(nid))
         old_neighs1 = orig_ids[neighs]
         old_nid = orig_ids[nid]
@@ -1110,7 +1110,7 @@ def test_to_simple(idtype):
 
     sg = dgl.to_simple(g, writeback_mapping=False, copy_ndata=False)
     for ntype in g.ntypes:
-        assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
+        assert g.num_nodes(ntype) == sg.num_nodes(ntype)
     assert "h" not in sg.nodes["user"].data
     assert "hh" not in sg.nodes["user"].data
 
@@ -1211,20 +1211,20 @@ def test_add_edges(idtype):
     v = 1
     g = dgl.add_edges(g, u, v)
     assert g.device == F.ctx()
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 3
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 3
     u = [0]
     v = [1]
     g = dgl.add_edges(g, u, v)
     assert g.device == F.ctx()
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 4
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 4
     u = F.tensor(u, dtype=idtype)
     v = F.tensor(v, dtype=idtype)
     g = dgl.add_edges(g, u, v)
     assert g.device == F.ctx()
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 5
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 5
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 1, 0, 0, 0], dtype=idtype))
     assert F.array_equal(v, F.tensor([1, 2, 1, 1, 1], dtype=idtype))
@@ -1232,8 +1232,8 @@ def test_add_edges(idtype):
     g = dgl.add_edges(g, 0, [])
     g = dgl.add_edges(g, [], 0)
     assert g.device == F.ctx()
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 5
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 5
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 1, 0, 0, 0], dtype=idtype))
     assert F.array_equal(v, F.tensor([1, 2, 1, 1, 1], dtype=idtype))
@@ -1243,8 +1243,8 @@ def test_add_edges(idtype):
     u = F.tensor([0, 1], dtype=idtype)
     v = F.tensor([2, 3], dtype=idtype)
     g = dgl.add_edges(g, u, v)
-    assert g.number_of_nodes() == 4
-    assert g.number_of_edges() == 4
+    assert g.num_nodes() == 4
+    assert g.num_edges() == 4
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 1, 0, 1], dtype=idtype))
     assert F.array_equal(v, F.tensor([1, 2, 2, 3], dtype=idtype))
@@ -1260,8 +1260,8 @@ def test_add_edges(idtype):
         "hh": F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
     }
     g = dgl.add_edges(g, u, v, e_feat)
-    assert g.number_of_nodes() == 4
-    assert g.number_of_edges() == 4
+    assert g.num_nodes() == 4
+    assert g.num_edges() == 4
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 1, 0, 1], dtype=idtype))
     assert F.array_equal(v, F.tensor([1, 2, 2, 3], dtype=idtype))
@@ -1278,8 +1278,8 @@ def test_add_edges(idtype):
         "hh": F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
     }
     g = dgl.add_edges(g, u, v, e_feat)
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 2
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 2
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 1], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 2], dtype=idtype))
@@ -1296,23 +1296,23 @@ def test_add_edges(idtype):
     v = 1
     g = dgl.add_edges(g, u, v)
     assert g.device == F.ctx()
-    assert g.number_of_nodes("user") == 2
-    assert g.number_of_nodes("game") == 3
-    assert g.number_of_edges() == 3
+    assert g.num_nodes("user") == 2
+    assert g.num_nodes("game") == 3
+    assert g.num_edges() == 3
     u = [0]
     v = [1]
     g = dgl.add_edges(g, u, v)
     assert g.device == F.ctx()
-    assert g.number_of_nodes("user") == 2
-    assert g.number_of_nodes("game") == 3
-    assert g.number_of_edges() == 4
+    assert g.num_nodes("user") == 2
+    assert g.num_nodes("game") == 3
+    assert g.num_edges() == 4
     u = F.tensor(u, dtype=idtype)
     v = F.tensor(v, dtype=idtype)
     g = dgl.add_edges(g, u, v)
     assert g.device == F.ctx()
-    assert g.number_of_nodes("user") == 2
-    assert g.number_of_nodes("game") == 3
-    assert g.number_of_edges() == 5
+    assert g.num_nodes("user") == 2
+    assert g.num_nodes("game") == 3
+    assert g.num_edges() == 5
     u, v = g.edges(form="uv")
     assert F.array_equal(u, F.tensor([0, 1, 0, 0, 0], dtype=idtype))
     assert F.array_equal(v, F.tensor([1, 2, 1, 1, 1], dtype=idtype))
@@ -1327,9 +1327,9 @@ def test_add_edges(idtype):
     v = F.tensor([2, 3], dtype=idtype)
     g = dgl.add_edges(g, u, v)
     assert g.device == F.ctx()
-    assert g.number_of_nodes("user") == 3
-    assert g.number_of_nodes("game") == 4
-    assert g.number_of_edges() == 4
+    assert g.num_nodes("user") == 3
+    assert g.num_nodes("game") == 4
+    assert g.num_edges() == 4
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 1, 0, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([1, 2, 2, 3], dtype=idtype))
@@ -1354,9 +1354,9 @@ def test_add_edges(idtype):
         "hh": F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx()),
     }
     g = dgl.add_edges(g, u, v, e_feat)
-    assert g.number_of_nodes("user") == 3
-    assert g.number_of_nodes("game") == 4
-    assert g.number_of_edges() == 4
+    assert g.num_nodes("user") == 3
+    assert g.num_nodes("game") == 4
+    assert g.num_edges() == 4
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 1, 0, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([1, 2, 2, 3], dtype=idtype))
@@ -1374,11 +1374,11 @@ def test_add_edges(idtype):
     u = F.tensor([0, 2], dtype=idtype)
     v = F.tensor([2, 3], dtype=idtype)
     g = dgl.add_edges(g, u, v, etype="plays")
-    assert g.number_of_nodes("user") == 3
-    assert g.number_of_nodes("game") == 4
-    assert g.number_of_nodes("developer") == 2
-    assert g.number_of_edges("plays") == 6
-    assert g.number_of_edges("develops") == 2
+    assert g.num_nodes("user") == 3
+    assert g.num_nodes("game") == 4
+    assert g.num_nodes("developer") == 2
+    assert g.num_edges("plays") == 6
+    assert g.num_edges("develops") == 2
     u, v = g.edges(form="uv", order="eid", etype="plays")
     assert F.array_equal(u, F.tensor([0, 1, 1, 2, 0, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 0, 1, 1, 2, 3], dtype=idtype))
@@ -1400,11 +1400,11 @@ def test_add_edges(idtype):
         F.tensor([2, 2, 1, 1], dtype=idtype), ctx=F.ctx()
     )
     g = dgl.add_edges(g, u, v, data=e_feat, etype="develops")
-    assert g.number_of_nodes("user") == 3
-    assert g.number_of_nodes("game") == 4
-    assert g.number_of_nodes("developer") == 3
-    assert g.number_of_edges("plays") == 6
-    assert g.number_of_edges("develops") == 4
+    assert g.num_nodes("user") == 3
+    assert g.num_nodes("game") == 4
+    assert g.num_nodes("developer") == 3
+    assert g.num_edges("plays") == 6
+    assert g.num_edges("develops") == 4
     u, v = g.edges(form="uv", order="eid", etype="develops")
     assert F.array_equal(u, F.tensor([0, 1, 0, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1, 2, 3], dtype=idtype))
@@ -1425,8 +1425,8 @@ def test_add_nodes(idtype):
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     g.ndata["h"] = F.copy_to(F.tensor([1, 1, 1], dtype=idtype), ctx=F.ctx())
     new_g = dgl.add_nodes(g, 1)
-    assert g.number_of_nodes() == 3
-    assert new_g.number_of_nodes() == 4
+    assert g.num_nodes() == 3
+    assert new_g.num_nodes() == 4
     assert F.array_equal(new_g.ndata["h"], F.tensor([1, 1, 1, 0], dtype=idtype))
 
     # zero node graph
@@ -1435,7 +1435,7 @@ def test_add_nodes(idtype):
     g = dgl.add_nodes(
         g, 1, data={"h": F.copy_to(F.tensor([2], dtype=idtype), ctx=F.ctx())}
     )
-    assert g.number_of_nodes() == 4
+    assert g.num_nodes() == 4
     assert F.array_equal(g.ndata["h"], F.tensor([1, 1, 1, 2], dtype=idtype))
 
     # bipartite graph
@@ -1450,14 +1450,14 @@ def test_add_nodes(idtype):
         data={"h": F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())},
         ntype="user",
     )
-    assert g.number_of_nodes("user") == 4
-    assert g.number_of_nodes("game") == 3
+    assert g.num_nodes("user") == 4
+    assert g.num_nodes("game") == 3
     assert F.array_equal(
         g.nodes["user"].data["h"], F.tensor([0, 0, 2, 2], dtype=idtype)
     )
     g = dgl.add_nodes(g, 2, ntype="game")
-    assert g.number_of_nodes("user") == 4
-    assert g.number_of_nodes("game") == 5
+    assert g.num_nodes("user") == 4
+    assert g.num_nodes("game") == 5
 
     # heterogeneous graph
     g = create_test_heterograph3(idtype)
@@ -1468,9 +1468,9 @@ def test_add_nodes(idtype):
         data={"h": F.copy_to(F.tensor([2, 2], dtype=idtype), ctx=F.ctx())},
         ntype="game",
     )
-    assert g.number_of_nodes("user") == 4
-    assert g.number_of_nodes("game") == 4
-    assert g.number_of_nodes("developer") == 2
+    assert g.num_nodes("user") == 4
+    assert g.num_nodes("game") == 4
+    assert g.num_nodes("developer") == 2
     assert F.array_equal(
         g.nodes["user"].data["h"], F.tensor([1, 1, 1, 0], dtype=idtype)
     )
@@ -1485,33 +1485,33 @@ def test_remove_edges(idtype):
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     e = 0
     g = dgl.remove_edges(g, e)
-    assert g.number_of_edges() == 1
+    assert g.num_edges() == 1
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([2], dtype=idtype))
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     e = [0]
     g = dgl.remove_edges(g, e)
-    assert g.number_of_edges() == 1
+    assert g.num_edges() == 1
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([2], dtype=idtype))
     e = F.tensor([0], dtype=idtype)
     g = dgl.remove_edges(g, e)
-    assert g.number_of_edges() == 0
+    assert g.num_edges() == 0
 
     # has node data
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     g.ndata["h"] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g = dgl.remove_edges(g, 1)
-    assert g.number_of_edges() == 1
+    assert g.num_edges() == 1
     assert F.array_equal(g.ndata["h"], F.tensor([1, 2, 3], dtype=idtype))
 
     # has edge data
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     g.edata["h"] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
     g = dgl.remove_edges(g, 0)
-    assert g.number_of_edges() == 1
+    assert g.num_edges() == 1
     assert F.array_equal(g.edata["h"], F.tensor([2], dtype=idtype))
 
     # invalid eid
@@ -1530,7 +1530,7 @@ def test_remove_edges(idtype):
     )
     e = 0
     g = dgl.remove_edges(g, e)
-    assert g.number_of_edges() == 1
+    assert g.num_edges() == 1
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([2], dtype=idtype))
@@ -1541,13 +1541,13 @@ def test_remove_edges(idtype):
     )
     e = [0]
     g = dgl.remove_edges(g, e)
-    assert g.number_of_edges() == 1
+    assert g.num_edges() == 1
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([2], dtype=idtype))
     e = F.tensor([0], dtype=idtype)
     g = dgl.remove_edges(g, e)
-    assert g.number_of_edges() == 0
+    assert g.num_edges() == 0
 
     # has data
     g = dgl.heterograph(
@@ -1563,7 +1563,7 @@ def test_remove_edges(idtype):
     )
     g.edata["h"] = F.copy_to(F.tensor([1, 2], dtype=idtype), ctx=F.ctx())
     g = dgl.remove_edges(g, 1)
-    assert g.number_of_edges() == 1
+    assert g.num_edges() == 1
     assert F.array_equal(
         g.nodes["user"].data["h"], F.tensor([1, 1], dtype=idtype)
     )
@@ -1578,7 +1578,7 @@ def test_remove_edges(idtype):
         F.tensor([1, 2, 3, 4], dtype=idtype), ctx=F.ctx()
     )
     g = dgl.remove_edges(g, 1, etype="plays")
-    assert g.number_of_edges("plays") == 3
+    assert g.num_edges("plays") == 3
     u, v = g.edges(form="uv", order="eid", etype="plays")
     assert F.array_equal(u, F.tensor([0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1, 1], dtype=idtype))
@@ -1587,7 +1587,7 @@ def test_remove_edges(idtype):
     )
     # remove all edges of 'develops'
     g = dgl.remove_edges(g, [0, 1], etype="develops")
-    assert g.number_of_edges("develops") == 0
+    assert g.num_edges("develops") == 0
     assert F.array_equal(
         g.nodes["user"].data["h"], F.tensor([1, 1, 1], dtype=idtype)
     )
@@ -1729,21 +1729,21 @@ def test_remove_nodes(idtype):
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     n = 0
     g = dgl.remove_nodes(g, n)
-    assert g.number_of_nodes() == 2
-    assert g.number_of_edges() == 1
+    assert g.num_nodes() == 2
+    assert g.num_edges() == 1
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0], dtype=idtype))
     assert F.array_equal(v, F.tensor([1], dtype=idtype))
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     n = [1]
     g = dgl.remove_nodes(g, n)
-    assert g.number_of_nodes() == 2
-    assert g.number_of_edges() == 0
+    assert g.num_nodes() == 2
+    assert g.num_edges() == 0
     g = dgl.graph(([0, 1], [1, 2]), idtype=idtype, device=F.ctx())
     n = F.tensor([2], dtype=idtype)
     g = dgl.remove_nodes(g, n)
-    assert g.number_of_nodes() == 2
-    assert g.number_of_edges() == 1
+    assert g.num_nodes() == 2
+    assert g.num_edges() == 1
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0], dtype=idtype))
     assert F.array_equal(v, F.tensor([1], dtype=idtype))
@@ -1761,8 +1761,8 @@ def test_remove_nodes(idtype):
     g.ndata["hv"] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g.edata["he"] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g = dgl.remove_nodes(g, F.tensor([0], dtype=idtype))
-    assert g.number_of_nodes() == 2
-    assert g.number_of_edges() == 1
+    assert g.num_nodes() == 2
+    assert g.num_edges() == 1
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([1], dtype=idtype))
     assert F.array_equal(v, F.tensor([1], dtype=idtype))
@@ -1777,9 +1777,9 @@ def test_remove_nodes(idtype):
     )
     n = 0
     g = dgl.remove_nodes(g, n, ntype="user")
-    assert g.number_of_nodes("user") == 1
-    assert g.number_of_nodes("game") == 3
-    assert g.number_of_edges() == 1
+    assert g.num_nodes("user") == 1
+    assert g.num_nodes("game") == 3
+    assert g.num_edges() == 1
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0], dtype=idtype))
     assert F.array_equal(v, F.tensor([2], dtype=idtype))
@@ -1790,9 +1790,9 @@ def test_remove_nodes(idtype):
     )
     n = [1]
     g = dgl.remove_nodes(g, n, ntype="user")
-    assert g.number_of_nodes("user") == 1
-    assert g.number_of_nodes("game") == 3
-    assert g.number_of_edges() == 1
+    assert g.num_nodes("user") == 1
+    assert g.num_nodes("game") == 3
+    assert g.num_edges() == 1
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0], dtype=idtype))
     assert F.array_equal(v, F.tensor([1], dtype=idtype))
@@ -1803,9 +1803,9 @@ def test_remove_nodes(idtype):
     )
     n = F.tensor([0], dtype=idtype)
     g = dgl.remove_nodes(g, n, ntype="game")
-    assert g.number_of_nodes("user") == 2
-    assert g.number_of_nodes("game") == 2
-    assert g.number_of_edges() == 2
+    assert g.num_nodes("user") == 2
+    assert g.num_nodes("game") == 2
+    assert g.num_edges() == 2
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 1], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1], dtype=idtype))
@@ -1816,11 +1816,11 @@ def test_remove_nodes(idtype):
         F.tensor([1, 2, 3, 4], dtype=idtype), ctx=F.ctx()
     )
     g = dgl.remove_nodes(g, 0, ntype="game")
-    assert g.number_of_nodes("user") == 3
-    assert g.number_of_nodes("game") == 1
-    assert g.number_of_nodes("developer") == 2
-    assert g.number_of_edges("plays") == 2
-    assert g.number_of_edges("develops") == 1
+    assert g.num_nodes("user") == 3
+    assert g.num_nodes("game") == 1
+    assert g.num_nodes("developer") == 2
+    assert g.num_edges("plays") == 2
+    assert g.num_edges("develops") == 1
     assert F.array_equal(
         g.nodes["user"].data["h"], F.tensor([1, 1, 1], dtype=idtype)
     )
@@ -2006,8 +2006,8 @@ def test_add_selfloop(idtype):
     )
     g.ndata["hn"] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g = dgl.add_self_loop(g)
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 6
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 6
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
@@ -2036,8 +2036,8 @@ def test_add_selfloop(idtype):
     )
     g.ndata["hn"] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g = dgl.add_self_loop(g, fill_data=1)
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 6
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 6
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
@@ -2059,8 +2059,8 @@ def test_add_selfloop(idtype):
     )
     g.ndata["hn"] = F.copy_to(F.tensor([1, 2, 3], dtype=idtype), ctx=F.ctx())
     g = dgl.add_self_loop(g, fill_data="sum")
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 6
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 6
     u, v = g.edges(form="uv", order="eid")
     assert F.array_equal(u, F.tensor([0, 0, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([2, 1, 0, 0, 1, 2], dtype=idtype))
@@ -2101,10 +2101,10 @@ def test_add_selfloop(idtype):
         F.tensor([[0.0, 1.0], [1.0, 2.0]]), ctx=F.ctx()
     )
     g = dgl.add_self_loop(g, etype="follows")
-    assert g.number_of_nodes("user") == 3
-    assert g.number_of_nodes("game") == 2
-    assert g.number_of_edges("follows") == 5
-    assert g.number_of_edges("plays") == 2
+    assert g.num_nodes("user") == 3
+    assert g.num_nodes("game") == 2
+    assert g.num_edges("follows") == 5
+    assert g.num_edges("plays") == 2
     u, v = g.edges(form="uv", order="eid", etype="follows")
     assert F.array_equal(u, F.tensor([1, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
@@ -2125,10 +2125,10 @@ def test_add_selfloop(idtype):
         F.tensor([[0, 1], [1, 2]], dtype=idtype), ctx=F.ctx()
     )
     g = dgl.add_self_loop(g, fill_data=1, etype="follows")
-    assert g.number_of_nodes("user") == 3
-    assert g.number_of_nodes("game") == 2
-    assert g.number_of_edges("follows") == 5
-    assert g.number_of_edges("plays") == 2
+    assert g.num_nodes("user") == 3
+    assert g.num_nodes("game") == 2
+    assert g.num_edges("follows") == 5
+    assert g.num_edges("plays") == 2
     u, v = g.edges(form="uv", order="eid", etype="follows")
     assert F.array_equal(u, F.tensor([1, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
@@ -2170,10 +2170,10 @@ def test_add_selfloop(idtype):
     )
     g.edges["plays"].data["h"] = F.copy_to(F.tensor([1.0, 2.0]), ctx=F.ctx())
     g = dgl.add_self_loop(g, fill_data="mean", etype="follows")
-    assert g.number_of_nodes("user") == 3
-    assert g.number_of_nodes("game") == 2
-    assert g.number_of_edges("follows") == 5
-    assert g.number_of_edges("plays") == 2
+    assert g.num_nodes("user") == 3
+    assert g.num_nodes("game") == 2
+    assert g.num_edges("follows") == 5
+    assert g.num_edges("plays") == 2
     u, v = g.edges(form="uv", order="eid", etype="follows")
     assert F.array_equal(u, F.tensor([1, 2, 0, 1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1, 0, 1, 2], dtype=idtype))
@@ -2200,8 +2200,8 @@ def test_remove_selfloop(idtype):
     g = dgl.graph(([0, 0, 0, 1], [1, 0, 0, 2]), idtype=idtype, device=F.ctx())
     g.edata["he"] = F.copy_to(F.tensor([1, 2, 3, 4], dtype=idtype), ctx=F.ctx())
     g = dgl.remove_self_loop(g)
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 2
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 2
     assert F.array_equal(g.edata["he"], F.tensor([1, 4], dtype=idtype))
 
     # bipartite graph
@@ -2220,10 +2220,10 @@ def test_remove_selfloop(idtype):
 
     g = create_test_heterograph4(idtype)
     g = dgl.remove_self_loop(g, etype="follows")
-    assert g.number_of_nodes("user") == 3
-    assert g.number_of_nodes("game") == 2
-    assert g.number_of_edges("follows") == 2
-    assert g.number_of_edges("plays") == 2
+    assert g.num_nodes("user") == 3
+    assert g.num_nodes("game") == 2
+    assert g.num_edges("follows") == 2
+    assert g.num_edges("plays") == 2
     u, v = g.edges(form="uv", order="eid", etype="follows")
     assert F.array_equal(u, F.tensor([1, 2], dtype=idtype))
     assert F.array_equal(v, F.tensor([0, 1], dtype=idtype))
@@ -2250,8 +2250,8 @@ def test_remove_selfloop(idtype):
     g.set_batch_num_nodes(F.tensor([3, 2], dtype=F.int64))
     g.set_batch_num_edges(F.tensor([4, 3], dtype=F.int64))
     g = dgl.remove_self_loop(g)
-    assert g.number_of_nodes() == 5
-    assert g.number_of_edges() == 3
+    assert g.num_nodes() == 5
+    assert g.num_edges() == 3
     assert F.array_equal(g.batch_num_nodes(), F.tensor([3, 2], dtype=F.int64))
     assert F.array_equal(g.batch_num_edges(), F.tensor([2, 1], dtype=F.int64))
 
@@ -3065,7 +3065,7 @@ def test_module_random_walk_pe(idtype):
 
 
 @parametrize_idtype
-def test_module_laplacian_pe(idtype):
+def test_module_lap_pe(idtype):
     g = dgl.graph(
         ([2, 1, 0, 3, 1, 1], [3, 1, 1, 2, 1, 0]), idtype=idtype, device=F.ctx()
     )
@@ -3090,7 +3090,7 @@ def test_module_laplacian_pe(idtype):
     )
 
     # without padding (k<n)
-    transform = dgl.LaplacianPE(2, feat_name="lappe")
+    transform = dgl.LapPE(2, feat_name="lappe")
     new_g = transform(g)
     # tensorflow has no abs() api
     if dgl.backend.backend_name == "tensorflow":
@@ -3100,7 +3100,7 @@ def test_module_laplacian_pe(idtype):
         assert F.allclose(new_g.ndata["lappe"].abs(), tgt_pe[:, :2])
 
     # with padding (k>=n)
-    transform = dgl.LaplacianPE(5, feat_name="lappe", padding=True)
+    transform = dgl.LapPE(5, feat_name="lappe", padding=True)
     new_g = transform(g)
     # tensorflow has no abs() api
     if dgl.backend.backend_name == "tensorflow":
@@ -3110,7 +3110,7 @@ def test_module_laplacian_pe(idtype):
         assert F.allclose(new_g.ndata["lappe"].abs(), tgt_pe)
 
     # with eigenvalues
-    transform = dgl.LaplacianPE(
+    transform = dgl.LapPE(
         5, feat_name="lappe", eigval_name="eigval", padding=True
     )
     new_g = transform(g)

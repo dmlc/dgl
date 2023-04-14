@@ -29,7 +29,7 @@ dgl.transforms
     DropEdge
     AddEdge
     RandomWalkPE
-    LaplacianPE
+    LapPE
     FeatMask
     RowFeatNormalizer
     SIGNDiffusion

@@ -115,8 +115,8 @@ def _read_graph(schema):
                     )
 
     # print from graph
-    logging.info(f"|V|= {g.number_of_nodes()}")
-    logging.info(f"|E|= {g.number_of_edges()}")
+    logging.info(f"|V|= {g.num_nodes()}")
+    logging.info(f"|E|= {g.num_edges()}")
     for ntype in g.ntypes:
         for name, data in g.nodes[ntype].data.items():
             if isinstance(data, th.Tensor):

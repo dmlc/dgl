@@ -69,13 +69,11 @@ def preprocess(graph, labels, train_idx):
     n_node_feats = graph.ndata["feat"].shape[-1]
 
     graph.ndata["train_labels_onehot"] = torch.zeros(
-        graph.number_of_nodes(), n_classes
+        graph.num_nodes(), n_classes
     )
     graph.ndata["train_labels_onehot"][train_idx, labels[train_idx, 0]] = 1
 
-    graph.ndata["is_train"] = torch.zeros(
-        graph.number_of_nodes(), dtype=torch.bool
-    )
+    graph.ndata["is_train"] = torch.zeros(graph.num_nodes(), dtype=torch.bool)
     graph.ndata["is_train"][train_idx] = 1
 
     graph.create_formats_()

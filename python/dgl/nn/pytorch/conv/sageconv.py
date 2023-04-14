@@ -214,14 +214,14 @@ class SAGEConv(nn.Module):
                     feat_dst = feat_src[: graph.number_of_dst_nodes()]
             msg_fn = fn.copy_u("h", "m")
             if edge_weight is not None:
-                assert edge_weight.shape[0] == graph.number_of_edges()
+                assert edge_weight.shape[0] == graph.num_edges()
                 graph.edata["_edge_weight"] = edge_weight
                 msg_fn = fn.u_mul_e("h", "_edge_weight", "m")
 
             h_self = feat_dst
 
             # Handle the case of graphs without edges
-            if graph.number_of_edges() == 0:
+            if graph.num_edges() == 0:
                 graph.dstdata["neigh"] = torch.zeros(
                     feat_dst.shape[0], self._in_src_feats
                 ).to(feat_dst)

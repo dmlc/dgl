@@ -45,7 +45,7 @@ class RGCN(nn.Module):
         return h
 
 
-def evaluate(model, labels, dataloader, inv_target):
+def evaluate(model, labels, num_classes, dataloader, inv_target):
     model.eval()
     eval_logits = []
     eval_seeds = []
@@ -61,12 +61,25 @@ def evaluate(model, labels, dataloader, inv_target):
     eval_seeds = torch.cat(eval_seeds)
     num_seeds = len(eval_seeds)
     loc_sum = accuracy(
-        eval_logits.argmax(dim=1), labels[eval_seeds].cpu()
+        eval_logits.argmax(dim=1),
+        labels[eval_seeds].cpu(),
+        task="multiclass",
+        num_classes=num_classes,
     ) * float(num_seeds)
     return torch.tensor([loc_sum.item(), float(num_seeds)])
 
 
-def train(proc_id, device, g, target_idx, labels, train_idx, inv_target, model):
+def train(
+    proc_id,
+    device,
+    g,
+    target_idx,
+    labels,
+    num_classes,
+    train_idx,
+    inv_target,
+    model,
+):
     # define loss function and optimizer
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
@@ -106,9 +119,9 @@ def train(proc_id, device, g, target_idx, labels, train_idx, inv_target, model):
             total_loss += loss.item()
         # torchmetric accuracy defined as num_correct_labels / num_train_nodes
         # loc_acc_split = [loc_accuracy * loc_num_train_nodes, loc_num_train_nodes]
-        loc_acc_split = evaluate(model, labels, val_loader, inv_target).to(
-            device
-        )
+        loc_acc_split = evaluate(
+            model, labels, num_classes, val_loader, inv_target
+        ).to(device)
         dist.reduce(loc_acc_split, 0)
         if proc_id == 0:
             acc = loc_acc_split[0] / loc_acc_split[1]
@@ -143,13 +156,22 @@ def run(proc_id, nprocs, devices, g, data):
     inv_target = inv_target.to(device)
     # create RGCN model (distributed)
     in_size = g.num_nodes()
-    out_size = num_classes
-    model = RGCN(in_size, 16, out_size, num_rels).to(device)
+    model = RGCN(in_size, 16, num_classes, num_rels).to(device)
     model = DistributedDataParallel(
         model, device_ids=[device], output_device=device
     )
     # training + testing
-    train(proc_id, device, g, target_idx, labels, train_idx, inv_target, model)
+    train(
+        proc_id,
+        device,
+        g,
+        target_idx,
+        labels,
+        num_classes,
+        train_idx,
+        inv_target,
+        model,
+    )
     test_sampler = MultiLayerNeighborSampler(
         [-1, -1]
     )  # -1 for sampling all neighbors
@@ -162,7 +184,9 @@ def run(proc_id, nprocs, devices, g, data):
         shuffle=False,
         use_ddp=True,
     )
-    loc_acc_split = evaluate(model, labels, test_loader, inv_target).to(device)
+    loc_acc_split = evaluate(
+        model, labels, num_classes, test_loader, inv_target
+    ).to(device)
     dist.reduce(loc_acc_split, 0)
     if proc_id == 0:
         acc = loc_acc_split[0] / loc_acc_split[1]

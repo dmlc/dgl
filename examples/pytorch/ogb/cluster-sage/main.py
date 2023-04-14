@@ -258,7 +258,7 @@ if __name__ == "__main__":
     graph, labels = data[0]
     labels = labels[:, 0]
     num_nodes = train_idx.shape[0] + val_idx.shape[0] + test_idx.shape[0]
-    assert num_nodes == graph.number_of_nodes()
+    assert num_nodes == graph.num_nodes()
     graph.ndata["labels"] = labels
     mask = th.zeros(num_nodes, dtype=th.bool)
     mask[train_idx] = True

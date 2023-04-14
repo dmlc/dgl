@@ -60,6 +60,9 @@ struct CSRMatrix {
         indices(iarr),
         data(darr),
         sorted(sorted_flag) {
+    is_pinned = (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
+                (aten::IsNullArray(indices) || indices.IsPinned()) &&
+                (aten::IsNullArray(data) || data.IsPinned());
     CheckValidity();
   }
 
@@ -124,6 +127,19 @@ struct CSRMatrix {
     return CSRMatrix(
         num_rows, num_cols, indptr.CopyTo(ctx), indices.CopyTo(ctx),
         aten::IsNullArray(data) ? data : data.CopyTo(ctx), sorted);
+  }
+
+  /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
+  inline CSRMatrix PinMemory() {
+    if (is_pinned) return *this;
+    auto new_csr = CSRMatrix(
+        num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
+        aten::IsNullArray(data) ? data : data.PinMemory(), sorted);
+    CHECK(new_csr.is_pinned)
+        << "An internal DGL error has occured while trying to pin a CSR "
+           "matrix. Please file a bug at 'https://github.com/dmlc/dgl/issues' "
+           "with the above stacktrace.";
+    return new_csr;
   }
 
   /**

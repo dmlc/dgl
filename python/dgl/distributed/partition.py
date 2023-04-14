@@ -748,7 +748,7 @@ def partition_graph(
                     num_ntypes += len(uniq_ntypes)
                 else:
                     g.nodes[key].data["bal_ntype"] = (
-                        F.ones((g.number_of_nodes(key),), F.int32, F.cpu())
+                        F.ones((g.num_nodes(key),), F.int32, F.cpu())
                         * num_ntypes
                     )
                     num_ntypes += 1
@@ -798,34 +798,33 @@ def partition_graph(
                 )
             )
 
-        node_parts = F.zeros((sim_g.number_of_nodes(),), F.int64, F.cpu())
+        node_parts = F.zeros((sim_g.num_nodes(),), F.int64, F.cpu())
         parts = {0: sim_g.clone()}
-        orig_nids = parts[0].ndata[NID] = F.arange(0, sim_g.number_of_nodes())
-        orig_eids = parts[0].edata[EID] = F.arange(0, sim_g.number_of_edges())
+        orig_nids = parts[0].ndata[NID] = F.arange(0, sim_g.num_nodes())
+        orig_eids = parts[0].edata[EID] = F.arange(0, sim_g.num_edges())
         # For one partition, we don't really shuffle nodes and edges. We just need to simulate
         # it and set node data and edge data of orig_id.
         parts[0].ndata["orig_id"] = orig_nids
         parts[0].edata["orig_id"] = orig_eids
         if return_mapping:
             if g.is_homogeneous:
-                orig_nids = F.arange(0, sim_g.number_of_nodes())
-                orig_eids = F.arange(0, sim_g.number_of_edges())
+                orig_nids = F.arange(0, sim_g.num_nodes())
+                orig_eids = F.arange(0, sim_g.num_edges())
             else:
                 orig_nids = {
-                    ntype: F.arange(0, g.number_of_nodes(ntype))
-                    for ntype in g.ntypes
+                    ntype: F.arange(0, g.num_nodes(ntype)) for ntype in g.ntypes
                 }
                 orig_eids = {
-                    etype: F.arange(0, g.number_of_edges(etype))
+                    etype: F.arange(0, g.num_edges(etype))
                     for etype in g.canonical_etypes
                 }
         parts[0].ndata["inner_node"] = F.ones(
-            (sim_g.number_of_nodes(),),
+            (sim_g.num_nodes(),),
             RESERVED_FIELD_DTYPE["inner_node"],
             F.cpu(),
         )
         parts[0].edata["inner_edge"] = F.ones(
-            (sim_g.number_of_edges(),),
+            (sim_g.num_edges(),),
             RESERVED_FIELD_DTYPE["inner_edge"],
             F.cpu(),
         )
@@ -870,7 +869,7 @@ def partition_graph(
                 )
             )
         else:
-            node_parts = random_choice(num_parts, sim_g.number_of_nodes())
+            node_parts = random_choice(num_parts, sim_g.num_nodes())
         start = time.time()
         parts, orig_nids, orig_eids = partition_graph_with_halo(
             sim_g, node_parts, num_hops, reshuffle=True
@@ -971,7 +970,7 @@ def partition_graph(
                     ]
                 )
             val = np.cumsum(val).tolist()
-            assert val[-1] == g.number_of_nodes(ntype)
+            assert val[-1] == g.num_nodes(ntype)
         for etype in g.canonical_etypes:
             etype_id = g.get_etype_id(etype)
             val = []
@@ -990,7 +989,7 @@ def partition_graph(
                     [int(inner_eids[0]), int(inner_eids[-1]) + 1]
                 )
             val = np.cumsum(val).tolist()
-            assert val[-1] == g.number_of_edges(etype)
+            assert val[-1] == g.num_edges(etype)
     else:
         node_map_val = {}
         edge_map_val = {}
@@ -1028,8 +1027,8 @@ def partition_graph(
     etypes = {etype: g.get_etype_id(etype) for etype in g.canonical_etypes}
     part_metadata = {
         "graph_name": graph_name,
-        "num_nodes": g.number_of_nodes(),
-        "num_edges": g.number_of_edges(),
+        "num_nodes": g.num_nodes(),
+        "num_edges": g.num_edges(),
         "part_method": part_method,
         "num_parts": num_parts,
         "halo_hops": num_hops,
@@ -1071,7 +1070,7 @@ def partition_graph(
                 else:
                     print(
                         "part {} has {} nodes and {} are inside the partition".format(
-                            part_id, part.number_of_nodes(), len(local_nodes)
+                            part_id, part.num_nodes(), len(local_nodes)
                         )
                     )
 
@@ -1105,7 +1104,7 @@ def partition_graph(
                 else:
                     print(
                         "part {} has {} edges and {} are inside the partition".format(
-                            part_id, part.number_of_edges(), len(local_edges)
+                            part_id, part.num_edges(), len(local_edges)
                         )
                     )
                 tot_num_inner_edges += len(local_edges)
@@ -1185,12 +1184,12 @@ def partition_graph(
 
     _dump_part_config(f"{out_path}/{graph_name}.json", part_metadata)
 
-    num_cuts = sim_g.number_of_edges() - tot_num_inner_edges
+    num_cuts = sim_g.num_edges() - tot_num_inner_edges
     if num_parts == 1:
         num_cuts = 0
     print(
         "There are {} edges in the graph and {} edge cuts for {} partitions.".format(
-            g.number_of_edges(), num_cuts, num_parts
+            g.num_edges(), num_cuts, num_parts
         )
     )
 

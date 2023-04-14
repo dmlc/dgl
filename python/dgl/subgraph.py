@@ -1154,7 +1154,7 @@ def edge_type_subgraph(graph, etypes, output_device=None):
         graph._etypes[i] for i in etype_ids
     ]  # get the "name" of edge type
     num_nodes_per_induced_type = [
-        graph.number_of_nodes(ntype) for ntype in induced_ntypes
+        graph.num_nodes(ntype) for ntype in induced_ntypes
     ]
 
     metagraph = graph_index.from_edge_list(

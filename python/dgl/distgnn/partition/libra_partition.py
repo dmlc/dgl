@@ -59,8 +59,8 @@ def libra_partition(num_community, G, resultdir):
     3. The folder also contains a json file which contains partitions' information.
     """
 
-    num_nodes = G.number_of_nodes()  # number of nodes
-    num_edges = G.number_of_edges()  # number of edges
+    num_nodes = G.num_nodes()  # number of nodes
+    num_edges = G.num_edges()  # number of edges
     print("Number of nodes in the graph: ", num_nodes)
     print("Number of edges in the graph: ", num_edges)
 
@@ -161,8 +161,8 @@ def libra_partition(num_community, G, resultdir):
 
     part_metadata = {
         "graph_name": graph_name,
-        "num_nodes": G.number_of_nodes(),
-        "num_edges": G.number_of_edges(),
+        "num_nodes": G.num_nodes(),
+        "num_edges": G.num_edges(),
         "part_method": part_method,
         "num_parts": num_parts,
         "halo_hops": num_hops,

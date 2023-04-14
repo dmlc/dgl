@@ -68,13 +68,13 @@ on how messages are aggregated and combined as well.
             """
             # Compute representations layer by layer
             for l, layer in enumerate([self.conv1, self.conv2]):
-                y = torch.zeros(g.number_of_nodes(),
+                y = torch.zeros(g.num_nodes(),
                                 self.hidden_features
                                 if l != self.n_layers - 1
                                 else self.out_features)
                 sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
                 dataloader = dgl.dataloading.NodeDataLoader(
-                    g, torch.arange(g.number_of_nodes()), sampler,
+                    g, torch.arange(g.num_nodes()), sampler,
                     batch_size=batch_size,
                     shuffle=True,
                     drop_last=False)

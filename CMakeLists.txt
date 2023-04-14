@@ -33,6 +33,7 @@ dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if
 dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
 dgl_option(TP_BUILD_LIBUV "Build libuv together with tensorpipe (only impacts Linux)" ON)
+dgl_option(BUILD_TORCH "Build the PyTorch plugin" OFF)
 dgl_option(BUILD_SPARSE "Build DGL sparse library" ON)
 dgl_option(TORCH_PYTHON_INTERPS "Python interpreter used to build tensoradapter and DGL sparse library" python3)
 
@@ -202,11 +203,11 @@ endif(NOT MSVC)
 # Compile LIBXSMM
 if((NOT MSVC) AND USE_LIBXSMM)
   if(REBUILD_LIBXSMM)
-    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0
+    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${CMAKE_C_COMPILER}
                       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                       )
   else(REBUILD_LIBXSMM)
-    add_custom_target(libxsmm COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0
+    add_custom_target(libxsmm COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${CMAKE_C_COMPILER}
                       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                       )
   endif(REBUILD_LIBXSMM)

@@ -5,28 +5,7 @@
 
 :ref:`(English Version) <guide-mixed_precision>`
 
-DGL은 mixed precision 학습을 위해서 `PyTorch's automatic mixed precision package <https://pytorch.org/docs/stable/amp.html>`_ 와 호환된다. 따라서, 학습 시간 및 GPU 메모리 사용량을 절약할 수 있다. 이 기능을 활성화하기 위해서는, PyTorch 1.6+, python 3.7+을 설치하고, ``float16`` 데이터 타입 지원을 위해서 DGL을 소스 파일을 사용해서 빌드해야 한다. (이 기능은 아직 베타 단계이고, pre-built pip wheel 형태로 제공하지 않는다.)
-
-설치
----------
-
-우선 DGL 소스 코드를 GitHub에서 다운로드하고, ``USE_FP16=ON`` 플래그를 사용해서 shared library를 빌드한다.
-
-.. code:: bash
-
-   git clone --recurse-submodules https://github.com/dmlc/dgl.git
-   cd dgl
-   mkdir build
-   cd build
-   cmake -DUSE_CUDA=ON -DUSE_FP16=ON ..
-   make -j
-
-다음으로 Python 바인딩을 설치한다.
-
-.. code:: bash
-
-   cd ../python
-   python setup.py install
+DGL은 mixed precision 학습을 위해서 `PyTorch's automatic mixed precision package <https://pytorch.org/docs/stable/amp.html>`_ 와 호환된다. 따라서, 학습 시간 및 GPU 메모리 사용량을 절약할 수 있다. 
 
 Half precision을 사용한 메시지 전달
 ------------------------------
@@ -129,7 +108,7 @@ GNN 모델의 forward 패스(loss 계산 포함)를 ``torch.cuda.amp.autocast()`
     in_feats = features.shape[1]
     n_hidden = 256
     n_classes = data.num_classes
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     heads = [1, 1, 1]
     model = GAT(in_feats, n_hidden, n_classes, heads)
     model = model.to(device)
