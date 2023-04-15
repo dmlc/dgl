@@ -11,7 +11,7 @@ import dgl
 from dgl.ops import gather_mm
 from model import IGMC
 from data import MovieLens
-from dataset import MovieLensDataset, collate_movielens 
+from dataset import IGMCMovieLens, collate_movielens 
 
 def evaluate(model, loader, device):
     # Evaluate RMSE
@@ -63,9 +63,9 @@ def train_epoch(model, loss_fn, optimizer, arr_lambda, loader, device, log_inter
 def train(args):
     ### prepare data and set model
     movielens = MovieLens()
-    test_dataset = MovieLensDataset(
+    test_dataset = IGMCMovieLens(
         movielens.test_rating_pairs, movielens.test_rating_values, movielens.train_graph) 
-    train_dataset = MovieLensDataset(
+    train_dataset = IGMCMovieLens(
         movielens.train_rating_pairs, movielens.train_rating_values, movielens.train_graph)
 
     train_loader = th.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 

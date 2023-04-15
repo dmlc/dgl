@@ -1,25 +1,30 @@
 import torch as th
 import dgl
 
+from data import MovieLens
+from torch.utils.data import Dataset
 from utils import igmc_subgraph_extraction_labeling, one_hot
 
-class MovieLensDataset(th.utils.data.Dataset):
-    def __init__(self, links, g_labels, graph, 
-                hop=1, sample_ratio=1.0, max_nodes_per_hop=200):
-        self.links = links
-        self.g_labels = g_labels
-        self.graph = graph 
-
+class IGMCMovieLens(Dataset):
+    def __init__(self, movielens,
+                hop=1, sample_ratio=1.0, max_nodes_per_hop=200, mode='train'):
+        super(IGMCMovieLens, self).__init__()    
+        assert mode in ['train', 'test'], f"unrecorgnized mode {mode}"
+        self.movielens = movielens
         self.hop = hop
         self.sample_ratio = sample_ratio
         self.max_nodes_per_hop = max_nodes_per_hop
 
+        self.graph = self.movielens.train_graph if mode == 'train' else self.movielens.test_graph
+
     def __len__(self):
-        return len(self.links[0])
+        return int(self.graph.num_edges() / 2)
 
     def __getitem__(self, idx):
-        u, v = self.links[0][idx], self.links[1][idx]
-        g_label = self.g_labels[idx]
+        num_links, edges = int(self.graph.num_edges() / 2), self.graph.edges()
+        src, dst = edges[0][:num_links], edges[1][:num_links]
+        u, v = src[idx], dst[idx]
+        g_label = self.graph.edata['etype'][idx]
 
         subgraph = igmc_subgraph_extraction_labeling(
             self.graph, (u, v), h=self.hop, 
@@ -41,3 +46,9 @@ def collate_movielens(data):
     g = dgl.batch(g_list)
     g_label = th.stack(label_list)
     return g, g_label
+
+if __name__ == '__main__':
+    movielens = MovieLens()
+    data = IGMCMovieLens(movielens)
+    data[0]
+    pass
