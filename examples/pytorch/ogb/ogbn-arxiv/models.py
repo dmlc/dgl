@@ -232,8 +232,8 @@ class GATConv(nn.Module):
             e = self.leaky_relu(graph.edata.pop("e"))
 
             if self.training and self.edge_drop > 0:
-                perm = torch.randperm(graph.number_of_edges(), device=e.device)
-                bound = int(graph.number_of_edges() * self.edge_drop)
+                perm = torch.randperm(graph.num_edges(), device=e.device)
+                bound = int(graph.num_edges() * self.edge_drop)
                 eids = perm[bound:]
                 graph.edata["a"] = torch.zeros_like(e)
                 graph.edata["a"][eids] = self.attn_drop(

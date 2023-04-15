@@ -88,7 +88,7 @@ def start_sample_client_shuffle(
     src, dst = sampled_graph.edges()
     src = orig_nid[src]
     dst = orig_nid[dst]
-    assert sampled_graph.number_of_nodes() == g.number_of_nodes()
+    assert sampled_graph.num_nodes() == g.num_nodes()
     assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
     eids = g.edge_ids(src, dst)
     eids1 = orig_eid[sampled_graph.edata[dgl.EID]]
@@ -167,7 +167,7 @@ def check_rpc_sampling(tmpdir, num_server):
         assert p.exitcode == 0
 
     src, dst = sampled_graph.edges()
-    assert sampled_graph.number_of_nodes() == g.number_of_nodes()
+    assert sampled_graph.num_nodes() == g.num_nodes()
     assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
@@ -202,7 +202,7 @@ def check_rpc_find_edges_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    eids = F.tensor(np.random.randint(g.number_of_edges(), size=100))
+    eids = F.tensor(np.random.randint(g.num_edges(), size=100))
     u, v = g.find_edges(orig_eid[eids])
     du, dv = start_find_edges_client(0, tmpdir, num_server > 1, eids)
     du = orig_nid[du]
@@ -232,7 +232,7 @@ def create_random_hetero(dense=False, empty=False):
         edges[etype] = (arr.row, arr.col)
     g = dgl.heterograph(edges, num_nodes)
     g.nodes["n1"].data["feat"] = F.ones(
-        (g.number_of_nodes("n1"), 10), F.float32, F.cpu()
+        (g.num_nodes("n1"), 10), F.float32, F.cpu()
     )
     return g
 
@@ -332,7 +332,7 @@ def check_rpc_get_degree_shuffle(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    nids = F.tensor(np.random.randint(g.number_of_nodes(), size=100))
+    nids = F.tensor(np.random.randint(g.num_nodes(), size=100))
     in_degs, out_degs, all_in_degs, all_out_degs = start_get_degrees_client(
         0, tmpdir, num_server > 1, nids
     )
@@ -619,7 +619,7 @@ def check_rpc_hetero_sampling_empty_shuffle(tmpdir, num_server):
         p.join()
         assert p.exitcode == 0
 
-    assert block.number_of_edges() == 0
+    assert block.num_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
 
@@ -733,7 +733,7 @@ def check_rpc_hetero_etype_sampling_empty_shuffle(tmpdir, num_server):
         p.join()
         assert p.exitcode == 0
 
-    assert block.number_of_edges() == 0
+    assert block.num_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
 
@@ -841,7 +841,7 @@ def check_rpc_bipartite_sampling_empty(tmpdir, num_server):
         p.join()
         assert p.exitcode == 0
 
-    assert block.number_of_edges() == 0
+    assert block.num_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
 
@@ -943,7 +943,7 @@ def check_rpc_bipartite_etype_sampling_empty(tmpdir, num_server):
         assert p.exitcode == 0
 
     assert block is not None
-    assert block.number_of_edges() == 0
+    assert block.num_edges() == 0
     assert len(block.etypes) == len(g.etypes)
 
 
@@ -1071,7 +1071,7 @@ def check_standalone_sampling(tmpdir):
     sampled_graph = sample_neighbors(dist_graph, [0, 10, 99, 66, 1024, 2008], 3)
 
     src, dst = sampled_graph.edges()
-    assert sampled_graph.number_of_nodes() == g.number_of_nodes()
+    assert sampled_graph.num_nodes() == g.num_nodes()
     assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
     eids = g.edge_ids(src, dst)
     assert np.array_equal(
@@ -1117,7 +1117,7 @@ def check_standalone_etype_sampling(tmpdir):
     sampled_graph = sample_etype_neighbors(dist_graph, [0, 10, 99, 66, 1023], 3)
 
     src, dst = sampled_graph.edges()
-    assert sampled_graph.number_of_nodes() == hg.number_of_nodes()
+    assert sampled_graph.num_nodes() == hg.num_nodes()
     assert np.all(F.asnumpy(hg.has_edges_between(src, dst)))
     eids = hg.edge_ids(src, dst)
     assert np.array_equal(
@@ -1148,7 +1148,7 @@ def check_standalone_etype_sampling_heterograph(tmpdir):
             ("paper", "cite", "paper"): (src, dst),
             ("paper", "cite-by", "paper"): (dst, src),
         },
-        {"paper": hg.number_of_nodes()},
+        {"paper": hg.num_nodes()},
     )
     partition_graph(
         new_hg,
@@ -1170,7 +1170,7 @@ def check_standalone_etype_sampling_heterograph(tmpdir):
     assert len(src) == 10
     src, dst = sampled_graph.edges(etype=("paper", "cite-by", "paper"))
     assert len(src) == 10
-    assert sampled_graph.number_of_nodes() == new_hg.number_of_nodes()
+    assert sampled_graph.num_nodes() == new_hg.num_nodes()
     dgl.distributed.exit_client()
 
 
@@ -1241,7 +1241,7 @@ def check_rpc_in_subgraph_shuffle(tmpdir, num_server):
     src, dst = sampled_graph.edges()
     src = orig_nid[src]
     dst = orig_nid[dst]
-    assert sampled_graph.number_of_nodes() == g.number_of_nodes()
+    assert sampled_graph.num_nodes() == g.num_nodes()
     assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
 
     subg1 = dgl.in_subgraph(g, orig_nid[nodes])

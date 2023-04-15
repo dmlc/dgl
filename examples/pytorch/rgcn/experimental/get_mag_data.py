@@ -22,11 +22,11 @@ val_idx = split_idx["valid"]["paper"]
 test_idx = split_idx["test"]["paper"]
 paper_labels = labels["paper"].squeeze()
 
-train_mask = th.zeros((hg.number_of_nodes("paper"),), dtype=th.bool)
+train_mask = th.zeros((hg.num_nodes("paper"),), dtype=th.bool)
 train_mask[train_idx] = True
-val_mask = th.zeros((hg.number_of_nodes("paper"),), dtype=th.bool)
+val_mask = th.zeros((hg.num_nodes("paper"),), dtype=th.bool)
 val_mask[val_idx] = True
-test_mask = th.zeros((hg.number_of_nodes("paper"),), dtype=th.bool)
+test_mask = th.zeros((hg.num_nodes("paper"),), dtype=th.bool)
 test_mask[test_idx] = True
 hg.nodes["paper"].data["train_mask"] = train_mask
 hg.nodes["paper"].data["val_mask"] = val_mask

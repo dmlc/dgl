@@ -64,6 +64,9 @@ struct COOMatrix {
         data(darr),
         row_sorted(rsorted),
         col_sorted(csorted) {
+    is_pinned = (aten::IsNullArray(row) || row.IsPinned()) &&
+                (aten::IsNullArray(col) || col.IsPinned()) &&
+                (aten::IsNullArray(data) || data.IsPinned());
     CheckValidity();
   }
 
@@ -131,6 +134,20 @@ struct COOMatrix {
         num_rows, num_cols, row.CopyTo(ctx), col.CopyTo(ctx),
         aten::IsNullArray(data) ? data : data.CopyTo(ctx), row_sorted,
         col_sorted);
+  }
+
+  /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
+  inline COOMatrix PinMemory() {
+    if (is_pinned) return *this;
+    auto new_coo = COOMatrix(
+        num_rows, num_cols, row.PinMemory(), col.PinMemory(),
+        aten::IsNullArray(data) ? data : data.PinMemory(), row_sorted,
+        col_sorted);
+    CHECK(new_coo.is_pinned)
+        << "An internal DGL error has occured while trying to pin a COO "
+           "matrix. Please file a bug at 'https://github.com/dmlc/dgl/issues' "
+           "with the above stacktrace.";
+    return new_coo;
   }
 
   /**
@@ -232,8 +249,10 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
-/** @brief Get data. The return type is an ndarray due to possible duplicate
- * entries. */
+/**
+ * @brief Get data. The return type is an ndarray due to possible duplicate
+ * entries.
+ */
 inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
   IdArray rows =
       VecToIdArray<int64_t>({row}, mat.row->dtype.bits, mat.row->ctx);

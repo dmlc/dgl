@@ -103,9 +103,17 @@ constexpr bool CopyRhs<DType>::use_rhs;
 //////////////////////////////// Reduce operators on CPU
 ///////////////////////////////////
 template <typename DType>
+constexpr DType MinDType() {
+  if (std::is_same<DType, BFloat16>::value)
+    return BFloat16::Min();
+  else
+    return -std::numeric_limits<DType>::infinity();
+}
+
+template <typename DType>
 struct Max {
   typedef DType type;
-  static constexpr DType zero = -std::numeric_limits<DType>::infinity();
+  static constexpr DType zero = MinDType<DType>();
   // return true if accum should be replaced
   inline static DType Call(DType accum, DType val) { return accum < val; }
 };
@@ -113,9 +121,17 @@ template <typename DType>
 constexpr DType Max<DType>::zero;
 
 template <typename DType>
+constexpr DType MaxDType() {
+  if (std::is_same<DType, BFloat16>::value)
+    return BFloat16::Max();
+  else
+    return std::numeric_limits<DType>::infinity();
+}
+
+template <typename DType>
 struct Min {
   typedef DType type;
-  static constexpr DType zero = std::numeric_limits<DType>::infinity();
+  static constexpr DType zero = MaxDType<DType>();
   // return true if accum should be replaced
   inline static DType Call(DType accum, DType val) { return accum > val; }
 };

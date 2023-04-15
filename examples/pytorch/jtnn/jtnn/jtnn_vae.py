@@ -70,10 +70,10 @@ class DGLJTNNVAE(nn.Module):
             [t.graph for t in mol_batch["mol_trees"]]
         )
 
-        self.n_nodes_total += mol_graphs.number_of_nodes()
-        self.n_edges_total += mol_graphs.number_of_edges()
+        self.n_nodes_total += mol_graphs.num_nodes()
+        self.n_edges_total += mol_graphs.num_edges()
         self.n_tree_nodes_total += sum(
-            t.graph.number_of_nodes() for t in mol_batch["mol_trees"]
+            t.graph.num_nodes() for t in mol_batch["mol_trees"]
         )
         self.n_passes += 1
 

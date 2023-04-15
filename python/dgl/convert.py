@@ -971,7 +971,7 @@ def to_homogeneous(
     --------
     to_heterogeneous
     """
-    num_nodes_per_ntype = [G.number_of_nodes(ntype) for ntype in G.ntypes]
+    num_nodes_per_ntype = [G.num_nodes(ntype) for ntype in G.ntypes]
     offset_per_ntype = np.insert(np.cumsum(num_nodes_per_ntype), 0, 0)
     srcs = []
     dsts = []
@@ -986,7 +986,7 @@ def to_homogeneous(
     total_num_nodes = 0
 
     for ntype_id, ntype in enumerate(G.ntypes):
-        num_nodes = G.number_of_nodes(ntype)
+        num_nodes = G.num_nodes(ntype)
         total_num_nodes += num_nodes
         if store_type:
             # Type ID is always in int64
@@ -1376,7 +1376,7 @@ def from_networkx(
     if node_attrs is not None:
         # mapping from feature name to a list of tensors to be concatenated
         attr_dict = defaultdict(list)
-        for nid in range(g.number_of_nodes()):
+        for nid in range(g.num_nodes()):
             for attr in node_attrs:
                 attr_dict[attr].append(nx_graph.nodes[nid][attr])
         for attr in node_attrs:
@@ -1384,12 +1384,12 @@ def from_networkx(
 
     if edge_attrs is not None:
         # mapping from feature name to a list of tensors to be concatenated
-        attr_dict = defaultdict(lambda: [None] * g.number_of_edges())
+        attr_dict = defaultdict(lambda: [None] * g.num_edges())
         # each defaultdict value is initialized to be a list of None
         # None here serves as placeholder to be replaced by feature with
         # corresponding edge id
         if has_edge_id:
-            num_edges = g.number_of_edges()
+            num_edges = g.num_edges()
             for _, _, attrs in nx_graph.edges(data=True):
                 if attrs[edge_id_attr_name] >= num_edges:
                     raise DGLError(
@@ -1618,7 +1618,7 @@ def bipartite_from_networkx(
 
     if e_attrs is not None:
         # mapping from feature name to a list of tensors to be concatenated
-        attr_dict = defaultdict(lambda: [None] * g.number_of_edges())
+        attr_dict = defaultdict(lambda: [None] * g.num_edges())
         # each defaultdict value is initialized to be a list of None
         # None here serves as placeholder to be replaced by feature with
         # corresponding edge id
@@ -1700,7 +1700,7 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
     dst = F.asnumpy(dst)
     # xiangsx: Always treat graph as multigraph
     nx_graph = nx.MultiDiGraph()
-    nx_graph.add_nodes_from(range(g.number_of_nodes()))
+    nx_graph.add_nodes_from(range(g.num_nodes()))
     for eid, (u, v) in enumerate(zip(src, dst)):
         nx_graph.add_edge(u, v, id=eid)
 

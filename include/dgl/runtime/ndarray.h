@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "bfloat16.h"
 #include "c_runtime_api.h"
 #include "serializer.h"
 #include "shared_mem.h"
@@ -153,6 +154,7 @@ class NDArray {
     else
       return static_cast<T*>(operator->()->data);
   }
+
   /**
    * @brief Copy data content from/into another array.
    * @param other The source array to be copied from.
@@ -170,19 +172,34 @@ class NDArray {
    * @return The array under another context.
    */
   inline NDArray CopyTo(const DGLContext& ctx) const;
+
   /**
    * @brief Return a new array with a copy of the content.
    */
   inline NDArray Clone() const;
+
+  /**
+   * @brief Return a copy of the current instance of NDArray in pinned
+   *     (page-locked) memory.
+   * @note This is an out-of-place method, which utilizes PyTorch's
+   *     CachingHostAllocator for allocating pinned memory and copying data
+   *     from the current NDAarray. As a result, PyTorch is responsible for
+   *     managing the lifecycle of the returned NDArray, including deciding
+   *     when to flush the data for reuse or call cudaFreeHost. The current
+   *     context must be kDGLCPU, otherwise, an error will be thrown.
+   */
+  inline NDArray PinMemory();
+
   /**
    * @brief In-place method to pin the current array by calling PinContainer
    *        on the underlying NDArray:Container.
-   * @note This is an in-place method. Behavior depends on the current context,
-   *       kDGLCPU: will be pinned;
-   *       IsPinned: directly return;
-   *       kDGLCUDA: invalid, will throw an error.
+   * @note This is an in-place method that flags the memory as page-locked by
+   *     utilizing cudaHostRegister at the underlying level to pin the current
+   *     instance of NDArray. The current context must be kDGLCPU, otherwise,
+   *     an error will be thrown.
    */
   inline void PinMemory_();
+
   /**
    * @brief In-place method to unpin the current array by calling UnpinContainer
    *        on the underlying NDArray:Container.
@@ -191,26 +208,31 @@ class NDArray {
    *       others: directly return.
    */
   inline void UnpinMemory_();
+
   /**
    * @brief Check if the array is pinned.
    */
   inline bool IsPinned() const;
+
   /**
    * @brief Record streams that are using the underlying tensor.
    * @param stream The stream that is using the underlying tensor.
    */
   inline void RecordStream(DGLStreamHandle stream) const;
+
   /**
    * @brief Load NDArray from stream
    * @param stream The input data stream
    * @return Whether load is successful
    */
   bool Load(dmlc::Stream* stream);
+
   /**
    * @brief Save NDArray to stream
    * @param stream The output data stream
    */
   void Save(dmlc::Stream* stream) const;
+
   /**
    * @brief Create a NDArray that shares the data memory with the current one.
    * @param shape The shape of the new array.
@@ -220,27 +242,40 @@ class NDArray {
    */
   DGL_DLL NDArray
   CreateView(std::vector<int64_t> shape, DGLDataType dtype, int64_t offset = 0);
+
   /**
    * @brief Create an empty NDArray.
    * @param shape The shape of the new array.
    * @param dtype The data type of the new array.
-   * @param ctx The context of the Array.
+   * @param ctx The context of the array.
    * @return The created Array
    */
   DGL_DLL static NDArray Empty(
       std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx);
+
+  /**
+   * @brief Create an empty NDArray in pinned memory.
+   * @param shape The shape of the new array.
+   * @param dtype The data type of the new array.
+   * @param ctx The context of the array.
+   * @return The created array.
+   */
+  DGL_DLL static NDArray PinnedEmpty(
+      std::vector<int64_t> shape, DGLDataType dtype, DGLContext ctx);
+
   /**
    * @brief Create an empty NDArray with shared memory.
    * @param name The name of shared memory.
    * @param shape The shape of the new array.
    * @param dtype The data type of the new array.
-   * @param ctx The context of the Array.
+   * @param ctx The context of the array.
    * @param is_create whether to create shared memory.
    * @return The created Array
    */
   DGL_DLL static NDArray EmptyShared(
       const std::string& name, std::vector<int64_t> shape, DGLDataType dtype,
       DGLContext ctx, bool is_create);
+
   /**
    * @brief Get the size of the array in the number of bytes.
    */
@@ -286,6 +321,18 @@ class NDArray {
   DGL_DLL static void CopyFromTo(DGLArray* from, DGLArray* to);
   DGL_DLL static void CopyFromTo(
       DGLArray* from, DGLArray* to, DGLStreamHandle stream);
+
+  /**
+   * @brief Function to copy data between device and CPU while recording the
+   *     event.
+   * @param from The source array.
+   * @param to The target array.
+   * @param pytorch_ctx The context pointer from PyTorch's CachingHostAllocator.
+   * @note This function fuses data-copy and event recording to ensure
+   *     CachingHostAllocator works properly.
+   */
+  DGL_DLL static void RecordedCopyFromTo(
+      DGLArray* from, DGLArray* to, void* pytorch_ctx);
 
   /**
    * @brief Function to pin the DGLArray of a Container.
@@ -427,7 +474,20 @@ struct NDArray::Container {
   /** @brief The internal array object */
   std::atomic<int> ref_counter_{0};
 
+  /** @brief Whether underlying dl_tensor is pinned by DGL. */
   bool pinned_by_dgl_{false};
+
+  /** @brief Whether underlying dl_tensor is pinned by PyTorch
+   *    (CachingHostAllocator). */
+  bool pinned_by_pytorch_{false};
+
+  /** @brief The PyTorch storage ctx ptr if pinned_by_pytorch_ = True. */
+  void* pytorch_ctx_{nullptr};
+
+  /** @brief Pointer to the corresp. PyTorch deleter if pinned_by_pytorch_ =
+   *    True.
+   */
+  void* pytorch_raw_deleter_{nullptr};
 };
 
 // implementations of inline functions
@@ -454,6 +514,22 @@ inline void NDArray::CopyFrom(DGLArray* other) {
 
 inline void NDArray::CopyFrom(const NDArray& other) {
   CHECK(other.data_ != nullptr);
+  // Copy between two devices
+  if (data_->dl_tensor.ctx.device_type !=
+      other.data_->dl_tensor.ctx.device_type) {
+    CHECK(data_ != nullptr);
+    auto to_ctx_type = data_->dl_tensor.ctx.device_type;
+    auto cpu_data = (to_ctx_type == kDGLCPU ? data_ : other.data_);
+    // Pinned by PyTorch
+    if (cpu_data->pinned_by_pytorch_) {
+      // To ensure correct behavior, the event must be recorded after
+      // cudaMemcpyAsync as long as the memory is pinned by PyTorch.
+      void* pytorch_ctx = cpu_data->pytorch_ctx_;
+      RecordedCopyFromTo(
+          &(other.data_->dl_tensor), &(data_->dl_tensor), pytorch_ctx);
+      return;
+    }
+  }
   CopyFrom(&(other.data_->dl_tensor));
 }
 
@@ -464,23 +540,50 @@ inline void NDArray::CopyTo(DGLArray* other) const {
 
 inline void NDArray::CopyTo(const NDArray& other) const {
   CHECK(other.data_ != nullptr);
+  // copy between two devices
+  if (data_->dl_tensor.ctx.device_type !=
+      other.data_->dl_tensor.ctx.device_type) {
+    CHECK(data_ != nullptr);
+    auto from_ctx_type = data_->dl_tensor.ctx.device_type;
+    auto cpu_data = (from_ctx_type == kDGLCPU ? data_ : other.data_);
+    // pinned by PyTorch
+    if (cpu_data->pinned_by_pytorch_) {
+      // To ensure correct behavior, the event must be recorded after
+      // cudaMemcpyAsync as long as the memory is pinned by PyTorch.
+      void* pytorch_ctx = cpu_data->pytorch_ctx_;
+      RecordedCopyFromTo(
+          &(data_->dl_tensor), &(other.data_->dl_tensor), pytorch_ctx);
+      return;
+    }
+  }
   CopyTo(&(other.data_->dl_tensor));
 }
 
 inline NDArray NDArray::CopyTo(const DGLContext& ctx) const {
   CHECK(data_ != nullptr);
-  const DGLArray* dptr = operator->();
+  const DGLArray* array = operator->();
   NDArray ret = Empty(
-      std::vector<int64_t>(dptr->shape, dptr->shape + dptr->ndim), dptr->dtype,
-      ctx);
+      std::vector<int64_t>(array->shape, array->shape + array->ndim),
+      array->dtype, ctx);
   this->CopyTo(ret);
   return ret;
 }
 
 inline NDArray NDArray::Clone() const {
   CHECK(data_ != nullptr);
-  const DGLArray* dptr = operator->();
-  return this->CopyTo(dptr->ctx);
+  const DGLArray* array = operator->();
+  return this->CopyTo(array->ctx);
+}
+
+inline NDArray NDArray::PinMemory() {
+  CHECK(data_ != nullptr);
+  const DGLArray* array = operator->();
+  auto ctx = array->ctx;
+  NDArray ret = PinnedEmpty(
+      std::vector<int64_t>(array->shape, array->shape + array->ndim),
+      array->dtype, ctx);
+  this->CopyTo(ret);
+  return ret;
 }
 
 inline void NDArray::PinMemory_() {

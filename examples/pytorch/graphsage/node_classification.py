@@ -74,7 +74,7 @@ class SAGE(nn.Module):
         return y
 
 
-def evaluate(model, graph, dataloader):
+def evaluate(model, graph, dataloader, num_classes):
     model.eval()
     ys = []
     y_hats = []
@@ -83,10 +83,15 @@ def evaluate(model, graph, dataloader):
             x = blocks[0].srcdata["feat"]
             ys.append(blocks[-1].dstdata["label"])
             y_hats.append(model(blocks, x))
-    return MF.accuracy(torch.cat(y_hats), torch.cat(ys))
+    return MF.accuracy(
+        torch.cat(y_hats),
+        torch.cat(ys),
+        task="multiclass",
+        num_classes=num_classes,
+    )
 
 
-def layerwise_infer(device, graph, nid, model, batch_size):
+def layerwise_infer(device, graph, nid, model, num_classes, batch_size):
     model.eval()
     with torch.no_grad():
         pred = model.inference(
@@ -94,10 +99,12 @@ def layerwise_infer(device, graph, nid, model, batch_size):
         )  # pred in buffer_device
         pred = pred[nid]
         label = graph.ndata["label"][nid].to(pred.device)
-        return MF.accuracy(pred, label)
+        return MF.accuracy(
+            pred, label, task="multiclass", num_classes=num_classes
+        )
 
 
-def train(args, device, g, dataset, model):
+def train(args, device, g, dataset, model, num_classes):
     # create sampler & dataloader
     train_idx = dataset.train_idx.to(device)
     val_idx = dataset.val_idx.to(device)
@@ -147,7 +154,7 @@ def train(args, device, g, dataset, model):
             loss.backward()
             opt.step()
             total_loss += loss.item()
-        acc = evaluate(model, g, val_dataloader)
+        acc = evaluate(model, g, val_dataloader, num_classes)
         print(
             "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(
                 epoch, total_loss / (it + 1), acc.item()
@@ -174,6 +181,7 @@ if __name__ == "__main__":
     dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
     g = dataset[0]
     g = g.to("cuda" if args.mode == "puregpu" else "cpu")
+    num_classes = dataset.num_classes
     device = torch.device("cpu" if args.mode == "cpu" else "cuda")
 
     # create GraphSAGE model
@@ -183,9 +191,11 @@ if __name__ == "__main__":
 
     # model training
     print("Training...")
-    train(args, device, g, dataset, model)
+    train(args, device, g, dataset, model, num_classes)
 
     # test the model
     print("Testing...")
-    acc = layerwise_infer(device, g, dataset.test_idx, model, batch_size=4096)
+    acc = layerwise_infer(
+        device, g, dataset.test_idx, model, num_classes, batch_size=4096
+    )
     print("Test Accuracy {:.4f}".format(acc.item()))

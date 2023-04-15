@@ -17,7 +17,6 @@
 #include <algorithm>
 
 #if !defined(_WIN32)
-#ifdef USE_AVX
 #ifdef USE_LIBXSMM
 #include <libxsmm.h>
 #include <unistd.h>
@@ -258,7 +257,13 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
         N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32,
         (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32,
         opredop_flags);
+  } else {  // assume bf16
+    kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
+        N, &_ld, &_ld, LIBXSMM_DATATYPE_BF16, LIBXSMM_DATATYPE_BF16,
+        (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32,
+        opredop_flags);
   }
+
   if (kernel == nullptr) {
     LOG(FATAL) << "Failed to generate libxsmm kernel for the SpMM operation."
                   "To disable libxsmm, use dgl.use_libxsmm(false).";
@@ -589,7 +594,6 @@ void SpMMCmpCsrLibxsmm(
 }  // namespace dgl
 
 #endif  // USE_LIBXSMM
-#endif  // USE_AVX
 #endif  // _WIN32
 
 #endif  // DGL_ARRAY_CPU_SPMM_BLOCKING_LIBXSMM_H_

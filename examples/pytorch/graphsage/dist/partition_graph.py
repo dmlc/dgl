@@ -3,10 +3,10 @@ import os
 import sys
 import time
 
+import dgl
+
 import numpy as np
 import torch as th
-
-import dgl
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from load_graph import load_ogb, load_reddit
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     print(
         "load {} takes {:.3f} seconds".format(args.dataset, time.time() - start)
     )
-    print("|V|={}, |E|={}".format(g.number_of_nodes(), g.number_of_edges()))
+    print("|V|={}, |E|={}".format(g.num_nodes(), g.num_edges()))
     print(
         "train: {}, valid: {}, test: {}".format(
             th.sum(g.ndata["train_mask"]),

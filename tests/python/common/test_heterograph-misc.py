@@ -67,8 +67,8 @@ def gen_from_data(data, readonly, sort):
 
 def test_query():
     def _test_one(g):
-        assert g.number_of_nodes() == 10
-        assert g.number_of_edges() == 20
+        assert g.num_nodes() == 10
+        assert g.num_edges() == 20
 
         for i in range(10):
             assert g.has_nodes(i)
@@ -158,8 +158,8 @@ def test_query():
         _test_one(g)
 
     def _test_csr_one(g):
-        assert g.number_of_nodes() == 10
-        assert g.number_of_edges() == 20
+        assert g.num_nodes() == 10
+        assert g.num_edges() == 20
 
         for i in range(10):
             assert g.has_nodes(i)

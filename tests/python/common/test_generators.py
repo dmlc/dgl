@@ -11,8 +11,8 @@ import numpy as np
 )
 def test_rand_graph():
     g = dgl.rand_graph(10000, 100000)
-    assert g.number_of_nodes() == 10000
-    assert g.number_of_edges() == 100000
+    assert g.num_nodes() == 10000
+    assert g.num_edges() == 100000
     # test random seed
     dgl.random.seed(42)
     g1 = dgl.rand_graph(100, 30)

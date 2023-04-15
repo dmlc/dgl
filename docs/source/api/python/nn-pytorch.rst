@@ -18,6 +18,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GATConv
     ~dgl.nn.pytorch.conv.GATv2Conv
     ~dgl.nn.pytorch.conv.EGATConv
+    ~dgl.nn.pytorch.conv.EdgeGATConv
     ~dgl.nn.pytorch.conv.EdgeConv
     ~dgl.nn.pytorch.conv.SAGEConv
     ~dgl.nn.pytorch.conv.SGConv
@@ -145,3 +146,18 @@ Network Embedding Modules
 
     ~dgl.nn.pytorch.DeepWalk
     ~dgl.nn.pytorch.MetaPath2Vec
+
+Utility Modules for Graph Transformer
+----------------------------------------
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    ~dgl.nn.pytorch.gt.DegreeEncoder
+    ~dgl.nn.pytorch.gt.LapPosEncoder
+    ~dgl.nn.pytorch.gt.PathEncoder
+    ~dgl.nn.pytorch.gt.SpatialEncoder
+    ~dgl.nn.pytorch.gt.SpatialEncoder3d
+    ~dgl.nn.pytorch.gt.BiasedMHA
+    ~dgl.nn.pytorch.gt.GraphormerLayer

@@ -525,19 +525,19 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
         results = recv_responses(msgseq2pos)
         res_list.extend(results)
 
-    sampled_graph = merge_graphs(res_list, g.number_of_nodes())
+    sampled_graph = merge_graphs(res_list, g.num_nodes())
     return sampled_graph
 
 
 def _frontier_to_heterogeneous_graph(g, frontier, gpb):
     # We need to handle empty frontiers correctly.
-    if frontier.number_of_edges() == 0:
+    if frontier.num_edges() == 0:
         data_dict = {
             etype: (np.zeros(0), np.zeros(0)) for etype in g.canonical_etypes
         }
         return heterograph(
             data_dict,
-            {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+            {ntype: g.num_nodes(ntype) for ntype in g.ntypes},
             idtype=g.idtype,
         )
 
@@ -561,7 +561,7 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
             edge_ids[etype] = F.boolean_mask(eid, type_idx)
     hg = heterograph(
         data_dict,
-        {ntype: g.number_of_nodes(ntype) for ntype in g.ntypes},
+        {ntype: g.num_nodes(ntype) for ntype in g.ntypes},
         idtype=g.idtype,
     )
 
