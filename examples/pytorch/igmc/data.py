@@ -7,9 +7,9 @@ import torch as th
 
 import dgl 
 import zipfile
+import re
 
-from dgl import save_graphs, load_graphs
-from dgl.data.utils import download, save_info
+from dgl.data.utils import download, save_info, load_info, save_graphs, load_graphs
 
 from dgl.data import DGLDataset
 
@@ -17,10 +17,11 @@ from dgl.data import DGLDataset
 Jiahang Li
 [x] TODO: follow dgl dataset flow for ml-100k
 [x] TODO: appropriately deal with train, test split of ml-100k
-[] TODO: add side features
-[] TODO: add options to control the use of text embeddings
+[x] TODO: add side features, text embeddings follow GCMC
 [] TODO: support ml-1M, ml-10M datasets
+[] TODO: add other types of text embedding
 [] TODO: train and valid split of ml-100k
+[] TODO: add an option to specify where word embeddings are stored
 
 '''
 
@@ -29,13 +30,15 @@ GENRES_ML_100K =\
      'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy',
      'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi',
      'Thriller', 'War', 'Western']
+GENRES_ML_1M = GENRES_ML_100K[1:]
+GENRES_ML_10M = GENRES_ML_100K + ["IMAX"]
 
 class MovieLens(DGLDataset):
     """MovieLens dataset used by GCMC model, ml-100k
     """
     _url = {
         'ml-100k': 'http://files.grouplens.org/datasets/movielens/ml-100k.zip'
-    }
+    } 
 
     def __init__(self, name='ml-100k', raw_dir=None, force_reload=None, verbose=None, transform=None):
         super(MovieLens, self).__init__(name=name, url=self._url[name], raw_dir=raw_dir, force_reload=force_reload, verbose=verbose,
@@ -67,6 +70,12 @@ class MovieLens(DGLDataset):
                                             col_name="id",
                                             reserved_ids_set=set(all_rating_data["movie_id"].values))
 
+        user_feat, movie_feat = th.tensor(self._process_user_fea(user_data)), th.tensor(self._process_movie_fea(movie_data))
+        self.feat = {
+            "user_feat": user_feat,
+            "movie_feat": movie_feat
+        }
+
         # 3. generate rating pairs
         # Map user/movie to the global id
         self._global_user_id_map = {ele: i for i, ele in enumerate(user_data['id'])}
@@ -87,15 +96,19 @@ class MovieLens(DGLDataset):
         self.test_rating_pairs = (th.LongTensor(test_u_indices), th.LongTensor(test_v_indices))
         self.train_rating_values = th.FloatTensor(train_labels)
         self.test_rating_values = th.FloatTensor(test_labels)
+        self.info = {
+            "train_rating_pairs": self.train_rating_pairs,
+            "test_rating_pairs": self.test_rating_pairs
+        }
 
         # build dgl graph object, which is homogeneous and bidirectional and contains only training edges
-        self.train_graph = dgl.graph(self.train_rating_pairs[0], self.train_rating_pairs[1])
-        self.test_graph = dgl.graph(self.test_rating_pairs[0], self.test_rating_pairs[1])
-        self.train_graph.edata['etype'] = self.train_rating_values, self.train_rating_values.to(th.long)
+        self.train_graph = dgl.graph((self.train_rating_pairs[0], self.train_rating_pairs[1]))
+        self.test_graph = dgl.graph((self.test_rating_pairs[0], self.test_rating_pairs[1]))
+        self.train_graph.edata['etype'] = self.train_rating_values.to(th.long)
         self.test_graph.edata['etype'] = self.test_rating_values.to(th.long)
 
-        self.train_graph = dgl.to_bidirected(self.train_graph, copy_ndata=True)
-        self.test_graph = dgl.to_bidirected(self.test_graph, copy_ndata=True)
+        self.train_graph = dgl.add_reverse_edges(self.train_graph, copy_edata=True)
+        self.test_graph = dgl.add_reverse_edges(self.test_graph, copy_edata=True)
 
     def has_cache(self):
         if os.path.exists(self.graph_path):
@@ -104,11 +117,15 @@ class MovieLens(DGLDataset):
 
     def save(self):
         save_graphs(self.graph_path, [self.train_graph, self.test_graph])
+        save_info(self.info_path, self.info)
+        save_info(self.feat_path, self.feat)
         if self.verbose:
             print(f'Done saving data into {self.graph_path}.')
 
     def load(self):
         g_list, _ = load_graphs(self.graph_path)
+        self.info = load_info(self.info_path)
+        self.feat = load_info(self.feat_path)
         self.train_graph, self.test_graph = g_list[0], g_list[1]
         if self.verbose:
             print(f'Done loading data from {self.graph_path}.')
@@ -134,9 +151,128 @@ class MovieLens(DGLDataset):
         return os.path.join(self.save_path, self.name + '.bin')
     
     @property
+    def feat_path(self):
+        return os.path.join(self.save_path, self.name + '_feat.pkl')
+    
+    @property
     def info_path(self):
         return os.path.join(self.save_path, self.name + '.pkl')
+    
+    def _process_user_fea(self, user_data):
+        """
+        adopted from GCMC
+        Parameters
+        ----------
+        user_info : pd.DataFrame
+        name : str
+        For ml-100k and ml-1m, the column name is ['id', 'gender', 'age', 'occupation', 'zip_code'].
+            We take the age, gender, and the one-hot encoding of the occupation as the user features.
+        For ml-10m, there is no user feature and we set the feature to be a single zero.
+        Returns
+        -------
+        user_features : np.ndarray
+        """
+        if self._name == "ml-100k" or self._name == "ml-1m":
+            ages = user_data["age"].values.astype(np.float32)
+            gender = (user_data["gender"] == "F").values.astype(np.float32)
+            all_occupations = set(user_data["occupation"])
+            occupation_map = {ele: i for i, ele in enumerate(all_occupations)}
+            occupation_one_hot = np.zeros(
+                shape=(user_data.shape[0], len(all_occupations)),
+                dtype=np.float32,
+            )
+            occupation_one_hot[
+                np.arange(user_data.shape[0]),
+                np.array(
+                    [
+                        occupation_map[ele]
+                        for ele in user_data["occupation"]
+                    ]
+                ),
+            ] = 1
+            user_features = np.concatenate(
+                [
+                    ages.reshape((user_data.shape[0], 1)) / 50.0,
+                    gender.reshape((user_data.shape[0], 1)),
+                    occupation_one_hot,
+                ],
+                axis=1,
+            )
+        elif self._name == "ml-10m":
+            user_features = np.zeros(
+                shape=(user_data.shape[0], 1), dtype=np.float32
+            )
+        else:
+            raise NotImplementedError
+        return user_features
+    
+    def _process_movie_fea(self, movie_data):
+        """
+        adopted from GCMC
+        Parameters
+        ----------
+        movie_info : pd.DataFrame
+        name :  str
+        Returns
+        -------
+        movie_features : np.ndarray
+            Generate movie features by concatenating embedding and the year
+        """
+        import torchtext
+        from torchtext.data.utils import get_tokenizer
 
+        if self._name == "ml-100k":
+            GENRES = GENRES_ML_100K
+        elif self._name == "ml-1m":
+            GENRES = GENRES_ML_1M
+        elif self._name == "ml-10m":
+            GENRES = GENRES_ML_10M
+        else:
+            raise NotImplementedError
+
+        # Old torchtext-legacy API commented below
+        # TEXT = torchtext.legacy.data.Field(tokenize='spacy', tokenizer_language='en_core_web_sm')
+        tokenizer = get_tokenizer(
+            "spacy", language="en_core_web_sm"
+        )  # new API (torchtext 0.9+)
+        embedding = torchtext.vocab.GloVe(name="840B", dim=300)
+
+        title_embedding = np.zeros(
+            shape=(movie_data.shape[0], 300), dtype=np.float32
+        )
+        release_years = np.zeros(
+            shape=(movie_data.shape[0], 1), dtype=np.float32
+        )
+        p = re.compile(r"(.+)\s*\((\d+)\)")
+        for i, title in enumerate(movie_data["title"]):
+            match_res = p.match(title)
+            if match_res is None:
+                print(
+                    "title {} cannot be matched, index={}, name={}".format(
+                        title, i, self._name
+                    )
+                )
+                title_context, year = title, 1950
+            else:
+                title_context, year = match_res.groups()
+            # We use average of glove
+            # Upgraded torchtext API:  TEXT.tokenize(title_context) --> tokenizer(title_context)
+            title_embedding[i, :] = (
+                embedding.get_vecs_by_tokens(tokenizer(title_context))
+                .numpy()
+                .mean(axis=0)
+            )
+            release_years[i] = float(year)
+        movie_features = np.concatenate(
+            (
+                title_embedding,
+                (release_years - 1950.0) / 100.0,
+                movie_data[GENRES],
+            ),
+            axis=1,
+        )
+        return movie_features
+    
     def _load_raw_user_data(self):
         """In MovieLens, the user attributes file have the following formats:
 
@@ -217,5 +353,7 @@ class MovieLens(DGLDataset):
         return rating_pairs[0], rating_pairs[1], rating_values
 
 if __name__ == '__main__':
-    train_graph, test_graph = MovieLens(verbose=True)[0]
+    movielens = MovieLens(verbose=True, force_reload=True)
+    train_graph, test_graph = movielens[0]
+    info, feat = movielens.info, movielens.feat
     pass

@@ -16,14 +16,13 @@ class IGMCMovieLens(Dataset):
         self.max_nodes_per_hop = max_nodes_per_hop
 
         self.graph = self.movielens.train_graph if mode == 'train' else self.movielens.test_graph
+        self.rating_pairs = self.movielens.info['train_rating_pairs'] if mode == 'train' else self.movielens.info['test_rating_pairs']
 
     def __len__(self):
         return int(self.graph.num_edges() / 2)
 
     def __getitem__(self, idx):
-        num_links, edges = int(self.graph.num_edges() / 2), self.graph.edges()
-        src, dst = edges[0][:num_links], edges[1][:num_links]
-        u, v = src[idx], dst[idx]
+        u, v = self.rating_pairs[0][idx], self.rating_pairs[1][idx]
         g_label = self.graph.edata['etype'][idx]
 
         subgraph = igmc_subgraph_extraction_labeling(
@@ -48,7 +47,7 @@ def collate_movielens(data):
     return g, g_label
 
 if __name__ == '__main__':
-    movielens = MovieLens()
+    movielens = MovieLens(force_reload=True)
     data = IGMCMovieLens(movielens)
-    data[0]
+    g = data[0]
     pass
