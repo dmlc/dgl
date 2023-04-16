@@ -6,6 +6,10 @@ warnings.simplefilter('ignore', sp.SparseEfficiencyWarning)
 import numpy as np
 import torch as th
 
+'''
+Jiahang Li
+[] TODO: simplify the logic of igmc_subgraph_extraction_labeling with sample_neighbors() API
+'''
 def one_hot(idx, length):
     x = th.zeros([len(idx), length])
     x[th.arange(len(idx)), idx] = 1.0

@@ -18,9 +18,11 @@ Jiahang Li
 [x] TODO: follow dgl dataset flow for ml-100k
 [x] TODO: appropriately deal with train, test split of ml-100k
 [x] TODO: add side features, text embeddings follow GCMC
-[] TODO: support ml-1M, ml-10M datasets
+[x] TODO: support ml-1M, ml-10M datasets
+[] TODO: something wrong with etypes of ml-1M and ml-10M
+[] TODO: something wrong with user feats of ml-1M and ml-10M
 [] TODO: add other types of text embedding
-[] TODO: train and valid split of ml-100k
+[] TODO: train and valid split
 [] TODO: add an option to specify where word embeddings are stored
 
 '''
@@ -37,10 +39,22 @@ class MovieLens(DGLDataset):
     """MovieLens dataset used by GCMC model, ml-100k
     """
     _url = {
-        'ml-100k': 'http://files.grouplens.org/datasets/movielens/ml-100k.zip'
+        'ml-100k': 'http://files.grouplens.org/datasets/movielens/ml-100k.zip',
+        "ml-1m": "http://files.grouplens.org/datasets/movielens/ml-1m.zip",
+        "ml-10m": "http://files.grouplens.org/datasets/movielens/ml-10m.zip",
     } 
 
-    def __init__(self, name='ml-100k', raw_dir=None, force_reload=None, verbose=None, transform=None):
+    def __init__(self, name='ml-100k', valid_ratio=None, test_ratio=0.1, raw_dir=None, force_reload=None, verbose=None, transform=None):
+        self.test_ratio = test_ratio
+        if name == "ml-100k":
+            self.genres = GENRES_ML_100K
+        elif name == "ml-1m":
+            self.genres = GENRES_ML_1M
+        elif name == "ml-10m":
+            self.genres = GENRES_ML_10M
+        else:
+            raise NotImplementedError
+        
         super(MovieLens, self).__init__(name=name, url=self._url[name], raw_dir=raw_dir, force_reload=force_reload, verbose=verbose,
                                         transform=transform)
 
@@ -54,11 +68,25 @@ class MovieLens(DGLDataset):
 
     def process(self):
         print("Starting processing {} ...".format(self.name))
-        train_rating_data = self._load_raw_rates(os.path.join(self.raw_path, 'u1.base'), '\t')
-        test_rating_data = self._load_raw_rates(os.path.join(self.raw_path, 'u1.test'), '\t')
-        all_rating_data = pd.concat([train_rating_data, test_rating_data])
-
-        self._rating = np.sort(np.unique(all_rating_data["rating"].values))
+        # 1. dataset split: train + test
+        if self.name == 'ml-100k':
+            train_rating_data = self._load_raw_rates(os.path.join(self.raw_path, 'u1.base'), '\t')
+            test_rating_data = self._load_raw_rates(os.path.join(self.raw_path, 'u1.test'), '\t')
+            all_rating_data = pd.concat([train_rating_data, test_rating_data])
+        elif self.name == 'ml-1m' or self.name == 'ml-10m':
+            all_rating_data = self._load_raw_rates(
+                os.path.join(self.raw_path, "ratings.dat"), "::"
+            )
+            num_test = int(
+                np.ceil(all_rating_data.shape[0] * self.test_ratio)
+            )
+            shuffled_idx = np.random.permutation(all_rating_data.shape[0])
+            test_rating_data = all_rating_data.iloc[
+                shuffled_idx[:num_test]
+            ]
+            train_rating_data = all_rating_data.iloc[
+                shuffled_idx[num_test:]
+            ]
 
         # 2. load user and movie data, and drop those unseen in rating_data
         user_data = self._load_raw_user_data()
@@ -80,17 +108,15 @@ class MovieLens(DGLDataset):
         # Map user/movie to the global id
         self._global_user_id_map = {ele: i for i, ele in enumerate(user_data['id'])}
         self._global_movie_id_map = {ele: i for i, ele in enumerate(movie_data['id'])}
-    
-        self._num_user = len(self._global_user_id_map)
-        self._num_movie = len(self._global_movie_id_map)
 
         # pair value is idx rather than id, and rating value starts from 1.0
         train_u_indices, train_v_indices, train_labels = self._generate_pair_value(train_rating_data)
         test_u_indices, test_v_indices, test_labels = self._generate_pair_value(test_rating_data)
 
         # reindex u and v, v nodes start after u
-        train_v_indices += self._num_user
-        test_v_indices += self._num_user
+        num_user = len(self._global_user_id_map)
+        train_v_indices += num_user
+        test_v_indices += num_user
 
         self.train_rating_pairs = (th.LongTensor(train_u_indices), th.LongTensor(train_v_indices))
         self.test_rating_pairs = (th.LongTensor(test_u_indices), th.LongTensor(test_v_indices))
@@ -147,23 +173,29 @@ class MovieLens(DGLDataset):
         return 1
     
     @property
+    def raw_path(self):
+        if self.name == 'ml-10m':
+            return os.path.join(self.raw_dir, 'ml-10M100K')
+        return super().raw_path
+
+    @property
     def graph_path(self):
-        return os.path.join(self.save_path, self.name + '.bin')
+        return os.path.join(self.raw_path, self.name + '.bin')
     
     @property
     def feat_path(self):
-        return os.path.join(self.save_path, self.name + '_feat.pkl')
+        return os.path.join(self.raw_path, self.name + '_feat.pkl')
     
     @property
     def info_path(self):
-        return os.path.join(self.save_path, self.name + '.pkl')
+        return os.path.join(self.raw_path, self.name + '.pkl')
     
     def _process_user_fea(self, user_data):
         """
         adopted from GCMC
         Parameters
         ----------
-        user_info : pd.DataFrame
+        user_data : pd.DataFrame
         name : str
         For ml-100k and ml-1m, the column name is ['id', 'gender', 'age', 'occupation', 'zip_code'].
             We take the age, gender, and the one-hot encoding of the occupation as the user features.
@@ -172,7 +204,7 @@ class MovieLens(DGLDataset):
         -------
         user_features : np.ndarray
         """
-        if self._name == "ml-100k" or self._name == "ml-1m":
+        if self.name == "ml-100k" or self.name == "ml-1m":
             ages = user_data["age"].values.astype(np.float32)
             gender = (user_data["gender"] == "F").values.astype(np.float32)
             all_occupations = set(user_data["occupation"])
@@ -198,7 +230,7 @@ class MovieLens(DGLDataset):
                 ],
                 axis=1,
             )
-        elif self._name == "ml-10m":
+        elif self.name == "ml-10m":
             user_features = np.zeros(
                 shape=(user_data.shape[0], 1), dtype=np.float32
             )
@@ -211,7 +243,7 @@ class MovieLens(DGLDataset):
         adopted from GCMC
         Parameters
         ----------
-        movie_info : pd.DataFrame
+        movie_data : pd.DataFrame
         name :  str
         Returns
         -------
@@ -220,15 +252,6 @@ class MovieLens(DGLDataset):
         """
         import torchtext
         from torchtext.data.utils import get_tokenizer
-
-        if self._name == "ml-100k":
-            GENRES = GENRES_ML_100K
-        elif self._name == "ml-1m":
-            GENRES = GENRES_ML_1M
-        elif self._name == "ml-10m":
-            GENRES = GENRES_ML_10M
-        else:
-            raise NotImplementedError
 
         # Old torchtext-legacy API commented below
         # TEXT = torchtext.legacy.data.Field(tokenize='spacy', tokenizer_language='en_core_web_sm')
@@ -249,7 +272,7 @@ class MovieLens(DGLDataset):
             if match_res is None:
                 print(
                     "title {} cannot be matched, index={}, name={}".format(
-                        title, i, self._name
+                        title, i, self.name
                     )
                 )
                 title_context, year = title, 1950
@@ -267,7 +290,7 @@ class MovieLens(DGLDataset):
             (
                 title_embedding,
                 (release_years - 1950.0) / 100.0,
-                movie_data[GENRES],
+                movie_data[self.genres],
             ),
             axis=1,
         )
@@ -287,9 +310,42 @@ class MovieLens(DGLDataset):
         -------
         user_data : pd.DataFrame
         """
-        
-        user_data = pd.read_csv(os.path.join(self.raw_path, 'u.user'), sep='|', header=None,
-                                names=['id', 'age', 'gender', 'occupation', 'zip_code'], engine='python')
+        if self.name == "ml-100k":
+            user_data = pd.read_csv(
+                os.path.join(self.raw_path, "u.user"),
+                sep="|",
+                header=None,
+                names=["id", "age", "gender", "occupation", "zip_code"],
+                engine="python",
+            )
+        elif self.name == "ml-1m":
+            user_data = pd.read_csv(
+                os.path.join(self.raw_path, "users.dat"),
+                sep="::",
+                header=None,
+                names=["id", "gender", "age", "occupation", "zip_code"],
+                engine="python",
+            )
+        elif self.name == "ml-10m":
+            rating_info = pd.read_csv(
+                os.path.join(self.raw_path, "ratings.dat"),
+                sep="::",
+                header=None,
+                names=["user_id", "movie_id", "rating", "timestamp"],
+                dtype={
+                    "user_id": np.int32,
+                    "movie_id": np.int32,
+                    "ratings": np.float32,
+                    "timestamp": np.int64,
+                },
+                engine="python",
+            )
+            user_data = pd.DataFrame(
+                np.unique(rating_info["user_id"].values.astype(np.int32)),
+                columns=["id"],
+            )
+        else:
+            raise NotImplementedError
         return user_data
 
     def _load_raw_movie_data(self):
@@ -306,14 +362,50 @@ class MovieLens(DGLDataset):
         Returns
         -------
         movie_data : pd.DataFrame
-            For ml-100k, the column name is ['id', 'title', 'release_date', 'video_release_date', 'url'] + [GENRES (19)]]
-            For ml-1m, the column name is ['id', 'title'] + [GENRES (18/20)]]
+            For ml-100k, the column name is ['id', 'title', 'release_date', 'video_release_date', 'url'] + [self.genres (19)]]
+            For ml-1m, the column name is ['id', 'title'] + [self.genres (18/20)]]
         """
 
         file_path = os.path.join(self.raw_path, 'u.item')
-        movie_data = pd.read_csv(file_path, sep='|', header=None,
-                                        names=['id', 'title', 'release_date', 'video_release_date', 'url'] + GENRES_ML_100K,
-                                        engine='python', encoding="ISO-8859-1")
+        if self.name == 'ml-100k':
+            movie_data = pd.read_csv(file_path, sep='|', header=None,
+                                            names=['id', 'title', 'release_date', 'video_release_date', 'url'] + GENRES_ML_100K,
+                                            engine='python', encoding="ISO-8859-1")
+        elif self.name == "ml-1m" or self.name == "ml-10m":
+            file_path = os.path.join(self.raw_path, "movies.dat")
+            movie_data = pd.read_csv(
+                file_path,
+                sep="::",
+                header=None,
+                names=["id", "title", "genres"],
+                encoding="iso-8859-1",
+                engine='python'
+            )
+            genre_map = {ele: i for i, ele in enumerate(self.genres)}
+            genre_map["Children's"] = genre_map["Children"]
+            genre_map["Childrens"] = genre_map["Children"]
+            movie_genres = np.zeros(
+                shape=(movie_data.shape[0], len(self.genres)), dtype=np.float32
+            )
+            for i, genres in enumerate(movie_data["genres"]):
+                for ele in genres.split("|"):
+                    if ele in genre_map:
+                        movie_genres[i, genre_map[ele]] = 1.0
+                    else:
+                        print(
+                            "genres not found, filled with unknown: {}".format(
+                                genres
+                            )
+                        )
+                        movie_genres[i, genre_map["unknown"]] = 1.0
+            for idx, genre_name in enumerate(self.genres):
+                assert idx == genre_map[genre_name]
+                movie_data[genre_name] = movie_genres[:, idx]
+            movie_data= movie_data.drop(columns=["genres"])
+        else:
+            raise NotImplementedError
+
+            
         return movie_data
 
     def _load_raw_rates(self, file_path, sep):
@@ -353,7 +445,7 @@ class MovieLens(DGLDataset):
         return rating_pairs[0], rating_pairs[1], rating_values
 
 if __name__ == '__main__':
-    movielens = MovieLens(verbose=True, force_reload=True)
+    movielens = MovieLens(name='ml-10m', verbose=True, force_reload=True)
     train_graph, test_graph = movielens[0]
     info, feat = movielens.info, movielens.feat
     pass

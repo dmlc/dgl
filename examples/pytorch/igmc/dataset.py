@@ -47,7 +47,7 @@ def collate_movielens(data):
     return g, g_label
 
 if __name__ == '__main__':
-    movielens = MovieLens(force_reload=True)
+    movielens = MovieLens(name='ml-10m')
     data = IGMCMovieLens(movielens)
     g = data[0]
     pass
