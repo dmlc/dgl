@@ -168,3 +168,5 @@ config.cmake
 
 # model file
 *.pth
+
+.vector_cache/
