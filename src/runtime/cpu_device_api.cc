@@ -26,8 +26,9 @@ class CPUDeviceAPI final : public DeviceAPI {
   void* AllocDataSpace(
       DGLContext ctx, size_t nbytes, size_t alignment,
       DGLDataType type_hint) final {
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable()) return td->CPUAllocWorkspace(nbytes);
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable())
+      return tensor_dispatcher->CPUAllocWorkspace(nbytes);
 
     void* ptr;
 #if _MSC_VER || defined(__MINGW32__)
@@ -44,8 +45,9 @@ class CPUDeviceAPI final : public DeviceAPI {
   }
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable()) return td->CPUFreeWorkspace(ptr);
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable())
+      return tensor_dispatcher->CPUFreeWorkspace(ptr);
 
 #if _MSC_VER || defined(__MINGW32__)
     _aligned_free(ptr);
@@ -61,6 +63,13 @@ class CPUDeviceAPI final : public DeviceAPI {
     memcpy(
         static_cast<char*>(to) + to_offset,
         static_cast<const char*>(from) + from_offset, size);
+  }
+
+  void RecordedCopyDataFromTo(
+      void* from, size_t from_offset, void* to, size_t to_offset, size_t size,
+      DGLContext ctx_from, DGLContext ctx_to, DGLDataType type_hint,
+      void* pytorch_ctx) final {
+    BUG_IF_FAIL(false) << "This piece of code should not be reached.";
   }
 
   DGLStreamHandle CreateStream(DGLContext) final { return nullptr; }
@@ -84,16 +93,20 @@ struct CPUWorkspacePool : public WorkspacePool {
 
 void* CPUDeviceAPI::AllocWorkspace(
     DGLContext ctx, size_t size, DGLDataType type_hint) {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable()) return td->CPUAllocWorkspace(size);
+  TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+  if (tensor_dispatcher->IsAvailable()) {
+    return tensor_dispatcher->CPUAllocWorkspace(size);
+  }
 
   return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->AllocWorkspace(
       ctx, size);
 }
 
 void CPUDeviceAPI::FreeWorkspace(DGLContext ctx, void* data) {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable()) return td->CPUFreeWorkspace(data);
+  TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+  if (tensor_dispatcher->IsAvailable()) {
+    return tensor_dispatcher->CPUFreeWorkspace(data);
+  }
 
   dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(ctx, data);
 }

@@ -108,7 +108,7 @@ def main(args):
         model.train()
         for step, batch in enumerate(train_loader):
             g = batch.graph.to(device)
-            n = g.number_of_nodes()
+            n = g.num_nodes()
             h = th.zeros((n, args.h_size)).to(device)
             c = th.zeros((n, args.h_size)).to(device)
             if step >= 3:
@@ -129,9 +129,7 @@ def main(args):
                 pred = th.argmax(logits, 1)
                 acc = th.sum(th.eq(batch.label, pred))
                 root_ids = [
-                    i
-                    for i in range(g.number_of_nodes())
-                    if g.out_degrees(i) == 0
+                    i for i in range(g.num_nodes()) if g.out_degrees(i) == 0
                 ]
                 root_acc = np.sum(
                     batch.label.cpu().data.numpy()[root_ids]
@@ -160,7 +158,7 @@ def main(args):
         model.eval()
         for step, batch in enumerate(dev_loader):
             g = batch.graph.to(device)
-            n = g.number_of_nodes()
+            n = g.num_nodes()
             with th.no_grad():
                 h = th.zeros((n, args.h_size)).to(device)
                 c = th.zeros((n, args.h_size)).to(device)
@@ -170,7 +168,7 @@ def main(args):
             acc = th.sum(th.eq(batch.label, pred)).item()
             accs.append([acc, len(batch.label)])
             root_ids = [
-                i for i in range(g.number_of_nodes()) if g.out_degrees(i) == 0
+                i for i in range(g.num_nodes()) if g.out_degrees(i) == 0
             ]
             root_acc = np.sum(
                 batch.label.cpu().data.numpy()[root_ids]
@@ -212,7 +210,7 @@ def main(args):
     model.eval()
     for step, batch in enumerate(test_loader):
         g = batch.graph.to(device)
-        n = g.number_of_nodes()
+        n = g.num_nodes()
         with th.no_grad():
             h = th.zeros((n, args.h_size)).to(device)
             c = th.zeros((n, args.h_size)).to(device)
@@ -221,9 +219,7 @@ def main(args):
         pred = th.argmax(logits, 1)
         acc = th.sum(th.eq(batch.label, pred)).item()
         accs.append([acc, len(batch.label)])
-        root_ids = [
-            i for i in range(g.number_of_nodes()) if g.out_degrees(i) == 0
-        ]
+        root_ids = [i for i in range(g.num_nodes()) if g.out_degrees(i) == 0]
         root_acc = np.sum(
             batch.label.cpu().data.numpy()[root_ids]
             == pred.cpu().data.numpy()[root_ids]

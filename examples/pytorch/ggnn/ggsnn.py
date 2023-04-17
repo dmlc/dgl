@@ -48,7 +48,7 @@ class GGSNN(nn.Module):
 
         assert annotation.size()[-1] == self.annotation_size
 
-        node_num = graph.number_of_nodes()
+        node_num = graph.num_nodes()
 
         all_logits = []
         for _ in range(self.max_seq_length):
