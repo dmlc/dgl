@@ -210,16 +210,18 @@ class PGExplainer(nn.Module):
         func_extract_feat : func
             A function that extracts the node embeddings for each individual graphs.
         """
+        graph, _ = dataset[0]
+        self.model = self.model.to(graph.device)
+        self.elayers = self.elayers.to(graph.device)
+
         optimizer = Adam(self.elayers.parameters(), lr=self.learning_rate)
 
         ori_pred_dict = {}
 
+        self.model.eval()
         with torch.no_grad():
             for idx, (g, _) in enumerate(dataset):
-                self.model = self.model.to(g.device)
                 feat = func_extract_feat(g)
-
-                self.model.eval()
 
                 logits = self.model(g, feat)
                 ori_pred_dict[idx] = logits.argmax(-1).data
@@ -234,7 +236,6 @@ class PGExplainer(nn.Module):
                 * np.power(self.final_tmp / self.init_tmp, epoch / self.epochs)
             )
 
-            self.elayers = self.elayers.to(self.model.device)
             self.elayers.train()
             optimizer.zero_grad()
 
