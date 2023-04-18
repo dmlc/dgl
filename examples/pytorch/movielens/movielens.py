@@ -99,14 +99,13 @@ class MovieLens(DGLDataset):
     test_graph: dgl.DGLGraph
         Testing graph
     info: dict
-        Storing training, validation and testing rating pairs.
+        Store training, validation and testing rating pairs.
     feat: dict
-        Storing input features of users and movies
+        Store input features of users and movies
 
     Notes
     -----
-    - The number of edges are doubled to form an undirected(bidirected) graph structure.
-    - When the param :obj:`test_ratio` is invalid, it should be left unchanged with the default value or given a value within (0.0, 1.0)
+    - The number of edges is doubled to form an undirected(bidirected) graph structure.
 
     Examples
     --------
