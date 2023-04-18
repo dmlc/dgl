@@ -23,7 +23,7 @@ Jiahang Li
 [x] TODO: something wrong with user feats ml-10M
 [x] TODO: train and valid split
 [x] TODO: add an option to specify where word embeddings are stored
-[] TODO: finish the document
+[x] TODO: finish the document
 
 '''
 
@@ -70,9 +70,9 @@ class MovieLens(DGLDataset):
     valid_ratio: int
         Ratio of validation samples out of the training dataset. Should be in (0.0, 1.0).
     test_ratio: int
-        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0). This parameter is valid
-        only when :obj:`name` is not :obj:`"ml-100k"`.
-        Default: 0.1
+        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0). This parameter is invalid
+        when :obj:`name` is :obj:`"ml-100k"`.
+        Default: None
     text_cache: str
         Raw file directory to store the pre-trained word embeddings that used to preprocess movie titles.
         Default: ~/.dgl/movielens_vector_cache/
@@ -92,29 +92,40 @@ class MovieLens(DGLDataset):
 
     Attributes
     ----------
-    
+    train_graph: dgl.DGLGraph
+        Training graph
+    valid_graph: dgl.DGLGraph
+        Validation graph
+    test_graph: dgl.DGLGraph
+        Testing graph
+    info: dict
+        Storing training, validation and testing rating pairs.
+    feat: dict
+        Storing input features of users and movies
 
     Notes
     -----
     - The number of edges are doubled to form an undirected(bidirected) graph structure.
-    - When the param :obj:`test_ratio` is invalid, it can be left unchanged with the default value. 
+    - When the param :obj:`test_ratio` is invalid, it should be left unchanged with the default value or given a value within (0.0, 1.0)
 
     Examples
     --------
-    >>> dataset = CoraGraphDataset()
-    >>> g = dataset[0]
-    >>> num_class = dataset.num_classes
+    >>> dataset = MovieLens()
+    >>> train_g, valid_g, test_g = dataset[0]
     >>>
-    >>> # get node feature
-    >>> feat = g.ndata['feat']
+    >>> # get ratings of edges in the training graph
+    >>> ratings = train_g.edata['etype']
     >>>
-    >>> # get data split
-    >>> train_mask = g.ndata['train_mask']
-    >>> val_mask = g.ndata['val_mask']
-    >>> test_mask = g.ndata['test_mask']
+    >>> # get training, validation and testing rating pairs
+    >>> train_rating, valid_rating, test_rating = \
+    >>>    dataset.info['train_rating_pairs'], dataset.info['valid_rating_pairs'], dataset.info['test_rating_pairs']
     >>>
-    >>> # get labels
-    >>> label = g.ndata['label']
+    >>> train_rating[0] # node index of users in training rating pairs
+    >>> train_rating[1] # node index of movies in training rating pairs
+    >>>
+    >>> # get input features of users and movies respectively
+    >>> user_feat, movie_feat = \
+    >>>     dataset.feat['user_feat'], dataset.feat['movie_feat']
 
     """
 
@@ -124,7 +135,7 @@ class MovieLens(DGLDataset):
         "ml-10m": "http://files.grouplens.org/datasets/movielens/ml-10m.zip",
     } 
 
-    def __init__(self, name, valid_ratio, test_ratio=0.1, text_cache=None, 
+    def __init__(self, name, valid_ratio, test_ratio=None, text_cache=None, 
                  raw_dir=None, force_reload=None, verbose=None, transform=None):
 
         assert name in ['ml-100k', 'ml-1m', 'ml-10m'], f"currently movielens does not support {name}"
