@@ -1,39 +1,49 @@
 """MovieLens dataset"""
 
 import os
+import re
+import zipfile
+
 import numpy as np
 import pandas as pd
 import torch as th
-
-import dgl 
-import zipfile
-import re
-
-from dgl.data.utils import download, save_info, load_info, save_graphs, load_graphs
-from dgl.data import DGLDataset
 from sklearn.model_selection import train_test_split
 
-'''
-Jiahang Li
-[x] TODO: follow dgl dataset flow for ml-100k
-[x] TODO: appropriately deal with train, test split of ml-100k
-[x] TODO: add side features, text embeddings follow GCMC
-[x] TODO: support ml-1M, ml-10M datasets
-[x] TODO: something wrong with etypes of ml-10M
-[x] TODO: something wrong with user feats ml-10M
-[x] TODO: train and valid split
-[x] TODO: add an option to specify where word embeddings are stored
-[x] TODO: finish the document
+import dgl
+from dgl.data import DGLDataset
 
-'''
+from dgl.data.utils import (
+    download,
+    load_graphs,
+    load_info,
+    save_graphs,
+    save_info,
+)
 
-GENRES_ML_100K =\
-    ['unknown', 'Action', 'Adventure', 'Animation',
-     'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy',
-     'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi',
-     'Thriller', 'War', 'Western']
+GENRES_ML_100K = [
+    "unknown",
+    "Action",
+    "Adventure",
+    "Animation",
+    "Children",
+    "Comedy",
+    "Crime",
+    "Documentary",
+    "Drama",
+    "Fantasy",
+    "Film-Noir",
+    "Horror",
+    "Musical",
+    "Mystery",
+    "Romance",
+    "Sci-Fi",
+    "Thriller",
+    "War",
+    "Western",
+]
 GENRES_ML_1M = GENRES_ML_100K[1:]
 GENRES_ML_10M = GENRES_ML_100K + ["IMAX"]
+
 
 class MovieLensDataset(DGLDataset):
     r"""MovieLens dataset.
@@ -132,23 +142,38 @@ class MovieLensDataset(DGLDataset):
     """
 
     _url = {
-        'ml-100k': 'http://files.grouplens.org/datasets/movielens/ml-100k.zip',
+        "ml-100k": "http://files.grouplens.org/datasets/movielens/ml-100k.zip",
         "ml-1m": "http://files.grouplens.org/datasets/movielens/ml-1m.zip",
         "ml-10m": "http://files.grouplens.org/datasets/movielens/ml-10m.zip",
-    } 
+    }
 
-    def __init__(self, name, valid_ratio, test_ratio=None, text_cache=None, 
-                 raw_dir=None, force_reload=None, verbose=None, transform=None):
+    def __init__(
+        self,
+        name,
+        valid_ratio,
+        test_ratio=None,
+        text_cache=None,
+        raw_dir=None,
+        force_reload=None,
+        verbose=None,
+        transform=None,
+    ):
 
-        assert name in ['ml-100k', 'ml-1m', 'ml-10m'], f"currently movielens does not support {name}"
+        assert name in [
+            "ml-100k",
+            "ml-1m",
+            "ml-10m",
+        ], f"currently movielens does not support {name}"
 
         self.valid_ratio = valid_ratio
         self.test_ratio = test_ratio
         if text_cache is None:
-            self.text_cache = os.path.join(os.path.expanduser("~"), ".dgl", "movielens_vector_cache")
+            self.text_cache = os.path.join(
+                os.path.expanduser("~"), ".dgl", "movielens_vector_cache"
+            )
         else:
             self.text_cache = text_cache
-        
+
         if name == "ml-100k":
             self.genres = GENRES_ML_100K
         elif name == "ml-1m":
@@ -157,9 +182,15 @@ class MovieLensDataset(DGLDataset):
             self.genres = GENRES_ML_10M
         else:
             raise NotImplementedError
-        
-        super(MovieLensDataset, self).__init__(name=name, url=self._url[name], raw_dir=raw_dir, force_reload=force_reload, verbose=verbose,
-                                        transform=transform)
+
+        super(MovieLensDataset, self).__init__(
+            name=name,
+            url=self._url[name],
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
 
     def download(self):
         if self.url is not None:
@@ -173,48 +204,74 @@ class MovieLensDataset(DGLDataset):
         print("Starting processing {} ...".format(self.name))
 
         # 1. dataset split: train + (valid + ) test
-        if self.name == 'ml-100k':
-            train_rating_data = self._load_raw_rates(os.path.join(self.raw_path, 'u1.base'), '\t')
-            test_rating_data = self._load_raw_rates(os.path.join(self.raw_path, 'u1.test'), '\t')
+        if self.name == "ml-100k":
+            train_rating_data = self._load_raw_rates(
+                os.path.join(self.raw_path, "u1.base"), "\t"
+            )
+            test_rating_data = self._load_raw_rates(
+                os.path.join(self.raw_path, "u1.test"), "\t"
+            )
 
-            train_rating_data, valid_rating_data = \
-                train_test_split(train_rating_data, test_size=self.valid_ratio)
-            all_rating_data = pd.concat([train_rating_data, valid_rating_data, test_rating_data])
+            train_rating_data, valid_rating_data = train_test_split(
+                train_rating_data, test_size=self.valid_ratio
+            )
+            all_rating_data = pd.concat(
+                [train_rating_data, valid_rating_data, test_rating_data]
+            )
 
-        elif self.name == 'ml-1m' or self.name == 'ml-10m':
+        elif self.name == "ml-1m" or self.name == "ml-10m":
             all_rating_data = self._load_raw_rates(
                 os.path.join(self.raw_path, "ratings.dat"), "::"
             )
-            train_rating_data, test_rating_data = \
-                train_test_split(all_rating_data, test_size=self.test_ratio)
-            train_rating_data, valid_rating_data = \
-                train_test_split(train_rating_data, test_size=self.valid_ratio)
+            train_rating_data, test_rating_data = train_test_split(
+                all_rating_data, test_size=self.test_ratio
+            )
+            train_rating_data, valid_rating_data = train_test_split(
+                train_rating_data, test_size=self.valid_ratio
+            )
 
         # 2. load user and movie data, and drop those unseen in rating_data
         user_data = self._load_raw_user_data()
         movie_data = self._load_raw_movie_data()
-        user_data = self._drop_unseen_nodes(data_df=user_data,
-                                            col_name="id",
-                                            reserved_ids_set=set(all_rating_data["user_id"].values))
-        movie_data = self._drop_unseen_nodes(data_df=movie_data,
-                                            col_name="id",
-                                            reserved_ids_set=set(all_rating_data["movie_id"].values))
+        user_data = self._drop_unseen_nodes(
+            data_df=user_data,
+            col_name="id",
+            reserved_ids_set=set(all_rating_data["user_id"].values),
+        )
+        movie_data = self._drop_unseen_nodes(
+            data_df=movie_data,
+            col_name="id",
+            reserved_ids_set=set(all_rating_data["movie_id"].values),
+        )
 
-        user_feat, movie_feat = th.tensor(self._process_user_fea(user_data)), th.tensor(self._process_movie_fea(movie_data))
-        self.feat = {
-            "user_feat": user_feat,
-            "movie_feat": movie_feat
-        }
+        user_feat, movie_feat = th.tensor(
+            self._process_user_fea(user_data)
+        ), th.tensor(self._process_movie_fea(movie_data))
+        self.feat = {"user_feat": user_feat, "movie_feat": movie_feat}
 
         # 3. generate rating pairs
         # Map user/movie to the global id
-        self._global_user_id_map = {ele: i for i, ele in enumerate(user_data['id'])}
-        self._global_movie_id_map = {ele: i for i, ele in enumerate(movie_data['id'])}
+        self._global_user_id_map = {
+            ele: i for i, ele in enumerate(user_data["id"])
+        }
+        self._global_movie_id_map = {
+            ele: i for i, ele in enumerate(movie_data["id"])
+        }
 
         # pair value is idx rather than id
-        train_u_indices, train_v_indices, train_labels = self._generate_pair_value(train_rating_data)
-        valid_u_indices, valid_v_indices, valid_labels = self._generate_pair_value(valid_rating_data)
-        test_u_indices, test_v_indices, test_labels = self._generate_pair_value(test_rating_data)
+        (
+            train_u_indices,
+            train_v_indices,
+            train_labels,
+        ) = self._generate_pair_value(train_rating_data)
+        (
+            valid_u_indices,
+            valid_v_indices,
+            valid_labels,
+        ) = self._generate_pair_value(valid_rating_data)
+        test_u_indices, test_v_indices, test_labels = self._generate_pair_value(
+            test_rating_data
+        )
 
         # reindex u and v, v nodes start after u
         num_user = len(self._global_user_id_map)
@@ -222,29 +279,50 @@ class MovieLensDataset(DGLDataset):
         valid_v_indices += num_user
         test_v_indices += num_user
 
-        self.train_rating_pairs = (th.LongTensor(train_u_indices), th.LongTensor(train_v_indices))
-        self.valid_rating_pairs = (th.LongTensor(valid_u_indices), th.LongTensor(valid_v_indices))
-        self.test_rating_pairs = (th.LongTensor(test_u_indices), th.LongTensor(test_v_indices))
+        self.train_rating_pairs = (
+            th.LongTensor(train_u_indices),
+            th.LongTensor(train_v_indices),
+        )
+        self.valid_rating_pairs = (
+            th.LongTensor(valid_u_indices),
+            th.LongTensor(valid_v_indices),
+        )
+        self.test_rating_pairs = (
+            th.LongTensor(test_u_indices),
+            th.LongTensor(test_v_indices),
+        )
         self.train_rating_values = th.FloatTensor(train_labels)
         self.valid_rating_values = th.FloatTensor(valid_labels)
         self.test_rating_values = th.FloatTensor(test_labels)
         self.info = {
             "train_rating_pairs": self.train_rating_pairs,
             "valid_rating_pairs": self.valid_rating_pairs,
-            "test_rating_pairs": self.test_rating_pairs
+            "test_rating_pairs": self.test_rating_pairs,
         }
 
         # build dgl graph object, which is homogeneous and bidirectional and contains only training edges
-        self.train_graph = dgl.graph((self.train_rating_pairs[0], self.train_rating_pairs[1]))
-        self.valid_graph = dgl.graph((self.valid_rating_pairs[0], self.valid_rating_pairs[1]))
-        self.test_graph = dgl.graph((self.test_rating_pairs[0], self.test_rating_pairs[1]))
-        self.train_graph.edata['etype'] = self.train_rating_values
-        self.valid_graph.edata['etype'] = self.valid_rating_values
-        self.test_graph.edata['etype'] = self.test_rating_values
+        self.train_graph = dgl.graph(
+            (self.train_rating_pairs[0], self.train_rating_pairs[1])
+        )
+        self.valid_graph = dgl.graph(
+            (self.valid_rating_pairs[0], self.valid_rating_pairs[1])
+        )
+        self.test_graph = dgl.graph(
+            (self.test_rating_pairs[0], self.test_rating_pairs[1])
+        )
+        self.train_graph.edata["etype"] = self.train_rating_values
+        self.valid_graph.edata["etype"] = self.valid_rating_values
+        self.test_graph.edata["etype"] = self.test_rating_values
 
-        self.train_graph = dgl.add_reverse_edges(self.train_graph, copy_edata=True)
-        self.valid_graph = dgl.add_reverse_edges(self.valid_graph, copy_edata=True)
-        self.test_graph = dgl.add_reverse_edges(self.test_graph, copy_edata=True)
+        self.train_graph = dgl.add_reverse_edges(
+            self.train_graph, copy_edata=True
+        )
+        self.valid_graph = dgl.add_reverse_edges(
+            self.valid_graph, copy_edata=True
+        )
+        self.test_graph = dgl.add_reverse_edges(
+            self.test_graph, copy_edata=True
+        )
 
     def has_cache(self):
         if os.path.exists(self.graph_path):
@@ -252,55 +330,89 @@ class MovieLensDataset(DGLDataset):
         return False
 
     def save(self):
-        save_graphs(self.graph_path, [self.train_graph, self.valid_graph, self.test_graph])
+        save_graphs(
+            self.graph_path,
+            [self.train_graph, self.valid_graph, self.test_graph],
+        )
         save_info(self.info_path, self.info)
         save_info(self.feat_path, self.feat)
         if self.verbose:
-            print(f'Done saving data into {self.graph_path}.')
+            print(f"Done saving data into {self.graph_path}.")
 
     def load(self):
         g_list, _ = load_graphs(self.graph_path)
         self.info = load_info(self.info_path)
         self.feat = load_info(self.feat_path)
-        self.train_graph, self.valid_graph, self.test_graph = g_list[0], g_list[1], g_list[2]
+        self.train_graph, self.valid_graph, self.test_graph = (
+            g_list[0],
+            g_list[1],
+            g_list[2],
+        )
         if self.verbose:
-            print(f'Done loading data from {self.graph_path}.')
+            print(f"Done loading data from {self.graph_path}.")
 
-            print("All rating pairs : {}".format(
-                int((self.train_graph.num_edges() + self.valid_graph.num_edges() + self.test_graph.num_edges()) / 2))
+            print(
+                "All rating pairs : {}".format(
+                    int(
+                        (
+                            self.train_graph.num_edges()
+                            + self.valid_graph.num_edges()
+                            + self.test_graph.num_edges()
+                        )
+                        / 2
+                    )
+                )
             )
-            print("\tTrain rating pairs : {}".format(int(self.train_graph.num_edges() / 2)))
-            print("\tValid rating pairs : {}".format(int(self.valid_graph.num_edges() / 2)))
-            print("\tTest rating pairs  : {}".format(int(self.test_graph.num_edges() / 2)))
-    
+            print(
+                "\tTrain rating pairs : {}".format(
+                    int(self.train_graph.num_edges() / 2)
+                )
+            )
+            print(
+                "\tValid rating pairs : {}".format(
+                    int(self.valid_graph.num_edges() / 2)
+                )
+            )
+            print(
+                "\tTest rating pairs  : {}".format(
+                    int(self.test_graph.num_edges() / 2)
+                )
+            )
+
     def __getitem__(self, idx):
-        assert idx == 0, "This dataset has only one set of training, validation and testing graph"
+        assert (
+            idx == 0
+        ), "This dataset has only one set of training, validation and testing graph"
         if self._transform is None:
             return self.train_graph, self.valid_graph, self.test_graph
         else:
-            return self._transform(self.train_graph), self._transform(self.valid_graph), self._transform(self.test_graph)
-        
+            return (
+                self._transform(self.train_graph),
+                self._transform(self.valid_graph),
+                self._transform(self.test_graph),
+            )
+
     def __len__(self):
         return 1
-    
+
     @property
     def raw_path(self):
-        if self.name == 'ml-10m':
-            return os.path.join(self.raw_dir, 'ml-10M100K')
+        if self.name == "ml-10m":
+            return os.path.join(self.raw_dir, "ml-10M100K")
         return super().raw_path
 
     @property
     def graph_path(self):
-        return os.path.join(self.raw_path, self.name + '.bin')
-    
+        return os.path.join(self.raw_path, self.name + ".bin")
+
     @property
     def feat_path(self):
-        return os.path.join(self.raw_path, self.name + '_feat.pkl')
-    
+        return os.path.join(self.raw_path, self.name + "_feat.pkl")
+
     @property
     def info_path(self):
-        return os.path.join(self.raw_path, self.name + '.pkl')
-    
+        return os.path.join(self.raw_path, self.name + ".pkl")
+
     def _process_user_fea(self, user_data):
         """
         adopted from GCMC
@@ -327,10 +439,7 @@ class MovieLensDataset(DGLDataset):
             occupation_one_hot[
                 np.arange(user_data.shape[0]),
                 np.array(
-                    [
-                        occupation_map[ele]
-                        for ele in user_data["occupation"]
-                    ]
+                    [occupation_map[ele] for ele in user_data["occupation"]]
                 ),
             ] = 1
             user_features = np.concatenate(
@@ -348,7 +457,7 @@ class MovieLensDataset(DGLDataset):
         else:
             raise NotImplementedError
         return user_features
-    
+
     def _process_movie_fea(self, movie_data):
         """
         adopted from GCMC
@@ -369,7 +478,9 @@ class MovieLensDataset(DGLDataset):
         tokenizer = get_tokenizer(
             "spacy", language="en_core_web_sm"
         )  # new API (torchtext 0.9+)
-        embedding = torchtext.vocab.GloVe(name="840B", dim=300, cache=self.text_cache)
+        embedding = torchtext.vocab.GloVe(
+            name="840B", dim=300, cache=self.text_cache
+        )
 
         title_embedding = np.zeros(
             shape=(movie_data.shape[0], 300), dtype=np.float32
@@ -406,7 +517,7 @@ class MovieLensDataset(DGLDataset):
             axis=1,
         )
         return movie_features
-    
+
     def _load_raw_user_data(self):
         """In MovieLens, the user attributes file have the following formats:
 
@@ -477,11 +588,23 @@ class MovieLensDataset(DGLDataset):
             For ml-1m, the column name is ['id', 'title'] + [self.genres (18/20)]]
         """
 
-        file_path = os.path.join(self.raw_path, 'u.item')
-        if self.name == 'ml-100k':
-            movie_data = pd.read_csv(file_path, sep='|', header=None,
-                                            names=['id', 'title', 'release_date', 'video_release_date', 'url'] + GENRES_ML_100K,
-                                            engine='python', encoding="ISO-8859-1")
+        file_path = os.path.join(self.raw_path, "u.item")
+        if self.name == "ml-100k":
+            movie_data = pd.read_csv(
+                file_path,
+                sep="|",
+                header=None,
+                names=[
+                    "id",
+                    "title",
+                    "release_date",
+                    "video_release_date",
+                    "url",
+                ]
+                + GENRES_ML_100K,
+                engine="python",
+                encoding="ISO-8859-1",
+            )
         elif self.name == "ml-1m" or self.name == "ml-10m":
             file_path = os.path.join(self.raw_path, "movies.dat")
             movie_data = pd.read_csv(
@@ -490,7 +613,7 @@ class MovieLensDataset(DGLDataset):
                 header=None,
                 names=["id", "title", "genres"],
                 encoding="iso-8859-1",
-                engine='python'
+                engine="python",
             )
             genre_map = {ele: i for i, ele in enumerate(self.genres)}
             genre_map["Children's"] = genre_map["Children"]
@@ -512,11 +635,10 @@ class MovieLensDataset(DGLDataset):
             for idx, genre_name in enumerate(self.genres):
                 assert idx == genre_map[genre_name]
                 movie_data[genre_name] = movie_genres[:, idx]
-            movie_data= movie_data.drop(columns=["genres"])
+            movie_data = movie_data.drop(columns=["genres"])
         else:
             raise NotImplementedError
 
-            
         return movie_data
 
     def _load_raw_rates(self, file_path, sep):
@@ -534,10 +656,18 @@ class MovieLensDataset(DGLDataset):
         rating_data : pd.DataFrame
         """
         rating_data = pd.read_csv(
-            file_path, sep=sep, header=None,
-            names=['user_id', 'movie_id', 'rating', 'timestamp'],
-            dtype={'user_id': np.int32, 'movie_id' : np.int32,
-                   'ratings': np.float32, 'timestamp': np.int64}, engine='python')
+            file_path,
+            sep=sep,
+            header=None,
+            names=["user_id", "movie_id", "rating", "timestamp"],
+            dtype={
+                "user_id": np.int32,
+                "movie_id": np.int32,
+                "ratings": np.float32,
+                "timestamp": np.int64,
+            },
+            engine="python",
+        )
         rating_data = rating_data.sample(frac=1).reset_index(drop=True)
         return rating_data
 
@@ -547,10 +677,21 @@ class MovieLensDataset(DGLDataset):
         return data_df
 
     def _generate_pair_value(self, rating_data):
-        rating_pairs = (np.array([self._global_user_id_map[ele] for ele in rating_data["user_id"]],
-                                 dtype=np.int32),
-                        np.array([self._global_movie_id_map[ele] for ele in rating_data["movie_id"]],
-                                 dtype=np.int32))
+        rating_pairs = (
+            np.array(
+                [
+                    self._global_user_id_map[ele]
+                    for ele in rating_data["user_id"]
+                ],
+                dtype=np.int32,
+            ),
+            np.array(
+                [
+                    self._global_movie_id_map[ele]
+                    for ele in rating_data["movie_id"]
+                ],
+                dtype=np.int32,
+            ),
+        )
         rating_values = rating_data["rating"].values.astype(np.float32)
         return rating_pairs[0], rating_pairs[1], rating_values
-    
