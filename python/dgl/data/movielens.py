@@ -414,19 +414,6 @@ class MovieLensDataset(DGLDataset):
         return os.path.join(self.raw_path, self.name + ".pkl")
 
     def _process_user_fea(self, user_data):
-        """
-        adopted from GCMC
-        Parameters
-        ----------
-        user_data : pd.DataFrame
-        name : str
-        For ml-100k and ml-1m, the column name is ['id', 'gender', 'age', 'occupation', 'zip_code'].
-            We take the age, gender, and the one-hot encoding of the occupation as the user features.
-        For ml-10m, there is no user feature and we set the feature to be a single zero.
-        Returns
-        -------
-        user_features : np.ndarray
-        """
         if self.name == "ml-100k" or self.name == "ml-1m":
             ages = user_data["age"].values.astype(np.float32)
             gender = (user_data["gender"] == "F").values.astype(np.float32)
@@ -459,17 +446,6 @@ class MovieLensDataset(DGLDataset):
         return user_features
 
     def _process_movie_fea(self, movie_data):
-        """
-        adopted from GCMC
-        Parameters
-        ----------
-        movie_data : pd.DataFrame
-        name :  str
-        Returns
-        -------
-        movie_features : np.ndarray
-            Generate movie features by concatenating embedding and the year
-        """
         import torchtext
         from torchtext.data.utils import get_tokenizer
 
@@ -519,19 +495,6 @@ class MovieLensDataset(DGLDataset):
         return movie_features
 
     def _load_raw_user_data(self):
-        """In MovieLens, the user attributes file have the following formats:
-
-        ml-100k:
-        user id | age | gender | occupation | zip code
-
-        Parameters
-        ----------
-        name : str
-
-        Returns
-        -------
-        user_data : pd.DataFrame
-        """
         if self.name == "ml-100k":
             user_data = pd.read_csv(
                 os.path.join(self.raw_path, "u.user"),
@@ -571,23 +534,6 @@ class MovieLensDataset(DGLDataset):
         return user_data
 
     def _load_raw_movie_data(self):
-        """In MovieLens, the movie attributes may have the following formats:
-
-        In ml-100k:
-
-        movie id | movie title | release date | video release date | IMDb URL | [genres]
-
-        Parameters
-        ----------
-        name : str
-
-        Returns
-        -------
-        movie_data : pd.DataFrame
-            For ml-100k, the column name is ['id', 'title', 'release_date', 'video_release_date', 'url'] + [self.genres (19)]]
-            For ml-1m, the column name is ['id', 'title'] + [self.genres (18/20)]]
-        """
-
         file_path = os.path.join(self.raw_path, "u.item")
         if self.name == "ml-100k":
             movie_data = pd.read_csv(
@@ -642,19 +588,6 @@ class MovieLensDataset(DGLDataset):
         return movie_data
 
     def _load_raw_rates(self, file_path, sep):
-        """In MovieLens, the rates have the following format
-
-        ml-100k
-        user id \t movie id \t rating \t timestamp
-
-        Parameters
-        ----------
-        file_path : str
-
-        Returns
-        -------
-        rating_data : pd.DataFrame
-        """
         rating_data = pd.read_csv(
             file_path,
             sep=sep,
