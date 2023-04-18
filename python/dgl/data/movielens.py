@@ -35,7 +35,7 @@ GENRES_ML_100K =\
 GENRES_ML_1M = GENRES_ML_100K[1:]
 GENRES_ML_10M = GENRES_ML_100K + ["IMAX"]
 
-class MovieLens(DGLDataset):
+class MovieLensDataset(DGLDataset):
     r"""MovieLens dataset.
 
     The datasets consist of user ratings for movies and incorporate additional user/movie information in the form of features. 
@@ -48,19 +48,19 @@ class MovieLens(DGLDataset):
     MovieLens-100K (ml-100k)
 
     - Users: 943
-    - Edges: 1,682
+    - Movies: 1,682
     - Ratings: 100,000 (1, 2, 3, 4, 5)
 
     MovieLens-1M (ml-1m)
 
     - Users: 6,040
-    - Edges: 3,706
+    - Movies: 3,706
     - Ratings: 1,000,209 (1, 2, 3, 4, 5)
 
     MovieLens-10M (ml-10m)
 
     - Users: 69,878 
-    - Edges: 10,677
+    - Movies: 10,677
     - Ratings: 10,000,054 (0.5, 1, 1.5, ..., 4.5, 5.0)
 
     Parameters
@@ -68,10 +68,10 @@ class MovieLens(DGLDataset):
     name: str
         Dataset name. (:obj:`"ml-100k"`, :obj:`"ml-1m"`, :obj:`"ml-10m"`). 
     valid_ratio: int
-        Ratio of validation samples out of the training dataset. Should be in (0.0, 1.0).
+        Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0).
     test_ratio: int
         Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0). This parameter is invalid
-        when :obj:`name` is :obj:`"ml-100k"`.
+        when :obj:`name` is :obj:`"ml-100k"`, since testing sampled are pre-specfied for :obj:`"ml-100k"`.
         Default: None
     text_cache: str
         Raw file directory to store the pre-trained word embeddings that used to preprocess movie titles.
@@ -106,6 +106,9 @@ class MovieLens(DGLDataset):
     Notes
     -----
     - The number of edges is doubled to form an undirected(bidirected) graph structure.
+    - Each time when the dataset is loaded with a different setting of training, validation and testing ratio, the param
+    :obj:`"force_reload"` should be set to :obj:`"True"`. Otherwise the previous split of dataset will be loaded and not be
+    updated in the storage.
 
     Examples
     --------
@@ -155,7 +158,7 @@ class MovieLens(DGLDataset):
         else:
             raise NotImplementedError
         
-        super(MovieLens, self).__init__(name=name, url=self._url[name], raw_dir=raw_dir, force_reload=force_reload, verbose=verbose,
+        super(MovieLensDataset, self).__init__(name=name, url=self._url[name], raw_dir=raw_dir, force_reload=force_reload, verbose=verbose,
                                         transform=transform)
 
     def download(self):
@@ -550,10 +553,4 @@ class MovieLens(DGLDataset):
                                  dtype=np.int32))
         rating_values = rating_data["rating"].values.astype(np.float32)
         return rating_pairs[0], rating_pairs[1], rating_values
-
-if __name__ == '__main__':
-    movielens = MovieLens(name='ml-100k', valid_ratio=0.1, test_ratio=0.1, 
-                          verbose=True, force_reload=True, text_cache="/home/ubuntu/.dgl/movielens_vector_cache")
-    train_graph, valid_graph, test_graph = movielens[0]
-    info, feat = movielens.info, movielens.feat
-    pass
+    
