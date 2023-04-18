@@ -619,7 +619,7 @@ class HeteroSubgraphX(nn.Module):
                 chosen_ntype = np.random.choice(available_ntypes)
                 # backtrack from subgraph node ids to entire graph
                 chosen_node = subg.ndata[NID][chosen_ntype][
-                    np.random.choice(new_subg.nodes(chosen_ntype))
+                    np.random.choice(new_subg.nodes[chosen_ntype].data[NID])
                 ]
                 cc_nodes = {
                     chosen_ntype: torch.tensor(
