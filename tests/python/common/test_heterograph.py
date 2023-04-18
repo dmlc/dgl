@@ -1313,8 +1313,8 @@ def test_convert(idtype):
         dsttype = hg.ntypes[ntype_id[dst[i]]]
         etype = hg.etypes[etype_id[i]]
         src_i, dst_i = hg.find_edges([eid[i]], (srctype, etype, dsttype))
-        assert np.asscalar(F.asnumpy(src_i)) == nid[src[i]]
-        assert np.asscalar(F.asnumpy(dst_i)) == nid[dst[i]]
+        assert F.asnumpy(src_i).item() == nid[src[i]]
+        assert F.asnumpy(dst_i).item() == nid[dst[i]]
 
     mg = nx.MultiDiGraph(
         [
