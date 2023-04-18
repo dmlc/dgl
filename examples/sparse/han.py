@@ -3,8 +3,9 @@
 (https://arxiv.org/abs/1903.07293)
 """
 
-import dgl.sparse as dglsp
 import pickle
+
+import dgl.sparse as dglsp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -71,19 +72,21 @@ class SemanticAttention(nn.Module):
 
 
 class HAN(nn.Module):
-    def __init__(self, num_meta_paths, in_size, out_size, hidden_size=8,
-                 num_heads=8, dropout=0.6):
+    def __init__(
+        self,
+        num_meta_paths,
+        in_size,
+        out_size,
+        hidden_size=8,
+        num_heads=8,
+        dropout=0.6,
+    ):
         super().__init__()
 
         self.gat_layers = nn.ModuleList()
         for _ in range(num_meta_paths):
             self.gat_layers.append(
-                GATConv(
-                    in_size,
-                    hidden_size,
-                    num_heads,
-                    dropout
-                )
+                GATConv(in_size, hidden_size, num_heads, dropout)
             )
 
         in_size = hidden_size * num_heads
@@ -160,17 +163,15 @@ if __name__ == "__main__":
     # Create sparse adjacency matrices corresponding to two meta paths.
     # Self-loops already added.
     PAP_dst, PAP_src = data["PAP"].nonzero()
-    PAP_indices = torch.stack([
-        torch.from_numpy(PAP_src).long(),
-        torch.from_numpy(PAP_dst).long()
-    ]).to(dev)
+    PAP_indices = torch.stack(
+        [torch.from_numpy(PAP_src).long(), torch.from_numpy(PAP_dst).long()]
+    ).to(dev)
     PAP_A = dglsp.spmatrix(PAP_indices)
 
     PLP_dst, PLP_src = data["PLP"].nonzero()
-    PLP_indices = torch.stack([
-        torch.from_numpy(PLP_src).long(),
-        torch.from_numpy(PLP_src).long()
-    ]).to(dev)
+    PLP_indices = torch.stack(
+        [torch.from_numpy(PLP_src).long(), torch.from_numpy(PLP_src).long()]
+    ).to(dev)
     PLP_A = dglsp.spmatrix(PLP_indices)
     A_list = [PAP_A, PLP_A]
 
