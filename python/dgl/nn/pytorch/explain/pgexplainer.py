@@ -12,14 +12,14 @@ __all__ = ["PGExplainer"]
 
 class PGExplainer(nn.Module):
     r"""PGExplainer from `Parameterized Explainer for Graph Neural Network
-     <https://arxiv.org/pdf/2011.04573>`
+    <https://arxiv.org/pdf/2011.04573>`
 
-     PGExplainer adopts a deep neural network to parameterize the generation
-     process of explanations, which enables it to explain multiple instances
-     collectively. PGExplainer models the underlying structure as edge
-     distributions, where the explanatory graph is sampled from.
+    PGExplainer adopts a deep neural network to parameterize the generation
+    process of explanations, which enables it to explain multiple instances
+    collectively. PGExplainer models the underlying structure as edge
+    distributions, from which the explanatory graph is sampled.
 
-     Parameters
+    Parameters
     ----------
     model : nn.Module
         The GNN model to explain that tackles multiclass graph classification
@@ -301,13 +301,13 @@ class PGExplainer(nn.Module):
         ...         th.nn.init.xavier_uniform_(self.fc.weight)
         ...
         ...     def forward(self, g, h, embed=False, edge_weight=None):
-        ...         h = self.conv(g, emb, edge_weight=edge_weight)
+        ...         h = self.conv(g, h, edge_weight=edge_weight)
         ...         if not embed:
-        ...             g.ndata['h'] = emb
+        ...             g.ndata['h'] = h
         ...             hg = dgl.mean_nodes(g, 'h')
         ...             return th.sigmoid(self.fc(hg))
         ...         else:
-        ...             return emb
+        ...             return h
 
         >>> # Load dataset
         >>> data = GINDataset('MUTAG', self_loop=True)
