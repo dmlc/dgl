@@ -14,7 +14,7 @@ class PGExplainer(nn.Module):
     r"""PGExplainer from `Parameterized Explainer for Graph Neural Network
     <https://arxiv.org/pdf/2011.04573>`
 
-    PGExplainer adopts a deep neural network to parameterize the generation
+    PGExplainer adopts a deep neural network (explanation network) to parameterize the generation
     process of explanations, which enables it to explain multiple instances
     collectively. PGExplainer models the underlying structure as edge
     distributions, from which the explanatory graph is sampled.
