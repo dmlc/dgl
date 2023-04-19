@@ -483,7 +483,7 @@ class HeteroSubgraphX(nn.Module):
             ntype: list(
                 set(local_regions[ntype]) - set(subgraph_nodes[ntype].tolist())
             )
-            + [num_nodes]
+            + [split_point]
             for ntype in subgraph_nodes.keys()
         }
 
