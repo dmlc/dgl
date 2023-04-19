@@ -36,7 +36,7 @@ class PGExplainer(nn.Module):
         Learning rate to train the explanation network. Default: 0.01.
     coff_budget : float, optional
         Size regularization to constrain the explanation size. Default: 0.01.
-    coff_ent : float, optional
+    coff_connect : float, optional
         Entropy regularization to constrain the connectivity of explanation. Default: 5e-4.
     init_tmp : float, optional
         The temperature at the first epoch. Default: 5.0.
