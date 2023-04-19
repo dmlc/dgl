@@ -34,7 +34,7 @@ class PGExplainer(nn.Module):
         Number of epochs to train the explanation network. Default: 10.
     learning_rate : float, optional
         Learning rate to train the explanation network. Default: 0.01.
-    coff_size : float, optional
+    coff_budget : float, optional
         Size regularization to constrain the explanation size. Default: 0.01.
     coff_ent : float, optional
         Entropy regularization to constrain the connectivity of explanation. Default: 5e-4.
