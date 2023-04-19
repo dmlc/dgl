@@ -152,6 +152,7 @@ if __name__ == "__main__":
     # otherwise.
     dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    # (TODO): Move the logic to a built-in dataset.
     # Load the data.
     url = "dataset/ACM3025.pkl"
     data_path = get_download_dir() + "/ACM3025.pkl"
