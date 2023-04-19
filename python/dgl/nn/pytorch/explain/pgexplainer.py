@@ -29,7 +29,7 @@ class PGExplainer(nn.Module):
         * The output of its forward function is the logits if embed=False else
           return the intermediate node embeddings.
     num_features : int
-        Number of input feature for the explanation network.
+        Node embedding size used by :attr:`model`.
     epochs : int, optional
         Number of epochs to train the explanation network. Default: 10.
     learning_rate : float, optional
