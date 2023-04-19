@@ -1661,24 +1661,17 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
                 }
             )
 
-        def forward(self, graph, feat, eweight=None):
+        def forward(self, graph, feat):
             with graph.local_scope():
                 c_etype_func_dict = {}
                 for c_etype in graph.canonical_etypes:
                     src_type, etype, dst_type = c_etype
                     wh = self.etype_weights["_".join(c_etype)](feat[src_type])
                     graph.nodes[src_type].data[f"h_{c_etype}"] = wh
-                    if eweight is None:
-                        c_etype_func_dict[c_etype] = (
-                            fn.copy_u(f"h_{c_etype}", "m"),
-                            fn.mean("m", "h"),
-                        )
-                    else:
-                        graph.edges[c_etype].data["w"] = eweight[c_etype]
-                        c_etype_func_dict[c_etype] = (
-                            fn.u_mul_e(f"h_{c_etype}", "w", "m"),
-                            fn.mean("m", "h"),
-                        )
+                    c_etype_func_dict[c_etype] = (
+                        fn.copy_u(f"h_{c_etype}", "m"),
+                        fn.mean("m", "h"),
+                    )
                 graph.multi_update_all(c_etype_func_dict, "sum")
                 hg = 0
                 for ntype in graph.ntypes:
