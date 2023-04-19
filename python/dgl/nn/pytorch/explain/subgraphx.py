@@ -450,8 +450,6 @@ class HeteroSubgraphX(nn.Module):
         float
             Shapley value
         """
-        num_nodes = self.graph.num_nodes()
-
         # Obtain neighboring nodes of the subgraph g_i, P'.
         local_regions = {
             ntype: nodes.tolist() for ntype, nodes in subgraph_nodes.items()
@@ -478,7 +476,7 @@ class HeteroSubgraphX(nn.Module):
                     set(local_regions[dst_ntype] + out_neighbors.tolist())
                 )
 
-        split_point = num_nodes
+        split_point = self.graph.num_nodes()
         coalition_space = {
             ntype: list(
                 set(local_regions[ntype]) - set(subgraph_nodes[ntype].tolist())
