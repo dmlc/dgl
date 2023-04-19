@@ -27,7 +27,7 @@ class PGExplainer(nn.Module):
         * Its forward function must have the form
           :attr:`forward(self, graph, nfeat, embed, edge_weight)`.
         * The output of its forward function is the logits if embed=False else
-        return the graph embedding.
+          return the intermediate node embeddings.
     num_features : int
         Number of input feature for the explanation network.
     epochs : int, optional
