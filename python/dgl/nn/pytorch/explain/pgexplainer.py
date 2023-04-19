@@ -32,7 +32,7 @@ class PGExplainer(nn.Module):
         Node embedding size used by :attr:`model`.
     epochs : int, optional
         Number of epochs to train the explanation network. Default: 10.
-    learning_rate : float, optional
+    lr : float, optional
         Learning rate to train the explanation network. Default: 0.01.
     coff_budget : float, optional
         Size regularization to constrain the explanation size. Default: 0.01.
