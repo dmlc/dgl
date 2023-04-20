@@ -53,20 +53,29 @@ def test_movielens():
         == test_graph.num_nodes()
     )
 
-    train_ratings, valid_ratings, test_ratings = \
-        movielens.info['train_rating_pairs'], movielens.info['valid_rating_pairs'], movielens.info['test_rating_pairs']
-    assert (
-        len(train_ratings[0]) == len(train_ratings[1]) == train_graph.num_edges() / 2
+    train_ratings, valid_ratings, test_ratings = (
+        movielens.info["train_rating_pairs"],
+        movielens.info["valid_rating_pairs"],
+        movielens.info["test_rating_pairs"],
     )
     assert (
-        len(valid_ratings[0]) == len(valid_ratings[1]) == valid_graph.num_edges() / 2
+        len(train_ratings[0])
+        == len(train_ratings[1])
+        == train_graph.num_edges() / 2
     )
     assert (
-        len(test_ratings[0]) == len(test_ratings[1]) == test_graph.num_edges() / 2
+        len(valid_ratings[0])
+        == len(valid_ratings[1])
+        == valid_graph.num_edges() / 2
+    )
+    assert (
+        len(test_ratings[0])
+        == len(test_ratings[1])
+        == test_graph.num_edges() / 2
     )
 
-    user_feat, movie_feat = \
-        movielens.feat['user_feat'], movielens.feat['movie_feat']
-    assert (
-        user_feat.shape[0] + movie_feat.shape[0] == 943 + 1682
+    user_feat, movie_feat = (
+        movielens.feat["user_feat"],
+        movielens.feat["movie_feat"],
     )
+    assert user_feat.shape[0] + movie_feat.shape[0] == 943 + 1682

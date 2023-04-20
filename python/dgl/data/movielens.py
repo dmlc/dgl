@@ -6,12 +6,11 @@ import zipfile
 import numpy as np
 import pandas as pd
 
+from ..backend import data_type_dict, tensor
+
 from ..convert import graph
 from ..transforms.functional import add_reverse_edges
 from .dgl_dataset import DGLDataset
-from .utils import split_dataset
-from ..backend import tensor, data_type_dict
-
 
 from .utils import (
     download,
@@ -19,6 +18,7 @@ from .utils import (
     load_info,
     save_graphs,
     save_info,
+    split_dataset,
 )
 
 GENRES_ML_100K = [
@@ -214,10 +214,15 @@ class MovieLensDataset(DGLDataset):
                 os.path.join(self.raw_path, "u1.test"), "\t"
             )
             indices = np.arange(len(train_rating_data))
-            train, valid, _ = \
-                split_dataset(indices, [1-self.valid_ratio, self.valid_ratio, 0.0], shuffle=True)
-            train_rating_data, valid_rating_data = \
-                train_rating_data.iloc[train.indices], train_rating_data.iloc[valid.indices]
+            train, valid, _ = split_dataset(
+                indices,
+                [1 - self.valid_ratio, self.valid_ratio, 0.0],
+                shuffle=True,
+            )
+            train_rating_data, valid_rating_data = (
+                train_rating_data.iloc[train.indices],
+                train_rating_data.iloc[valid.indices],
+            )
             all_rating_data = pd.concat(
                 [train_rating_data, valid_rating_data, test_rating_data]
             )
@@ -227,10 +232,20 @@ class MovieLensDataset(DGLDataset):
                 os.path.join(self.raw_path, "ratings.dat"), "::"
             )
             indices = np.arange(len(train_rating_data))
-            train, valid, test = \
-                split_dataset(indices, [1-self.valid_ratio-self.test_ratio, self.valid_ratio, self.test_ratio], shuffle=True)
-            train_rating_data, valid_rating_data, test_rating_data = \
-                all_rating_data.iloc[train.indices], all_rating_data.iloc[valid.indices], all_rating_data.iloc[test.indices]
+            train, valid, test = split_dataset(
+                indices,
+                [
+                    1 - self.valid_ratio - self.test_ratio,
+                    self.valid_ratio,
+                    self.test_ratio,
+                ],
+                shuffle=True,
+            )
+            train_rating_data, valid_rating_data, test_rating_data = (
+                all_rating_data.iloc[train.indices],
+                all_rating_data.iloc[valid.indices],
+                all_rating_data.iloc[test.indices],
+            )
 
         # 2. load user and movie data, and drop those unseen in rating_data
         user_data = self._load_raw_user_data()
@@ -316,15 +331,9 @@ class MovieLensDataset(DGLDataset):
         self.valid_graph.edata["etype"] = self.valid_rating_values
         self.test_graph.edata["etype"] = self.test_rating_values
 
-        self.train_graph = add_reverse_edges(
-            self.train_graph, copy_edata=True
-        )
-        self.valid_graph = add_reverse_edges(
-            self.valid_graph, copy_edata=True
-        )
-        self.test_graph = add_reverse_edges(
-            self.test_graph, copy_edata=True
-        )
+        self.train_graph = add_reverse_edges(self.train_graph, copy_edata=True)
+        self.valid_graph = add_reverse_edges(self.valid_graph, copy_edata=True)
+        self.test_graph = add_reverse_edges(self.test_graph, copy_edata=True)
 
     def has_cache(self):
         if os.path.exists(self.graph_path):
@@ -631,6 +640,7 @@ class MovieLensDataset(DGLDataset):
         rating_values = rating_data["rating"].values.astype(np.float32)
         return rating_pairs[0], rating_pairs[1], rating_values
 
-if __name__ == '__main__':
-    movielens = MovieLensDataset('ml-100k', 0.2, 0.1, force_reload=True)
+
+if __name__ == "__main__":
+    movielens = MovieLensDataset("ml-100k", 0.2, 0.1, force_reload=True)
     pass
