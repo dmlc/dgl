@@ -52,7 +52,7 @@ class PGExplainer(nn.Module):
         model,
         num_features,
         epochs=10,
-        learning_rate=0.01,
+        lr=0.01,
         coff_size=0.01,
         coff_ent=5e-4,
         init_tmp=5.0,
