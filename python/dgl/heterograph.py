@@ -3817,6 +3817,7 @@ class DGLGraph(object):
         assert F.backend_name == "pytorch", "Only PyTorch backend supports adj."
         # Temporal fix to introduce a dependency on torch
         import torch
+
         from .sparse import spmatrix
 
         etype = self.to_canonical_etype(etype)
