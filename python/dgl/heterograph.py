@@ -3897,7 +3897,7 @@ class DGLGraph(object):
         """
         etid = self.get_etype_id(etype)
         if scipy_fmt is None:
-            return self._graph.adjacency_matrix(etid, transpose, ctx)[0]
+            return self._graph.adj_external(etid, transpose, ctx)[0]
         else:
             return self._graph.adjacency_matrix_scipy(
                 etid, transpose, scipy_fmt, False

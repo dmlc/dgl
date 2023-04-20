@@ -3135,10 +3135,12 @@ def test_module_sign(g):
 
     ctx = F.ctx()
     g = g.to(ctx)
-    adj = g.adj(transpose=True, scipy_fmt="coo").todense()
+    adj = g.adj_external(transpose=True, scipy_fmt="coo").todense()
     adj = torch.tensor(adj).float().to(ctx)
 
-    weight_adj = g.adj(transpose=True, scipy_fmt="coo").astype(float).todense()
+    weight_adj = (
+        g.adj_external(transpose=True, scipy_fmt="coo").astype(float).todense()
+    )
     weight_adj = torch.tensor(weight_adj).float().to(ctx)
     src, dst = g.edges()
     src, dst = src.long(), dst.long()

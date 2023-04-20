@@ -150,7 +150,7 @@ class SealSampler(Sampler):
             subg.remove_edges(edges_to_remove)
             # add double radius node labeling
             subg.ndata["z"] = self._double_radius_node_labeling(
-                subg.adj(scipy_fmt="csr")
+                subg.adj_external(scipy_fmt="csr")
             )
             subg_aug = subg.add_self_loop()
             if "weight" in subg.edata:
