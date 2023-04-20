@@ -27,7 +27,6 @@ from .base import (
 )
 from .frame import Frame
 from .ops import segment
-from .sparse import spmatrix
 from .view import (
     HeteroEdgeDataView,
     HeteroEdgeView,
@@ -3815,8 +3814,10 @@ class DGLGraph(object):
                      values=tensor([3, 2]),
                      shape=(2, 2), nnz=2)
         """
+        assert F.backend_name == "pytorch", "Only PyTorch backend supports adj."
         # Temporal fix to introduce a dependency on torch
         import torch
+        from .sparse import spmatrix
 
         etype = self.to_canonical_etype(etype)
         indices = torch.stack(self.all_edges(etype=etype))
