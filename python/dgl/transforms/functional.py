@@ -1165,7 +1165,9 @@ def khop_adj(g, k):
             [0., 1., 3., 3., 1.]])
     """
     assert g.is_homogeneous, "only homogeneous graph is supported"
-    adj_k = g.adj(transpose=True, scipy_fmt=g.formats()["created"][0]) ** k
+    adj_k = (
+        g.adj_external(transpose=True, scipy_fmt=g.formats()["created"][0]) ** k
+    )
     return F.tensor(adj_k.todense().astype(np.float32))
 
 
@@ -1235,7 +1237,10 @@ def khop_graph(g, k, copy_ndata=True):
     """
     assert g.is_homogeneous, "only homogeneous graph is supported"
     n = g.num_nodes()
-    adj_k = g.adj(transpose=False, scipy_fmt=g.formats()["created"][0]) ** k
+    adj_k = (
+        g.adj_external(transpose=False, scipy_fmt=g.formats()["created"][0])
+        ** k
+    )
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
     row = np.repeat(adj_k.row, multiplicity)
@@ -1447,7 +1452,7 @@ def laplacian_lambda_max(g):
     rst = []
     for g_i in g_arr:
         n = g_i.num_nodes()
-        adj = g_i.adj(
+        adj = g_i.adj_external(
             transpose=True, scipy_fmt=g_i.formats()["created"][0]
         ).astype(float)
         norm = sparse.diags(
@@ -1511,7 +1516,9 @@ def metapath_reachable_graph(g, metapath):
     """
     adj = 1
     for etype in metapath:
-        adj = adj * g.adj(etype=etype, scipy_fmt="csr", transpose=False)
+        adj = adj * g.adj_external(
+            etype=etype, scipy_fmt="csr", transpose=False
+        )
 
     adj = (adj != 0).tocsr()
     srctype = g.to_canonical_etype(metapath[0])[0]
@@ -2883,12 +2890,12 @@ def sort_csr_by_tag(g, tag, tag_offset_name="_TAG_OFFSET", tag_type="node"):
     >>> import torch
 
     >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
-    >>> g.adjacency_matrix(scipy_fmt='csr').nonzero()
+    >>> g.adj_external(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32))
     >>> tag = torch.IntTensor([1,1,0,2,0])
     >>> g_sorted = dgl.sort_csr_by_tag(g, tag)
-    >>> g_sorted.adjacency_matrix(scipy_fmt='csr').nonzero()
+    >>> g_sorted.adj_external(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.ndata['_TAG_OFFSET']
@@ -2905,7 +2912,7 @@ def sort_csr_by_tag(g, tag, tag_offset_name="_TAG_OFFSET", tag_type="node"):
     (tensor([0, 0, 0, 0, 0, 1, 1, 1]), tensor([0, 1, 2, 3, 4, 0, 1, 2]))
     >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
     >>> g_sorted = dgl.sort_csr_by_tag(g, tag, tag_type='edge')
-    >>> g_sorted.adj(scipy_fmt='csr').nonzero()
+    >>> g_sorted.adj_external(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.srcdata['_TAG_OFFSET']
     tensor([[0, 2, 4, 5],
@@ -3011,12 +3018,12 @@ def sort_csc_by_tag(g, tag, tag_offset_name="_TAG_OFFSET", tag_type="node"):
     >>> import dgl
     >>> import torch
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
-    >>> g.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
+    >>> g.adj_external(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
     >>> tag = torch.IntTensor([1,1,0,2,0])
     >>> g_sorted = dgl.sort_csc_by_tag(g, tag)
-    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
+    >>> g_sorted.adj_external(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.ndata['_TAG_OFFSET']
@@ -3031,7 +3038,7 @@ def sort_csc_by_tag(g, tag, tag_offset_name="_TAG_OFFSET", tag_type="node"):
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
     >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
     >>> g_sorted = dgl.sort_csc_by_tag(g, tag, tag_type='edge')
-    >>> g_sorted.adj(scipy_fmt='csr', transpose=True).nonzero()
+    >>> g_sorted.adj_external(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.dstdata['_TAG_OFFSET']
     tensor([[0, 2, 4, 5],
@@ -3376,7 +3383,7 @@ def rcmk_perm(g):
     allowed_fmats = sum(g.formats().values(), [])
     if fmat not in allowed_fmats:
         g = g.formats(allowed_fmats + [fmat])
-    csr_adj = g.adj(scipy_fmt=fmat)
+    csr_adj = g.adj_external(scipy_fmt=fmat)
     perm = sparse.csgraph.reverse_cuthill_mckee(csr_adj)
     return perm.copy()
 
@@ -3573,7 +3580,7 @@ def random_walk_pe(g, k, eweight_name=None):
     """
     N = g.num_nodes()  # number of nodes
     M = g.num_edges()  # number of edges
-    A = g.adj(scipy_fmt="csr")  # adjacency matrix
+    A = g.adj_external(scipy_fmt="csr")  # adjacency matrix
     if eweight_name is not None:
         # add edge weights if required
         W = sparse.csr_matrix(
@@ -3657,7 +3664,7 @@ def lap_pe(g, k, padding=False, return_eigval=False):
         )
 
     # get laplacian matrix as I - D^-0.5 * A * D^-0.5
-    A = g.adj(scipy_fmt="csr")  # adjacency matrix
+    A = g.adj_external(scipy_fmt="csr")  # adjacency matrix
     N = sparse.diags(
         F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float
     )  # D^-1/2
@@ -3789,7 +3796,7 @@ def double_radius_node_labeling(g, src, dst):
     >>> dgl.double_radius_node_labeling(g, 0, 1)
     tensor([1, 1, 3, 2, 3, 7, 0])
     """
-    adj = g.adj(scipy_fmt="csr")
+    adj = g.adj_external(scipy_fmt="csr")
     src, dst = (dst, src) if src > dst else (src, dst)
 
     idx = list(range(src)) + list(range(src + 1, adj.shape[0]))
@@ -3899,14 +3906,14 @@ def shortest_dist(g, root=None, return_paths=False):
     """
     if root is None:
         dist, pred = sparse.csgraph.shortest_path(
-            g.adj(scipy_fmt="csr"),
+            g.adj_external(scipy_fmt="csr"),
             return_predecessors=True,
             unweighted=True,
             directed=True,
         )
     else:
         dist, pred = sparse.csgraph.dijkstra(
-            g.adj(scipy_fmt="csr"),
+            g.adj_external(scipy_fmt="csr"),
             directed=True,
             indices=root,
             return_predecessors=True,
@@ -4010,7 +4017,7 @@ def svd_pe(g, k, padding=False, random_flip=True):
             "The number of singular values k must be no greater than the "
             "number of nodes n, but " + f"got {k} and {n} respectively."
         )
-    a = g.adj(ctx=g.device, scipy_fmt="coo").toarray()
+    a = g.adj_external(ctx=g.device, scipy_fmt="coo").toarray()
     u, d, vh = scipy.linalg.svd(a)
     v = vh.transpose()
     m = min(n, k)

@@ -31,7 +31,7 @@ def test_graph_conv(out_dim):
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
     adj = tf.sparse.to_dense(
-        tf.sparse.reorder(g.adjacency_matrix(transpose=True, ctx=ctx))
+        tf.sparse.reorder(g.adj_external(transpose=True, ctx=ctx))
     )
 
     conv = nn.GraphConv(5, out_dim, norm="none", bias=True)
@@ -610,7 +610,7 @@ def test_dense_cheb_conv(out_dim):
         g = g.to(ctx)
 
         adj = tf.sparse.to_dense(
-            tf.sparse.reorder(g.adjacency_matrix(transpose=True, ctx=ctx))
+            tf.sparse.reorder(g.adj_external(transpose=True, ctx=ctx))
         )
         cheb = nn.ChebConv(5, out_dim, k, None, bias=True)
         dense_cheb = nn.DenseChebConv(5, out_dim, k, bias=True)
