@@ -1,18 +1,19 @@
 """MovieLens dataset"""
-
 import os
 import re
 import zipfile
 
 import numpy as np
 import pandas as pd
-import torch as th
-from sklearn.model_selection import train_test_split
 
-import dgl
-from dgl.data import DGLDataset
+from ..convert import graph
+from ..transforms.functional import add_reverse_edges
+from .dgl_dataset import DGLDataset
+from .utils import split_dataset
+from ..backend import tensor, data_type_dict
 
-from dgl.data.utils import (
+
+from .utils import (
     download,
     load_graphs,
     load_info,
@@ -115,6 +116,7 @@ class MovieLensDataset(DGLDataset):
 
     Notes
     -----
+    - When using MovieLens, users are required to install :obj:`torchtext>=0.15.1`, which provides :obj:`Glove` API to preprocess text embeddings.
     - The number of edges is doubled to form an undirected(bidirected) graph structure.
     - Each time when the dataset is loaded with a different setting of training, validation and testing ratio, the param
     :obj:`"force_reload"` should be set to :obj:`"True"`. Otherwise the previous split of dataset will be loaded and not be
@@ -211,10 +213,11 @@ class MovieLensDataset(DGLDataset):
             test_rating_data = self._load_raw_rates(
                 os.path.join(self.raw_path, "u1.test"), "\t"
             )
-
-            train_rating_data, valid_rating_data = train_test_split(
-                train_rating_data, test_size=self.valid_ratio
-            )
+            indices = np.arange(len(train_rating_data))
+            train, valid, _ = \
+                split_dataset(indices, [1-self.valid_ratio, self.valid_ratio, 0.0], shuffle=True)
+            train_rating_data, valid_rating_data = \
+                train_rating_data.iloc[train.indices], train_rating_data.iloc[valid.indices]
             all_rating_data = pd.concat(
                 [train_rating_data, valid_rating_data, test_rating_data]
             )
@@ -223,12 +226,11 @@ class MovieLensDataset(DGLDataset):
             all_rating_data = self._load_raw_rates(
                 os.path.join(self.raw_path, "ratings.dat"), "::"
             )
-            train_rating_data, test_rating_data = train_test_split(
-                all_rating_data, test_size=self.test_ratio
-            )
-            train_rating_data, valid_rating_data = train_test_split(
-                train_rating_data, test_size=self.valid_ratio
-            )
+            indices = np.arange(len(train_rating_data))
+            train, valid, test = \
+                split_dataset(indices, [1-self.valid_ratio-self.test_ratio, self.valid_ratio, self.test_ratio], shuffle=True)
+            train_rating_data, valid_rating_data, test_rating_data = \
+                all_rating_data.iloc[train.indices], all_rating_data.iloc[valid.indices], all_rating_data.iloc[test.indices]
 
         # 2. load user and movie data, and drop those unseen in rating_data
         user_data = self._load_raw_user_data()
@@ -244,9 +246,9 @@ class MovieLensDataset(DGLDataset):
             reserved_ids_set=set(all_rating_data["movie_id"].values),
         )
 
-        user_feat, movie_feat = th.tensor(
+        user_feat, movie_feat = tensor(
             self._process_user_fea(user_data)
-        ), th.tensor(self._process_movie_fea(movie_data))
+        ), tensor(self._process_movie_fea(movie_data))
         self.feat = {"user_feat": user_feat, "movie_feat": movie_feat}
 
         # 3. generate rating pairs
@@ -280,20 +282,20 @@ class MovieLensDataset(DGLDataset):
         test_v_indices += num_user
 
         self.train_rating_pairs = (
-            th.LongTensor(train_u_indices),
-            th.LongTensor(train_v_indices),
+            tensor(train_u_indices, dtype=data_type_dict["int64"]),
+            tensor(train_v_indices, dtype=data_type_dict["int64"]),
         )
         self.valid_rating_pairs = (
-            th.LongTensor(valid_u_indices),
-            th.LongTensor(valid_v_indices),
+            tensor(valid_u_indices, dtype=data_type_dict["int64"]),
+            tensor(valid_v_indices, dtype=data_type_dict["int64"]),
         )
         self.test_rating_pairs = (
-            th.LongTensor(test_u_indices),
-            th.LongTensor(test_v_indices),
+            tensor(test_u_indices, dtype=data_type_dict["int64"]),
+            tensor(test_v_indices, dtype=data_type_dict["int64"]),
         )
-        self.train_rating_values = th.FloatTensor(train_labels)
-        self.valid_rating_values = th.FloatTensor(valid_labels)
-        self.test_rating_values = th.FloatTensor(test_labels)
+        self.train_rating_values = tensor(train_labels)
+        self.valid_rating_values = tensor(valid_labels)
+        self.test_rating_values = tensor(test_labels)
         self.info = {
             "train_rating_pairs": self.train_rating_pairs,
             "valid_rating_pairs": self.valid_rating_pairs,
@@ -301,26 +303,26 @@ class MovieLensDataset(DGLDataset):
         }
 
         # build dgl graph object, which is homogeneous and bidirectional and contains only training edges
-        self.train_graph = dgl.graph(
+        self.train_graph = graph(
             (self.train_rating_pairs[0], self.train_rating_pairs[1])
         )
-        self.valid_graph = dgl.graph(
+        self.valid_graph = graph(
             (self.valid_rating_pairs[0], self.valid_rating_pairs[1])
         )
-        self.test_graph = dgl.graph(
+        self.test_graph = graph(
             (self.test_rating_pairs[0], self.test_rating_pairs[1])
         )
         self.train_graph.edata["etype"] = self.train_rating_values
         self.valid_graph.edata["etype"] = self.valid_rating_values
         self.test_graph.edata["etype"] = self.test_rating_values
 
-        self.train_graph = dgl.add_reverse_edges(
+        self.train_graph = add_reverse_edges(
             self.train_graph, copy_edata=True
         )
-        self.valid_graph = dgl.add_reverse_edges(
+        self.valid_graph = add_reverse_edges(
             self.valid_graph, copy_edata=True
         )
-        self.test_graph = dgl.add_reverse_edges(
+        self.test_graph = add_reverse_edges(
             self.test_graph, copy_edata=True
         )
 
@@ -628,3 +630,7 @@ class MovieLensDataset(DGLDataset):
         )
         rating_values = rating_data["rating"].values.astype(np.float32)
         return rating_pairs[0], rating_pairs[1], rating_values
+
+if __name__ == '__main__':
+    movielens = MovieLensDataset('ml-100k', 0.2, 0.1, force_reload=True)
+    pass
