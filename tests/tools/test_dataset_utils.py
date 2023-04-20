@@ -314,8 +314,12 @@ def _run(
             ntype_counts,
         )
 
-        #_validate_node_data (rank, world_size, num_chunks, node_features, node_feature_tids)
-        #_validate_edge_data (rank, world_size, num_chunks, edge_features, edge_feature_tids)
+        _validate_node_data(
+            rank, world_size, num_chunks, node_features, node_feature_tids
+        )
+        _validate_edge_data(
+            rank, world_size, num_chunks, edge_features, edge_feature_tids
+        )
         _validate_edges(
             rank, world_size, num_chunks, edge_datadict, edge_tids, schema_map
         )
