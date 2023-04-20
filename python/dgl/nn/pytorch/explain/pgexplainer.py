@@ -52,9 +52,9 @@ class PGExplainer(nn.Module):
         model,
         num_features,
         epochs=10,
-        learning_rate=0.01,
-        coff_size=0.01,
-        coff_ent=5e-4,
+        lr=0.01,
+        coff_budget=0.01,
+        coff_connect=5e-4,
         init_tmp=5.0,
         final_tmp=1.0,
         sample_bias=0.0,
@@ -64,11 +64,11 @@ class PGExplainer(nn.Module):
         self.model = model
         self.num_features = num_features * 2
 
-        # training parameters for PGExplainer
+        # training hyperparameters for PGExplainer
         self.epochs = epochs
-        self.learning_rate = learning_rate
-        self.coff_size = coff_size
-        self.coff_ent = coff_ent
+        self.lr = lr
+        self.coff_budget = coff_budget
+        self.coff_connect = coff_connect
         self.init_tmp = init_tmp
         self.final_tmp = final_tmp
         self.sample_bias = sample_bias
@@ -145,11 +145,11 @@ class PGExplainer(nn.Module):
 
         # size
         edge_mask = self.sparse_mask_values
-        if self.coff_size <= 0:
-            size_loss = self.coff_size * torch.sum(edge_mask)
+        if self.coff_budget <= 0:
+            size_loss = self.coff_budget * torch.sum(edge_mask)
         else:
-            size_loss = self.coff_size * F.relu(
-                torch.sum(edge_mask) - self.coff_size
+            size_loss = self.coff_budget * F.relu(
+                torch.sum(edge_mask) - self.coff_budget
             )
 
         # entropy
@@ -158,7 +158,7 @@ class PGExplainer(nn.Module):
         mask_ent = -edge_mask * torch.log(edge_mask) - (
             1 - edge_mask
         ) * torch.log(1 - edge_mask)
-        mask_ent_loss = self.coff_ent * torch.mean(mask_ent)
+        mask_ent_loss = self.coff_connect * torch.mean(mask_ent)
 
         loss = pred_loss + size_loss + mask_ent_loss
 
@@ -214,7 +214,7 @@ class PGExplainer(nn.Module):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        optimizer = Adam(self.elayers.parameters(), lr=self.learning_rate)
+        optimizer = Adam(self.elayers.parameters(), lr=self.lr)
 
         ori_pred_dict = {}
 
@@ -259,9 +259,9 @@ class PGExplainer(nn.Module):
             print(f"Epoch: {epoch} | Loss: {loss}")
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False):
-        r"""Learn and return an an edge mask that play a crucial role to
+        r"""Learn and return an edge mask that plays a crucial role to
         explain the prediction made by the GNN for a graph. Also, return
-        the prediction made with just the edge mask.
+        the prediction made with the edges chosen based on the edge mask.
 
         Parameters
         ----------
@@ -271,16 +271,19 @@ class PGExplainer(nn.Module):
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
         tmp : float
-            The temperature parameter fed to the sample procedure
+            The temperature parameter fed to the sampling procedure.
         training : bool
-            Indicates whether the concrete_sample is called during
-            training or evaluation.
+            We indicate we want to train the explanation network if
+            set to True. If set to False, we indicate that we want
+            to find the edges of the graph that contribute most to
+            the graph explanations.
 
         Returns
         -------
         Tensor, Tensor
             The classification probability for graph with edge mask,
-            the probability mask for graph edges.
+            the edge weights where higher edge weights indicate that
+            they contribute to the explanation.
 
         Examples
         --------
@@ -293,12 +296,12 @@ class PGExplainer(nn.Module):
         >>> from dgl.nn import GraphConv, PGExplainer
 
         >>> # Define the model
-        >>> class Model(th.nn.Module):
+        >>> class Model(nn.Module):
         ...     def __init__(self, in_feats, out_feats):
         ...         super().__init__()
         ...         self.conv = GraphConv(in_feats, out_feats)
         ...         self.fc = nn.Linear(out_feats, 1)
-        ...         th.nn.init.xavier_uniform_(self.fc.weight)
+        ...         nn.init.xavier_uniform_(self.fc.weight)
         ...
         ...     def forward(self, g, h, embed=False, edge_weight=None):
         ...         h = self.conv(g, h, edge_weight=edge_weight)
@@ -319,8 +322,8 @@ class PGExplainer(nn.Module):
         >>> criterion = nn.BCELoss()
         >>> optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
         >>> for bg, labels in dataloader:
-        ...     logits = model(bg, bg.ndata['attr'])
-        ...     loss = criterion(logits.squeeze(1).float(), labels.float())
+        ...     preds = model(bg, bg.ndata['attr'])
+        ...     loss = criterion(preds.squeeze(1).float(), labels.float())
         ...     optimizer.zero_grad()
         ...     loss.backward()
         ...     optimizer.step()
@@ -348,8 +351,6 @@ class PGExplainer(nn.Module):
         row_emb = embed[row.long()]
         emb = torch.cat([col_emb, row_emb], dim=-1)
 
-        # using the node embedding to calculate the edge weight
-        emb = emb.to(graph.device)
         for elayer in self.elayers:
             emb = elayer(emb)
         values = emb.reshape(-1)
