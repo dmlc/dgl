@@ -166,19 +166,13 @@ def _chunk_graph(
     metadata["edges"] = {}
     with setdir("edge_index"):
         np.random.shuffle(idxes)
-        valid_delimiters = [" ", ",", "\t", ":"]
         for idx in idxes:
             etype = idxes_etypestr[idx][0]
             etypestr = idxes_etypestr[idx][1]
             logging.info("Chunking edge index for %s" % etypestr)
             edges_meta = {}
             if edges_format == "csv":
-                fmt_meta = {
-                    "name": edges_format,
-                    "delimiter": valid_delimiters[
-                        np.random.randint(0, len(valid_delimiters))
-                    ],
-                }
+                fmt_meta = {"name": edges_format, "delimiter": " "}
             elif edges_format == "parquet":
                 fmt_meta = {"name": edges_format}
             else:
