@@ -1034,7 +1034,11 @@ class DataLoader(torch.utils.data.DataLoader):
         )
 
     def __iter__(self):
-        if self.device.type == "cpu" and not self.cpu_affinity_enabled:
+        if (
+            self.device.type == "cpu"
+            and hasattr(psutil.Process, "cpu_affinity")
+            and not self.cpu_affinity_enabled
+        ):
             link = "https://docs.dgl.ai/tutorials/cpu/cpu_best_practises.html"
             dgl_warning(
                 f"Dataloader CPU affinity opt is not enabled, consider switching it on "
