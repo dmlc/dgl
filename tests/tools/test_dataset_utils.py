@@ -325,7 +325,7 @@ def _run(
         )
 
     except Exception as arg:
-        sh_dict[f"RANK-{rank}"] = inst
+        sh_dict[f"RANK-{rank}"] = arg
 
 
 def _single_machine_run(
