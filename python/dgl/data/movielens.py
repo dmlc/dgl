@@ -654,8 +654,3 @@ class MovieLensDataset(DGLDataset):
         )
         rating_values = rating_data["rating"].values.astype(np.float32)
         return rating_pairs[0], rating_pairs[1], rating_values
-
-
-if __name__ == "__main__":
-    movielens = MovieLensDataset("ml-100k", 0.2, 0.1, force_reload=True)
-    pass
