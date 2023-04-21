@@ -425,6 +425,8 @@ class MovieLensDataset(DGLDataset):
 
     @property
     def raw_path(self):
+        if self.name == "ml-10m":
+            return os.path.join(self.raw_dir, "ml-10M100K")
         return os.path.join(self.raw_dir, self.name)
 
     @property
