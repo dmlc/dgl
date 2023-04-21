@@ -75,7 +75,7 @@ class PGExplainer(nn.Module):
 
         self.init_bias = 0.0
 
-        # Explanation model in PGExplainer
+        # Explanation network in PGExplainer
         self.elayers = nn.ModuleList()
         self.elayers.append(
             nn.Sequential(nn.Linear(self.num_features, 64), nn.ReLU())
@@ -199,9 +199,9 @@ class PGExplainer(nn.Module):
 
         return gate_inputs
 
-    def train_explanation_network(self, dataset, func_extract_feat):
+    def train_step(self, dataset, func_extract_feat):
         r"""Training the explanation network by gradient descent(GD)
-         using Adam optimizer
+        using Adam optimizer
 
         Parameters
         ----------
@@ -330,7 +330,7 @@ class PGExplainer(nn.Module):
 
         >>> # Initialize the explainer
         >>> explainer = PGExplainer(model, data.gclasses)
-        >>> explainer.train_explanation_network(data, lambda g: g.ndata["attr"])
+        >>> explainer.train_step(data, lambda g: g.ndata["attr"])
 
         >>> # Explain the prediction for graph 0
         >>> graph, l = data[0]

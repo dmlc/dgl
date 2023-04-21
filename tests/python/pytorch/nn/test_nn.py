@@ -1776,7 +1776,7 @@ def test_pgexplainer(g, idtype, n_classes):
     dataset = [(g, th.tensor([1]))]
 
     explainer = nn.PGExplainer(model, n_classes)
-    explainer.train_explanation_network(dataset, lambda g: g.ndata["attr"])
+    explainer.train_step(dataset, lambda g: g.ndata["attr"])
 
     probs, edge_weight = explainer.explain_graph(g, feat)
 
