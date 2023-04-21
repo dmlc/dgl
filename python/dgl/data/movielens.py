@@ -45,6 +45,19 @@ GENRES_ML_100K = [
 GENRES_ML_1M = GENRES_ML_100K[1:]
 GENRES_ML_10M = GENRES_ML_100K + ["IMAX"]
 
+try:
+    import torch
+except ImportError:
+    HAS_TORCH = False
+else:
+    HAS_TORCH = True
+
+def check_pytorch():
+    """Check if PyTorch is the backend."""
+    if HAS_TORCH is False:
+        raise ModuleNotFoundError(
+            "MovieLensDataset requires PyTorch to be the backend."
+        )
 
 class MovieLensDataset(DGLDataset):
     r"""MovieLens dataset.
@@ -160,7 +173,7 @@ class MovieLensDataset(DGLDataset):
         verbose=None,
         transform=None,
     ):
-
+        check_pytorch()
         assert name in [
             "ml-100k",
             "ml-1m",
