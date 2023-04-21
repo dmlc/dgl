@@ -117,7 +117,6 @@ def gen_edge_files(rank, schema_map, params):
         os.makedirs(os.path.dirname(out_file), exist_ok=True)
 
         options = csv.WriteOptions(include_header=False, delimiter=" ")
-        options.delimiter = " "
         csv.write_csv(
             pyarrow.Table.from_arrays(cols, names=col_names),
             out_file,

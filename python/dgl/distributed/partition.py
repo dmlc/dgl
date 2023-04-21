@@ -193,9 +193,11 @@ def load_partition(part_config, part_id, load_feats=True):
     ), "the partition does not contain graph structure."
     partition_path = relative_to_config(part_files["part_graph"])
     logging.info(
-        f"Start to load partition from {partition_path} which is "
-        f"{os.path.getsize(partition_path)} bytes. It may take non-trivial "
-        "time for large partition."
+        "Start to load partition from %s which is "
+        "%d bytes. It may take non-trivial "
+        "time for large partition.",
+        partition_path,
+        os.path.getsize(partition_path)
     )
     graph = load_graphs(partition_path)[0][0]
     logging.info("Finished loading partition.")
@@ -304,20 +306,24 @@ def load_partition_feats(
     if load_nodes:
         feat_path = relative_to_config(part_files["node_feats"])
         logging.debug(
-            f"Start to load node data from {feat_path} which is "
-            f"{os.path.getsize(feat_path)} bytes."
+            "Start to load node data from %s which is "
+            "%d bytes.",
+            feat_path,
+            os.path.getsize(feat_path)
         )
         node_feats = load_tensors(feat_path)
-        print("Finished loading node data.")
+        logging.info("Finished loading node data.")
     edge_feats = None
     if load_edges:
         feat_path = relative_to_config(part_files["edge_feats"])
         logging.debug(
-            f"Start to load edge data from {feat_path} which is "
-            f"{os.path.getsize(feat_path)} bytes."
+            "Start to load edge data from %s which is "
+            "%d bytes.",
+            feat_path,
+            os.path.getsize(feat_path)
         )
         edge_feats = load_tensors(feat_path)
-        logging.debug("Finished loading edge data.")
+        logging.info("Finished loading edge data.")
     # In the old format, the feature name doesn't contain node/edge type.
     # For compatibility, let's add node/edge types to the feature names.
     if node_feats is not None:
