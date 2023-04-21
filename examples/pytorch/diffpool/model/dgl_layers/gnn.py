@@ -141,7 +141,7 @@ class DiffPoolBatchedGraphLayer(nn.Module):
         )  # size = (sum_N, batch_size * N_a)
 
         h = torch.matmul(torch.t(assign_tensor), feat)
-        adj = g.adjacency_matrix(transpose=True, ctx=device)
+        adj = g.adj_external(transpose=True, ctx=device)
         adj_new = torch.sparse.mm(adj, assign_tensor)
         adj_new = torch.mm(torch.t(assign_tensor), adj_new)
 

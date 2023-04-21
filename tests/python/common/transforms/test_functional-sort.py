@@ -74,8 +74,8 @@ def test_sort_with_tag(idtype):
         new_g = dgl.sort_csr_by_tag(
             g, tag if tag_type == "node" else edge_tag_dst, tag_type=tag_type
         )
-        old_csr = g.adjacency_matrix(scipy_fmt="csr")
-        new_csr = new_g.adjacency_matrix(scipy_fmt="csr")
+        old_csr = g.adj_external(scipy_fmt="csr")
+        new_csr = new_g.adj_external(scipy_fmt="csr")
         assert check_sort(new_csr, tag, new_g.dstdata["_TAG_OFFSET"])
         assert not check_sort(
             old_csr, tag
@@ -85,8 +85,8 @@ def test_sort_with_tag(idtype):
         new_g = dgl.sort_csc_by_tag(
             g, tag if tag_type == "node" else edge_tag_src, tag_type=tag_type
         )
-        old_csc = g.adjacency_matrix(transpose=True, scipy_fmt="csr")
-        new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt="csr")
+        old_csc = g.adj_external(transpose=True, scipy_fmt="csr")
+        new_csc = new_g.adj_external(transpose=True, scipy_fmt="csr")
         assert check_sort(new_csc, tag, new_g.srcdata["_TAG_OFFSET"])
         assert not check_sort(old_csc, tag)
 
@@ -103,14 +103,14 @@ def test_sort_with_tag_bipartite(idtype):
     vtag = F.tensor(np.random.choice(num_tags, g.num_nodes("_V")))
 
     new_g = dgl.sort_csr_by_tag(g, vtag)
-    old_csr = g.adjacency_matrix(scipy_fmt="csr")
-    new_csr = new_g.adjacency_matrix(scipy_fmt="csr")
+    old_csr = g.adj_external(scipy_fmt="csr")
+    new_csr = new_g.adj_external(scipy_fmt="csr")
     assert check_sort(new_csr, vtag, new_g.nodes["_U"].data["_TAG_OFFSET"])
     assert not check_sort(old_csr, vtag)
 
     new_g = dgl.sort_csc_by_tag(g, utag)
-    old_csc = g.adjacency_matrix(transpose=True, scipy_fmt="csr")
-    new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt="csr")
+    old_csc = g.adj_external(transpose=True, scipy_fmt="csr")
+    new_csc = new_g.adj_external(transpose=True, scipy_fmt="csr")
     assert check_sort(new_csc, utag, new_g.nodes["_V"].data["_TAG_OFFSET"])
     assert not check_sort(old_csc, utag)
 

@@ -30,6 +30,8 @@ class GraphormerLayer(nn.Module):
         afterwards. Default: False.
     dropout : float, optional
         Dropout probability. Default: 0.1.
+    attn_dropout : float, optional
+        Attention dropout probability. Default: 0.1.
     activation : callable activation layer, optional
         Activation function. Default: nn.ReLU().
 
@@ -60,6 +62,7 @@ class GraphormerLayer(nn.Module):
         attn_bias_type="add",
         norm_first=False,
         dropout=0.1,
+        attn_dropout=0.1,
         activation=nn.ReLU(),
     ):
         super().__init__()
@@ -70,7 +73,7 @@ class GraphormerLayer(nn.Module):
             feat_size=feat_size,
             num_heads=num_heads,
             attn_bias_type=attn_bias_type,
-            attn_drop=dropout,
+            attn_drop=attn_dropout,
         )
         self.ffn = nn.Sequential(
             nn.Linear(feat_size, hidden_size),

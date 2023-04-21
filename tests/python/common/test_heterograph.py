@@ -708,41 +708,57 @@ def _test_edge_ids():
     assert eid == 0
 
 
+@pytest.mark.skipif(
+    F.backend_name != "pytorch", reason="Only support PyTorch for now"
+)
 @parametrize_idtype
 def test_adj(idtype):
     g = create_test_heterograph(idtype)
-    adj = F.sparse_to_numpy(g.adj(transpose=True, etype="follows"))
+    adj = g.adj("follows")
+    assert F.asnumpy(adj.indices()).tolist() == [[0, 1], [1, 2]]
+    assert np.allclose(F.asnumpy(adj.val), np.array([1, 1]))
+    g.edata["h"] = {("user", "plays", "game"): F.tensor([1, 2, 3, 4])}
+    print(g.edata["h"])
+    adj = g.adj("plays", "h")
+    assert F.asnumpy(adj.indices()).tolist() == [[0, 1, 2, 1], [0, 0, 1, 1]]
+    assert np.allclose(F.asnumpy(adj.val), np.array([1, 2, 3, 4]))
+
+
+@parametrize_idtype
+def test_adj_external(idtype):
+    g = create_test_heterograph(idtype)
+    adj = F.sparse_to_numpy(g.adj_external(transpose=True, etype="follows"))
     assert np.allclose(
         adj, np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
     )
-    adj = F.sparse_to_numpy(g.adj(transpose=False, etype="follows"))
+    adj = F.sparse_to_numpy(g.adj_external(transpose=False, etype="follows"))
     assert np.allclose(
         adj, np.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, 0.0]])
     )
-    adj = F.sparse_to_numpy(g.adj(transpose=True, etype="plays"))
+    adj = F.sparse_to_numpy(g.adj_external(transpose=True, etype="plays"))
     assert np.allclose(adj, np.array([[1.0, 1.0, 0.0], [0.0, 1.0, 1.0]]))
-    adj = F.sparse_to_numpy(g.adj(transpose=False, etype="plays"))
+    adj = F.sparse_to_numpy(g.adj_external(transpose=False, etype="plays"))
     assert np.allclose(adj, np.array([[1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]))
 
-    adj = g.adj(transpose=True, scipy_fmt="csr", etype="follows")
+    adj = g.adj_external(transpose=True, scipy_fmt="csr", etype="follows")
     assert np.allclose(
         adj.todense(),
         np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
     )
-    adj = g.adj(transpose=True, scipy_fmt="coo", etype="follows")
+    adj = g.adj_external(transpose=True, scipy_fmt="coo", etype="follows")
     assert np.allclose(
         adj.todense(),
         np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
     )
-    adj = g.adj(transpose=True, scipy_fmt="csr", etype="plays")
+    adj = g.adj_external(transpose=True, scipy_fmt="csr", etype="plays")
     assert np.allclose(
         adj.todense(), np.array([[1.0, 1.0, 0.0], [0.0, 1.0, 1.0]])
     )
-    adj = g.adj(transpose=True, scipy_fmt="coo", etype="plays")
+    adj = g.adj_external(transpose=True, scipy_fmt="coo", etype="plays")
     assert np.allclose(
         adj.todense(), np.array([[1.0, 1.0, 0.0], [0.0, 1.0, 1.0]])
     )
-    adj = F.sparse_to_numpy(g["follows"].adj(transpose=True))
+    adj = F.sparse_to_numpy(g["follows"].adj_external(transpose=True))
     assert np.allclose(
         adj, np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
     )
@@ -3535,7 +3551,7 @@ def test_create_block(idtype):
 
 @parametrize_idtype
 @pytest.mark.parametrize("fmt", ["coo", "csr", "csc"])
-def test_adj_sparse(idtype, fmt):
+def test_adj_tensors(idtype, fmt):
     if fmt == "coo":
         A = ssp.random(10, 10, 0.2).tocoo()
         A.data = np.arange(20)
@@ -3562,11 +3578,11 @@ def test_adj_sparse(idtype, fmt):
     A_coo = A.tocoo()
     A_csr = A.tocsr()
     A_csc = A.tocsc()
-    row, col = g.adj_sparse("coo")
+    row, col = g.adj_tensors("coo")
     assert np.array_equal(F.asnumpy(row), A_coo.row)
     assert np.array_equal(F.asnumpy(col), A_coo.col)
 
-    indptr, indices, eids = g.adj_sparse("csr")
+    indptr, indices, eids = g.adj_tensors("csr")
     assert np.array_equal(F.asnumpy(indptr), A_csr.indptr)
     if fmt == "csr":
         assert len(eids) == 0
@@ -3578,7 +3594,7 @@ def test_adj_sparse(idtype, fmt):
         indices_sorted_np[A_csr.data] = A_csr.indices
         assert np.array_equal(F.asnumpy(indices_sorted), indices_sorted_np)
 
-    indptr, indices, eids = g.adj_sparse("csc")
+    indptr, indices, eids = g.adj_tensors("csc")
     assert np.array_equal(F.asnumpy(indptr), A_csc.indptr)
     if fmt == "csc":
         assert len(eids) == 0
