@@ -15,12 +15,10 @@ from .. import utils
 @utils.parametrize("scipy_format", ["coo", "csr"])
 def track_time(size, scipy_format):
     matrix_dict = {
-        "small": dgl.data.CiteseerGraphDataset(verbose=False)[
-            0
-        ].adjacency_matrix(scipy_fmt=scipy_format),
-        "large": utils.get_livejournal().adjacency_matrix(
+        "small": dgl.data.CiteseerGraphDataset(verbose=False)[0].adj_external(
             scipy_fmt=scipy_format
         ),
+        "large": utils.get_livejournal().adj_external(scipy_fmt=scipy_format),
     }
 
     # dry run

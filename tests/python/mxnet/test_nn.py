@@ -34,7 +34,7 @@ def test_graph_conv(idtype, out_dim):
     g = dgl.from_networkx(nx.path_graph(3))
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx)
+    adj = g.adj_external(transpose=True, ctx=ctx)
 
     conv = nn.GraphConv(5, out_dim, norm="none", bias=True)
     conv.initialize(ctx=ctx)
@@ -154,7 +154,7 @@ def _S2AXWb(A, N, X, W, b):
 def test_tagconv(out_dim):
     g = dgl.from_networkx(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx)
+    adj = g.adj_external(transpose=True, ctx=ctx)
     norm = mx.nd.power(g.in_degrees().astype("float32"), -0.5)
 
     conv = nn.TAGConv(5, out_dim, bias=True)
@@ -361,7 +361,7 @@ def test_dense_cheb_conv(out_dim):
     for k in range(1, 4):
         ctx = F.ctx()
         g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.3)).to(F.ctx())
-        adj = g.adjacency_matrix(transpose=True, ctx=ctx).tostype("default")
+        adj = g.adj_external(transpose=True, ctx=ctx).tostype("default")
         cheb = nn.ChebConv(5, out_dim, k)
         dense_cheb = nn.DenseChebConv(5, out_dim, k)
         cheb.initialize(ctx=ctx)
@@ -387,7 +387,7 @@ def test_dense_cheb_conv(out_dim):
 def test_dense_graph_conv(idtype, g, norm_type, out_dim):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx).tostype("default")
+    adj = g.adj_external(transpose=True, ctx=ctx).tostype("default")
     conv = nn.GraphConv(5, out_dim, norm=norm_type, bias=True)
     dense_conv = nn.DenseGraphConv(5, out_dim, norm=norm_type, bias=True)
     conv.initialize(ctx=ctx)
@@ -408,7 +408,7 @@ def test_dense_graph_conv(idtype, g, norm_type, out_dim):
 def test_dense_sage_conv(idtype, g, out_dim):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx).tostype("default")
+    adj = g.adj_external(transpose=True, ctx=ctx).tostype("default")
     sage = nn.SAGEConv(5, out_dim, "gcn")
     dense_sage = nn.DenseSAGEConv(5, out_dim)
     sage.initialize(ctx=ctx)
