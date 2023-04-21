@@ -60,12 +60,16 @@ def check_pytorch():
         )
 
 class MovieLensDataset(DGLDataset):
-    r"""MovieLens dataset.
+    r"""MovieLens[1] dataset for edge prediction tasks.
 
     The datasets consist of user ratings for movies and incorporate additional user/movie information in the form of features. 
     The data are stored in undirected bipartite graph structure, where nodes represent users and movies, edges store ratings
-    that users assign to movies.
+    that users assign to movies. The website of raw datasets: `<https://grouplens.org/datasets/movielens/>`_
 
+    Reference:
+    [1] Bradley N Miller, Istvan Albert, Shyong K Lam, Joseph A Konstan, and John Riedl. 
+    Movielens unplugged: experiences with an occasionally connected recommender system. In Proceedings of
+    the 8th international conference on Intelligent user interfaces, pp. 263-266. ACM, 2003.
 
     Statistics:
 
