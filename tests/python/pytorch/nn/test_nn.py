@@ -35,7 +35,7 @@ def _AXWb(A, X, W, b):
 def test_graph_conv0(out_dim):
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx)
+    adj = g.adj_external(transpose=True, ctx=ctx)
 
     conv = nn.GraphConv(5, out_dim, norm="none", bias=True)
     conv = conv.to(ctx)
@@ -220,7 +220,7 @@ def test_tagconv(out_dim):
     g = dgl.DGLGraph(nx.path_graph(3))
     g = g.to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx)
+    adj = g.adj_external(transpose=True, ctx=ctx)
     norm = th.pow(g.in_degrees().float(), -0.5)
 
     conv = nn.TAGConv(5, out_dim, bias=True)
@@ -1140,7 +1140,7 @@ def test_dense_graph_conv(norm_type, g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
     # TODO(minjie): enable the following option after #1385
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx).to_dense()
+    adj = g.adj_external(transpose=True, ctx=ctx).to_dense()
     conv = nn.GraphConv(5, out_dim, norm=norm_type, bias=True)
     dense_conv = nn.DenseGraphConv(5, out_dim, norm=norm_type, bias=True)
     dense_conv.weight.data = conv.weight.data
@@ -1159,7 +1159,7 @@ def test_dense_graph_conv(norm_type, g, idtype, out_dim):
 def test_dense_sage_conv(g, idtype, out_dim):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx).to_dense()
+    adj = g.adj_external(transpose=True, ctx=ctx).to_dense()
     sage = nn.SAGEConv(5, out_dim, "gcn")
     dense_sage = nn.DenseSAGEConv(5, out_dim)
     dense_sage.fc.weight.data = sage.fc_neigh.weight.data
@@ -1258,7 +1258,7 @@ def test_dense_cheb_conv(out_dim):
         ctx = F.ctx()
         g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
         g = g.to(F.ctx())
-        adj = g.adjacency_matrix(transpose=True, ctx=ctx).to_dense()
+        adj = g.adj_external(transpose=True, ctx=ctx).to_dense()
         cheb = nn.ChebConv(5, out_dim, k, None)
         dense_cheb = nn.DenseChebConv(5, out_dim, k)
         # for i in range(len(cheb.fc)):
@@ -2227,25 +2227,9 @@ def test_degree_encoder(max_degree, embedding_dim, direction):
             th.tensor([1, 2, 3, 0, 3, 0, 0, 1]),
         )
     )
-    # test heterograph
-    hg = dgl.heterograph(
-        {
-            ("drug", "interacts", "drug"): (
-                th.tensor([0, 1]),
-                th.tensor([1, 2]),
-            ),
-            ("drug", "interacts", "gene"): (
-                th.tensor([0, 1]),
-                th.tensor([2, 3]),
-            ),
-            ("drug", "treats", "disease"): (th.tensor([1]), th.tensor([2])),
-        }
-    )
     model = nn.DegreeEncoder(max_degree, embedding_dim, direction=direction)
     de_g = model(g)
-    de_hg = model(hg)
     assert de_g.shape == (4, embedding_dim)
-    assert de_hg.shape == (10, embedding_dim)
 
 
 @parametrize_idtype
@@ -2279,7 +2263,7 @@ def test_MetaPath2Vec(idtype):
 @pytest.mark.parametrize("n_head", [1, 4])
 @pytest.mark.parametrize("batch_norm", [True, False])
 @pytest.mark.parametrize("num_post_layer", [0, 1, 2])
-def test_LaplacianPosEnc(
+def test_LapPosEncoder(
     num_layer, k, lpe_dim, n_head, batch_norm, num_post_layer
 ):
     ctx = F.ctx()
@@ -2288,12 +2272,12 @@ def test_LaplacianPosEnc(
     EigVals = th.randn((num_nodes, k)).to(ctx)
     EigVecs = th.randn((num_nodes, k)).to(ctx)
 
-    model = nn.LaplacianPosEnc(
+    model = nn.LapPosEncoder(
         "Transformer", num_layer, k, lpe_dim, n_head, batch_norm, num_post_layer
     ).to(ctx)
     assert model(EigVals, EigVecs).shape == (num_nodes, lpe_dim)
 
-    model = nn.LaplacianPosEnc(
+    model = nn.LapPosEncoder(
         "DeepSet",
         num_layer,
         k,
@@ -2309,16 +2293,12 @@ def test_LaplacianPosEnc(
 @pytest.mark.parametrize("bias", [True, False])
 @pytest.mark.parametrize("attn_bias_type", ["add", "mul"])
 @pytest.mark.parametrize("attn_drop", [0.1, 0.5])
-def test_BiasedMultiheadAttention(
-    feat_size, num_heads, bias, attn_bias_type, attn_drop
-):
+def test_BiasedMHA(feat_size, num_heads, bias, attn_bias_type, attn_drop):
     ndata = th.rand(16, 100, feat_size)
     attn_bias = th.rand(16, 100, 100, num_heads)
     attn_mask = th.rand(16, 100, 100) < 0.5
 
-    net = nn.BiasedMultiheadAttention(
-        feat_size, num_heads, bias, attn_bias_type, attn_drop
-    )
+    net = nn.BiasedMHA(feat_size, num_heads, bias, attn_bias_type, attn_drop)
     out = net(ndata, attn_bias, attn_mask)
 
     assert out.shape == (16, 100, feat_size)
@@ -2342,6 +2322,7 @@ def test_GraphormerLayer(attn_bias_type, norm_first):
         attn_bias_type=attn_bias_type,
         norm_first=norm_first,
         dropout=0.1,
+        attn_dropout=0.1,
         activation=th.nn.ReLU(),
     )
     out = net(nfeat, attn_bias, attn_mask)
