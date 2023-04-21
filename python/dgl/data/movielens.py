@@ -99,7 +99,7 @@ class MovieLensDataset(DGLDataset):
         Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0).
     test_ratio: int
         Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0). This parameter is invalid
-        when :obj:`name` is :obj:`"ml-100k"`, since testing sampled are pre-specfied for :obj:`"ml-100k"`.
+        when :obj:`name` is :obj:`"ml-100k"`, since testing samples are pre-specfied for :obj:`"ml-100k"`.
         Default: None
     text_cache: str
         Raw file directory to store the pre-trained word embeddings that used to preprocess movie titles.
@@ -425,9 +425,7 @@ class MovieLensDataset(DGLDataset):
 
     @property
     def raw_path(self):
-        if self.name == "ml-10m":
-            return os.path.join(self.raw_dir, "ml-10M100K")
-        return super().raw_path
+        return os.path.join(self.raw_dir, self.name)
 
     @property
     def graph_path(self):
