@@ -63,7 +63,7 @@ class MovieLensDataset(DGLDataset):
     r"""MovieLens[1] dataset for edge prediction tasks.
 
     The datasets consist of user ratings for movies and incorporate additional user/movie information in the form of features. 
-    The data are stored in undirected bipartite graph structure, where nodes represent users and movies, edges store ratings
+    The nodes represent users and movies, and the edges store ratings
     that users assign to movies. The website of raw datasets: `<https://grouplens.org/datasets/movielens/>`_
 
     Reference:
