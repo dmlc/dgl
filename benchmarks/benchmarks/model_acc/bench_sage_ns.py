@@ -53,14 +53,14 @@ class SAGE(nn.Module):
         # TODO: can we standardize this?
         for l, layer in enumerate(self.layers):
             y = th.zeros(
-                g.number_of_nodes(),
+                g.num_nodes(),
                 self.n_hidden if l != len(self.layers) - 1 else self.n_classes,
             )
 
             sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
             dataloader = dgl.dataloading.DataLoader(
                 g,
-                th.arange(g.number_of_nodes()),
+                th.arange(g.num_nodes()),
                 sampler,
                 batch_size=batch_size,
                 shuffle=True,

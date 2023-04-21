@@ -418,7 +418,7 @@ class GraphConv(nn.Module):
                     )
             aggregate_fn = fn.copy_u("h", "m")
             if edge_weight is not None:
-                assert edge_weight.shape[0] == graph.number_of_edges()
+                assert edge_weight.shape[0] == graph.num_edges()
                 graph.edata["_edge_weight"] = edge_weight
                 aggregate_fn = fn.u_mul_e("h", "_edge_weight", "m")
 

@@ -140,5 +140,17 @@ std::shared_ptr<COO> COOTranspose(const std::shared_ptr<COO>& coo) {
   return COOFromOldDGLCOO(dgl_coo_tr);
 }
 
+std::pair<std::shared_ptr<COO>, torch::Tensor> COOSort(
+    const std::shared_ptr<COO>& coo) {
+  auto encoded_coo =
+      coo->indices.index({0}) * coo->num_cols + coo->indices.index({1});
+  torch::Tensor sorted, perm;
+  std::tie(sorted, perm) = encoded_coo.sort();
+  auto sorted_coo = std::make_shared<COO>(
+      COO{coo->num_rows, coo->num_cols, coo->indices.index_select(1, perm),
+          true, true});
+  return {sorted_coo, perm};
+}
+
 }  // namespace sparse
 }  // namespace dgl

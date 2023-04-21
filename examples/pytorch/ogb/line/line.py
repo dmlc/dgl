@@ -30,7 +30,7 @@ class LineTrainer:
             load_from_ogbn=args.load_from_ogbn,
             num_samples=args.num_samples * 1000000,
         )
-        self.emb_size = self.dataset.G.number_of_nodes()
+        self.emb_size = self.dataset.G.num_nodes()
         self.emb_model = None
 
     def init_device_emb(self):

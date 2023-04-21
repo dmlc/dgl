@@ -72,7 +72,7 @@ def drnl_node_labeling(subgraph, src, dst):
     Returns:
         z(Tensor): node labeling tensor
     """
-    adj = subgraph.adj().to_dense().numpy()
+    adj = subgraph.adj_external().to_dense().numpy()
     src, dst = (dst, src) if src > dst else (src, dst)
 
     idx = list(range(src)) + list(range(src + 1, adj.shape[0]))

@@ -47,15 +47,15 @@ class HeteroGraphIndex(ObjectBase):
             self.__init_handle_by_constructor__(_CAPI_DGLHeteroUnpickle, state)
         elif isinstance(state, tuple) and len(state) == 3:
             # pre-0.4.2
-            metagraph, number_of_nodes, edges = state
+            metagraph, num_nodes, edges = state
 
             self._cache = {}
             # loop over etypes and recover unit graphs
             rel_graphs = []
             for i, edges_per_type in enumerate(edges):
                 src_ntype, dst_ntype = metagraph.find_edge(i)
-                num_src = number_of_nodes[src_ntype]
-                num_dst = number_of_nodes[dst_ntype]
+                num_src = num_nodes[src_ntype]
+                num_dst = num_nodes[dst_ntype]
                 src_id, dst_id, _ = edges_per_type
                 rel_graphs.append(
                     create_unitgraph_from_coo(
@@ -88,11 +88,11 @@ class HeteroGraphIndex(ObjectBase):
 
     def number_of_ntypes(self):
         """Return number of node types."""
-        return self.metagraph.number_of_nodes()
+        return self.metagraph.num_nodes()
 
     def number_of_etypes(self):
         """Return number of edge types."""
-        return self.metagraph.number_of_edges()
+        return self.metagraph.num_edges()
 
     def get_relation_graph(self, etype):
         """Get the unitgraph graph of the given edge/relation type.
@@ -212,9 +212,9 @@ class HeteroGraphIndex(ObjectBase):
         """
         stype, dtype = self.metagraph.find_edge(etype)
         if (
-            self.number_of_edges(etype) >= 0x80000000
-            or self.number_of_nodes(stype) >= 0x80000000
-            or self.number_of_nodes(dtype) >= 0x80000000
+            self.num_edges(etype) >= 0x80000000
+            or self.num_nodes(stype) >= 0x80000000
+            or self.num_nodes(dtype) >= 0x80000000
         ):
             return 64
         else:
@@ -254,12 +254,32 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroCopyTo(self, ctx.device_type, ctx.device_id)
 
+    def pin_memory(self):
+        """Copies the graph structure to pinned memory, if it's not already
+        pinned.
+
+        NOTE: This function is similar to PyTorch's Tensor.pin_memory(), but
+              tailored for graphs. It utilizes the same pin_memory allocator as
+              PyTorch, so the lifecycle of the graph is also managed by PyTorch.
+              If a batch includes a DGL graph object (HeteroGraphIndex),
+              PyTorch's DataLoader memory pinning logic will detect it and
+              automatically activate this function when pin_memory=True.
+
+        Returns
+        -------
+        HeteroGraphIndex
+            The pinned graph index.
+        """
+        return _CAPI_DGLHeteroPinMemory(self)
+
     def pin_memory_(self):
         """Pin this graph to the page-locked memory.
 
-        NOTE: This is an inplace method.
-              The graph structure must be on CPU to be pinned.
-              If the graph struture is already pinned, the function directly returns it.
+        NOTE: This is an inplace method to pin the current graph index, i.e.,
+              it does not require new memory allocation but simply flags the
+              existing graph structure to be page-locked. The graph structure
+              must be on CPU to be pinned. If the graph struture is already
+              pinned, the function directly returns it.
 
         Returns
         -------
@@ -359,6 +379,37 @@ class HeteroGraphIndex(ObjectBase):
         """
         return bool(_CAPI_DGLHeteroIsReadonly(self))
 
+    def num_nodes(self, ntype):
+        """Return the number of nodes.
+
+        Parameters
+        ----------
+        ntype : int
+            Node type.
+
+        Returns
+        -------
+        int
+            The number of nodes.
+        """
+        return _CAPI_DGLHeteroNumVertices(self, int(ntype))
+
+    def num_edges(self, etype):
+        """Return the number of edges.
+
+        Parameters
+        ----------
+        etype : int
+            Edge type.
+
+        Returns
+        -------
+        int
+            The number of edges.
+        """
+        return _CAPI_DGLHeteroNumEdges(self, int(etype))
+
+    # TODO(#5485): remove this method.
     def number_of_nodes(self, ntype):
         """Return the number of nodes.
 
@@ -374,6 +425,7 @@ class HeteroGraphIndex(ObjectBase):
         """
         return _CAPI_DGLHeteroNumVertices(self, int(ntype))
 
+    # TODO(#5485): remove this method.
     def number_of_edges(self, etype):
         """Return the number of edges.
 
@@ -725,16 +777,12 @@ class HeteroGraphIndex(ObjectBase):
         # convert to framework-specific sparse matrix
         srctype, dsttype = self.metagraph.find_edge(etype)
         nrows = (
-            self.number_of_nodes(dsttype)
-            if transpose
-            else self.number_of_nodes(srctype)
+            self.num_nodes(dsttype) if transpose else self.num_nodes(srctype)
         )
         ncols = (
-            self.number_of_nodes(srctype)
-            if transpose
-            else self.number_of_nodes(dsttype)
+            self.num_nodes(srctype) if transpose else self.num_nodes(dsttype)
         )
-        nnz = self.number_of_edges(etype)
+        nnz = self.num_edges(etype)
         if fmt == "csr":
             indptr = F.copy_to(F.from_dgl_nd(rst(0)), ctx)
             indices = F.copy_to(F.from_dgl_nd(rst(1)), ctx)
@@ -799,16 +847,12 @@ class HeteroGraphIndex(ObjectBase):
         rst = _CAPI_DGLHeteroGetAdj(self, int(etype), transpose, fmt)
         srctype, dsttype = self.metagraph.find_edge(etype)
         nrows = (
-            self.number_of_nodes(dsttype)
-            if transpose
-            else self.number_of_nodes(srctype)
+            self.num_nodes(dsttype) if transpose else self.num_nodes(srctype)
         )
         ncols = (
-            self.number_of_nodes(srctype)
-            if transpose
-            else self.number_of_nodes(dsttype)
+            self.num_nodes(srctype) if transpose else self.num_nodes(dsttype)
         )
-        nnz = self.number_of_edges(etype)
+        nnz = self.num_edges(etype)
         if fmt == "csr":
             indptr = F.from_dgl_nd(rst(0))
             indices = F.from_dgl_nd(rst(1))
@@ -868,7 +912,7 @@ class HeteroGraphIndex(ObjectBase):
 
             # Check if edge ID is omitted
             if return_edge_ids and data.shape[0] == 0:
-                data = np.arange(self.number_of_edges(etype))
+                data = np.arange(self.num_edges(etype))
             else:
                 data = np.ones_like(indices)
 
@@ -882,7 +926,7 @@ class HeteroGraphIndex(ObjectBase):
             row = F.asnumpy(row)
             col = F.asnumpy(col)
             data = (
-                np.arange(self.number_of_edges(etype))
+                np.arange(self.num_edges(etype))
                 if return_edge_ids
                 else np.ones_like(row)
             )
@@ -932,9 +976,9 @@ class HeteroGraphIndex(ObjectBase):
         src, dst, eid = self.edges(etype)
         srctype, dsttype = self.metagraph.find_edge(etype)
 
-        m = self.number_of_edges(etype)
+        m = self.num_edges(etype)
         if typestr == "in":
-            n = self.number_of_nodes(dsttype)
+            n = self.num_nodes(dsttype)
             row = F.unsqueeze(dst, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.copy_to(F.cat([row, col], dim=0), ctx)
@@ -942,7 +986,7 @@ class HeteroGraphIndex(ObjectBase):
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
             inc, shuffle_idx = F.sparse_matrix(dat, ("coo", idx), (n, m))
         elif typestr == "out":
-            n = self.number_of_nodes(srctype)
+            n = self.num_nodes(srctype)
             row = F.unsqueeze(src, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.copy_to(F.cat([row, col], dim=0), ctx)
@@ -953,7 +997,7 @@ class HeteroGraphIndex(ObjectBase):
             assert (
                 srctype == dsttype
             ), "'both' is supported only if source and destination type are the same"
-            n = self.number_of_nodes(srctype)
+            n = self.num_nodes(srctype)
             # first remove entries for self loops
             mask = F.logical_not(F.equal(src, dst))
             src = F.boolean_mask(src, mask)

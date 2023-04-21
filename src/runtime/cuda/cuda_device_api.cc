@@ -107,10 +107,11 @@ class CUDADeviceAPI final : public DeviceAPI {
       DGLDataType type_hint) final {
     SetDevice(ctx);
     // Redirect to PyTorch's allocator when available.
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable())
-      return td->CUDAAllocWorkspace(nbytes, getCurrentCUDAStream());
-
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable()) {
+      return tensor_dispatcher->CUDAAllocWorkspace(
+          nbytes, getCurrentCUDAStream());
+    }
     CHECK_EQ(256 % alignment, 0U) << "CUDA space is aligned at 256 bytes";
     void* ret;
     CUDA_CALL(cudaMalloc(&ret, nbytes));
@@ -119,9 +120,10 @@ class CUDADeviceAPI final : public DeviceAPI {
 
   void FreeDataSpace(DGLContext ctx, void* ptr) final {
     SetDevice(ctx);
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable()) return td->CUDAFreeWorkspace(ptr);
-
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable()) {
+      return tensor_dispatcher->CUDAFreeWorkspace(ptr);
+    }
     CUDA_CALL(cudaFree(ptr));
   }
 
@@ -161,6 +163,28 @@ class CUDADeviceAPI final : public DeviceAPI {
     CopyDataFromTo(
         from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint,
         stream);
+  }
+
+  // To ensure correct behavior, `record_event` must be invoked anytime a
+  // pointer from PyTorch CachingHostAllocator is used in a cudaMemcpyAsync
+  // call. It provides a way to re-use freed pinned (page-locked) memory
+  // allocations and avoid device sync due to cudaFreeHost calls.
+  void RecordedCopyDataFromTo(
+      void* from, size_t from_offset, void* to, size_t to_offset, size_t size,
+      DGLContext ctx_from, DGLContext ctx_to, DGLDataType type_hint,
+      void* pytorch_ctx) final {
+    auto stream = GetStream();
+    CopyDataFromTo(
+        from, from_offset, to, to_offset, size, ctx_from, ctx_to, type_hint,
+        stream);
+    auto tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable()) {
+      auto custream = static_cast<cudaStream_t>(stream);
+      void* ptr = ctx_to.device_type == kDGLCPU ? to : from;
+      int id =
+          ctx_to.device_type == kDGLCPU ? ctx_from.device_id : ctx_to.device_id;
+      tensor_dispatcher->CUDARecordHostAlloc(ptr, pytorch_ctx, custream, id);
+    }
   }
 
   DGLStreamHandle CreateStream(DGLContext ctx) {
@@ -214,6 +238,12 @@ class CUDADeviceAPI final : public DeviceAPI {
   bool PinData(void* ptr, size_t nbytes) override {
     // prevent users from pinning empty tensors or graphs
     if (ptr == nullptr || nbytes == 0) return false;
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    // Minimize the pinned memory pool allocated by backend (via tensoradapter)
+    // to preserve enough memory for DGL inherited in-place pin-memory operation
+    if (tensor_dispatcher->IsAvailable()) {
+      tensor_dispatcher->CUDAHostAllocatorEmptyCache();
+    }
     CUDA_CALL(cudaHostRegister(ptr, nbytes, cudaHostRegisterDefault));
     return true;
   }
@@ -221,6 +251,25 @@ class CUDADeviceAPI final : public DeviceAPI {
   void UnpinData(void* ptr) {
     if (ptr == nullptr) return;
     CUDA_CALL(cudaHostUnregister(ptr));
+  }
+
+  void* AllocPinnedDataSpace(
+      size_t nbytes, void** ctx, void** deleter) override {
+    // prevent pinning empty tensors or graphs
+    if (nbytes == 0) return nullptr;
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    CHECK(tensor_dispatcher->IsAvailable())
+        << "CachingHostAllocator is not available in the current backend "
+           "PyTorch. Please update the PyTorch version to 1.11+";
+    return tensor_dispatcher->CUDAAllocHostWorkspace(nbytes, ctx, deleter);
+  }
+
+  void FreePinnedDataSpace(void** deleter) override {
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    CHECK(tensor_dispatcher->IsAvailable())
+        << "CachingHostAllocator is not available in the current backend "
+           "PyTorch. Please update the PyTorch version to 1.11+";
+    tensor_dispatcher->CUDAFreeHostWorkspace(deleter);
   }
 
   bool IsPinned(const void* ptr) override {
@@ -264,17 +313,19 @@ class CUDADeviceAPI final : public DeviceAPI {
       DGLContext ctx, size_t size, DGLDataType type_hint) final {
     SetDevice(ctx);
     // Redirect to PyTorch's allocator when available.
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable())
-      return td->CUDAAllocWorkspace(size, getCurrentCUDAStream());
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable())
+      return tensor_dispatcher->CUDAAllocWorkspace(
+          size, getCurrentCUDAStream());
 
     return CUDAThreadEntry::ThreadLocal()->pool.AllocWorkspace(ctx, size);
   }
 
   void FreeWorkspace(DGLContext ctx, void* data) final {
     SetDevice(ctx);
-    TensorDispatcher* td = TensorDispatcher::Global();
-    if (td->IsAvailable()) return td->CUDAFreeWorkspace(data);
+    TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+    if (tensor_dispatcher->IsAvailable())
+      return tensor_dispatcher->CUDAFreeWorkspace(data);
 
     CUDAThreadEntry::ThreadLocal()->pool.FreeWorkspace(ctx, data);
   }
@@ -309,9 +360,9 @@ CUDAThreadEntry* CUDAThreadEntry::ThreadLocal() {
 }
 
 cudaStream_t getCurrentCUDAStream() {
-  TensorDispatcher* td = TensorDispatcher::Global();
-  if (td->IsAvailable())
-    return td->CUDAGetCurrentStream();
+  TensorDispatcher* tensor_dispatcher = TensorDispatcher::Global();
+  if (tensor_dispatcher->IsAvailable())
+    return tensor_dispatcher->CUDAGetCurrentStream();
   else  // return the default stream when TA is not available
     return nullptr;
 }

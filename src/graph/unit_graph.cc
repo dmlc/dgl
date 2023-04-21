@@ -140,6 +140,15 @@ class UnitGraph::COO : public BaseHeteroGraph {
     return COO(meta_graph_, adj_.CopyTo(ctx));
   }
 
+  /**
+   * @brief Copy the adj_ to pinned memory.
+   * @return COOMatrix of the COO graph.
+   */
+  COO PinMemory() {
+    if (adj_.is_pinned) return *this;
+    return COO(meta_graph_, adj_.PinMemory());
+  }
+
   /** @brief Pin the adj_: COOMatrix of the COO graph. */
   void PinMemory_() { adj_.PinMemory_(); }
 
@@ -533,6 +542,15 @@ class UnitGraph::CSR : public BaseHeteroGraph {
     } else {
       return CSR(meta_graph_, adj_.CopyTo(ctx));
     }
+  }
+
+  /**
+   * @brief Copy the adj_ to pinned memory.
+   * @return CSRMatrix of the CSR graph.
+   */
+  CSR PinMemory() {
+    if (adj_.is_pinned) return *this;
+    return CSR(meta_graph_, adj_.PinMemory());
   }
 
   /** @brief Pin the adj_: CSRMatrix of the CSR graph. */
@@ -1257,6 +1275,37 @@ HeteroGraphPtr UnitGraph::CopyTo(HeteroGraphPtr g, const DGLContext& ctx) {
     return HeteroGraphPtr(new UnitGraph(
         g->meta_graph(), new_incsr, new_outcsr, new_coo, bg->formats_));
   }
+}
+
+HeteroGraphPtr UnitGraph::PinMemory() {
+  CSRPtr pinned_in_csr, pinned_out_csr;
+  COOPtr pinned_coo;
+  if (this->in_csr_->defined() && this->in_csr_->IsPinned()) {
+    pinned_in_csr = this->in_csr_;
+  } else if (this->in_csr_->defined()) {
+    pinned_in_csr = CSRPtr(new CSR(this->in_csr_->PinMemory()));
+  } else {
+    pinned_in_csr = nullptr;
+  }
+
+  if (this->out_csr_->defined() && this->out_csr_->IsPinned()) {
+    pinned_out_csr = this->out_csr_;
+  } else if (this->out_csr_->defined()) {
+    pinned_out_csr = CSRPtr(new CSR(this->out_csr_->PinMemory()));
+  } else {
+    pinned_out_csr = nullptr;
+  }
+
+  if (this->coo_->defined() && this->coo_->IsPinned()) {
+    pinned_coo = this->coo_;
+  } else if (this->coo_->defined()) {
+    pinned_coo = COOPtr(new COO(this->coo_->PinMemory()));
+  } else {
+    pinned_coo = nullptr;
+  }
+
+  return HeteroGraphPtr(new UnitGraph(
+      meta_graph(), pinned_in_csr, pinned_out_csr, pinned_coo, this->formats_));
 }
 
 void UnitGraph::PinMemory_() {

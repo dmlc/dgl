@@ -244,8 +244,6 @@ class CUDAThreadEntry {
   cusparseHandle_t cusparse_handle{nullptr};
   /** @brief The cublas handler */
   cublasHandle_t cublas_handle{nullptr};
-  /** @brief The curand generator */
-  curandGenerator_t curand_gen{nullptr};
   /** @brief thread local pool*/
   WorkspacePool pool;
   /** @brief constructor */

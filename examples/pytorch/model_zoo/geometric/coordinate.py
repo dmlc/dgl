@@ -8,7 +8,7 @@ def get_coordinates(graphs, grid_side, coarsening_levels, perm):
     rst = []
     for l in range(coarsening_levels + 1):
         xs, ys = [], []
-        for i in range(graphs[l].number_of_nodes()):
+        for i in range(graphs[l].num_nodes()):
             cnt = eps
             x_accum = 0
             y_accum = 0

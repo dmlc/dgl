@@ -100,8 +100,8 @@ def load_subtensor(input_nodes, pair_graph, blocks, dataset, parent_graph):
 
 
 def flatten_etypes(pair_graph, dataset, segment):
-    n_users = pair_graph.number_of_nodes("user")
-    n_movies = pair_graph.number_of_nodes("movie")
+    n_users = pair_graph.num_nodes("user")
+    n_movies = pair_graph.num_nodes("movie")
     src = []
     dst = []
     labels = []
@@ -274,7 +274,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
         dataset.train_enc_graph,
         {
             to_etype_name(k): th.arange(
-                dataset.train_enc_graph.number_of_edges(etype=to_etype_name(k))
+                dataset.train_enc_graph.num_edges(etype=to_etype_name(k))
             )
             for k in dataset.possible_rating_values
         },
@@ -288,7 +288,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
     if proc_id == 0:
         valid_dataloader = dgl.dataloading.DataLoader(
             dataset.valid_dec_graph,
-            th.arange(dataset.valid_dec_graph.number_of_edges()),
+            th.arange(dataset.valid_dec_graph.num_edges()),
             sampler,
             g_sampling=dataset.valid_enc_graph,
             batch_size=args.minibatch_size,
@@ -297,7 +297,7 @@ def run(proc_id, n_gpus, args, devices, dataset):
         )
         test_dataloader = dgl.dataloading.DataLoader(
             dataset.test_dec_graph,
-            th.arange(dataset.test_dec_graph.number_of_edges()),
+            th.arange(dataset.test_dec_graph.num_edges()),
             sampler,
             g_sampling=dataset.test_enc_graph,
             batch_size=args.minibatch_size,

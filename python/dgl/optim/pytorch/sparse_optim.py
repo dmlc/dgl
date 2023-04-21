@@ -535,7 +535,7 @@ class SparseAdagrad(SparseGradOptimizer):
     >>> def initializer(emb):
             th.nn.init.xavier_uniform_(emb)
             return emb
-    >>> emb = dgl.nn.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> emb = dgl.nn.NodeEmbedding(g.num_nodes(), 10, 'emb', init_func=initializer)
     >>> optimizer = dgl.optim.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     ...
@@ -690,7 +690,7 @@ class SparseAdam(SparseGradOptimizer):
     >>> def initializer(emb):
             th.nn.init.xavier_uniform_(emb)
             return emb
-    >>> emb = dgl.nn.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> emb = dgl.nn.NodeEmbedding(g.num_nodes(), 10, 'emb', init_func=initializer)
     >>> optimizer = dgl.optim.SparseAdam([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     ...

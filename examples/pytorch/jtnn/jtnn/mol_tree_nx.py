@@ -72,7 +72,7 @@ class DGLMolTree(object):
             self.nodes_dict[i]["is_leaf"] = self.graph.out_degrees(i) == 1
 
     def treesize(self):
-        return self.graph.number_of_nodes()
+        return self.graph.num_nodes()
 
     def _recover_node(self, i, original_mol):
         node = self.nodes_dict[i]

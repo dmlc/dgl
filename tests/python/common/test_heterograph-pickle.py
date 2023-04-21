@@ -21,7 +21,7 @@ from utils import (
 
 
 def _assert_is_identical_nodeflow(nf1, nf2):
-    assert nf1.number_of_nodes() == nf2.number_of_nodes()
+    assert nf1.num_nodes() == nf2.num_nodes()
     src, dst = nf1.all_edges()
     src2, dst2 = nf2.all_edges()
     assert F.array_equal(src, src2)
@@ -96,7 +96,7 @@ def test_pickling_graph_index():
 
     gi2 = _reconstruct_pickle(gi)
 
-    assert gi2.number_of_nodes() == gi.number_of_nodes()
+    assert gi2.num_nodes() == gi.num_nodes()
     src_idx2, dst_idx2, _ = gi2.edges()
     assert F.array_equal(src_idx.tousertensor(), src_idx2.tousertensor())
     assert F.array_equal(dst_idx.tousertensor(), dst_idx2.tousertensor())

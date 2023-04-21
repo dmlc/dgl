@@ -150,7 +150,7 @@ class SealSampler(Sampler):
             subg.remove_edges(edges_to_remove)
             # add double radius node labeling
             subg.ndata["z"] = self._double_radius_node_labeling(
-                subg.adj(scipy_fmt="csr")
+                subg.adj_external(scipy_fmt="csr")
             )
             subg_aug = subg.add_self_loop()
             if "weight" in subg.edata:
@@ -463,12 +463,12 @@ if __name__ == "__main__":
 
     # reconstruct the graph for ogbl-collab data for validation edge augmentation and coalesce
     if args.dataset == "ogbl-collab":
+        graph.edata.pop("year")
+        # float edata for to_simple transform
+        graph.edata["weight"] = graph.edata["weight"].to(torch.float)
         if args.use_valedges_as_input:
             val_edges = split_edge["valid"]["edge"]
             row, col = val_edges.t()
-            # float edata for to_simple transform
-            graph.edata.pop("year")
-            graph.edata["weight"] = graph.edata["weight"].to(torch.float)
             val_weights = torch.ones(size=(val_edges.size(0), 1))
             graph.add_edges(
                 torch.cat([row, col]),
