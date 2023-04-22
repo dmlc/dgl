@@ -410,8 +410,10 @@ def test_gather_mm_idx_b(feat_size, dtype, tol):
         and dtype == torch.float16
         and torch.cuda.get_device_capability() < (7, 0)
     ):
-        pytest.skip(f"FP16 is not supported for atomic operations on GPU with "
-                    f"cuda capability ({torch.cuda.get_device_capability()}).")
+        pytest.skip(
+            f"FP16 is not supported for atomic operations on GPU with "
+            f"cuda capability ({torch.cuda.get_device_capability()})."
+        )
 
     dev = F.ctx()
     # input
