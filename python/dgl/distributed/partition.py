@@ -197,7 +197,7 @@ def load_partition(part_config, part_id, load_feats=True):
         "%d bytes. It may take non-trivial "
         "time for large partition.",
         partition_path,
-        os.path.getsize(partition_path)
+        os.path.getsize(partition_path),
     )
     graph = load_graphs(partition_path)[0][0]
     logging.info("Finished loading partition.")
@@ -306,10 +306,9 @@ def load_partition_feats(
     if load_nodes:
         feat_path = relative_to_config(part_files["node_feats"])
         logging.debug(
-            "Start to load node data from %s which is "
-            "%d bytes.",
+            "Start to load node data from %s which is " "%d bytes.",
             feat_path,
-            os.path.getsize(feat_path)
+            os.path.getsize(feat_path),
         )
         node_feats = load_tensors(feat_path)
         logging.info("Finished loading node data.")
@@ -317,10 +316,9 @@ def load_partition_feats(
     if load_edges:
         feat_path = relative_to_config(part_files["edge_feats"])
         logging.debug(
-            "Start to load edge data from %s which is "
-            "%d bytes.",
+            "Start to load edge data from %s which is " "%d bytes.",
             feat_path,
-            os.path.getsize(feat_path)
+            os.path.getsize(feat_path),
         )
         edge_feats = load_tensors(feat_path)
         logging.info("Finished loading edge data.")
