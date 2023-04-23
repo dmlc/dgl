@@ -6,7 +6,9 @@
 
 #include <dgl/runtime/config.h>
 #include <dgl/runtime/registry.h>
+#if !defined(_WIN32) && defined(USE_LIBXSMM)
 #include <libxsmm_cpuid.h>
+#endif
 
 using namespace dgl::runtime;
 
