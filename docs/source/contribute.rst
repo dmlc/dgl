@@ -88,7 +88,7 @@ locally first (require cpplint and pylint to be installed first):
 
    bash tests/scripts/task_lint.sh
 
-The python code style configure file is ``tests/scripts/pylintrc``. We tweak it a little bit from
+The python code style configure file is ``tests/lint/pylintrc``. We tweak it a little bit from
 the standard. For example, following variable names are accepted:
 
 * ``i,j,k``: for loop variables
