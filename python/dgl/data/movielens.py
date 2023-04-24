@@ -60,16 +60,12 @@ def check_pytorch():
         )
 
 class MovieLensDataset(DGLDataset):
-    r"""MovieLens[1] dataset for edge prediction tasks.
+    r"""MovieLens[1] dataset for edge prediction tasks. The raw datasets are extracted from 
+    `MovieLens <https://grouplens.org/datasets/movielens/>`, introduced by
+    `Movielens unplugged: experiences with an occasionally connected recommender system <https://dl.acm.org/doi/10.1145/604045.604094>`.
 
     The datasets consist of user ratings for movies and incorporate additional user/movie information in the form of features. 
-    The nodes represent users and movies, and the edges store ratings
-    that users assign to movies. The website of raw datasets: `<https://grouplens.org/datasets/movielens/>`_
-
-    Reference:
-    [1] Bradley N Miller, Istvan Albert, Shyong K Lam, Joseph A Konstan, and John Riedl. 
-    Movielens unplugged: experiences with an occasionally connected recommender system. In Proceedings of
-    the 8th international conference on Intelligent user interfaces, pp. 263-266. ACM, 2003.
+    The nodes represent users and movies, and the edges store ratings that users assign to movies.
 
     Statistics:
 
@@ -141,22 +137,46 @@ class MovieLensDataset(DGLDataset):
 
     Examples
     --------
-    >>> dataset = MovieLens()
+    >>> from dgl.data import MovieLensDataset
+    >>> 
+    >>> dataset = MovieLensDataset(name='ml-100k', valid_ratio=0.2)
     >>> train_g, valid_g, test_g = dataset[0]
+    >>> train_g
+    Graph(num_nodes=2625, num_edges=128000,
+        ndata_schemes={}
+        edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64), 'etype': Scheme(shape=(), dtype=torch.float32)})
     >>>
     >>> # get ratings of edges in the training graph
     >>> ratings = train_g.edata['etype']
+    >>> ratings
+    tensor([3., 3., 2.,  ..., 4., 4., 2.])
     >>>
     >>> # get training, validation and testing rating pairs
     >>> train_rating, valid_rating, test_rating = \
-    >>>    dataset.info['train_rating_pairs'], dataset.info['valid_rating_pairs'], dataset.info['test_rating_pairs']
-    >>>
+    ...     dataset.info['train_rating_pairs'], dataset.info['valid_rating_pairs'], dataset.info['test_rating_pairs']
     >>> train_rating[0] # node index of users in training rating pairs
-    >>> train_rating[1] # node index of movies in training rating pairs
+    tensor([614, 772, 531,  ..., 674, 639, 740])
+    >>> train_rating[1] node index of movies in training rating pairs
+    tensor([1236,  954, 1487,  ..., 1842, 1631, 1168])
+    >>>
+    >>> # get the rating of a certain user-movie rating pair
+    >>> u, m = train_rating[0][0], train_rating[1][0]
+    >>> eid = train_g.edge_ids(u, m)
+    >>> rating = train_g.edata['etype'][eid]
+    >>> rating
+    tensor([3.])
     >>>
     >>> # get input features of users and movies respectively
     >>> user_feat, movie_feat = \
-    >>>     dataset.feat['user_feat'], dataset.feat['movie_feat']
+    ...     dataset.feat['user_feat'], dataset.feat['movie_feat']
+    >>> user_feat
+    tensor([[0.4800, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
+            [1.0600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
+            [0.4600, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
+            ...,
+            [0.4000, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
+            [0.9600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
+            [0.4400, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000]])
 
     """
 
