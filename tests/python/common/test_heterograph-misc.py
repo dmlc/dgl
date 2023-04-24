@@ -144,11 +144,11 @@ def test_query():
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(
-            F.sparse_to_numpy(g.adjacency_matrix(transpose=True)),
+            F.sparse_to_numpy(g.adj_external(transpose=True)),
             scipy_coo_input().toarray().T,
         )
         assert np.array_equal(
-            F.sparse_to_numpy(g.adjacency_matrix(transpose=False)),
+            F.sparse_to_numpy(g.adj_external(transpose=False)),
             scipy_coo_input().toarray(),
         )
 
@@ -245,11 +245,11 @@ def test_query():
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
         assert np.array_equal(
-            F.sparse_to_numpy(g.adjacency_matrix(transpose=True)),
+            F.sparse_to_numpy(g.adj_external(transpose=True)),
             scipy_coo_input().toarray().T,
         )
         assert np.array_equal(
-            F.sparse_to_numpy(g.adjacency_matrix(transpose=False)),
+            F.sparse_to_numpy(g.adj_external(transpose=False)),
             scipy_coo_input().toarray(),
         )
 
@@ -308,12 +308,12 @@ def test_scipy_adjmat():
     g.add_nodes(10)
     g.add_edges(range(9), range(1, 10))
 
-    adj_0 = g.adj(scipy_fmt="csr")
-    adj_1 = g.adj(scipy_fmt="coo")
+    adj_0 = g.adj_external(scipy_fmt="csr")
+    adj_1 = g.adj_external(scipy_fmt="coo")
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
-    adj_t0 = g.adj(transpose=False, scipy_fmt="csr")
-    adj_t_1 = g.adj(transpose=False, scipy_fmt="coo")
+    adj_t0 = g.adj_external(transpose=False, scipy_fmt="csr")
+    adj_t_1 = g.adj_external(transpose=False, scipy_fmt="coo")
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
 

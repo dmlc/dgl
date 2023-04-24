@@ -14,6 +14,7 @@
 #include <torch/script.h>
 
 #include <memory>
+#include <utility>
 
 namespace dgl {
 namespace sparse {
@@ -112,6 +113,13 @@ std::shared_ptr<CSR> DiagToCSC(
 
 /** @brief COO transposition. */
 std::shared_ptr<COO> COOTranspose(const std::shared_ptr<COO>& coo);
+
+/**
+ * @brief Sort the COO matrix by row and column indices.
+ * @return A pair of the sorted COO matrix and the permutation indices.
+ */
+std::pair<std::shared_ptr<COO>, torch::Tensor> COOSort(
+    const std::shared_ptr<COO>& coo);
 
 }  // namespace sparse
 }  // namespace dgl

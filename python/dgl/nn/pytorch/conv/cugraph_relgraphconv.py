@@ -178,7 +178,7 @@ class CuGraphRelGraphConv(CuGraphBaseConv):
         torch.Tensor
             New node features. Shape: :math:`(|V|, D_{out})`.
         """
-        offsets, indices, edge_ids = g.adj_sparse("csc")
+        offsets, indices, edge_ids = g.adj_tensors("csc")
         edge_types_perm = etypes[edge_ids.long()].int()
 
         if g.is_block:

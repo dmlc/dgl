@@ -121,7 +121,7 @@ class CuGraphSAGEConv(CuGraphBaseConv):
         torch.Tensor
             Output node features. Shape: :math:`(N, D_{out})`.
         """
-        offsets, indices, _ = g.adj_sparse("csc")
+        offsets, indices, _ = g.adj_tensors("csc")
 
         if g.is_block:
             if max_in_degree is None:

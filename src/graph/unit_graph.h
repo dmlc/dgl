@@ -223,6 +223,15 @@ class UnitGraph : public BaseHeteroGraph {
   void UnpinMemory_();
 
   /**
+   * @brief Create a copy of the current graph in pinned memory.
+   * @note The graph will be pinned outplace through PyTorch
+   *     CachingHostAllocator, if available. Otherwise, an error will be thrown.
+   *     If any of the underlying structures (incsr, outcsr, coo) are already
+   *     pinned, the function will simply use its original copy.
+   */
+  HeteroGraphPtr PinMemory();
+
+  /**
    * @brief Record stream for this graph.
    * @param stream The stream that is using the graph
    */

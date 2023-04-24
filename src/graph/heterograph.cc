@@ -277,6 +277,31 @@ HeteroGraphPtr HeteroGraph::CopyTo(HeteroGraphPtr g, const DGLContext& ctx) {
       hgindex->meta_graph_, rel_graphs, hgindex->num_verts_per_type_));
 }
 
+HeteroGraphPtr HeteroGraph::PinMemory(HeteroGraphPtr g) {
+  auto casted_ptr = std::dynamic_pointer_cast<HeteroGraph>(g);
+  CHECK_NOTNULL(casted_ptr);
+  auto relation_graphs = casted_ptr->relation_graphs_;
+
+  auto it = std::find_if_not(
+      relation_graphs.begin(), relation_graphs.end(),
+      [](auto& underlying_g) { return underlying_g->IsPinned(); });
+  // All underlying relation graphs are pinned, return the input hetero-graph
+  // directly.
+  if (it == relation_graphs.end()) return g;
+
+  std::vector<HeteroGraphPtr> pinned_relation_graphs(relation_graphs.size());
+  for (size_t i = 0; i < pinned_relation_graphs.size(); ++i) {
+    if (!relation_graphs[i]->IsPinned()) {
+      pinned_relation_graphs[i] = relation_graphs[i]->PinMemory();
+    } else {
+      pinned_relation_graphs[i] = relation_graphs[i];
+    }
+  }
+  return HeteroGraphPtr(new HeteroGraph(
+      casted_ptr->meta_graph_, pinned_relation_graphs,
+      casted_ptr->num_verts_per_type_));
+}
+
 void HeteroGraph::PinMemory_() {
   for (auto g : relation_graphs_) g->PinMemory_();
 }

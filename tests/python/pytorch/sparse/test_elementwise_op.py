@@ -225,7 +225,7 @@ def test_sub_sparse_diag(val_shape):
     assert torch.allclose(dense_diff, -diff4)
 
 
-@pytest.mark.parametrize("op", ["mul", "truediv", "pow"])
+@pytest.mark.parametrize("op", ["pow"])
 def test_error_op_sparse_diag(op):
     ctx = F.ctx()
     row = torch.tensor([1, 0, 2]).to(ctx)
