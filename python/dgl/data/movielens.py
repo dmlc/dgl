@@ -60,7 +60,7 @@ def check_pytorch():
         )
 
 class MovieLensDataset(DGLDataset):
-    r"""MovieLens[1] dataset for edge prediction tasks. The raw datasets are extracted from 
+    r"""MovieLens dataset for edge prediction tasks. The raw datasets are extracted from 
     `MovieLens <https://grouplens.org/datasets/movielens/>`, introduced by
     `Movielens unplugged: experiences with an occasionally connected recommender system <https://dl.acm.org/doi/10.1145/604045.604094>`.
 
