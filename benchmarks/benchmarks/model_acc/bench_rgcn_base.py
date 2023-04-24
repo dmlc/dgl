@@ -65,7 +65,7 @@ def track_acc(dataset, ns_mode):
         logits[test_idx].argmax(dim=1),
         labels[test_idx],
         task="multiclass",
-        num_classes=num_classes
+        num_classes=num_classes,
     ).item()
 
     return test_acc
