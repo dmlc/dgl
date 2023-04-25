@@ -60,9 +60,11 @@ struct CSRMatrix {
         indices(iarr),
         data(darr),
         sorted(sorted_flag) {
-    is_pinned = (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
-                (aten::IsNullArray(indices) || indices.IsPinned()) &&
-                (aten::IsNullArray(data) || data.IsPinned());
+    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) || !aten::IsNullArray(data)) {
+      is_pinned = (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
+                  (aten::IsNullArray(indices) || indices.IsPinned()) &&
+                  (aten::IsNullArray(data) || data.IsPinned());
+    }
     CheckValidity();
   }
 
@@ -131,15 +133,19 @@ struct CSRMatrix {
 
   /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline CSRMatrix PinMemory() {
-    if (is_pinned) return *this;
-    auto new_csr = CSRMatrix(
-        num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
-        aten::IsNullArray(data) ? data : data.PinMemory(), sorted);
-    CHECK(new_csr.is_pinned)
-        << "An internal DGL error has occured while trying to pin a CSR "
-           "matrix. Please file a bug at 'https://github.com/dmlc/dgl/issues' "
-           "with the above stacktrace.";
-    return new_csr;
+    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) || !aten::IsNullArray(data)) {
+      if (is_pinned) return *this;
+      auto new_csr = CSRMatrix(
+          num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
+          aten::IsNullArray(data) ? data : data.PinMemory(), sorted);
+      CHECK(new_csr.is_pinned)
+          << "An internal DGL error has occured while trying to pin a CSR "
+             "matrix. Please file a bug at 'https://github.com/dmlc/dgl/issues' "
+             "with the above stacktrace.";
+      return new_csr;
+    }
+    is_pinned = true;
+    return *this;
   }
 
   /**
@@ -151,13 +157,17 @@ struct CSRMatrix {
    *       The context check is deferred to pinning the NDArray.
    */
   inline void PinMemory_() {
-    if (is_pinned) return;
-    indptr.PinMemory_();
-    indices.PinMemory_();
-    if (!aten::IsNullArray(data)) {
-      data.PinMemory_();
+    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) || !aten::IsNullArray(data)) {
+      if (is_pinned) return;
+      indptr.PinMemory_();
+      indices.PinMemory_();
+      if (!aten::IsNullArray(data)) {
+        data.PinMemory_();
+      }
+      is_pinned = true;
     }
     is_pinned = true;
+    return;
   }
 
   /**
@@ -168,13 +178,17 @@ struct CSRMatrix {
    *       The context check is deferred to unpinning the NDArray.
    */
   inline void UnpinMemory_() {
-    if (!is_pinned) return;
-    indptr.UnpinMemory_();
-    indices.UnpinMemory_();
-    if (!aten::IsNullArray(data)) {
-      data.UnpinMemory_();
+    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) || !aten::IsNullArray(data)) {
+      if (!is_pinned) return;
+      indptr.UnpinMemory_();
+      indices.UnpinMemory_();
+      if (!aten::IsNullArray(data)) {
+        data.UnpinMemory_();
+      }
+      is_pinned = false;
     }
     is_pinned = false;
+    return;
   }
 
   /**
