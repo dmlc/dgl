@@ -9,12 +9,12 @@ import argparse
 import math
 import time
 
+import dgl.function as fn
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import load_data, register_data_args
 from dgl.nn.pytorch.conv import SGConv
@@ -52,7 +52,7 @@ def main(args):
     test_mask = g.ndata["test_mask"]
     in_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     print(
         """----Data statistics------'
       #Edges %d
@@ -70,7 +70,7 @@ def main(args):
     )
 
     # graph preprocess and calculate normalization factor
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     # normalization
     degs = g.in_degrees().float()
     norm = torch.pow(degs, -0.5)

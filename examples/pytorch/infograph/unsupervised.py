@@ -1,12 +1,12 @@
 import argparse
 
-import torch as th
-from evaluate_embedding import evaluate_embedding
-from model import InfoGraph
-
 import dgl
+
+import torch as th
 from dgl.data import GINDataset
 from dgl.dataloading import GraphDataLoader
+from evaluate_embedding import evaluate_embedding
+from model import InfoGraph
 
 
 def argument():
@@ -75,7 +75,6 @@ def collate(samples):
 
 
 if __name__ == "__main__":
-
     # Step 1: Prepare graph data   ===================================== #
     args = argument()
     print(args)
@@ -131,7 +130,6 @@ if __name__ == "__main__":
         model.train()
 
         for graph, label in dataloader:
-
             graph = graph.to(args.device)
             feat = graph.ndata["attr"]
             graph_id = graph.ndata["graph_id"]
@@ -147,7 +145,6 @@ if __name__ == "__main__":
         print("Epoch {}, Loss {:.4f}".format(epoch, loss_all))
 
         if epoch % args.log_interval == 0:
-
             # evaluate embeddings
             model.eval()
             emb = model.get_embedding(wholegraph, wholefeat).cpu()

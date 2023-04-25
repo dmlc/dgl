@@ -86,18 +86,20 @@ Line Graph Neural Network
 # The following code snippet verifies that there are more intra-class edges
 # than inter-class.
 
+import os
+
+os.environ["DGLBACKEND"] = "pytorch"
+import dgl
 import torch
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
 from dgl.data import citation_graph as citegrh
 
 data = citegrh.load_cora()
 
 G = data[0]
-labels = th.tensor(G.ndata['label'])
+labels = th.tensor(G.ndata["label"])
 
 # find all the nodes labeled with class 0
 label0_nodes = th.nonzero(labels == 0, as_tuple=False).squeeze()
@@ -106,7 +108,9 @@ src, _ = G.in_edges(label0_nodes)
 src_labels = labels[src]
 # find all the edges whose both endpoints are in class 0
 intra_src = th.nonzero(src_labels == 0, as_tuple=False)
-print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
+print("Intra-class edges percent: %.4f" % (len(intra_src) / len(src_labels)))
+
+import matplotlib.pyplot as plt
 
 ###########################################################################################
 # Binary community subgraph from Cora with a test dataset
@@ -125,19 +129,30 @@ print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
 # With the following code, you can visualize one of the training samples and its community structure.
 
 import networkx as nx
-import matplotlib.pyplot as plt
 
 train_set = dgl.data.CoraBinary()
 G1, pmpd1, label1 = train_set[1]
 nx_G1 = G1.to_networkx()
 
+
 def visualize(labels, g):
     pos = nx.spring_layout(g, seed=1)
     plt.figure(figsize=(8, 8))
-    plt.axis('off')
-    nx.draw_networkx(g, pos=pos, node_size=50, cmap=plt.get_cmap('coolwarm'),
-                     node_color=labels, edge_color='k',
-                     arrows=False, width=0.5, style='dotted', with_labels=False)
+    plt.axis("off")
+    nx.draw_networkx(
+        g,
+        pos=pos,
+        node_size=50,
+        cmap=plt.get_cmap("coolwarm"),
+        node_color=labels,
+        edge_color="k",
+        arrows=False,
+        width=0.5,
+        style="dotted",
+        with_labels=False,
+    )
+
+
 visualize(label1, nx_G1)
 
 ###########################################################################################
@@ -367,19 +382,22 @@ visualize(label1, nx_G1)
 
 # Return a list containing features gathered from multiple radius.
 import dgl.function as fn
+
+
 def aggregate_radius(radius, g, z):
     # initializing list to collect message passing result
     z_list = []
-    g.ndata['z'] = z
+    g.ndata["z"] = z
     # pulling message from 1-hop neighbourhood
-    g.update_all(fn.copy_u(u='z', out='m'), fn.sum(msg='m', out='z'))
-    z_list.append(g.ndata['z'])
+    g.update_all(fn.copy_u(u="z", out="m"), fn.sum(msg="m", out="z"))
+    z_list.append(g.ndata["z"])
     for i in range(radius - 1):
-        for j in range(2 ** i):
-            #pulling message from 2^j neighborhood
-            g.update_all(fn.copy_u(u='z', out='m'), fn.sum(msg='m', out='z'))
-        z_list.append(g.ndata['z'])
+        for j in range(2**i):
+            # pulling message from 2^j neighborhood
+            g.update_all(fn.copy_u(u="z", out="m"), fn.sum(msg="m", out="z"))
+        z_list.append(g.ndata["z"])
     return z_list
+
 
 #########################################################################
 # Implementing :math:`\text{fuse}` as sparse matrix multiplication
@@ -426,7 +444,8 @@ class LGNNCore(nn.Module):
         self.linear_prev = nn.Linear(in_feats, out_feats)
         self.linear_deg = nn.Linear(in_feats, out_feats)
         self.linear_radius = nn.ModuleList(
-                [nn.Linear(in_feats, out_feats) for i in range(radius)])
+            [nn.Linear(in_feats, out_feats) for i in range(radius)]
+        )
         self.linear_fuse = nn.Linear(in_feats, out_feats)
         self.bn = nn.BatchNorm1d(out_feats)
 
@@ -440,7 +459,9 @@ class LGNNCore(nn.Module):
         # aggregate 2^j-hop features
         hop2j_list = aggregate_radius(self.radius, g, feat_a)
         # apply linear transformation
-        hop2j_list = [linear(x) for linear, x in zip(self.linear_radius, hop2j_list)]
+        hop2j_list = [
+            linear(x) for linear, x in zip(self.linear_radius, hop2j_list)
+        ]
         radius_proj = sum(hop2j_list)
 
         # term "fuse"
@@ -455,6 +476,7 @@ class LGNNCore(nn.Module):
         result = self.bn(result)
 
         return result
+
 
 ##############################################################################################################
 # Chain-up LGNN abstractions as an LGNN layer
@@ -480,6 +502,7 @@ class LGNNLayer(nn.Module):
         next_lg_x = self.lg_layer(lg, lg_x, x, deg_lg, pm_pd_y)
         return next_x, next_lg_x
 
+
 ########################################################################################
 # Chain-up LGNN layers
 # ~~~~~~~~~~~~~~~~~~~~
@@ -502,15 +525,17 @@ class LGNN(nn.Module):
         x, lg_x = self.layer2(g, lg, x, lg_x, deg_g, deg_lg, pm_pd)
         x, lg_x = self.layer3(g, lg, x, lg_x, deg_g, deg_lg, pm_pd)
         return self.linear(x)
+
+
 #########################################################################################
 # Training and inference
 # -----------------------
 # First load the data.
 from torch.utils.data import DataLoader
-training_loader = DataLoader(train_set,
-                             batch_size=1,
-                             collate_fn=train_set.collate_fn,
-                             drop_last=True)
+
+training_loader = DataLoader(
+    train_set, batch_size=1, collate_fn=train_set.collate_fn, drop_last=True
+)
 
 #######################################################################################
 # Next, define the main training loop. Note that each training sample contains
@@ -534,8 +559,11 @@ optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
 def sparse2th(mat):
     value = mat.data
     indices = th.LongTensor([mat.row, mat.col])
-    tensor = th.sparse.FloatTensor(indices, th.from_numpy(value).float(), mat.shape)
+    tensor = th.sparse.FloatTensor(
+        indices, th.from_numpy(value).float(), mat.shape
+    )
     return tensor
+
 
 # Train for 20 epochs
 for i in range(20):
@@ -569,11 +597,11 @@ for i in range(20):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
     niters = len(all_loss)
-    print("Epoch %d | loss %.4f | accuracy %.4f" % (i,
-        sum(all_loss) / niters, sum(all_acc) / niters))
-
+    print(
+        "Epoch %d | loss %.4f | accuracy %.4f"
+        % (i, sum(all_loss) / niters, sum(all_acc) / niters)
+    )
 #######################################################################################
 # Visualize training progress
 # -----------------------------
@@ -611,12 +639,14 @@ visualize(label1, nx_G1)
 # :math`\{Pm,Pd\}` as block diagonal matrix in correspondence to DGL batched
 # graph API.
 
+
 def collate_fn(batch):
     graphs, pmpds, labels = zip(*batch)
     batched_graphs = dgl.batch(graphs)
     batched_pmpds = sp.block_diag(pmpds)
     batched_labels = np.concatenate(labels, axis=0)
     return batched_graphs, batched_pmpds, batched_labels
+
 
 ######################################################################################
 # You can find the complete code on Github at

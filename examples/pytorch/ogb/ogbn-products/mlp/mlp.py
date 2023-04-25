@@ -7,23 +7,23 @@ import random
 import time
 from collections import OrderedDict
 
+import dgl.function as fn
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from matplotlib.ticker import AutoMinorLocator, MultipleLocator
-from models import MLP
-from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-from torch import nn
-from tqdm import tqdm
-
-import dgl.function as fn
 from dgl.dataloading import (
     DataLoader,
     MultiLayerFullNeighborSampler,
     MultiLayerNeighborSampler,
 )
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator
+from models import MLP
+from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
+from torch import nn
+from tqdm import tqdm
 
 epsilon = 1 - math.log(2)
 

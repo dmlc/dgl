@@ -98,7 +98,6 @@ class TWIRLSConv(nn.Module):
         attn_dropout=0.0,
         inp_dropout=0.0,
     ):
-
         super().__init__()
         self.input_d = input_d
         self.output_d = output_d
@@ -542,7 +541,6 @@ class TWIRLSUnfoldingAndAttention(nn.Module):
         attn_dropout=0,
         precond=True,
     ):
-
         super().__init__()
 
         self.d = d
@@ -589,14 +587,13 @@ class TWIRLSUnfoldingAndAttention(nn.Module):
         """
         Y = X
 
-        g.edata["w"] = tc.ones(g.number_of_edges(), 1, device=g.device)
+        g.edata["w"] = tc.ones(g.num_edges(), 1, device=g.device)
         g.ndata["deg"] = g.in_degrees().to(X)
 
         if self.init_att:
             g = self.init_attn(g, Y, self.etas)
 
         for k, layer in enumerate(self.prop_layers):
-
             # do unfolding
             Y = layer(g, Y, X, self.alp, self.lam)
 

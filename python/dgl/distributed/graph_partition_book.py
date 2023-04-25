@@ -5,8 +5,7 @@ from abc import ABC
 
 import numpy as np
 
-from .. import backend as F
-from .. import utils
+from .. import backend as F, utils
 from .._ffi.ndarray import empty_shared_mem
 from ..base import DGLError
 from ..ndarray import exist_shared_mem_array
@@ -14,16 +13,17 @@ from ..partition import NDArrayPartition
 from .constants import DEFAULT_ETYPE, DEFAULT_NTYPE
 from .id_map import IdMap
 from .shared_mem_utils import (
-    DTYPE_DICT,
     _get_edata_path,
     _get_ndata_path,
     _to_shared_mem,
+    DTYPE_DICT,
 )
 
 CANONICAL_ETYPE_DELIMITER = ":"
 
+
 def _etype_tuple_to_str(c_etype):
-    '''Convert canonical etype from tuple to string.
+    """Convert canonical etype from tuple to string.
 
     Examples
     --------
@@ -32,14 +32,16 @@ def _etype_tuple_to_str(c_etype):
     >>> print(c_etype_str)
     'user:like:item'
 
-    '''
-    assert isinstance(c_etype, tuple) and len(c_etype) == 3, \
-        "Passed-in canonical etype should be in format of (str, str, str). " \
+    """
+    assert isinstance(c_etype, tuple) and len(c_etype) == 3, (
+        "Passed-in canonical etype should be in format of (str, str, str). "
         f"But got {c_etype}."
+    )
     return CANONICAL_ETYPE_DELIMITER.join(c_etype)
 
+
 def _etype_str_to_tuple(c_etype):
-    '''Convert canonical etype from tuple to string.
+    """Convert canonical etype from tuple to string.
 
     Examples
     --------
@@ -48,12 +50,14 @@ def _etype_str_to_tuple(c_etype):
     >>> print(c_etype)
     ('user', 'like', 'item')
 
-    '''
+    """
     ret = tuple(c_etype.split(CANONICAL_ETYPE_DELIMITER))
-    assert len(ret) == 3, \
-        "Passed-in canonical etype should be in format of 'str:str:str'. " \
+    assert len(ret) == 3, (
+        "Passed-in canonical etype should be in format of 'str:str:str'. "
         f"But got {c_etype}."
+    )
     return ret
+
 
 def _move_metadata_to_shared_mem(
     graph_name,
@@ -533,6 +537,7 @@ class GraphPartitionBook(ABC):
             Homogeneous edge IDs.
         """
 
+
 class RangePartitionBook(GraphPartitionBook):
     """This partition book supports more efficient storage of partition information.
 
@@ -582,9 +587,10 @@ class RangePartitionBook(GraphPartitionBook):
             ntype is not None for ntype in self._ntypes
         ), "The node types have invalid IDs."
         for c_etype, etype_id in etypes.items():
-            assert isinstance(c_etype, tuple) and len(c_etype) == 3, \
-                "Expect canonical edge type in a triplet of string, but got " \
+            assert isinstance(c_etype, tuple) and len(c_etype) == 3, (
+                "Expect canonical edge type in a triplet of string, but got "
                 f"{c_etype}."
+            )
             etype = c_etype[1]
             self._etypes[etype_id] = etype
             self._canonical_etypes[etype_id] = c_etype
@@ -660,13 +666,19 @@ class RangePartitionBook(GraphPartitionBook):
         # to local heterogenized node/edge IDs.  One can do the mapping by binary search
         # on these arrays.
         self._local_ntype_offset = np.cumsum(
-                [0] + [
-                    v[self._partid, 1] - v[self._partid, 0]
-                    for v in self._typed_nid_range.values()]).tolist()
+            [0]
+            + [
+                v[self._partid, 1] - v[self._partid, 0]
+                for v in self._typed_nid_range.values()
+            ]
+        ).tolist()
         self._local_etype_offset = np.cumsum(
-                [0] + [
-                    v[self._partid, 1] - v[self._partid, 0]
-                    for v in self._typed_eid_range.values()]).tolist()
+            [0]
+            + [
+                v[self._partid, 1] - v[self._partid, 0]
+                for v in self._typed_eid_range.values()
+            ]
+        ).tolist()
 
         # Get meta data of the partition book
         self._partition_meta_data = []
@@ -945,7 +957,7 @@ class RangePartitionBook(GraphPartitionBook):
 
 NODE_PART_POLICY = "node"
 EDGE_PART_POLICY = "edge"
-POLICY_DELIMITER = '~'
+POLICY_DELIMITER = "~"
 
 
 class PartitionPolicy(object):
@@ -967,11 +979,12 @@ class PartitionPolicy(object):
     """
 
     def __init__(self, policy_str, partition_book):
-        assert (policy_str.startswith(NODE_PART_POLICY) or
-            policy_str.startswith(EDGE_PART_POLICY)), (
-                f"policy_str must start with {NODE_PART_POLICY} or "
-                f"{EDGE_PART_POLICY}, but got {policy_str}."
-            )
+        assert policy_str.startswith(NODE_PART_POLICY) or policy_str.startswith(
+            EDGE_PART_POLICY
+        ), (
+            f"policy_str must start with {NODE_PART_POLICY} or "
+            f"{EDGE_PART_POLICY}, but got {policy_str}."
+        )
         if NODE_PART_POLICY == policy_str:
             policy_str = NODE_PART_POLICY + POLICY_DELIMITER + DEFAULT_NTYPE
         if EDGE_PART_POLICY == policy_str:
@@ -1127,11 +1140,12 @@ class EdgePartitionPolicy(PartitionPolicy):
     """Partition policy for edges."""
 
     def __init__(self, partition_book, etype=DEFAULT_ETYPE):
-        assert isinstance(etype, tuple) and len(etype) == 3, \
-            f"Expect canonical edge type in a triplet of string, but got {etype}."
+        assert (
+            isinstance(etype, tuple) and len(etype) == 3
+        ), f"Expect canonical edge type in a triplet of string, but got {etype}."
         super(EdgePartitionPolicy, self).__init__(
             EDGE_PART_POLICY + POLICY_DELIMITER + _etype_tuple_to_str(etype),
-            partition_book
+            partition_book,
         )
 
 
@@ -1156,9 +1170,10 @@ class HeteroDataName(object):
     def __init__(self, is_node, entity_type, data_name):
         self._policy = NODE_PART_POLICY if is_node else EDGE_PART_POLICY
         if not is_node:
-            assert isinstance(entity_type, tuple) and len(entity_type) == 3, \
-                "Expect canonical edge type in a triplet of string, but got " \
+            assert isinstance(entity_type, tuple) and len(entity_type) == 3, (
+                "Expect canonical edge type in a triplet of string, but got "
                 f"{entity_type}."
+            )
         self._entity_type = entity_type
         self.data_name = data_name
 
@@ -1226,6 +1241,4 @@ def parse_hetero_data_name(name):
     entity_type = names[1]
     if not is_node:
         entity_type = _etype_str_to_tuple(entity_type)
-    return HeteroDataName(
-        is_node, entity_type, names[2]
-    )
+    return HeteroDataName(is_node, entity_type, names[2])

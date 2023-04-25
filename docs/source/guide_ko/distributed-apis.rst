@@ -55,7 +55,7 @@ DistGraph 생성
 
 .. code:: python
 
-    print(g.number_of_nodes())
+    print(g.num_nodes())
 
 노드/에지 데이터 접근
 ^^^^^^^^^^^^^^^^
@@ -76,7 +76,7 @@ DistGraph 생성
 
 .. code:: python
 
-    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name='test')
+    tensor = dgl.distributed.DistTensor((g.num_nodes(), 10), th.float32, name='test')
 
 **Note**: :class:`~dgl.distributed.DistTensor` 생성은 동기화 수행이다. 모든 트레이너들은 생성을 실행해야하고, 모든 트레이너가 이를 호출한 경우에만 생성이 완료된다.
 
@@ -109,7 +109,7 @@ DGL은 노드 임베딩들을 필요로 하는 변환 모델(transductive models
         arr = th.zeros(shape, dtype=dtype)
         arr.uniform_(-1, 1)
         return arr
-    emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10, init_func=initializer)
+    emb = dgl.distributed.DistEmbedding(g.num_nodes(), 10, init_func=initializer)
 
 내부적으로는 분산 임배딩은 분산 텐서를 사용해서 만들어진다. 따라서, 분산 텐서와 비슷하게 동작한다. 예를 들어, 임베딩이 만들어지면, 그것들은 클러스터의 여러 머신들에 나눠져서(shard) 저장된다. 이는 이름을 통해서 고유하게 식별될 수 있다.
 

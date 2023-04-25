@@ -1,42 +1,55 @@
 """DGL PyTorch DataLoaders"""
-from collections.abc import Mapping, Sequence
-from queue import Queue, Empty, Full
-import itertools
-import threading
-import math
-import inspect
-import re
 import atexit
+import inspect
+import itertools
+import math
 import os
+import re
+import threading
+from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
-import psutil
+from queue import Empty, Full, Queue
 
 import numpy as np
+import psutil
 import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
-from ..base import NID, EID, dgl_warning, DGLError
-from ..batch import batch as batch_graphs
-from .._ffi.base import is_tensor_adaptor_enabled
-from ..heterograph import DGLGraph
-from ..utils import (
-    recursive_apply, ExceptionWrapper, recursive_apply_pair, set_num_threads, get_num_threads,
-    get_numa_nodes_cores, dtype_of, version)
-from ..frame import LazyFeature
-from ..storages import wrap_storage
 from .. import backend as F
+from .._ffi.base import is_tensor_adaptor_enabled
+
+from ..base import dgl_warning, DGLError, EID, NID
+from ..batch import batch as batch_graphs
 from ..distributed import DistGraph
+from ..frame import LazyFeature
+from ..heterograph import DGLGraph
 from ..multiprocessing import call_once_and_share
+from ..storages import wrap_storage
+from ..utils import (
+    dtype_of,
+    ExceptionWrapper,
+    get_num_threads,
+    get_numa_nodes_cores,
+    recursive_apply,
+    recursive_apply_pair,
+    set_num_threads,
+    version,
+)
 
 PYTORCH_VER = version.parse(torch.__version__)
 PYTHON_EXIT_STATUS = False
+
+
 def _set_python_exit_flag():
     global PYTHON_EXIT_STATUS
     PYTHON_EXIT_STATUS = True
+
+
 atexit.register(_set_python_exit_flag)
 
-prefetcher_timeout = int(os.environ.get('DGL_PREFETCHER_TIMEOUT', '30'))
+prefetcher_timeout = int(os.environ.get("DGL_PREFETCHER_TIMEOUT", "30"))
+
 
 class _TensorizedDatasetIter(object):
     def __init__(self, dataset, batch_size, drop_last, mapping_keys, shuffle):
@@ -60,7 +73,7 @@ class _TensorizedDatasetIter(object):
             if self.drop_last:
                 raise StopIteration
             end_idx = num_items
-        batch = self.dataset[self.index:end_idx]
+        batch = self.dataset[self.index : end_idx]
         self.index += self.batch_size
 
         return batch
@@ -79,28 +92,34 @@ class _TensorizedDatasetIter(object):
         else:
             if not self.shuffle:
                 dgl_warning(
-                    'The current output_nodes are out of order even if set shuffle '
-                    'to False in Dataloader, the reason is that the current version '
-                    'of torch dose not support stable sort. '
-                    'Please update torch to 1.10.0 or higher to fix it.')
+                    "The current output_nodes are out of order even if set shuffle "
+                    "to False in Dataloader, the reason is that the current version "
+                    "of torch dose not support stable sort. "
+                    "Please update torch to 1.10.0 or higher to fix it."
+                )
             type_ids_sortidx = torch.argsort(type_ids)
         type_ids = type_ids[type_ids_sortidx]
         indices = indices[type_ids_sortidx]
-        type_id_uniq, type_id_count = torch.unique_consecutive(type_ids, return_counts=True)
+        type_id_uniq, type_id_count = torch.unique_consecutive(
+            type_ids, return_counts=True
+        )
         type_id_uniq = type_id_uniq.tolist()
         type_id_offset = type_id_count.cumsum(0).tolist()
         type_id_offset.insert(0, 0)
         id_dict = {
-            self.mapping_keys[type_id_uniq[i]]:
-                indices[type_id_offset[i]:type_id_offset[i+1]].clone()
-            for i in range(len(type_id_uniq))}
+            self.mapping_keys[type_id_uniq[i]]: indices[
+                type_id_offset[i] : type_id_offset[i + 1]
+            ].clone()
+            for i in range(len(type_id_uniq))
+        }
         return id_dict
 
 
 def _get_id_tensor_from_mapping(indices, device, keys):
     dtype = dtype_of(indices)
     id_tensor = torch.empty(
-        sum(v.shape[0] for v in indices.values()), 2, dtype=dtype, device=device)
+        sum(v.shape[0] for v in indices.values()), 2, dtype=dtype, device=device
+    )
 
     offset = 0
     for i, k in enumerate(keys):
@@ -108,8 +127,8 @@ def _get_id_tensor_from_mapping(indices, device, keys):
             continue
         index = indices[k]
         length = index.shape[0]
-        id_tensor[offset:offset+length, 0] = i
-        id_tensor[offset:offset+length, 1] = index
+        id_tensor[offset : offset + length, 0] = i
+        id_tensor[offset : offset + length, 1] = index
         offset += length
     return id_tensor
 
@@ -118,10 +137,14 @@ def _divide_by_worker(dataset, batch_size, drop_last):
     num_samples = dataset.shape[0]
     worker_info = torch.utils.data.get_worker_info()
     if worker_info:
-        num_batches = (num_samples + (0 if drop_last else batch_size - 1)) // batch_size
+        num_batches = (
+            num_samples + (0 if drop_last else batch_size - 1)
+        ) // batch_size
         num_batches_per_worker = num_batches // worker_info.num_workers
         left_over = num_batches % worker_info.num_workers
-        start = (num_batches_per_worker * worker_info.id) + min(left_over, worker_info.id)
+        start = (num_batches_per_worker * worker_info.id) + min(
+            left_over, worker_info.id
+        )
         end = start + num_batches_per_worker + (worker_info.id < left_over)
         start *= batch_size
         end = min(end * batch_size, num_samples)
@@ -133,12 +156,16 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
     When the dataset is on the GPU, this significantly reduces the overhead.
     """
-    def __init__(self, indices, batch_size, drop_last, shuffle, use_shared_memory):
+
+    def __init__(
+        self, indices, batch_size, drop_last, shuffle, use_shared_memory
+    ):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
             self._device = next(iter(indices.values())).device
             self._id_tensor = _get_id_tensor_from_mapping(
-                indices, self._device, self._mapping_keys)
+                indices, self._device, self._mapping_keys
+            )
         else:
             self._id_tensor = indices
             self._device = indices.device
@@ -146,7 +173,9 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         # Use a shared memory array to permute indices for shuffling.  This is to make sure that
         # the worker processes can see it when persistent_workers=True, where self._indices
         # would not be duplicated every epoch.
-        self._indices = torch.arange(self._id_tensor.shape[0], dtype=torch.int64)
+        self._indices = torch.arange(
+            self._id_tensor.shape[0], dtype=torch.int64
+        )
         if use_shared_memory:
             self._indices.share_memory_()
         self.batch_size = batch_size
@@ -158,14 +187,24 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         np.random.shuffle(self._indices.numpy())
 
     def __iter__(self):
-        indices = _divide_by_worker(self._indices, self.batch_size, self.drop_last)
+        indices = _divide_by_worker(
+            self._indices, self.batch_size, self.drop_last
+        )
         id_tensor = self._id_tensor[indices]
         return _TensorizedDatasetIter(
-            id_tensor, self.batch_size, self.drop_last, self._mapping_keys, self._shuffle)
+            id_tensor,
+            self.batch_size,
+            self.drop_last,
+            self._mapping_keys,
+            self._shuffle,
+        )
 
     def __len__(self):
         num_samples = self._id_tensor.shape[0]
-        return (num_samples + (0 if self.drop_last else (self.batch_size - 1))) // self.batch_size
+        return (
+            num_samples + (0 if self.drop_last else (self.batch_size - 1))
+        ) // self.batch_size
+
 
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
@@ -174,6 +213,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     This class additionally saves the index tensor in shared memory and therefore
     avoids duplicating the same index tensor during shuffling.
     """
+
     def __init__(self, indices, batch_size, drop_last, ddp_seed, shuffle):
         if isinstance(indices, Mapping):
             self._mapping_keys = list(indices.keys())
@@ -191,7 +231,9 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self._shuffle = shuffle
 
         if self.drop_last and len_indices % self.num_replicas != 0:
-            self.num_samples = math.ceil((len_indices - self.num_replicas) / self.num_replicas)
+            self.num_samples = math.ceil(
+                (len_indices - self.num_replicas) / self.num_replicas
+            )
         else:
             self.num_samples = math.ceil(len_indices / self.num_replicas)
         self.total_size = self.num_samples * self.num_replicas
@@ -199,20 +241,27 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         # of indices since we will need to pad it after shuffling to make it evenly
         # divisible before every epoch.  If drop_last is False, we create an array
         # with the same size as the indices so we can trim it later.
-        self.shared_mem_size = self.total_size if not self.drop_last else len_indices
+        self.shared_mem_size = (
+            self.total_size if not self.drop_last else len_indices
+        )
         self.num_indices = len_indices
 
         if isinstance(indices, Mapping):
             self._device = next(iter(indices.values())).device
             self._id_tensor = call_once_and_share(
-                lambda: _get_id_tensor_from_mapping(indices, self._device, self._mapping_keys),
-                (self.num_indices, 2), dtype_of(indices))
+                lambda: _get_id_tensor_from_mapping(
+                    indices, self._device, self._mapping_keys
+                ),
+                (self.num_indices, 2),
+                dtype_of(indices),
+            )
         else:
             self._id_tensor = indices
             self._device = self._id_tensor.device
 
         self._indices = call_once_and_share(
-            self._create_shared_indices, (self.shared_mem_size,), torch.int64)
+            self._create_shared_indices, (self.shared_mem_size,), torch.int64
+        )
 
     def _create_shared_indices(self):
         indices = torch.empty(self.shared_mem_size, dtype=torch.int64)
@@ -225,27 +274,38 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         """Shuffles the dataset."""
         # Only rank 0 does the actual shuffling.  The other ranks wait for it.
         if self.rank == 0:
-            np.random.shuffle(self._indices[:self.num_indices].numpy())
+            np.random.shuffle(self._indices[: self.num_indices].numpy())
             if not self.drop_last:
                 # pad extra
-                self._indices[self.num_indices:] = \
-                    self._indices[:self.total_size - self.num_indices]
+                self._indices[self.num_indices :] = self._indices[
+                    : self.total_size - self.num_indices
+                ]
         dist.barrier()
 
     def __iter__(self):
         start = self.num_samples * self.rank
         end = self.num_samples * (self.rank + 1)
-        indices = _divide_by_worker(self._indices[start:end], self.batch_size, self.drop_last)
+        indices = _divide_by_worker(
+            self._indices[start:end], self.batch_size, self.drop_last
+        )
         id_tensor = self._id_tensor[indices]
         return _TensorizedDatasetIter(
-            id_tensor, self.batch_size, self.drop_last, self._mapping_keys, self._shuffle)
+            id_tensor,
+            self.batch_size,
+            self.drop_last,
+            self._mapping_keys,
+            self._shuffle,
+        )
 
     def __len__(self):
-        return (self.num_samples + (0 if self.drop_last else (self.batch_size - 1))) // \
-            self.batch_size
+        return (
+            self.num_samples + (0 if self.drop_last else (self.batch_size - 1))
+        ) // self.batch_size
 
 
-def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, device, pin_prefetcher):
+def _prefetch_update_feats(
+    feats, frames, types, get_storage_func, id_name, device, pin_prefetcher
+):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
         default_id = frame.get(id_name, None)
@@ -255,16 +315,19 @@ def _prefetch_update_feats(feats, frames, types, get_storage_func, id_name, devi
                 parent_key = column.name or key
                 if column.id_ is None and default_id is None:
                     raise DGLError(
-                        'Found a LazyFeature with no ID specified, '
-                        'and the graph does not have dgl.NID or dgl.EID columns')
+                        "Found a LazyFeature with no ID specified, "
+                        "and the graph does not have dgl.NID or dgl.EID columns"
+                    )
                 feats[tid, key] = get_storage_func(parent_key, type_).fetch(
-                    column.id_ or default_id, device, pin_prefetcher)
+                    column.id_ or default_id, device, pin_prefetcher
+                )
 
 
 # This class exists to avoid recursion into the feature dictionary returned by the
 # prefetcher when calling recursive_apply().
 class _PrefetchedGraphFeatures(object):
-    __slots__ = ['node_feats', 'edge_feats']
+    __slots__ = ["node_feats", "edge_feats"]
+
     def __init__(self, node_feats, edge_feats):
         self.node_feats = node_feats
         self.edge_feats = edge_feats
@@ -273,11 +336,23 @@ class _PrefetchedGraphFeatures(object):
 def _prefetch_for_subgraph(subg, dataloader):
     node_feats, edge_feats = {}, {}
     _prefetch_update_feats(
-        node_feats, subg._node_frames, subg.ntypes, dataloader.graph.get_node_storage,
-        NID, dataloader.device, dataloader.pin_prefetcher)
+        node_feats,
+        subg._node_frames,
+        subg.ntypes,
+        dataloader.graph.get_node_storage,
+        NID,
+        dataloader.device,
+        dataloader.pin_prefetcher,
+    )
     _prefetch_update_feats(
-        edge_feats, subg._edge_frames, subg.canonical_etypes, dataloader.graph.get_edge_storage,
-        EID, dataloader.device, dataloader.pin_prefetcher)
+        edge_feats,
+        subg._edge_frames,
+        subg.canonical_etypes,
+        dataloader.graph.get_edge_storage,
+        EID,
+        dataloader.device,
+        dataloader.pin_prefetcher,
+    )
     return _PrefetchedGraphFeatures(node_feats, edge_feats)
 
 
@@ -286,13 +361,14 @@ def _prefetch_for(item, dataloader):
         return _prefetch_for_subgraph(item, dataloader)
     elif isinstance(item, LazyFeature):
         return dataloader.other_storages[item.name].fetch(
-            item.id_, dataloader.device, dataloader.pin_prefetcher)
+            item.id_, dataloader.device, dataloader.pin_prefetcher
+        )
     else:
         return None
 
 
 def _await_or_return(x):
-    if hasattr(x, 'wait'):
+    if hasattr(x, "wait"):
         return x.wait()
     elif isinstance(x, _PrefetchedGraphFeatures):
         node_feats = recursive_apply(x.node_feats, _await_or_return)
@@ -301,10 +377,11 @@ def _await_or_return(x):
     else:
         return x
 
+
 def _record_stream(x, stream):
     if stream is None:
         return x
-    if hasattr(x, 'record_stream'):
+    if hasattr(x, "record_stream"):
         x.record_stream(stream)
         return x
     elif isinstance(x, _PrefetchedGraphFeatures):
@@ -313,6 +390,7 @@ def _record_stream(x, stream):
         return _PrefetchedGraphFeatures(node_feats, edge_feats)
     else:
         return x
+
 
 def _prefetch(batch, dataloader, stream):
     # feats has the same nested structure of batch, except that
@@ -335,7 +413,9 @@ def _prefetch(batch, dataloader, stream):
         feats = recursive_apply(feats, _await_or_return)
         feats = recursive_apply(feats, _record_stream, current_stream)
         # transfer input nodes/seed nodes/subgraphs
-        batch = recursive_apply(batch, lambda x: x.to(dataloader.device, non_blocking=True))
+        batch = recursive_apply(
+            batch, lambda x: x.to(dataloader.device, non_blocking=True)
+        )
         batch = recursive_apply(batch, _record_stream, current_stream)
     stream_event = stream.record_event() if stream is not None else None
     return batch, feats, stream_event
@@ -356,6 +436,7 @@ def _assign_for(item, feat):
     else:
         return item
 
+
 def _put_if_event_not_set(queue, result, event):
     while not event.is_set():
         try:
@@ -364,8 +445,10 @@ def _put_if_event_not_set(queue, result, event):
         except Full:
             continue
 
+
 def _prefetcher_entry(
-        dataloader_it, dataloader, queue, num_threads, stream, done_event):
+    dataloader_it, dataloader, queue, num_threads, stream, done_event
+):
     # PyTorch will set the number of threads to 1 which slows down pin_memory() calls
     # in main process if a prefetching thread is created.
     if num_threads is not None:
@@ -377,13 +460,20 @@ def _prefetcher_entry(
                 batch = next(dataloader_it)
             except StopIteration:
                 break
-            batch = recursive_apply(batch, restore_parent_storage_columns, dataloader.graph)
+            batch = recursive_apply(
+                batch, restore_parent_storage_columns, dataloader.graph
+            )
             batch, feats, stream_event = _prefetch(batch, dataloader, stream)
-            _put_if_event_not_set(queue, (batch, feats, stream_event, None), done_event)
+            _put_if_event_not_set(
+                queue, (batch, feats, stream_event, None), done_event
+            )
         _put_if_event_not_set(queue, (None, None, None, None), done_event)
-    except:     # pylint: disable=bare-except
+    except:  # pylint: disable=bare-except
         _put_if_event_not_set(
-            queue, (None, None, None, ExceptionWrapper(where='in prefetcher')), done_event)
+            queue,
+            (None, None, None, ExceptionWrapper(where="in prefetcher")),
+            done_event,
+        )
 
 
 # DGLGraphs have the semantics of lazy feature slicing with subgraphs.  Such behavior depends
@@ -400,10 +490,11 @@ def remove_parent_storage_columns(item, g):
         return item
 
     for subframe, frame in zip(
-            itertools.chain(item._node_frames, item._edge_frames),
-            itertools.chain(g._node_frames, g._edge_frames)):
+        itertools.chain(item._node_frames, item._edge_frames),
+        itertools.chain(g._node_frames, g._edge_frames),
+    ):
         for key in list(subframe.keys()):
-            subcol = subframe._columns[key]   # directly get the column object
+            subcol = subframe._columns[key]  # directly get the column object
             if isinstance(subcol, LazyFeature):
                 continue
             col = frame._columns.get(key, None)
@@ -422,8 +513,9 @@ def restore_parent_storage_columns(item, g):
         return item
 
     for subframe, frame in zip(
-            itertools.chain(item._node_frames, item._edge_frames),
-            itertools.chain(g._node_frames, g._edge_frames)):
+        itertools.chain(item._node_frames, item._edge_frames),
+        itertools.chain(g._node_frames, g._edge_frames),
+    ):
         for key in subframe.keys():
             subcol = subframe._columns[key]
             if isinstance(subcol, LazyFeature):
@@ -446,7 +538,7 @@ class _PrefetchingIter(object):
         self.use_thread = dataloader.use_prefetch_thread
         self.use_alternate_streams = dataloader.use_alternate_streams
         self.device = self.dataloader.device
-        if self.use_alternate_streams and self.device.type == 'cuda':
+        if self.use_alternate_streams and self.device.type == "cuda":
             self.stream = torch.cuda.Stream(device=self.device)
         else:
             self.stream = None
@@ -455,9 +547,16 @@ class _PrefetchingIter(object):
             self._done_event = threading.Event()
             thread = threading.Thread(
                 target=_prefetcher_entry,
-                args=(dataloader_it, dataloader, self.queue, num_threads,
-                      self.stream, self._done_event),
-                daemon=True)
+                args=(
+                    dataloader_it,
+                    dataloader,
+                    self.queue,
+                    num_threads,
+                    self.stream,
+                    self._done_event,
+                ),
+                daemon=True,
+            )
             thread.start()
             self.thread = thread
 
@@ -477,12 +576,12 @@ class _PrefetchingIter(object):
                 self._done_event.set()
 
                 try:
-                    self.queue.get_nowait()     # In case the thread is blocking on put().
-                except:     # pylint: disable=bare-except
+                    self.queue.get_nowait()  # In case the thread is blocking on put().
+                except:  # pylint: disable=bare-except
                     pass
 
                 self.thread.join()
-            except:         # pylint: disable=bare-except
+            except:  # pylint: disable=bare-except
                 pass
 
     def __del__(self):
@@ -491,16 +590,23 @@ class _PrefetchingIter(object):
 
     def _next_non_threaded(self):
         batch = next(self.dataloader_it)
-        batch = recursive_apply(batch, restore_parent_storage_columns, self.dataloader.graph)
-        batch, feats, stream_event = _prefetch(batch, self.dataloader, self.stream)
+        batch = recursive_apply(
+            batch, restore_parent_storage_columns, self.dataloader.graph
+        )
+        batch, feats, stream_event = _prefetch(
+            batch, self.dataloader, self.stream
+        )
         return batch, feats, stream_event
 
     def _next_threaded(self):
         try:
-            batch, feats, stream_event, exception = self.queue.get(timeout=prefetcher_timeout)
+            batch, feats, stream_event, exception = self.queue.get(
+                timeout=prefetcher_timeout
+            )
         except Empty:
             raise RuntimeError(
-                f'Prefetcher thread timed out at {prefetcher_timeout} seconds.')
+                f"Prefetcher thread timed out at {prefetcher_timeout} seconds."
+            )
         if batch is None:
             self.thread.join()
             if exception is None:
@@ -509,8 +615,11 @@ class _PrefetchingIter(object):
         return batch, feats, stream_event
 
     def __next__(self):
-        batch, feats, stream_event = \
-            self._next_non_threaded() if not self.use_thread else self._next_threaded()
+        batch, feats, stream_event = (
+            self._next_non_threaded()
+            if not self.use_thread
+            else self._next_threaded()
+        )
         batch = recursive_apply_pair(batch, feats, _assign_for)
         if stream_event is not None:
             stream_event.wait()
@@ -522,6 +631,7 @@ class CollateWrapper(object):
     """Wraps a collate function with :func:`remove_parent_storage_columns` for serializing
     from PyTorch DataLoader workers.
     """
+
     def __init__(self, sample_func, g, use_uva, device):
         self.sample_func = sample_func
         self.g = g
@@ -529,8 +639,8 @@ class CollateWrapper(object):
         self.device = device
 
     def __call__(self, items):
-        graph_device = getattr(self.g, 'device', None)
-        if self.use_uva or (graph_device != torch.device('cpu')):
+        graph_device = getattr(self.g, "device", None)
+        if self.use_uva or (graph_device != torch.device("cpu")):
             # Only copy the indices to the given device if in UVA mode or the graph
             # is not on CPU.
             items = recursive_apply(items, lambda x: x.to(self.device))
@@ -542,6 +652,7 @@ class WorkerInitWrapper(object):
     """Wraps the :attr:`worker_init_fn` argument of the DataLoader to set the number of DGL
     OMP threads to 1 for PyTorch DataLoader workers.
     """
+
     def __init__(self, func):
         self.func = func
 
@@ -551,24 +662,36 @@ class WorkerInitWrapper(object):
             self.func(worker_id)
 
 
-def create_tensorized_dataset(indices, batch_size, drop_last, use_ddp, ddp_seed,
-                              shuffle, use_shared_memory):
+def create_tensorized_dataset(
+    indices,
+    batch_size,
+    drop_last,
+    use_ddp,
+    ddp_seed,
+    shuffle,
+    use_shared_memory,
+):
     """Converts a given indices tensor to a TensorizedDataset, an IterableDataset
     that returns views of the original tensor, to reduce overhead from having
     a list of scalar tensors in default PyTorch DataLoader implementation.
     """
     if use_ddp:
         # DDP always uses shared memory
-        return DDPTensorizedDataset(indices, batch_size, drop_last, ddp_seed, shuffle)
+        return DDPTensorizedDataset(
+            indices, batch_size, drop_last, ddp_seed, shuffle
+        )
     else:
-        return TensorizedDataset(indices, batch_size, drop_last, shuffle, use_shared_memory)
+        return TensorizedDataset(
+            indices, batch_size, drop_last, shuffle, use_shared_memory
+        )
 
 
 def _get_device(device):
     device = torch.device(device)
-    if device.type == 'cuda' and device.index is None:
-        device = torch.device('cuda', torch.cuda.current_device())
+    if device.type == "cuda" and device.index is None:
+        device = torch.device("cuda", torch.cuda.current_device())
     return device
+
 
 class DataLoader(torch.utils.data.DataLoader):
     """Sampled graph data loader. Wrap a :class:`~dgl.DGLGraph` and a
@@ -695,10 +818,24 @@ class DataLoader(torch.utils.data.DataLoader):
 
       - Otherwise, both the sampling and subgraph construction will take place on the CPU.
     """
-    def __init__(self, graph, indices, graph_sampler, device=None, use_ddp=False,
-                 ddp_seed=0, batch_size=1, drop_last=False, shuffle=False,
-                 use_prefetch_thread=None, use_alternate_streams=None,
-                 pin_prefetcher=None, use_uva=False, **kwargs):
+
+    def __init__(
+        self,
+        graph,
+        indices,
+        graph_sampler,
+        device=None,
+        use_ddp=False,
+        ddp_seed=0,
+        batch_size=1,
+        drop_last=False,
+        shuffle=False,
+        use_prefetch_thread=None,
+        use_alternate_streams=None,
+        pin_prefetcher=None,
+        use_uva=False,
+        **kwargs,
+    ):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
         # DataLoader with modifications to the original arguments.  The arguments are retrieved
         # from the attributes with the same name, and because we change certain arguments
@@ -710,8 +847,8 @@ class DataLoader(torch.utils.data.DataLoader):
         # is indeed in kwargs and it's already a CollateWrapper object, we can assume that
         # the arguments come from a previously created DGL DataLoader, and directly initialize
         # the new DataLoader from kwargs without any changes.
-        if isinstance(kwargs.get('collate_fn', None), CollateWrapper):
-            assert batch_size is None       # must be None
+        if isinstance(kwargs.get("collate_fn", None), CollateWrapper):
+            assert batch_size is None  # must be None
             # restore attributes
             self.graph = graph
             self.indices = indices
@@ -725,14 +862,15 @@ class DataLoader(torch.utils.data.DataLoader):
             self.use_alternate_streams = use_alternate_streams
             self.pin_prefetcher = pin_prefetcher
             self.use_uva = use_uva
-            kwargs['batch_size'] = None
+            kwargs["batch_size"] = None
             super().__init__(**kwargs)
             return
 
         if isinstance(graph, DistGraph):
             raise TypeError(
-                'Please use dgl.dataloading.DistNodeDataLoader or '
-                'dgl.datalaoding.DistEdgeDataLoader for DistGraphs.')
+                "Please use dgl.dataloading.DistNodeDataLoader or "
+                "dgl.datalaoding.DistEdgeDataLoader for DistGraphs."
+            )
         # (BarclayII) I hoped that pin_prefetcher can be merged into PyTorch's native
         # pin_memory argument.  But our neighbor samplers and subgraph samplers
         # return indices, which could be CUDA tensors (e.g. during UVA sampling)
@@ -743,26 +881,34 @@ class DataLoader(torch.utils.data.DataLoader):
         # to pinning prefetched features and disable pin memory for sampler's returns
         # no matter what, but I doubt if it's reasonable.
         self.graph = graph
-        self.indices = indices      # For PyTorch-Lightning
-        num_workers = kwargs.get('num_workers', 0)
+        self.indices = indices  # For PyTorch-Lightning
+        num_workers = kwargs.get("num_workers", 0)
 
         indices_device = None
         try:
             if isinstance(indices, Mapping):
-                indices = {k: (torch.tensor(v) if not torch.is_tensor(v) else v)
-                           for k, v in indices.items()}
+                indices = {
+                    k: (torch.tensor(v) if not torch.is_tensor(v) else v)
+                    for k, v in indices.items()
+                }
                 indices_device = next(iter(indices.values())).device
             else:
-                indices = torch.tensor(indices) if not torch.is_tensor(indices) else indices
+                indices = (
+                    torch.tensor(indices)
+                    if not torch.is_tensor(indices)
+                    else indices
+                )
                 indices_device = indices.device
-        except:     # pylint: disable=bare-except
+        except:  # pylint: disable=bare-except
             # ignore when it fails to convert to torch Tensors.
             pass
 
         if indices_device is None:
-            if not hasattr(indices, 'device'):
-                raise AttributeError('Custom indices dataset requires a \"device\" \
-                attribute indicating where the indices is.')
+            if not hasattr(indices, "device"):
+                raise AttributeError(
+                    'Custom indices dataset requires a "device" \
+                attribute indicating where the indices is.'
+                )
             indices_device = indices.device
 
         if device is None:
@@ -776,10 +922,14 @@ class DataLoader(torch.utils.data.DataLoader):
         if isinstance(self.graph, DGLGraph):
             # Check graph and indices device as well as num_workers
             if use_uva:
-                if self.graph.device.type != 'cpu':
-                    raise ValueError('Graph must be on CPU if UVA sampling is enabled.')
+                if self.graph.device.type != "cpu":
+                    raise ValueError(
+                        "Graph must be on CPU if UVA sampling is enabled."
+                    )
                 if num_workers > 0:
-                    raise ValueError('num_workers must be 0 if UVA sampling is enabled.')
+                    raise ValueError(
+                        "num_workers must be 0 if UVA sampling is enabled."
+                    )
 
                 # Create all the formats and pin the features - custom GraphStorages
                 # will need to do that themselves.
@@ -788,16 +938,23 @@ class DataLoader(torch.utils.data.DataLoader):
             else:
                 if self.graph.device != indices_device:
                     raise ValueError(
-                        'Expect graph and indices to be on the same device when use_uva=False. ')
-                if self.graph.device.type == 'cuda' and num_workers > 0:
-                    raise ValueError('num_workers must be 0 if graph and indices are on CUDA.')
-                if self.graph.device.type == 'cpu' and num_workers > 0:
+                        "Expect graph and indices to be on the same device when use_uva=False. "
+                    )
+                if self.graph.device.type == "cuda" and num_workers > 0:
+                    raise ValueError(
+                        "num_workers must be 0 if graph and indices are on CUDA."
+                    )
+                if self.graph.device.type == "cpu" and num_workers > 0:
                     # Instantiate all the formats if the number of workers is greater than 0.
                     self.graph.create_formats_()
 
             # Check pin_prefetcher and use_prefetch_thread - should be only effective
             # if performing CPU sampling but output device is CUDA
-            if self.device.type == 'cuda' and self.graph.device.type == 'cpu' and not use_uva:
+            if (
+                self.device.type == "cuda"
+                and self.graph.device.type == "cpu"
+                and not use_uva
+            ):
                 if pin_prefetcher is None:
                     pin_prefetcher = True
                 if use_prefetch_thread is None:
@@ -805,15 +962,17 @@ class DataLoader(torch.utils.data.DataLoader):
             else:
                 if pin_prefetcher is True:
                     raise ValueError(
-                        'pin_prefetcher=True is only effective when device=cuda and '
-                        'sampling is performed on CPU.')
+                        "pin_prefetcher=True is only effective when device=cuda and "
+                        "sampling is performed on CPU."
+                    )
                 if pin_prefetcher is None:
                     pin_prefetcher = False
 
                 if use_prefetch_thread is True:
                     raise ValueError(
-                        'use_prefetch_thread=True is only effective when device=cuda and '
-                        'sampling is performed on CPU.')
+                        "use_prefetch_thread=True is only effective when device=cuda and "
+                        "sampling is performed on CPU."
+                    )
                 if use_prefetch_thread is None:
                     use_prefetch_thread = False
 
@@ -826,16 +985,25 @@ class DataLoader(torch.utils.data.DataLoader):
                     and is_tensor_adaptor_enabled()
                 )
             elif use_alternate_streams and not is_tensor_adaptor_enabled():
-                dgl_warning("use_alternate_streams is turned off because "
-                    "TensorAdaptor is not available.")
+                dgl_warning(
+                    "use_alternate_streams is turned off because "
+                    "TensorAdaptor is not available."
+                )
                 use_alternate_streams = False
 
-        if (torch.is_tensor(indices) or (
-                isinstance(indices, Mapping) and
-                all(torch.is_tensor(v) for v in indices.values()))):
+        if torch.is_tensor(indices) or (
+            isinstance(indices, Mapping)
+            and all(torch.is_tensor(v) for v in indices.values())
+        ):
             self.dataset = create_tensorized_dataset(
-                indices, batch_size, drop_last, use_ddp, ddp_seed, shuffle,
-                kwargs.get('persistent_workers', False))
+                indices,
+                batch_size,
+                drop_last,
+                use_ddp,
+                ddp_seed,
+                shuffle,
+                kwargs.get("persistent_workers", False),
+            )
         else:
             self.dataset = indices
 
@@ -850,35 +1018,47 @@ class DataLoader(torch.utils.data.DataLoader):
         self.use_prefetch_thread = use_prefetch_thread
         self.cpu_affinity_enabled = False
 
-        worker_init_fn = WorkerInitWrapper(kwargs.get('worker_init_fn', None))
+        worker_init_fn = WorkerInitWrapper(kwargs.pop("worker_init_fn", None))
 
         self.other_storages = {}
 
         super().__init__(
             self.dataset,
             collate_fn=CollateWrapper(
-                self.graph_sampler.sample, graph, self.use_uva, self.device),
+                self.graph_sampler.sample, graph, self.use_uva, self.device
+            ),
             batch_size=None,
             pin_memory=self.pin_prefetcher,
             worker_init_fn=worker_init_fn,
-            **kwargs)
+            **kwargs,
+        )
 
     def __iter__(self):
-        if self.device.type == 'cpu' and not self.cpu_affinity_enabled:
-            link = 'https://docs.dgl.ai/tutorials/cpu/cpu_best_practises.html'
-            dgl_warning(f'Dataloader CPU affinity opt is not enabled, consider switching it on '
-                        f'(see enable_cpu_affinity() or CPU best practices for DGL [{link}])')
+        if (
+            self.device.type == "cpu"
+            and hasattr(psutil.Process, "cpu_affinity")
+            and not self.cpu_affinity_enabled
+        ):
+            link = "https://docs.dgl.ai/tutorials/cpu/cpu_best_practises.html"
+            dgl_warning(
+                f"Dataloader CPU affinity opt is not enabled, consider switching it on "
+                f"(see enable_cpu_affinity() or CPU best practices for DGL [{link}])"
+            )
 
         if self.shuffle:
             self.dataset.shuffle()
         # When using multiprocessing PyTorch sometimes set the number of PyTorch threads to 1
         # when spawning new Python threads.  This drastically slows down pinning features.
         num_threads = torch.get_num_threads() if self.num_workers > 0 else None
-        return _PrefetchingIter(self, super().__iter__(), num_threads=num_threads)
+        return _PrefetchingIter(
+            self, super().__iter__(), num_threads=num_threads
+        )
 
     @contextmanager
-    def enable_cpu_affinity(self, loader_cores=None, compute_cores=None, verbose=True):
-        """ Helper method for enabling cpu affinity for compute threads and dataloader workers
+    def enable_cpu_affinity(
+        self, loader_cores=None, compute_cores=None, verbose=True
+    ):
+        """Helper method for enabling cpu affinity for compute threads and dataloader workers
         Only for CPU devices
         Uses only NUMA node 0 by default for multi-node systems
 
@@ -900,16 +1080,21 @@ class DataLoader(torch.utils.data.DataLoader):
         with dataloader.enable_cpu_affinity():
             <training loop>
         """
-        if self.device.type == 'cpu':
+        if self.device.type == "cpu":
             if not self.num_workers > 0:
-                raise Exception('ERROR: affinity should be used with at least one DL worker')
+                raise Exception(
+                    "ERROR: affinity should be used with at least one DL worker"
+                )
             if loader_cores and len(loader_cores) != self.num_workers:
-                raise Exception('ERROR: cpu_affinity incorrect '
-                                'number of loader_cores={} for num_workers={}'
-                                .format(loader_cores, self.num_workers))
+                raise Exception(
+                    "ERROR: cpu_affinity incorrect "
+                    "number of loader_cores={} for num_workers={}".format(
+                        loader_cores, self.num_workers
+                    )
+                )
 
             # False positive E0203 (access-member-before-definition) linter warning
-            worker_init_fn_old = self.worker_init_fn # pylint: disable=E0203
+            worker_init_fn_old = self.worker_init_fn  # pylint: disable=E0203
             affinity_old = psutil.Process().cpu_affinity()
             nthreads_old = get_num_threads()
 
@@ -920,8 +1105,11 @@ class DataLoader(torch.utils.data.DataLoader):
                 try:
                     psutil.Process().cpu_affinity([loader_cores[worker_id]])
                 except:
-                    raise Exception('ERROR: cannot use affinity id={} cpu={}'
-                                    .format(worker_id, loader_cores))
+                    raise Exception(
+                        "ERROR: cannot use affinity id={} cpu={}".format(
+                            worker_id, loader_cores
+                        )
+                    )
 
                 worker_init_fn_old(worker_id)
 
@@ -931,13 +1119,15 @@ class DataLoader(torch.utils.data.DataLoader):
                     # take one thread per each node 0 core
                     node0_cores = [cpus[0] for core_id, cpus in numa_info[0]]
                 else:
-                    node0_cores = list(range(psutil.cpu_count(logical = False)))
+                    node0_cores = list(range(psutil.cpu_count(logical=False)))
 
                 if len(node0_cores) <= self.num_workers:
-                    raise Exception('ERROR: more workers than available cores')
+                    raise Exception("ERROR: more workers than available cores")
 
-                loader_cores = loader_cores or node0_cores[0:self.num_workers]
-                compute_cores = [cpu for cpu in node0_cores if cpu not in loader_cores]
+                loader_cores = loader_cores or node0_cores[0 : self.num_workers]
+                compute_cores = [
+                    cpu for cpu in node0_cores if cpu not in loader_cores
+                ]
 
             try:
                 psutil.Process().cpu_affinity(compute_cores)
@@ -946,8 +1136,11 @@ class DataLoader(torch.utils.data.DataLoader):
 
                 self.cpu_affinity_enabled = True
                 if verbose:
-                    print('{} DL workers are assigned to cpus {}, main process will use cpus {}'
-                        .format(self.num_workers, loader_cores, compute_cores))
+                    print(
+                        f"{self.num_workers} DL workers are assigned to cpus "
+                        f"{loader_cores}, main process will use cpus "
+                        f"{compute_cores}"
+                    )
 
                 yield
             finally:
@@ -970,15 +1163,17 @@ class DataLoader(torch.utils.data.DataLoader):
 # GraphDataLoader loads a set of graphs so it's not relevant to the above.  They are currently
 # copied from the old DataLoader implementation.
 
+
 def _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed):
     # Note: will change the content of dataloader_kwargs
-    dist_sampler_kwargs = {'shuffle': dataloader_kwargs.get('shuffle', False)}
-    dataloader_kwargs['shuffle'] = False
-    dist_sampler_kwargs['seed'] = ddp_seed
-    dist_sampler_kwargs['drop_last'] = dataloader_kwargs.get('drop_last', False)
-    dataloader_kwargs['drop_last'] = False
+    dist_sampler_kwargs = {"shuffle": dataloader_kwargs.get("shuffle", False)}
+    dataloader_kwargs["shuffle"] = False
+    dist_sampler_kwargs["seed"] = ddp_seed
+    dist_sampler_kwargs["drop_last"] = dataloader_kwargs.get("drop_last", False)
+    dataloader_kwargs["drop_last"] = False
 
     return DistributedSampler(dataset, **dist_sampler_kwargs)
+
 
 class GraphCollator(object):
     """Given a set of graphs as well as their graph-level data, the collate function will batch the
@@ -998,13 +1193,15 @@ class GraphCollator(object):
     >>> for batched_graph, labels in dataloader:
     ...     train_on(batched_graph, labels)
     """
+
     def __init__(self):
         self.graph_collate_err_msg_format = (
             "graph_collate: batch must contain DGLGraph, tensors, numpy arrays, "
-            "numbers, dicts or lists; found {}")
-        self.np_str_obj_array_pattern = re.compile(r'[SaUO]')
+            "numbers, dicts or lists; found {}"
+        )
+        self.np_str_obj_array_pattern = re.compile(r"[SaUO]")
 
-    #This implementation is based on torch.utils.data._utils.collate.default_collate
+    # This implementation is based on torch.utils.data._utils.collate.default_collate
     def collate(self, items):
         """This function is similar to ``torch.utils.data._utils.collate.default_collate``.
         It combines the sampled graphs and corresponding graph-level data
@@ -1028,12 +1225,23 @@ class GraphCollator(object):
             return batched_graphs
         elif F.is_tensor(elem):
             return F.stack(items, 0)
-        elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
-                and elem_type.__name__ != 'string_':
-            if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
+        elif (
+            elem_type.__module__ == "numpy"
+            and elem_type.__name__ != "str_"
+            and elem_type.__name__ != "string_"
+        ):
+            if (
+                elem_type.__name__ == "ndarray"
+                or elem_type.__name__ == "memmap"
+            ):
                 # array of string classes and object
-                if self.np_str_obj_array_pattern.search(elem.dtype.str) is not None:
-                    raise TypeError(self.graph_collate_err_msg_format.format(elem.dtype))
+                if (
+                    self.np_str_obj_array_pattern.search(elem.dtype.str)
+                    is not None
+                ):
+                    raise TypeError(
+                        self.graph_collate_err_msg_format.format(elem.dtype)
+                    )
 
                 return self.collate([F.tensor(b) for b in items])
             elif elem.shape == ():  # scalars
@@ -1046,18 +1254,23 @@ class GraphCollator(object):
             return items
         elif isinstance(elem, Mapping):
             return {key: self.collate([d[key] for d in items]) for key in elem}
-        elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
-            return elem_type(*(self.collate(samples) for samples in zip(*items)))
+        elif isinstance(elem, tuple) and hasattr(elem, "_fields"):  # namedtuple
+            return elem_type(
+                *(self.collate(samples) for samples in zip(*items))
+            )
         elif isinstance(elem, Sequence):
             # check to make sure that the elements in batch have consistent size
             item_iter = iter(items)
             elem_size = len(next(item_iter))
             if not all(len(elem) == elem_size for elem in item_iter):
-                raise RuntimeError('each element in list of batch should be of equal size')
+                raise RuntimeError(
+                    "each element in list of batch should be of equal size"
+                )
             transposed = zip(*items)
             return [self.collate(samples) for samples in transposed]
 
         raise TypeError(self.graph_collate_err_msg_format.format(elem_type))
+
 
 class GraphDataLoader(torch.utils.data.DataLoader):
     """Batched graph data loader.
@@ -1113,9 +1326,12 @@ class GraphDataLoader(torch.utils.data.DataLoader):
     ...     for batched_graph, labels in dataloader:
     ...         train_on(batched_graph, labels)
     """
+
     collator_arglist = inspect.getfullargspec(GraphCollator).args
 
-    def __init__(self, dataset, collate_fn=None, use_ddp=False, ddp_seed=0, **kwargs):
+    def __init__(
+        self, dataset, collate_fn=None, use_ddp=False, ddp_seed=0, **kwargs
+    ):
         collator_kwargs = {}
         dataloader_kwargs = {}
         for k, v in kwargs.items():
@@ -1126,13 +1342,17 @@ class GraphDataLoader(torch.utils.data.DataLoader):
 
         self.use_ddp = use_ddp
         if use_ddp:
-            self.dist_sampler = _create_dist_sampler(dataset, dataloader_kwargs, ddp_seed)
-            dataloader_kwargs['sampler'] = self.dist_sampler
+            self.dist_sampler = _create_dist_sampler(
+                dataset, dataloader_kwargs, ddp_seed
+            )
+            dataloader_kwargs["sampler"] = self.dist_sampler
 
-        if collate_fn is None and kwargs.get('batch_size', 1) is not None:
+        if collate_fn is None and kwargs.get("batch_size", 1) is not None:
             collate_fn = GraphCollator(**collator_kwargs).collate
 
-        super().__init__(dataset=dataset, collate_fn=collate_fn, **dataloader_kwargs)
+        super().__init__(
+            dataset=dataset, collate_fn=collate_fn, **dataloader_kwargs
+        )
 
     def set_epoch(self, epoch):
         """Sets the epoch number for the underlying sampler which ensures all replicas
@@ -1150,4 +1370,4 @@ class GraphDataLoader(torch.utils.data.DataLoader):
         if self.use_ddp:
             self.dist_sampler.set_epoch(epoch)
         else:
-            raise DGLError('set_epoch is only available when use_ddp is True.')
+            raise DGLError("set_epoch is only available when use_ddp is True.")

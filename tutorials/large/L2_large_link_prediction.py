@@ -52,9 +52,12 @@ Sampling for Node Classification <L1_large_node_classification>`.
 # :doc:`previous tutorial <L1_large_node_classification>`.
 #
 
+import os
+
+os.environ["DGLBACKEND"] = "pytorch"
 import dgl
-import torch
 import numpy as np
+import torch
 from ogb.nodeproppred import DglNodePropPredDataset
 
 dataset = DglNodePropPredDataset("ogbn-arxiv")
@@ -117,7 +120,7 @@ sampler = dgl.dataloading.as_edge_prediction_sampler(
 train_dataloader = dgl.dataloading.DataLoader(
     # The following arguments are specific to DataLoader.
     graph,  # The graph
-    torch.arange(graph.number_of_edges()),  # The edges to iterate over
+    torch.arange(graph.num_edges()),  # The edges to iterate over
     sampler,  # The neighbor sampler
     device=device,  # Put the MFGs on CPU or GPU
     # The following arguments are inherited from PyTorch DataLoader.
@@ -137,15 +140,15 @@ input_nodes, pos_graph, neg_graph, mfgs = next(iter(train_dataloader))
 print("Number of input nodes:", len(input_nodes))
 print(
     "Positive graph # nodes:",
-    pos_graph.number_of_nodes(),
+    pos_graph.num_nodes(),
     "# edges:",
-    pos_graph.number_of_edges(),
+    pos_graph.num_edges(),
 )
 print(
     "Negative graph # nodes:",
-    neg_graph.number_of_nodes(),
+    neg_graph.num_nodes(),
     "# edges:",
-    neg_graph.number_of_edges(),
+    neg_graph.num_edges(),
 )
 print(mfgs)
 
@@ -261,12 +264,12 @@ class DotPredictor(nn.Module):
 
 def inference(model, graph, node_features):
     with torch.no_grad():
-        nodes = torch.arange(graph.number_of_nodes())
+        nodes = torch.arange(graph.num_nodes())
 
         sampler = dgl.dataloading.NeighborSampler([4, 4])
         train_dataloader = dgl.dataloading.DataLoader(
             graph,
-            torch.arange(graph.number_of_nodes()),
+            torch.arange(graph.num_nodes()),
             sampler,
             batch_size=1024,
             shuffle=False,
@@ -337,6 +340,8 @@ predictor = DotPredictor().to(device)
 opt = torch.optim.Adam(list(model.parameters()) + list(predictor.parameters()))
 
 
+import sklearn.metrics
+
 ######################################################################
 # The following is the training loop for link prediction and
 # evaluation, and also saves the model that performs the best on the
@@ -344,7 +349,6 @@ opt = torch.optim.Adam(list(model.parameters()) + list(predictor.parameters()))
 #
 
 import tqdm
-import sklearn.metrics
 
 best_accuracy = 0
 best_model_path = "model.pt"

@@ -67,13 +67,15 @@ offers a different perspective. The tutorial describes how to implement a Capsul
 #
 # Here's how we set up the graph and initialize node and edge features.
 
+import os
+
+os.environ["DGLBACKEND"] = "pytorch"
+import dgl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
 
 
 def init_graph(in_nodes, out_nodes, f_size):
@@ -184,7 +186,6 @@ for i in range(10):
     entropy = (-dist_matrix * th.log(dist_matrix)).sum(dim=1)
     entropy_list.append(entropy.data.numpy())
     dist_list.append(dist_matrix.data.numpy())
-
 stds = np.std(entropy_list, axis=1)
 means = np.mean(entropy_list, axis=1)
 plt.errorbar(np.arange(len(entropy_list)), means, stds, marker="o")

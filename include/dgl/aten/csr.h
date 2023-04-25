@@ -60,6 +60,9 @@ struct CSRMatrix {
         indices(iarr),
         data(darr),
         sorted(sorted_flag) {
+    is_pinned = (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
+                (aten::IsNullArray(indices) || indices.IsPinned()) &&
+                (aten::IsNullArray(data) || data.IsPinned());
     CheckValidity();
   }
 
@@ -124,6 +127,19 @@ struct CSRMatrix {
     return CSRMatrix(
         num_rows, num_cols, indptr.CopyTo(ctx), indices.CopyTo(ctx),
         aten::IsNullArray(data) ? data : data.CopyTo(ctx), sorted);
+  }
+
+  /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
+  inline CSRMatrix PinMemory() {
+    if (is_pinned) return *this;
+    auto new_csr = CSRMatrix(
+        num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
+        aten::IsNullArray(data) ? data : data.PinMemory(), sorted);
+    CHECK(new_csr.is_pinned)
+        << "An internal DGL error has occured while trying to pin a CSR "
+           "matrix. Please file a bug at 'https://github.com/dmlc/dgl/issues' "
+           "with the above stacktrace.";
+    return new_csr;
   }
 
   /**
@@ -285,6 +301,36 @@ template <typename DType>
 runtime::NDArray CSRGetData(
     CSRMatrix, runtime::NDArray rows, runtime::NDArray cols,
     runtime::NDArray weights, DType filler);
+
+/**
+ * @brief Get the data for each (row, col) pair, then index into the weights
+ * array.
+ *
+ * The operator supports matrix with duplicate entries but only one matched
+ * entry will be returned for each (row, col) pair. Support duplicate input
+ * (row, col) pairs.
+ *
+ * If some (row, col) pairs do not contain a valid non-zero elements to index
+ * into the weights array, DGL returns the value \a filler for that pair
+ * instead.
+ *
+ * @note This operator allows broadcasting (i.e, either row or col can be of
+ * length 1).
+
+ * @note This is the floating point number version of `CSRGetData`, which
+ removes the dtype template.
+ *
+ * @param mat Sparse matrix.
+ * @param rows Row index.
+ * @param cols Column index.
+ * @param weights The weights array.
+ * @param filler The value to return for row-column pairs not existent in the
+ * matrix.
+ * @return Data array. The i^th element is the data of (rows[i], cols[i])
+ */
+runtime::NDArray CSRGetFloatingData(
+    CSRMatrix, runtime::NDArray rows, runtime::NDArray cols,
+    runtime::NDArray weights, double filler);
 
 /** @brief Return a transposed CSR matrix */
 CSRMatrix CSRTranspose(CSRMatrix csr);

@@ -74,7 +74,7 @@ DGL分布式模块的初始化
 
 .. code:: python
 
-    print(g.number_of_nodes())
+    print(g.num_nodes())
 
 访问节点/边数据
 ^^^^^^^^^^^^^^^^^^^^^
@@ -107,7 +107,7 @@ DGL为分布式张量提供了类似于单机普通张量的接口，以访问�
 
 .. code:: python
 
-    tensor = dgl.distributed.DistTensor((g.number_of_nodes(), 10), th.float32, name='test')
+    tensor = dgl.distributed.DistTensor((g.num_nodes(), 10), th.float32, name='test')
 
 **Note**: :class:`~dgl.distributed.DistTensor` 的创建是一个同步操作。所有训练器都必须调用创建，
 并且只有当所有训练器都调用它时，此创建过程才能成功。
@@ -147,7 +147,7 @@ DGL提供 :class:`~dgl.distributed.DistEmbedding` 以支持需要节点嵌入的
         arr = th.zeros(shape, dtype=dtype)
         arr.uniform_(-1, 1)
         return arr
-    emb = dgl.distributed.DistEmbedding(g.number_of_nodes(), 10, init_func=initializer)
+    emb = dgl.distributed.DistEmbedding(g.num_nodes(), 10, init_func=initializer)
 
 在内部，分布式嵌入建立在分布式张量之上，因此，其行为与分布式张量非常相似。
 例如，创建嵌入时，DGL会将它们分片并存储在集群中的所有计算机上。(分布式嵌入)可以通过名称唯一标识。

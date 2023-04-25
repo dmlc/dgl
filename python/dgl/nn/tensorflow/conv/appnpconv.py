@@ -66,9 +66,7 @@ class APPNPConv(layers.Layer):
                 # normalization by src node
                 feat = feat * norm
                 graph.ndata["h"] = feat
-                graph.edata["w"] = self.edge_drop(
-                    tf.ones(graph.number_of_edges(), 1)
-                )
+                graph.edata["w"] = self.edge_drop(tf.ones(graph.num_edges(), 1))
                 graph.update_all(fn.u_mul_e("h", "w", "m"), fn.sum("m", "h"))
                 feat = graph.ndata.pop("h")
                 # normalization by dst node

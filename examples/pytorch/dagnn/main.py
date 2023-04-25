@@ -1,15 +1,14 @@
 import argparse
 
+import dgl.function as fn
+
 import numpy as np
 import torch
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from torch import nn
-from torch.nn import Parameter
-from torch.nn import functional as F
+from torch.nn import functional as F, Parameter
 from tqdm import trange
 from utils import evaluate, generate_random_seeds, set_random_state
-
-import dgl.function as fn
-from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 
 class DAGNNConv(nn.Module):
@@ -26,7 +25,6 @@ class DAGNNConv(nn.Module):
         nn.init.xavier_uniform_(self.s, gain=gain)
 
     def forward(self, graph, feats):
-
         with graph.local_scope():
             results = [feats]
 
@@ -68,7 +66,6 @@ class MLPLayer(nn.Module):
             nn.init.zeros_(self.linear.bias)
 
     def forward(self, feats):
-
         feats = self.dropout(feats)
         feats = self.linear(feats)
         if self.activation:

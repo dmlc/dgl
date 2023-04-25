@@ -3,9 +3,14 @@ import copy
 import numpy as np
 import torch
 
-from dgl.data import (AmazonCoBuyComputerDataset, AmazonCoBuyPhotoDataset,
-                      CoauthorCSDataset, CoauthorPhysicsDataset, PPIDataset,
-                      WikiCSDataset)
+from dgl.data import (
+    AmazonCoBuyComputerDataset,
+    AmazonCoBuyPhotoDataset,
+    CoauthorCSDataset,
+    CoauthorPhysicsDataset,
+    PPIDataset,
+    WikiCSDataset,
+)
 from dgl.dataloading import GraphDataLoader
 from dgl.transforms import Compose, DropEdge, FeatMask, RowFeatNormalizer
 
@@ -72,7 +77,7 @@ def get_ppi():
     test_dataset = PPIDataset(mode="test")
     train_val_dataset = [i for i in train_dataset] + [i for i in val_dataset]
     for idx, data in enumerate(train_val_dataset):
-        data.ndata["batch"] = torch.zeros(data.number_of_nodes()) + idx
+        data.ndata["batch"] = torch.zeros(data.num_nodes()) + idx
         data.ndata["batch"] = data.ndata["batch"].long()
 
     g = list(GraphDataLoader(train_val_dataset, batch_size=22, shuffle=True))

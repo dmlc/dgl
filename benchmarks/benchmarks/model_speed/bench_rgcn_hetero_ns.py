@@ -1,16 +1,18 @@
-import dgl
 import itertools
-import torch as th
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
-import dgl.nn.pytorch as dglnn
 import time
 import traceback
 
+import dgl
+import dgl.nn.pytorch as dglnn
+import torch as th
+import torch.multiprocessing as mp
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import DataLoader
+
 from .. import utils
+
 
 class RelGraphConvLayer(nn.Module):
     r"""Relational graph convolution layer.
@@ -36,17 +38,20 @@ class RelGraphConvLayer(nn.Module):
     dropout : float, optional
         Dropout rate. Default: 0.0
     """
-    def __init__(self,
-                 in_feat,
-                 out_feat,
-                 rel_names,
-                 num_bases,
-                 *,
-                 weight=True,
-                 bias=True,
-                 activation=None,
-                 self_loop=False,
-                 dropout=0.0):
+
+    def __init__(
+        self,
+        in_feat,
+        out_feat,
+        rel_names,
+        num_bases,
+        *,
+        weight=True,
+        bias=True,
+        activation=None,
+        self_loop=False,
+        dropout=0.0
+    ):
         super(RelGraphConvLayer, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -56,19 +61,29 @@ class RelGraphConvLayer(nn.Module):
         self.activation = activation
         self.self_loop = self_loop
 
-        self.conv = dglnn.HeteroGraphConv({
-                rel : dglnn.GraphConv(in_feat, out_feat, norm='right', weight=False, bias=False)
+        self.conv = dglnn.HeteroGraphConv(
+            {
+                rel: dglnn.GraphConv(
+                    in_feat, out_feat, norm="right", weight=False, bias=False
+                )
                 for rel in rel_names
-            })
+            }
+        )
 
         self.use_weight = weight
         self.use_basis = num_bases < len(self.rel_names) and weight
         if self.use_weight:
             if self.use_basis:
-                self.basis = dglnn.WeightBasis((in_feat, out_feat), num_bases, len(self.rel_names))
+                self.basis = dglnn.WeightBasis(
+                    (in_feat, out_feat), num_bases, len(self.rel_names)
+                )
             else:
-                self.weight = nn.Parameter(th.Tensor(len(self.rel_names), in_feat, out_feat))
-                nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+                self.weight = nn.Parameter(
+                    th.Tensor(len(self.rel_names), in_feat, out_feat)
+                )
+                nn.init.xavier_uniform_(
+                    self.weight, gain=nn.init.calculate_gain("relu")
+                )
 
         # bias
         if bias:
@@ -78,8 +93,9 @@ class RelGraphConvLayer(nn.Module):
         # weight for self loop
         if self.self_loop:
             self.loop_weight = nn.Parameter(th.Tensor(in_feat, out_feat))
-            nn.init.xavier_uniform_(self.loop_weight,
-                                    gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(
+                self.loop_weight, gain=nn.init.calculate_gain("relu")
+            )
 
         self.dropout = nn.Dropout(dropout)
 
@@ -101,14 +117,18 @@ class RelGraphConvLayer(nn.Module):
         g = g.local_var()
         if self.use_weight:
             weight = self.basis() if self.use_basis else self.weight
-            wdict = {self.rel_names[i] : {'weight' : w.squeeze(0)}
-                     for i, w in enumerate(th.split(weight, 1, dim=0))}
+            wdict = {
+                self.rel_names[i]: {"weight": w.squeeze(0)}
+                for i, w in enumerate(th.split(weight, 1, dim=0))
+            }
         else:
             wdict = {}
 
         if g.is_block:
             inputs_src = inputs
-            inputs_dst = {k: v[:g.number_of_dst_nodes(k)] for k, v in inputs.items()}
+            inputs_dst = {
+                k: v[: g.number_of_dst_nodes(k)] for k, v in inputs.items()
+            }
         else:
             inputs_src = inputs_dst = inputs
 
@@ -122,20 +142,24 @@ class RelGraphConvLayer(nn.Module):
             if self.activation:
                 h = self.activation(h)
             return self.dropout(h)
-        return {ntype : _apply(ntype, h) for ntype, h in hs.items()}
+
+        return {ntype: _apply(ntype, h) for ntype, h in hs.items()}
 
 
 class RelGraphEmbed(nn.Module):
     r"""Embedding layer for featureless heterograph."""
-    def __init__(self,
-                 g,
-                 device,
-                 embed_size,
-                 num_nodes,
-                 node_feats,
-                 embed_name='embed',
-                 activation=None,
-                 dropout=0.0):
+
+    def __init__(
+        self,
+        g,
+        device,
+        embed_size,
+        num_nodes,
+        node_feats,
+        embed_name="embed",
+        activation=None,
+        dropout=0.0,
+    ):
         super(RelGraphEmbed, self).__init__()
         self.g = g
         self.device = device
@@ -150,7 +174,9 @@ class RelGraphEmbed(nn.Module):
         self.node_embeds = nn.ModuleDict()
         for ntype in g.ntypes:
             if node_feats[ntype] is None:
-                sparse_emb = th.nn.Embedding(num_nodes[ntype], embed_size, sparse=True)
+                sparse_emb = th.nn.Embedding(
+                    num_nodes[ntype], embed_size, sparse=True
+                )
                 nn.init.uniform_(sparse_emb.weight, -1.0, 1.0)
                 self.node_embeds[ntype] = sparse_emb
             else:
@@ -177,19 +203,28 @@ class RelGraphEmbed(nn.Module):
         embeds = {}
         for ntype in block.ntypes:
             if self.node_feats[ntype] is None:
-                embeds[ntype] = self.node_embeds[ntype](block.nodes(ntype)).to(self.device)
+                embeds[ntype] = self.node_embeds[ntype](block.nodes(ntype)).to(
+                    self.device
+                )
             else:
-                embeds[ntype] = self.node_feats[ntype][block.nodes(ntype)].to(self.device) @ self.embeds[ntype]
+                embeds[ntype] = (
+                    self.node_feats[ntype][block.nodes(ntype)].to(self.device)
+                    @ self.embeds[ntype]
+                )
         return embeds
 
+
 class EntityClassify(nn.Module):
-    def __init__(self,
-                 g,
-                 h_dim, out_dim,
-                 num_bases,
-                 num_hidden_layers=1,
-                 dropout=0,
-                 use_self_loop=False):
+    def __init__(
+        self,
+        g,
+        h_dim,
+        out_dim,
+        num_bases,
+        num_hidden_layers=1,
+        dropout=0,
+        use_self_loop=False,
+    ):
         super(EntityClassify, self).__init__()
         self.g = g
         self.h_dim = h_dim
@@ -206,34 +241,56 @@ class EntityClassify(nn.Module):
 
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RelGraphConvLayer(
-            self.h_dim, self.h_dim, self.rel_names,
-            self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-            dropout=self.dropout, weight=False))
+        self.layers.append(
+            RelGraphConvLayer(
+                self.h_dim,
+                self.h_dim,
+                self.rel_names,
+                self.num_bases,
+                activation=F.relu,
+                self_loop=self.use_self_loop,
+                dropout=self.dropout,
+                weight=False,
+            )
+        )
         # h2h
         for i in range(self.num_hidden_layers):
-            self.layers.append(RelGraphConvLayer(
-                self.h_dim, self.h_dim, self.rel_names,
-                self.num_bases, activation=F.relu, self_loop=self.use_self_loop,
-                dropout=self.dropout))
+            self.layers.append(
+                RelGraphConvLayer(
+                    self.h_dim,
+                    self.h_dim,
+                    self.rel_names,
+                    self.num_bases,
+                    activation=F.relu,
+                    self_loop=self.use_self_loop,
+                    dropout=self.dropout,
+                )
+            )
         # h2o
-        self.layers.append(RelGraphConvLayer(
-            self.h_dim, self.out_dim, self.rel_names,
-            self.num_bases, activation=None,
-            self_loop=self.use_self_loop))
+        self.layers.append(
+            RelGraphConvLayer(
+                self.h_dim,
+                self.out_dim,
+                self.rel_names,
+                self.num_bases,
+                activation=None,
+                self_loop=self.use_self_loop,
+            )
+        )
 
     def forward(self, h, blocks):
         for layer, block in zip(self.layers, blocks):
             h = layer(block, h)
         return h
 
-@utils.benchmark('time', 600)
-@utils.parametrize('data', ['ogbn-mag'])
+
+@utils.benchmark("time", 600)
+@utils.parametrize("data", ["ogbn-mag"])
 def track_time(data):
     dataset = utils.process_data(data)
     device = utils.get_bench_device()
 
-    if data == 'ogbn-mag':
+    if data == "ogbn-mag":
         n_bases = 2
         l2norm = 0
     else:
@@ -252,35 +309,50 @@ def track_time(data):
     hg = dataset[0]
     category = dataset.predict_category
     num_classes = dataset.num_classes
-    train_mask = hg.nodes[category].data.pop('train_mask')
+    train_mask = hg.nodes[category].data.pop("train_mask")
     train_idx = th.nonzero(train_mask, as_tuple=False).squeeze()
-    labels = hg.nodes[category].data.pop('labels')
+    labels = hg.nodes[category].data.pop("labels")
 
     node_feats = {}
     num_nodes = {}
     for ntype in hg.ntypes:
-        node_feats[ntype] = hg.nodes[ntype].data['feat'] if 'feat' in hg.nodes[ntype].data else None
-        num_nodes[ntype] = hg.number_of_nodes(ntype)
+        node_feats[ntype] = (
+            hg.nodes[ntype].data["feat"]
+            if "feat" in hg.nodes[ntype].data
+            else None
+        )
+        num_nodes[ntype] = hg.num_nodes(ntype)
 
     embed_layer = RelGraphEmbed(hg, device, n_hidden, num_nodes, node_feats)
-    model = EntityClassify(hg,
-                           n_hidden,
-                           num_classes,
-                           num_bases=n_bases,
-                           num_hidden_layers=n_layers - 2,
-                           dropout=dropout,
-                           use_self_loop=use_self_loop)
+    model = EntityClassify(
+        hg,
+        n_hidden,
+        num_classes,
+        num_bases=n_bases,
+        num_hidden_layers=n_layers - 2,
+        dropout=dropout,
+        use_self_loop=use_self_loop,
+    )
     embed_layer = embed_layer.to(device)
     model = model.to(device)
 
-    all_params = itertools.chain(model.parameters(), embed_layer.embeds.parameters())
+    all_params = itertools.chain(
+        model.parameters(), embed_layer.embeds.parameters()
+    )
     optimizer = th.optim.Adam(all_params, lr=lr, weight_decay=l2norm)
-    sparse_optimizer = th.optim.SparseAdam(list(embed_layer.node_embeds.parameters()), lr=lr)
+    sparse_optimizer = th.optim.SparseAdam(
+        list(embed_layer.node_embeds.parameters()), lr=lr
+    )
 
     sampler = dgl.dataloading.MultiLayerNeighborSampler([fanout] * n_layers)
     loader = dgl.dataloading.DataLoader(
-        hg, {category: train_idx}, sampler,
-        batch_size=batch_size, shuffle=True, num_workers=4)
+        hg,
+        {category: train_idx},
+        sampler,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,
+    )
 
     print("start training...")
     model.train()
@@ -292,11 +364,13 @@ def track_time(data):
     with loader.enable_cpu_affinity():
         for step, (input_nodes, seeds, blocks) in enumerate(loader):
             blocks = [blk.to(device) for blk in blocks]
-            seeds = seeds[category]     # we only predict the nodes with type "category"
+            seeds = seeds[
+                category
+            ]  # we only predict the nodes with type "category"
             batch_tic = time.time()
             emb = embed_layer(blocks[0])
             lbl = labels[seeds].to(device)
-            emb = {k : e.to(device) for k, e in emb.items()}
+            emb = {k: e.to(device) for k, e in emb.items()}
             logits = model(emb, blocks)[category]
             loss = F.cross_entropy(logits, lbl)
             loss.backward()
@@ -306,7 +380,9 @@ def track_time(data):
             # start timer at before iter_start
             if step == iter_start - 1:
                 t0 = time.time()
-            elif step == iter_count + iter_start - 1:  # time iter_count iterations
+            elif (
+                step == iter_count + iter_start - 1
+            ):  # time iter_count iterations
                 break
 
     t1 = time.time()

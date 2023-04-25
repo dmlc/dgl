@@ -1,11 +1,11 @@
 import argparse
 
+import dgl
+import dgl.nn as dglnn
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.nn as dglnn
 from dgl import AddSelfLoop
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 

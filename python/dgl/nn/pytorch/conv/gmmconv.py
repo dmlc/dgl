@@ -6,8 +6,8 @@ from torch.nn import init
 
 from .... import function as fn
 from ....base import DGLError
-from ..utils import Identity
 from ....utils import expand_as_pair
+from ..utils import Identity
 
 
 class GMMConv(nn.Module):
@@ -103,45 +103,54 @@ class GMMConv(nn.Module):
             [-0.1377, -0.1943],
             [-0.1107, -0.1559]], grad_fn=<AddBackward0>)
     """
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 dim,
-                 n_kernels,
-                 aggregator_type='sum',
-                 residual=False,
-                 bias=True,
-                 allow_zero_in_degree=False):
+
+    def __init__(
+        self,
+        in_feats,
+        out_feats,
+        dim,
+        n_kernels,
+        aggregator_type="sum",
+        residual=False,
+        bias=True,
+        allow_zero_in_degree=False,
+    ):
         super(GMMConv, self).__init__()
         self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
         self._out_feats = out_feats
         self._dim = dim
         self._n_kernels = n_kernels
         self._allow_zero_in_degree = allow_zero_in_degree
-        if aggregator_type == 'sum':
+        if aggregator_type == "sum":
             self._reducer = fn.sum
-        elif aggregator_type == 'mean':
+        elif aggregator_type == "mean":
             self._reducer = fn.mean
-        elif aggregator_type == 'max':
+        elif aggregator_type == "max":
             self._reducer = fn.max
         else:
-            raise KeyError("Aggregator type {} not recognized.".format(aggregator_type))
+            raise KeyError(
+                "Aggregator type {} not recognized.".format(aggregator_type)
+            )
 
         self.mu = nn.Parameter(th.Tensor(n_kernels, dim))
         self.inv_sigma = nn.Parameter(th.Tensor(n_kernels, dim))
-        self.fc = nn.Linear(self._in_src_feats, n_kernels * out_feats, bias=False)
+        self.fc = nn.Linear(
+            self._in_src_feats, n_kernels * out_feats, bias=False
+        )
         if residual:
             if self._in_dst_feats != out_feats:
-                self.res_fc = nn.Linear(self._in_dst_feats, out_feats, bias=False)
+                self.res_fc = nn.Linear(
+                    self._in_dst_feats, out_feats, bias=False
+                )
             else:
                 self.res_fc = Identity()
         else:
-            self.register_buffer('res_fc', None)
+            self.register_buffer("res_fc", None)
 
         if bias:
             self.bias = nn.Parameter(th.Tensor(out_feats))
         else:
-            self.register_buffer('bias', None)
+            self.register_buffer("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -158,7 +167,7 @@ class GMMConv(nn.Module):
         The mu weight is initialized using normal distribution and
         inv_sigma is initialized with constant value 1.0.
         """
-        gain = init.calculate_gain('relu')
+        gain = init.calculate_gain("relu")
         init.xavier_normal_(self.fc.weight, gain=gain)
         if isinstance(self.res_fc, nn.Linear):
             init.xavier_normal_(self.res_fc.weight, gain=gain)
@@ -218,27 +227,38 @@ class GMMConv(nn.Module):
         with graph.local_scope():
             if not self._allow_zero_in_degree:
                 if (graph.in_degrees() == 0).any():
-                    raise DGLError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+                    raise DGLError(
+                        "There are 0-in-degree nodes in the graph, "
+                        "output for those nodes will be invalid. "
+                        "This is harmful for some applications, "
+                        "causing silent performance regression. "
+                        "Adding self-loop on the input graph by "
+                        "calling `g = dgl.add_self_loop(g)` will resolve "
+                        "the issue. Setting ``allow_zero_in_degree`` "
+                        "to be `True` when constructing this module will "
+                        "suppress the check and let the code run."
+                    )
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = self.fc(feat_src).view(-1, self._n_kernels, self._out_feats)
-            E = graph.number_of_edges()
+            graph.srcdata["h"] = self.fc(feat_src).view(
+                -1, self._n_kernels, self._out_feats
+            )
+            E = graph.num_edges()
             # compute gaussian weight
-            gaussian = -0.5 * ((pseudo.view(E, 1, self._dim) -
-                                self.mu.view(1, self._n_kernels, self._dim)) ** 2)
-            gaussian = gaussian * (self.inv_sigma.view(1, self._n_kernels, self._dim) ** 2)
-            gaussian = th.exp(gaussian.sum(dim=-1, keepdim=True)) # (E, K, 1)
-            graph.edata['w'] = gaussian
-            graph.update_all(fn.u_mul_e('h', 'w', 'm'), self._reducer('m', 'h'))
-            rst = graph.dstdata['h'].sum(1)
+            gaussian = -0.5 * (
+                (
+                    pseudo.view(E, 1, self._dim)
+                    - self.mu.view(1, self._n_kernels, self._dim)
+                )
+                ** 2
+            )
+            gaussian = gaussian * (
+                self.inv_sigma.view(1, self._n_kernels, self._dim) ** 2
+            )
+            gaussian = th.exp(gaussian.sum(dim=-1, keepdim=True))  # (E, K, 1)
+            graph.edata["w"] = gaussian
+            graph.update_all(fn.u_mul_e("h", "w", "m"), self._reducer("m", "h"))
+            rst = graph.dstdata["h"].sum(1)
             # residual connection
             if self.res_fc is not None:
                 rst = rst + self.res_fc(feat_dst)

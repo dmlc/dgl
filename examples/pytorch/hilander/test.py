@@ -3,14 +3,14 @@ import os
 import pickle
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.optim as optim
 from dataset import LanderDataset
 from models import LANDER
 from utils import build_next_level, decode, evaluation, stop_iterating
-
-import dgl
 
 ###########
 # ArgParser
@@ -63,10 +63,10 @@ dataset = LanderDataset(
 )
 g = dataset.gs[0].to(device)
 global_labels = labels.copy()
-ids = np.arange(g.number_of_nodes())
+ids = np.arange(g.num_nodes())
 global_edges = ([], [])
 global_edges_len = len(global_edges[0])
-global_num_nodes = g.number_of_nodes()
+global_num_nodes = g.num_nodes()
 
 ##################
 # Model Definition

@@ -37,6 +37,7 @@ def save_heterographs(filename, g_list, labels, formats):
         filename, gdata_list, tensor_dict_to_ndarray_dict(labels), formats
     )
 
+
 @register_object("heterograph_serialize.HeteroGraphData")
 class HeteroGraphData(ObjectBase):
     """Object to hold the data to be stored for DGLGraph"""
@@ -66,13 +67,13 @@ class HeteroGraphData(ObjectBase):
                 ntensor[i]: F.zerocopy_from_dgl_ndarray(ntensor[i + 1])
                 for i in range(0, len(ntensor), 2)
             }
-            nframes.append(Frame(ndict, num_rows=gidx.number_of_nodes(ntid)))
+            nframes.append(Frame(ndict, num_rows=gidx.num_nodes(ntid)))
 
         for etid, etensor in enumerate(etensor_list):
             edict = {
                 etensor[i]: F.zerocopy_from_dgl_ndarray(etensor[i + 1])
                 for i in range(0, len(etensor), 2)
             }
-            eframes.append(Frame(edict, num_rows=gidx.number_of_edges(etid)))
+            eframes.append(Frame(edict, num_rows=gidx.num_edges(etid)))
 
         return DGLGraph(gidx, ntype_names, etype_names, nframes, eframes)

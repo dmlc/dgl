@@ -1,8 +1,7 @@
 """Module for message propagation."""
 from __future__ import absolute_import
 
-from . import backend as F
-from . import traversal as trv
+from . import backend as F, traversal as trv
 from .heterograph import DGLGraph
 
 __all__ = [

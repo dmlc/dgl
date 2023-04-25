@@ -2,8 +2,7 @@
 
 import numpy as np
 
-from .. import backend as F
-from .. import convert, utils
+from .. import backend as F, convert, utils
 from .._ffi.function import _init_api
 from .randomwalks import random_walk
 
@@ -157,7 +156,7 @@ class RandomWalkNeighborSampler(object):
         )
         neighbor_graph = convert.heterograph(
             {(self.ntype, "_E", self.ntype): (src, dst)},
-            {self.ntype: self.G.number_of_nodes(self.ntype)},
+            {self.ntype: self.G.num_nodes(self.ntype)},
         )
         neighbor_graph.edata[self.weight_column] = counts
 

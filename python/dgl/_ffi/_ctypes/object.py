@@ -6,11 +6,11 @@ import ctypes
 from ..base import _LIB, c_str, check_call
 from ..object_generic import _set_class_object_base
 from .types import (
-    C_TO_PY_ARG_SWITCH,
-    RETURN_SWITCH,
-    DGLValue,
-    TypeCode,
     _wrap_arg_func,
+    C_TO_PY_ARG_SWITCH,
+    DGLValue,
+    RETURN_SWITCH,
+    TypeCode,
 )
 
 ObjectHandle = ctypes.c_void_p

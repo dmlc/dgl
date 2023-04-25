@@ -7,6 +7,8 @@ import os
 import random
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -15,8 +17,6 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator
 from models import GAT
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-
-import dgl
 
 epsilon = 1 - math.log(2)
 
@@ -66,9 +66,9 @@ def preprocess(graph):
     graph.ndata["feat"] = feat
 
     # add self-loop
-    print(f"Total edges before adding self-loop {graph.number_of_edges()}")
+    print(f"Total edges before adding self-loop {graph.num_edges()}")
     graph = graph.remove_self_loop().add_self_loop()
-    print(f"Total edges after adding self-loop {graph.number_of_edges()}")
+    print(f"Total edges after adding self-loop {graph.num_edges()}")
 
     graph.create_formats_()
 

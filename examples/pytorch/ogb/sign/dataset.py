@@ -1,9 +1,8 @@
+import dgl
+import dgl.function as fn
 import numpy as np
 import torch
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
-
-import dgl
-import dgl.function as fn
 
 
 def get_ogb_evaluator(dataset):
@@ -86,8 +85,8 @@ def load_dataset(name, device):
     evaluator = get_ogb_evaluator(name)
 
     print(
-        f"# Nodes: {g.number_of_nodes()}\n"
-        f"# Edges: {g.number_of_edges()}\n"
+        f"# Nodes: {g.num_nodes()}\n"
+        f"# Edges: {g.num_edges()}\n"
         f"# Train: {len(train_nid)}\n"
         f"# Val: {len(val_nid)}\n"
         f"# Test: {len(test_nid)}\n"

@@ -1,14 +1,13 @@
 """ Code adapted from https://github.com/kavehhassani/mvgrl """
+import dgl
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 import torch as th
-from scipy.linalg import fractional_matrix_power, inv
-from sklearn.preprocessing import MinMaxScaler
-
-import dgl
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from dgl.nn import APPNPConv
+from scipy.linalg import fractional_matrix_power, inv
+from sklearn.preprocessing import MinMaxScaler
 
 
 def preprocess_features(features):
@@ -123,7 +122,7 @@ def process_dataset_appnp(epsilon):
     test_idx = th.nonzero(test_mask, as_tuple=False).squeeze()
 
     appnp = APPNPConv(k, alpha)
-    id = th.eye(graph.number_of_nodes()).float()
+    id = th.eye(graph.num_nodes()).float()
     diff_adj = appnp(graph.add_self_loop(), id).numpy()
 
     diff_adj[diff_adj < epsilon] = 0

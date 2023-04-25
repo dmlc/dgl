@@ -14,12 +14,10 @@ from .chemutils import (
     enum_assemble_nx,
     set_atommap,
 )
-from .jtmpn import DGLJTMPN
-from .jtmpn import mol2dgl_single as mol2dgl_dec
+from .jtmpn import DGLJTMPN, mol2dgl_single as mol2dgl_dec
 from .jtnn_dec import DGLJTNNDecoder
 from .jtnn_enc import DGLJTNNEncoder
-from .mpn import DGLMPN
-from .mpn import mol2dgl_single as mol2dgl_enc
+from .mpn import DGLMPN, mol2dgl_single as mol2dgl_enc
 from .nnutils import cuda
 
 
@@ -72,10 +70,10 @@ class DGLJTNNVAE(nn.Module):
             [t.graph for t in mol_batch["mol_trees"]]
         )
 
-        self.n_nodes_total += mol_graphs.number_of_nodes()
-        self.n_edges_total += mol_graphs.number_of_edges()
+        self.n_nodes_total += mol_graphs.num_nodes()
+        self.n_edges_total += mol_graphs.num_edges()
         self.n_tree_nodes_total += sum(
-            t.graph.number_of_nodes() for t in mol_batch["mol_trees"]
+            t.graph.num_nodes() for t in mol_batch["mol_trees"]
         )
         self.n_passes += 1
 

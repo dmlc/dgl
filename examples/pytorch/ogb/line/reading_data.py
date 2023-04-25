@@ -3,18 +3,18 @@ import pickle
 import random
 import time
 
+import dgl
+
 import numpy as np
 import scipy.sparse as sp
 import torch
-from torch.utils.data import DataLoader
-
-import dgl
 from dgl.data.utils import (
     _get_dgl_url,
     download,
     extract_archive,
     get_download_dir,
 )
+from torch.utils.data import DataLoader
 
 
 def ReadTxtNet(file_path="", undirected=True):
@@ -188,11 +188,11 @@ class LineDataset:
         self.G = make_undirected(self.G)
         print("Finish reading graph")
 
-        self.num_nodes = self.G.number_of_nodes()
+        self.num_nodes = self.G.num_nodes()
 
         start = time.time()
         seeds = np.random.choice(
-            np.arange(self.G.number_of_edges()), self.num_samples, replace=True
+            np.arange(self.G.num_edges()), self.num_samples, replace=True
         )  # edge index
         self.seeds = torch.split(
             torch.LongTensor(seeds),

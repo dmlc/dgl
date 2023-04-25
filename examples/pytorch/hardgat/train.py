@@ -8,19 +8,19 @@ Paper: https://arxiv.org/abs/1907.04652
 import argparse
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.nn.functional as F
-from hgao import HardGAT
-from utils import EarlyStopping
-
-import dgl
 from dgl.data import (
     CiteseerGraphDataset,
     CoraGraphDataset,
     PubmedGraphDataset,
     register_data_args,
 )
+from hgao import HardGAT
+from utils import EarlyStopping
 
 
 def accuracy(logits, labels):
@@ -65,7 +65,7 @@ def main(args):
     test_mask = g.ndata["test_mask"]
     num_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     print(
         """----Data statistics------'
       #Edges %d
@@ -85,7 +85,7 @@ def main(args):
     # add self loop
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     # create model
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     model = HardGAT(
@@ -161,7 +161,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="GAT")
     register_data_args(parser)
     parser.add_argument(

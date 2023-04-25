@@ -3,17 +3,17 @@ import os
 from datetime import datetime
 from time import time
 
+import dgl
+
 import torch
 import torch.nn.functional as F
 from data_preprocess import degree_as_feature, node_label_as_feature
+from dgl.data import LegacyTUDataset
+from dgl.dataloading import GraphDataLoader
 from networks import GraphClassifier
 from torch import Tensor
 from torch.utils.data import random_split
 from utils import get_stats, parse_args
-
-import dgl
-from dgl.data import LegacyTUDataset
-from dgl.dataloading import GraphDataLoader
 
 
 def compute_loss(

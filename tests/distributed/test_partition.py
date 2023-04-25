@@ -1,12 +1,12 @@
+import json
 import os
+import tempfile
 
 import backend as F
-import torch as th
 import dgl
-import json
 import numpy as np
 import pytest
-import tempfile
+import torch as th
 from dgl import function as fn
 from dgl.distributed import (
     load_partition,
@@ -15,18 +15,18 @@ from dgl.distributed import (
     partition_graph,
 )
 from dgl.distributed.graph_partition_book import (
+    _etype_tuple_to_str,
     DEFAULT_ETYPE,
     DEFAULT_NTYPE,
     EdgePartitionPolicy,
     HeteroDataName,
     NodePartitionPolicy,
     RangePartitionBook,
-    _etype_tuple_to_str,
 )
 from dgl.distributed.partition import (
-    RESERVED_FIELD_DTYPE,
     _get_inner_edge_mask,
     _get_inner_node_mask,
+    RESERVED_FIELD_DTYPE,
 )
 from scipy import sparse as spsp
 from utils import reset_envs
@@ -98,18 +98,18 @@ def verify_hetero_graph(g, parts):
     for ntype in g.ntypes:
         print(
             "node {}: {}, {}".format(
-                ntype, g.number_of_nodes(ntype), num_nodes[ntype]
+                ntype, g.num_nodes(ntype), num_nodes[ntype]
             )
         )
-        assert g.number_of_nodes(ntype) == num_nodes[ntype]
+        assert g.num_nodes(ntype) == num_nodes[ntype]
     # Verify the number of edges are correct.
     for etype in g.canonical_etypes:
         print(
             "edge {}: {}, {}".format(
-                etype, g.number_of_edges(etype), num_edges[etype]
+                etype, g.num_edges(etype), num_edges[etype]
             )
         )
-        assert g.number_of_edges(etype) == num_edges[etype]
+        assert g.num_edges(etype) == num_edges[etype]
 
     nids = {ntype: [] for ntype in g.ntypes}
     eids = {etype: [] for etype in g.canonical_etypes}
@@ -149,11 +149,11 @@ def verify_hetero_graph(g, parts):
         nids_type = F.cat(nids[ntype], 0)
         uniq_ids = F.unique(nids_type)
         # We should get all nodes.
-        assert len(uniq_ids) == g.number_of_nodes(ntype)
+        assert len(uniq_ids) == g.num_nodes(ntype)
     for etype in eids:
         eids_type = F.cat(eids[etype], 0)
         uniq_ids = F.unique(eids_type)
-        assert len(uniq_ids) == g.number_of_edges(etype)
+        assert len(uniq_ids) == g.num_edges(etype)
     # TODO(zhengda) this doesn't check 'part_id'
 
 
@@ -235,9 +235,9 @@ def check_hetero_partition(
     assert len(orig_nids) == len(hg.ntypes)
     assert len(orig_eids) == len(hg.canonical_etypes)
     for ntype in hg.ntypes:
-        assert len(orig_nids[ntype]) == hg.number_of_nodes(ntype)
+        assert len(orig_nids[ntype]) == hg.num_nodes(ntype)
     for etype in hg.canonical_etypes:
-        assert len(orig_eids[etype]) == hg.number_of_edges(etype)
+        assert len(orig_eids[etype]) == hg.num_edges(etype)
     parts = []
     shuffled_labels = []
     shuffled_elabels = []
@@ -334,13 +334,9 @@ def check_partition(
     load_feats=True,
     graph_formats=None,
 ):
-    g.ndata["labels"] = F.arange(0, g.number_of_nodes())
-    g.ndata["feats"] = F.tensor(
-        np.random.randn(g.number_of_nodes(), 10), F.float32
-    )
-    g.edata["feats"] = F.tensor(
-        np.random.randn(g.number_of_edges(), 10), F.float32
-    )
+    g.ndata["labels"] = F.arange(0, g.num_nodes())
+    g.ndata["feats"] = F.tensor(np.random.randn(g.num_nodes(), 10), F.float32)
+    g.edata["feats"] = F.tensor(np.random.randn(g.num_edges(), 10), F.float32)
     g.update_all(fn.copy_u("feats", "msg"), fn.sum("msg", "h"))
     g.update_all(fn.copy_e("feats", "msg"), fn.sum("msg", "eh"))
     num_hops = 2
@@ -389,8 +385,8 @@ def check_partition(
                 assert np.all(F.asnumpy(part_ids) == i)
 
         # Check the metadata
-        assert gpb._num_nodes() == g.number_of_nodes()
-        assert gpb._num_edges() == g.number_of_edges()
+        assert gpb._num_nodes() == g.num_nodes()
+        assert gpb._num_edges() == g.num_edges()
 
         assert gpb.num_partitions() == num_parts
         gpb_meta = gpb.metadata()
@@ -446,12 +442,8 @@ def check_partition(
 
         local_orig_nids = orig_nids[part_g.ndata[dgl.NID]]
         local_orig_eids = orig_eids[part_g.edata[dgl.EID]]
-        part_g.ndata["feats"] = F.gather_row(
-            g.ndata["feats"], local_orig_nids
-        )
-        part_g.edata["feats"] = F.gather_row(
-            g.edata["feats"], local_orig_eids
-        )
+        part_g.ndata["feats"] = F.gather_row(g.ndata["feats"], local_orig_nids)
+        part_g.edata["feats"] = F.gather_row(g.edata["feats"], local_orig_eids)
         local_nodes = orig_nids[local_nodes]
         local_edges = orig_eids[local_edges]
 
@@ -487,9 +479,7 @@ def check_partition(
     # Verify that we can reconstruct node/edge data for original IDs.
     shuffled_labels = F.asnumpy(F.cat(shuffled_labels, 0))
     shuffled_edata = F.asnumpy(F.cat(shuffled_edata, 0))
-    orig_labels = np.zeros(
-        shuffled_labels.shape, dtype=shuffled_labels.dtype
-    )
+    orig_labels = np.zeros(shuffled_labels.shape, dtype=shuffled_labels.dtype)
     orig_edata = np.zeros(shuffled_edata.shape, dtype=shuffled_edata.dtype)
     orig_labels[F.asnumpy(orig_nids)] = shuffled_labels
     orig_edata[F.asnumpy(orig_eids)] = shuffled_edata
@@ -547,6 +537,7 @@ def test_partition(
         graph_formats,
     )
     reset_envs()
+
 
 def test_RangePartitionBook():
     part_id = 1
@@ -629,7 +620,7 @@ def test_RangePartitionBook():
     assert node_policy.policy_str == "node~node1"
     assert node_policy.part_id == part_id
     assert node_policy.is_node
-    assert node_policy.get_data_name('x').is_node()
+    assert node_policy.get_data_name("x").is_node()
     local_ids = th.arange(0, 1000)
     global_ids = local_ids + 1000
     assert th.equal(node_policy.to_local(global_ids), local_ids)
@@ -643,7 +634,7 @@ def test_RangePartitionBook():
     assert edge_policy.policy_str == "edge~node1:edge1:node2"
     assert edge_policy.part_id == part_id
     assert not edge_policy.is_node
-    assert not edge_policy.get_data_name('x').is_node()
+    assert not edge_policy.get_data_name("x").is_node()
     local_ids = th.arange(0, 5000)
     global_ids = local_ids + 5000
     assert th.equal(edge_policy.to_local(global_ids), local_ids)
@@ -662,8 +653,8 @@ def test_RangePartitionBook():
 
 
 def test_UnknownPartitionBook():
-    node_map = {'_N': {0:0, 1:1, 2:2}}
-    edge_map = {'_N:_E:_N': {0:0, 1:1, 2:2}}
+    node_map = {"_N": {0: 0, 1: 1, 2: 2}}
+    edge_map = {"_N:_E:_N": {0: 0, 1: 1, 2: 2}}
 
     part_metadata = {
         "num_parts": 1,
@@ -671,13 +662,13 @@ def test_UnknownPartitionBook():
         "num_edges": len(edge_map),
         "node_map": node_map,
         "edge_map": edge_map,
-        "graph_name": "test_graph"
+        "graph_name": "test_graph",
     }
 
     with tempfile.TemporaryDirectory() as test_dir:
         part_config = os.path.join(test_dir, "test_graph.json")
         with open(part_config, "w") as file:
-            json.dump(part_metadata, file, indent = 4)
+            json.dump(part_metadata, file, indent=4)
         try:
             load_partition_book(part_config, 0)
         except Exception as e:

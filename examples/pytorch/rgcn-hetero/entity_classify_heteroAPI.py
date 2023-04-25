@@ -9,9 +9,9 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-from model import EntityClassify_HeteroAPI
 
 from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
+from model import EntityClassify_HeteroAPI
 
 
 def main(args):

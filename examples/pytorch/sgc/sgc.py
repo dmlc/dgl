@@ -9,13 +9,13 @@ import argparse
 import math
 import time
 
+import dgl
+import dgl.function as fn
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.function as fn
 from dgl.data import (
     CiteseerGraphDataset,
     CoraGraphDataset,
@@ -60,7 +60,7 @@ def main(args):
     test_mask = g.ndata["test_mask"]
     in_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     print(
         """----Data statistics------'
       #Edges %d
@@ -77,7 +77,7 @@ def main(args):
         )
     )
 
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     # add self loop
     g = dgl.remove_self_loop(g)
     g = dgl.add_self_loop(g)

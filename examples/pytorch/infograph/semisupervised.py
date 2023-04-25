@@ -1,14 +1,14 @@
 import argparse
 
+import dgl
+
 import numpy as np
 import torch as th
 import torch.nn.functional as F
-from model import InfoGraphS
-
-import dgl
 from dgl.data import QM9EdgeDataset
 from dgl.data.utils import Subset
 from dgl.dataloading import GraphDataLoader
+from model import InfoGraphS
 
 
 def argument():
@@ -160,7 +160,6 @@ def evaluate(model, loader, num, device):
 
 
 if __name__ == "__main__":
-
     # Step 1: Prepare graph data   ===================================== #
     args = argument()
     label_keys = [args.target]

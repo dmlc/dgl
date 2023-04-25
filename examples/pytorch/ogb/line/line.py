@@ -3,6 +3,8 @@ import os
 import random
 import time
 
+import dgl
+
 import numpy as np
 import torch
 import torch.multiprocessing as mp
@@ -10,8 +12,6 @@ from model import SkipGramModel
 from reading_data import LineDataset
 from torch.utils.data import DataLoader
 from utils import check_args, sum_up_params
-
-import dgl
 
 
 class LineTrainer:
@@ -30,7 +30,7 @@ class LineTrainer:
             load_from_ogbn=args.load_from_ogbn,
             num_samples=args.num_samples * 1000000,
         )
-        self.emb_size = self.dataset.G.number_of_nodes()
+        self.emb_size = self.dataset.G.num_nodes()
         self.emb_model = None
 
     def init_device_emb(self):

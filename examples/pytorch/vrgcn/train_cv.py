@@ -1,18 +1,18 @@
 import argparse
 import time
 
+import dgl
+import dgl.function as fn
+import dgl.nn.pytorch as dglnn
+
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
-from torch.utils.data import DataLoader
-
-import dgl
-import dgl.function as fn
-import dgl.nn.pytorch as dglnn
 from dgl.data import RedditDataset
+from torch.utils.data import DataLoader
 
 
 class SAGEConvWithCV(nn.Module):
@@ -99,11 +99,11 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
+        nodes = th.arange(g.num_nodes())
         ys = []
         for l, layer in enumerate(self.layers):
             y = th.zeros(
-                g.number_of_nodes(),
+                g.num_nodes(),
                 self.n_hidden if l != len(self.layers) - 1 else self.n_classes,
             )
 

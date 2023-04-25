@@ -50,18 +50,21 @@ Generative Models of Graphs
 # you can write the code as follows.
 #
 
+import os
+
+os.environ["DGLBACKEND"] = "pytorch"
 import dgl
 
 g = dgl.DGLGraph()
-g.add_nodes(1)              # Add node 0
-g.add_nodes(1)              # Add node 1
+g.add_nodes(1)  # Add node 0
+g.add_nodes(1)  # Add node 1
 
 # Edges in DGLGraph are directed by default.
 # For undirected edges, add edges for both directions.
-g.add_edges([1, 0], [0, 1]) # Add edges (1, 0), (0, 1)
-g.add_nodes(1)              # Add node 2
-g.add_edges([2, 1], [1, 2]) # Add edges (2, 1), (1, 2)
-g.add_edges([2, 0], [0, 2]) # Add edges (2, 0), (0, 2)
+g.add_edges([1, 0], [0, 1])  # Add edges (1, 0), (0, 1)
+g.add_nodes(1)  # Add node 2
+g.add_edges([2, 1], [1, 2])  # Add edges (2, 1), (1, 2)
+g.add_edges([2, 0], [0, 2])  # Add edges (2, 0), (0, 2)
 
 #######################################################################################
 # Real-world graphs are much more complex. There are many families of graphs,
@@ -79,16 +82,16 @@ g.add_edges([2, 0], [0, 2]) # Add edges (2, 0), (0, 2)
 #
 # .. note::
 #
-#    To be sure, this is not necessarily a hard constraint. Subgraphs can be 
+#    To be sure, this is not necessarily a hard constraint. Subgraphs can be
 #    built in parallel and then get assembled. But we
 #    will restrict ourselves to the sequential processes for this tutorial.
 #
 #
 # DGMG: The main flow
 # --------------------
-# For this tutorial, you use 
+# For this tutorial, you use
 # `Deep Generative Models of Graphs <https://arxiv.org/abs/1803.03324>`__
-# ) (DGMG) to implement a graph generative model using DGL. Its algorithmic 
+# ) (DGMG) to implement a graph generative model using DGL. Its algorithmic
 # framework is general but also challenging to parallelize.
 #
 # .. note::
@@ -114,18 +117,19 @@ g.add_edges([2, 0], [0, 2]) # Add edges (2, 0), (0, 2)
 # with DGMG is implemented in DGL.
 #
 
+
 def forward_inference(self):
     stop = self.add_node_and_update()
-    while (not stop) and (self.g.number_of_nodes() < self.v_max + 1):
+    while (not stop) and (self.g.num_nodes() < self.v_max + 1):
         num_trials = 0
         to_add_edge = self.add_edge_or_not()
-        while to_add_edge and (num_trials < self.g.number_of_nodes() - 1):
+        while to_add_edge and (num_trials < self.g.num_nodes() - 1):
             self.choose_dest_and_update()
             num_trials += 1
             to_add_edge = self.add_edge_or_not()
         stop = self.add_node_and_update()
-
     return self.g
+
 
 #######################################################################################
 # Assume you have a pre-trained model for generating cycles of nodes 10-20.
@@ -170,7 +174,7 @@ def forward_inference(self):
 #             ax.cla()
 #             g_t = evolution[i]
 #             nx.draw_circular(g_t, with_labels=True, ax=ax,
-#                              node_color=['#FEBD69'] * g_t.number_of_nodes())
+#                              node_color=['#FEBD69'] * g_t.num_nodes())
 #
 #         fig, ax = plt.subplots()
 #         ani = animation.FuncAnimation(fig, animate,
@@ -201,6 +205,7 @@ def forward_inference(self):
 #    -\log p(a_{1},\cdots,a_{T})=-\sum_{t=1}^{T}\log p(a_{t}|a_{1},\cdots, a_{t-1}).\\
 #
 
+
 def forward_train(self, actions):
     """
     - actions: list
@@ -223,8 +228,8 @@ def forward_train(self, actions):
             self.choose_dest_and_update(a=actions[self.action_step])
             to_add_edge = self.add_edge_or_not(a=actions[self.action_step])
         stop = self.add_node_and_update(a=actions[self.action_step])
-
     return self.get_log_prob()
+
 
 #######################################################################################
 # The key difference between ``forward_train`` and ``forward_inference`` is
@@ -293,6 +298,7 @@ class DGMGSkeleton(nn.Module):
         else:
             return self.forward_inference()
 
+
 #######################################################################################
 # Encoding a dynamic graph
 # ``````````````````````````
@@ -336,20 +342,20 @@ class GraphEmbed(nn.Module):
 
         # Embed graphs
         self.node_gating = nn.Sequential(
-            nn.Linear(node_hidden_size, 1),
-            nn.Sigmoid()
+            nn.Linear(node_hidden_size, 1), nn.Sigmoid()
         )
-        self.node_to_graph = nn.Linear(node_hidden_size,
-                                       self.graph_hidden_size)
+        self.node_to_graph = nn.Linear(node_hidden_size, self.graph_hidden_size)
 
     def forward(self, g):
-        if g.number_of_nodes() == 0:
+        if g.num_nodes() == 0:
             return torch.zeros(1, self.graph_hidden_size)
         else:
             # Node features are stored as hv in ndata.
-            hvs = g.ndata['hv']
-            return (self.node_gating(hvs) *
-                    self.node_to_graph(hvs)).sum(0, keepdim=True)
+            hvs = g.ndata["hv"]
+            return (self.node_gating(hvs) * self.node_to_graph(hvs)).sum(
+                0, keepdim=True
+            )
+
 
 #######################################################################################
 # Update node embeddings via graph propagation
@@ -393,6 +399,7 @@ class GraphEmbed(nn.Module):
 
 from functools import partial
 
+
 class GraphProp(nn.Module):
     def __init__(self, num_prop_rounds, node_hidden_size):
         super(GraphProp, self).__init__()
@@ -408,39 +415,43 @@ class GraphProp(nn.Module):
 
         for t in range(num_prop_rounds):
             # input being [hv, hu, xuv]
-            message_funcs.append(nn.Linear(2 * node_hidden_size + 1,
-                                           self.node_activation_hidden_size))
+            message_funcs.append(
+                nn.Linear(
+                    2 * node_hidden_size + 1, self.node_activation_hidden_size
+                )
+            )
 
             self.reduce_funcs.append(partial(self.dgmg_reduce, round=t))
             node_update_funcs.append(
-                nn.GRUCell(self.node_activation_hidden_size,
-                           node_hidden_size))
-
+                nn.GRUCell(self.node_activation_hidden_size, node_hidden_size)
+            )
         self.message_funcs = nn.ModuleList(message_funcs)
         self.node_update_funcs = nn.ModuleList(node_update_funcs)
 
     def dgmg_msg(self, edges):
         """For an edge u->v, return concat([h_u, x_uv])"""
-        return {'m': torch.cat([edges.src['hv'],
-                                edges.data['he']],
-                               dim=1)}
+        return {"m": torch.cat([edges.src["hv"], edges.data["he"]], dim=1)}
 
     def dgmg_reduce(self, nodes, round):
-        hv_old = nodes.data['hv']
-        m = nodes.mailbox['m']
-        message = torch.cat([
-            hv_old.unsqueeze(1).expand(-1, m.size(1), -1), m], dim=2)
+        hv_old = nodes.data["hv"]
+        m = nodes.mailbox["m"]
+        message = torch.cat(
+            [hv_old.unsqueeze(1).expand(-1, m.size(1), -1), m], dim=2
+        )
         node_activation = (self.message_funcs[round](message)).sum(1)
 
-        return {'a': node_activation}
+        return {"a": node_activation}
 
     def forward(self, g):
-        if g.number_of_edges() > 0:
+        if g.num_edges() > 0:
             for t in range(self.num_prop_rounds):
-                g.update_all(message_func=self.dgmg_msg,
-                             reduce_func=self.reduce_funcs[t])
-                g.ndata['hv'] = self.node_update_funcs[t](
-                     g.ndata['a'], g.ndata['hv'])
+                g.update_all(
+                    message_func=self.dgmg_msg, reduce_func=self.reduce_funcs[t]
+                )
+                g.ndata["hv"] = self.node_update_funcs[t](
+                    g.ndata["a"], g.ndata["hv"]
+                )
+
 
 #######################################################################################
 # Actions
@@ -473,6 +484,7 @@ class GraphProp(nn.Module):
 import torch.nn.functional as F
 from torch.distributions import Bernoulli
 
+
 def bernoulli_action_log_prob(logit, action):
     """Calculate the log p of an action with respect to a Bernoulli
     distribution. Use logit rather than prob for numerical stability."""
@@ -481,38 +493,45 @@ def bernoulli_action_log_prob(logit, action):
     else:
         return F.logsigmoid(logit)
 
+
 class AddNode(nn.Module):
     def __init__(self, graph_embed_func, node_hidden_size):
         super(AddNode, self).__init__()
 
-        self.graph_op = {'embed': graph_embed_func}
+        self.graph_op = {"embed": graph_embed_func}
 
         self.stop = 1
         self.add_node = nn.Linear(graph_embed_func.graph_hidden_size, 1)
 
         # If to add a node, initialize its hv
         self.node_type_embed = nn.Embedding(1, node_hidden_size)
-        self.initialize_hv = nn.Linear(node_hidden_size + \
-                                       graph_embed_func.graph_hidden_size,
-                                       node_hidden_size)
+        self.initialize_hv = nn.Linear(
+            node_hidden_size + graph_embed_func.graph_hidden_size,
+            node_hidden_size,
+        )
 
         self.init_node_activation = torch.zeros(1, 2 * node_hidden_size)
 
     def _initialize_node_repr(self, g, node_type, graph_embed):
         """Whenver a node is added, initialize its representation."""
-        num_nodes = g.number_of_nodes()
+        num_nodes = g.num_nodes()
         hv_init = self.initialize_hv(
-            torch.cat([
-                self.node_type_embed(torch.LongTensor([node_type])),
-                graph_embed], dim=1))
-        g.nodes[num_nodes - 1].data['hv'] = hv_init
-        g.nodes[num_nodes - 1].data['a'] = self.init_node_activation
+            torch.cat(
+                [
+                    self.node_type_embed(torch.LongTensor([node_type])),
+                    graph_embed,
+                ],
+                dim=1,
+            )
+        )
+        g.nodes[num_nodes - 1].data["hv"] = hv_init
+        g.nodes[num_nodes - 1].data["a"] = self.init_node_activation
 
     def prepare_training(self):
         self.log_prob = []
 
     def forward(self, g, action=None):
-        graph_embed = self.graph_op['embed'](g)
+        graph_embed = self.graph_op["embed"](g)
 
         logit = self.add_node(graph_embed)
         prob = torch.sigmoid(logit)
@@ -524,13 +543,12 @@ class AddNode(nn.Module):
         if not stop:
             g.add_nodes(1)
             self._initialize_node_repr(g, action, graph_embed)
-
         if self.training:
             sample_log_prob = bernoulli_action_log_prob(logit, action)
 
             self.log_prob.append(sample_log_prob)
-
         return stop
+
 
 #######################################################################################
 # Action 2: Add edges
@@ -548,23 +566,24 @@ class AddNode(nn.Module):
 # whether to add a new edge starting from :math:`v`.
 #
 
+
 class AddEdge(nn.Module):
     def __init__(self, graph_embed_func, node_hidden_size):
         super(AddEdge, self).__init__()
 
-        self.graph_op = {'embed': graph_embed_func}
-        self.add_edge = nn.Linear(graph_embed_func.graph_hidden_size + \
-                                  node_hidden_size, 1)
+        self.graph_op = {"embed": graph_embed_func}
+        self.add_edge = nn.Linear(
+            graph_embed_func.graph_hidden_size + node_hidden_size, 1
+        )
 
     def prepare_training(self):
         self.log_prob = []
 
     def forward(self, g, action=None):
-        graph_embed = self.graph_op['embed'](g)
-        src_embed = g.nodes[g.number_of_nodes() - 1].data['hv']
+        graph_embed = self.graph_op["embed"](g)
+        src_embed = g.nodes[g.num_nodes() - 1].data["hv"]
 
-        logit = self.add_edge(torch.cat(
-            [graph_embed, src_embed], dim=1))
+        logit = self.add_edge(torch.cat([graph_embed, src_embed], dim=1))
         prob = torch.sigmoid(logit)
 
         if self.training:
@@ -572,9 +591,9 @@ class AddEdge(nn.Module):
             self.log_prob.append(sample_log_prob)
         else:
             action = Bernoulli(prob).sample().item()
-
         to_add_edge = bool(action == 0)
         return to_add_edge
+
 
 #######################################################################################
 # Action 3: Choose a destination
@@ -593,11 +612,12 @@ class AddEdge(nn.Module):
 
 from torch.distributions import Categorical
 
+
 class ChooseDestAndUpdate(nn.Module):
     def __init__(self, graph_prop_func, node_hidden_size):
         super(ChooseDestAndUpdate, self).__init__()
 
-        self.graph_op = {'prop': graph_prop_func}
+        self.graph_op = {"prop": graph_prop_func}
         self.choose_dest = nn.Linear(2 * node_hidden_size, 1)
 
     def _initialize_edge_repr(self, g, src_list, dest_list):
@@ -605,26 +625,25 @@ class ChooseDestAndUpdate(nn.Module):
         # For multiple edge types, use a one-hot representation
         # or an embedding module.
         edge_repr = torch.ones(len(src_list), 1)
-        g.edges[src_list, dest_list].data['he'] = edge_repr
+        g.edges[src_list, dest_list].data["he"] = edge_repr
 
     def prepare_training(self):
         self.log_prob = []
 
     def forward(self, g, dest):
-        src = g.number_of_nodes() - 1
+        src = g.num_nodes() - 1
         possible_dests = range(src)
 
-        src_embed_expand = g.nodes[src].data['hv'].expand(src, -1)
-        possible_dests_embed = g.nodes[possible_dests].data['hv']
+        src_embed_expand = g.nodes[src].data["hv"].expand(src, -1)
+        possible_dests_embed = g.nodes[possible_dests].data["hv"]
 
         dests_scores = self.choose_dest(
-            torch.cat([possible_dests_embed,
-                       src_embed_expand], dim=1)).view(1, -1)
+            torch.cat([possible_dests_embed, src_embed_expand], dim=1)
+        ).view(1, -1)
         dests_probs = F.softmax(dests_scores, dim=1)
 
         if not self.training:
             dest = Categorical(dests_probs).sample().item()
-
         if not g.has_edges_between(src, dest):
             # For undirected graphs, add edges for both directions
             # so that you can perform graph propagation.
@@ -634,12 +653,13 @@ class ChooseDestAndUpdate(nn.Module):
             g.add_edges(src_list, dest_list)
             self._initialize_edge_repr(g, src_list, dest_list)
 
-            self.graph_op['prop'](g)
-
+            self.graph_op["prop"](g)
         if self.training:
             if dests_probs.nelement() > 1:
                 self.log_prob.append(
-                    F.log_softmax(dests_scores, dim=1)[:, dest: dest + 1])
+                    F.log_softmax(dests_scores, dim=1)[:, dest : dest + 1]
+                )
+
 
 #######################################################################################
 # Putting it together
@@ -648,25 +668,23 @@ class ChooseDestAndUpdate(nn.Module):
 # You are now ready to have a complete implementation of the model class.
 #
 
+
 class DGMG(DGMGSkeleton):
-    def __init__(self, v_max, node_hidden_size,
-                 num_prop_rounds):
+    def __init__(self, v_max, node_hidden_size, num_prop_rounds):
         super(DGMG, self).__init__(v_max)
 
         # Graph embedding module
         self.graph_embed = GraphEmbed(node_hidden_size)
 
         # Graph propagation module
-        self.graph_prop = GraphProp(num_prop_rounds,
-                                    node_hidden_size)
+        self.graph_prop = GraphProp(num_prop_rounds, node_hidden_size)
 
         # Actions
-        self.add_node_agent = AddNode(
-            self.graph_embed, node_hidden_size)
-        self.add_edge_agent = AddEdge(
-            self.graph_embed, node_hidden_size)
+        self.add_node_agent = AddNode(self.graph_embed, node_hidden_size)
+        self.add_edge_agent = AddEdge(self.graph_embed, node_hidden_size)
         self.choose_dest_agent = ChooseDestAndUpdate(
-            self.graph_prop, node_hidden_size)
+            self.graph_prop, node_hidden_size
+        )
 
         # Forward functions
         self.forward_train = partial(forward_train, self=self)
@@ -709,6 +727,7 @@ class DGMG(DGMGSkeleton):
         choose_dest_log_p = torch.cat(self.choose_dest_agent.log_prob).sum()
         return add_node_log_p + add_edge_log_p + choose_dest_log_p
 
+
 #######################################################################################
 # Below is an animation where a graph is generated on the fly
 # after every 10 batches of training for the first 400 batches. You
@@ -723,10 +742,13 @@ class DGMG(DGMGSkeleton):
 import torch.utils.model_zoo as model_zoo
 
 # Download a pre-trained model state dict for generating cycles with 10-20 nodes.
-state_dict = model_zoo.load_url('https://data.dgl.ai/model/dgmg_cycles-5a0c40be.pth')
+state_dict = model_zoo.load_url(
+    "https://data.dgl.ai/model/dgmg_cycles-5a0c40be.pth"
+)
 model = DGMG(v_max=20, node_hidden_size=16, num_prop_rounds=2)
 model.load_state_dict(state_dict)
 model.eval()
+
 
 def is_valid(g):
     # Check if g is a cycle having 10-20 nodes.
@@ -742,32 +764,28 @@ def is_valid(g):
         else:
             return i + 1
 
-    size = g.number_of_nodes()
+    size = g.num_nodes()
 
     if size < 10 or size > 20:
         return False
-
     for node in range(size):
         neighbors = g.successors(node)
 
         if len(neighbors) != 2:
             return False
-
         if _get_previous(node, size - 1) not in neighbors:
             return False
-
         if _get_next(node, size - 1) not in neighbors:
             return False
-
     return True
+
 
 num_valid = 0
 for i in range(100):
     g = model()
     num_valid += is_valid(g)
-
 del model
-print('Among 100 graphs generated, {}% are valid.'.format(num_valid))
+print("Among 100 graphs generated, {}% are valid.".format(num_valid))
 
 #######################################################################################
 # For the complete implementation, see the `DGL DGMG example

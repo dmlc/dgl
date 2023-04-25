@@ -1,10 +1,9 @@
+import dgl
 import torch
 import torch.nn
 import torch.nn.functional as F
-from layer import ConvPoolBlock, SAGPool
-
-import dgl
 from dgl.nn import AvgPooling, GraphConv, MaxPooling
+from layer import ConvPoolBlock, SAGPool
 
 
 class SAGNetworkHierarchical(torch.nn.Module):

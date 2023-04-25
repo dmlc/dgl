@@ -321,7 +321,7 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
             src = src[mask]
             dst = dst[mask]
             # 返回一个与初始图有相同节点的边界
-            frontier = dgl.graph((src, dst), num_nodes=g.number_of_nodes())
+            frontier = dgl.graph((src, dst), num_nodes=g.num_nodes())
             return frontier
     
         def __len__(self):
@@ -376,7 +376,7 @@ DGL确保块的输出节点将始终出现在输入节点中。如下代码所�
             new_edges_masks = {}
             # 遍历所有边的类型
             for etype in sg.canonical_etypes:
-                edge_mask = torch.zeros(sg.number_of_edges(etype))
+                edge_mask = torch.zeros(sg.num_edges(etype))
                 edge_mask.bernoulli_(self.p)
                 new_edges_masks[etype] = edge_mask.bool()
     

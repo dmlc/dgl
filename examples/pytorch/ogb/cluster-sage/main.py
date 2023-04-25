@@ -3,6 +3,10 @@ import time
 import traceback
 from functools import partial
 
+import dgl
+import dgl.function as fn
+import dgl.nn.pytorch as dglnn
+
 import numpy as np
 import torch as th
 import torch.multiprocessing as mp
@@ -10,14 +14,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
+from dgl.data import RedditDataset
 from ogb.nodeproppred import DglNodePropPredDataset
 from sampler import ClusterIter, subgraph_collate_fn
 from torch.utils.data import DataLoader
-
-import dgl
-import dgl.function as fn
-import dgl.nn.pytorch as dglnn
-from dgl.data import RedditDataset
 
 #### Neighbor sampler
 
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     graph, labels = data[0]
     labels = labels[:, 0]
     num_nodes = train_idx.shape[0] + val_idx.shape[0] + test_idx.shape[0]
-    assert num_nodes == graph.number_of_nodes()
+    assert num_nodes == graph.num_nodes()
     graph.ndata["labels"] = labels
     mask = th.zeros(num_nodes, dtype=th.bool)
     mask[train_idx] = True

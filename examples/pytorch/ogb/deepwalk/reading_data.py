@@ -3,19 +3,19 @@ import pickle
 import random
 import time
 
+import dgl
+
 import numpy as np
 import scipy.sparse as sp
 import torch
-from torch.utils.data import DataLoader
-from utils import shuffle_walks
-
-import dgl
 from dgl.data.utils import (
     _get_dgl_url,
     download,
     extract_archive,
     get_download_dir,
 )
+from torch.utils.data import DataLoader
+from utils import shuffle_walks
 
 
 def ReadTxtNet(file_path="", undirected=True):
@@ -186,7 +186,7 @@ class DeepwalkDataset:
             self.save_mapping(map_file)
             self.G = net2graph(self.sm)
 
-        self.num_nodes = self.G.number_of_nodes()
+        self.num_nodes = self.G.num_nodes()
 
         # random walk seeds
         start = time.time()

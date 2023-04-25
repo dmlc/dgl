@@ -1,6 +1,9 @@
 import glob
 import os
 
+import dgl
+import dgl.nn.pytorch as dglnn
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,9 +14,6 @@ from ogb.nodeproppred import DglNodePropPredDataset
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torchmetrics import Accuracy
-
-import dgl
-import dgl.nn.pytorch as dglnn
 
 
 class SAGE(LightningModule):
@@ -27,8 +27,8 @@ class SAGE(LightningModule):
         self.dropout = nn.Dropout(0.5)
         self.n_hidden = n_hidden
         self.n_classes = n_classes
-        self.train_acc = Accuracy()
-        self.val_acc = Accuracy()
+        self.train_acc = Accuracy(task="multiclass", num_classes=n_classes)
+        self.val_acc = Accuracy(task="multiclass", num_classes=n_classes)
 
     def forward(self, blocks, x):
         h = x
@@ -180,9 +180,11 @@ if __name__ == "__main__":
     # Train
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", save_top_k=1)
     # Use this for single GPU
-    # trainer = Trainer(gpus=[0], max_epochs=10, callbacks=[checkpoint_callback])
+    # trainer = Trainer(accelerator="gpu", devices=[0], max_epochs=10,
+    #                   callbacks=[checkpoint_callback])
     trainer = Trainer(
-        gpus=[0, 1, 2, 3],
+        accelerator="gpu",
+        devices=[0, 1, 2, 3],
         max_epochs=10,
         callbacks=[checkpoint_callback],
         strategy="ddp_spawn",
@@ -203,5 +205,7 @@ if __name__ == "__main__":
         pred = model.inference(graph, "cuda", 4096, 12, graph.device)
         pred = pred[test_idx]
         label = graph.ndata["label"][test_idx]
-        acc = MF.accuracy(pred, label)
+        acc = MF.accuracy(
+            pred, label, task="multiclass", num_classes=datamodule.n_classes
+        )
     print("Test accuracy:", acc)

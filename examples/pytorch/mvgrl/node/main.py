@@ -8,7 +8,7 @@ import torch.nn as nn
 warnings.filterwarnings("ignore")
 
 from dataset import process_dataset
-from model import MVGRL, LogReg
+from model import LogReg, MVGRL
 
 parser = argparse.ArgumentParser(description="mvgrl")
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     val_idx = val_idx.to(args.device)
     test_idx = test_idx.to(args.device)
 
-    n_node = graph.number_of_nodes()
+    n_node = graph.num_nodes()
     lbl1 = th.ones(n_node * 2)
     lbl2 = th.zeros(n_node * 2)
     lbl = th.cat((lbl1, lbl2))

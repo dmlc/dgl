@@ -27,7 +27,7 @@ DGL v0.6.0은 heterogeneous 그래프들을 위한 분산 학습을 실험적으
 
 .. code:: python
 
-    g.nodes['T0'].data['feat1'] = dgl.distributed.DistTensor((g.number_of_nodes('T0'), 1), th.float32, 'feat1',
+    g.nodes['T0'].data['feat1'] = dgl.distributed.DistTensor((g.num_nodes('T0'), 1), th.float32, 'feat1',
                                                              part_policy=g.get_node_partition_policy('T0'))
 
 분산 텐서 및 분산 임베딩을 만들기 위한 파티션 정책은 heterogeneous 그래프가 그래프 서버에 로드될 때 초기화된다. 사용자는 새로운 파티션 정책을 실행 중에 생성할 수 없다. 따라서, 사용자는 노드 타입 이나 에지 타입에 대한 분산 텐서 또는 분산 임베딩 만을 만들 수 있다.

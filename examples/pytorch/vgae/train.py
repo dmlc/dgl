@@ -2,11 +2,14 @@ import argparse
 import os
 import time
 
+import dgl
+
 import model
 import numpy as np
 import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from input_data import load_data
 from preprocess import (
     mask_test_edges,
@@ -15,9 +18,6 @@ from preprocess import (
     sparse_to_tuple,
 )
 from sklearn.metrics import average_precision_score, roc_auc_score
-
-import dgl
-from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
@@ -125,7 +125,7 @@ def dgl_main():
     in_dim = feats.shape[-1]
 
     # generate input
-    adj_orig = graph.adjacency_matrix().to_dense()
+    adj_orig = graph.adj_external().to_dense()
 
     # build test set with 10% positive links
     (
@@ -142,7 +142,7 @@ def dgl_main():
     train_edge_idx = torch.tensor(train_edge_idx).to(device)
     train_graph = dgl.edge_subgraph(graph, train_edge_idx, relabel_nodes=False)
     train_graph = train_graph.to(device)
-    adj = train_graph.adjacency_matrix().to_dense().to(device)
+    adj = train_graph.adj_external().to_dense().to(device)
 
     # compute loss parameters
     weight_tensor, norm = compute_loss_para(adj)

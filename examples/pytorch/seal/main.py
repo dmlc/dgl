@@ -3,15 +3,15 @@ import time
 import numpy as np
 import torch
 import torch.multiprocessing
+
+from dgl import EID, NID
+from dgl.dataloading import GraphDataLoader
 from logger import LightLogging
 from model import DGCNN, GCN
 from sampler import SEALData
 from torch.nn import BCEWithLogitsLoss
 from tqdm import tqdm
 from utils import evaluate_hits, load_ogb_dataset, parse_arguments
-
-from dgl import EID, NID
-from dgl.dataloading import GraphDataLoader
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 

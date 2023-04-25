@@ -1,18 +1,18 @@
 """Neighbor sampling APIs"""
 
+from .. import backend as F, ndarray as nd, utils
 from .._ffi.function import _init_api
-from .. import backend as F
 from ..base import DGLError, EID
 from ..heterograph import DGLGraph
-from .. import ndarray as nd
-from .. import utils
 from .utils import EidExcluder
 
 __all__ = [
-    'sample_etype_neighbors',
-    'sample_neighbors',
-    'sample_neighbors_biased',
-    'select_topk']
+    "sample_etype_neighbors",
+    "sample_neighbors",
+    "sample_neighbors_biased",
+    "select_topk",
+]
+
 
 def _prepare_edge_arrays(g, arg):
     """Converts the argument into a list of NDArrays.
@@ -41,9 +41,11 @@ def _prepare_edge_arrays(g, arg):
                     result.append(None)
 
             result = [
-                    F.to_dgl_nd(F.copy_to(F.tensor([], dtype=dtype), ctx))
-                    if x is None else x
-                    for x in result]
+                F.to_dgl_nd(F.copy_to(F.tensor([], dtype=dtype), ctx))
+                if x is None
+                else x
+                for x in result
+            ]
             return result
     elif arg is None:
         return [nd.array([], ctx=nd.cpu())] * len(g.etypes)
@@ -56,10 +58,21 @@ def _prepare_edge_arrays(g, arg):
                 arrays.append(nd.array([], ctx=nd.cpu()))
         return arrays
 
+
 def sample_etype_neighbors(
-        g, nodes, etype_offset, fanout, edge_dir='in', prob=None,
-        replace=False, copy_ndata=True, copy_edata=True, etype_sorted=False,
-        _dist_training=False, output_device=None):
+    g,
+    nodes,
+    etype_offset,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    replace=False,
+    copy_ndata=True,
+    copy_edata=True,
+    etype_sorted=False,
+    _dist_training=False,
+    output_device=None,
+):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -144,7 +157,7 @@ def sample_etype_neighbors(
         assert len(nodes) == 1, "The input graph should not have node types"
         nodes = list(nodes.values())[0]
 
-    nodes = utils.prepare_tensor(g, nodes, 'nodes')
+    nodes = utils.prepare_tensor(g, nodes, "nodes")
     device = utils.context_of(nodes)
     nodes = F.to_dgl_nd(nodes)
     # treat etypes as int32, it is much cheaper than int64
@@ -154,8 +167,15 @@ def sample_etype_neighbors(
     prob_array = _prepare_edge_arrays(g, prob)
 
     subgidx = _CAPI_DGLSampleNeighborsEType(
-            g._graph, nodes, etype_offset, fanout, edge_dir, prob_array,
-            replace, etype_sorted)
+        g._graph,
+        nodes,
+        etype_offset,
+        fanout,
+        edge_dir,
+        prob_array,
+        replace,
+        etype_sorted,
+    )
     induced_edges = subgidx.induced_edges
     ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
 
@@ -178,12 +198,23 @@ def sample_etype_neighbors(
 
     return ret if output_device is None else ret.to(output_device)
 
+
 DGLGraph.sample_etype_neighbors = utils.alias_func(sample_etype_neighbors)
 
-def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
-                     replace=False, copy_ndata=True, copy_edata=True,
-                     _dist_training=False, exclude_edges=None,
-                     output_device=None):
+
+def sample_neighbors(
+    g,
+    nodes,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    replace=False,
+    copy_ndata=True,
+    copy_edata=True,
+    _dist_training=False,
+    exclude_edges=None,
+    output_device=None,
+):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -319,33 +350,60 @@ def sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
     tensor([False, False, False])
 
     """
-    if F.device_type(g.device) == 'cpu' and not g.is_pinned():
+    if F.device_type(g.device) == "cpu" and not g.is_pinned():
         frontier = _sample_neighbors(
-            g, nodes, fanout, edge_dir=edge_dir, prob=prob,
-            replace=replace, copy_ndata=copy_ndata, copy_edata=copy_edata,
-            exclude_edges=exclude_edges)
+            g,
+            nodes,
+            fanout,
+            edge_dir=edge_dir,
+            prob=prob,
+            replace=replace,
+            copy_ndata=copy_ndata,
+            copy_edata=copy_edata,
+            exclude_edges=exclude_edges,
+        )
     else:
         frontier = _sample_neighbors(
-            g, nodes, fanout, edge_dir=edge_dir, prob=prob,
-            replace=replace, copy_ndata=copy_ndata, copy_edata=copy_edata)
+            g,
+            nodes,
+            fanout,
+            edge_dir=edge_dir,
+            prob=prob,
+            replace=replace,
+            copy_ndata=copy_ndata,
+            copy_edata=copy_edata,
+        )
         if exclude_edges is not None:
             eid_excluder = EidExcluder(exclude_edges)
             frontier = eid_excluder(frontier)
     return frontier if output_device is None else frontier.to(output_device)
 
-def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
-                      replace=False, copy_ndata=True, copy_edata=True,
-                      _dist_training=False, exclude_edges=None):
+
+def _sample_neighbors(
+    g,
+    nodes,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    replace=False,
+    copy_ndata=True,
+    copy_edata=True,
+    _dist_training=False,
+    exclude_edges=None,
+):
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
-            raise DGLError("Must specify node type when the graph is not homogeneous.")
-        nodes = {g.ntypes[0] : nodes}
+            raise DGLError(
+                "Must specify node type when the graph is not homogeneous."
+            )
+        nodes = {g.ntypes[0]: nodes}
 
-    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
+    nodes = utils.prepare_tensor_dict(g, nodes, "nodes")
     if len(nodes) == 0:
         raise ValueError(
             "Got an empty dictionary in the nodes argument. "
-            "Please pass in a dictionary with empty tensors as values instead.")
+            "Please pass in a dictionary with empty tensors as values instead."
+        )
     device = utils.context_of(nodes)
     ctx = utils.to_dgl_context(device)
     nodes_all_types = []
@@ -362,8 +420,10 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
             fanout_array = [int(fanout)] * len(g.etypes)
         else:
             if len(fanout) != len(g.etypes):
-                raise DGLError('Fan-out must be specified for each edge type '
-                               'if a dict is provided.')
+                raise DGLError(
+                    "Fan-out must be specified for each edge type "
+                    "if a dict is provided."
+                )
             fanout_array = [None] * len(g.etypes)
             for etype, value in fanout.items():
                 fanout_array[g.get_etype_id(etype)] = value
@@ -375,9 +435,11 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
     if exclude_edges is not None:
         if not isinstance(exclude_edges, dict):
             if len(g.etypes) > 1:
-                raise DGLError("Must specify etype when the graph is not homogeneous.")
-            exclude_edges = {g.canonical_etypes[0] : exclude_edges}
-        exclude_edges = utils.prepare_tensor_dict(g, exclude_edges, 'edges')
+                raise DGLError(
+                    "Must specify etype when the graph is not homogeneous."
+                )
+            exclude_edges = {g.canonical_etypes[0]: exclude_edges}
+        exclude_edges = utils.prepare_tensor_dict(g, exclude_edges, "edges")
         for etype in g.canonical_etypes:
             if etype in exclude_edges:
                 excluded_edges_all_t.append(F.to_dgl_nd(exclude_edges[etype]))
@@ -385,8 +447,14 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
                 excluded_edges_all_t.append(nd.array([], ctx=ctx))
 
     subgidx = _CAPI_DGLSampleNeighbors(
-            g._graph, nodes_all_types, fanout_array, edge_dir, prob_arrays,
-            excluded_edges_all_t, replace)
+        g._graph,
+        nodes_all_types,
+        fanout_array,
+        edge_dir,
+        prob_arrays,
+        excluded_edges_all_t,
+        replace,
+    )
     induced_edges = subgidx.induced_edges
     ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
 
@@ -409,11 +477,22 @@ def _sample_neighbors(g, nodes, fanout, edge_dir='in', prob=None,
 
     return ret
 
+
 DGLGraph.sample_neighbors = utils.alias_func(sample_neighbors)
 
-def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
-                            tag_offset_name='_TAG_OFFSET', replace=False,
-                            copy_ndata=True, copy_edata=True, output_device=None):
+
+def sample_neighbors_biased(
+    g,
+    nodes,
+    fanout,
+    bias,
+    edge_dir="in",
+    tag_offset_name="_TAG_OFFSET",
+    replace=False,
+    copy_ndata=True,
+    copy_edata=True,
+    output_device=None,
+):
     r"""Sample neighboring edges of the given nodes and return the induced subgraph, where each
     neighbor's probability to be picked is determined by its tag.
 
@@ -558,15 +637,22 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
 
     nodes_array = F.to_dgl_nd(nodes)
     bias_array = F.to_dgl_nd(bias)
-    if edge_dir == 'in':
+    if edge_dir == "in":
         tag_offset_array = F.to_dgl_nd(g.dstdata[tag_offset_name])
-    elif edge_dir == 'out':
+    elif edge_dir == "out":
         tag_offset_array = F.to_dgl_nd(g.srcdata[tag_offset_name])
     else:
         raise DGLError("edge_dir can only be 'in' or 'out'")
 
-    subgidx = _CAPI_DGLSampleNeighborsBiased(g._graph, nodes_array, fanout, bias_array,
-                                             tag_offset_array, edge_dir, replace)
+    subgidx = _CAPI_DGLSampleNeighborsBiased(
+        g._graph,
+        nodes_array,
+        fanout,
+        bias_array,
+        tag_offset_array,
+        edge_dir,
+        replace,
+    )
     induced_edges = subgidx.induced_edges
     ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
 
@@ -581,10 +667,21 @@ def sample_neighbors_biased(g, nodes, fanout, bias, edge_dir='in',
     ret.edata[EID] = induced_edges[0]
     return ret if output_device is None else ret.to(output_device)
 
+
 DGLGraph.sample_neighbors_biased = utils.alias_func(sample_neighbors_biased)
 
-def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
-                copy_ndata=True, copy_edata=True, output_device=None):
+
+def select_topk(
+    g,
+    k,
+    weight,
+    nodes=None,
+    edge_dir="in",
+    ascending=False,
+    copy_ndata=True,
+    copy_edata=True,
+    output_device=None,
+):
     """Select the neighboring edges with k-largest (or k-smallest) weights of the given
     nodes and return the induced subgraph.
 
@@ -664,17 +761,19 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
     # Rectify nodes to a dictionary
     if nodes is None:
         nodes = {
-            ntype: F.astype(F.arange(0, g.number_of_nodes(ntype)), g.idtype)
+            ntype: F.astype(F.arange(0, g.num_nodes(ntype)), g.idtype)
             for ntype in g.ntypes
         }
     elif not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
-            raise DGLError("Must specify node type when the graph is not homogeneous.")
-        nodes = {g.ntypes[0] : nodes}
+            raise DGLError(
+                "Must specify node type when the graph is not homogeneous."
+            )
+        nodes = {g.ntypes[0]: nodes}
     assert g.device == F.cpu(), "Graph must be on CPU."
 
     # Parse nodes into a list of NDArrays.
-    nodes = utils.prepare_tensor_dict(g, nodes, 'nodes')
+    nodes = utils.prepare_tensor_dict(g, nodes, "nodes")
     device = utils.context_of(nodes)
     nodes_all_types = []
     for ntype in g.ntypes:
@@ -687,8 +786,10 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
         k_array = [int(k)] * len(g.etypes)
     else:
         if len(k) != len(g.etypes):
-            raise DGLError('K value must be specified for each edge type '
-                           'if a dict is provided.')
+            raise DGLError(
+                "K value must be specified for each edge type "
+                "if a dict is provided."
+            )
         k_array = [None] * len(g.etypes)
         for etype, value in k.items():
             k_array[g.get_etype_id(etype)] = value
@@ -699,11 +800,20 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
         if weight in g.edges[etype].data:
             weight_arrays.append(F.to_dgl_nd(g.edges[etype].data[weight]))
         else:
-            raise DGLError('Edge weights "{}" do not exist for relation graph "{}".'.format(
-                weight, etype))
+            raise DGLError(
+                'Edge weights "{}" do not exist for relation graph "{}".'.format(
+                    weight, etype
+                )
+            )
 
     subgidx = _CAPI_DGLSampleNeighborsTopk(
-        g._graph, nodes_all_types, k_array, edge_dir, weight_arrays, bool(ascending))
+        g._graph,
+        nodes_all_types,
+        k_array,
+        edge_dir,
+        weight_arrays,
+        bool(ascending),
+    )
     induced_edges = subgidx.induced_edges
     ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
 
@@ -717,6 +827,7 @@ def select_topk(g, k, weight, nodes=None, edge_dir='in', ascending=False,
         utils.set_new_frames(ret, edge_frames=edge_frames)
     return ret if output_device is None else ret.to(output_device)
 
+
 DGLGraph.select_topk = utils.alias_func(select_topk)
 
-_init_api('dgl.sampling.neighbor', __name__)
+_init_api("dgl.sampling.neighbor", __name__)

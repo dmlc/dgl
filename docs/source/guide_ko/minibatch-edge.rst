@@ -46,7 +46,7 @@
 
 .. code:: python
 
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     dataloader = dgl.dataloading.EdgeDataLoader(
         g, train_eid_dict, sampler,
     
@@ -97,7 +97,7 @@
             self.W = nn.Linear(2 * in_features, num_classes)
     
         def apply_edges(self, edges):
-            data = torch.cat([edges.src['x'], edges.dst['x']])
+            data = torch.cat([edges.src['x'], edges.dst['x']], 1)
             return {'score': self.W(data)}
     
         def forward(self, edge_subgraph, x):
@@ -179,7 +179,7 @@ Heterogeneous 그래프들의 노드 representation들을 계산하는 모델은
             self.W = nn.Linear(2 * in_features, num_classes)
     
         def apply_edges(self, edges):
-            data = torch.cat([edges.src['x'], edges.dst['x']])
+            data = torch.cat([edges.src['x'], edges.dst['x']], 1)
             return {'score': self.W(data)}
     
         def forward(self, edge_subgraph, x):

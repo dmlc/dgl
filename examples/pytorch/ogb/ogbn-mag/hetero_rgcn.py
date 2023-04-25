@@ -1,21 +1,22 @@
 import argparse
 import itertools
+import sys
+
+import dgl
+import dgl.nn as dglnn
+
+import psutil
 
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+from dgl import AddReverse, Compose, ToSimple
+from dgl.nn import HeteroEmbedding
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 from tqdm import tqdm
 
-import dgl
-import dgl.nn as dglnn
-from dgl import AddReverse, Compose, ToSimple
-from dgl.nn import HeteroEmbedding
-
-import psutil
-import sys
-
 v_t = dgl.__version__
+
 
 def prepare_data(args, device):
     dataset = DglNodePropPredDataset(name="ogbn-mag")
@@ -41,7 +42,7 @@ def prepare_data(args, device):
         batch_size=1024,
         shuffle=True,
         num_workers=num_workers,
-        device=device
+        device=device,
     )
 
     return g, labels, dataset.num_classes, split_idx, logger, train_loader
@@ -271,9 +272,7 @@ def train(
 
             emb = extract_embed(node_embed, input_nodes)
             # Add the batch's raw "paper" features
-            emb.update(
-                {"paper": g.ndata["feat"]["paper"][input_nodes_indexes]}
-            )
+            emb.update({"paper": g.ndata["feat"]["paper"][input_nodes_indexes]})
 
             emb = {k: e.to(device) for k, e in emb.items()}
             lbl = labels[seeds].to(device)
@@ -322,7 +321,7 @@ def test(g, model, node_embed, y_true, device, split_idx):
         batch_size=16384,
         shuffle=False,
         num_workers=0,
-        device=device
+        device=device,
     )
 
     pbar = tqdm(total=y_true.size(0))
@@ -375,14 +374,18 @@ def test(g, model, node_embed, y_true, device, split_idx):
 
     return train_acc, valid_acc, test_acc
 
+
 def is_support_affinity(v_t):
     # dgl supports enable_cpu_affinity since 0.9.1
     return v_t >= "0.9.1"
 
+
 def main(args):
     device = f"cuda:0" if th.cuda.is_available() else "cpu"
 
-    g, labels, num_classes, split_idx, logger, train_loader = prepare_data(args, device)
+    g, labels, num_classes, split_idx, logger, train_loader = prepare_data(
+        args, device
+    )
 
     embed_layer = rel_graph_embed(g, 128).to(device)
     model = EntityClassify(g, 128, num_classes).to(device)
@@ -395,7 +398,6 @@ def main(args):
     )
 
     for run in range(args.runs):
-
         try:
             embed_layer.reset_parameters()
             model.reset_parameters()
@@ -409,10 +411,17 @@ def main(args):
         )
         optimizer = th.optim.Adam(all_params, lr=0.01)
 
-        if args.num_workers != 0 and device == "cpu" and is_support_affinity(v_t):
+        if (
+            args.num_workers != 0
+            and device == "cpu"
+            and is_support_affinity(v_t)
+        ):
             expected_max = int(psutil.cpu_count(logical=False))
             if args.num_workers >= expected_max:
-                print(f"[ERROR] You specified num_workers are larger than physical cores, please set any number less than {expected_max}", file=sys.stderr)
+                print(
+                    f"[ERROR] You specified num_workers are larger than physical cores, please set any number less than {expected_max}",
+                    file=sys.stderr,
+                )
             with train_loader.enable_cpu_affinity():
                 logger = train(
                     g,

@@ -1,10 +1,9 @@
+import dgl
+import dgl.function as DGLF
 import rdkit.Chem as Chem
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dgl
-import dgl.function as DGLF
 from dgl import line_graph, mean_nodes
 
 from .chemutils import get_mol
@@ -155,8 +154,8 @@ class DGLMPN(nn.Module):
 
         mol_line_graph = line_graph(mol_graph, backtracking=False, shared=True)
 
-        n_nodes = mol_graph.number_of_nodes()
-        n_edges = mol_graph.number_of_edges()
+        n_nodes = mol_graph.num_nodes()
+        n_edges = mol_graph.num_edges()
 
         mol_graph = self.run(mol_graph, mol_line_graph)
 
@@ -171,7 +170,7 @@ class DGLMPN(nn.Module):
         return g_repr
 
     def run(self, mol_graph, mol_line_graph):
-        n_nodes = mol_graph.number_of_nodes()
+        n_nodes = mol_graph.num_nodes()
 
         mol_graph.apply_edges(
             func=lambda edges: {"src_x": edges.src["x"]},

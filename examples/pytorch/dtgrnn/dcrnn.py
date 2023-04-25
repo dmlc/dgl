@@ -1,10 +1,9 @@
+import dgl
+import dgl.function as fn
 import numpy as np
 import scipy.sparse as sparse
 import torch
 import torch.nn as nn
-
-import dgl
-import dgl.function as fn
 from dgl.base import DGLError
 
 
@@ -72,7 +71,7 @@ class DiffConv(nn.Module):
 
     @staticmethod
     def get_weight_matrix(g):
-        adj = g.adj(scipy_fmt="coo")
+        adj = g.adj_external(scipy_fmt="coo")
         ind = g.in_degrees()
         outd = g.out_degrees()
         weight = g.edata["weight"]
@@ -82,7 +81,7 @@ class DiffConv(nn.Module):
     @staticmethod
     def diffuse(progress_g, weighted_adj, degree):
         device = progress_g.device
-        progress_adj = progress_g.adj(scipy_fmt="coo")
+        progress_adj = progress_g.adj_external(scipy_fmt="coo")
         progress_adj.data = progress_g.edata["weight"].cpu().numpy()
         ret_adj = sparse.coo_matrix(
             progress_adj @ (weighted_adj / degree.cpu().numpy())

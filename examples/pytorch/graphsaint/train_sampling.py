@@ -9,7 +9,7 @@ from config import CONFIG
 from modules import GCNNet
 from sampler import SAINTEdgeSampler, SAINTNodeSampler, SAINTRandomWalkSampler
 from torch.utils.data import DataLoader
-from utils import Logger, calc_f1, evaluate, load_data, save_log_dir
+from utils import calc_f1, evaluate, load_data, Logger, save_log_dir
 
 
 def main(args, task):

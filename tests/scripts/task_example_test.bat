@@ -22,6 +22,8 @@ SET DGL_LIBRARY_PATH=!CD!\build
 SET PYTHONPATH=!CD!\python;!PYTHONPATH!
 SET DGL_DOWNLOAD_DIR=!CD!
 
+python -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests\examples || GOTO :FAIL
+
 PUSHD !GCN_EXAMPLE_DIR!
 python pagerank.py || GOTO :FAIL
 python gcn\train.py --dataset cora || GOTO :FAIL

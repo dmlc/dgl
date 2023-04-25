@@ -1,16 +1,19 @@
-import torch.nn as nn
 import dgl
+import torch.nn as nn
 from dgl.base import dgl_warning
 
+
 class GraphSAGE(nn.Module):
-    def __init__(self,
-                 data_info: dict,
-                 embed_size: int = -1,
-                 hidden_size: int = 16,
-                 num_layers: int = 1,
-                 activation: str = "relu",
-                 dropout: float = 0.5,
-                 aggregator_type: str = "gcn"):
+    def __init__(
+        self,
+        data_info: dict,
+        embed_size: int = -1,
+        hidden_size: int = 16,
+        num_layers: int = 1,
+        activation: str = "relu",
+        dropout: float = 0.5,
+        aggregator_type: str = "gcn",
+    ):
         """GraphSAGE model
 
         Parameters
@@ -44,12 +47,18 @@ class GraphSAGE(nn.Module):
 
         for i in range(num_layers):
             in_hidden = hidden_size if i > 0 else in_size
-            out_hidden = hidden_size if i < num_layers - 1 else data_info["out_size"]
-            self.layers.append(dgl.nn.SAGEConv(in_hidden, out_hidden, aggregator_type))
+            out_hidden = (
+                hidden_size if i < num_layers - 1 else data_info["out_size"]
+            )
+            self.layers.append(
+                dgl.nn.SAGEConv(in_hidden, out_hidden, aggregator_type)
+            )
 
-    def forward(self, graph, node_feat, edge_feat = None):
+    def forward(self, graph, node_feat, edge_feat=None):
         if self.embed_size > 0:
-            dgl_warning("The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size.")
+            dgl_warning(
+                "The embedding for node feature is used, and input node_feat is ignored, due to the provided embed_size."
+            )
             h = self.embed.weight
         else:
             h = node_feat
@@ -61,7 +70,7 @@ class GraphSAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-    def forward_block(self, blocks, node_feat, edge_feat = None):
+    def forward_block(self, blocks, node_feat, edge_feat=None):
         h = node_feat
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h, edge_feat)

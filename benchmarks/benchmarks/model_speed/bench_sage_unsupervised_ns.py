@@ -1,14 +1,14 @@
 import time
 
+import dgl
+import dgl.function as fn
+import dgl.nn.pytorch as dglnn
+
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
-import dgl
-import dgl.function as fn
-import dgl.nn.pytorch as dglnn
 
 from .. import utils
 
@@ -120,7 +120,7 @@ def track_time(data, num_negs, batch_size):
     iter_start = 3
     iter_count = 10
 
-    n_edges = g.number_of_edges()
+    n_edges = g.num_edges()
     train_seeds = np.arange(n_edges)
 
     # Create PyTorch DataLoader for constructing blocks

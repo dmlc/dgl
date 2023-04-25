@@ -3,9 +3,9 @@
 # It implements the data processing and graph construction.
 import random as rd
 
-import numpy as np
-
 import dgl
+
+import numpy as np
 
 
 class Data(object):

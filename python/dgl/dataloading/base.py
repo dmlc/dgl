@@ -1,12 +1,14 @@
 """Base classes and functionalities for dataloaders"""
-from collections.abc import Mapping
 import inspect
-from ..base import NID, EID
-from ..convert import heterograph
+from collections.abc import Mapping
+
 from .. import backend as F
-from ..transforms import compact_graphs
+from ..base import EID, NID
+from ..convert import heterograph
 from ..frame import LazyFeature
-from ..utils import recursive_apply, context_of
+from ..transforms import compact_graphs
+from ..utils import context_of, recursive_apply
+
 
 def _set_lazy_features(x, xdata, feature_names):
     if feature_names is None:
@@ -16,6 +18,7 @@ def _set_lazy_features(x, xdata, feature_names):
     else:
         for type_, names in feature_names.items():
             x[type_].data.update({k: LazyFeature(k) for k in names})
+
 
 def set_node_lazy_features(g, feature_names):
     """Assign lazy features to the ``ndata`` of the input graph for prefetching optimization.
@@ -50,6 +53,7 @@ def set_node_lazy_features(g, feature_names):
     dgl.LazyFeature
     """
     return _set_lazy_features(g.nodes, g.ndata, feature_names)
+
 
 def set_edge_lazy_features(g, feature_names):
     """Assign lazy features to the ``edata`` of the input graph for prefetching optimization.
@@ -86,6 +90,7 @@ def set_edge_lazy_features(g, feature_names):
     """
     return _set_lazy_features(g.edges, g.edata, feature_names)
 
+
 def set_src_lazy_features(g, feature_names):
     """Assign lazy features to the ``srcdata`` of the input graph for prefetching optimization.
 
@@ -119,6 +124,7 @@ def set_src_lazy_features(g, feature_names):
     dgl.LazyFeature
     """
     return _set_lazy_features(g.srcnodes, g.srcdata, feature_names)
+
 
 def set_dst_lazy_features(g, feature_names):
     """Assign lazy features to the ``dstdata`` of the input graph for prefetching optimization.
@@ -154,6 +160,7 @@ def set_dst_lazy_features(g, feature_names):
     """
     return _set_lazy_features(g.dstnodes, g.dstdata, feature_names)
 
+
 class Sampler(object):
     """Base class for graph samplers.
 
@@ -171,6 +178,7 @@ class Sampler(object):
             def sample(self, g, indices):
                 return g.subgraph(indices)
     """
+
     def sample(self, g, indices):
         """Abstract sample method.
 
@@ -182,6 +190,7 @@ class Sampler(object):
             Any object representing the indices selected in the current minibatch.
         """
         raise NotImplementedError
+
 
 class BlockSampler(Sampler):
     """Base class for sampling mini-batches in the form of Message-passing
@@ -211,8 +220,14 @@ class BlockSampler(Sampler):
         The device of the output subgraphs or MFGs.  Default is the same as the
         minibatch of seed nodes.
     """
-    def __init__(self, prefetch_node_feats=None, prefetch_labels=None,
-                 prefetch_edge_feats=None, output_device=None):
+
+    def __init__(
+        self,
+        prefetch_node_feats=None,
+        prefetch_labels=None,
+        prefetch_edge_feats=None,
+        output_device=None,
+    ):
         super().__init__()
         self.prefetch_node_feats = prefetch_node_feats or []
         self.prefetch_labels = prefetch_labels or []
@@ -238,7 +253,9 @@ class BlockSampler(Sampler):
             set_edge_lazy_features(block, self.prefetch_edge_feats)
         return input_nodes, output_nodes, blocks
 
-    def sample(self, g, seed_nodes, exclude_eids=None):     # pylint: disable=arguments-differ
+    def sample(
+        self, g, seed_nodes, exclude_eids=None
+    ):  # pylint: disable=arguments-differ
         """Sample a list of blocks from the given seed nodes."""
         result = self.sample_blocks(g, seed_nodes, exclude_eids=exclude_eids)
         return self.assign_lazy_features(result)
@@ -249,18 +266,29 @@ def _find_exclude_eids_with_reverse_id(g, eids, reverse_eid_map):
         eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
         exclude_eids = {
             k: F.cat([v, F.gather_row(reverse_eid_map[k], v)], 0)
-            for k, v in eids.items()}
+            for k, v in eids.items()
+        }
     else:
         exclude_eids = F.cat([eids, F.gather_row(reverse_eid_map, eids)], 0)
     return exclude_eids
+
 
 def _find_exclude_eids_with_reverse_types(g, eids, reverse_etype_map):
     exclude_eids = {g.to_canonical_etype(k): v for k, v in eids.items()}
     reverse_etype_map = {
         g.to_canonical_etype(k): g.to_canonical_etype(v)
-        for k, v in reverse_etype_map.items()}
-    exclude_eids.update({reverse_etype_map[k]: v for k, v in exclude_eids.items()})
+        for k, v in reverse_etype_map.items()
+    }
+    for k, v in reverse_etype_map.items():
+        if k in exclude_eids:
+            if v in exclude_eids:
+                exclude_eids[v] = F.unique(
+                    F.cat((exclude_eids[k], exclude_eids[v]), dim=0)
+                )
+            else:
+                exclude_eids[v] = exclude_eids[k]
     return exclude_eids
+
 
 def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     if exclude_mode is None:
@@ -268,20 +296,32 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     elif callable(exclude_mode):
         return exclude_mode(eids)
     elif F.is_tensor(exclude_mode) or (
-            isinstance(exclude_mode, Mapping) and
-            all(F.is_tensor(v) for v in exclude_mode.values())):
+        isinstance(exclude_mode, Mapping)
+        and all(F.is_tensor(v) for v in exclude_mode.values())
+    ):
         return exclude_mode
-    elif exclude_mode == 'self':
+    elif exclude_mode == "self":
         return eids
-    elif exclude_mode == 'reverse_id':
-        return _find_exclude_eids_with_reverse_id(g, eids, kwargs['reverse_eid_map'])
-    elif exclude_mode == 'reverse_types':
-        return _find_exclude_eids_with_reverse_types(g, eids, kwargs['reverse_etype_map'])
+    elif exclude_mode == "reverse_id":
+        return _find_exclude_eids_with_reverse_id(
+            g, eids, kwargs["reverse_eid_map"]
+        )
+    elif exclude_mode == "reverse_types":
+        return _find_exclude_eids_with_reverse_types(
+            g, eids, kwargs["reverse_etype_map"]
+        )
     else:
-        raise ValueError('unsupported mode {}'.format(exclude_mode))
+        raise ValueError("unsupported mode {}".format(exclude_mode))
 
-def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=None,
-                      output_device=None):
+
+def find_exclude_eids(
+    g,
+    seed_edges,
+    exclude,
+    reverse_eids=None,
+    reverse_etypes=None,
+    output_device=None,
+):
     """Find all edge IDs to exclude according to :attr:`exclude_mode`.
 
     Parameters
@@ -334,10 +374,14 @@ def find_exclude_eids(g, seed_edges, exclude, reverse_eids=None, reverse_etypes=
         exclude,
         seed_edges,
         reverse_eid_map=reverse_eids,
-        reverse_etype_map=reverse_etypes)
+        reverse_etype_map=reverse_etypes,
+    )
     if exclude_eids is not None and output_device is not None:
-        exclude_eids = recursive_apply(exclude_eids, lambda x: F.copy_to(x, output_device))
+        exclude_eids = recursive_apply(
+            exclude_eids, lambda x: F.copy_to(x, output_device)
+        )
     return exclude_eids
+
 
 class EdgePredictionSampler(Sampler):
     """Sampler class that wraps an existing sampler for node classification into another
@@ -347,15 +391,24 @@ class EdgePredictionSampler(Sampler):
     --------
     as_edge_prediction_sampler
     """
-    def __init__(self, sampler, exclude=None, reverse_eids=None,
-                 reverse_etypes=None, negative_sampler=None, prefetch_labels=None):
+
+    def __init__(
+        self,
+        sampler,
+        exclude=None,
+        reverse_eids=None,
+        reverse_etypes=None,
+        negative_sampler=None,
+        prefetch_labels=None,
+    ):
         super().__init__()
         # Check if the sampler's sample method has an optional third argument.
         argspec = inspect.getfullargspec(sampler.sample)
-        if len(argspec.args) < 4:       # ['self', 'g', 'indices', 'exclude_eids']
+        if len(argspec.args) < 4:  # ['self', 'g', 'indices', 'exclude_eids']
             raise TypeError(
                 "This sampler does not support edge or link prediction; please add an"
-                "optional third argument for edge IDs to exclude in its sample() method.")
+                "optional third argument for edge IDs to exclude in its sample() method."
+            )
         self.reverse_eids = reverse_eids
         self.reverse_etypes = reverse_etypes
         self.exclude = exclude
@@ -367,20 +420,27 @@ class EdgePredictionSampler(Sampler):
     def _build_neg_graph(self, g, seed_edges):
         neg_srcdst = self.negative_sampler(g, seed_edges)
         if not isinstance(neg_srcdst, Mapping):
-            assert len(g.canonical_etypes) == 1, \
-                'graph has multiple or no edge types; '\
-                'please return a dict in negative sampler.'
+            assert len(g.canonical_etypes) == 1, (
+                "graph has multiple or no edge types; "
+                "please return a dict in negative sampler."
+            )
             neg_srcdst = {g.canonical_etypes[0]: neg_srcdst}
 
         dtype = F.dtype(list(neg_srcdst.values())[0][0])
         ctx = context_of(seed_edges) if seed_edges is not None else g.device
         neg_edges = {
-            etype: neg_srcdst.get(etype,
-                                  (F.copy_to(F.tensor([], dtype), ctx=ctx),
-                                   F.copy_to(F.tensor([], dtype), ctx=ctx)))
-            for etype in g.canonical_etypes}
+            etype: neg_srcdst.get(
+                etype,
+                (
+                    F.copy_to(F.tensor([], dtype), ctx=ctx),
+                    F.copy_to(F.tensor([], dtype), ctx=ctx),
+                ),
+            )
+            for etype in g.canonical_etypes
+        }
         neg_pair_graph = heterograph(
-            neg_edges, {ntype: g.num_nodes(ntype) for ntype in g.ntypes})
+            neg_edges, {ntype: g.num_nodes(ntype) for ntype in g.ntypes}
+        )
         return neg_pair_graph
 
     def assign_lazy_features(self, result):
@@ -390,7 +450,7 @@ class EdgePredictionSampler(Sampler):
         # In-place updates
         return result
 
-    def sample(self, g, seed_edges):    # pylint: disable=arguments-differ
+    def sample(self, g, seed_edges):  # pylint: disable=arguments-differ
         """Samples a list of blocks, as well as a subgraph containing the sampled
         edges from the original graph.
 
@@ -398,10 +458,13 @@ class EdgePredictionSampler(Sampler):
         negative pairs as edges.
         """
         if isinstance(seed_edges, Mapping):
-            seed_edges = {g.to_canonical_etype(k): v for k, v in seed_edges.items()}
+            seed_edges = {
+                g.to_canonical_etype(k): v for k, v in seed_edges.items()
+            }
         exclude = self.exclude
         pair_graph = g.edge_subgraph(
-            seed_edges, relabel_nodes=False, output_device=self.output_device)
+            seed_edges, relabel_nodes=False, output_device=self.output_device
+        )
         eids = pair_graph.edata[EID]
 
         if self.negative_sampler is not None:
@@ -414,19 +477,34 @@ class EdgePredictionSampler(Sampler):
         seed_nodes = pair_graph.ndata[NID]
 
         exclude_eids = find_exclude_eids(
-            g, seed_edges, exclude, self.reverse_eids, self.reverse_etypes,
-            self.output_device)
+            g,
+            seed_edges,
+            exclude,
+            self.reverse_eids,
+            self.reverse_etypes,
+            self.output_device,
+        )
 
-        input_nodes, _, blocks = self.sampler.sample(g, seed_nodes, exclude_eids)
+        input_nodes, _, blocks = self.sampler.sample(
+            g, seed_nodes, exclude_eids
+        )
 
         if self.negative_sampler is None:
             return self.assign_lazy_features((input_nodes, pair_graph, blocks))
         else:
-            return self.assign_lazy_features((input_nodes, pair_graph, neg_graph, blocks))
+            return self.assign_lazy_features(
+                (input_nodes, pair_graph, neg_graph, blocks)
+            )
+
 
 def as_edge_prediction_sampler(
-        sampler, exclude=None, reverse_eids=None, reverse_etypes=None, negative_sampler=None,
-        prefetch_labels=None):
+    sampler,
+    exclude=None,
+    reverse_eids=None,
+    reverse_etypes=None,
+    negative_sampler=None,
+    prefetch_labels=None,
+):
     """Create an edge-wise sampler from a node-wise sampler.
 
     For each batch of edges, the sampler applies the provided node-wise sampler to
@@ -571,5 +649,10 @@ def as_edge_prediction_sampler(
     ...     train_on(input_nodes, pair_graph, neg_pair_graph, blocks)
     """
     return EdgePredictionSampler(
-        sampler, exclude=exclude, reverse_eids=reverse_eids, reverse_etypes=reverse_etypes,
-        negative_sampler=negative_sampler, prefetch_labels=prefetch_labels)
+        sampler,
+        exclude=exclude,
+        reverse_eids=reverse_eids,
+        reverse_etypes=reverse_etypes,
+        negative_sampler=negative_sampler,
+        prefetch_labels=prefetch_labels,
+    )

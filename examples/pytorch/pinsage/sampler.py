@@ -1,9 +1,8 @@
+import dgl
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, IterableDataset
 from torchtext.data.functional import numericalize_tokens_from_iterator
-
-import dgl
 
 
 def padding(array, yy, val):

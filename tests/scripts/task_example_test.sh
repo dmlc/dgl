@@ -36,6 +36,8 @@ export DGL_DOWNLOAD_DIR=${PWD}
 
 # test
 
+python3 -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests/examples || fail "sparse examples on $1"
+
 pushd $GCN_EXAMPLE_DIR> /dev/null
 
 python3 pagerank.py || fail "run pagerank.py on $1"

@@ -5,13 +5,12 @@ import pickle
 import random
 from pprint import pprint
 
+import dgl
+
 import numpy as np
 import torch
-from scipy import io as sio
-from scipy import sparse
-
-import dgl
 from dgl.data.utils import _get_dgl_url, download, get_download_dir
+from scipy import io as sio, sparse
 
 
 def set_random_seed(seed=0):
@@ -155,7 +154,7 @@ def load_acm(remove_self_loop):
     val_idx = torch.from_numpy(data["val_idx"]).long().squeeze(0)
     test_idx = torch.from_numpy(data["test_idx"]).long().squeeze(0)
 
-    num_nodes = author_g.number_of_nodes()
+    num_nodes = author_g.num_nodes()
     train_mask = get_binary_mask(num_nodes, train_idx)
     val_mask = get_binary_mask(num_nodes, val_idx)
     test_mask = get_binary_mask(num_nodes, test_idx)
@@ -239,7 +238,7 @@ def load_acm_raw(remove_self_loop):
     val_idx = np.where((float_mask > 0.2) & (float_mask <= 0.3))[0]
     test_idx = np.where(float_mask > 0.3)[0]
 
-    num_nodes = hg.number_of_nodes("paper")
+    num_nodes = hg.num_nodes("paper")
     train_mask = get_binary_mask(num_nodes, train_idx)
     val_mask = get_binary_mask(num_nodes, val_idx)
     test_mask = get_binary_mask(num_nodes, test_idx)

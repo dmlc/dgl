@@ -4,9 +4,9 @@ Gated Graph Sequence Neural Network for sequence outputs
 
 import torch
 import torch.nn.functional as F
-from torch import nn
 
 from dgl.nn.pytorch import GatedGraphConv, GlobalAttentionPooling
+from torch import nn
 
 
 class GGSNN(nn.Module):
@@ -48,7 +48,7 @@ class GGSNN(nn.Module):
 
         assert annotation.size()[-1] == self.annotation_size
 
-        node_num = graph.number_of_nodes()
+        node_num = graph.num_nodes()
 
         all_logits = []
         for _ in range(self.max_seq_length):
