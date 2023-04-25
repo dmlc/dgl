@@ -3,13 +3,12 @@ import numpy as np
 import torch as th
 import torch.multiprocessing as mp
 
-from .. import utils
 
-
-@utils.thread_wrapped_func
 def run(proc_id, n_gpus, n_cpus, devices, queue=None):
     dev_id = devices[proc_id]
     world_size = n_gpus
+    data = th.rand(1000, 1000).cuda(dev_id)
+    print(data.shape)
 
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
         master_ip="127.0.0.1", master_port="12345"
@@ -22,16 +21,13 @@ def run(proc_id, n_gpus, n_cpus, devices, queue=None):
         world_size=world_size,
         rank=dev_id,
     )
+    
     time.sleep(3)
     if proc_id == 0:
         queue.put(np.array([0.1, 0.2, 0.1, 0.2, 0.5, 0.2]))
 
 
-@utils.skip_if_not_4gpu()
-@utils.benchmark("time", timeout=600)
-@utils.parametrize("data", ["am"])
-@utils.parametrize("dgl_sparse", [True])
-def track_time(data, dgl_sparse):
+def track_time():
     devices = [0, 1, 2, 3]
     n_gpus = len(devices)
     n_cpus = mp.cpu_count()
