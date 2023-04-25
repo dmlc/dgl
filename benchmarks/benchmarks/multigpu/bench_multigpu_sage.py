@@ -15,7 +15,9 @@ import torch.optim as optim
 from torch.nn.parallel import DistributedDataParallel
 
 import sys
-sys.path.insert(0, "../../benchmarks")
+sys.path.insert(0, "..")
+sys.path.insert(0, "../..")
+sys.path.insert(0, "../../../benchmarks")
 from .. import utils
 
 

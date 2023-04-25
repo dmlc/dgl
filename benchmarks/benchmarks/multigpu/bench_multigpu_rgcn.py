@@ -26,7 +26,9 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
 import sys
-sys.path.insert(0, "../../benchmarks")
+sys.path.insert(0, "..")
+sys.path.insert(0, "../..")
+sys.path.insert(0, "../../../benchmarks")
 from .. import utils
 
 
