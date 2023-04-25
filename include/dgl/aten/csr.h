@@ -60,7 +60,8 @@ struct CSRMatrix {
         indices(iarr),
         data(darr),
         sorted(sorted_flag) {
-    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) || !aten::IsNullArray(data)) {
+    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) ||
+        !aten::IsNullArray(data)) {
       is_pinned = (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
                   (aten::IsNullArray(indices) || indices.IsPinned()) &&
                   (aten::IsNullArray(data) || data.IsPinned());
@@ -133,14 +134,16 @@ struct CSRMatrix {
 
   /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline CSRMatrix PinMemory() {
-    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) || !aten::IsNullArray(data)) {
+    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) ||
+        !aten::IsNullArray(data)) {
       if (is_pinned) return *this;
       auto new_csr = CSRMatrix(
           num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
           aten::IsNullArray(data) ? data : data.PinMemory(), sorted);
       CHECK(new_csr.is_pinned)
           << "An internal DGL error has occured while trying to pin a CSR "
-             "matrix. Please file a bug at 'https://github.com/dmlc/dgl/issues' "
+             "matrix. Please file a bug at "
+             "'https://github.com/dmlc/dgl/issues' "
              "with the above stacktrace.";
       return new_csr;
     }
@@ -157,7 +160,8 @@ struct CSRMatrix {
    *       The context check is deferred to pinning the NDArray.
    */
   inline void PinMemory_() {
-    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) || !aten::IsNullArray(data)) {
+    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) ||
+        !aten::IsNullArray(data)) {
       if (is_pinned) return;
       indptr.PinMemory_();
       indices.PinMemory_();
@@ -178,7 +182,8 @@ struct CSRMatrix {
    *       The context check is deferred to unpinning the NDArray.
    */
   inline void UnpinMemory_() {
-    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) || !aten::IsNullArray(data)) {
+    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) ||
+        !aten::IsNullArray(data)) {
       if (!is_pinned) return;
       indptr.UnpinMemory_();
       indices.UnpinMemory_();

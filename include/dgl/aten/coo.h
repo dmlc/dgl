@@ -64,10 +64,11 @@ struct COOMatrix {
         data(darr),
         row_sorted(rsorted),
         col_sorted(csorted) {
-    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) || !aten::IsNullArray(data)) {
+    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) ||
+        !aten::IsNullArray(data)) {
       is_pinned = (aten::IsNullArray(row) || row.IsPinned()) &&
-                (aten::IsNullArray(col) || col.IsPinned()) &&
-                (aten::IsNullArray(data) || data.IsPinned());
+                  (aten::IsNullArray(col) || col.IsPinned()) &&
+                  (aten::IsNullArray(data) || data.IsPinned());
     }
     CheckValidity();
   }
@@ -140,7 +141,8 @@ struct COOMatrix {
 
   /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline COOMatrix PinMemory() {
-    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) || !aten::IsNullArray(data)) {
+    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) ||
+        !aten::IsNullArray(data)) {
       if (is_pinned) return *this;
       auto new_coo = COOMatrix(
           num_rows, num_cols, row.PinMemory(), col.PinMemory(),
@@ -148,7 +150,8 @@ struct COOMatrix {
           col_sorted);
       CHECK(new_coo.is_pinned)
           << "An internal DGL error has occured while trying to pin a COO "
-             "matrix. Please file a bug at 'https://github.com/dmlc/dgl/issues' "
+             "matrix. Please file a bug at "
+             "'https://github.com/dmlc/dgl/issues' "
              "with the above stacktrace.";
       return new_coo;
     }
@@ -165,7 +168,8 @@ struct COOMatrix {
    *       The context check is deferred to pinning the NDArray.
    */
   inline void PinMemory_() {
-    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) || !aten::IsNullArray(data)) {
+    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) ||
+        !aten::IsNullArray(data)) {
       if (is_pinned) return;
       row.PinMemory_();
       col.PinMemory_();
@@ -186,7 +190,8 @@ struct COOMatrix {
    *       The context check is deferred to unpinning the NDArray.
    */
   inline void UnpinMemory_() {
-    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) || !aten::IsNullArray(data)) {
+    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) ||
+        !aten::IsNullArray(data)) {
       if (!is_pinned) return;
       row.UnpinMemory_();
       col.UnpinMemory_();
