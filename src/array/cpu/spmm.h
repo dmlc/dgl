@@ -43,7 +43,39 @@ using AccType = typename std::conditional<
  *       for the computation of different nodes.
  */
 template <typename IdType, typename DType, typename Op>
-void SpMMSumCsrNaive(
+typename std::enable_if<!std::is_same<DType, BFloat16>::value, void>::type
+SpMMSumCsrNaive(
+    const BcastOff& bcast, const CSRMatrix& csr, const DType* X, const DType* W,
+    DType* O) {
+  const bool has_idx = !IsNullArray(csr.data);
+  const IdType* indptr = csr.indptr.Ptr<IdType>();
+  const IdType* indices = csr.indices.Ptr<IdType>();
+  const IdType* edges = csr.data.Ptr<IdType>();
+  int64_t dim = bcast.out_len, lhs_dim = bcast.lhs_len, rhs_dim = bcast.rhs_len;
+  runtime::parallel_for(0, csr.num_rows, [&](size_t b, size_t e) {
+    for (auto rid = b; rid < e; ++rid) {
+      const IdType row_start = indptr[rid], row_end = indptr[rid + 1];
+      DType* out_off = O + rid * dim;
+      for (IdType j = row_start; j < row_end; ++j) {
+        const IdType cid = indices[j];
+        const IdType eid = has_idx ? edges[j] : j;
+        for (int64_t k = 0; k < dim; ++k) {
+          const int64_t lhs_add = bcast.use_bcast ? bcast.lhs_offset[k] : k;
+          const int64_t rhs_add = bcast.use_bcast ? bcast.rhs_offset[k] : k;
+          const DType* lhs_off =
+              Op::use_lhs ? X + cid * lhs_dim + lhs_add : nullptr;
+          const DType* rhs_off =
+              Op::use_rhs ? W + eid * rhs_dim + rhs_add : nullptr;
+          out_off[k] += Op::Call(lhs_off, rhs_off);
+        }
+      }
+    }
+  });
+}
+
+template <typename IdType, typename DType, typename Op>
+typename std::enable_if<std::is_same<DType, BFloat16>::value, void>::type
+SpMMSumCsrNaive(
     const BcastOff& bcast, const CSRMatrix& csr, const DType* X, const DType* W,
     DType* O) {
   const bool has_idx = !IsNullArray(csr.data);
