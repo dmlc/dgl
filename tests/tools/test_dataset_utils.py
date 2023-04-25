@@ -91,7 +91,7 @@ def _validate_edge_data(
         edge_feats.append(data)
 
     if len(edge_feats) == 0:
-        actual_results = edge_feats["n1:e1:n1/edge_feat_1/0"]
+        actual_results = edge_features["n1:e1:n1/edge_feat_1/0"]
         assert actual_results == None
         assert edge_feature_tids["n1:e1:n1/edge_feat_1/0"][0] == (0, 0)
     else:
