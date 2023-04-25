@@ -25,15 +25,9 @@ from torch.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
+import sys
+sys.path.insert(0, "../../benchmarks")
 from .. import utils
-
-# import sys
-# import os
-# dir_path = Path(os.path.dirname(__file__))
-# sys.path.insert(0, dir_path.parent)
-
-
-# import utils
 
 
 class EntityClassify(nn.Module):

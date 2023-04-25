@@ -14,6 +14,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.parallel import DistributedDataParallel
 
+import sys
+sys.path.insert(0, "../../benchmarks")
 from .. import utils
 
 
