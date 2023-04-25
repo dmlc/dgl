@@ -21,7 +21,20 @@ class CuGraphBaseConv(nn.Module):
     def pad_offsets(self, offsets: torch.Tensor, size: int) -> torch.Tensor:
         r"""Pad zero-in-degree nodes to the end of offsets to reach size. This
         is used to augment offset tensors from DGL blocks (MFGs) to be
-        compatible with cugraph-ops full-graph primitives."""
+        compatible with cugraph-ops full-graph primitives.
+
+        Parameters
+        ----------
+        offsets :
+            The (monotonically increasing) index pointer array in a CSC-format
+            graph.
+        size : int
+            The length of offsets after padding.
+        Returns
+        -------
+        torch.Tensor
+            The augmented offsets array.
+        """
         if self._cached_offsets_fg is None:
             self._cached_offsets_fg = torch.empty(
                 size, dtype=offsets.dtype, device=offsets.device

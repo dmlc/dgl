@@ -97,7 +97,7 @@ class CuGraphRelGraphConv(CuGraphBaseConv):
         if HAS_PYLIBCUGRAPHOPS is False:
             raise ModuleNotFoundError(
                 f"{self.__class__.__name__} requires pylibcugraphops>=23.04. "
-                f"Install via `conda install -c nvidia pylibcugraphops>=23.04`."
+                f"Install via `conda install -c nvidia 'pylibcugraphops>=23.04'`."
             )
         super().__init__()
         self.in_feat = in_feat

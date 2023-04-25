@@ -79,7 +79,7 @@ class CuGraphSAGEConv(CuGraphBaseConv):
         if HAS_PYLIBCUGRAPHOPS is False:
             raise ModuleNotFoundError(
                 f"{self.__class__.__name__} requires pylibcugraphops>=23.04. "
-                f"Install via `conda install -c nvidia pylibcugraphops>=23.04`."
+                f"Install via `conda install -c nvidia 'pylibcugraphops>=23.04'`."
             )
 
         valid_aggr_types = {"max", "min", "mean", "sum"}

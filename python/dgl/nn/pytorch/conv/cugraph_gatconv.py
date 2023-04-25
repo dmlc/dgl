@@ -24,7 +24,7 @@ class CuGraphGATConv(CuGraphBaseConv):
     See :class:`dgl.nn.pytorch.conv.GATConv` for mathematical model.
 
     This module depends on :code:`pylibcugraphops` package, which can be
-    installed via :code:`conda install -c nvidia pylibcugraphops>=23.04`.
+    installed via :code:`conda install -c nvidia 'pylibcugraphops>=23.04'`.
 
     .. note::
         This is an **experimental** feature.
