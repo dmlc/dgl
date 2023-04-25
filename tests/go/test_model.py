@@ -1,7 +1,7 @@
 import dgl
 import pytest
 import torch
-from pytests_utils.graph_cases import get_cases
+from utils.graph_cases import get_cases
 from dglgo.model import *
 
 

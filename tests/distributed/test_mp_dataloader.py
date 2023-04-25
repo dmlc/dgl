@@ -637,12 +637,8 @@ def create_random_hetero():
         )
         edges[etype] = (arr.row, arr.col)
     g = dgl.heterograph(edges, num_nodes)
-    g.nodes["n1"].data["feat"] = F.unsqueeze(
-        F.arange(0, g.number_of_nodes("n1")), 1
-    )
-    g.edges["r1"].data["feat"] = F.unsqueeze(
-        F.arange(0, g.number_of_edges("r1")), 1
-    )
+    g.nodes["n1"].data["feat"] = F.unsqueeze(F.arange(0, g.num_nodes("n1")), 1)
+    g.edges["r1"].data["feat"] = F.unsqueeze(F.arange(0, g.num_edges("r1")), 1)
     return g
 
 

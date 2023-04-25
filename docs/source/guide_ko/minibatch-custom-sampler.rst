@@ -283,7 +283,7 @@ GNN 레이어 수를 상위 클래스에 전달해야 한다.
             dst = dst[mask]
             # Return a new graph with the same nodes as the original graph as a
             # frontier
-            frontier = dgl.graph((src, dst), num_nodes=g.number_of_nodes())
+            frontier = dgl.graph((src, dst), num_nodes=g.num_nodes())
             return frontier
     
         def __len__(self):
@@ -335,7 +335,7 @@ Heterogeneous 그래프에 대한 프론티어를 생성하는 것은 homogeneou
             new_edges_masks = {}
             # Iterate over all edge types
             for etype in sg.canonical_etypes:
-                edge_mask = torch.zeros(sg.number_of_edges(etype))
+                edge_mask = torch.zeros(sg.num_edges(etype))
                 edge_mask.bernoulli_(self.p)
                 new_edges_masks[etype] = edge_mask.bool()
     

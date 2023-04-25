@@ -11,10 +11,6 @@
 #include <dgl/runtime/registry.h>
 #include <dmlc/omp.h>
 
-#ifdef DGL_USE_CUDA
-#include "../runtime/cuda/cuda_common.h"
-#endif  // DGL_USE_CUDA
-
 using namespace dgl::runtime;
 
 namespace dgl {
@@ -28,17 +24,6 @@ DGL_REGISTER_GLOBAL("rng._CAPI_SetSeed")
           RandomEngine::ThreadLocal()->SetSeed(seed);
         }
       });
-#ifdef DGL_USE_CUDA
-      if (DeviceAPI::Get(kDGLCUDA)->IsAvailable()) {
-        auto *thr_entry = CUDAThreadEntry::ThreadLocal();
-        if (!thr_entry->curand_gen) {
-          CURAND_CALL(curandCreateGenerator(
-              &thr_entry->curand_gen, CURAND_RNG_PSEUDO_DEFAULT));
-        }
-        CURAND_CALL(curandSetPseudoRandomGeneratorSeed(
-            thr_entry->curand_gen, static_cast<uint64_t>(seed)));
-      }
-#endif  // DGL_USE_CUDA
     });
 
 DGL_REGISTER_GLOBAL("rng._CAPI_Choice")

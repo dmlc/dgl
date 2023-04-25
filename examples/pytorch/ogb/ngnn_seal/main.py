@@ -85,7 +85,7 @@ class SEALOGBLDataset(Dataset):
 
         NIDs, EIDs = subg.ndata[dgl.NID], subg.edata[dgl.EID]
 
-        z = drnl_node_labeling(subg.adj(scipy_fmt="csr"), 0, 1)
+        z = drnl_node_labeling(subg.adj_external(scipy_fmt="csr"), 0, 1)
         edge_weights = (
             self.edge_weights[EIDs] if self.edge_weights is not None else None
         )

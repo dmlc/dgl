@@ -85,32 +85,36 @@ COOMatrix DisjointUnionCoo(const std::vector<COOMatrix>& coos) {
   auto res_dst_data = result_dst.Ptr<IdType>();
   auto res_dat_data = result_dat.Ptr<IdType>();
 
-  dgl::runtime::parallel_for(0, coos.size(), [&](IdType b, IdType e) {
-    for (IdType i = b; i < e; ++i) {
-      const aten::COOMatrix& coo = coos[i];
-      if (!coo.row_sorted) row_sorted = false;
-      if (!coo.col_sorted) col_sorted = false;
+  // 32 is a number obtained from experience. If a user set the grain size
+  // explicitly via env, use that value instead.
+  size_t grain_size = dgl::runtime::DefaultGrainSizeT(32)();
+  dgl::runtime::parallel_for(
+      0, coos.size(), grain_size, [&](IdType b, IdType e) {
+        for (IdType i = b; i < e; ++i) {
+          const aten::COOMatrix& coo = coos[i];
+          if (!coo.row_sorted) row_sorted = false;
+          if (!coo.col_sorted) col_sorted = false;
 
-      auto edges_src = coo.row.Ptr<IdType>();
-      auto edges_dst = coo.col.Ptr<IdType>();
-      auto edges_dat = coo.data.Ptr<IdType>();
+          auto edges_src = coo.row.Ptr<IdType>();
+          auto edges_dst = coo.col.Ptr<IdType>();
+          auto edges_dat = coo.data.Ptr<IdType>();
 
-      for (IdType j = 0; j < coo.row->shape[0]; j++) {
-        res_src_data[prefix_elm[i] + j] = edges_src[j] + prefix_src[i];
-      }
+          for (IdType j = 0; j < coo.row->shape[0]; j++) {
+            res_src_data[prefix_elm[i] + j] = edges_src[j] + prefix_src[i];
+          }
 
-      for (IdType j = 0; j < coo.row->shape[0]; j++) {
-        res_dst_data[prefix_elm[i] + j] = edges_dst[j] + prefix_dst[i];
-      }
+          for (IdType j = 0; j < coo.row->shape[0]; j++) {
+            res_dst_data[prefix_elm[i] + j] = edges_dst[j] + prefix_dst[i];
+          }
 
-      if (has_data) {
-        for (IdType j = 0; j < coo.row->shape[0]; j++) {
-          const auto d = (!COOHasData(coo)) ? j : edges_dat[j];
-          res_dat_data[prefix_elm[i] + j] = d + prefix_elm[i];
+          if (has_data) {
+            for (IdType j = 0; j < coo.row->shape[0]; j++) {
+              const auto d = (!COOHasData(coo)) ? j : edges_dat[j];
+              res_dat_data[prefix_elm[i] + j] = d + prefix_elm[i];
+            }
+          }
         }
-      }
-    }
-  });
+      });
   return COOMatrix(
       prefix_src[coos.size()], prefix_dst[coos.size()], result_src, result_dst,
       result_dat, row_sorted, col_sorted);

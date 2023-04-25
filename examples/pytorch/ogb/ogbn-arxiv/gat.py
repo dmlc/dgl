@@ -66,9 +66,9 @@ def preprocess(graph):
     graph.ndata["feat"] = feat
 
     # add self-loop
-    print(f"Total edges before adding self-loop {graph.number_of_edges()}")
+    print(f"Total edges before adding self-loop {graph.num_edges()}")
     graph = graph.remove_self_loop().add_self_loop()
-    print(f"Total edges after adding self-loop {graph.number_of_edges()}")
+    print(f"Total edges after adding self-loop {graph.num_edges()}")
 
     graph.create_formats_()
 

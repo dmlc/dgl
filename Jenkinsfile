@@ -122,9 +122,11 @@ def is_authorized(name) {
   def devs = ['dgl-bot', 'noreply', 'Rhett-Ying', 'BarclayII', 'jermainewang',
               'mufeili', 'isratnisa', 'rudongyu', 'classicsong', 'HuXiangkun',
               'hetong007', 'kylasa', 'frozenbugs', 'peizhou001', 'zheng-da',
-              'czkkkkkk',
+              'czkkkkkk', 'thvasilo',
               'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa',
               'kkranen',
+              'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
+              'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
               'VoVAllen',
               ]
   return (name in devs)

@@ -72,7 +72,12 @@ for _ in range(10):
         loss.backward()
         opt.step()
         if it % 20 == 0:
-            acc = MF.accuracy(y_hat[m], y[m])
+            acc = MF.accuracy(
+                y_hat[m],
+                y[m],
+                task="multiclass",
+                num_classes=dataset.num_classes,
+            )
             mem = torch.cuda.max_memory_allocated() / 1000000
             print("Loss", loss.item(), "Acc", acc.item(), "GPU Mem", mem, "MB")
     tt = time.time()
@@ -97,8 +102,18 @@ for _ in range(10):
         val_labels = torch.cat(val_labels, 0)
         test_preds = torch.cat(test_preds, 0)
         test_labels = torch.cat(test_labels, 0)
-        val_acc = MF.accuracy(val_preds, val_labels)
-        test_acc = MF.accuracy(test_preds, test_labels)
+        val_acc = MF.accuracy(
+            val_preds,
+            val_labels,
+            task="multiclass",
+            num_classes=dataset.num_classes,
+        )
+        test_acc = MF.accuracy(
+            test_preds,
+            test_labels,
+            task="multiclass",
+            num_classes=dataset.num_classes,
+        )
         print("Validation acc:", val_acc.item(), "Test acc:", test_acc.item())
 
 print(np.mean(durations[4:]), np.std(durations[4:]))

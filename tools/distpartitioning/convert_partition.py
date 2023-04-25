@@ -466,14 +466,14 @@ def create_dgl_object(
     )
     part_graph.edata[dgl.EID] = th.arange(
         edgeid_offset,
-        edgeid_offset + part_graph.number_of_edges(),
+        edgeid_offset + part_graph.num_edges(),
         dtype=th.int64,
     )
     part_graph.edata[dgl.ETYPE] = th.as_tensor(
         etype_ids, dtype=RESERVED_FIELD_DTYPE[dgl.ETYPE]
     )
     part_graph.edata["inner_edge"] = th.ones(
-        part_graph.number_of_edges(), dtype=RESERVED_FIELD_DTYPE["inner_edge"]
+        part_graph.num_edges(), dtype=RESERVED_FIELD_DTYPE["inner_edge"]
     )
 
     # compute per_type_ids and ntype for all the nodes in the graph.

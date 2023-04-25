@@ -197,8 +197,8 @@ class JTNNCollator(object):
             tree_mess_tgt_e[i] += n_graph_nodes
             tree_mess_src_e[i] += n_tree_nodes
             tree_mess_tgt_n[i] += n_graph_nodes
-            n_graph_nodes += sum(g.number_of_nodes() for g in cand_graphs[i])
-            n_tree_nodes += mol_trees[i].graph.number_of_nodes()
+            n_graph_nodes += sum(g.num_nodes() for g in cand_graphs[i])
+            n_tree_nodes += mol_trees[i].graph.num_nodes()
             cand_batch_idx.extend([i] * len(cand_graphs[i]))
         tree_mess_tgt_e = torch.cat(tree_mess_tgt_e)
         tree_mess_src_e = torch.cat(tree_mess_src_e)

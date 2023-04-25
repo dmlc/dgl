@@ -50,7 +50,7 @@ class PATTERNDataset(DGLBuiltinDataset):
         Number of classes for each node.
 
     Examples
-    —-------
+    --------
     >>> from dgl.data import PATTERNDataset
     >>> data = PATTERNDataset(mode='train')
     >>> data.num_classes
