@@ -25,10 +25,6 @@ from torch.multiprocessing import Queue
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
-import sys
-sys.path.insert(0, "..")
-sys.path.insert(0, "../..")
-sys.path.insert(0, "../../../benchmarks")
 from .. import utils
 
 
