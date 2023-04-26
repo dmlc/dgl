@@ -318,7 +318,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "rapidsai/cugraph_nightly_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
+                  image "rapidsai/cugraph_stable_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
                   args "-u root"
                   alwaysPull true
                 }
@@ -545,7 +545,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "rapidsai/cugraph_nightly_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
+                  image "rapidsai/cugraph_stable_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
