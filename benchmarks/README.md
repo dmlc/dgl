@@ -9,7 +9,7 @@ Usage
 Before beginning, ensure that airspeed velocity is installed:
 
 ```bash
-pip install asv
+pip install asv==0.4.2
 ```
 
 To run all benchmarks locally, build the project first and then run:
