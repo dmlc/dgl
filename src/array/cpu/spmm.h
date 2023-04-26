@@ -73,6 +73,8 @@ SpMMSumCsrNaive(
   });
 }
 
+// Naive implementation with additional accumulator, which prevents accuracy
+// degradation in less precise data types, like bfloat16.
 template <typename IdType, typename DType, typename Op>
 typename std::enable_if<std::is_same<DType, BFloat16>::value, void>::type
 SpMMSumCsrNaive(
