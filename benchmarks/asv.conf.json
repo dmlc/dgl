@@ -105,7 +105,6 @@
     // The directory (relative to the current directory) to cache the Python
     // environments in.  If not provided, defaults to "env"
     "env_dir": "env",
-    "conda_environment_file": "environment.yml",
     // The directory (relative to the current directory) that raw benchmark
     // results are stored in.  If not provided, defaults to "results".
     "results_dir": "results",
