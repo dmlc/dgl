@@ -17,6 +17,7 @@ pip uninstall -y dgl
 export DGL_BENCH_DEVICE=$DEVICE
 echo "DGL_BENCH_DEVICE=$DGL_BENCH_DEVICE"
 pushd $ROOT/benchmarks
+export PYTHONPATH=$ROOT/benchmarks:$PYTHONPATH
 cat environment.yml
 cat asv.conf.json
 asv machine --yes
