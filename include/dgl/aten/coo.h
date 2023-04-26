@@ -64,8 +64,7 @@ struct COOMatrix {
         data(darr),
         row_sorted(rsorted),
         col_sorted(csorted) {
-    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) ||
-        !aten::IsNullArray(data)) {
+    if (!IsEmpty()) {
       is_pinned = (aten::IsNullArray(row) || row.IsPinned()) &&
                   (aten::IsNullArray(col) || col.IsPinned()) &&
                   (aten::IsNullArray(data) || data.IsPinned());
@@ -130,6 +129,11 @@ struct COOMatrix {
     CHECK_NO_OVERFLOW(row->dtype, num_cols);
   }
 
+  inline bool IsEmpty() const {
+    return aten::IsNullArray(row) && aten::IsNullArray(col) &&
+           aten::IsNullArray(data);
+  }
+
   /** @brief Return a copy of this matrix on the give device context. */
   inline COOMatrix CopyTo(const DGLContext& ctx) const {
     if (ctx == row->ctx) return *this;
@@ -141,8 +145,7 @@ struct COOMatrix {
 
   /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline COOMatrix PinMemory() {
-    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) ||
-        !aten::IsNullArray(data)) {
+    if (!IsEmpty()) {
       if (is_pinned) return *this;
       auto new_coo = COOMatrix(
           num_rows, num_cols, row.PinMemory(), col.PinMemory(),
@@ -168,8 +171,7 @@ struct COOMatrix {
    *       The context check is deferred to pinning the NDArray.
    */
   inline void PinMemory_() {
-    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) ||
-        !aten::IsNullArray(data)) {
+    if (!IsEmpty()) {
       if (is_pinned) return;
       row.PinMemory_();
       col.PinMemory_();
@@ -190,8 +192,7 @@ struct COOMatrix {
    *       The context check is deferred to unpinning the NDArray.
    */
   inline void UnpinMemory_() {
-    if (!aten::IsNullArray(row) || !aten::IsNullArray(col) ||
-        !aten::IsNullArray(data)) {
+    if (!IsEmpty()) {
       if (!is_pinned) return;
       row.UnpinMemory_();
       col.UnpinMemory_();

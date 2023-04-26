@@ -60,8 +60,7 @@ struct CSRMatrix {
         indices(iarr),
         data(darr),
         sorted(sorted_flag) {
-    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) ||
-        !aten::IsNullArray(data)) {
+    if (!IsEmpty()) {
       is_pinned = (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
                   (aten::IsNullArray(indices) || indices.IsPinned()) &&
                   (aten::IsNullArray(data) || data.IsPinned());
@@ -124,6 +123,11 @@ struct CSRMatrix {
     CHECK_EQ(indptr->shape[0], num_rows + 1);
   }
 
+  inline bool IsEmpty() const {
+    return aten::IsNullArray(indptr) && aten::IsNullArray(indices) &&
+           aten::IsNullArray(data);
+  }
+
   /** @brief Return a copy of this matrix on the give device context. */
   inline CSRMatrix CopyTo(const DGLContext& ctx) const {
     if (ctx == indptr->ctx) return *this;
@@ -134,8 +138,7 @@ struct CSRMatrix {
 
   /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
   inline CSRMatrix PinMemory() {
-    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) ||
-        !aten::IsNullArray(data)) {
+    if (!IsEmpty()) {
       if (is_pinned) return *this;
       auto new_csr = CSRMatrix(
           num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
@@ -160,8 +163,7 @@ struct CSRMatrix {
    *       The context check is deferred to pinning the NDArray.
    */
   inline void PinMemory_() {
-    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) ||
-        !aten::IsNullArray(data)) {
+    if (!IsEmpty()) {
       if (is_pinned) return;
       indptr.PinMemory_();
       indices.PinMemory_();
@@ -182,8 +184,7 @@ struct CSRMatrix {
    *       The context check is deferred to unpinning the NDArray.
    */
   inline void UnpinMemory_() {
-    if (!aten::IsNullArray(indptr) || !aten::IsNullArray(indices) ||
-        !aten::IsNullArray(data)) {
+    if (!IsEmpty()) {
       if (!is_pinned) return;
       indptr.UnpinMemory_();
       indices.UnpinMemory_();
