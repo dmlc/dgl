@@ -260,7 +260,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         ) // self.batch_size
 
 
-def _decompose_1_D(length, world_size, rank, drop_last):
+def _decompose_one_dimension(length, world_size, rank, drop_last):
     if drop_last and length % world_size != 0:
         num_samples = math.ceil((length - world_size) / world_size)
     else:
@@ -293,7 +293,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.drop_last = drop_last
         self._shuffle = shuffle
-        self.local_bounds = _decompose_1_D(
+        self.local_bounds = _decompose_one_dimension(
             len_indices, self.num_replicas, self.rank, drop_last
         )
         self.num_samples = self.local_bounds[1] - self.local_bounds[0]
