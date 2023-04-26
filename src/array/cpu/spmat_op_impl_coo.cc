@@ -708,7 +708,15 @@ inline COOToCSRAlg WhichCOOToCSR(const COOMatrix &coo) {
   if (coo.row_sorted) {
     return COOToCSRAlg::alSorted;
   } else {
+#ifdef _WIN32
+    // On Windows omp_get_max_threads() gives larger value than later OMP can
+    // spawn.
+    int64_t num_threads;
+#pragma omp parallel
+    { num_threads = omp_get_num_threads(); }
+#else
     const int64_t num_threads = omp_get_max_threads();
+#endif
     const int64_t N = coo.num_rows;
     const int64_t NNZ = coo.row->shape[0];
     // Parameters below are heuristically chosen according to measured
