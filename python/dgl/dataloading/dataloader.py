@@ -159,9 +159,9 @@ def _split_to_local_id_tensor_from_mapping(indices, keys, bounds):
             if split_id_offset2 == num_samples:
                 break
         index_offset = index_offset2
+
     # padding locally when drop_last = False
     if split_id_offset2 < num_samples:
-        assert (bounds[1] - index_offset2) == (num_samples - split_id_offset2)
         padding_size = bounds[1] - index_offset2
         id_tensor[split_id_offset2:, 0] = id_tensor[:padding_size, 0]
         id_tensor[split_id_offset2:, 1] = id_tensor[:padding_size, 1]
@@ -311,7 +311,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             )
         self._device = self._id_tensor.device
         # always on cpu
-        self._indices = torch.arange(self.num_samples, dtype=dtype_of(indices))
+        self._indices = torch.arange(self.num_samples, dtype=torch.int64)
         assert len(self._id_tensor) == self.num_samples
 
     def shuffle(self):
