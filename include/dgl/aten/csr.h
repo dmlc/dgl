@@ -150,6 +150,7 @@ struct CSRMatrix {
              "with the above stacktrace.";
       return new_csr;
     }
+    is_pinned = true;
     return *this;
   }
 

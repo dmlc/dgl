@@ -158,6 +158,7 @@ struct COOMatrix {
              "with the above stacktrace.";
       return new_coo;
     }
+    is_pinned = true;
     return *this;
   }
 
