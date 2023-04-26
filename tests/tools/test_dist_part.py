@@ -213,6 +213,7 @@ def _test_pipeline(
     num_chunks_node_data=None,
     num_chunks_edge_data=None,
     use_verify_partitions=False,
+    feat_mesg_size=None,
 ):
 
     if num_parts % world_size != 0:
@@ -263,6 +264,8 @@ def _test_pipeline(
         cmd += " --save-orig-nids"
         cmd += " --save-orig-eids"
         cmd += f" --graph-formats {graph_formats}" if graph_formats else ""
+        if feat_mesg_size != None:
+            cmd += f" --feature-mesg-size {feat_mesg_size}"
         os.system(cmd)
 
         # check if verify_partitions.py is used for validation.
@@ -371,6 +374,11 @@ def test_pipeline_formats(graph_formats):
 @pytest.mark.parametrize("data_fmt", ["numpy", "parquet"])
 def test_pipeline_feature_format(data_fmt):
     _test_pipeline(4, 4, 4, data_fmt=data_fmt)
+
+
+@pytest.mark.parametrize("feat_mesg_size", [0, 1, 10])
+def test_pipeline_feat_mesg_size(feat_mesg_size):
+    _test_pipeline(4, 4, 4, feat_mesg_size=feat_mesg_size)
 
 
 def test_utils_generate_read_list():
