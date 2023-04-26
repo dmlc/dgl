@@ -146,16 +146,16 @@ def _split_to_local_id_tensor_from_mapping(indices, keys, bounds):
         index = indices[k]
         length = index.shape[0]
         index_offset2 = index_offset + length
-        lb = max(bounds[0], index_offset)
-        ub = min(bounds[1], index_offset2)
-        if ub > lb:
-            split_id_offset2 = split_id_offset + (ub - lb)
+        lower = max(bounds[0], index_offset)
+        upper = min(bounds[1], index_offset2)
+        if upper > lower:
+            split_id_offset2 = split_id_offset + (upper - lower)
             assert split_id_offset2 <= num_samples
             id_tensor[split_id_offset:split_id_offset2, 0] = i
             id_tensor[split_id_offset:split_id_offset2, 1] = index[
-                lb - index_offset : ub - index_offset
+                lower - index_offset : upper - index_offset
             ]
-            split_id_offset += ub - lb
+            split_id_offset += upper - lower
             if split_id_offset2 == num_samples:
                 break
         index_offset = index_offset2
@@ -165,11 +165,7 @@ def _split_to_local_id_tensor_from_mapping(indices, keys, bounds):
         padding_size = bounds[1] - index_offset2
         id_tensor[split_id_offset2:, 0] = id_tensor[:padding_size, 0]
         id_tensor[split_id_offset2:, 1] = id_tensor[:padding_size, 1]
-    # make sure id_tensor is completely filled
-    assert (
-        split_id_offset2 == num_samples
-        or split_id_offset2 + padding_size == num_samples
-    )
+        assert num_samples == split_id_offset2 + padding_size
     return id_tensor
 
 
@@ -264,7 +260,7 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         ) // self.batch_size
 
 
-def _decompose_1D(length, world_size, rank, drop_last):
+def _decompose_1_D(length, world_size, rank, drop_last):
     if drop_last and length % world_size != 0:
         num_samples = math.ceil((length - world_size) / world_size)
     else:
@@ -297,7 +293,7 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.drop_last = drop_last
         self._shuffle = shuffle
-        self.local_bounds = _decompose_1D(
+        self.local_bounds = _decompose_1_D(
             len_indices, self.num_replicas, self.rank, drop_last
         )
         self.num_samples = self.local_bounds[1] - self.local_bounds[0]
