@@ -173,7 +173,8 @@ def track_time(data):
     # Pack data
     data = n_classes, train_g, val_g, test_g
 
-    ctx = mp.get_context("fork")
+    mp.set_sharing_strategy('file_system')
+    ctx = mp.get_context("forkserver")
     result_queue = ctx.Queue()
     procs = []
     for proc_id in range(n_gpus):
