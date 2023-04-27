@@ -467,8 +467,7 @@ def track_time(data, dgl_sparse):
     n_gpus = len(devices)
     n_cpus = mp.cpu_count()
 
-    mp.set_sharing_strategy('file_system')
-    ctx = mp.get_context("forkserver")
+    ctx = mp.get_context("spawn")
     queue = ctx.Queue()
     procs = []
     num_train_seeds = train_idx.shape[0]
