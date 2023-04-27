@@ -1,7 +1,8 @@
-name: dgl-dev-gpu
+name: dgl-dev-gpuX
 dependencies:
   - python=3.10
   - pip
+  - wheel
   - graphviz
   - pandoc
   - pygraphviz

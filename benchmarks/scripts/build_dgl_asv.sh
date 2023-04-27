@@ -18,3 +18,5 @@ pushd build
 cmake $CMAKE_VARS ..
 make -j8
 popd
+
+cp -R benchmarks/benchmarks /opt/conda/envs/dgl-dev-gpuX/lib/python3.10/site-packages/
