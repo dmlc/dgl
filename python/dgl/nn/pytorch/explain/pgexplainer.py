@@ -109,10 +109,13 @@ class PGExplainer(nn.Module):
         ----------
         prob: Tensor
             Tensor contains a set of probabilities for each possible
-            class label of some model, which is of shape :math:`(L)`,
-            where :math:`L` is the different types of label in the dataset.
+            class label of some model for all the batched graphs,
+            which is of shape :math:`(G, L)`, where :math:`L` is the
+            different types of label in the dataset and :math:`G` is the
+            number of batched graphs.
         ori_pred: Tensor
-            Tensor of shape :math:`(1)`, representing the original prediction.
+            Tensor of shape ::math:`(G, 1)`, representing the original prediction
+            for :math:`G` batched graphs.
 
         Returns
         -------
@@ -120,11 +123,11 @@ class PGExplainer(nn.Module):
             The function that returns the sum of the three loss components,
             which is a scalar tensor representing the total loss.
         """
-        target_prob = prob[ori_pred]
+        target_prob = prob.gather(-1, ori_pred.unsqueeze(-1))
         # 1e-6 added to prob to avoid taking the logarithm of zero
         target_prob += 1e-6
-        # computing the cross-entropy loss for a single prediction
-        pred_loss = -torch.log(target_prob)
+        # computing the log likelihood for a single prediction
+        pred_loss = torch.mean(-torch.log(target_prob))
 
         # size
         edge_mask = self.sparse_mask_values
@@ -144,7 +147,6 @@ class PGExplainer(nn.Module):
         mask_ent_loss = self.coff_connect * torch.mean(mask_ent)
 
         loss = pred_loss + size_loss + mask_ent_loss
-
         return loss
 
     def concrete_sample(self, log_alpha, beta=1.0, training=True):
@@ -266,7 +268,7 @@ class PGExplainer(nn.Module):
         ...     def __init__(self, in_feats, out_feats):
         ...         super().__init__()
         ...         self.conv = GraphConv(in_feats, out_feats)
-        ...         self.fc = nn.Linear(out_feats, 1)
+        ...         self.fc = nn.Linear(out_feats, 2)
         ...         nn.init.xavier_uniform_(self.fc.weight)
         ...
         ...     def forward(self, g, h, embed=False, edge_weight=None):
@@ -274,7 +276,7 @@ class PGExplainer(nn.Module):
         ...         if not embed:
         ...             g.ndata['h'] = h
         ...             hg = dgl.mean_nodes(g, 'h')
-        ...             return th.sigmoid(self.fc(hg))
+        ...             return self.fc(hg)
         ...         else:
         ...             return h
 
@@ -285,7 +287,7 @@ class PGExplainer(nn.Module):
         >>> # Train the model
         >>> feat_size = data[0][0].ndata['attr'].shape[1]
         >>> model = Model(feat_size, data.gclasses)
-        >>> criterion = nn.BCEWithLogitsLoss()
+        >>> criterion = nn.CrossEntropyLoss()
         >>> optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
         >>> for bg, labels in dataloader:
         ...     preds = model(bg, bg.ndata['attr'])
