@@ -205,8 +205,7 @@ class PGExplainer(nn.Module):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        logits = self.model(graph, feat)
-        org_pred = logits.argmax(-1).data
+        pred = self.model(graph, feat).argmax(-1).data
 
         prob, edge_mask = self.explain_graph(
             graph, feat, tmp=tmp, training=True
@@ -214,7 +213,7 @@ class PGExplainer(nn.Module):
 
         self.edge_mask = edge_mask
 
-        loss_tmp = self.loss(prob.unsqueeze(dim=0), org_pred)
+        loss_tmp = self.loss(prob.unsqueeze(dim=0), pred)
         return loss_tmp
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False):
