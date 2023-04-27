@@ -127,6 +127,7 @@ Utility Modules
     ~dgl.nn.pytorch.explain.GNNExplainer
     ~dgl.nn.pytorch.explain.HeteroGNNExplainer
     ~dgl.nn.pytorch.explain.SubgraphX
+    ~dgl.nn.pytorch.explain.HeteroSubgraphX
     ~dgl.nn.pytorch.explain.PGExplainer
     ~dgl.nn.pytorch.utils.LabelPropagation
     ~dgl.nn.pytorch.graph_transformer.DegreeEncoder

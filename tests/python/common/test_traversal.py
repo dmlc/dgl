@@ -70,7 +70,7 @@ def test_topological_nodes(idtype, n=100):
 
     layers_dgl = dgl.topological_nodes_generator(g)
 
-    adjmat = g.adjacency_matrix(transpose=True)
+    adjmat = g.adj_external(transpose=True)
 
     def tensor_topo_traverse():
         n = g.num_nodes()
