@@ -292,12 +292,11 @@ class PGExplainer(nn.Module):
         >>> explainer = PGExplainer(model, data.gclasses)
 
         >>> # Train the explainer
-        >>> # Define explainer training parameter
+        >>> # Define explainer temperature parameter
         >>> init_tmp, final_tmp = 5.0, 1.0
+        >>> tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
         >>> optimizer_exp = torch.optim.Adam(explainer.parameters(), lr=0.01)
         >>> for epoch in range(20):
-        ...     tmp =  float(init_tmp* np.power(final_tmp / init_tmp,
-        ...          epoch / num_epochs))
         ...     for bg, labels in dataloader:
         ...          loss = explainer.train_step(bg, bg.ndata['attr'], tmp)
         ...          optimizer_exp.zero_grad()
