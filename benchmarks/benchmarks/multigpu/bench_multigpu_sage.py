@@ -173,7 +173,7 @@ def track_time(data):
     # Pack data
     data = n_classes, train_g, val_g, test_g
 
-    ctx = mp.get_context("spawn")
+    ctx = mp.get_context("fork")
     result_queue = ctx.Queue()
     procs = []
     for proc_id in range(n_gpus):
