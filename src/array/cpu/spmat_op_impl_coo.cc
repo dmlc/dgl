@@ -442,15 +442,16 @@ CSRMatrix UnSortedSparseCOOToCSR(const COOMatrix &coo) {
   // from making calculation parallel.
   const int64_t min_chunk_size = 1000;
   const int64_t num_threads_for_batch = 2 + (NNZ + N) / min_chunk_size;
-  const int num_threads = std::min(
+  const int num_threads_required = std::min(
       static_cast<int64_t>(omp_get_max_threads()), num_threads_for_batch);
 
   // record row_idx in each thread.
   std::vector<std::vector<int64_t>> p_sum(
-      num_threads, std::vector<int64_t>(num_threads));
+      num_threads_required, std::vector<int64_t>(num_threads_required));
 
-#pragma omp parallel num_threads(num_threads)
+#pragma omp parallel num_threads(num_threads_required)
   {
+    const int num_threads = omp_get_num_threads();
     const int thread_id = omp_get_thread_num();
     CHECK_LT(thread_id, num_threads);
 
