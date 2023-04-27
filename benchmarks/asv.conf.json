@@ -44,7 +44,7 @@
     "conda_environment_file": "environment.yml",
     "plugins": [
         "benchmarks"
-    ]
+    ],
     // timeout in seconds for installing any dependencies in environment
     // defaults to 10 min
     "install_timeout": 600,
