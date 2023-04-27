@@ -60,11 +60,9 @@ class PGExplainer(nn.Module):
         self.init_bias = 0.0
 
         # Explanation network in PGExplainer
-        self.elayers = nn.ModuleList()
-        self.elayers.append(
-            nn.Sequential(nn.Linear(self.num_features, 64), nn.ReLU())
+        self.elayers = nn.Sequential(
+            nn.Linear(self.num_features, 64), nn.ReLU(), nn.Linear(64, 1)
         )
-        self.elayers.append(nn.Linear(64, 1))
 
     def set_masks(self, graph, feat, edge_mask=None):
         r"""Set the edge mask that play a crucial role to explain the
@@ -109,23 +107,24 @@ class PGExplainer(nn.Module):
 
         Parameters
         ----------
-        prob:  Tensor
+        prob: Tensor
             Tensor contains a set of probabilities for each possible
-            class label of some model.
-        ori_pred: int
-            Integer representing the original prediction.
+            class label of some model, which is of shape :math:`(L)`,
+            where :math:`L` is the different types of label in the dataset.
+        ori_pred: Tensor
+            Tensor of shape :math:`(1)`, representing the original prediction.
 
         Returns
         -------
         float
-            The function returns the sum of the three loss components,
+            The function that returns the sum of the three loss components,
             which is a scalar tensor representing the total loss.
         """
-        logit = prob[ori_pred]
-        # 1e-6 added to logit to avoid taking the logarithm of zero
-        logit += 1e-6
+        target_prob = prob[ori_pred]
+        # 1e-6 added to prob to avoid taking the logarithm of zero
+        target_prob += 1e-6
         # computing the cross-entropy loss for a single prediction
-        pred_loss = -torch.log(logit)
+        pred_loss = -torch.log(target_prob)
 
         # size
         edge_mask = self.sparse_mask_values
@@ -183,7 +182,7 @@ class PGExplainer(nn.Module):
 
         return gate_inputs
 
-    def train_step(self, graph, feat, tmp):
+    def train_step(self, graph, feat, tmp, **kwargs):
         r"""Training the explanation network by gradient descent(GD)
         using Adam optimizer
 
@@ -196,6 +195,10 @@ class PGExplainer(nn.Module):
             number of nodes, and :math:`D` is the feature size.
         tmp : float
             The temperature parameter fed to the sampling procedure.
+        kwargs : dict
+            Additional arguments passed to the GNN model. Tensors whose
+            first dimension is the number of nodes or edges will be
+            assumed to be node/edge features.
 
         Returns
         -------
@@ -205,18 +208,18 @@ class PGExplainer(nn.Module):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        pred = self.model(graph, feat).argmax(-1).data
+        pred = self.model(graph, feat, embed=False, **kwargs).argmax(-1).data
 
         prob, edge_mask = self.explain_graph(
-            graph, feat, tmp=tmp, training=True
+            graph, feat, tmp=tmp, training=True, **kwargs
         )
 
         self.edge_mask = edge_mask
 
-        loss_tmp = self.loss(prob.unsqueeze(dim=0), pred)
+        loss_tmp = self.loss(prob, pred)
         return loss_tmp
 
-    def explain_graph(self, graph, feat, tmp=1.0, training=False):
+    def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
         r"""Learn and return an edge mask that plays a crucial role to
         explain the prediction made by the GNN for a graph. Also, return
         the prediction made with the edges chosen based on the edge mask.
@@ -231,17 +234,21 @@ class PGExplainer(nn.Module):
         tmp : float
             The temperature parameter fed to the sampling procedure.
         training : bool
-            We indicate we want to train the explanation network if
-            set to True. If set to False, we indicate that we want
-            to find the edges of the graph that contribute most to
-            the graph explanations.
+            Training the explanation network.
+        kwargs : dict
+            Additional arguments passed to the GNN model. Tensors whose
+            first dimension is the number of nodes or edges will be
+            assumed to be node/edge features.
 
         Returns
         -------
-        Tensor, Tensor
-            The classification probability for graph with edge mask,
-            the edge weights where higher edge weights indicate that
-            they contribute to the explanation.
+        Tensor
+            Classification label given to the masked graph. It is a tensor of
+            shape :math:`1`.
+        Tensor
+            Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
+            is the number of edges in the graph. A higher weight suggests a larger
+            contribution of the edge.
 
         Examples
         --------
@@ -278,7 +285,7 @@ class PGExplainer(nn.Module):
         >>> # Train the model
         >>> feat_size = data[0][0].ndata['attr'].shape[1]
         >>> model = Model(feat_size, data.gclasses)
-        >>> criterion = nn.BCELoss()
+        >>> criterion = nn.BCEWithLogitsLoss()
         >>> optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
         >>> for bg, labels in dataloader:
         ...     preds = model(bg, bg.ndata['attr'])
@@ -310,7 +317,7 @@ class PGExplainer(nn.Module):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        embed = self.model(graph, feat, embed=True)
+        embed = self.model(graph, feat, embed=True, **kwargs)
         embed = embed.data
 
         edge_idx = graph.edges()
@@ -343,7 +350,7 @@ class PGExplainer(nn.Module):
         self.set_masks(graph, feat, edge_mask)
 
         # the model prediction with the updated edge mask
-        logits = self.model(graph, feat, edge_weight=self.edge_mask)
+        logits = self.model(graph, feat, edge_weight=self.edge_mask, **kwargs)
         probs = F.softmax(logits, dim=-1)
 
         self.clear_masks()
