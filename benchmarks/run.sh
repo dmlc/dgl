@@ -21,6 +21,6 @@ cat asv.conf.json
 asv machine --yes
 # If --launch-method is specified as 'spawn', multigpu tests will crash with
 # "No module named 'benchmarks' is found".
-asv run -e -v
+asv run -e -v --python=same
 asv publish
 popd

@@ -39,8 +39,6 @@ else
     DOCKER_ENV_OPT=" -e INSTANCE_TYPE=$INSTANCE_TYPE $DOCKER_ENV_OPT"
 fi
 
-DOCKER_ENV_OPT=" -e PYTHONPATH=/asv/dgl/benchmarks:${PYTHONPATH} ${DOCKER_ENV_OPT}"
-
 if [ -z "$MOUNT_PATH" ]; then
     DOCKER_MOUNT_OPT=""
 else
