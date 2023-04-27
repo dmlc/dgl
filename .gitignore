@@ -169,4 +169,5 @@ config.cmake
 # model file
 *.pth
 
-.vector_cache/
+# third_parth modules
+third_party/*

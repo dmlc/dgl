@@ -1,7 +1,7 @@
 """MovieLens dataset"""
 import os
-import re
 import zipfile
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -94,12 +94,9 @@ class MovieLensDataset(DGLDataset):
     valid_ratio: int
         Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0).
     test_ratio: int
-        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0). This parameter is invalid
-        when :obj:`name` is :obj:`"ml-100k"`, since testing samples are pre-specfied for :obj:`"ml-100k"`.
+        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0) for ml-1m and ml-10m. This parameter is invalid
+        when :obj:`name` is :obj:`"ml-100k"`, since it testing samples are pre-specified.
         Default: None
-    text_cache: str
-        Raw file directory to store the pre-trained word embeddings that used to preprocess movie titles.
-        Default: ~/.dgl/movielens_vector_cache/
     raw_dir : str
         Raw file directory to download/contain the input data directory.
         Default: ~/.dgl/
@@ -122,14 +119,15 @@ class MovieLensDataset(DGLDataset):
         Validation graph
     test_graph: dgl.DGLGraph
         Testing graph
+    user_feat: torch.Tensor
+        User features
+    movie_feat: torch.Tensor
+        Movie features
     info: dict
         Store training, validation and testing rating pairs.
-    feat: dict
-        Store input features of users and movies
 
     Notes
     -----
-    - When using MovieLens, users are required to install :obj:`torchtext>=0.15.1`, which provides :obj:`Glove` API to preprocess text embeddings.
     - The number of edges is doubled to form an undirected(bidirected) graph structure.
     - Each time when the dataset is loaded with a different setting of training, validation and testing ratio, the param
     :obj:`"force_reload"` should be set to :obj:`"True"`. Otherwise the previous split of dataset will be loaded and not be
@@ -156,7 +154,7 @@ class MovieLensDataset(DGLDataset):
     ...     dataset.info['train_rating_pairs'], dataset.info['valid_rating_pairs'], dataset.info['test_rating_pairs']
     >>> train_rating[0] # node index of users in training rating pairs
     tensor([614, 772, 531,  ..., 674, 639, 740])
-    >>> train_rating[1] node index of movies in training rating pairs
+    >>> train_rating[1] # node index of movies in training rating pairs
     tensor([1236,  954, 1487,  ..., 1842, 1631, 1168])
     >>>
     >>> # get the rating of a certain user-movie rating pair
@@ -168,7 +166,7 @@ class MovieLensDataset(DGLDataset):
     >>>
     >>> # get input features of users and movies respectively
     >>> user_feat, movie_feat = \
-    ...     dataset.feat['user_feat'], dataset.feat['movie_feat']
+    ...     dataset.user_feat, dataset.movie_feat
     >>> user_feat
     tensor([[0.4800, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [1.0600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
@@ -191,7 +189,6 @@ class MovieLensDataset(DGLDataset):
         name,
         valid_ratio,
         test_ratio=None,
-        text_cache=None,
         raw_dir=None,
         force_reload=None,
         verbose=None,
@@ -204,14 +201,11 @@ class MovieLensDataset(DGLDataset):
             "ml-10m",
         ], f"currently movielens does not support {name}"
 
+        if name in ['ml-1m', 'ml-10m'] and test_ratio is None:
+            raise Exception("test_ratio must be set to (0.0, 1.0) when using ml-1m and ml-10m, otherwise there's no testing dataset.")
+
         self.valid_ratio = valid_ratio
         self.test_ratio = test_ratio
-        if text_cache is None:
-            self.text_cache = os.path.join(
-                os.path.expanduser("~"), ".dgl", "movielens_vector_cache"
-            )
-        else:
-            self.text_cache = text_cache
 
         if name == "ml-100k":
             self.genres = GENRES_ML_100K
@@ -232,15 +226,25 @@ class MovieLensDataset(DGLDataset):
         )
 
     def download(self):
-        if self.url is not None:
-            zip_file_path = os.path.join(self.raw_dir, self.name + ".zip")
-            download(self.url, path=zip_file_path)
+        zip_file_path = os.path.join(self.raw_dir, self.name + ".zip")
+        download(self.url, path=zip_file_path)
 
-            with zipfile.ZipFile(zip_file_path, "r") as archive:
-                archive.extractall(path=self.raw_dir)
+        with zipfile.ZipFile(zip_file_path, "r") as archive:
+            archive.extractall(path=self.raw_dir)
+
+        '''
+        TODO: Here are codes downloading movie features from dgl s3. 
+        Right now codes are used for testing only.
+        '''
+        dir = os.path.join(os.path.expanduser("~"), ".dgl", "movie_feat")
+        shutil.copyfile(os.path.join(dir, self.name + '_movie_feat.pkl'), 
+                        os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
 
     def process(self):
         print("Starting processing {} ...".format(self.name))
+
+        # 0. loading movie features
+        self.movie_feat = load_info(os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
 
         # 1. dataset split: train + (valid + ) test
         if self.name == "ml-100k":
@@ -268,7 +272,7 @@ class MovieLensDataset(DGLDataset):
             all_rating_data = self._load_raw_rates(
                 os.path.join(self.raw_path, "ratings.dat"), "::"
             )
-            indices = np.arange(len(train_rating_data))
+            indices = np.arange(len(all_rating_data))
             train, valid, test = split_dataset(
                 indices,
                 [
@@ -298,10 +302,7 @@ class MovieLensDataset(DGLDataset):
             reserved_ids_set=set(all_rating_data["movie_id"].values),
         )
 
-        user_feat, movie_feat = tensor(
-            self._process_user_fea(user_data)
-        ), tensor(self._process_movie_fea(movie_data))
-        self.feat = {"user_feat": user_feat, "movie_feat": movie_feat}
+        self.user_feat = tensor(self._process_user_fea(user_data)) 
 
         # 3. generate rating pairs
         # Map user/movie to the global id
@@ -372,8 +373,12 @@ class MovieLensDataset(DGLDataset):
         self.valid_graph = add_reverse_edges(self.valid_graph, copy_edata=True)
         self.test_graph = add_reverse_edges(self.test_graph, copy_edata=True)
 
+        self.train_graph.edata.pop('_ID')
+        self.valid_graph.edata.pop('_ID')
+        self.test_graph.edata.pop('_ID')
+
     def has_cache(self):
-        if os.path.exists(self.graph_path):
+        if os.path.exists(self.graph_path) and os.path.exists(self.user_feat_path) and os.path.exists(self.movie_feat_path):
             return True
         return False
 
@@ -383,14 +388,16 @@ class MovieLensDataset(DGLDataset):
             [self.train_graph, self.valid_graph, self.test_graph],
         )
         save_info(self.info_path, self.info)
-        save_info(self.feat_path, self.feat)
+        save_info(self.user_feat_path, self.user_feat)
+        save_info(self.movie_feat_path, self.movie_feat)
         if self.verbose:
-            print(f"Done saving data into {self.graph_path}.")
+            print(f"Done saving data into {self.raw_path}.")
 
     def load(self):
         g_list, _ = load_graphs(self.graph_path)
         self.info = load_info(self.info_path)
-        self.feat = load_info(self.feat_path)
+        self.user_feat = load_info(self.user_feat_path)
+        self.movie_feat = load_info(self.movie_feat_path)
         self.train_graph, self.valid_graph, self.test_graph = (
             g_list[0],
             g_list[1],
@@ -454,8 +461,12 @@ class MovieLensDataset(DGLDataset):
         return os.path.join(self.raw_path, self.name + ".bin")
 
     @property
-    def feat_path(self):
-        return os.path.join(self.raw_path, self.name + "_feat.pkl")
+    def user_feat_path(self):
+        return os.path.join(self.raw_path, self.name + "_user_feat.pkl")
+
+    @property
+    def movie_feat_path(self):
+        return os.path.join(self.raw_path, self.name + "_movie_feat.pkl")
 
     @property
     def info_path(self):
@@ -492,55 +503,6 @@ class MovieLensDataset(DGLDataset):
         else:
             raise NotImplementedError
         return user_features
-
-    def _process_movie_fea(self, movie_data):
-        import torchtext
-        from torchtext.data.utils import get_tokenizer
-
-        # Old torchtext-legacy API commented below
-        # TEXT = torchtext.legacy.data.Field(tokenize='spacy', tokenizer_language='en_core_web_sm')
-        tokenizer = get_tokenizer(
-            "spacy", language="en_core_web_sm"
-        )  # new API (torchtext 0.9+)
-        embedding = torchtext.vocab.GloVe(
-            name="840B", dim=300, cache=self.text_cache
-        )
-
-        title_embedding = np.zeros(
-            shape=(movie_data.shape[0], 300), dtype=np.float32
-        )
-        release_years = np.zeros(
-            shape=(movie_data.shape[0], 1), dtype=np.float32
-        )
-        p = re.compile(r"(.+)\s*\((\d+)\)")
-        for i, title in enumerate(movie_data["title"]):
-            match_res = p.match(title)
-            if match_res is None:
-                print(
-                    "title {} cannot be matched, index={}, name={}".format(
-                        title, i, self.name
-                    )
-                )
-                title_context, year = title, 1950
-            else:
-                title_context, year = match_res.groups()
-            # We use average of glove
-            # Upgraded torchtext API:  TEXT.tokenize(title_context) --> tokenizer(title_context)
-            title_embedding[i, :] = (
-                embedding.get_vecs_by_tokens(tokenizer(title_context))
-                .numpy()
-                .mean(axis=0)
-            )
-            release_years[i] = float(year)
-        movie_features = np.concatenate(
-            (
-                title_embedding,
-                (release_years - 1950.0) / 100.0,
-                movie_data[self.genres],
-            ),
-            axis=1,
-        )
-        return movie_features
 
     def _load_raw_user_data(self):
         if self.name == "ml-100k":
