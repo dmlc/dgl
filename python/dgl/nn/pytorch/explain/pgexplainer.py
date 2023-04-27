@@ -294,14 +294,14 @@ class PGExplainer(nn.Module):
         >>> # Train the explainer
         >>> # Define explainer temperature parameter
         >>> init_tmp, final_tmp = 5.0, 1.0
-        >>> tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
         >>> optimizer_exp = torch.optim.Adam(explainer.parameters(), lr=0.01)
         >>> for epoch in range(20):
+        ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
         ...     for bg, labels in dataloader:
         ...          loss = explainer.train_step(bg, bg.ndata['attr'], tmp)
         ...          optimizer_exp.zero_grad()
         ...          loss.backward()
-        ...          optimizer.step()
+        ...          optimizer_exp.step()
 
         >>> # Explain the prediction for graph 0
         >>> graph, l = data[0]
