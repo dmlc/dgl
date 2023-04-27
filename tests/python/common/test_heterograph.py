@@ -1259,6 +1259,7 @@ def test_pin_memory_(idtype):
 
     # test pin empty homograph
     g2 = dgl.graph(([], []))
+    assert not g2.is_pinned()
     g2.pin_memory_()
     assert g2.is_pinned()
     g2.unpin_memory_()
