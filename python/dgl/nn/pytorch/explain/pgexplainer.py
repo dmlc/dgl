@@ -30,18 +30,10 @@ class PGExplainer(nn.Module):
           return the intermediate node embeddings.
     num_features : int
         Node embedding size used by :attr:`model`.
-    epochs : int, optional
-        Number of epochs to train the explanation network. Default: 10.
-    lr : float, optional
-        Learning rate to train the explanation network. Default: 0.01.
     coff_budget : float, optional
         Size regularization to constrain the explanation size. Default: 0.01.
     coff_connect : float, optional
         Entropy regularization to constrain the connectivity of explanation. Default: 5e-4.
-    init_tmp : float, optional
-        The temperature at the first epoch. Default: 5.0.
-    final_tmp : float, optional
-        The temperature at the final epoch. Default: 1.0.
     sample_bias : float, optional
         Some members of a population are systematically more likely to be selected
         in a sample than others. Default: 0.0.
@@ -51,12 +43,8 @@ class PGExplainer(nn.Module):
         self,
         model,
         num_features,
-        epochs=10,
-        lr=0.01,
         coff_budget=0.01,
         coff_connect=5e-4,
-        init_tmp=5.0,
-        final_tmp=1.0,
         sample_bias=0.0,
     ):
         super(PGExplainer, self).__init__()
@@ -65,12 +53,8 @@ class PGExplainer(nn.Module):
         self.num_features = num_features * 2
 
         # training hyperparameters for PGExplainer
-        self.epochs = epochs
-        self.lr = lr
         self.coff_budget = coff_budget
         self.coff_connect = coff_connect
-        self.init_tmp = init_tmp
-        self.final_tmp = final_tmp
         self.sample_bias = sample_bias
 
         self.init_bias = 0.0
@@ -199,64 +183,39 @@ class PGExplainer(nn.Module):
 
         return gate_inputs
 
-    def train_step(self, dataset, func_extract_feat):
+    def train_step(self, graph, feat, tmp):
         r"""Training the explanation network by gradient descent(GD)
         using Adam optimizer
 
         Parameters
         ----------
-        dataset : dgl.data
-            The dataset to train the importance edge mask.
-        func_extract_feat : func
-            A function that extracts the node embeddings for each individual graphs.
+        graph : DGLGraph
+            A homogeneous graph.
+        feat : Tensor
+            The input feature of shape :math:`(N, D)`. :math:`N` is the
+            number of nodes, and :math:`D` is the feature size.
+        tmp : float
+            The temperature parameter fed to the sampling procedure.
+
+        Returns
+        -------
+        Tensor
+            A scalar tensor representing the loss.
         """
-        graph, _ = dataset[0]
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        optimizer = Adam(self.elayers.parameters(), lr=self.lr)
+        logits = self.model(graph, feat)
+        org_pred = logits.argmax(-1).data
 
-        ori_pred_dict = {}
+        prob, edge_mask = self.explain_graph(
+            graph, feat, tmp=tmp, training=True
+        )
 
-        self.model.eval()
-        with torch.no_grad():
-            for idx, (g, _) in enumerate(dataset):
-                feat = func_extract_feat(g)
+        self.edge_mask = edge_mask
 
-                logits = self.model(g, feat)
-                ori_pred_dict[idx] = logits.argmax(-1).data
-
-        # train the mask generator
-        for epoch in range(self.epochs):
-            loss = 0.0
-            pred_list = []
-
-            tmp = float(
-                self.init_tmp
-                * np.power(self.final_tmp / self.init_tmp, epoch / self.epochs)
-            )
-
-            self.elayers.train()
-            optimizer.zero_grad()
-
-            for idx, (g, _) in enumerate(dataset):
-                feat = func_extract_feat(g)
-
-                prob, edge_mask = self.explain_graph(
-                    g, feat, tmp=tmp, training=True
-                )
-
-                self.edge_mask = edge_mask
-
-                loss_tmp = self.loss(prob.unsqueeze(dim=0), ori_pred_dict[idx])
-                loss_tmp.backward()
-
-                loss += loss_tmp.item()
-                pred_label = prob.argmax(-1).item()
-                pred_list.append(pred_label)
-
-            optimizer.step()
-            print(f"Epoch: {epoch} | Loss: {loss}")
+        loss_tmp = self.loss(prob.unsqueeze(dim=0), org_pred)
+        return loss_tmp
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False):
         r"""Learn and return an edge mask that plays a crucial role to
@@ -294,6 +253,7 @@ class PGExplainer(nn.Module):
         >>> from dgl.data import GINDataset
         >>> from dgl.dataloading import GraphDataLoader
         >>> from dgl.nn import GraphConv, PGExplainer
+        >>> import numpy as np
 
         >>> # Define the model
         >>> class Model(nn.Module):
@@ -330,7 +290,19 @@ class PGExplainer(nn.Module):
 
         >>> # Initialize the explainer
         >>> explainer = PGExplainer(model, data.gclasses)
-        >>> explainer.train_step(data, lambda g: g.ndata["attr"])
+
+        >>> # Train the explainer
+        >>> # Define explainer training parameter
+        >>> init_tmp, final_tmp = 5.0, 1.0
+        >>> optimizer_exp = torch.optim.Adam(explainer.parameters(), lr=0.01)
+        >>> for epoch in range(20):
+        ...     tmp =  float(init_tmp* np.power(final_tmp / init_tmp,
+        ...          epoch / num_epochs))
+        ...     for bg, labels in dataloader:
+        ...          loss = explainer.train_step(bg, bg.ndata['attr'], tmp)
+        ...          optimizer_exp.zero_grad()
+        ...          loss.backward()
+        ...          optimizer.step()
 
         >>> # Explain the prediction for graph 0
         >>> graph, l = data[0]
