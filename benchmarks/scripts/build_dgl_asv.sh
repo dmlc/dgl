@@ -19,7 +19,6 @@ cmake $CMAKE_VARS ..
 make -j8
 popd
 
-/asv/dgl/benchmarks/env/06715dc6ea55f2b02b6ebc21bca7e34a/lib/python3.10/site-packages
 for t_dir in /asv/dgl/benchmarks/env/*; do
   cp -R /asv/dgl/benchmarks/benchmarks "${t_dir}/lib/python3.10/site-packages/"
 done
