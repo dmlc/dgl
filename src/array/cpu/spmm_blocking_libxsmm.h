@@ -42,8 +42,12 @@ struct CSRMatrixInternal {
 };
 
 int32_t GetLLCSize() {
+#ifdef _SC_LEVEL3_CACHE_SIZE
   int32_t cache_size = sysconf(_SC_LEVEL3_CACHE_SIZE);
   if (cache_size < 0) cache_size = DGL_CPU_LLC_SIZE;
+#else
+  int32_t cache_size = DGL_CPU_LLC_SIZE;
+#endif
   return cache_size;
 }
 
