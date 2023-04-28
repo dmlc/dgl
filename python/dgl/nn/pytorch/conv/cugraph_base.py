@@ -19,9 +19,17 @@ class CuGraphBaseConv(nn.Module):
         raise NotImplementedError
 
     def pad_offsets(self, offsets: torch.Tensor, size: int) -> torch.Tensor:
-        r"""Pad zero-in-degree nodes to the end of offsets to reach size. This
-        is used to augment offset tensors from DGL blocks (MFGs) to be
-        compatible with cugraph-ops full-graph primitives.
+        r"""Pad zero-in-degree nodes to the end of offsets to reach size.
+
+        cugraph-ops often provides two variants of aggregation functions for a
+        specific model: one intended for sampled-graph use cases, one for
+        full-graph ones. The former is in general more performant, however, it
+        only works when the sample size (the max of in-degrees) is small (<200),
+        due to the limit of GPU shared memory. For graphs with a larger max
+        in-degree, we need to fall back to the full-graph option, which requires
+        to convert a DGL block to a full graph. With the csc-representation,
+        this is equivalent to pad zero-in-degree nodes to the end of the offsets
+        array (also called indptr or colptr).
 
         Parameters
         ----------
@@ -30,6 +38,7 @@ class CuGraphBaseConv(nn.Module):
             graph.
         size : int
             The length of offsets after padding.
+
         Returns
         -------
         torch.Tensor
