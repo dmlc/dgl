@@ -68,6 +68,7 @@ def test_pin_memory(idtype):
 
     # Test pinning an empty homograph
     g2 = dgl.graph(([], []))
+    assert not g2.is_pinned()
     g2._graph = g2._graph.pin_memory()
     assert g2.is_pinned()
 
