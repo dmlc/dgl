@@ -713,6 +713,7 @@ inline COOToCSRAlg WhichCOOToCSR(const COOMatrix &coo) {
     // spawn.
     int64_t num_threads;
 #pragma omp parallel
+#pragma master
     { num_threads = omp_get_num_threads(); }
 #else
     const int64_t num_threads = omp_get_max_threads();
