@@ -1,12 +1,14 @@
 import os
 import tempfile
 
+import constants
+
 import numpy as np
 import pytest
 
 import utils
 
-from convert_partition import _get_unique_invidx
+from convert_partition import _get_unique_invidx, _process_node_data
 
 
 @pytest.mark.parametrize(
@@ -152,3 +154,50 @@ def test_get_unique_invidx(num_nodes, num_edges, nid_begin, nid_end):
 
     assert len(uniques) > max_dst, f"Inverse idx, dst_ids, invalid max value."
     assert max_dst >= 0, f"Inverse idx, dst_ids has negative values."
+
+def test_process_node_data():
+    """Unit test for the _process_node_data function"""
+
+    def test_basic():
+        # Prepare test data
+        # schema, part_id, node_data, node_type_counts
+        schema_dict = {}
+        schema_dict[constants.STR_NODE_TYPE] = ["n1", "n2"]
+        schema_dict[constants.STR_NUM_NODES_PER_TYPE] = [100, 100]
+
+        ntype_counts = {}
+        ntype_counts["n1"] = 100
+        ntype_counts["n2"] = 100
+
+        node_data = {}
+        node_data[constants.SHUFFLE_GLOBAL_NID] = np.arange(100)
+        node_data[constants.NTYPE_ID] = np.hstack(
+            (np.zeros((50,), dtype=np.int64), np.ones((50,), dtype=np.int64))
+        )
+        node_data[constants.GLOBAL_TYPE_NID] = np.hstack(
+            (np.arange(50), np.arange(50))
+        )
+
+        # Test the function
+        (
+            shuffle_global_nids,
+            shuffle_global_nid_range,
+            node_map_val,
+            ntypes_map,
+            global_homo_nid,
+            id_map,
+        ) = _process_node_data(schema_dict, 0, node_data, ntype_counts)
+
+        # validate the return values of the test function call here
+        assert np.all(shuffle_global_nids == np.arange(100))
+        assert shuffle_global_nid_range == (0, 99)
+        assert node_map_val["n1"] == [[0, 50]]
+        assert node_map_val["n2"] == [[50, 100]]
+        assert ntypes_map["n1"] == 0
+        assert ntypes_map["n2"] == 1
+        assert np.all(
+            global_homo_nid == np.hstack((np.arange(50), np.arange(100, 150)))
+        )
+
+    # Invoke the test cases here
+    test_basic()
