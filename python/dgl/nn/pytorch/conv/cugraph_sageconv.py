@@ -28,7 +28,8 @@ class CuGraphSAGEConv(CuGraphBaseConv):
         (h_{i}^{l}, h_{\mathcal{N}(i)}^{(l+1)})
 
     This module depends on :code:`pylibcugraphops` package, which can be
-    installed via :code:`conda install -c nvidia pylibcugraphops>=23.04`.
+    installed via :code:`conda install -c nvidia pylibcugraphops=23.04`.
+    :code:`pylibcugraphops` 23.04 requires python 3.8.x or 3.10.x.
 
     .. note::
         This is an **experimental** feature.
@@ -77,8 +78,9 @@ class CuGraphSAGEConv(CuGraphBaseConv):
     ):
         if HAS_PYLIBCUGRAPHOPS is False:
             raise ModuleNotFoundError(
-                f"{self.__class__.__name__} requires pylibcugraphops>=23.04. "
-                f"Install via `conda install -c nvidia 'pylibcugraphops>=23.04'`."
+                f"{self.__class__.__name__} requires pylibcugraphops=23.04. "
+                f"Install via `conda install -c nvidia 'pylibcugraphops=23.04'`."
+                f"pylibcugraphops requires Python 3.8 or 3.10."
             )
 
         valid_aggr_types = {"max", "min", "mean", "sum"}

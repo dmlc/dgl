@@ -28,7 +28,8 @@ class CuGraphRelGraphConv(CuGraphBaseConv):
     See :class:`dgl.nn.pytorch.conv.RelGraphConv` for mathematical model.
 
     This module depends on :code:`pylibcugraphops` package, which can be
-    installed via :code:`conda install -c nvidia pylibcugraphops>=23.04`.
+    installed via :code:`conda install -c nvidia pylibcugraphops=23.04`.
+    :code:`pylibcugraphops` 23.04 requires python 3.8.x or 3.10.x.
 
     .. note::
         This is an **experimental** feature.
@@ -96,8 +97,9 @@ class CuGraphRelGraphConv(CuGraphBaseConv):
     ):
         if HAS_PYLIBCUGRAPHOPS is False:
             raise ModuleNotFoundError(
-                f"{self.__class__.__name__} requires pylibcugraphops>=23.04. "
-                f"Install via `conda install -c nvidia 'pylibcugraphops>=23.04'`."
+                f"{self.__class__.__name__} requires pylibcugraphops=23.04. "
+                f"Install via `conda install -c nvidia 'pylibcugraphops=23.04'`."
+                f"pylibcugraphops requires Python 3.8 or 3.10."
             )
         super().__init__()
         self.in_feat = in_feat
