@@ -2,7 +2,6 @@
 cugraph-ops"""
 # pylint: disable=no-member, arguments-differ, invalid-name, too-many-arguments
 
-import torch
 from torch import nn
 
 from .cugraph_base import CuGraphBaseConv
