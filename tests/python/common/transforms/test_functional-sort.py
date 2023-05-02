@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 import scipy.sparse as ssp
 from dgl import DGLError
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 def create_test_heterograph(num_nodes, num_adj, idtype):
@@ -65,7 +65,7 @@ def check_sort(spm, tag_arr=None, tag_pos=None):
 def test_sort_with_tag(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 50], 5
     g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)
-    tag = F.tensor(np.random.choice(num_tags, g.number_of_nodes()))
+    tag = F.tensor(np.random.choice(num_tags, g.num_nodes()))
     src, dst = g.edges()
     edge_tag_dst = F.gather_row(tag, F.tensor(dst))
     edge_tag_src = F.gather_row(tag, F.tensor(src))
@@ -74,8 +74,8 @@ def test_sort_with_tag(idtype):
         new_g = dgl.sort_csr_by_tag(
             g, tag if tag_type == "node" else edge_tag_dst, tag_type=tag_type
         )
-        old_csr = g.adjacency_matrix(scipy_fmt="csr")
-        new_csr = new_g.adjacency_matrix(scipy_fmt="csr")
+        old_csr = g.adj_external(scipy_fmt="csr")
+        new_csr = new_g.adj_external(scipy_fmt="csr")
         assert check_sort(new_csr, tag, new_g.dstdata["_TAG_OFFSET"])
         assert not check_sort(
             old_csr, tag
@@ -85,8 +85,8 @@ def test_sort_with_tag(idtype):
         new_g = dgl.sort_csc_by_tag(
             g, tag if tag_type == "node" else edge_tag_src, tag_type=tag_type
         )
-        old_csc = g.adjacency_matrix(transpose=True, scipy_fmt="csr")
-        new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt="csr")
+        old_csc = g.adj_external(transpose=True, scipy_fmt="csr")
+        new_csc = new_g.adj_external(transpose=True, scipy_fmt="csr")
         assert check_sort(new_csc, tag, new_g.srcdata["_TAG_OFFSET"])
         assert not check_sort(old_csc, tag)
 
@@ -99,18 +99,18 @@ def test_sort_with_tag_bipartite(idtype):
     num_nodes, num_adj, num_tags = 200, [20, 50], 5
     g = create_test_heterograph(num_nodes, num_adj, idtype=idtype)
     g = dgl.heterograph({("_U", "_E", "_V"): g.edges()})
-    utag = F.tensor(np.random.choice(num_tags, g.number_of_nodes("_U")))
-    vtag = F.tensor(np.random.choice(num_tags, g.number_of_nodes("_V")))
+    utag = F.tensor(np.random.choice(num_tags, g.num_nodes("_U")))
+    vtag = F.tensor(np.random.choice(num_tags, g.num_nodes("_V")))
 
     new_g = dgl.sort_csr_by_tag(g, vtag)
-    old_csr = g.adjacency_matrix(scipy_fmt="csr")
-    new_csr = new_g.adjacency_matrix(scipy_fmt="csr")
+    old_csr = g.adj_external(scipy_fmt="csr")
+    new_csr = new_g.adj_external(scipy_fmt="csr")
     assert check_sort(new_csr, vtag, new_g.nodes["_U"].data["_TAG_OFFSET"])
     assert not check_sort(old_csr, vtag)
 
     new_g = dgl.sort_csc_by_tag(g, utag)
-    old_csc = g.adjacency_matrix(transpose=True, scipy_fmt="csr")
-    new_csc = new_g.adjacency_matrix(transpose=True, scipy_fmt="csr")
+    old_csc = g.adj_external(transpose=True, scipy_fmt="csr")
+    new_csc = new_g.adj_external(transpose=True, scipy_fmt="csr")
     assert check_sort(new_csc, utag, new_g.nodes["_V"].data["_TAG_OFFSET"])
     assert not check_sort(old_csc, utag)
 

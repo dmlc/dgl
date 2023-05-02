@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 import torch
 from dgl.ops import gather_mm, gsddmm, gspmm, segment_reduce
-from test_utils import parametrize_idtype
-from test_utils.graph_cases import get_cases
+from utils import parametrize_idtype
+from utils.graph_cases import get_cases
 
 random.seed(42)
 np.random.seed(42)
@@ -117,7 +117,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
     print(g.idtype)
 
     hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
-    he = F.tensor(np.random.rand(*((g.number_of_edges(),) + shp[1])) + 1)
+    he = F.tensor(np.random.rand(*((g.num_edges(),) + shp[1])) + 1)
     print("u shape: {}, e shape: {}".format(F.shape(hu), F.shape(he)))
 
     g.srcdata["x"] = F.attach_grad(F.clone(hu))
@@ -130,7 +130,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
         v = gspmm(g, msg, reducer, u, e)
         if reducer in ["max", "min"]:
             v = F.replace_inf_with_zero(v)
-        if g.number_of_edges() > 0:
+        if g.num_edges() > 0:
             F.backward(F.reduce_sum(v))
             if msg != "copy_rhs":
                 grad_u = F.grad(u)
@@ -139,7 +139,7 @@ def test_spmm(idtype, g, shp, msg, reducer):
 
     with F.record_grad():
         g.update_all(udf_msg[msg], udf_reduce[reducer])
-        if g.number_of_edges() > 0:
+        if g.num_edges() > 0:
             v1 = g.dstdata["v"]
             assert F.allclose(v, v1)
             print("forward passed")
@@ -176,17 +176,19 @@ def test_spmm(idtype, g, shp, msg, reducer):
     dgl.backend.backend_name != "pytorch",
     reason="Only support PyTorch for now.",
 )
-@unittest.skipIf(
-    F._default_context_str == "cpu",
-    reason="Don't support half precision on CPU.",
-)
 @parametrize_idtype
 @pytest.mark.parametrize(
     "dtype, rtol, atol",
     [(torch.float16, 1e-3, 0.5), (torch.bfloat16, 4e-3, 2.0)],
 )
 def test_half_spmm(idtype, dtype, rtol, atol):
-    if dtype == torch.bfloat16 and not torch.cuda.is_bf16_supported():
+    if F._default_context_str == "cpu" and dtype == torch.float16:
+        pytest.skip("float16 is not supported on CPU.")
+    if (
+        F._default_context_str == "gpu"
+        and dtype == torch.bfloat16
+        and not torch.cuda.is_bf16_supported()
+    ):
         pytest.skip("BF16 is not supported.")
 
     # make sure the spmm result is < 512 to match the rtol/atol we set.
@@ -195,7 +197,7 @@ def test_half_spmm(idtype, dtype, rtol, atol):
         idtype=idtype,
         device=F.ctx(),
     )
-    feat_fp32 = torch.rand((g.num_src_nodes(), 32)).to(0)
+    feat_fp32 = torch.rand((g.num_src_nodes(), 32)).to(F.ctx())
     feat_half = feat_fp32.to(dtype)
 
     # test SpMMCSR
@@ -224,7 +226,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
     if lhs_target == rhs_target:
         return
     g = g.astype(idtype).to(F.ctx())
-    if dgl.backend.backend_name == "mxnet" and g.number_of_edges() == 0:
+    if dgl.backend.backend_name == "mxnet" and g.num_edges() == 0:
         pytest.skip()  # mxnet do not support zero shape tensor
     print(g)
     print(g.idtype)
@@ -232,14 +234,14 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
     len_lhs = select(
         lhs_target,
         g.number_of_src_nodes(),
-        g.number_of_edges(),
+        g.num_edges(),
         g.number_of_dst_nodes(),
     )
     lhs_shp = (len_lhs,) + shp[0]
     len_rhs = select(
         rhs_target,
         g.number_of_src_nodes(),
-        g.number_of_edges(),
+        g.num_edges(),
         g.number_of_dst_nodes(),
     )
     rhs_shp = (len_rhs,) + shp[1]
@@ -270,7 +272,7 @@ def test_sddmm(g, shp, lhs_target, rhs_target, msg, idtype):
 
     with F.record_grad():
         g.apply_edges(udf_apply_edges[msg_func])
-        if g.number_of_edges() > 0:
+        if g.num_edges() > 0:
             e1 = g.edata["m"]
             assert F.allclose(e, e1)
             print("forward passed")
@@ -337,11 +339,8 @@ def test_segment_reduce(reducer):
     ],
 )
 def test_segment_mm(idtype, feat_size, dtype, tol):
-    if F._default_context_str == "cpu" and dtype in (
-        torch.float16,
-        torch.bfloat16,
-    ):
-        pytest.skip("Only support float32 and float64 on CPU.")
+    if F._default_context_str == "cpu" and dtype == torch.float16:
+        pytest.skip("float16 is not supported on CPU.")
     if (
         F._default_context_str == "gpu"
         and dtype == torch.bfloat16
@@ -397,17 +396,24 @@ def test_segment_mm(idtype, feat_size, dtype, tol):
     ],
 )
 def test_gather_mm_idx_b(feat_size, dtype, tol):
-    if F._default_context_str == "cpu" and dtype in (
-        torch.float16,
-        torch.bfloat16,
-    ):
-        pytest.skip("Only support float32 and float64 on CPU.")
+    if F._default_context_str == "cpu" and dtype == torch.float16:
+        pytest.skip("float16 is not supported on CPU.")
     if (
         F._default_context_str == "gpu"
         and dtype == torch.bfloat16
         and not torch.cuda.is_bf16_supported()
     ):
         pytest.skip("BF16 is not supported.")
+
+    if (
+        F._default_context_str == "gpu"
+        and dtype == torch.float16
+        and torch.cuda.get_device_capability() < (7, 0)
+    ):
+        pytest.skip(
+            f"FP16 is not supported for atomic operations on GPU with "
+            f"cuda capability ({torch.cuda.get_device_capability()})."
+        )
 
     dev = F.ctx()
     # input
@@ -487,8 +493,6 @@ def test_use_libxsmm_switch():
     x = torch.ones(3, 2, requires_grad=True)
     y = torch.arange(1, 13).float().view(6, 2).requires_grad_()
 
-    assert dgl.is_libxsmm_enabled()
-    dgl.ops.u_mul_e_sum(g, x, y)
     dgl.use_libxsmm(False)
     assert ~dgl.is_libxsmm_enabled()
     dgl.ops.u_mul_e_sum(g, x, y)

@@ -103,7 +103,7 @@ class SAGE(nn.Module):
         # Therefore, we compute the representation of all nodes layer by layer.  The nodes
         # on each layer are of course splitted in batches.
         # TODO: can we standardize this?
-        nodes = th.arange(g.number_of_nodes())
+        nodes = th.arange(g.num_nodes())
         for l, layer in enumerate(self.layers):
             y = g.ndata["hist_%d" % (l + 1)]
 
@@ -217,7 +217,7 @@ def create_history_storage(g, args, n_classes):
     for l in range(args.num_layers):
         dim = args.num_hidden if l != args.num_layers - 1 else n_classes
         g.ndata["hist_%d" % (l + 1)] = th.zeros(
-            g.number_of_nodes(), dim
+            g.num_nodes(), dim
         ).share_memory_()
 
 

@@ -13,7 +13,7 @@ class CSVArrayParser(object):
         self.delimiter = delimiter
 
     def read(self, path):
-        logging.info(
+        logging.debug(
             "Reading from %s using CSV format with configuration %s"
             % (path, self.__dict__)
         )
@@ -23,11 +23,11 @@ class CSVArrayParser(object):
         arr = pyarrow.csv.read_csv(
             path, read_options=read_options, parse_options=parse_options
         )
-        logging.info("Done reading from %s" % path)
+        logging.debug("Done reading from %s" % path)
         return arr.to_pandas().to_numpy()
 
     def write(self, path, arr):
-        logging.info(
+        logging.debug(
             "Writing to %s using CSV format with configuration %s"
             % (path, self.__dict__)
         )
@@ -36,4 +36,4 @@ class CSVArrayParser(object):
         )
         arr = pyarrow.Table.from_pandas(pd.DataFrame(arr))
         pyarrow.csv.write_csv(arr, path, write_options=write_options)
-        logging.info("Done writing to %s" % path)
+        logging.debug("Done writing to %s" % path)

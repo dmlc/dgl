@@ -6,7 +6,7 @@ import dgl
 import numpy as np
 import pytest
 import torch
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 random.seed(42)
 np.random.seed(42)

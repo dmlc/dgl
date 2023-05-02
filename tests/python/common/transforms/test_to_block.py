@@ -18,7 +18,7 @@ import backend as F
 
 import dgl
 import dgl.partition
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 @parametrize_idtype
@@ -26,7 +26,7 @@ def test_to_block(idtype):
     def check(g, bg, ntype, etype, dst_nodes, include_dst_in_src=True):
         if dst_nodes is not None:
             assert F.array_equal(bg.dstnodes[ntype].data[dgl.NID], dst_nodes)
-        n_dst_nodes = bg.number_of_nodes("DST/" + ntype)
+        n_dst_nodes = bg.num_nodes("DST/" + ntype)
         if include_dst_in_src:
             assert F.array_equal(
                 bg.srcnodes[ntype].data[dgl.NID][:n_dst_nodes],
@@ -136,21 +136,21 @@ def test_to_block(idtype):
 
     bg = dgl.to_block(g_ab)
     assert bg.idtype == idtype
-    assert bg.number_of_nodes("SRC/B") == 4
+    assert bg.num_nodes("SRC/B") == 4
     assert F.array_equal(
         bg.srcnodes["B"].data[dgl.NID], bg.dstnodes["B"].data[dgl.NID]
     )
-    assert bg.number_of_nodes("DST/A") == 0
+    assert bg.num_nodes("DST/A") == 0
     checkall(g_ab, bg, None)
     check_features(g_ab, bg)
 
     dst_nodes = {"B": F.tensor([5, 6, 3, 1], dtype=idtype)}
     bg = dgl.to_block(g, dst_nodes)
-    assert bg.number_of_nodes("SRC/B") == 4
+    assert bg.num_nodes("SRC/B") == 4
     assert F.array_equal(
         bg.srcnodes["B"].data[dgl.NID], bg.dstnodes["B"].data[dgl.NID]
     )
-    assert bg.number_of_nodes("DST/A") == 0
+    assert bg.num_nodes("DST/A") == 0
     checkall(g, bg, dst_nodes)
     check_features(g, bg)
 

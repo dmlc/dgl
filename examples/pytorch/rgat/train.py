@@ -57,7 +57,7 @@ class HeteroGAT(nn.Module):
         return self.linear(h["paper"])
 
 
-def evaluate(model, dataloader, desc):
+def evaluate(num_classes, model, dataloader, desc):
     preds = []
     labels = []
     with torch.no_grad():
@@ -71,11 +71,13 @@ def evaluate(model, dataloader, desc):
             labels.append(y.cpu())
         preds = torch.cat(preds, 0)
         labels = torch.cat(labels, 0)
-        acc = MF.accuracy(preds, labels)
+        acc = MF.accuracy(
+            preds, labels, task="multiclass", num_classes=num_classes
+        )
         return acc
 
 
-def train(train_loader, val_loader, test_loader, model):
+def train(train_loader, val_loader, test_loader, num_classes, model):
     # loss function and optimizer
     loss_fcn = nn.CrossEntropyLoss()
     opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
@@ -96,8 +98,8 @@ def train(train_loader, val_loader, test_loader, model):
             opt.step()
             total_loss += loss.item()
         model.eval()
-        val_acc = evaluate(model, val_dataloader, "Val. ")
-        test_acc = evaluate(model, test_dataloader, "Test ")
+        val_acc = evaluate(num_classes, model, val_dataloader, "Val. ")
+        test_acc = evaluate(num_classes, model, test_dataloader, "Test ")
         print(
             f"Epoch {epoch:05d} | Loss {total_loss/(it+1):.4f} | Validation Acc. {val_acc.item():.4f} | Test Acc. {test_acc.item():.4f}"
         )
@@ -138,8 +140,8 @@ if __name__ == "__main__":
 
     # create RGAT model
     in_size = graph.ndata["feat"]["paper"].shape[1]
-    out_size = dataset.num_classes
-    model = HeteroGAT(graph.etypes, in_size, 256, out_size).to(device)
+    num_classes = dataset.num_classes
+    model = HeteroGAT(graph.etypes, in_size, 256, num_classes).to(device)
 
     # dataloader + model training + testing
     train_sampler = NeighborSampler(
@@ -186,4 +188,4 @@ if __name__ == "__main__":
         use_uva=torch.cuda.is_available(),
     )
 
-    train(train_dataloader, val_dataloader, test_dataloader, model)
+    train(train_dataloader, val_dataloader, test_dataloader, num_classes, model)

@@ -369,6 +369,75 @@ def test_flickr():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_pattern():
+    mode_n_graphs = {
+        "train": 10000,
+        "valid": 2000,
+        "test": 2000,
+    }
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    for mode, n_graphs in mode_n_graphs.items():
+        ds = data.PATTERNDataset(mode=mode)
+        assert len(ds) == n_graphs, (len(ds), mode)
+        g1 = ds[0]
+        ds = data.PATTERNDataset(mode=mode, transform=transform)
+        g2 = ds[0]
+        assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+        assert ds.num_classes == 2
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+def test_cluster():
+    mode_n_graphs = {
+        "train": 10000,
+        "valid": 1000,
+        "test": 1000,
+    }
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    for mode, n_graphs in mode_n_graphs.items():
+        ds = data.CLUSTERDataset(mode=mode)
+        assert len(ds) == n_graphs, (len(ds), mode)
+        g1 = ds[0]
+        ds = data.CLUSTERDataset(mode=mode, transform=transform)
+        g2 = ds[0]
+        assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+        assert ds.num_classes == 6
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="only supports pytorch"
+)
+def test_zinc():
+    mode_n_graphs = {
+        "train": 10000,
+        "valid": 1000,
+        "test": 1000,
+    }
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    for mode, n_graphs in mode_n_graphs.items():
+        dataset1 = data.ZINCDataset(mode=mode)
+        g1, label = dataset1[0]
+        dataset2 = data.ZINCDataset(mode=mode, transform=transform)
+        g2, _ = dataset2[0]
+
+        assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+        # return a scalar tensor
+        assert not label.shape
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
+@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_extract_archive():
     # gzip
     with tempfile.TemporaryDirectory() as src_dir:
@@ -624,12 +693,12 @@ def _test_construct_graphs_multiple():
     num_edges = 1000
     num_graphs = 10
     num_dims = 3
-    node_ids = np.array([], dtype=np.int)
-    src_ids = np.array([], dtype=np.int)
-    dst_ids = np.array([], dtype=np.int)
-    ngraph_ids = np.array([], dtype=np.int)
-    egraph_ids = np.array([], dtype=np.int)
-    u_indices = np.array([], dtype=np.int)
+    node_ids = np.array([], dtype=int)
+    src_ids = np.array([], dtype=int)
+    dst_ids = np.array([], dtype=int)
+    ngraph_ids = np.array([], dtype=int)
+    egraph_ids = np.array([], dtype=int)
+    u_indices = np.array([], dtype=int)
     for i in range(num_graphs):
         l_node_ids = np.random.choice(
             np.arange(num_nodes * 2), size=num_nodes, replace=False
@@ -1510,7 +1579,7 @@ def _test_NodeEdgeGraphData():
 
     # NodeData basics
     num_nodes = 100
-    node_ids = np.arange(num_nodes, dtype=np.float)
+    node_ids = np.arange(num_nodes, dtype=float)
     ndata = NodeData(node_ids, {})
     assert np.array_equal(ndata.id, node_ids)
     assert len(ndata.data) == 0
@@ -1550,8 +1619,8 @@ def _test_NodeEdgeGraphData():
     assert len(edata.data) == 0
     assert np.array_equal(edata.graph_id, np.full(num_edges, 0))
     # EdageData more
-    src_ids = np.random.randint(num_nodes, size=num_edges).astype(np.float)
-    dst_ids = np.random.randint(num_nodes, size=num_edges).astype(np.float)
+    src_ids = np.random.randint(num_nodes, size=num_edges).astype(float)
+    dst_ids = np.random.randint(num_nodes, size=num_edges).astype(float)
     data = {"feat": np.random.rand(num_edges, 3)}
     etype = ("user", "like", "item")
     graph_ids = np.arange(num_edges)
@@ -1584,7 +1653,7 @@ def _test_NodeEdgeGraphData():
     assert np.array_equal(gdata.graph_id, graph_ids)
     assert len(gdata.data) == 0
     # GraphData more
-    graph_ids = np.arange(num_graphs).astype(np.float)
+    graph_ids = np.arange(num_graphs).astype(float)
     data = {"feat": np.random.rand(num_graphs, 3)}
     gdata = GraphData(graph_ids, data)
     assert np.array_equal(gdata.graph_id, graph_ids)
@@ -1613,25 +1682,6 @@ def test_csvdataset():
     _test_CSVDataset_single()
     _test_CSVDataset_multiple()
     _test_CSVDataset_customized_data_parser()
-
-
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Datasets don't need to be tested on GPU.",
-)
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
-def test_add_nodepred_split():
-    dataset = data.AmazonCoBuyComputerDataset()
-    print("train_mask" in dataset[0].ndata)
-    data.utils.add_nodepred_split(dataset, [0.8, 0.1, 0.1])
-    assert "train_mask" in dataset[0].ndata
-
-    dataset = data.AIFBDataset()
-    print("train_mask" in dataset[0].nodes["Publikationen"].data)
-    data.utils.add_nodepred_split(
-        dataset, [0.8, 0.1, 0.1], ntype="Publikationen"
-    )
-    assert "train_mask" in dataset[0].nodes["Publikationen"].data
 
 
 @unittest.skipIf(
@@ -2050,9 +2100,7 @@ if __name__ == "__main__":
     test_tudataset_regression()
     test_fraud()
     test_fakenews()
-    test_extract_archive()
     test_csvdataset()
-    test_add_nodepred_split()
     test_as_nodepred1()
     test_as_nodepred2()
     test_as_nodepred_csvdataset()

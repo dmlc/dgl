@@ -18,6 +18,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GATConv
     ~dgl.nn.pytorch.conv.GATv2Conv
     ~dgl.nn.pytorch.conv.EGATConv
+    ~dgl.nn.pytorch.conv.EdgeGATConv
     ~dgl.nn.pytorch.conv.EdgeConv
     ~dgl.nn.pytorch.conv.SAGEConv
     ~dgl.nn.pytorch.conv.SGConv
@@ -50,6 +51,7 @@ CuGraph Conv Layers
     :template: classtemplate.rst
 
     ~dgl.nn.pytorch.conv.CuGraphRelGraphConv
+    ~dgl.nn.pytorch.conv.CuGraphGATConv
     ~dgl.nn.pytorch.conv.CuGraphSAGEConv
 
 Dense Conv Layers
@@ -125,6 +127,7 @@ Utility Modules
     ~dgl.nn.pytorch.explain.GNNExplainer
     ~dgl.nn.pytorch.explain.HeteroGNNExplainer
     ~dgl.nn.pytorch.explain.SubgraphX
+    ~dgl.nn.pytorch.explain.HeteroSubgraphX
     ~dgl.nn.pytorch.utils.LabelPropagation
     ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
     ~dgl.nn.pytorch.utils.LaplacianPosEnc
@@ -144,3 +147,18 @@ Network Embedding Modules
 
     ~dgl.nn.pytorch.DeepWalk
     ~dgl.nn.pytorch.MetaPath2Vec
+
+Utility Modules for Graph Transformer
+----------------------------------------
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    ~dgl.nn.pytorch.gt.DegreeEncoder
+    ~dgl.nn.pytorch.gt.LapPosEncoder
+    ~dgl.nn.pytorch.gt.PathEncoder
+    ~dgl.nn.pytorch.gt.SpatialEncoder
+    ~dgl.nn.pytorch.gt.SpatialEncoder3d
+    ~dgl.nn.pytorch.gt.BiasedMHA
+    ~dgl.nn.pytorch.gt.GraphormerLayer

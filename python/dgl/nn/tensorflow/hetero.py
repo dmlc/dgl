@@ -58,7 +58,7 @@ class HeteroGraphConv(layers.Layer):
     ``'user'`` and ``'game'`` nodes.
 
     >>> import tensorflow as tf
-    >>> h1 = {'user' : tf.random.normal((g.number_of_nodes('user'), 5))}
+    >>> h1 = {'user' : tf.random.normal((g.num_nodes('user'), 5))}
     >>> h2 = conv(g, h1)
     >>> print(h2.keys())
     dict_keys(['user', 'game'])

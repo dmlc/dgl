@@ -19,13 +19,13 @@ from dgl.distributed.partition import (
 
 from distpartitioning import array_readwriter
 from distpartitioning.utils import generate_read_list
+from pytest_utils import create_chunked_dataset
 
 from tools.verification_utils import (
     verify_graph_feats,
     verify_partition_data_types,
     verify_partition_formats,
 )
-from utils import create_chunked_dataset
 
 
 def _test_chunk_graph(
@@ -166,6 +166,42 @@ def test_chunk_graph_vector_rows(num_chunks, vector_rows):
     )
 
 
+@pytest.mark.parametrize(
+    "num_chunks, "
+    "num_chunks_nodes, "
+    "num_chunks_edges, "
+    "num_chunks_node_data, "
+    "num_chunks_edge_data",
+    [
+        [1, None, None, None, None],
+        [8, None, None, None, None],
+        [4, 4, 4, 8, 12],
+        [4, 4, 4, {"paper": 10}, {("author", "writes", "paper"): 24}],
+        [
+            4,
+            4,
+            4,
+            {"paper": {"feat": 10}},
+            {("author", "writes", "paper"): {"year": 24}},
+        ],
+    ],
+)
+def test_chunk_graph_arbitrary_chunks(
+    num_chunks,
+    num_chunks_nodes,
+    num_chunks_edges,
+    num_chunks_node_data,
+    num_chunks_edge_data,
+):
+    _test_chunk_graph(
+        num_chunks,
+        num_chunks_nodes=num_chunks_nodes,
+        num_chunks_edges=num_chunks_edges,
+        num_chunks_node_data=num_chunks_node_data,
+        num_chunks_edge_data=num_chunks_edge_data,
+    )
+
+
 def _test_pipeline(
     num_chunks,
     num_parts,
@@ -178,9 +214,6 @@ def _test_pipeline(
     num_chunks_edge_data=None,
     use_verify_partitions=False,
 ):
-    if num_chunks < num_parts:
-        # num_parts should less/equal than num_chunks
-        return
 
     if num_parts % world_size != 0:
         # num_parts should be a multiple of world_size
@@ -286,6 +319,46 @@ def test_pipeline_basics(num_chunks, num_parts, world_size):
 )
 def test_pipeline_formats(graph_formats):
     _test_pipeline(4, 4, 4, graph_formats)
+
+
+@pytest.mark.parametrize(
+    "num_chunks, "
+    "num_parts, "
+    "world_size, "
+    "num_chunks_node_data, "
+    "num_chunks_edge_data",
+    [
+        # Test cases where no. of chunks more than
+        # no. of partitions
+        [8, 4, 4, 8, 8],
+        [8, 4, 2, 8, 8],
+        [9, 7, 5, 9, 9],
+        [8, 8, 4, 8, 8],
+        # Test cases where no. of chunks smaller
+        # than no. of partitions
+        [7, 8, 4, 7, 7],
+        [1, 8, 4, 1, 1],
+        [1, 4, 4, 1, 1],
+        [3, 4, 4, 3, 3],
+        [1, 4, 2, 1, 1],
+        [3, 4, 2, 3, 3],
+        [1, 5, 3, 1, 1],
+    ],
+)
+def test_pipeline_arbitrary_chunks(
+    num_chunks,
+    num_parts,
+    world_size,
+    num_chunks_node_data,
+    num_chunks_edge_data,
+):
+    _test_pipeline(
+        num_chunks,
+        num_parts,
+        world_size,
+        num_chunks_node_data=num_chunks_node_data,
+        num_chunks_edge_data=num_chunks_edge_data,
+    )
 
 
 @pytest.mark.parametrize(

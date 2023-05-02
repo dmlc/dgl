@@ -27,14 +27,6 @@ from torch.utils.data import DataLoader
 
 from .. import utils
 
-# import sys
-# import os
-# dir_path = Path(os.path.dirname(__file__))
-# sys.path.insert(0, dir_path.parent)
-
-
-# import utils
-
 
 class EntityClassify(nn.Module):
     def __init__(
@@ -211,7 +203,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     #
     embed_layer = RelGraphEmbedLayer(
         dev_id,
-        g.number_of_nodes(),
+        g.num_nodes(),
         node_tids,
         num_of_ntype,
         node_feats,
@@ -223,7 +215,7 @@ def run(proc_id, n_gpus, n_cpus, args, devices, dataset, split, queue=None):
     # all model params are in device.
     model = EntityClassify(
         dev_id,
-        g.number_of_nodes(),
+        g.num_nodes(),
         args.n_hidden,
         num_classes,
         num_rels,
@@ -438,7 +430,7 @@ def track_time(data, dgl_sparse):
     node_feats = []
     for ntype in hg.ntypes:
         if len(hg.nodes[ntype].data) == 0 or args.node_feats is False:
-            node_feats.append(hg.number_of_nodes(ntype))
+            node_feats.append(hg.num_nodes(ntype))
         else:
             assert len(hg.nodes[ntype].data) == 1
             feat = hg.nodes[ntype].data.pop("feat")
@@ -458,7 +450,7 @@ def track_time(data, dgl_sparse):
     g.edata["etype"].share_memory_()
     g.ndata["type_id"] = g.ndata[dgl.NID]
     g.ndata["type_id"].share_memory_()
-    node_ids = th.arange(g.number_of_nodes())
+    node_ids = th.arange(g.num_nodes())
 
     # find out the target node ids
     node_tids = g.ndata[dgl.NTYPE]
@@ -475,7 +467,7 @@ def track_time(data, dgl_sparse):
     n_gpus = len(devices)
     n_cpus = mp.cpu_count()
 
-    ctx = mp.get_context("fork")
+    ctx = mp.get_context("spawn")
     queue = ctx.Queue()
     procs = []
     num_train_seeds = train_idx.shape[0]

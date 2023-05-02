@@ -9,6 +9,8 @@
 #include <cuda_runtime.h>
 
 #include <cassert>
+#include <cstdint>
+#include <cstdio>
 
 #include "bf16.cuh"
 #include "fp16.cuh"

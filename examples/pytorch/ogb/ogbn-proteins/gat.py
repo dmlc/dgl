@@ -68,7 +68,7 @@ def preprocess(graph, labels, train_idx):
 
     # Only the labels in the training set are used as features, while others are filled with zeros.
     graph.ndata["train_labels_onehot"] = torch.zeros(
-        graph.number_of_nodes(), n_classes
+        graph.num_nodes(), n_classes
     )
     graph.ndata["train_labels_onehot"][train_idx, labels[train_idx, 0]] = 1
     graph.ndata["deg"] = graph.out_degrees().float().clamp(min=1)

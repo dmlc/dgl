@@ -9,7 +9,6 @@ from ...partition import NDArrayPartition
 from ...utils import create_shared_mem_array, get_shared_mem_array
 
 _STORE = None
-_COMM = None
 
 
 class NodeEmbedding:  # NodeEmbedding
@@ -58,7 +57,7 @@ class NodeEmbedding:  # NodeEmbedding
 
     In each training process
 
-    >>> emb = dgl.nn.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> emb = dgl.nn.NodeEmbedding(g.num_nodes(), 10, 'emb', init_func=initializer)
     >>> optimizer = dgl.optim.SparseAdam([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     ...
@@ -78,7 +77,6 @@ class NodeEmbedding:  # NodeEmbedding
         partition=None,
     ):
         global _STORE
-        global _COMM
 
         if device is None:
             device = th.device("cpu")
@@ -132,25 +130,7 @@ class NodeEmbedding:  # NodeEmbedding
                 )
             self._tensor = emb
         else:  # embeddings is stored in GPU memory.
-            # setup nccl communicator
-            if _COMM is None:
-                if rank < 0:
-                    _COMM = nccl.Communicator(1, 0, nccl.UniqueId())
-                else:
-                    # needs to be set for nccl to work
-                    th.cuda.set_device(device)
-                    if rank == 0:
-                        # root process broadcasts nccl id
-                        nccl_id = nccl.UniqueId()
-                        self._store.set("nccl_root_id_sparse_emb", str(nccl_id))
-                    else:
-                        nccl_id = nccl.UniqueId(
-                            self._store.get("nccl_root_id_sparse_emb")
-                        )
-                    _COMM = nccl.Communicator(
-                        self._world_size, self._rank, nccl_id
-                    )
-            self._comm = _COMM
+            self._comm = True
 
             if not self._partition:
                 # for communication we need a partition
@@ -161,7 +141,7 @@ class NodeEmbedding:  # NodeEmbedding
                 )
 
             # create local tensors for the weights
-            local_size = self._partition.local_size(self._comm.rank())
+            local_size = self._partition.local_size(max(self._rank, 0))
 
             # TODO(dlasalle): support 16-bit/half embeddings
             emb = th.empty(
@@ -187,15 +167,18 @@ class NodeEmbedding:  # NodeEmbedding
         device : th.device
             Target device to put the collected embeddings.
         """
-        if not self._comm or self._comm.size() == 1:
+        if not self._comm:
+            # For embeddings stored on the CPU.
             emb = self._tensor[node_ids].to(device)
         else:
-            if self.world_size > 0:
-                emb = self._comm.sparse_all_to_all_pull(
-                    node_ids, self._tensor, self._partition
-                )
-            else:
-                emb = self._tensor[node_ids]
+            # For embeddings stored on the GPU.
+            # The following method is designed to perform communication
+            # across multiple GPUs and can handle situations where only one GPU
+            # is present gracefully, a.k.a. self._world_size == 1 or
+            # 0 (when th.distributed.is_initialized() is false).
+            emb = nccl.sparse_all_to_all_pull(
+                node_ids, self._tensor, self._partition
+            )
             emb = emb.to(device)
         if F.is_recording():
             emb = F.attach_grad(emb)
@@ -214,18 +197,6 @@ class NodeEmbedding:  # NodeEmbedding
             KVStore used for meta data sharing.
         """
         return self._store
-
-    @property
-    def comm(self):
-        """Return dgl.cuda.nccl.Communicator for data
-        sharing across processes.
-
-        Returns
-        -------
-        dgl.cuda.nccl.Communicator
-            Communicator used for data sharing.
-        """
-        return self._comm
 
     @property
     def partition(self):
@@ -361,7 +332,8 @@ class NodeEmbedding:  # NodeEmbedding
         if self._partition:
             idxs = F.copy_to(
                 self._partition.get_local_indices(
-                    self._comm.rank(), ctx=F.context(self._tensor)
+                    max(self._rank, 0),
+                    ctx=F.context(self._tensor),
                 ),
                 F.context(values),
             )
@@ -375,6 +347,41 @@ class NodeEmbedding:  # NodeEmbedding
                 )[:]
         if th.distributed.is_initialized():
             th.distributed.barrier()
+
+    def _all_get_tensor(self, shared_name, tensor, shape):
+        """A helper function to get model-parallel tensors.
+
+        This method must and only need to be called in multi-GPU DDP training.
+        For now, it's only used in ``all_get_embedding`` and
+        ``_all_get_optm_state``.
+        """
+        # create a shared memory tensor
+        if self._rank == 0:
+            # root process creates shared memory
+            val = create_shared_mem_array(
+                shared_name,
+                shape,
+                tensor.dtype,
+            )
+            self._store.set(shared_name, shared_name)
+        else:
+            self._store.wait([shared_name])
+            val = get_shared_mem_array(
+                shared_name,
+                shape,
+                tensor.dtype,
+            )
+        # need to map indices and slice into existing tensor
+        idxs = self._partition.map_to_global(
+            F.arange(0, tensor.shape[0], ctx=F.context(tensor)),
+            self._rank,
+        ).to(val.device)
+        val[idxs] = tensor.to(val.device)
+
+        self._store.delete_key(shared_name)
+        # wait for all processes to finish
+        th.distributed.barrier()
+        return val
 
     def all_get_embedding(self):
         """Return a copy of the embedding stored in CPU memory. If this is a
@@ -395,35 +402,78 @@ class NodeEmbedding:  # NodeEmbedding
                 # non-multiprocessing
                 return self._tensor.to(th.device("cpu"))
             else:
-                # create a shared memory tensor
-                shared_name = self._name + "_gather"
-                if self._rank == 0:
-                    # root process creates shared memory
-                    emb = create_shared_mem_array(
-                        shared_name,
-                        (self._num_embeddings, self._embedding_dim),
-                        self._tensor.dtype,
-                    )
-                    self._store.set(shared_name, shared_name)
-                else:
-                    self._store.wait([shared_name])
-                    emb = get_shared_mem_array(
-                        shared_name,
-                        (self._num_embeddings, self._embedding_dim),
-                        self._tensor.dtype,
-                    )
-                # need to map indices and slice into existing tensor
-                idxs = self._partition.map_to_global(
-                    F.arange(
-                        0, self._tensor.shape[0], ctx=F.context(self._tensor)
-                    ),
-                    self._rank,
-                ).to(emb.device)
-                emb[idxs] = self._tensor.to(emb.device)
-
-                # wait for all processes to finish
-                th.distributed.barrier()
-                return emb
+                return self._all_get_tensor(
+                    f"{self._name}_gather",
+                    self._tensor,
+                    (self._num_embeddings, self._embedding_dim),
+                )
         else:
             # already stored in CPU memory
             return self._tensor
+
+    def _all_get_optm_state(self):
+        """Return a copy of the whole optimizer states stored in CPU memory.
+        If this is a multi-processing instance, the states will be returned in
+        shared memory. If the embedding is currently stored on multiple GPUs,
+        all processes must call this method in the same order.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
+
+        Returns
+        -------
+        tuple of torch.Tensor
+            The optimizer states stored in CPU memory.
+        """
+        if self._partition:
+            if self._world_size == 0:
+                # non-multiprocessing
+                return tuple(
+                    state.to(th.device("cpu")) for state in self._optm_state
+                )
+            else:
+                return tuple(
+                    self._all_get_tensor(
+                        f"state_gather_{self._name}_{i}",
+                        state,
+                        (self._num_embeddings, *state.shape[1:]),
+                    )
+                    for i, state in enumerate(self._optm_state)
+                )
+        else:
+            # already stored in CPU memory
+            return self._optm_state
+
+    def _all_set_optm_state(self, states):
+        """Set the optimizer states of the embedding. This method must be
+        called by all processes sharing the embedding with identical
+        :attr:`states`.
+
+        NOTE: This method must be called by all processes sharing the
+        embedding, or it may result in a deadlock.
+
+        Parameters
+        ----------
+        states : tuple of torch.Tensor
+            The global states to pull values from.
+        """
+        if self._partition:
+            idxs = F.copy_to(
+                self._partition.get_local_indices(
+                    max(self._rank, 0), ctx=F.context(self._tensor)
+                ),
+                F.context(states[0]),
+            )
+            for state, new_state in zip(self._optm_state, states):
+                state[:] = F.copy_to(
+                    F.gather_row(new_state, idxs), ctx=F.context(self._tensor)
+                )[:]
+        else:
+            # stored in CPU memory
+            if self._rank <= 0:
+                for state, new_state in zip(self._optm_state, states):
+                    state[:] = F.copy_to(
+                        new_state, ctx=F.context(self._tensor)
+                    )[:]
+        if th.distributed.is_initialized():
+            th.distributed.barrier()

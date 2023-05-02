@@ -11,7 +11,7 @@ import torch
 from dgl.data.utils import load_graphs, load_tensors
 from partition_algo.base import load_partition_meta
 
-from utils import create_chunked_dataset
+from pytest_utils import create_chunked_dataset
 
 """
 TODO: skipping this test case since the dependency, mpirun, is
@@ -26,11 +26,14 @@ def test_parmetis_preprocessing():
         g = create_chunked_dataset(root_dir, num_chunks)
 
         # Trigger ParMETIS pre-processing here.
-        schema_path = os.path.join(root_dir, "chunked-data/metadata.json")
+        input_dir = os.path.join(root_dir, "chunked-data")
         results_dir = os.path.join(root_dir, "parmetis-data")
         os.system(
-            f"mpirun -np 2 python3 tools/distpartitioning/parmetis_preprocess.py "
-            f"--schema {schema_path} --output {results_dir}"
+            f"mpirun -np {num_chunks} python3 tools/distpartitioning/parmetis_preprocess.py "
+            f"--schema {metadata.json} "
+            f"--input_dir {input_dir} "
+            f"--output_dir {results_dir} "
+            f"--num_parts {num_chunks}"
         )
 
         # Now add all the tests and check whether the test has passed or failed.
@@ -116,14 +119,16 @@ def test_parmetis_postprocessing():
         num_chunks = 2
         g = create_chunked_dataset(root_dir, num_chunks)
 
-        num_nodes = g.number_of_nodes()
-        num_institutions = g.number_of_nodes("institution")
-        num_authors = g.number_of_nodes("author")
-        num_papers = g.number_of_nodes("paper")
+        num_nodes = g.num_nodes()
+        num_institutions = g.num_nodes("institution")
+        num_authors = g.num_nodes("author")
+        num_papers = g.num_nodes("paper")
 
         # Generate random parmetis partition ids for the nodes in the graph.
         # Replace this code with actual ParMETIS executable when it is ready
         output_dir = os.path.join(root_dir, "chunked-data")
+        assert os.path.isdir(output_dir)
+
         parmetis_file = os.path.join(output_dir, "parmetis_output.txt")
         node_ids = np.arange(num_nodes)
         partition_ids = np.random.randint(0, 2, (num_nodes,))
@@ -132,6 +137,7 @@ def test_parmetis_postprocessing():
         # Create parmetis output, this is mimicking running actual parmetis.
         with open(parmetis_file, "w") as f:
             np.savetxt(f, parmetis_output)
+        assert os.path.isfile(parmetis_file)
 
         # Check the post processing script here.
         results_dir = os.path.join(output_dir, "partitions_dir")
@@ -141,7 +147,8 @@ def test_parmetis_postprocessing():
         print(parmetis_file)
         os.system(
             f"python3 tools/distpartitioning/parmetis_postprocess.py "
-            f"--schema_file {json_file} "
+            f"--postproc_input_dir {output_dir} "
+            f"--schema_file metadata.json "
             f"--parmetis_output_file {parmetis_file} "
             f"--partitions_dir {results_dir}"
         )
@@ -185,12 +192,13 @@ def test_parmetis_wrapper():
         all_ntypes = g.ntypes
         all_etypes = g.etypes
         num_constraints = len(all_ntypes) + 3
-        num_institutions = g.number_of_nodes("institution")
-        num_authors = g.number_of_nodes("author")
-        num_papers = g.number_of_nodes("paper")
+        num_institutions = g.num_nodes("institution")
+        num_authors = g.num_nodes("author")
+        num_papers = g.num_nodes("paper")
 
         # Trigger ParMETIS.
         schema_file = os.path.join(root_dir, "chunked-data/metadata.json")
+        preproc_input_dir = os.path.join(root_dir, "chunked-data")
         preproc_output_dir = os.path.join(
             root_dir, "chunked-data/preproc_output_dir"
         )
@@ -203,23 +211,23 @@ def test_parmetis_wrapper():
             f.write("127.0.0.1\n")
             f.write("127.0.0.1\n")
 
-        num_nodes = g.number_of_nodes()
-        num_edges = g.number_of_edges()
+        num_nodes = g.num_nodes()
+        num_edges = g.num_edges()
         stats_file = f"{graph_name}_stats.txt"
         with open(stats_file, "w") as f:
             f.write(f"{num_nodes} {num_edges} {num_constraints}")
 
-        parmetis_cmd = (
+        os.system(
             f"python3 tools/distpartitioning/parmetis_wrapper.py "
             f"--schema_file {schema_file} "
+            f"--preproc_input_dir {preproc_input_dir} "
             f"--preproc_output_dir {preproc_output_dir} "
             f"--hostfile {hostfile} "
+            f"--num_parts {num_chunks} "
             f"--parmetis_output_file {parmetis_output_file} "
             f"--partitions_dir {partitions_dir} "
         )
-        print(f"Executing the following cmd: {parmetis_cmd}")
-        print(parmetis_cmd)
-        os.system(parmetis_cmd)
+        print("Executing Done.")
 
         ntype_count = {
             "author": num_authors,

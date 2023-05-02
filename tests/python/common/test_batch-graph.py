@@ -4,7 +4,7 @@ import backend as F
 
 import dgl
 import numpy as np
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 
 def tree1(idtype):
@@ -53,8 +53,8 @@ def test_batch_unbatch(idtype):
     t2 = tree2(idtype)
 
     bg = dgl.batch([t1, t2])
-    assert bg.number_of_nodes() == 10
-    assert bg.number_of_edges() == 8
+    assert bg.num_nodes() == 10
+    assert bg.num_edges() == 8
     assert bg.batch_size == 2
     assert F.allclose(bg.batch_num_nodes(), F.tensor([5, 5]))
     assert F.allclose(bg.batch_num_edges(), F.tensor([4, 4]))
@@ -72,8 +72,8 @@ def test_batch_unbatch1(idtype):
     t2 = tree2(idtype)
     b1 = dgl.batch([t1, t2])
     b2 = dgl.batch([t2, b1])
-    assert b2.number_of_nodes() == 15
-    assert b2.number_of_edges() == 12
+    assert b2.num_nodes() == 15
+    assert b2.num_edges() == 12
     assert b2.batch_size == 3
     assert F.allclose(b2.batch_num_nodes(), F.tensor([5, 5, 5]))
     assert F.allclose(b2.batch_num_edges(), F.tensor([4, 4, 4]))
@@ -98,10 +98,10 @@ def test_batch_unbatch_frame(idtype):
     """
     t1 = tree1(idtype)
     t2 = tree2(idtype)
-    N1 = t1.number_of_nodes()
-    E1 = t1.number_of_edges()
-    N2 = t2.number_of_nodes()
-    E2 = t2.number_of_edges()
+    N1 = t1.num_nodes()
+    E1 = t1.num_edges()
+    N2 = t2.num_nodes()
+    E2 = t2.num_edges()
     D = 10
     t1.ndata["h"] = F.randn((N1, D))
     t1.edata["h"] = F.randn((E1, D))

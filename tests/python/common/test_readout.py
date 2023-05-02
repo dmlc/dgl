@@ -6,8 +6,8 @@ import dgl
 import networkx as nx
 import numpy as np
 import pytest
-from test_utils import parametrize_idtype
-from test_utils.graph_cases import get_cases
+from utils import parametrize_idtype
+from utils.graph_cases import get_cases
 
 
 @parametrize_idtype
@@ -30,8 +30,8 @@ def test_sum_case1(idtype):
 @pytest.mark.parametrize("reducer", ["sum", "max", "mean"])
 def test_reduce_readout(g, idtype, reducer):
     g = g.astype(idtype).to(F.ctx())
-    g.ndata["h"] = F.randn((g.number_of_nodes(), 3))
-    g.edata["h"] = F.randn((g.number_of_edges(), 2))
+    g.ndata["h"] = F.randn((g.num_nodes(), 3))
+    g.edata["h"] = F.randn((g.num_edges(), 2))
 
     # Test.1: node readout
     x = dgl.readout_nodes(g, "h", op=reducer)
@@ -77,10 +77,10 @@ def test_reduce_readout(g, idtype, reducer):
 @pytest.mark.parametrize("reducer", ["sum", "max", "mean"])
 def test_weighted_reduce_readout(g, idtype, reducer):
     g = g.astype(idtype).to(F.ctx())
-    g.ndata["h"] = F.randn((g.number_of_nodes(), 3))
-    g.ndata["w"] = F.randn((g.number_of_nodes(), 1))
-    g.edata["h"] = F.randn((g.number_of_edges(), 2))
-    g.edata["w"] = F.randn((g.number_of_edges(), 1))
+    g.ndata["h"] = F.randn((g.num_nodes(), 3))
+    g.ndata["w"] = F.randn((g.num_nodes(), 1))
+    g.edata["h"] = F.randn((g.num_edges(), 2))
+    g.edata["w"] = F.randn((g.num_edges(), 1))
 
     # Test.1: node readout
     x = dgl.readout_nodes(g, "h", "w", op=reducer)
@@ -126,7 +126,7 @@ def test_weighted_reduce_readout(g, idtype, reducer):
 @pytest.mark.parametrize("descending", [True, False])
 def test_topk(g, idtype, descending):
     g = g.astype(idtype).to(F.ctx())
-    g.ndata["x"] = F.randn((g.number_of_nodes(), 3))
+    g.ndata["x"] = F.randn((g.num_nodes(), 3))
 
     # Test.1: to test the case where k > number of nodes.
     dgl.topk_nodes(g, "x", 100, sortby=-1)
@@ -158,7 +158,7 @@ def test_topk(g, idtype, descending):
     # Test.3: sorby=None
     dgl.topk_nodes(g, "x", k, sortby=None)
 
-    g.edata["x"] = F.randn((g.number_of_edges(), 3))
+    g.edata["x"] = F.randn((g.num_edges(), 3))
 
     # Test.4: topk edges where k > number of edges.
     dgl.topk_edges(g, "x", 100, sortby=-1)
@@ -192,8 +192,8 @@ def test_topk(g, idtype, descending):
 @pytest.mark.parametrize("g", get_cases(["homo"], exclude=["dglgraph"]))
 def test_softmax(g, idtype):
     g = g.astype(idtype).to(F.ctx())
-    g.ndata["h"] = F.randn((g.number_of_nodes(), 3))
-    g.edata["h"] = F.randn((g.number_of_edges(), 2))
+    g.ndata["h"] = F.randn((g.num_nodes(), 3))
+    g.edata["h"] = F.randn((g.num_edges(), 2))
 
     # Test.1: node readout
     x = dgl.softmax_nodes(g, "h")
@@ -224,7 +224,7 @@ def test_broadcast(idtype, g):
     for i, sg in enumerate(subg):
         assert F.allclose(
             sg.ndata["h"],
-            F.repeat(F.reshape(gfeat[i], (1, 3)), sg.number_of_nodes(), dim=0),
+            F.repeat(F.reshape(gfeat[i], (1, 3)), sg.num_nodes(), dim=0),
         )
 
     # Test.1: broadcast_edges
@@ -233,5 +233,5 @@ def test_broadcast(idtype, g):
     for i, sg in enumerate(subg):
         assert F.allclose(
             sg.edata["h"],
-            F.repeat(F.reshape(gfeat[i], (1, 3)), sg.number_of_edges(), dim=0),
+            F.repeat(F.reshape(gfeat[i], (1, 3)), sg.num_edges(), dim=0),
         )

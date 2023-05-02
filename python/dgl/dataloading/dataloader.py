@@ -1018,7 +1018,7 @@ class DataLoader(torch.utils.data.DataLoader):
         self.use_prefetch_thread = use_prefetch_thread
         self.cpu_affinity_enabled = False
 
-        worker_init_fn = WorkerInitWrapper(kwargs.get("worker_init_fn", None))
+        worker_init_fn = WorkerInitWrapper(kwargs.pop("worker_init_fn", None))
 
         self.other_storages = {}
 
@@ -1034,7 +1034,11 @@ class DataLoader(torch.utils.data.DataLoader):
         )
 
     def __iter__(self):
-        if self.device.type == "cpu" and not self.cpu_affinity_enabled:
+        if (
+            self.device.type == "cpu"
+            and hasattr(psutil.Process, "cpu_affinity")
+            and not self.cpu_affinity_enabled
+        ):
             link = "https://docs.dgl.ai/tutorials/cpu/cpu_best_practises.html"
             dgl_warning(
                 f"Dataloader CPU affinity opt is not enabled, consider switching it on "

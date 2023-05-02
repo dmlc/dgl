@@ -191,8 +191,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
         if self.verbose:
             print("Finished data loading and preprocessing.")
-            print("  NumNodes: {}".format(self._g.number_of_nodes()))
-            print("  NumEdges: {}".format(self._g.number_of_edges()))
+            print("  NumNodes: {}".format(self._g.num_nodes()))
+            print("  NumEdges: {}".format(self._g.num_edges()))
             print("  NumFeats: {}".format(self._g.ndata["feat"].shape[1]))
             print("  NumClasses: {}".format(self.num_classes))
             print(
@@ -256,8 +256,8 @@ class CitationGraphDataset(DGLBuiltinDataset):
         # hack for mxnet compatability
 
         if self.verbose:
-            print("  NumNodes: {}".format(self._g.number_of_nodes()))
-            print("  NumEdges: {}".format(self._g.number_of_edges()))
+            print("  NumNodes: {}".format(self._g.num_nodes()))
+            print("  NumEdges: {}".format(self._g.num_edges()))
             print("  NumFeats: {}".format(self._g.ndata["feat"].shape[1]))
             print("  NumClasses: {}".format(self.num_classes))
             print(

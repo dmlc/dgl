@@ -44,14 +44,14 @@ class GraphIndex(ObjectBase):
 
     def __getstate__(self):
         src, dst, _ = self.edges()
-        n_nodes = self.number_of_nodes()
+        n_nodes = self.num_nodes()
         readonly = self.is_readonly()
 
         return n_nodes, readonly, src, dst
 
     def __setstate__(self, state):
         """The pickle state of GraphIndex is defined as a triplet
-        (number_of_nodes, readonly, src_nodes, dst_nodes)
+        (num_nodes, readonly, src_nodes, dst_nodes)
         """
         # Pickle compatibility check
         # TODO: we should store a storage version number in later releases.
@@ -161,6 +161,27 @@ class GraphIndex(ObjectBase):
         state = (n_nodes, readonly_state, src, dst)
         self.__setstate__(state)
 
+    def num_nodes(self):
+        """Return the number of nodes.
+
+        Returns
+        -------
+        int
+            The number of nodes.
+        """
+        return _CAPI_DGLGraphNumVertices(self)
+
+    def num_edges(self):
+        """Return the number of edges.
+
+        Returns
+        -------
+        int
+            The number of edges.
+        """
+        return _CAPI_DGLGraphNumEdges(self)
+
+    # TODO(#5485): remove this method.
     def number_of_nodes(self):
         """Return the number of nodes.
 
@@ -171,6 +192,7 @@ class GraphIndex(ObjectBase):
         """
         return _CAPI_DGLGraphNumVertices(self)
 
+    # TODO(#5485): remove this method.
     def number_of_edges(self):
         """Return the number of edges.
 
@@ -665,14 +687,14 @@ class GraphIndex(ObjectBase):
                 if return_edge_ids
                 else np.ones_like(indices)
             )
-            n = self.number_of_nodes()
+            n = self.num_nodes()
             return scipy.sparse.csr_matrix(
                 (data, indices, indptr), shape=(n, n)
             )
         elif fmt == "coo":
             idx = utils.toindex(rst(0)).tonumpy()
-            n = self.number_of_nodes()
-            m = self.number_of_edges()
+            n = self.num_nodes()
+            m = self.num_edges()
             row, col = np.reshape(idx, (2, m))
             data = np.arange(0, m) if return_edge_ids else np.ones_like(row)
             return scipy.sparse.coo_matrix((data, (row, col)), shape=(n, n))
@@ -750,16 +772,16 @@ class GraphIndex(ObjectBase):
             spmat = F.sparse_matrix(
                 dat,
                 ("csr", indices, indptr),
-                (self.number_of_nodes(), self.number_of_nodes()),
+                (self.num_nodes(), self.num_nodes()),
             )[0]
             return spmat, shuffle
         elif fmt == "coo":
             ## FIXME(minjie): data type
             idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
-            m = self.number_of_edges()
+            m = self.num_edges()
             idx = F.reshape(idx, (2, m))
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            n = self.number_of_nodes()
+            n = self.num_nodes()
             adj, shuffle_idx = F.sparse_matrix(dat, ("coo", idx), (n, n))
             shuffle_idx = (
                 utils.toindex(shuffle_idx) if shuffle_idx is not None else None
@@ -807,8 +829,8 @@ class GraphIndex(ObjectBase):
         src = src.tousertensor(ctx)  # the index of the ctx will be cached
         dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
         eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
-        n = self.number_of_nodes()
-        m = self.number_of_edges()
+        n = self.num_nodes()
+        m = self.num_edges()
         if typestr == "in":
             row = F.unsqueeze(dst, 0)
             col = F.unsqueeze(eid, 0)
@@ -859,7 +881,7 @@ class GraphIndex(ObjectBase):
         src, dst, eid = self.edges()
         # xiangsx: Always treat graph as multigraph
         ret = nx.MultiDiGraph()
-        ret.add_nodes_from(range(self.number_of_nodes()))
+        ret.add_nodes_from(range(self.num_nodes()))
         for u, v, e in zip(src, dst, eid):
             ret.add_edge(u, v, id=e)
         return ret
@@ -969,10 +991,7 @@ class GraphIndex(ObjectBase):
         int
             The number of bits needed
         """
-        if (
-            self.number_of_edges() >= 0x80000000
-            or self.number_of_nodes() >= 0x80000000
-        ):
+        if self.num_edges() >= 0x80000000 or self.num_nodes() >= 0x80000000:
             return 64
         else:
             return 32

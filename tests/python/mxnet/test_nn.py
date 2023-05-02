@@ -9,8 +9,8 @@ import numpy as np
 import pytest
 import scipy as sp
 from mxnet import autograd, gluon, nd
-from test_utils import parametrize_idtype
-from test_utils.graph_cases import (
+from utils import parametrize_idtype
+from utils.graph_cases import (
     get_cases,
     random_bipartite,
     random_dglgraph,
@@ -34,7 +34,7 @@ def test_graph_conv(idtype, out_dim):
     g = dgl.from_networkx(nx.path_graph(3))
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx)
+    adj = g.adj_external(transpose=True, ctx=ctx)
 
     conv = nn.GraphConv(5, out_dim, norm="none", bias=True)
     conv.initialize(ctx=ctx)
@@ -154,7 +154,7 @@ def _S2AXWb(A, N, X, W, b):
 def test_tagconv(out_dim):
     g = dgl.from_networkx(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx)
+    adj = g.adj_external(transpose=True, ctx=ctx)
     norm = mx.nd.power(g.in_degrees().astype("float32"), -0.5)
 
     conv = nn.TAGConv(5, out_dim, bias=True)
@@ -198,7 +198,7 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, True)
-    assert a.shape == (g.number_of_edges(), num_heads, 1)
+    assert a.shape == (g.num_edges(), num_heads, 1)
 
     # test residual connection
     gat = nn.GATConv(10, out_dim, num_heads, residual=True)
@@ -222,7 +222,7 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, True)
-    assert a.shape == (g.number_of_edges(), num_heads, 1)
+    assert a.shape == (g.num_edges(), num_heads, 1)
 
 
 @parametrize_idtype
@@ -291,7 +291,7 @@ def test_gg_conv():
 
     # test#1: basic
     h0 = F.randn((20, 10))
-    etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
+    etypes = nd.random.randint(0, 4, g.num_edges()).as_in_context(ctx)
     h1 = gg_conv(g, h0, etypes)
     assert h1.shape == (20, 20)
 
@@ -361,7 +361,7 @@ def test_dense_cheb_conv(out_dim):
     for k in range(1, 4):
         ctx = F.ctx()
         g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.3)).to(F.ctx())
-        adj = g.adjacency_matrix(transpose=True, ctx=ctx).tostype("default")
+        adj = g.adj_external(transpose=True, ctx=ctx).tostype("default")
         cheb = nn.ChebConv(5, out_dim, k)
         dense_cheb = nn.DenseChebConv(5, out_dim, k)
         cheb.initialize(ctx=ctx)
@@ -387,7 +387,7 @@ def test_dense_cheb_conv(out_dim):
 def test_dense_graph_conv(idtype, g, norm_type, out_dim):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx).tostype("default")
+    adj = g.adj_external(transpose=True, ctx=ctx).tostype("default")
     conv = nn.GraphConv(5, out_dim, norm=norm_type, bias=True)
     dense_conv = nn.DenseGraphConv(5, out_dim, norm=norm_type, bias=True)
     conv.initialize(ctx=ctx)
@@ -408,7 +408,7 @@ def test_dense_graph_conv(idtype, g, norm_type, out_dim):
 def test_dense_sage_conv(idtype, g, out_dim):
     g = g.astype(idtype).to(F.ctx())
     ctx = F.ctx()
-    adj = g.adjacency_matrix(transpose=True, ctx=ctx).tostype("default")
+    adj = g.adj_external(transpose=True, ctx=ctx).tostype("default")
     sage = nn.SAGEConv(5, out_dim, "gcn")
     dense_sage = nn.DenseSAGEConv(5, out_dim)
     sage.initialize(ctx=ctx)
@@ -421,7 +421,7 @@ def test_dense_sage_conv(idtype, g, out_dim):
             F.randn((g.number_of_dst_nodes(), 5)),
         )
     else:
-        feat = F.randn((g.number_of_nodes(), 5))
+        feat = F.randn((g.num_nodes(), 5))
 
     out_sage = sage(g, feat)
     out_dense_sage = dense_sage(adj, feat)
@@ -508,7 +508,7 @@ def test_gmm_conv(g, idtype):
     gmm_conv = nn.GMMConv(5, 2, 5, 3, "max")
     gmm_conv.initialize(ctx=ctx)
     h0 = F.randn((g.number_of_src_nodes(), 5))
-    pseudo = F.randn((g.number_of_edges(), 5))
+    pseudo = F.randn((g.num_edges(), 5))
     h1 = gmm_conv(g, h0, pseudo)
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
@@ -523,7 +523,7 @@ def test_gmm_conv_bi(g, idtype):
     # test #1: basic
     h0 = F.randn((g.number_of_src_nodes(), 5))
     hd = F.randn((g.number_of_dst_nodes(), 4))
-    pseudo = F.randn((g.number_of_edges(), 5))
+    pseudo = F.randn((g.num_edges(), 5))
     h1 = gmm_conv(g, (h0, hd), pseudo)
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
@@ -537,7 +537,7 @@ def test_nn_conv(g, idtype):
     nn_conv.initialize(ctx=ctx)
     # test #1: basic
     h0 = F.randn((g.number_of_src_nodes(), 5))
-    etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
+    etypes = nd.random.randint(0, 4, g.num_edges()).as_in_context(ctx)
     h1 = nn_conv(g, h0, etypes)
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
@@ -552,7 +552,7 @@ def test_nn_conv_bi(g, idtype):
     # test #1: basic
     h0 = F.randn((g.number_of_src_nodes(), 5))
     hd = F.randn((g.number_of_dst_nodes(), 4))
-    etypes = nd.random.randint(0, 4, g.number_of_edges()).as_in_context(ctx)
+    etypes = nd.random.randint(0, 4, g.num_edges()).as_in_context(ctx)
     h1 = nn_conv(g, (h0, hd), etypes)
     assert h1.shape == (g.number_of_dst_nodes(), 2)
 
@@ -568,9 +568,9 @@ def test_sg_conv(out_dim):
     print(sgc)
 
     # test #1: basic
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.num_nodes(), 5))
     h1 = sgc(g, h0)
-    assert h1.shape == (g.number_of_nodes(), out_dim)
+    assert h1.shape == (g.num_nodes(), out_dim)
 
 
 def test_set2set():
@@ -582,13 +582,13 @@ def test_set2set():
     print(s2s)
 
     # test#1: basic
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.num_nodes(), 5))
     h1 = s2s(g, h0)
     assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.ndim == 2
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g])
-    h0 = F.randn((bg.number_of_nodes(), 5))
+    h0 = F.randn((bg.num_nodes(), 5))
     h1 = s2s(bg, h0)
     assert h1.shape[0] == 3 and h1.shape[1] == 10 and h1.ndim == 2
 
@@ -601,13 +601,13 @@ def test_glob_att_pool():
     gap.initialize(ctx=ctx)
     print(gap)
     # test#1: basic
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.num_nodes(), 5))
     h1 = gap(g, h0)
     assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.ndim == 2
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
-    h0 = F.randn((bg.number_of_nodes(), 5))
+    h0 = F.randn((bg.num_nodes(), 5))
     h1 = gap(bg, h0)
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
 
@@ -622,7 +622,7 @@ def test_simple_pool():
     print(sum_pool, avg_pool, max_pool, sort_pool)
 
     # test#1: basic
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.num_nodes(), 5))
     h1 = sum_pool(g, h0)
     check_close(F.squeeze(h1, 0), F.sum(h0, 0))
     h1 = avg_pool(g, h0)
@@ -635,7 +635,7 @@ def test_simple_pool():
     # test#2: batched graph
     g_ = dgl.from_networkx(nx.path_graph(5)).to(F.ctx())
     bg = dgl.batch([g, g_, g, g_, g])
-    h0 = F.randn((bg.number_of_nodes(), 5))
+    h0 = F.randn((bg.num_nodes(), 5))
     h1 = sum_pool(bg, h0)
     truth = mx.nd.stack(
         F.sum(h0[:15], 0),
@@ -680,7 +680,7 @@ def test_rgcn(O):
     g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.1)).to(F.ctx())
     # 5 etypes
     R = 5
-    for i in range(g.number_of_edges()):
+    for i in range(g.num_edges()):
         etype.append(i % 5)
     B = 2
     I = 10
@@ -701,7 +701,7 @@ def test_rgcn(O):
         assert list(h_new.shape) == [100, O]
 
     # with norm
-    norm = nd.zeros((g.number_of_edges(), 1), ctx=ctx)
+    norm = nd.zeros((g.num_edges(), 1), ctx=ctx)
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     rgc_basis.initialize(ctx=ctx)
@@ -768,7 +768,7 @@ def test_sequential():
             graph.ndata["h"] = n_feat
             graph.update_all(fn.copy_u("h", "m"), fn.sum("m", "h"))
             n_feat += graph.ndata["h"]
-            return n_feat.reshape(graph.number_of_nodes() // 2, 2, -1).sum(1)
+            return n_feat.reshape(graph.num_nodes() // 2, 2, -1).sum(1)
 
     g1 = dgl.from_networkx(nx.erdos_renyi_graph(32, 0.05)).to(F.ctx())
     g2 = dgl.from_networkx(nx.erdos_renyi_graph(16, 0.2)).to(F.ctx())

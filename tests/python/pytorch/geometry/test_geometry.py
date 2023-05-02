@@ -8,8 +8,8 @@ import torch as th
 from dgl import DGLError
 from dgl.base import DGLWarning
 from dgl.geometry import farthest_point_sampler, neighbor_matching
-from test_utils import parametrize_idtype
-from test_utils.graph_cases import get_cases
+from utils import parametrize_idtype
+from utils.graph_cases import get_cases
 
 
 def test_fps():
@@ -183,6 +183,33 @@ def test_knn_cuda(algorithm, dist, exclude_self):
     _test_knn_common(F.cuda(), algorithm, dist, exclude_self)
 
 
+@pytest.mark.parametrize("num_points", [8, 64, 256, 1024])
+def test_knn_sharedmem_large(num_points):
+    if not th.cuda.is_available():
+        return
+    x = th.randn(num_points, 5, device="cuda")
+    y = th.randn(num_points, 5, device="cuda")
+    k = 4
+
+    def ground_truth(x, y, k):
+        dist = (
+            th.sum(x * x, dim=1)
+            + th.sum(y * y, dim=1).unsqueeze(-1)
+            - 2 * th.mm(y, x.T)
+        )
+        ret = th.topk(dist, k, dim=-1, largest=False)[1]
+        return th.sort(ret, dim=-1)[0]
+
+    gt = ground_truth(x, y, k)
+    actual = th.sort(
+        dgl.functional.knn(
+            k, x, [num_points], y, [num_points], algorithm="bruteforce-sharemem"
+        )[1].reshape(-1, k),
+        -1,
+    )[0]
+    assert th.all(actual == gt).item()
+
+
 @parametrize_idtype
 @pytest.mark.parametrize("g", get_cases(["homo"], exclude=["dglgraph"]))
 @pytest.mark.parametrize("weight", [True, False])
@@ -224,3 +251,4 @@ if __name__ == "__main__":
     test_fps()
     test_fps_start_idx()
     test_knn()
+    test_knn_sharedmem_large()

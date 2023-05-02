@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 import scipy.sparse as ssp
 from dgl import DGLGraph
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 D = 5
 reduce_msg_shapes = set()
@@ -250,8 +250,8 @@ def _test_nx_conversion():
     # use id feature to test non-tensor copy
     g = dgl.from_networkx(nxg, node_attrs=["n1"], edge_attrs=["e1", "id"])
     # check graph size
-    assert g.number_of_nodes() == 5
-    assert g.number_of_edges() == 4
+    assert g.num_nodes() == 5
+    assert g.num_edges() == 4
     # check number of features
     # test with existing dglgraph (so existing features should be cleared)
     assert len(g.ndata) == 1
@@ -286,8 +286,8 @@ def _test_nx_conversion():
     # test with a new graph
     g = dgl.from_networkx(nxg, node_attrs=["n1"], edge_attrs=["e1"])
     # check graph size
-    assert g.number_of_nodes() == 7
-    assert g.number_of_edges() == 7
+    assert g.num_nodes() == 7
+    assert g.num_edges() == 7
     # check number of features
     assert len(g.ndata) == 1
     assert len(g.edata) == 1
@@ -310,8 +310,8 @@ def _test_nx_conversion():
         d["h"] = F.tensor([u, v])
 
     g = dgl.from_networkx(nxg, node_attrs=["h"], edge_attrs=["h"])
-    assert g.number_of_nodes() == 3
-    assert g.number_of_edges() == 4
+    assert g.num_nodes() == 3
+    assert g.num_edges() == 4
     assert g.has_edge_between(0, 1)
     assert g.has_edge_between(1, 2)
     assert F.allclose(g.ndata["h"], F.tensor([[1.0], [2.0], [3.0]]))
@@ -511,18 +511,18 @@ def test_repr(idtype):
 @parametrize_idtype
 def test_local_var(idtype):
     g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
-    g.ndata["h"] = F.zeros((g.number_of_nodes(), 3))
-    g.edata["w"] = F.zeros((g.number_of_edges(), 4))
+    g.ndata["h"] = F.zeros((g.num_nodes(), 3))
+    g.edata["w"] = F.zeros((g.num_edges(), 4))
 
     # test override
     def foo(g):
         g = g.local_var()
-        g.ndata["h"] = F.ones((g.number_of_nodes(), 3))
-        g.edata["w"] = F.ones((g.number_of_edges(), 4))
+        g.ndata["h"] = F.ones((g.num_nodes(), 3))
+        g.edata["w"] = F.ones((g.num_edges(), 4))
 
     foo(g)
-    assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
-    assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+    assert F.allclose(g.ndata["h"], F.zeros((g.num_nodes(), 3)))
+    assert F.allclose(g.edata["w"], F.zeros((g.num_edges(), 4)))
 
     # test out-place update
     def foo(g):
@@ -531,8 +531,8 @@ def test_local_var(idtype):
         g.edges[[2, 3]].data["w"] = F.ones((2, 4))
 
     foo(g)
-    assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
-    assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+    assert F.allclose(g.ndata["h"], F.zeros((g.num_nodes(), 3)))
+    assert F.allclose(g.edata["w"], F.zeros((g.num_edges(), 4)))
 
     # test out-place update 2
     def foo(g):
@@ -541,14 +541,14 @@ def test_local_var(idtype):
         g.apply_edges(lambda edges: {"w": edges.data["w"] + 10}, [2, 3])
 
     foo(g)
-    assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
-    assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+    assert F.allclose(g.ndata["h"], F.zeros((g.num_nodes(), 3)))
+    assert F.allclose(g.edata["w"], F.zeros((g.num_edges(), 4)))
 
     # test auto-pop
     def foo(g):
         g = g.local_var()
-        g.ndata["hh"] = F.ones((g.number_of_nodes(), 3))
-        g.edata["ww"] = F.ones((g.number_of_edges(), 4))
+        g.ndata["hh"] = F.ones((g.num_nodes(), 3))
+        g.edata["ww"] = F.ones((g.num_edges(), 4))
 
     foo(g)
     assert "hh" not in g.ndata
@@ -584,18 +584,18 @@ def test_local_var(idtype):
 @parametrize_idtype
 def test_local_scope(idtype):
     g = dgl.graph(([0, 1, 2, 3], [1, 2, 3, 4]), idtype=idtype, device=F.ctx())
-    g.ndata["h"] = F.zeros((g.number_of_nodes(), 3))
-    g.edata["w"] = F.zeros((g.number_of_edges(), 4))
+    g.ndata["h"] = F.zeros((g.num_nodes(), 3))
+    g.edata["w"] = F.zeros((g.num_edges(), 4))
 
     # test override
     def foo(g):
         with g.local_scope():
-            g.ndata["h"] = F.ones((g.number_of_nodes(), 3))
-            g.edata["w"] = F.ones((g.number_of_edges(), 4))
+            g.ndata["h"] = F.ones((g.num_nodes(), 3))
+            g.edata["w"] = F.ones((g.num_edges(), 4))
 
     foo(g)
-    assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
-    assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+    assert F.allclose(g.ndata["h"], F.zeros((g.num_nodes(), 3)))
+    assert F.allclose(g.edata["w"], F.zeros((g.num_edges(), 4)))
 
     # test out-place update
     def foo(g):
@@ -604,8 +604,8 @@ def test_local_scope(idtype):
             g.edges[[2, 3]].data["w"] = F.ones((2, 4))
 
     foo(g)
-    assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
-    assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+    assert F.allclose(g.ndata["h"], F.zeros((g.num_nodes(), 3)))
+    assert F.allclose(g.edata["w"], F.zeros((g.num_edges(), 4)))
 
     # test out-place update 2
     def foo(g):
@@ -614,14 +614,14 @@ def test_local_scope(idtype):
             g.apply_edges(lambda edges: {"w": edges.data["w"] + 10}, [2, 3])
 
     foo(g)
-    assert F.allclose(g.ndata["h"], F.zeros((g.number_of_nodes(), 3)))
-    assert F.allclose(g.edata["w"], F.zeros((g.number_of_edges(), 4)))
+    assert F.allclose(g.ndata["h"], F.zeros((g.num_nodes(), 3)))
+    assert F.allclose(g.edata["w"], F.zeros((g.num_edges(), 4)))
 
     # test auto-pop
     def foo(g):
         with g.local_scope():
-            g.ndata["hh"] = F.ones((g.number_of_nodes(), 3))
-            g.edata["ww"] = F.ones((g.number_of_edges(), 4))
+            g.ndata["hh"] = F.ones((g.num_nodes(), 3))
+            g.edata["ww"] = F.ones((g.num_edges(), 4))
 
     foo(g)
     assert "hh" not in g.ndata
@@ -630,11 +630,11 @@ def test_local_scope(idtype):
     # test nested scope
     def foo(g):
         with g.local_scope():
-            g.ndata["hh"] = F.ones((g.number_of_nodes(), 3))
-            g.edata["ww"] = F.ones((g.number_of_edges(), 4))
+            g.ndata["hh"] = F.ones((g.num_nodes(), 3))
+            g.edata["ww"] = F.ones((g.num_edges(), 4))
             with g.local_scope():
-                g.ndata["hhh"] = F.ones((g.number_of_nodes(), 3))
-                g.edata["www"] = F.ones((g.number_of_edges(), 4))
+                g.ndata["hhh"] = F.ones((g.num_nodes(), 3))
+                g.edata["www"] = F.ones((g.num_edges(), 4))
             assert "hhh" not in g.ndata
             assert "www" not in g.edata
 
@@ -672,7 +672,7 @@ def test_local_scope(idtype):
 @parametrize_idtype
 def test_isolated_nodes(idtype):
     g = dgl.graph(([0, 1], [1, 2]), num_nodes=5, idtype=idtype, device=F.ctx())
-    assert g.number_of_nodes() == 5
+    assert g.num_nodes() == 5
 
     g = dgl.heterograph(
         {("user", "plays", "game"): ([0, 0, 1], [2, 3, 2])},
@@ -681,8 +681,8 @@ def test_isolated_nodes(idtype):
         device=F.ctx(),
     )
     assert g.idtype == idtype
-    assert g.number_of_nodes("user") == 5
-    assert g.number_of_nodes("game") == 7
+    assert g.num_nodes("user") == 5
+    assert g.num_nodes("game") == 7
 
     # Test backward compatibility
     g = dgl.heterograph(
@@ -692,8 +692,8 @@ def test_isolated_nodes(idtype):
         device=F.ctx(),
     )
     assert g.idtype == idtype
-    assert g.number_of_nodes("user") == 5
-    assert g.number_of_nodes("game") == 7
+    assert g.num_nodes("user") == 5
+    assert g.num_nodes("game") == 7
 
 
 @parametrize_idtype

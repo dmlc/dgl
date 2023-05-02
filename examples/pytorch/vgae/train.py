@@ -125,7 +125,7 @@ def dgl_main():
     in_dim = feats.shape[-1]
 
     # generate input
-    adj_orig = graph.adjacency_matrix().to_dense()
+    adj_orig = graph.adj_external().to_dense()
 
     # build test set with 10% positive links
     (
@@ -142,7 +142,7 @@ def dgl_main():
     train_edge_idx = torch.tensor(train_edge_idx).to(device)
     train_graph = dgl.edge_subgraph(graph, train_edge_idx, relabel_nodes=False)
     train_graph = train_graph.to(device)
-    adj = train_graph.adjacency_matrix().to_dense().to(device)
+    adj = train_graph.adj_external().to_dense().to(device)
 
     # compute loss parameters
     weight_tensor, norm = compute_loss_para(adj)

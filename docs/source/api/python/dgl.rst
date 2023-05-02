@@ -111,7 +111,7 @@ Operators for generating positional encodings of each node.
     :toctree: ../../generated
 
     random_walk_pe
-    laplacian_pe
+    lap_pe
     double_radius_node_labeling
     shortest_dist
     svd_pe
@@ -212,7 +212,9 @@ Utilities for measuring homophily of a graph
 .. autosummary::
     :toctree: ../../generated/
 
+    edge_homophily
     node_homophily
+    linkx_homophily
 
 Utilities
 -----------------------------------------------

@@ -64,6 +64,11 @@ struct COOMatrix {
         data(darr),
         row_sorted(rsorted),
         col_sorted(csorted) {
+    if (!IsEmpty()) {
+      is_pinned = (aten::IsNullArray(row) || row.IsPinned()) &&
+                  (aten::IsNullArray(col) || col.IsPinned()) &&
+                  (aten::IsNullArray(data) || data.IsPinned());
+    }
     CheckValidity();
   }
 
@@ -124,6 +129,11 @@ struct COOMatrix {
     CHECK_NO_OVERFLOW(row->dtype, num_cols);
   }
 
+  inline bool IsEmpty() const {
+    return aten::IsNullArray(row) && aten::IsNullArray(col) &&
+           aten::IsNullArray(data);
+  }
+
   /** @brief Return a copy of this matrix on the give device context. */
   inline COOMatrix CopyTo(const DGLContext& ctx) const {
     if (ctx == row->ctx) return *this;
@@ -131,6 +141,25 @@ struct COOMatrix {
         num_rows, num_cols, row.CopyTo(ctx), col.CopyTo(ctx),
         aten::IsNullArray(data) ? data : data.CopyTo(ctx), row_sorted,
         col_sorted);
+  }
+
+  /** @brief Return a copy of this matrix in pinned (page-locked) memory. */
+  inline COOMatrix PinMemory() {
+    if (!IsEmpty()) {
+      if (is_pinned) return *this;
+      auto new_coo = COOMatrix(
+          num_rows, num_cols, row.PinMemory(), col.PinMemory(),
+          aten::IsNullArray(data) ? data : data.PinMemory(), row_sorted,
+          col_sorted);
+      CHECK(new_coo.is_pinned)
+          << "An internal DGL error has occured while trying to pin a COO "
+             "matrix. Please file a bug at "
+             "'https://github.com/dmlc/dgl/issues' "
+             "with the above stacktrace.";
+      return new_coo;
+    }
+    is_pinned = true;
+    return *this;
   }
 
   /**
@@ -142,13 +171,17 @@ struct COOMatrix {
    *       The context check is deferred to pinning the NDArray.
    */
   inline void PinMemory_() {
-    if (is_pinned) return;
-    row.PinMemory_();
-    col.PinMemory_();
-    if (!aten::IsNullArray(data)) {
-      data.PinMemory_();
+    if (!IsEmpty()) {
+      if (is_pinned) return;
+      row.PinMemory_();
+      col.PinMemory_();
+      if (!aten::IsNullArray(data)) {
+        data.PinMemory_();
+      }
+      is_pinned = true;
     }
     is_pinned = true;
+    return;
   }
 
   /**
@@ -159,13 +192,17 @@ struct COOMatrix {
    *       The context check is deferred to unpinning the NDArray.
    */
   inline void UnpinMemory_() {
-    if (!is_pinned) return;
-    row.UnpinMemory_();
-    col.UnpinMemory_();
-    if (!aten::IsNullArray(data)) {
-      data.UnpinMemory_();
+    if (!IsEmpty()) {
+      if (!is_pinned) return;
+      row.UnpinMemory_();
+      col.UnpinMemory_();
+      if (!aten::IsNullArray(data)) {
+        data.UnpinMemory_();
+      }
+      is_pinned = false;
     }
     is_pinned = false;
+    return;
   }
 
   /**
@@ -232,8 +269,10 @@ std::pair<bool, bool> COOIsSorted(COOMatrix coo);
 std::vector<runtime::NDArray> COOGetDataAndIndices(
     COOMatrix mat, runtime::NDArray rows, runtime::NDArray cols);
 
-/** @brief Get data. The return type is an ndarray due to possible duplicate
- * entries. */
+/**
+ * @brief Get data. The return type is an ndarray due to possible duplicate
+ * entries.
+ */
 inline runtime::NDArray COOGetAllData(COOMatrix mat, int64_t row, int64_t col) {
   IdArray rows =
       VecToIdArray<int64_t>({row}, mat.row->dtype.bits, mat.row->ctx);

@@ -41,7 +41,7 @@ class RGCN(nn.Module):
         return h
 
 
-def evaluate(model, label, dataloader, inv_target):
+def evaluate(model, labels, num_classes, dataloader, inv_target):
     model.eval()
     eval_logits = []
     eval_seeds = []
@@ -55,10 +55,15 @@ def evaluate(model, label, dataloader, inv_target):
             eval_seeds.append(output_nodes.cpu().detach())
     eval_logits = torch.cat(eval_logits)
     eval_seeds = torch.cat(eval_seeds)
-    return accuracy(eval_logits.argmax(dim=1), labels[eval_seeds].cpu()).item()
+    return accuracy(
+        eval_logits.argmax(dim=1),
+        labels[eval_seeds].cpu(),
+        task="multiclass",
+        num_classes=num_classes,
+    ).item()
 
 
-def train(device, g, target_idx, labels, train_mask, model):
+def train(device, g, target_idx, labels, train_mask, num_classes, model):
     # define train idx, loss function and optimizer
     train_idx = torch.nonzero(train_mask, as_tuple=False).squeeze()
     loss_fcn = nn.CrossEntropyLoss()
@@ -95,7 +100,7 @@ def train(device, g, target_idx, labels, train_mask, model):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        acc = evaluate(model, labels, val_loader, inv_target)
+        acc = evaluate(model, labels, num_classes, val_loader, inv_target)
         print(
             "Epoch {:05d} | Loss {:.4f} | Val. Accuracy {:.4f} ".format(
                 epoch, total_loss / (it + 1), acc
@@ -150,10 +155,10 @@ if __name__ == "__main__":
 
     # create RGCN model
     in_size = g.num_nodes()  # featureless with one-hot encoding
-    out_size = data.num_classes
-    model = RGCN(in_size, 16, out_size, num_rels).to(device)
+    num_classes = data.num_classes
+    model = RGCN(in_size, 16, num_classes, num_rels).to(device)
 
-    train(device, g, target_idx, labels, train_mask, model)
+    train(device, g, target_idx, labels, train_mask, num_classes, model)
     test_idx = torch.nonzero(test_mask, as_tuple=False).squeeze()
     test_sampler = MultiLayerNeighborSampler(
         [-1, -1]
@@ -166,5 +171,5 @@ if __name__ == "__main__":
         batch_size=32,
         shuffle=False,
     )
-    acc = evaluate(model, labels, test_loader, inv_target)
+    acc = evaluate(model, labels, num_classes, test_loader, inv_target)
     print("Test accuracy {:.4f}".format(acc))

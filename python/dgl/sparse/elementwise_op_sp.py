@@ -1,4 +1,6 @@
 """DGL elementwise operators for sparse matrix module."""
+from typing import Union
+
 import torch
 
 from .sparse_matrix import SparseMatrix, val_like
@@ -9,6 +11,20 @@ def spsp_add(A, B):
     """Invoke C++ sparse library for addition"""
     return SparseMatrix(
         torch.ops.dgl_sparse.spsp_add(A.c_sparse_matrix, B.c_sparse_matrix)
+    )
+
+
+def spsp_mul(A, B):
+    """Invoke C++ sparse library for multiplication"""
+    return SparseMatrix(
+        torch.ops.dgl_sparse.spsp_mul(A.c_sparse_matrix, B.c_sparse_matrix)
+    )
+
+
+def spsp_div(A, B):
+    """Invoke C++ sparse library for division"""
+    return SparseMatrix(
+        torch.ops.dgl_sparse.spsp_div(A.c_sparse_matrix, B.c_sparse_matrix)
     )
 
 
@@ -78,15 +94,17 @@ def sp_sub(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     return spsp_add(A, -B) if isinstance(B, SparseMatrix) else NotImplemented
 
 
-def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
-
+def sp_mul(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     """Elementwise multiplication
+
+    Note that if both :attr:`A` and :attr:`B` are sparse matrices, both of them
+    need to be diagonal or on CPU.
 
     Parameters
     ----------
     A : SparseMatrix
         First operand
-    B : Scalar
+    B : SparseMatrix or Scalar
         Second operand
 
     Returns
@@ -104,32 +122,41 @@ def sp_mul(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     >>> A * 2
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
-    values=tensor([2, 4, 6]),
-    shape=(3, 4), nnz=3)
+                 values=tensor([2, 4, 6]),
+                 shape=(3, 4), nnz=3)
 
     >>> 2 * A
     SparseMatrix(indices=tensor([[1, 0, 2],
                                  [0, 3, 2]]),
-    values=tensor([2, 4, 6]),
-    shape=(3, 4), nnz=3)
+                 values=tensor([2, 4, 6]),
+                 shape=(3, 4), nnz=3)
+
+    >>> indices2 = torch.tensor([[2, 0, 1], [0, 3, 2]])
+    >>> val2 = torch.tensor([3, 2, 1])
+    >>> B = dglsp.spmatrix(indices2, val2, shape=(3, 4))
+    >>> A * B
+    SparseMatrix(indices=tensor([[0],
+                                 [3]]),
+                 values=tensor([4]),
+                 shape=(3, 4), nnz=1)
     """
     if is_scalar(B):
         return val_like(A, A.val * B)
-    # Python falls back to B.__rmul__(A) then TypeError when NotImplemented is
-    # returned.
-    # So this also handles the case of scalar * SparseMatrix since we set
-    # SparseMatrix.__rmul__ to be the same as SparseMatrix.__mul__.
-    return NotImplemented
+    return spsp_mul(A, B)
 
 
-def sp_div(A: SparseMatrix, B: Scalar) -> SparseMatrix:
+def sp_div(A: SparseMatrix, B: Union[SparseMatrix, Scalar]) -> SparseMatrix:
     """Elementwise division
+
+    If :attr:`B` is a sparse matrix, both :attr:`A` and :attr:`B` must have the
+    same sparsity. And the returned matrix has the same order of non-zero
+    entries as :attr:`A`.
 
     Parameters
     ----------
     A : SparseMatrix
         First operand
-    B : Scalar
+    B : SparseMatrix or Scalar
         Second operand
 
     Returns
@@ -150,9 +177,7 @@ def sp_div(A: SparseMatrix, B: Scalar) -> SparseMatrix:
     """
     if is_scalar(B):
         return val_like(A, A.val / B)
-    # Python falls back to B.__rtruediv__(A) then TypeError when NotImplemented
-    # is returned.
-    return NotImplemented
+    return spsp_div(A, B)
 
 
 def sp_power(A: SparseMatrix, scalar: Scalar) -> SparseMatrix:
