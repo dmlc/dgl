@@ -5,7 +5,7 @@ import backend as F
 import dgl
 import pytest
 from dgl.base import ALL
-from test_utils import check_graph_equal, get_cases, parametrize_idtype
+from utils import check_graph_equal, get_cases, parametrize_idtype
 
 
 def check_equivalence_between_heterographs(
@@ -16,14 +16,14 @@ def check_equivalence_between_heterographs(
     assert g1.canonical_etypes == g2.canonical_etypes
 
     for nty in g1.ntypes:
-        assert g1.number_of_nodes(nty) == g2.number_of_nodes(nty)
+        assert g1.num_nodes(nty) == g2.num_nodes(nty)
 
     for ety in g1.etypes:
         if len(g1._etype2canonical[ety]) > 0:
-            assert g1.number_of_edges(ety) == g2.number_of_edges(ety)
+            assert g1.num_edges(ety) == g2.num_edges(ety)
 
     for ety in g1.canonical_etypes:
-        assert g1.number_of_edges(ety) == g2.number_of_edges(ety)
+        assert g1.num_edges(ety) == g2.num_edges(ety)
         src1, dst1, eid1 = g1.edges(etype=ety, form="all")
         src2, dst2, eid2 = g2.edges(etype=ety, form="all")
         assert F.allclose(src1, src2)
@@ -32,7 +32,7 @@ def check_equivalence_between_heterographs(
 
     if node_attrs is not None:
         for nty in node_attrs.keys():
-            if g1.number_of_nodes(nty) == 0:
+            if g1.num_nodes(nty) == 0:
                 continue
             for feat_name in node_attrs[nty]:
                 assert F.allclose(
@@ -41,7 +41,7 @@ def check_equivalence_between_heterographs(
 
     if edge_attrs is not None:
         for ety in edge_attrs.keys():
-            if g1.number_of_edges(ety) == 0:
+            if g1.num_edges(ety) == 0:
                 continue
             for feat_name in edge_attrs[ety]:
                 assert F.allclose(
@@ -69,27 +69,27 @@ def test_topology(gs, idtype):
     for ntype in bg.ntypes:
         print(ntype)
         assert F.asnumpy(bg.batch_num_nodes(ntype)).tolist() == [
-            g1.number_of_nodes(ntype),
-            g2.number_of_nodes(ntype),
+            g1.num_nodes(ntype),
+            g2.num_nodes(ntype),
         ]
-        assert bg.number_of_nodes(ntype) == (
-            g1.number_of_nodes(ntype) + g2.number_of_nodes(ntype)
+        assert bg.num_nodes(ntype) == (
+            g1.num_nodes(ntype) + g2.num_nodes(ntype)
         )
 
     # Test number of edges
     for etype in bg.canonical_etypes:
         assert F.asnumpy(bg.batch_num_edges(etype)).tolist() == [
-            g1.number_of_edges(etype),
-            g2.number_of_edges(etype),
+            g1.num_edges(etype),
+            g2.num_edges(etype),
         ]
-        assert bg.number_of_edges(etype) == (
-            g1.number_of_edges(etype) + g2.number_of_edges(etype)
+        assert bg.num_edges(etype) == (
+            g1.num_edges(etype) + g2.num_edges(etype)
         )
 
     # Test relabeled nodes
     for ntype in bg.ntypes:
         assert list(F.asnumpy(bg.nodes(ntype))) == list(
-            range(bg.number_of_nodes(ntype))
+            range(bg.num_nodes(ntype))
         )
 
     # Test relabeled edges
@@ -160,33 +160,29 @@ def test_batching_batched(idtype):
     # Test number of nodes
     for ntype in bg2.ntypes:
         assert F.asnumpy(bg2.batch_num_nodes(ntype)).tolist() == [
-            g1.number_of_nodes(ntype),
-            g2.number_of_nodes(ntype),
-            g3.number_of_nodes(ntype),
+            g1.num_nodes(ntype),
+            g2.num_nodes(ntype),
+            g3.num_nodes(ntype),
         ]
-        assert bg2.number_of_nodes(ntype) == (
-            g1.number_of_nodes(ntype)
-            + g2.number_of_nodes(ntype)
-            + g3.number_of_nodes(ntype)
+        assert bg2.num_nodes(ntype) == (
+            g1.num_nodes(ntype) + g2.num_nodes(ntype) + g3.num_nodes(ntype)
         )
 
     # Test number of edges
     for etype in bg2.canonical_etypes:
         assert F.asnumpy(bg2.batch_num_edges(etype)).tolist() == [
-            g1.number_of_edges(etype),
-            g2.number_of_edges(etype),
-            g3.number_of_edges(etype),
+            g1.num_edges(etype),
+            g2.num_edges(etype),
+            g3.num_edges(etype),
         ]
-        assert bg2.number_of_edges(etype) == (
-            g1.number_of_edges(etype)
-            + g2.number_of_edges(etype)
-            + g3.number_of_edges(etype)
+        assert bg2.num_edges(etype) == (
+            g1.num_edges(etype) + g2.num_edges(etype) + g3.num_edges(etype)
         )
 
     # Test relabeled nodes
     for ntype in bg2.ntypes:
         assert list(F.asnumpy(bg2.nodes(ntype))) == list(
-            range(bg2.number_of_nodes(ntype))
+            range(bg2.num_nodes(ntype))
         )
 
     # Test relabeled edges
@@ -374,15 +370,15 @@ def test_empty_relation(idtype):
     # Test number of nodes
     for ntype in bg.ntypes:
         assert F.asnumpy(bg.batch_num_nodes(ntype)).tolist() == [
-            g1.number_of_nodes(ntype),
-            g2.number_of_nodes(ntype),
+            g1.num_nodes(ntype),
+            g2.num_nodes(ntype),
         ]
 
     # Test number of edges
     for etype in bg.canonical_etypes:
         assert F.asnumpy(bg.batch_num_edges(etype)).tolist() == [
-            g1.number_of_edges(etype),
-            g2.number_of_edges(etype),
+            g1.num_edges(etype),
+            g2.num_edges(etype),
         ]
 
     # Test features

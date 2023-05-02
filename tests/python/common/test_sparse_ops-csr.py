@@ -4,7 +4,7 @@ import dgl
 import numpy as np
 import pytest
 import scipy.sparse as ssp
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 if F.backend_name == "pytorch":
     import torch

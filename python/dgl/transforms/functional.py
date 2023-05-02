@@ -84,6 +84,7 @@ __all__ = [
     "radius_graph",
     "random_walk_pe",
     "laplacian_pe",
+    "lap_pe",
     "to_half",
     "to_float",
     "to_double",
@@ -1039,9 +1040,7 @@ def add_reverse_edges(
         for c_etype in canonical_etypes:
             if c_etype[0] != c_etype[2]:
                 eids.append(
-                    F.copy_to(
-                        F.arange(0, g.number_of_edges(c_etype)), new_g.device
-                    )
+                    F.copy_to(F.arange(0, g.num_edges(c_etype)), new_g.device)
                 )
             else:
                 eids.append(rev_eids[c_etype])
@@ -1166,7 +1165,9 @@ def khop_adj(g, k):
             [0., 1., 3., 3., 1.]])
     """
     assert g.is_homogeneous, "only homogeneous graph is supported"
-    adj_k = g.adj(transpose=True, scipy_fmt=g.formats()["created"][0]) ** k
+    adj_k = (
+        g.adj_external(transpose=True, scipy_fmt=g.formats()["created"][0]) ** k
+    )
     return F.tensor(adj_k.todense().astype(np.float32))
 
 
@@ -1235,8 +1236,11 @@ def khop_graph(g, k, copy_ndata=True):
              edata_schemes={})
     """
     assert g.is_homogeneous, "only homogeneous graph is supported"
-    n = g.number_of_nodes()
-    adj_k = g.adj(transpose=False, scipy_fmt=g.formats()["created"][0]) ** k
+    n = g.num_nodes()
+    adj_k = (
+        g.adj_external(transpose=False, scipy_fmt=g.formats()["created"][0])
+        ** k
+    )
     adj_k = adj_k.tocoo()
     multiplicity = adj_k.data
     row = np.repeat(adj_k.row, multiplicity)
@@ -1447,8 +1451,8 @@ def laplacian_lambda_max(g):
     g_arr = batch.unbatch(g)
     rst = []
     for g_i in g_arr:
-        n = g_i.number_of_nodes()
-        adj = g_i.adj(
+        n = g_i.num_nodes()
+        adj = g_i.adj_external(
             transpose=True, scipy_fmt=g_i.formats()["created"][0]
         ).astype(float)
         norm = sparse.diags(
@@ -1512,7 +1516,9 @@ def metapath_reachable_graph(g, metapath):
     """
     adj = 1
     for etype in metapath:
-        adj = adj * g.adj(etype=etype, scipy_fmt="csr", transpose=False)
+        adj = adj * g.adj_external(
+            etype=etype, scipy_fmt="csr", transpose=False
+        )
 
     adj = (adj != 0).tocsr()
     srctype = g.to_canonical_etype(metapath[0])[0]
@@ -1721,10 +1727,10 @@ def add_edges(g, u, v, data=None, etype=None):
     ...     ('developer', 'develops', 'game'): (torch.tensor([0, 1]),
     ...                                         torch.tensor([0, 1]))
     ...     })
-    >>> g.number_of_edges('plays')
+    >>> g.num_edges('plays')
     4
     >>> g = dgl.add_edges(g, torch.tensor([3]), torch.tensor([3]), etype='plays')
-    >>> g.number_of_edges('plays')
+    >>> g.num_edges('plays')
     5
 
     See Also
@@ -2797,7 +2803,7 @@ def adj_sum_graph(graphs, weight_name):
     metagraph = graphs[0]._graph.metagraph
     num_nodes = utils.toindex(
         [
-            graphs[0]._graph.number_of_nodes(i)
+            graphs[0]._graph.num_nodes(i)
             for i in range(graphs[0]._graph.number_of_ntypes())
         ]
     )
@@ -2884,12 +2890,12 @@ def sort_csr_by_tag(g, tag, tag_offset_name="_TAG_OFFSET", tag_type="node"):
     >>> import torch
 
     >>> g = dgl.graph(([0,0,0,0,0,1,1,1],[0,1,2,3,4,0,1,2]))
-    >>> g.adjacency_matrix(scipy_fmt='csr').nonzero()
+    >>> g.adj_external(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32))
     >>> tag = torch.IntTensor([1,1,0,2,0])
     >>> g_sorted = dgl.sort_csr_by_tag(g, tag)
-    >>> g_sorted.adjacency_matrix(scipy_fmt='csr').nonzero()
+    >>> g_sorted.adj_external(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.ndata['_TAG_OFFSET']
@@ -2906,7 +2912,7 @@ def sort_csr_by_tag(g, tag, tag_offset_name="_TAG_OFFSET", tag_type="node"):
     (tensor([0, 0, 0, 0, 0, 1, 1, 1]), tensor([0, 1, 2, 3, 4, 0, 1, 2]))
     >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
     >>> g_sorted = dgl.sort_csr_by_tag(g, tag, tag_type='edge')
-    >>> g_sorted.adj(scipy_fmt='csr').nonzero()
+    >>> g_sorted.adj_external(scipy_fmt='csr').nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.srcdata['_TAG_OFFSET']
     tensor([[0, 2, 4, 5],
@@ -3012,12 +3018,12 @@ def sort_csc_by_tag(g, tag, tag_offset_name="_TAG_OFFSET", tag_type="node"):
     >>> import dgl
     >>> import torch
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
-    >>> g.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
+    >>> g.adj_external(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([0, 1, 2, 3, 4, 0, 1, 2], dtype=int32)))
     >>> tag = torch.IntTensor([1,1,0,2,0])
     >>> g_sorted = dgl.sort_csc_by_tag(g, tag)
-    >>> g_sorted.adjacency_matrix(scipy_fmt='csr', transpose=True).nonzero()
+    >>> g_sorted.adj_external(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32),
      array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.ndata['_TAG_OFFSET']
@@ -3032,7 +3038,7 @@ def sort_csc_by_tag(g, tag, tag_offset_name="_TAG_OFFSET", tag_type="node"):
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2],[0,0,0,0,0,1,1,1]))
     >>> tag = torch.tensor([1, 1, 0, 2, 0, 1, 1, 0])
     >>> g_sorted = dgl.sort_csc_by_tag(g, tag, tag_type='edge')
-    >>> g_sorted.adj(scipy_fmt='csr', transpose=True).nonzero()
+    >>> g_sorted.adj_external(scipy_fmt='csr', transpose=True).nonzero()
     (array([0, 0, 0, 0, 0, 1, 1, 1], dtype=int32), array([2, 4, 0, 1, 3, 2, 0, 1], dtype=int32))
     >>> g_sorted.dstdata['_TAG_OFFSET']
     tensor([[0, 2, 4, 5],
@@ -3377,7 +3383,7 @@ def rcmk_perm(g):
     allowed_fmats = sum(g.formats().values(), [])
     if fmat not in allowed_fmats:
         g = g.formats(allowed_fmats + [fmat])
-    csr_adj = g.adj(scipy_fmt=fmat)
+    csr_adj = g.adj_external(scipy_fmt=fmat)
     perm = sparse.csgraph.reverse_cuthill_mckee(csr_adj)
     return perm.copy()
 
@@ -3574,7 +3580,7 @@ def random_walk_pe(g, k, eweight_name=None):
     """
     N = g.num_nodes()  # number of nodes
     M = g.num_edges()  # number of edges
-    A = g.adj(scipy_fmt="csr")  # adjacency matrix
+    A = g.adj_external(scipy_fmt="csr")  # adjacency matrix
     if eweight_name is not None:
         # add edge weights if required
         W = sparse.csr_matrix(
@@ -3595,7 +3601,7 @@ def random_walk_pe(g, k, eweight_name=None):
     return PE
 
 
-def laplacian_pe(g, k, padding=False, return_eigval=False):
+def lap_pe(g, k, padding=False, return_eigval=False):
     r"""Laplacian Positional Encoding, as introduced in
     `Benchmarking Graph Neural Networks
     <https://arxiv.org/abs/2003.00982>`__
@@ -3608,13 +3614,12 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     g : DGLGraph
         The input graph. Must be homogeneous and bidirected.
     k : int
-        Number of smallest non-trivial eigenvectors to use for positional encoding.
+        Number of smallest non-trivial eigenvectors to use for positional
+        encoding.
     padding : bool, optional
-        If False, raise an exception when k>=n.
-        Otherwise, add zero paddings in the end of eigenvectors and 'nan' paddings
-        in the end of eigenvalues when k>=n.
-        Default: False.
-        n is the number of nodes in the given graph.
+        If False, raise an exception when k>=n. Otherwise, add zero paddings
+        in the end of eigenvectors and 'nan' paddings in the end of eigenvalues
+        when k>=n. Default: False. n is the number of nodes in the given graph.
     return_eigval : bool, optional
         If True, return laplacian eigenvalues together with eigenvectors.
         Otherwise, return laplacian eigenvectors only.
@@ -3623,26 +3628,27 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     Returns
     -------
     Tensor or (Tensor, Tensor)
-        Return the laplacian positional encodings of shape :math:`(N, k)`, where :math:`N` is the
-        number of nodes in the input graph, when :attr:`return_eigval` is False. The eigenvalues
-        of shape :math:`N` is additionally returned as the second element when :attr:`return_eigval`
+        Return the laplacian positional encodings of shape :math:`(N, k)`,
+        where :math:`N` is the number of nodes in the input graph, when
+        :attr:`return_eigval` is False. The eigenvalues of shape :math:`N` is
+        additionally returned as the second element when :attr:`return_eigval`
         is True.
 
     Example
     -------
     >>> import dgl
     >>> g = dgl.graph(([0,1,2,3,1,2,3,0], [1,2,3,0,0,1,2,3]))
-    >>> dgl.laplacian_pe(g, 2)
+    >>> dgl.lap_pe(g, 2)
     tensor([[ 7.0711e-01, -6.4921e-17],
             [ 3.0483e-16, -7.0711e-01],
             [-7.0711e-01, -2.4910e-16],
             [ 9.9288e-17,  7.0711e-01]])
-    >>> dgl.laplacian_pe(g, 5, padding=True)
+    >>> dgl.lap_pe(g, 5, padding=True)
     tensor([[ 7.0711e-01, -6.4921e-17,  5.0000e-01,  0.0000e+00,  0.0000e+00],
             [ 3.0483e-16, -7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00],
             [-7.0711e-01, -2.4910e-16,  5.0000e-01,  0.0000e+00,  0.0000e+00],
             [ 9.9288e-17,  7.0711e-01, -5.0000e-01,  0.0000e+00,  0.0000e+00]])
-    >>> dgl.laplacian_pe(g, 5, padding=True, return_eigval=True)
+    >>> dgl.lap_pe(g, 5, padding=True, return_eigval=True)
     (tensor([[-7.0711e-01,  6.4921e-17, -5.0000e-01,  0.0000e+00,  0.0000e+00],
              [-3.0483e-16,  7.0711e-01,  5.0000e-01,  0.0000e+00,  0.0000e+00],
              [ 7.0711e-01,  2.4910e-16, -5.0000e-01,  0.0000e+00,  0.0000e+00],
@@ -3653,12 +3659,12 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     n = g.num_nodes()
     if not padding and n <= k:
         assert (
-            "the number of eigenvectors k must be smaller than the number of nodes n, "
-            + f"{k} and {n} detected."
+            "the number of eigenvectors k must be smaller than the number of "
+            + f"nodes n, {k} and {n} detected."
         )
 
     # get laplacian matrix as I - D^-0.5 * A * D^-0.5
-    A = g.adj(scipy_fmt="csr")  # adjacency matrix
+    A = g.adj_external(scipy_fmt="csr")  # adjacency matrix
     N = sparse.diags(
         F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float
     )  # D^-1/2
@@ -3689,6 +3695,12 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     if return_eigval:
         return PE, eigvals
     return PE
+
+
+def laplacian_pe(g, k, padding=False, return_eigval=False):
+    r"""Alias of `dgl.lap_pe`."""
+    dgl_warning("dgl.laplacian_pe will be deprecated. Use dgl.lap_pe please.")
+    return lap_pe(g, k, padding, return_eigval)
 
 
 def to_half(g):
@@ -3784,7 +3796,7 @@ def double_radius_node_labeling(g, src, dst):
     >>> dgl.double_radius_node_labeling(g, 0, 1)
     tensor([1, 1, 3, 2, 3, 7, 0])
     """
-    adj = g.adj(scipy_fmt="csr")
+    adj = g.adj_external(scipy_fmt="csr")
     src, dst = (dst, src) if src > dst else (src, dst)
 
     idx = list(range(src)) + list(range(src + 1, adj.shape[0]))
@@ -3894,14 +3906,14 @@ def shortest_dist(g, root=None, return_paths=False):
     """
     if root is None:
         dist, pred = sparse.csgraph.shortest_path(
-            g.adj(scipy_fmt="csr"),
+            g.adj_external(scipy_fmt="csr"),
             return_predecessors=True,
             unweighted=True,
             directed=True,
         )
     else:
         dist, pred = sparse.csgraph.dijkstra(
-            g.adj(scipy_fmt="csr"),
+            g.adj_external(scipy_fmt="csr"),
             directed=True,
             indices=root,
             return_predecessors=True,
@@ -4005,7 +4017,7 @@ def svd_pe(g, k, padding=False, random_flip=True):
             "The number of singular values k must be no greater than the "
             "number of nodes n, but " + f"got {k} and {n} respectively."
         )
-    a = g.adj(ctx=g.device, scipy_fmt="coo").toarray()
+    a = g.adj_external(ctx=g.device, scipy_fmt="coo").toarray()
     u, d, vh = scipy.linalg.svd(a)
     v = vh.transpose()
     m = min(n, k)

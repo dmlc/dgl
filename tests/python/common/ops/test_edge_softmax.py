@@ -11,11 +11,10 @@ import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
-import test_utils
 from dgl import DGLError
 from dgl.ops import edge_softmax
 from scipy.sparse import rand
-from test_utils import get_cases, parametrize_idtype
+from utils import get_cases, parametrize_idtype
 
 edge_softmax_shapes = [(1,), (1, 3), (3, 4, 5)]
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}
@@ -29,7 +28,7 @@ feat_size = 2
 @parametrize_idtype
 def test_edge_softmax(g, norm_by, shp, idtype):
     g = g.astype(idtype).to(F.ctx())
-    edata = F.tensor(np.random.rand(g.number_of_edges(), *shp))
+    edata = F.tensor(np.random.rand(g.num_edges(), *shp))
     e1 = F.attach_grad(F.clone(edata))
 
     with F.record_grad():

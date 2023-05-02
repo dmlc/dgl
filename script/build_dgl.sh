@@ -10,21 +10,25 @@ examples:
   Start a CUDA build: bash $0 -g
   Build incrementally: bash $0
   Remove all intermediate output and restart a CPU only build: bash $0 -c -r
+  Build with extra cmake arguments: bash $0 -c -e '-DBUILD_TORCH=ON'
 
 Build DGL. By default, build incrementally on top of the current state.
 
 OPTIONS:
   -h           Show this message.
   -c           Restart CPU only build.
+  -e           Extra arguments of cmake.
   -g           Restart CUDA build.
   -r           Remove all intermediate output.
 EOF
 }
 
 # Parse flags.
-while getopts "cghr" flag; do
+while getopts "ce:ghr" flag; do
   if [[ ${flag} == "c" ]]; then
     cuda="OFF"
+  elif [[ ${flag} == "e" ]]; then
+    extra_args=${OPTARG}
   elif [[ ${flag} == "g" ]]; then
     cuda="ON"
   elif [[ ${flag} == "r" ]]; then
@@ -65,7 +69,7 @@ if [[ -z ${cuda} ]]; then
 else
   mkdir -p build
   cd build
-  cmake -DUSE_CUDA=${cuda} ..
+  cmake -DUSE_CUDA=${cuda} ${extra_args} ..
 fi
 
 if [[ ${PWD} == "${DGL_HOME}/build" ]]; then

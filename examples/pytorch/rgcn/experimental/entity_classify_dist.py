@@ -318,7 +318,7 @@ class DistEmbedLayer(nn.Module):
                     if feat_name not in g.nodes[ntype].data:
                         part_policy = g.get_node_partition_policy(ntype)
                         self.node_embeds[ntype] = dgl.distributed.DistEmbedding(
-                            g.number_of_nodes(ntype),
+                            g.num_nodes(ntype),
                             self.embed_size,
                             embed_name + "_" + ntype,
                             init_emb,
@@ -330,7 +330,7 @@ class DistEmbedLayer(nn.Module):
                     # We only create embeddings for nodes without node features.
                     if feat_name not in g.nodes[ntype].data:
                         self.node_embeds[ntype] = th.nn.Embedding(
-                            g.number_of_nodes(ntype),
+                            g.num_nodes(ntype),
                             self.embed_size,
                             sparse=self.sparse_emb,
                         )
@@ -343,7 +343,7 @@ class DistEmbedLayer(nn.Module):
                 # We only create embeddings for nodes without node features.
                 if feat_name not in g.nodes[ntype].data:
                     self.node_embeds[ntype] = th.nn.Embedding(
-                        g.number_of_nodes(ntype), self.embed_size
+                        g.num_nodes(ntype), self.embed_size
                     )
                     nn.init.uniform_(self.node_embeds[ntype].weight, -1.0, 1.0)
 
@@ -410,7 +410,7 @@ def evaluate(
             assert len(logits) == 1
             logits = logits["paper"]
             eval_logits.append(logits.cpu().detach())
-            assert np.all(seeds.numpy() < g.number_of_nodes("paper"))
+            assert np.all(seeds.numpy() < g.num_nodes("paper"))
             eval_seeds.append(seeds.cpu().detach())
     eval_logits = th.cat(eval_logits)
     eval_seeds = th.cat(eval_seeds)
@@ -428,7 +428,7 @@ def evaluate(
             assert len(logits) == 1
             logits = logits["paper"]
             test_logits.append(logits.cpu().detach())
-            assert np.all(seeds.numpy() < g.number_of_nodes("paper"))
+            assert np.all(seeds.numpy() < g.num_nodes("paper"))
             test_seeds.append(seeds.cpu().detach())
     test_logits = th.cat(test_logits)
     test_seeds = th.cat(test_seeds)
@@ -769,21 +769,15 @@ def main(args):
     else:
         dev_id = g.rank() % args.num_gpus
         device = th.device("cuda:" + str(dev_id))
-    labels = g.nodes["paper"].data["labels"][
-        np.arange(g.number_of_nodes("paper"))
-    ]
+    labels = g.nodes["paper"].data["labels"][np.arange(g.num_nodes("paper"))]
     all_val_nid = th.LongTensor(
         np.nonzero(
-            g.nodes["paper"].data["val_mask"][
-                np.arange(g.number_of_nodes("paper"))
-            ]
+            g.nodes["paper"].data["val_mask"][np.arange(g.num_nodes("paper"))]
         )
     ).squeeze()
     all_test_nid = th.LongTensor(
         np.nonzero(
-            g.nodes["paper"].data["test_mask"][
-                np.arange(g.number_of_nodes("paper"))
-            ]
+            g.nodes["paper"].data["test_mask"][np.arange(g.num_nodes("paper"))]
         )
     ).squeeze()
     n_classes = len(th.unique(labels[labels >= 0]))

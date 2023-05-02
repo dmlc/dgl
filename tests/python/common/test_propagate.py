@@ -4,8 +4,7 @@ import backend as F
 
 import dgl
 import networkx as nx
-import utils as U
-from test_utils import parametrize_idtype
+from utils import check_fail, parametrize_idtype
 
 
 def create_graph(idtype):
@@ -87,7 +86,7 @@ def test_prop_edges_dfs(idtype):
 def test_prop_nodes_topo(idtype):
     # bi-directional chain
     g = create_graph(idtype)
-    assert U.check_fail(dgl.prop_nodes_topo, g)  # has loop
+    assert check_fail(dgl.prop_nodes_topo, g)  # has loop
 
     # tree
     tree = dgl.DGLGraph()

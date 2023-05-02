@@ -7,7 +7,7 @@ import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as ssp
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 D = 5
 
@@ -43,15 +43,15 @@ def test_edge_subgraph():
         sg.ndata[dgl.NID], F.tensor([0, 2, 4, 5, 1, 9], g.idtype)
     )
     assert F.array_equal(sg.edata[dgl.EID], F.tensor(eid, g.idtype))
-    sg.ndata["h"] = F.arange(0, sg.number_of_nodes())
-    sg.edata["h"] = F.arange(0, sg.number_of_edges())
+    sg.ndata["h"] = F.arange(0, sg.num_nodes())
+    sg.edata["h"] = F.arange(0, sg.num_edges())
 
     # relabel=False
     sg = g.edge_subgraph(eid, relabel_nodes=False)
-    assert g.number_of_nodes() == sg.number_of_nodes()
+    assert g.num_nodes() == sg.num_nodes()
     assert F.array_equal(sg.edata[dgl.EID], F.tensor(eid, g.idtype))
-    sg.ndata["h"] = F.arange(0, sg.number_of_nodes())
-    sg.edata["h"] = F.arange(0, sg.number_of_edges())
+    sg.ndata["h"] = F.arange(0, sg.num_nodes())
+    sg.edata["h"] = F.arange(0, sg.num_edges())
 
 
 def test_subgraph():
@@ -192,8 +192,8 @@ def test_subgraph_mask(idtype):
         assert F.array_equal(
             F.tensor(sg.edges["wishes"].data[dgl.EID]), F.tensor([1], idtype)
         )
-        assert sg.number_of_nodes("developer") == 0
-        assert sg.number_of_edges("develops") == 0
+        assert sg.num_nodes("developer") == 0
+        assert sg.num_edges("develops") == 0
         assert F.array_equal(
             sg.nodes["user"].data["h"], g.nodes["user"].data["h"][1:3]
         )
@@ -250,8 +250,8 @@ def test_subgraph1(idtype):
         assert F.array_equal(
             F.tensor(sg.edges["wishes"].data[dgl.EID]), F.tensor([1], g.idtype)
         )
-        assert sg.number_of_nodes("developer") == 0
-        assert sg.number_of_edges("develops") == 0
+        assert sg.num_nodes("developer") == 0
+        assert sg.num_edges("develops") == 0
         assert F.array_equal(
             sg.nodes["user"].data["h"], g.nodes["user"].data["h"][1:3]
         )
@@ -307,7 +307,7 @@ def test_subgraph1(idtype):
             )
         else:
             for ntype in sg.ntypes:
-                assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
+                assert g.num_nodes(ntype) == sg.num_nodes(ntype)
 
         assert F.array_equal(
             F.tensor(sg.edges["follows"].data[dgl.EID]), F.tensor([1], g.idtype)
@@ -337,7 +337,7 @@ def test_subgraph1(idtype):
             )
         else:
             for ntype in sg.ntypes:
-                assert g.number_of_nodes(ntype) == sg.number_of_nodes(ntype)
+                assert g.num_nodes(ntype) == sg.num_nodes(ntype)
 
         assert F.array_equal(
             F.tensor(sg.edges["plays"].data[dgl.EID]),
@@ -361,7 +361,7 @@ def test_subgraph1(idtype):
         assert set(sg.ntypes) == {"user", "game"}
         assert set(sg.etypes) == {"follows", "plays", "wishes"}
         for ntype in sg.ntypes:
-            assert sg.number_of_nodes(ntype) == g.number_of_nodes(ntype)
+            assert sg.num_nodes(ntype) == g.num_nodes(ntype)
         for etype in sg.etypes:
             src_sg, dst_sg = sg.all_edges(etype=etype, order="eid")
             src_g, dst_g = g.all_edges(etype=etype, order="eid")
@@ -390,7 +390,7 @@ def test_subgraph1(idtype):
         assert set(sg.ntypes) == {"developer", "game"}
         assert set(sg.etypes) == {"develops"}
         for ntype in sg.ntypes:
-            assert sg.number_of_nodes(ntype) == g.number_of_nodes(ntype)
+            assert sg.num_nodes(ntype) == g.num_nodes(ntype)
         for etype in sg.etypes:
             src_sg, dst_sg = sg.all_edges(etype=etype, order="eid")
             src_g, dst_g = g.all_edges(etype=etype, order="eid")
@@ -454,7 +454,7 @@ def test_in_subgraph(idtype):
         hg["liked-by"].edge_ids(u, v), subg["liked-by"].edata[dgl.EID]
     )
     assert edge_set == {(2, 0), (2, 1), (1, 0), (0, 0)}
-    assert subg["flips"].number_of_edges() == 0
+    assert subg["flips"].num_edges() == 0
     for ntype in subg.ntypes:
         assert dgl.NID not in subg.nodes[ntype].data
 

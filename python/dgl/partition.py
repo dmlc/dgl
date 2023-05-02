@@ -37,13 +37,13 @@ def reorder_nodes(g, new_node_ids):
         The graph with new node IDs.
     """
     assert (
-        len(new_node_ids) == g.number_of_nodes()
+        len(new_node_ids) == g.num_nodes()
     ), "The number of new node ids must match #nodes in the graph."
     new_node_ids = utils.toindex(new_node_ids)
     sorted_ids, idx = F.sort_1d(new_node_ids.tousertensor())
     assert (
         F.asnumpy(sorted_ids[0]) == 0
-        and F.asnumpy(sorted_ids[-1]) == g.number_of_nodes() - 1
+        and F.asnumpy(sorted_ids[-1]) == g.num_nodes() - 1
     ), "The new node IDs are incorrect."
     new_gidx = _CAPI_DGLReorderGraph_Hetero(
         g._graph, new_node_ids.todgltensor()
@@ -81,8 +81,8 @@ def reshuffle_graph(g, node_part=None):
     """
     # In this case, we don't need to reshuffle node IDs and edge IDs.
     if node_part is None:
-        g.ndata["orig_id"] = F.arange(0, g.number_of_nodes())
-        g.edata["orig_id"] = F.arange(0, g.number_of_edges())
+        g.ndata["orig_id"] = F.arange(0, g.num_nodes())
+        g.edata["orig_id"] = F.arange(0, g.num_edges())
         return g, None
 
     start = time.time()
@@ -109,8 +109,8 @@ def reshuffle_graph(g, node_part=None):
         g.edata["orig_id"] = g.edata[EID]
         return g, None
 
-    new_node_ids = np.zeros((g.number_of_nodes(),), dtype=np.int64)
-    new_node_ids[F.asnumpy(new2old_map)] = np.arange(0, g.number_of_nodes())
+    new_node_ids = np.zeros((g.num_nodes(),), dtype=np.int64)
+    new_node_ids[F.asnumpy(new2old_map)] = np.arange(0, g.num_nodes())
     # If the input graph is homogneous, we only need to create an empty array, so that
     # _CAPI_DGLReassignEdges_Hetero knows how to handle it.
     etype = (
@@ -174,7 +174,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         1D tensor that stores the mapping between the reshuffled edge IDs and
         the original edge IDs if 'reshuffle=True'. Otherwise, return None.
     """
-    assert len(node_part) == g.number_of_nodes()
+    assert len(node_part) == g.num_nodes()
     if reshuffle:
         g, node_part = reshuffle_graph(g, node_part)
         orig_nids = g.ndata["orig_id"]
@@ -196,7 +196,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
     # An edge is assigned to a partition based on its destination node. If its destination node
     # is assigned to a partition, we assign the edge to the partition as well.
     def get_inner_edge(subg, inner_node):
-        inner_edge = F.zeros((subg.number_of_edges(),), F.int8, F.cpu())
+        inner_edge = F.zeros((subg.num_edges(),), F.int8, F.cpu())
         inner_nids = F.nonzero_1d(inner_node)
         # TODO(zhengda) we need to fix utils.toindex() to avoid the dtype cast below.
         inner_nids = F.astype(inner_nids, F.int64)
@@ -248,7 +248,7 @@ def partition_graph_with_halo(g, node_part, extra_cached_hops, reshuffle=False):
         if extra_cached_hops >= 1:
             inner_edge = get_inner_edge(subg, inner_node)
         else:
-            inner_edge = F.ones((subg.number_of_edges(),), F.int8, F.cpu())
+            inner_edge = F.ones((subg.num_edges(),), F.int8, F.cpu())
         subg.edata["inner_edge"] = inner_edge
         subg_dict[i] = subg
     print("Construct subgraphs: {:.3f} seconds".format(time.time() - start))
@@ -344,7 +344,7 @@ def metis_partition_assignment(
     start = time.time()
     if balance_ntypes is not None:
         assert (
-            len(balance_ntypes) == g.number_of_nodes()
+            len(balance_ntypes) == g.num_nodes()
         ), "The length of balance_ntypes should be equal to #nodes in the graph"
         balance_ntypes = F.tensor(balance_ntypes)
         uniq_ntypes = F.unique(balance_ntypes)
@@ -358,7 +358,7 @@ def metis_partition_assignment(
         else:
             for ntype in uniq_ntypes:
                 nids = F.asnumpy(F.nonzero_1d(balance_ntypes == ntype))
-                degs = np.zeros((g.number_of_nodes(),), np.int64)
+                degs = np.zeros((g.num_nodes(),), np.int64)
                 degs[nids] = F.asnumpy(g.in_degrees(nids))
                 vwgt.append(F.zerocopy_from_numpy(degs))
 
@@ -590,6 +590,45 @@ class NDArrayPartition(object):
             _CAPI_DGLNDArrayPartitionMapToGlobal(
                 self._partition, F.zerocopy_to_dgl_ndarray(idxs), part_id
             )
+        )
+
+    def generate_permutation(self, idxs):
+        """Produce a scheme that maps the given indices to separate partitions
+        and the counts of how many indices are in each partition.
+
+
+        Parameters
+        ----------
+        idxs: torch.Tensor.
+            A tensor with shape (`num_indices`,), representing global indices.
+
+        Return
+        ------
+        torch.Tensor.
+            A tensor with shape (`num_indices`,), representing the permutation
+            to re-order the indices by partition.
+        torch.Tensor.
+            A tensor with shape (`num_partition`,), representing the number of
+            indices per partition.
+
+        Examples
+        --------
+
+        >>> import torch
+        >>> from dgl.partition import NDArrayPartition
+        >>> part = NDArrayPartition(10, 2, mode="remainder")
+        >>> idx = torch.tensor([0, 2, 4, 5, 8, 8, 9], device="cuda:0")
+        >>> perm, splits_sum = part.generate_permutation(idx)
+        >>> perm
+        tensor([0, 1, 2, 4, 5, 3, 6], device='cuda:0')
+        >>> splits_sum
+        tensor([5, 2], device='cuda:0')
+        """
+        ret = _CAPI_DGLNDArrayPartitionGeneratePermutation(
+            self._partition, F.zerocopy_to_dgl_ndarray(idxs)
+        )
+        return F.zerocopy_from_dgl_ndarray(ret(0)), F.zerocopy_from_dgl_ndarray(
+            ret(1)
         )
 
 

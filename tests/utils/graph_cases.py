@@ -75,8 +75,8 @@ def graph1():
         ),
         device=F.cpu(),
     )
-    g.ndata["h"] = F.copy_to(F.randn((g.number_of_nodes(), 2)), F.cpu())
-    g.edata["w"] = F.copy_to(F.randn((g.number_of_edges(), 3)), F.cpu())
+    g.ndata["h"] = F.copy_to(F.randn((g.num_nodes(), 2)), F.cpu())
+    g.edata["w"] = F.copy_to(F.randn((g.num_edges(), 3)), F.cpu())
     return g
 
 
@@ -89,10 +89,8 @@ def graph1():
         ),
         device=F.cpu(),
     )
-    g.ndata["h"] = F.copy_to(F.randn((g.number_of_nodes(), 2)), F.cpu())
-    g.edata["scalar_w"] = F.copy_to(
-        F.abs(F.randn((g.number_of_edges(),))), F.cpu()
-    )
+    g.ndata["h"] = F.copy_to(F.randn((g.num_nodes(), 2)), F.cpu())
+    g.edata["scalar_w"] = F.copy_to(F.abs(F.randn((g.num_edges(),))), F.cpu())
     return g
 
 
@@ -129,19 +127,19 @@ def heterograph0():
         device=F.cpu(),
     )
     g.nodes["user"].data["h"] = F.copy_to(
-        F.randn((g.number_of_nodes("user"), 3)), F.cpu()
+        F.randn((g.num_nodes("user"), 3)), F.cpu()
     )
     g.nodes["game"].data["h"] = F.copy_to(
-        F.randn((g.number_of_nodes("game"), 2)), F.cpu()
+        F.randn((g.num_nodes("game"), 2)), F.cpu()
     )
     g.nodes["developer"].data["h"] = F.copy_to(
-        F.randn((g.number_of_nodes("developer"), 3)), F.cpu()
+        F.randn((g.num_nodes("developer"), 3)), F.cpu()
     )
     g.edges["plays"].data["h"] = F.copy_to(
-        F.randn((g.number_of_edges("plays"), 1)), F.cpu()
+        F.randn((g.num_edges("plays"), 1)), F.cpu()
     )
     g.edges["develops"].data["h"] = F.copy_to(
-        F.randn((g.number_of_edges("develops"), 5)), F.cpu()
+        F.randn((g.num_edges("develops"), 5)), F.cpu()
     )
     return g
 

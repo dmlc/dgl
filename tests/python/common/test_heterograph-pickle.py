@@ -9,15 +9,19 @@ import dgl.function as fn
 import networkx as nx
 import pytest
 import scipy.sparse as ssp
-import test_utils
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
-from test_utils import get_cases, parametrize_idtype
-from utils import assert_is_identical, assert_is_identical_hetero
+from utils import (
+    assert_is_identical,
+    assert_is_identical_hetero,
+    check_graph_equal,
+    get_cases,
+    parametrize_idtype,
+)
 
 
 def _assert_is_identical_nodeflow(nf1, nf2):
-    assert nf1.number_of_nodes() == nf2.number_of_nodes()
+    assert nf1.num_nodes() == nf2.num_nodes()
     src, dst = nf1.all_edges()
     src2, dst2 = nf2.all_edges()
     assert F.array_equal(src, src2)
@@ -92,7 +96,7 @@ def test_pickling_graph_index():
 
     gi2 = _reconstruct_pickle(gi)
 
-    assert gi2.number_of_nodes() == gi.number_of_nodes()
+    assert gi2.num_nodes() == gi.num_nodes()
     src_idx2, dst_idx2, _ = gi2.edges()
     assert F.array_equal(src_idx.tousertensor(), src_idx2.tousertensor())
     assert F.array_equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
@@ -110,7 +114,7 @@ def _global_message_func(nodes):
 def test_pickling_graph(g, idtype):
     g = g.astype(idtype)
     new_g = _reconstruct_pickle(g)
-    test_utils.check_graph_equal(g, new_g, check_feature=True)
+    check_graph_equal(g, new_g, check_feature=True)
 
 
 @unittest.skipIf(F._default_context_str == "gpu", reason="GPU not implemented")
@@ -142,7 +146,7 @@ def test_pickling_batched_heterograph():
 
     bg = dgl.batch([g, g2])
     new_bg = _reconstruct_pickle(bg)
-    test_utils.check_graph_equal(bg, new_bg)
+    check_graph_equal(bg, new_bg)
 
 
 @unittest.skipIf(

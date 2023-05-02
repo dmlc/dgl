@@ -24,10 +24,8 @@ from dgl.distributed.partition import (
 from utils import get_idranges, read_json
 from verification_utils import (
     get_node_partids,
-    read_csv_file,
-    read_npy_file,
+    read_file,
     read_orig_ids,
-    read_pq_file,
     verify_graph_feats,
     verify_metadata_counts,
     verify_node_partitionids,
@@ -117,8 +115,8 @@ def _read_graph(schema):
                     )
 
     # print from graph
-    logging.info(f"|V|= {g.number_of_nodes()}")
-    logging.info(f"|E|= {g.number_of_edges()}")
+    logging.info(f"|V|= {g.num_nodes()}")
+    logging.info(f"|E|= {g.num_edges()}")
     for ntype in g.ntypes:
         for name, data in g.nodes[ntype].data.items():
             if isinstance(data, th.Tensor):

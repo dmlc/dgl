@@ -243,7 +243,7 @@ class GMMConv(nn.Module):
             graph.srcdata["h"] = self.fc(feat_src).view(
                 -1, self._n_kernels, self._out_feats
             )
-            E = graph.number_of_edges()
+            E = graph.num_edges()
             # compute gaussian weight
             gaussian = -0.5 * (
                 (

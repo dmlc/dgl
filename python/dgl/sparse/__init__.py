@@ -5,17 +5,15 @@ import sys
 import torch
 
 from .._ffi import libinfo
-from .diag_matrix import *
+from .broadcast import *
 from .elementwise_op import *
-from .elementwise_op_diag import *
 from .elementwise_op_sp import *
 from .matmul import *
 from .reduction import *  # pylint: disable=W0622
 from .sddmm import *
 from .softmax import *
 from .sparse_matrix import *
-from .unary_op_diag import *
-from .unary_op_sp import *
+from .unary_op import *
 
 
 def load_dgl_sparse():

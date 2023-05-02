@@ -37,7 +37,7 @@ def get_launch_cmd(args) -> str:
 
 def submit_jobs(args) -> str:
     # read the json file and get the remaining argument here.
-    schema_path = "metadata.json"
+    schema_path = args.metadata_filename
     with open(os.path.join(args.in_dir, schema_path)) as schema:
         schema_map = json.load(schema)
 
@@ -102,6 +102,12 @@ def main():
         help="Location of the input directory where the dataset is located",
     )
     parser.add_argument(
+        "--metadata-filename",
+        type=str,
+        default="metadata.json",
+        help="Filename for the metadata JSON file that describes the dataset to be dispatched.",
+    )
+    parser.add_argument(
         "--partitions-dir",
         type=str,
         help="Location of the partition-id mapping files which define node-ids and their respective partition-ids, relative to the input directory",
@@ -124,9 +130,11 @@ def main():
     )
     parser.add_argument(
         "--log-level",
+        required=False,
         type=str,
-        default="info",
-        help="To enable log level for debugging purposes. Available options: (Critical, Error, Warning, Info, Debug, Notset)",
+        help="Log level to use for execution.",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     )
     parser.add_argument(
         "--python-path",
@@ -161,19 +169,21 @@ def main():
         "from high to low is ``coo``, ``csc``, ``csr``.",
     )
 
-    args, udf_command = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
+
+    fmt = "%(asctime)s %(levelname)s %(message)s"
+    logging.basicConfig(
+        format=fmt,
+        level=getattr(logging, args.log_level, None),
+    )
 
     assert os.path.isdir(args.in_dir)
     assert os.path.isdir(args.partitions_dir)
     assert os.path.isfile(args.ip_config)
-    assert isinstance(args.log_level, str)
     assert isinstance(args.master_port, int)
 
-    tokens = sys.executable.split(os.sep)
     submit_jobs(args)
 
 
 if __name__ == "__main__":
-    fmt = "%(asctime)s %(levelname)s %(message)s"
-    logging.basicConfig(format=fmt, level=logging.INFO)
     main()

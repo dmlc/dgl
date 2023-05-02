@@ -7,7 +7,7 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-from test_utils import get_cases, parametrize_idtype
+from utils import get_cases, parametrize_idtype
 
 
 def udf_copy_src(edges):
@@ -44,8 +44,8 @@ def generate_feature(g, broadcast="none", binary_op="none"):
     'e', 'v', 'none'
     """
     np.random.seed(31)
-    nv = g.number_of_nodes()
-    ne = g.number_of_edges()
+    nv = g.num_nodes()
+    ne = g.num_edges()
     if binary_op == "dot":
         if broadcast == "e":
             u = F.tensor(np.random.uniform(-1, 1, (nv, D1, D2, D3, D4)))
@@ -401,7 +401,7 @@ def test_all_binary_builtins():
 @pytest.mark.parametrize("g", get_cases(["homo-zero-degree"]))
 def test_mean_zero_degree(g, idtype):
     g = g.astype(idtype).to(F.ctx())
-    g.ndata["h"] = F.ones((g.number_of_nodes(), 3))
+    g.ndata["h"] = F.ones((g.num_nodes(), 3))
     g.update_all(fn.copy_u("h", "m"), fn.mean("m", "x"))
     deg = F.asnumpy(g.in_degrees())
     v = F.tensor(np.where(deg == 0)[0])

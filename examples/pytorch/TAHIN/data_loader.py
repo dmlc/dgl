@@ -19,7 +19,7 @@ def split_data(hg, etype_name):
     pos_label = [1] * num_link
     pos_data = list(zip(user_item_src, user_item_dst, pos_label))
 
-    ui_adj = np.array(hg.adj(etype=etype_name).to_dense())
+    ui_adj = np.array(hg.adj_external(etype=etype_name).to_dense())
     full_idx = np.where(ui_adj == 0)
 
     sample = random.sample(range(0, len(full_idx[0])), num_link)

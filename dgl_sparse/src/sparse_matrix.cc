@@ -17,12 +17,18 @@ namespace sparse {
 
 SparseMatrix::SparseMatrix(
     const std::shared_ptr<COO>& coo, const std::shared_ptr<CSR>& csr,
-    const std::shared_ptr<CSR>& csc, torch::Tensor value,
-    const std::vector<int64_t>& shape)
-    : coo_(coo), csr_(csr), csc_(csc), value_(value), shape_(shape) {
+    const std::shared_ptr<CSR>& csc, const std::shared_ptr<Diag>& diag,
+    torch::Tensor value, const std::vector<int64_t>& shape)
+    : coo_(coo),
+      csr_(csr),
+      csc_(csc),
+      diag_(diag),
+      value_(value),
+      shape_(shape) {
   TORCH_CHECK(
-      coo != nullptr || csr != nullptr || csc != nullptr, "At least ",
-      "one of CSR/COO/CSC is required to construct a SparseMatrix.")
+      coo != nullptr || csr != nullptr || csc != nullptr || diag != nullptr,
+      "At least one of CSR/COO/CSC/Diag is required to construct a "
+      "SparseMatrix.")
   TORCH_CHECK(
       shape.size() == 2, "The shape of a sparse matrix should be ",
       "2-dimensional.");
@@ -51,31 +57,44 @@ SparseMatrix::SparseMatrix(
     TORCH_CHECK(csc->indptr.device() == value.device());
     TORCH_CHECK(csc->indices.device() == value.device());
   }
+  if (diag != nullptr) {
+    TORCH_CHECK(value.size(0) == std::min(diag->num_rows, diag->num_cols));
+  }
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCOOPointer(
     const std::shared_ptr<COO>& coo, torch::Tensor value,
     const std::vector<int64_t>& shape) {
-  return c10::make_intrusive<SparseMatrix>(coo, nullptr, nullptr, value, shape);
+  return c10::make_intrusive<SparseMatrix>(
+      coo, nullptr, nullptr, nullptr, value, shape);
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSRPointer(
     const std::shared_ptr<CSR>& csr, torch::Tensor value,
     const std::vector<int64_t>& shape) {
-  return c10::make_intrusive<SparseMatrix>(nullptr, csr, nullptr, value, shape);
+  return c10::make_intrusive<SparseMatrix>(
+      nullptr, csr, nullptr, nullptr, value, shape);
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSCPointer(
     const std::shared_ptr<CSR>& csc, torch::Tensor value,
     const std::vector<int64_t>& shape) {
-  return c10::make_intrusive<SparseMatrix>(nullptr, nullptr, csc, value, shape);
+  return c10::make_intrusive<SparseMatrix>(
+      nullptr, nullptr, csc, nullptr, value, shape);
+}
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromDiagPointer(
+    const std::shared_ptr<Diag>& diag, torch::Tensor value,
+    const std::vector<int64_t>& shape) {
+  return c10::make_intrusive<SparseMatrix>(
+      nullptr, nullptr, nullptr, diag, value, shape);
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCOO(
-    torch::Tensor row, torch::Tensor col, torch::Tensor value,
+    torch::Tensor indices, torch::Tensor value,
     const std::vector<int64_t>& shape) {
-  auto coo = std::make_shared<COO>(
-      COO{shape[0], shape[1], torch::stack({row, col}), false, false});
+  auto coo =
+      std::make_shared<COO>(COO{shape[0], shape[1], indices, false, false});
   return SparseMatrix::FromCOOPointer(coo, value, shape);
 }
 
@@ -97,6 +116,12 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromCSC(
   return SparseMatrix::FromCSCPointer(csc, value, shape);
 }
 
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromDiag(
+    torch::Tensor value, const std::vector<int64_t>& shape) {
+  auto diag = std::make_shared<Diag>(Diag{shape[0], shape[1]});
+  return SparseMatrix::FromDiagPointer(diag, value, shape);
+}
+
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(
     const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value) {
   TORCH_CHECK(
@@ -105,14 +130,18 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(
   TORCH_CHECK(
       mat->value().device() == value.device(), "The device of the ",
       "old values and the new values must be the same.");
-  auto shape = mat->shape();
+  const auto& shape = mat->shape();
+  if (mat->HasDiag()) {
+    return SparseMatrix::FromDiagPointer(mat->DiagPtr(), value, shape);
+  }
   if (mat->HasCOO()) {
     return SparseMatrix::FromCOOPointer(mat->COOPtr(), value, shape);
-  } else if (mat->HasCSR()) {
-    return SparseMatrix::FromCSRPointer(mat->CSRPtr(), value, shape);
-  } else {
-    return SparseMatrix::FromCSCPointer(mat->CSCPtr(), value, shape);
   }
+  if (mat->HasCSR()) {
+    return SparseMatrix::FromCSRPointer(mat->CSRPtr(), value, shape);
+  }
+  TORCH_CHECK(mat->HasCSC(), "Invalid sparse format for ValLike.")
+  return SparseMatrix::FromCSCPointer(mat->CSCPtr(), value, shape);
 }
 
 std::shared_ptr<COO> SparseMatrix::COOPtr() {
@@ -136,10 +165,21 @@ std::shared_ptr<CSR> SparseMatrix::CSCPtr() {
   return csc_;
 }
 
+std::shared_ptr<Diag> SparseMatrix::DiagPtr() {
+  TORCH_CHECK(
+      diag_ != nullptr,
+      "Cannot get Diag sparse format from a non-diagonal sparse matrix");
+  return diag_;
+}
+
 std::tuple<torch::Tensor, torch::Tensor> SparseMatrix::COOTensors() {
   auto coo = COOPtr();
-  auto val = value();
   return std::make_tuple(coo->indices.index({0}), coo->indices.index({1}));
+}
+
+torch::Tensor SparseMatrix::Indices() {
+  auto coo = COOPtr();
+  return coo->indices;
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
@@ -159,7 +199,9 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Transpose() const {
   auto shape = shape_;
   std::swap(shape[0], shape[1]);
   auto value = value_;
-  if (HasCOO()) {
+  if (HasDiag()) {
+    return SparseMatrix::FromDiag(value, shape);
+  } else if (HasCOO()) {
     auto coo = COOTranspose(coo_);
     return SparseMatrix::FromCOOPointer(coo, value, shape);
   } else if (HasCSR()) {
@@ -171,7 +213,13 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Transpose() const {
 
 void SparseMatrix::_CreateCOO() {
   if (HasCOO()) return;
-  if (HasCSR()) {
+  if (HasDiag()) {
+    auto indices_options = torch::TensorOptions()
+                               .dtype(torch::kInt64)
+                               .layout(torch::kStrided)
+                               .device(this->device());
+    coo_ = DiagToCOO(diag_, indices_options);
+  } else if (HasCSR()) {
     coo_ = CSRToCOO(csr_);
   } else if (HasCSC()) {
     coo_ = CSCToCOO(csc_);
@@ -182,7 +230,13 @@ void SparseMatrix::_CreateCOO() {
 
 void SparseMatrix::_CreateCSR() {
   if (HasCSR()) return;
-  if (HasCOO()) {
+  if (HasDiag()) {
+    auto indices_options = torch::TensorOptions()
+                               .dtype(torch::kInt64)
+                               .layout(torch::kStrided)
+                               .device(this->device());
+    csr_ = DiagToCSR(diag_, indices_options);
+  } else if (HasCOO()) {
     csr_ = COOToCSR(coo_);
   } else if (HasCSC()) {
     csr_ = CSCToCSR(csc_);
@@ -193,7 +247,13 @@ void SparseMatrix::_CreateCSR() {
 
 void SparseMatrix::_CreateCSC() {
   if (HasCSC()) return;
-  if (HasCOO()) {
+  if (HasDiag()) {
+    auto indices_options = torch::TensorOptions()
+                               .dtype(torch::kInt64)
+                               .layout(torch::kStrided)
+                               .device(this->device());
+    csc_ = DiagToCSC(diag_, indices_options);
+  } else if (HasCOO()) {
     csc_ = COOToCSC(coo_);
   } else if (HasCSR()) {
     csc_ = CSRToCSC(csr_);

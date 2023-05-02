@@ -10,7 +10,7 @@ import dgl
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 np.random.seed(42)
 
@@ -70,10 +70,10 @@ def test_topological_nodes(idtype, n=100):
 
     layers_dgl = dgl.topological_nodes_generator(g)
 
-    adjmat = g.adjacency_matrix(transpose=True)
+    adjmat = g.adj_external(transpose=True)
 
     def tensor_topo_traverse():
-        n = g.number_of_nodes()
+        n = g.num_nodes()
         mask = F.copy_to(F.ones((n, 1)), F.cpu())
         degree = F.spmm(adjmat, mask)
         while F.reduce_sum(mask) != 0.0:

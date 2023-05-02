@@ -177,7 +177,7 @@ class CuGraphRelGraphConv(nn.Module):
             New node features. Shape: :math:`(|V|, D_{out})`.
         """
         # Create csc-representation and cast etypes to int32.
-        offsets, indices, edge_ids = g.adj_sparse("csc")
+        offsets, indices, edge_ids = g.adj_tensors("csc")
         edge_types_perm = etypes[edge_ids.long()].int()
 
         # Create cugraph-ops graph.

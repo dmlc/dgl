@@ -159,7 +159,9 @@ class EGATConv(nn.Module):
         init.xavier_normal_(self.attn, gain=gain)
         init.constant_(self.bias, 0)
 
-    def forward(self, graph, nfeats, efeats, get_attention=False):
+    def forward(
+        self, graph, nfeats, efeats, edge_weight=None, get_attention=False
+    ):
         r"""
         Compute new node and edge features.
 
@@ -180,6 +182,8 @@ class EGATConv(nn.Module):
              where:
                  :math:`F_{in}` is size of input node feature,
                  :math:`E` is the number of edges.
+        edge_weight : torch.Tensor, optional
+            A 1D tensor of edge weight values.  Shape: :math:`(|E|,)`.
         get_attention : bool, optional
                 Whether to return the attention values. Default to False.
 
@@ -235,6 +239,10 @@ class EGATConv(nn.Module):
             # compute attention factor
             e = (f_out * self.attn).sum(dim=-1).unsqueeze(-1)
             graph.edata["a"] = edge_softmax(graph, e)
+            if edge_weight is not None:
+                graph.edata["a"] = graph.edata["a"] * edge_weight.tile(
+                    1, self._num_heads, 1
+                ).transpose(0, 2)
             graph.srcdata["h_out"] = self.fc_node_src(nfeats_src).view(
                 -1, self._num_heads, self._out_node_feats
             )

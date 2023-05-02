@@ -63,7 +63,6 @@ class SparseGradOptimizer(abc.ABC):
                 ), "MultiGPU world_size for each embedding should be same."
         assert not self._rank is None
         assert not self._world_size is None
-        self._nccl_root_id = "SparseGradOptimizer.nccl_root_id"
 
     def step(self):
         """The step function.
@@ -74,7 +73,7 @@ class SparseGradOptimizer(abc.ABC):
         if self._first_step:
             for emb in self._params:
                 for _, data in emb._trace:
-                    if data.grad.data.device.type == "cuda":
+                    if data.grad.device.type == "cuda":
                         # create a communicator
                         if self._device:
                             assert (
@@ -96,7 +95,6 @@ class SparseGradOptimizer(abc.ABC):
                 self._comm_setup()
             else:
                 self._shared_setup()
-            self.setup(self._params)
             self._first_step = False
 
         if self._comm:
@@ -104,6 +102,7 @@ class SparseGradOptimizer(abc.ABC):
         else:
             self._shared_step()
 
+    @abstractmethod
     def setup(self, params):
         """This is function where subclasses can perform any setup they need
         to. It will be called during the first step, and communicators or
@@ -116,27 +115,7 @@ class SparseGradOptimizer(abc.ABC):
         """
 
     def _comm_setup(self):
-        # find a store to communicate the unique id through
-        if len(self._params) > 0:
-            store = self._params[0].store
-
-            if self._rank < 0:
-                self._comm = nccl.Communicator(1, 0, nccl.UniqueId())
-            else:
-                th.cuda.set_device(self._device)
-                if self._rank == 0:
-                    # root process broadcasts nccl id
-                    nccl_id = nccl.UniqueId()
-                    uid = str(nccl_id)
-                    store.set(self._nccl_root_id, uid)
-                else:
-                    uid = store.get(self._nccl_root_id)
-                    nccl_id = nccl.UniqueId(uid)
-                # needs to be set for nccl to work
-                self._comm = nccl.Communicator(
-                    self._world_size, self._rank, nccl_id
-                )
-                th.distributed.barrier()
+        self._comm = True
 
     def _shared_setup(self):
         for emb in self._params:
@@ -162,7 +141,6 @@ class SparseGradOptimizer(abc.ABC):
                 self._opt_meta[emb_name] = opt_meta
 
     def _comm_step(self):
-        comm = self._comm
         with th.no_grad():
             idx_in = {}
             grad_in = {}
@@ -203,7 +181,7 @@ class SparseGradOptimizer(abc.ABC):
                 (
                     idx_in[emb_name],
                     grad_in[emb_name],
-                ) = comm.sparse_all_to_all_push(idx, grad, partition=partition)
+                ) = nccl.sparse_all_to_all_push(idx, grad, partition=partition)
                 if emb.partition:
                     # if the embedding is partitioned, map back to indexes
                     # into the local tensor
@@ -474,6 +452,59 @@ class SparseGradOptimizer(abc.ABC):
         """clean grad cache"""
         self._clean_grad = True
 
+    def state_dict(self, **kwargs):  # pylint: disable=unused-argument
+        """Return a copy of the whole optimizer states stored in CPU memory.
+        If this is a multi-processing instance, the states will be returned in
+        shared memory. If the underlying embedding is currently stored on
+        multiple GPUs, all processes must call this method in the same order.
+
+        NOTE: This method must be called by all processes sharing the
+        underlying embedding, or it may result in a deadlock.
+
+        Returns
+        -------
+        dictionary of optimizer states
+            The optimizer states stored in CPU memory.
+        """
+        return {
+            "state": {
+                emb.name: emb._all_get_optm_state() for emb in self._params
+            },
+            "param_groups": self.param_groups,
+        }
+
+    def load_state_dict(
+        self, state_dict, **kwargs
+    ):  # pylint: disable=unused-argument
+        """Load the optimizer states. This method must be called by all
+        processes sharing the underlying embedding with identical
+        :attr:`state_dict`.
+
+        NOTE: This method must be called by all processes sharing the
+        underlying embedding, or it may result in a deadlock.
+
+        Parameters
+        ----------
+        state_dict : dictionary of optimizer states
+            The global states to pull values from.
+        """
+        for emb in self._params:
+            emb._all_set_optm_state(state_dict["state"][emb.name])
+        self._set_param_groups(state_dict["param_groups"])
+
+    @property
+    @abstractmethod
+    def param_groups(self):
+        """Emulate 'param_groups' of torch.optim.Optimizer.
+        Different from that, the returned 'param_groups' doesn't contain
+        parameters because getting the whole embedding is very expensive.
+        It contains other attributes, e.g., lr, eps, for debugging.
+        """
+
+    @abstractmethod
+    def _set_param_groups(self, groups):
+        """A helper method to load param_groups from saved state_dict."""
+
 
 class SparseAdagrad(SparseGradOptimizer):
     r"""Node embedding optimizer using the Adagrad algorithm.
@@ -504,7 +535,7 @@ class SparseAdagrad(SparseGradOptimizer):
     >>> def initializer(emb):
             th.nn.init.xavier_uniform_(emb)
             return emb
-    >>> emb = dgl.nn.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> emb = dgl.nn.NodeEmbedding(g.num_nodes(), 10, 'emb', init_func=initializer)
     >>> optimizer = dgl.optim.SparseAdagrad([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     ...
@@ -517,6 +548,9 @@ class SparseAdagrad(SparseGradOptimizer):
     def __init__(self, params, lr, eps=1e-10):
         super(SparseAdagrad, self).__init__(params, lr)
         self._eps = eps
+
+        # setup tensors for optimizer states
+        self.setup(self._params)
 
     def setup(self, params):
         # We need to register a state sum for each embedding in the kvstore.
@@ -554,7 +588,7 @@ class SparseAdagrad(SparseGradOptimizer):
                     dtype=th.float32,
                     device=emb.weight.device,
                 ).zero_()
-            emb.set_optm_state(state)
+            emb.set_optm_state((state,))
 
     def update(self, idx, grad, emb):
         """Update embeddings in a sparse manner
@@ -584,7 +618,7 @@ class SparseAdagrad(SparseGradOptimizer):
         grad_values = grad_values / cnt.unsqueeze(1)
 
         grad_sum = grad_values * grad_values
-        state = emb.optm_state
+        (state,) = emb.optm_state
         state_dev = state.device
         state_idx = grad_indices.to(state_dev)
         grad_state = state[state_idx].to(grad.device)
@@ -594,6 +628,20 @@ class SparseAdagrad(SparseGradOptimizer):
         std_values = grad_state.add_(eps).sqrt_()
         tmp = clr * grad_values / std_values
         emb.weight[state_idx] -= tmp.to(state_dev)
+
+    @property
+    def param_groups(self):
+        """Emulate 'param_groups' of torch.optim.Optimizer.
+        Different from that, the returned 'param_groups' doesn't contain
+        parameters because getting the whole embedding is very expensive.
+        It contains other attributes, e.g., lr, eps, for debugging.
+        """
+        return [{"lr": self._lr, "eps": self._eps}]
+
+    def _set_param_groups(self, groups):
+        """A helper method to load param_groups from saved state_dict."""
+        self._lr = groups[0]["lr"]
+        self._eps = groups[0]["eps"]
 
 
 class SparseAdam(SparseGradOptimizer):
@@ -642,7 +690,7 @@ class SparseAdam(SparseGradOptimizer):
     >>> def initializer(emb):
             th.nn.init.xavier_uniform_(emb)
             return emb
-    >>> emb = dgl.nn.NodeEmbedding(g.number_of_nodes(), 10, 'emb', init_func=initializer)
+    >>> emb = dgl.nn.NodeEmbedding(g.num_nodes(), 10, 'emb', init_func=initializer)
     >>> optimizer = dgl.optim.SparseAdam([emb], lr=0.001)
     >>> for blocks in dataloader:
     ...     ...
@@ -674,6 +722,9 @@ class SparseAdam(SparseGradOptimizer):
             "and th.float32".format(dtype)
         )
         self._dtype = dtype
+
+        # setup tensors for optimizer states
+        self.setup(self._params)
 
     def _setup_uva(self, name, mem, power):
         self._is_using_uva[name] = True
@@ -885,3 +936,24 @@ class SparseAdam(SparseGradOptimizer):
                 # can use it
                 std_event.wait()
             emb.weight[state_idx] -= std_values_dst
+
+    @property
+    def param_groups(self):
+        """Emulate 'param_groups' of torch.optim.Optimizer.
+        Different from that, the returned 'param_groups' doesn't contain
+        parameters because getting the whole embedding is very expensive.
+        It contains other attributes, e.g., lr, betas, eps, for debugging.
+        """
+        return [
+            {
+                "lr": self._lr,
+                "betas": (self._beta1, self._beta2),
+                "eps": self._eps,
+            }
+        ]
+
+    def _set_param_groups(self, groups):
+        """A helper method to load param_groups from saved state_dict."""
+        self._lr = groups[0]["lr"]
+        self._beta1, self._beta2 = groups[0]["betas"]
+        self._eps = groups[0]["eps"]

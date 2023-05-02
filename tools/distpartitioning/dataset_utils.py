@@ -12,32 +12,13 @@ import torch
 import torch.distributed as dist
 from gloo_wrapper import alltoallv_cpu
 from utils import (
+    DATA_TYPE_ID,
     generate_read_list,
     get_gid_offsets,
     get_idranges,
     map_partid_rank,
+    REV_DATA_TYPE_ID,
 )
-
-
-DATA_TYPE_ID = {
-    data_type: id
-    for id, data_type in enumerate(
-        [
-            torch.float32,
-            torch.float64,
-            torch.float16,
-            torch.uint8,
-            torch.int8,
-            torch.int16,
-            torch.int32,
-            torch.int64,
-            torch.bool,
-        ]
-    )
-}
-
-
-REV_DATA_TYPE_ID = {id: data_type for data_type, id in DATA_TYPE_ID.items()}
 
 
 def _broadcast_shape(
@@ -84,14 +65,14 @@ def _broadcast_shape(
         torch.zeros_like(data_shape) for _ in range(world_size)
     ]
     dist.all_gather(data_shape_output, data_shape)
-    logging.info(
+    logging.debug(
         f"[Rank: {rank} Received shapes from all ranks: {data_shape_output}"
     )
     shapes = [x.numpy() for x in data_shape_output if x[0] != 0]
     shapes = np.vstack(shapes)
 
     if is_feat_data:
-        logging.info(
+        logging.debug(
             f"shapes: {shapes}, condition: {all(shapes[0,2] == s for s in shapes[:,2])}"
         )
         assert all(
@@ -103,7 +84,7 @@ def _broadcast_shape(
     tid_start = np.cumsum([0] + type_counts[:-1])
     tid_end = np.cumsum(type_counts)
     tid_ranges = list(zip(tid_start, tid_end))
-    logging.info(f"starts -> {tid_start} ... end -> {tid_end}")
+    logging.debug(f"starts -> {tid_start} ... end -> {tid_end}")
 
     return tid_ranges
 
@@ -173,7 +154,7 @@ def get_dataset(
     node_feature_tids = {}
 
     """
-    The structure of the node_data is as follows, which is present in the input metadata json file. 
+    The structure of the node_data is as follows, which is present in the input metadata json file.
        "node_data" : {
             "ntype0-name" : {
                 "feat0-name" : {
@@ -186,8 +167,8 @@ def get_dataset(
                     ]
                 },
                 "feat1-name" : {
-                    "format" : {"name": "numpy"}, 
-                    "data" : [ #list 
+                    "format" : {"name": "numpy"},
+                    "data" : [ #list
                         "<path>/feat-0.npy",
                         "<path>/feat-1.npy",
                         ....
@@ -197,7 +178,7 @@ def get_dataset(
             }
        }
 
-    As shown above, the value for the key "node_data" is a dictionary object, which is 
+    As shown above, the value for the key "node_data" is a dictionary object, which is
     used to describe the feature data for each of the node-type names. Keys in this top-level
     dictionary are node-type names and value is a dictionary which captures all the features
     for the current node-type. Feature data is captured with keys being the feature-names and
@@ -211,7 +192,7 @@ def get_dataset(
         "node_type" : ["ntype0-name", "ntype1-name", ....], #m node types
         "num_nodes_per_chunk" : [
             [a0, a1, ...a<p-1>], #p partitions
-            [b0, b1, ... b<p-1>], 
+            [b0, b1, ... b<p-1>],
             ....
             [c0, c1, ..., c<p-1>] #no, of node types
         ],
@@ -224,7 +205,7 @@ def get_dataset(
 
     Since nodes are NOT actually associated with any additional metadata, w.r.t to the processing
     involved in this pipeline this information is not needed to be stored in files. This optimization
-    saves a considerable amount of time when loading massively large datasets for paritioning. 
+    saves a considerable amount of time when loading massively large datasets for paritioning.
     As opposed to reading from files and performing shuffling process each process/rank generates nodes
     which are owned by that particular rank. And using the "num_nodes_per_chunk" information each
     process can easily compute any nodes per-type node_id and global node_id.
@@ -239,11 +220,11 @@ def get_dataset(
         num_chunks=num_parts,
     )
     """
-    logging.info(f"[Rank: {rank} ntype_counts: {ntype_counts}")
+    logging.debug(f"[Rank: {rank} ntype_counts: {ntype_counts}")
     ntype_gnid_offset = get_gid_offsets(
         schema_map[constants.STR_NODE_TYPE], ntype_counts
     )
-    logging.info(f"[Rank: {rank} - ntype_gnid_offset = {ntype_gnid_offset}")
+    logging.debug(f"[Rank: {rank} - ntype_gnid_offset = {ntype_gnid_offset}")
 
     # iterate over the "node_data" dictionary in the schema_map
     # read the node features if exists
@@ -256,6 +237,7 @@ def get_dataset(
                     constants.STR_NUMPY,
                     constants.STR_PARQUET,
                 ]
+
                 # It is guaranteed that num_chunks is always greater
                 # than num_partitions.
                 node_data = []
@@ -288,7 +270,7 @@ def get_dataset(
                     True,
                     f"{ntype_name}/{feat_name}",
                 )
-                logging.info(f"[Rank: {rank} - cur_tids: {cur_tids}")
+                logging.debug(f"[Rank: {rank} - cur_tids: {cur_tids}")
 
                 # collect data on current rank.
                 for local_part_id in range(num_parts):
@@ -309,7 +291,7 @@ def get_dataset(
 
     # done building node_features locally.
     if len(node_features) <= 0:
-        logging.info(
+        logging.debug(
             f"[Rank: {rank}] This dataset does not have any node features"
         )
     else:
@@ -324,7 +306,7 @@ def get_dataset(
             if feat_info == None:
                 continue
 
-            logging.info(
+            logging.debug(
                 f"[Rank: {rank}] node feature name: {feat_name}, feature data shape: {feat_info.size()}"
             )
             tokens = feat_name.split("/")
@@ -342,7 +324,7 @@ def get_dataset(
 
     """
     Reading edge features now.
-    The structure of the edge_data is as follows, which is present in the input metadata json file. 
+    The structure of the edge_data is as follows, which is present in the input metadata json file.
        "edge_data" : {
             "etype0-name" : {
                 "feat0-name" : {
@@ -355,8 +337,8 @@ def get_dataset(
                     ]
                 },
                 "feat1-name" : {
-                    "format" : {"name": "numpy"}, 
-                    "data" : [ #list 
+                    "format" : {"name": "numpy"},
+                    "data" : [ #list
                         "<path>/feat-0.npy",
                         "<path>/feat-1.npy",
                         ....
@@ -366,7 +348,7 @@ def get_dataset(
             }
        }
 
-    As shown above, the value for the key "edge_data" is a dictionary object, which is 
+    As shown above, the value for the key "edge_data" is a dictionary object, which is
     used to describe the feature data for each of the edge-type names. Keys in this top-level
     dictionary are edge-type names and value is a dictionary which captures all the features
     for the current edge-type. Feature data is captured with keys being the feature-names and
@@ -404,7 +386,7 @@ def get_dataset(
                     data_file = feat_data[constants.STR_DATA][idx]
                     if not os.path.isabs(data_file):
                         data_file = os.path.join(input_dir, data_file)
-                    logging.info(
+                    logging.debug(
                         f"[Rank: {rank}] Loading edges-feats of {etype_name}[{feat_name}] from {data_file}"
                     )
                     edge_data.append(
@@ -443,11 +425,11 @@ def get_dataset(
                             edge_feature_tids[data_key] = [(start, end)]
                         else:
                             edge_features[data_key] = None
-                            edge_feature_tids[data_key] = []
+                            edge_feature_tids[data_key] = [(0, 0)]
 
     # Done with building node_features locally.
     if len(edge_features) <= 0:
-        logging.info(
+        logging.debug(
             f"[Rank: {rank}] This dataset does not have any edge features"
         )
     else:
@@ -456,7 +438,7 @@ def get_dataset(
         for k, v in edge_features.items():
             if v == None:
                 continue
-            logging.info(
+            logging.debug(
                 f"[Rank: {rank}] edge feature name: {k}, feature data shape: {v.shape}"
             )
             tids = edge_feature_tids[k]
@@ -465,31 +447,31 @@ def get_dataset(
 
     """
     Code below is used to read edges from the input dataset with the help of the metadata json file
-    for the input graph dataset. 
-    In the metadata json file, we expect the following key-value pairs to help read the edges of the 
-    input graph. 
+    for the input graph dataset.
+    In the metadata json file, we expect the following key-value pairs to help read the edges of the
+    input graph.
 
     "edge_type" : [ # a total of n edge types
-        canonical_etype_0, 
-        canonical_etype_1, 
-        ..., 
+        canonical_etype_0,
+        canonical_etype_1,
+        ...,
         canonical_etype_n-1
     ]
 
     The value for the key is a list of strings, each string is associated with an edgetype in the input graph.
     Note that these strings are in canonical edgetypes format. This means, these edge type strings follow the
-    following naming convention: src_ntype:etype:dst_ntype. src_ntype and dst_ntype are node type names of the 
-    src and dst end points of this edge type, and etype is the relation name between src and dst ntypes. 
+    following naming convention: src_ntype:etype:dst_ntype. src_ntype and dst_ntype are node type names of the
+    src and dst end points of this edge type, and etype is the relation name between src and dst ntypes.
 
-    The files in which edges are present and their storage format are present in the following key-value pair: 
-    
+    The files in which edges are present and their storage format are present in the following key-value pair:
+
     "edges" : {
         "canonical_etype_0" : {
-            "format" : { "name" : "csv", "delimiter" : " " }, 
+            "format" : { "name" : "csv", "delimiter" : " " },
             "data" : [
-                filename_0, 
-                filename_1, 
-                filename_2, 
+                filename_0,
+                filename_1,
+                filename_2,
                 ....
                 filename_<p-1>
             ]
@@ -497,7 +479,7 @@ def get_dataset(
     }
 
     As shown above the "edges" dictionary value has canonical edgetypes as keys and for each canonical edgetype
-    we have "format" and "data" which describe the storage format of the edge files and actual filenames respectively. 
+    we have "format" and "data" which describe the storage format of the edge files and actual filenames respectively.
     Please note that each edgetype data is split in to `p` files, where p is the no. of partitions to be made of
     the input graph.
 
@@ -535,7 +517,6 @@ def get_dataset(
         dst_ntype_name = tokens[2]
 
         num_chunks = len(edge_info)
-        # read_list = generate_read_list(num_chunks, num_parts)
         read_list = generate_read_list(num_chunks, world_size)
         src_ids = []
         dst_ids = []
@@ -552,7 +533,7 @@ def get_dataset(
             edge_file = edge_info[idx]
             if not os.path.isabs(edge_file):
                 edge_file = os.path.join(input_dir, edge_file)
-            logging.info(
+            logging.debug(
                 f"[Rank: {rank}] Loading edges of etype[{etype_name}] from {edge_file}"
             )
 
@@ -654,7 +635,7 @@ def get_dataset(
             edge_datadict[constants.GLOBAL_TYPE_EID].shape
             == edge_datadict[constants.ETYPE_ID].shape
         )
-        logging.info(
+        logging.debug(
             f"[Rank: {rank}] Done reading edge_file: {len(edge_datadict)}, {edge_datadict[constants.GLOBAL_SRC_ID].shape}"
         )
     else:
@@ -667,7 +648,7 @@ def get_dataset(
         edge_datadict[constants.GLOBAL_TYPE_EID] = np.array([], dtype=np.int64)
         edge_datadict[constants.ETYPE_ID] = np.array([], dtype=np.int64)
 
-    logging.info(f"Rank: {rank} edge_feat_tids: {edge_feature_tids}")
+    logging.debug(f"Rank: {rank} edge_feat_tids: {edge_feature_tids}")
 
     return (
         node_features,

@@ -186,7 +186,7 @@ class Sequential(gluon.nn.Sequential):
     >>>             graph.ndata['h'] = n_feat
     >>>             graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
     >>>             n_feat += graph.ndata['h']
-    >>>             return n_feat.reshape(graph.number_of_nodes() // 2, 2, -1).sum(1)
+    >>>             return n_feat.reshape(graph.num_nodes() // 2, 2, -1).sum(1)
     >>>
     >>> g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05))
     >>> g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2))

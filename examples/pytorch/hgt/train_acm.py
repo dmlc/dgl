@@ -120,14 +120,13 @@ for ntype in G.ntypes:
 for etype in G.etypes:
     edge_dict[etype] = len(edge_dict)
     G.edges[etype].data["id"] = (
-        torch.ones(G.number_of_edges(etype), dtype=torch.long)
-        * edge_dict[etype]
+        torch.ones(G.num_edges(etype), dtype=torch.long) * edge_dict[etype]
     )
 
 #     Random initialize input feature
 for ntype in G.ntypes:
     emb = nn.Parameter(
-        torch.Tensor(G.number_of_nodes(ntype), 256), requires_grad=False
+        torch.Tensor(G.num_nodes(ntype), 256), requires_grad=False
     )
     nn.init.xavier_uniform_(emb)
     G.nodes[ntype].data["inp"] = emb

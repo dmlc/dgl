@@ -165,7 +165,7 @@ class SAGEConv(layers.Layer):
             h_self = feat_dst
 
             # Handle the case of graphs without edges
-            if graph.number_of_edges() == 0:
+            if graph.num_edges() == 0:
                 graph.dstdata["neigh"] = tf.cast(
                     tf.zeros((graph.number_of_dst_nodes(), self._in_src_feats)),
                     tf.float32,

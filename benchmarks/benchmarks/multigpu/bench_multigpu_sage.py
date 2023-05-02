@@ -53,8 +53,7 @@ def load_subtensor(nfeat, labels, seeds, input_nodes, dev_id):
 
 
 # Entry point
-
-
+@utils.thread_wrapped_func
 def run(result_queue, proc_id, n_gpus, args, devices, data):
     dev_id = devices[proc_id]
     timing_records = []
@@ -174,11 +173,12 @@ def track_time(data):
     # Pack data
     data = n_classes, train_g, val_g, test_g
 
-    result_queue = mp.Queue()
+    ctx = mp.get_context("spawn")
+    result_queue = ctx.Queue()
     procs = []
     for proc_id in range(n_gpus):
-        p = mp.Process(
-            target=utils.thread_wrapped_func(run),
+        p = ctx.Process(
+            target=run,
             args=(result_queue, proc_id, n_gpus, args, devices, data),
         )
         p.start()

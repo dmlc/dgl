@@ -2,10 +2,7 @@ import argparse
 import logging
 import os
 import platform
-import sys
-from datetime import timedelta
 from pathlib import Path
-from timeit import default_timer as timer
 
 import array_readwriter
 
@@ -14,9 +11,13 @@ import constants
 import numpy as np
 import pyarrow
 import pyarrow.csv as csv
-import pyarrow.parquet as pq
-import torch
-from utils import generate_read_list, get_idranges, get_node_types, read_json
+from utils import (
+    generate_read_list,
+    generate_roundrobin_read_list,
+    get_idranges,
+    get_node_types,
+    read_json,
+)
 
 
 def get_proc_info():
@@ -43,7 +44,27 @@ def get_proc_info():
         return 0
 
 
-def gen_edge_files(schema_map, params):
+def get_world_size():
+    """Helper function to get the world size from the
+    environment when `mpirun` is used to run this python program.
+
+    Returns:
+    --------
+    integer :
+        Numer of processes created by the executor that created this process.
+    """
+    env_variables = dict(os.environ)
+    # mpich
+    if "PMI_SIZE" in env_variables:
+        return int(env_variables["PMI_SIZE"])
+    # openmpi
+    elif "OMPI_COMM_WORLD_SIZE" in env_variables:
+        return int(env_variables["OMPI_COMM_WORLD_SIZE"])
+    else:
+        return 1
+
+
+def gen_edge_files(rank, schema_map, params):
     """Function to create edges files to be consumed by ParMETIS
     for partitioning purposes.
 
@@ -57,13 +78,14 @@ def gen_edge_files(schema_map, params):
 
     Parameters:
     -----------
+    rank : int
+        rank of the current process
     schema_map : json dictionary
         Dictionary created by reading the metadata.json file for the input dataset.
     output : string
         Location of storing the node-weights and edge files for ParMETIS.
     """
-    rank = get_proc_info()
-    type_nid_dict, ntype_gnid_offset = get_idranges(
+    _, ntype_gnid_offset = get_idranges(
         schema_map[constants.STR_NODE_TYPE],
         dict(
             zip(
@@ -75,15 +97,35 @@ def gen_edge_files(schema_map, params):
 
     # Regenerate edge files here.
     edge_data = schema_map[constants.STR_EDGES]
-    etype_names = schema_map[constants.STR_EDGE_TYPE]
-    etype_name_idmap = {e: idx for idx, e in enumerate(etype_names)}
 
     outdir = Path(params.output_dir)
     os.makedirs(outdir, exist_ok=True)
+
+    def process_and_write_back(data_df, idx):
+        data_f0 = data_df[:, 0]
+        data_f1 = data_df[:, 1]
+
+        global_src_id = data_f0 + ntype_gnid_offset[src_ntype_name][0, 0]
+        global_dst_id = data_f1 + ntype_gnid_offset[dst_ntype_name][0, 0]
+        cols = [global_src_id, global_dst_id]
+        col_names = ["global_src_id", "global_dst_id"]
+
+        out_file_name = Path(edge_data_files[idx]).stem.split(".")[0]
+        out_file = os.path.join(
+            outdir, etype_name, f"edges_{out_file_name}.csv"
+        )
+        os.makedirs(os.path.dirname(out_file), exist_ok=True)
+
+        options = csv.WriteOptions(include_header=False, delimiter=" ")
+        csv.write_csv(
+            pyarrow.Table.from_arrays(cols, names=col_names),
+            out_file,
+            options,
+        )
+        return out_file
+
     edge_files = []
-    num_parts = params.num_parts
     for etype_name, etype_info in edge_data.items():
-        edges_format = etype_info[constants.STR_FORMAT][constants.STR_NAME]
         edge_data_files = etype_info[constants.STR_DATA]
 
         # ``edgetype`` strings are in canonical format, src_node_type:edge_type:dst_node_type
@@ -91,41 +133,24 @@ def gen_edge_files(schema_map, params):
         assert len(tokens) == 3
 
         src_ntype_name = tokens[0]
-        rel_name = tokens[1]
+
         dst_ntype_name = tokens[2]
 
-        def process_and_write_back(data_df, idx):
-            data_f0 = data_df[:, 0]
-            data_f1 = data_df[:, 1]
-
-            global_src_id = data_f0 + ntype_gnid_offset[src_ntype_name][0, 0]
-            global_dst_id = data_f1 + ntype_gnid_offset[dst_ntype_name][0, 0]
-            cols = [global_src_id, global_dst_id]
-            col_names = ["global_src_id", "global_dst_id"]
-
-            out_file = edge_data_files[idx].split("/")[-1]
-            out_file = os.path.join(outdir, "edges_{}".format(out_file))
-
-            # TODO(thvasilo): We should support writing to the same format as the input
-            options = csv.WriteOptions(include_header=False, delimiter=" ")
-            options.delimiter = " "
-            csv.write_csv(
-                pyarrow.Table.from_arrays(cols, names=col_names),
-                out_file,
-                options,
-            )
-            return out_file
-
-        # handle any no. of files case here.
-        file_idxes = generate_read_list(len(edge_data_files), params.num_parts)
-        for idx in file_idxes[rank]:
+        rank_assignments = generate_roundrobin_read_list(
+            len(edge_data_files), params.num_parts
+        )
+        for file_idx in rank_assignments[rank]:
             reader_fmt_meta = {
-                "name": etype_info[constants.STR_FORMAT][constants.STR_NAME]
+                "name": etype_info[constants.STR_FORMAT][constants.STR_NAME],
             }
+            if reader_fmt_meta["name"] == constants.STR_CSV:
+                reader_fmt_meta["delimiter"] = etype_info[constants.STR_FORMAT][
+                    constants.STR_FORMAT_DELIMITER
+                ]
             data_df = array_readwriter.get_array_parser(**reader_fmt_meta).read(
-                edge_data_files[idx]
+                os.path.join(params.input_dir, edge_data_files[file_idx])
             )
-            out_file = process_and_write_back(data_df, idx)
+            out_file = process_and_write_back(data_df, file_idx)
             edge_files.append(out_file)
 
     return edge_files
@@ -280,14 +305,18 @@ def gen_parmetis_input_args(params, schema_map):
         constants.STR_GRAPH_NAME in schema_map
     ), "Graph name is not present in the json file"
     graph_name = schema_map[constants.STR_GRAPH_NAME]
-    if not os.path.isfile(f"{graph_name}_stats.txt"):
+    if not os.path.isfile(
+        os.path.join(params.input_dir, f"{graph_name}_stats.txt")
+    ):
         num_nodes = np.sum(schema_map[constants.STR_NUM_NODES_PER_TYPE])
         num_edges = np.sum(schema_map[constants.STR_NUM_EDGES_PER_TYPE])
         num_ntypes = len(schema_map[constants.STR_NODE_TYPE])
 
         num_constraints = num_ntypes
 
-        with open(f"{graph_name}_stats.txt", "w") as sf:
+        with open(
+            os.path.join(params.input_dir, f"{graph_name}_stats.txt"), "w"
+        ) as sf:
             sf.write(f"{num_nodes} {num_edges} {num_constraints}")
 
     node_files = []
@@ -306,11 +335,11 @@ def gen_parmetis_input_args(params, schema_map):
         logging.info(f" tid-start = {tid_start}, tid-end = {tid_end}")
         logging.info(f" per_rank_range - {per_rank_range}")
 
-        for rank in range(params.num_parts):
-            local_tid_start = tid_start[rank]
-            local_tid_end = tid_end[rank]
+        for part_idx in range(params.num_parts):
+            local_tid_start = tid_start[part_idx]
+            local_tid_end = tid_end[part_idx]
             out_file = os.path.join(
-                outdir, "node_weights_{}_{}.txt".format(ntype_name, rank)
+                outdir, "node_weights_{}_{}.txt".format(ntype_name, part_idx)
             )
             node_files.append(
                 (
@@ -320,27 +349,33 @@ def gen_parmetis_input_args(params, schema_map):
                 )
             )
 
-    nfile = open(os.path.join(params.output_dir, "parmetis_nfiles.txt"), "w")
-    for f in node_files:
-        # format: filename global_node_id_start global_node_id_end(exclusive)
-        nfile.write("{} {} {}\n".format(f[0], f[1], f[2]))
-    nfile.close()
+    with open(
+        os.path.join(params.output_dir, "parmetis_nfiles.txt"), "w"
+    ) as parmetis_nf:
+        for node_file in node_files:
+            # format: filename global_node_id_start global_node_id_end(exclusive)
+            parmetis_nf.write(
+                "{} {} {}\n".format(node_file[0], node_file[1], node_file[2])
+            )
 
     # Regenerate edge files here.
+    # NOTE: The file names need to match the ones generated by gen_edge_files function
     edge_data = schema_map[constants.STR_EDGES]
     edge_files = []
     for etype_name, etype_info in edge_data.items():
         edge_data_files = etype_info[constants.STR_DATA]
         for edge_file_path in edge_data_files:
-            out_file = os.path.basename(edge_file_path)
-            out_file = os.path.join(outdir, "edges_{}".format(out_file))
+            out_file_name = Path(edge_file_path).stem.split(".")[0]
+            out_file = os.path.join(
+                outdir, etype_name, "edges_{}.csv".format(out_file_name)
+            )
             edge_files.append(out_file)
 
     with open(
         os.path.join(params.output_dir, "parmetis_efiles.txt"), "w"
-    ) as efile:
-        for f in edge_files:
-            efile.write("{}\n".format(f))
+    ) as parmetis_efile:
+        for edge_file in edge_files:
+            parmetis_efile.write("{}\n".format(edge_file))
 
 
 def run_preprocess_data(params):
@@ -351,18 +386,23 @@ def run_preprocess_data(params):
     params : argparser object
         An instance of argparser class which stores command line arguments.
     """
-    logging.info(f"Starting to generate ParMETIS files...")
+    logging.info("Starting to generate ParMETIS files...")
     rank = get_proc_info()
-    schema_map = read_json(params.schema_file)
-    gen_node_weights_files(schema_map, params)
-    logging.info(f"Done with node weights....")
 
-    gen_edge_files(schema_map, params)
-    logging.info(f"Done with edge weights...")
+    assert os.path.isdir(
+        params.input_dir
+    ), f"Please check `input_dir` argument: {params.input_dit}."
+
+    schema_map = read_json(os.path.join(params.input_dir, params.schema_file))
+    gen_node_weights_files(schema_map, params)
+    logging.info("Done with node weights....")
+
+    gen_edge_files(rank, schema_map, params)
+    logging.info("Done with edge weights...")
 
     if rank == 0:
         gen_parmetis_input_args(params, schema_map)
-    logging.info(f"Done generating files for ParMETIS run ..")
+    logging.info("Done generating files for ParMETIS run ..")
 
 
 if __name__ == "__main__":
@@ -400,11 +440,19 @@ if __name__ == "__main__":
         type=int,
         help="Total no. of output graph partitions.",
     )
+    parser.add_argument(
+        "--log_level",
+        required=False,
+        type=str,
+        help="Log level to use for execution.",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    )
     params = parser.parse_args()
 
     # Configure logging.
     logging.basicConfig(
-        level="INFO",
+        level=getattr(logging, params.log_level, None),
         format=f"[{platform.node()} \
         %(levelname)s %(asctime)s PID:%(process)d] %(message)s",
     )

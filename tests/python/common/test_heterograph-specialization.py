@@ -4,7 +4,7 @@ import dgl
 import dgl.function as fn
 import numpy as np
 import scipy.sparse as sp
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 D = 5
 
@@ -319,7 +319,7 @@ def test_spmv_3d_feat(idtype):
     a = sp.random(n, n, p, data_rvs=lambda n: np.ones(n))
     g = dgl.DGLGraph(a)
     g = g.astype(idtype).to(F.ctx())
-    m = g.number_of_edges()
+    m = g.num_edges()
 
     # test#1: v2v with adj data
     h = F.randn((n, 5, 5))

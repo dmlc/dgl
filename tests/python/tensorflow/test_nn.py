@@ -11,8 +11,8 @@ import pytest
 import scipy as sp
 import tensorflow as tf
 from tensorflow.keras import layers
-from test_utils import parametrize_idtype
-from test_utils.graph_cases import (
+from utils import parametrize_idtype
+from utils.graph_cases import (
     get_cases,
     random_bipartite,
     random_dglgraph,
@@ -31,7 +31,7 @@ def test_graph_conv(out_dim):
     g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
     adj = tf.sparse.to_dense(
-        tf.sparse.reorder(g.adjacency_matrix(transpose=True, ctx=ctx))
+        tf.sparse.reorder(g.adj_external(transpose=True, ctx=ctx))
     )
 
     conv = nn.GraphConv(5, out_dim, norm="none", bias=True)
@@ -141,7 +141,7 @@ def test_simple_pool():
     print(sum_pool, avg_pool, max_pool, sort_pool)
 
     # test#1: basic
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.num_nodes(), 5))
     h1 = sum_pool(g, h0)
     assert F.allclose(F.squeeze(h1, 0), F.sum(h0, 0))
     h1 = avg_pool(g, h0)
@@ -154,7 +154,7 @@ def test_simple_pool():
     # test#2: batched graph
     g_ = dgl.DGLGraph(nx.path_graph(5)).to(F.ctx())
     bg = dgl.batch([g, g_, g, g_, g])
-    h0 = F.randn((bg.number_of_nodes(), 5))
+    h0 = F.randn((bg.num_nodes(), 5))
     h1 = sum_pool(bg, h0)
     truth = tf.stack(
         [
@@ -205,13 +205,13 @@ def test_glob_att_pool():
     print(gap)
 
     # test#1: basic
-    h0 = F.randn((g.number_of_nodes(), 5))
+    h0 = F.randn((g.num_nodes(), 5))
     h1 = gap(g, h0)
     assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.ndim == 2
 
     # test#2: batched graph
     bg = dgl.batch([g, g, g, g])
-    h0 = F.randn((bg.number_of_nodes(), 5))
+    h0 = F.randn((bg.num_nodes(), 5))
     h1 = gap(bg, h0)
     assert h1.shape[0] == 4 and h1.shape[1] == 10 and h1.ndim == 2
 
@@ -224,7 +224,7 @@ def test_rgcn(O):
     )
     # 5 etypes
     R = 5
-    for i in range(g.number_of_edges()):
+    for i in range(g.num_edges()):
         etype.append(i % 5)
     B = 2
     I = 10
@@ -256,7 +256,7 @@ def test_rgcn(O):
         assert F.allclose(h_new, h_new_low)
 
     # with norm
-    norm = tf.zeros((g.number_of_edges(), 1))
+    norm = tf.zeros((g.num_edges(), 1))
 
     rgc_basis = nn.RelGraphConv(I, O, R, "basis", B)
     rgc_basis_low = nn.RelGraphConv(I, O, R, "basis", B, low_mem=True)
@@ -313,7 +313,7 @@ def test_gat_conv(g, idtype, out_dim, num_heads):
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
-    assert a.shape == (g.number_of_edges(), num_heads, 1)
+    assert a.shape == (g.num_edges(), num_heads, 1)
 
     # test residual connection
     gat = nn.GATConv(5, out_dim, num_heads, residual=True)
@@ -335,7 +335,7 @@ def test_gat_conv_bi(g, idtype, out_dim, num_heads):
     h = gat(g, feat)
     assert h.shape == (g.number_of_dst_nodes(), num_heads, out_dim)
     _, a = gat(g, feat, get_attention=True)
-    assert a.shape == (g.number_of_edges(), num_heads, 1)
+    assert a.shape == (g.num_edges(), num_heads, 1)
 
 
 @parametrize_idtype
@@ -397,7 +397,7 @@ def test_sgc_conv(g, idtype, out_dim):
     g = g.astype(idtype).to(ctx)
     # not cached
     sgc = nn.SGConv(5, out_dim, 3)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.num_nodes(), 5))
 
     h = sgc(g, feat)
     assert h.shape[-1] == out_dim
@@ -416,7 +416,7 @@ def test_appnp_conv(g, idtype):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
     appnp = nn.APPNPConv(10, 0.1)
-    feat = F.randn((g.number_of_nodes(), 5))
+    feat = F.randn((g.num_nodes(), 5))
 
     h = appnp(g, feat)
     assert h.shape[-1] == 5
@@ -610,7 +610,7 @@ def test_dense_cheb_conv(out_dim):
         g = g.to(ctx)
 
         adj = tf.sparse.to_dense(
-            tf.sparse.reorder(g.adjacency_matrix(transpose=True, ctx=ctx))
+            tf.sparse.reorder(g.adj_external(transpose=True, ctx=ctx))
         )
         cheb = nn.ChebConv(5, out_dim, k, None, bias=True)
         dense_cheb = nn.DenseChebConv(5, out_dim, k, bias=True)

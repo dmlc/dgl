@@ -6,6 +6,7 @@ from .appnpconv import APPNPConv
 from .atomicconv import AtomicConv
 from .cfconv import CFConv
 from .chebconv import ChebConv
+from .cugraph_gatconv import CuGraphGATConv
 from .cugraph_relgraphconv import CuGraphRelGraphConv
 from .cugraph_sageconv import CuGraphSAGEConv
 from .densechebconv import DenseChebConv
@@ -14,6 +15,7 @@ from .densesageconv import DenseSAGEConv
 from .dgnconv import DGNConv
 from .dotgatconv import DotGatConv
 from .edgeconv import EdgeConv
+from .edgegatconv import EdgeGATConv
 from .egatconv import EGATConv
 from .egnnconv import EGNNConv
 from .gatconv import GATConv
@@ -40,6 +42,7 @@ __all__ = [
     "GATConv",
     "GATv2Conv",
     "EGATConv",
+    "EdgeGATConv",
     "TAGConv",
     "RelGraphConv",
     "SAGEConv",
@@ -67,6 +70,7 @@ __all__ = [
     "EGNNConv",
     "PNAConv",
     "DGNConv",
+    "CuGraphGATConv",
     "CuGraphRelGraphConv",
     "CuGraphSAGEConv",
 ]

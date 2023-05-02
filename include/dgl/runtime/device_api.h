@@ -50,11 +50,13 @@ class DeviceAPI {
    * @brief Check whether the device is available.
    */
   virtual bool IsAvailable() { return true; }
+
   /**
    * @brief Set the environment device id to ctx
    * @param ctx The context to be set.
    */
   virtual void SetDevice(DGLContext ctx) = 0;
+
   /**
    * @brief Get attribute of specified device.
    * @param ctx The device context
@@ -64,6 +66,7 @@ class DeviceAPI {
    */
   virtual void GetAttr(
       DGLContext ctx, DeviceAttrKind kind, DGLRetValue* rv) = 0;
+
   /**
    * @brief Allocate a data space on device.
    * @param ctx The device context to perform operation.
@@ -76,28 +79,51 @@ class DeviceAPI {
   virtual void* AllocDataSpace(
       DGLContext ctx, size_t nbytes, size_t alignment,
       DGLDataType type_hint) = 0;
+
   /**
    * @brief Free a data space on device.
    * @param ctx The device context to perform operation.
    * @param ptr The data space.
    */
   virtual void FreeDataSpace(DGLContext ctx, void* ptr) = 0;
+
   /**
    * @brief copy data from one place to another
    * @param from The source array.
    * @param from_offset The byte offeset in the from.
    * @param to The target array.
    * @param to_offset The byte offset in the to.
-   * @param num_bytes The size of the memory in bytes
-   * @param ctx_from The source context
-   * @param ctx_to The target context
-   * @param type_hint The type of elements, only neded by certain backends.
-   *                  can be useful for cross device endian converison.
+   * @param num_bytes The size of the memory in bytes.
+   * @param ctx_from The source context.
+   * @param ctx_to The target context.
+   * @param type_hint The type of elements, only needed by certain backends,
+   *     can be useful for cross device endian converison.
    */
   virtual void CopyDataFromTo(
       const void* from, size_t from_offset, void* to, size_t to_offset,
       size_t num_bytes, DGLContext ctx_from, DGLContext ctx_to,
       DGLDataType type_hint) = 0;
+
+  /**
+   * @brief copy data between device and CPU while recording the event.
+   * @param from The source array.
+   * @param from_offset The byte offeset in the from.
+   * @param to The target array.
+   * @param to_offset The byte offset in the to.
+   * @param num_bytes The size of the memory in bytes.
+   * @param ctx_from The source context.
+   * @param ctx_to The target context.
+   * @param type_hint The type of elements, only needed by certain backends,
+   *     can be useful for cross device endian converison.
+   * @param pytorch_ctx The context pointer from PyTorch's CachingHostAllocator.
+   * @note This function only works when PyTorch CachingHostAllocator is
+   *     available.
+   */
+  virtual void RecordedCopyDataFromTo(
+      void* from, size_t from_offset, void* to, size_t to_offset,
+      size_t num_bytes, DGLContext ctx_from, DGLContext ctx_to,
+      DGLDataType type_hint, void* pytorch_ctx) = 0;
+
   /**
    * @brief Create a new stream of execution.
    *
@@ -119,16 +145,19 @@ class DeviceAPI {
    * @param stream The stream to be sync.
    */
   virtual void StreamSync(DGLContext ctx, DGLStreamHandle stream) = 0;
+
   /**
    * @brief Set the stream
    * @param ctx The context to set stream.
    * @param stream The stream to be set.
    */
   virtual void SetStream(DGLContext ctx, DGLStreamHandle stream) {}
+
   /**
    * @brief Get the stream
    */
   virtual DGLStreamHandle GetStream() const { return nullptr; }
+
   /**
    * @brief Synchronize 2 streams of execution.
    *
@@ -161,6 +190,27 @@ class DeviceAPI {
   DGL_DLL virtual void UnpinData(void* ptr);
 
   /**
+   * @brief Allocate the pinned memory using PyTorch CachingHostAllocator.
+   *
+   * @param nbytes The size to be pinned.
+   * @param ctx Pointer to the context pointer from PyTorch's
+   *     CachingHostAllocator.
+   * @param deleter Pointer to the deleter function from PyTorch's
+   *     CachingHostAllocator.
+   */
+  DGL_DLL virtual void* AllocPinnedDataSpace(
+      size_t nbytes, void** ctx, void** deleter);
+
+  /**
+   * @brief 'Deallocate' the pinned memory from PyTorch CachingHostAllocator.
+   * @note It avoids unnecessary cudaFreeHost calls and puts the memory
+   *     block into CachingHostAllocator's free list.
+   * @param deleter Pointer to the deleter function from PyTorch's
+   *     CachingHostAllocator.
+   */
+  DGL_DLL virtual void FreePinnedDataSpace(void** deleter);
+
+  /**
    * @brief Check whether the memory is in pinned memory.
    */
   DGL_DLL virtual bool IsPinned(const void* ptr) { return false; }
@@ -184,6 +234,7 @@ class DeviceAPI {
    */
   DGL_DLL virtual void* AllocWorkspace(
       DGLContext ctx, size_t nbytes, DGLDataType type_hint = {});
+
   /**
    * @brief Free temporal workspace in backend execution.
    *
@@ -201,7 +252,7 @@ class DeviceAPI {
   DGL_DLL static DeviceAPI* Get(DGLContext ctx, bool allow_missing = false);
 
   /**
-   * @brief Get device API based on context.
+   * @brief Get device API based on device type.
    * @param dev_type The device type
    * @param allow_missing Whether allow missing
    * @return The corresponding device API.
