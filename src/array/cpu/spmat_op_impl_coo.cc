@@ -680,10 +680,10 @@ CSRMatrix UnSortedSmallCOOToCSR(COOMatrix coo) {
 }
 
 enum class COOToCSRAlg {
-  alSorted = 0,
-  alUnSortedSmall,
-  alUnSortedSparse,
-  alUnSortedDense
+  sorted = 0,
+  unsortedSmall,
+  unsortedSparse,
+  unsortedDense
 };
 
 /**
@@ -707,7 +707,7 @@ tests/cpp/test_spmat_coo.cc
 template <typename IdType>
 inline COOToCSRAlg WhichCOOToCSR(const COOMatrix &coo) {
   if (coo.row_sorted) {
-    return COOToCSRAlg::alSorted;
+    return COOToCSRAlg::sorted;
   } else {
 #ifdef _WIN32
     // On Windows omp_get_max_threads() gives larger value than later OMP can
@@ -729,13 +729,13 @@ inline COOToCSRAlg WhichCOOToCSR(const COOMatrix &coo) {
       // For relatively small number of non zero elements cost of spread
       // algorithm between threads is bigger than improvements from using
       // many cores
-      return COOToCSRAlg::alUnSortedSmall;
+      return COOToCSRAlg::unsortedSmall;
     } else if (type_scale * NNZ < num_threads * N) {
       // For relatively small number of non zero elements in matrix, sparse
       // parallel version of algorithm is more efficient than dense.
-      return COOToCSRAlg::alUnSortedSparse;
+      return COOToCSRAlg::unsortedSparse;
     }
-    return COOToCSRAlg::alUnSortedDense;
+    return COOToCSRAlg::unsortedDense;
   }
 }
 
@@ -744,14 +744,14 @@ inline COOToCSRAlg WhichCOOToCSR(const COOMatrix &coo) {
 template <DGLDeviceType XPU, typename IdType>
 CSRMatrix COOToCSR(COOMatrix coo) {
   switch (WhichCOOToCSR<IdType>(coo)) {
-    case COOToCSRAlg::alSorted:
+    case COOToCSRAlg::sorted:
       return SortedCOOToCSR<IdType>(coo);
-    case COOToCSRAlg::alUnSortedSmall:
+    case COOToCSRAlg::unsortedSmall:
     default:
       return UnSortedSmallCOOToCSR<IdType>(coo);
-    case COOToCSRAlg::alUnSortedSparse:
+    case COOToCSRAlg::unsortedSparse:
       return UnSortedSparseCOOToCSR<IdType>(coo);
-    case COOToCSRAlg::alUnSortedDense:
+    case COOToCSRAlg::unsortedDense:
       return UnSortedDenseCOOToCSR<IdType>(coo);
   }
 }
