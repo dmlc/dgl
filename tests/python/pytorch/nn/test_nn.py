@@ -1067,6 +1067,21 @@ def test_gated_graph_conv_one_etype(g, idtype):
 
 
 @parametrize_idtype
+@pytest.mark.parametrize("g", get_cases(["homo"], exclude=["zero-degree"]))
+def test_gatedgcn_conv(g, idtype):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    gatedgcnconv = nn.GatedGCNConv(10, 10, 5)
+    feat = F.randn((g.num_nodes(), 10))
+    efeat = F.randn((g.num_edges(), 10))
+    gatedgcnconv = gatedgcnconv.to(ctx)
+
+    h = gatedgcnconv(g, feat, efeat)
+    # current we only do shape check
+    assert h.shape[-1] == 5
+
+
+@parametrize_idtype
 @pytest.mark.parametrize(
     "g", get_cases(["homo", "block-bipartite"], exclude=["zero-degree"])
 )
