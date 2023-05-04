@@ -51,6 +51,7 @@ if(USE_CUDA)
   message(STATUS "Use external CUB/Thrust library for a consistent API and performance.")
   cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
   cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/cub")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/libcudacxx/include")
 endif(USE_CUDA)
 
 # initial variables
