@@ -133,19 +133,16 @@ class MovieLensDataset(DGLDataset):
     Examples
     --------
     >>> from dgl.data import MovieLensDataset
-    >>> 
     >>> dataset = MovieLensDataset(name='ml-100k', valid_ratio=0.2)
     >>> train_g, valid_g, test_g = dataset[0]
     >>> train_g
     Graph(num_nodes=2625, num_edges=128000,
         ndata_schemes={}
         edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64), 'etype': Scheme(shape=(), dtype=torch.float32)})
-    >>>
     >>> # get ratings of edges in the training graph
     >>> ratings = train_g.edata['etype']
     >>> ratings
     tensor([3., 3., 2.,  ..., 4., 4., 2.])
-    >>>
     >>> # get training, validation and testing rating pairs
     >>> train_rating, valid_rating, test_rating = \
     ...     dataset.info['train_rating_pairs'], dataset.info['valid_rating_pairs'], dataset.info['test_rating_pairs']
@@ -153,14 +150,12 @@ class MovieLensDataset(DGLDataset):
     tensor([614, 772, 531, ..., 674, 639, 740])
     >>> train_rating[1] # node index of movies in training rating pairs
     tensor([1236, 954, 1487, ..., 1842, 1631, 1168])
-    >>>
     >>> # get the rating of a certain user-movie rating pair
     >>> u, m = train_rating[0][0], train_rating[1][0]
     >>> eid = train_g.edge_ids(u, m)
     >>> rating = train_g.edata['etype'][eid]
     >>> rating
     tensor([3.])
-    >>>
     >>> # get input features of users and movies respectively
     >>> user_feat, movie_feat = \
     ...     dataset.user_feat, dataset.movie_feat
