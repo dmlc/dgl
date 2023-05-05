@@ -123,7 +123,7 @@ class MovieLensDataset(DGLDataset):
 
     Notes
     -----
-    - Each time when the dataset is loaded with a different setting of training, validation and testing ratio, the param
+    - Each time when the dataset is loaded with a different setting of training, validation and test ratio, the parameter
     :obj:`force_reload` should be set to :obj:`True`. Otherwise the previous split of the dataset will be loaded and the new split will not come into effect.
     updated in the storage.
     - When test_ratio is valid, that is, the dataset is :obj:`"ml-1m"` or :obj:`"ml-10m"`, 
