@@ -93,7 +93,7 @@ class MovieLensDataset(DGLDataset):
         Dataset name. (:obj:`"ml-100k"`, :obj:`"ml-1m"`, :obj:`"ml-10m"`). 
     valid_ratio: int
         Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0). 
-    test_ratio: int
+    test_ratio: int, optional
         Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0) for :obj:`"ml-1m"` and :obj:`"ml-10m"`. This parameter is invalid
         when :obj:`name` is :obj:`"ml-100k"`, since it testing samples are pre-specified. 
         Default: None
