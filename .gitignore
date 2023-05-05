@@ -168,6 +168,3 @@ config.cmake
 
 # model file
 *.pth
-
-# third_parth modules
-third_party/*

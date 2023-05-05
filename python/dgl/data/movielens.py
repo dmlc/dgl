@@ -92,10 +92,10 @@ class MovieLensDataset(DGLDataset):
     name: str
         Dataset name. (:obj:`"ml-100k"`, :obj:`"ml-1m"`, :obj:`"ml-10m"`). 
     valid_ratio: int
-        Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0).
+        Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0). 
     test_ratio: int
-        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0) for ml-1m and ml-10m. This parameter is invalid
-        when :obj:`name` is :obj:`"ml-100k"`, since it testing samples are pre-specified.
+        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0) for :obj:`"ml-1m"` and :obj:`"ml-10m"`. This parameter is invalid
+        when :obj:`name` is :obj:`"ml-100k"`, since it testing samples are pre-specified. 
         Default: None
     raw_dir : str
         Raw file directory to download/contain the input data directory.
@@ -110,6 +110,8 @@ class MovieLensDataset(DGLDataset):
         A transform that takes in a :class:`~dgl.DGLGraph` object and returns
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
+    random_state : int
+        Random seed used for random dataset split. Default: 0
 
     Attributes
     ----------
@@ -132,6 +134,8 @@ class MovieLensDataset(DGLDataset):
     - Each time when the dataset is loaded with a different setting of training, validation and testing ratio, the param
     :obj:`"force_reload"` should be set to :obj:`"True"`. Otherwise the previous split of dataset will be loaded and not be
     updated in the storage.
+    - When test_ratio is valid, that is, the dataset is :obj:`"ml-1m"` or :obj:`"ml-10m"`, 
+    the sum of valid_ratio and test_ratio must be in (0.0, 1.0).
 
     Examples
     --------
@@ -193,6 +197,7 @@ class MovieLensDataset(DGLDataset):
         force_reload=None,
         verbose=None,
         transform=None,
+        random_state=None
     ):
         check_pytorch()
         assert name in [
@@ -201,11 +206,23 @@ class MovieLensDataset(DGLDataset):
             "ml-10m",
         ], f"currently movielens does not support {name}"
 
-        if name in ['ml-1m', 'ml-10m'] and test_ratio is None:
-            raise Exception("test_ratio must be set to (0.0, 1.0) when using ml-1m and ml-10m, otherwise there's no testing dataset.")
+        # test regarding valid and test split ratio
+        assert valid_ratio > 0.0 and valid_ratio < 1.0, f"valid_ratio {valid_ratio} must be in (0.0, 1.0)"
+
+        if name in ['ml-1m', 'ml-10m']:
+            assert test_ratio is not None and test_ratio > 0.0 and test_ratio < 1.0, \
+                f"test_ratio {test_ratio} must be set to (0.0, 1.0) when using ml-1m and ml-10m"
+            assert test_ratio + valid_ratio > 0.0 and test_ratio + valid_ratio < 1.0, \
+                f"test_ratio {test_ratio} + valid_ratio {valid_ratio} must be set to (0.0, 1.0) when using ml-1m and ml-10m"
+
+        if name == 'ml-100k' and test_ratio is not None:
+            raise Warning(f"test_ratio {test_ratio} is not set to None for ml-100k, "
+                           "while testing samples would not be affected by test_ratio since "
+                           "testing samples of ml-100k have been pre-specified.")
 
         self.valid_ratio = valid_ratio
         self.test_ratio = test_ratio
+        self.random_state = random_state
 
         if name == "ml-100k":
             self.genres = GENRES_ML_100K
@@ -258,7 +275,7 @@ class MovieLensDataset(DGLDataset):
             train, valid, _ = split_dataset(
                 indices,
                 [1 - self.valid_ratio, self.valid_ratio, 0.0],
-                shuffle=True,
+                shuffle=True, random_state=self.random_state
             )
             train_rating_data, valid_rating_data = (
                 train_rating_data.iloc[train.indices],
@@ -280,7 +297,7 @@ class MovieLensDataset(DGLDataset):
                     self.valid_ratio,
                     self.test_ratio,
                 ],
-                shuffle=True,
+                shuffle=True, random_state=self.random_state
             )
             train_rating_data, valid_rating_data, test_rating_data = (
                 all_rating_data.iloc[train.indices],
