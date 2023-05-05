@@ -6,8 +6,8 @@ import shutil
 import numpy as np
 import pandas as pd
 
-from ..backend import data_type_dict, tensor
 
+from torch import LongTensor, Tensor
 from ..convert import graph
 from ..transforms.functional import add_reverse_edges
 from .dgl_dataset import DGLDataset
@@ -319,7 +319,7 @@ class MovieLensDataset(DGLDataset):
             reserved_ids_set=set(all_rating_data["movie_id"].values),
         )
 
-        self.user_feat = tensor(self._process_user_fea(user_data)) 
+        self.user_feat = Tensor(self._process_user_feat(user_data)) 
 
         # 3. generate rating pairs
         # Map user/movie to the global id
@@ -352,20 +352,20 @@ class MovieLensDataset(DGLDataset):
         test_v_indices += num_user
 
         self.train_rating_pairs = (
-            tensor(train_u_indices, dtype=data_type_dict["int64"]),
-            tensor(train_v_indices, dtype=data_type_dict["int64"]),
+            LongTensor(train_u_indices),
+            LongTensor(train_v_indices),
         )
         self.valid_rating_pairs = (
-            tensor(valid_u_indices, dtype=data_type_dict["int64"]),
-            tensor(valid_v_indices, dtype=data_type_dict["int64"]),
+            LongTensor(valid_u_indices),
+            LongTensor(valid_v_indices),
         )
         self.test_rating_pairs = (
-            tensor(test_u_indices, dtype=data_type_dict["int64"]),
-            tensor(test_v_indices, dtype=data_type_dict["int64"]),
+            LongTensor(test_u_indices),
+            LongTensor(test_v_indices),
         )
-        self.train_rating_values = tensor(train_labels)
-        self.valid_rating_values = tensor(valid_labels)
-        self.test_rating_values = tensor(test_labels)
+        self.train_rating_values = Tensor(train_labels)
+        self.valid_rating_values = Tensor(valid_labels)
+        self.test_rating_values = Tensor(test_labels)
         self.info = {
             "train_rating_pairs": self.train_rating_pairs,
             "valid_rating_pairs": self.valid_rating_pairs,
@@ -489,7 +489,7 @@ class MovieLensDataset(DGLDataset):
     def info_path(self):
         return os.path.join(self.raw_path, self.name + ".pkl")
 
-    def _process_user_fea(self, user_data):
+    def _process_user_feat(self, user_data):
         if self.name == "ml-100k" or self.name == "ml-1m":
             ages = user_data["age"].values.astype(np.float32)
             gender = (user_data["gender"] == "F").values.astype(np.float32)
@@ -606,7 +606,6 @@ class MovieLensDataset(DGLDataset):
                         )
                         movie_genres[i, genre_map["unknown"]] = 1.0
             for idx, genre_name in enumerate(self.genres):
-                assert idx == genre_map[genre_name]
                 movie_data[genre_name] = movie_genres[:, idx]
             movie_data = movie_data.drop(columns=["genres"])
         else:
@@ -628,7 +627,7 @@ class MovieLensDataset(DGLDataset):
             },
             engine="python",
         )
-        rating_data = rating_data.sample(frac=1).reset_index(drop=True)
+        rating_data = rating_data.reset_index(drop=True)
         return rating_data
 
     def _drop_unseen_nodes(self, data_df, col_name, reserved_ids_set):
