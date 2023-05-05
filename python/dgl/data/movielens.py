@@ -97,7 +97,7 @@ class MovieLensDataset(DGLDataset):
         Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0) for :obj:`"ml-1m"` and :obj:`"ml-10m"`. This parameter is invalid
         when :obj:`name` is :obj:`"ml-100k"`, since it testing samples are pre-specified. 
         Default: None
-    raw_dir : str
+    raw_dir : str, optional
         Raw file directory to download/contain the input data directory.
         Default: ~/.dgl/
     force_reload : bool
