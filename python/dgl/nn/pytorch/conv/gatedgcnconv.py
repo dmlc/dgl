@@ -9,34 +9,37 @@ from .... import function as fn
 
 class GatedGCNConv(nn.Module):
     r"""GatedGCN: Residual Gated Graph ConvNets
-        <https://arxiv.org/pdf/1711.07553v2.pdf>`
+    <https://arxiv.org/pdf/1711.07553v2.pdf>`
 
     .. math::
-        e_{ij}^{l+1}=D^{l} h_{i}^{l}+E^{l} h_{j}^{l}+C^l e_{ij}^{l}
+        e_{ij}^{l+1}=D^l h_{i}^{l}+E^l h_{j}^{l}+C^l e_{ij}^{l}
 
         norm_{ij}=\Sigma_{j\in N_{i}} \sigma\left(e_{ij}^{l+1}\right)+\varepsilon
 
-        \hat{e}_{ij}^{l+1}=\sigma(e_{ij}^{l+1}) \div norm_{ij}
+        \hat{e}_{ij}^{l+1}=\sigma(e_{ij}^{l+1}) / norm_{ij}
 
         h_{i}^{l+1}=A^l h_{i}^{l}+\Sigma_{j \in N_{i}} \hat{e}_{ij}^{l+1} \odot B^l h_{j}^{l}
 
+    where h_{i}^{l} are node features of layer l, \Sigma is sigmoid function,
+    \varepsilon is miniterm, A^l, B^l, C^l, D^l, E^l are linear layers.
+
     Parameters
     ----------
-    in_feats : int
-        Input feature size; i.e, the number of dimensions of :math:`\mathbf{x}_i`.
+    input_feats : int
+        Input feature size; i.e, the number of dimensions of :math:`h_{i}^{l}`.
     edge_feats: int
-        Edge feature size; i.e., the number of dimensions of :math:\mathbf{e}_{j,i}`.
-    out_feats : int
-        Output feature size; i.e., the number of dimensions of :math:`h_i^{(t+1)}`.
+        Edge feature size; i.e., the number of dimensions of :math:`e_{ij}^{l}`.
+    output_feats : int
+        Output feature size; i.e., the number of dimensions of :math:`h_{i}^{l+1}`.
     dropout : float, optional
-        Dropout rate on node and edge feature. Defaults: ``0``.
-    batch_norm : bool
+        Dropout rate on node feature and edge feature. Default: ``0``.
+    batch_norm : bool, optional
         Whether to include batch normalization on node . Default: ``True``.
-    residual : bool
-        Whether to include residual connection . Default: ``True``.
-    activation : callable activation function/layer or None, optional.
-        If not None, applies an activation function to the updated node features.
-        Default: ``None``.
+    residual : bool, optional
+        Whether to include residual connections. Default: ``True``.
+    activation : callable activation function/layer or None, optional
+        If not None, apply an activation function to the updated node features.
+        Default: ``F.relu``.
 
     Example
     -------
@@ -44,17 +47,12 @@ class GatedGCNConv(nn.Module):
     >>> import torch as th
     >>> import torch.nn.functional as F
     >>> from dgl.nn import GatedGCNConv
+
     >>> num_nodes, num_edges = 8, 30
     >>> graph = dgl.rand_graph(num_nodes,num_edges)
-    >>> node_feats = th.rand((num_nodes, 20))
-    >>> edge_feats = th.rand((num_edges, 12))
-    >>> gatedGCN = GatedGCNConv(input_feats=20,
-    ...                         edge_feats=12,
-    ...                         output_feats=20,
-    ...                         dropout=0.2,
-    ...                         batch_norm=True,
-    ...                         residual=True,
-    ...                         activation=F.relu)
+    >>> node_feats = th.rand(num_nodes, 20)
+    >>> edge_feats = th.rand(num_edges, 12)
+    >>> gatedGCN = GatedGCNConv(20, 12, 20)
     >>> new_node_feats, new_edge_feats = gatedGCN(graph, node_feats, edge_feats)
     >>> new_node_feats.shape, new_edge_feats.shape
     (torch.Size([8, 20]), torch.Size([30, 20]))
@@ -72,8 +70,6 @@ class GatedGCNConv(nn.Module):
         activation=F.relu,
     ):
         super(GatedGCNConv, self).__init__()
-        self._input_feats = input_feats
-        self._output_feats = output_feats
         self.dropout = nn.Dropout(dropout)
         self.batch_norm = batch_norm
         self.residual = residual
@@ -81,13 +77,13 @@ class GatedGCNConv(nn.Module):
         if input_feats != output_feats or edge_feats != output_feats:
             self.residual = False
 
-        # Linearly tranform the node features.
+        # Linearly transform the node features.
         self.A = nn.Linear(input_feats, output_feats, bias=True)
         self.B = nn.Linear(input_feats, output_feats, bias=True)
         self.D = nn.Linear(input_feats, output_feats, bias=True)
         self.E = nn.Linear(input_feats, output_feats, bias=True)
 
-        # Linearly tranform the edge features.
+        # Linearly transform the edge features.
         self.C = nn.Linear(edge_feats, output_feats, bias=True)
 
         # Batch normalization on the node/edge features.
@@ -112,14 +108,14 @@ class GatedGCNConv(nn.Module):
             is the number of nodes of the graph and :math:`D_{in}` is the
             input feature size.
         edge_feat : torch.Tensor
-            The input edge feature of shape :math:`(E, D_{in_{edge}})`,
-            where :math:`E` is the number of edges and :math:`D_{in_{edge}}`
+            The input edge feature of shape :math:`(E, D_{edge})`,
+            where :math:`E` is the number of edges and :math:`D_{edge}`
             the size of the edge features.
 
         Returns
         -------
         torch.Tensor
-            The output feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
+            The output node feature of shape :math:`(N, D_{out})` where :math:`D_{out}`
             is the output feature size.
         torch.Tensor
             The output edge feature of shape :math:`(E, D_{out})` where :math:`D_{out}`
@@ -130,15 +126,10 @@ class GatedGCNConv(nn.Module):
             h_in = feat
             e_in = edge_feat
 
-            # Linearly tranform the node features.
-            graph.ndata["h"] = feat
             graph.ndata["Ah"] = self.A(feat)
             graph.ndata["Bh"] = self.B(feat)
             graph.ndata["Dh"] = self.D(feat)
             graph.ndata["Eh"] = self.E(feat)
-
-            # Linearly tranform the edge features.
-            graph.edata["e"] = edge_feat
             graph.edata["Ce"] = self.C(edge_feat)
 
             graph.apply_edges(fn.u_add_v("Dh", "Eh", "DEh"))
