@@ -54,7 +54,7 @@ else:
 
 def check_pytorch():
     """Check if PyTorch is the backend."""
-    if HAS_TORCH is False:
+    if not HAS_TORCH:
         raise ModuleNotFoundError(
             "MovieLensDataset requires PyTorch to be the backend."
         )
