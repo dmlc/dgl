@@ -157,7 +157,7 @@ class MovieLensDataset(DGLDataset):
     >>> train_rating, valid_rating, test_rating = \
     ...     dataset.info['train_rating_pairs'], dataset.info['valid_rating_pairs'], dataset.info['test_rating_pairs']
     >>> train_rating[0] # node index of users in training rating pairs
-    tensor([614, 772, 531,  ..., 674, 639, 740])
+    tensor([614, 772, 531, ..., 674, 639, 740])
     >>> train_rating[1] # node index of movies in training rating pairs
     tensor([1236,  954, 1487,  ..., 1842, 1631, 1168])
     >>>
