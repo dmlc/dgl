@@ -264,7 +264,7 @@ class PGExplainer(nn.Module):
         ...     def __init__(self, in_feats, out_feats):
         ...         super().__init__()
         ...         self.conv = GraphConv(in_feats, out_feats)
-        ...         self.fc = nn.Linear(out_feats, 2)
+        ...         self.fc = nn.Linear(out_feats, out_feats)
         ...         nn.init.xavier_uniform_(self.fc.weight)
         ...
         ...     def forward(self, g, h, embed=False, edge_weight=None):
