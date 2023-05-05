@@ -128,14 +128,14 @@ class ChebConv(nn.Module):
             if self._k > 1:
                 h = unnLaplacian(X_0, D_invsqrt, graph)
                 X_1 = -re_norm * h + X_0 * (re_norm - 1)
-                # Append x_1 to Xt
+                # Append X_1 to Xt
                 Xt.append(X_1)
 
             # Xi(x), i = 2...k
             for _ in range(2, self._k):
                 h = unnLaplacian(X_1, D_invsqrt, graph)
                 X_i = -2 * re_norm * h + X_1 * 2 * (re_norm - 1) - X_0
-                # Add x_1 to Xt
+                # Add X_1 to Xt
                 Xt.append(X_i)
                 X_1, X_0 = X_i, X_1
 
