@@ -258,7 +258,7 @@ class MovieLensDataset(DGLDataset):
                         os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
 
     def process(self):
-        print("Starting processing {} ...".format(self.name))
+        print(f"Starting processing {self.name} ...")
 
         # 0. loading movie features
         self.movie_feat = load_info(os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
