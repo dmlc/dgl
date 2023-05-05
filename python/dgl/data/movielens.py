@@ -253,7 +253,7 @@ class MovieLensDataset(DGLDataset):
         TODO: Here are codes downloading movie features from dgl s3. 
         Right now codes are used for testing only.
         '''
-        dir = os.path.join(os.path.expanduser("~"), ".dgl", "movie_feat")
+        dir = os.path.join(self.raw_dir, "movie_feat")
         shutil.copyfile(os.path.join(dir, self.name + '_movie_feat.pkl'), 
                         os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
 
