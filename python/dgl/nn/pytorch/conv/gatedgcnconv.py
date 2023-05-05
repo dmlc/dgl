@@ -32,9 +32,9 @@ class GatedGCNConv(nn.Module):
     output_feats : int
         Output feature size; i.e., the number of dimensions of :math:`h_{i}^{l+1}`.
     dropout : float, optional
-        Dropout rate on node feature and edge feature. Default: ``0``.
+        Dropout rate on node and edge feature. Default: ``0``.
     batch_norm : bool, optional
-        Whether to include batch normalization on node . Default: ``True``.
+        Whether to include batch normalization on node and edge feature. Default: ``True``.
     residual : bool, optional
         Whether to include residual connections. Default: ``True``.
     activation : callable activation function/layer or None, optional
@@ -110,7 +110,7 @@ class GatedGCNConv(nn.Module):
         edge_feat : torch.Tensor
             The input edge feature of shape :math:`(E, D_{edge})`,
             where :math:`E` is the number of edges and :math:`D_{edge}`
-            the size of the edge features.
+            is the size of the edge features.
 
         Returns
         -------
