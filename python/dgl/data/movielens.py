@@ -54,7 +54,7 @@ else:
 
 def check_pytorch():
     """Check if PyTorch is the backend."""
-    if HAS_TORCH is False:
+    if not HAS_TORCH:
         raise ModuleNotFoundError(
             "MovieLensDataset requires PyTorch to be the backend."
         )
@@ -97,8 +97,8 @@ class MovieLensDataset(DGLDataset):
         Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0) for :obj:`"ml-1m"` and :obj:`"ml-10m"`. This parameter is invalid
         when :obj:`name` is :obj:`"ml-100k"`, since its testing samples are pre-specified. 
         Default: None
-    raw_dir : str
-        Raw file directory to download/contain the input data directory.
+    raw_dir : str, optional
+        Raw file directory to download/store the data.
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
@@ -157,9 +157,9 @@ class MovieLensDataset(DGLDataset):
     >>> train_rating, valid_rating, test_rating = \
     ...     dataset.info['train_rating_pairs'], dataset.info['valid_rating_pairs'], dataset.info['test_rating_pairs']
     >>> train_rating[0] # node index of users in training rating pairs
-    tensor([614, 772, 531,  ..., 674, 639, 740])
+    tensor([614, 772, 531, ..., 674, 639, 740])
     >>> train_rating[1] # node index of movies in training rating pairs
-    tensor([1236,  954, 1487,  ..., 1842, 1631, 1168])
+    tensor([1236, 954, 1487, ..., 1842, 1631, 1168])
     >>>
     >>> # get the rating of a certain user-movie rating pair
     >>> u, m = train_rating[0][0], train_rating[1][0]
