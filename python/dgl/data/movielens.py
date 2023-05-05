@@ -100,27 +100,20 @@ class MovieLensDataset(DGLDataset):
     raw_dir : str, optional
         Raw file directory to download/store the data.
         Default: ~/.dgl/
-    force_reload : bool
-        Whether to reload the dataset. Default: False
-    verbose : bool
-        Whether to print out progress information. Default: True.
-    reverse_edge : bool
-        Whether to add reverse edges in graph. Default: True.
+    force_reload : bool, optional
+        Whether to re-download(if the dataset has not been downloaded) and re-process the dataset. 
+        Default: False
+    verbose : bool, optional
+        Whether to print progress information. Default: True.
     transform : callable, optional
         A transform that takes in a :class:`~dgl.DGLGraph` object and returns
         a transformed version. The :class:`~dgl.DGLGraph` object will be
         transformed before every access.
-    random_state : int
+    random_state : int, optional
         Random seed used for random dataset split. Default: 0
 
     Attributes
     ----------
-    train_graph: dgl.DGLGraph
-        Training graph
-    valid_graph: dgl.DGLGraph
-        Validation graph
-    test_graph: dgl.DGLGraph
-        Testing graph
     user_feat: torch.Tensor
         User features
     movie_feat: torch.Tensor
@@ -130,12 +123,12 @@ class MovieLensDataset(DGLDataset):
 
     Notes
     -----
-    - The number of edges is doubled to form an undirected(bidirected) graph structure.
     - Each time when the dataset is loaded with a different setting of training, validation and testing ratio, the param
     :obj:`"force_reload"` should be set to :obj:`"True"`. Otherwise the previous split of dataset will be loaded and not be
     updated in the storage.
     - When test_ratio is valid, that is, the dataset is :obj:`"ml-1m"` or :obj:`"ml-10m"`, 
     the sum of valid_ratio and test_ratio must be in (0.0, 1.0).
+    - The number of edges is doubled to form an undirected(bidirected) graph structure.
 
     Examples
     --------
