@@ -98,7 +98,7 @@ class MovieLensDataset(DGLDataset):
         when :obj:`name` is :obj:`"ml-100k"`, since it testing samples are pre-specified. 
         Default: None
     raw_dir : str, optional
-        Raw file directory to download/contain the input data directory.
+        Raw file directory to download/store the data.
         Default: ~/.dgl/
     force_reload : bool
         Whether to reload the dataset. Default: False
