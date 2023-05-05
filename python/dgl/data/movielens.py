@@ -93,7 +93,7 @@ class MovieLensDataset(DGLDataset):
         Dataset name. (:obj:`"ml-100k"`, :obj:`"ml-1m"`, :obj:`"ml-10m"`). 
     valid_ratio: int
         Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0). 
-    test_ratio: int
+    test_ratio: int, optional
         Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0) for :obj:`"ml-1m"` and :obj:`"ml-10m"`. This parameter is invalid
         when :obj:`name` is :obj:`"ml-100k"`, since it testing samples are pre-specified. 
         Default: None
@@ -253,12 +253,12 @@ class MovieLensDataset(DGLDataset):
         TODO: Here are codes downloading movie features from dgl s3. 
         Right now codes are used for testing only.
         '''
-        dir = os.path.join(os.path.expanduser("~"), ".dgl", "movie_feat")
+        dir = os.path.join(self.raw_dir, "movie_feat")
         shutil.copyfile(os.path.join(dir, self.name + '_movie_feat.pkl'), 
                         os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
 
     def process(self):
-        print("Starting processing {} ...".format(self.name))
+        print(f"Starting processing {self.name} ...")
 
         # 0. loading movie features
         self.movie_feat = load_info(os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
