@@ -1076,9 +1076,10 @@ def test_gatedgcn_conv(g, idtype):
     efeat = F.randn((g.num_edges(), 10))
     gatedgcnconv = gatedgcnconv.to(ctx)
 
-    h = gatedgcnconv(g, feat, efeat)
+    h, edge_h = gatedgcnconv(g, feat, efeat)
     # current we only do shape check
-    assert h.shape[-1] == 5
+    assert h.shape == (g.number_of_dst_nodes(), 5)
+    assert edge_h.shape == (g.number_of_edges(), 5)
 
 
 @parametrize_idtype
