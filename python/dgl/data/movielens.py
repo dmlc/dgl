@@ -185,7 +185,7 @@ class MovieLensDataset(DGLDataset):
         force_reload=None,
         verbose=None,
         transform=None,
-        random_state=None
+        random_state=0
     ):
         check_pytorch()
         assert name in [
