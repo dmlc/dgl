@@ -1,1 +1,3 @@
+"""GraphBolt"""
+
 from .itemset import *

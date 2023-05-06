@@ -1,3 +1,5 @@
+"""GraphBolt Itemset."""
+
 __all__ = ["ItemSet", "DictItemSet"]
 
 
