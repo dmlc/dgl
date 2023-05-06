@@ -1,9 +1,9 @@
-Gated Graph Convolutional Network(Gated-GCN)
+Gated Graph ConvNet (GatedGCN)
 ============================================
 
-Residual Gated Graph ConvNets [https://arxiv.org/pdf/1711.07553v2.pdf](https://arxiv.org/pdf/1711.07553v2.pdf)
 
-Contributor: [paoxiaode](https://github.com/paoxiaode)
+* paper link: <https://arxiv.org/abs/2003.00982.pdf>
+
 
 ## Dateset
 

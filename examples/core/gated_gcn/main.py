@@ -17,10 +17,10 @@ def train(model, device, data_loader, opt, loss_fn):
         labels = labels.to(torch.float32).to(device)
         logits = model(g, g.edata["feat"], g.ndata["feat"])
         loss = loss_fn(logits, labels)
-        train_loss.append(loss.item())
         opt.zero_grad()
         loss.backward()
         opt.step()
+        train_loss.append(loss.item())
 
     return sum(train_loss) / len(train_loss)
 
@@ -42,7 +42,7 @@ def evaluate(model, device, data_loader, evaluator):
     return evaluator.eval({"y_true": y_true, "y_pred": y_pred})["rocauc"]
 
 
-def main():
+def main(args):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     # Load ogb dataset & evaluator.
@@ -120,6 +120,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    print(args)
 
-    main()
+    main(args)
