@@ -8,10 +8,8 @@ from .... import function as fn
 
 
 class GatedGCNConv(nn.Module):
-    r"""GatedGCN: Residual Gated Graph ConvNets
-    <https://arxiv.org/pdf/1711.07553v2.pdf>
-    Benchmarking Graph Neural Networks
-    <https://arxiv.org/pdf/2003.00982.pdf>
+    r"""Gated graph convolutional layer from `Benchmarking Graph Neural Networks
+    <https://arxiv.org/abs/2003.00982>`__
 
     .. math::
         e_{ij}^{l+1}=D^l h_{i}^{l}+E^l h_{j}^{l}+C^l e_{ij}^{l}
@@ -24,7 +22,7 @@ class GatedGCNConv(nn.Module):
 
     where :math:`h_{i}^{l}` is node :math:`i` feature of layer :math:`l`,
     :math:`e_{ij}^{l}` is edge :math:`ij` feature of layer :math:`l`,
-    :math:`\Sigma` is sigmoid function, :math:`\varepsilon` is miniterm,
+    :math:`\sigma` is sigmoid function, :math:`\varepsilon` is miniterm,
     :math:`A^l, B^l, C^l, D^l, E^l` are linear layers.
 
     Parameters
