@@ -2,6 +2,7 @@ import dgl
 import torch
 from torch.testing import assert_close
 
+
 def test_ItemSet():
     # Node or edge IDs.
     item_set = dgl.ItemSet(torch.arange(0, 5))
@@ -40,6 +41,7 @@ def test_ItemSet():
         assert tails[i] == tail
         assert_close(neg_tails[i], negs)
 
+
 def test_DictItemSet():
     # Node or edge IDs
     ids = {
@@ -76,8 +78,12 @@ def test_DictItemSet():
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     labels = torch.randint(0, 3, (5,))
     node_pairs_dict = {
-        ("user", "like", "item"): dgl.ItemSet((node_pairs[0], node_pairs[1], labels)),
-        ("user", "follow", "user"): dgl.ItemSet((node_pairs[0], node_pairs[1], labels)),
+        ("user", "like", "item"): dgl.ItemSet(
+            (node_pairs[0], node_pairs[1], labels)
+        ),
+        ("user", "follow", "user"): dgl.ItemSet(
+            (node_pairs[0], node_pairs[1], labels)
+        ),
     }
     expected_data = []
     for key, value in node_pairs_dict.items():

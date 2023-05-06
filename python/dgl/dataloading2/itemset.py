@@ -1,7 +1,4 @@
-__all__ = [
-    "ItemSet",
-    "DictItemSet"
-]
+__all__ = ["ItemSet", "DictItemSet"]
 
 
 class ItemSet:
@@ -15,6 +12,7 @@ class ItemSet:
     ----------
     items: Iterable or Tuple[Iterable]
     """
+
     def __init__(self, items):
         if isinstance(items, tuple):
             self._items = items
@@ -31,14 +29,14 @@ class ItemSet:
 
     def __getitem__(self, _):
         raise NotImplementedError
-    
+
     def __len__(self):
         raise NotImplementedError
 
 
 class DictItemSet(ItemSet):
     r"""Itemset wrapping multiple itemsets with keys.
-    
+
     Each item is retrieved by iterating over each itemset and returned with
     corresponding key as a dict.
 
@@ -46,6 +44,7 @@ class DictItemSet(ItemSet):
     ----------
     itemsets: Dict[str, ItemSet]
     """
+
     def __init__(self, itemsets):
         self._itemsets = itemsets
 
