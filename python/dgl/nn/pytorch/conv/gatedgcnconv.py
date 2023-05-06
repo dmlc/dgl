@@ -22,7 +22,7 @@ class GatedGCNConv(nn.Module):
 
     where :math:`h_{i}^{l}` is node :math:`i` feature of layer :math:`l`,
     :math:`e_{ij}^{l}` is edge :math:`ij` feature of layer :math:`l`,
-    :math:`\sigma` is sigmoid function, :math:`\varepsilon` is a small fixed constant 
+    :math:`\sigma` is sigmoid function, :math:`\varepsilon` is a small fixed constant
     for numerical stability, :math:`A^l, B^l, C^l, D^l, E^l` are linear layers.
 
     Parameters
