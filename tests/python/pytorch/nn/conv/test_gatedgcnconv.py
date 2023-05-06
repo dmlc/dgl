@@ -1,13 +1,9 @@
 import io
-import pickle
-from copy import deepcopy
 
 import backend as F
 
-import dgl
 import dgl.nn.pytorch as nn
 import pytest
-import torch
 from utils import parametrize_idtype
 from utils.graph_cases import get_cases
 

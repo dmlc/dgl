@@ -9,7 +9,9 @@ from .... import function as fn
 
 class GatedGCNConv(nn.Module):
     r"""GatedGCN: Residual Gated Graph ConvNets
-    <https://arxiv.org/pdf/1711.07553v2.pdf>`
+    <https://arxiv.org/pdf/1711.07553v2.pdf>
+    Benchmarking Graph Neural Networks
+    <https://arxiv.org/pdf/2003.00982.pdf>
 
     .. math::
         e_{ij}^{l+1}=D^l h_{i}^{l}+E^l h_{j}^{l}+C^l e_{ij}^{l}
@@ -20,8 +22,10 @@ class GatedGCNConv(nn.Module):
 
         h_{i}^{l+1}=A^l h_{i}^{l}+\Sigma_{j \in N_{i}} \hat{e}_{ij}^{l+1} \odot B^l h_{j}^{l}
 
-    where h_{i}^{l} are node features of layer l, \Sigma is sigmoid function,
-    \varepsilon is miniterm, A^l, B^l, C^l, D^l, E^l are linear layers.
+    where :math:`h_{i}^{l}` is node :math:`i` feature of layer :math:`l`,
+    :math:`e_{ij}^{l}` is edge :math:`ij` feature of layer :math:`l`,
+    :math:`\Sigma` is sigmoid function, :math:`\varepsilon` is miniterm,
+    :math:`A^l, B^l, C^l, D^l, E^l` are linear layers.
 
     Parameters
     ----------
@@ -160,12 +164,12 @@ class GatedGCNConv(nn.Module):
                 feat = self.activation(feat)
                 edge_feat = self.activation(edge_feat)
 
-            feat = self.dropout(feat)
-            edge_feat = self.dropout(edge_feat)
-
             # Residual connection.
             if self.residual:
                 feat = h_in + feat
                 edge_feat = e_in + edge_feat
+
+            feat = self.dropout(feat)
+            edge_feat = self.dropout(edge_feat)
 
             return feat, edge_feat
