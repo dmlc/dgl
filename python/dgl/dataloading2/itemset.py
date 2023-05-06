@@ -36,7 +36,7 @@ class ItemSet:
         raise NotImplementedError
 
 
-class DictItemSet(ItemSet):
+class DictItemSet:
     r"""Itemset wrapping multiple itemsets with keys.
 
     Each item is retrieved by iterating over each itemset and returned with
@@ -54,3 +54,9 @@ class DictItemSet(ItemSet):
         for key, itemset in self._itemsets.items():
             for item in itemset:
                 yield {key: item}
+
+    def __getitem__(self, _):
+        raise NotImplementedError
+
+    def __len__(self):
+        raise NotImplementedError
