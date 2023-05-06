@@ -76,7 +76,7 @@ Finally, install the Python binding.
 
 .. code:: bash
 
-   cd ../python
+   cd python
    python setup.py install
    # Build Cython extension
    python setup.py build_ext --inplace
