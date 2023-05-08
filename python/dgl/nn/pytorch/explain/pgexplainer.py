@@ -335,7 +335,6 @@ class PGExplainer(nn.Module):
 
         edge_idx = graph.edges()
 
-        node_size = embed.shape[0]
         row, col = edge_idx
         col_emb = embed[col.long()]
         row_emb = embed[row.long()]
@@ -347,12 +346,6 @@ class PGExplainer(nn.Module):
         values = self.concrete_sample(values, beta=tmp, training=training)
         self.sparse_mask_values = values
 
-        mask_sparse = torch.sparse_coo_tensor(
-            [edge_idx[0].tolist(), edge_idx[1].tolist()],
-            values.tolist(),
-            (node_size, node_size),
-        )
-        mask_sigmoid = mask_sparse.to_dense()
         # set the symmetric edge weights
         reverse_eids = graph.edge_ids(row, col).long()
         edge_mask = (values + values[reverse_eids]) / 2
