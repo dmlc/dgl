@@ -139,4 +139,4 @@ if __name__ == "__main__":
     # test the model
     print("Testing...")
     acc = evaluate(g, features, labels, masks[2], model)
-    print("Test accuracy: {:.4f}".format(acc))
+    print("Test accuracy {:.4f}".format(acc))
