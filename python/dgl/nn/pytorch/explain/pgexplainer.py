@@ -336,7 +336,7 @@ class PGExplainer(nn.Module):
         edge_idx = graph.edges()
 
         node_size = embed.shape[0]
-        col, row = edge_idx
+        row, col = edge_idx
         col_emb = embed[col.long()]
         row_emb = embed[row.long()]
         emb = torch.cat([col_emb, row_emb], dim=-1)
@@ -354,10 +354,10 @@ class PGExplainer(nn.Module):
         )
         mask_sigmoid = mask_sparse.to_dense()
         # set the symmetric edge weights
-        sym_mask = (mask_sigmoid + mask_sigmoid.transpose(0, 1)) / 2
-        edge_mask = sym_mask[edge_idx[0].long(), edge_idx[1].long()]
+        reverse_eids = graph.edge_ids(row, col).long()
+        edge_mask = (values + values[reverse_eids]) / 2
 
-        # inverse the weights before sigmoid
+        # clear the weights and set the edge mask
         self.clear_masks()
         self.set_masks(graph, feat, edge_mask)
 
