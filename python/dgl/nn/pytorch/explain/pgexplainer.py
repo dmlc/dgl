@@ -65,7 +65,7 @@ class PGExplainer(nn.Module):
         )
 
     def set_masks(self, graph, feat, edge_mask=None):
-        r"""Set the edge mask that play a crucial role to explain the
+        r"""Set the edge mask that plays a crucial role to explain the
         prediction made by the GNN for a graph. Initialize learnable edge
         mask if it is None.
 
@@ -100,6 +100,21 @@ class PGExplainer(nn.Module):
         prediction made by the GNN for a graph.
         """
         self.edge_mask = None
+
+    def parameters(self):
+        r"""
+        Returns an iterator over the `Parameter` objects of the `nn.Linear`
+        layers in the `self.elayers` sequential module. Each `Parameter`
+        object contains the weight and bias parameters of an `nn.Linear`
+        layer, as learned during training.
+
+        Returns
+        -------
+        iterator
+            An iterator over the `Parameter` objects of the `nn.Linear`
+            layers in the `self.elayers` sequential module.
+        """
+        return self.elayers.parameters()
 
     def loss(self, prob, ori_pred):
         r"""The loss function that is used to learn the edge
@@ -148,17 +163,17 @@ class PGExplainer(nn.Module):
         loss = pred_loss + size_loss + mask_ent_loss
         return loss
 
-    def concrete_sample(self, log_alpha, beta=1.0, training=True):
+    def concrete_sample(self, w, beta=1.0, training=True):
         r"""Sample from the instantiation of concrete distribution when training.
 
         Parameters
         ----------
-        log_alpha : Tensor
-            A tensor representing the log of the prior probability of activating the gate.
+        w : Tensor
+            A tensor representing the log of the prior probability of choosing the edges.
         beta : float, optional
-            Controls the degree of randomness in the gate's output.
+            Controls the degree of randomness in the output of the sigmoid function.
         training : bool, optional
-            Indicates whether the gate is being used during training or evaluation.
+            Randomness is injected during training.
 
         Returns
         -------
@@ -171,15 +186,15 @@ class PGExplainer(nn.Module):
         """
         if training:
             bias = self.sample_bias
-            random_noise = torch.rand(log_alpha.size()).to(log_alpha.device)
+            random_noise = torch.rand(w.size()).to(w.device)
             random_noise = bias + (1 - 2 * bias) * random_noise
             gate_inputs = torch.log(random_noise) - torch.log(
                 1.0 - random_noise
             )
-            gate_inputs = (gate_inputs + log_alpha) / beta
+            gate_inputs = (gate_inputs + w) / beta
             gate_inputs = torch.sigmoid(gate_inputs)
         else:
-            gate_inputs = torch.sigmoid(log_alpha)
+            gate_inputs = torch.sigmoid(w)
 
         return gate_inputs
 
@@ -298,7 +313,7 @@ class PGExplainer(nn.Module):
         >>> # Train the explainer
         >>> # Define explainer temperature parameter
         >>> init_tmp, final_tmp = 5.0, 1.0
-        >>> optimizer_exp = torch.optim.Adam(explainer.parameters(), lr=0.01)
+        >>> optimizer_exp = th.optim.Adam(explainer.parameters(), lr=0.01)
         >>> for epoch in range(20):
         ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
         ...     for bg, labels in dataloader:
@@ -326,8 +341,7 @@ class PGExplainer(nn.Module):
         row_emb = embed[row.long()]
         emb = torch.cat([col_emb, row_emb], dim=-1)
 
-        for elayer in self.elayers:
-            emb = elayer(emb)
+        emb = self.elayers(emb)
         values = emb.reshape(-1)
 
         values = self.concrete_sample(values, beta=tmp, training=training)
@@ -353,4 +367,4 @@ class PGExplainer(nn.Module):
 
         self.clear_masks()
 
-        return probs, edge_mask
+        return probs.data, edge_mask
