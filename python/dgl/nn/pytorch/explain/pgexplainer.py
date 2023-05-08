@@ -27,7 +27,7 @@ class PGExplainer(nn.Module):
         * Its forward function must have the form
           :attr:`forward(self, graph, nfeat, embed, edge_weight)`.
         * The output of its forward function is the logits if embed=False else
-          return the intermediate node embeddings.
+          the intermediate node embeddings.
     num_features : int
         Node embedding size used by :attr:`model`.
     coff_budget : float, optional
@@ -279,7 +279,7 @@ class PGExplainer(nn.Module):
         ...     def __init__(self, in_feats, out_feats):
         ...         super().__init__()
         ...         self.conv = GraphConv(in_feats, out_feats)
-        ...         self.fc = nn.Linear(out_feats, 2)
+        ...         self.fc = nn.Linear(out_feats, out_feats)
         ...         nn.init.xavier_uniform_(self.fc.weight)
         ...
         ...     def forward(self, g, h, embed=False, edge_weight=None):
@@ -302,7 +302,7 @@ class PGExplainer(nn.Module):
         >>> optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
         >>> for bg, labels in dataloader:
         ...     preds = model(bg, bg.ndata['attr'])
-        ...     loss = criterion(preds.squeeze(1).float(), labels.float())
+        ...     loss = criterion(preds.float(), labels.float())
         ...     optimizer.zero_grad()
         ...     loss.backward()
         ...     optimizer.step()
