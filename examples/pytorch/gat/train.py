@@ -1,7 +1,7 @@
 import argparse
-import time
-import dgl.nn as dglnn
 
+import dgl.nn as dglnn
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         "--num_gpus",
         type=int,
         default=0,
-        help="Number of GPUs used for train and evaluation."
+        help="Number of GPUs used for train and evaluation.",
     )
     args = parser.parse_args()
     print(f"Training with DGL built-in GATConv module.")
