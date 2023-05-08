@@ -1,5 +1,5 @@
 import argparse
-
+import time
 import dgl.nn as dglnn
 
 import torch
@@ -66,6 +66,7 @@ def train(g, features, labels, masks, model):
 
     # training loop
     for epoch in range(200):
+        t0 = time.time()
         model.train()
         logits = model(g, features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
@@ -73,9 +74,10 @@ def train(g, features, labels, masks, model):
         loss.backward()
         optimizer.step()
         acc = evaluate(g, features, labels, val_mask, model)
+        t1 = time.time()
         print(
-            "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(
-                epoch, loss.item(), acc
+            "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} | Time {:.4f}".format(
+                epoch, loss.item(), acc, t1 - t0
             )
         )
 
@@ -87,6 +89,12 @@ if __name__ == "__main__":
         type=str,
         default="cora",
         help="Dataset name ('cora', 'citeseer', 'pubmed').",
+    )
+    parser.add_argument(
+        "--num_gpus",
+        type=int,
+        default=0,
+        help="Number of GPUs used for train and evaluation."
     )
     args = parser.parse_args()
     print(f"Training with DGL built-in GATConv module.")
@@ -104,7 +112,10 @@ if __name__ == "__main__":
     else:
         raise ValueError("Unknown dataset: {}".format(args.dataset))
     g = data[0]
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if args.num_gpus > 0 and torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
     g = g.int().to(device)
     features = g.ndata["feat"]
     labels = g.ndata["label"]
@@ -122,4 +133,4 @@ if __name__ == "__main__":
     # test the model
     print("Testing...")
     acc = evaluate(g, features, labels, masks[2], model)
-    print("Test accuracy {:.4f}".format(acc))
+    print("Test accuracy: {:.4f}".format(acc))
