@@ -302,7 +302,7 @@ class PGExplainer(nn.Module):
         >>> optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
         >>> for bg, labels in dataloader:
         ...     preds = model(bg, bg.ndata['attr'])
-        ...     loss = criterion(preds.float(), labels.float())
+        ...     loss = criterion(preds, labels)
         ...     optimizer.zero_grad()
         ...     loss.backward()
         ...     optimizer.step()
