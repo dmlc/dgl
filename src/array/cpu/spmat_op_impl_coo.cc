@@ -687,23 +687,26 @@ enum class COOToCSRAlg {
 };
 
 /**
-Implementation and Complexity details. N: num_nodes, NNZ: num_edges, P:
-num_threads.
-  1. If row is sorted in COO, SortedCOOToCSR<> is applied. Time: O(NNZ/P).
-Space: O(1).
-  2 If row is NOT sorted in COO and graph is small (small number of NNZ),
-UnSortedSmallCOOToCSR<> is applied. Time: O(NNZ), space O(N).
-  3 If row is NOT sorted in COO and graph is sparse (low average degree),
-UnSortedSparseCOOToCSR<> is applied. Time: O(NNZ/P + N/P + P^2), space O(NNZ +
-P^2).
-  4. If row is NOT sorted in COO and graph is dense (medium/high average
-degree), UnSortedDenseCOOToCSR<> is applied. Time: O(NNZ/P + N/P), space O(NNZ +
-N*P).
-
-Note:
-  If you change this function, change also _TestCOOToCSRalgs in
-tests/cpp/test_spmat_coo.cc
-*/
+ * Chose COO to CSR format conversion algorithm for given COO matrix according
+ * to heuristic based on measured performance.
+ *
+ * Implementation and complexity details. N: num_nodes, NNZ: num_edges, P:
+ * num_threads.
+ *   1. If row is sorted in COO, SortedCOOToCSR<> is applied. Time: O(NNZ/P),
+ * space: O(1).
+ *   2 If row is NOT sorted in COO and graph is small (small number of NNZ),
+ * UnSortedSmallCOOToCSR<> is applied. Time: O(NNZ), space O(N).
+ *   3 If row is NOT sorted in COO and graph is sparse (low average degree),
+ * UnSortedSparseCOOToCSR<> is applied. Time: O(NNZ/P + N/P + P^2),
+ * space O(NNZ + P^2).
+ *   4. If row is NOT sorted in COO and graph is dense (medium/high average
+ * degree), UnSortedDenseCOOToCSR<> is applied. Time: O(NNZ/P + N/P),
+ * space O(NNZ + N*P).
+ *
+ * Note:
+ *   If you change this function, change also _TestCOOToCSRAlgs in
+ * tests/cpp/test_spmat_coo.cc
+ */
 template <typename IdType>
 inline COOToCSRAlg WhichCOOToCSR(const COOMatrix &coo) {
   if (coo.row_sorted) {

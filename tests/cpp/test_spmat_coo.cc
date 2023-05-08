@@ -506,7 +506,7 @@ TEST(SpmatTest, COOGetDataAndIndices) {
 }
 
 template <typename IDX>
-void _TestCOOToCSRalgs() {
+void _TestCOOToCSRAlgs() {
   // Compare results between different CPU COOToCSR implementations.
   // NNZ is chosen to be bigger than the limit for the "small" matrix algorithm.
   // N is set to lay on border between "sparse" and "dense" algorithm choice.
@@ -533,8 +533,10 @@ void _TestCOOToCSRalgs() {
   const int64_t n = type_scale * nnz / num_threads;
   const IDX rows_nad_cols = n + 1;  // should be bigger than sparse/dense border
 
-  // TODO Set seed to random value when gtest allows using --gtest_random_seed
-  // parameter without --gtest_shuffle and report this value for reproductions
+  // Note that it will be better to set the seed to a random value when gtest
+  // allows to use --gtest_random_seed without --gtest_shuffle and report this
+  // value for reproduction. This way we can find unforeseen situations and
+  // potential bugs.
   const auto seed = 123321;
   auto coo = COORandomized<IDX>(rows_nad_cols, nnz, seed);
 
@@ -564,7 +566,7 @@ void _TestCOOToCSRalgs() {
   return;
 }
 
-TEST(SpmatTest, COOToCSRalgs) {
-  _TestCOOToCSRalgs<int32_t>();
-  _TestCOOToCSRalgs<int64_t>();
+TEST(SpmatTest, COOToCSRAlgs) {
+  _TestCOOToCSRAlgs<int32_t>();
+  _TestCOOToCSRAlgs<int64_t>();
 }
