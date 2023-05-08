@@ -2,19 +2,20 @@
 cugraph-ops"""
 # pylint: disable=no-member, arguments-differ, invalid-name, too-many-arguments
 
-import torch
 from torch import nn
 
+from .cugraph_base import CuGraphBaseConv
+
 try:
-    from pylibcugraphops import make_fg_csr, make_mfg_csr
-    from pylibcugraphops.torch.autograd import agg_concat_n2n as SAGEConvAgg
+    from pylibcugraphops.pytorch import SampledCSC, StaticCSC
+    from pylibcugraphops.pytorch.operators import agg_concat_n2n as SAGEConvAgg
+
+    HAS_PYLIBCUGRAPHOPS = True
 except ImportError:
-    has_pylibcugraphops = False
-else:
-    has_pylibcugraphops = True
+    HAS_PYLIBCUGRAPHOPS = False
 
 
-class CuGraphSAGEConv(nn.Module):
+class CuGraphSAGEConv(CuGraphBaseConv):
     r"""An accelerated GraphSAGE layer from `Inductive Representation Learning
     on Large Graphs <https://arxiv.org/pdf/1706.02216.pdf>`__ that leverages the
     highly-optimized aggregation primitives in cugraph-ops:
@@ -27,7 +28,8 @@ class CuGraphSAGEConv(nn.Module):
         (h_{i}^{l}, h_{\mathcal{N}(i)}^{(l+1)})
 
     This module depends on :code:`pylibcugraphops` package, which can be
-    installed via :code:`conda install -c nvidia pylibcugraphops>=23.02`.
+    installed via :code:`conda install -c nvidia pylibcugraphops=23.04`.
+    :code:`pylibcugraphops` 23.04 requires python 3.8.x or 3.10.x.
 
     .. note::
         This is an **experimental** feature.
@@ -74,10 +76,11 @@ class CuGraphSAGEConv(nn.Module):
         feat_drop=0.0,
         bias=True,
     ):
-        if has_pylibcugraphops is False:
+        if HAS_PYLIBCUGRAPHOPS is False:
             raise ModuleNotFoundError(
-                f"{self.__class__.__name__} requires pylibcugraphops >= 23.02. "
-                f"Install via `conda install -c nvidia 'pylibcugraphops>=23.02'`."
+                f"{self.__class__.__name__} requires pylibcugraphops=23.04. "
+                f"Install via `conda install -c nvidia 'pylibcugraphops=23.04'`."
+                f"pylibcugraphops requires Python 3.8 or 3.10."
             )
 
         valid_aggr_types = {"max", "min", "mean", "sum"}
@@ -126,25 +129,17 @@ class CuGraphSAGEConv(nn.Module):
                 max_in_degree = g.in_degrees().max().item()
 
             if max_in_degree < self.MAX_IN_DEGREE_MFG:
-                _graph = make_mfg_csr(
-                    g.dstnodes(),
+                _graph = SampledCSC(
                     offsets,
                     indices,
                     max_in_degree,
                     g.num_src_nodes(),
                 )
             else:
-                offsets_fg = torch.empty(
-                    g.num_src_nodes() + 1,
-                    dtype=offsets.dtype,
-                    device=offsets.device,
-                )
-                offsets_fg[: offsets.numel()] = offsets
-                offsets_fg[offsets.numel() :] = offsets[-1]
-
-                _graph = make_fg_csr(offsets_fg, indices)
+                offsets_fg = self.pad_offsets(offsets, g.num_src_nodes() + 1)
+                _graph = StaticCSC(offsets_fg, indices)
         else:
-            _graph = make_fg_csr(offsets, indices)
+            _graph = StaticCSC(offsets, indices)
 
         feat = self.feat_drop(feat)
         h = SAGEConvAgg(feat, _graph, self.aggr)[: g.num_dst_nodes()]
