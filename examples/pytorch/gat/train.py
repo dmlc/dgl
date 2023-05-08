@@ -57,7 +57,7 @@ def evaluate(g, features, labels, mask, model):
         return correct.item() * 1.0 / len(labels)
 
 
-def train(g, features, labels, masks, model):
+def train(g, features, labels, masks, model, num_epochs):
     # define train/val samples, loss function and optimizer
     train_mask = masks[0]
     val_mask = masks[1]
@@ -65,7 +65,7 @@ def train(g, features, labels, masks, model):
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-3, weight_decay=5e-4)
 
     # training loop
-    for epoch in range(200):
+    for epoch in range(num_epochs):
         t0 = time.time()
         model.train()
         logits = model(g, features)
@@ -89,6 +89,12 @@ if __name__ == "__main__":
         type=str,
         default="cora",
         help="Dataset name ('cora', 'citeseer', 'pubmed').",
+    )
+    parser.add_argument(
+        "--num_epochs",
+        type=int,
+        default=200,
+        help="Number of epochs for train.",
     )
     parser.add_argument(
         "--num_gpus",
@@ -128,7 +134,7 @@ if __name__ == "__main__":
 
     # model training
     print("Training...")
-    train(g, features, labels, masks, model)
+    train(g, features, labels, masks, model, args.num_epochs)
 
     # test the model
     print("Testing...")
