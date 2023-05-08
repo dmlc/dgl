@@ -1,7 +1,8 @@
 import argparse
+import time
 
 import dgl.nn as dglnn
-import time
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
