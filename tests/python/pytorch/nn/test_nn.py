@@ -1811,6 +1811,10 @@ def test_pgexplainer(g, idtype, n_classes):
     feat = F.randn((g.num_nodes(), 5))
     g.ndata["attr"] = feat
 
+    # add reverse edges
+    transform = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform(g)
+
     class Model(th.nn.Module):
         def __init__(self, in_feats, out_feats):
             super(Model, self).__init__()
@@ -1829,8 +1833,6 @@ def test_pgexplainer(g, idtype, n_classes):
 
     model = Model(feat.shape[1], n_classes)
     model = model.to(ctx)
-
-    dataset = [(g, th.tensor([1]))]
 
     explainer = nn.PGExplainer(model, n_classes)
     explainer.train_step(g, g.ndata["attr"], 5.0)
