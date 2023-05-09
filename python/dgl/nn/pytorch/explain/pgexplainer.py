@@ -360,4 +360,4 @@ class PGExplainer(nn.Module):
 
         self.clear_masks()
 
-        return probs.data, edge_mask
+        return (probs, edge_mask) if training else (probs.data, edge_mask)
