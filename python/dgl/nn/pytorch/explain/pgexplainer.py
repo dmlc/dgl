@@ -125,11 +125,12 @@ class PGExplainer(nn.Module):
         prob: Tensor
             Tensor contains a set of probabilities for each possible
             class label of some model for all the batched graphs,
-            which is of shape :math:`(1, L)`, where :math:`L` is the
-            different types of label in the dataset.
+            which is of shape :math:`(B, L)`, where :math:`L` is the
+            different types of label in the dataset and :math:`B` is
+            the batch size.
         ori_pred: Tensor
-            Tensor of shape ::math:`(1, 1)`, representing the original prediction
-            for the graph.
+            Tensor of shape ::math:`(B, 1)`, representing the original prediction
+            for the graph, where :math:`B` is the batch size.
 
         Returns
         -------
@@ -256,8 +257,8 @@ class PGExplainer(nn.Module):
         -------
         Tensor
             Classification probabilities given the masked graph. It is a tensor of
-            shape :math:`(1, L)`, where :math:`L` is the different types of label
-            in the dataset.
+            shape :math:`(B, L)`, where :math:`L` is the different types of label
+            in the dataset, and :math:`B` is the batch size.
         Tensor
             Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
             is the number of edges in the graph. A higher weight suggests a larger
