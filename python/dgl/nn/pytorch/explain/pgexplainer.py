@@ -205,7 +205,7 @@ class PGExplainer(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            A homogeneous graph.
+            Input batched homogeneous graph.
         feat : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
