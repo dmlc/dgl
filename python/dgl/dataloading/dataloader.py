@@ -34,10 +34,8 @@ from ..utils import (
     recursive_apply,
     recursive_apply_pair,
     set_num_threads,
-    version,
 )
 
-PYTORCH_VER = version.parse(torch.__version__)
 PYTHON_EXIT_STATUS = False
 
 
@@ -87,17 +85,7 @@ class _TensorizedDatasetIter(object):
         # convert the type-ID pairs to dictionary
         type_ids = batch[:, 0]
         indices = batch[:, 1]
-        if PYTORCH_VER >= version.parse("1.10.0"):
-            _, type_ids_sortidx = torch.sort(type_ids, stable=True)
-        else:
-            if not self.shuffle:
-                dgl_warning(
-                    "The current output_nodes are out of order even if set shuffle "
-                    "to False in Dataloader, the reason is that the current version "
-                    "of torch dose not support stable sort. "
-                    "Please update torch to 1.10.0 or higher to fix it."
-                )
-            type_ids_sortidx = torch.argsort(type_ids)
+        _, type_ids_sortidx = torch.sort(type_ids, stable=True)
         type_ids = type_ids[type_ids_sortidx]
         indices = indices[type_ids_sortidx]
         type_id_uniq, type_id_count = torch.unique_consecutive(
