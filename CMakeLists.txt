@@ -103,7 +103,7 @@ if(USE_OPENMP)
   message(STATUS "Build with OpenMP.")
 endif(USE_OPENMP)
 
-if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
+if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
   message(STATUS "Disabling LIBXSMM on ${CMAKE_SYSTEM_PROCESSOR}.")
   set(USE_LIBXSMM OFF)
 endif()
