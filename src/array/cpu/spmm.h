@@ -144,7 +144,7 @@ void SpMMSumCsr(
   int cpu_id = libxsmm_cpuid_x86();
   const bool no_libxsmm =
       bcast.use_bcast || std::is_same<DType, double>::value ||
-      std::is_same<DType, BFloat16>::value && cpu_id < LIBXSMM_X86_AVX512 ||
+      (std::is_same<DType, BFloat16>::value && cpu_id < LIBXSMM_X86_AVX512) ||
       !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMSumCsrLibxsmm<IdType, DType, Op>(bcast, csr, ufeat, efeat, out);
@@ -269,7 +269,7 @@ void SpMMCmpCsr(
   int cpu_id = libxsmm_cpuid_x86();
   const bool no_libxsmm =
       bcast.use_bcast || std::is_same<DType, double>::value ||
-      std::is_same<DType, BFloat16>::value && cpu_id < LIBXSMM_X86_AVX512 ||
+      (std::is_same<DType, BFloat16>::value && cpu_id < LIBXSMM_X86_AVX512) ||
       !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(
