@@ -1,11 +1,67 @@
-import argparse
+"""
+Gated Graph Convolutional Network module for graph classification tasks
+"""
 
 import torch
 import torch.nn as nn
+
+import torch.nn.functional as F
 import torch.optim as optim
-from model import GatedGCN
+from dgl.dataloading import GraphDataLoader
+from dgl.nn.pytorch import GatedGCNConv
+from dgl.nn.pytorch.glob import AvgPooling
 from ogb.graphproppred import collate_dgl, DglGraphPropPredDataset, Evaluator
-from torch.utils.data import DataLoader
+from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
+
+
+class GatedGCN(nn.Module):
+    def __init__(
+        self,
+        hid_dim,
+        out_dim,
+        num_layers,
+        dropout=0.2,
+        batch_norm=True,
+        residual=True,
+        activation=F.relu,
+    ):
+        super(GatedGCN, self).__init__()
+
+        self.num_layers = num_layers
+        self.dropout = dropout
+
+        self.node_encoder = AtomEncoder(hid_dim)
+        self.edge_encoder = BondEncoder(hid_dim)
+
+        self.layers = nn.ModuleList()
+        for _ in range(self.num_layers):
+            layer = GatedGCNConv(
+                input_feats=hid_dim,
+                edge_feats=hid_dim,
+                output_feats=hid_dim,
+                dropout=dropout,
+                batch_norm=batch_norm,
+                residual=residual,
+                activation=activation,
+            )
+            self.layers.append(layer)
+
+        self.pooling = AvgPooling()
+        self.output = nn.Linear(hid_dim, out_dim)
+
+    def forward(self, g, node_feat, edge_feat):
+        # Encode node and edge feature.
+        hv = self.node_encoder(node_feat)
+        he = self.edge_encoder(edge_feat)
+
+        # GatedGCNConv layers.
+        for layer in self.layers:
+            hv, he = layer(g, hv, he)
+
+        # Output project.
+        h_g = self.pooling(g, hv)
+
+        return self.output(h_g)
 
 
 def train(model, device, data_loader, opt, loss_fn):
@@ -15,7 +71,7 @@ def train(model, device, data_loader, opt, loss_fn):
     for g, labels in data_loader:
         g = g.to(device)
         labels = labels.to(torch.float32).to(device)
-        logits = model(g, g.edata["feat"], g.ndata["feat"])
+        logits = model(g, g.ndata["feat"], g.edata["feat"])
         loss = loss_fn(logits, labels)
         opt.zero_grad()
         loss.backward()
@@ -32,7 +88,7 @@ def evaluate(model, device, data_loader, evaluator):
 
     for g, labels in data_loader:
         g = g.to(device)
-        logits = model(g, g.edata["feat"], g.ndata["feat"])
+        logits = model(g, g.ndata["feat"], g.edata["feat"])
         y_true.append(labels.detach().cpu())
         y_pred.append(logits.detach().cpu())
 
@@ -42,7 +98,7 @@ def evaluate(model, device, data_loader, evaluator):
     return evaluator.eval({"y_true": y_true, "y_pred": y_pred})["rocauc"]
 
 
-def main(args):
+def main():
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     # Load ogb dataset & evaluator.
@@ -52,41 +108,33 @@ def main(args):
     n_classes = dataset.num_tasks
 
     split_idx = dataset.get_idx_split()
-    train_loader = DataLoader(
+    train_loader = GraphDataLoader(
         dataset[split_idx["train"]],
-        batch_size=args.batch_size,
+        batch_size=32,
         shuffle=True,
         collate_fn=collate_dgl,
     )
-    valid_loader = DataLoader(
-        dataset[split_idx["valid"]],
-        batch_size=args.batch_size,
-        shuffle=False,
-        collate_fn=collate_dgl,
+    valid_loader = GraphDataLoader(
+        dataset[split_idx["valid"]], batch_size=32, collate_fn=collate_dgl
     )
-
-    test_loader = DataLoader(
-        dataset[split_idx["test"]],
-        batch_size=args.batch_size,
-        shuffle=False,
-        collate_fn=collate_dgl,
+    test_loader = GraphDataLoader(
+        dataset[split_idx["test"]], batch_size=32, collate_fn=collate_dgl
     )
 
     # Load model.
     model = GatedGCN(
-        hid_dim=args.hid_dim,
+        hid_dim=256,
         out_dim=n_classes,
-        num_layers=args.num_layers,
-        dropout=args.dropout,
+        num_layers=8,
     ).to(device)
 
     print(model)
 
-    opt = optim.Adam(model.parameters(), lr=args.lr)
+    opt = optim.Adam(model.parameters(), lr=0.01)
     loss_fn = nn.BCEWithLogitsLoss()
 
     print("---------- Training ----------")
-    for epoch in range(args.epochs):
+    for epoch in range(50):
         # Kick off training.
         loss = train(model, device, train_loader, opt, loss_fn)
 
@@ -100,25 +148,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="GatedGCN")
-    # Parameters.
-    parser.add_argument(
-        "--epochs", type=int, default=50, help="Number of epochs to train."
-    )
-    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate.")
-    parser.add_argument(
-        "--dropout", type=float, default=0.2, help="Dropout rate."
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=32, help="Batch size."
-    )
-    parser.add_argument(
-        "--num-layers", type=int, default=7, help="Number of GNN layers."
-    )
-    parser.add_argument(
-        "--hid-dim", type=int, default=256, help="Hidden channel size."
-    )
-
-    args = parser.parse_args()
-
-    main(args)
+    main()
