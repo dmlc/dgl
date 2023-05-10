@@ -3,18 +3,22 @@ import torch
 from torch.testing import assert_close
 
 
-def test_ItemSet():
+def test_ItemSet_node_edge_ids():
     # Node or edge IDs.
     item_set = dgl.ItemSet(torch.arange(0, 5))
     for i, item in enumerate(item_set):
         assert i == item.item()
 
+
+def test_ItemSet_graphs():
     # Graphs.
     graphs = [dgl.rand_graph(10, 20) for _ in range(5)]
     item_set = dgl.ItemSet(graphs)
     for i, item in enumerate(item_set):
         assert graphs[i] == item
 
+
+def test_ItemSet_node_pairs():
     # Node pairs.
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     item_set = dgl.ItemSet(node_pairs)
@@ -22,6 +26,8 @@ def test_ItemSet():
         assert node_pairs[0][i] == src
         assert node_pairs[1][i] == dst
 
+
+def test_ItemSet_node_pairs_labels():
     # Node pairs and labels
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     labels = torch.randint(0, 3, (5,))
@@ -31,6 +37,8 @@ def test_ItemSet():
         assert node_pairs[1][i] == dst
         assert labels[i] == label
 
+
+def test_ItemSet_head_tail_neg_tails():
     # Head, tail and negative tails.
     heads = torch.arange(0, 5)
     tails = torch.arange(5, 10)
@@ -42,11 +50,11 @@ def test_ItemSet():
         assert_close(neg_tails[i], negs)
 
 
-def test_DictItemSet():
+def test_DictItemSet_node_edge_ids():
     # Node or edge IDs
     ids = {
         ("user", "like", "item"): dgl.ItemSet(torch.arange(0, 5)),
-        ("user", "follow", "user"): dgl.ItemSet(torch.arange(5, 10)),
+        ("user", "follow", "user"): dgl.ItemSet(torch.arange(0, 5)),
     }
     chained_ids = []
     for key, value in ids.items():
@@ -58,6 +66,8 @@ def test_DictItemSet():
         assert chained_ids[i][0] in item
         assert item[chained_ids[i][0]] == chained_ids[i][1]
 
+
+def test_DictItemSet_node_pairs():
     # Node pairs.
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     node_pairs_dict = {
@@ -74,6 +84,8 @@ def test_DictItemSet():
         assert expected_data[i][0] in item
         assert item[expected_data[i][0]] == expected_data[i][1]
 
+
+def test_DictItemSet_node_pairs_labels():
     # Node pairs and labels
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     labels = torch.randint(0, 3, (5,))
@@ -95,6 +107,8 @@ def test_DictItemSet():
         assert expected_data[i][0] in item
         assert item[expected_data[i][0]] == expected_data[i][1]
 
+
+def test_DictItemSet_head_tail_neg_tails():
     # Head, tail and negative tails.
     heads = torch.arange(0, 5)
     tails = torch.arange(5, 10)
