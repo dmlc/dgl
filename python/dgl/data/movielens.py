@@ -131,9 +131,9 @@ class MovieLensDataset(DGLDataset):
     >>> train_g
     Graph(num_nodes=2625, num_edges=128000,
         ndata_schemes={}
-        edata_schemes={'_ID': Scheme(shape=(), dtype=torch.int64), 'etype': Scheme(shape=(), dtype=torch.float32)})
+        edata_schemes={'rate': Scheme(shape=(), dtype=torch.float32)})
     >>> # get ratings of edges in the training graph
-    >>> ratings = train_g.edata['etype']
+    >>> ratings = train_g.edata['rate']
     >>> ratings
     tensor([3., 3., 2.,  ..., 4., 4., 2.])
     >>> # get training, validation and testing rating pairs
@@ -146,7 +146,7 @@ class MovieLensDataset(DGLDataset):
     >>> # get the rating of a certain user-movie rating pair
     >>> u, m = train_rating[0][0], train_rating[1][0]
     >>> eid = train_g.edge_ids(u, m)
-    >>> rating = train_g.edata['etype'][eid]
+    >>> rating = train_g.edata['rate'][eid]
     >>> rating
     tensor([3.])
     >>> # get input features of users and movies respectively
@@ -362,9 +362,9 @@ class MovieLensDataset(DGLDataset):
         self.test_graph = graph(
             (self.test_rating_pairs[0], self.test_rating_pairs[1])
         )
-        self.train_graph.edata["etype"] = self.train_rating_values
-        self.valid_graph.edata["etype"] = self.valid_rating_values
-        self.test_graph.edata["etype"] = self.test_rating_values
+        self.train_graph.edata["rate"] = self.train_rating_values
+        self.valid_graph.edata["rate"] = self.valid_rating_values
+        self.test_graph.edata["rate"] = self.test_rating_values
 
         self.train_graph = add_reverse_edges(self.train_graph, copy_edata=True)
         self.valid_graph = add_reverse_edges(self.valid_graph, copy_edata=True)
