@@ -1800,7 +1800,6 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
             "has_scalar_e_feature",
             "row_sorted",
             "col_sorted",
-            "batched",
         ],
     ),
 )
@@ -1819,7 +1818,7 @@ def test_pgexplainer(g, idtype, n_classes):
         def __init__(self, in_feats, out_feats):
             super(Model, self).__init__()
             self.conv = nn.GraphConv(in_feats, out_feats)
-            self.fc = th.nn.Linear(out_feats, 1)
+            self.fc = th.nn.Linear(out_feats, out_feats)
             th.nn.init.xavier_uniform_(self.fc.weight)
 
         def forward(self, g, h, embed=False, edge_weight=None):
@@ -1827,7 +1826,7 @@ def test_pgexplainer(g, idtype, n_classes):
             if not embed:
                 g.ndata["h"] = h
                 hg = dgl.mean_nodes(g, "h")
-                return torch.sigmoid(self.fc(hg))
+                return self.fc(hg)
             else:
                 return h
 
