@@ -30,8 +30,8 @@ def track_time(graph_name, format):
     graph = utils.get_graph(graph_name, from_format)
     graph = graph.to(device)
     if format == ("coo", "csr") and graph_name == "friendster":
-        # mark graph as sorted to check performance for COO matrix marked as sorted
-        # (friendster dataset is already sorted)
+        # Mark graph as sorted to check performance for COO matrix marked as
+        # sorted. Note that friendster dataset is already sorted.
         graph = dgl.graph(graph.edges(), row_sorted=True)
     graph = graph.formats([from_format])
     # dry run
