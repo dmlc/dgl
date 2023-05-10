@@ -1,11 +1,9 @@
 """Torch Module for PGExplainer"""
 import math
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
 
 __all__ = ["PGExplainer"]
 
