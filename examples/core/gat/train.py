@@ -40,7 +40,7 @@ class GAT(nn.Module):
         h = inputs
         for i, layer in enumerate(self.gat_layers):
             h = layer(g, h)
-            if i == 1:  # last layer
+            if i == len(self.gat_layers) - 1:  # last layer
                 h = h.mean(1)
             else:  # other layer(s)
                 h = h.flatten(1)
@@ -59,13 +59,12 @@ def evaluate(g, features, labels, mask, model):
 
 
 def train(g, features, labels, masks, model, num_epochs):
-    # define train/val samples, loss function and optimizer
+    # Define train/val samples, loss function and optimizer
     train_mask = masks[0]
     val_mask = masks[1]
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-3, weight_decay=5e-4)
 
-    # training loop
     for epoch in range(num_epochs):
         t0 = time.time()
         model.train()
@@ -106,7 +105,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"Training with DGL built-in GATConv module.")
 
-    # load and preprocess dataset
+    # Load and preprocess dataset
     transform = (
         AddSelfLoop()
     )  # by default, it will first remove self-loops to prevent duplication
@@ -128,16 +127,14 @@ if __name__ == "__main__":
     labels = g.ndata["label"]
     masks = g.ndata["train_mask"], g.ndata["val_mask"], g.ndata["test_mask"]
 
-    # create GAT model
+    # Create GAT model
     in_size = features.shape[1]
     out_size = data.num_classes
     model = GAT(in_size, 8, out_size, heads=[8, 1]).to(device)
 
-    # model training
     print("Training...")
     train(g, features, labels, masks, model, args.num_epochs)
 
-    # test the model
     print("Testing...")
     acc = evaluate(g, features, labels, masks[2], model)
     print("Test accuracy {:.4f}".format(acc))
