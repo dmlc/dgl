@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+
 import dgl.nn as dglnn
 
 import torch
@@ -119,8 +120,16 @@ def layerwise_infer(
 
 
 def train(
-    proc_id, nprocs, device, g, num_classes, train_idx, val_idx, model,
-    use_uva, num_epochs
+    proc_id,
+    nprocs,
+    device,
+    g,
+    num_classes,
+    train_idx,
+    val_idx,
+    model,
+    use_uva,
+    num_epochs,
 ):
     sampler = NeighborSampler(
         [10, 10, 10], prefetch_node_feats=["feat"], prefetch_labels=["label"]
@@ -154,9 +163,7 @@ def train(
         t0 = time.time()
         model.train()
         total_loss = 0
-        for it, (_, _, blocks) in enumerate(
-            train_dataloader
-        ):
+        for it, (_, _, blocks) in enumerate(train_dataloader):
             x = blocks[0].srcdata["feat"]
             y = blocks[-1].dstdata["label"]
             y_hat = model(blocks, x)
@@ -279,6 +286,7 @@ if __name__ == "__main__":
     )
 
     mp.spawn(
-        run, args=(nprocs, devices, g, data, args.mode, args.num_epochs),
-        nprocs=nprocs
+        run,
+        args=(nprocs, devices, g, data, args.mode, args.num_epochs),
+        nprocs=nprocs,
     )
