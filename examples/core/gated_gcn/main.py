@@ -20,10 +20,10 @@ class GatedGCN(nn.Module):
         hid_dim,
         out_dim,
         num_layers,
-        dropout=0.2,
-        batch_norm=True,
-        residual=True,
-        activation=F.relu,
+        dropout,
+        batch_norm,
+        residual,
+        activation,
     ):
         super(GatedGCN, self).__init__()
 
@@ -126,6 +126,10 @@ def main():
         hid_dim=256,
         out_dim=n_classes,
         num_layers=8,
+        dropout=0.2,
+        batch_norm=True,
+        residual=True,
+        activation=F.relu,
     ).to(device)
 
     print(model)
