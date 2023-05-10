@@ -17,7 +17,6 @@ from .utils import (
     load_graphs,
     load_info,
     save_graphs,
-    save_info,
     split_dataset,
 )
 
@@ -112,15 +111,6 @@ class MovieLensDataset(DGLDataset):
     random_state : int, optional
         Random seed used for random dataset split. Default: 0
 
-    Attributes
-    ----------
-    user_feat: torch.Tensor
-        User features
-    movie_feat: torch.Tensor
-        Movie features
-    info: dict
-        Store training, validation and testing rating pairs.
-
     Notes
     -----
     - Each time when the dataset is loaded with a different setting of training, validation and test ratio, the parameter
@@ -134,7 +124,7 @@ class MovieLensDataset(DGLDataset):
     --------
     >>> from dgl.data import MovieLensDataset
     >>> dataset = MovieLensDataset(name='ml-100k', valid_ratio=0.2)
-    >>> train_g, valid_g, test_g = dataset[0]
+    >>> train_g, valid_g, test_g, info, user_feat, movie_feat = dataset[0]
     >>> train_g
     Graph(num_nodes=2625, num_edges=128000,
         ndata_schemes={}
@@ -145,7 +135,7 @@ class MovieLensDataset(DGLDataset):
     tensor([3., 3., 2.,  ..., 4., 4., 2.])
     >>> # get training, validation and testing rating pairs
     >>> train_rating, valid_rating, test_rating = \
-    ...     dataset.info['train_rating_pairs'], dataset.info['valid_rating_pairs'], dataset.info['test_rating_pairs']
+    ...     info['train_rating_pairs'], info['valid_rating_pairs'], info['test_rating_pairs']
     >>> train_rating[0] # node index of users in training rating pairs
     tensor([614, 772, 531, ..., 674, 639, 740])
     >>> train_rating[1] # node index of movies in training rating pairs
@@ -156,9 +146,7 @@ class MovieLensDataset(DGLDataset):
     >>> rating = train_g.edata['etype'][eid]
     >>> rating
     tensor([3.])
-    >>> # get input features of users and movies respectively
-    >>> user_feat, movie_feat = \
-    ...     dataset.user_feat, dataset.movie_feat
+    >>> # check input features of users and movies respectively
     >>> user_feat
     tensor([[0.4800, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [1.0600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
@@ -383,30 +371,23 @@ class MovieLensDataset(DGLDataset):
         self.test_graph.edata.pop('_ID')
 
     def has_cache(self):
-        if os.path.exists(self.graph_path) and os.path.exists(self.user_feat_path) and os.path.exists(self.movie_feat_path):
+        if os.path.exists(self.graph_path):
             return True
         return False
 
     def save(self):
         save_graphs(
             self.graph_path,
-            [self.train_graph, self.valid_graph, self.test_graph],
+            [self.train_graph, self.valid_graph, self.test_graph, self.info, self.user_feat, self.movie_feat],
         )
-        save_info(self.info_path, self.info)
-        save_info(self.user_feat_path, self.user_feat)
-        save_info(self.movie_feat_path, self.movie_feat)
         if self.verbose:
             print(f"Done saving data into {self.raw_path}.")
 
     def load(self):
         g_list, _ = load_graphs(self.graph_path)
-        self.info = load_info(self.info_path)
-        self.user_feat = load_info(self.user_feat_path)
-        self.movie_feat = load_info(self.movie_feat_path)
-        self.train_graph, self.valid_graph, self.test_graph = (
-            g_list[0],
-            g_list[1],
-            g_list[2],
+        self.train_graph, self.valid_graph, self.test_graph, self.info, self.user_feat, self.movie_feat = (
+            g_list[0], g_list[1], g_list[2],
+            g_list[3], g_list[4], g_list[5]
         )
         if self.verbose:
             print(f"Done loading data from {self.graph_path}.")
@@ -444,13 +425,13 @@ class MovieLensDataset(DGLDataset):
             idx == 0
         ), "This dataset has only one set of training, validation and testing graph"
         if self._transform is None:
-            return self.train_graph, self.valid_graph, self.test_graph
+            return self.train_graph, self.valid_graph, self.test_graph, 
         else:
             return (
                 self._transform(self.train_graph),
                 self._transform(self.valid_graph),
                 self._transform(self.test_graph),
-            )
+            ), self.info, self.user_feat, self.movie_feat
 
     def __len__(self):
         return 1
@@ -464,18 +445,6 @@ class MovieLensDataset(DGLDataset):
     @property
     def graph_path(self):
         return os.path.join(self.raw_path, self.name + ".bin")
-
-    @property
-    def user_feat_path(self):
-        return os.path.join(self.raw_path, self.name + "_user_feat.pkl")
-
-    @property
-    def movie_feat_path(self):
-        return os.path.join(self.raw_path, self.name + "_movie_feat.pkl")
-
-    @property
-    def info_path(self):
-        return os.path.join(self.raw_path, self.name + ".pkl")
 
     def _process_user_feat(self, user_data):
         if self.name == "ml-100k" or self.name == "ml-1m":
