@@ -27,14 +27,6 @@ from torch.utils.data import DataLoader
 
 from .. import utils
 
-# import sys
-# import os
-# dir_path = Path(os.path.dirname(__file__))
-# sys.path.insert(0, dir_path.parent)
-
-
-# import utils
-
 
 class EntityClassify(nn.Module):
     def __init__(
@@ -475,7 +467,7 @@ def track_time(data, dgl_sparse):
     n_gpus = len(devices)
     n_cpus = mp.cpu_count()
 
-    ctx = mp.get_context("fork")
+    ctx = mp.get_context("spawn")
     queue = ctx.Queue()
     procs = []
     num_train_seeds = train_idx.shape[0]

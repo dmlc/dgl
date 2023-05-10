@@ -103,6 +103,11 @@ if(USE_OPENMP)
   message(STATUS "Build with OpenMP.")
 endif(USE_OPENMP)
 
+if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
+  message(STATUS "Disabling LIBXSMM on ${CMAKE_SYSTEM_PROCESSOR}.")
+  set(USE_LIBXSMM OFF)
+endif()
+
 if(USE_LIBXSMM)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_LIBXSMM -DDGL_CPU_LLC_SIZE=40000000")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_LIBXSMM -DDGL_CPU_LLC_SIZE=40000000")
@@ -202,12 +207,16 @@ endif(NOT MSVC)
 
 # Compile LIBXSMM
 if((NOT MSVC) AND USE_LIBXSMM)
+  set(LIBXSMM_COMPILER "${CMAKE_C_COMPILER}")
+  if (APPLE)
+    set(LIBXSMM_COMPILER "${CMAKE_C_COMPILER} -isysroot ${CMAKE_OSX_SYSROOT}")
+  endif()
   if(REBUILD_LIBXSMM)
-    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${CMAKE_C_COMPILER}
+    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${LIBXSMM_COMPILER}
                       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                       )
   else(REBUILD_LIBXSMM)
-    add_custom_target(libxsmm COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${CMAKE_C_COMPILER}
+    add_custom_target(libxsmm COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${LIBXSMM_COMPILER}
                       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                       )
   endif(REBUILD_LIBXSMM)

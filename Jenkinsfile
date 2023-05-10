@@ -122,7 +122,7 @@ def is_authorized(name) {
   def devs = ['dgl-bot', 'noreply', 'Rhett-Ying', 'BarclayII', 'jermainewang',
               'mufeili', 'isratnisa', 'rudongyu', 'classicsong', 'HuXiangkun',
               'hetong007', 'kylasa', 'frozenbugs', 'peizhou001', 'zheng-da',
-              'czkkkkkk',
+              'czkkkkkk', 'thvasilo',
               'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa',
               'kkranen',
               'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
@@ -318,7 +318,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.12"
+                  image "rapidsai/cugraph_stable_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
                   args "-u root"
                   alwaysPull true
                 }
@@ -545,7 +545,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "rapidsai/cugraph_nightly_torch-cuda:11.5-base-ubuntu18.04-py3.9-pytorch1.12.0-rapids22.12"
+                  image "rapidsai/cugraph_stable_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }

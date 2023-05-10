@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from itertools import cycle
 
 import constants
 
@@ -689,7 +690,10 @@ def map_partid_rank(partid, world_size):
 
 
 def generate_read_list(num_files, world_size):
-    """Generate the file IDs to read for each rank.
+    """
+    Generate the file IDs to read for each rank
+    using sequential assignment.
+
 
     Parameters:
     -----------
@@ -701,7 +705,11 @@ def generate_read_list(num_files, world_size):
     Returns:
     --------
     read_list : np.array
-        Array of target file IDs to read.
+        Array of target file IDs to read. Each worker is expected
+        to read the list of file indexes in its rank's index in the list.
+        e.g. rank 0 reads the file indexed in read_list[0], rank 1 the
+        ones in read_list[1] etc.
+
 
     Examples
     --------
@@ -709,3 +717,35 @@ def generate_read_list(num_files, world_size):
     [array([0, 1, 2]), array([3, 4, 5]), array([6, 7]), array([8, 9])]
     """
     return np.array_split(np.arange(num_files), world_size)
+
+
+def generate_roundrobin_read_list(num_files, world_size):
+    """
+    Generate the file IDs to read for each rank
+    using round robin assignment.
+
+    Parameters:
+    -----------
+    num_files : int
+        Total number of files.
+    world_size : int
+        World size of group.
+
+    Returns:
+    --------
+    read_list : np.array
+        Array of target file IDs to read. Each worker is expected
+        to read the list of file indexes in its rank's index in the list.
+        e.g. rank 0 reads the indexed in read_list[0], rank 1 the
+        ones in read_list[1] etc.
+
+    Examples
+    --------
+    >>> tools.distpartitionning.utils.generate_roundrobin_read_list(10, 4)
+    [[0, 4, 8], [1, 5, 9], [2, 6], [3, 7]]
+    """
+    assignment_lists = [[] for _ in range(world_size)]
+    for rank, part_idx in zip(cycle(range(world_size)), range(num_files)):
+        assignment_lists[rank].append(part_idx)
+
+    return assignment_lists

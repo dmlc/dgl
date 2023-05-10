@@ -19,6 +19,7 @@ from .edgegatconv import EdgeGATConv
 from .egatconv import EGATConv
 from .egnnconv import EGNNConv
 from .gatconv import GATConv
+from .gatedgcnconv import GatedGCNConv
 from .gatedgraphconv import GatedGraphConv
 from .gatv2conv import GATv2Conv
 from .gcn2conv import GCN2Conv
@@ -51,6 +52,7 @@ __all__ = [
     "GINConv",
     "GINEConv",
     "GatedGraphConv",
+    "GatedGCNConv",
     "GMMConv",
     "ChebConv",
     "AGNNConv",
