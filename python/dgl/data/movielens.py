@@ -11,12 +11,14 @@ from torch import LongTensor, Tensor
 from ..convert import graph
 from ..transforms.functional import add_reverse_edges
 from .dgl_dataset import DGLDataset
+from ..base import dgl_warning
 
 from .utils import (
     download,
     load_graphs,
     load_info,
     save_graphs,
+    save_info,
     split_dataset,
 )
 
@@ -124,7 +126,7 @@ class MovieLensDataset(DGLDataset):
     --------
     >>> from dgl.data import MovieLensDataset
     >>> dataset = MovieLensDataset(name='ml-100k', valid_ratio=0.2)
-    >>> train_g, valid_g, test_g, info, user_feat, movie_feat = dataset[0]
+    >>> train_g, valid_g, test_g, info = dataset[0]
     >>> train_g
     Graph(num_nodes=2625, num_edges=128000,
         ndata_schemes={}
@@ -146,7 +148,8 @@ class MovieLensDataset(DGLDataset):
     >>> rating = train_g.edata['etype'][eid]
     >>> rating
     tensor([3.])
-    >>> # check input features of users and movies respectively
+    >>> # get input features of users and movies respectively
+    >>> user_feat, movie_feat = info['user_feat'], info['movie_feat']
     >>> user_feat
     tensor([[0.4800, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [1.0600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
@@ -192,7 +195,7 @@ class MovieLensDataset(DGLDataset):
                 f"test_ratio {test_ratio} + valid_ratio {valid_ratio} must be set to (0.0, 1.0) when using ml-1m and ml-10m"
 
         if name == 'ml-100k' and test_ratio is not None:
-            raise Warning(f"test_ratio {test_ratio} is not set to None for ml-100k, "
+            dgl_warning(f"test_ratio {test_ratio} is not set to None for ml-100k, "
                            "while testing samples would not be affected by test_ratio since "
                            "testing samples of ml-100k have been pre-specified.")
 
@@ -237,7 +240,7 @@ class MovieLensDataset(DGLDataset):
         print(f"Starting processing {self.name} ...")
 
         # 0. loading movie features
-        self.movie_feat = load_info(os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
+        movie_feat = load_info(os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
 
         # 1. dataset split: train + (valid + ) test
         if self.name == "ml-100k":
@@ -295,7 +298,7 @@ class MovieLensDataset(DGLDataset):
             reserved_ids_set=set(all_rating_data["movie_id"].values),
         )
 
-        self.user_feat = Tensor(self._process_user_feat(user_data)) 
+        user_feat = Tensor(self._process_user_feat(user_data)) 
 
         # 3. generate rating pairs
         # Map user/movie to the global id
@@ -346,6 +349,8 @@ class MovieLensDataset(DGLDataset):
             "train_rating_pairs": self.train_rating_pairs,
             "valid_rating_pairs": self.valid_rating_pairs,
             "test_rating_pairs": self.test_rating_pairs,
+            "user_feat": user_feat,
+            "movie_feat": movie_feat
         }
 
         # build dgl graph object, which is homogeneous and bidirectional and contains only training edges
@@ -371,26 +376,27 @@ class MovieLensDataset(DGLDataset):
         self.test_graph.edata.pop('_ID')
 
     def has_cache(self):
-        if os.path.exists(self.graph_path):
+        if os.path.exists(self.graph_path) and os.path.exists(self.info_path):
             return True
         return False
 
     def save(self):
         save_graphs(
             self.graph_path,
-            [self.train_graph, self.valid_graph, self.test_graph, self.info, self.user_feat, self.movie_feat],
+            [self.train_graph, self.valid_graph, self.test_graph]
         )
+        save_info(self.info_path, self.info)
         if self.verbose:
             print(f"Done saving data into {self.raw_path}.")
 
     def load(self):
-        g_list, _ = load_graphs(self.graph_path)
-        self.train_graph, self.valid_graph, self.test_graph, self.info, self.user_feat, self.movie_feat = (
-            g_list[0], g_list[1], g_list[2],
-            g_list[3], g_list[4], g_list[5]
+        g_list, self.info = load_graphs(self.graph_path)
+        self.train_graph, self.valid_graph, self.test_graph = (
+            g_list[0], g_list[1], g_list[2]
         )
+        self.info = load_info(self.info_path)
         if self.verbose:
-            print(f"Done loading data from {self.graph_path}.")
+            print(f"Done loading data from {self.raw_path}.")
 
             print(
                 "All rating pairs : {}".format(
@@ -425,13 +431,13 @@ class MovieLensDataset(DGLDataset):
             idx == 0
         ), "This dataset has only one set of training, validation and testing graph"
         if self._transform is None:
-            return self.train_graph, self.valid_graph, self.test_graph, 
+            return self.train_graph, self.valid_graph, self.test_graph, self.info
         else:
             return (
                 self._transform(self.train_graph),
                 self._transform(self.valid_graph),
                 self._transform(self.test_graph),
-            ), self.info, self.user_feat, self.movie_feat
+            ), self.info
 
     def __len__(self):
         return 1
@@ -445,6 +451,10 @@ class MovieLensDataset(DGLDataset):
     @property
     def graph_path(self):
         return os.path.join(self.raw_path, self.name + ".bin")
+    
+    @property
+    def info_path(self):
+        return os.path.join(self.raw_path, self.name + ".pkl")
 
     def _process_user_feat(self, user_data):
         if self.name == "ml-100k" or self.name == "ml-1m":
