@@ -130,8 +130,8 @@ class MovieLensDataset(DGLDataset):
     >>> train_g, valid_g, test_g, info = dataset[0]
     >>> train_g
     Graph(num_nodes=2625, num_edges=128000,
-         ndata_schemes={}
-        edata_schemes={'rate': Scheme(shape=(), dtype=torch.float32)})
+          ndata_schemes={}
+          edata_schemes={'rate': Scheme(shape=(), dtype=torch.float32)})
     >>> # get ratings of edges in the training graph
     >>> ratings = train_g.edata['rate']
     >>> ratings
