@@ -20,6 +20,7 @@ from .utils import (
     save_graphs,
     save_info,
     split_dataset,
+    extract_archive
 )
 
 GENRES_ML_100K = [
@@ -224,9 +225,7 @@ class MovieLensDataset(DGLDataset):
     def download(self):
         zip_file_path = os.path.join(self.raw_dir, self.name + ".zip")
         download(self.url, path=zip_file_path)
-
-        with zipfile.ZipFile(zip_file_path, "r") as archive:
-            archive.extractall(path=self.raw_dir)
+        extract_archive(zip_file_path, self.raw_dir, overwrite=True)
 
         '''
         TODO: Here are codes downloading movie features from dgl s3. 
