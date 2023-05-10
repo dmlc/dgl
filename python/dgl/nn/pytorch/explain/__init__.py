@@ -3,3 +3,4 @@
 
 from .gnnexplainer import *
 from .subgraphx import *
+from .pgexplainer import *
