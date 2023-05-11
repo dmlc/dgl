@@ -19,5 +19,5 @@ python3 node_classification_sage.py --dataset_name ogbn-products
 #### __Results__ with default arguments
 ```
 * Test Accuracy of "ogbn-products": ~0.7632
-* Test Accuracy of "ogbn-arxiv": ~0.5397
+* Test Accuracy of "ogbn-arxiv": ~0.5606
 ```

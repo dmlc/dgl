@@ -116,7 +116,7 @@ def layerwise_infer(
         acc = MF.accuracy(
             pred, labels, task="multiclass", num_classes=num_classes
         )
-        print("Test Accuracy {:.4f}".format(acc.item()))
+        print("Test accuracy {:.4f}".format(acc.item()))
 
 
 def train(
@@ -180,7 +180,7 @@ def train(
         if proc_id == 0:
             print(
                 "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} | "
-                "Time: {:.4f}".format(
+                "Time {:.4f}".format(
                     epoch, total_loss / (it + 1), acc.item(), t1 - t0
                 )
             )
@@ -276,6 +276,8 @@ if __name__ == "__main__":
     g = dataset[0]
     # avoid creating certain graph formats in each sub-process to save momory
     g.create_formats_()
+    if args.dataset_name == "ogbn-arxiv":
+        g = g.add_self_loop()
     # thread limiting to avoid resource competition
     os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // nprocs)
     data = (
