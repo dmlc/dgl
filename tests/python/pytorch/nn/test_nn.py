@@ -1839,6 +1839,39 @@ def test_pgexplainer(g, idtype, n_classes):
     probs, edge_weight = explainer.explain_graph(g, feat)
 
 
+@pytest.mark.parametrize("g", get_cases(["hetero"], exclude=["zero-degree"]))
+@pytest.mark.parametrize("idtype", [F.int64])
+@pytest.mark.parametrize("input_dim", [5])
+@pytest.mark.parametrize("n_classes", [2])
+def test_heteropgexplainer(g, idtype, input_dim, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    g.ndata["attr"] = {
+        ntype: F.randn((g.num_nodes(ntype), input_dim)) for ntype in g.ntypes
+    }
+
+    # add self-loop and reverse edges
+    transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
+    g = transform1(g)
+    transform2 = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform2(g)
+
+    class Model(th.nn.Module):
+        def __init__(self, in_feats, out_feats, canonical_etypes):
+            super(Model, self).__init__()
+            # TODO
+
+        def forward(self, g, h, embed=False, edge_weight=None):
+            # TODO
+            return h
+
+    model = Model(input_dim, n_classes, g.canonical_etypes)
+    model = model.to(ctx)
+
+    explainer = nn.HeteroPGExplainer(model, n_classes)
+    probs, edge_weight = explainer.explain_graph(g, g.ndata["attr"], 5.0)
+
+
 def test_jumping_knowledge():
     ctx = F.ctx()
     num_layers = 2
