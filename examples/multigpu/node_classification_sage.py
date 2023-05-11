@@ -2,6 +2,7 @@ import argparse
 import os
 import time
 
+import dgl
 import dgl.nn as dglnn
 
 import torch
@@ -245,7 +246,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_epochs",
         type=int,
-        default=10,
+        default=20,
         help="Number of epochs for train.",
     )
     parser.add_argument(
@@ -277,7 +278,8 @@ if __name__ == "__main__":
     # avoid creating certain graph formats in each sub-process to save momory
     g.create_formats_()
     if args.dataset_name == "ogbn-arxiv":
-        g = g.add_self_loop()
+        g = dgl.to_bidirected(g, copy_ndata=True)
+        g = dgl.add_self_loop(g)
     # thread limiting to avoid resource competition
     os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // nprocs)
     data = (
