@@ -13,7 +13,7 @@ pip install torchmetrics==0.11.4
 Run with following (available dataset: "ogbn-products", "ogbn-arxiv")
 
 ```bash
-python3 nc_sage.py --dataset_name ogbn-products
+python3 node_classification_sage.py --dataset_name ogbn-products
 ```
 
 #### __Results__ with default arguments
