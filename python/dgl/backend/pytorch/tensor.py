@@ -434,7 +434,8 @@ def zerocopy_to_dgl_ndarray(data):
     return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
 
-if version.parse(th.__version__) >= version.parse("2.0.0"):
+# NGC PyTorch containers are shipping alpha version PyTorch.
+if version.parse(th.__version__) >= version.parse("2.0.0a0"):
 
     def check_is_view(input):
         assert (
