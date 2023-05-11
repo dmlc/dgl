@@ -105,7 +105,7 @@ def evaluate(model, g, num_classes, dataloader):
 
 
 def layerwise_infer(
-    proc_id, device, g, num_classes, nid, model, use_uva, batch_size=2**16
+    proc_id, device, g, num_classes, nid, model, use_uva, batch_size=2**10
 ):
     model.eval()
     with torch.no_grad():
