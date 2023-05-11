@@ -10,7 +10,7 @@ import torch.optim as optim
 from dgl.dataloading import GraphDataLoader
 from dgl.nn.pytorch import GatedGCNConv
 from dgl.nn.pytorch.glob import AvgPooling
-from ogb.graphproppred import collate_dgl, DglGraphPropPredDataset, Evaluator
+from ogb.graphproppred import DglGraphPropPredDataset, Evaluator
 from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
 
 
@@ -112,14 +112,9 @@ def main():
         dataset[split_idx["train"]],
         batch_size=32,
         shuffle=True,
-        collate_fn=collate_dgl,
     )
-    valid_loader = GraphDataLoader(
-        dataset[split_idx["valid"]], batch_size=32, collate_fn=collate_dgl
-    )
-    test_loader = GraphDataLoader(
-        dataset[split_idx["test"]], batch_size=32, collate_fn=collate_dgl
-    )
+    valid_loader = GraphDataLoader(dataset[split_idx["valid"]], batch_size=32)
+    test_loader = GraphDataLoader(dataset[split_idx["test"]], batch_size=32)
 
     # Load model.
     model = GatedGCN(hid_dim=256, out_dim=n_classes, num_layers=8).to(device)

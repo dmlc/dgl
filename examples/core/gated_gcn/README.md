@@ -15,7 +15,7 @@ How to run
 ----------
 
 ```bash
-python main.py
+python train.py
 ```
 
 ## Summary
