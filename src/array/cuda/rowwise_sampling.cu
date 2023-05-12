@@ -287,13 +287,12 @@ COOMatrix _CSRRowWiseSamplingUniform(
   cudaEvent_t copyEvent;
   CUDA_CALL(cudaEventCreate(&copyEvent));
 
-  // TODO(dlasalle): use pinned memory to overlap with the actual sampling, and
-  // wait on a cudaevent
-  IdType new_len;
+  auto new_len_tensor = NDArray::PinnedEmpty(
+      {1}, DGLDataTypeTraits<IdType>::dtype, DGLContext{kDGLCPU, 0});
+
   // copy using the internal current stream
-  device->CopyDataFromTo(
-      out_ptr, num_rows * sizeof(new_len), &new_len, 0, sizeof(new_len), ctx,
-      DGLContext{kDGLCPU, 0}, mat.indptr->dtype);
+  CUDA_CALL(cudaMemcpyAsync(new_len_tensor->data, out_ptr + num_rows,
+      sizeof(IdType), cudaMemcpyDeviceToHost, stream));
   CUDA_CALL(cudaEventRecord(copyEvent, stream));
 
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
@@ -322,6 +321,7 @@ COOMatrix _CSRRowWiseSamplingUniform(
   CUDA_CALL(cudaEventSynchronize(copyEvent));
   CUDA_CALL(cudaEventDestroy(copyEvent));
 
+  const IdType new_len = static_cast<const IdType*>(new_len_tensor->data)[0];
   picked_row = picked_row.CreateView({new_len}, picked_row->dtype);
   picked_col = picked_col.CreateView({new_len}, picked_col->dtype);
   picked_idx = picked_idx.CreateView({new_len}, picked_idx->dtype);
