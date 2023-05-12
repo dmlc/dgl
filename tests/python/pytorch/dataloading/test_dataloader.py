@@ -224,7 +224,7 @@ def _check_device(data):
 
 
 @parametrize_idtype
-@pytest.mark.parametrize("sampler_name", ["full"])
+@pytest.mark.parametrize("sampler_name", ["full", "neighbor"])
 @pytest.mark.parametrize(
     "mode", ["cpu", "uva_cuda_indices", "uva_cpu_indices", "pure_gpu"]
 )
@@ -235,7 +235,7 @@ def test_ddp_dataloader_decompose_dataset(
 ):
     if torch.cuda.device_count() < nprocs and mode != "cpu":
         pytest.skip(
-            "DDP dataloader requires enough number of GPUs for UVA and GPU sampling."
+            "DDP dataloader needs sufficient GPUs for UVA and GPU sampling."
         )
     if mode != "cpu" and F.ctx() == F.cpu():
         pytest.skip("UVA and GPU sampling require a GPU.")
@@ -248,7 +248,6 @@ def test_ddp_dataloader_decompose_dataset(
     sampler = {
         "full": dgl.dataloading.MultiLayerFullNeighborSampler(2),
         "neighbor": dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
-        "neighbor2": dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
     }[sampler_name]
     indices = F.copy_to(F.arange(0, g.num_nodes(), idtype), F.cpu())
     data = indices, sampler
