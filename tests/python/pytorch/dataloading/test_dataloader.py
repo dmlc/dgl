@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 import torch
 import torch.distributed as dist
+import torch.multiprocessing as mp
 from utils import parametrize_idtype
 
 
@@ -221,6 +222,99 @@ def _check_device(data):
     else:
         assert data.device == F.ctx()
 
+@parametrize_idtype
+@pytest.mark.parametrize("sampler_name", ["full"])
+@pytest.mark.parametrize(
+    "mode", ["cpu", "uva_cuda_indices", "uva_cpu_indices", "pure_gpu"]
+)
+@pytest.mark.parametrize("nprocs", [1, 4])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_ddp_dataloader_decompose_dataset(idtype, sampler_name, mode, nprocs, drop_last):
+    if torch.cuda.device_count() < nprocs and mode != "cpu":
+            pytest.skip("DDP dataloader requires enough number of GPUs for UVA and GPU sampling.")
+    if mode != "cpu" and F.ctx() == F.cpu():
+        pytest.skip("UVA and GPU sampling require a GPU.")
+
+    if os.name == "nt":
+        pytest.skip("PyTorch 1.13.0+ has problems in Windows DDP...")
+    g, _, _, _ = _create_homogeneous()
+    g = g.to(F.cpu()).astype(idtype)
+
+    sampler = {
+        "full": dgl.dataloading.MultiLayerFullNeighborSampler(2),
+        "neighbor": dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
+        "neighbor2": dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
+    }[sampler_name]
+    indices = F.copy_to(F.arange(0, g.num_nodes(), idtype), F.cpu())
+    data = indices, sampler
+    arguments = mode, idtype, drop_last
+    g.create_formats_()
+    os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // nprocs)
+    mp.spawn(_ddp_runner, args=(nprocs, g, data, arguments), nprocs=nprocs)
+
+def _ddp_runner(proc_id, nprocs, g, data, args):
+    mode, idtype, drop_last = args
+    indices, sampler = data
+    if mode == "cpu":
+        device = torch.device("cpu")
+    else:
+        device = torch.device(proc_id)
+        torch.cuda.set_device(device)
+    if mode == "pure_gpu":
+        g = g.to(F.cuda())
+    if mode in ("cpu", "uva_cpu_indices"):
+        indices = indices.cpu()
+    else:
+        indices = indices.cuda()
+
+    dist.init_process_group(
+        "nccl" if mode != "cpu" else "gloo",
+        "tcp://127.0.0.1:12347",
+        world_size=nprocs,
+        rank=proc_id,
+    )
+    use_uva = mode.startswith("uva")
+    batch_size = g.num_nodes()
+    shuffle = False
+    for num_workers in [1, 4] if mode == "cpu" else [0]:
+        dataloader = dgl.dataloading.DataLoader(
+            g,
+            indices,
+            sampler,
+            device=device,
+            batch_size= batch_size,#g1.num_nodes(),
+            num_workers=num_workers,
+            use_uva=use_uva,
+            use_ddp=True,
+            drop_last=drop_last,
+            shuffle=shuffle,
+        )
+        max_nid = [0]
+        for i, (input_nodes, output_nodes, blocks) in enumerate(dataloader):
+            block = blocks[-1]
+            o_src, o_dst = block.edges()
+            src_nodes_id = block.srcdata[dgl.NID][o_src]
+            dst_nodes_id = block.dstdata[dgl.NID][o_dst]
+            max_nid.append(np.max(dst_nodes_id.cpu().numpy()))
+
+        local_max = torch.tensor(np.max(max_nid))
+        if torch.distributed.get_backend() == "nccl":
+            local_max = local_max.cuda()
+        dist.reduce(local_max, 0, op=dist.ReduceOp.MAX)
+        if proc_id == 0:
+            if drop_last and not shuffle and local_max > 0:
+                print('local max', len(indices)
+                    - len(indices)%nprocs - 1
+                    - (len(indices)//nprocs) % batch_size)
+                assert (
+                    local_max.item()
+                    == len(indices)
+                    - len(indices)%nprocs - 1
+                    - (len(indices)//nprocs) % batch_size
+                )
+            elif not drop_last:
+                assert local_max == len(indices) - 1
+    dist.destroy_process_group()
 
 @parametrize_idtype
 @pytest.mark.parametrize("sampler_name", ["full", "neighbor", "neighbor2"])
