@@ -222,6 +222,7 @@ def _check_device(data):
     else:
         assert data.device == F.ctx()
 
+
 @parametrize_idtype
 @pytest.mark.parametrize("sampler_name", ["full"])
 @pytest.mark.parametrize(
@@ -229,9 +230,13 @@ def _check_device(data):
 )
 @pytest.mark.parametrize("nprocs", [1, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ddp_dataloader_decompose_dataset(idtype, sampler_name, mode, nprocs, drop_last):
+def test_ddp_dataloader_decompose_dataset(
+    idtype, sampler_name, mode, nprocs, drop_last
+):
     if torch.cuda.device_count() < nprocs and mode != "cpu":
-            pytest.skip("DDP dataloader requires enough number of GPUs for UVA and GPU sampling.")
+        pytest.skip(
+            "DDP dataloader requires enough number of GPUs for UVA and GPU sampling."
+        )
     if mode != "cpu" and F.ctx() == F.cpu():
         pytest.skip("UVA and GPU sampling require a GPU.")
 
@@ -251,6 +256,7 @@ def test_ddp_dataloader_decompose_dataset(idtype, sampler_name, mode, nprocs, dr
     g.create_formats_()
     os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // nprocs)
     mp.spawn(_ddp_runner, args=(nprocs, g, data, arguments), nprocs=nprocs)
+
 
 def _ddp_runner(proc_id, nprocs, g, data, args):
     mode, idtype, drop_last = args
@@ -282,7 +288,7 @@ def _ddp_runner(proc_id, nprocs, g, data, args):
             indices,
             sampler,
             device=device,
-            batch_size= batch_size,#g1.num_nodes(),
+            batch_size=batch_size,  # g1.num_nodes(),
             num_workers=num_workers,
             use_uva=use_uva,
             use_ddp=True,
@@ -303,18 +309,24 @@ def _ddp_runner(proc_id, nprocs, g, data, args):
         dist.reduce(local_max, 0, op=dist.ReduceOp.MAX)
         if proc_id == 0:
             if drop_last and not shuffle and local_max > 0:
-                print('local max', len(indices)
-                    - len(indices)%nprocs - 1
-                    - (len(indices)//nprocs) % batch_size)
+                print(
+                    "local max",
+                    len(indices)
+                    - len(indices) % nprocs
+                    - 1
+                    - (len(indices) // nprocs) % batch_size,
+                )
                 assert (
                     local_max.item()
                     == len(indices)
-                    - len(indices)%nprocs - 1
-                    - (len(indices)//nprocs) % batch_size
+                    - len(indices) % nprocs
+                    - 1
+                    - (len(indices) // nprocs) % batch_size
                 )
             elif not drop_last:
                 assert local_max == len(indices) - 1
     dist.destroy_process_group()
+
 
 @parametrize_idtype
 @pytest.mark.parametrize("sampler_name", ["full", "neighbor", "neighbor2"])
