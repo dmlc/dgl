@@ -168,7 +168,6 @@ def _split_to_local_id_tensor(indices, bounds):
     num_samples = bounds[1] - bounds[0]
     id_tensor = torch.empty(num_samples, dtype=dtype, device=device)
 
-    # if needs padding when drop_last = False
     if bounds[1] > len(indices):
         remainder = len(indices) - bounds[0]
         id_tensor[0:remainder] = indices[bounds[0] :]
