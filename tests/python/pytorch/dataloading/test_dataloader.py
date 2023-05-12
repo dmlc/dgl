@@ -309,13 +309,6 @@ def _ddp_runner(proc_id, nprocs, g, data, args):
         dist.reduce(local_max, 0, op=dist.ReduceOp.MAX)
         if proc_id == 0:
             if drop_last and not shuffle and local_max > 0:
-                print(
-                    "local max",
-                    len(indices)
-                    - len(indices) % nprocs
-                    - 1
-                    - (len(indices) // nprocs) % batch_size,
-                )
                 assert (
                     local_max.item()
                     == len(indices)

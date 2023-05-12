@@ -159,13 +159,6 @@ def _split_to_local_id_tensor_from_mapping(indices, keys, bounds):
             if split_id_offset2 == num_samples:
                 break
         index_offset = index_offset2
-
-    # padding locally when drop_last = False
-    if split_id_offset2 < num_samples:
-        padding_size = bounds[1] - index_offset2
-        id_tensor[split_id_offset2:, 0] = id_tensor[:padding_size, 0]
-        id_tensor[split_id_offset2:, 1] = id_tensor[:padding_size, 1]
-        assert num_samples == split_id_offset2 + padding_size
     return id_tensor
 
 
@@ -177,11 +170,8 @@ def _split_to_local_id_tensor(indices, bounds):
 
     # if needs padding when drop_last = False
     if bounds[1] > len(indices):
-        reminder = len(indices) - bounds[0]
-        id_tensor[0:reminder] = indices[bounds[0] :]
-        padding_size = bounds[1] - len(indices)
-        # padding id_tensor from start
-        id_tensor[reminder:] = indices[:padding_size]
+        remainder = len(indices) - bounds[0]
+        id_tensor[0:remainder] = indices[bounds[0] :]
     else:
         id_tensor = indices[bounds[0] : bounds[1]]
     return id_tensor
@@ -261,8 +251,8 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
 
 
 def _decompose_one_dimension(length, world_size, rank, drop_last):
-    if drop_last and length % world_size != 0:
-        num_samples = math.ceil((length - world_size) / world_size)
+    if drop_last:
+        num_samples = math.floor(length / world_size)
     else:
         num_samples = math.ceil(length / world_size)
     sta = rank * num_samples
@@ -298,7 +288,8 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         )
         self.num_samples = self.local_bounds[1] - self.local_bounds[0]
         self.local_num_indices = self.num_samples
-        if not drop_last and self.local_bounds[1] > len_indices:
+        if self.local_bounds[1] > len_indices:
+            assert not drop_last
             self.local_num_indices = len_indices - self.local_bounds[0]
 
         if isinstance(indices, Mapping):
@@ -310,8 +301,16 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
                 indices, self.local_bounds
             )
         self._device = self._id_tensor.device
-        # always on cpu
-        self._indices = torch.arange(self.num_samples, dtype=torch.int64)
+        # padding self._indices when drop_last = False (self._indices always on cpu)
+        self._indices = torch.empty(self.num_samples, dtype=torch.int64)
+        torch.arange(
+            self.local_num_indices, out=self._indices[: self.local_num_indices]
+        )
+        if not drop_last:
+            torch.arange(
+                self.num_samples - self.local_num_indices,
+                out=self._indices[self.local_num_indices :],
+            )
         assert len(self._id_tensor) == self.num_samples
 
     def shuffle(self):
