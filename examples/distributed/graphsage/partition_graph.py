@@ -1,10 +1,9 @@
 import argparse
 import time
-import torch as th
 
 import dgl
+import torch as th
 from dgl.data import RedditDataset
-
 from ogb.nodeproppred import DglNodePropPredDataset
 
 
