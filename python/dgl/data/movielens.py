@@ -191,12 +191,12 @@ class MovieLensDataset(DGLDataset):
 
         if name in ['ml-1m', 'ml-10m']:
             assert test_ratio is not None and test_ratio > 0.0 and test_ratio < 1.0, \
-                f"test_ratio {test_ratio} must be set to (0.0, 1.0) when using ml-1m and ml-10m"
+                f"test_ratio({test_ratio}) must be set to (0.0, 1.0) when using ml-1m and ml-10m"
             assert test_ratio + valid_ratio > 0.0 and test_ratio + valid_ratio < 1.0, \
-                f"test_ratio {test_ratio} + valid_ratio {valid_ratio} must be set to (0.0, 1.0) when using ml-1m and ml-10m"
+                f"test_ratio({test_ratio}) + valid_ratio({valid_ratio}) must be set to (0.0, 1.0) when using ml-1m and ml-10m"
 
         if name == 'ml-100k' and test_ratio is not None:
-            dgl_warning(f"test_ratio {test_ratio} is not set to None for ml-100k, "
+            dgl_warning(f"test_ratio({test_ratio}) is not set to None for ml-100k, "
                            "while testing samples would not be affected by test_ratio since "
                            "testing samples of ml-100k have been pre-specified.")
 
@@ -222,6 +222,17 @@ class MovieLensDataset(DGLDataset):
             transform=transform,
         )
 
+    def check_version(self):
+        valid_ratio, test_ratio = load_info(self.version_path)
+        if self.valid_ratio == valid_ratio and (self.test_ratio == test_ratio if self.name != "ml-100k" else True):
+            return True
+        else:
+            print(f"At least one of current valid({self.valid_ratio}) and test({self.test_ratio}, ignored if using ml-100k) ratio "
+                   "are not the same as the last setting"
+                  f"(valid: {valid_ratio}, test: {test_ratio}, ignore test if using ml-100k). "
+                   "MovieLens will be re-processed with the new dataset split setting.")
+            return False
+    
     def download(self):
         zip_file_path = os.path.join(self.raw_dir, self.name + ".zip")
         download(self.url, path=zip_file_path)
@@ -375,7 +386,8 @@ class MovieLensDataset(DGLDataset):
         self.test_graph.edata.pop('_ID')
 
     def has_cache(self):
-        if os.path.exists(self.graph_path) and os.path.exists(self.info_path):
+        if os.path.exists(self.graph_path) and os.path.exists(self.info_path) and \
+           os.path.exists(self.version_path) and self.check_version():
             return True
         return False
 
@@ -385,6 +397,7 @@ class MovieLensDataset(DGLDataset):
             [self.train_graph, self.valid_graph, self.test_graph]
         )
         save_info(self.info_path, self.info)
+        save_info(self.version_path, [self.valid_ratio, self.test_ratio])
         if self.verbose:
             print(f"Done saving data into {self.raw_path}.")
 
@@ -454,6 +467,10 @@ class MovieLensDataset(DGLDataset):
     @property
     def info_path(self):
         return os.path.join(self.raw_path, self.name + ".pkl")
+    
+    @property
+    def version_path(self):
+        return os.path.join(self.raw_path, self.name + "_version.pkl")
 
     def _process_user_feat(self, user_data):
         if self.name == "ml-100k" or self.name == "ml-1m":
@@ -620,3 +637,9 @@ class MovieLensDataset(DGLDataset):
         )
         rating_values = rating_data["rating"].values.astype(np.float32)
         return rating_pairs[0], rating_pairs[1], rating_values
+    
+    def __repr__(self):
+        return (
+            f'Dataset("{self.name}", num_graphs={len(self)},'
+            + f" save_path={self.raw_path}), valid_ratio={self.valid_ratio}, test_ratio={self.test_ratio}"
+        )
