@@ -116,9 +116,6 @@ class MovieLensDataset(DGLDataset):
 
     Notes
     -----
-    - Each time when the dataset is loaded with a different setting of training, validation and test ratio, the parameter
-    :obj:`force_reload` should be set to :obj:`True`. Otherwise the previous split of the dataset will be loaded and the new split will not come into effect.
-    updated in the storage.
     - When test_ratio is valid, that is, the dataset is :obj:`"ml-1m"` or :obj:`"ml-10m"`, 
     the sum of valid_ratio and test_ratio must be in (0.0, 1.0).
     - The number of edges is doubled to form an undirected(bidirected) graph structure.
