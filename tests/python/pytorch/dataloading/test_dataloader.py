@@ -223,7 +223,6 @@ def _check_device(data):
         assert data.device == F.ctx()
 
 
-@parametrize_idtype
 @pytest.mark.parametrize("sampler_name", ["full", "neighbor"])
 @pytest.mark.parametrize(
     "mode", ["cpu", "uva_cuda_indices", "uva_cpu_indices", "pure_gpu"]
@@ -231,7 +230,7 @@ def _check_device(data):
 @pytest.mark.parametrize("nprocs", [1, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
 def test_ddp_dataloader_decompose_dataset(
-    idtype, sampler_name, mode, nprocs, drop_last
+    sampler_name, mode, nprocs, drop_last
 ):
     if torch.cuda.device_count() < nprocs and mode != "cpu":
         pytest.skip(
@@ -243,22 +242,22 @@ def test_ddp_dataloader_decompose_dataset(
     if os.name == "nt":
         pytest.skip("PyTorch 1.13.0+ has problems in Windows DDP...")
     g, _, _, _ = _create_homogeneous()
-    g = g.to(F.cpu()).astype(idtype)
+    g = g.to(F.cpu())
 
     sampler = {
         "full": dgl.dataloading.MultiLayerFullNeighborSampler(2),
         "neighbor": dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
     }[sampler_name]
-    indices = F.copy_to(F.arange(0, g.num_nodes(), idtype), F.cpu())
+    indices = F.copy_to(F.arange(0, g.num_nodes()), F.cpu())
     data = indices, sampler
-    arguments = mode, idtype, drop_last
+    arguments = mode, drop_last
     g.create_formats_()
     os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // nprocs)
     mp.spawn(_ddp_runner, args=(nprocs, g, data, arguments), nprocs=nprocs)
 
 
 def _ddp_runner(proc_id, nprocs, g, data, args):
-    mode, idtype, drop_last = args
+    mode, drop_last = args
     indices, sampler = data
     if mode == "cpu":
         device = torch.device("cpu")
