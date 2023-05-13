@@ -179,15 +179,12 @@ struct CUDAIdsMapper {
 
       CUDA_CALL(cudaEventCreate(&copyEvent));
       new_len_tensor = NDArray::PinnedEmpty(
-          {num_ntypes},
-          DGLDataTypeTraits<int64_t>::dtype,
+          {num_ntypes}, DGLDataTypeTraits<int64_t>::dtype,
           DGLContext{kDGLCPU, 0});
       CUDA_CALL(cudaMemcpyAsync(
-          new_len_tensor->data,
-          count_lhs_device,
+          new_len_tensor->data, count_lhs_device,
           sizeof(*num_nodes_per_type.data()) * num_ntypes,
-          cudaMemcpyDeviceToHost,
-          stream));
+          cudaMemcpyDeviceToHost, stream));
       CUDA_CALL(cudaEventRecord(copyEvent, stream));
 
       device->FreeWorkspace(ctx, count_lhs_device);
@@ -208,7 +205,8 @@ struct CUDAIdsMapper {
 
       // Resize lhs nodes.
       for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
-        num_nodes_per_type[ntype] = static_cast<int64_t*>(new_len_tensor->data)[ntype];
+        num_nodes_per_type[ntype] =
+            static_cast<int64_t*>(new_len_tensor->data)[ntype];
         lhs_nodes[ntype]->shape[0] = num_nodes_per_type[ntype];
       }
     }

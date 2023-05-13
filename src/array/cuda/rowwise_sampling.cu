@@ -291,8 +291,9 @@ COOMatrix _CSRRowWiseSamplingUniform(
       {1}, DGLDataTypeTraits<IdType>::dtype, DGLContext{kDGLCPU, 0});
 
   // copy using the internal current stream
-  CUDA_CALL(cudaMemcpyAsync(new_len_tensor->data, out_ptr + num_rows,
-      sizeof(IdType), cudaMemcpyDeviceToHost, stream));
+  CUDA_CALL(cudaMemcpyAsync(
+      new_len_tensor->data, out_ptr + num_rows, sizeof(IdType),
+      cudaMemcpyDeviceToHost, stream));
   CUDA_CALL(cudaEventRecord(copyEvent, stream));
 
   const uint64_t random_seed = RandomEngine::ThreadLocal()->RandInt(1000000000);
