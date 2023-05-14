@@ -278,7 +278,7 @@ def run(args, device, data):
                 )
             )
 
-    return np.mean(epoch_time[-int(args.num_epochs * 0.8):]), test_acc
+    return np.mean(epoch_time[-int(args.num_epochs * 0.8) :]), test_acc
 
 
 def main(args):
