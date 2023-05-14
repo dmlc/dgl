@@ -160,7 +160,7 @@ def run(args, device, data):
         args.dropout,
     )
     model = model.to(device)
-    if args.num_gpus == -1:
+    if args.num_gpus == 0:
         model = th.nn.parallel.DistributedDataParallel(model)
     else:
         model = th.nn.parallel.DistributedDataParallel(
@@ -334,7 +334,7 @@ def main(args):
         )
     )
     del local_nid
-    if args.num_gpus == -1:
+    if args.num_gpus == 0:
         device = th.device("cpu")
     else:
         dev_id = g.rank() % args.num_gpus
@@ -380,8 +380,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_gpus",
         type=int,
-        default=-1,
-        help="the number of GPU device. Use -1 for CPU training",
+        default=0,
+        help="the number of GPU device. Use 0 for CPU training",
     )
     parser.add_argument("--num_epochs", type=int, default=20)
     parser.add_argument("--num_hidden", type=int, default=16)
