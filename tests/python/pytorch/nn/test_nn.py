@@ -1849,7 +1849,6 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     feat = {
         ntype: F.randn((g.num_nodes(ntype), input_dim)) for ntype in g.ntypes
     }
-    embed_dim = input_dim
 
     # add self-loop and reverse edges
     transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
@@ -1858,18 +1857,38 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     g = transform2(g)
 
     class Model(th.nn.Module):
-        def __init__(self, in_feats, out_feats, canonical_etypes):
+        def __init__(self, in_feats, embed_dim, out_feats, canonical_etypes):
             super(Model, self).__init__()
-            # TODO
+            self.conv = nn.HeteroGraphConv(
+                {
+                    c_etype: nn.GraphConv(in_feats, embed_dim)
+                    for c_etype in canonical_etypes
+                }
+            )
+            self.fc = th.nn.Linear(embed_dim, out_feats)
 
         def forward(self, g, h, embed=False, edge_weight=None):
-            # TODO
-            if embed:
-                return h
+            if edge_weight is not None:
+                mod_kwargs = {
+                    etype: {"edge_weight": mask}
+                    for etype, mask in edge_weight.items()
+                }
+                h = self.conv(g, h, mod_kwargs=mod_kwargs)
             else:
-                return torch.randn(n_classes)
+                h = self.conv(g, h)
 
-    model = Model(input_dim, n_classes, g.canonical_etypes)
+            if not embed:
+                with g.local_scope():
+                    g.ndata["h"] = h
+                    hg = 0
+                    for ntype in g.ntypes:
+                        hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
+                    return self.fc(hg)
+            else:
+                return h
+
+    embed_dim = input_dim
+    model = Model(input_dim, embed_dim, n_classes, g.canonical_etypes)
     model = model.to(ctx)
 
     explainer = nn.HeteroPGExplainer(model, embed_dim)
