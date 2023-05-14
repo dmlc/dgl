@@ -1846,9 +1846,10 @@ def test_pgexplainer(g, idtype, n_classes):
 def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     ctx = F.ctx()
     g = g.astype(idtype).to(ctx)
-    g.ndata["attr"] = {
+    feat = {
         ntype: F.randn((g.num_nodes(ntype), input_dim)) for ntype in g.ntypes
     }
+    embed_dim = input_dim
 
     # add self-loop and reverse edges
     transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
@@ -1863,13 +1864,18 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
 
         def forward(self, g, h, embed=False, edge_weight=None):
             # TODO
-            return h
+            if embed:
+                return h
+            else:
+                return torch.randn(n_classes)
 
     model = Model(input_dim, n_classes, g.canonical_etypes)
     model = model.to(ctx)
 
-    explainer = nn.HeteroPGExplainer(model, n_classes)
-    probs, edge_weight = explainer.explain_graph(g, g.ndata["attr"], 5.0)
+    explainer = nn.HeteroPGExplainer(model, embed_dim)
+    explainer.train_step(g, feat, 5.0)
+
+    probs, edge_weight = explainer.explain_graph(g, feat)
 
 
 def test_jumping_knowledge():

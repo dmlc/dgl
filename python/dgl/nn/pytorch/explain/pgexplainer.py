@@ -416,7 +416,7 @@ class HeteroPGExplainer(nn.Module):
             nn.Linear(self.num_features, 64), nn.ReLU(), nn.Linear(64, 1)
         )
 
-    def set_masks(self, graph, feat, edge_mask=None):
+    def set_masks(self, graph, edge_mask=None):
         r"""Set the edge mask that plays a crucial role to explain the
         prediction made by the GNN for a graph. Initialize learnable edge
         mask if it is None.
@@ -424,7 +424,7 @@ class HeteroPGExplainer(nn.Module):
         Parameters
         ----------
         graph : DGLGraph
-            A heterogeneous graph.
+            A homogenous graph.
         feat : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
@@ -434,7 +434,7 @@ class HeteroPGExplainer(nn.Module):
             graph. The values are within range :math:`(0, 1)`. The higher,
             the more important. Default: None.
         """
-        num_nodes, _ = feat.shape
+        num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
 
         init_bias = self.init_bias
@@ -689,16 +689,15 @@ class HeteroPGExplainer(nn.Module):
         self.elayers = self.elayers.to(graph.device)
 
         embed = self.model(graph, feat, embed=True, **kwargs)
-        embed = embed.data
+        embed_nids = torch.concat([nodes for nodes in embed.values()])
 
-        # TODO: convert embeddings to homogeneous rep.
         g_homo = to_homogeneous(graph, store_type=True)
 
         edge_idx = g_homo.edges()
 
         col, row = edge_idx
-        col_emb = embed[col.long()]
-        row_emb = embed[row.long()]
+        col_emb = embed_nids[col.long()]
+        row_emb = embed_nids[row.long()]
         emb = torch.cat([col_emb, row_emb], dim=-1)
 
         emb = self.elayers(emb)
@@ -711,7 +710,7 @@ class HeteroPGExplainer(nn.Module):
         edge_mask = (values + values[reverse_eids]) / 2
 
         self.clear_masks()
-        self.set_masks(g_homo, feat, edge_mask)
+        self.set_masks(g_homo, edge_mask)
 
         # TODO: convert edge mask to hetero rep.
 
