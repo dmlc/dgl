@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .... import to_homogeneous
+from .... import to_homogeneous, ETYPE
 
 __all__ = ["PGExplainer", "HeteroPGExplainer"]
 
@@ -583,8 +583,7 @@ class HeteroPGExplainer(nn.Module):
             graph, feat, tmp=tmp, training=True, **kwargs
         )
 
-        # TODO: convert mask rep. from hetero to homo
-        self.edge_mask = edge_mask
+        self.edge_mask = torch.concat([mask for mask in edge_mask.values()])
 
         loss_tmp = self.loss(prob, pred)
         return loss_tmp
@@ -689,17 +688,16 @@ class HeteroPGExplainer(nn.Module):
         self.elayers = self.elayers.to(graph.device)
 
         embed = self.model(graph, feat, embed=True, **kwargs)
-        embed_nids = torch.concat([nodes for nodes in embed.values()])
+        embed_flat = torch.concat([e_embed for e_embed in embed.values()])
 
         g_homo = to_homogeneous(graph, store_type=True)
 
         edge_idx = g_homo.edges()
 
         col, row = edge_idx
-        col_emb = embed_nids[col.long()]
-        row_emb = embed_nids[row.long()]
+        col_emb = embed_flat[col.long()]
+        row_emb = embed_flat[row.long()]
         emb = torch.cat([col_emb, row_emb], dim=-1)
-
         emb = self.elayers(emb)
         values = emb.reshape(-1)
 
@@ -707,15 +705,22 @@ class HeteroPGExplainer(nn.Module):
         self.sparse_mask_values = values
 
         reverse_eids = g_homo.edge_ids(row, col).long()
-        edge_mask = (values + values[reverse_eids]) / 2
+        edge_mask_homo = (values + values[reverse_eids]) / 2
 
         self.clear_masks()
-        self.set_masks(g_homo, edge_mask)
+        self.set_masks(g_homo, edge_mask_homo)
 
-        # TODO: convert edge mask to hetero rep.
+        edge_mask = {
+            etype: edge_mask_homo[
+                (g_homo.edata[ETYPE] == graph.get_etype_id(etype))
+                .nonzero()
+                .squeeze()
+            ]
+            for etype in graph.canonical_etypes
+        }
 
         # the model prediction with the updated edge mask
-        logits = self.model(graph, feat, edge_weight=self.edge_mask, **kwargs)
+        logits = self.model(graph, feat, edge_weight=edge_mask, **kwargs)
         probs = F.softmax(logits, dim=-1)
 
         self.clear_masks()
