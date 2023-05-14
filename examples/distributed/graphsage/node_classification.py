@@ -173,9 +173,11 @@ def run(args, device, data):
     # Training loop.
     iter_tput = []
     epoch = 0
-    for epoch in range(args.num_epochs):
+    epoch_time = []
+    test_acc = 0.0
+    for _ in range(args.num_epochs):
+        epoch += 1
         tic = time.time()
-
         sample_time = 0
         forward_time = 0
         backward_time = 0
@@ -218,7 +220,7 @@ def run(args, device, data):
                 step_t = time.time() - tic_step
                 step_time.append(step_t)
                 iter_tput.append(len(blocks[-1].dstdata[dgl.NID]) / step_t)
-                if step % args.log_every == 0:
+                if (step + 1) % args.log_every == 0:
                     acc = compute_acc(batch_pred, batch_labels)
                     gpu_mem_alloc = (
                         th.cuda.max_memory_allocated() / 1000000
@@ -236,7 +238,7 @@ def run(args, device, data):
                             acc.item(),
                             np.mean(iter_tput[3:]),
                             gpu_mem_alloc,
-                            np.sum(step_time[-args.log_every :]),
+                            np.mean(step_time[-args.log_every :]),
                         )
                     )
                 start = time.time()
@@ -256,9 +258,9 @@ def run(args, device, data):
                 num_inputs,
             )
         )
-        epoch += 1
+        epoch_time.append(toc - tic)
 
-        if epoch % args.eval_every == 0 and epoch != 0:
+        if epoch % args.eval_every == 0 or epoch == args.num_epochs:
             start = time.time()
             val_acc, test_acc = evaluate(
                 model.module,
@@ -275,6 +277,8 @@ def run(args, device, data):
                     g.rank(), val_acc, test_acc, time.time() - start
                 )
             )
+
+    return np.mean(epoch_time[-int(args.num_epochs * 0.8):]), test_acc
 
 
 def main(args):
@@ -342,10 +346,17 @@ def main(args):
         del labels
     print(f"Number of classes: {n_classes}")
 
-    # Pack data
+    # Pack data.
     in_feats = g.ndata["features"].shape[1]
     data = train_nid, val_nid, test_nid, in_feats, n_classes, g
-    run(args, device, data)
+
+    # Train and evaluate.
+    epoch_time, test_acc = run(args, device, data)
+    print(
+        f"Summary of node classification(GraphSAGE): GraphName "
+        f"{args.graph_name} | TrainEpochTime(mean) {epoch_time} "
+        f"| TestAccuracy {test_acc}"
+    )
 
 
 if __name__ == "__main__":
