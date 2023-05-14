@@ -354,8 +354,8 @@ def main(args):
     epoch_time, test_acc = run(args, device, data)
     print(
         f"Summary of node classification(GraphSAGE): GraphName "
-        f"{args.graph_name} | TrainEpochTime(mean) {epoch_time} "
-        f"| TestAccuracy {test_acc}"
+        f"{args.graph_name} | TrainEpochTime(mean) {epoch_time:.4f} "
+        f"| TestAccuracy {test_acc:.4f}"
     )
 
 
