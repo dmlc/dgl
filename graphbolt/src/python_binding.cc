@@ -1,4 +1,4 @@
- /**
+/**
  *  Copyright (c) 2023 by Contributors
  * @file python_binding.cc
  * @brief Graph bolt library Python binding.
