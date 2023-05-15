@@ -4,8 +4,6 @@ import sys
 
 import torch
 
-from .._ffi import libinfo
-
 from .data_fetcher import *
 from .graph_storage import *
 from .minibatch_sampler import *
@@ -25,12 +23,10 @@ def load_graphbolt():
     else:
         raise NotImplementedError("Unsupported system: %s" % sys.platform)
 
-    dirname = os.path.dirname('/home/ubuntu/workspace/dgl/graphbolt/build/')
-    path = os.path.join(dirname, basename)
-    dirname = os.path.dirname(libinfo.find_lib_path()[0])
-    path = os.path.join(dirname, "dgl_sparse", basename)
+    dirname = os.getenv("DGL_HOME")
+    path = os.path.join(dirname, "graphbolt/build", basename)
     if not os.path.exists(path):
-        raise FileNotFoundError(f"Cannot find DGL C++ sparse library at {path}")
+        raise FileNotFoundError(f"Cannot find DGL C++ graphbolt library at {path}")
 
     try:
         torch.classes.load_library(path)

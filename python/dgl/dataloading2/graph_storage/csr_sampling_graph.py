@@ -3,10 +3,11 @@
 from typing import List, Optional, Tuple
 
 import numpy as np
-
 import torch
 
 from .base import Graph
+
+HeteroInfo = Tuple[List[str], List[str], torch.tensor, torch.tensor]
 
 
 class CSRSamplingGraph(Graph):
@@ -15,17 +16,6 @@ class CSRSamplingGraph(Graph):
 
     def __init__(self, c_csr_graph: torch.ScriptObject):
         self.c_csr_graph = c_csr_graph
-
-    def set_hetero_info(
-        self,
-        ntypes: List[str],
-        etypes: List[str],
-        type_per_edge: torch.tensor,
-        node_type_offset: torch.tensor,
-    ):
-        self.c_csr_graph.set_hetero_info(
-            ntypes, etypes, type_per_edge, node_type_offset
-        )
 
     @property
     def num_rows(self) -> int:
@@ -116,7 +106,9 @@ class CSRSamplingGraph(Graph):
             returns None.
         """
         return (
-            self.c_csr_graph.node_types() if self.is_heterogeneous() else None
+            self.c_csr_graph.node_types()
+            if self.c_csr_graph.is_heterogeneous()
+            else None
         )
 
     @property
@@ -131,7 +123,9 @@ class CSRSamplingGraph(Graph):
             returns None.
         """
         return (
-            self.c_csr_graph.edge_types() if self.is_heterogeneous() else None
+            self.c_csr_graph.edge_types()
+            if self.c_csr_graph.is_heterogeneous()
+            else None
         )
 
     @property
@@ -148,7 +142,7 @@ class CSRSamplingGraph(Graph):
         """
         return (
             self.c_csr_graph.node_type_offset()
-            if self.is_heterogeneous()
+            if self.c_csr_graph.is_heterogeneous()
             else None
         )
 
@@ -165,45 +159,45 @@ class CSRSamplingGraph(Graph):
         """
         return (
             self.c_csr_graph.per_edge_type()
-            if self.is_heterogeneous()
+            if self.c_csr_graph.is_heterogeneous()
             else None
         )
+
+    def _set_hetero_info(
+        self,
+        hetero_info: HeteroInfo,
+    ):
+        self.c_csr_graph.set_hetero_info(*hetero_info)
 
 
 def from_csr(
     indptr: torch.Tensor,
     indices: torch.Tensor,
     shape: Optional[Tuple[int, int]] = None,
-    ntypes: List[str] = None,
-    etypes: List[str] = None,
-    type_per_edge: torch.tensor = None,
-    node_type_offset: torch.tensor = None,
+    hetero_info: Optional[HeteroInfo] = None,
 ):
     if shape is None:
         shape = (indptr.shape[0] - 1, torch.max(indices).item())
 
     graph = CSRSamplingGraph(
-        torch.ops.graphbolt.from_csr(indptr, indices, shape)
+        torch.ops.graphbolt.from_csr(shape, indptr, indices)
     )
-    if ntypes is not None:
-        graph.set_hetero_info(ntypes, etypes, type_per_edge, node_type_offset)
-    return CSRSamplingGraph(
-        torch.ops.graphbolt.from_csr(indptr, indices, shape)
-    )
+    if hetero_info is not None:
+        graph._set_hetero_info(hetero_info)
+
+    return graph
 
 
 def from_coo(
     row: torch.Tensor,
     col: torch.Tensor,
-    ntypes: List[str] = None,
-    etypes: List[str] = None,
-    node_type_offset: Optional[torch.tensor] = None,
-    type_per_edge: Optional[torch.Tensor] = None,
+    hetero_info: Optional[HeteroInfo] = None,
 ):
     assert row.dim() == 1
     assert col.dim() == 1
     assert row.size(0) == col.size(0)
 
+    _, _, _, type_per_edge = hetero_info
     if type_per_edge is not None:
         assert type_per_edge.size(0) == row.size(0)
         indices = np.lexsort((row.numpy(), type_per_edge.numpy()))
@@ -220,7 +214,4 @@ def from_coo(
 
     indptr = torch.cumsum(torch.bincount(row), dim=0)
 
-    graph = from_csr(indptr, col)
-    if type_per_edge is not None:
-        graph.set_hetero_info(ntypes, etypes, node_type_offset, type_per_edge)
-    return graph
+    return from_csr(indptr, col, hetero_info=hetero_info)
