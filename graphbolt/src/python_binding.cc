@@ -18,11 +18,11 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("indptr", &CSRSamplingGraph::IndPtr)
       .def("indices", &CSRSamplingGraph::Indices)
       .def("set_hetero_info", &CSRSamplingGraph::SetHeteroInfo)
-      .def("is_hetero", &CSRSamplingGraph::IsHeterogeneous)
+      .def("is_heterogeneous", &CSRSamplingGraph::IsHeterogeneous)
       .def("node_types", &CSRSamplingGraph::NodeTypes)
       .def("edge_types", &CSRSamplingGraph::EdgeTypes)
-      .def("per_edge_types", &CSRSamplingGraph::NodeTypeOffset)
-      .def("per_edge_types", &CSRSamplingGraph::PerEdgeType);
+      .def("node_type_offset", &CSRSamplingGraph::NodeTypeOffset)
+      .def("per_edge_type", &CSRSamplingGraph::PerEdgeType);
   m.def("from_csr", &CSRSamplingGraph::FromCSR);
 }
 

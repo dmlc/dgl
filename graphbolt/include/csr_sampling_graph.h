@@ -62,8 +62,8 @@ class CSRSamplingGraph : public torch::CustomClassHolder {
    * @return CSRSamplingGraph
    */
   static c10::intrusive_ptr<CSRSamplingGraph> FromCSR(
-      const std::vector<int64_t>& shape, torch::Tensor& indptr,
-      torch::Tensor& indices);
+      const std::vector<int64_t>& shape, torch::Tensor indptr,
+      torch::Tensor indices);
 
   /**
    * @brief Set the heterogeneous information for the graph.
@@ -90,16 +90,16 @@ class CSRSamplingGraph : public torch::CustomClassHolder {
   int64_t NumEdges() const { return indices_.size(0); }
 
   /** @brief Get the index pointer tensor. */
-  const torch::Tensor& IndPtr() const { return indptr_; }
+  const torch::Tensor IndPtr() const { return indptr_; }
 
   /** @brief Get the index tensor. */
-  const torch::Tensor& Indices() const { return indices_; }
+  const torch::Tensor Indices() const { return indices_; }
 
   /** @brief Check if the graph is heterogeneous. */
   inline bool IsHeterogeneous() const { return hetero_info_ != nullptr; }
 
   /** @brief Get the node type offset tensor for a heterogeneous graph. */
-  inline const torch::Tensor& NodeTypeOffset() const {
+  inline const torch::Tensor NodeTypeOffset() const {
     return hetero_info_->node_type_offset;
   }
 
@@ -112,7 +112,7 @@ class CSRSamplingGraph : public torch::CustomClassHolder {
   }
 
   /** @brief Get the edge type tensor for a heterogeneous graph. */
-  inline const torch::Tensor& PerEdgeType() const {
+  inline const torch::Tensor PerEdgeType() const {
     return hetero_info_->type_per_edge;
   }
 

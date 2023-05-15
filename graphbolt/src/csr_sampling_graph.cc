@@ -26,8 +26,8 @@ CSRSamplingGraph::CSRSamplingGraph(
 }
 
 c10::intrusive_ptr<CSRSamplingGraph> CSRSamplingGraph::FromCSR(
-    const std::vector<int64_t>& shape, torch::Tensor& indptr,
-    torch::Tensor& indices) {
+    const std::vector<int64_t>& shape, torch::Tensor indptr,
+    torch::Tensor indices) {
   return c10::make_intrusive<CSRSamplingGraph>(
       shape[0], shape[1], indptr, indices, nullptr);
 }
