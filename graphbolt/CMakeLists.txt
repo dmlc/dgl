@@ -43,12 +43,14 @@ file(GLOB BOLT_HEADERS ${BOLT_INCLUDE})
 file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
-target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR} ${BOLT_HEADERS})
+target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
+                           ${BOLT_HEADERS})
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 
 # The Torch CMake configuration only sets up the path for the MKL library when
 # using the conda distribution. The following is a workaround to address this
 # when using a standalone installation of MKL.
 if(DEFINED MKL_LIBRARIES)
-  target_link_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${MKL_ROOT}/lib/${MKL_ARCH})
+  target_link_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
+                          ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
