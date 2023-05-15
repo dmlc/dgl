@@ -11,6 +11,8 @@ HeteroInfo = Tuple[List[str], List[str], torch.tensor, torch.tensor]
 
 
 class CSRSamplingGraph(Graph):
+    r"""Class for Csr sampling graph."""
+
     def __repr__(self):
         pass
 
@@ -175,7 +177,26 @@ def from_csr(
     indices: torch.Tensor,
     shape: Optional[Tuple[int, int]] = None,
     hetero_info: Optional[HeteroInfo] = None,
-):
+) -> CSRSamplingGraph:
+    """
+    Create a CSRSamplingGraph object from a CSR sparse matrix representation.
+
+    Parameters
+    ----------
+    indptr : torch.Tensor
+        Pointer to the start of each row in indices.
+    indices : torch.Tensor
+        Column indices of the non-zero elements in the CSR matrix.
+    shape : Optional[Tuple[int, int]], optional
+        Shape of the matrix (number of rows, number of columns), by default None.
+    hetero_info : Optional[HeteroInfo], optional
+        Heterogeneous graph metadata, by default None.
+
+    Returns
+    -------
+    CSRSamplingGraph
+        The created CSRSamplingGraph object.
+    """
     if shape is None:
         shape = (indptr.shape[0] - 1, torch.max(indices).item())
 
@@ -192,7 +213,24 @@ def from_coo(
     row: torch.Tensor,
     col: torch.Tensor,
     hetero_info: Optional[HeteroInfo] = None,
-):
+) -> CSRSamplingGraph:
+    """
+    Create a CSRSamplingGraph object from a COO sparse matrix representation.
+
+    Parameters
+    ----------
+    row : torch.Tensor
+        Row indices of the non-zero elements in the COO matrix.
+    col : torch.Tensor
+        Column indices of the non-zero elements in the COO matrix.
+    hetero_info : Optional[HeteroInfo], optional
+        Heterogeneous graph metadata, by default None.
+
+    Returns
+    -------
+    CSRSamplingGraph
+        The created CSRSamplingGraph object.
+    """
     assert row.dim() == 1
     assert col.dim() == 1
     assert row.size(0) == col.size(0)
