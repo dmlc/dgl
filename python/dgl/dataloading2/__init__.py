@@ -10,6 +10,7 @@ from .minibatch_sampler import *
 from .negative_sampler import *
 from .subgraph_sampler import *
 
+
 def load_graphbolt():
     """Load Graphbolt C++ library"""
     version = torch.__version__.split("+", maxsplit=1)[0]
@@ -26,7 +27,9 @@ def load_graphbolt():
     dirname = os.getenv("DGL_HOME")
     path = os.path.join(dirname, "graphbolt/build", basename)
     if not os.path.exists(path):
-        raise FileNotFoundError(f"Cannot find DGL C++ graphbolt library at {path}")
+        raise FileNotFoundError(
+            f"Cannot find DGL C++ graphbolt library at {path}"
+        )
 
     try:
         torch.classes.load_library(path)
@@ -35,6 +38,3 @@ def load_graphbolt():
 
 
 load_graphbolt()
-
-
-

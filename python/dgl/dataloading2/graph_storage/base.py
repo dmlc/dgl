@@ -1,5 +1,6 @@
 """Graph bolt sampling graph base class."""
 
+
 class Graph(object):
     def sample_negative_edge_uniform(self, ids):
         """
@@ -30,5 +31,3 @@ class Graph(object):
         Perform random walk starting from given nodes and going through n_layers
         """
         pass
-
-
