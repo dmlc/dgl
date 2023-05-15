@@ -17,8 +17,6 @@ list(GET TORCH_PREFIX_VER 0 TORCH_PREFIX)
 list(GET TORCH_PREFIX_VER 1 TORCH_VER)
 message(STATUS "Configuring for PyTorch ${TORCH_VER}")
 string(REPLACE "." ";" TORCH_VERSION_LIST ${TORCH_VER})
-list(GET TORCH_VERSION_LIST 0 TORCH_VERSION_MAJOR)
-list(GET TORCH_VERSION_LIST 1 TORCH_VERSION_MINOR)
 
 if(USE_CUDA)
   add_definitions(-DDGL_USE_CUDA)
@@ -43,8 +41,6 @@ add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 target_include_directories(
   ${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR} ${BOLT_HEADERS})
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
-target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE TORCH_VERSION_MAJOR=${TORCH_VERSION_MAJOR})
-target_compile_definitions(${LIB_GRAPHBOLT_NAME} PRIVATE TORCH_VERSION_MINOR=${TORCH_VERSION_MINOR})
 
 # The Torch CMake configuration only sets up the path for the MKL library when
 # using the conda distribution. The following is a workaround to address this
