@@ -1,7 +1,7 @@
 """Graph bolt sampling graph module."""
 
 
-class Graph(object):             
+class Graph(object):
     r"""Graph bolt sampling graph base class."""
 
     def sample_negative_edge_uniform(self, ids):
