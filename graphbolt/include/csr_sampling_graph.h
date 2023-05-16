@@ -26,14 +26,14 @@ struct HeteroInfo {
         edge_types(etypes),
         node_type_offset(node_type_offset_),
         type_per_edge(type_per_edge_) {}
-  /** @brief Offset array of node type. */
-  torch::Tensor node_type_offset;
-  /** @brief Type of each edge. */
-  torch::Tensor type_per_edge;
   /** @brief List of node types in the graph. */
   StringList node_types;
   /** @brief List of edge types in the graph. */
   StringList edge_types;
+  /** @brief Offset array of node type. */
+  torch::Tensor node_type_offset;
+  /** @brief Type of each edge. */
+  torch::Tensor type_per_edge;
 };
 
 /**
