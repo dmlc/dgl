@@ -23,6 +23,7 @@
 #include <cuda_runtime.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/tensordispatch.h>
 
 #include <algorithm>
 #include <memory>
@@ -36,6 +37,7 @@
 using namespace dgl::aten;
 using namespace dgl::runtime::cuda;
 using namespace dgl::transform::cuda;
+using TensorDispatcher = dgl::runtime::TensorDispatcher;
 
 namespace dgl {
 namespace transform {
@@ -178,9 +180,16 @@ struct CUDAIdsMapper {
           stream);
 
       CUDA_CALL(cudaEventCreate(&copyEvent));
-      new_len_tensor = NDArray::PinnedEmpty(
-          {num_ntypes}, DGLDataTypeTraits<int64_t>::dtype,
-          DGLContext{kDGLCPU, 0});
+      if (TensorDispatcher::Global()->IsAvailable()) {
+        new_len_tensor = NDArray::PinnedEmpty(
+            {num_ntypes}, DGLDataTypeTraits<int64_t>::dtype,
+            DGLContext{kDGLCPU, 0});
+      } else {
+        // use pageable memory, it will unecessarily block but be functional
+        new_len_tensor = NDArray::Empty(
+            {num_ntypes}, DGLDataTypeTraits<int64_t>::dtype,
+            DGLContext{kDGLCPU, 0});
+      }
       CUDA_CALL(cudaMemcpyAsync(
           new_len_tensor->data, count_lhs_device,
           sizeof(*num_nodes_per_type.data()) * num_ntypes,

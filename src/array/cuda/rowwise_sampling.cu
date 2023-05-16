@@ -7,6 +7,7 @@
 #include <curand_kernel.h>
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/tensordispatch.h>
 
 #include <numeric>
 
@@ -15,9 +16,11 @@
 #include "./dgl_cub.cuh"
 #include "./utils.h"
 
+using namespace dgl::cuda;
+using namespace dgl::aten::cuda;
+using TensorDispatcher = dgl::runtime::TensorDispatcher;
+
 namespace dgl {
-using namespace cuda;
-using namespace aten::cuda;
 namespace aten {
 namespace impl {
 
@@ -287,8 +290,15 @@ COOMatrix _CSRRowWiseSamplingUniform(
   cudaEvent_t copyEvent;
   CUDA_CALL(cudaEventCreate(&copyEvent));
 
-  auto new_len_tensor = NDArray::PinnedEmpty(
-      {1}, DGLDataTypeTraits<IdType>::dtype, DGLContext{kDGLCPU, 0});
+  NDArray new_len_tensor;
+  if (TensorDispatcher::Global()->IsAvailable()) {
+    new_len_tensor = NDArray::PinnedEmpty(
+        {1}, DGLDataTypeTraits<IdType>::dtype, DGLContext{kDGLCPU, 0});
+  } else {
+    // use pageable memory, it will unecessarily block but be functional
+    new_len_tensor = NDArray::Empty(
+        {1}, DGLDataTypeTraits<IdType>::dtype, DGLContext{kDGLCPU, 0});
+  }
 
   // copy using the internal current stream
   CUDA_CALL(cudaMemcpyAsync(
