@@ -32,7 +32,8 @@ struct HeteroInfo {
   StringList edge_types;
   /** @brief Offset array of node type. */
   torch::Tensor node_type_offset;
-  /** @brief Type id of each edge, where type id is the corresponding index of edge_types. */
+  /** @brief Type id of each edge, where type id is the corresponding index of
+   * edge_types. */
   torch::Tensor type_per_edge;
 };
 
