@@ -22,8 +22,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("edge_types", &CSCSamplingGraph::EdgeTypes)
       .def("node_type_offset", &CSCSamplingGraph::NodeTypeOffset)
       .def("per_edge_type", &CSCSamplingGraph::PerEdgeType);
-  m.def("from_csr", &CSCSamplingGraph::FromCSC);
-  m.def("from_csr", &CSCSamplingGraph::FromCSCWithHeteroInfo);
+  m.def("from_csc", &CSCSamplingGraph::FromCSC);
+  m.def("from_csc_with_hetero_info", &CSCSamplingGraph::FromCSCWithHeteroInfo);
 }
 
 }  // namespace sampling
