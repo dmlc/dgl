@@ -19,6 +19,7 @@ from . import (
     container,
     cuda,
     dataloading,
+    dataloading2,
     distributed,
     function,
     ops,
@@ -47,6 +48,7 @@ from .dataloading import (
     set_node_lazy_features,
     set_src_lazy_features,
 )
+from .dataloading2 import *
 from .heterograph import (  # pylint: disable=reimported
     DGLGraph,
     DGLGraph as DGLHeteroGraph,

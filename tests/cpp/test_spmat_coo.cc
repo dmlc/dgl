@@ -1,6 +1,9 @@
 #include <dgl/array.h>
 #include <dmlc/omp.h>
 #include <gtest/gtest.h>
+#include <omp.h>
+
+#include <random>
 
 #include "./common.h"
 
@@ -132,6 +135,41 @@ aten::COOMatrix COO3(DGLContext ctx) {
           std::vector<IDX>({2, 2, 1, 0, 3, 2}), sizeof(IDX) * 8, ctx));
 }
 
+template <typename IDX>
+aten::COOMatrix COORandomized(IDX rows_and_cols, int64_t nnz, int seed) {
+  std::vector<IDX> vec_rows(nnz);
+  std::vector<IDX> vec_cols(nnz);
+  std::vector<IDX> vec_data(nnz);
+
+#pragma omp parallel
+  {
+    const int64_t num_threads = omp_get_num_threads();
+    const int64_t thread_id = omp_get_thread_num();
+    const int64_t chunk = nnz / num_threads;
+    const int64_t size = (thread_id == num_threads - 1)
+                             ? nnz - chunk * (num_threads - 1)
+                             : chunk;
+    auto rows = vec_rows.data() + thread_id * chunk;
+    auto cols = vec_cols.data() + thread_id * chunk;
+    auto data = vec_data.data() + thread_id * chunk;
+
+    std::mt19937_64 gen64(seed + thread_id);
+    std::mt19937 gen32(seed + thread_id);
+
+    for (int64_t i = 0; i < size; ++i) {
+      rows[i] = gen64() % rows_and_cols;
+      cols[i] = gen64() % rows_and_cols;
+      data[i] = gen32() % 90 + 1;
+    }
+  }
+
+  return aten::COOMatrix(
+      rows_and_cols, rows_and_cols,
+      aten::VecToIdArray(vec_rows, sizeof(IDX) * 8, CTX),
+      aten::VecToIdArray(vec_cols, sizeof(IDX) * 8, CTX),
+      aten::VecToIdArray(vec_data, sizeof(IDX) * 8, CTX), false, false);
+}
+
 struct SparseCOOCSR {
   static constexpr uint64_t NUM_ROWS = 100;
   static constexpr uint64_t NUM_COLS = 150;
@@ -162,13 +200,6 @@ struct SparseCOOCSR {
         false);
   }
 };
-
-bool isSparseCOO(
-    const int64_t &num_threads, const int64_t &num_nodes,
-    const int64_t &num_edges) {
-  // refer to COOToCSR<>() in ~dgl/src/array/cpu/spmat_op_impl_coo for details.
-  return num_threads * num_nodes > 4 * num_edges;
-}
 
 template <typename IDX>
 aten::COOMatrix RowSorted_NullData_COO(DGLContext ctx = CTX) {
@@ -212,8 +243,6 @@ void _TestCOOToCSR(DGLContext ctx) {
   auto csr = CSR1<IDX>(ctx);
   auto tcsr = aten::COOToCSR(coo);
   ASSERT_FALSE(coo.row_sorted);
-  ASSERT_FALSE(
-      isSparseCOO(omp_get_num_threads(), coo.num_rows, coo.row->shape[0]));
   ASSERT_EQ(csr.num_rows, tcsr.num_rows);
   ASSERT_EQ(csr.num_cols, tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
@@ -289,8 +318,6 @@ void _TestCOOToCSR(DGLContext ctx) {
   csr = SparseCOOCSR::CSRSparse<IDX>(ctx);
   tcsr = aten::COOToCSR(coo);
   ASSERT_FALSE(coo.row_sorted);
-  ASSERT_TRUE(
-      isSparseCOO(omp_get_num_threads(), coo.num_rows, coo.row->shape[0]));
   ASSERT_EQ(csr.num_rows, tcsr.num_rows);
   ASSERT_EQ(csr.num_cols, tcsr.num_cols);
   ASSERT_TRUE(ArrayEQ<IDX>(csr.indptr, tcsr.indptr));
@@ -448,10 +475,10 @@ void _TestCOOGetData(DGLContext ctx) {
 TEST(SpmatTest, COOGetData) {
   _TestCOOGetData<int32_t>(CPU);
   _TestCOOGetData<int64_t>(CPU);
-  //#ifdef DGL_USE_CUDA
+  // #ifdef DGL_USE_CUDA
   //_TestCOOGetData<int32_t>(GPU);
   //_TestCOOGetData<int64_t>(GPU);
-  //#endif
+  // #endif
 }
 
 template <typename IDX>
@@ -476,4 +503,70 @@ void _TestCOOGetDataAndIndices() {
 TEST(SpmatTest, COOGetDataAndIndices) {
   _TestCOOGetDataAndIndices<int32_t>();
   _TestCOOGetDataAndIndices<int64_t>();
+}
+
+template <typename IDX>
+void _TestCOOToCSRAlgs() {
+  // Compare results between different CPU COOToCSR implementations.
+  // NNZ is chosen to be bigger than the limit for the "small" matrix algorithm.
+  // N is set to lay on border between "sparse" and "dense" algorithm choice.
+
+  const int64_t num_threads = std::min(256, omp_get_max_threads());
+  const int64_t min_num_threads = 3;
+
+  if (num_threads < min_num_threads) {
+    std::cerr << "[          ] [ INFO ]"
+              << "This test requires at least 3 OMP threads to work properly"
+              << std::endl;
+    GTEST_SKIP();
+    return;
+  }
+
+  // Select N and NNZ for COO matrix in a way than depending on number of
+  // threads different algorithm will be used.
+  // See WhichCOOToCSR in src/array/cpu/spmat_op_impl_coo.cc for details
+  const int64_t type_scale = sizeof(IDX) >> 1;
+  const int64_t small = 50 * num_threads * type_scale * type_scale;
+  // NNZ should be bigger than limit for small matrix algorithm
+  const int64_t nnz = small + 1234;
+  // N is chosen to lay on sparse/dense border
+  const int64_t n = type_scale * nnz / num_threads;
+  const IDX rows_nad_cols = n + 1;  // should be bigger than sparse/dense border
+
+  // Note that it will be better to set the seed to a random value when gtest
+  // allows to use --gtest_random_seed without --gtest_shuffle and report this
+  // value for reproduction. This way we can find unforeseen situations and
+  // potential bugs.
+  const auto seed = 123321;
+  auto coo = COORandomized<IDX>(rows_nad_cols, nnz, seed);
+
+  omp_set_num_threads(1);
+  // UnSortedSmallCOOToCSR will be used
+  auto tcsr_small = aten::COOToCSR(coo);
+  ASSERT_EQ(coo.num_rows, tcsr_small.num_rows);
+  ASSERT_EQ(coo.num_cols, tcsr_small.num_cols);
+
+  omp_set_num_threads(num_threads - 1);
+  // UnSortedDenseCOOToCSR will be used
+  auto tcsr_dense = aten::COOToCSR(coo);
+  ASSERT_EQ(tcsr_small.num_rows, tcsr_dense.num_rows);
+  ASSERT_EQ(tcsr_small.num_cols, tcsr_dense.num_cols);
+  ASSERT_TRUE(ArrayEQ<IDX>(tcsr_small.indptr, tcsr_dense.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(tcsr_small.indices, tcsr_dense.indices));
+  ASSERT_TRUE(ArrayEQ<IDX>(tcsr_small.data, tcsr_dense.data));
+
+  omp_set_num_threads(num_threads);
+  // UnSortedSparseCOOToCSR will be used
+  auto tcsr_sparse = aten::COOToCSR(coo);
+  ASSERT_EQ(tcsr_small.num_rows, tcsr_sparse.num_rows);
+  ASSERT_EQ(tcsr_small.num_cols, tcsr_sparse.num_cols);
+  ASSERT_TRUE(ArrayEQ<IDX>(tcsr_small.indptr, tcsr_sparse.indptr));
+  ASSERT_TRUE(ArrayEQ<IDX>(tcsr_small.indices, tcsr_sparse.indices));
+  ASSERT_TRUE(ArrayEQ<IDX>(tcsr_small.data, tcsr_sparse.data));
+  return;
+}
+
+TEST(SpmatTest, COOToCSRAlgs) {
+  _TestCOOToCSRAlgs<int32_t>();
+  _TestCOOToCSRAlgs<int64_t>();
 }
