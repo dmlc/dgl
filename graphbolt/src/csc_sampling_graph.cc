@@ -32,19 +32,24 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
       shape[0], shape[1], indptr, indices, nullptr);
 }
 
-void CSCSamplingGraph::SetHeteroInfo(
-    const StringList& ntypes, const StringList& etypes,
+c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSCWithHeteroInfo(
+    const std::vector<int64_t>& shape, torch::Tensor indptr,
+    torch::Tensor indices, const StringList& ntypes, const StringList& etypes,
     torch::Tensor node_type_offset, torch::Tensor type_per_edge) {
   TORCH_CHECK(node_type_offset.size(0) > 0);
   TORCH_CHECK(node_type_offset.dim() == 1);
   TORCH_CHECK(type_per_edge.size(0) > 0);
   TORCH_CHECK(type_per_edge.dim() == 1);
   TORCH_CHECK(node_type_offset.device() == type_per_edge.device());
-  TORCH_CHECK(type_per_edge.device() == indices_.device());
+  TORCH_CHECK(type_per_edge.device() == indices.device());
   TORCH_CHECK(!ntypes.empty());
   TORCH_CHECK(!etypes.empty());
-  hetero_info_ = std::make_shared<HeteroInfo>(
+  auto hetero_info = std::make_shared<HeteroInfo>(
       ntypes, etypes, node_type_offset, type_per_edge);
+
+  return c10::make_intrusive<CSCSamplingGraph>(
+      shape[0], shape[1], indptr, indices, hetero_info);
 }
+
 }  // namespace sampling
 }  // namespace graphbolt

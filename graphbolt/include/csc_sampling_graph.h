@@ -48,7 +48,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param num_cols The number of columns in the dense shape.
    * @param indptr The CSC format index pointer array.
    * @param indices The CSC format index array.
-   * @param hetero_info Heterogeneous graph information, if present.
+   * @param hetero_info Heterogeneous graph information, if present. Nullptr
+   * means it is a homogeneous graph.
    */
   CSCSamplingGraph(
       int64_t num_rows, int64_t num_cols, torch::Tensor& indptr,
@@ -65,6 +66,25 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
       const std::vector<int64_t>& shape, torch::Tensor indptr,
       torch::Tensor indices);
+
+  /**
+   * @brief Create a CSC graph from tensors of CSC format.
+   * @param indptr Index pointer array of the CSC.
+   * @param indices Indices array of the CSC.
+   * @param shape Shape of the sparse matrix.
+   * @param ntypes A list of node types, if present.
+   * @param etypes A list of edge types, if present.
+   * @param node_type_offset_ A tensor representing the offset of node types, if
+   * present.
+   * @param type_per_edge_ A tensor representing the type of each edge, if
+   * present.
+   *
+   * @return CSCSamplingGraph
+   */
+  static c10::intrusive_ptr<CSCSamplingGraph> FromCSCWithHeteroInfo(
+      const std::vector<int64_t>& shape, torch::Tensor indptr,
+      torch::Tensor indices, const StringList& ntypes, const StringList& etypes,
+      torch::Tensor node_type_offset, torch::Tensor type_per_edge);
 
   /**
    * @brief Set the heterogeneous information for the graph.
@@ -90,8 +110,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   /** @brief Get the number of edges. */
   int64_t NumEdges() const { return indices_.size(0); }
 
-  /** @brief Get the index pointer tensor. */
-  const torch::Tensor Indptr() const { return indptr_; }
+  /** @brief Get the csc index pointer tensor. */
+  const torch::Tensor CSCIndptr() const { return indptr_; }
 
   /** @brief Get the index tensor. */
   const torch::Tensor Indices() const { return indices_; }
