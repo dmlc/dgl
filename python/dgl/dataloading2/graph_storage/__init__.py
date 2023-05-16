@@ -1,2 +1,2 @@
 """Graphbolt graph module."""
-from .csr_sampling_graph import *
+from .csc_sampling_graph import *

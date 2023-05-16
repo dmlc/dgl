@@ -167,7 +167,7 @@ class CSCSamplingGraph(Graph):
 
 
 def from_csc(
-    indptr: torch.Tensor,
+    csc_indptr: torch.Tensor,
     indices: torch.Tensor,
     shape: Optional[Tuple[int, int]] = None,
     hetero_info: Optional[HeteroInfo] = None,
@@ -184,7 +184,8 @@ def from_csc(
     shape : Optional[Tuple[int, int]], optional
         Shape of the matrix (number of rows, number of columns), by default None.
     hetero_info : Optional[HeteroInfo], optional
-        Heterogeneous graph metadata, by default None.
+        Heterogeneous graph metadata, by default None. Indicates whether the graph is
+        homogeneous or heterogeneous.
 
     Returns
     -------
@@ -192,15 +193,18 @@ def from_csc(
         The created CSCSamplingGraph object.
     """
     if shape is None:
-        shape = (indptr.shape[0] - 1, torch.max(indices).item())
+        shape = (csc_indptr.shape[0] - 1, torch.max(indices).item())
 
-    graph = CSCSamplingGraph(
-        torch.ops.graphbolt.from_csc(shape, indptr, indices)
-    )
-    if hetero_info is not None:
-        graph._set_hetero_info(hetero_info)
-
-    return graph
+    if hetero_info is None:
+        return CSCSamplingGraph(
+            torch.ops.graphbolt.from_csc(shape, csc_indptr, indices)
+        )
+    else:
+        return CSCSamplingGraph(
+            torch.ops.graphbolt.from_csc_with_hetero_info(
+                shape, csc_indptr, indices, *hetero_info
+            )
+        )
 
 
 def from_coo(
@@ -218,7 +222,8 @@ def from_coo(
     col : torch.Tensor
         Column indices of the non-zero elements in the COO matrix.
     hetero_info : Optional[HeteroInfo], optional
-        Heterogeneous graph metadata, by default None.
+        Heterogeneous graph metadata, by default None. Indicates whether the graph is
+        homogeneous or heterogeneous.
 
     Returns
     -------
@@ -244,6 +249,6 @@ def from_coo(
         row, indices = torch.sort(row)
         col = col[indices]
 
-    indptr = torch.cumsum(torch.bincount(row), dim=0)
+    csc_indptr = torch.cumsum(torch.bincount(row), dim=0)
 
-    return from_csc(indptr, col, hetero_info=hetero_info)
+    return from_csc(csc_indptr, col, hetero_info=hetero_info)

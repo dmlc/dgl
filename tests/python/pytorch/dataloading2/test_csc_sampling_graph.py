@@ -32,11 +32,11 @@ def test_from_coo(num_nodes, num_edges, num_ntypes=3, num_etypes=5):
         num_nodes, num_edges, num_ntypes, num_etypes
     )
 
-    indptr = graph.indptr
+    csc_indptr = graph.csc_indptr
     indices = graph.indices
     per_edge_type = graph.per_edge_type
 
-    row = indptr[1:] - indptr[:-1]
+    row = csc_indptr[1:] - csc_indptr[:-1]
     row_indices = torch.nonzero(row).squeeze()
     row = row_indices.repeat_interleave(row[row_indices]) + 1
     col = indices
