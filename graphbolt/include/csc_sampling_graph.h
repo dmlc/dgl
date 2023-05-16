@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/include/csr_sampling_graph.h
- * @brief Header file of csr sampling graph.
+ * @file graphbolt/include/csc_sampling_graph.h
+ * @brief Header file of csc sampling graph.
  */
 
 #include <torch/custom_class.h>
@@ -21,47 +21,47 @@ using StringList = std::vector<std::string>;
 struct HeteroInfo {
   HeteroInfo(
       const StringList& ntypes, const StringList& etypes,
-      torch::Tensor& node_type_offset_, torch::Tensor& type_per_edge_)
+      torch::Tensor& node_type_offset, torch::Tensor& type_per_edge)
       : node_types(ntypes),
         edge_types(etypes),
-        node_type_offset(node_type_offset_),
-        type_per_edge(type_per_edge_) {}
+        node_type_offset(node_type_offset),
+        type_per_edge(type_per_edge) {}
   /** @brief List of node types in the graph. */
   StringList node_types;
   /** @brief List of edge types in the graph. */
   StringList edge_types;
   /** @brief Offset array of node type. */
   torch::Tensor node_type_offset;
-  /** @brief Type of each edge. */
+  /** @brief Type id of each edge, where type id is the corresponding index of edge_types. */
   torch::Tensor type_per_edge;
 };
 
 /**
- * @brief A sampling oriented csr format graph.
+ * @brief A sampling oriented csc format graph.
  */
-class CSRSamplingGraph : public torch::CustomClassHolder {
+class CSCSamplingGraph : public torch::CustomClassHolder {
  public:
   /**
-   * @brief Constructor for CSR with data.
+   * @brief Constructor for CSC with data.
    * @param num_rows The number of rows in the dense shape.
    * @param num_cols The number of columns in the dense shape.
-   * @param indptr The CSR format index pointer array.
-   * @param indices The CSR format index array.
+   * @param indptr The CSC format index pointer array.
+   * @param indices The CSC format index array.
    * @param hetero_info Heterogeneous graph information, if present.
    */
-  CSRSamplingGraph(
+  CSCSamplingGraph(
       int64_t num_rows, int64_t num_cols, torch::Tensor& indptr,
       torch::Tensor& indices, const std::shared_ptr<HeteroInfo>& hetero_info);
 
   /**
-   * @brief Create a CSR graph from tensors of CSR format.
-   * @param indptr Index pointer array of the CSR.
-   * @param indices Indices array of the CSR.
+   * @brief Create a CSC graph from tensors of CSC format.
+   * @param indptr Index pointer array of the CSC.
+   * @param indices Indices array of the CSC.
    * @param shape Shape of the sparse matrix.
    *
-   * @return CSRSamplingGraph
+   * @return CSCSamplingGraph
    */
-  static c10::intrusive_ptr<CSRSamplingGraph> FromCSR(
+  static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
       const std::vector<int64_t>& shape, torch::Tensor indptr,
       torch::Tensor indices);
 
@@ -75,7 +75,7 @@ class CSRSamplingGraph : public torch::CustomClassHolder {
    */
   void SetHeteroInfo(
       const StringList& ntypes, const StringList& etypes,
-      torch::Tensor node_type_offset_, torch::Tensor type_per_edge_);
+      torch::Tensor node_type_offset, torch::Tensor type_per_edge);
 
   /** @brief Get the number of rows. */
   int64_t NumRows() const { return num_rows_; }
@@ -90,7 +90,7 @@ class CSRSamplingGraph : public torch::CustomClassHolder {
   int64_t NumEdges() const { return indices_.size(0); }
 
   /** @brief Get the index pointer tensor. */
-  const torch::Tensor IndPtr() const { return indptr_; }
+  const torch::Tensor Indptr() const { return indptr_; }
 
   /** @brief Get the index tensor. */
   const torch::Tensor Indices() const { return indices_; }
@@ -119,9 +119,9 @@ class CSRSamplingGraph : public torch::CustomClassHolder {
  private:
   /** @brief The dense shape. */
   int64_t num_rows_ = 0, num_cols_ = 0;
-  /** @brief CSR format index pointer array. */
+  /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
-  /** @brief CSR format index array. */
+  /** @brief CSC format index array. */
   torch::Tensor indices_;
   /** @brief Heterogeneous graph information, if present. */
   std::shared_ptr<HeteroInfo> hetero_info_;
