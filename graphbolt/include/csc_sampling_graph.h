@@ -20,19 +20,24 @@ using StringList = std::vector<std::string>;
  *
  * Example usage:
  *
+ * Suppose the graph has 6 edges
+ * node_offset = [0, 2, 4]
+ * edge_types = [0, 1, 0, 2, 1, 2]
  * HeteroInfo info({"A", "B", "C"}, {"X", "Y", "Z"}, node_offset, edge_types);
  *
  * This example creates a `HeteroInfo` object with three node types ("A", "B",
  * "C") and three edge types ("X", "Y", "Z"). The `node_offset` tensor
- * represents the offset array of node type, and the `edge_types` tensor
- * represents the type id of each edge.
+ * represents the offset array of node type, the given array indicates that node
+ * [0, 2) has type "A", [2, 4) has type "B", and [4, 6) has type "C". And the
+ * `edge_types` tensor represents the type id of each edge.
  */
 struct HeteroInfo {
   /**
    * @brief Constructs a new `HeteroInfo` object.
    * @param ntypes List of node types in the graph.
    * @param etypes List of edge types in the graph.
-   * @param node_type_offset Offset array of node type.
+   * @param node_type_offset Offset array of node type. It is assumed that nodes
+   * of same type have consecutive ids.
    * @param type_per_edge Type id of each edge, where type id is the
    * corresponding index of `edge_types`.
    */
