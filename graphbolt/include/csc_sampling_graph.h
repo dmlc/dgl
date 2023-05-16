@@ -86,18 +86,6 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       torch::Tensor indices, const StringList& ntypes, const StringList& etypes,
       torch::Tensor node_type_offset, torch::Tensor type_per_edge);
 
-  /**
-   * @brief Set the heterogeneous information for the graph.
-   *
-   * @param ntypes A list of node types.
-   * @param etypes A list of edge types.
-   * @param node_type_offset_ A tensor representing the offset of node types.
-   * @param type_per_edge_ A tensor representing the type of each edge.
-   */
-  void SetHeteroInfo(
-      const StringList& ntypes, const StringList& etypes,
-      torch::Tensor node_type_offset, torch::Tensor type_per_edge);
-
   /** @brief Get the number of rows. */
   int64_t NumRows() const { return num_rows_; }
 
