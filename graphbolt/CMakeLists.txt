@@ -54,3 +54,4 @@ if(DEFINED MKL_LIBRARIES)
   target_link_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
                           ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
+

@@ -35,6 +35,7 @@ dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
 dgl_option(TP_BUILD_LIBUV "Build libuv together with tensorpipe (only impacts Linux)" ON)
 dgl_option(BUILD_TORCH "Build the PyTorch plugin" OFF)
 dgl_option(BUILD_SPARSE "Build DGL sparse library" ON)
+dgl_option(BUILD_GRAPHBOLT "Build Graphbolt library" OFF)
 dgl_option(TORCH_PYTHON_INTERPS "Python interpreter used to build tensoradapter and DGL sparse library" python3)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
@@ -391,3 +392,38 @@ if(BUILD_SPARSE)
   endif(MSVC)
   add_dependencies(dgl_sparse dgl)
 endif(BUILD_SPARSE)
+
+if(BUILD_GRAPHBOLT)
+  message(STATUS "Configuring graphbolt library")
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
+  file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  if(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.bat BUILD_SCRIPT)
+    add_custom_target(
+      graphbolt
+      ALL
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      BINDIR=${BINDIR}
+      CFLAGS=${CMAKE_C_FLAGS}
+      CXXFLAGS=${CMAKE_CXX_FLAGS}
+      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+      cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
+  else(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.sh BUILD_SCRIPT)
+    add_custom_target(
+      graphbolt
+      ALL
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      CFLAGS=${CMAKE_C_FLAGS}
+      CXXFLAGS=${CMAKE_CXX_FLAGS}
+      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+      bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
+  endif(MSVC)
+endif(BUILD_GRAPHBOLT)
