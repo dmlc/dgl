@@ -75,34 +75,30 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  public:
   /**
    * @brief Constructor for CSC with data.
-   * @param num_rows The number of rows in the dense shape.
-   * @param num_cols The number of columns in the dense shape.
+   * @param num_rows The number of nodes in the graph.
    * @param indptr The CSC format index pointer array.
    * @param indices The CSC format index array.
    * @param hetero_info Heterogeneous graph information, if present. Nullptr
    * means it is a homogeneous graph.
    */
   CSCSamplingGraph(
-      int64_t num_rows, int64_t num_cols, torch::Tensor& indptr,
-      torch::Tensor& indices, const std::shared_ptr<HeteroInfo>& hetero_info);
+      int64_t num_nodes, torch::Tensor& indptr, torch::Tensor& indices,
+      const std::shared_ptr<HeteroInfo>& hetero_info);
 
   /**
    * @brief Create a homogeneous CSC graph from tensors of CSC format.
-   * @param num_rows The number of rows in the dense shape.
-   * @param num_cols The number of columns in the dense shape.
+   * @param num_nodes The number of nodes in the graph.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
    *
    * @return CSCSamplingGraph
    */
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
-      int64_t num_rows, int64_t num_cols, torch::Tensor indptr,
-      torch::Tensor indices);
+      int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices);
 
   /**
    * @brief Create a heterogeneous CSC graph from tensors of CSC format.
-   * @param num_rows The number of rows in the dense shape.
-   * @param num_cols The number of columns in the dense shape.
+   * @param num_rows The number of nodes in the graph.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
    * @param ntypes A list of node types, if present.
@@ -115,18 +111,12 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @return CSCSamplingGraph
    */
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSCWithHeteroInfo(
-      int64_t num_rows, int64_t num_cols, torch::Tensor indptr,
-      torch::Tensor indices, const StringList& ntypes, const StringList& etypes,
+      int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices,
+      const StringList& ntypes, const StringList& etypes,
       torch::Tensor node_type_offset, torch::Tensor type_per_edge);
 
-  /** @brief Get the number of rows. */
-  int64_t NumRows() const { return num_rows_; }
-
-  /** @brief Get the number of columns. */
-  int64_t NumCols() const { return num_cols_; }
-
   /** @brief Get the number of nodes. */
-  int64_t NumNodes() const { return indptr_.size(0) - 1; }
+  int64_t NumNodes() const { return num_nodes_; }
 
   /** @brief Get the number of edges. */
   int64_t NumEdges() const { return indices_.size(0); }
@@ -159,8 +149,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   }
 
  private:
-  /** @brief The dense shape. */
-  int64_t num_rows_ = 0, num_cols_ = 0;
+  /** @brief The number of nodes of the graph. */
+  int64_t num_nodes_ = 0;
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
   /** @brief CSC format index array. */
