@@ -16,9 +16,26 @@ namespace sampling {
 using StringList = std::vector<std::string>;
 
 /**
- * @brief Heterogeneous information in the Graph.
+ * @brief Structure representing heterogeneous information about a graph.
+ *
+ * Example usage:
+ *
+ * HeteroInfo info({"A", "B", "C"}, {"X", "Y", "Z"}, node_offset, edge_types);
+ *
+ * This example creates a `HeteroInfo` object with three node types ("A", "B",
+ * "C") and three edge types ("X", "Y", "Z"). The `node_offset` tensor
+ * represents the offset array of node type, and the `edge_types` tensor
+ * represents the type id of each edge.
  */
 struct HeteroInfo {
+  /**
+   * @brief Constructs a new `HeteroInfo` object.
+   * @param ntypes List of node types in the graph.
+   * @param etypes List of edge types in the graph.
+   * @param node_type_offset Offset array of node type.
+   * @param type_per_edge Type id of each edge, where type id is the
+   * corresponding index of `edge_types`.
+   */
   HeteroInfo(
       const StringList& ntypes, const StringList& etypes,
       torch::Tensor& node_type_offset, torch::Tensor& type_per_edge)
@@ -26,12 +43,16 @@ struct HeteroInfo {
         edge_types(etypes),
         node_type_offset(node_type_offset),
         type_per_edge(type_per_edge) {}
+
   /** @brief List of node types in the graph. */
   StringList node_types;
+
   /** @brief List of edge types in the graph. */
   StringList edge_types;
+
   /** @brief Offset array of node type. */
   torch::Tensor node_type_offset;
+
   /** @brief Type id of each edge, where type id is the corresponding index of
    * edge_types. */
   torch::Tensor type_per_edge;
@@ -56,22 +77,24 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       torch::Tensor& indices, const std::shared_ptr<HeteroInfo>& hetero_info);
 
   /**
-   * @brief Create a CSC graph from tensors of CSC format.
+   * @brief Create a homogeneous CSC graph from tensors of CSC format.
+   * @param num_rows The number of rows in the dense shape.
+   * @param num_cols The number of columns in the dense shape.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
-   * @param shape Shape of the sparse matrix.
    *
    * @return CSCSamplingGraph
    */
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
-      const std::vector<int64_t>& shape, torch::Tensor indptr,
+      int64_t num_rows, int64_t num_cols, torch::Tensor indptr,
       torch::Tensor indices);
 
   /**
-   * @brief Create a CSC graph from tensors of CSC format.
+   * @brief Create a heterogeneous CSC graph from tensors of CSC format.
+   * @param num_rows The number of rows in the dense shape.
+   * @param num_cols The number of columns in the dense shape.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
-   * @param shape Shape of the sparse matrix.
    * @param ntypes A list of node types, if present.
    * @param etypes A list of edge types, if present.
    * @param node_type_offset_ A tensor representing the offset of node types, if
@@ -82,7 +105,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @return CSCSamplingGraph
    */
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSCWithHeteroInfo(
-      const std::vector<int64_t>& shape, torch::Tensor indptr,
+      int64_t num_rows, int64_t num_cols, torch::Tensor indptr,
       torch::Tensor indices, const StringList& ntypes, const StringList& etypes,
       torch::Tensor node_type_offset, torch::Tensor type_per_edge);
 
@@ -121,7 +144,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   }
 
   /** @brief Get the edge type tensor for a heterogeneous graph. */
-  inline const torch::Tensor PerEdgeType() const {
+  inline const torch::Tensor TypePerEdge() const {
     return hetero_info_->type_per_edge;
   }
 

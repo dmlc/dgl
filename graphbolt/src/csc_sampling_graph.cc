@@ -26,14 +26,14 @@ CSCSamplingGraph::CSCSamplingGraph(
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
-    const std::vector<int64_t>& shape, torch::Tensor indptr,
+    int64_t num_rows, int64_t num_cols, torch::Tensor indptr,
     torch::Tensor indices) {
   return c10::make_intrusive<CSCSamplingGraph>(
-      shape[0], shape[1], indptr, indices, nullptr);
+      num_rows, num_cols, indptr, indices, nullptr);
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSCWithHeteroInfo(
-    const std::vector<int64_t>& shape, torch::Tensor indptr,
+    int64_t num_rows, int64_t num_cols, torch::Tensor indptr,
     torch::Tensor indices, const StringList& ntypes, const StringList& etypes,
     torch::Tensor node_type_offset, torch::Tensor type_per_edge) {
   TORCH_CHECK(node_type_offset.size(0) > 0);
@@ -48,7 +48,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSCWithHeteroInfo(
       ntypes, etypes, node_type_offset, type_per_edge);
 
   return c10::make_intrusive<CSCSamplingGraph>(
-      shape[0], shape[1], indptr, indices, hetero_info);
+      num_rows, num_cols, indptr, indices, hetero_info);
 }
 
 }  // namespace sampling
