@@ -1788,6 +1788,57 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
     explainer.explain_graph(g, feat, target_class=0)
 
 
+@parametrize_idtype
+@pytest.mark.parametrize(
+    "g",
+    get_cases(
+        ["homo"],
+        exclude=[
+            "zero-degree",
+            "homo-zero-degree",
+            "has_feature",
+            "has_scalar_e_feature",
+            "row_sorted",
+            "col_sorted",
+        ],
+    ),
+)
+@pytest.mark.parametrize("n_classes", [2])
+def test_pgexplainer(g, idtype, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    feat = F.randn((g.num_nodes(), 5))
+    g.ndata["attr"] = feat
+
+    # add reverse edges
+    transform = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform(g)
+
+    class Model(th.nn.Module):
+        def __init__(self, in_feats, out_feats):
+            super(Model, self).__init__()
+            self.conv = nn.GraphConv(in_feats, out_feats)
+            self.fc = th.nn.Linear(out_feats, out_feats)
+            th.nn.init.xavier_uniform_(self.fc.weight)
+
+        def forward(self, g, h, embed=False, edge_weight=None):
+            h = self.conv(g, h, edge_weight=edge_weight)
+            if not embed:
+                g.ndata["h"] = h
+                hg = dgl.mean_nodes(g, "h")
+                return self.fc(hg)
+            else:
+                return h
+
+    model = Model(feat.shape[1], n_classes)
+    model = model.to(ctx)
+
+    explainer = nn.PGExplainer(model, n_classes)
+    explainer.train_step(g, g.ndata["attr"], 5.0)
+
+    probs, edge_weight = explainer.explain_graph(g, feat)
+
+
 def test_jumping_knowledge():
     ctx = F.ctx()
     num_layers = 2
