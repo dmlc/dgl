@@ -23,10 +23,6 @@ list(GET TORCH_PREFIX_VER 1 TORCH_VER)
 message(STATUS "Configuring for PyTorch ${TORCH_VER}")
 string(REPLACE "." ";" TORCH_VERSION_LIST ${TORCH_VER})
 
-if(USE_CUDA)
-  add_definitions(-DDGL_USE_CUDA)
-endif()
-
 set(Torch_DIR "${TORCH_PREFIX}/Torch")
 message(STATUS "Setting directory to ${Torch_DIR}")
 
