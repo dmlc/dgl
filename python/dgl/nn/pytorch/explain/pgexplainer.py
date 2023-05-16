@@ -714,7 +714,7 @@ class HeteroPGExplainer(nn.Module):
             etype: edge_mask_homo[
                 (g_homo.edata[ETYPE] == graph.get_etype_id(etype))
                 .nonzero()
-                .squeeze()
+                .squeeze(1)
             ]
             for etype in graph.canonical_etypes
         }
