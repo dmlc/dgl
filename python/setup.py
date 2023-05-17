@@ -70,10 +70,23 @@ def get_dgl_sparse_pattern():
     return dgl_sparse_lib_pattern
 
 
+def get_graph_bolt_pattern():
+    if sys.platform.startswith("linux"):
+        graphbolt_lib_pattern = "libgraphbolt_*.so"
+    elif sys.platform.startswith("darwin"):
+        graphbolt_lib_pattern = "libgraphbolt_*.dylib"
+    elif sys.platform.startswith("win"):
+        graphbolt_lib_pattern = "graphbolt_*.dll"
+    else:
+        raise NotImplementedError("Unsupported system: %s" % sys.platform)
+    return graphbolt_lib_pattern
+
+
 LIBS, VERSION = get_lib_path()
 BACKENDS = ["pytorch"]
 TA_LIB_PATTERN = get_ta_lib_pattern()
 SPARSE_LIB_PATTERN = get_dgl_sparse_pattern()
+BOLT_LIB_PATTERN = get_graph_bolt_pattern()
 
 
 def cleanup():
@@ -108,6 +121,15 @@ def cleanup():
             ):
                 try:
                     os.remove(sparse_path)
+                except BaseException:
+                    pass
+            for bolt_path in glob.glob(
+                os.path.join(
+                    CURRENT_DIR, "dgl", "graphbolt", BOLT_LIB_PATTERN
+                )
+            ):
+                try:
+                    os.remove(bolt_path)
                 except BaseException:
                     pass
 
@@ -214,7 +236,19 @@ if wheel_include_libs:
                         os.path.join(CURRENT_DIR, "dgl", "dgl_sparse"),
                     )
                     fo.write("include dgl/dgl_sparse/%s\n" % sparse_name)
-
+                for bolt_path in glob.glob(
+                    os.path.join(dir_, "graphbolt", BOLT_LIB_PATTERN)
+                ):
+                    bolt_name = os.path.basename(bolt_path)
+                    os.makedirs(
+                        os.path.join(CURRENT_DIR, "dgl", "graphbolt"),
+                        exist_ok=True,
+                    )
+                    shutil.copy(
+                        os.path.join(dir_, "graphbolt", bolt_name),
+                        os.path.join(CURRENT_DIR, "dgl", "graphbolt"),
+                    )
+                    fo.write("include dgl/graphbolt/%s\n" % bolt_name)
     setup_kwargs = {"include_package_data": True}
 
 # For source tree setup
@@ -248,6 +282,20 @@ if include_libs:
                                 ),
                                 "dgl_sparse",
                                 SPARSE_LIB_PATTERN,
+                            )
+                        ),
+                    )
+                )
+                data_files.append(
+                    (
+                        "dgl/graphbolt",
+                        glob.glob(
+                            os.path.join(
+                                os.path.dirname(
+                                    os.path.relpath(path, CURRENT_DIR)
+                                ),
+                                "graphbolt",
+                                BOLT_LIB_PATTERN,
                             )
                         ),
                     )
