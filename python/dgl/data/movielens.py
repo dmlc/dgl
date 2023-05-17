@@ -8,7 +8,7 @@ import pandas as pd
 
 
 from torch import LongTensor, Tensor
-from ..convert import graph
+from ..convert import graph, heterograph
 from ..transforms.functional import add_reverse_edges
 from .dgl_dataset import DGLDataset
 from ..base import dgl_warning
@@ -124,35 +124,21 @@ class MovieLensDataset(DGLDataset):
     --------
     >>> from dgl.data import MovieLensDataset
     >>> dataset = MovieLensDataset(name='ml-100k', valid_ratio=0.2)
-    >>> train_g, valid_g, test_g, info = dataset[0]
+    >>> train_g, valid_g, test_g = dataset[0]
     >>> train_g
-    Graph(num_nodes=2625, num_edges=128000,
-          ndata_schemes={}
-          edata_schemes={'rate': Scheme(shape=(), dtype=torch.float32)})
+    Graph(num_nodes={'movie': 1617, 'user': 943},
+          num_edges={('movie', 'movie-user', 'user'): 64000, ('user', 'user-movie', 'movie'): 64000},
+          metagraph=[('movie', 'user', 'movie-user'), ('user', 'movie', 'user-movie')])
 
-    >>> # get ratings of edges in the training graph
-    >>> ratings = train_g.edata['rate']
+    >>> # get ratings of edges in the training graph.
+    >>> # Note that we only store ratings in 'user-movie' edges since 'user-movie' and 'movie-user' are
+    >>> # just inverse edges and share the same set of ratings.
+    >>> ratings = train_g.edata['rate']['user-movie']
     >>> ratings
     tensor([3., 3., 2.,  ..., 4., 4., 2.])
 
-    >>> # get training, validation and testing rating pairs
-    >>> train_rating, valid_rating, test_rating = \
-    ...     info['train_rating_pairs'], info['valid_rating_pairs'], info['test_rating_pairs']
-    >>> train_rating[0] # node index of users in training rating pairs
-    tensor([614, 772, 531, ..., 674, 639, 740])
-    >>> train_rating[1] # node index of movies in training rating pairs
-    tensor([1236, 954, 1487, ..., 1842, 1631, 1168])
-
-    >>> # get the rating of a certain user-movie rating pair
-    >>> u, m = train_rating[0][0], train_rating[1][0]
-    >>> eid = train_g.edge_ids(u, m)
-    >>> rating = train_g.edata['rate'][eid]
-    >>> rating
-    tensor([3.])
-    
     >>> # get input features of users and movies respectively
-    >>> user_feat, movie_feat = info['user_feat'], info['movie_feat']
-    >>> user_feat
+    >>> train.ndata['feat']['user'] # user features
     tensor([[0.4800, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [1.0600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [0.4600, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
@@ -335,59 +321,58 @@ class MovieLensDataset(DGLDataset):
             test_rating_data
         )
 
-        # reindex u and v, v nodes start after u
-        num_user = len(self._global_user_id_map)
-        train_v_indices += num_user
-        valid_v_indices += num_user
-        test_v_indices += num_user
-
-        self.train_rating_pairs = (
+        train_rating_pairs = (
             LongTensor(train_u_indices),
             LongTensor(train_v_indices),
         )
-        self.valid_rating_pairs = (
+        valid_rating_pairs = (
             LongTensor(valid_u_indices),
             LongTensor(valid_v_indices),
         )
-        self.test_rating_pairs = (
+        test_rating_pairs = (
             LongTensor(test_u_indices),
             LongTensor(test_v_indices),
         )
-        self.train_rating_values = Tensor(train_labels)
-        self.valid_rating_values = Tensor(valid_labels)
-        self.test_rating_values = Tensor(test_labels)
-        self.info = {
-            "train_rating_pairs": self.train_rating_pairs,
-            "valid_rating_pairs": self.valid_rating_pairs,
-            "test_rating_pairs": self.test_rating_pairs,
-            "user_feat": user_feat,
-            "movie_feat": movie_feat
-        }
-
-        # build dgl graph object, which is homogeneous and bidirectional and contains only training edges
-        self.train_graph = graph(
-            (self.train_rating_pairs[0], self.train_rating_pairs[1])
-        )
-        self.valid_graph = graph(
-            (self.valid_rating_pairs[0], self.valid_rating_pairs[1])
-        )
-        self.test_graph = graph(
-            (self.test_rating_pairs[0], self.test_rating_pairs[1])
-        )
-        self.train_graph.edata["rate"] = self.train_rating_values
-        self.valid_graph.edata["rate"] = self.valid_rating_values
-        self.test_graph.edata["rate"] = self.test_rating_values
-
-        self.train_graph = add_reverse_edges(self.train_graph, copy_edata=True)
-        self.valid_graph = add_reverse_edges(self.valid_graph, copy_edata=True)
-        self.test_graph = add_reverse_edges(self.test_graph, copy_edata=True)
+        train_rating_values = Tensor(train_labels)
+        valid_rating_values = Tensor(valid_labels)
+        test_rating_values = Tensor(test_labels)
+        
+        self.train_graph, self.valid_graph, self.test_graph = \
+            self.construct_g(train_rating_pairs, train_rating_values, user_feat, movie_feat), \
+            self.construct_g(valid_rating_pairs, valid_rating_values, user_feat, movie_feat), \
+            self.construct_g(test_rating_pairs, test_rating_values, user_feat, movie_feat)
 
         self.train_graph.edata.pop('_ID')
         self.valid_graph.edata.pop('_ID')
         self.test_graph.edata.pop('_ID')
 
+        self.train_graph.ndata.pop('_ID')
+        self.valid_graph.ndata.pop('_ID')
+        self.test_graph.ndata.pop('_ID')
+
+    def construct_g(self, rate_pairs, rate_values, user_feat, movie_feat):
+        g = heterograph({
+            ('user', 'user-movie', 'movie'): (rate_pairs[0], rate_pairs[1]),
+            ('movie', 'movie-user', 'user'): (rate_pairs[1], rate_pairs[0])
+        }) 
+        # bidirected graph needs edges of only one direction to check if nodes are isolated
+        iso_nodes_movie = (g.in_degrees(etype='user-movie') == 0).nonzero().squeeze()
+        g.remove_nodes(iso_nodes_movie, ntype='movie', store_ids=True)
+        iso_nodes_user = (g.in_degrees(etype='movie-user') == 0).nonzero().squeeze()
+        g.remove_nodes(iso_nodes_user, ntype='user', store_ids=True)
+        ndata = {
+            'user': user_feat[g.ndata['_ID']['user']],
+            'movie': movie_feat[g.ndata['_ID']['movie']]
+        }
+        edata = {
+            'user-movie': rate_values,
+        }
+        g.ndata['feat'] = ndata
+        g.edata['rate'] = edata
+        return g
+
     def has_cache(self):
-        if os.path.exists(self.graph_path) and os.path.exists(self.info_path) and \
+        if os.path.exists(self.graph_path) and \
            os.path.exists(self.version_path) and self.check_version():
             return True
         return False
@@ -397,17 +382,15 @@ class MovieLensDataset(DGLDataset):
             self.graph_path,
             [self.train_graph, self.valid_graph, self.test_graph]
         )
-        save_info(self.info_path, self.info)
         save_info(self.version_path, [self.valid_ratio, self.test_ratio])
         if self.verbose:
             print(f"Done saving data into {self.raw_path}.")
 
     def load(self):
-        g_list, self.info = load_graphs(self.graph_path)
+        g_list = load_graphs(self.graph_path)
         self.train_graph, self.valid_graph, self.test_graph = (
             g_list[0], g_list[1], g_list[2]
         )
-        self.info = load_info(self.info_path)
         if self.verbose:
             print(f"Done loading data from {self.raw_path}.")
 
@@ -444,13 +427,13 @@ class MovieLensDataset(DGLDataset):
             idx == 0
         ), "This dataset has only one set of training, validation and testing graph"
         if self._transform is None:
-            return self.train_graph, self.valid_graph, self.test_graph, self.info
+            return self.train_graph, self.valid_graph, self.test_graph
         else:
             return (
                 self._transform(self.train_graph),
                 self._transform(self.valid_graph),
                 self._transform(self.test_graph),
-            ), self.info
+            )
 
     def __len__(self):
         return 1
@@ -464,10 +447,6 @@ class MovieLensDataset(DGLDataset):
     @property
     def graph_path(self):
         return os.path.join(self.raw_path, self.name + ".bin")
-    
-    @property
-    def info_path(self):
-        return os.path.join(self.raw_path, self.name + ".pkl")
     
     @property
     def version_path(self):
