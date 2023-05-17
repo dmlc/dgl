@@ -283,8 +283,10 @@ def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
     """
     csc_indptr_str = str(graph.csc_indptr)
     indices_str = str(graph.indices)
-    meta_str = f"num_nodes={graph.num_nodes}, num_edges={graph.num_edges},"
-    f"is_heterogeneous={graph.is_heterogeneous}"
+    meta_str = (
+        f"num_nodes={graph.num_nodes}, num_edges={graph.num_edges}"
+        f", is_heterogeneous={graph.is_heterogeneous}"
+    )
     prefix = f"{type(graph).__name__}("
 
     def _add_indent(_str, indent):
