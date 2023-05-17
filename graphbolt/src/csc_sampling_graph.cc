@@ -10,31 +10,28 @@ namespace graphbolt {
 namespace sampling {
 
 CSCSamplingGraph::CSCSamplingGraph(
-    int64_t num_rows, int64_t num_cols, torch::Tensor& indptr,
-    torch::Tensor& indices, const std::shared_ptr<HeteroInfo>& hetero_info)
-    : num_rows_(num_rows),
-      num_cols_(num_cols),
+    int64_t num_nodes, torch::Tensor& indptr, torch::Tensor& indices,
+    const std::shared_ptr<HeteroInfo>& hetero_info)
+    : num_nodes_(num_nodes),
       indptr_(indptr),
       indices_(indices),
       hetero_info_(hetero_info) {
-  TORCH_CHECK(num_rows >= 0);
-  TORCH_CHECK(num_cols >= 0);
+  TORCH_CHECK(num_nodes >= 0);
   TORCH_CHECK(indptr.dim() == 1);
   TORCH_CHECK(indices.dim() == 1);
-  TORCH_CHECK(indptr.size(0) == num_rows + 1);
+  TORCH_CHECK(indptr.size(0) == num_nodes + 1);
   TORCH_CHECK(indptr.device() == indices.device());
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
-    const std::vector<int64_t>& shape, torch::Tensor indptr,
-    torch::Tensor indices) {
+    int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices) {
   return c10::make_intrusive<CSCSamplingGraph>(
-      shape[0], shape[1], indptr, indices, nullptr);
+      num_nodes, indptr, indices, nullptr);
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSCWithHeteroInfo(
-    const std::vector<int64_t>& shape, torch::Tensor indptr,
-    torch::Tensor indices, const StringList& ntypes, const StringList& etypes,
+    int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices,
+    const StringList& ntypes, const StringList& etypes,
     torch::Tensor node_type_offset, torch::Tensor type_per_edge) {
   TORCH_CHECK(node_type_offset.size(0) > 0);
   TORCH_CHECK(node_type_offset.dim() == 1);
@@ -48,7 +45,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSCWithHeteroInfo(
       ntypes, etypes, node_type_offset, type_per_edge);
 
   return c10::make_intrusive<CSCSamplingGraph>(
-      shape[0], shape[1], indptr, indices, hetero_info);
+      num_nodes, indptr, indices, hetero_info);
 }
 
 }  // namespace sampling
