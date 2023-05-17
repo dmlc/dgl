@@ -75,7 +75,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  public:
   /**
    * @brief Constructor for CSC with data.
-   * @param num_rows The number of nodes in the graph.
+   * @param num_nodes The number of nodes in the graph.
    * @param indptr The CSC format index pointer array.
    * @param indices The CSC format index array.
    * @param hetero_info Heterogeneous graph information, if present. Nullptr
@@ -98,7 +98,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
   /**
    * @brief Create a heterogeneous CSC graph from tensors of CSC format.
-   * @param num_rows The number of nodes in the graph.
+   * @param num_nodes The number of nodes in the graph.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
    * @param ntypes A list of node types, if present.
