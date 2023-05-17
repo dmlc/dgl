@@ -49,6 +49,9 @@ struct HeteroInfo {
         node_type_offset(node_type_offset),
         type_per_edge(type_per_edge) {}
 
+  /** @brief Default constructor. */
+  HeteroInfo() = default;
+
   /** @brief List of node types in the graph.*/
   StringList node_types;
 
@@ -66,6 +69,25 @@ struct HeteroInfo {
    * edge_types. The length of it is equal to the number of edges.
    */
   torch::Tensor type_per_edge;
+
+  /**
+  * @brief Magic number to indicate Hetero info version in serialize/
+  * deserialize stages.
+  */
+  static constexpr int64_t kHeteroInfo_Serialize_Magic
+    = 0xDD2E60F0F6B4A129;
+
+  /**
+  * @brief Load hetero info from stream.
+  * @param archive Input stream for deserializing.
+  */
+  void Load(torch::serialize::InputArchive& archive);
+
+  /**
+  * @brief Save hetero info to stream.
+  * @param archive Output stream for serializing.
+  */
+  void Save(torch::serialize::OutputArchive& archive) const;
 };
 
 /**
@@ -148,6 +170,25 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
     return hetero_info_->type_per_edge;
   }
 
+  /**
+  * @brief Magic number to indicate graph version in serialize/deserialize
+  * stage.
+  */
+  static constexpr int64_t kCSCSamplingGraph_Serialize_Magic
+    = 0xDD2E60F0F6B4A128;
+
+  /**
+  * @brief Load graph from stream.
+  * @param archive Input stream for deserializing.
+  */
+  void Load(torch::serialize::InputArchive& archive);
+
+  /**
+  * @brief Save graph to stream.
+  * @param archive Output stream for serializing.
+  */
+  void Save(torch::serialize::OutputArchive& archive) const;
+
  private:
   /** @brief The number of nodes of the graph. */
   int64_t num_nodes_ = 0;
@@ -161,3 +202,34 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
 }  // namespace sampling
 }  // namespace graphbolt
+
+
+/**
+* @brief Overload stream operator to enable `torch::save()` and `torch.load()`
+* for CSCSamplingGraph.
+*/
+namespace torch {
+
+/**
+* @briedf Overload Input stream operator.
+* @param archive Input stream for deserializing.
+* @param graph CSCSamplingGraph.
+*
+* @return archive
+*/
+inline serialize::InputArchive& operator>>(
+    serialize::InputArchive& archive,
+    graphbolt::sampling::CSCSamplingGraph& graph);
+
+/**
+* @briedf Overload Output stream operator.
+* @param archive Output stream for serializing.
+* @param graph CSCSamplingGraph.
+*
+* @return archive
+*/
+inline serialize::OutputArchive& operator<<(
+    serialize::OutputArchive& archive,
+    const graphbolt::sampling::CSCSamplingGraph& graph);
+    
+}  // namespace torch
