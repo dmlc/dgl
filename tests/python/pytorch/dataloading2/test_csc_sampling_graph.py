@@ -45,14 +45,15 @@ def random_heterogeneous_graph_from_coo(
             coo,
             hetero_info=(ntypes, etypes, node_type_offset, type_per_edge),
         ),
-        coo,
-        type_per_edge,
+        torch.cat([coo, type_per_edge.unsqueeze(dim=0)], dim=0),
     )
 
 
 def sort_coo(coo: torch.tensor):
-    row, col = coo
-    indices = torch.from_numpy(np.lexsort((row.numpy(), col.numpy())))
+    row, col, etype = coo
+    indices = torch.from_numpy(
+        np.lexsort((etype.numpy(), row.numpy(), col.numpy()))
+    )
     return torch.index_select(coo, 1, indices)
 
 
@@ -86,7 +87,7 @@ def test_from_csc(num_nodes, num_ntypes=3, num_etypes=5):
     "num_nodes,num_edges", [(10, 20), (50, 300), (1000, 500000)]
 )
 def test_from_coo(num_nodes, num_edges, num_ntypes=3, num_etypes=5):
-    graph, orig_coo, orig_type_per_edge = random_heterogeneous_graph_from_coo(
+    graph, orig_coo = random_heterogeneous_graph_from_coo(
         num_nodes, num_edges, num_ntypes, num_etypes
     )
 
@@ -97,17 +98,13 @@ def test_from_coo(num_nodes, num_edges, num_ntypes=3, num_etypes=5):
     col = csc_indptr[1:] - csc_indptr[:-1]
     col_indices = torch.nonzero(col).squeeze()
     col = col_indices.repeat_interleave(col[col_indices])
-    coo = torch.stack((indices, col), dim=0)
+    coo = torch.stack([indices, col, type_per_edge], dim=0)
     orig_coo, coo = sort_coo(orig_coo), sort_coo(coo)
 
     assert graph.num_nodes == num_nodes
     assert graph.num_edges == num_edges
     assert coo.shape == orig_coo.shape
-    assert type_per_edge.shape == orig_type_per_edge.shape
     assert torch.equal(orig_coo, coo)
-    assert torch.equal(
-        torch.sort(orig_type_per_edge).values, torch.sort(type_per_edge).values
-    )
 
 
 if __name__ == "__main__":

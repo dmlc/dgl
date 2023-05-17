@@ -2,7 +2,6 @@
 # pylint: disable= invalid-name
 from typing import List, Optional, Tuple
 
-import numpy as np
 import torch
 
 from .base import Graph
@@ -264,6 +263,10 @@ def from_coo(
     csc_indptr = torch.cat(
         (torch.zeros((1,), dtype=csc_indptr.dtype), csc_indptr), dim=0
     )
+    if hetero_info is not None:
+        ntypes, etypes, node_type_offset, type_per_edge = hetero_info
+        type_per_edge = type_per_edge[indices]
+        hetero_info = (ntypes, etypes, node_type_offset, type_per_edge)
 
     return from_csc(
         csc_indptr,
@@ -280,7 +283,8 @@ def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
     """
     csc_indptr_str = str(graph.csc_indptr)
     indices_str = str(graph.indices)
-    meta_str = f"num_nodes={graph.num_nodes}, num_edges={graph.num_edges}, is_heterogeneous={graph.is_heterogeneous}"
+    meta_str = f"num_nodes={graph.num_nodes}, num_edges={graph.num_edges},"
+    f"is_heterogeneous={graph.is_heterogeneous}"
     prefix = f"{type(graph).__name__}("
 
     def _add_indent(_str, indent):
