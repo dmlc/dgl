@@ -14,36 +14,14 @@ class CSCSamplingGraph(Graph):
     r"""Class for Csc sampling graph."""
 
     def __repr__(self):
-        pass
+        return _csc_sampling_graph_str(self)
 
     def __init__(self, c_csc_graph: torch.ScriptObject):
         self.c_csc_graph = c_csc_graph
 
     @property
-    def num_rows(self) -> int:
-        """Returns the number of rows in the dense format.
-
-        Returns
-        -------
-        int
-            The number of rows in the dense format
-        """
-        return self.c_csc_graph.num_rows()
-
-    @property
-    def num_cols(self) -> int:
-        """Returns the number of columns in the dense format.
-
-        Returns
-        -------
-        int
-            The number of columns in the dense format
-        """
-        return self.c_csc_graph.num_cols()
-
-    @property
     def num_nodes(self) -> int:
-        """Returns the number of nodes in the Graph.
+        """Returns the number of nodes in the graph.
 
         Returns
         -------
@@ -54,34 +32,34 @@ class CSCSamplingGraph(Graph):
 
     @property
     def num_edges(self) -> int:
-        """Returns the number of edges in the Graph.
+        """Returns the number of edges in the graph.
 
         Returns
         -------
         int
-            The number of columns in the dense format
+            The number of edges in the graph
         """
         return self.c_csc_graph.num_edges()
 
     @property
     def csc_indptr(self) -> torch.tensor:
-        """Returns the indices pointer in the Csc.
+        """Returns the indices pointer in the Csc graph.
 
         Returns
         -------
         int
-            The indices pointer in the Csc
+            The indices pointer in the Csc graph
         """
         return self.c_csc_graph.csc_indptr()
 
     @property
     def indices(self) -> torch.tensor:
-        """Returns the indices in the Csc.
+        """Returns the indices in the Csc graph.
 
         Returns
         -------
         int
-            The indices in the Csc
+            The indices in the Csc graph
         """
         return self.c_csc_graph.indices()
 
@@ -149,7 +127,7 @@ class CSCSamplingGraph(Graph):
         )
 
     @property
-    def per_edge_type(self) -> Optional[torch.Tensor]:
+    def type_per_edge(self) -> Optional[torch.Tensor]:
         """Returns the edge type tensor for a heterogeneous graph.
 
         Returns
@@ -160,7 +138,7 @@ class CSCSamplingGraph(Graph):
             returns None.
         """
         return (
-            self.c_csc_graph.per_edge_type()
+            self.c_csc_graph.type_per_edge()
             if self.c_csc_graph.is_heterogeneous()
             else None
         )
@@ -169,58 +147,86 @@ class CSCSamplingGraph(Graph):
 def from_csc(
     csc_indptr: torch.Tensor,
     indices: torch.Tensor,
-    shape: Optional[Tuple[int, int]] = None,
+    etype_sorted: bool = True,
+    num_nodes: Optional[int] = None,
     hetero_info: Optional[HeteroInfo] = None,
 ) -> CSCSamplingGraph:
     """
-    Create a CSCSamplingGraph object from a CSC sparse matrix representation.
+    Create a CSCSamplingGraph object from a CSC representation.
 
     Parameters
     ----------
-    indptr : torch.Tensor
-        Pointer to the start of each row in indices.
+    csc_indptr : torch.Tensor
+        Pointer to the start of each row in the `indices`.
     indices : torch.Tensor
-        Column indices of the non-zero elements in the CSC matrix.
-    shape : Optional[Tuple[int, int]], optional
-        Shape of the matrix (number of rows, number of columns), by default None.
+        Column indices of the non-zero elements in the CSC graph.
+    etype_sorted : bool
+        A hint telling whether neighbors of each node are already sorted by edge type ID,
+        it is only meaningful when graph is heterogeneous, by default True.
+    num_nodes : int, optional
+        Number of nodes in the graph, by default None.
     hetero_info : Optional[HeteroInfo], optional
-        Heterogeneous graph metadata, by default None. Indicates whether the graph is
-        homogeneous or heterogeneous.
+        Heterogeneous graph metadata, by default None.
+        Indicates whether the graph is homogeneous or heterogeneous.
 
     Returns
     -------
     CSCSamplingGraph
         The created CSCSamplingGraph object.
-    """
-    if shape is None:
-        shape = (csc_indptr.shape[0] - 1, torch.max(indices).item())
 
+    Examples
+    --------
+    >>> csc_indptr = torch.tensor([0, 2, 5, 7])
+    >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
+    >>> num_nodes = 3
+    >>> ntypes, etypes = ['n1', 'n2'], ['e1', 'e2']
+    >>> hetero_info = (ntypes, etypes, torch.tensor([0, 2]), torch.tensor([0, 1, 0, 1, 1, 0, 0]))
+    >>> graph = from_csc(csc_indptr, indices, num_nodes, hetero_info)
+    >>> print(graph)
+    CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
+                    indices=tensor([1, 3, 0, 1, 2, 0, 3]),
+                    num_nodes=3, num_edges=7, is_heterogeneous=True)
+    """
+    if num_nodes is None:
+        num_nodes = csc_indptr.shape[0] - 1
+
+    assert torch.max(indices) < num_nodes
     if hetero_info is None:
         return CSCSamplingGraph(
-            torch.ops.graphbolt.from_csc(shape, csc_indptr, indices)
+            torch.ops.graphbolt.from_csc(num_nodes, csc_indptr, indices)
         )
     else:
+        if etype_sorted is False:
+            ntypes, etypes, node_type_offset, type_per_edge = hetero_info
+            # sort neighbors by edge type id for each node
+            sorted_etype = []
+            sorted_indices = []
+            for s, e in zip(csc_indptr[:-1], csc_indptr[1:]):
+                neighbor_etype, index = torch.sort(type_per_edge[s:e])
+                sorted_etype.append(neighbor_etype)
+                sorted_indices.append(indices[s:e][index])
+            type_per_edge = torch.cat(sorted_etype, dim=0)
+            indices = torch.cat(sorted_indices, dim=0)
+            hetero_info = (ntypes, etypes, node_type_offset, type_per_edge)
+
         return CSCSamplingGraph(
             torch.ops.graphbolt.from_csc_with_hetero_info(
-                shape, csc_indptr, indices, *hetero_info
+                num_nodes, csc_indptr, indices, *hetero_info
             )
         )
 
 
 def from_coo(
-    row: torch.Tensor,
-    col: torch.Tensor,
+    coo: torch.Tensor,
     hetero_info: Optional[HeteroInfo] = None,
 ) -> CSCSamplingGraph:
     """
-    Create a CSCSamplingGraph object from a COO sparse matrix representation.
+    Create a CSCSamplingGraph object from a COO representation.
 
     Parameters
     ----------
-    row : torch.Tensor
-        Row indices of the non-zero elements in the COO matrix.
-    col : torch.Tensor
-        Column indices of the non-zero elements in the COO matrix.
+    coo : torch.Tensor
+        COO format graph.
     hetero_info : Optional[HeteroInfo], optional
         Heterogeneous graph metadata, by default None. Indicates whether the graph is
         homogeneous or heterogeneous.
@@ -229,26 +235,57 @@ def from_coo(
     -------
     CSCSamplingGraph
         The created CSCSamplingGraph object.
+
+    Examples
+    --------
+    >>> coo = torch.tensor([[0, 1, 2, 2, 3, 3],
+    ...                     [1, 2, 0, 3, 1, 3]])
+    >>> ntypes, etypes = ['n1', 'n2', 'n3'], ['e1', 'e2']
+    >>> hetero_info = (ntypes, etypes, torch.tensor([0, 2, 5]), torch.tensor([0, 1, 0, 1, 0, 1]))
+    >>> graph = dataloading2.from_coo(coo, hetero_info)
+    >>> print(graph)
+    CSCSamplingGraph(csc_indptr=tensor([0, 1, 3, 4, 6]),
+                    indices=tensor([2, 0, 3, 1, 2, 3]),
+                    num_nodes=4, num_edges=6, is_heterogeneous=True)
     """
-    assert row.dim() == 1
-    assert col.dim() == 1
-    assert row.size(0) == col.size(0)
+    assert coo.dim() == 2
 
-    _, _, _, type_per_edge = hetero_info
-    if type_per_edge is not None:
-        assert type_per_edge.size(0) == row.size(0)
-        indices = np.lexsort((row.numpy(), type_per_edge.numpy()))
-        indices = torch.from_numpy(indices)
-        row, col, type_per_edge = (
-            row[indices],
-            col[indices],
-            type_per_edge[indices],
-        )
+    rol = coo[1]
+    _, indices = torch.sort(rol)
 
-    else:
-        row, indices = torch.sort(row)
-        col = col[indices]
+    row, col = torch.index_select(coo, 1, indices)
+    csc_indptr = torch.cumsum(torch.bincount(col), dim=0)
+    csc_indptr = torch.cat(
+        (torch.zeros((1,), dtype=csc_indptr.dtype), csc_indptr), dim=0
+    )
 
-    csc_indptr = torch.cumsum(torch.bincount(row), dim=0)
+    return from_csc(csc_indptr, row, hetero_info=hetero_info)
 
-    return from_csc(csc_indptr, col, hetero_info=hetero_info)
+
+def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
+    """Internal function for converting a csc sampling graph to string
+    representation.
+    """
+    csc_indptr_str = str(graph.csc_indptr)
+    indices_str = str(graph.indices)
+    meta_str = f"num_nodes={graph.num_nodes}, num_edges={graph.num_edges}, is_heterogeneous={graph.is_heterogeneous}"
+    prefix = f"{type(graph).__name__}("
+
+    def _add_indent(_str, indent):
+        lines = _str.split("\n")
+        lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+        return "\n".join(lines)
+
+    final_str = (
+        "csc_indptr="
+        + _add_indent(csc_indptr_str, len("csc_indptr="))
+        + ",\n"
+        + "indices="
+        + _add_indent(indices_str, len("indices="))
+        + ",\n"
+        + meta_str
+        + ")"
+    )
+
+    final_str = prefix + _add_indent(final_str, len(prefix))
+    return final_str
