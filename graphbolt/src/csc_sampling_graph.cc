@@ -5,6 +5,7 @@
  */
 
 #include "csc_sampling_graph.h"
+
 #include "serialize.h"
 
 namespace graphbolt {
@@ -17,20 +18,18 @@ void HeteroInfo::Load(torch::serialize::InputArchive& archive) {
   utils::read_from_archive(archive, "HeteroInfo/node_types", node_types);
   utils::read_from_archive(archive, "HeteroInfo/edge_types", edge_types);
   utils::read_from_archive(
-    archive, "HeteroInfo/node_type_offset", node_type_offset);
-  utils::read_from_archive(
-    archive, "HeteroInfo/type_per_edge", type_per_edge);
+      archive, "HeteroInfo/node_type_offset", node_type_offset);
+  utils::read_from_archive(archive, "HeteroInfo/type_per_edge", type_per_edge);
 }
 
 void HeteroInfo::Save(torch::serialize::OutputArchive& archive) const {
   utils::write_to_archive(
-    archive, "HeteroInfo/magic_num", kHeteroInfoSerializeMagic);
+      archive, "HeteroInfo/magic_num", kHeteroInfoSerializeMagic);
   utils::write_to_archive(archive, "HeteroInfo/node_types", node_types);
   utils::write_to_archive(archive, "HeteroInfo/edge_types", edge_types);
   utils::write_to_archive(
-    archive, "HeteroInfo/node_type_offset", node_type_offset);
-  utils::write_to_archive(
-    archive, "HeteroInfo/type_per_edge", type_per_edge);
+      archive, "HeteroInfo/node_type_offset", node_type_offset);
+  utils::write_to_archive(archive, "HeteroInfo/type_per_edge", type_per_edge);
 }
 
 CSCSamplingGraph::CSCSamplingGraph(
@@ -81,7 +80,7 @@ void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   utils::read_from_archive(archive, "CSCSamplingGraph/indices", indices_);
   bool is_heterogeneous = false;
   utils::read_from_archive(
-    archive, "CSCSamplingGraph/is_hetero", is_heterogeneous);
+      archive, "CSCSamplingGraph/is_hetero", is_heterogeneous);
   if (is_heterogeneous) {
     hetero_info_ = std::make_shared<HeteroInfo>();
     hetero_info_->Load(archive);
@@ -90,13 +89,12 @@ void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
 
 void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
   archive.write(
-    "CSCSamplingGraph/magic_num",
-    torch::IValue(kCSCSamplingGraphSerializeMagic));
+      "CSCSamplingGraph/magic_num",
+      torch::IValue(kCSCSamplingGraphSerializeMagic));
   archive.write("CSCSamplingGraph/num_nodes", torch::IValue(num_nodes_));
   archive.write("CSCSamplingGraph/indptr", indptr_);
   archive.write("CSCSamplingGraph/indices", indices_);
-  archive.write(
-    "CSCSamplingGraph/is_hetero", torch::IValue(IsHeterogeneous()));
+  archive.write("CSCSamplingGraph/is_hetero", torch::IValue(IsHeterogeneous()));
   if (IsHeterogeneous()) {
     hetero_info_->Save(archive);
   }
@@ -104,7 +102,6 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
 
 }  // namespace sampling
 }  // namespace graphbolt
-
 
 namespace torch {
 

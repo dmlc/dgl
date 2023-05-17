@@ -173,8 +173,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   ** @brief Magic number to indicate graph version in serialize/deserialize
   ** stage.
   **/
-  static constexpr int64_t kCSCSamplingGraphSerializeMagic
-    = 0xDD2E60F0F6B4A128;
+  static constexpr int64_t kCSCSamplingGraphSerializeMagic = 0xDD2E60F0F6B4A128;
 
   /**
   ** @brief Load graph from stream.
@@ -202,33 +201,32 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 }  // namespace sampling
 }  // namespace graphbolt
 
-
 /**
-* @brief Overload stream operator to enable `torch::save()` and `torch.load()`
-* for CSCSamplingGraph.
-*/
+** @brief Overload stream operator to enable `torch::save()` and `torch.load()`
+** for CSCSamplingGraph.
+**/
 namespace torch {
 
 /**
-* @briedf Overload Input stream operator.
-* @param archive Input stream for deserializing.
-* @param graph CSCSamplingGraph.
-*
-* @return archive
-*/
+** @briedf Overload Input stream operator.
+** @param archive Input stream for deserializing.
+** @param graph CSCSamplingGraph.
+**
+** @return archive
+**/
 inline serialize::InputArchive& operator>>(
     serialize::InputArchive& archive,
     graphbolt::sampling::CSCSamplingGraph& graph);
 
 /**
-* @briedf Overload Output stream operator.
-* @param archive Output stream for serializing.
-* @param graph CSCSamplingGraph.
-*
-* @return archive
-*/
+ * @briedf Overload Output stream operator.
+ * @param archive Output stream for serializing.
+ * @param graph CSCSamplingGraph.
+ *
+ * @return archive
+ */
 inline serialize::OutputArchive& operator<<(
     serialize::OutputArchive& archive,
     const graphbolt::sampling::CSCSamplingGraph& graph);
-    
+
 }  // namespace torch
