@@ -190,6 +190,7 @@ def from_csc(
     if num_nodes is None:
         num_nodes = csc_indptr.shape[0] - 1
 
+    assert csc_indptr.shape[0] == num_nodes + 1
     assert torch.max(indices) < num_nodes
     if hetero_info is None:
         return CSCSamplingGraph(
@@ -218,6 +219,7 @@ def from_csc(
 
 def from_coo(
     coo: torch.Tensor,
+    num_nodes: Optional[int] = None,
     hetero_info: Optional[HeteroInfo] = None,
 ) -> CSCSamplingGraph:
     """
@@ -227,6 +229,8 @@ def from_coo(
     ----------
     coo : torch.Tensor
         COO format graph.
+    num_nodes : int, optional
+        Number of nodes in the graph, by default None.
     hetero_info : Optional[HeteroInfo], optional
         Heterogeneous graph metadata, by default None. Indicates whether the graph is
         homogeneous or heterogeneous.
@@ -250,16 +254,24 @@ def from_coo(
     """
     assert coo.dim() == 2
 
+    if num_nodes is None:
+        num_nodes = torch.max(coo) + (1 if coo.size(1) > 0 else 0)
     rol = coo[1]
     _, indices = torch.sort(rol)
 
     row, col = torch.index_select(coo, 1, indices)
-    csc_indptr = torch.cumsum(torch.bincount(col), dim=0)
+    csc_indptr = torch.cumsum(torch.bincount(col, minlength=num_nodes), dim=0)
     csc_indptr = torch.cat(
         (torch.zeros((1,), dtype=csc_indptr.dtype), csc_indptr), dim=0
     )
 
-    return from_csc(csc_indptr, row, hetero_info=hetero_info)
+    return from_csc(
+        csc_indptr,
+        row,
+        etype_sorted=False,
+        num_nodes=num_nodes,
+        hetero_info=hetero_info,
+    )
 
 
 def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:

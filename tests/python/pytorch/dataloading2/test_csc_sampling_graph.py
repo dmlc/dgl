@@ -100,6 +100,8 @@ def test_from_coo(num_nodes, num_edges, num_ntypes=3, num_etypes=5):
     coo = torch.stack((indices, col), dim=0)
     orig_coo, coo = sort_coo(orig_coo), sort_coo(coo)
 
+    assert graph.num_nodes == num_nodes
+    assert graph.num_edges == num_edges
     assert coo.shape == orig_coo.shape
     assert type_per_edge.shape == orig_type_per_edge.shape
     assert torch.equal(orig_coo, coo)
