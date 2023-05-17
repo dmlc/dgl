@@ -14,10 +14,10 @@ def random_heterogeneous_graph_from_csc(num_nodes, num_ntypes, num_etypes):
     indices = torch.randint(0, num_nodes, (num_edges,))
     ntypes = [f"n{i}" for i in range(num_ntypes)]
     etypes = [f"e{i}" for i in range(num_etypes)]
+    # random get node type split point
     node_type_offset = torch.sort(torch.randperm(num_nodes)[:num_ntypes])[0]
     node_type_offset[0] = 0
     type_per_edge = torch.randint(0, num_etypes, (num_edges,))
-    # random get node type split point
     return (
         from_csc(
             csc_indptr,
