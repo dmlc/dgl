@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/include/csc_sampling_graph.h
- * @brief Header file of csc sampling graph.
+ * @file graphbolt/include/serialize.h
+ * @brief Utility functions for serialize and deserialize.
  */
 
 #include <torch/torch.h>
@@ -17,33 +17,28 @@ namespace utils {
  * @param archive Output archive.
  * @param key Key name used in saving.
  * @param data Data that could be constructed as `torch::IValue`.
-*/
+**/
 template <typename DataT>
 void write_to_archive(
-    torch::serialize::OutputArchive& archive,
-    const std::string& key,
+    torch::serialize::OutputArchive& archive, const std::string& key,
     const DataT& data) {
   archive.write(key, data);
 }
 
 /**
- * @brief Specialization utility function to save vector.
+ * @brief Specialization utility function to save string vector.
  * @param archive Output archive.
  * @param key Key name used in saving.
  * @param data Vector of string.
- *
- *
-*/
-template<>
+**/
+template <>
 void write_to_archive<std::vector<std::string>>(
-    torch::serialize::OutputArchive& archive,
-    const std::string& key,
+    torch::serialize::OutputArchive& archive, const std::string& key,
     const std::vector<std::string>& data) {
   archive.write(
       key + "/size", torch::tensor(static_cast<int64_t>(data.size())));
   for (const auto index : c10::irange(data.size())) {
-    archive.write(
-        key + "/" + std::to_string(index), data[index]);
+    archive.write(key + "/" + std::to_string(index), data[index]);
   }
 }
 
@@ -52,11 +47,10 @@ void write_to_archive<std::vector<std::string>>(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that could be constructed as `torch::IValue`.
-*/
+**/
 template <typename DataT=torch::IValue>
 void read_from_archive(
-    torch::serialize::InputArchive& archive,
-    const std::string& key,
+    torch::serialize::InputArchive& archive, const std::string& key,
     DataT& data) {
   archive.read(key, data);
 }
@@ -66,11 +60,10 @@ void read_from_archive(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that is `bool`.
-*/
+**/
 template <>
 void read_from_archive<bool>(
-    torch::serialize::InputArchive& archive,
-    const std::string& key,
+    torch::serialize::InputArchive& archive, const std::string& key,
     bool& data) {
   torch::IValue iv_data;
   archive.read(key, iv_data);
@@ -82,11 +75,10 @@ void read_from_archive<bool>(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that is `int64_t`.
-*/
+**/
 template <>
 void read_from_archive<int64_t>(
-    torch::serialize::InputArchive& archive,
-    const std::string& key,
+    torch::serialize::InputArchive& archive, const std::string& key,
     int64_t& data) {
   torch::IValue iv_data;
   archive.read(key, iv_data);
@@ -98,11 +90,10 @@ void read_from_archive<int64_t>(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that is `std::string`.
-*/
+**/
 template <>
 void read_from_archive<std::string>(
-    torch::serialize::InputArchive& archive,
-    const std::string& key,
+    torch::serialize::InputArchive& archive, const std::string& key,
     std::string& data) {
   torch::IValue iv_data;
   archive.read(key, iv_data);
@@ -114,11 +105,10 @@ void read_from_archive<std::string>(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that is `torch::Tensor`.
-*/
+**/
 template <>
 void read_from_archive<torch::Tensor>(
-    torch::serialize::InputArchive& archive,
-    const std::string& key,
+    torch::serialize::InputArchive& archive, const std::string& key,
     torch::Tensor& data) {
   torch::IValue iv_data;
   archive.read(key, iv_data);
@@ -126,23 +116,22 @@ void read_from_archive<torch::Tensor>(
 }
 
 /**
- * @brief Specialization utility function to read to vector.
+ * @brief Specialization utility function to read to string vector.
  * @param archive Output archive.
  * @param key Key name used in saving.
  * @param data Vector of string.
-*/
-template<>
+**/
+template <>
 void read_from_archive<std::vector<std::string>>(
-    torch::serialize::InputArchive& archive,
-    const std::string& key,
+    torch::serialize::InputArchive& archive, const std::string& key,
     std::vector<std::string>& data) {
   int64_t size = 0;
   read_from_archive<int64_t>(archive, key + "/size", size);
   data.resize(static_cast<size_t>(size));
   std::string element;
   for (int64_t index = 0; index < size; ++index) {
-    read_from_archive<std::string>(archive,
-        key + "/" + std::to_string(index), element);
+    read_from_archive<std::string>(
+        archive, key + "/" + std::to_string(index), element);
     data[index] = element;
   }
 }

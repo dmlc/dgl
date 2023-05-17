@@ -71,22 +71,21 @@ struct HeteroInfo {
   torch::Tensor type_per_edge;
 
   /**
-  * @brief Magic number to indicate Hetero info version in serialize/
-  * deserialize stages.
-  */
-  static constexpr int64_t kHeteroInfo_Serialize_Magic
-    = 0xDD2E60F0F6B4A129;
+  ** @brief Magic number to indicate Hetero info version in serialize/
+  ** deserialize stages.
+  **/
+  static constexpr int64_t kHeteroInfoSerializeMagic = 0xDD2E60F0F6B4A129;
 
   /**
-  * @brief Load hetero info from stream.
-  * @param archive Input stream for deserializing.
-  */
+  ** @brief Load hetero info from stream.
+  ** @param archive Input stream for deserializing.
+  **/
   void Load(torch::serialize::InputArchive& archive);
 
   /**
-  * @brief Save hetero info to stream.
-  * @param archive Output stream for serializing.
-  */
+  ** @brief Save hetero info to stream.
+  ** @param archive Output stream for serializing.
+  **/
   void Save(torch::serialize::OutputArchive& archive) const;
 };
 
@@ -171,22 +170,22 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   }
 
   /**
-  * @brief Magic number to indicate graph version in serialize/deserialize
-  * stage.
-  */
-  static constexpr int64_t kCSCSamplingGraph_Serialize_Magic
+  ** @brief Magic number to indicate graph version in serialize/deserialize
+  ** stage.
+  **/
+  static constexpr int64_t kCSCSamplingGraphSerializeMagic
     = 0xDD2E60F0F6B4A128;
 
   /**
-  * @brief Load graph from stream.
-  * @param archive Input stream for deserializing.
-  */
+  ** @brief Load graph from stream.
+  ** @param archive Input stream for deserializing.
+  **/
   void Load(torch::serialize::InputArchive& archive);
 
   /**
-  * @brief Save graph to stream.
-  * @param archive Output stream for serializing.
-  */
+  ** @brief Save graph to stream.
+  ** @param archive Output stream for serializing.
+  **/
   void Save(torch::serialize::OutputArchive& archive) const;
 
  private:
