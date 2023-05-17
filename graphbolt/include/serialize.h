@@ -4,6 +4,9 @@
  * @brief Utility functions for serialize and deserialize.
  */
 
+#ifndef GRAPHBOLT_INCLUDE_SERIALIZE_H_
+#define GRAPHBOLT_INCLUDE_SERIALIZE_H_
+
 #include <torch/torch.h>
 
 #include <string>
@@ -138,3 +141,5 @@ void read_from_archive<std::vector<std::string>>(
 
 }  // namespace utils
 }  // namespace graphbolt
+
+#endif  // GRAPHBOLT_INCLUDE_SERIALIZE_H_
