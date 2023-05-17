@@ -1,3 +1,7 @@
+import unittest
+
+import backend as F
+
 import numpy as np
 import pytest
 import torch
@@ -57,6 +61,10 @@ def sort_coo(coo: torch.tensor):
     return torch.index_select(coo, 1, indices)
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
 @pytest.mark.parametrize("num_nodes", [10, 50, 1000, 10000])
 def test_from_csc(num_nodes, num_ntypes=3, num_etypes=5):
     (
@@ -83,6 +91,10 @@ def test_from_csc(num_nodes, num_ntypes=3, num_etypes=5):
         assert torch.equal(etype, torch.sort(etype).values)
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
 @pytest.mark.parametrize(
     "num_nodes,num_edges", [(10, 20), (50, 300), (1000, 500000)]
 )
