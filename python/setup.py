@@ -124,9 +124,7 @@ def cleanup():
                 except BaseException:
                     pass
             for bolt_path in glob.glob(
-                os.path.join(
-                    CURRENT_DIR, "dgl", "graphbolt", BOLT_LIB_PATTERN
-                )
+                os.path.join(CURRENT_DIR, "dgl", "graphbolt", BOLT_LIB_PATTERN)
             ):
                 try:
                     os.remove(bolt_path)
