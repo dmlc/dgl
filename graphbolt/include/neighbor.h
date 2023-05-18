@@ -12,6 +12,11 @@
 namespace graphbolt {
 namespace sampling {
 
+using TensorList = std::vector<torch::Tensor>;
+using CSCPtr = c10::intrusive_ptr<CSCSamplingGraph>;
+using RangePickFn = std::function<torch::Tensor(
+    int64_t start, int64_t end, int64_t num_samples)>;
+
 /**
  * @brief Performs neighbor sampling for a given set of seed nodes taking edge type into account, where each edge type has a specified pick number.
  *
