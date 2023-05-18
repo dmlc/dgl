@@ -20,7 +20,7 @@ namespace utils {
  * @param archive Output archive.
  * @param key Key name used in saving.
  * @param data Data that could be constructed as `torch::IValue`.
- **/
+ */
 template <typename DataT>
 void write_to_archive(
     torch::serialize::OutputArchive& archive, const std::string& key,
@@ -33,7 +33,7 @@ void write_to_archive(
  * @param archive Output archive.
  * @param key Key name used in saving.
  * @param data Vector of string.
- **/
+ */
 template <>
 void write_to_archive<std::vector<std::string>>(
     torch::serialize::OutputArchive& archive, const std::string& key,
@@ -50,7 +50,7 @@ void write_to_archive<std::vector<std::string>>(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that could be constructed as `torch::IValue`.
- **/
+ */
 template <typename DataT = torch::IValue>
 void read_from_archive(
     torch::serialize::InputArchive& archive, const std::string& key,
@@ -63,7 +63,7 @@ void read_from_archive(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that is `bool`.
- **/
+ */
 template <>
 void read_from_archive<bool>(
     torch::serialize::InputArchive& archive, const std::string& key,
@@ -78,7 +78,7 @@ void read_from_archive<bool>(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that is `int64_t`.
- **/
+ */
 template <>
 void read_from_archive<int64_t>(
     torch::serialize::InputArchive& archive, const std::string& key,
@@ -93,7 +93,7 @@ void read_from_archive<int64_t>(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that is `std::string`.
- **/
+ */
 template <>
 void read_from_archive<std::string>(
     torch::serialize::InputArchive& archive, const std::string& key,
@@ -108,7 +108,7 @@ void read_from_archive<std::string>(
  * @param archive Input archive.
  * @param key Key name used in reading.
  * @param data Data that is `torch::Tensor`.
- **/
+ */
 template <>
 void read_from_archive<torch::Tensor>(
     torch::serialize::InputArchive& archive, const std::string& key,
@@ -123,7 +123,7 @@ void read_from_archive<torch::Tensor>(
  * @param archive Output archive.
  * @param key Key name used in saving.
  * @param data Vector of string.
- **/
+ */
 template <>
 void read_from_archive<std::vector<std::string>>(
     torch::serialize::InputArchive& archive, const std::string& key,
