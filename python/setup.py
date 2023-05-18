@@ -64,9 +64,7 @@ BACKENDS = ["pytorch"]
 
 def remove_lib(lib_name):
     for lib_path in glob.glob(
-        os.path.join(
-            CURRENT_DIR, "dgl", lib_name, get_lib_pattern(lib_name)
-        )
+        os.path.join(CURRENT_DIR, "dgl", lib_name, get_lib_pattern(lib_name))
     ):
         try:
             os.remove(lib_path)
@@ -148,12 +146,14 @@ def config_cython():
         return []
 
 
-def copy_lib(lib_name, backend=''):
+def copy_lib(lib_name, backend=""):
     for lib_path in glob.glob(
         os.path.join(dir_, lib_name, backend, get_lib_pattern(lib_name))
     ):
         lib_file_name = os.path.basename(lib_path)
-        dst_dir_ = os.path.dirname(os.path.join(CURRENT_DIR, "dgl", lib_name, backend))
+        dst_dir_ = os.path.dirname(
+            os.path.join(CURRENT_DIR, "dgl", lib_name, backend)
+        )
         os.makedirs(
             dst_dir_,
             exist_ok=True,
@@ -162,9 +162,7 @@ def copy_lib(lib_name, backend=''):
             os.path.join(dir_, lib_name, backend, lib_file_name),
             dst_dir_,
         )
-        fo.write(
-            "include dgl/tensoradapter/%s/%s\n" % (backend, lib_file_name)
-        )                          
+        fo.write("include dgl/tensoradapter/%s/%s\n" % (backend, lib_file_name))
 
 
 include_libs = False
@@ -194,9 +192,9 @@ if wheel_include_libs:
     setup_kwargs = {"include_package_data": True}
 
 
-def get_lib_file_path(lib_name, backend=''):
+def get_lib_file_path(lib_name, backend=""):
     return (
-        f"dgl/{lib_name}" if backend=='' else   f"dgl/{lib_name}/{backend}",
+        f"dgl/{lib_name}" if backend == "" else f"dgl/{lib_name}/{backend}",
         glob.glob(
             os.path.join(
                 os.path.dirname(os.path.relpath(path, CURRENT_DIR)),
@@ -206,6 +204,8 @@ def get_lib_file_path(lib_name, backend=''):
             )
         ),
     )
+
+
 # For source tree setup
 # Conda build also includes the binary library
 if include_libs:
@@ -244,7 +244,7 @@ setup(
         "License :: OSI Approved :: Apache Software License",
     ],
     license="APACHE",
-    **setup_kwargs
+    **setup_kwargs,
 )
 
 if wheel_include_libs:
