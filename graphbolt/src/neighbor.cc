@@ -4,8 +4,9 @@
  * @brief Source file of neighbor sampling.
  */
 
-#include "rowwise_pick.h"
 #include <algorithm>
+
+#include "rowwise_pick.h"
 
 namespace graphbolt {
 namespace sampling {
@@ -39,36 +40,41 @@ RangePickFn GetRangePickFn(
   return pick_fn;
 }
 
-std::tuple<TensorList, TensorList, TensorList> SampleEtypeNeighbors(
-    const CSRPtr& graph, const torch::Tensor seed_nodes,
-    const std::vector<int64_t>& fanouts,
-    const torch::optional<torch::Tensor>& probs, bool replace,
-    bool require_eids) {
+std::tuple<TensorList, TensorList> SampleEtypeNeighbors(
+    const CSCPtr graph, torch::Tensor seed_nodes,
+    const std::vector<int64_t>& fanouts, bool replace, bool require_eids,
+    const torch::optional<torch::Tensor>& probs) {
   std::cout << "here" << std::endl;
   TORCH_CHECK(
-      fanouts.size() == 1 || fanouts.size() == graph->GetEdgeTypes().size())
+      graph->IsHeterogeneous(),
+      "SampleNeighborsEType only work with heterogeneous graph")
+  TORCH_CHECK(
+      fanouts.size() == graph->EdgeTypes().size(),
+      "The length of Fanouts and edge type should be equal.")
 
+  const int64_t num_etypes = fanouts.size();
   const int64_t num_nodes = seed_nodes.size(0);
 
   int64_t fanout_value = fanouts[0];
-  bool same_fanout = std::all_of(fanouts.begin(), fanouts.end(), [fanout_value](auto
-  elem) {
-    return elem == fanout_value;
-  });
+  bool same_fanout = std::all_of(
+      fanouts.begin(), fanouts.end(),
+      [fanout_value](auto elem) { return elem == fanout_value; });
 
-  if (fanouts.size() == 1) {
-    // do homogeneous sampling
+  if (num_nodes == 0 || (same_fanout && fanout_value == 0)) {
+    // Empty graph
+    return std::tuple<TensorList, TensorList>();
   } else {
-    if (num_nodes == 0 || (same_fanout && fanout_value == 0)) {
-      // Empty graph
-
-    } else {
-      auto pick_fn = GetRangePickFn(probs, replace);
-      return RowWisePickPerEtype(graph, seed_nodes, fanouts, probs, require_eids, replace, pick_fn);
+    auto pick_fn = GetRangePickFn(probs, replace);
+    TensorList picked_rows, picked_cols, picked_eids;
+    std::tie(picked_rows, picked_cols, picked_eids) = RowWisePickPerEtype(
+        graph, seed_nodes, fanouts, probs, require_eids, replace, pick_fn);
+    TensorList induced_coos(num_etypes);
+    for (int64_t i = 0; i < num_etypes; i++) {
+      // Note the graph is csc, so row and col should be reversed.
+      induced_coos[i] = torch::stack({picked_cols[i], picked_rows[i]});
     }
+    return std::tuple<TensorList, TensorList>(induced_coos, picked_eids);
   }
-
-  return std::tuple<TensorList, TensorList, TensorList>();
 }
 
 }  // namespace sampling
