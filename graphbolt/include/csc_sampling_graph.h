@@ -208,7 +208,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 namespace torch {
 
 /**
-** @briedf Overload Input stream operator.
+** @brief Overload input stream operator for CSCSamplingGraph deserialization.
 ** @param archive Input stream for deserializing.
 ** @param graph CSCSamplingGraph.
 **
@@ -219,7 +219,7 @@ inline serialize::InputArchive& operator>>(
     graphbolt::sampling::CSCSamplingGraph& graph);
 
 /**
- * @briedf Overload Output stream operator.
+ * @brief Overload output stream operator for CSCSamplingGraph serialization.
  * @param archive Output stream for serializing.
  * @param graph CSCSamplingGraph.
  *

@@ -14,7 +14,9 @@ namespace sampling {
 void HeteroInfo::Load(torch::serialize::InputArchive& archive) {
   int64_t magic_num = 0x0;
   utils::read_from_archive(archive, "HeteroInfo/magic_num", magic_num);
-  TORCH_CHECK(magic_num, kHeteroInfoSerializeMagic);
+  TORCH_CHECK(
+      magic_num == kHeteroInfoSerializeMagic,
+      "Magic numbers mismatch when loading HeteroInfo.");
   utils::read_from_archive(archive, "HeteroInfo/node_types", node_types);
   utils::read_from_archive(archive, "HeteroInfo/edge_types", edge_types);
   utils::read_from_archive(
@@ -74,7 +76,9 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSCWithHeteroInfo(
 void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   int64_t magic_num = 0x0;
   utils::read_from_archive(archive, "CSCSamplingGraph/magic_num", magic_num);
-  TORCH_CHECK(magic_num, kCSCSamplingGraphSerializeMagic);
+  TORCH_CHECK(
+      magic_num == kCSCSamplingGraphSerializeMagic,
+      "Magic numbers mismatch when loading CSCSamplingGraph.");
   utils::read_from_archive(archive, "CSCSamplingGraph/num_nodes", num_nodes_);
   utils::read_from_archive(archive, "CSCSamplingGraph/indptr", indptr_);
   utils::read_from_archive(archive, "CSCSamplingGraph/indices", indices_);
