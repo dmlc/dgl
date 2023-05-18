@@ -4,12 +4,11 @@ from typing import List, Optional, Tuple
 
 import torch
 
-from .base import Graph
 
 HeteroInfo = Tuple[List[str], List[str], torch.tensor, torch.tensor]
 
 
-class CSCSamplingGraph(Graph):
+class CSCSamplingGraph:
     r"""Class for Csc sampling graph."""
 
     def __repr__(self):
