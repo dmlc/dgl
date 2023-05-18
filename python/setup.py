@@ -46,34 +46,32 @@ def get_lib_path():
     return libs, version
 
 
-def get_ta_lib_pattern():
+def get_lib_pattern(lib_name):
     if sys.platform.startswith("linux"):
-        ta_lib_pattern = "libtensoradapter_*.so"
+        lib_pattern = f"lib{lib_name}_*.so"
     elif sys.platform.startswith("darwin"):
-        ta_lib_pattern = "libtensoradapter_*.dylib"
+        lib_pattern = f"lib{lib_name}_*.dylib"
     elif sys.platform.startswith("win"):
-        ta_lib_pattern = "tensoradapter_*.dll"
+        lib_pattern = f"{lib_name}_*.dll"
     else:
         raise NotImplementedError("Unsupported system: %s" % sys.platform)
-    return ta_lib_pattern
-
-
-def get_dgl_sparse_pattern():
-    if sys.platform.startswith("linux"):
-        dgl_sparse_lib_pattern = "libdgl_sparse_*.so"
-    elif sys.platform.startswith("darwin"):
-        dgl_sparse_lib_pattern = "libdgl_sparse_*.dylib"
-    elif sys.platform.startswith("win"):
-        dgl_sparse_lib_pattern = "dgl_sparse_*.dll"
-    else:
-        raise NotImplementedError("Unsupported system: %s" % sys.platform)
-    return dgl_sparse_lib_pattern
+    return lib_pattern
 
 
 LIBS, VERSION = get_lib_path()
 BACKENDS = ["pytorch"]
-TA_LIB_PATTERN = get_ta_lib_pattern()
-SPARSE_LIB_PATTERN = get_dgl_sparse_pattern()
+
+
+def remove_lib(lib_name):
+    for lib_path in glob.glob(
+        os.path.join(
+            CURRENT_DIR, "dgl", lib_name, get_lib_pattern(lib_name)
+        )
+    ):
+        try:
+            os.remove(lib_path)
+        except BaseException:
+            pass
 
 
 def cleanup():
@@ -90,26 +88,11 @@ def cleanup():
         except BaseException:
             pass
     for backend in BACKENDS:
-        for ta_path in glob.glob(
-            os.path.join(
-                CURRENT_DIR, "dgl", "tensoradapter", backend, TA_LIB_PATTERN
-            )
-        ):
-            try:
-                os.remove(ta_path)
-            except BaseException:
-                pass
+        remove_lib("tensoradapter")
 
         if backend == "pytorch":
-            for sparse_path in glob.glob(
-                os.path.join(
-                    CURRENT_DIR, "dgl", "dgl_sparse", SPARSE_LIB_PATTERN
-                )
-            ):
-                try:
-                    os.remove(sparse_path)
-                except BaseException:
-                    pass
+            remove_lib("dgl_sparse")
+            remove_lib("graphbolt")
 
 
 def config_cython():
@@ -165,6 +148,25 @@ def config_cython():
         return []
 
 
+def copy_lib(lib_name, backend=''):
+    for lib_path in glob.glob(
+        os.path.join(dir_, lib_name, backend, get_lib_pattern(lib_name))
+    ):
+        lib_file_name = os.path.basename(lib_path)
+        dst_dir_ = os.path.dirname(os.path.join(CURRENT_DIR, "dgl", lib_name, backend))
+        os.makedirs(
+            dst_dir_,
+            exist_ok=True,
+        )
+        shutil.copy(
+            os.path.join(dir_, lib_name, backend, lib_file_name),
+            dst_dir_,
+        )
+        fo.write(
+            "include dgl/tensoradapter/%s/%s\n" % (backend, lib_file_name)
+        )                          
+
+
 include_libs = False
 wheel_include_libs = False
 if "bdist_wheel" in sys.argv or os.getenv("CONDA_BUILD"):
@@ -185,38 +187,25 @@ if wheel_include_libs:
             fo.write("include dgl/%s\n" % libname)
 
         for backend in BACKENDS:
-            for ta_path in glob.glob(
-                os.path.join(dir_, "tensoradapter", backend, TA_LIB_PATTERN)
-            ):
-                ta_name = os.path.basename(ta_path)
-                os.makedirs(
-                    os.path.join(CURRENT_DIR, "dgl", "tensoradapter", backend),
-                    exist_ok=True,
-                )
-                shutil.copy(
-                    os.path.join(dir_, "tensoradapter", backend, ta_name),
-                    os.path.join(CURRENT_DIR, "dgl", "tensoradapter", backend),
-                )
-                fo.write(
-                    "include dgl/tensoradapter/%s/%s\n" % (backend, ta_name)
-                )
+            copy_lib("tensoradapter", backend)
             if backend == "pytorch":
-                for sparse_path in glob.glob(
-                    os.path.join(dir_, "dgl_sparse", SPARSE_LIB_PATTERN)
-                ):
-                    sparse_name = os.path.basename(sparse_path)
-                    os.makedirs(
-                        os.path.join(CURRENT_DIR, "dgl", "dgl_sparse"),
-                        exist_ok=True,
-                    )
-                    shutil.copy(
-                        os.path.join(dir_, "dgl_sparse", sparse_name),
-                        os.path.join(CURRENT_DIR, "dgl", "dgl_sparse"),
-                    )
-                    fo.write("include dgl/dgl_sparse/%s\n" % sparse_name)
-
+                copy_lib("dgl_sparse")
+                copy_lib("graphbolt")
     setup_kwargs = {"include_package_data": True}
 
+
+def get_lib_file_path(lib_name, backend=''):
+    return (
+        f"dgl/{lib_name}" if backend=='' else   f"dgl/{lib_name}/{backend}",
+        glob.glob(
+            os.path.join(
+                os.path.dirname(os.path.relpath(path, CURRENT_DIR)),
+                lib_name,
+                backend,
+                get_lib_pattern(lib_name),
+            )
+        ),
+    )
 # For source tree setup
 # Conda build also includes the binary library
 if include_libs:
@@ -224,34 +213,10 @@ if include_libs:
     data_files = [("dgl", rpath)]
     for path in LIBS:
         for backend in BACKENDS:
-            data_files.append(
-                (
-                    "dgl/tensoradapter/%s" % backend,
-                    glob.glob(
-                        os.path.join(
-                            os.path.dirname(os.path.relpath(path, CURRENT_DIR)),
-                            "tensoradapter",
-                            backend,
-                            TA_LIB_PATTERN,
-                        )
-                    ),
-                )
-            )
+            data_files.append(get_lib_file_path("tensoradapter", backend))
             if backend == "pytorch":
-                data_files.append(
-                    (
-                        "dgl/dgl_sparse",
-                        glob.glob(
-                            os.path.join(
-                                os.path.dirname(
-                                    os.path.relpath(path, CURRENT_DIR)
-                                ),
-                                "dgl_sparse",
-                                SPARSE_LIB_PATTERN,
-                            )
-                        ),
-                    )
-                )
+                data_files.append(get_lib_file_path("dgl_sparse"))
+                data_files.append(get_lib_file_path("graphbolt"))
     setup_kwargs = {"include_package_data": True, "data_files": data_files}
 
 setup(
