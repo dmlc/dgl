@@ -1532,19 +1532,12 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
   COOPtr coo_ptr = nullptr;
   CSRPtr in_csr_ptr = nullptr;
   CSRPtr out_csr_ptr = nullptr;
-  if (formats & COO_CODE)
-    coo_ptr = GetCOO(false);
-  if (formats & CSC_CODE)
-    in_csr_ptr = GetInCSR(false);
-  if (formats & CSR_CODE)
-    out_csr_ptr = GetOutCSR(false);
+  if (formats & COO_CODE) coo_ptr = GetCOO(false);
+  if (formats & CSC_CODE) in_csr_ptr = GetInCSR(false);
+  if (formats & CSR_CODE) out_csr_ptr = GetOutCSR(false);
 
   return HeteroGraphPtr(
-      new UnitGraph(
-          meta_graph_,
-          in_csr_ptr,
-          out_csr_ptr,
-          coo_ptr, formats));
+      new UnitGraph(meta_graph_, in_csr_ptr, out_csr_ptr, coo_ptr, formats));
 }
 
 SparseFormat UnitGraph::SelectFormat(
