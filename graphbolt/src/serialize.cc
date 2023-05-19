@@ -4,7 +4,7 @@
  * @brief Source file of serialize.
  */
 
-#include "serialize.h"
+#include <graphbolt/serialize.h>
 
 namespace torch {
 
