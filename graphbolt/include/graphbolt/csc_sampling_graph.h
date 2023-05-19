@@ -96,6 +96,9 @@ struct HeteroInfo {
  */
 class CSCSamplingGraph : public torch::CustomClassHolder {
  public:
+  /** @brief Default constructor. */
+  CSCSamplingGraph() = default;
+
   /**
    * @brief Constructor for CSC with data.
    * @param num_nodes The number of nodes in the graph.
@@ -203,6 +206,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 }  // namespace sampling
 }  // namespace graphbolt
 
+<<<<<<< HEAD:graphbolt/include/graphbolt/csc_sampling_graph.h
 /**
  * @brief Overload stream operator to enable `torch::save()` and `torch.load()`
  * for CSCSamplingGraph.
@@ -233,3 +237,6 @@ inline serialize::OutputArchive& operator<<(
 
 }  // namespace torch
 #endif  //  GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
+=======
+#endif  // GRAPHBOLT_INCLUDE_CSCSAMPLINGGRAPH_H_
+>>>>>>> 31b649cb... [GraphBolt] add support for load and save CSCSamplingGraph:graphbolt/include/csc_sampling_graph.h
