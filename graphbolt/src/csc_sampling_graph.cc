@@ -16,10 +16,10 @@ void HeteroInfo::Load(torch::serialize::InputArchive& archive) {
   TORCH_CHECK(
       magic_num == kHeteroInfoSerializeMagic,
       "Magic numbers mismatch when loading HeteroInfo.");
-  node_types =
-      read_from_archive(archive, "HeteroInfo/node_types").to<StringList>();
-  edge_types =
-      read_from_archive(archive, "HeteroInfo/edge_types").to<StringList>();
+  node_types = read_from_archive(archive, "HeteroInfo/node_types")
+                   .to<decltype(node_types)>();
+  edge_types = read_from_archive(archive, "HeteroInfo/edge_types")
+                   .to<decltype(edge_types)>();
   node_type_offset =
       read_from_archive(archive, "HeteroInfo/node_type_offset").toTensor();
   type_per_edge =
