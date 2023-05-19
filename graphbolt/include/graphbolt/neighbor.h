@@ -1,13 +1,13 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/include/neighbor.h
+ * @file graphbolt/neighbor.h
  * @brief Header file of neighbor sampling.
  */
 
 #ifndef GRAPHBOLT_NEIGHBOR_H_
 #define GRAPHBOLT_NEIGHBOR_H_
 
-#include "csc_sampling_graph.h"
+#include <graphbolt/csc_sampling_graph.h>
 
 namespace graphbolt {
 namespace sampling {

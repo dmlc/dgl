@@ -7,7 +7,7 @@
 #ifndef GRAPHBOLT_ROWWISE_PICK_H_
 #define GRAPHBOLT_ROWWISE_PICK_H_
 
-#include "neighbor.h"
+#include <graphbolt/neighbor.h>
 
 namespace graphbolt {
 namespace sampling {
@@ -46,6 +46,16 @@ std::tuple<TensorList, TensorList, TensorList> RowWisePickPerEtype(
   if (require_eids) {
     picked_eids_per_etype.resize(num_etypes, TensorList(num_rows));
   }
+  int64_t min_num_picks = -1;
+  bool pick_all = true;
+  for (auto num_pick : num_picks) {
+    if (num_picks[i] != -1)  {
+      if (min_num_picks == -1 || num_picks[i] < min_num_pick)
+        min_num_picks = num_picks[i];
+      pick_all = false;
+    }
+  }
+  // TODO: all -1 fast path?
 
   const bool has_probs = probs.has_value();
   torch::parallel_for(
@@ -59,47 +69,64 @@ std::tuple<TensorList, TensorList, TensorList> RowWisePickPerEtype(
 
           if (len == 0) continue;
 
-          auto cur_et = type_per_edge[off].item<int>();
-          int64_t et_len = 1;
-          for (int64_t j = 0; j < len; ++j) {
-            TORCH_CHECK(
-                j + 1 == len ||
-                    cur_et <= type_per_edge[off + j + 1].item<int>(),
-                "Edge type is not sorted. Please sort in advance");
-
-            if ((j + 1 == len) ||
-                cur_et != type_per_edge[off + j + 1].item<int>()) {
-              // 1 end of the current etype
-              // 2 end of the row
-              // random pick for current etype
-              torch::Tensor picked_indices;
-              int64_t et_end = off + j + 1;
-              int64_t et_start = et_end - et_len;
-              if ((num_picks[cur_et] == -1) ||
-                  (et_len <= num_picks[cur_et] && !replace)) {
-                // fast path
-                picked_indices = torch::arange(et_start, et_end);
-                if (has_probs) {
-                  auto mask_tensor =
-                      probs.value().slice(0, et_start, et_end) > 0;
-                  picked_indices =
-                      torch::masked_select(picked_indices, mask_tensor);
-                }
-              } else {
-                picked_indices = pick_fn(et_start, et_end, num_picks[cur_et]);
+          // fast path
+          if (len <= min_num_pick && !replace) {
+              picked_indices = torch::arange(et_start, et_end);
+              if (has_probs) {
+                auto mask_tensor =
+                    probs.value().slice(0, et_start, et_end) > 0;
+                picked_indices =
+                    torch::masked_select(picked_indices, mask_tensor);
               }
-
-              int64_t picked_num = picked_indices.size(0);
-              picked_rows_per_etype[cur_et][i] = torch::full({picked_num}, rid);
-              picked_cols_per_etype[cur_et][i] = indices[picked_indices];
-              if (require_eids)
-                picked_eids_per_etype[cur_et][i] = picked_indices;
-              if (j + 1 == len) break;
-
-              cur_et = type_per_edge[off + j + 1].item<int>();
-              et_len = 1;
             } else {
-              et_len++;
+              picked_indices = pick_fn(et_start, et_end, cur_num_pick);
+            }
+          } else {
+            auto cur_et = type_per_edge[off].item<int>();
+            auto cur_num_pick = num_picks[cur_et];
+            int64_t et_len = 1;
+            for (int64_t j = 0; j < len; ++j) {
+              TORCH_CHECK(
+                  j + 1 == len ||
+                      cur_et <= type_per_edge[off + j + 1].item<int>(),
+                  "Edge type is not sorted. Please sort in advance");
+
+              if ((j + 1 == len) ||
+                  cur_et != type_per_edge[off + j + 1].item<int>()) {
+                // 1 end of the current etype
+                // 2 end of the row
+                // random pick for current etype
+                if (cur_num_pick != 0) {
+                  torch::Tensor picked_indices;
+                  int64_t et_end = off + j + 1;
+                  int64_t et_start = et_end - et_len;
+                  if ((cur_num_pick == -1) ||
+                      (et_len <= cur_num_pick && !replace)) {
+                    // fast path
+                    picked_indices = torch::arange(et_start, et_end);
+                    if (has_probs) {
+                      auto mask_tensor =
+                          probs.value().slice(0, et_start, et_end) > 0;
+                      picked_indices =
+                          torch::masked_select(picked_indices, mask_tensor);
+                    }
+                  } else {
+                    picked_indices = pick_fn(et_start, et_end, cur_num_pick);
+                  }
+
+                  int64_t picked_num = picked_indices.size(0);
+                  picked_rows_per_etype[cur_et][i] = torch::full({picked_num}, rid);
+                  picked_cols_per_etype[cur_et][i] = indices[picked_indices];
+                  if (require_eids)
+                    picked_eids_per_etype[cur_et][i] = picked_indices;
+                  if (j + 1 == len) break;
+                }
+                cur_et = type_per_edge[off + j + 1].item<int>();
+                et_len = 1;
+                cur_num_pick = num_picks[cur_et];
+              } else {
+                et_len++;
+              }
             }
           }
         }

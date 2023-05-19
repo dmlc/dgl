@@ -6,7 +6,7 @@
 
 #include <algorithm>
 
-#include "rowwise_pick.h"
+#include <graphbolt/rowwise_pick.h>
 
 namespace graphbolt {
 namespace sampling {
