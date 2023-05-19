@@ -23,6 +23,7 @@
 #include <cuda_runtime.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/runtime/tensordispatch.h>
 
 #include <algorithm>
 #include <memory>
@@ -36,6 +37,7 @@
 using namespace dgl::aten;
 using namespace dgl::runtime::cuda;
 using namespace dgl::transform::cuda;
+using TensorDispatcher = dgl::runtime::TensorDispatcher;
 
 namespace dgl {
 namespace transform {
@@ -165,6 +167,9 @@ struct CUDAIdsMapper {
             NewIdArray(maxNodesPerType[ntype], ctx, sizeof(IdType) * 8));
       }
     }
+
+    cudaEvent_t copyEvent;
+    NDArray new_len_tensor;
     // Populate the mappings.
     if (generate_lhs_nodes) {
       int64_t* count_lhs_device = static_cast<int64_t*>(
@@ -174,13 +179,23 @@ struct CUDAIdsMapper {
           src_nodes, rhs_nodes, &node_maps, count_lhs_device, &lhs_nodes,
           stream);
 
-      device->CopyDataFromTo(
-          count_lhs_device, 0, num_nodes_per_type.data(), 0,
-          sizeof(*num_nodes_per_type.data()) * num_ntypes, ctx,
-          DGLContext{kDGLCPU, 0}, DGLDataType{kDGLInt, 64, 1});
-      device->StreamSync(ctx, stream);
+      CUDA_CALL(cudaEventCreate(&copyEvent));
+      if (TensorDispatcher::Global()->IsAvailable()) {
+        new_len_tensor = NDArray::PinnedEmpty(
+            {num_ntypes}, DGLDataTypeTraits<int64_t>::dtype,
+            DGLContext{kDGLCPU, 0});
+      } else {
+        // use pageable memory, it will unecessarily block but be functional
+        new_len_tensor = NDArray::Empty(
+            {num_ntypes}, DGLDataTypeTraits<int64_t>::dtype,
+            DGLContext{kDGLCPU, 0});
+      }
+      CUDA_CALL(cudaMemcpyAsync(
+          new_len_tensor->data, count_lhs_device,
+          sizeof(*num_nodes_per_type.data()) * num_ntypes,
+          cudaMemcpyDeviceToHost, stream));
+      CUDA_CALL(cudaEventRecord(copyEvent, stream));
 
-      // Wait for the node counts to finish transferring.
       device->FreeWorkspace(ctx, count_lhs_device);
     } else {
       maker.Make(lhs_nodes, rhs_nodes, &node_maps, stream);
@@ -189,14 +204,23 @@ struct CUDAIdsMapper {
         num_nodes_per_type[ntype] = lhs_nodes[ntype]->shape[0];
       }
     }
-    // Resize lhs nodes.
+    // Map node numberings from global to local, and build pointer for CSR.
+    auto ret = MapEdges(graph, edge_arrays, node_maps, stream);
+
     if (generate_lhs_nodes) {
+      // wait for the previous copy
+      CUDA_CALL(cudaEventSynchronize(copyEvent));
+      CUDA_CALL(cudaEventDestroy(copyEvent));
+
+      // Resize lhs nodes.
       for (int64_t ntype = 0; ntype < num_ntypes; ++ntype) {
+        num_nodes_per_type[ntype] =
+            static_cast<int64_t*>(new_len_tensor->data)[ntype];
         lhs_nodes[ntype]->shape[0] = num_nodes_per_type[ntype];
       }
     }
-    // Map node numberings from global to local, and build pointer for CSR.
-    return MapEdges(graph, edge_arrays, node_maps, stream);
+
+    return ret;
   }
 };
 
