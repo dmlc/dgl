@@ -56,7 +56,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSCWithHeteroInfo(
     int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices,
-    const StringList& ntypes, const StringList& etypes,
+    const NodeTypeList& ntypes, const EdgeTypeList& etypes,
     torch::Tensor node_type_offset, torch::Tensor type_per_edge) {
   TORCH_CHECK(node_type_offset.size(0) > 0);
   TORCH_CHECK(node_type_offset.dim() == 1);
