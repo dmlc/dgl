@@ -58,18 +58,6 @@ def get_lib_pattern(lib_name):
     return lib_pattern
 
 
-def get_graph_bolt_pattern():
-    if sys.platform.startswith("linux"):
-        graphbolt_lib_pattern = "libgraphbolt_*.so"
-    elif sys.platform.startswith("darwin"):
-        graphbolt_lib_pattern = "libgraphbolt_*.dylib"
-    elif sys.platform.startswith("win"):
-        graphbolt_lib_pattern = "graphbolt_*.dll"
-    else:
-        raise NotImplementedError("Unsupported system: %s" % sys.platform)
-    return graphbolt_lib_pattern
-
-
 LIBS, VERSION = get_lib_path()
 BACKENDS = ["pytorch"]
 
