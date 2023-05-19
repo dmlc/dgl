@@ -1,8 +1,10 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/include/csc_sampling_graph.h
+ * @file graphbolt/csc_sampling_graph.h
  * @brief Header file of csc sampling graph.
  */
+#ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
+#define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
 #include <torch/custom_class.h>
 #include <torch/torch.h>
@@ -71,21 +73,21 @@ struct HeteroInfo {
   torch::Tensor type_per_edge;
 
   /**
-  ** @brief Magic number to indicate Hetero info version in serialize/
-  ** deserialize stages.
-  **/
+   * @brief Magic number to indicate Hetero info version in serialize/
+   * deserialize stages.
+   */
   static constexpr int64_t kHeteroInfoSerializeMagic = 0xDD2E60F0F6B4A129;
 
   /**
-  ** @brief Load hetero info from stream.
-  ** @param archive Input stream for deserializing.
-  **/
+   * @brief Load hetero info from stream.
+   * @param archive Input stream for deserializing.
+   */
   void Load(torch::serialize::InputArchive& archive);
 
   /**
-  ** @brief Save hetero info to stream.
-  ** @param archive Output stream for serializing.
-  **/
+   * @brief Save hetero info to stream.
+   * @param archive Output stream for serializing.
+   */
   void Save(torch::serialize::OutputArchive& archive) const;
 };
 
@@ -94,6 +96,9 @@ struct HeteroInfo {
  */
 class CSCSamplingGraph : public torch::CustomClassHolder {
  public:
+  /** @brief Default constructor. */
+  CSCSamplingGraph() = default;
+
   /**
    * @brief Constructor for CSC with data.
    * @param num_nodes The number of nodes in the graph.
@@ -170,21 +175,21 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   }
 
   /**
-  ** @brief Magic number to indicate graph version in serialize/deserialize
-  ** stage.
-  **/
+   * @brief Magic number to indicate graph version in serialize/deserialize
+   * stage.
+   */
   static constexpr int64_t kCSCSamplingGraphSerializeMagic = 0xDD2E60F0F6B4A128;
 
   /**
-  ** @brief Load graph from stream.
-  ** @param archive Input stream for deserializing.
-  **/
+   * @brief Load graph from stream.
+   * @param archive Input stream for deserializing.
+   */
   void Load(torch::serialize::InputArchive& archive);
 
   /**
-  ** @brief Save graph to stream.
-  ** @param archive Output stream for serializing.
-  **/
+   * @brief Save graph to stream.
+   * @param archive Output stream for serializing.
+   */
   void Save(torch::serialize::OutputArchive& archive) const;
 
  private:
@@ -201,32 +206,4 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 }  // namespace sampling
 }  // namespace graphbolt
 
-/**
-** @brief Overload stream operator to enable `torch::save()` and `torch.load()`
-** for CSCSamplingGraph.
-**/
-namespace torch {
-
-/**
-** @brief Overload input stream operator for CSCSamplingGraph deserialization.
-** @param archive Input stream for deserializing.
-** @param graph CSCSamplingGraph.
-**
-** @return archive
-**/
-inline serialize::InputArchive& operator>>(
-    serialize::InputArchive& archive,
-    graphbolt::sampling::CSCSamplingGraph& graph);
-
-/**
- * @brief Overload output stream operator for CSCSamplingGraph serialization.
- * @param archive Output stream for serializing.
- * @param graph CSCSamplingGraph.
- *
- * @return archive
- */
-inline serialize::OutputArchive& operator<<(
-    serialize::OutputArchive& archive,
-    const graphbolt::sampling::CSCSamplingGraph& graph);
-
-}  // namespace torch
+#endif  // GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
