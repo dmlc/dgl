@@ -12,134 +12,69 @@
 #include <string>
 #include <vector>
 
+#include "csc_sampling_graph.h"
+
+/**
+ * @brief Overload stream operator to enable `torch::save()` and `torch.load()`
+ * for CSCSamplingGraph.
+ */
+namespace torch {
+
+/**
+ * @brief Overload input stream operator for CSCSamplingGraph deserialization.
+ * @param archive Input stream for deserializing.
+ * @param graph CSCSamplingGraph.
+ *
+ * @return archive
+ */
+inline serialize::InputArchive& operator>>(
+    serialize::InputArchive& archive,
+    graphbolt::sampling::CSCSamplingGraph& graph);
+
+/**
+ * @brief Overload output stream operator for CSCSamplingGraph serialization.
+ * @param archive Output stream for serializing.
+ * @param graph CSCSamplingGraph.
+ *
+ * @return archive
+ */
+inline serialize::OutputArchive& operator<<(
+    serialize::OutputArchive& archive,
+    const graphbolt::sampling::CSCSamplingGraph& graph);
+
+}  // namespace torch
+
 namespace graphbolt {
-namespace utils {
 
 /**
- * @brief Utility function to write to archive.
- * @param archive Output archive.
- * @param key Key name used in saving.
- * @param data Data that could be constructed as `torch::IValue`.
+ * @brief Load CSCSamplingGraph from file.
+ * @param filename File name to read.
+ *
+ * @return CSCSamplingGraph.
  */
-template <typename DataT>
-void write_to_archive(
-    torch::serialize::OutputArchive& archive, const std::string& key,
-    const DataT& data) {
-  archive.write(key, data);
-}
+c10::intrusive_ptr<sampling::CSCSamplingGraph> LoadCSCSamplingGraph(
+    const std::string& filename);
 
 /**
- * @brief Specialization utility function to save string vector.
- * @param archive Output archive.
- * @param key Key name used in saving.
- * @param data Vector of string.
+ * @brief Save CSCSamplingGraph to file.
+ * @param graph CSCSamplingGraph to save.
+ * @param filename File name to save.
+ *
  */
-template <>
-void write_to_archive<std::vector<std::string>>(
-    torch::serialize::OutputArchive& archive, const std::string& key,
-    const std::vector<std::string>& data) {
-  archive.write(
-      key + "/size", torch::tensor(static_cast<int64_t>(data.size())));
-  for (const auto index : c10::irange(data.size())) {
-    archive.write(key + "/" + std::to_string(index), data[index]);
-  }
-}
+void SaveCSCSamplingGraph(
+    c10::intrusive_ptr<sampling::CSCSamplingGraph> graph,
+    const std::string& filename);
 
 /**
- * @brief Utility function to read from archive.
+ * @brief Read data from archive.
  * @param archive Input archive.
- * @param key Key name used in reading.
- * @param data Data that could be constructed as `torch::IValue`.
+ * @param key Key name of data.
+ *
+ * @return data.
  */
-template <typename DataT = torch::IValue>
-void read_from_archive(
-    torch::serialize::InputArchive& archive, const std::string& key,
-    DataT& data) {
-  archive.read(key, data);
-}
+torch::IValue read_from_archive(
+    torch::serialize::InputArchive& archive, const std::string& key);
 
-/**
- * @brief Specialization utility function to read from archive.
- * @param archive Input archive.
- * @param key Key name used in reading.
- * @param data Data that is `bool`.
- */
-template <>
-void read_from_archive<bool>(
-    torch::serialize::InputArchive& archive, const std::string& key,
-    bool& data) {
-  torch::IValue iv_data;
-  archive.read(key, iv_data);
-  data = iv_data.toBool();
-}
-
-/**
- * @brief Specialization utility function to read from archive.
- * @param archive Input archive.
- * @param key Key name used in reading.
- * @param data Data that is `int64_t`.
- */
-template <>
-void read_from_archive<int64_t>(
-    torch::serialize::InputArchive& archive, const std::string& key,
-    int64_t& data) {
-  torch::IValue iv_data;
-  archive.read(key, iv_data);
-  data = iv_data.toInt();
-}
-
-/**
- * @brief Specialization utility function to read from archive.
- * @param archive Input archive.
- * @param key Key name used in reading.
- * @param data Data that is `std::string`.
- */
-template <>
-void read_from_archive<std::string>(
-    torch::serialize::InputArchive& archive, const std::string& key,
-    std::string& data) {
-  torch::IValue iv_data;
-  archive.read(key, iv_data);
-  data = iv_data.toString();
-}
-
-/**
- * @brief Specialization utility function to read from archive.
- * @param archive Input archive.
- * @param key Key name used in reading.
- * @param data Data that is `torch::Tensor`.
- */
-template <>
-void read_from_archive<torch::Tensor>(
-    torch::serialize::InputArchive& archive, const std::string& key,
-    torch::Tensor& data) {
-  torch::IValue iv_data;
-  archive.read(key, iv_data);
-  data = iv_data.toTensor();
-}
-
-/**
- * @brief Specialization utility function to read to string vector.
- * @param archive Output archive.
- * @param key Key name used in saving.
- * @param data Vector of string.
- */
-template <>
-void read_from_archive<std::vector<std::string>>(
-    torch::serialize::InputArchive& archive, const std::string& key,
-    std::vector<std::string>& data) {
-  int64_t size = 0;
-  read_from_archive<int64_t>(archive, key + "/size", size);
-  data.resize(static_cast<size_t>(size));
-  std::string element;
-  for (int64_t index = 0; index < size; ++index) {
-    read_from_archive<std::string>(
-        archive, key + "/" + std::to_string(index), element);
-    data[index] = element;
-  }
-}
-
-}  // namespace utils
 }  // namespace graphbolt
 
 #endif  // GRAPHBOLT_SERIALIZE_H_
