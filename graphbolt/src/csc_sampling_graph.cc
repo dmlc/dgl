@@ -1,12 +1,11 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/include/csc_sampling_graph.cc
+ * @file csc_sampling_graph.cc
  * @brief Source file of sampling graph.
  */
 
-#include "csc_sampling_graph.h"
-
-#include "serialize.h"
+#include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/serialize.h>
 
 namespace graphbolt {
 namespace sampling {

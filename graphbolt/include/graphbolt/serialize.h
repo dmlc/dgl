@@ -1,11 +1,11 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/include/serialize.h
+ * @file graphbolt/serialize.h
  * @brief Utility functions for serialize and deserialize.
  */
 
-#ifndef GRAPHBOLT_INCLUDE_SERIALIZE_H_
-#define GRAPHBOLT_INCLUDE_SERIALIZE_H_
+#ifndef GRAPHBOLT_SERIALIZE_H_
+#define GRAPHBOLT_SERIALIZE_H_
 
 #include <torch/torch.h>
 
@@ -142,4 +142,4 @@ void read_from_archive<std::vector<std::string>>(
 }  // namespace utils
 }  // namespace graphbolt
 
-#endif  // GRAPHBOLT_INCLUDE_SERIALIZE_H_
+#endif  // GRAPHBOLT_SERIALIZE_H_

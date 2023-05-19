@@ -1,8 +1,10 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/include/csc_sampling_graph.h
+ * @file graphbolt/csc_sampling_graph.h
  * @brief Header file of csc sampling graph.
  */
+#ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
+#define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
 #include <torch/custom_class.h>
 #include <torch/torch.h>
@@ -230,3 +232,4 @@ inline serialize::OutputArchive& operator<<(
     const graphbolt::sampling::CSCSamplingGraph& graph);
 
 }  // namespace torch
+#endif  //  GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
