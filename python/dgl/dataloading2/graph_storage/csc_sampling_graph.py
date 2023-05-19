@@ -1,4 +1,4 @@
-"""Csc format sampling graph."""
+"""CSC format sampling graph."""
 # pylint: disable= invalid-name
 from typing import List, Optional, Tuple
 
@@ -9,7 +9,7 @@ HeteroInfo = Tuple[List[str], List[str], torch.tensor, torch.tensor]
 
 
 class CSCSamplingGraph:
-    r"""Class for Csc sampling graph."""
+    r"""Class for CSC sampling graph."""
 
     def __repr__(self):
         return _csc_sampling_graph_str(self)
@@ -41,23 +41,23 @@ class CSCSamplingGraph:
 
     @property
     def csc_indptr(self) -> torch.tensor:
-        """Returns the indices pointer in the Csc graph.
+        """Returns the indices pointer in the CSC graph.
 
         Returns
         -------
-        int
-            The indices pointer in the Csc graph
+        torch.tensor
+            The indices pointer in the CSC graph
         """
         return self.c_csc_graph.csc_indptr()
 
     @property
     def indices(self) -> torch.tensor:
-        """Returns the indices in the Csc graph.
+        """Returns the indices in the CSC graph.
 
         Returns
         -------
-        int
-            The indices in the Csc graph
+        torch.tensor
+            The indices in the CSC graph
         """
         return self.c_csc_graph.indices()
 
@@ -73,15 +73,15 @@ class CSCSamplingGraph:
         return self.c_csc_graph.is_heterogeneous()
 
     @property
-    def node_types(self) -> Optional[torch.Tensor]:
-        """Returns the type of each node in the graph.
+    def node_types(self) -> Optional[List[str]]:
+        """Returns all node types in the graph.
 
         Returns
         -------
-        torch.Tensor or None
-            If the graph is heterogeneous, returns a 1D tensor of size num_nodes,
-            containing the type of each node in the graph. If the graph is homogeneous,
-            returns None.
+        List[str] or None
+            If the graph is heterogeneous, returns a string list of size
+            the number of node types, containing all node types in the graph.
+            If the graph is homogeneous, returns None.
         """
         return (
             self.c_csc_graph.node_types()
@@ -90,15 +90,15 @@ class CSCSamplingGraph:
         )
 
     @property
-    def edge_types(self) -> Optional[torch.Tensor]:
-        """Returns the type of each edge in the graph.
+    def edge_types(self) -> Optional[List[str]]:
+        """Returns all edge types in the graph.
 
         Returns
         -------
-        torch.Tensor or None
-            If the graph is heterogeneous, returns a 1D tensor of size num_edges,
-            containing the type of each edge in the graph. If the graph is homogeneous,
-            returns None.
+        List[str] or None
+            If the graph is heterogeneous, returns a string triplet list tensor
+            of size the number of edge types, containing all edge types in the
+            graph. If the graph is homogeneous, returns None.
         """
         return (
             self.c_csc_graph.edge_types()
@@ -113,10 +113,11 @@ class CSCSamplingGraph:
         Returns
         -------
         torch.Tensor or None
-            If the graph is heterogeneous, returns a 1D tensor of size num_node_types + 1,
-            where num_node_types is the number of unique node types in the graph.
-            The i-th element of the tensor indicates the index in the node type tensor
-            where nodes of type i start. If the graph is homogeneous, returns None.
+            If the graph is heterogeneous, returns a 1D tensor of size
+            num_node_types + 1, where num_node_types is the number of unique
+            node types in the graph. The i-th element of the tensor indicates
+            the index in the node type tensor where nodes of type i start.
+            If the graph is homogeneous, returns None.
         """
         return (
             self.c_csc_graph.node_type_offset()
@@ -131,9 +132,9 @@ class CSCSamplingGraph:
         Returns
         -------
         torch.Tensor or None
-            If the graph is heterogeneous, returns a 1D tensor of size num_edges,
-            containing the type of each edge in the graph. If the graph is homogeneous,
-            returns None.
+            If the graph is heterogeneous, returns a 1D tensor of size
+            the number of edges, containing the type of each edge in the graph.
+            If the graph is homogeneous, returns None.
         """
         return (
             self.c_csc_graph.type_per_edge()
@@ -159,8 +160,8 @@ def from_csc(
     indices : torch.Tensor
         Column indices of the non-zero elements in the CSC graph.
     etype_sorted : bool
-        A hint telling whether neighbors of each node are already sorted by edge type ID,
-        it is only meaningful when graph is heterogeneous, by default True.
+        A hint telling whether neighbors of each node are sorted by edge type
+        ID, it is only meaningful when graph is heterogeneous, by default True.
     num_nodes : int, optional
         Number of nodes in the graph, by default None.
     hetero_info : Optional[HeteroInfo], optional
@@ -177,8 +178,10 @@ def from_csc(
     >>> csc_indptr = torch.tensor([0, 2, 5, 7])
     >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
     >>> num_nodes = 3
-    >>> ntypes, etypes = ['n1', 'n2'], ['e1', 'e2']
-    >>> hetero_info = (ntypes, etypes, torch.tensor([0, 2]), torch.tensor([0, 1, 0, 1, 1, 0, 0]))
+    >>> ntypes = ['n1', 'n2', 'n3']
+    >>> etypes = [('n1', 'e1', 'n2'), ('n1', 'e2', 'n3')]
+    >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
+    >>> hetero_info = (ntypes, etypes, torch.tensor([0, 1, 2]), type_per_edge)
     >>> graph = from_csc(csc_indptr, indices, num_nodes, hetero_info)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
@@ -230,8 +233,8 @@ def from_coo(
     num_nodes : int, optional
         Number of nodes in the graph, by default None.
     hetero_info : Optional[HeteroInfo], optional
-        Heterogeneous graph metadata, by default None. Indicates whether the graph is
-        homogeneous or heterogeneous.
+        Heterogeneous graph metadata, by default None. Indicates whether
+        the graph is homogeneous or heterogeneous.
 
     Returns
     -------
@@ -242,8 +245,10 @@ def from_coo(
     --------
     >>> coo = torch.tensor([[0, 1, 2, 2, 3, 3],
     ...                     [1, 2, 0, 3, 1, 3]])
-    >>> ntypes, etypes = ['n1', 'n2', 'n3'], ['e1', 'e2']
-    >>> hetero_info = (ntypes, etypes, torch.tensor([0, 2, 5]), torch.tensor([0, 1, 0, 1, 0, 1]))
+    >>> ntypes, etypes = ['n1', 'n2', 'n3']
+    >>> etypes = [('n1', 'e1', 'n2'), ('n1', 'e2', 'n3')]
+    >>> type_per_edge = torch.tensor([0, 1, 0, 1, 0, 1])
+    >>> hetero_info = (ntypes, etypes, torch.tensor([0, 2, 5]), type_per_edge)
     >>> graph = dataloading2.from_coo(coo, hetero_info)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 1, 3, 4, 6]),
