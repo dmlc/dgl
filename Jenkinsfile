@@ -128,6 +128,7 @@ def is_authorized(name) {
               'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
               'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
               'VoVAllen',
+              'keli-wen',
               ]
   return (name in devs)
 }
