@@ -206,37 +206,4 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 }  // namespace sampling
 }  // namespace graphbolt
 
-<<<<<<< HEAD:graphbolt/include/graphbolt/csc_sampling_graph.h
-/**
- * @brief Overload stream operator to enable `torch::save()` and `torch.load()`
- * for CSCSamplingGraph.
- */
-namespace torch {
-
-/**
- * @brief Overload input stream operator for CSCSamplingGraph deserialization.
- * @param archive Input stream for deserializing.
- * @param graph CSCSamplingGraph.
- *
- * @return archive
- */
-inline serialize::InputArchive& operator>>(
-    serialize::InputArchive& archive,
-    graphbolt::sampling::CSCSamplingGraph& graph);
-
-/**
- * @brief Overload output stream operator for CSCSamplingGraph serialization.
- * @param archive Output stream for serializing.
- * @param graph CSCSamplingGraph.
- *
- * @return archive
- */
-inline serialize::OutputArchive& operator<<(
-    serialize::OutputArchive& archive,
-    const graphbolt::sampling::CSCSamplingGraph& graph);
-
-}  // namespace torch
-#endif  //  GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
-=======
-#endif  // GRAPHBOLT_INCLUDE_CSCSAMPLINGGRAPH_H_
->>>>>>> 31b649cb... [GraphBolt] add support for load and save CSCSamplingGraph:graphbolt/include/csc_sampling_graph.h
+#endif  // GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
