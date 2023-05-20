@@ -40,7 +40,7 @@ RangePickFn GetRangePickFn(
   return pick_fn;
 }
 
-std::tuple<TensorList, TensorList> SampleEtypeNeighbors(
+std::tuple<torch::Tensor, torch::Tensor> SampleEtypeNeighbors(
     const CSCPtr graph, torch::Tensor seed_nodes,
     const std::vector<int64_t>& fanouts, bool replace, bool require_eids,
     const torch::optional<torch::Tensor>& probs) {
@@ -52,7 +52,6 @@ std::tuple<TensorList, TensorList> SampleEtypeNeighbors(
       fanouts.size() == graph->EdgeTypes().size(),
       "The length of Fanouts and edge type should be equal.")
 
-  const int64_t num_etypes = fanouts.size();
   const int64_t num_nodes = seed_nodes.size(0);
 
   int64_t fanout_value = fanouts[0];
@@ -62,18 +61,16 @@ std::tuple<TensorList, TensorList> SampleEtypeNeighbors(
 
   if (num_nodes == 0 || (same_fanout && fanout_value == 0)) {
     // Empty graph
-    return std::tuple<TensorList, TensorList>();
+    return std::tuple<torch::Tensor, torch::Tensor>();
   } else {
     auto pick_fn = GetRangePickFn(probs, replace);
-    TensorList picked_rows, picked_cols, picked_eids;
-    std::tie(picked_rows, picked_cols, picked_eids) = RowWisePickPerEtype(
+    torch::Tensor picked_rows, picked_cols, picked_etypes, picked_eids;
+    std::tie(picked_rows, picked_cols, picked_etypes, picked_eids) = RowWisePickPerEtype(
         graph, seed_nodes, fanouts, probs, require_eids, replace, pick_fn);
-    TensorList induced_coos(num_etypes);
-    for (int64_t i = 0; i < num_etypes; i++) {
-      // Note the graph is csc, so row and col should be reversed.
-      induced_coos[i] = torch::stack({picked_cols[i], picked_rows[i]});
-    }
-    return std::tuple<TensorList, TensorList>(induced_coos, picked_eids);
+    torch::Tensor induced_coos;
+    // Note the graph is csc, so row and col should be reversed.
+    induced_coos = torch::stack({picked_cols, picked_rows, picked_etypes});
+    return std::make_tuple(induced_coos, picked_eids);
   }
 }
 

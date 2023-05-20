@@ -12,6 +12,7 @@
 namespace graphbolt {
 namespace sampling {
 
+using TensorList = std::vector<torch::Tensor>;
 static constexpr int kDefaultPickGrainSize = 100;
 
 /**
@@ -25,10 +26,10 @@ static constexpr int kDefaultPickGrainSize = 100;
  * last TensorList in the tuple is this value when required.
  * @param replace Boolean indicating if picking is done with replacement.
  * @param pick_fn The function used for picking.
- * @return A tuple containing the picked rows, picked columns, and picked edge
- * IDs (if required).
+ * @return A tuple containing the picked rows, picked columns, picked etypes, 
+ * and picked edge IDs (if required).
  */
-std::tuple<TensorList, TensorList, TensorList> RowWisePickPerEtype(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> RowWisePickPerEtype(
     const CSCPtr graph, const torch::Tensor& rows,
     const std::vector<int64_t>& num_picks,
     const torch::optional<torch::Tensor>& probs, bool require_eids,
@@ -38,24 +39,22 @@ std::tuple<TensorList, TensorList, TensorList> RowWisePickPerEtype(
   const auto type_per_edge = graph->TypePerEdge();
   const int64_t num_rows = rows.size(0);
   const int64_t num_etypes = num_picks.size();
-  std::vector<TensorList> picked_rows_per_etype(
-      num_etypes, TensorList(num_rows));
-  std::vector<TensorList> picked_cols_per_etype(
-      num_etypes, TensorList(num_rows));
-  std::vector<TensorList> picked_eids_per_etype;
+  TensorList picked_rows_per_row(num_rows);
+  TensorList picked_cols_per_row(num_rows);
+  TensorList picked_etypes_per_row(num_rows);
+  TensorList picked_eids_per_row;
   if (require_eids) {
-    picked_eids_per_etype.resize(num_etypes, TensorList(num_rows));
+    picked_eids_per_row.resize(num_rows);
   }
-  int64_t min_num_picks = -1;
+  int64_t min_num_pick = -1;
   bool pick_all = true;
   for (auto num_pick : num_picks) {
-    if (num_picks[i] != -1)  {
-      if (min_num_picks == -1 || num_picks[i] < min_num_pick)
-        min_num_picks = num_picks[i];
+    if (num_pick != -1)  {
+      if (min_num_pick == -1 || num_pick < min_num_pick)
+        min_num_pick = num_pick;
       pick_all = false;
     }
   }
-  // TODO: all -1 fast path?
 
   const bool has_probs = probs.has_value();
   torch::parallel_for(
@@ -68,20 +67,19 @@ std::tuple<TensorList, TensorList, TensorList> RowWisePickPerEtype(
           const auto len = (indptr[rid + 1] - off).item<int>();
 
           if (len == 0) continue;
-
+          
+          torch::Tensor picked_indices_row;
           // fast path
-          if (len <= min_num_pick && !replace) {
-              picked_indices = torch::arange(et_start, et_end);
+          if ((pick_all || len <= min_num_pick) && !replace) {
+              picked_indices_row = torch::arange(off, off + len);
               if (has_probs) {
                 auto mask_tensor =
-                    probs.value().slice(0, et_start, et_end) > 0;
-                picked_indices =
-                    torch::masked_select(picked_indices, mask_tensor);
+                    probs.value().slice(0, off, off + len) > 0;
+                picked_indices_row =
+                    torch::masked_select(picked_indices_row, mask_tensor);
               }
-            } else {
-              picked_indices = pick_fn(et_start, et_end, cur_num_pick);
-            }
           } else {
+            TensorList pick_indices_per_etype(num_etypes);
             auto cur_et = type_per_edge[off].item<int>();
             auto cur_num_pick = num_picks[cur_et];
             int64_t et_len = 1;
@@ -96,8 +94,8 @@ std::tuple<TensorList, TensorList, TensorList> RowWisePickPerEtype(
                 // 1 end of the current etype
                 // 2 end of the row
                 // random pick for current etype
+                torch::Tensor picked_indices;
                 if (cur_num_pick != 0) {
-                  torch::Tensor picked_indices;
                   int64_t et_end = off + j + 1;
                   int64_t et_start = et_end - et_len;
                   if ((cur_num_pick == -1) ||
@@ -113,13 +111,12 @@ std::tuple<TensorList, TensorList, TensorList> RowWisePickPerEtype(
                   } else {
                     picked_indices = pick_fn(et_start, et_end, cur_num_pick);
                   }
-
-                  int64_t picked_num = picked_indices.size(0);
-                  picked_rows_per_etype[cur_et][i] = torch::full({picked_num}, rid);
-                  picked_cols_per_etype[cur_et][i] = indices[picked_indices];
-                  if (require_eids)
-                    picked_eids_per_etype[cur_et][i] = picked_indices;
-                  if (j + 1 == len) break;
+                  pick_indices_per_etype[cur_et] = picked_indices;
+                }
+                
+                if (j + 1 == len) {
+                  picked_indices_row = torch::cat(pick_indices_per_etype, 0);
+                  break;
                 }
                 cur_et = type_per_edge[off + j + 1].item<int>();
                 et_len = 1;
@@ -129,22 +126,23 @@ std::tuple<TensorList, TensorList, TensorList> RowWisePickPerEtype(
               }
             }
           }
+          // concat here
+          int64_t picked_num = picked_indices_row.size(0);
+          picked_rows_per_row[i] = torch::full({picked_num}, rid);
+          picked_cols_per_row[i] = indices[picked_indices_row];
+          picked_eids_per_row[i] = type_per_edge[picked_indices_row];
+          if (require_eids)
+            picked_eids_per_row[i] = picked_indices_row;
         }
       });
 
-  TensorList picked_rows(num_etypes);
-  TensorList picked_cols(num_etypes);
-  TensorList picked_eids;
-  if (require_eids) picked_eids.resize(num_etypes);
+  torch::Tensor picked_rows = torch::cat(picked_rows_per_row);
+  torch::Tensor picked_cols = torch::cat(picked_cols_per_row);
+  torch::Tensor picked_etypes = torch::cat(picked_etypes_per_row);
+  torch::Tensor picked_eids;
+  if (require_eids) picked_eids = torch::cat(picked_eids_per_row);
 
-  for (int i = 0; i < num_etypes; i++) {
-    picked_rows[i] = torch::cat(picked_rows_per_etype[i]);
-    picked_cols[i] = torch::cat(picked_cols_per_etype[i]);
-    if (require_eids) picked_eids[i] = torch::cat(picked_eids_per_etype[i]);
-  }
-
-  return std::tuple<TensorList, TensorList, TensorList>(
-      picked_rows, picked_cols, picked_eids);
+  return std::make_tuple(picked_rows, picked_cols, picked_etypes, picked_eids);
 }
 
 }  // namespace sampling
