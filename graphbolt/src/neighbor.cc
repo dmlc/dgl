@@ -4,9 +4,9 @@
  * @brief Source file of neighbor sampling.
  */
 
-#include <algorithm>
-
 #include <graphbolt/rowwise_pick.h>
+
+#include <algorithm>
 
 namespace graphbolt {
 namespace sampling {
@@ -65,8 +65,9 @@ std::tuple<torch::Tensor, torch::Tensor> SampleEtypeNeighbors(
   } else {
     auto pick_fn = GetRangePickFn(probs, replace);
     torch::Tensor picked_rows, picked_cols, picked_etypes, picked_eids;
-    std::tie(picked_rows, picked_cols, picked_etypes, picked_eids) = RowWisePickPerEtype(
-        graph, seed_nodes, fanouts, probs, require_eids, replace, pick_fn);
+    std::tie(picked_rows, picked_cols, picked_etypes, picked_eids) =
+        RowWisePickPerEtype(
+            graph, seed_nodes, fanouts, probs, require_eids, replace, pick_fn);
     torch::Tensor induced_coos;
     // Note the graph is csc, so row and col should be reversed.
     induced_coos = torch::stack({picked_cols, picked_rows, picked_etypes});

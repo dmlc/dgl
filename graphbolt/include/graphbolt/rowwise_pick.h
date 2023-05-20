@@ -1,6 +1,6 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/include/rowwise_pick.h
+ * @file graphbolt/rowwise_pick.h
  * @brief Contains the function definition for RowWisePickPerEtype.
  */
 
@@ -26,10 +26,11 @@ static constexpr int kDefaultPickGrainSize = 100;
  * last TensorList in the tuple is this value when required.
  * @param replace Boolean indicating if picking is done with replacement.
  * @param pick_fn The function used for picking.
- * @return A tuple containing the picked rows, picked columns, picked etypes, 
+ * @return A tuple containing the picked rows, picked columns, picked etypes,
  * and picked edge IDs (if required).
  */
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> RowWisePickPerEtype(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+RowWisePickPerEtype(
     const CSCPtr graph, const torch::Tensor& rows,
     const std::vector<int64_t>& num_picks,
     const torch::optional<torch::Tensor>& probs, bool require_eids,
@@ -49,7 +50,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> RowWisePi
   int64_t min_num_pick = -1;
   bool pick_all = true;
   for (auto num_pick : num_picks) {
-    if (num_pick != -1)  {
+    if (num_pick != -1) {
       if (min_num_pick == -1 || num_pick < min_num_pick)
         min_num_pick = num_pick;
       pick_all = false;
@@ -67,17 +68,16 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> RowWisePi
           const auto len = (indptr[rid + 1] - off).item<int>();
 
           if (len == 0) continue;
-          
+
           torch::Tensor picked_indices_row;
           // fast path
           if ((pick_all || len <= min_num_pick) && !replace) {
-              picked_indices_row = torch::arange(off, off + len);
-              if (has_probs) {
-                auto mask_tensor =
-                    probs.value().slice(0, off, off + len) > 0;
-                picked_indices_row =
-                    torch::masked_select(picked_indices_row, mask_tensor);
-              }
+            picked_indices_row = torch::arange(off, off + len);
+            if (has_probs) {
+              auto mask_tensor = probs.value().slice(0, off, off + len) > 0;
+              picked_indices_row =
+                  torch::masked_select(picked_indices_row, mask_tensor);
+            }
           } else {
             TensorList pick_indices_per_etype(num_etypes);
             auto cur_et = type_per_edge[off].item<int>();
@@ -113,7 +113,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> RowWisePi
                   }
                   pick_indices_per_etype[cur_et] = picked_indices;
                 }
-                
+
                 if (j + 1 == len) {
                   picked_indices_row = torch::cat(pick_indices_per_etype, 0);
                   break;
@@ -126,13 +126,11 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> RowWisePi
               }
             }
           }
-          // concat here
           int64_t picked_num = picked_indices_row.size(0);
           picked_rows_per_row[i] = torch::full({picked_num}, rid);
           picked_cols_per_row[i] = indices[picked_indices_row];
           picked_eids_per_row[i] = type_per_edge[picked_indices_row];
-          if (require_eids)
-            picked_eids_per_row[i] = picked_indices_row;
+          if (require_eids) picked_eids_per_row[i] = picked_indices_row;
         }
       });
 
