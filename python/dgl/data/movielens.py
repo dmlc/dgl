@@ -342,14 +342,6 @@ class MovieLensDataset(DGLDataset):
             self.construct_g(valid_rating_pairs, valid_rating_values, user_feat, movie_feat), \
             self.construct_g(test_rating_pairs, test_rating_values, user_feat, movie_feat)
 
-        self.train_graph.edata.pop('_ID')
-        self.valid_graph.edata.pop('_ID')
-        self.test_graph.edata.pop('_ID')
-
-        self.train_graph.ndata.pop('_ID')
-        self.valid_graph.ndata.pop('_ID')
-        self.test_graph.ndata.pop('_ID')
-
     def construct_g(self, rate_pairs, rate_values, user_feat, movie_feat):
         g = heterograph({
             ('user', 'user-movie', 'movie'): (rate_pairs[0], rate_pairs[1]),
@@ -369,6 +361,9 @@ class MovieLensDataset(DGLDataset):
         }
         g.ndata['feat'] = ndata
         g.edata['rate'] = edata
+
+        g.edata.pop('_ID')
+        g.ndata.pop('_ID')
         return g
 
     def has_cache(self):
