@@ -133,12 +133,12 @@ class MovieLensDataset(DGLDataset):
     >>> # get ratings of edges in the training graph.
     >>> # Note that we only store ratings in 'user-movie' edges since 'user-movie' and 'movie-user' are
     >>> # just inverse edges and share the same set of ratings.
-    >>> ratings = train_g.edata['rate']['user-movie']
+    >>> ratings = train_g.edges["user-movie"].data["rate"]
     >>> ratings
     tensor([3., 3., 2.,  ..., 4., 4., 2.])
 
-    >>> # get input features of users and movies respectively
-    >>> train.ndata['feat']['user'] # user features
+    >>> # get input features of users
+    >>> train_g.nodes["user"].data["feat"]
     tensor([[0.4800, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [1.0600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [0.4600, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
