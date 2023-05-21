@@ -1747,7 +1747,7 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
 
     Examples
     --------
-    The following examplex use PyTorch backend.
+    The following examples use PyTorch backend.
 
     >>> import dgl
     >>> import torch
