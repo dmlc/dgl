@@ -20,7 +20,7 @@ inline torch::Tensor UniformRangeWithRepeat(
       });
 }
 
-inline torch::Tensor UniformRangeWithOutRepeat(
+inline torch::Tensor UniformRangeWithoutRepeat(
     int64_t start, int64_t end, int64_t num_samples) {
   auto perm = torch::randperm(end - start) + start;
   return perm.slice(0, 0, num_samples);
@@ -38,7 +38,7 @@ RangePickFn GetRangePickFn(
         auto true_num = true_indices.size(0);
         auto choosed =
             replace ? UniformRangeWithRepeat(0, true_num, num_samples)
-                    : UniformRangeWithOutRepeat(0, true_num, num_samples);
+                    : UniformRangeWithoutRepeat(0, true_num, num_samples);
         return true_indices[choosed];
       };
     } else {
@@ -49,7 +49,7 @@ RangePickFn GetRangePickFn(
       };
     }
   } else {
-    pick_fn = replace ? UniformRangeWithRepeat : UniformRangeWithOutRepeat;
+    pick_fn = replace ? UniformRangeWithRepeat : UniformRangeWithoutRepeat;
   }
   return pick_fn;
 }
