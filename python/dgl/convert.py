@@ -1703,7 +1703,11 @@ def _to_networkx_heterogeneous(g, node_attrs=None, edge_attrs=None):
 
             feat_dict = g._get_n_repr(ntype_id, nid - n_offset)
             attr.update(
-                {key: F.squeeze(feat_dict[key], 0) for key in node_attrs if key in feat_dict}
+                {
+                    key: F.squeeze(feat_dict[key], 0)
+                    for key in node_attrs
+                    if key in feat_dict
+                }
             )
 
     if edge_attrs is not None:
@@ -1714,7 +1718,11 @@ def _to_networkx_heterogeneous(g, node_attrs=None, edge_attrs=None):
 
             feat_dict = g._get_e_repr(etype_id, eid - eid_offset)
             attr.update(
-                {key: F.squeeze(feat_dict[key], 0) for key in edge_attrs if key in feat_dict}
+                {
+                    key: F.squeeze(feat_dict[key], 0)
+                    for key in edge_attrs
+                    if key in feat_dict
+                }
             )
 
     return nx_graph
@@ -1810,9 +1818,9 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
             "Cannot convert a CUDA graph to networkx. Call g.cpu() first."
         )
     if not g.is_homogeneous:
-        return _to_networkx_heterogeneous(g, node_attrs=node_attrs, edge_attrs=edge_attrs)
+        return _to_networkx_heterogeneous(g, node_attrs, edge_attrs)
     else:
-        return _to_networkx_homogeneous(g, node_attrs=node_attrs, edge_attrs=edge_attrs)
+        return _to_networkx_homogeneous(g, node_attrs, edge_attrs)
 
 
 DGLGraph.to_networkx = to_networkx
