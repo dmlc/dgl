@@ -61,11 +61,11 @@ RowWisePickPerEtype(
   torch::parallel_for(
       0, num_rows, kDefaultPickGrainSize, [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
-          const auto rid = rows[i].item<int>();
+          const auto rid = rows[i].item<int64_t>();
           TORCH_CHECK(rid < num_rows);
 
-          const auto off = indptr[rid].item<int>();
-          const auto len = (indptr[rid + 1] - off).item<int>();
+          const auto off = indptr[rid].item<int64_t>();
+          const auto len = (indptr[rid + 1] - off).item<int64_t>();
 
           if (len == 0) continue;
 
@@ -80,17 +80,17 @@ RowWisePickPerEtype(
             }
           } else {
             TensorList pick_indices_per_etype(num_etypes);
-            auto cur_et = type_per_edge[off].item<int>();
+            auto cur_et = type_per_edge[off].item<int64_t>();
             auto cur_num_pick = num_picks[cur_et];
             int64_t et_len = 1;
             for (int64_t j = 0; j < len; ++j) {
               TORCH_CHECK(
                   j + 1 == len ||
-                      cur_et <= type_per_edge[off + j + 1].item<int>(),
+                      cur_et <= type_per_edge[off + j + 1].item<int64_t>(),
                   "Edge type is not sorted. Please sort in advance");
 
               if ((j + 1 == len) ||
-                  cur_et != type_per_edge[off + j + 1].item<int>()) {
+                  cur_et != type_per_edge[off + j + 1].item<int64_t>()) {
                 // 1 end of the current etype
                 // 2 end of the row
                 // random pick for current etype
@@ -118,7 +118,7 @@ RowWisePickPerEtype(
                   picked_indices_row = torch::cat(pick_indices_per_etype, 0);
                   break;
                 }
-                cur_et = type_per_edge[off + j + 1].item<int>();
+                cur_et = type_per_edge[off + j + 1].item<int64_t>();
                 et_len = 1;
                 cur_num_pick = num_picks[cur_et];
               } else {
@@ -127,10 +127,10 @@ RowWisePickPerEtype(
             }
           }
           int64_t picked_num = picked_indices_row.size(0);
-          picked_rows_per_row[i] = torch::full({picked_num}, rid);
+          picked_rows_per_row[i] = torch::full({picked_num}, rid, indices.dtype());
           picked_cols_per_row[i] = indices[picked_indices_row];
-          picked_eids_per_row[i] = type_per_edge[picked_indices_row];
-          if (require_eids) picked_eids_per_row[i] = picked_indices_row;
+          picked_etypes_per_row[i] = type_per_edge[picked_indices_row];
+          if (require_eids) picked_eids_per_row[i] = picked_indices_row.to(indptr.dtype());
         }
       });
 
