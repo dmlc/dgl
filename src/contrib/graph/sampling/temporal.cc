@@ -19,15 +19,15 @@ namespace dgl {
 namespace sampling {
 
 DGLContext _GetContext(
-    const std::unordered_map<dgl_type_t, NDArray>& ndarray_map) {
-  CHECK(ndarray_map.size() > 1);
+    const std::unordered_map<std::string, NDArray>& ndarray_map) {
+  CHECK(ndarray_map.size() > 0);
   for (const auto& item : ndarray_map)
     return item.second->ctx;
   return DGLContext();
 }
 
 void _CheckContext(
-    const std::unordered_map<dgl_type_t, NDArray>& ndarray_map,
+    const std::unordered_map<std::string, NDArray>& ndarray_map,
     const DGLContext& ctx) {
   for (const auto& item : ndarray_map) {
     CHECK_EQ(item.second->ctx, ctx);
@@ -35,7 +35,7 @@ void _CheckContext(
 }
 
 void _CheckTimestamp(
-    const std::unordered_map<dgl_type_t, NDArray>& timestamp_map) {
+    const std::unordered_map<std::string, NDArray>& timestamp_map) {
   const auto int64_dtype = DGLDataType{kDGLInt, 64, 1};
   for (const auto& item : timestamp_map) {
     CHECK_EQ(item.second->dtype, int64_dtype);
@@ -45,9 +45,10 @@ void _CheckTimestamp(
 
 HeteroSubgraph TemporalSampleNeighbors(
     const HeteroGraphPtr hg,
-    const std::unordered_map<dgl_type_t, NDArray>& nodes,
+    const std::vector<std::string>& vtype_names,
+    const std::unordered_map<std::string, NDArray>& nodes,
     const std::vector<int64_t>& fanouts,
-    const std::unordered_map<dgl_type_t, NDArray>& timestamp,
+    const std::unordered_map<std::string, NDArray>& timestamp,
     bool replace) {
   // Sanity check.
   CHECK_EQ(fanouts.size(), hg->NumEdgeTypes());
@@ -67,7 +68,8 @@ HeteroSubgraph TemporalSampleNeighbors(
     auto pair = hg->meta_graph()->FindEdge(etype);
     const dgl_type_t src_vtype = pair.first;
     const dgl_type_t dst_vtype = pair.second;
-    const int64_t num_nodes = nodes.count(dst_vtype) == 1? nodes.at(dst_vtype)->shape[0] : 0;
+    const auto& dst_type_name = vtype_names[dst_vtype];
+    const int64_t num_nodes = nodes.count(dst_type_name) == 1? nodes.at(dst_type_name)->shape[0] : 0;
 
     if (num_nodes == 0 || fanouts[etype] == 0) {
       // Nothing to sample for this etype, create a placeholder relation graph
@@ -86,6 +88,7 @@ HeteroSubgraph TemporalSampleNeighbors(
           timestamp.at(src_vtype),
           replace
       );*/
+      CHECK(false);
       subrels[etype] = UnitGraph::CreateFromCOO(
           hg->GetRelationGraph(etype)->NumVertexTypes(), sampled_coo.num_rows,
           sampled_coo.num_cols, sampled_coo.row, sampled_coo.col);
@@ -103,14 +106,15 @@ HeteroSubgraph TemporalSampleNeighbors(
 DGL_REGISTER_GLOBAL("contrib.sampling.temporal._CAPI_DGLTemporalSampleNeighbors")
     .set_body([](DGLArgs args, DGLRetValue* rv) {
       HeteroGraphRef hg = args[0];
-      const auto& nodes = MapValueToUnorderedMap<dgl_type_t, NDArray>(args[1]);
-      const auto& fanout = ListValueToVector<int64_t>(args[2]);
-      const auto& timestamp = MapValueToUnorderedMap<dgl_type_t, NDArray>(args[3]);
-      const bool replace = args[4];
+      const auto& vtype_names = ListValueToVector<std::string>(args[1]);
+      const auto& nodes = MapValueToUnorderedMap<NDArray>(args[2]);
+      const auto& fanout = ListValueToVector<int64_t>(args[3]);
+      const auto& timestamp = MapValueToUnorderedMap<NDArray>(args[4]);
+      const bool replace = args[5];
 
       std::shared_ptr<HeteroSubgraph> subg(new HeteroSubgraph);
       *subg = sampling::TemporalSampleNeighbors(
-          hg.sptr(), nodes, fanout, timestamp, replace);
+          hg.sptr(), vtype_names, nodes, fanout, timestamp, replace);
 
       *rv = HeteroSubgraphRef(subg);
     });

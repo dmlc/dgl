@@ -39,16 +39,6 @@ def temporal_sample_neighbors(
         assert len(g.ntypes) == 1
         timestamp = {g.ntypes[0] : timestamp}
 
-    # Convert key from type string to type ID.
-    nodes = {
-        type_id : nodes[ntype]
-        for type_id, ntype in enumerate(g.ntypes) if ntype in nodes
-    }
-    timestamp = {
-        type_id : timestamp[ntype]
-        for type_id, ntype in enumerate(g.ntypes) if ntype in timestamp
-    }
-
     if isinstance(fanout, int):
         fanout_list = [fanout] * len(g.canonical_etypes)
     else:
@@ -56,6 +46,7 @@ def temporal_sample_neighbors(
 
     sample_rst = _CAPI_DGLTemporalSampleNeighbors(
         g._graph,
+        g.ntypes,
         _to_nd_dict(nodes),
         fanout_list,
         _to_nd_dict(timestamp),
