@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 
-from dgl.dataloading2 import *
+from dgl.graphbolt import *
 
 
 def random_heterogeneous_graph_from_csc(num_nodes, num_ntypes, num_etypes):

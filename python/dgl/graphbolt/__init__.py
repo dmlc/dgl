@@ -5,11 +5,8 @@ import sys
 import torch
 
 from .._ffi import libinfo
-from .data_fetcher import *
 from .graph_storage import *
-from .minibatch_sampler import *
-from .negative_sampler import *
-from .subgraph_sampler import *
+from .itemset import *
 
 
 def load_graphbolt():
