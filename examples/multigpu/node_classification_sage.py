@@ -47,7 +47,7 @@ class SAGE(nn.Module):
         self.hid_size = hid_size
         self.out_size = out_size
 
-        # Three-layer GraphSAGE-mean
+        # Three-layer GraphSAGE-mean.
         self.layers = nn.ModuleList(
             [
                 dglnn.SAGEConv(in_size, hid_size, "mean"),
@@ -83,7 +83,7 @@ class SAGE(nn.Module):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
-            # If not the last layer
+            # If not the last layer.
             if l != len(self.layers) - 1:
                 h = F.relu(h)
                 h = self.dropout(h)
@@ -106,7 +106,7 @@ class SAGE(nn.Module):
                 use_uva=use_uva,
             )
             # In order to prevent running out of GPU memory, allocate a
-            # shared output tensor 'y' in host memory
+            # shared output tensor 'y' in host memory.
             y = shared_tensor(
                 (
                     g.num_nodes(),
@@ -123,9 +123,9 @@ class SAGE(nn.Module):
                 if l != len(self.layers) - 1:
                     h = F.relu(h)
                     h = self.dropout(h)
-                # non_blocking (with pinned memory) to accelerate data transfer
+                # non_blocking (with pinned memory) to accelerate data transfer.
                 y[output_nodes] = h.to(y.device, non_blocking=True)
-            # Make sure all GPUs are done writing to 'y'
+            # Make sure all GPUs are done writing to 'y'.
             dist.barrier()
             g.ndata["h"] = y if use_uva else y.to(device)
 
@@ -172,7 +172,7 @@ def evaluate(model, g, num_classes, dataloader):
             y_hats.append(model(blocks, x))
 
     # Concatenate all true labels and all predictions, then calculate
-    # the accuracy of the predictions using the function MF.accuracy
+    # the accuracy of the predictions using the function MF.accuracy.
     return MF.accuracy(
         torch.cat(y_hats),
         torch.cat(ys),
@@ -347,13 +347,13 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
     --------
     None
     """
-    # The rank of the current process
+    # The rank of the current process.
     device = devices[proc_id]
 
-    # Set the device for this process
+    # Set the device for this process.
     torch.cuda.set_device(device)
 
-    # Initialize process group and unpack data for sub-processes
+    # Initialize process group and unpack data for sub-processes.
     dist.init_process_group(
         backend="nccl",
         init_method="tcp://127.0.0.1:12345",
@@ -361,13 +361,13 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
         rank=proc_id,
     )
 
-    # Fetch the data for training/validation/testing
+    # Fetch the data for training/validation/testing.
     num_classes, train_idx, val_idx, test_idx = data
     train_idx = train_idx.to(device)
     val_idx = val_idx.to(device)
     g = g.to(device if mode == "puregpu" else "cpu")
 
-    # Create GraphSAGE model (distributed)
+    # Create GraphSAGE model (distributed).
     in_size = g.ndata["feat"].shape[1]
     # Hidden_size: 256
     model = SAGE(in_size, 256, num_classes).to(device)
@@ -375,8 +375,8 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
         model, device_ids=[device], output_device=device
     )
 
-    # Training + testing
-    # Wether turn on CUDA UVA(Unified Virtual Addressing) optimization
+    # Training + testing.
+    # Wether turn on CUDA UVA(Unified Virtual Addressing) optimization.
     use_uva = mode == "mixed"
     train(
         proc_id,
@@ -390,10 +390,10 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
         use_uva,
         num_epochs,
     )
-    # After training, perform inference on the test data
+    # After training, perform inference on the test data.
     layerwise_infer(proc_id, device, g, num_classes, test_idx, model, use_uva)
 
-    # Cleanup process group
+    # Cleanup process group.
     dist.destroy_process_group()
 
 
@@ -405,21 +405,21 @@ def main(args):
         torch.cuda.is_available()
     ), f"Must have GPUs to enable multi-gpu training."
 
-    # Load and preprocess dataset
+    # Load and preprocess dataset.
     print("Loading data")
     dataset = AsNodePredDataset(
         DglNodePropPredDataset(args.dataset_name, root=args.dataset_dir)
     )
     g = dataset[0]
-    # Avoid creating certain graph formats in each sub-process to save momory
+    # Avoid creating certain graph formats in each sub-process to save momory.
     g.create_formats_()
     if args.dataset_name == "ogbn-arxiv":
         g = dgl.to_bidirected(g, copy_ndata=True)
         g = dgl.add_self_loop(g)
-    # Thread limiting to avoid resource competition
+    # Thread limiting to avoid resource competition.
     os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // nprocs)
 
-    # 'data' contain the various pieces of data needed for training and testing
+    # 'data' contain the various pieces of data needed for training and testing.
     data = (
         dataset.num_classes,
         dataset.train_idx,
@@ -429,13 +429,13 @@ def main(args):
 
     print(f"Training in {args.mode} mode using {nprocs} GPU(s)")
     # Spawn multiple processes using 'mp.spawn'.
-    # This will start the function 'run' for each process
+    # This will start the function 'run' for each process.
     mp.spawn(
-        # The function to be run in each spawned process
+        # The function to be run in each spawned process.
         run,
-        # The arguments to be passed to the function 'run'
+        # The arguments to be passed to the function 'run'.
         args=(nprocs, devices, g, data, args.mode, args.num_epochs),
-        # The number of processes to spawn
+        # The number of processes to spawn.
         nprocs=nprocs,
     )
 
