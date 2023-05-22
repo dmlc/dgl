@@ -40,6 +40,7 @@ main
             └───> SAGE.inference
 """
 
+
 class SAGE(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
         super().__init__()
@@ -49,7 +50,7 @@ class SAGE(nn.Module):
         # three-layer GraphSAGE-mean
         self.layers = nn.ModuleList(
             [
-                dglnn.SAGEConv(in_size , hid_size, "mean"),
+                dglnn.SAGEConv(in_size, hid_size, "mean"),
                 dglnn.SAGEConv(hid_size, hid_size, "mean"),
                 dglnn.SAGEConv(hid_size, out_size, "mean"),
             ]
@@ -64,7 +65,7 @@ class SAGE(nn.Module):
         -----------
         blocks : list of dgl.Block objects
             List of blocks that corresponds to the computation dependency of the GraphSAGE layers.
-            
+
             A block is a graph consisting of two sets of nodes: the source nodes and destination
             nodes. The source and destination nodes can have multiple node types.
             All the edges connect from source nodes to destination nodes.
@@ -72,7 +73,7 @@ class SAGE(nn.Module):
 
         x : torch.Tensor
             Initial node features. Could be of shape (number_of_nodes, in_size).
-        
+
         Returns:
         --------
         torch.Tensor
@@ -334,7 +335,7 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
           - The test indices (torch.Tensor)
 
     mode : str
-        Training mode. It could be either 'mixed' for CPU-GPU 
+        Training mode. It could be either 'mixed' for CPU-GPU
         mixed training, or 'puregpu' for pure-GPU training.
 
     num_epochs : int
@@ -367,7 +368,7 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
     # create GraphSAGE model (distributed)
     in_size = g.ndata["feat"].shape[1]
     # hidden_size: 256
-    model = SAGE(in_size, 256, num_classes).to(device) 
+    model = SAGE(in_size, 256, num_classes).to(device)
     model = DistributedDataParallel(
         model, device_ids=[device], output_device=device
     )
