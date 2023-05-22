@@ -262,8 +262,8 @@ def from_csc(
     >>> graph = from_csc(csc_indptr, indices, num_nodes, hetero_info)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
-                    indices=tensor([1, 3, 0, 1, 2, 0, 3]),
-                    num_nodes=3, num_edges=7, is_heterogeneous=True)
+                     indices=tensor([1, 3, 0, 1, 2, 0, 3]),
+                     num_nodes=3, num_edges=7, is_heterogeneous=True)
     """
     if num_nodes is None:
         num_nodes = csc_indptr.shape[0] - 1
@@ -332,8 +332,8 @@ def from_coo(
     >>> graph = dataloading2.from_coo(coo, hetero_info)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 1, 3, 4, 6]),
-                    indices=tensor([2, 0, 3, 1, 2, 3]),
-                    num_nodes=4, num_edges=6, is_heterogeneous=True)
+                     indices=tensor([2, 0, 3, 1, 2, 3]),
+                     num_nodes=4, num_edges=6, is_heterogeneous=True)
     """
     assert coo.dim() == 2
 

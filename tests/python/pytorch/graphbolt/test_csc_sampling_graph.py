@@ -16,7 +16,20 @@ torch.manual_seed(42)
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize("num_nodes", [0, 1, 10, 100, 1000])
-def test_empty_graph(num_nodes):
+def test_empty_graph_from_coo(num_nodes):
+    coo = torch.empty((2, 0), dtype=int)
+    graph = from_coo(coo, num_nodes)
+    assert graph.num_edges == 0
+    assert graph.num_nodes == num_nodes
+    assert graph.indices.numel() == 0
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize("num_nodes", [0, 1, 10, 100, 1000])
+def test_empty_graph_from_csc(num_nodes):
     csc_indptr = torch.zeros((num_nodes + 1,), dtype=int)
     indices = torch.tensor([])
     graph = from_csc(csc_indptr, indices)
@@ -31,7 +44,7 @@ def test_empty_graph(num_nodes):
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize("num_nodes", [0, 1, 10, 100, 1000])
-def test_hetero_empty_graph(num_nodes):
+def test_empty_hetero_graph_from_csc(num_nodes):
     csc_indptr = torch.zeros((num_nodes + 1,), dtype=int)
     indices = torch.tensor([])
     ntypes, etypes = get_ntypes_and_etypes(num_ntypes=3, num_etypes=5)
@@ -42,9 +55,11 @@ def test_hetero_empty_graph(num_nodes):
         node_type_offset = torch.sort(torch.randint(0, num_nodes, (3,)))[0]
         node_type_offset[0] = 0
     type_per_edge = torch.tensor([])
-    graph = from_csc(csc_indptr, indices, hetero_info=HeteroInfo(
-                ntypes, etypes, node_type_offset, type_per_edge
-            ),)
+    graph = from_csc(
+        csc_indptr,
+        indices,
+        hetero_info=HeteroInfo(ntypes, etypes, node_type_offset, type_per_edge),
+    )
     assert graph.num_edges == 0
     assert graph.num_nodes == num_nodes
     assert torch.equal(graph.csc_indptr, csc_indptr)
@@ -114,6 +129,12 @@ def random_heterogeneous_graph_from_coo(
 
 
 def sort_coo(coo: torch.tensor):
+    row, col = coo
+    indices = torch.from_numpy(np.lexsort((row.numpy(), col.numpy())))
+    return torch.index_select(coo, 1, indices)
+
+
+def sort_coo_with_hetero(coo: torch.tensor):
     row, col, etype = coo
     indices = torch.from_numpy(
         np.lexsort((etype.numpy(), row.numpy(), col.numpy()))
@@ -187,6 +208,28 @@ def test_hetero_info_with_exception(ntypes, etypes, ntype_offset, per_etype):
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize(
+    "num_nodes, num_edges", [(10, 0), (1, 1), (10, 50), (1000, 50000)]
+)
+def test_homogeneous_graph(num_nodes, num_edges):
+    orig_coo = torch.randint(0, num_nodes, (2, num_edges))
+    graph = from_coo(orig_coo, num_nodes)
+    assert graph.num_nodes == num_nodes
+    assert graph.num_edges == num_edges
+    assert graph.is_heterogeneous == False
+
+    csc_indptr = graph.csc_indptr
+    col = csc_indptr[1:] - csc_indptr[:-1]
+    col_indices = torch.nonzero(col).squeeze()
+    col = col_indices.repeat_interleave(col[col_indices])
+    coo = torch.stack([graph.indices, col], dim=0)
+    orig_coo, coo = sort_coo(orig_coo), sort_coo(coo)
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
     "num_ntypes, num_etypes", [(1, 1), (2, 1), (3, 3), (5, 1), (3, 5)]
 )
 @pytest.mark.parametrize("num_nodes", [10, 50, 1000, 10000])
@@ -238,7 +281,7 @@ def test_from_coo(num_nodes, num_edges, num_ntypes, num_etypes):
     col_indices = torch.nonzero(col).squeeze()
     col = col_indices.repeat_interleave(col[col_indices])
     coo = torch.stack([indices, col, type_per_edge], dim=0)
-    orig_coo, coo = sort_coo(orig_coo), sort_coo(coo)
+    orig_coo, coo = sort_coo_with_hetero(orig_coo), sort_coo_with_hetero(coo)
 
     assert graph.num_nodes == num_nodes
     assert graph.num_edges == num_edges
@@ -247,6 +290,5 @@ def test_from_coo(num_nodes, num_edges, num_ntypes, num_etypes):
 
 
 if __name__ == "__main__":
-    test_hetero_empty_graph(0)
     test_from_csc(100000, 3, 5)
     test_from_coo(1000, 50000, 3, 5)
