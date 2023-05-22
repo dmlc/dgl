@@ -43,16 +43,17 @@ class HeteroInfo:
         if len(node_types) > 1:
             assert torch.is_tensor(node_type_offset)
             assert node_type_offset.shape[0] == len(node_types)
+            assert torch.equal(
+                node_type_offset, torch.sort(node_type_offset)[0]
+            ), "node_type_offset should be sorted."
         if len(edge_types) > 1:
             assert torch.is_tensor(type_per_edge)
-        assert (
-            len(node_types) == len(set(node_types)),
-            "Node types shound not have duplicates.",
-        )
-        assert (
-            len(edge_types) == len(set(edge_types)),
-            "Node types shound not have duplicates.",
-        )
+        assert len(node_types) == len(
+            set(node_types)
+        ), "Node types shound not have duplicates."
+        assert len(edge_types) == len(
+            set(edge_types)
+        ), "Node types shound not have duplicates."
 
         self.node_types = node_types
         self.edge_types = edge_types
