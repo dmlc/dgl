@@ -94,9 +94,10 @@ class MovieLensDataset(DGLDataset):
     name: str
         Dataset name. (:obj:`"ml-100k"`, :obj:`"ml-1m"`, :obj:`"ml-10m"`). 
     valid_ratio: int
-        Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0). 
+        Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0).
     test_ratio: int, optional
-        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0) for :obj:`"ml-1m"` and :obj:`"ml-10m"`. This parameter is invalid
+        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0). And its sum with 
+        :obj:`valid_ratio` should be in (0.0, 1.0) as well. This parameter is invalid
         when :obj:`name` is :obj:`"ml-100k"`, since its testing samples are pre-specified. 
         Default: None
     raw_dir : str, optional
@@ -116,8 +117,9 @@ class MovieLensDataset(DGLDataset):
 
     Notes
     -----
-    - When test_ratio is valid, that is, the dataset is :obj:`"ml-1m"` or :obj:`"ml-10m"`, 
-    the sum of valid_ratio and test_ratio must be in (0.0, 1.0).
+    - When :obj:`name` is :obj:`"ml-100k"`, the :obj:`test_ratio` is invalid, and the training ratio is equal to 1-:obj:`valid_ratio`. 
+    When :obj:`name` is :obj:`"ml-1m"` or :obj:`"ml-10m"`, the :obj:`test_ratio` is valid, 
+    and the training ratio is equal to 1-:obj:`valid_ratio`-:obj:`test_ratio`.
     - The number of edges is doubled to form an undirected(bidirected) graph structure.
 
     Examples
@@ -131,11 +133,9 @@ class MovieLensDataset(DGLDataset):
           metagraph=[('movie', 'user', 'movie-user'), ('user', 'movie', 'user-movie')])
 
     >>> # get ratings of edges in the training graph.
-    >>> # Note that we only store ratings in 'user-movie' edges since 'user-movie' and 'movie-user' are
-    >>> # just inverse edges and share the same set of ratings.
-    >>> ratings = train_g.edges["user-movie"].data["rate"]
+    >>> ratings = train_g.edges["user-movie"].data["rate"] # or train_g.edges["movie-user"].data["rate"]
     >>> ratings
-    tensor([3., 3., 2.,  ..., 4., 4., 2.])
+    tensor([5., 5., 3.,  ..., 3., 5., 3.])
 
     >>> # get input features of users
     >>> train_g.nodes["user"].data["feat"]
@@ -143,9 +143,9 @@ class MovieLensDataset(DGLDataset):
             [1.0600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [0.4600, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             ...,
-            [0.4000, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
+            [0.4000, 0.0000, 1.0000,  ..., 0.0000, 0.0000, 0.0000],
             [0.9600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
-            [0.4400, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000]])
+            [0.4400, 0.0000, 1.0000,  ..., 0.0000, 0.0000, 0.0000]])
 
     """
 
@@ -341,6 +341,8 @@ class MovieLensDataset(DGLDataset):
             self.construct_g(train_rating_pairs, train_rating_values, user_feat, movie_feat), \
             self.construct_g(valid_rating_pairs, valid_rating_values, user_feat, movie_feat), \
             self.construct_g(test_rating_pairs, test_rating_values, user_feat, movie_feat)
+        
+        print(f"End processing {self.name} ...")
 
     def construct_g(self, rate_pairs, rate_values, user_feat, movie_feat):
         g = heterograph({
@@ -358,6 +360,7 @@ class MovieLensDataset(DGLDataset):
         }
         edata = {
             'user-movie': rate_values,
+            'movie-user': rate_values
         }
         g.ndata['feat'] = ndata
         g.edata['rate'] = edata
@@ -382,7 +385,7 @@ class MovieLensDataset(DGLDataset):
             print(f"Done saving data into {self.raw_path}.")
 
     def load(self):
-        g_list = load_graphs(self.graph_path)
+        g_list, _ = load_graphs(self.graph_path)
         self.train_graph, self.valid_graph, self.test_graph = (
             g_list[0], g_list[1], g_list[2]
         )
