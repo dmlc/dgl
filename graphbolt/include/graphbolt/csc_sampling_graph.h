@@ -25,8 +25,7 @@ namespace sampling {
  * auto type_per_edge = {0, 1, 0, 2, 1, 2}
  * auto graph = CSCSamplingGraph(..., ..., node_type_offset, type_per_edge)
  *
- * This example creates a graph with three node types and 6 edges. The
- * `node_type_offset` tensor represents the offset array of node type, the given
+ * The `node_type_offset` tensor represents the offset array of node type, the given
  * array indicates that node [0, 2) has type id 0, [2, 4) has type id 1, and [4,
  * 6) has type id 2. And the `type_per_edge` tensor represents the type id of
  * each edge.
@@ -109,17 +108,20 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  private:
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
+
   /** @brief CSC format index array. */
   torch::Tensor indices_;
+
   /**
    * @brief Offset array of node type. The length of it is equal to the number
-   * of node types + 1. It is an ascending tensor as nodes of same type have
-   * continuous IDs, and larger node IDs are paired with larger node type IDs.
-   * Its first value is 0 and last value is the number of nodes. And nodes with
-   * ID between `node_type_offset_[i] ~ node_type_offset_[i+1]` are of type id
-   * `i`.
+   * of node types + 1. The tensor is in ascending order as nodes of the same
+   * type have continuous IDs, and larger node IDs are paired with larger node
+   * type IDs. Its first value is 0 and last value is the number of nodes. And
+   * nodes with ID between `node_type_offset_[i] ~ node_type_offset_[i+1]` are
+   * of type id `i`.
    */
   torch::optional<torch::Tensor> node_type_offset_;
+
   /**
    * @brief Type id of each edge, where type id is the corresponding index of
    * edge types. The length of it is equal to the number of edges.
