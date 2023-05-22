@@ -23,22 +23,63 @@ from ogb.nodeproppred import DglNodePropPredDataset
 from torch.nn.parallel import DistributedDataParallel
 
 
+"""
+This flowchart describes the main functional sequence of the provided example. 
+main
+│
+└───> run
+      │
+      ├───> train
+      │     │
+      │     ├───> evaluate
+      │     │
+      │     └───> SAGE.forward
+      │
+      └───> layerwise_infer
+            │
+            └───> SAGE.inference
+"""
+
 class SAGE(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
         super().__init__()
-        self.layers = nn.ModuleList()
-        # three-layer GraphSAGE-mean
-        self.layers.append(dglnn.SAGEConv(in_size, hid_size, "mean"))
-        self.layers.append(dglnn.SAGEConv(hid_size, hid_size, "mean"))
-        self.layers.append(dglnn.SAGEConv(hid_size, out_size, "mean"))
-        self.dropout = nn.Dropout(0.5)
         self.hid_size = hid_size
         self.out_size = out_size
 
+        # three-layer GraphSAGE-mean
+        self.layers = nn.ModuleList([
+            dglnn.SAGEConv(in_size , hid_size, "mean"),
+            dglnn.SAGEConv(hid_size, hid_size, "mean"),
+            dglnn.SAGEConv(hid_size, out_size, "mean"),
+        ])
+        self.dropout = nn.Dropout(0.5)
+
     def forward(self, blocks, x):
-        h = x
+        """
+        Forward propagation of the SAGE model.
+
+        Parameters:
+        -----------
+        blocks : list of dgl.Block objects
+            List of blocks that corresponds to the computation dependency of the GraphSAGE layers.
+            
+            A block is a graph consisting of two sets of nodes: the source nodes and destination 
+            nodes. The source and destination nodes can have multiple node types. 
+            All the edges connect from source nodes to destination nodes.
+            See https://discuss.dgl.ai/t/what-is-the-block/2932 for more details.
+
+        x : torch.Tensor
+            Initial node features. Could be of shape (number_of_nodes, in_size).
+        
+        Returns:
+        --------
+        torch.Tensor
+            Output feature tensor. Could be of shape (number_of_nodes, out_size).
+        """
+        h = x # feature
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
+            # If not the last layer
             if l != len(self.layers) - 1:
                 h = F.relu(h)
                 h = self.dropout(h)
@@ -89,14 +130,45 @@ class SAGE(nn.Module):
 
 
 def evaluate(model, g, num_classes, dataloader):
+    """
+    The evaluation function for the model's performance on a given DataLoader. 
+    This function is used during the training phase to assess the model's 
+    performance on the validation set.
+
+    Parameters:
+    ----------
+    model : SAGE
+        The model to be evaluated.
+
+    g : DGLGraph
+        The graph on which the model is trained and evaluated.
+
+    num_classes : int
+        Number of output classes.
+
+    dataloader : DataLoader
+        DataLoader to fetch data during the evaluation.
+
+    Returns:
+    --------
+    float
+        The model's accuracy on the given DataLoader.
+    """
+
     model.eval()
+    # Initialize the list to store true labels.
     ys = []
+    # Initialize the list to store predicted labels.
     y_hats = []
+
     for it, (input_nodes, output_nodes, blocks) in enumerate(dataloader):
         with torch.no_grad():
             x = blocks[0].srcdata["feat"]
             ys.append(blocks[-1].dstdata["label"])
             y_hats.append(model(blocks, x))
+
+    # concatenate all true labels and all predictions.
+    # then calculate the accuracy of the predictions using the function MF.accuracy
     return MF.accuracy(
         torch.cat(y_hats),
         torch.cat(ys),
@@ -111,6 +183,7 @@ def layerwise_infer(
     model.eval()
     with torch.no_grad():
         pred = model.module.inference(g, device, batch_size, use_uva)
+        # nid: Node IDs on which the inference is performed. (test_idx)
         pred = pred[nid]
         labels = g.ndata["label"][nid].to(pred.device)
     if proc_id == 0:
@@ -132,9 +205,51 @@ def train(
     use_uva,
     num_epochs,
 ):
+    """
+    Training function for GraphSAGE model.
+
+    Parameters:
+    -----------
+    proc_id : int
+        The process ID assigned during multiprocessing. Used for determining the master process.
+
+    nprocs : int
+        Total number of processes involved in the distributed training.
+
+    device : int
+        The device (e.g., 0) on which to perform computations.
+
+    g : dgl.DGLGraph
+        The input graph on which to perform node classification.
+
+    num_classes : int
+        The number of classes for the classification task.
+
+    train_idx : LongTensor
+        The indices of nodes in the training set.
+
+    val_idx : LongTensor
+        The indices of nodes in the validation set.
+
+    model : SAGE
+        The GraphSAGE model to train.
+
+    use_uva : bool
+        If True, uses Unified Virtual Addressing (UVA) for CUDA computation. 
+
+    num_epochs : int
+        The number of epochs for which to train the model.
+
+    Returns:
+    --------
+    None
+    """
+    # Define the neighborhood sampler. The arguments [10, 10, 10] specify that we sample 
+    # 10 neighbors at each layer for 3 layers. Prefetching node features and labels for speedup.
     sampler = NeighborSampler(
         [10, 10, 10], prefetch_node_feats=["feat"], prefetch_labels=["label"]
     )
+
     train_dataloader = DataLoader(
         g,
         train_idx,
@@ -159,7 +274,9 @@ def train(
         use_ddp=True,
         use_uva=use_uva,
     )
+    # define the optimizer.
     opt = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+    # main training loop.
     for epoch in range(num_epochs):
         t0 = time.time()
         model.train()
@@ -177,6 +294,8 @@ def train(
             evaluate(model, g, num_classes, val_dataloader).to(device) / nprocs
         )
         t1 = time.time()
+
+        # Reduce validation accuracy from all processes.
         dist.reduce(acc, 0)
         if proc_id == 0:
             print(
@@ -188,9 +307,47 @@ def train(
 
 
 def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
-    # find corresponding device for my rank
+    """
+    Main training function to be run in each spawned process.
+
+    Parameters:
+    ----------
+    proc_id : int
+        Process ID. This will be a unique number for each spawned process (0, 1, ..., nprocs-1).
+    
+    nprocs : int
+        Total number of processes.
+
+    devices : list[int]
+        List of devices (GPUs) available for each process.
+    
+    g : DGLGraph
+        The input graph.
+    
+    data : tuple
+        The data needed for training and testing. It contains:
+          - The number of classes (int)
+          - The training indices (torch.Tensor)
+          - The validation indices (torch.Tensor)
+          - The test indices (torch.Tensor)
+    
+    mode : str
+        Training mode. It could be either 'mixed' for CPU-GPU 
+        mixed training, or 'puregpu' for pure-GPU training.
+    
+    num_epochs : int
+        Number of training epochs.
+
+    Returns:
+    --------
+    None
+    """
+    # the rank of the current process
     device = devices[proc_id]
+
+    # set the device for this process
     torch.cuda.set_device(device)
+
     # initialize process group and unpack data for sub-processes
     dist.init_process_group(
         backend="nccl",
@@ -198,17 +355,24 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
         world_size=nprocs,
         rank=proc_id,
     )
+
+    # Fetch the data for training/validation/testing
     num_classes, train_idx, val_idx, test_idx = data
     train_idx = train_idx.to(device)
     val_idx = val_idx.to(device)
     g = g.to(device if mode == "puregpu" else "cpu")
+
     # create GraphSAGE model (distributed)
     in_size = g.ndata["feat"].shape[1]
-    model = SAGE(in_size, 256, num_classes).to(device)
+    model = SAGE(in_size, 
+                 256, # hidden_size
+                 num_classes).to(device)
     model = DistributedDataParallel(
         model, device_ids=[device], output_device=device
     )
+
     # training + testing
+    # wether turn on CUDA UVA(Unified Virtual Addressing) optimization
     use_uva = mode == "mixed"
     train(
         proc_id,
@@ -222,9 +386,53 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
         use_uva,
         num_epochs,
     )
+    # after training, perform inference (i.e., make predictions) on the test data
     layerwise_infer(proc_id, device, g, num_classes, test_idx, model, use_uva)
+    
     # cleanup process group
     dist.destroy_process_group()
+
+def main(args):
+    # get the device list
+    devices = list(map(int, args.gpu.split(",")))
+    nprocs = len(devices)
+    assert (
+        torch.cuda.is_available()
+    ), f"Must have GPUs to enable multi-gpu training."
+
+    # load and preprocess dataset
+    print("Loading data")
+    dataset = AsNodePredDataset(
+        DglNodePropPredDataset(args.dataset_name, root=args.dataset_dir)
+    )
+    g = dataset[0]
+    # avoid creating certain graph formats in each sub-process to save momory
+    g.create_formats_()
+    if args.dataset_name == "ogbn-arxiv":
+        g = dgl.to_bidirected(g, copy_ndata=True)
+        g = dgl.add_self_loop(g)
+    # thread limiting to avoid resource competition
+    os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // nprocs)
+
+    # 'data' contain the various pieces of data needed for training and testing
+    data = (
+        dataset.num_classes,
+        dataset.train_idx,
+        dataset.val_idx,
+        dataset.test_idx,
+    )
+
+    print(f"Training in {args.mode} mode using {nprocs} GPU(s)")
+    # Spawn multiple processes using 'mp.spawn'. 
+    # This will start the function 'run' for each process
+    mp.spawn(
+        # The function to be run in each spawned process
+        run, 
+        # The arguments to be passed to the function 'run'
+        args=(nprocs, devices, g, data, args.mode, args.num_epochs),
+        # The number of processes to spawn
+        nprocs=nprocs,
+    )
 
 
 if __name__ == "__main__":
@@ -262,35 +470,5 @@ if __name__ == "__main__":
         help="Root directory of dataset.",
     )
     args = parser.parse_args()
-    devices = list(map(int, args.gpu.split(",")))
-    nprocs = len(devices)
-    assert (
-        torch.cuda.is_available()
-    ), f"Must have GPUs to enable multi-gpu training."
-    print(f"Training in {args.mode} mode using {nprocs} GPU(s)")
-
-    # load and preprocess dataset
-    print("Loading data")
-    dataset = AsNodePredDataset(
-        DglNodePropPredDataset(args.dataset_name, root=args.dataset_dir)
-    )
-    g = dataset[0]
-    # avoid creating certain graph formats in each sub-process to save momory
-    g.create_formats_()
-    if args.dataset_name == "ogbn-arxiv":
-        g = dgl.to_bidirected(g, copy_ndata=True)
-        g = dgl.add_self_loop(g)
-    # thread limiting to avoid resource competition
-    os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // nprocs)
-    data = (
-        dataset.num_classes,
-        dataset.train_idx,
-        dataset.val_idx,
-        dataset.test_idx,
-    )
-
-    mp.spawn(
-        run,
-        args=(nprocs, devices, g, data, args.mode, args.num_epochs),
-        nprocs=nprocs,
-    )
+    
+    main(args)
