@@ -41,10 +41,10 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Create a homogeneous CSC graph from tensors of CSC format.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
-   * @param node_type_offset A tensor representing the offset of node types.
-   * None if the graph is homogeneous or the number of node types is 1.
-   * @param type_per_edge A tensor representing the type of each edge. None if
-   * the graph is homogeneous or the number of edge types is 1.
+   * @param node_type_offset A tensor representing the offset of node types, if
+   * present.
+   * @param type_per_edge A tensor representing the type of each edge, if
+   * present.
    *
    * @return CSCSamplingGraph
    */
