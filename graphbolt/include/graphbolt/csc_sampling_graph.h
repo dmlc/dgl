@@ -43,25 +43,17 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param num_nodes The number of nodes in the graph.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
+   * @param node_type_offset A tensor representing the offset of node types.
+   * None if the graph is homogeneous or the number of node types is 1.
+   * @param type_per_edge A tensor representing the type of each edge. None if
+   * the graph is homogeneous or the number of edge types is 1.
    *
    * @return CSCSamplingGraph
    */
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
-      int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices);
-
-  /**
-   * @brief Create a heterogeneous CSC graph from tensors of CSC format.
-   * @param num_nodes The number of nodes in the graph.
-   * @param indptr Index pointer array of the CSC.
-   * @param indices Indices array of the CSC.
-   * @param node_type_offset A tensor representing the offset of node types.
-   * @param type_per_edge A tensor representing the type of each edge.
-   *
-   * @return CSCSamplingGraph
-   */
-  static c10::intrusive_ptr<CSCSamplingGraph> FromCSCWithHeteroInfo(
       int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices,
-      torch::Tensor node_type_offset, torch::Tensor type_per_edge);
+      const torch::optional<torch::Tensor>& node_type_offset,
+      const torch::optional<torch::Tensor>& type_per_edge);
 
   /** @brief Get the number of nodes. */
   int64_t NumNodes() const { return num_nodes_; }

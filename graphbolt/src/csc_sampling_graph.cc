@@ -27,19 +27,15 @@ CSCSamplingGraph::CSCSamplingGraph(
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
-    int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices) {
-  return c10::make_intrusive<CSCSamplingGraph>(
-      num_nodes, indptr, indices, torch::nullopt, torch::nullopt);
-}
-
-c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSCWithHeteroInfo(
     int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices,
-    torch::Tensor node_type_offset, torch::Tensor type_per_edge) {
-  TORCH_CHECK(node_type_offset.dim() == 1);
-  TORCH_CHECK(type_per_edge.size(0) == indices.size(0));
-  TORCH_CHECK(type_per_edge.dim() == 1);
-  TORCH_CHECK(node_type_offset.device() == type_per_edge.device());
-  TORCH_CHECK(type_per_edge.device() == indices.device());
+    const torch::optional<torch::Tensor>& node_type_offset,
+    const torch::optional<torch::Tensor>& type_per_edge) {
+  if (node_type_offset.has_value())
+    TORCH_CHECK(node_type_offset.value().dim() == 1);
+  if (type_per_edge.has_value()) {
+    TORCH_CHECK(type_per_edge.value().dim() == 1);
+    TORCH_CHECK(type_per_edge.value().size(0) == indices.size(0));
+  }
 
   return c10::make_intrusive<CSCSamplingGraph>(
       num_nodes, indptr, indices, node_type_offset, type_per_edge);
