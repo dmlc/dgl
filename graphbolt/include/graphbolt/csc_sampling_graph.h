@@ -25,10 +25,10 @@ namespace sampling {
  * auto type_per_edge = {0, 1, 0, 2, 1, 2}
  * auto graph = CSCSamplingGraph(..., ..., node_type_offset, type_per_edge)
  *
- * The `node_type_offset` tensor represents the offset array of node type, the given
- * array indicates that node [0, 2) has type id 0, [2, 4) has type id 1, and [4,
- * 6) has type id 2. And the `type_per_edge` tensor represents the type id of
- * each edge.
+ * The `node_type_offset` tensor represents the offset array of node type, the
+ * given array indicates that node [0, 2) has type id 0, [2, 4) has type id 1,
+ * and [4, 6) has type id 2. And the `type_per_edge` tensor represents the type
+ * id of each edge.
  */
 class CSCSamplingGraph : public torch::CustomClassHolder {
  public:
