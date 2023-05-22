@@ -25,7 +25,6 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
   /**
    * @brief Constructor for CSC with data.
-   * @param num_nodes The number of nodes in the graph.
    * @param indptr The CSC format index pointer array.
    * @param indices The CSC format index array.
    * @param node_type_offset A tensor representing the offset of node types, if
@@ -34,13 +33,12 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    */
   CSCSamplingGraph(
-      int64_t num_nodes, torch::Tensor& indptr, torch::Tensor& indices,
+      torch::Tensor& indptr, torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge);
 
   /**
    * @brief Create a homogeneous CSC graph from tensors of CSC format.
-   * @param num_nodes The number of nodes in the graph.
    * @param indptr Index pointer array of the CSC.
    * @param indices Indices array of the CSC.
    * @param node_type_offset A tensor representing the offset of node types.
@@ -51,12 +49,12 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @return CSCSamplingGraph
    */
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
-      int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices,
+      torch::Tensor indptr, torch::Tensor indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge);
 
   /** @brief Get the number of nodes. */
-  int64_t NumNodes() const { return num_nodes_; }
+  int64_t NumNodes() const { return indptr_.size(0) - 1; }
 
   /** @brief Get the number of edges. */
   int64_t NumEdges() const { return indices_.size(0); }
@@ -96,8 +94,6 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   void Save(torch::serialize::OutputArchive& archive) const;
 
  private:
-  /** @brief The number of nodes of the graph. */
-  int64_t num_nodes_ = 0;
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
   /** @brief CSC format index array. */
