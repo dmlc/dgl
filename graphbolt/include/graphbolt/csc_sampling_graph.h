@@ -100,7 +100,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   torch::Tensor indices_;
   /**
    * @brief Offset array of node type. The length of it is equal to number of
-   * node types.
+   * node types + 1.
    */
   torch::optional<torch::Tensor> node_type_offset_;
   /**
