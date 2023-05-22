@@ -17,6 +17,19 @@ namespace sampling {
 
 /**
  * @brief A sampling oriented csc format graph.
+ *
+ * Example usage:
+ *
+ * Suppose the graph has 3 node types, 3 edge types and 6 edges
+ * auto node_type_offset = {0, 2, 4, 6}
+ * auto type_per_edge = {0, 1, 0, 2, 1, 2}
+ * auto graph = CSCSamplingGraph(..., ..., node_type_offset, type_per_edge)
+ *
+ * This example creates a graph with three node types and 6 edges. The
+ * `node_type_offset` tensor represents the offset array of node type, the given
+ * array indicates that node [0, 2) has type id 0, [2, 4) has type id 1, and [4,
+ * 6) has type id 2. And the `type_per_edge` tensor represents the type id of
+ * each edge.
  */
 class CSCSamplingGraph : public torch::CustomClassHolder {
  public:
@@ -99,8 +112,12 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   /** @brief CSC format index array. */
   torch::Tensor indices_;
   /**
-   * @brief Offset array of node type. The length of it is equal to number of
-   * node types + 1.
+   * @brief Offset array of node type. The length of it is equal to the number
+   * of node types + 1. It is an ascending tensor as nodes of same type have
+   * continuous IDs, and larger node IDs are paired with larger node type IDs.
+   * Its first value is 0 and last value is the number of nodes. And nodes with
+   * ID between `node_type_offset_[i] ~ node_type_offset_[i+1]` are of type id
+   * `i`.
    */
   torch::optional<torch::Tensor> node_type_offset_;
   /**
