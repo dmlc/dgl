@@ -47,11 +47,13 @@ class SAGE(nn.Module):
         self.out_size = out_size
 
         # three-layer GraphSAGE-mean
-        self.layers = nn.ModuleList([
-            dglnn.SAGEConv(in_size , hid_size, "mean"),
-            dglnn.SAGEConv(hid_size, hid_size, "mean"),
-            dglnn.SAGEConv(hid_size, out_size, "mean"),
-        ])
+        self.layers = nn.ModuleList(
+            [
+                dglnn.SAGEConv(in_size , hid_size, "mean"),
+                dglnn.SAGEConv(hid_size, hid_size, "mean"),
+                dglnn.SAGEConv(hid_size, out_size, "mean"),
+            ]
+        )
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, blocks, x):
@@ -63,8 +65,8 @@ class SAGE(nn.Module):
         blocks : list of dgl.Block objects
             List of blocks that corresponds to the computation dependency of the GraphSAGE layers.
             
-            A block is a graph consisting of two sets of nodes: the source nodes and destination 
-            nodes. The source and destination nodes can have multiple node types. 
+            A block is a graph consisting of two sets of nodes: the source nodes and destination
+            nodes. The source and destination nodes can have multiple node types.
             All the edges connect from source nodes to destination nodes.
             See https://discuss.dgl.ai/t/what-is-the-block/2932 for more details.
 
@@ -76,7 +78,7 @@ class SAGE(nn.Module):
         torch.Tensor
             Output feature tensor. Could be of shape (number_of_nodes, out_size).
         """
-        h = x # feature
+        h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
             # If not the last layer
@@ -131,8 +133,8 @@ class SAGE(nn.Module):
 
 def evaluate(model, g, num_classes, dataloader):
     """
-    The evaluation function for the model's performance on a given DataLoader. 
-    This function is used during the training phase to assess the model's 
+    The evaluation function for the model's performance on a given DataLoader.
+    This function is used during the training phase to assess the model's
     performance on the validation set.
 
     Parameters:
@@ -235,7 +237,7 @@ def train(
         The GraphSAGE model to train.
 
     use_uva : bool
-        If True, uses Unified Virtual Addressing (UVA) for CUDA computation. 
+        If True, uses Unified Virtual Addressing (UVA) for CUDA computation.
 
     num_epochs : int
         The number of epochs for which to train the model.
@@ -244,7 +246,7 @@ def train(
     --------
     None
     """
-    # Define the neighborhood sampler. The arguments [10, 10, 10] specify that we sample 
+    # Define the neighborhood sampler. The arguments [10, 10, 10] specify that we sample
     # 10 neighbors at each layer for 3 layers. Prefetching node features and labels for speedup.
     sampler = NeighborSampler(
         [10, 10, 10], prefetch_node_feats=["feat"], prefetch_labels=["label"]
@@ -314,27 +316,27 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
     ----------
     proc_id : int
         Process ID. This will be a unique number for each spawned process (0, 1, ..., nprocs-1).
-    
+
     nprocs : int
         Total number of processes.
 
     devices : list[int]
         List of devices (GPUs) available for each process.
-    
+
     g : DGLGraph
         The input graph.
-    
+
     data : tuple
         The data needed for training and testing. It contains:
           - The number of classes (int)
           - The training indices (torch.Tensor)
           - The validation indices (torch.Tensor)
           - The test indices (torch.Tensor)
-    
+
     mode : str
         Training mode. It could be either 'mixed' for CPU-GPU 
         mixed training, or 'puregpu' for pure-GPU training.
-    
+
     num_epochs : int
         Number of training epochs.
 
@@ -364,9 +366,8 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
 
     # create GraphSAGE model (distributed)
     in_size = g.ndata["feat"].shape[1]
-    model = SAGE(in_size, 
-                 256, # hidden_size
-                 num_classes).to(device)
+    # hidden_size: 256
+    model = SAGE(in_size, 256, num_classes).to(device) 
     model = DistributedDataParallel(
         model, device_ids=[device], output_device=device
     )
@@ -388,9 +389,10 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
     )
     # after training, perform inference (i.e., make predictions) on the test data
     layerwise_infer(proc_id, device, g, num_classes, test_idx, model, use_uva)
-    
+
     # cleanup process group
     dist.destroy_process_group()
+
 
 def main(args):
     # get the device list
@@ -423,11 +425,11 @@ def main(args):
     )
 
     print(f"Training in {args.mode} mode using {nprocs} GPU(s)")
-    # Spawn multiple processes using 'mp.spawn'. 
-    # This will start the function 'run' for each process
+    # spawn multiple processes using 'mp.spawn'.
+    # this will start the function 'run' for each process
     mp.spawn(
         # The function to be run in each spawned process
-        run, 
+        run,
         # The arguments to be passed to the function 'run'
         args=(nprocs, devices, g, data, args.mode, args.num_epochs),
         # The number of processes to spawn
@@ -470,5 +472,4 @@ if __name__ == "__main__":
         help="Root directory of dataset.",
     )
     args = parser.parse_args()
-    
     main(args)
