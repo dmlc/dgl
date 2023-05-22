@@ -48,3 +48,6 @@ def test_linkx_homophily(idtype):
     graph = dgl.graph(([0, 1, 2, 3], [1, 2, 0, 4]), device=device)
     y = F.tensor([0, 0, 0, 0, 1])
     assert math.isclose(dgl.linkx_homophily(graph, y), 0.19999998807907104)
+
+    y = F.tensor([0, 1, 2, 3, 4])
+    assert math.isclose(dgl.linkx_homophily(graph, y), 0.0000000000000000)
