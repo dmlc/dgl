@@ -137,9 +137,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param indices Indices array of the CSC.
    * @param ntypes A list of node types, if present.
    * @param etypes A list of edge types, if present.
-   * @param node_type_offset_ A tensor representing the offset of node types, if
+   * @param node_type_offset A tensor representing the offset of node types, if
    * present.
-   * @param type_per_edge_ A tensor representing the type of each edge, if
+   * @param type_per_edge A tensor representing the type of each edge, if
    * present.
    *
    * @return CSCSamplingGraph
