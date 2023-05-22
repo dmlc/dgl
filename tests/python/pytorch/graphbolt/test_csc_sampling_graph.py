@@ -11,25 +11,24 @@ from dgl.graphbolt import *
 torch.manual_seed(42)
 
 
+def get_metadata(num_ntypes, num_etypes):
+    ntypes = {f"n{i}":i for i in range(num_ntypes)}
+    etypes = {}
+    count = 0
+    for n1 in range(num_ntypes):
+        for n2 in range(n1, num_ntypes):
+            if count >= num_etypes:
+                break
+            etypes.update({(f"n{n1}", f"e{count}", f"n{n2}") : count})
+            count += 1
+    return CSCGraphMetadata(ntypes, etypes)
+
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize("num_nodes", [0, 1, 10, 100, 1000])
-def test_empty_graph_from_coo(num_nodes):
-    coo = torch.empty((2, 0), dtype=int)
-    graph = from_coo(coo, num_nodes)
-    assert graph.num_edges == 0
-    assert graph.num_nodes == num_nodes
-    assert graph.indices.numel() == 0
-
-
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
-@pytest.mark.parametrize("num_nodes", [0, 1, 10, 100, 1000])
-def test_empty_graph_from_csc(num_nodes):
+def test_empty_graph(num_nodes):
     csc_indptr = torch.zeros((num_nodes + 1,), dtype=int)
     indices = torch.tensor([])
     graph = from_csc(csc_indptr, indices)
@@ -44,43 +43,33 @@ def test_empty_graph_from_csc(num_nodes):
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize("num_nodes", [0, 1, 10, 100, 1000])
-def test_empty_hetero_graph_from_csc(num_nodes):
+def test_hetero_empty_graph(num_nodes):
     csc_indptr = torch.zeros((num_nodes + 1,), dtype=int)
     indices = torch.tensor([])
-    ntypes, etypes = get_ntypes_and_etypes(num_ntypes=3, num_etypes=5)
+    metadata = get_metadata(num_ntypes=3, num_etypes=5)
     # Some node types have no nodes.
     if num_nodes == 0:
-        node_type_offset = torch.zeros((3,), dtype=int)
+        node_type_offset = torch.zeros((4,), dtype=int)
     else:
-        node_type_offset = torch.sort(torch.randint(0, num_nodes, (3,)))[0]
+        node_type_offset = torch.sort(torch.randint(0, num_nodes, (4,)))[0]
         node_type_offset[0] = 0
+        node_type_offset[-1] = num_nodes
     type_per_edge = torch.tensor([])
     graph = from_csc(
         csc_indptr,
         indices,
-        hetero_info=HeteroInfo(ntypes, etypes, node_type_offset, type_per_edge),
+        node_type_offset,
+        type_per_edge,
+        metadata,
     )
     assert graph.num_edges == 0
     assert graph.num_nodes == num_nodes
     assert torch.equal(graph.csc_indptr, csc_indptr)
     assert torch.equal(graph.indices, indices)
-    assert graph.node_types == ntypes
-    assert graph.edge_types == etypes
+    assert graph.node_type_to_id == metadata.node_type_to_id
+    assert graph.edge_type_to_id == metadata.edge_type_to_id
     assert torch.equal(graph.node_type_offset, node_type_offset)
     assert torch.equal(graph.type_per_edge, type_per_edge)
-
-
-def get_ntypes_and_etypes(num_ntypes, num_etypes):
-    ntypes = [f"n{i}" for i in range(num_ntypes)]
-    etypes = []
-    count = 0
-    for n1 in range(num_ntypes):
-        for n2 in range(n1, num_ntypes):
-            if count >= num_etypes:
-                break
-            etypes.append((f"n{n1}", f"e{count}", f"n{n2}"))
-            count += 1
-    return (ntypes, etypes)
 
 
 def random_heterogeneous_graph_from_csc(num_nodes, num_ntypes, num_etypes):
@@ -290,5 +279,6 @@ def test_from_coo(num_nodes, num_edges, num_ntypes, num_etypes):
 
 
 if __name__ == "__main__":
-    test_from_csc(100000, 3, 5)
-    test_from_coo(1000, 50000, 3, 5)
+    test_hetero_empty_graph(10)
+    # test_from_csc(100000, 3, 5)
+    # test_from_coo(1000, 50000, 3, 5)

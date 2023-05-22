@@ -15,13 +15,9 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("num_edges", &CSCSamplingGraph::NumEdges)
       .def("csc_indptr", &CSCSamplingGraph::CSCIndptr)
       .def("indices", &CSCSamplingGraph::Indices)
-      .def("is_heterogeneous", &CSCSamplingGraph::IsHeterogeneous)
-      .def("node_types", &CSCSamplingGraph::NodeTypes)
-      .def("edge_types", &CSCSamplingGraph::EdgeTypes)
       .def("node_type_offset", &CSCSamplingGraph::NodeTypeOffset)
       .def("type_per_edge", &CSCSamplingGraph::TypePerEdge);
   m.def("from_csc", &CSCSamplingGraph::FromCSC);
-  m.def("from_csc_with_hetero_info", &CSCSamplingGraph::FromCSCWithHeteroInfo);
 }
 
 }  // namespace sampling

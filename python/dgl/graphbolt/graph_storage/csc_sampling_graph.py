@@ -1,36 +1,27 @@
 """CSC format sampling graph."""
 # pylint: disable= invalid-name
-from typing import List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import torch
 
 
-class HeteroInfo:
-    r"""Class for heterogeneous information of a graph."""
+class CSCGraphMetadata:
+    r"""Class for metadata of csc sampling graph."""
 
     def __init__(
         self,
-        node_types: List[str],
-        edge_types: List[Tuple[str, str, str]],
-        node_type_offset: torch.tensor,
-        type_per_edge: torch.tensor,
+        node_type_to_id: Dict[str, int],
+        edge_type_to_id: Dict[Tuple[str, str, str], int],
     ):
         """
-        Initialize the HeteroInfo object.
+        Initialize the CSCGraphMetadata object.
 
         Parameters
         ----------
-        node_types : List[str]
-            List of node types.
-        edge_types : List[Tuple[str, str, str]]
-            List of edge types.
-        node_type_offset : torch.tensor
-            Tensor representing the node type offset. Should have shape
-            (num_node_types,) and dtype `long`.
-        type_per_edge : torch.tensor
-            Tensor representing the type per edge. Can be None if there is
-            only 1 edge type. Should have shape `(num_edges,)` and dtype is
-            normally 8 or 16 bits int.
+        node_type_dict : Dict[str, int]
+            Dictionary from node types to node IDs.
+        edge_types : Dict[Tuple[str, str, str], int]
+            Dictionary from edge types to edge IDs.
 
         Raises
         ------
@@ -38,46 +29,23 @@ class HeteroInfo:
             If any of the assertions fail.
         """
 
-        assert node_types
-        assert edge_types
-        if len(node_types) > 1:
-            assert torch.is_tensor(node_type_offset)
-            assert node_type_offset.shape[0] == len(node_types)
-            assert torch.equal(
-                node_type_offset, torch.sort(node_type_offset)[0]
-            ), "node_type_offset should be sorted."
-        if len(edge_types) > 1:
-            assert torch.is_tensor(type_per_edge)
-        assert len(node_types) == len(
-            set(node_types)
-        ), "Node types shound not have duplicates."
-        assert len(edge_types) == len(
-            set(edge_types)
-        ), "Node types shound not have duplicates."
-
-        self.node_types = node_types
-        self.edge_types = edge_types
-        self.node_type_offset = node_type_offset
-        self.type_per_edge = type_per_edge
-
-    def __iter__(self):
-        """
-        Return an iterator over the HeteroInfo object.
-
-        Returns
-        -------
-        iterator
-            An iterator containing node_types, edge_types, node_type_offset,
-            and type_per_edge.
-        """
-        return iter(
-            (
-                self.node_types,
-                self.edge_types,
-                self.node_type_offset,
-                self.type_per_edge,
-            )
-        )
+        node_types = list(node_type_to_id.keys())
+        edge_types = list(edge_type_to_id.keys())
+        node_type_ids = list(node_type_to_id.values())
+        edge_type_ids = list(edge_type_to_id.values())
+        
+        assert len(node_type_ids) == len(
+            set(node_type_ids)
+        ), "Multiple node types shoud not be mapped to a same id."
+        assert len(edge_type_ids) == len(
+            set(edge_type_ids)
+        ), "Multiple edge types shoud not be mapped to a same id."
+        for edge_type in edge_types:
+            src, _, dst = edge_type
+            assert src in node_types, f"Unrecognized node type {src} in edge type {edge_type}"
+            assert dst in node_types, f"Unrecognized node type {dst} in edge type {edge_type}"
+        self.node_type_to_id = node_type_to_id
+        self.edge_type_to_id = edge_type_to_id
 
 
 class CSCSamplingGraph:
@@ -86,8 +54,9 @@ class CSCSamplingGraph:
     def __repr__(self):
         return _csc_sampling_graph_str(self)
 
-    def __init__(self, c_csc_graph: torch.ScriptObject):
+    def __init__(self, c_csc_graph: torch.ScriptObject, metadata: Optional[CSCGraphMetadata]):
         self.c_csc_graph = c_csc_graph
+        self.metadata = metadata
 
     @property
     def num_nodes(self) -> int:
@@ -118,112 +87,92 @@ class CSCSamplingGraph:
         Returns
         -------
         torch.tensor
-            The indices pointer in the CSC graph. Shape is `(num_nodes,)`
-            and dtype is usually 16 or 32 bits int.
+            The indices pointer in the CSC graph. An integer tensor with
+            shape `(num_nodes+1,)`.
         """
         return self.c_csc_graph.csc_indptr()
 
     @property
     def indices(self) -> torch.tensor:
-        """Returns the indices in the CSC graph. Shape is `(num_edges,)`
-            and dtype is usually 32 or 64 bits int.
+        """Returns the indices in the CSC graph.
 
         Returns
         -------
         torch.tensor
-            The indices in the CSC graph
+            The indices in the CSC graph. An integer tensor with shape
+            `(num_edges,)`.
         """
         return self.c_csc_graph.indices()
 
     @property
-    def is_heterogeneous(self) -> bool:
-        """Returns if the graph is heterogeneous.
+    def node_type_to_id(self) -> Optional[Dict[str, int]]:
+        """Returns mappings from node types to type ids in the graph if present.
 
         Returns
         -------
-        bool
-            True if the graph is heterogeneous, False otherwise.
-        """
-        return self.c_csc_graph.is_heterogeneous()
-
-    @property
-    def node_types(self) -> Optional[List[str]]:
-        """Returns all node types in the graph.
-
-        Returns
-        -------
-        List[str] or None
-            If the graph is heterogeneous, returns a string list of size
-            the number of node types, containing all node types in the graph.
-            If the graph is homogeneous, returns None.
+        Dict[str, int] or None
+            Returns a dict containing all mappings from node types to
+            node type IDs if present.
         """
         return (
-            self.c_csc_graph.node_types()
-            if self.c_csc_graph.is_heterogeneous()
+            self.metadata.node_type_to_id
+            if self.metadata
             else None
         )
 
     @property
-    def edge_types(self) -> Optional[List[Tuple[str, str, str]]]:
-        """Returns all edge types in the graph.
+    def edge_type_to_id(self) -> Optional[Dict[Tuple[str, str, str], int]]:
+        """Returns mappings from edge types to type ids in the graph if present.
 
         Returns
         -------
-        List[Tuple[str, str, str]] or None
-            If the graph is heterogeneous, returns a string triplet list tensor
-            of size the number of edge types, containing all edge types in the
-            graph. If the graph is homogeneous, returns None.
+        Dict[Tuple[str, str, str], int] or None
+            Returns a dict containing all mappings from edge types to
+            edge type IDs if present.
         """
         return (
-            self.c_csc_graph.edge_types()
-            if self.c_csc_graph.is_heterogeneous()
+            self.metadata.edge_type_to_id
+            if self.metadata
             else None
         )
 
     @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
-        """Returns the node type offset tensor for a heterogeneous graph.
+        """Returns the node type offset tensor if present.
 
         Returns
         -------
         torch.Tensor or None
-            If the graph is heterogeneous, returns a 1D tensor of shape
-            `(num_node_types + 1,)` and dtype `long` or could be None if
-            the graph has only one edge type. The i-th element of
-            the tensor indicates the index in the node type tensor where nodes
-            of type i start. If the graph is homogeneous, returns None.
+            If present, returns a 1D integer tensor of shape
+            `(num_node_types + 1,)`. The tensor is in ascending order as nodes
+            of the same type have continuous IDs, and larger node IDs are
+            paired with larger node type IDs. The first value is 0 and last
+            value is the number of nodes. And nodes with IDs between
+            `node_type_offset_[i]~node_type_offset_[i+1]` are of type id 'i'.
+
         """
-        return (
-            self.c_csc_graph.node_type_offset()
-            if self.c_csc_graph.is_heterogeneous()
-            else None
-        )
+        return self.c_csc_graph.node_type_offset()
+
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
-        """Returns the edge type tensor for a heterogeneous graph.
+        """Returns the edge type tensor if present.
 
         Returns
         -------
         torch.Tensor or None
-            If the graph is heterogeneous, returns a 1D tensor of shape
-            (num_edges,) and dtype 8 or 16 bits int containing the
-            type of each edge in the graph, or could be None if the graph has
-            only one edge type. If the graph is homogeneous, returns None.
+            If present, returns a 1D integer tensor of shape (num_edges,)
+            containing the type of each edge in the graph.
         """
-        return (
-            self.c_csc_graph.type_per_edge()
-            if self.c_csc_graph.is_heterogeneous()
-            else None
-        )
+        return self.c_csc_graph.type_per_edge()
 
 
 def from_csc(
     csc_indptr: torch.Tensor,
     indices: torch.Tensor,
-    etype_sorted: bool = True,
-    num_nodes: Optional[int] = None,
-    hetero_info: Optional[HeteroInfo] = None,
+    node_type_offset: Optional[torch.tensor] = None,
+    type_per_edge: Optional[torch.tensor] = None,
+    metadata: Optional[CSCGraphMetadata] = None,
 ) -> CSCSamplingGraph:
     """
     Create a CSCSamplingGraph object from a CSC representation.
@@ -231,20 +180,17 @@ def from_csc(
     Parameters
     ----------
     csc_indptr : torch.Tensor
-        Pointer to the start of each row in the `indices`. shape is
-        `(num_nodes,)` and dtype is usually 16 or 32 bits int.
+        Pointer to the start of each row in the `indices`. An integer tensor
+        with shape `(num_nodes+1,)`.
     indices : torch.Tensor
-        Column indices of the non-zero elements in the CSC graph. shape is
-        `(num_edges,)` and dtype is usually 32 or 64 bits int.
-    etype_sorted : bool
-        A hint telling whether neighbors of each node are sorted by edge type
-        ID, it is only meaningful when graph is heterogeneous, by default True.
-    num_nodes : int, optional
-        Number of nodes in the graph, by default None.
-    hetero_info : Optional[HeteroInfo], optional
-        Heterogeneous graph metadata, by default None.
-        Implicitly indicates whether the graph is homogeneous or heterogeneous.
-
+        Column indices of the non-zero elements in the CSC graph. An integer
+        tensor with shape `(num_edges,)`.
+    node_type_offset : Optional[torch.tensor], optional
+        Offset of node types in the graph, by default None.
+    type_per_edge : Optional[torch.tensor], optional
+        Type ids of each edge in the graph, by default None.
+    metadata: Optional[CSCGraphMetadata], optional
+        Metadata of the graph, by default None.
     Returns
     -------
     CSCSamplingGraph
@@ -252,114 +198,23 @@ def from_csc(
 
     Examples
     --------
+    >>> ntypes = {'n1': 0, 'n2': 1, 'n3': 2}
+    >>> etypes = {('n1', 'e1', 'n2'): 0, ('n1', 'e2', 'n3'): 1}
+    >>> metadata = graphbolt.CSCGraphMetadata(ntypes, etypes)
     >>> csc_indptr = torch.tensor([0, 2, 5, 7])
     >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
-    >>> num_nodes = 3
-    >>> ntypes = ['n1', 'n2', 'n3']
-    >>> etypes = [('n1', 'e1', 'n2'), ('n1', 'e2', 'n3')]
+    >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
-    >>> hetero_info = HeteroInfo(ntypes, etypes, torch.tensor([0, 1, 2]), type_per_edge)
-    >>> graph = from_csc(csc_indptr, indices, num_nodes, hetero_info)
+    >>> graph = graphbolt.from_csc(csc_indptr, indices, node_type_offset, type_per_edge, metadata)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
-                     num_nodes=3, num_edges=7, is_heterogeneous=True)
+                     num_nodes=3, num_edges=7)
     """
-    if num_nodes is None:
-        num_nodes = csc_indptr.shape[0] - 1
-
-    assert csc_indptr.shape[0] == num_nodes + 1
-    if hetero_info is None:
-        return CSCSamplingGraph(
-            torch.ops.graphbolt.from_csc(num_nodes, csc_indptr, indices)
-        )
-    else:
-        if etype_sorted is False:
-            ntypes, etypes, node_type_offset, type_per_edge = hetero_info
-            if type_per_edge is not None:
-                # sort neighbors by edge type id for each node
-                sorted_etype = []
-                sorted_indices = []
-                for s, e in zip(csc_indptr[:-1], csc_indptr[1:]):
-                    neighbor_etype, index = torch.sort(type_per_edge[s:e])
-                    sorted_etype.append(neighbor_etype)
-                    sorted_indices.append(indices[s:e][index])
-                type_per_edge = torch.cat(sorted_etype, dim=0)
-                indices = torch.cat(sorted_indices, dim=0)
-                hetero_info = HeteroInfo(
-                    ntypes, etypes, node_type_offset, type_per_edge
-                )
-
-        return CSCSamplingGraph(
-            torch.ops.graphbolt.from_csc_with_hetero_info(
-                num_nodes, csc_indptr, indices, *hetero_info
-            )
-        )
-
-
-def from_coo(
-    coo: torch.Tensor,
-    num_nodes: int,
-    hetero_info: Optional[HeteroInfo] = None,
-) -> CSCSamplingGraph:
-    """
-    Create a CSCSamplingGraph object from a COO representation.
-
-    Parameters
-    ----------
-    coo : torch.Tensor
-        COO format graph. shape is`(2, num_edges)` and dtype, depends on the
-        number of nodes, is usually 16 or 32 bits int.
-    num_nodes : int
-        Number of nodes in the graph.
-    hetero_info : Optional[HeteroInfo], optional
-        Heterogeneous graph metadata, by default None. Implicitly Indicates
-        whether the graph is homogeneous or heterogeneous.
-
-    Returns
-    -------
-    CSCSamplingGraph
-        The created CSCSamplingGraph object.
-
-    Examples
-    --------
-    >>> coo = torch.tensor([[0, 1, 2, 2, 3, 3],
-    ...                     [1, 2, 0, 3, 1, 3]])
-    >>> ntypes, etypes = ['n1', 'n2', 'n3']
-    >>> etypes = [('n1', 'e1', 'n2'), ('n1', 'e2', 'n3')]
-    >>> type_per_edge = torch.tensor([0, 1, 0, 1, 0, 1])
-    >>> hetero_info = HeteroInfo(ntypes, etypes, torch.tensor([0, 2, 5]), type_per_edge)
-    >>> graph = dataloading2.from_coo(coo, hetero_info)
-    >>> print(graph)
-    CSCSamplingGraph(csc_indptr=tensor([0, 1, 3, 4, 6]),
-                     indices=tensor([2, 0, 3, 1, 2, 3]),
-                     num_nodes=4, num_edges=6, is_heterogeneous=True)
-    """
-    assert coo.dim() == 2
-
-    rol = coo[1]
-    _, indices = torch.sort(rol)
-
-    row, col = torch.index_select(coo, 1, indices)
-    csc_indptr = torch.cumsum(torch.bincount(col, minlength=num_nodes), dim=0)
-    csc_indptr = torch.cat(
-        (torch.zeros((1,), dtype=csc_indptr.dtype), csc_indptr), dim=0
-    )
-    if hetero_info is not None:
-        ntypes, etypes, node_type_offset, type_per_edge = hetero_info
-        if type_per_edge is not None:
-            type_per_edge = type_per_edge[indices]
-            hetero_info = HeteroInfo(
-                ntypes, etypes, node_type_offset, type_per_edge
-            )
-
-    return from_csc(
-        csc_indptr,
-        row,
-        etype_sorted=False,
-        num_nodes=num_nodes,
-        hetero_info=hetero_info,
-    )
+    if metadata and metadata.node_type_to_id and node_type_offset is not None:
+        assert len(metadata.node_type_to_id) + 1 == node_type_offset.size(0), "node_type_offset length should be |ntypes| + 1."
+    return CSCSamplingGraph(
+        torch.ops.graphbolt.from_csc(csc_indptr, indices, node_type_offset, type_per_edge), metadata)
 
 
 def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
@@ -370,7 +225,6 @@ def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
     indices_str = str(graph.indices)
     meta_str = (
         f"num_nodes={graph.num_nodes}, num_edges={graph.num_edges}"
-        f", is_heterogeneous={graph.is_heterogeneous}"
     )
     prefix = f"{type(graph).__name__}("
 
