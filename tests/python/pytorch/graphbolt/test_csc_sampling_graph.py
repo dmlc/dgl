@@ -8,6 +8,20 @@ import torch
 
 from dgl.graphbolt import *
 
+torch.manual_seed(42)
+
+def get_ntypes_and_etypes(num_ntypes, num_etypes):
+    ntypes = [f"n{i}" for i in range(num_ntypes)]
+    etypes = []
+    count = 0
+    for n1 in range(num_ntypes):
+        for n2 in range(n1 + 1, num_ntypes):
+            if count >= num_etypes:
+                break
+            etypes.append((f"n{n1}", f"e{count}", f"n{n2}"))
+            count += 1
+    return (ntypes, etypes)
+
 
 def random_heterogeneous_graph_from_csc(num_nodes, num_ntypes, num_etypes):
     # assume each node has 0 ~ 10 neighbors
@@ -16,8 +30,7 @@ def random_heterogeneous_graph_from_csc(num_nodes, num_ntypes, num_etypes):
     csc_indptr = torch.cat((torch.tensor([0]), csc_indptr), dim=0)
     num_edges = csc_indptr[-1].item()
     indices = torch.randint(0, num_nodes, (num_edges,))
-    ntypes = [f"n{i}" for i in range(num_ntypes)]
-    etypes = [f"e{i}" for i in range(num_etypes)]
+    ntypes, etypes = get_ntypes_and_etypes(num_ntypes, num_etypes)
     # random get node type split point
     node_type_offset = torch.sort(torch.randperm(num_nodes)[:num_ntypes])[0]
     node_type_offset[0] = 0
@@ -27,7 +40,9 @@ def random_heterogeneous_graph_from_csc(num_nodes, num_ntypes, num_etypes):
             csc_indptr,
             indices,
             etype_sorted=False,
-            hetero_info=(ntypes, etypes, node_type_offset, type_per_edge),
+            hetero_info=HeteroInfo(
+                ntypes, etypes, node_type_offset, type_per_edge
+            ),
         ),
         csc_indptr,
         indices,
@@ -39,15 +54,15 @@ def random_heterogeneous_graph_from_coo(
     num_nodes, num_edges, num_ntypes, num_etypes
 ):
     coo = torch.randint(0, num_nodes, (2, num_edges))
-    ntypes = [f"n{i}" for i in range(num_ntypes)]
-    etypes = [f"e{i}" for i in range(num_etypes)]
+    ntypes, etypes = get_ntypes_and_etypes(num_ntypes, num_etypes)
     type_per_edge = torch.randint(0, num_etypes, (num_edges,))
     node_type_offset = torch.sort(torch.randperm(num_nodes)[:num_ntypes])[0]
     node_type_offset[0] = 0
     return (
         from_coo(
             coo,
-            hetero_info=(ntypes, etypes, node_type_offset, type_per_edge),
+            num_nodes,
+            HeteroInfo(ntypes, etypes, node_type_offset, type_per_edge),
         ),
         torch.cat([coo, type_per_edge.unsqueeze(dim=0)], dim=0),
     )
@@ -61,12 +76,31 @@ def sort_coo(coo: torch.tensor):
     return torch.index_select(coo, 1, indices)
 
 
+# @unittest.skipIf(
+#     F._default_context_str == "gpu",
+#     reason="Graph is CPU only at present.",
+# )
+# @pytest.mark.parametrize("num_ntypes, ntype_offset", [(1, torch.tensor([0], dtype=int)), (1, None), (3, torch.tensor([0, 2, 5], dtype=int))])
+# @pytest.mark.parametrize("num_etypes, per_etype", [(1, torch.tensor([0, 0, 0], dtype=int)), (1, None), (2, torch.tensor([0, 1, 1], dtype=int))])
+# def test_hetero_info(num_ntypes, num_etypes, ntype_offset, per_etype):
+#     ntypes, etypes = get_ntypes_and_etypes(num_ntypes, num_etypes)
+#     hetero_info = HeteroInfo(ntypes, etypes)
+#     node_types, edge_types, node_type_offset, typer_per_edge = hetero_info
+#     assert ntypes == node_types
+#     assert etypes == edge_types
+#     if torch.is_tensor(ntype_offset):
+#         assert ntype_offset == node_type_offset
+#     if torch.is_tensor(per_etype):
+#         assert per_etype == typer_per_edge
+        
+
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
+@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (1, 3), (5, 1), (3, 5)])
 @pytest.mark.parametrize("num_nodes", [10, 50, 1000, 10000])
-def test_from_csc(num_nodes, num_ntypes=3, num_etypes=5):
+def test_from_csc(num_nodes, num_ntypes, num_etypes):
     (
         graph,
         orig_csc_indptr,
@@ -95,10 +129,11 @@ def test_from_csc(num_nodes, num_ntypes=3, num_etypes=5):
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
+@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (1, 3), (5, 1), (3, 5)])
 @pytest.mark.parametrize(
     "num_nodes,num_edges", [(10, 20), (50, 300), (1000, 500000)]
 )
-def test_from_coo(num_nodes, num_edges, num_ntypes=3, num_etypes=5):
+def test_from_coo(num_nodes, num_edges, num_ntypes, num_etypes):
     graph, orig_coo = random_heterogeneous_graph_from_coo(
         num_nodes, num_edges, num_ntypes, num_etypes
     )
@@ -120,5 +155,5 @@ def test_from_coo(num_nodes, num_edges, num_ntypes=3, num_etypes=5):
 
 
 if __name__ == "__main__":
-    test_from_csc(100000)
-    test_from_coo(1000, 50000)
+    test_from_csc(100000, 3, 5)
+    test_from_coo(1000, 50000, 3, 5)

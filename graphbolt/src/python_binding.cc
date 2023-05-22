@@ -4,7 +4,7 @@
  * @brief Graph bolt library Python binding.
  */
 
-#include "csc_sampling_graph.h"
+#include <graphbolt/csc_sampling_graph.h>
 
 namespace graphbolt {
 namespace sampling {
