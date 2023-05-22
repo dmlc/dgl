@@ -15,7 +15,6 @@
 namespace graphbolt {
 namespace sampling {
 
-
 /**
  * @brief A sampling oriented csc format graph.
  */
