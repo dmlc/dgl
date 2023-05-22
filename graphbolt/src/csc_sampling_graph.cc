@@ -30,9 +30,6 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
   if (node_type_offset.has_value()) {
     auto& offset = node_type_offset.value();
     TORCH_CHECK(offset.dim() == 1);
-    TORCH_CHECK(offset[0].item<int64_t>() == 0);
-    TORCH_CHECK(offset[-1].item<int64_t>() == indptr.size(0) - 1);
-    TORCH_CHECK(torch::equal(offset, std::get<0>(torch::sort(offset))));
   }
   if (type_per_edge.has_value()) {
     TORCH_CHECK(type_per_edge.value().dim() == 1);
