@@ -58,6 +58,7 @@ RangePickFn GetRangePickFn(
 std::tuple<torch::Tensor, torch::Tensor> CSCSamplingGraph::SampleEtypeNeighbors(
     torch::Tensor seed_nodes, torch::Tensor fanouts, bool replace,
     bool require_eids, const torch::optional<torch::Tensor>& probs) {
+  std::cout << "start SampleEtypeNeighbors" << std::endl;
   TORCH_CHECK(
       type_per_edge_.has_value(),
       "SampleNeighborsEType only works with heterogeneous graph")
@@ -68,14 +69,18 @@ std::tuple<torch::Tensor, torch::Tensor> CSCSamplingGraph::SampleEtypeNeighbors(
     // Empty graph
     return std::tuple<torch::Tensor, torch::Tensor>();
   } else {
+    std::cout << "start GetRangePickFn" << std::endl;
     auto pick_fn = GetRangePickFn(probs, replace);
+    std::cout << "start pick" << std::endl;
     torch::Tensor picked_rows, picked_cols, picked_etypes, picked_eids;
     std::tie(picked_rows, picked_cols, picked_etypes, picked_eids) =
         RowWisePickPerEtype(
             this, seed_nodes, fanouts, probs, require_eids, replace, pick_fn);
     torch::Tensor induced_coos;
+    std::cout << "end pick" << std::endl;
     // Note the graph is csc, so row and col should be reversed.
     induced_coos = torch::stack({picked_cols, picked_rows, picked_etypes});
+    std::cout << induced_coos << std::endl;
     return std::make_tuple(induced_coos, picked_eids);
   }
 }

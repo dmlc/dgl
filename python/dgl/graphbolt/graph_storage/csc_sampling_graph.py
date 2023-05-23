@@ -226,8 +226,8 @@ class CSCSamplingGraph:
             (|sampled edges|,), containing all mapped original edge ids.
 
         """
-        if self.edge_type_to_id:
-            assert len(self.edge_type_to_id) == len(fanouts)
+        if self.metadata and self.metadata.edge_type_to_id:
+            assert len(self.metadata.edge_type_to_id) == len(fanouts), "fanouts should have same length as edge types."
         if not torch.is_tensor(fanouts):
             assert fanouts.dim == 1
             raise TypeError("The fanout should be a tensor")

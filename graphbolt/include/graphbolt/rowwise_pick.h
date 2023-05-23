@@ -65,6 +65,7 @@ RowWisePickPerEtype(
   const bool has_probs = probs.has_value();
   torch::parallel_for(
       0, num_rows, kDefaultPickGrainSize, [&](size_t b, size_t e) {
+        std::cout << "start parallel" << std::endl;
         for (size_t i = b; i < e; ++i) {
           const auto rid = rows[i].item<int64_t>();
           TORCH_CHECK(rid < graph->NumNodes());
@@ -74,6 +75,7 @@ RowWisePickPerEtype(
 
           if (len == 0) continue;
 
+          std::cout << len << std::endl;
           torch::Tensor picked_indices_row;
           // fast path
           if ((pick_all || len <= min_num_pick) && !replace) {
@@ -130,6 +132,7 @@ RowWisePickPerEtype(
               }
             }
           }
+          std::cout << "a row pick end" << std::endl;
           int64_t picked_num = picked_indices_row.size(0);
           picked_rows_per_row[i] =
               torch::full({picked_num}, rid, indices.dtype());
@@ -142,9 +145,11 @@ RowWisePickPerEtype(
         }
       });
 
+  std::cout << "start cat" << std::endl;
   torch::Tensor picked_rows = torch::cat(picked_rows_per_row);
   torch::Tensor picked_cols = torch::cat(picked_cols_per_row);
   torch::Tensor picked_etypes = torch::cat(picked_etypes_per_row);
+  std::cout << "start get pick eids" << std::endl;
   torch::Tensor picked_eids =
       torch::tensor({}, torch::TensorOptions().dtype(torch::kInt64));
   if (return_eids) picked_eids = torch::cat(picked_eids_per_row);
