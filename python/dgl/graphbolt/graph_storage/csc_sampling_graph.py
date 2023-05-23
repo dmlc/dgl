@@ -14,7 +14,7 @@ class GraphMetadata:
         edge_type_to_id: Dict[Tuple[str, str, str], int],
     ):
         """
-        Initialize the CSCGraphMetadata object.
+        Initialize the GraphMetadata object.
 
         Parameters
         ----------
@@ -203,7 +203,7 @@ def from_csc(
         Offset of node types in the graph, by default None.
     type_per_edge : Optional[torch.tensor], optional
         Type ids of each edge in the graph, by default None.
-    metadata: Optional[CSCGraphMetadata], optional
+    metadata: Optional[GraphMetadata], optional
         Metadata of the graph, by default None.
     Returns
     -------
@@ -214,7 +214,7 @@ def from_csc(
     --------
     >>> ntypes = {'n1': 0, 'n2': 1, 'n3': 2}
     >>> etypes = {('n1', 'e1', 'n2'): 0, ('n1', 'e2', 'n3'): 1}
-    >>> metadata = graphbolt.CSCGraphMetadata(ntypes, etypes)
+    >>> metadata = graphbolt.GraphMetadata(ntypes, etypes)
     >>> csc_indptr = torch.tensor([0, 2, 5, 7])
     >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
