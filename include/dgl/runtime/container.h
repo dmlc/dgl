@@ -680,7 +680,8 @@ inline std::vector<T> ListValueToVector(const List<Value>& list) {
 }
 
 /**
- * @brief Helper function to convert a Map<std::string, Value> object to an unordered map.
+ * @brief Helper function to convert a Map<std::string, Value> object to an
+ * unordered map.
  * @tparam V value type
  * @param map Input map object.
  * @return std unordered map

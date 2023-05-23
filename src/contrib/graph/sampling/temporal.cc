@@ -32,7 +32,7 @@ void _CheckIdType(
 
 DGLContext _GetContext(
     const std::unordered_map<std::string, NDArray>& ndarray_map) {
-  CHECK(ndarray_map.size() > 0);
+  CHECK(!ndarray_map.empty());
   for (const auto& item : ndarray_map) {
     CHECK(item.second.defined());
     return item.second->ctx;
