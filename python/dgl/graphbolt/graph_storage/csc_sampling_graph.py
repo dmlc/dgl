@@ -13,7 +13,6 @@ class GraphMetadata:
         node_type_to_id: Dict[str, int],
         edge_type_to_id: Dict[Tuple[str, str, str], int],
     ):
-
         """Initialize the GraphMetadata object.
 
         Parameters
