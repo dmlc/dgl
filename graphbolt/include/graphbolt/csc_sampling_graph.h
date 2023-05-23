@@ -70,7 +70,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * type into account, where each edge type has a specified pick number.
    *
    * @param seed_nodes The tensor containing the seed nodes.
-   * @param fanouts The vector containing the number of neighbors to sample per
+   * @param fanouts The tensor containing the number of neighbors to sample per
    * edge type.
    * @param replace Boolean indicating if sampling is done with replacement.
    * @param return_eids Boolean indicating if edge IDs are required to return,
@@ -78,14 +78,14 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param probs Optional tensor containing probabilities for sampling. Dtype
    * should be bool or float.
    * @return A tuple containing the sampled coo graph with type information and
-   * their corresponding edge IDs (if required). The first tensor is of shape
-   * (3, |sampled edges|) where each subtensor represents 'rows', 'cols' and
-   * 'edge types',  the second is original edge ids of shape (|sampled edges|,).
+   * their corresponding edge IDs (if required). The first one is an integer
+   * tensor of shape (3, |sampled edges|) where each subtensor represents
+   * 'rows', 'cols' and 'edge types',  the second is an integer tensor with
+   * shape (|sampled edges|,), containing all mapped original edge ids.
    */
   std::tuple<torch::Tensor, torch::Tensor> SampleEtypeNeighbors(
-      torch::Tensor seed_nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool return_eids,
-      const torch::optional<torch::Tensor>& probs);
+      torch::Tensor seed_nodes, torch::Tensor fanouts, bool replace,
+      bool return_eids, const torch::optional<torch::Tensor>& probs);
 
   /** @brief Get the number of nodes. */
   int64_t NumNodes() const { return indptr_.size(0) - 1; }

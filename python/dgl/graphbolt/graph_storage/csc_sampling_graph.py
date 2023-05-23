@@ -181,6 +181,63 @@ class CSCSamplingGraph:
         """
         return self.c_csc_graph.type_per_edge()
 
+    def sample_etype_neighbors(
+        self,
+        nodes,
+        fanouts,
+        probs=None,
+        replace=False,
+        return_eids=False,
+    ) -> Tuple[torch.tensor, torch.tensor]:
+        """Sample neighboring edges of the given nodes and return the induced subgraph.
+
+        For each node, a number of inbound edges will be randomly chosen.
+
+        Parameters
+        ----------
+        nodes : tensor
+            Node IDs to sample neighbors from.
+
+            A 1D tensor containing seed nodes to be sampled from.
+        fanouts : Tensor
+            The number of edges to be sampled for each node per edge type.  Must be a
+            1D tensor with the number of elements same as the number of edge types.
+
+            If -1 is given, all of the neighbors with non-zero probability will be selected.
+        probs : Tensor, optional
+            A 1D tensor with shape (num_edges,) containing (unnormalized)
+            probabilities associated with each neighboring edge of a node.
+
+            The features must be non-negative floats or boolean.  Otherwise, the
+            result will be undefined.
+        replace : bool, optional
+            If True, sample with replacement.
+        return_eids : bool, optional
+            If True, return edge ids as well in the result. This is usually set
+            when edge features are required.
+
+        Returns
+        -------
+        Tuple[torch.tensor, torch.tensor]
+            A tuple containing the sampled coo graph with type information and
+            their corresponding edge IDs (if required). The first one is an integer
+            tensor of shape (3, |sampled edges|) where each subtensor represents 'rows',
+            'cols' and 'edge types',  the second is an integer tensor with shape
+            (|sampled edges|,), containing all mapped original edge ids.
+
+        """
+        if self.edge_type_to_id:
+            assert len(self.edge_type_to_id) == len(fanouts)
+        if not torch.is_tensor(fanouts):
+            assert fanouts.dim == 1
+            raise TypeError("The fanout should be a tensor")
+        if probs:
+            assert probs.dim == 1
+            assert probs.shape[0] == self.indices.shape[0]
+        return self.c_csc_graph.sample_etype_neighbors(
+            nodes, fanouts, replace, return_eids, probs
+        )
+
 
 def from_csc(
     csc_indptr: torch.Tensor,

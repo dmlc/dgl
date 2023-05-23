@@ -56,17 +56,14 @@ RangePickFn GetRangePickFn(
 }
 
 std::tuple<torch::Tensor, torch::Tensor> CSCSamplingGraph::SampleEtypeNeighbors(
-    torch::Tensor seed_nodes, const std::vector<int64_t>& fanouts, bool replace,
+    torch::Tensor seed_nodes, torch::Tensor fanouts, bool replace,
     bool require_eids, const torch::optional<torch::Tensor>& probs) {
   TORCH_CHECK(
       type_per_edge_.has_value(),
       "SampleNeighborsEType only works with heterogeneous graph")
 
   const int64_t num_nodes = seed_nodes.size(0);
-
-  bool all_fanout_zero = std::all_of(
-      fanouts.begin(), fanouts.end(), [](auto elem) { return elem == 0; });
-
+  bool all_fanout_zero = (fanouts == 0).all().item<bool>();
   if (num_nodes == 0 || all_fanout_zero) {
     // Empty graph
     return std::tuple<torch::Tensor, torch::Tensor>();
