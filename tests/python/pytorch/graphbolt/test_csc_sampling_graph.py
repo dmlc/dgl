@@ -66,8 +66,8 @@ def test_hetero_empty_graph(num_nodes):
     assert graph.num_nodes == num_nodes
     assert torch.equal(graph.csc_indptr, csc_indptr)
     assert torch.equal(graph.indices, indices)
-    assert graph.node_type_to_id == metadata.node_type_to_id
-    assert graph.edge_type_to_id == metadata.edge_type_to_id
+    assert graph.metadata.node_type_to_id == metadata.node_type_to_id
+    assert graph.metadata.edge_type_to_id == metadata.edge_type_to_id
     assert torch.equal(graph.node_type_offset, node_type_offset)
     assert torch.equal(graph.type_per_edge, type_per_edge)
 
@@ -118,7 +118,7 @@ def random_homo_graph(num_nodes, num_edges):
 def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
     metadata = get_metadata(num_ntypes, num_etypes)
-    # random get node type split point
+    # Randomly get node type split point.
     node_type_offset = torch.sort(
         torch.randint(0, num_nodes, (num_ntypes + 1,))
     )[0]
@@ -153,8 +153,6 @@ def test_homo_graph(num_nodes, num_edges):
     assert torch.equal(indices, graph.indices)
 
     assert graph.metadata is None
-    assert graph.node_type_to_id is None
-    assert graph.edge_type_to_id is None
     assert graph.node_type_offset is None
     assert graph.type_per_edge is None
 
@@ -186,8 +184,8 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert torch.equal(indices, graph.indices)
     assert torch.equal(node_type_offset, graph.node_type_offset)
     assert torch.equal(type_per_edge, graph.type_per_edge)
-    assert metadata.node_type_to_id == graph.node_type_to_id
-    assert metadata.edge_type_to_id == graph.edge_type_to_id
+    assert metadata.node_type_to_id == graph.metadata.node_type_to_id
+    assert metadata.edge_type_to_id == graph.metadata.edge_type_to_id
 
 
 @unittest.skipIf(
@@ -214,5 +212,6 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
 
 
 if __name__ == "__main__":
+    test_empty_graph(10)
     test_node_type_offset_wrong_legnth(torch.tensor([0, 1, 5]))
     test_hetero_graph(10, 50, 3, 5)

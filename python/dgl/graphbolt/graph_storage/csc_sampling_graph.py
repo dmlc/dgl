@@ -13,15 +13,15 @@ class GraphMetadata:
         node_type_to_id: Dict[str, int],
         edge_type_to_id: Dict[Tuple[str, str, str], int],
     ):
-        """
-        Initialize the GraphMetadata object.
+
+        """Initialize the GraphMetadata object.
 
         Parameters
         ----------
         node_type_to_id : Dict[str, int]
-            Dictionary from node types to node IDs.
+            Dictionary from node types to node type IDs.
         edge_type_to_id : Dict[Tuple[str, str, str], int]
-            Dictionary from edge types to edge IDs.
+            Dictionary from edge types to edge type IDs.
 
         Raises
         ------
@@ -34,21 +34,17 @@ class GraphMetadata:
         node_type_ids = list(node_type_to_id.values())
         edge_type_ids = list(edge_type_to_id.values())
 
+        # Validate node_type_to_id.
         assert all(
             isinstance(x, str) for x in node_types
         ), "Node type name should be string."
         assert all(
             isinstance(x, int) for x in node_type_ids
         ), "Node type id should be int."
-        assert all(
-            isinstance(x, int) for x in edge_type_ids
-        ), "Edge type id should be int."
         assert len(node_type_ids) == len(
             set(node_type_ids)
         ), "Multiple node types shoud not be mapped to a same id."
-        assert len(edge_type_ids) == len(
-            set(edge_type_ids)
-        ), "Multiple edge types shoud not be mapped to a same id."
+        # Validate edge_type_to_id.
         edges = set()
         for edge_type in edge_types:
             src, edge, dst = edge_type
@@ -61,6 +57,13 @@ class GraphMetadata:
             assert (
                 dst in node_types
             ), f"Unrecognized node type {dst} in edge type {edge_type}"
+        assert all(
+            isinstance(x, int) for x in edge_type_ids
+        ), "Edge type id should be int."
+        assert len(edge_type_ids) == len(
+            set(edge_type_ids)
+        ), "Multiple edge types shoud not be mapped to a same id."
+
         self.node_type_to_id = node_type_to_id
         self.edge_type_to_id = edge_type_to_id
 
@@ -75,7 +78,7 @@ class CSCSamplingGraph:
         self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
     ):
         self.c_csc_graph = c_csc_graph
-        self.metadata = metadata
+        self._metadata = metadata
 
     @property
     def num_nodes(self) -> int:
@@ -129,18 +132,6 @@ class CSCSamplingGraph:
         return self.c_csc_graph.indices()
 
     @property
-    def node_type_to_id(self) -> Optional[Dict[str, int]]:
-        """Returns mappings from node types to type ids in the graph if present.
-
-        Returns
-        -------
-        Dict[str, int] or None
-            Returns a dict containing all mappings from node types to
-            node type IDs if present.
-        """
-        return self.metadata.node_type_to_id if self.metadata else None
-
-    @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
         """Returns the node type offset tensor if present.
 
@@ -158,18 +149,6 @@ class CSCSamplingGraph:
         return self.c_csc_graph.node_type_offset()
 
     @property
-    def edge_type_to_id(self) -> Optional[Dict[Tuple[str, str, str], int]]:
-        """Returns mappings from edge types to type ids in the graph if present.
-
-        Returns
-        -------
-        Dict[Tuple[str, str, str], int] or None
-            Returns a dict containing all mappings from edge types to
-            edge type IDs if present.
-        """
-        return self.metadata.edge_type_to_id if self.metadata else None
-
-    @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
         """Returns the edge type tensor if present.
 
@@ -180,6 +159,17 @@ class CSCSamplingGraph:
             containing the type of each edge in the graph.
         """
         return self.c_csc_graph.type_per_edge()
+
+    @property
+    def metadata(self) -> Optional[GraphMetadata]:
+        """Returns the metadata of the graph.
+
+        Returns
+        -------
+        GraphMetadata or None
+            If present, returns the metadata of the graph.
+        """
+        return self._metadata
 
 
 def from_csc(
