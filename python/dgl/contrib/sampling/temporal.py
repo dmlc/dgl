@@ -3,6 +3,9 @@
 from ... import backend as F
 from ... import ndarray as nd
 from ..._ffi.function import _init_api
+from ... import DGLGraph
+
+__all__ = ['temporal_sample_neighbors']
 
 def _to_nd_dict(pt_dict):
     """Convert a dictionary of torch tensors to a dictionary of DGL NDArrays."""
@@ -13,7 +16,8 @@ def temporal_sample_neighbors(
     nodes,
     fanout,
     timestamp,
-    replace=False
+    replace=False,
+    return_eid=False
 ):
     """Sample neighbors of the given nodes constrained by node timestamps.
 
@@ -22,7 +26,9 @@ def temporal_sample_neighbors(
     Parameters
     ----------
     g : DGLGraph
+        The graph to sample on.
     nodes : torch.Tensor or dict[ntype, torch.Tensor]
+        Seed nodes.
     fanout : int or dict[etype, int]
         The number of neighbors to be sampled for each edge type.
     timestamp : torch.Tensor or dict[ntype, torch.Tensor]
@@ -30,6 +36,8 @@ def temporal_sample_neighbors(
         the Unix timestamp format.
     replace : bool, optional
         If True, sample with replacement.
+    return_eid : bool, optional
+        If True, return the ID of the sampled edges.
     """
     # Handle non-dict input.
     if F.is_tensor(nodes):
@@ -44,7 +52,7 @@ def temporal_sample_neighbors(
     else:
         fanout_list = [fanout[etype] for etype in g.canonical_etypes]
 
-    sample_rst = _CAPI_DGLTemporalSampleNeighbors(
+    subgidx = _CAPI_DGLTemporalSampleNeighbors(
         g._graph,
         g.ntypes,
         _to_nd_dict(nodes),
@@ -52,5 +60,12 @@ def temporal_sample_neighbors(
         _to_nd_dict(timestamp),
         replace
     )
+    induced_edges = subgidx.induced_edges
+    ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
+
+    if return_eid:
+        return ret, induced_edges
+    else:
+        return ret
 
 _init_api("dgl.contrib.sampling.temporal", __name__)
