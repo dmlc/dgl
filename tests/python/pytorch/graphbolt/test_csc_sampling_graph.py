@@ -7,7 +7,24 @@ import dgl.graphbolt as gb
 import pytest
 import torch
 
+<<<<<<< HEAD
 from .utils import get_metadata, random_hetero_graph, random_homo_graph
+=======
+torch.manual_seed(3407)
+
+
+def get_metadata(num_ntypes, num_etypes):
+    ntypes = {f"n{i}": i for i in range(num_ntypes)}
+    etypes = {}
+    count = 0
+    for n1 in range(num_ntypes):
+        for n2 in range(n1, num_ntypes):
+            if count >= num_etypes:
+                break
+            etypes.update({(f"n{n1}", f"e{count}", f"n{n2}"): count})
+            count += 1
+    return gb.GraphMetadata(ntypes, etypes)
+>>>>>>> peizhou/addsampledgraph
 
 
 @unittest.skipIf(
@@ -53,8 +70,13 @@ def test_hetero_empty_graph(num_nodes):
     assert graph.num_nodes == num_nodes
     assert torch.equal(graph.csc_indptr, csc_indptr)
     assert torch.equal(graph.indices, indices)
+<<<<<<< HEAD
     assert graph.node_type_to_id == metadata.node_type_to_id
     assert graph.edge_type_to_id == metadata.edge_type_to_id
+=======
+    assert graph.metadata.node_type_to_id == metadata.node_type_to_id
+    assert graph.metadata.edge_type_to_id == metadata.edge_type_to_id
+>>>>>>> peizhou/addsampledgraph
     assert torch.equal(graph.node_type_offset, node_type_offset)
     assert torch.equal(graph.type_per_edge, type_per_edge)
 
@@ -93,6 +115,38 @@ def test_metadata_with_etype_exception(etypes):
         gb.GraphMetadata({"n1": 0, "n2": 1, "n3": 2}, etypes)
 
 
+<<<<<<< HEAD
+=======
+def random_homo_graph(num_nodes, num_edges):
+    csc_indptr = torch.randint(0, num_edges, (num_nodes + 1,))
+    csc_indptr = torch.sort(csc_indptr)[0]
+    csc_indptr[0] = 0
+    csc_indptr[-1] = num_edges
+    indices = torch.randint(0, num_nodes, (num_edges,))
+    return csc_indptr, indices
+
+
+def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
+    csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
+    metadata = get_metadata(num_ntypes, num_etypes)
+    # Randomly get node type split point.
+    node_type_offset = torch.sort(
+        torch.randint(0, num_nodes, (num_ntypes + 1,))
+    )[0]
+    node_type_offset[0] = 0
+    node_type_offset[-1] = num_nodes
+
+    type_per_edge = []
+    for i in range(num_nodes):
+        num = csc_indptr[i + 1] - csc_indptr[i]
+        type_per_edge.append(
+            torch.sort(torch.randint(0, num_etypes, (num,)))[0]
+        )
+    type_per_edge = torch.cat(type_per_edge, dim=0)
+    return (csc_indptr, indices, node_type_offset, type_per_edge, metadata)
+
+
+>>>>>>> peizhou/addsampledgraph
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
@@ -111,8 +165,11 @@ def test_homo_graph(num_nodes, num_edges):
     assert torch.equal(indices, graph.indices)
 
     assert graph.metadata is None
+<<<<<<< HEAD
     assert graph.node_type_to_id is None
     assert graph.edge_type_to_id is None
+=======
+>>>>>>> peizhou/addsampledgraph
     assert graph.node_type_offset is None
     assert graph.type_per_edge is None
 
@@ -144,8 +201,13 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert torch.equal(indices, graph.indices)
     assert torch.equal(node_type_offset, graph.node_type_offset)
     assert torch.equal(type_per_edge, graph.type_per_edge)
+<<<<<<< HEAD
     assert metadata.node_type_to_id == graph.node_type_to_id
     assert metadata.edge_type_to_id == graph.edge_type_to_id
+=======
+    assert metadata.node_type_to_id == graph.metadata.node_type_to_id
+    assert metadata.edge_type_to_id == graph.metadata.edge_type_to_id
+>>>>>>> peizhou/addsampledgraph
 
 
 @unittest.skipIf(
@@ -172,5 +234,9 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
 
 
 if __name__ == "__main__":
+<<<<<<< HEAD
+=======
+    test_empty_graph(10)
+>>>>>>> peizhou/addsampledgraph
     test_node_type_offset_wrong_legnth(torch.tensor([0, 1, 5]))
     test_hetero_graph(10, 50, 3, 5)
