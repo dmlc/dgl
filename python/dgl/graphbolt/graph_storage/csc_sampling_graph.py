@@ -77,7 +77,7 @@ class CSCSamplingGraph:
     def __init__(
         self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
     ):
-        self.c_csc_graph = c_csc_graph
+        self._c_csc_graph = c_csc_graph
         self._metadata = metadata
 
     @property
@@ -89,7 +89,7 @@ class CSCSamplingGraph:
         int
             The number of rows in the dense format.
         """
-        return self.c_csc_graph.num_nodes()
+        return self._c_csc_graph.num_nodes()
 
     @property
     def num_edges(self) -> int:
@@ -100,7 +100,7 @@ class CSCSamplingGraph:
         int
             The number of edges in the graph.
         """
-        return self.c_csc_graph.num_edges()
+        return self._c_csc_graph.num_edges()
 
     @property
     def csc_indptr(self) -> torch.tensor:
@@ -112,7 +112,7 @@ class CSCSamplingGraph:
             The indices pointer in the CSC graph. An integer tensor with
             shape `(num_nodes+1,)`.
         """
-        return self.c_csc_graph.csc_indptr()
+        return self._c_csc_graph.csc_indptr()
 
     @property
     def indices(self) -> torch.tensor:
@@ -129,7 +129,7 @@ class CSCSamplingGraph:
         It is assumed that edges of each node are already sorted by edge type
         ids.
         """
-        return self.c_csc_graph.indices()
+        return self._c_csc_graph.indices()
 
     @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
@@ -146,7 +146,7 @@ class CSCSamplingGraph:
             `node_type_offset_[i]~node_type_offset_[i+1]` are of type id 'i'.
 
         """
-        return self.c_csc_graph.node_type_offset()
+        return self._c_csc_graph.node_type_offset()
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
@@ -158,7 +158,7 @@ class CSCSamplingGraph:
             If present, returns a 1D integer tensor of shape (num_edges,)
             containing the type of each edge in the graph.
         """
-        return self.c_csc_graph.type_per_edge()
+        return self._c_csc_graph.type_per_edge()
 
     @property
     def metadata(self) -> Optional[GraphMetadata]:
