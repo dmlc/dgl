@@ -7,11 +7,14 @@
 #ifndef GRAPHBOLT_ROWWISE_PICK_H_
 #define GRAPHBOLT_ROWWISE_PICK_H_
 
-#include <graphbolt/neighbor.h>
+#include <graphbolt/csc_sampling_graph.h>
 
 namespace graphbolt {
 namespace sampling {
 
+using CSCPtr = CSCSamplingGraph*;
+using RangePickFn = std::function<torch::Tensor(
+    int64_t start, int64_t end, int64_t num_samples)>;
 using TensorList = std::vector<torch::Tensor>;
 static constexpr int kDefaultPickGrainSize = 100;
 
@@ -22,7 +25,7 @@ static constexpr int kDefaultPickGrainSize = 100;
  * @param rows The tensor containing the row indices.
  * @param num_picks The vector containing the number of picks per edge type.
  * @param probs Optional tensor containing probabilities for picking.
- * @param require_eids Boolean indicating if edge IDs need to be returned. The
+ * @param return_eids Boolean indicating if edge IDs need to be returned. The
  * last TensorList in the tuple is this value when required.
  * @param replace Boolean indicating if picking is done with replacement.
  * @param pick_fn The function used for picking.
@@ -33,18 +36,18 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 RowWisePickPerEtype(
     const CSCPtr graph, const torch::Tensor& rows,
     const std::vector<int64_t>& num_picks,
-    const torch::optional<torch::Tensor>& probs, bool require_eids,
-    bool replace, RangePickFn pick_fn) {
+    const torch::optional<torch::Tensor>& probs, bool return_eids, bool replace,
+    RangePickFn pick_fn) {
   const auto indptr = graph->CSCIndptr();
   const auto indices = graph->Indices();
-  const auto type_per_edge = graph->TypePerEdge();
+  const auto type_per_edge = graph->TypePerEdge().value();
   const int64_t num_rows = rows.size(0);
   const int64_t num_etypes = num_picks.size();
   TensorList picked_rows_per_row(num_rows);
   TensorList picked_cols_per_row(num_rows);
   TensorList picked_etypes_per_row(num_rows);
   TensorList picked_eids_per_row;
-  if (require_eids) {
+  if (return_eids) {
     picked_eids_per_row.resize(num_rows);
   }
   int64_t min_num_pick = -1;
@@ -127,10 +130,12 @@ RowWisePickPerEtype(
             }
           }
           int64_t picked_num = picked_indices_row.size(0);
-          picked_rows_per_row[i] = torch::full({picked_num}, rid, indices.dtype());
+          picked_rows_per_row[i] =
+              torch::full({picked_num}, rid, indices.dtype());
           picked_cols_per_row[i] = indices[picked_indices_row];
           picked_etypes_per_row[i] = type_per_edge[picked_indices_row];
-          if (require_eids) picked_eids_per_row[i] = picked_indices_row.to(indptr.dtype());
+          if (return_eids)
+            picked_eids_per_row[i] = picked_indices_row.to(indptr.dtype());
         }
       });
 
@@ -138,7 +143,7 @@ RowWisePickPerEtype(
   torch::Tensor picked_cols = torch::cat(picked_cols_per_row);
   torch::Tensor picked_etypes = torch::cat(picked_etypes_per_row);
   torch::Tensor picked_eids;
-  if (require_eids) picked_eids = torch::cat(picked_eids_per_row);
+  if (return_eids) picked_eids = torch::cat(picked_eids_per_row);
 
   return std::make_tuple(picked_rows, picked_cols, picked_etypes, picked_eids);
 }

@@ -11,7 +11,7 @@
 namespace graphbolt {
 namespace sampling {
 
-inline torch::Tensor UniformRangeWithRepeat(
+inline torch::Tensor UniformRangePickWithRepeat(
     int64_t start, int64_t end, int64_t num_samples) {
   return torch::randint(
       start, end,
@@ -20,7 +20,7 @@ inline torch::Tensor UniformRangeWithRepeat(
       });
 }
 
-inline torch::Tensor UniformRangeWithoutRepeat(
+inline torch::Tensor UniformRangePickWithoutRepeat(
     int64_t start, int64_t end, int64_t num_samples) {
   auto perm = torch::randperm(end - start) + start;
   return perm.slice(0, 0, num_samples);
@@ -37,8 +37,8 @@ RangePickFn GetRangePickFn(
         auto true_indices = local_probs.nonzero().view(-1);
         auto true_num = true_indices.size(0);
         auto choosed =
-            replace ? UniformRangeWithRepeat(0, true_num, num_samples)
-                    : UniformRangeWithoutRepeat(0, true_num, num_samples);
+            replace ? UniformRangePickWithRepeat(0, true_num, num_samples)
+                    : UniformRangePickWithoutRepeat(0, true_num, num_samples);
         return true_indices[choosed];
       };
     } else {
@@ -49,30 +49,25 @@ RangePickFn GetRangePickFn(
       };
     }
   } else {
-    pick_fn = replace ? UniformRangeWithRepeat : UniformRangeWithoutRepeat;
+    pick_fn =
+        replace ? UniformRangePickWithRepeat : UniformRangePickWithoutRepeat;
   }
   return pick_fn;
 }
 
-std::tuple<torch::Tensor, torch::Tensor> SampleEtypeNeighbors(
-    const CSCPtr graph, torch::Tensor seed_nodes,
-    const std::vector<int64_t>& fanouts, bool replace, bool require_eids,
-    const torch::optional<torch::Tensor>& probs) {
+std::tuple<torch::Tensor, torch::Tensor> CSCSamplingGraph::SampleEtypeNeighbors(
+    torch::Tensor seed_nodes, const std::vector<int64_t>& fanouts, bool replace,
+    bool require_eids, const torch::optional<torch::Tensor>& probs) {
   TORCH_CHECK(
-      graph->IsHeterogeneous(),
-      "SampleNeighborsEType only work with heterogeneous graph")
-  TORCH_CHECK(
-      fanouts.size() == graph->EdgeTypes().size(),
-      "The length of Fanouts and edge type should be equal.")
+      type_per_edge_.has_value(),
+      "SampleNeighborsEType only works with heterogeneous graph")
 
   const int64_t num_nodes = seed_nodes.size(0);
 
-  int64_t fanout_value = fanouts[0];
-  bool same_fanout = std::all_of(
-      fanouts.begin(), fanouts.end(),
-      [fanout_value](auto elem) { return elem == fanout_value; });
+  bool all_fanout_zero = std::all_of(
+      fanouts.begin(), fanouts.end(), [](auto elem) { return elem == 0; });
 
-  if (num_nodes == 0 || (same_fanout && fanout_value == 0)) {
+  if (num_nodes == 0 || all_fanout_zero) {
     // Empty graph
     return std::tuple<torch::Tensor, torch::Tensor>();
   } else {
@@ -80,7 +75,7 @@ std::tuple<torch::Tensor, torch::Tensor> SampleEtypeNeighbors(
     torch::Tensor picked_rows, picked_cols, picked_etypes, picked_eids;
     std::tie(picked_rows, picked_cols, picked_etypes, picked_eids) =
         RowWisePickPerEtype(
-            graph, seed_nodes, fanouts, probs, require_eids, replace, pick_fn);
+            this, seed_nodes, fanouts, probs, require_eids, replace, pick_fn);
     torch::Tensor induced_coos;
     // Note the graph is csc, so row and col should be reversed.
     induced_coos = torch::stack({picked_cols, picked_rows, picked_etypes});
