@@ -78,7 +78,6 @@ inline aten::impl::NumPicksFn<IdxType> _GetNumPicksFn(
       if (col_ts <= row_ts)
         ++num;
     }
-    //LOG(INFO) << rowid << " " << max_num_picks << " " << num;
 
     if (replace) {
       return static_cast<IdxType>(num == 0 ? 0 : num_samples);
@@ -108,7 +107,6 @@ inline aten::impl::PickFn<IdxType> _GetPickFn(
       if (ts <= row_ts)
         candidate_col.push_back(i);
     }
-    //LOG(INFO) << rowid << " " << candidate_col.size() << " " << num_picks;
     RandomEngine::ThreadLocal()->UniformChoice<IdxType>(
         num_picks, candidate_col.size(), out_idx, replace);
     for (int64_t j = 0; j < num_picks; ++j) {
@@ -130,6 +128,10 @@ COOMatrix CSRRowWiseTemporalSampling(
   COOMatrix ret;
   ATEN_CSR_SWITCH(mat, XPU, IdType, "CSRRowWiseTemporalSampling", {
     CHECK(XPU == kDGLCPU);
+    for (int64_t i = 0; i < rows->shape[0]; ++i) {
+      const IdType rowid = rows.Ptr<IdType>()[i];
+      CHECK_LT(rowid, mat.num_rows) << "Row ID (" << rowid <<  ") out of range.";
+    }
     auto num_picks_fn =
       _GetNumPicksFn<IdType>(num_samples, row_timestamp, col_timestamp, replace);
     auto pick_fn =
