@@ -51,7 +51,7 @@ def test_homogeneous(idtype, fanout, replace):
     ts[u2] = torch.tensor(t_u2)
 
     ####
-    nodes = torch.tensor([0, 1, 2])
+    nodes = torch.tensor([0, 1, 2], dtype=idtype)
     from dgl.contrib.sampling import temporal_sample_neighbors
     subg = temporal_sample_neighbors(
         g, nodes, fanout, ts, replace=replace)

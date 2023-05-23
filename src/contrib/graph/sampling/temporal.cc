@@ -21,6 +21,15 @@ namespace dgl {
 namespace sampling {
 namespace {
 
+void _CheckIdType(
+    DGLDataType idtype,
+    const std::unordered_map<std::string, NDArray>& ndarray_map) {
+  for (const auto& item : ndarray_map) {
+    CHECK(item.second.defined());
+    CHECK_EQ(item.second->dtype, idtype);
+  }
+}
+
 DGLContext _GetContext(
     const std::unordered_map<std::string, NDArray>& ndarray_map) {
   CHECK(ndarray_map.size() > 0);
@@ -72,7 +81,7 @@ inline aten::impl::NumPicksFn<IdxType> _GetNumPicksFn(
     //LOG(INFO) << rowid << " " << max_num_picks << " " << num;
 
     if (replace) {
-      return static_cast<IdxType>(len == 0 ? 0 : num_samples);
+      return static_cast<IdxType>(num == 0 ? 0 : num_samples);
     } else {
       return std::min(static_cast<IdxType>(max_num_picks), num);
     }
@@ -92,7 +101,7 @@ inline aten::impl::PickFn<IdxType> _GetPickFn(
         IdxType num_picks, const IdxType* col,
         const IdxType* data, IdxType* out_idx) {
     const auto row_ts = row_timestamp.Ptr<int64_t>()[rowid];
-    std::vector<int64_t> candidate_col;
+    std::vector<IdxType> candidate_col;
     candidate_col.reserve(len);
     for (IdxType i = off; i < off + len; ++i) {
       const auto ts = col_timestamp.Ptr<int64_t>()[col[i]];
@@ -143,6 +152,8 @@ HeteroSubgraph TemporalSampleNeighbors(
   // Sanity check.
   CHECK_EQ(fanouts.size(), hg->NumEdgeTypes());
   CHECK_EQ(timestamp.size(), hg->NumVertexTypes());
+
+  _CheckIdType(hg->DataType(), nodes);
 
   DGLContext ctx = _GetContext(nodes);
   CHECK_EQ(ctx.device_type, kDGLCPU)
