@@ -5,7 +5,7 @@ from typing import Dict, Optional, Tuple
 import torch
 
 
-class CSCGraphMetadata:
+class GraphMetadata:
     r"""Class for metadata of csc sampling graph."""
 
     def __init__(
@@ -33,17 +33,34 @@ class CSCGraphMetadata:
         edge_types = list(edge_type_to_id.keys())
         node_type_ids = list(node_type_to_id.values())
         edge_type_ids = list(edge_type_to_id.values())
-        
+
+        assert all(
+            isinstance(x, str) for x in node_types
+        ), "Node type name should be string."
+        assert all(
+            isinstance(x, int) for x in node_type_ids
+        ), "Node type id should be int."
+        assert all(
+            isinstance(x, int) for x in edge_type_ids
+        ), "Edge type id should be int."
         assert len(node_type_ids) == len(
             set(node_type_ids)
         ), "Multiple node types shoud not be mapped to a same id."
         assert len(edge_type_ids) == len(
             set(edge_type_ids)
         ), "Multiple edge types shoud not be mapped to a same id."
+        edges = set()
         for edge_type in edge_types:
-            src, _, dst = edge_type
-            assert src in node_types, f"Unrecognized node type {src} in edge type {edge_type}"
-            assert dst in node_types, f"Unrecognized node type {dst} in edge type {edge_type}"
+            src, edge, dst = edge_type
+            assert isinstance(edge, str), "Edge type name should be string."
+            assert edge not in edges, f"Edge type {edge} is defined repeatedly."
+            edges.add(edge)
+            assert (
+                src in node_types
+            ), f"Unrecognized node type {src} in edge type {edge_type}"
+            assert (
+                dst in node_types
+            ), f"Unrecognized node type {dst} in edge type {edge_type}"
         self.node_type_to_id = node_type_to_id
         self.edge_type_to_id = edge_type_to_id
 
@@ -54,7 +71,9 @@ class CSCSamplingGraph:
     def __repr__(self):
         return _csc_sampling_graph_str(self)
 
-    def __init__(self, c_csc_graph: torch.ScriptObject, metadata: Optional[CSCGraphMetadata]):
+    def __init__(
+        self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
+    ):
         self.c_csc_graph = c_csc_graph
         self.metadata = metadata
 
@@ -101,6 +120,11 @@ class CSCSamplingGraph:
         torch.tensor
             The indices in the CSC graph. An integer tensor with shape
             `(num_edges,)`.
+
+        Notes
+        -------
+        It is assumed that edges of each node are already sorted by edge type
+        ids.
         """
         return self.c_csc_graph.indices()
 
@@ -114,11 +138,7 @@ class CSCSamplingGraph:
             Returns a dict containing all mappings from node types to
             node type IDs if present.
         """
-        return (
-            self.metadata.node_type_to_id
-            if self.metadata
-            else None
-        )
+        return self.metadata.node_type_to_id if self.metadata else None
 
     @property
     def edge_type_to_id(self) -> Optional[Dict[Tuple[str, str, str], int]]:
@@ -130,11 +150,7 @@ class CSCSamplingGraph:
             Returns a dict containing all mappings from edge types to
             edge type IDs if present.
         """
-        return (
-            self.metadata.edge_type_to_id
-            if self.metadata
-            else None
-        )
+        return self.metadata.edge_type_to_id if self.metadata else None
 
     @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
@@ -152,7 +168,6 @@ class CSCSamplingGraph:
 
         """
         return self.c_csc_graph.node_type_offset()
-
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
@@ -172,7 +187,7 @@ def from_csc(
     indices: torch.Tensor,
     node_type_offset: Optional[torch.tensor] = None,
     type_per_edge: Optional[torch.tensor] = None,
-    metadata: Optional[CSCGraphMetadata] = None,
+    metadata: Optional[GraphMetadata] = None,
 ) -> CSCSamplingGraph:
     """
     Create a CSCSamplingGraph object from a CSC representation.
@@ -205,16 +220,23 @@ def from_csc(
     >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
-    >>> graph = graphbolt.from_csc(csc_indptr, indices, node_type_offset, type_per_edge, metadata)
+    >>> graph = graphbolt.from_csc(csc_indptr, indices, node_type_offset, \
+    >>>                            type_per_edge, metadata)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
                      num_nodes=3, num_edges=7)
     """
     if metadata and metadata.node_type_to_id and node_type_offset is not None:
-        assert len(metadata.node_type_to_id) + 1 == node_type_offset.size(0), "node_type_offset length should be |ntypes| + 1."
+        assert len(metadata.node_type_to_id) + 1 == node_type_offset.size(
+            0
+        ), "node_type_offset length should be |ntypes| + 1."
     return CSCSamplingGraph(
-        torch.ops.graphbolt.from_csc(csc_indptr, indices, node_type_offset, type_per_edge), metadata)
+        torch.ops.graphbolt.from_csc(
+            csc_indptr, indices, node_type_offset, type_per_edge
+        ),
+        metadata,
+    )
 
 
 def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
@@ -223,9 +245,7 @@ def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
     """
     csc_indptr_str = str(graph.csc_indptr)
     indices_str = str(graph.indices)
-    meta_str = (
-        f"num_nodes={graph.num_nodes}, num_edges={graph.num_edges}"
-    )
+    meta_str = f"num_nodes={graph.num_nodes}, num_edges={graph.num_edges}"
     prefix = f"{type(graph).__name__}("
 
     def _add_indent(_str, indent):
