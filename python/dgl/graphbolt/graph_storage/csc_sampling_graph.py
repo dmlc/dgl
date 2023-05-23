@@ -18,9 +18,9 @@ class GraphMetadata:
 
         Parameters
         ----------
-        node_type_dict : Dict[str, int]
+        node_type_to_id : Dict[str, int]
             Dictionary from node types to node IDs.
-        edge_types : Dict[Tuple[str, str, str], int]
+        edge_type_to_id : Dict[Tuple[str, str, str], int]
             Dictionary from edge types to edge IDs.
 
         Raises
@@ -141,18 +141,6 @@ class CSCSamplingGraph:
         return self.metadata.node_type_to_id if self.metadata else None
 
     @property
-    def edge_type_to_id(self) -> Optional[Dict[Tuple[str, str, str], int]]:
-        """Returns mappings from edge types to type ids in the graph if present.
-
-        Returns
-        -------
-        Dict[Tuple[str, str, str], int] or None
-            Returns a dict containing all mappings from edge types to
-            edge type IDs if present.
-        """
-        return self.metadata.edge_type_to_id if self.metadata else None
-
-    @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
         """Returns the node type offset tensor if present.
 
@@ -168,6 +156,18 @@ class CSCSamplingGraph:
 
         """
         return self.c_csc_graph.node_type_offset()
+
+    @property
+    def edge_type_to_id(self) -> Optional[Dict[Tuple[str, str, str], int]]:
+        """Returns mappings from edge types to type ids in the graph if present.
+
+        Returns
+        -------
+        Dict[Tuple[str, str, str], int] or None
+            Returns a dict containing all mappings from edge types to
+            edge type IDs if present.
+        """
+        return self.metadata.edge_type_to_id if self.metadata else None
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
@@ -189,8 +189,7 @@ def from_csc(
     type_per_edge: Optional[torch.tensor] = None,
     metadata: Optional[GraphMetadata] = None,
 ) -> CSCSamplingGraph:
-    """
-    Create a CSCSamplingGraph object from a CSC representation.
+    """Create a CSCSamplingGraph object from a CSC representation.
 
     Parameters
     ----------
