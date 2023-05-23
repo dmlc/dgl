@@ -1,9 +1,9 @@
 from collections import defaultdict as ddict
 
-import backend as F
-
 import dgl
 import networkx as nx
+
+import backend as F
 
 
 def _test_nx_conversion():
@@ -67,9 +67,7 @@ def _test_nx_conversion():
     assert F.allclose(g.ndata["n1"], n1)
     # with id in nx edge feature, e1 should follow original order
     assert F.allclose(g.edata["e1"], e1)
-    assert F.array_equal(
-        F.astype(g.edata["id"], F.int64), F.copy_to(F.arange(0, 4), F.cpu())
-    )
+    assert F.array_equal(F.astype(g.edata["id"], F.int64), F.copy_to(F.arange(0, 4), F.cpu()))
 
     # test conversion after modifying DGLGraph
     g.edata.pop("id")  # pop id so we don't need to provide id when adding edges
@@ -122,6 +120,60 @@ def _test_nx_conversion():
     assert g.has_edge_between(0, 1)
     assert g.has_edge_between(1, 2)
     assert F.allclose(g.ndata["h"], F.tensor([[1.0], [2.0], [3.0]]))
-    assert F.allclose(
-        g.edata["h"], F.tensor([[1.0, 2.0], [1.0, 2.0], [2.0, 3.0], [2.0, 3.0]])
+    assert F.allclose(g.edata["h"], F.tensor([[1.0, 2.0], [1.0, 2.0], [2.0, 3.0], [2.0, 3.0]]))
+
+
+def test_nx_convert_heterogeneous():
+    g = dgl.heterograph(
+        {
+            ("user", "follows", "user"): ([0, 1], [1, 2]),
+            ("user", "follows", "topic"): ([1, 1], [1, 2]),
+            ("user", "plays", "game"): ([0, 3], [3, 4]),
+        }
     )
+
+    n1 = F.randn((5, 3))
+    n2 = F.randn((4, 2))
+    e1 = F.randn((2, 3))
+    e2 = F.randn((2, 2))
+
+    g.ndata["n"] = {"game": n1, "user": n2}
+    g.edata["e"] = {("user", "follows", "user"): e1, "plays": e2}
+
+    nxg = dgl.to_networkx(g, node_attrs=["n"], edge_attrs=["e"])
+
+    # Test nodes
+    nxg_nodes = dict(nxg.nodes(data=True))
+    assert len(nxg_nodes) == g.num_nodes()
+    assert {v["label"] for v in nxg_nodes.values()} == set(g.ntypes)
+
+    nxg_nodes_by_label = {}
+    for ntype in g.ntypes:
+        nxg_nodes_by_label[ntype] = dict((k, v) for k, v in nxg_nodes.items() if v["label"] == ntype)
+        assert g.num_nodes(ntype) == len(nxg_nodes_by_label[ntype])
+
+    assert all(v.keys() == {"label", "n"} for v in nxg_nodes_by_label["game"].values())
+    assert F.allclose(F.stack([v["n"] for v in nxg_nodes_by_label["game"].values()], 0), n1)
+    assert all(v.keys() == {"label", "n"} for v in nxg_nodes_by_label["user"].values())
+    assert F.allclose(F.stack([v["n"] for v in nxg_nodes_by_label["user"].values()], 0), n2)
+    # Nodes without node attributes
+    assert all(v.keys() == {"label"} for v in nxg_nodes_by_label["topic"].values())
+
+    # Test edges
+    nxg_edges = list(nxg.edges(data=True))
+    assert len(nxg_edges) == g.num_edges()
+    assert {e[2]["triples"] for e in nxg_edges} == set(g.canonical_etypes)
+
+    nxg_edges_by_triples = {}
+    for etype in g.canonical_etypes:
+        nxg_edges_by_triples[etype] = sorted(
+            [e for e in nxg_edges if e[2]["triples"] == etype], key=lambda el: el[2]["id"]
+        )
+        assert g.num_edges(etype) == len(nxg_edges_by_triples[etype])
+
+    assert all(e[2].keys() == {"id", "triples", "e"} for e in nxg_edges_by_triples[("user", "follows", "user")])
+    assert F.allclose(F.stack([e[2]["e"] for e in nxg_edges_by_triples[("user", "follows", "user")]], 0), e1)
+    assert all(e[2].keys() == {"id", "triples", "e"} for e in nxg_edges_by_triples[("user", "plays", "game")])
+    assert F.allclose(F.stack([e[2]["e"] for e in nxg_edges_by_triples[("user", "plays", "game")]], 0), e2)
+    # Edges without edge attributes
+    assert all(e[2].keys() == {"id", "triples"} for e in nxg_edges_by_triples[("user", "follows", "topic")])
