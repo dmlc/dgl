@@ -3,7 +3,7 @@ import dgl
 import backend as F
 
 
-def test_nx_convert_heterogeneous():
+def test_to_networkx():
     # TODO: adapt and move code from the _test_nx_conversion function in
     # tests/python/common/function/test_basics.py to here
     # (pending resolution of https://github.com/dmlc/dgl/issues/5735).
