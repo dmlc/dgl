@@ -132,10 +132,12 @@ def _get_id_tensor_from_mapping(indices, device, keys):
     return id_tensor
 
 
-def _split_to_local_id_tensor_from_mapping(indices, keys, bounds):
+def _split_to_local_id_tensor_from_mapping(
+    indices, keys, local_lower_bound, local_upper_bound
+):
     dtype = dtype_of(indices)
     device = next(iter(indices.values())).device
-    num_samples = bounds[1] - bounds[0]
+    num_samples = local_upper_bound - local_lower_bound
     id_tensor = torch.empty(num_samples, 2, dtype=dtype, device=device)
 
     index_offset = 0
@@ -146,8 +148,8 @@ def _split_to_local_id_tensor_from_mapping(indices, keys, bounds):
         index = indices[k]
         length = index.shape[0]
         index_offset2 = index_offset + length
-        lower = max(bounds[0], index_offset)
-        upper = min(bounds[1], index_offset2)
+        lower = max(local_lower_bound, index_offset)
+        upper = min(local_upper_bound, index_offset2)
         if upper > lower:
             split_id_offset2 = split_id_offset + (upper - lower)
             assert split_id_offset2 <= num_samples
@@ -162,17 +164,17 @@ def _split_to_local_id_tensor_from_mapping(indices, keys, bounds):
     return id_tensor
 
 
-def _split_to_local_id_tensor(indices, bounds):
+def _split_to_local_id_tensor(indices, local_lower_bound, local_upper_bound):
     dtype = dtype_of(indices)
     device = indices.device
-    num_samples = bounds[1] - bounds[0]
+    num_samples = local_upper_bound - local_lower_bound
     id_tensor = torch.empty(num_samples, dtype=dtype, device=device)
 
-    if bounds[1] > len(indices):
-        remainder = len(indices) - bounds[0]
-        id_tensor[0:remainder] = indices[bounds[0] :]
+    if local_upper_bound > len(indices):
+        remainder = len(indices) - local_lower_bound
+        id_tensor[0:remainder] = indices[local_lower_bound:]
     else:
-        id_tensor = indices[bounds[0] : bounds[1]]
+        id_tensor = indices[local_lower_bound:local_upper_bound]
     return id_tensor
 
 
@@ -282,22 +284,28 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.drop_last = drop_last
         self._shuffle = shuffle
-        self.local_bounds = _decompose_one_dimension(
+        (
+            self.local_lower_bound,
+            self.local_upper_bound,
+        ) = _decompose_one_dimension(
             len_indices, self.num_replicas, self.rank, drop_last
         )
-        self.num_samples = self.local_bounds[1] - self.local_bounds[0]
+        self.num_samples = self.local_upper_bound - self.local_lower_bound
         self.local_num_indices = self.num_samples
-        if self.local_bounds[1] > len_indices:
+        if self.local_upper_bound > len_indices:
             assert not drop_last
-            self.local_num_indices = len_indices - self.local_bounds[0]
+            self.local_num_indices = len_indices - self.local_lower_bound
 
         if isinstance(indices, Mapping):
             self._id_tensor = _split_to_local_id_tensor_from_mapping(
-                indices, self._mapping_keys, self.local_bounds
+                indices,
+                self._mapping_keys,
+                self.local_lower_bound,
+                self.local_upper_bound,
             )
         else:
             self._id_tensor = _split_to_local_id_tensor(
-                indices, self.local_bounds
+                indices, self.local_lower_bound, self.local_upper_bound
             )
         self._device = self._id_tensor.device
         # padding self._indices when drop_last = False (self._indices always on cpu)
