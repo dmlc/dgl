@@ -236,9 +236,7 @@ def test_load_save_homo_graph(num_nodes, num_edges):
     assert torch.equal(graph.indices, graph2.indices)
 
     assert graph.metadata is None and graph2.metadata is None
-    assert (
-        graph.node_type_offset is None and graph2.node_type_offset is None
-    )
+    assert graph.node_type_offset is None and graph2.node_type_offset is None
     assert graph.type_per_edge is None and graph2.type_per_edge is None
 
 
@@ -274,9 +272,5 @@ def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert torch.equal(graph.indices, graph2.indices)
     assert torch.equal(graph.node_type_offset, graph2.node_type_offset)
     assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
-    assert (
-        graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
-    )
-    assert (
-        graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
-    )
+    assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
+    assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
