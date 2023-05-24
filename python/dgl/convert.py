@@ -1643,7 +1643,7 @@ def bipartite_from_networkx(
     return g.to(device)
 
 
-def _to_networkx_homogeneous(g, node_attrs=None, edge_attrs=None):
+def _to_networkx_homogeneous(g, node_attrs, edge_attrs):
     src, dst = g.edges()
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)
@@ -1669,7 +1669,9 @@ def _to_networkx_homogeneous(g, node_attrs=None, edge_attrs=None):
     return nx_graph
 
 
-def _to_networkx_heterogeneous(g, node_attrs=None, edge_attrs=None):
+def _to_networkx_heterogeneous(
+    g, node_attrs, edge_attrs, ntype_attr, etype_attr
+):
     nx_graph = nx.MultiDiGraph()
 
     num_nodes_per_ntype = [g.num_nodes(ntype) for ntype in g.ntypes]
@@ -1698,7 +1700,7 @@ def _to_networkx_heterogeneous(g, node_attrs=None, edge_attrs=None):
 
     if node_attrs is not None:
         for nid, attr in nx_graph.nodes(data=True):
-            ntype_id = g.get_ntype_id(attr["label"])
+            ntype_id = g.get_ntype_id(attr[ntype_attr])
             n_offset = int(offset_per_ntype[ntype_id])
 
             feat_dict = g._get_n_repr(ntype_id, nid - n_offset)
@@ -1712,7 +1714,7 @@ def _to_networkx_heterogeneous(g, node_attrs=None, edge_attrs=None):
 
     if edge_attrs is not None:
         for _, _, attr in nx_graph.edges(data=True):
-            etype_id = g.get_etype_id(attr["triples"])
+            etype_id = g.get_etype_id(attr[etype_attr])
             eid = attr["id"]
             eid_offset = int(offset_per_etype[etype_id])
 
@@ -1728,7 +1730,13 @@ def _to_networkx_heterogeneous(g, node_attrs=None, edge_attrs=None):
     return nx_graph
 
 
-def to_networkx(g, node_attrs=None, edge_attrs=None):
+def to_networkx(
+    g,
+    node_attrs=None,
+    edge_attrs=None,
+    ntype_attr="label",
+    etype_attr="triples",
+):
     """Convert a graph to a NetworkX graph and return.
 
     The resulting NetworkX graph also contains the node/edge features of the input graph.
@@ -1743,6 +1751,10 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
         The node attributes to copy from ``g.ndata``. (Default: None)
     edge_attrs : iterable of str, optional
         The edge attributes to copy from ``g.edata``. (Default: None)
+    ntype_attr : str, optional
+        The node attribute to write the node type to. (Default: "label")
+    etype_attr : str, optional
+        The edge attribute to write the edge type to. (Default: "triples")
 
     Returns
     -------
@@ -1818,7 +1830,9 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
             "Cannot convert a CUDA graph to networkx. Call g.cpu() first."
         )
     if not g.is_homogeneous:
-        return _to_networkx_heterogeneous(g, node_attrs, edge_attrs)
+        return _to_networkx_heterogeneous(
+            g, node_attrs, edge_attrs, ntype_attr, etype_attr
+        )
     else:
         return _to_networkx_homogeneous(g, node_attrs, edge_attrs)
 
