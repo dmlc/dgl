@@ -1736,7 +1736,7 @@ def to_networkx(
     g,
     node_attrs=None,
     edge_attrs=None,
-    ntype_attr="label",
+    ntype_attr="type",
     etype_attr="triples",
 ):
     """Convert a graph to a NetworkX graph and return.
@@ -1754,7 +1754,7 @@ def to_networkx(
     edge_attrs : iterable of str, optional
         The edge attributes to copy from ``g.edata``. (Default: None)
     ntype_attr : str, optional
-        The node attribute to write the node type to. (Default: "label")
+        The node attribute to write the node type to. (Default: "type")
     etype_attr : str, optional
         The edge attribute to write the edge type to. (Default: "triples")
 
@@ -1807,18 +1807,18 @@ def to_networkx(
         ... }
     >>> nx_g = dgl.to_networkx(g, node_attrs=['n'], edge_attrs=['e'])
     >>> nx_g.nodes(data=True)
-    NodeDataView({0: {'label': 'game', 'n': tensor([0.])},
-                  1: {'label': 'game', 'n': tensor([0.])},
-                  2: {'label': 'game', 'n': tensor([0.])},
-                  3: {'label': 'game', 'n': tensor([0.])},
-                  4: {'label': 'game', 'n': tensor([0.])},
-                  5: {'label': 'topic'},
-                  6: {'label': 'topic'},
-                  7: {'label': 'topic'},
-                  8: {'label': 'user', 'n': tensor([1.])},
-                  9: {'label': 'user', 'n': tensor([1.])},
-                  10: {'label': 'user', 'n': tensor([1.])},
-                  11: {'label': 'user', 'n': tensor([1.])}})
+    NodeDataView({0: {'type': 'game', 'n': tensor([0.])},
+                  1: {'type': 'game', 'n': tensor([0.])},
+                  2: {'type': 'game', 'n': tensor([0.])},
+                  3: {'type': 'game', 'n': tensor([0.])},
+                  4: {'type': 'game', 'n': tensor([0.])},
+                  5: {'type': 'topic'},
+                  6: {'type': 'topic'},
+                  7: {'type': 'topic'},
+                  8: {'type': 'user', 'n': tensor([1.])},
+                  9: {'type': 'user', 'n': tensor([1.])},
+                  10: {'type': 'user', 'n': tensor([1.])},
+                  11: {'type': 'user', 'n': tensor([1.])}})
     >>> nx_g.edges(data=True)
     OutMultiEdgeDataView([(8, 9, {'id': 2, 'triples': ('user', 'follows', 'user'), 'e': tensor([0.])}),
                           (8, 3, {'id': 4, 'triples': ('user', 'plays', 'game'), 'e': tensor([1.])}),
