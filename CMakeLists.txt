@@ -221,7 +221,7 @@ if((NOT MSVC) AND USE_LIBXSMM)
                       )
   endif(REBUILD_LIBXSMM)
   add_dependencies(dgl libxsmm)
-  list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm)
+  list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm.a)
 endif((NOT MSVC) AND USE_LIBXSMM)
 
 if(NOT MSVC)
