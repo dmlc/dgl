@@ -1791,7 +1791,7 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
         ...     ('user', 'follows', 'user'): torch.zeros(2, 1),
         ...     'plays': torch.ones(2, 1)
         ... }
-    >>> nx_g = to_networkx(g, node_attrs=['n'], edge_attrs=['e'])
+    >>> nx_g = dgl.to_networkx(g, node_attrs=['n'], edge_attrs=['e'])
     >>> nx_g.nodes(data=True)
     NodeDataView({0: {'label': 'game', 'n': tensor([0.])},
                   1: {'label': 'game', 'n': tensor([0.])},
