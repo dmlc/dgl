@@ -56,12 +56,14 @@ struct SampledSubgraph : torch::CustomClassHolder {
       torch::Tensor reverse_row_node_ids,
       torch::optional<torch::Tensor> node_type_offset = torch::nullopt,
       torch::optional<torch::Tensor> type_per_edge = torch::nullopt,
-      torch::optional<torch::Tensor> reverse_edge_ids = torch::nullopt,
-      torch::optional<torch::Tensor> reverse_column_node_ids = torch::nullopt)
+      torch::optional<torch::Tensor> reverse_column_node_ids = torch::nullopt,
+      torch::optional<torch::Tensor> reverse_edge_ids = torch::nullopt)
       : indptr(indptr),
         indices(indices),
+        reverse_row_node_ids(reverse_row_node_ids),
         node_type_offset(node_type_offset),
         type_per_edge(type_per_edge),
+        reverse_column_node_ids(reverse_column_node_ids),
         reverse_edge_ids(reverse_edge_ids) {}
 
   /**
