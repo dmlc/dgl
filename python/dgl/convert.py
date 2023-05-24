@@ -1683,7 +1683,7 @@ def _to_networkx_heterogeneous(
         nodes = F.asnumpy(g.nodes(ntype))
         node_offset = int(offset_per_ntype[g.get_ntype_id(ntype)])
 
-        nx_graph.add_nodes_from(nodes + node_offset, label=ntype)
+        nx_graph.add_nodes_from(nodes + node_offset, **{ntype_attr: ntype})
 
     for etype in g.canonical_etypes:
         srctype, _, dsttype = etype
@@ -1696,7 +1696,7 @@ def _to_networkx_heterogeneous(
 
         for eid, (u, v) in enumerate(zip(src, dst)):
             eid_offset = eid + int(offset_per_etype[g.get_etype_id(etype)])
-            nx_graph.add_edge(u, v, id=eid_offset, triples=etype)
+            nx_graph.add_edge(u, v, id=eid_offset, **{etype_attr: etype})
 
     if node_attrs is not None:
         for nid, attr in nx_graph.nodes(data=True):
