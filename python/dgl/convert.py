@@ -1699,6 +1699,7 @@ def _to_networkx_heterogeneous(
             nx_graph.add_edge(u, v, id=eid_offset, **{etype_attr: etype})
 
     if node_attrs is not None:
+        assert ntype_attr not in node_attrs, f"'{ntype_attr}' already used as node type attribute"
         for nid, attr in nx_graph.nodes(data=True):
             ntype_id = g.get_ntype_id(attr[ntype_attr])
             n_offset = int(offset_per_ntype[ntype_id])
@@ -1713,6 +1714,7 @@ def _to_networkx_heterogeneous(
             )
 
     if edge_attrs is not None:
+        assert etype_attr not in edge_attrs, f"'{etype_attr}' already used as edge type attribute"
         for _, _, attr in nx_graph.edges(data=True):
             etype_id = g.get_etype_id(attr[etype_attr])
             eid = attr["id"]
