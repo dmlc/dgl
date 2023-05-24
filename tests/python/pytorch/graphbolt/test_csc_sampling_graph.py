@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 
 import backend as F
@@ -211,7 +213,64 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
         )
 
 
-if __name__ == "__main__":
-    test_empty_graph(10)
-    test_node_type_offset_wrong_legnth(torch.tensor([0, 1, 5]))
-    test_hetero_graph(10, 50, 3, 5)
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
+)
+def test_load_save_homo_graph(num_nodes, num_edges):
+    csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
+    graph = gb.from_csc(csc_indptr, indices)
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        filename = os.path.join(test_dir, "csc_sampling_graph.tar")
+        gb.save_csc_sampling_graph(graph, filename)
+        loaded_graph = gb.load_csc_sampling_graph(filename)
+
+    assert graph.num_nodes == loaded_graph.num_nodes
+    assert graph.num_edges == loaded_graph.num_edges
+
+    assert torch.equal(graph.csc_indptr, loaded_graph.csc_indptr)
+    assert torch.equal(graph.indices, loaded_graph.indices)
+
+    assert graph.metadata is None and loaded_graph.metadata is None
+    assert graph.node_type_offset is None and loaded_graph.node_type_offset is None
+    assert graph.type_per_edge is None and loaded_graph.type_per_edge is None
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
+)
+@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    graph = gb.from_csc(
+        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+    )
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        filename = os.path.join(test_dir, "csc_sampling_graph.tar")
+        gb.save_csc_sampling_graph(graph, filename)
+        loaded_graph = gb.load_csc_sampling_graph(filename)
+
+    assert graph.num_nodes == loaded_graph.num_nodes
+    assert graph.num_edges == loaded_graph.num_edges
+
+    assert torch.equal(graph.csc_indptr, loaded_graph.csc_indptr)
+    assert torch.equal(graph.indices, loaded_graph.indices)
+    assert torch.equal(graph.node_type_offset, loaded_graph.node_type_offset)
+    assert torch.equal(graph.type_per_edge, loaded_graph.type_per_edge)
+    assert graph.metadata.node_type_to_id == loaded_graph.metadata.node_type_to_id
+    assert graph.metadata.edge_type_to_id == loaded_graph.metadata.edge_type_to_id
