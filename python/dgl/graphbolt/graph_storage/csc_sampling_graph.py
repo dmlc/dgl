@@ -13,25 +13,14 @@ class GraphMetadata:
         node_type_to_id: Dict[str, int],
         edge_type_to_id: Dict[Tuple[str, str, str], int],
     ):
-<<<<<<< HEAD
-        """
-        Initialize the GraphMetadata object.
-=======
         """Initialize the GraphMetadata object.
->>>>>>> peizhou/addsampledgraph
 
         Parameters
         ----------
         node_type_to_id : Dict[str, int]
-<<<<<<< HEAD
-            Dictionary from node types to node IDs.
-        edge_type_to_id : Dict[Tuple[str, str, str], int]
-            Dictionary from edge types to edge IDs.
-=======
             Dictionary from node types to node type IDs.
         edge_type_to_id : Dict[Tuple[str, str, str], int]
             Dictionary from edge types to edge type IDs.
->>>>>>> peizhou/addsampledgraph
 
         Raises
         ------
@@ -44,32 +33,17 @@ class GraphMetadata:
         node_type_ids = list(node_type_to_id.values())
         edge_type_ids = list(edge_type_to_id.values())
 
-<<<<<<< HEAD
-=======
         # Validate node_type_to_id.
->>>>>>> peizhou/addsampledgraph
         assert all(
             isinstance(x, str) for x in node_types
         ), "Node type name should be string."
         assert all(
             isinstance(x, int) for x in node_type_ids
         ), "Node type id should be int."
-<<<<<<< HEAD
-        assert all(
-            isinstance(x, int) for x in edge_type_ids
-        ), "Edge type id should be int."
-        assert len(node_type_ids) == len(
-            set(node_type_ids)
-        ), "Multiple node types shoud not be mapped to a same id."
-        assert len(edge_type_ids) == len(
-            set(edge_type_ids)
-        ), "Multiple edge types shoud not be mapped to a same id."
-=======
         assert len(node_type_ids) == len(
             set(node_type_ids)
         ), "Multiple node types shoud not be mapped to a same id."
         # Validate edge_type_to_id.
->>>>>>> peizhou/addsampledgraph
         edges = set()
         for edge_type in edge_types:
             src, edge, dst = edge_type
@@ -82,8 +56,6 @@ class GraphMetadata:
             assert (
                 dst in node_types
             ), f"Unrecognized node type {dst} in edge type {edge_type}"
-<<<<<<< HEAD
-=======
         assert all(
             isinstance(x, int) for x in edge_type_ids
         ), "Edge type id should be int."
@@ -91,7 +63,6 @@ class GraphMetadata:
             set(edge_type_ids)
         ), "Multiple edge types shoud not be mapped to a same id."
 
->>>>>>> peizhou/addsampledgraph
         self.node_type_to_id = node_type_to_id
         self.edge_type_to_id = edge_type_to_id
 
@@ -105,13 +76,8 @@ class CSCSamplingGraph:
     def __init__(
         self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
     ):
-<<<<<<< HEAD
-        self.c_csc_graph = c_csc_graph
-        self.metadata = metadata
-=======
         self._c_csc_graph = c_csc_graph
         self._metadata = metadata
->>>>>>> peizhou/addsampledgraph
 
     @property
     def num_nodes(self) -> int:
@@ -122,11 +88,7 @@ class CSCSamplingGraph:
         int
             The number of rows in the dense format.
         """
-<<<<<<< HEAD
-        return self.c_csc_graph.num_nodes()
-=======
         return self._c_csc_graph.num_nodes()
->>>>>>> peizhou/addsampledgraph
 
     @property
     def num_edges(self) -> int:
@@ -137,11 +99,7 @@ class CSCSamplingGraph:
         int
             The number of edges in the graph.
         """
-<<<<<<< HEAD
-        return self.c_csc_graph.num_edges()
-=======
         return self._c_csc_graph.num_edges()
->>>>>>> peizhou/addsampledgraph
 
     @property
     def csc_indptr(self) -> torch.tensor:
@@ -153,11 +111,7 @@ class CSCSamplingGraph:
             The indices pointer in the CSC graph. An integer tensor with
             shape `(num_nodes+1,)`.
         """
-<<<<<<< HEAD
-        return self.c_csc_graph.csc_indptr()
-=======
         return self._c_csc_graph.csc_indptr()
->>>>>>> peizhou/addsampledgraph
 
     @property
     def indices(self) -> torch.tensor:
@@ -174,23 +128,7 @@ class CSCSamplingGraph:
         It is assumed that edges of each node are already sorted by edge type
         ids.
         """
-<<<<<<< HEAD
-        return self.c_csc_graph.indices()
-
-    @property
-    def node_type_to_id(self) -> Optional[Dict[str, int]]:
-        """Returns mappings from node types to type ids in the graph if present.
-
-        Returns
-        -------
-        Dict[str, int] or None
-            Returns a dict containing all mappings from node types to
-            node type IDs if present.
-        """
-        return self.metadata.node_type_to_id if self.metadata else None
-=======
         return self._c_csc_graph.indices()
->>>>>>> peizhou/addsampledgraph
 
     @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
@@ -207,23 +145,7 @@ class CSCSamplingGraph:
             `node_type_offset_[i]~node_type_offset_[i+1]` are of type id 'i'.
 
         """
-<<<<<<< HEAD
-        return self.c_csc_graph.node_type_offset()
-
-    @property
-    def edge_type_to_id(self) -> Optional[Dict[Tuple[str, str, str], int]]:
-        """Returns mappings from edge types to type ids in the graph if present.
-
-        Returns
-        -------
-        Dict[Tuple[str, str, str], int] or None
-            Returns a dict containing all mappings from edge types to
-            edge type IDs if present.
-        """
-        return self.metadata.edge_type_to_id if self.metadata else None
-=======
         return self._c_csc_graph.node_type_offset()
->>>>>>> peizhou/addsampledgraph
 
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
@@ -235,7 +157,6 @@ class CSCSamplingGraph:
             If present, returns a 1D integer tensor of shape (num_edges,)
             containing the type of each edge in the graph.
         """
-<<<<<<< HEAD
         return self.c_csc_graph.type_per_edge()
 
     def sample_etype_neighbors(
@@ -294,7 +215,6 @@ class CSCSamplingGraph:
         return self.c_csc_graph.sample_etype_neighbors(
             nodes, fanouts, replace, return_eids, probs
         )
-=======
         return self._c_csc_graph.type_per_edge()
 
     @property
@@ -307,7 +227,6 @@ class CSCSamplingGraph:
             If present, returns the metadata of the graph.
         """
         return self._metadata
->>>>>>> peizhou/addsampledgraph
 
 
 def from_csc(

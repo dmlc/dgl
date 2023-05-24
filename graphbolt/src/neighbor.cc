@@ -68,7 +68,7 @@ RangePickFn GetRangePickFn(
   bool all_fanout_zero = (fanouts == 0).all().item<bool>();
   if (num_nodes == 0 || all_fanout_zero) {
     // Empty graph
-
+    
   } else {
     std::cout << "start GetRangePickFn" << std::endl;
     auto pick_fn = GetRangePickFn(probs, replace);
@@ -80,7 +80,7 @@ RangePickFn GetRangePickFn(
     torch::Tensor induced_coos;
     std::cout << "end pick" << std::endl;
   return c10::make_intrusive<SampledSubgraph>(
-      picked_rows, picked_cols, node_type_offset_, picked_etypes, picked_eids);
+      picked_rows, picked_cols, seed_nodes, torch::nullopt, node_type_offset_, picked_etypes, picked_eids);
   }
 }
 

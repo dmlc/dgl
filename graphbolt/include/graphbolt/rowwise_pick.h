@@ -133,7 +133,6 @@ RowWisePickPerEtype(
             }
           }
           std::cout << "a row pick end" << std::endl;
-          int64_t picked_num = picked_indices_row.size(0);
           picked_rows_per_row[i] = i;
           picked_cols_per_row[i] =
               torch::index_select(indices, 0, picked_indices_row);
