@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include <graphbolt/sampled_subgraph.h>
+
 namespace graphbolt {
 namespace sampling {
 
@@ -83,7 +85,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * 'rows', 'cols' and 'edge types',  the second is an integer tensor with
    * shape (|sampled edges|,), containing all mapped original edge ids.
    */
-  std::tuple<torch::Tensor, torch::Tensor> SampleEtypeNeighbors(
+  c10::intrusive_ptr<SampledSubgraph> SampleEtypeNeighbors(
       torch::Tensor seed_nodes, torch::Tensor fanouts, bool replace,
       bool return_eids, const torch::optional<torch::Tensor>& probs);
 

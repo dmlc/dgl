@@ -42,7 +42,7 @@ RowWisePickPerEtype(
   const auto type_per_edge = graph->TypePerEdge().value();
   const int64_t num_rows = rows.size(0);
   const int64_t num_etypes = num_picks.size(0);
-  TensorList picked_rows_per_row(num_rows);
+  std::vector<int64_t> picked_rows_per_row(num_rows);
   TensorList picked_cols_per_row(num_rows);
   TensorList picked_etypes_per_row(num_rows);
   TensorList picked_eids_per_row;
@@ -134,8 +134,7 @@ RowWisePickPerEtype(
           }
           std::cout << "a row pick end" << std::endl;
           int64_t picked_num = picked_indices_row.size(0);
-          picked_rows_per_row[i] =
-              torch::full({picked_num}, rid, indices.dtype());
+          picked_rows_per_row[i] = i;
           picked_cols_per_row[i] =
               torch::index_select(indices, 0, picked_indices_row);
           picked_etypes_per_row[i] =
@@ -146,12 +145,12 @@ RowWisePickPerEtype(
       });
 
   std::cout << "start cat" << std::endl;
-  torch::Tensor picked_rows = torch::cat(picked_rows_per_row);
+  torch::Tensor picked_rows = torch::tensor(picked_rows_per_row, {indices.dtype()});
   torch::Tensor picked_cols = torch::cat(picked_cols_per_row);
   torch::Tensor picked_etypes = torch::cat(picked_etypes_per_row);
   std::cout << "start get pick eids" << std::endl;
   torch::Tensor picked_eids =
-      torch::tensor({}, torch::TensorOptions().dtype(torch::kInt64));
+      torch::tensor({}, {indptr.dtype()});
   if (return_eids) picked_eids = torch::cat(picked_eids_per_row);
 
   return std::make_tuple(picked_rows, picked_cols, picked_etypes, picked_eids);

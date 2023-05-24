@@ -4,6 +4,7 @@
  * @brief Source file of neighbor sampling.
  */
 
+#include <graphbolt/sampled_subgraph.h>
 #include <graphbolt/rowwise_pick.h>
 
 #include <algorithm>
@@ -55,7 +56,7 @@ RangePickFn GetRangePickFn(
   return pick_fn;
 }
 
-std::tuple<torch::Tensor, torch::Tensor> CSCSamplingGraph::SampleEtypeNeighbors(
+ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleEtypeNeighbors(
     torch::Tensor seed_nodes, torch::Tensor fanouts, bool replace,
     bool require_eids, const torch::optional<torch::Tensor>& probs) {
   std::cout << "start SampleEtypeNeighbors" << std::endl;
@@ -67,7 +68,7 @@ std::tuple<torch::Tensor, torch::Tensor> CSCSamplingGraph::SampleEtypeNeighbors(
   bool all_fanout_zero = (fanouts == 0).all().item<bool>();
   if (num_nodes == 0 || all_fanout_zero) {
     // Empty graph
-    return std::tuple<torch::Tensor, torch::Tensor>();
+
   } else {
     std::cout << "start GetRangePickFn" << std::endl;
     auto pick_fn = GetRangePickFn(probs, replace);
@@ -78,10 +79,8 @@ std::tuple<torch::Tensor, torch::Tensor> CSCSamplingGraph::SampleEtypeNeighbors(
             this, seed_nodes, fanouts, probs, require_eids, replace, pick_fn);
     torch::Tensor induced_coos;
     std::cout << "end pick" << std::endl;
-    // Note the graph is csc, so row and col should be reversed.
-    induced_coos = torch::stack({picked_cols, picked_rows, picked_etypes});
-    std::cout << induced_coos << std::endl;
-    return std::make_tuple(induced_coos, picked_eids);
+  return c10::make_intrusive<SampledSubgraph>(
+      picked_rows, picked_cols, node_type_offset_, picked_etypes, picked_eids);
   }
 }
 
