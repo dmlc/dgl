@@ -1,5 +1,8 @@
 """CSC format sampling graph."""
 # pylint: disable= invalid-name
+import os
+import tarfile
+import tempfile
 from typing import Dict, Optional, Tuple
 
 import torch
@@ -254,3 +257,35 @@ def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
 
     final_str = prefix + _add_indent(final_str, len(prefix))
     return final_str
+
+
+def load_csc_sampling_graph(filename):
+    """Load CSCSamplingGraph from tar file."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with tarfile.open(filename, "r") as archive:
+            archive.extractall(temp_dir)
+        graph_filename = os.path.join(temp_dir, "csc_sampling_graph.pt")
+        metadata_filename = os.path.join(temp_dir, "metadata.pt")
+        return CSCSamplingGraph(
+            torch.ops.graphbolt.load_csc_sampling_graph(graph_filename),
+            torch.load(metadata_filename),
+        )
+
+
+def save_csc_sampling_graph(graph, filename):
+    """Save CSCSamplingGraph to tar file."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        graph_filename = os.path.join(temp_dir, "csc_sampling_graph.pt")
+        torch.ops.graphbolt.save_csc_sampling_graph(
+            graph._c_csc_graph, graph_filename
+        )
+        metadata_filename = os.path.join(temp_dir, "metadata.pt")
+        torch.save(graph.metadata, metadata_filename)
+        with tarfile.open(filename, "w") as archive:
+            archive.add(
+                graph_filename, arcname=os.path.basename(graph_filename)
+            )
+            archive.add(
+                metadata_filename, arcname=os.path.basename(metadata_filename)
+            )
+    print(f"CSCSamplingGraph has been saved to {filename}.")
