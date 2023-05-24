@@ -8,7 +8,7 @@ import time
 import numpy as np
 import torch
 
-from .. import backend as F
+from .. import backend as F, graphbolt
 from ..base import DGLError, EID, ETYPE, NID, NTYPE
 from ..convert import to_homogeneous
 from ..data.utils import load_graphs, load_tensors, save_graphs, save_tensors
@@ -25,7 +25,6 @@ from .graph_partition_book import (
     _etype_tuple_to_str,
     RangePartitionBook,
 )
-from .. import graphbolt
 
 RESERVED_FIELD_DTYPE = {
     "inner_node": F.uint8,  # A flag indicates whether the node is inside a partition.
@@ -1203,6 +1202,7 @@ def partition_graph(
     if return_mapping:
         return orig_nids, orig_eids
 
+
 def convert_dgl_partition_to_csc_sampling_graph(part_config):
     """Convert partitions of dgl to CSCSamplingGraph of GraphBolt.
 
@@ -1255,9 +1255,9 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         )
         orig_graph_path = os.path.join(
             os.path.dirname(part_config),
-            part_meta[f"part-{part_id}"]["part_graph"]
+            part_meta[f"part-{part_id}"]["part_graph"],
         )
-        csc_graph_path  = os.path.join(
+        csc_graph_path = os.path.join(
             os.path.dirname(orig_graph_path), "csc_sampling_graph.tar"
         )
         graphbolt.save_csc_sampling_graph(csc_graph, csc_graph_path)
