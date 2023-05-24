@@ -1,21 +1,20 @@
 /**
  *  Copyright (c) 2020 by Contributors
  *
- * Copied to dgl/graphbolt/src/shm/resource_manager.cc. Modifications to one of
+ * Copied from dgl/src/runtime/resource_manager.cc. Modifications to one of
  * these files should be propagated to the other.
  *
- * @file resource_manager.cc
+ * @file shm/resource_manager.cc
  * @brief Manage the resources.
  */
+#include "./resource_manager.h"
 
-#include "resource_manager.h"
-
-#include <dmlc/logging.h>
+#include <torch/torch.h>
 
 #include <utility>
 
-namespace dgl {
-namespace runtime {
+namespace graphbolt {
+namespace sampling {
 
 /**
  * The runtime allocates resources during the computation. Some of the resources
@@ -29,7 +28,7 @@ class ResourceManager {
  public:
   void Add(const std::string &key, std::shared_ptr<Resource> resource) {
     auto it = resources.find(key);
-    CHECK(it == resources.end()) << key << " already exists";
+    TORCH_CHECK(it == resources.end(), key, " already exists");
     resources.insert(
         std::pair<std::string, std::shared_ptr<Resource>>(key, resource));
   }
@@ -54,5 +53,5 @@ void DeleteResource(const std::string &key) { manager.Erase(key); }
 
 void CleanupResources() { manager.Cleanup(); }
 
-}  // namespace runtime
-}  // namespace dgl
+}  // namespace sampling
+}  // namespace graphbolt

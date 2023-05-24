@@ -1,22 +1,22 @@
 /**
  *  Copyright (c) 2017 by Contributors
  *
- * Copied to dgl/graphbolt/include/shared_mem.h. Modifications to one of
+ * Copied from dgl/include/dgl/runtime/shared_mem.h. Modifications to one of
  * these files should be propagated to the other.
  *
- * @file dgl/runtime/ndarray.h
+ * @file shm/shared_mem.h
  * @brief shared memory management.
  */
-#ifndef DGL_RUNTIME_SHARED_MEM_H_
-#define DGL_RUNTIME_SHARED_MEM_H_
+#ifndef GRAPHBOLT_SHM_SHARED_MEM_H_
+#define GRAPHBOLT_SHM_SHARED_MEM_H_
 
 #ifdef _WIN32
 #include <windows.h>
 #endif  // _WIN32
 #include <string>
 
-namespace dgl {
-namespace runtime {
+namespace graphbolt {
+namespace sampling {
 
 /**
  * @brief This class owns shared memory.
@@ -58,6 +58,9 @@ class SharedMemory {
    */
   std::string GetName() const { return name; }
 
+  /** @brief Get the address of the shared memory. */
+  void *GetPtr() const { return ptr_; }
+
   /**
    * @brief constructor of the shared memory.
    * @param name The file corresponding to the shared memory.
@@ -90,6 +93,6 @@ class SharedMemory {
   static bool Exist(const std::string &name);
 };
 
-}  // namespace runtime
-}  // namespace dgl
-#endif  // DGL_RUNTIME_SHARED_MEM_H_
+}  // namespace sampling
+}  // namespace graphbolt
+#endif  // GRAPHBOLT_SHM_SHARED_MEM_H_

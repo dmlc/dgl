@@ -1,21 +1,21 @@
 /**
  *  Copyright (c) 2020 by Contributors
  *
- * Copied to dgl/graphbolt/src/shm/resource_manager.h. Modifications to one of
+ * Copied from dgl/src/runtime/resource_manager.h. Modifications to one of
  * these files should be propagated to the other.
  *
- * @file resource_manager.h
+ * @file shm/resource_manager.h
  * @brief Manage the resources in the runtime system.
  */
-#ifndef DGL_RUNTIME_RESOURCE_MANAGER_H_
-#define DGL_RUNTIME_RESOURCE_MANAGER_H_
+#ifndef GRAPHBOLT_SHM_RESOURCE_MANAGER_H_
+#define GRAPHBOLT_SHM_RESOURCE_MANAGER_H_
 
 #include <memory>
 #include <string>
 #include <unordered_map>
 
-namespace dgl {
-namespace runtime {
+namespace graphbolt {
+namespace sampling {
 
 /**
  * A class that provides the interface to describe a resource that can be
@@ -40,7 +40,7 @@ void DeleteResource(const std::string &key);
 // Clean up all resources.
 void CleanupResources();
 
-}  // namespace runtime
-}  // namespace dgl
+}  // namespace sampling
+}  // namespace graphbolt
 
-#endif  // DGL_RUNTIME_RESOURCE_MANAGER_H_
+#endif  // GRAPHBOLT_SHM_RESOURCE_MANAGER_H_

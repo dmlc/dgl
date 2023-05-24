@@ -36,7 +36,10 @@ set(LIB_GRAPHBOLT_NAME "graphbolt_pytorch_${TORCH_VER}")
 set(BOLT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(BOLT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 file(GLOB BOLT_HEADERS ${BOLT_INCLUDE})
-file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
+file(GLOB BOLT_SRC
+  ${BOLT_DIR}/*.cc
+  ${BOLT_DIR}/shm/*.cc
+)
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
