@@ -44,12 +44,12 @@ struct SampledSubgraph : torch::CustomClassHolder {
    *
    * @param indptr CSC format index pointer array.
    * @param indices CSC format index array.
-   * @param reverse_row_node_ids Row's reverse edge ids in the original graph.
+   * @param reverse_row_node_ids Row's reverse node ids in the original graph.
    * @param node_type_offset Offset array of node type.
    * @param type_per_edge Type id of each edge.
-   * @param reverse_edge_ids Reverse edge ids in the original graph.
-   * @param reverse_column_node_ids Column's reverse edge ids in the original
+   * @param reverse_column_node_ids Column's reverse node ids in the original
    * graph.
+   * @param reverse_edge_ids Reverse edge ids in the original graph.
    */
   SampledSubgraph(
       torch::Tensor indptr, torch::Tensor indices,
