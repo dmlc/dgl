@@ -282,6 +282,10 @@ def save_csc_sampling_graph(graph, filename):
         metadata_filename = os.path.join(temp_dir, "metadata.pt")
         torch.save(graph.metadata, metadata_filename)
         with tarfile.open(filename, "w") as archive:
-            archive.add(graph_filename, arcname=os.path.basename(graph_filename))
-            archive.add(metadata_filename, arcname=os.path.basename(metadata_filename))
+            archive.add(
+                graph_filename,
+                arcname=os.path.basename(graph_filename))
+            archive.add(
+                metadata_filename,
+                arcname=os.path.basename(metadata_filename))
     print(f"CSCSamplingGraph has been saved to {filename}.")
