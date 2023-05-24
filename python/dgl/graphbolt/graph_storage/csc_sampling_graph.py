@@ -47,12 +47,9 @@ class GraphMetadata:
             set(node_type_ids)
         ), "Multiple node types shoud not be mapped to a same id."
         # Validate edge_type_to_id.
-        edges = set()
         for edge_type in edge_types:
             src, edge, dst = edge_type
             assert isinstance(edge, str), "Edge type name should be string."
-            assert edge not in edges, f"Edge type {edge} is defined repeatedly."
-            edges.add(edge)
             assert (
                 src in node_types
             ), f"Unrecognized node type {src} in edge type {edge_type}"
