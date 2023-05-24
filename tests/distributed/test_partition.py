@@ -679,21 +679,29 @@ def test_UnknownPartitionBook():
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-def test_convert_dgl_partition_to_csc_sampling_graph_homo(part_method, num_parts):
+def test_convert_dgl_partition_to_csc_sampling_graph_homo(
+    part_method, num_parts
+):
     with tempfile.TemporaryDirectory() as test_dir:
         g = create_random_graph(1000)
         graph_name = "test"
-        partition_graph(g, graph_name, num_parts, test_dir, part_method=part_method)
+        partition_graph(
+            g, graph_name, num_parts, test_dir, part_method=part_method
+        )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         convert_dgl_partition_to_csc_sampling_graph(part_config)
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-def test_convert_dgl_partition_to_csc_sampling_graph_hetero(part_method, num_parts):
+def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
+    part_method, num_parts
+):
     with tempfile.TemporaryDirectory() as test_dir:
         g = create_random_hetero()
         graph_name = "test"
-        partition_graph(g, graph_name, num_parts, test_dir, part_method=part_method)
+        partition_graph(
+            g, graph_name, num_parts, test_dir, part_method=part_method
+        )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         convert_dgl_partition_to_csc_sampling_graph(part_config)

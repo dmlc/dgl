@@ -1235,7 +1235,9 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
 
     # Iterate over partitions.
     for part_id in range(num_parts):
-        graph, _, _, gpb, _, _, _ = load_partition(part_config, part_id, load_feats=False)
+        graph, _, _, gpb, _, _, _ = load_partition(
+            part_config, part_id, load_feats=False
+        )
         # Construct GraphMetadata.
         _, _, ntypes, etypes = load_partition_book(part_config, part_id)
         metadata = graphbolt.GraphMetadata(ntypes, etypes)
@@ -1248,7 +1250,14 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         # Sanity check.
         assert len(node_type_offset) == len(ntypes) + 1
         assert len(type_per_edge) == graph.num_edges()
-        csc_graph = graphbolt.from_csc(indptr, indices, node_type_offset, type_per_edge, metadata)
-        orig_graph_path = os.path.join(os.path.dirname(part_config), part_meta[f"part-{part_id}"]["part_graph"])
-        csc_graph_path  = os.path.join(os.path.dirname(orig_graph_path), "csc_sampling_graph.tar")
+        csc_graph = graphbolt.from_csc(
+            indptr, indices, node_type_offset, type_per_edge, metadata
+        )
+        orig_graph_path = os.path.join(
+            os.path.dirname(part_config),
+            part_meta[f"part-{part_id}"]["part_graph"]
+        )
+        csc_graph_path  = os.path.join(
+            os.path.dirname(orig_graph_path), "csc_sampling_graph.tar"
+        )
         graphbolt.save_csc_sampling_graph(csc_graph, csc_graph_path)
