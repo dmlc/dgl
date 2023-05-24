@@ -9,11 +9,11 @@ import pytest
 import torch as th
 from dgl import function as fn
 from dgl.distributed import (
+    convert_dgl_partition_to_csc_sampling_graph,
     load_partition,
     load_partition_book,
     load_partition_feats,
     partition_graph,
-    convert_dgl_partition_to_csc_sampling_graph
 )
 from dgl.distributed.graph_partition_book import (
     _etype_tuple_to_str,
