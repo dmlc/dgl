@@ -1,6 +1,31 @@
+import backend as F
 import dgl
 
-import backend as F
+
+def get_nodes_by_ntype(nodes, ntype):
+    return dict((k, v) for k, v in nodes.items() if v["label"] == ntype)
+
+
+def get_edges_by_etype(edges, etype):
+    return [e for e in edges if e[2]["triples"] == etype]
+
+
+def check_attrs_for_nodes(nodes, attrs):
+    return all(v.keys() == attrs for v in nodes.values())
+
+
+def check_attr_values_for_nodes(nodes, attr_name, values):
+    return F.allclose(
+        F.stack([v[attr_name] for v in nodes.values()], 0), values
+    )
+
+
+def check_attrs_for_edges(edges, attrs):
+    return all(e[2].keys() == attrs for e in edges)
+
+
+def check_attr_values_for_edges(edges, attr_name, values):
+    return F.allclose(F.stack([e[2][attr_name] for e in edges], 0), values)
 
 
 def test_to_networkx():
@@ -32,15 +57,15 @@ def test_to_networkx():
 
     nxg_nodes_by_label = {}
     for ntype in g.ntypes:
-        nxg_nodes_by_label[ntype] = dict((k, v) for k, v in nxg_nodes.items() if v["label"] == ntype)
+        nxg_nodes_by_label[ntype] = get_nodes_by_ntype(nxg_nodes, ntype)
         assert g.num_nodes(ntype) == len(nxg_nodes_by_label[ntype])
 
-    assert all(v.keys() == {"label", "n"} for v in nxg_nodes_by_label["game"].values())
-    assert F.allclose(F.stack([v["n"] for v in nxg_nodes_by_label["game"].values()], 0), n1)
-    assert all(v.keys() == {"label", "n"} for v in nxg_nodes_by_label["user"].values())
-    assert F.allclose(F.stack([v["n"] for v in nxg_nodes_by_label["user"].values()], 0), n2)
+    assert check_attrs_for_nodes(nxg_nodes_by_label["game"], {"label", "n"})
+    assert check_attr_values_for_nodes(nxg_nodes_by_label["game"], "n", n1)
+    assert check_attrs_for_nodes(nxg_nodes_by_label["user"], {"label", "n"})
+    assert check_attr_values_for_nodes(nxg_nodes_by_label["user"], "n", n2)
     # Nodes without node attributes
-    assert all(v.keys() == {"label"} for v in nxg_nodes_by_label["topic"].values())
+    assert check_attrs_for_nodes(nxg_nodes_by_label["topic"], {"label"})
 
     # Test edges
     nxg_edges = list(nxg.edges(data=True))
@@ -49,14 +74,23 @@ def test_to_networkx():
 
     nxg_edges_by_triples = {}
     for etype in g.canonical_etypes:
-        nxg_edges_by_triples[etype] = sorted(
-            [e for e in nxg_edges if e[2]["triples"] == etype], key=lambda el: el[2]["id"]
-        )
+        nxg_edges_by_triples[etype] = get_edges_by_etype(nxg_edges, etype)
         assert g.num_edges(etype) == len(nxg_edges_by_triples[etype])
 
-    assert all(e[2].keys() == {"id", "triples", "e"} for e in nxg_edges_by_triples[("user", "follows", "user")])
-    assert F.allclose(F.stack([e[2]["e"] for e in nxg_edges_by_triples[("user", "follows", "user")]], 0), e1)
-    assert all(e[2].keys() == {"id", "triples", "e"} for e in nxg_edges_by_triples[("user", "plays", "game")])
-    assert F.allclose(F.stack([e[2]["e"] for e in nxg_edges_by_triples[("user", "plays", "game")]], 0), e2)
+    assert check_attrs_for_edges(
+        nxg_edges_by_triples[("user", "follows", "user")],
+        {"id", "triples", "e"},
+    )
+    assert check_attr_values_for_edges(
+        nxg_edges_by_triples[("user", "follows", "user")], "e", e1
+    )
+    assert check_attrs_for_edges(
+        nxg_edges_by_triples[("user", "plays", "game")], {"id", "triples", "e"}
+    )
+    assert check_attr_values_for_edges(
+        nxg_edges_by_triples[("user", "plays", "game")], "e", e2
+    )
     # Edges without edge attributes
-    assert all(e[2].keys() == {"id", "triples"} for e in nxg_edges_by_triples[("user", "follows", "topic")])
+    assert check_attrs_for_edges(
+        nxg_edges_by_triples[("user", "follows", "topic")], {"id", "triples"}
+    )
