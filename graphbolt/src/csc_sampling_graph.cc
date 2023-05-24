@@ -65,12 +65,14 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
   archive.write("CSCSamplingGraph/magic_num", kCSCSamplingGraphSerializeMagic);
   archive.write("CSCSamplingGraph/indptr", indptr_);
   archive.write("CSCSamplingGraph/indices", indices_);
-  archive.write("CSCSamplingGraph/has_node_type_offset", !!node_type_offset_);
+  archive.write(
+      "CSCSamplingGraph/has_node_type_offset", node_type_offset_.has_value());
   if (node_type_offset_) {
     archive.write(
         "CSCSamplingGraph/node_type_offset", node_type_offset_.value());
   }
-  archive.write("CSCSamplingGraph/has_type_per_edge", !!type_per_edge_);
+  archive.write(
+      "CSCSamplingGraph/has_type_per_edge", type_per_edge_.has_value());
   if (type_per_edge_) {
     archive.write("CSCSamplingGraph/type_per_edge", type_per_edge_.value());
   }
