@@ -29,11 +29,12 @@ inline DecorateName(const std::string& name) {
 }
 
 SharedMemory::SharedMemory(const std::string& name)
-    : name_(name), size_(0), ptr_(nullptr), is_creator_(false) {
+    : name_(name), size_(0), ptr_(nullptr) {
 #ifdef _WIN32
   this->handle_ = nullptr;
 #else   // _WIN32
   this->file_descriptor_ = -1;
+  this->is_creator_ = false;
 #endif  // _WIN32
 }
 
