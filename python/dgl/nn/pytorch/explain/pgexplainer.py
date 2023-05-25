@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .... import to_homogeneous, ETYPE
+from .... import ETYPE, to_homogeneous
 
 __all__ = ["PGExplainer", "HeteroPGExplainer"]
 
@@ -418,29 +418,28 @@ class HeteroPGExplainer(nn.Module):
 
     def set_masks(self, graph, edge_mask=None):
         r"""Set the edge mask that plays a crucial role to explain the
-        prediction made by the GNN for a graph. Initialize learnable edge
-        mask if it is None.
+        prediction made by the GNN for a homogenous graph. Initialize learnable
+        edge mask if it is None.
 
         Parameters
         ----------
         graph : DGLGraph
             A homogenous graph.
-        feat : Tensor
-            The input feature of shape :math:`(N, D)`. :math:`N` is the
-            number of nodes, and :math:`D` is the feature size.
         edge_mask : Tensor, optional
             Learned importance mask of the edges in the graph, which is a tensor
             of shape :math:`(E)`, where :math:`E` is the number of edges in the
             graph. The values are within range :math:`(0, 1)`. The higher,
             the more important. Default: None.
         """
-        num_nodes = graph.num_nodes()
-        num_edges = graph.num_edges()
-
-        init_bias = self.init_bias
-        std = nn.init.calculate_gain("relu") * math.sqrt(2.0 / (2 * num_nodes))
-
         if edge_mask is None:
+            num_nodes = graph.num_nodes()
+            num_edges = graph.num_edges()
+
+            init_bias = self.init_bias
+            std = nn.init.calculate_gain("relu") * math.sqrt(
+                2.0 / (2 * num_nodes)
+            )
+
             self.edge_mask = torch.randn(num_edges) * std + init_bias
         else:
             self.edge_mask = edge_mask
@@ -552,8 +551,7 @@ class HeteroPGExplainer(nn.Module):
         return gate_inputs
 
     def train_step(self, graph, feat, tmp, **kwargs):
-        r"""Training the explanation network by gradient descent(GD)
-        using Adam optimizer
+        r"""Compute the loss of the explanation network
 
         Parameters
         ----------
@@ -583,6 +581,7 @@ class HeteroPGExplainer(nn.Module):
             graph, feat, tmp=tmp, training=True, **kwargs
         )
 
+        # store edge mask in homogeneous format
         self.edge_mask = torch.concat([mask for mask in edge_mask.values()])
 
         loss_tmp = self.loss(prob, pred)
@@ -617,72 +616,13 @@ class HeteroPGExplainer(nn.Module):
             in the dataset, and :math:`B` is the batch size.
         dict[str, Tensor]
             A dict mapping edge types (keys) to edge tensors (values) of shape :math:`(E_t)`,
-            where :math:`E_t` is the number of edges in the graph for edge tpye :math:`t`.
+            where :math:`E_t` is the number of edges in the graph for edge type :math:`t`.
             A higher weight suggests a larger contribution of the edge.
 
         Examples
         --------
 
-        >>> import torch as th
-        >>> import torch.nn as nn
-        >>> import dgl
-        >>> from dgl.data import GINDataset
-        >>> from dgl.dataloading import GraphDataLoader
-        >>> from dgl.nn import GraphConv, PGExplainer
-        >>> import numpy as np
-
-        >>> # Define the model
-        >>> class Model(nn.Module):
-        ...     def __init__(self, in_feats, out_feats):
-        ...         super().__init__()
-        ...         self.conv = GraphConv(in_feats, out_feats)
-        ...         self.fc = nn.Linear(out_feats, out_feats)
-        ...         nn.init.xavier_uniform_(self.fc.weight)
-        ...
-        ...     def forward(self, g, h, embed=False, edge_weight=None):
-        ...         h = self.conv(g, h, edge_weight=edge_weight)
-        ...         if not embed:
-        ...             g.ndata['h'] = h
-        ...             hg = dgl.mean_nodes(g, 'h')
-        ...             return self.fc(hg)
-        ...         else:
-        ...             return h
-
-        >>> # Load dataset
-        >>> data = GINDataset('MUTAG', self_loop=True)
-        >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
-
-        >>> # Train the model
-        >>> feat_size = data[0][0].ndata['attr'].shape[1]
-        >>> model = Model(feat_size, data.gclasses)
-        >>> criterion = nn.CrossEntropyLoss()
-        >>> optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
-        >>> for bg, labels in dataloader:
-        ...     preds = model(bg, bg.ndata['attr'])
-        ...     loss = criterion(preds, labels)
-        ...     optimizer.zero_grad()
-        ...     loss.backward()
-        ...     optimizer.step()
-
-        >>> # Initialize the explainer
-        >>> explainer = PGExplainer(model, data.gclasses)
-
-        >>> # Train the explainer
-        >>> # Define explainer temperature parameter
-        >>> init_tmp, final_tmp = 5.0, 1.0
-        >>> optimizer_exp = th.optim.Adam(explainer.parameters(), lr=0.01)
-        >>> for epoch in range(20):
-        ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
-        ...     for bg, labels in dataloader:
-        ...          loss = explainer.train_step(bg, bg.ndata['attr'], tmp)
-        ...          optimizer_exp.zero_grad()
-        ...          loss.backward()
-        ...          optimizer_exp.step()
-
-        >>> # Explain the prediction for graph 0
-        >>> graph, l = data[0]
-        >>> graph_feat = graph.ndata.pop("attr")
-        >>> probs, edge_weight = explainer.explain_graph(graph, graph_feat)
+        >>>
         """
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
@@ -710,6 +650,7 @@ class HeteroPGExplainer(nn.Module):
         self.clear_masks()
         self.set_masks(g_homo, edge_mask_homo)
 
+        # convert the edge mask back into heterogeneous format
         edge_mask = {
             etype: edge_mask_homo[
                 (g_homo.edata[ETYPE] == graph.get_etype_id(etype))
