@@ -8,7 +8,9 @@ import time
 import numpy as np
 import torch
 
-from .. import backend as F, graphbolt
+from .. import backend as F
+if F.backend_name == "pytorch":
+    from .. import graphbolt
 from ..base import DGLError, EID, ETYPE, NID, NTYPE
 from ..convert import to_homogeneous
 from ..data.utils import load_graphs, load_tensors, save_graphs, save_tensors
