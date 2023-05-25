@@ -111,7 +111,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Extract induced subgraph of given nodes.
    * @param nodes Type agnostic node IDs to form the subgraph.
    *
-   * @return CSCSamplingGraph.
+   * @return SampledSubgraph.
    */
   c10::intrusive_ptr<SampledSubgraph> InSubgraph(
       const torch::Tensor& nodes) const;
