@@ -582,7 +582,7 @@ class HeteroPGExplainer(nn.Module):
         )
 
         # store edge mask in homogeneous format
-        self.edge_mask = torch.concat([mask for mask in edge_mask.values()])
+        self.edge_mask = torch.concat(list(edge_mask.values()))
 
         loss_tmp = self.loss(prob, pred)
         return loss_tmp
@@ -628,7 +628,7 @@ class HeteroPGExplainer(nn.Module):
         self.elayers = self.elayers.to(graph.device)
 
         embed = self.model(graph, feat, embed=True, **kwargs)
-        embed_flat = torch.concat([e_embed for e_embed in embed.values()])
+        embed_flat = torch.concat(list(embed.values()))
 
         g_homo = to_homogeneous(graph, store_type=True)
 
