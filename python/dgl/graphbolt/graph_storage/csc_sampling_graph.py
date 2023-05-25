@@ -172,7 +172,7 @@ class CSCSamplingGraph:
 
     def sample_etype_neighbors(
         self,
-        nodes,
+        seed_nodes,
         fanouts,
         probs=None,
         replace=False,
@@ -184,7 +184,7 @@ class CSCSamplingGraph:
 
         Parameters
         ----------
-        nodes : tensor
+        seed_nodes : tensor
             Node IDs to sample neighbors from.
 
             A 1D tensor containing seed nodes to be sampled from.
@@ -202,17 +202,20 @@ class CSCSamplingGraph:
             (|sampled edges|,), containing all mapped original edge ids.
 
         """
+        if not torch.is_tensor(seed_nodes) or not seed_nodes.ndim == 1:
+            raise TypeError("The seed_nodes should be a 1D tensor")
         if self.metadata and self.metadata.edge_type_to_id:
             assert len(self.metadata.edge_type_to_id) == len(fanouts), "fanouts should have same length as edge types."
-        if not torch.is_tensor(fanouts):
-            assert fanouts.dim == 1
-            raise TypeError("The fanout should be a tensor")
-        if probs:
-            assert probs.dim == 1
-            assert probs.shape[0] == self.indices.shape[0]
+        if not torch.is_tensor(fanouts) or not fanouts.ndim == 1:
+            raise TypeError("The fanout should be a 1D tensor")
+        assert torch.all((fanouts >= 0) | (fanouts== -1)), "fanouts value should be -1 or >= 0."
+        if probs is not None:
+            assert probs.ndim == 1, "probs should be a 1D tensor."
+            assert probs.shape[0] == self.indices.shape[0],  "probs should have same length as edges."
         return self._c_csc_graph.sample_etype_neighbors(
-            nodes, fanouts, replace, return_eids, probs
+            seed_nodes, fanouts, replace, return_eids, probs
         )
+
 def from_csc(
     csc_indptr: torch.Tensor,
     indices: torch.Tensor,

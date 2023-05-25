@@ -77,7 +77,7 @@ RowWisePickPerEtype(
         int64_t sampled_num_this_thread = 0;
         for (size_t i = b; i < e; ++i) {
           const auto rid = rows[i].item<int64_t>();
-
+          TORCH_CHECK(rid >= 0 && rid < graph->NumNodes());
           const auto off = indptr[rid].item<int64_t>();
           const auto len = indptr[rid + 1].item<int64_t>() - off;
 

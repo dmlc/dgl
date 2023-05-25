@@ -63,5 +63,6 @@ def random_graph_with_fixed_neighbors(num_nodes, neighbors_per_etype, num_ntypes
     )[0]
     node_type_offset[0] = 0
     node_type_offset[-1] = num_nodes
-    return gb.from_csc(csc_indptr, indices, node_type_offset, type_per_edge)
+    metadata = get_metadata(num_ntypes, num_etypes)
+    return gb.from_csc(csc_indptr, indices, node_type_offset, type_per_edge, metadata)
     
