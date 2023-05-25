@@ -67,7 +67,7 @@ class SharedMemory {
    * @param name The name of the shared memory.
    * @return True if the shared memory exists, otherwise False.
    */
-  static bool Exists(const std::string &name);
+  static bool Exists(const std::string& name);
 
  private:
   /** @brief The name of the shared memory. */
@@ -85,14 +85,14 @@ class SharedMemory {
   size_t size_;
 
   /** @brief The pointer of the shared memory. */
-  void *ptr_;
+  void* ptr_;
 
 #ifdef _WIN32
 
   /** @brief The handle of the shared memory object. */
   HANDLE handle_;
 
-#else   // _WIN32
+#else  // _WIN32
 
   /** @brief The file descriptor of the shared memory object. */
   int file_descriptor_;

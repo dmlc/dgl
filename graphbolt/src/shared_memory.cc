@@ -19,10 +19,13 @@ namespace sampling {
 
 // Two processes opening the same path are guaranteed to access the same shared
 // memory object if and only if path begins with a slash (`/') character.
-constexpr char kSharedMemNamePrefix[] = "/" "dgl.graphbolt.";
+constexpr char kSharedMemNamePrefix[] =
+    "/"
+    "dgl.graphbolt.";
 constexpr char kSharedMemNameSuffix[] = ".lock";
 
-SharedMemory::SharedMemory(const std::string& name) : name_(name), size_(0), ptr_(nullptr), is_creator_(false) {
+SharedMemory::SharedMemory(const std::string& name)
+    : name_(name), size_(0), ptr_(nullptr), is_creator_(false) {
   decorated_name_ = kSharedMemNamePrefix + name + kSharedMemNameSuffix;
 #ifdef _WIN32
   this->handle_ = nullptr;
@@ -38,7 +41,7 @@ SharedMemory::~SharedMemory() {
   if (handle_) CloseHandle(handle_);
 }
 
-void *SharedMemory::Create(size_t size) {
+void* SharedMemory::Create(size_t size) {
   size_ = size;
 
   handle_ = CreateFileMapping(
@@ -55,10 +58,11 @@ void *SharedMemory::Create(size_t size) {
   return ptr_;
 }
 
-void *SharedMemory::Open(size_t size) {
+void* SharedMemory::Open(size_t size) {
   size_ = size;
 
-  handle_ = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, decorated_name_.c_str());
+  handle_ =
+      OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, decorated_name_.c_str());
   TORCH_CHECK(
       handle_ != nullptr, "fail to open ", decorated_name_,
       ", Win32 Error: ", GetLastError());
@@ -78,7 +82,7 @@ static bool SharedMemory::Exists(const std::string& name) {
   return exists;
 }
 
-#else   // _WIN32
+#else  // _WIN32
 
 SharedMemory::~SharedMemory() {
   if (ptr_ && size_ != 0) CHECK(munmap(ptr_, size_) != -1) << strerror(errno);
@@ -92,13 +96,15 @@ void *SharedMemory::Create(size_t size) {
 
   // TODO(zhenkun): handle the error properly if the shared memory object
   // already exists.
-  file_descriptor_ = shm_open(decorated_name_.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+  file_descriptor_ =
+      shm_open(decorated_name_.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   TORCH_CHECK(file_descriptor_ != -1, "Fail to open : ", strerror(errno));
 
   auto status = ftruncate(file_descriptor_, size);
   TORCH_CHECK(status != -1, "Failed to truncate the file: ", strerror(errno));
 
-  ptr_ = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, file_descriptor_, 0);
+  ptr_ =
+      mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, file_descriptor_, 0);
   TORCH_CHECK(
       ptr_ != MAP_FAILED,
       "Failed to map shared memory. mmap failed with error ", strerror(errno));
@@ -108,10 +114,14 @@ void *SharedMemory::Create(size_t size) {
 void *SharedMemory::Open(size_t size) {
   size_ = size;
 
-  file_descriptor_ = shm_open(decorated_name_.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
-  TORCH_CHECK(file_descriptor_ != -1, "fail to open ", decorated_name_, ": ", strerror(errno));
+  file_descriptor_ =
+      shm_open(decorated_name_.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
+  TORCH_CHECK(
+      file_descriptor_ != -1, "fail to open ", decorated_name_, ": ",
+      strerror(errno));
 
-  ptr_ = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, file_descriptor_, 0);
+  ptr_ =
+      mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, file_descriptor_, 0);
   TORCH_CHECK(
       ptr_ != MAP_FAILED,
       "Failed to map shared memory. mmap failed with error ", strerror(errno));
