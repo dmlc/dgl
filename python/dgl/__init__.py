@@ -25,9 +25,6 @@ from . import (
     sampling,
     storages,
 )
-
-if backend_name == "pytorch":
-    from . import distributed
 from ._ffi.base import __version__, DGLError
 from ._ffi.function import (
     extract_ext_funcs,
@@ -66,3 +63,6 @@ from .frame import LazyFeature
 from .global_config import is_libxsmm_enabled, use_libxsmm
 from .utils import apply_each
 from .mpops import *
+
+if backend_name == "pytorch":
+    from . import distributed
