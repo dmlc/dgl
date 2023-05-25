@@ -7,8 +7,6 @@
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
 #include <graphbolt/sampled_subgraph.h>
-#include <torch/custom_class.h>
-#include <torch/torch.h>
 
 #include <string>
 #include <vector>
