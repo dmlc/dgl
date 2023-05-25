@@ -6,6 +6,7 @@
 #ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
+#include <graphbolt/sampled_subgraph.h>
 #include <torch/custom_class.h>
 #include <torch/torch.h>
 
@@ -77,13 +78,11 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * which is usually used when edge features are required.
    * @param probs Optional tensor containing probabilities for sampling. Dtype
    * should be bool or float.
-   * @return A tuple containing the sampled coo graph with type information and
-   * their corresponding edge IDs (if required). The first one is an integer
-   * tensor of shape (3, |sampled edges|) where each subtensor represents
-   * 'rows', 'cols' and 'edge types',  the second is an integer tensor with
-   * shape (|sampled edges|,), containing all mapped original edge ids.
+   *
+   * @return A pointer to a SampledSubgraph object representing the sampled
+   * subgraph.
    */
-  std::tuple<torch::Tensor, torch::Tensor> SampleEtypeNeighbors(
+  c10::intrusive_ptr<SampledSubgraph> SampleEtypeNeighbors(
       torch::Tensor seed_nodes, torch::Tensor fanouts, bool replace,
       bool return_eids, const torch::optional<torch::Tensor>& probs);
 
