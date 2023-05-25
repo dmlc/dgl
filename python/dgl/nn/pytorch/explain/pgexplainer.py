@@ -622,7 +622,79 @@ class HeteroPGExplainer(nn.Module):
         Examples
         --------
 
-        >>>
+        >>> import dgl
+        >>> import torch as th
+        >>> import torch.nn as nn
+        >>> import numpy as np
+
+        >>> # Define the model
+        >>> class Model(nn.Module):
+        ...     def __init__(self, in_feats, hid_feats, out_feats, rel_names):
+        ...         super().__init__()
+        ...         self.conv = dgl.nn.HeteroGraphConv(
+        ...             {rel: dgl.nn.GraphConv(in_feats, hid_feats) for rel in rel_names},
+        ...             aggregate="sum",
+        ...         )
+        ...         self.fc = nn.Linear(hid_feats, out_feats)
+        ...         nn.init.xavier_uniform_(self.fc.weight)
+        ...
+        ...     def forward(self, g, h, embed=False, edge_weight=None):
+        ...         if edge_weight:
+        ...             mod_kwargs = {
+        ...                 etype: {"edge_weight": mask} for etype, mask in edge_weight.items()
+        ...             }
+        ...             h = self.conv(g, h, mod_kwargs=mod_kwargs)
+        ...         else:
+        ...             h = self.conv(g, h)
+        ...
+        ...         if embed:
+        ...             return h
+        ...
+        ...         with g.local_scope():
+        ...             g.ndata["h"] = h
+        ...             hg = 0
+        ...             for ntype in g.ntypes:
+        ...                 hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
+        ...             return th.sigmoid(self.fc(hg))
+
+        >>> # Load dataset
+        >>> input_dim = 5
+        >>> hidden_dim = 5
+        >>> num_classes = 2
+        >>> g = dgl.heterograph({("user", "plays", "game"): ([0, 1, 1, 2], [0, 0, 1, 1])})
+        >>> g.nodes["user"].data["h"] = th.randn(g.num_nodes("user"), input_dim)
+        >>> g.nodes["game"].data["h"] = th.randn(g.num_nodes("game"), input_dim)
+
+        >>> transform = dgl.transforms.AddReverse()
+        >>> g = transform(g)
+
+        >>> # define and train the model
+        >>> model = Model(input_dim, hidden_dim, num_classes, g.canonical_etypes)
+        >>> optimizer = th.optim.Adam(model.parameters())
+        >>> for epoch in range(10):
+        ...     logits = model(g, g.ndata["h"])
+        ...     loss = th.nn.functional.cross_entropy(logits, th.tensor([1]))
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
+
+        >>> # Initialize the explainer
+        >>> explainer = dgl.nn.HeteroPGExplainer(model, hidden_dim)
+
+        >>> # Train the explainer
+        >>> # Define explainer temperature parameter
+        >>> init_tmp, final_tmp = 5.0, 1.0
+        >>> optimizer_exp = th.optim.Adam(explainer.parameters(), lr=0.01)
+        >>> for epoch in range(20):
+        ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
+        ...     loss = explainer.train_step(g, g.ndata["h"], tmp)
+        ...     optimizer_exp.zero_grad()
+        ...     loss.backward()
+        ...     optimizer_exp.step()
+
+        >>> # Explain the graph
+        >>> feat = g.ndata.pop("h")
+        >>> probs, edge_mask = explainer.explain_graph(g, feat)
         """
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
