@@ -18,7 +18,7 @@ namespace sampling {
  *
  * Example usage:
  *
- * Suppose the subgraph has 3 nodes and 9 edges.
+ * Suppose the subgraph has 3 nodes and 4 edges.
  * ```
  * auto indptr = torch::tensor({0, 2, 3, 4}, {torch::kInt64});
  * auto indices = torch::tensor({55, 101, 3, 3}, {torch::kInt64});
