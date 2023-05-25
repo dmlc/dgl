@@ -19,13 +19,15 @@ from . import (
     container,
     cuda,
     dataloading,
-    distributed,
     function,
     ops,
     random,
     sampling,
     storages,
 )
+
+if backend_name == "pytorch":
+    from . import distributed
 from ._ffi.base import __version__, DGLError
 from ._ffi.function import (
     extract_ext_funcs,
