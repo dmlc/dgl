@@ -54,7 +54,7 @@ void* SharedMemory::Create(size_t size) {
       static_cast<DWORD>(size >> 32), static_cast<DWORD>(size & 0xFFFFFFFF),
       decorated_name.c_str());
   TORCH_CHECK(
-      handle_ != nullptr, "fail to open ", decorated_name,
+      handle_ != nullptr, "Failed to open ", decorated_name,
       ", Win32 error: ", GetLastError());
 
   ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size);
@@ -69,7 +69,7 @@ void* SharedMemory::Open(size_t size) {
   std::string decorated_name = DecorateName(name_);
   handle_ = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, decorated_name.c_str());
   TORCH_CHECK(
-      handle_ != nullptr, "fail to open ", decorated_name,
+      handle_ != nullptr, "Failed to open ", decorated_name,
       ", Win32 Error: ", GetLastError());
 
   ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size);
@@ -108,7 +108,7 @@ void *SharedMemory::Create(size_t size) {
   std::string decorated_name = DecorateName(name_);
   file_descriptor_ =
       shm_open(decorated_name.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  TORCH_CHECK(file_descriptor_ != -1, "Fail to open : ", strerror(errno));
+  TORCH_CHECK(file_descriptor_ != -1, "Failed to open: ", strerror(errno));
 
   auto status = ftruncate(file_descriptor_, size);
   TORCH_CHECK(status != -1, "Failed to truncate the file: ", strerror(errno));
@@ -117,7 +117,7 @@ void *SharedMemory::Create(size_t size) {
       mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, file_descriptor_, 0);
   TORCH_CHECK(
       ptr_ != MAP_FAILED,
-      "Failed to map shared memory. mmap failed with error ", strerror(errno));
+      "Failed to map shared memory, mmap failed with error: ", strerror(errno));
   return ptr_;
 }
 
@@ -128,14 +128,14 @@ void *SharedMemory::Open(size_t size) {
   file_descriptor_ =
       shm_open(decorated_name.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
   TORCH_CHECK(
-      file_descriptor_ != -1, "fail to open ", decorated_name, ": ",
+      file_descriptor_ != -1, "Failed to open ", decorated_name, ": ",
       strerror(errno));
 
   ptr_ =
       mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, file_descriptor_, 0);
   TORCH_CHECK(
       ptr_ != MAP_FAILED,
-      "Failed to map shared memory. mmap failed with error ", strerror(errno));
+      "Failed to map shared memory, mmap failed with error: ", strerror(errno));
   return ptr_;
 }
 
