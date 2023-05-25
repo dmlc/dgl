@@ -11,6 +11,7 @@
 #include <windows.h>
 #endif  // _WIN32
 
+#include <memory>
 #include <string>
 
 namespace graphbolt {
@@ -99,6 +100,8 @@ class SharedMemory {
 
 #endif  // _WIN32
 };
+
+using SharedMemoryPtr = std::unique_ptr<SharedMemory>;
 
 }  // namespace sampling
 }  // namespace graphbolt
