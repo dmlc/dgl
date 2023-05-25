@@ -194,6 +194,24 @@ class CSCSamplingGraph:
         ), "Nodes cannot have duplicate values."
         return self._c_csc_graph.in_subgraph(nodes)
 
+    def copy_to_shared_memory(self, shared_memory_name: str):
+        """Copy the graph to shared memory.
+
+        Parameters
+        ----------
+        shared_memory_name : str
+            Name of the shared memory.
+
+        Returns
+        -------
+        CSCSamplingGraph
+            The copied CSCSamplingGraph object on shared memory.
+        """
+        return CSCSamplingGraph(
+            self._c_csc_graph.copy_to_shared_memory(shared_memory_name),
+            self._metadata,
+        )
+
 
 def from_csc(
     csc_indptr: torch.Tensor,
@@ -247,6 +265,28 @@ def from_csc(
         torch.ops.graphbolt.from_csc(
             csc_indptr, indices, node_type_offset, type_per_edge
         ),
+        metadata,
+    )
+
+
+def load_from_shared_memory(
+    shared_memory_name: str,
+    metadata: Optional[GraphMetadata] = None,
+) -> CSCSamplingGraph:
+    """Load a CSCSamplingGraph object from shared memory.
+
+    Parameters
+    ----------
+    shared_memory_name : str
+        Name of the shared memory.
+
+    Returns
+    -------
+    CSCSamplingGraph
+        The loaded CSCSamplingGraph object on shared memory.
+    """
+    return CSCSamplingGraph(
+        torch.ops.graphbolt.load_from_shared_memory(shared_memory_name),
         metadata,
     )
 

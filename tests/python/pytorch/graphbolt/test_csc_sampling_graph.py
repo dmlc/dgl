@@ -212,6 +212,19 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
         )
 
 
+def check_tensors_on_the_same_shared_memory(t: torch.Tensor, t2: torch.Tensor):
+    """Check if two tensors are on the same shared memory.
+
+    Cannot use `.data_ptr()` here because the memory created by different
+    SharedMemory objects have different pointers.
+    """
+    old_t1 = t.clone()
+    v = torch.randint_like(t, 100)
+    t[:] = v
+    assert torch.equal(t, t2)
+    t[:] = old_t1
+
+
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
@@ -383,3 +396,104 @@ def test_in_subgraph_heterogeneous():
     assert torch.equal(
         in_subgraph.type_per_edge, torch.LongTensor([2, 2, 1, 3, 1, 3, 3])
     )
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
+)
+@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+def test_homo_graph_on_shared_memory(num_nodes, num_edges):
+    csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
+    graph = gb.from_csc(csc_indptr, indices)
+
+    shm_name = "test_homo_g"
+    graph1 = graph.copy_to_shared_memory(shm_name)
+    graph2 = gb.load_from_shared_memory(shm_name, graph.metadata)
+
+    assert graph1.num_nodes == num_nodes
+    assert graph1.num_nodes == num_nodes
+    assert graph2.num_edges == num_edges
+    assert graph2.num_edges == num_edges
+
+    # Test the value of graph1 is correct
+    assert torch.equal(graph1.csc_indptr, csc_indptr)
+    assert torch.equal(graph1.indices, indices)
+
+    # Test the value of graph2 is correct
+    assert torch.equal(graph2.csc_indptr, csc_indptr)
+    assert torch.equal(graph2.indices, indices)
+
+    # Test the memory of graph1 and graph2 is on shared memory
+    check_tensors_on_the_same_shared_memory(
+        graph1.csc_indptr, graph2.csc_indptr
+    )
+    check_tensors_on_the_same_shared_memory(graph1.indices, graph2.indices)
+
+    assert graph1.metadata is None and graph2.metadata is None
+    assert graph1.node_type_offset is None and graph2.node_type_offset is None
+    assert graph1.type_per_edge is None and graph2.type_per_edge is None
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
+)
+@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+def test_hetero_graph_on_shared_memory(
+    num_nodes, num_edges, num_ntypes, num_etypes
+):
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    graph = gb.from_csc(
+        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+    )
+
+    shm_name = "test_hetero_g"
+    graph1 = graph.copy_to_shared_memory(shm_name)
+    graph2 = gb.load_from_shared_memory(shm_name, graph.metadata)
+
+    assert graph1.num_nodes == num_nodes
+    assert graph1.num_nodes == num_nodes
+    assert graph2.num_edges == num_edges
+    assert graph2.num_edges == num_edges
+
+    # Test the value of graph1 is correct
+    assert torch.equal(graph1.csc_indptr, csc_indptr)
+    assert torch.equal(graph1.indices, indices)
+    assert torch.equal(graph1.node_type_offset, node_type_offset)
+    assert torch.equal(graph1.type_per_edge, type_per_edge)
+
+    # Test the value of graph2 is correct
+    assert torch.equal(graph2.csc_indptr, csc_indptr)
+    assert torch.equal(graph2.indices, indices)
+    assert torch.equal(graph2.node_type_offset, node_type_offset)
+    assert torch.equal(graph2.type_per_edge, type_per_edge)
+
+    # Test the memory of graph1 and graph2 is on shared memory
+    check_tensors_on_the_same_shared_memory(
+        graph1.csc_indptr, graph2.csc_indptr
+    )
+    check_tensors_on_the_same_shared_memory(graph1.indices, graph2.indices)
+    check_tensors_on_the_same_shared_memory(
+        graph1.node_type_offset, graph2.node_type_offset
+    )
+    check_tensors_on_the_same_shared_memory(
+        graph1.type_per_edge, graph2.type_per_edge
+    )
+
+    assert metadata.node_type_to_id == graph1.metadata.node_type_to_id
+    assert metadata.edge_type_to_id == graph1.metadata.edge_type_to_id
+    assert metadata.node_type_to_id == graph2.metadata.node_type_to_id
+    assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
