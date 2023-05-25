@@ -18,7 +18,7 @@ namespace graphbolt {
 namespace sampling {
 
 // Two processes opening the same path are guaranteed to access the same shared
-// memory object if and only if path begins with a slash (`/') character.
+// memory object if and only if path begins with a slash ('/') character.
 constexpr char kSharedMemNamePrefix[] = "/dgl.graphbolt.";
 constexpr char kSharedMemNameSuffix[] = ".lock";
 
