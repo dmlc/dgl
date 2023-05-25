@@ -78,12 +78,14 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
   }
 }
 
-c10::intrusive_ptr<sampling::CSCSamplingGraph> CSCSamplingGraph::InSubgraph(
+c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
     const torch::Tensor& nodes) const {
+  using namespace torch::indexing;
   const int32_t kDefaultGrainSize = 100;
   torch::Tensor indptr = torch::zeros_like(indptr_);
   const size_t num_seeds = nodes.size(0);
   std::vector<torch::Tensor> indices_arr(num_seeds);
+  std::vector<torch::Tensor> edge_ids_arr(num_seeds);
   std::vector<torch::Tensor> type_per_edge_arr(num_seeds);
   torch::parallel_for(
       0, num_seeds, kDefaultGrainSize, [&](size_t start, size_t end) {
@@ -93,6 +95,7 @@ c10::intrusive_ptr<sampling::CSCSamplingGraph> CSCSamplingGraph::InSubgraph(
           const int64_t end_idx = indptr_[node_id + 1].item<int64_t>();
           indptr[node_id + 1] = end_idx - start_idx;
           indices_arr[i] = indices_.slice(0, start_idx, end_idx);
+          edge_ids_arr[i] = torch::arange(start_idx, end_idx);
           if (type_per_edge_) {
             type_per_edge_arr[i] =
                 type_per_edge_.value().slice(0, start_idx, end_idx);
@@ -100,8 +103,13 @@ c10::intrusive_ptr<sampling::CSCSamplingGraph> CSCSamplingGraph::InSubgraph(
         }
       });
 
-  return FromCSC(
-      indptr.cumsum(0), torch::cat(indices_arr), node_type_offset_,
+  const auto& nonzero_idx = torch::nonzero(indptr).reshape(-1);
+  torch::Tensor compact_indptr =
+      torch::zeros({nonzero_idx.size(0) + 1}, indptr_.dtype());
+  compact_indptr.index_put_({Slice(1, None)}, indptr.index({nonzero_idx}));
+  return c10::make_intrusive<SampledSubgraph>(
+      compact_indptr.cumsum(0), torch::cat(indices_arr), nonzero_idx,
+      torch::arange(0, NumNodes()), torch::cat(edge_ids_arr),
       type_per_edge_
           ? torch::optional<torch::Tensor>{torch::cat(type_per_edge_arr)}
           : torch::nullopt);

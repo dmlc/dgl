@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include "sampled_subgraph.h"
+
 namespace graphbolt {
 namespace sampling {
 
@@ -111,7 +113,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    *
    * @return CSCSamplingGraph.
    */
-  c10::intrusive_ptr<sampling::CSCSamplingGraph> InSubgraph(
+  c10::intrusive_ptr<SampledSubgraph> InSubgraph(
       const torch::Tensor& nodes) const;
 
  private:
