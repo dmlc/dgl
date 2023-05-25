@@ -67,9 +67,11 @@ RangePickFn GetRangePickFn(
   bool all_fanout_zero = (fanouts == 0).all().item<bool>();
   torch::Tensor picked_row_ptr, picked_cols, picked_etypes, picked_eids;
   torch::optional<torch::Tensor> picked_eids_or_null = torch::nullopt;
+  if (return_eids) picked_eids_or_null = torch::tensor({}, indptr_.options());
+  
   if (num_nodes == 0 || all_fanout_zero) {
     // Empty graph
-    picked_row_ptr = torch::tensor({0}, indptr_.options());
+    picked_row_ptr = torch::zeros({num_nodes + 1}, indptr_.options());
     picked_cols = torch::tensor({}, indices_.options());
     picked_etypes = torch::tensor({}, type_per_edge_.value().options());
   } else {
