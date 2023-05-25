@@ -82,7 +82,7 @@ RangePickFn GetRangePickFn(
     if (return_eids) picked_eids_or_null = picked_eids;
   }
   return c10::make_intrusive<SampledSubgraph>(
-      picked_row_ptr, picked_cols, seed_nodes, torch::nullopt, picked_eids_or_null, node_type_offset_, picked_etypes);
+      picked_row_ptr, picked_cols, seed_nodes, torch::nullopt, picked_eids_or_null, picked_etypes);
  
 }
 

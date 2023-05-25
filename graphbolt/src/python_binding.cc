@@ -5,6 +5,7 @@
  */
 
 #include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/serialize.h>
 
 namespace graphbolt {
 namespace sampling {
@@ -27,6 +28,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("type_per_edge", &CSCSamplingGraph::TypePerEdge)
       .def("sample_etype_neighbors", &CSCSamplingGraph::SampleEtypeNeighbors);
   m.def("from_csc", &CSCSamplingGraph::FromCSC);
+  m.def("load_csc_sampling_graph", &LoadCSCSamplingGraph);
+  m.def("save_csc_sampling_graph", &SaveCSCSamplingGraph);
 }
 
 }  // namespace sampling
