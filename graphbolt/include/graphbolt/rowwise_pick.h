@@ -7,8 +7,8 @@
 #ifndef GRAPHBOLT_ROWWISE_PICK_H_
 #define GRAPHBOLT_ROWWISE_PICK_H_
 
-#include <graphbolt/utils.h>
 #include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/utils.h>
 
 using namespace graphbolt::utils;
 
@@ -73,7 +73,6 @@ RowWisePickPerEtype(
 
   torch::parallel_for(
       0, num_rows, kDefaultPickGrainSize, [&](size_t b, size_t e) {
-        std::cout << "start parallel" << std::endl;
         int64_t sampled_num_this_thread = 0;
         for (size_t i = b; i < e; ++i) {
           const auto rid = rows[i].item<int64_t>();
@@ -84,7 +83,7 @@ RowWisePickPerEtype(
           if (len == 0) continue;
 
           torch::Tensor picked_indices_this_row;
-          // fast path
+          // Fast path.
           if ((pick_all || len <= min_num_pick) && !replace) {
             picked_indices_this_row =
                 torch::arange(off, off + len, indptr.options());
@@ -106,16 +105,16 @@ RowWisePickPerEtype(
 
               if ((j + 1 == len) ||
                   cur_et != type_per_edge_accessor[off + j + 1]) {
-                // 1 end of the current etype
-                // 2 end of the row
-                // random pick for current etype
+                // 1 end of the current etype.
+                // 2 end of the row.
+                // Random pick for current etype.
                 if (cur_num_pick != 0) {
                   torch::Tensor picked_indices;
                   int64_t et_end = off + j + 1;
                   int64_t et_start = et_end - et_len;
                   if ((cur_num_pick == -1) ||
                       (et_len <= cur_num_pick && !replace)) {
-                    // fast path
+                    // Fast path.
                     picked_indices =
                         torch::arange(et_start, et_end, indptr.options());
                     if (has_probs) {
@@ -143,7 +142,7 @@ RowWisePickPerEtype(
           }
 
           sampled_num_this_thread += picked_indices_this_row.size(0);
-          picked_num_per_row[i+1] = sampled_num_this_thread;
+          picked_num_per_row[i + 1] = sampled_num_this_thread;
           picked_cols_per_row[i] =
               torch::index_select(indices, 0, picked_indices_this_row);
           picked_etypes_per_row[i] =
@@ -153,22 +152,22 @@ RowWisePickPerEtype(
 
         block_offset[torch::get_thread_num() + 1] = sampled_num_this_thread;
       });
-  
+
   if (thread_num > 1) {
     // Get ExclusiveSum of each block.
     std::partial_sum(
         block_offset.begin() + 1, block_offset.end(), block_offset.begin() + 1);
-    
-    torch::parallel_for(0, num_rows, kDefaultPickGrainSize, [&](int64_t b, int64_t e) {
-      auto tid = omp_get_thread_num();
-      auto off = block_offset[tid];
-      for (int64_t i = b; i < e; i++) {
-        picked_num_per_row[i+1] += off;
-      }
-    });
+
+    torch::parallel_for(
+        0, num_rows, kDefaultPickGrainSize, [&](int64_t b, int64_t e) {
+          auto tid = omp_get_thread_num();
+          auto off = block_offset[tid];
+          for (int64_t i = b; i < e; i++) {
+            picked_num_per_row[i + 1] += off;
+          }
+        });
   }
 
-  // TODO : make cat per thread
   torch::Tensor picked_rows =
       torch::tensor(picked_num_per_row, {indices.dtype()});
   torch::Tensor picked_cols = torch::cat(picked_cols_per_row);
