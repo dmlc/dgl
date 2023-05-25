@@ -51,3 +51,17 @@ def csc_to_coo(csc_indptr, indices):
     col = torch.repeat_interleave(col, node_num[col])
     return torch.stack([indices, col])
 
+
+def random_graph_with_fixed_neighbors(num_nodes, neighbors_per_etype, num_ntypes, num_etypes):
+    neighbors_per_node = num_etypes * neighbors_per_etype
+    csc_indptr = torch.arange((num_nodes+1)) * neighbors_per_node
+    num_edges = num_nodes * neighbors_per_node
+    indices = torch.randint(0, num_nodes, (num_edges,))
+    type_per_edge = torch.arange(num_etypes).repeat_interleave(neighbors_per_etype).repeat(num_nodes)
+    node_type_offset = torch.sort(
+        torch.randint(0, num_nodes, (num_ntypes + 1,))
+    )[0]
+    node_type_offset[0] = 0
+    node_type_offset[-1] = num_nodes
+    return gb.from_csc(csc_indptr, indices, node_type_offset, type_per_edge)
+    

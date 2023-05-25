@@ -157,7 +157,18 @@ class CSCSamplingGraph:
             If present, returns a 1D integer tensor of shape (num_edges,)
             containing the type of each edge in the graph.
         """
-        return self.c_csc_graph.type_per_edge()
+        return self._c_csc_graph.type_per_edge()
+
+    @property
+    def metadata(self) -> Optional[GraphMetadata]:
+        """Returns the metadata of the graph.
+
+        Returns
+        -------
+        GraphMetadata or None
+            If present, returns the metadata of the graph.
+        """
+        return self._metadata
 
     def sample_etype_neighbors(
         self,
@@ -183,19 +194,6 @@ class CSCSamplingGraph:
 
             If -1 is given, all of the neighbors with non-zero probability will be selected.
         probs : Tensor, optional
-            A 1D tensor with shape (num_edges,) containing (unnormalized)
-            probabilities associated with each neighboring edge of a node.
-
-            The features must be non-negative floats or boolean.  Otherwise, the
-            result will be undefined.
-        replace : bool, optional
-            If True, sample with replacement.
-        return_eids : bool, optional
-            If True, return edge ids as well in the result. This is usually set
-            when edge features are required.
-
-        Returns
-        -------
         Tuple[torch.tensor, torch.tensor]
             A tuple containing the sampled coo graph with type information and
             their corresponding edge IDs (if required). The first one is an integer
@@ -212,23 +210,9 @@ class CSCSamplingGraph:
         if probs:
             assert probs.dim == 1
             assert probs.shape[0] == self.indices.shape[0]
-        return self.c_csc_graph.sample_etype_neighbors(
+        return self._c_csc_graph.sample_etype_neighbors(
             nodes, fanouts, replace, return_eids, probs
         )
-        return self._c_csc_graph.type_per_edge()
-
-    @property
-    def metadata(self) -> Optional[GraphMetadata]:
-        """Returns the metadata of the graph.
-
-        Returns
-        -------
-        GraphMetadata or None
-            If present, returns the metadata of the graph.
-        """
-        return self._metadata
-
-
 def from_csc(
     csc_indptr: torch.Tensor,
     indices: torch.Tensor,
