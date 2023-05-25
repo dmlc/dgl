@@ -73,14 +73,6 @@ class SharedMemory {
   /** @brief The name of the shared memory. */
   std::string name_;
 
-  /**
-   * @brief The name of the shared memory object.
-   *
-   * A prefix and a suffix are added to the name of the shared memory to create
-   * the name of the shared memory object.
-   */
-  std::string decorated_name_;
-
   /** @brief The size of the shared memory. */
   size_t size_;
 

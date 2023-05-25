@@ -19,14 +19,17 @@ namespace sampling {
 
 // Two processes opening the same path are guaranteed to access the same shared
 // memory object if and only if path begins with a slash (`/') character.
-constexpr char kSharedMemNamePrefix[] =
-    "/"
-    "dgl.graphbolt.";
+constexpr char kSharedMemNamePrefix[] = "/dgl.graphbolt.";
 constexpr char kSharedMemNameSuffix[] = ".lock";
+
+// A prefix and a suffix are added to the name of the shared memory to create
+// the name of the shared memory object.
+inline DecorateName(const std::string& name) {
+  return kSharedMemNamePrefix + name + kSharedMemNameSuffix;
+}
 
 SharedMemory::SharedMemory(const std::string& name)
     : name_(name), size_(0), ptr_(nullptr), is_creator_(false) {
-  decorated_name_ = kSharedMemNamePrefix + name + kSharedMemNameSuffix;
 #ifdef _WIN32
   this->handle_ = nullptr;
 #else   // _WIN32
@@ -44,12 +47,13 @@ SharedMemory::~SharedMemory() {
 void* SharedMemory::Create(size_t size) {
   size_ = size;
 
+  std::string decorated_name = DecorateName(name_);
   handle_ = CreateFileMapping(
       INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
       static_cast<DWORD>(size >> 32), static_cast<DWORD>(size & 0xFFFFFFFF),
-      decorated_name_.c_str());
+      decorated_name.c_str());
   TORCH_CHECK(
-      handle_ != nullptr, "fail to open ", decorated_name_,
+      handle_ != nullptr, "fail to open ", decorated_name,
       ", Win32 error: ", GetLastError());
 
   ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size);
@@ -61,10 +65,10 @@ void* SharedMemory::Create(size_t size) {
 void* SharedMemory::Open(size_t size) {
   size_ = size;
 
-  handle_ =
-      OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, decorated_name_.c_str());
+  std::string decorated_name = DecorateName(name_);
+  handle_ = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, decorated_name.c_str());
   TORCH_CHECK(
-      handle_ != nullptr, "fail to open ", decorated_name_,
+      handle_ != nullptr, "fail to open ", decorated_name,
       ", Win32 Error: ", GetLastError());
 
   ptr_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size);
@@ -74,7 +78,9 @@ void* SharedMemory::Open(size_t size) {
 }
 
 static bool SharedMemory::Exists(const std::string& name) {
-  HANDLE handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
+  std::string decorated_name = DecorateName(name_);
+  HANDLE handle =
+      OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, decorated_name.c_str());
   bool exists = handle != nullptr;
   if (exists) {
     CloseHandle(handle);
@@ -87,7 +93,9 @@ static bool SharedMemory::Exists(const std::string& name) {
 SharedMemory::~SharedMemory() {
   if (ptr_ && size_ != 0) CHECK(munmap(ptr_, size_) != -1) << strerror(errno);
   if (file_descriptor_ != -1) close(file_descriptor_);
-  if (is_creator_ && decorated_name_ != "") shm_unlink(decorated_name_.c_str());
+
+  std::string decorated_name = DecorateName(name_);
+  if (is_creator_ && decorated_name != "") shm_unlink(decorated_name.c_str());
 }
 
 void *SharedMemory::Create(size_t size) {
@@ -96,8 +104,9 @@ void *SharedMemory::Create(size_t size) {
 
   // TODO(zhenkun): handle the error properly if the shared memory object
   // already exists.
+  std::string decorated_name = DecorateName(name_);
   file_descriptor_ =
-      shm_open(decorated_name_.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+      shm_open(decorated_name.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   TORCH_CHECK(file_descriptor_ != -1, "Fail to open : ", strerror(errno));
 
   auto status = ftruncate(file_descriptor_, size);
@@ -114,10 +123,11 @@ void *SharedMemory::Create(size_t size) {
 void *SharedMemory::Open(size_t size) {
   size_ = size;
 
+  std::string decorated_name = DecorateName(name_);
   file_descriptor_ =
-      shm_open(decorated_name_.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
+      shm_open(decorated_name.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
   TORCH_CHECK(
-      file_descriptor_ != -1, "fail to open ", decorated_name_, ": ",
+      file_descriptor_ != -1, "fail to open ", decorated_name, ": ",
       strerror(errno));
 
   ptr_ =
@@ -129,7 +139,9 @@ void *SharedMemory::Open(size_t size) {
 }
 
 static bool SharedMemory::Exist(const std::string &name) {
-  int file_descriptor = shm_open(name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
+  std::string decorated_name = DecorateName(name_);
+  int file_descriptor =
+      shm_open(decorated_name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
   bool exists = file_descriptor > 0;
   if (exists) {
     close(fd);
