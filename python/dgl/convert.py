@@ -1835,12 +1835,12 @@ def to_networkx(
         raise DGLError(
             "Cannot convert a CUDA graph to networkx. Call g.cpu() first."
         )
-    if not g.is_homogeneous:
+    if g.is_homogeneous:
+        return _to_networkx_homogeneous(g, node_attrs, edge_attrs)
+    else:
         return _to_networkx_heterogeneous(
             g, node_attrs, edge_attrs, ntype_attr, etype_attr
         )
-    else:
-        return _to_networkx_homogeneous(g, node_attrs, edge_attrs)
 
 
 DGLGraph.to_networkx = to_networkx
