@@ -6,11 +6,12 @@
 #ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
-#include <torch/custom_class.h>
-#include <torch/torch.h>
+#include <graphbolt/sampled_subgraph.h>
 
 #include <string>
 #include <vector>
+
+#include "sampled_subgraph.h"
 
 namespace graphbolt {
 namespace sampling {
@@ -104,6 +105,15 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param archive Output stream for serializing.
    */
   void Save(torch::serialize::OutputArchive& archive) const;
+
+  /**
+   * @brief Return the subgraph induced on the inbound edges of the given nodes.
+   * @param nodes Type agnostic node IDs to form the subgraph.
+   *
+   * @return SampledSubgraph.
+   */
+  c10::intrusive_ptr<SampledSubgraph> InSubgraph(
+      const torch::Tensor& nodes) const;
 
  private:
   /** @brief CSC format index pointer array. */

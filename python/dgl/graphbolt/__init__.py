@@ -36,3 +36,5 @@ def load_graphbolt():
 
 
 load_graphbolt()
+
+SampledSubgraph = torch.classes.graphbolt.SampledSubgraph

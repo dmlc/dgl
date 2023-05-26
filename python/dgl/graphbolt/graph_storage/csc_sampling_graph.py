@@ -170,6 +170,30 @@ class CSCSamplingGraph:
         """
         return self._metadata
 
+    def in_subgraph(self, nodes: torch.Tensor) -> torch.ScriptObject:
+        """Return the subgraph induced on the inbound edges of the given nodes.
+
+        An in subgraph is equivalent to creating a new graph using the incoming
+        edges of the given nodes.
+
+        Parameters
+        ----------
+        nodes : torch.Tensor
+            The nodes to form the subgraph which are type agnostic.
+
+        Returns
+        -------
+        SampledSubgraph
+            The in subgraph.
+        """
+        # Ensure nodes is 1-D tensor.
+        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
+        # Ensure that there are no duplicate nodes.
+        assert len(torch.unique(nodes)) == len(
+            nodes
+        ), "Nodes cannot have duplicate values."
+        return self._c_csc_graph.in_subgraph(nodes)
+
 
 def from_csc(
     csc_indptr: torch.Tensor,
