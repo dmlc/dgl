@@ -189,6 +189,8 @@ class CSCSamplingGraph:
         SampledSubgraph
             The in subgraph.
         """
+        # Ensure nodes is 1-D tensor.
+        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         # Ensure that there are no duplicate nodes.
         assert len(torch.unique(nodes)) == len(
             nodes
