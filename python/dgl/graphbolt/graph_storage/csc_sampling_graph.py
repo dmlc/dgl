@@ -190,9 +190,9 @@ class CSCSamplingGraph:
             The in subgraph.
         """
         # Remove duplicate nodes.
-        assert len(torch.unique(nodes)) == len(nodes), (
-            f"Nodes cannot have duplicate values."
-        )
+        assert len(torch.unique(nodes)) == len(
+            nodes
+        ), f"Nodes cannot have duplicate values."
         return self._c_csc_graph.in_subgraph(nodes)
 
 
