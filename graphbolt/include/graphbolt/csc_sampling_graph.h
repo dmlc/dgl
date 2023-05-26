@@ -108,7 +108,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   void Save(torch::serialize::OutputArchive& archive) const;
 
   /**
-   * @brief Extract induced subgraph of given nodes.
+   * @brief Return the subgraph induced on the inbound edges of the given nodes.
    * @param nodes Type agnostic node IDs to form the subgraph.
    *
    * @return SampledSubgraph.
