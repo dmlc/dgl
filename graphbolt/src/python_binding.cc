@@ -27,7 +27,8 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("csc_indptr", &CSCSamplingGraph::CSCIndptr)
       .def("indices", &CSCSamplingGraph::Indices)
       .def("node_type_offset", &CSCSamplingGraph::NodeTypeOffset)
-      .def("type_per_edge", &CSCSamplingGraph::TypePerEdge);
+      .def("type_per_edge", &CSCSamplingGraph::TypePerEdge)
+      .def("in_subgraph", &CSCSamplingGraph::InSubgraph);
   m.def("from_csc", &CSCSamplingGraph::FromCSC);
   m.def("load_csc_sampling_graph", &LoadCSCSamplingGraph);
   m.def("save_csc_sampling_graph", &SaveCSCSamplingGraph);

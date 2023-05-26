@@ -108,7 +108,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
       torch::zeros({nonzero_idx.size(0) + 1}, indptr_.dtype());
   compact_indptr.index_put_({Slice(1, None)}, indptr.index({nonzero_idx}));
   return c10::make_intrusive<SampledSubgraph>(
-      compact_indptr.cumsum(0), torch::cat(indices_arr), nonzero_idx,
+      compact_indptr.cumsum(0), torch::cat(indices_arr), nonzero_idx - 1,
       torch::arange(0, NumNodes()), torch::cat(edge_ids_arr),
       type_per_edge_
           ? torch::optional<torch::Tensor>{torch::cat(type_per_edge_arr)}
