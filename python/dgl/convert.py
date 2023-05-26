@@ -1758,9 +1758,9 @@ def to_networkx(
     edge_attrs : iterable of str, optional
         The edge attributes to copy from ``g.edata``. (Default: None)
     ntype_attr : str, optional
-        The node attribute to write the node type to. (Default: "ntype")
+        The name of the node attribute to store the node types in the NetworkX object. (Default: "ntype")
     etype_attr : str, optional
-        The edge attribute to write the edge type to. (Default: "etype")
+        The name of the edge attribute to store the edge canonical types in the NetworkX object. (Default: "etype")
 
     Returns
     -------
