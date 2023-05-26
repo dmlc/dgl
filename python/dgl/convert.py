@@ -1811,25 +1811,25 @@ def to_networkx(
     ... }
     >>> nx_g = dgl.to_networkx(g, node_attrs=['n'], edge_attrs=['e'])
     >>> nx_g.nodes(data=True)
-    NodeDataView({0: {'type': 'game', 'n': tensor([0.])},
-                  1: {'type': 'game', 'n': tensor([0.])},
-                  2: {'type': 'game', 'n': tensor([0.])},
-                  3: {'type': 'game', 'n': tensor([0.])},
-                  4: {'type': 'game', 'n': tensor([0.])},
-                  5: {'type': 'topic'},
-                  6: {'type': 'topic'},
-                  7: {'type': 'topic'},
-                  8: {'type': 'user', 'n': tensor([1.])},
-                  9: {'type': 'user', 'n': tensor([1.])},
-                  10: {'type': 'user', 'n': tensor([1.])},
-                  11: {'type': 'user', 'n': tensor([1.])}})
+    NodeDataView({0: {'ntype': 'game', 'n': tensor([0.])},
+                  1: {'ntype': 'game', 'n': tensor([0.])},
+                  2: {'ntype': 'game', 'n': tensor([0.])},
+                  3: {'ntype': 'game', 'n': tensor([0.])},
+                  4: {'ntype': 'game', 'n': tensor([0.])},
+                  5: {'ntype': 'topic'},
+                  6: {'ntype': 'topic'},
+                  7: {'ntype': 'topic'},
+                  8: {'ntype': 'user', 'n': tensor([1.])},
+                  9: {'ntype': 'user', 'n': tensor([1.])},
+                  10: {'ntype': 'user', 'n': tensor([1.])},
+                  11: {'ntype': 'user', 'n': tensor([1.])}})
     >>> nx_g.edges(data=True)
-    OutMultiEdgeDataView([(8, 9, {'id': 2, 'triples': ('user', 'follows', 'user'), 'e': tensor([0.])}),
-                          (8, 3, {'id': 4, 'triples': ('user', 'plays', 'game'), 'e': tensor([1.])}),
-                          (9, 6, {'id': 0, 'triples': ('user', 'follows', 'topic')}),
-                          (9, 7, {'id': 1, 'triples': ('user', 'follows', 'topic')}),
-                          (9, 10, {'id': 3, 'triples': ('user', 'follows', 'user'), 'e': tensor([0.])}),
-                          (11, 4, {'id': 5, 'triples': ('user', 'plays', 'game'), 'e': tensor([1.])})])
+    OutMultiEdgeDataView([(8, 9, {'id': 2, 'etype': ('user', 'follows', 'user'), 'e': tensor([0.])}),
+                          (8, 3, {'id': 4, 'etype': ('user', 'plays', 'game'), 'e': tensor([1.])}),
+                          (9, 6, {'id': 0, 'etype': ('user', 'follows', 'topic')}),
+                          (9, 7, {'id': 1, 'etype': ('user', 'follows', 'topic')}),
+                          (9, 10, {'id': 3, 'etype': ('user', 'follows', 'user'), 'e': tensor([0.])}),
+                          (11, 4, {'id': 5, 'etype': ('user', 'plays', 'game'), 'e': tensor([1.])})])
     """
     if g.device != F.cpu():
         raise DGLError(
