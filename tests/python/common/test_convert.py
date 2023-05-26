@@ -3,7 +3,7 @@ import dgl
 
 
 def get_nodes_by_ntype(nodes, ntype):
-    return dict((k, v) for k, v in nodes.items() if v["type"] == ntype)
+    return dict((k, v) for k, v in nodes.items() if v["ntype"] == ntype)
 
 
 def get_edges_by_etype(edges, etype):
@@ -57,19 +57,19 @@ def test_to_networkx():
     # Test nodes
     nxg_nodes = dict(nxg.nodes(data=True))
     assert len(nxg_nodes) == g.num_nodes()
-    assert {v["type"] for v in nxg_nodes.values()} == set(g.ntypes)
+    assert {v["ntype"] for v in nxg_nodes.values()} == set(g.ntypes)
 
     nxg_nodes_by_ntype = {}
     for ntype in g.ntypes:
         nxg_nodes_by_ntype[ntype] = get_nodes_by_ntype(nxg_nodes, ntype)
         assert g.num_nodes(ntype) == len(nxg_nodes_by_ntype[ntype])
 
-    assert check_attrs_for_nodes(nxg_nodes_by_ntype["game"], {"type", "n"})
+    assert check_attrs_for_nodes(nxg_nodes_by_ntype["game"], {"ntype", "n"})
     assert check_attr_values_for_nodes(nxg_nodes_by_ntype["game"], "n", n1)
-    assert check_attrs_for_nodes(nxg_nodes_by_ntype["user"], {"type", "n"})
+    assert check_attrs_for_nodes(nxg_nodes_by_ntype["user"], {"ntype", "n"})
     assert check_attr_values_for_nodes(nxg_nodes_by_ntype["user"], "n", n2)
     # Nodes without node attributes
-    assert check_attrs_for_nodes(nxg_nodes_by_ntype["topic"], {"type"})
+    assert check_attrs_for_nodes(nxg_nodes_by_ntype["topic"], {"ntype"})
 
     # Test edges
     nxg_edges = list(nxg.edges(data=True))

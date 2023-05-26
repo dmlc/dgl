@@ -1740,7 +1740,7 @@ def to_networkx(
     g,
     node_attrs=None,
     edge_attrs=None,
-    ntype_attr="type",
+    ntype_attr="ntype",
     etype_attr="triples",
 ):
     """Convert a graph to a NetworkX graph and return.
@@ -1758,7 +1758,7 @@ def to_networkx(
     edge_attrs : iterable of str, optional
         The edge attributes to copy from ``g.edata``. (Default: None)
     ntype_attr : str, optional
-        The node attribute to write the node type to. (Default: "type")
+        The node attribute to write the node type to. (Default: "ntype")
     etype_attr : str, optional
         The edge attribute to write the edge type to. (Default: "triples")
 
