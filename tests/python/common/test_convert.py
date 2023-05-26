@@ -7,7 +7,7 @@ def get_nodes_by_ntype(nodes, ntype):
 
 
 def get_edges_by_etype(edges, etype):
-    return [e for e in edges if e[2]["triples"] == etype]
+    return [e for e in edges if e[2]["etype"] == etype]
 
 
 def check_attrs_for_nodes(nodes, attrs):
@@ -74,7 +74,7 @@ def test_to_networkx():
     # Test edges
     nxg_edges = list(nxg.edges(data=True))
     assert len(nxg_edges) == g.num_edges()
-    assert {e[2]["triples"] for e in nxg_edges} == set(g.canonical_etypes)
+    assert {e[2]["etype"] for e in nxg_edges} == set(g.canonical_etypes)
 
     nxg_edges_by_etype = {}
     for etype in g.canonical_etypes:
@@ -83,18 +83,18 @@ def test_to_networkx():
 
     assert check_attrs_for_edges(
         nxg_edges_by_etype[("user", "follows", "user")],
-        {"id", "triples", "e"},
+        {"id", "etype", "e"},
     )
     assert check_attr_values_for_edges(
         nxg_edges_by_etype[("user", "follows", "user")], "e", e1
     )
     assert check_attrs_for_edges(
-        nxg_edges_by_etype[("user", "plays", "game")], {"id", "triples", "e"}
+        nxg_edges_by_etype[("user", "plays", "game")], {"id", "etype", "e"}
     )
     assert check_attr_values_for_edges(
         nxg_edges_by_etype[("user", "plays", "game")], "e", e2
     )
     # Edges without edge attributes
     assert check_attrs_for_edges(
-        nxg_edges_by_etype[("user", "follows", "topic")], {"id", "triples"}
+        nxg_edges_by_etype[("user", "follows", "topic")], {"id", "etype"}
     )
