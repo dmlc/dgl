@@ -305,16 +305,16 @@ def test_in_subgraph_homogeneous():
 
     # Verify in subgraph.
     assert torch.equal(in_subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
-    assert torch.equal(in_subgraph.indices,
-                       torch.LongTensor([2, 3, 1, 2, 0, 3, 4]))
+    assert torch.equal(
+        in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
+    )
     assert torch.equal(in_subgraph.reverse_column_node_ids, nodes)
     assert torch.equal(
-        in_subgraph.reverse_row_node_ids,
-        torch.arange(
-            0,
-            num_nodes))
-    assert torch.equal(in_subgraph.reverse_edge_ids,
-                       torch.LongTensor([3, 4, 7, 8, 9, 10, 11]))
+        in_subgraph.reverse_row_node_ids, torch.arange(0, num_nodes)
+    )
+    assert torch.equal(
+        in_subgraph.reverse_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
+    )
     assert in_subgraph.type_per_edge is None
 
 
@@ -371,15 +371,16 @@ def test_in_subgraph_heterogeneous():
 
     # Verify in subgraph.
     assert torch.equal(in_subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
-    assert torch.equal(in_subgraph.indices,
-                       torch.LongTensor([2, 3, 1, 2, 0, 3, 4]))
+    assert torch.equal(
+        in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
+    )
     assert torch.equal(in_subgraph.reverse_column_node_ids, nodes)
     assert torch.equal(
-        in_subgraph.reverse_row_node_ids,
-        torch.arange(
-            0,
-            num_nodes))
-    assert torch.equal(in_subgraph.reverse_edge_ids,
-                       torch.LongTensor([3, 4, 7, 8, 9, 10, 11]))
-    assert torch.equal(in_subgraph.type_per_edge,
-                       torch.LongTensor([2, 2, 1, 3, 1, 3, 3]))
+        in_subgraph.reverse_row_node_ids, torch.arange(0, num_nodes)
+    )
+    assert torch.equal(
+        in_subgraph.reverse_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
+    )
+    assert torch.equal(
+        in_subgraph.type_per_edge, torch.LongTensor([2, 2, 1, 3, 1, 3, 3])
+    )
