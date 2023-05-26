@@ -1797,18 +1797,18 @@ def to_networkx(
     With a heterogeneous graph:
 
     >>> g = dgl.heterograph({
-        ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
-        ...     ('user', 'follows', 'topic'): (torch.tensor([1, 1]), torch.tensor([1, 2])),
-        ...     ('user', 'plays', 'game'): (torch.tensor([0, 3]), torch.tensor([3, 4]))
-        ... })
-        ... g.ndata['n'] = {
-        ...     'game': torch.zeros(5, 1),
-        ...     'user': torch.ones(4, 1)
-        ... }
-        ... g.edata['e'] = {
-        ...     ('user', 'follows', 'user'): torch.zeros(2, 1),
-        ...     'plays': torch.ones(2, 1)
-        ... }
+    ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+    ...     ('user', 'follows', 'topic'): (torch.tensor([1, 1]), torch.tensor([1, 2])),
+    ...     ('user', 'plays', 'game'): (torch.tensor([0, 3]), torch.tensor([3, 4]))
+    ... })
+    ... g.ndata['n'] = {
+    ...     'game': torch.zeros(5, 1),
+    ...     'user': torch.ones(4, 1)
+    ... }
+    ... g.edata['e'] = {
+    ...     ('user', 'follows', 'user'): torch.zeros(2, 1),
+    ...     'plays': torch.ones(2, 1)
+    ... }
     >>> nx_g = dgl.to_networkx(g, node_attrs=['n'], edge_attrs=['e'])
     >>> nx_g.nodes(data=True)
     NodeDataView({0: {'type': 'game', 'n': tensor([0.])},
