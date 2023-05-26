@@ -189,7 +189,7 @@ class CSCSamplingGraph:
         SampledSubgraph
             The in subgraph.
         """
-        # Remove duplicate nodes.
+        # Ensure that there are no duplicate nodes.
         assert len(torch.unique(nodes)) == len(
             nodes
         ), "Nodes cannot have duplicate values."
