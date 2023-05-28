@@ -13,13 +13,13 @@ namespace graphbolt {
 namespace sampling {
 
 static SharedMemoryPtr CopyTorchArchiveToSharedMemory(
-    const std::string& shared_memory_name, int64_t memory_size,
+    const std::string& name, int64_t size,
     torch::serialize::OutputArchive& archive) {
   std::stringstream serialized;
   archive.save_to(serialized);
   auto serialized_str = serialized.str();
-  auto shm = std::make_unique<SharedMemory>(shared_memory_name);
-  auto mem_buf = shm->Create(memory_size);
+  auto shm = std::make_unique<SharedMemory>(name);
+  auto mem_buf = shm->Create(size);
   // Use the first 8 bytes to store the size of the serialized string.
   static_cast<int64_t*>(mem_buf)[0] = serialized_str.size();
   memcpy(
@@ -29,23 +29,22 @@ static SharedMemoryPtr CopyTorchArchiveToSharedMemory(
 }
 
 static SharedMemoryPtr LoadTorchArchiveFromSharedMemory(
-    const std::string& shared_memory_name, int64_t memory_size,
+    const std::string& name, int64_t size,
     torch::serialize::InputArchive& archive) {
-  auto shm = std::make_unique<SharedMemory>(shared_memory_name);
-  auto mem_buf = shm->Open(memory_size);
+  auto shm = std::make_unique<SharedMemory>(name);
+  auto mem_buf = shm->Open(size);
   int64_t size = static_cast<int64_t*>(mem_buf)[0];
   archive.load_from(static_cast<const char*>(mem_buf) + sizeof(int64_t), size);
   return shm;
 }
 
 static SharedMemoryPtr CopyTensorsDataToSharedMemory(
-    const std::string& shared_memory_name,
-    const std::vector<torch::Tensor>& tensors) {
+    const std::string& name, const std::vector<torch::Tensor>& tensors) {
   int64_t memory_size = 0;
   for (const auto& tensor : tensors) {
     memory_size += tensor.numel() * tensor.element_size();
   }
-  auto shm = std::make_unique<SharedMemory>(shared_memory_name);
+  auto shm = std::make_unique<SharedMemory>(name);
   auto mem_buf = shm->Create(memory_size);
   for (auto tensor : tensors) {
     tensor = tensor.contiguous();
@@ -58,7 +57,7 @@ static SharedMemoryPtr CopyTensorsDataToSharedMemory(
 
 /**
  * @brief Load tensors data from shared memory.
- * @param shared_memory_name The name of shared memory.
+ * @param name The name of shared memory.
  * @param tensor_metas The meta info of tensors, including tensor shape and
  * dtype.
  *
@@ -66,10 +65,10 @@ static SharedMemoryPtr CopyTensorsDataToSharedMemory(
  */
 static std::pair<SharedMemoryPtr, std::vector<torch::Tensor>>
 LoadTensorsDataFromSharedMemory(
-    const std::string& shared_memory_name,
+    const std::string& name,
     const std::vector<std::pair<std::vector<int64_t>, torch::ScalarType>>&
         tensor_metas) {
-  auto shm = std::make_unique<SharedMemory>(shared_memory_name);
+  auto shm = std::make_unique<SharedMemory>(name);
   int64_t memory_size = 0;
   for (const auto& meta : tensor_metas) {
     int64_t size = std::accumulate(
@@ -89,10 +88,9 @@ LoadTensorsDataFromSharedMemory(
   return std::make_pair(std::move(shm), std::move(tensors));
 }
 
-std::tuple<SharedMemoryPtr, SharedMemoryPtr, std::vector<torch::Tensor>>
-CopyTensorsToSharedMemory(
-    const std::string& shared_memory_name,
-    const std::vector<torch::Tensor>& tensors, int64_t meta_memory_size) {
+SharedMemoryTensors CopyTensorsToSharedMemory(
+    const std::string& name, const std::vector<torch::Tensor>& tensors,
+    int64_t meta_memory_size) {
   torch::serialize::OutputArchive archive;
   archive.write("num_tensors", static_cast<int64_t>(tensors.size()));
   for (size_t i = 0; i < tensors.size(); ++i) {
@@ -100,10 +98,9 @@ CopyTensorsToSharedMemory(
     archive.write(
         "tensor_" + std::to_string(i) + "_dtype", tensors[i].scalar_type());
   }
-  auto meta_shm = CopyTorchArchiveToSharedMemory(
-      shared_memory_name + "_meta", meta_memory_size, archive);
-  auto data_shm =
-      CopyTensorsDataToSharedMemory(shared_memory_name + "_data", tensors);
+  auto meta_shm =
+      CopyTorchArchiveToSharedMemory(name + "_meta", meta_memory_size, archive);
+  auto data_shm = CopyTensorsDataToSharedMemory(name + "_data", tensors);
 
   std::vector<torch::Tensor> ret_tensors;
   auto mem_buf = data_shm->GetMemory();
@@ -117,12 +114,11 @@ CopyTensorsToSharedMemory(
       std::move(meta_shm), std::move(data_shm), std::move(ret_tensors));
 }
 
-std::tuple<SharedMemoryPtr, SharedMemoryPtr, std::vector<torch::Tensor>>
-LoadTensorsFromSharedMemory(
-    const std::string& shared_memory_name, int64_t meta_memory_size) {
+SharedMemoryTensors LoadTensorsFromSharedMemory(
+    const std::string& name, int64_t meta_memory_size) {
   torch::serialize::InputArchive archive;
   auto meta_shm = LoadTorchArchiveFromSharedMemory(
-      shared_memory_name + "_meta", meta_memory_size, archive);
+      name + "_meta", meta_memory_size, archive);
   std::vector<std::pair<std::vector<int64_t>, torch::ScalarType>> metas;
   int64_t num_tensors = read_from_archive(archive, "num_tensors").toInt();
   for (int64_t i = 0; i < num_tensors; ++i) {
@@ -137,7 +133,7 @@ LoadTensorsFromSharedMemory(
   SharedMemoryPtr data_shm;
   std::vector<torch::Tensor> ret_tensors;
   std::tie(data_shm, ret_tensors) =
-      LoadTensorsDataFromSharedMemory(shared_memory_name + "_data", metas);
+      LoadTensorsDataFromSharedMemory(name + "_data", metas);
   return std::make_tuple(
       std::move(meta_shm), std::move(data_shm), std::move(ret_tensors));
 }

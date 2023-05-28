@@ -120,45 +120,42 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
+static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryTensors(
+    SharedMemoryTensors&& shared_memory_tensors) {
+  const auto& tensors = std::get<2>(shared_memory_tensors);
+  return c10::make_intrusive<CSCSamplingGraph>(
+      tensors[0], tensors[1],
+      tensors.size() > 2 ? torch::optional<torch::Tensor>{tensors[2]}
+                         : torch::nullopt,
+      tensors.size() > 3 ? torch::optional<torch::Tensor>{tensors[3]}
+                         : torch::nullopt,
+      std::move(std::get<0>(shared_memory_tensors)),
+      std::move(std::get<1>(shared_memory_tensors)));
+}
+
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
     const std::string& shared_memory_name) {
-  auto shm_name_with_prefix = std::string("graphbolt_") + shared_memory_name;
   std::vector<torch::Tensor> tensors = {indptr_, indices_};
+  TORCH_CHECK(
+      !(!node_type_offset_.has_value() && type_per_edge_.has_value()),
+      "Cannot copy a graph with type_per_edge but without node_type_offset to "
+      "shared memory.");
   if (node_type_offset_.has_value()) {
     tensors.push_back(node_type_offset_.value());
+  }
+  if (type_per_edge_.has_value()) {
     tensors.push_back(type_per_edge_.value());
   }
-  SharedMemoryPtr tensor_meta_shm, tensor_data_shm;
-  std::vector<torch::Tensor> shared_tensors;
-  std::tie(tensor_meta_shm, tensor_data_shm, shared_tensors) =
-      CopyTensorsToSharedMemory(
-          shm_name_with_prefix, tensors, SERIALIZED_METAINFO_SIZE_MAX);
-  return c10::make_intrusive<CSCSamplingGraph>(
-      shared_tensors[0], shared_tensors[1],
-      shared_tensors.size() > 2
-          ? torch::optional<torch::Tensor>(shared_tensors[2])
-          : torch::optional<torch::Tensor>(),
-      shared_tensors.size() > 3
-          ? torch::optional<torch::Tensor>(shared_tensors[3])
-          : torch::optional<torch::Tensor>(),
-      std::move(tensor_meta_shm), std::move(tensor_data_shm));
+  auto shared_memory_tensors = CopyTensorsToSharedMemory(
+      shared_memory_name, tensors, SERIALIZED_METAINFO_SIZE_MAX);
+  return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
     const std::string& shared_memory_name) {
-  auto shm_name_with_prefix = std::string("graphbolt_") + shared_memory_name;
-  SharedMemoryPtr tensor_meta_shm, tensor_data_shm;
-  std::vector<torch::Tensor> tensors;
-  std::tie(tensor_meta_shm, tensor_data_shm, tensors) =
-      LoadTensorsFromSharedMemory(
-          shm_name_with_prefix, SERIALIZED_METAINFO_SIZE_MAX);
-  return c10::make_intrusive<CSCSamplingGraph>(
-      tensors[0], tensors[1],
-      tensors.size() > 2 ? torch::optional<torch::Tensor>(tensors[2])
-                         : torch::optional<torch::Tensor>(),
-      tensors.size() > 3 ? torch::optional<torch::Tensor>(tensors[3])
-                         : torch::optional<torch::Tensor>(),
-      std::move(tensor_meta_shm), std::move(tensor_data_shm));
+  auto shared_memory_tensors = LoadTensorsFromSharedMemory(
+      shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
 }
 
 }  // namespace sampling
