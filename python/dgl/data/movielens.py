@@ -307,40 +307,15 @@ class MovieLensDataset(DGLDataset):
         }
 
         # pair value is idx rather than id
-        (
-            train_u_indices,
-            train_v_indices,
-            train_labels,
-        ) = self._generate_pair_value(train_rating_data)
-        (
-            valid_u_indices,
-            valid_v_indices,
-            valid_labels,
-        ) = self._generate_pair_value(valid_rating_data)
-        test_u_indices, test_v_indices, test_labels = self._generate_pair_value(
-            test_rating_data
+        u_indices, v_indices, labels = self._generate_pair_value(all_rating_data)
+        all_rating_pairs = (
+            LongTensor(u_indices),
+            LongTensor(v_indices),
         )
-
-        train_rating_pairs = (
-            LongTensor(train_u_indices),
-            LongTensor(train_v_indices),
-        )
-        valid_rating_pairs = (
-            LongTensor(valid_u_indices),
-            LongTensor(valid_v_indices),
-        )
-        test_rating_pairs = (
-            LongTensor(test_u_indices),
-            LongTensor(test_v_indices),
-        )
-        train_rating_values = Tensor(train_labels)
-        valid_rating_values = Tensor(valid_labels)
-        test_rating_values = Tensor(test_labels)
+        all_rating_values = Tensor(labels)
         
-        self.train_graph, self.valid_graph, self.test_graph = \
-            self.construct_g(train_rating_pairs, train_rating_values, user_feat, movie_feat), \
-            self.construct_g(valid_rating_pairs, valid_rating_values, user_feat, movie_feat), \
-            self.construct_g(test_rating_pairs, test_rating_values, user_feat, movie_feat)
+        graph = self.construct_g(all_rating_pairs, all_rating_values, user_feat, movie_feat)
+        self.graph = self.add_edge_labels(graph, train_rating_data, valid_rating_data, test_rating_data)
         
         print(f"End processing {self.name} ...")
 
@@ -349,14 +324,9 @@ class MovieLensDataset(DGLDataset):
             ('user', 'user-movie', 'movie'): (rate_pairs[0], rate_pairs[1]),
             ('movie', 'movie-user', 'user'): (rate_pairs[1], rate_pairs[0])
         }) 
-        # bidirected graph needs edges of only one direction to check if nodes are isolated
-        iso_nodes_movie = (g.in_degrees(etype='user-movie') == 0).nonzero().squeeze()
-        g.remove_nodes(iso_nodes_movie, ntype='movie', store_ids=True)
-        iso_nodes_user = (g.in_degrees(etype='movie-user') == 0).nonzero().squeeze()
-        g.remove_nodes(iso_nodes_user, ntype='user', store_ids=True)
         ndata = {
-            'user': user_feat[g.ndata['_ID']['user']],
-            'movie': movie_feat[g.ndata['_ID']['movie']]
+            'user': user_feat,
+            'movie': movie_feat
         }
         edata = {
             'user-movie': rate_values,
@@ -364,9 +334,37 @@ class MovieLensDataset(DGLDataset):
         }
         g.ndata['feat'] = ndata
         g.edata['rate'] = edata
+        return g
+    
+    def add_edge_labels(self, g, train_rating_data, valid_rating_data, test_rating_data):
+        train_u_indices, train_v_indices, _ = self._generate_pair_value(train_rating_data)
+        valid_u_indices, valid_v_indices, _ = self._generate_pair_value(valid_rating_data)
+        test_u_indices, test_v_indices, _ = self._generate_pair_value(test_rating_data)
+        
+        # user-movie
+        train_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.int)
+        train_mask[g.edge_ids(train_u_indices, train_v_indices, etype='user-movie')] = 1
+        valid_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.int)
+        valid_mask[g.edge_ids(valid_u_indices, valid_v_indices, etype='user-movie')] = 1
+        test_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.int)
+        test_mask[g.edge_ids(test_u_indices, test_v_indices, etype='user-movie')] = 1
 
-        g.edata.pop('_ID')
-        g.ndata.pop('_ID')
+        g.edges['user-movie'].data['train_mask'] = train_mask
+        g.edges['user-movie'].data['valid_mask'] = valid_mask
+        g.edges['user-movie'].data['test_mask'] = test_mask
+
+        # movie-user
+        train_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.int)
+        train_mask_rev[g.edge_ids(train_v_indices, train_u_indices, etype='movie-user')] = 1
+        valid_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.int)
+        valid_mask_rev[g.edge_ids(valid_v_indices, valid_u_indices, etype='movie-user')] = 1
+        test_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.int)
+        test_mask_rev[g.edge_ids(test_v_indices, test_u_indices, etype='movie-user')] = 1
+
+        g.edges['movie-user'].data['train_mask'] = train_mask_rev
+        g.edges['movie-user'].data['valid_mask'] = valid_mask_rev
+        g.edges['movie-user'].data['test_mask'] = test_mask_rev
+
         return g
 
     def has_cache(self):
@@ -378,7 +376,7 @@ class MovieLensDataset(DGLDataset):
     def save(self):
         save_graphs(
             self.graph_path,
-            [self.train_graph, self.valid_graph, self.test_graph]
+            [self.graph]
         )
         save_info(self.version_path, [self.valid_ratio, self.test_ratio])
         if self.verbose:
@@ -386,52 +384,16 @@ class MovieLensDataset(DGLDataset):
 
     def load(self):
         g_list, _ = load_graphs(self.graph_path)
-        self.train_graph, self.valid_graph, self.test_graph = (
-            g_list[0], g_list[1], g_list[2]
-        )
-        if self.verbose:
-            print(f"Done loading data from {self.raw_path}.")
-
-            print(
-                "All rating pairs : {}".format(
-                    int(
-                        (
-                            self.train_graph.num_edges()
-                            + self.valid_graph.num_edges()
-                            + self.test_graph.num_edges()
-                        )
-                        / 2
-                    )
-                )
-            )
-            print(
-                "\tTrain rating pairs : {}".format(
-                    int(self.train_graph.num_edges() / 2)
-                )
-            )
-            print(
-                "\tValid rating pairs : {}".format(
-                    int(self.valid_graph.num_edges() / 2)
-                )
-            )
-            print(
-                "\tTest rating pairs  : {}".format(
-                    int(self.test_graph.num_edges() / 2)
-                )
-            )
+        self.graph = g_list[0]
 
     def __getitem__(self, idx):
         assert (
             idx == 0
         ), "This dataset has only one set of training, validation and testing graph"
         if self._transform is None:
-            return self.train_graph, self.valid_graph, self.test_graph
+            return self.graph
         else:
-            return (
-                self._transform(self.train_graph),
-                self._transform(self.valid_graph),
-                self._transform(self.test_graph),
-            )
+            return self._transform(self.graph)
 
     def __len__(self):
         return 1
