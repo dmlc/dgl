@@ -1240,6 +1240,7 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         indptr, indices, _ = graph.adj().csc()
         # Initalize type per edge.
         type_per_edge = init_type_per_edge(graph, gpb)
+        type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
         # Sanity check.
         assert len(type_per_edge) == graph.num_edges()
         csc_graph = graphbolt.from_csc(
