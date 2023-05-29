@@ -1674,40 +1674,26 @@ def _to_networkx_heterogeneous(
 ):
     nx_graph = nx.MultiDiGraph()
 
-    num_nodes_per_ntype = [g.num_nodes(ntype) for ntype in g.ntypes]
-    offset_per_ntype = np.insert(np.cumsum(num_nodes_per_ntype), 0, 0)
-    num_edges_per_etype = [g.num_edges(etype) for etype in g.canonical_etypes]
-    offset_per_etype = np.insert(np.cumsum(num_edges_per_etype), 0, 0)
+    # This implementation does not use `ndata` and `edata` in the call to
+    # `to_homogeneous` because the function expects node and edge attributes
+    # both to be defined for every type and to have the same shape.
+    # If the `to_homogeneous` function is updated to support non-uniform node
+    # and edge attributes, the implementation can be simplified.
+    hom_g = to_homogeneous(g, store_type=True, return_count=False)
+    ntypes = g.ntypes
+    etypes = g.canonical_etypes
 
-    for ntype in g.ntypes:
-        nodes = F.asnumpy(g.nodes(ntype))
-        node_offset = int(offset_per_ntype[g.get_ntype_id(ntype)])
+    for hom_nid, ndata in enumerate(zip(hom_g.ndata[NID], hom_g.ndata[NTYPE])):
+        orig_nid, ntype = ndata
+        attrs = {ntype_attr: ntypes[ntype]}
 
-        nx_graph.add_nodes_from(nodes + node_offset, **{ntype_attr: ntype})
+        if node_attrs is not None:
+            assert (
+                ntype_attr not in node_attrs
+            ), f"'{ntype_attr}' already used as node type attribute"
 
-    for etype in g.canonical_etypes:
-        srctype, _, dsttype = etype
-        src, dst = g.all_edges(etype=etype, order="eid")
-        src_offset = int(offset_per_ntype[g.get_ntype_id(srctype)])
-        dst_offset = int(offset_per_ntype[g.get_ntype_id(dsttype)])
-
-        src = F.asnumpy(src) + src_offset
-        dst = F.asnumpy(dst) + dst_offset
-
-        for eid, (u, v) in enumerate(zip(src, dst)):
-            eid_offset = eid + int(offset_per_etype[g.get_etype_id(etype)])
-            nx_graph.add_edge(u, v, id=eid_offset, **{etype_attr: etype})
-
-    if node_attrs is not None:
-        assert (
-            ntype_attr not in node_attrs
-        ), f"'{ntype_attr}' already used as node type attribute"
-        for nid, attr in nx_graph.nodes(data=True):
-            ntype_id = g.get_ntype_id(attr[ntype_attr])
-            n_offset = int(offset_per_ntype[ntype_id])
-
-            feat_dict = g._get_n_repr(ntype_id, nid - n_offset)
-            attr.update(
+            feat_dict = g._get_n_repr(ntype, orig_nid)
+            attrs.update(
                 {
                     key: F.squeeze(feat_dict[key], 0)
                     for key in node_attrs
@@ -1715,23 +1701,28 @@ def _to_networkx_heterogeneous(
                 }
             )
 
-    if edge_attrs is not None:
-        assert (
-            etype_attr not in edge_attrs
-        ), f"'{etype_attr}' already used as edge type attribute"
-        for _, _, attr in nx_graph.edges(data=True):
-            etype_id = g.get_etype_id(attr[etype_attr])
-            eid = attr["id"]
-            eid_offset = int(offset_per_etype[etype_id])
+        nx_graph.add_node(hom_nid, **attrs)
 
-            feat_dict = g._get_e_repr(etype_id, eid - eid_offset)
-            attr.update(
+    for hom_eid, edata in enumerate(zip(hom_g.edata[EID], hom_g.edata[ETYPE])):
+        orig_eid, etype = edata
+        attrs = {"id": hom_eid, etype_attr: etypes[etype]}
+
+        if edge_attrs is not None:
+            assert (
+                etype_attr not in edge_attrs
+            ), f"'{etype_attr}' already used as edge type attribute"
+
+            feat_dict = g._get_e_repr(etype, orig_eid)
+            attrs.update(
                 {
                     key: F.squeeze(feat_dict[key], 0)
                     for key in edge_attrs
                     if key in feat_dict
                 }
             )
+
+        src, dst = hom_g.find_edges(hom_eid)
+        nx_graph.add_edge(int(src), int(dst), **attrs)
 
     return nx_graph
 
