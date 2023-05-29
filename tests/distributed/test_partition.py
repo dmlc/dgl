@@ -728,6 +728,8 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
             assert set(g.ntypes) == set(new_g.metadata.node_type_to_id.keys())
-            assert set(g.canonical_etypes) == set(new_g.metadata.edge_type_to_id.keys())
+            assert set(g.canonical_etypes) == set(
+                new_g.metadata.edge_type_to_id.keys()
+            )
             assert new_g.node_type_offset is None
             assert th.equal(orig_g.edata[dgl.ETYPE], new_g.type_per_edge)
