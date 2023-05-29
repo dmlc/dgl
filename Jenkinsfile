@@ -1,8 +1,8 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so, build/dgl_sparse/*.so'
+dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so, build/dgl_sparse/*.so, build/graphbolt/*.so'
 // Currently DGL on Windows is not working with Cython yet
-dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll, build\\dgl_sparse\\*.dll"
+dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll, build\\dgl_sparse\\*.dll, build\\graphbolt\\*.dll"
 
 def init_git() {
   sh 'rm -rf *'
@@ -128,6 +128,7 @@ def is_authorized(name) {
               'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
               'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
               'VoVAllen',
+              'keli-wen',
               ]
   return (name in devs)
 }

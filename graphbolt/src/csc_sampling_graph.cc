@@ -1,126 +1,119 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/include/csc_sampling_graph.cc
+ * @file csc_sampling_graph.cc
  * @brief Source file of sampling graph.
  */
 
-#include "csc_sampling_graph.h"
-
-#include "serialize.h"
+#include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/serialize.h>
 
 namespace graphbolt {
 namespace sampling {
 
-void HeteroInfo::Load(torch::serialize::InputArchive& archive) {
-  int64_t magic_num = 0x0;
-  utils::read_from_archive(archive, "HeteroInfo/magic_num", magic_num);
-  TORCH_CHECK(
-      magic_num == kHeteroInfoSerializeMagic,
-      "Magic numbers mismatch when loading HeteroInfo.");
-  utils::read_from_archive(archive, "HeteroInfo/node_types", node_types);
-  utils::read_from_archive(archive, "HeteroInfo/edge_types", edge_types);
-  utils::read_from_archive(
-      archive, "HeteroInfo/node_type_offset", node_type_offset);
-  utils::read_from_archive(archive, "HeteroInfo/type_per_edge", type_per_edge);
-}
-
-void HeteroInfo::Save(torch::serialize::OutputArchive& archive) const {
-  utils::write_to_archive(
-      archive, "HeteroInfo/magic_num", kHeteroInfoSerializeMagic);
-  utils::write_to_archive(archive, "HeteroInfo/node_types", node_types);
-  utils::write_to_archive(archive, "HeteroInfo/edge_types", edge_types);
-  utils::write_to_archive(
-      archive, "HeteroInfo/node_type_offset", node_type_offset);
-  utils::write_to_archive(archive, "HeteroInfo/type_per_edge", type_per_edge);
-}
-
 CSCSamplingGraph::CSCSamplingGraph(
-    int64_t num_nodes, torch::Tensor& indptr, torch::Tensor& indices,
-    const std::shared_ptr<HeteroInfo>& hetero_info)
-    : num_nodes_(num_nodes),
-      indptr_(indptr),
+    torch::Tensor& indptr, torch::Tensor& indices,
+    const torch::optional<torch::Tensor>& node_type_offset,
+    const torch::optional<torch::Tensor>& type_per_edge)
+    : indptr_(indptr),
       indices_(indices),
-      hetero_info_(hetero_info) {
-  TORCH_CHECK(num_nodes >= 0);
+      node_type_offset_(node_type_offset),
+      type_per_edge_(type_per_edge) {
   TORCH_CHECK(indptr.dim() == 1);
   TORCH_CHECK(indices.dim() == 1);
-  TORCH_CHECK(indptr.size(0) == num_nodes + 1);
   TORCH_CHECK(indptr.device() == indices.device());
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
-    int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices) {
-  return c10::make_intrusive<CSCSamplingGraph>(
-      num_nodes, indptr, indices, nullptr);
-}
-
-c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSCWithHeteroInfo(
-    int64_t num_nodes, torch::Tensor indptr, torch::Tensor indices,
-    const StringList& ntypes, const StringList& etypes,
-    torch::Tensor node_type_offset, torch::Tensor type_per_edge) {
-  TORCH_CHECK(node_type_offset.size(0) > 0);
-  TORCH_CHECK(node_type_offset.dim() == 1);
-  TORCH_CHECK(type_per_edge.size(0) > 0);
-  TORCH_CHECK(type_per_edge.dim() == 1);
-  TORCH_CHECK(node_type_offset.device() == type_per_edge.device());
-  TORCH_CHECK(type_per_edge.device() == indices.device());
-  TORCH_CHECK(!ntypes.empty());
-  TORCH_CHECK(!etypes.empty());
-  auto hetero_info = std::make_shared<HeteroInfo>(
-      ntypes, etypes, node_type_offset, type_per_edge);
+    torch::Tensor indptr, torch::Tensor indices,
+    const torch::optional<torch::Tensor>& node_type_offset,
+    const torch::optional<torch::Tensor>& type_per_edge) {
+  if (node_type_offset.has_value()) {
+    auto& offset = node_type_offset.value();
+    TORCH_CHECK(offset.dim() == 1);
+  }
+  if (type_per_edge.has_value()) {
+    TORCH_CHECK(type_per_edge.value().dim() == 1);
+    TORCH_CHECK(type_per_edge.value().size(0) == indices.size(0));
+  }
 
   return c10::make_intrusive<CSCSamplingGraph>(
-      num_nodes, indptr, indices, hetero_info);
+      indptr, indices, node_type_offset, type_per_edge);
 }
 
 void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
-  int64_t magic_num = 0x0;
-  utils::read_from_archive(archive, "CSCSamplingGraph/magic_num", magic_num);
+  const int64_t magic_num =
+      read_from_archive(archive, "CSCSamplingGraph/magic_num").toInt();
   TORCH_CHECK(
       magic_num == kCSCSamplingGraphSerializeMagic,
       "Magic numbers mismatch when loading CSCSamplingGraph.");
-  utils::read_from_archive(archive, "CSCSamplingGraph/num_nodes", num_nodes_);
-  utils::read_from_archive(archive, "CSCSamplingGraph/indptr", indptr_);
-  utils::read_from_archive(archive, "CSCSamplingGraph/indices", indices_);
-  bool is_heterogeneous = false;
-  utils::read_from_archive(
-      archive, "CSCSamplingGraph/is_hetero", is_heterogeneous);
-  if (is_heterogeneous) {
-    hetero_info_ = std::make_shared<HeteroInfo>();
-    hetero_info_->Load(archive);
+  indptr_ = read_from_archive(archive, "CSCSamplingGraph/indptr").toTensor();
+  indices_ = read_from_archive(archive, "CSCSamplingGraph/indices").toTensor();
+  if (read_from_archive(archive, "CSCSamplingGraph/has_node_type_offset")
+          .toBool()) {
+    node_type_offset_ =
+        read_from_archive(archive, "CSCSamplingGraph/node_type_offset")
+            .toTensor();
+  }
+  if (read_from_archive(archive, "CSCSamplingGraph/has_type_per_edge")
+          .toBool()) {
+    type_per_edge_ =
+        read_from_archive(archive, "CSCSamplingGraph/type_per_edge").toTensor();
   }
 }
 
 void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
-  archive.write(
-      "CSCSamplingGraph/magic_num",
-      torch::IValue(kCSCSamplingGraphSerializeMagic));
-  archive.write("CSCSamplingGraph/num_nodes", torch::IValue(num_nodes_));
+  archive.write("CSCSamplingGraph/magic_num", kCSCSamplingGraphSerializeMagic);
   archive.write("CSCSamplingGraph/indptr", indptr_);
   archive.write("CSCSamplingGraph/indices", indices_);
-  archive.write("CSCSamplingGraph/is_hetero", torch::IValue(IsHeterogeneous()));
-  if (IsHeterogeneous()) {
-    hetero_info_->Save(archive);
+  archive.write(
+      "CSCSamplingGraph/has_node_type_offset", node_type_offset_.has_value());
+  if (node_type_offset_) {
+    archive.write(
+        "CSCSamplingGraph/node_type_offset", node_type_offset_.value());
   }
+  archive.write(
+      "CSCSamplingGraph/has_type_per_edge", type_per_edge_.has_value());
+  if (type_per_edge_) {
+    archive.write("CSCSamplingGraph/type_per_edge", type_per_edge_.value());
+  }
+}
+
+c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
+    const torch::Tensor& nodes) const {
+  using namespace torch::indexing;
+  const int32_t kDefaultGrainSize = 100;
+  torch::Tensor indptr = torch::zeros_like(indptr_);
+  const size_t num_seeds = nodes.size(0);
+  std::vector<torch::Tensor> indices_arr(num_seeds);
+  std::vector<torch::Tensor> edge_ids_arr(num_seeds);
+  std::vector<torch::Tensor> type_per_edge_arr(num_seeds);
+  torch::parallel_for(
+      0, num_seeds, kDefaultGrainSize, [&](size_t start, size_t end) {
+        for (size_t i = start; i < end; ++i) {
+          const int64_t node_id = nodes[i].item<int64_t>();
+          const int64_t start_idx = indptr_[node_id].item<int64_t>();
+          const int64_t end_idx = indptr_[node_id + 1].item<int64_t>();
+          indptr[node_id + 1] = end_idx - start_idx;
+          indices_arr[i] = indices_.slice(0, start_idx, end_idx);
+          edge_ids_arr[i] = torch::arange(start_idx, end_idx);
+          if (type_per_edge_) {
+            type_per_edge_arr[i] =
+                type_per_edge_.value().slice(0, start_idx, end_idx);
+          }
+        }
+      });
+
+  const auto& nonzero_idx = torch::nonzero(indptr).reshape(-1);
+  torch::Tensor compact_indptr =
+      torch::zeros({nonzero_idx.size(0) + 1}, indptr_.dtype());
+  compact_indptr.index_put_({Slice(1, None)}, indptr.index({nonzero_idx}));
+  return c10::make_intrusive<SampledSubgraph>(
+      compact_indptr.cumsum(0), torch::cat(indices_arr), nonzero_idx - 1,
+      torch::arange(0, NumNodes()), torch::cat(edge_ids_arr),
+      type_per_edge_
+          ? torch::optional<torch::Tensor>{torch::cat(type_per_edge_arr)}
+          : torch::nullopt);
 }
 
 }  // namespace sampling
 }  // namespace graphbolt
-
-namespace torch {
-
-serialize::InputArchive& operator>>(
-    serialize::InputArchive& archive,
-    graphbolt::sampling::CSCSamplingGraph& graph) {
-  graph.Load(archive);
-  return archive;
-}
-
-serialize::OutputArchive& operator<<(
-    serialize::OutputArchive& archive,
-    const graphbolt::sampling::CSCSamplingGraph& graph) {
-  graph.Save(archive);
-  return archive;
-}
-
-}  // namespace torch

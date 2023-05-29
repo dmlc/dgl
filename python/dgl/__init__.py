@@ -19,8 +19,6 @@ from . import (
     container,
     cuda,
     dataloading,
-    dataloading2,
-    distributed,
     function,
     ops,
     random,
@@ -48,7 +46,6 @@ from .dataloading import (
     set_node_lazy_features,
     set_src_lazy_features,
 )
-from .dataloading2 import *
 from .heterograph import (  # pylint: disable=reimported
     DGLGraph,
     DGLGraph as DGLHeteroGraph,
@@ -66,3 +63,6 @@ from .frame import LazyFeature
 from .global_config import is_libxsmm_enabled, use_libxsmm
 from .utils import apply_each
 from .mpops import *
+
+if backend_name == "pytorch":
+    from . import distributed
