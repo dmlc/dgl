@@ -6,7 +6,6 @@ import os
 import time
 
 import numpy as np
-import torch
 
 from .. import backend as F
 from ..base import DGLError, EID, ETYPE, NID, NTYPE
