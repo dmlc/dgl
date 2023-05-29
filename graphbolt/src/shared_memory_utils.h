@@ -18,11 +18,14 @@
 namespace graphbolt {
 namespace sampling {
 
-/** @brief SharedMemoryTensors includes: (1) two share memory objects holding
+/**
+ * @brief SharedMemoryTensors includes: (1) two share memory objects holding
  * tensor meta information and data respectively; (2) a vector of tensors on
- * shared memory. */
-using SharedMemoryTensors =
-    std::tuple<SharedMemoryPtr, SharedMemoryPtr, std::vector<torch::Tensor>>;
+ * shared memory; (3) a vector of optional tensors on shared memory.
+ */
+using SharedMemoryTensors = std::tuple<
+    SharedMemoryPtr, SharedMemoryPtr, std::vector<torch::Tensor>,
+    std::vector<torch::optional<torch::Tensor>>>;
 
 /**
  * @brief Copy torch tensors to shared memory.
@@ -35,13 +38,15 @@ using SharedMemoryTensors =
  *
  * @param name The name of shared memory.
  * @param tensors The tensors to copy.
+ * @param optional_tensors The optional tensors to copy.
  * @param meta_memory_size The maximum size of meta memory.
  *
- * @return A tuple of tensor meta shared memory, tensor data shared memory and
- * shared tensors.
+ * @return A tuple of tensor meta shared memory, tensor data shared memory,
+ * shared tensors, and shared optional tensors.
  */
 SharedMemoryTensors CopyTensorsToSharedMemory(
     const std::string& name, const std::vector<torch::Tensor>& tensors,
+    const std::vector<torch::optional<torch::Tensor>>& optional_tensors,
     int64_t meta_memory_size);
 
 /**
@@ -52,8 +57,8 @@ SharedMemoryTensors CopyTensorsToSharedMemory(
  * @param name The name of shared memory.
  * @param meta_memory_size The maximum size of meta memory.
  *
- * @return A tuple of tensor meta shared memory, tensor data shared memory and
- * shared tensors.
+ * @return A tuple of tensor meta shared memory, tensor data shared memory,
+ * shared tensors, and shared optional tensors.
  */
 SharedMemoryTensors LoadTensorsFromSharedMemory(
     const std::string& name, int64_t meta_memory_size);

@@ -122,32 +122,19 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 
 static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryTensors(
     SharedMemoryTensors&& shared_memory_tensors) {
-  const auto& tensors = std::get<2>(shared_memory_tensors);
+  auto& tensors = std::get<2>(shared_memory_tensors);
+  auto& optional_tensors = std::get<3>(shared_memory_tensors);
   return c10::make_intrusive<CSCSamplingGraph>(
-      tensors[0], tensors[1],
-      tensors.size() > 2 ? torch::optional<torch::Tensor>{tensors[2]}
-                         : torch::nullopt,
-      tensors.size() > 3 ? torch::optional<torch::Tensor>{tensors[3]}
-                         : torch::nullopt,
+      tensors[0], tensors[1], optional_tensors[0], optional_tensors[1],
       std::move(std::get<0>(shared_memory_tensors)),
       std::move(std::get<1>(shared_memory_tensors)));
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
     const std::string& shared_memory_name) {
-  std::vector<torch::Tensor> tensors = {indptr_, indices_};
-  TORCH_CHECK(
-      !(!node_type_offset_.has_value() && type_per_edge_.has_value()),
-      "Cannot copy a graph with type_per_edge but without node_type_offset to "
-      "shared memory.");
-  if (node_type_offset_.has_value()) {
-    tensors.push_back(node_type_offset_.value());
-  }
-  if (type_per_edge_.has_value()) {
-    tensors.push_back(type_per_edge_.value());
-  }
   auto shared_memory_tensors = CopyTensorsToSharedMemory(
-      shared_memory_name, tensors, SERIALIZED_METAINFO_SIZE_MAX);
+      shared_memory_name, {indptr_, indices_},
+      {node_type_offset_, type_per_edge_}, SERIALIZED_METAINFO_SIZE_MAX);
   return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
 }
 

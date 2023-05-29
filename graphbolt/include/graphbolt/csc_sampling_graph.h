@@ -167,7 +167,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 
   /**
    * @brief Maximum number of bytes used to serialize the metadata of the
-   * member tensors, including tensor shape and dtype.
+   * member tensors, including tensor shape and dtype. The constant is estimated
+   * by multiplying the number of tensors in this class and the maximum number
+   * of bytes used to serialize the metadata of a tensor (4 * 8192 for now).
    */
   static constexpr int64_t SERIALIZED_METAINFO_SIZE_MAX = 32768;
 
