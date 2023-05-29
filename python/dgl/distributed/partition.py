@@ -1225,13 +1225,6 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
     num_parts = part_meta["num_parts"]
 
     # Utility functions.
-    def init_node_type_offset(graph, gpb):
-        ntype_ids = gpb.map_to_per_ntype(graph.ndata[NID])[0]
-        offset = torch.bincount(ntype_ids)
-        offset = torch.cat([torch.LongTensor([0]), offset])
-        offset = torch.cumsum(offset, 0)
-        return offset
-
     def init_type_per_edge(graph, gpb):
         etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
         return etype_ids
@@ -1246,15 +1239,12 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         metadata = graphbolt.GraphMetadata(ntypes, etypes)
         # Obtain CSC indtpr and indices.
         indptr, indices, _ = graph.adj().csc()
-        # Initialize node type offest.
-        node_type_offset = init_node_type_offset(graph, gpb)
         # Initalize type per edge.
         type_per_edge = init_type_per_edge(graph, gpb)
         # Sanity check.
-        assert len(node_type_offset) == len(ntypes) + 1
         assert len(type_per_edge) == graph.num_edges()
         csc_graph = graphbolt.from_csc(
-            indptr, indices, node_type_offset, type_per_edge, metadata
+            indptr, indices, None, type_per_edge, metadata
         )
         orig_graph_path = os.path.join(
             os.path.dirname(part_config),

@@ -605,13 +605,13 @@ def test_RangePartitionBook():
     expect_except = False
     try:
         gpb.to_canonical_etype(("node1", "edge2", "node2"))
-    except:
+    except BaseException:
         expect_except = True
     assert expect_except
     expect_except = False
     try:
         gpb.to_canonical_etype("edge2")
-    except:
+    except BaseException:
         expect_except = True
     assert expect_except
 
@@ -646,7 +646,7 @@ def test_RangePartitionBook():
     expect_except = False
     try:
         HeteroDataName(False, "edge1", "feat")
-    except:
+    except BaseException:
         expect_except = True
     assert expect_except
     data_name = HeteroDataName(False, c_etype, "feat")
@@ -690,6 +690,18 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         convert_dgl_partition_to_csc_sampling_graph(part_config)
+        for part_id in range(num_parts):
+            orig_g = dgl.load_graphs(
+                os.path.join(test_dir, f"part{part_id}/graph.dgl")
+            )[0][0]
+            new_g = dgl.graphbolt.load_csc_sampling_graph(
+                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            )
+            orig_indptr, orig_indices, _ = orig_g.adj().csc()
+            assert th.equal(orig_indptr, new_g.csc_indptr)
+            assert th.equal(orig_indices, new_g.indices)
+            assert new_g.node_type_offset is None
+            assert all(new_g.type_per_edge == 0)
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
@@ -705,3 +717,17 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         convert_dgl_partition_to_csc_sampling_graph(part_config)
+        for part_id in range(num_parts):
+            orig_g = dgl.load_graphs(
+                os.path.join(test_dir, f"part{part_id}/graph.dgl")
+            )[0][0]
+            new_g = dgl.graphbolt.load_csc_sampling_graph(
+                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            )
+            orig_indptr, orig_indices, _ = orig_g.adj().csc()
+            assert th.equal(orig_indptr, new_g.csc_indptr)
+            assert th.equal(orig_indices, new_g.indices)
+            assert set(g.ntypes) == set(new_g.metadata.node_type_to_id.keys())
+            assert set(g.canonical_etypes) == set(new_g.metadata.edge_type_to_id.keys())
+            assert new_g.node_type_offset is None
+            assert th.equal(orig_g.edata[dgl.ETYPE], new_g.type_per_edge)
