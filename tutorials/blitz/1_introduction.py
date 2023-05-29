@@ -64,7 +64,7 @@ import torch.nn.functional as F
 
 
 dataset = dgl.data.CoraGraphDataset()
-print("Number of categories:", dataset.num_classes)
+print(f"Number of categories: {dataset.num_classes}")
 
 
 ######################################################################
@@ -185,9 +185,7 @@ def train(g, model):
 
         if e % 5 == 0:
             print(
-                "In epoch {}, loss: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})".format(
-                    e, loss, val_acc, best_val_acc, test_acc, best_test_acc
-                )
+                f"In epoch {e}, loss: {loss:.3f}, val acc: {val_acc:.3f} (best {best_val_acc:.3f}), test acc: {test_acc:.3f} (best {best_test_acc:.3f})"
             )
 
 
