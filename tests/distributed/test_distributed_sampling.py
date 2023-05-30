@@ -30,7 +30,7 @@ def start_server(
     tmpdir,
     disable_shared_mem,
     graph_name,
-    graph_format=["csc", "coo"],
+    graph_format=["coo"],
     keep_alive=False,
 ):
     g = DistGraphServer(
