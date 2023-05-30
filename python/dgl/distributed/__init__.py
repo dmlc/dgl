@@ -9,6 +9,7 @@ from .graph_services import *
 from .kvstore import KVClient, KVServer
 from .nn import *
 from .partition import (
+    convert_dgl_partition_to_csc_sampling_graph,
     load_partition,
     load_partition_book,
     load_partition_feats,

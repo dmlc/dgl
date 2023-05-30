@@ -11,7 +11,8 @@
 #include <string>
 #include <vector>
 
-#include "sampled_subgraph.h"
+#include "./sampled_subgraph.h"
+#include "./shared_memory.h"
 
 namespace graphbolt {
 namespace sampling {
@@ -46,7 +47,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    */
   CSCSamplingGraph(
-      torch::Tensor& indptr, torch::Tensor& indices,
+      const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge);
 
@@ -62,7 +63,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @return CSCSamplingGraph
    */
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
-      torch::Tensor indptr, torch::Tensor indices,
+      const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge);
 
@@ -115,7 +116,39 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   c10::intrusive_ptr<SampledSubgraph> InSubgraph(
       const torch::Tensor& nodes) const;
 
+  /**
+   * @brief Copy the graph to shared memory.
+   * @param shared_memory_name The name of the shared memory.
+   *
+   * @return A new CSCSamplingGraph object on shared memory.
+   */
+  c10::intrusive_ptr<CSCSamplingGraph> CopyToSharedMemory(
+      const std::string& shared_memory_name);
+
+  /**
+   * @brief Load the graph from shared memory.
+   * @param shared_memory_name The name of the shared memory.
+   *
+   * @return A new CSCSamplingGraph object on shared memory.
+   */
+  static c10::intrusive_ptr<CSCSamplingGraph> LoadFromSharedMemory(
+      const std::string& shared_memory_name);
+
  private:
+  /**
+   * @brief Build a CSCSamplingGraph from shared memory tensors.
+   *
+   * @param shared_memory_tensors A tuple of two share memory objects holding
+   * tensor meta information and data respectively, and a vector of optional
+   * tensors on shared memory.
+   *
+   * @return A new CSCSamplingGraph on shared memory.
+   */
+  static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryTensors(
+      std::tuple<
+          SharedMemoryPtr, SharedMemoryPtr,
+          std::vector<torch::optional<torch::Tensor>>>&& shared_memory_tensors);
+
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
 
@@ -137,6 +170,22 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * edge types. The length of it is equal to the number of edges.
    */
   torch::optional<torch::Tensor> type_per_edge_;
+
+  /**
+   * @brief Maximum number of bytes used to serialize the metadata of the
+   * member tensors, including tensor shape and dtype. The constant is estimated
+   * by multiplying the number of tensors in this class and the maximum number
+   * of bytes used to serialize the metadata of a tensor (4 * 8192 for now).
+   */
+  static constexpr int64_t SERIALIZED_METAINFO_SIZE_MAX = 32768;
+
+  /**
+   * @brief Shared memory used to hold the tensor meta information and data of
+   * this class. By storing its shared memory objects, the graph controls the
+   * resources of shared memory, which will be released automatically when the
+   * graph is destroyed.
+   */
+  SharedMemoryPtr tensor_meta_shm_, tensor_data_shm_;
 };
 
 }  // namespace sampling
