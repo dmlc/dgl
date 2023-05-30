@@ -28,10 +28,12 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("indices", &CSCSamplingGraph::Indices)
       .def("node_type_offset", &CSCSamplingGraph::NodeTypeOffset)
       .def("type_per_edge", &CSCSamplingGraph::TypePerEdge)
-      .def("in_subgraph", &CSCSamplingGraph::InSubgraph);
+      .def("in_subgraph", &CSCSamplingGraph::InSubgraph)
+      .def("copy_to_shared_memory", &CSCSamplingGraph::CopyToSharedMemory);
   m.def("from_csc", &CSCSamplingGraph::FromCSC);
   m.def("load_csc_sampling_graph", &LoadCSCSamplingGraph);
   m.def("save_csc_sampling_graph", &SaveCSCSamplingGraph);
+  m.def("load_from_shared_memory", &CSCSamplingGraph::LoadFromSharedMemory);
 }
 
 }  // namespace sampling
