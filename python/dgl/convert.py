@@ -1690,7 +1690,7 @@ def _to_networkx_heterogeneous(
         if node_attrs is not None:
             assert (
                 ntype_attr not in node_attrs
-            ), f"'{ntype_attr}' already used as node type attribute"
+            ), f"'{ntype_attr}' already used as node type attribute, please provide a different value for ntype_attr"
 
             feat_dict = g._get_n_repr(ntype, orig_nid)
             attrs.update(
@@ -1710,7 +1710,7 @@ def _to_networkx_heterogeneous(
         if edge_attrs is not None:
             assert (
                 etype_attr not in edge_attrs
-            ), f"'{etype_attr}' already used as edge type attribute"
+            ), f"'{etype_attr}' already used as edge type attribute, please provide a different value for etype_attr"
 
             feat_dict = g._get_e_repr(etype, orig_eid)
             attrs.update(
