@@ -47,7 +47,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    */
   CSCSamplingGraph(
-      torch::Tensor& indptr, torch::Tensor& indices,
+      const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge);
 
@@ -63,7 +63,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @return CSCSamplingGraph
    */
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
-      torch::Tensor indptr, torch::Tensor indices,
+      const torch::Tensor indptr, const torch::Tensor indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge);
 
