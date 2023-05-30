@@ -212,19 +212,6 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
         )
 
 
-def check_tensors_on_the_same_shared_memory(t: torch.Tensor, t2: torch.Tensor):
-    """Check if two tensors are on the same shared memory.
-
-    Cannot use `.data_ptr()` here because the memory created by different
-    SharedMemory objects have different pointers.
-    """
-    old_t1 = t.clone()
-    v = torch.randint_like(t, 100)
-    t[:] = v
-    assert torch.equal(t, t2)
-    t[:] = old_t1
-
-
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
@@ -398,14 +385,27 @@ def test_in_subgraph_heterogeneous():
     )
 
 
+def check_tensors_on_the_same_shared_memory(t: torch.Tensor, t2: torch.Tensor):
+    """Check if two tensors are on the same shared memory.
+
+    This function copies a random tensor to `t` and checks whether `t2` has the
+    same random value. It cannot use `.data_ptr()` because the memory pointers
+    created by different `shm_open` calls are different.
+    """
+    old_t1 = t.clone()
+    v = torch.randint_like(t, 100)
+    t[:] = v
+    assert torch.equal(t, t2)
+    t[:] = old_t1
+
+
 @unittest.skipIf(
     F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
+    reason="CSCSamplingGraph is only supported on CPU.",
 )
 @pytest.mark.parametrize(
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
-@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
 def test_homo_graph_on_shared_memory(num_nodes, num_edges):
     csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
     graph = gb.from_csc(csc_indptr, indices)
@@ -440,7 +440,7 @@ def test_homo_graph_on_shared_memory(num_nodes, num_edges):
 
 @unittest.skipIf(
     F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
+    reason="CSCSamplingGraph is only supported on CPU.",
 )
 @pytest.mark.parametrize(
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
