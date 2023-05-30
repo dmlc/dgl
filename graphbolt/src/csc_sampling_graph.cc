@@ -26,7 +26,7 @@ CSCSamplingGraph::CSCSamplingGraph(
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
-    const torch::Tensor indptr, const torch::Tensor indices,
+    const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge) {
   if (node_type_offset.has_value()) {
