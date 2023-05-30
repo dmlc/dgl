@@ -1670,7 +1670,7 @@ def _to_networkx_homogeneous(g, node_attrs, edge_attrs):
 
 
 def _to_networkx_heterogeneous(
-    g, node_attrs, edge_attrs, ntype_attr, etype_attr
+    g, node_attrs, edge_attrs, ntype_attr, etype_attr, eid_attr
 ):
     nx_graph = nx.MultiDiGraph()
 
@@ -1705,7 +1705,7 @@ def _to_networkx_heterogeneous(
 
     for hom_eid, edata in enumerate(zip(hom_g.edata[EID], hom_g.edata[ETYPE])):
         orig_eid, etype = edata
-        attrs = {"id": hom_eid, etype_attr: etypes[etype]}
+        attrs = {eid_attr: hom_eid, etype_attr: etypes[etype]}
 
         if edge_attrs is not None:
             assert (
@@ -1733,6 +1733,7 @@ def to_networkx(
     edge_attrs=None,
     ntype_attr="ntype",
     etype_attr="etype",
+    eid_attr="id",
 ):
     """Convert a graph to a NetworkX graph and return.
 
@@ -1752,6 +1753,8 @@ def to_networkx(
         The name of the node attribute to store the node types in the NetworkX object. (Default: "ntype")
     etype_attr : str, optional
         The name of the edge attribute to store the edge canonical types in the NetworkX object. (Default: "etype")
+    eid_attr : str, optional
+        The name of the edge attribute to store the original edge ID in the NetworkX object. (Default: "id")
 
     Returns
     -------
@@ -1830,7 +1833,7 @@ def to_networkx(
         return _to_networkx_homogeneous(g, node_attrs, edge_attrs)
     else:
         return _to_networkx_heterogeneous(
-            g, node_attrs, edge_attrs, ntype_attr, etype_attr
+            g, node_attrs, edge_attrs, ntype_attr, etype_attr, eid_attr
         )
 
 
