@@ -9,6 +9,7 @@ import pytest
 import torch as th
 from dgl import function as fn
 from dgl.distributed import (
+    convert_dgl_partition_to_csc_sampling_graph,
     load_partition,
     load_partition_book,
     load_partition_feats,
@@ -604,13 +605,13 @@ def test_RangePartitionBook():
     expect_except = False
     try:
         gpb.to_canonical_etype(("node1", "edge2", "node2"))
-    except:
+    except BaseException:
         expect_except = True
     assert expect_except
     expect_except = False
     try:
         gpb.to_canonical_etype("edge2")
-    except:
+    except BaseException:
         expect_except = True
     assert expect_except
 
@@ -645,7 +646,7 @@ def test_RangePartitionBook():
     expect_except = False
     try:
         HeteroDataName(False, "edge1", "feat")
-    except:
+    except BaseException:
         expect_except = True
     assert expect_except
     data_name = HeteroDataName(False, c_etype, "feat")
@@ -674,3 +675,65 @@ def test_UnknownPartitionBook():
         except Exception as e:
             if not isinstance(e, TypeError):
                 raise e
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+def test_convert_dgl_partition_to_csc_sampling_graph_homo(
+    part_method, num_parts
+):
+    with tempfile.TemporaryDirectory() as test_dir:
+        g = create_random_graph(1000)
+        graph_name = "test"
+        partition_graph(
+            g, graph_name, num_parts, test_dir, part_method=part_method
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        convert_dgl_partition_to_csc_sampling_graph(part_config)
+        for part_id in range(num_parts):
+            orig_g = dgl.load_graphs(
+                os.path.join(test_dir, f"part{part_id}/graph.dgl")
+            )[0][0]
+            new_g = dgl.graphbolt.load_csc_sampling_graph(
+                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            )
+            orig_indptr, orig_indices, _ = orig_g.adj().csc()
+            assert th.equal(orig_indptr, new_g.csc_indptr)
+            assert th.equal(orig_indices, new_g.indices)
+            assert new_g.node_type_offset is None
+            assert all(new_g.type_per_edge == 0)
+            for node_type, type_id in new_g.metadata.node_type_to_id.items():
+                assert g.get_ntype_id(node_type) == type_id
+            for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
+                assert g.get_etype_id(edge_type) == type_id
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
+    part_method, num_parts
+):
+    with tempfile.TemporaryDirectory() as test_dir:
+        g = create_random_hetero()
+        graph_name = "test"
+        partition_graph(
+            g, graph_name, num_parts, test_dir, part_method=part_method
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        convert_dgl_partition_to_csc_sampling_graph(part_config)
+        for part_id in range(num_parts):
+            orig_g = dgl.load_graphs(
+                os.path.join(test_dir, f"part{part_id}/graph.dgl")
+            )[0][0]
+            new_g = dgl.graphbolt.load_csc_sampling_graph(
+                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            )
+            orig_indptr, orig_indices, _ = orig_g.adj().csc()
+            assert th.equal(orig_indptr, new_g.csc_indptr)
+            assert th.equal(orig_indices, new_g.indices)
+            for node_type, type_id in new_g.metadata.node_type_to_id.items():
+                assert g.get_ntype_id(node_type) == type_id
+            for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
+                assert g.get_etype_id(edge_type) == type_id
+            assert new_g.node_type_offset is None
+            assert th.equal(orig_g.edata[dgl.ETYPE], new_g.type_per_edge)
