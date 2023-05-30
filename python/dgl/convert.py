@@ -1712,7 +1712,7 @@ def _to_networkx_heterogeneous(
                 etype_attr not in edge_attrs
             ), f"'{etype_attr}' already used as edge type attribute, please provide a different value for etype_attr"
             assert (
-                    eid_attr not in edge_attrs
+                eid_attr not in edge_attrs
             ), f"'{eid_attr}' already used as edge ID attribute, please provide a different value for etype_attr"
 
             feat_dict = g._get_e_repr(etype, orig_eid)
