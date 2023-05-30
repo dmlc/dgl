@@ -385,18 +385,20 @@ def test_in_subgraph_heterogeneous():
     )
 
 
-def check_tensors_on_the_same_shared_memory(t: torch.Tensor, t2: torch.Tensor):
+def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     """Check if two tensors are on the same shared memory.
 
-    This function copies a random tensor to `t` and checks whether `t2` has the
-    same random value. It cannot use `.data_ptr()` because the memory pointers
-    created by different `shm_open` calls are different.
+    This function copies a random tensor value to `t1` and checks whether `t2`
+    holds the same random value and checks whether t2 is a distinct tensor
+    object from `t1`. Their equality confirms that they are separate tensors
+    that rely on the shared memory for their tensor value.
     """
-    old_t1 = t.clone()
-    v = torch.randint_like(t, 100)
-    t[:] = v
-    assert torch.equal(t, t2)
-    t[:] = old_t1
+    assert t1.data_ptr() != t2.data_ptr()
+    old_t1 = t1.clone()
+    v = torch.randint_like(t1, 100)
+    t1[:] = v
+    assert torch.equal(t1, t2)
+    t1[:] = old_t1
 
 
 @unittest.skipIf(
