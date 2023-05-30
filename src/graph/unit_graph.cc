@@ -1529,20 +1529,15 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
 }
 
 HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
-  if (formats == ALL_CODE)
-    return HeteroGraphPtr(
-        // TODO(xiangsx) Make it as graph storage.Clone()
-        new UnitGraph(
-            meta_graph_,
-            (in_csr_->defined()) ? CSRPtr(new CSR(*in_csr_)) : nullptr,
-            (out_csr_->defined()) ? CSRPtr(new CSR(*out_csr_)) : nullptr,
-            (coo_->defined()) ? COOPtr(new COO(*coo_)) : nullptr, formats));
-  int64_t num_vtypes = NumVertexTypes();
-  if (formats & COO_CODE)
-    return CreateFromCOO(num_vtypes, GetCOO(false)->adj(), formats);
-  if (formats & CSR_CODE)
-    return CreateFromCSR(num_vtypes, GetOutCSR(false)->adj(), formats);
-  return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
+  COOPtr coo_ptr = nullptr;
+  CSRPtr in_csr_ptr = nullptr;
+  CSRPtr out_csr_ptr = nullptr;
+  if (formats & COO_CODE) coo_ptr = GetCOO(false);
+  if (formats & CSC_CODE) in_csr_ptr = GetInCSR(false);
+  if (formats & CSR_CODE) out_csr_ptr = GetOutCSR(false);
+
+  return HeteroGraphPtr(
+      new UnitGraph(meta_graph_, in_csr_ptr, out_csr_ptr, coo_ptr, formats));
 }
 
 SparseFormat UnitGraph::SelectFormat(
