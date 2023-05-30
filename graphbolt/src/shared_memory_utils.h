@@ -28,7 +28,7 @@ using SharedMemoryTensors = std::tuple<
     std::vector<torch::optional<torch::Tensor>>>;
 
 /**
- * @brief Copy optional torch tensors to shared memory.
+ * @brief Copy torch tensors to shared memory.
  *
  * To simpilfy this interface, a regular tensor is also wrapped as an optional
  * one.
@@ -39,8 +39,11 @@ using SharedMemoryTensors = std::tuple<
  * 2. Copy tensors to shared memory `shared_memory_name + "_data"`, which can be
  * loaded by other processes with meta info.
  *
+ * The order of tensors loaded from `LoadTensorsFromSharedMemory` will be
+ * exactly the same as the tensors copied from `CopyTensorsToSharedMemory`.
+ *
  * @param name The name of shared memory.
- * @param optional_tensors The optional tensors to copy.
+ * @param tensors The tensors to copy.
  * @param max_meta_memory_size The maximum size of meta memory.
  *
  * @return A tuple of tensor meta shared memory, tensor data shared memory, and
@@ -48,7 +51,7 @@ using SharedMemoryTensors = std::tuple<
  */
 SharedMemoryTensors CopyTensorsToSharedMemory(
     const std::string& name,
-    const std::vector<torch::optional<torch::Tensor>>& optional_tensors,
+    const std::vector<torch::optional<torch::Tensor>>& tensors,
     int64_t max_meta_memory_size);
 
 /**
@@ -58,7 +61,7 @@ SharedMemoryTensors CopyTensorsToSharedMemory(
  * @param max_meta_memory_size The maximum size of meta memory.
  *
  * @return A tuple of tensor meta shared memory, tensor data shared memory,
- * and shared optional tensors.
+ * and shared tensors.
  */
 SharedMemoryTensors LoadTensorsFromSharedMemory(
     const std::string& name, int64_t max_meta_memory_size);
