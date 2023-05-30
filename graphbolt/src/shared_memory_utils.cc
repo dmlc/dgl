@@ -68,7 +68,7 @@ static SharedMemoryPtr CopyTensorsDataToSharedMemory(
  * @param tensor_metas The meta info of tensors, including a flag indicating
  * whether the optional tensor has value, tensor shape and dtype.
  *
- * @return A pair of shared memory holing the tensors and the tensors.
+ * @return A pair of shared memory holding the tensors.
  */
 static std::pair<SharedMemoryPtr, std::vector<torch::optional<torch::Tensor>>>
 LoadTensorsDataFromSharedMemory(
