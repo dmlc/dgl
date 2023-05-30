@@ -6,8 +6,13 @@ def get_nodes_by_ntype(nodes, ntype):
     return dict((k, v) for k, v in nodes.items() if v["ntype"] == ntype)
 
 
+def edge_attrs(edge):
+    # Edges in Networkx are in the format (src, dst, attrs)
+    return edge[2]
+
+
 def get_edges_by_etype(edges, etype):
-    return [e for e in edges if e[2]["etype"] == etype]
+    return [e for e in edges if edge_attrs(e)["etype"] == etype]
 
 
 def check_attrs_for_nodes(nodes, attrs):
@@ -21,11 +26,13 @@ def check_attr_values_for_nodes(nodes, attr_name, values):
 
 
 def check_attrs_for_edges(edges, attrs):
-    return all(e[2].keys() == attrs for e in edges)
+    return all(edge_attrs(e).keys() == attrs for e in edges)
 
 
 def check_attr_values_for_edges(edges, attr_name, values):
-    return F.allclose(F.stack([e[2][attr_name] for e in edges], 0), values)
+    return F.allclose(
+        F.stack([edge_attrs(e)[attr_name] for e in edges], 0), values
+    )
 
 
 def test_to_networkx():
@@ -74,7 +81,9 @@ def test_to_networkx():
     # Test edges
     nxg_edges = list(nxg.edges(data=True))
     assert len(nxg_edges) == g.num_edges()
-    assert {e[2]["etype"] for e in nxg_edges} == set(g.canonical_etypes)
+    assert {edge_attrs(e)["etype"] for e in nxg_edges} == set(
+        g.canonical_etypes
+    )
 
     nxg_edges_by_etype = {}
     for etype in g.canonical_etypes:
