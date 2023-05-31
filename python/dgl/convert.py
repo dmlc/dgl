@@ -1644,6 +1644,9 @@ def bipartite_from_networkx(
 
 
 def _to_networkx_homogeneous(g, node_attrs, edge_attrs):
+    # TODO: consider adding an eid_attr parameter as in
+    #  `_to_networkx_heterogeneous` when this function is properly tested
+    # (see GitHub issue #5735)
     src, dst = g.edges()
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)
