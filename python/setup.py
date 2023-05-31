@@ -138,7 +138,9 @@ def config_cython():
                     language="c++",
                 )
             )
-        return cythonize(ret, force=True)
+        return cythonize(
+            ret, force=True, compiler_directives={"language_level": "3"}
+        )
     except ImportError:
         print(
             "WARNING: Cython is not installed, will compile without cython module"
@@ -151,9 +153,7 @@ def copy_lib(lib_name, backend=""):
         os.path.join(dir_, lib_name, backend, get_lib_pattern(lib_name))
     ):
         lib_file_name = os.path.basename(lib_path)
-        dst_dir_ = os.path.dirname(
-            os.path.join(CURRENT_DIR, "dgl", lib_name, backend)
-        )
+        dst_dir_ = os.path.join(CURRENT_DIR, "dgl", lib_name, backend)
         os.makedirs(
             dst_dir_,
             exist_ok=True,
@@ -162,7 +162,7 @@ def copy_lib(lib_name, backend=""):
             os.path.join(dir_, lib_name, backend, lib_file_name),
             dst_dir_,
         )
-        fo.write("include dgl/tensoradapter/%s/%s\n" % (backend, lib_file_name))
+        fo.write(f"include dgl/{lib_name}/{backend}/{lib_file_name}\n")
 
 
 include_libs = False
@@ -194,7 +194,7 @@ if wheel_include_libs:
 
 def get_lib_file_path(lib_name, backend=""):
     return (
-        f"dgl/{lib_name}" if backend == "" else f"dgl/{lib_name}/{backend}",
+        f"dgl/{lib_name}/{backend}",
         glob.glob(
             os.path.join(
                 os.path.dirname(os.path.relpath(path, CURRENT_DIR)),
