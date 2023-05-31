@@ -18,19 +18,18 @@
  *   EtypeType *data = static_cast<EtypeType *>(type_per_edge.data_ptr());
  * });
  */
-#define ATEN_ETYPE_TYPE_SWITCH(val, EtypeType, ...)    \
-  do {                                                 \
-    if ((val) == torch::kInt8 ||         \
-        (val) == torch::kUInt8) {        \
-      typedef uint8_t EtypeType;                       \
-      { __VA_ARGS__ }                                  \
-    } else if ((val) == torch::kInt16) { \
-      typedef uint16_t EtypeType;                      \
-      { __VA_ARGS__ }                                  \
-    } else {                                           \
-      typedef uint64_t EtypeType;                      \
-      { __VA_ARGS__ }                                  \
-    }                                                  \
+#define ATEN_ETYPE_TYPE_SWITCH(val, EtypeType, ...)        \
+  do {                                                     \
+    if ((val) == torch::kInt8 || (val) == torch::kUInt8) { \
+      typedef uint8_t EtypeType;                           \
+      { __VA_ARGS__ }                                      \
+    } else if ((val) == torch::kInt16) {                   \
+      typedef uint16_t EtypeType;                          \
+      { __VA_ARGS__ }                                      \
+    } else {                                               \
+      typedef uint64_t EtypeType;                          \
+      { __VA_ARGS__ }                                      \
+    }                                                      \
   } while (0)
 
 #endif  // GRAPHBOLT_MACRO_H_

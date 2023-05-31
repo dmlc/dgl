@@ -47,12 +47,9 @@ class GraphMetadata:
             set(node_type_ids)
         ), "Multiple node types shoud not be mapped to a same id."
         # Validate edge_type_to_id.
-        edges = set()
         for edge_type in edge_types:
             src, edge, dst = edge_type
             assert isinstance(edge, str), "Edge type name should be string."
-            assert edge not in edges, f"Edge type {edge} is defined repeatedly."
-            edges.add(edge)
             assert (
                 src in node_types
             ), f"Unrecognized node type {src} in edge type {edge_type}"
@@ -173,6 +170,48 @@ class CSCSamplingGraph:
         """
         return self._metadata
 
+    def in_subgraph(self, nodes: torch.Tensor) -> torch.ScriptObject:
+        """Return the subgraph induced on the inbound edges of the given nodes.
+
+        An in subgraph is equivalent to creating a new graph using the incoming
+        edges of the given nodes.
+
+        Parameters
+        ----------
+        nodes : torch.Tensor
+            The nodes to form the subgraph which are type agnostic.
+
+        Returns
+        -------
+        SampledSubgraph
+            The in subgraph.
+        """
+        # Ensure nodes is 1-D tensor.
+        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
+        # Ensure that there are no duplicate nodes.
+        assert len(torch.unique(nodes)) == len(
+            nodes
+        ), "Nodes cannot have duplicate values."
+        return self._c_csc_graph.in_subgraph(nodes)
+
+    def copy_to_shared_memory(self, shared_memory_name: str):
+        """Copy the graph to shared memory.
+
+        Parameters
+        ----------
+        shared_memory_name : str
+            Name of the shared memory.
+
+        Returns
+        -------
+        CSCSamplingGraph
+            The copied CSCSamplingGraph object on shared memory.
+        """
+        return CSCSamplingGraph(
+            self._c_csc_graph.copy_to_shared_memory(shared_memory_name),
+            self._metadata,
+        )
+
 
 def from_csc(
     csc_indptr: torch.Tensor,
@@ -226,6 +265,28 @@ def from_csc(
         torch.ops.graphbolt.from_csc(
             csc_indptr, indices, node_type_offset, type_per_edge
         ),
+        metadata,
+    )
+
+
+def load_from_shared_memory(
+    shared_memory_name: str,
+    metadata: Optional[GraphMetadata] = None,
+) -> CSCSamplingGraph:
+    """Load a CSCSamplingGraph object from shared memory.
+
+    Parameters
+    ----------
+    shared_memory_name : str
+        Name of the shared memory.
+
+    Returns
+    -------
+    CSCSamplingGraph
+        The loaded CSCSamplingGraph object on shared memory.
+    """
+    return CSCSamplingGraph(
+        torch.ops.graphbolt.load_from_shared_memory(shared_memory_name),
         metadata,
     )
 
