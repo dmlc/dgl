@@ -7,6 +7,8 @@
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
 #include <graphbolt/sampled_subgraph.h>
+#include <torch/custom_class.h>
+#include <torch/torch.h>
 
 #include <string>
 #include <vector>
@@ -71,18 +73,24 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param seed_nodes The tensor containing the seed nodes.
    * @param fanouts The tensor containing the number of neighbors to sample per
    * edge type.
-   * @param replace Boolean indicating if sampling is done with replacement.
+   * @param replace Boolean indicating if sampling is done with replacement. If
+   * set, one element can be picked multiple times.
    * @param return_eids Boolean indicating if edge IDs are required to return,
    * which is usually used when edge features are required.
-   * @param probs Optional tensor containing probabilities for sampling. Dtype
-   * should be bool or float.
+   * @param consider_etype Boolean indicating if considering edge type during
+   * sampling, if set, sampling for each edge type of each seed node, otherwise
+   * just sample once for each node.
+   * @param probs Optional tensor containing probabilities for sampling. Shape
+   * is
+   * '(num_edges,)' and Dtype should be bool or float.
    *
-   * @return A pointer to a SampledSubgraph object representing the sampled
+   * @return A pointer to a SampledSubgraph object representing the sampled csc
    * subgraph.
    */
   c10::intrusive_ptr<SampledSubgraph> SampleEtypeNeighbors(
-      torch::Tensor seed_nodes, torch::Tensor fanouts, bool replace,
-      bool return_eids, const torch::optional<torch::Tensor>& probs);
+      const torch::Tensor& seed_nodes, const torch::Tensor& fanouts,
+      bool replace, bool return_eids, bool consider_etype,
+      const torch::optional<torch::Tensor>& probs);
 
   /** @brief Get the number of nodes. */
   int64_t NumNodes() const { return indptr_.size(0) - 1; }
@@ -147,6 +155,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    */
   torch::optional<torch::Tensor> type_per_edge_;
 };
+
+using CSCPtr = CSCSamplingGraph*;
 
 }  // namespace sampling
 }  // namespace graphbolt
