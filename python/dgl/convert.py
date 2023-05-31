@@ -1691,9 +1691,10 @@ def _to_networkx_heterogeneous(
         attrs = {ntype_attr: ntypes[ntype]}
 
         if node_attrs is not None:
-            assert (
-                ntype_attr not in node_attrs
-            ), f"'{ntype_attr}' already used as node type attribute, please provide a different value for ntype_attr"
+            assert ntype_attr not in node_attrs, (
+                f"'{ntype_attr}' already used as node type attribute, "
+                f"please provide a different value for ntype_attr"
+            )
 
             feat_dict = g._get_n_repr(ntype, orig_nid)
             attrs.update(
@@ -1711,12 +1712,14 @@ def _to_networkx_heterogeneous(
         attrs = {eid_attr: hom_eid, etype_attr: etypes[etype]}
 
         if edge_attrs is not None:
-            assert (
-                etype_attr not in edge_attrs
-            ), f"'{etype_attr}' already used as edge type attribute, please provide a different value for etype_attr"
-            assert (
-                eid_attr not in edge_attrs
-            ), f"'{eid_attr}' already used as edge ID attribute, please provide a different value for eid_attr"
+            assert etype_attr not in edge_attrs, (
+                f"'{etype_attr}' already used as edge type attribute, "
+                f"please provide a different value for etype_attr"
+            )
+            assert eid_attr not in edge_attrs, (
+                f"'{eid_attr}' already used as edge ID attribute, "
+                f"please provide a different value for eid_attr"
+            )
 
             feat_dict = g._get_e_repr(etype, orig_eid)
             attrs.update(
@@ -1754,13 +1757,17 @@ def to_networkx(
     node_attrs : iterable of str, optional
         The node attributes to copy from ``g.ndata``. (Default: None)
     edge_attrs : iterable of str, optional
-        The edge attributes to copy from ``g.edata``. (Default: None)
+        The edge attributes to copy from ``g.edata``.
+        (Default: None)
     ntype_attr : str, optional
-        The name of the node attribute to store the node types in the NetworkX object. (Default: "ntype")
+        The name of the node attribute to store the node types in the NetworkX object.
+        (Default: "ntype")
     etype_attr : str, optional
-        The name of the edge attribute to store the edge canonical types in the NetworkX object. (Default: "etype")
+        The name of the edge attribute to store the edge canonical types in the NetworkX object.
+        (Default: "etype")
     eid_attr : str, optional
-        The name of the edge attribute to store the original edge ID in the NetworkX object. (Default: "id")
+        The name of the edge attribute to store the original edge ID in the NetworkX object.
+        (Default: "id")
 
     Returns
     -------
@@ -1786,13 +1793,17 @@ def to_networkx(
     >>> g.edata['h2'] = torch.zeros(2, 2)
     >>> nx_g = dgl.to_networkx(g, node_attrs=['h'], edge_attrs=['h1', 'h2'])
     >>> nx_g.nodes(data=True)
-    NodeDataView({0: {'h': tensor([0.])},
-                  1: {'h': tensor([0.])},
-                  2: {'h': tensor([0.])},
-                  3: {'h': tensor([0.])}})
+    NodeDataView({
+        0: {'h': tensor([0.])},
+        1: {'h': tensor([0.])},
+        2: {'h': tensor([0.])},
+        3: {'h': tensor([0.])}
+    })
     >>> nx_g.edges(data=True)
-    OutMultiEdgeDataView([(1, 1, {'id': 0, 'h1': tensor([1.]), 'h2': tensor([0., 0.])}),
-                          (2, 3, {'id': 1, 'h1': tensor([1.]), 'h2': tensor([0., 0.])})])
+    OutMultiEdgeDataView([
+        (1, 1, {'id': 0, 'h1': tensor([1.]), 'h2': tensor([0., 0.])}),
+        (2, 3, {'id': 1, 'h1': tensor([1.]), 'h2': tensor([0., 0.])})
+    ])
 
     With a heterogeneous graph:
 
@@ -1811,25 +1822,29 @@ def to_networkx(
     ... }
     >>> nx_g = dgl.to_networkx(g, node_attrs=['n'], edge_attrs=['e'])
     >>> nx_g.nodes(data=True)
-    NodeDataView({0: {'ntype': 'game', 'n': tensor([0.])},
-                  1: {'ntype': 'game', 'n': tensor([0.])},
-                  2: {'ntype': 'game', 'n': tensor([0.])},
-                  3: {'ntype': 'game', 'n': tensor([0.])},
-                  4: {'ntype': 'game', 'n': tensor([0.])},
-                  5: {'ntype': 'topic'},
-                  6: {'ntype': 'topic'},
-                  7: {'ntype': 'topic'},
-                  8: {'ntype': 'user', 'n': tensor([1.])},
-                  9: {'ntype': 'user', 'n': tensor([1.])},
-                  10: {'ntype': 'user', 'n': tensor([1.])},
-                  11: {'ntype': 'user', 'n': tensor([1.])}})
+    NodeDataView({
+        0: {'ntype': 'game', 'n': tensor([0.])},
+        1: {'ntype': 'game', 'n': tensor([0.])},
+        2: {'ntype': 'game', 'n': tensor([0.])},
+        3: {'ntype': 'game', 'n': tensor([0.])},
+        4: {'ntype': 'game', 'n': tensor([0.])},
+        5: {'ntype': 'topic'},
+        6: {'ntype': 'topic'},
+        7: {'ntype': 'topic'},
+        8: {'ntype': 'user', 'n': tensor([1.])},
+        9: {'ntype': 'user', 'n': tensor([1.])},
+        10: {'ntype': 'user', 'n': tensor([1.])},
+        11: {'ntype': 'user', 'n': tensor([1.])}
+    })
     >>> nx_g.edges(data=True)
-    OutMultiEdgeDataView([(8, 9, {'id': 2, 'etype': ('user', 'follows', 'user'), 'e': tensor([0.])}),
-                          (8, 3, {'id': 4, 'etype': ('user', 'plays', 'game'), 'e': tensor([1.])}),
-                          (9, 6, {'id': 0, 'etype': ('user', 'follows', 'topic')}),
-                          (9, 7, {'id': 1, 'etype': ('user', 'follows', 'topic')}),
-                          (9, 10, {'id': 3, 'etype': ('user', 'follows', 'user'), 'e': tensor([0.])}),
-                          (11, 4, {'id': 5, 'etype': ('user', 'plays', 'game'), 'e': tensor([1.])})])
+    OutMultiEdgeDataView([
+        (8, 9, {'id': 2, 'etype': ('user', 'follows', 'user'), 'e': tensor([0.])}),
+        (8, 3, {'id': 4, 'etype': ('user', 'plays', 'game'), 'e': tensor([1.])}),
+        (9, 6, {'id': 0, 'etype': ('user', 'follows', 'topic')}),
+        (9, 7, {'id': 1, 'etype': ('user', 'follows', 'topic')}),
+        (9, 10, {'id': 3, 'etype': ('user', 'follows', 'user'), 'e': tensor([0.])}),
+        (11, 4, {'id': 5, 'etype': ('user', 'plays', 'game'), 'e': tensor([1.])})
+    ])
     """
     if g.device != F.cpu():
         raise DGLError(
