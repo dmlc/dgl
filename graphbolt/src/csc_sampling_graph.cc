@@ -48,7 +48,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleEtypeNeighbors(
     const torch::Tensor& seed_nodes, const torch::Tensor& fanouts, bool replace,
     bool return_eids, bool consider_etype,
     const torch::optional<torch::Tensor>& probs) {
-  rerurn ColumnWiseSampling(
+  return ColumnWiseSampling(
       this, seed_nodes, fanouts, replace, return_eids, consider_etype, probs);
 }
 
