@@ -53,7 +53,7 @@
  * Dispatch according to float or bool type for probaility
  *
  */
-#define ATEN_PROB_TYPE_SWITCH(val, ProbType, ...)                          \
+#define ATEN_PROB_TYPE_SWITCH(val, ProbType, ...)                           \
   do {                                                                      \
     if ((val) == torch::kBool || (val) == torch::kUInt8) {                  \
       typedef uint8_t ProbType;                                             \

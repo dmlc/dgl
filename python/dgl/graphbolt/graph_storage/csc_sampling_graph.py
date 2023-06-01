@@ -180,7 +180,7 @@ class CSCSamplingGraph:
         probs=None,
         replace=False,
         return_eids=False,
-        consider_etype = True,
+        consider_etype=True,
     ) -> Tuple[torch.tensor, torch.tensor]:
         """Sample neighboring edges of the given nodes and return the induced subgraph.
 
@@ -209,16 +209,23 @@ class CSCSamplingGraph:
         if not torch.is_tensor(seed_nodes) or not seed_nodes.ndim == 1:
             raise TypeError("The seed_nodes should be a 1D tensor")
         if self.metadata and self.metadata.edge_type_to_id:
-            assert len(self.metadata.edge_type_to_id) == len(fanouts), "fanouts should have same length as edge types."
+            assert len(self.metadata.edge_type_to_id) == len(
+                fanouts
+            ), "fanouts should have same length as edge types."
         if not torch.is_tensor(fanouts) or not fanouts.ndim == 1:
             raise TypeError("The fanout should be a 1D tensor")
-        assert torch.all((fanouts >= 0) | (fanouts== -1)), "fanouts value should be -1 or >= 0."
+        assert torch.all(
+            (fanouts >= 0) | (fanouts == -1)
+        ), "fanouts value should be -1 or >= 0."
         if probs is not None:
             assert probs.ndim == 1, "probs should be a 1D tensor."
-            assert probs.shape[0] == self.indices.shape[0],  "probs should have same length as edges."
+            assert (
+                probs.shape[0] == self.indices.shape[0]
+            ), "probs should have same length as edges."
         return self._c_csc_graph.sample_etype_neighbors(
             seed_nodes, fanouts, replace, return_eids, consider_etype, probs
         )
+
 
 def from_csc(
     csc_indptr: torch.Tensor,

@@ -5,8 +5,9 @@
  */
 
 #include "columnwise_pick.h"
+
 #include "random.h"
-#include <chrono>
+
 using namespace graphbolt::runtime;
 
 namespace graphbolt {
@@ -42,14 +43,13 @@ inline RangePickFn<IdxType> GetRangePickFn(
   return pick_fn;
 }
 
-NumPickFn GetNumPickFn(
+template <typename IdxType, typename ProbType>
+NumPickFn<IdxType> GetNumPickFn(
     const torch::optional<torch::Tensor>& probs, bool replace) {
-  NumPickFn num_pick_fn;
+  NumPickFn<IdxType> num_pick_fn;
   if (!probs.has_value()) {
-    num_pick_fn =
-        [replace](int64_t start, int64_t end, int64_t num_samples) -> int64_t {
-      auto len = end - start;
-      const int64_t max_num_picks = (num_samples == -1) ? len : num_samples;
+    num_pick_fn = [replace](IdxType off, IdxType len, IdxType num_samples) {
+      const IdxType max_num_picks = (num_samples == -1) ? len : num_samples;
       if (replace) {
         return len == 0 ? 0 : max_num_picks;
       } else {
@@ -58,11 +58,16 @@ NumPickFn GetNumPickFn(
     };
   } else {
     num_pick_fn = [probs, replace](
-                      int64_t start, int64_t end,
-                      int64_t num_samples) -> int64_t {
-      const auto probs_data = probs.value().slice(0, start, end);
-      auto nnz = (probs_data > 0).sum().item<int64_t>();
-      const int64_t max_num_picks = (num_samples == -1) ? nnz : num_samples;
+                      IdxType off, IdxType len, IdxType num_samples) {
+      const ProbType* probs_data =
+          reinterpret_cast<ProbType*>(probs.value().data_ptr());
+      probs_data += off;
+      IdxType nnz = 0;
+      for (IdxType eid = off; eid < off + len; ++eid) {
+        if (probs_data[eid] > 0) ++nnz;
+      }
+
+      const IdxType max_num_picks = (num_samples == -1) ? nnz : num_samples;
       if (replace) {
         return nnz == 0 ? 0 : max_num_picks;
       } else {
@@ -73,41 +78,51 @@ NumPickFn GetNumPickFn(
   return num_pick_fn;
 }
 
-template <typename EtypeIdType>
-int64_t GetPickNumOfOneColumnConsiderEtype(
-    std::vector<int64_t>& picked_nums, int64_t seed_node_off, int64_t begin_eid,
-    int64_t end_eid, int64_t* fanouts, int64_t num_fanouts,
-    const EtypeIdType* type_per_edge_data, NumPickFn num_pick_fn) {
-  int64_t count = 0;
-  for (int64_t r = begin_eid, l = begin_eid; r < end_eid; l = r) {
+/**
+ * @brief Calculate pick number for one column with considering etype.
+ */
+template <typename EdgeIdType, typename EtypeIdType>
+EdgeIdType PickNumEtype(
+    std::vector<EdgeIdType>& picked_nums, EdgeIdType seed_node_off,
+    EdgeIdType begin_eid, EdgeIdType end_eid, const int64_t* fanouts,
+    int64_t num_fanouts, const EtypeIdType* type_per_edge_data,
+    NumPickFn<EdgeIdType> num_pick_fn) {
+  EdgeIdType count = 0;
+  for (EdgeIdType r = begin_eid, l = begin_eid; r < end_eid; l = r) {
     auto etype = type_per_edge_data[r];
     while (r < end_eid && type_per_edge_data[r] == etype) r++;
-    auto fanout = fanouts[static_cast<int>(etype)];
-    auto picked_num = num_pick_fn(l, r, fanout);
+    auto fanout = fanouts[static_cast<EtypeIdType>(etype)];
+    auto picked_num = num_pick_fn(l, r - l, fanout);
     picked_nums[seed_node_off * num_fanouts + etype] = picked_num;
     count += picked_num;
   }
-
   return count;
 }
 
-int64_t GetPickNumOfOneColumn(
-    std::vector<int64_t>& picked_nums, int64_t seed_node_off, int64_t begin_eid,
-    int64_t end_eid, const torch::Tensor& fanouts, NumPickFn num_pick_fn) {
-  int64_t count = 0;
-  auto fanout = fanouts[0].item<int64_t>();
+/**
+ * @brief Calculate pick number for one column without considering etype.
+ */
+template <typename EdgeIdType>
+EdgeIdType PickNum(
+    std::vector<EdgeIdType>& picked_nums, EdgeIdType seed_node_off,
+    EdgeIdType begin_eid, EdgeIdType end_eid, const int64_t* fanouts,
+    NumPickFn<EdgeIdType> num_pick_fn) {
+  auto fanout = fanouts[0];
   auto picked_num = num_pick_fn(begin_eid, end_eid, fanout);
   picked_nums[seed_node_off] = picked_num;
-  return count;
+  return picked_num;
 }
 
+/**
+ * @brief Pick neighbors for one column with considering etype.
+ */
 template <typename EdgeIdType, typename EtypeIdType>
-void SampleForOneColumnConsiderEtype(
-    int64_t out_off, const std::vector<int64_t>& picked_nums,
-    EdgeIdType* picked_indices_data, int64_t seed_node_off, int64_t begin_eid,
-    int64_t end_eid, int64_t num_fanouts, const EtypeIdType* type_per_edge_data,
-    RangePickFn<EdgeIdType> pick_fn) {
-  for (int64_t r = begin_eid, l = begin_eid; r < end_eid; l = r) {
+void PickEtype(
+    EdgeIdType out_off, const std::vector<EdgeIdType>& picked_nums,
+    EdgeIdType* picked_indices_data, EdgeIdType seed_node_off,
+    EdgeIdType begin_eid, EdgeIdType end_eid, int64_t num_fanouts,
+    const EtypeIdType* type_per_edge_data, RangePickFn<EdgeIdType> pick_fn) {
+  for (EdgeIdType r = begin_eid, l = begin_eid; r < end_eid; l = r) {
     auto etype = type_per_edge_data[r];
     while (r < end_eid && type_per_edge_data[r] == etype) r++;
     auto picked_num = picked_nums[seed_node_off * num_fanouts + etype];
@@ -119,12 +134,26 @@ void SampleForOneColumnConsiderEtype(
   }
 }
 
+/**
+ * @brief Pick neighbors for one column without considering etype.
+ */
+template <typename EdgeIdType>
+void Pick(
+    EdgeIdType out_off, const std::vector<EdgeIdType>& picked_nums,
+    EdgeIdType* picked_indices_data, EdgeIdType seed_node_off,
+    EdgeIdType begin_eid, EdgeIdType end_eid, RangePickFn<EdgeIdType> pick_fn) {
+  auto picked_num = picked_nums[seed_node_off];
+  pick_fn(
+      begin_eid, end_eid - begin_eid, picked_num,
+      picked_indices_data + out_off);
+}
+
 template <typename NodeIdType, typename EdgeIdType, typename EtypeIdType>
 c10::intrusive_ptr<SampledSubgraph> ColumnWisePickPerEtype(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn<EdgeIdType> pick_fn) {
+    bool return_eids, bool replace, bool consider_etype,
+    NumPickFn<EdgeIdType> num_pick_fn, RangePickFn<EdgeIdType> pick_fn) {
   const auto indptr = graph->CSCIndptr();
   const auto indices = graph->Indices();
   const auto type_per_edge = graph->TypePerEdge();
@@ -137,23 +166,21 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWisePickPerEtype(
   const auto sample_num = num_columns * num_fanouts;
   auto num_threads = compute_num_threads(0, num_columns, kDefaultPickGrainSize);
   // Store how much neighbors per seed node (per etype if set) will be picked.
-  std::vector<int64_t> picked_nums(sample_num);
-  std::vector<int64_t> block_offset(num_threads + 1);
+  std::vector<EdgeIdType> picked_nums(sample_num);
+  std::vector<EdgeIdType> block_offset(num_threads + 1);
   torch::Tensor picked_columns_ptr =
       torch::zeros({num_columns + 1}, indptr.options());
-  // 1. Calculate the memory usage per seed node (per etype).
-  auto start = std::chrono::high_resolution_clock::now();
 
   auto fanouts_ptr = reinterpret_cast<int64_t*>(fanouts.data_ptr());
-  auto columns_data = reinterpret_cast<int64_t*>(columns.data_ptr());
-  auto indptr_data = reinterpret_cast<int64_t*>(indptr.data_ptr());
+  auto columns_data = reinterpret_cast<NodeIdType*>(columns.data_ptr());
+  auto indptr_data = reinterpret_cast<EdgeIdType*>(indptr.data_ptr());
   auto picked_columns_ptr_data =
-      reinterpret_cast<int64_t*>(picked_columns_ptr.data_ptr());
-
+      reinterpret_cast<EdgeIdType*>(picked_columns_ptr.data_ptr());
+  // 1. Calculate the memory usage per seed node (per etype).
   torch::parallel_for(
       0, num_columns, kDefaultPickGrainSize, [&](size_t b, size_t e) {
         int64_t total_count(0);
-        for (int i = b; i < e; i++) {
+        for (EdgeIdType i = b; i < e; i++) {
           const auto column_id = columns_data[i];
           TORCH_CHECK(
               column_id >= 0 && column_id < graph->NumNodes(),
@@ -162,9 +189,13 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWisePickPerEtype(
           auto end = indptr_data[column_id + 1];
           int64_t count = 0;
           if (consider_etype) {
-            count = GetPickNumOfOneColumnConsiderEtype<EtypeIdType>(
+            count = PickNumEtype<EdgeIdType, EtypeIdType>(
                 picked_nums, i, begin, end, fanouts_ptr, num_fanouts,
                 type_per_edge_data, num_pick_fn);
+          }
+          {
+            count = PickNum<EdgeIdType>(
+                picked_nums, i, begin, end, fanouts_ptr, num_pick_fn);
           }
           total_count += count;
           picked_columns_ptr_data[i + 1] = total_count;
@@ -172,11 +203,6 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWisePickPerEtype(
         auto thread_id = torch::get_thread_num();
         block_offset[thread_id + 1] = total_count;
       });
-  auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> duration = end - start;
-  std::cout << "Num Pick Stage elapsed time: " << duration.count() << " seconds"
-            << std::endl;
-
   // 2. Get total required space and columns pointer in result csc.
   if (num_threads > 1) {
     std::partial_sum(
@@ -190,8 +216,7 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWisePickPerEtype(
           }
         });
   }
-
-  // 3. Pre-allocate.
+  // 3.Pre-allocate.
   auto total_length = block_offset[num_threads];
   torch::Tensor picked_indices = torch::empty({total_length}, indptr.options());
   torch::Tensor picked_rows = torch::empty({total_length}, indices.options());
@@ -199,49 +224,38 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWisePickPerEtype(
   if (consider_etype)
     picked_etypes =
         torch::empty({total_length}, type_per_edge.value().options());
-
-  // 4. Sample neighbors for each seed node to fill in the `picked_indices`
+  // 4.Sample neighbors for each seed node to fill in the `picked_indices`
   // tensor.
   auto picked_indices_data =
       reinterpret_cast<EdgeIdType*>(picked_indices.data_ptr());
-  start = std::chrono::high_resolution_clock::now();
   torch::parallel_for(
       0, num_columns, kDefaultPickGrainSize, [&](size_t b, size_t e) {
-        for (int i = b; i < e; i++) {
+        for (EdgeIdType i = b; i < e; i++) {
           const auto column_id = columns_data[i];
           auto begin = indptr_data[column_id];
           auto end = indptr_data[column_id + 1];
           auto out_off = picked_columns_ptr_data[i];
           if (consider_etype) {
-            SampleForOneColumnConsiderEtype<EdgeIdType, EtypeIdType>(
+            PickEtype<EdgeIdType, EtypeIdType>(
                 out_off, picked_nums, picked_indices_data, i, begin, end,
                 num_fanouts, type_per_edge_data, pick_fn);
+          } else {
+            Pick<EdgeIdType>(
+                out_off, picked_nums, picked_indices_data, i, begin, end,
+                pick_fn);
           }
         }
       });
-
-  end = std::chrono::high_resolution_clock::now();
-  duration = end - start;
-  std::cout << "Range Pick Stage elapsed time: " << duration.count()
-            << " seconds" << std::endl;
-
-  start = std::chrono::high_resolution_clock::now();
-  // 5. Select according to indices at the end of the thread.
+  // 5.Select according to indices at the end of the thread.
   torch::index_select_out(picked_rows, indices, 0, picked_indices);
-
   if (consider_etype) {
     torch::index_select_out(
         picked_etypes.value(), type_per_edge.value(), 0, picked_indices);
   }
-
-  end = std::chrono::high_resolution_clock::now();
-  duration = end - start;
-  std::cout << "Index select Stage elapsed time: " << duration.count()
-            << " seconds" << std::endl;
-
-  // 6. Return sampled graph
+  // 6.Return sampled graph
   torch::optional<torch::Tensor> picked_eids = torch::nullopt;
-  if (return_eids) picked_eids = std::move(picked_indices);
+  if (return_eids) picked_eids = picked_indices;
+
   return c10::make_intrusive<SampledSubgraph>(
       picked_columns_ptr, picked_rows, columns, torch::nullopt, picked_eids,
       picked_etypes);
@@ -251,63 +265,61 @@ template c10::intrusive_ptr<SampledSubgraph>
 ColumnWisePickPerEtype<int32_t, int32_t, uint8_t>(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn<int32_t> pick_fn);
+    bool return_eids, bool replace, bool consider_etype,
+    NumPickFn<int32_t> num_pick_fn, RangePickFn<int32_t> pick_fn);
 
 template c10::intrusive_ptr<SampledSubgraph>
 ColumnWisePickPerEtype<int32_t, int32_t, uint16_t>(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn<int32_t> pick_fn);
+    bool return_eids, bool replace, bool consider_etype,
+    NumPickFn<int32_t> num_pick_fn, RangePickFn<int32_t> pick_fn);
 
 template c10::intrusive_ptr<SampledSubgraph>
 ColumnWisePickPerEtype<int32_t, int64_t, uint8_t>(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn<int64_t> pick_fn);
+    bool return_eids, bool replace, bool consider_etype,
+    NumPickFn<int64_t> num_pick_fn, RangePickFn<int64_t> pick_fn);
 
 template c10::intrusive_ptr<SampledSubgraph>
 ColumnWisePickPerEtype<int32_t, int64_t, uint16_t>(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn<int64_t> pick_fn);
+    bool return_eids, bool replace, bool consider_etype,
+    NumPickFn<int64_t> num_pick_fn, RangePickFn<int64_t> pick_fn);
 
 template c10::intrusive_ptr<SampledSubgraph>
 ColumnWisePickPerEtype<int64_t, int64_t, uint8_t>(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn<int64_t> pick_fn);
+    bool return_eids, bool replace, bool consider_etype,
+    NumPickFn<int64_t> num_pick_fn, RangePickFn<int64_t> pick_fn);
 
 template c10::intrusive_ptr<SampledSubgraph>
 ColumnWisePickPerEtype<int64_t, int64_t, uint16_t>(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn<int64_t> pick_fn);
+    bool return_eids, bool replace, bool consider_etype,
+    NumPickFn<int64_t> num_pick_fn, RangePickFn<int64_t> pick_fn);
 
 // For test
 template c10::intrusive_ptr<SampledSubgraph>
 ColumnWisePickPerEtype<int64_t, int64_t, uint64_t>(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn<int64_t> pick_fn);
+    bool return_eids, bool replace, bool consider_etype,
+    NumPickFn<int64_t> num_pick_fn, RangePickFn<int64_t> pick_fn);
 
 c10::intrusive_ptr<SampledSubgraph> ColumnWiseSampling(
-    const CSCPtr graph, const torch::Tensor& seed_nodes, const torch::Tensor& fanouts, bool replace,
-    bool return_eids, bool consider_etype,
-    const torch::optional<torch::Tensor>& probs) {
-  auto num_pick_fn = GetNumPickFn(probs, replace);
-
+    const CSCPtr graph, const torch::Tensor& seed_nodes,
+    const torch::Tensor& fanouts, bool replace, bool return_eids,
+    bool consider_etype, const torch::optional<torch::Tensor>& probs) {
   c10::intrusive_ptr<SampledSubgraph> ret;
   auto node_id_dtype = graph->Indices().scalar_type();
   auto edge_id_dtype = graph->CSCIndptr().scalar_type();
-  auto etype_dtype =
-      consider_etype ? graph->TypePerEdge().value().scalar_type() : torch::kUInt8;
+  auto etype_dtype = consider_etype ? graph->TypePerEdge().value().scalar_type()
+                                    : torch::kUInt8;
   auto prob_type =
       probs.has_value() ? probs.value().scalar_type() : torch::kBool;
 
@@ -315,6 +327,7 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWiseSampling(
     ATEN_ID_TYPE_SWITCH(node_id_dtype, NodeIdType, {
       ATEN_ID_TYPE_SWITCH(edge_id_dtype, EdgeIdType, {
         ATEN_ETYPE_TYPE_SWITCH(etype_dtype, EtypeIdType, {
+          auto num_pick_fn = GetNumPickFn<EdgeIdType, ProbType>(probs, replace);
           auto pick_fn = GetRangePickFn<EdgeIdType, ProbType>(probs, replace);
           ret = ColumnWisePickPerEtype<NodeIdType, EdgeIdType, EtypeIdType>(
               graph, seed_nodes, fanouts, probs, return_eids, replace,
@@ -323,7 +336,6 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWiseSampling(
       });
     });
   });
-
   return ret;
 }
 

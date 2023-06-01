@@ -35,8 +35,9 @@ using RangePickFn = std::function<void(
  * @param num_samples The total number of samples to pick.
  * @return The number of samples that will be picked from the range.
  */
+template <typename IdxType>
 using NumPickFn =
-    std::function<int64_t(int64_t start, int64_t end, int64_t num_samples)>;
+    std::function<IdxType(IdxType off, IdxType len, IdxType num_samples)>;
 
 using TensorList = std::vector<torch::Tensor>;
 
@@ -45,9 +46,10 @@ using TensorList = std::vector<torch::Tensor>;
  * The pick grain size determines the number of elements processed in each
  * thread.
  */
-static constexpr int kDefaultPickGrainSize = 2;
+static constexpr int kDefaultPickGrainSize = 32;
 
-NumPickFn GetNumPickFn(
+template <typename IdxType, typename ProbType>
+NumPickFn<IdxType> GetNumPickFn(
     const torch::optional<torch::Tensor>& probs, bool replace);
 
 template <typename IdxType, typename ProbType>
@@ -74,14 +76,28 @@ template <typename NodeIdType, typename EdgeIdType, typename EtypeIdType>
 c10::intrusive_ptr<SampledSubgraph> ColumnWisePickPerEtype(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn<EdgeIdType> pick_fn);
+    bool return_eids, bool replace, bool consider_etype,
+    NumPickFn<EdgeIdType> num_pick_fn, RangePickFn<EdgeIdType> pick_fn);
 
+/**
+ * Perform column-wise sampling on a given graph.
+ *
+ * @param graph The input graph in compressed sparse column (CSC) format.
+ * @param seed_nodes A tensor containing the seed nodes for sampling.
+ * @param fanouts A tensor containing the number of neighbors to sample for each
+ * seed node.
+ * @param replace A flag indicating whether to sample with replacement.
+ * @param return_eids A flag indicating whether to return the sampled edge IDs.
+ * @param consider_etype A flag indicating whether to consider edge types during
+ * sampling.
+ * @param probs An optional tensor containing the probabilities for sampling
+ * each neighbor.
+ * @return A pointer to the sampled subgraph.
+ */
 c10::intrusive_ptr<SampledSubgraph> ColumnWiseSampling(
-    const CSCPtr graph, const torch::Tensor& seed_nodes, const torch::Tensor& fanouts, bool replace,
-    bool return_eids, bool consider_etype,
-    const torch::optional<torch::Tensor>& probs);
-
+    const CSCPtr graph, const torch::Tensor& seed_nodes,
+    const torch::Tensor& fanouts, bool replace, bool return_eids,
+    bool consider_etype, const torch::optional<torch::Tensor>& probs);
 
 }  // namespace sampling
 }  // namespace graphbolt
