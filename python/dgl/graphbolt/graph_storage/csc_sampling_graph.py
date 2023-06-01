@@ -47,9 +47,12 @@ class GraphMetadata:
             set(node_type_ids)
         ), "Multiple node types shoud not be mapped to a same id."
         # Validate edge_type_to_id.
+        edges = set()
         for edge_type in edge_types:
             src, edge, dst = edge_type
             assert isinstance(edge, str), "Edge type name should be string."
+            assert edge not in edges, f"Edge type {edge} is defined repeatedly."
+            edges.add(edge)
             assert (
                 src in node_types
             ), f"Unrecognized node type {src} in edge type {edge_type}"
@@ -170,48 +173,52 @@ class CSCSamplingGraph:
         """
         return self._metadata
 
-    def in_subgraph(self, nodes: torch.Tensor) -> torch.ScriptObject:
-        """Return the subgraph induced on the inbound edges of the given nodes.
+    def sample_etype_neighbors(
+        self,
+        seed_nodes,
+        fanouts,
+        probs=None,
+        replace=False,
+        return_eids=False,
+        consider_etype = True,
+    ) -> Tuple[torch.tensor, torch.tensor]:
+        """Sample neighboring edges of the given nodes and return the induced subgraph.
 
-        An in subgraph is equivalent to creating a new graph using the incoming
-        edges of the given nodes.
-
-        Parameters
-        ----------
-        nodes : torch.Tensor
-            The nodes to form the subgraph which are type agnostic.
-
-        Returns
-        -------
-        SampledSubgraph
-            The in subgraph.
-        """
-        # Ensure nodes is 1-D tensor.
-        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
-        # Ensure that there are no duplicate nodes.
-        assert len(torch.unique(nodes)) == len(
-            nodes
-        ), "Nodes cannot have duplicate values."
-        return self._c_csc_graph.in_subgraph(nodes)
-
-    def copy_to_shared_memory(self, shared_memory_name: str):
-        """Copy the graph to shared memory.
+        For each node, a number of inbound edges will be randomly chosen.
 
         Parameters
         ----------
-        shared_memory_name : str
-            Name of the shared memory.
+        seed_nodes : tensor
+            Node IDs to sample neighbors from.
 
-        Returns
-        -------
-        CSCSamplingGraph
-            The copied CSCSamplingGraph object on shared memory.
+            A 1D tensor containing seed nodes to be sampled from.
+        fanouts : Tensor
+            The number of edges to be sampled for each node per edge type.  Must be a
+            1D tensor with the number of elements same as the number of edge types.
+
+            If -1 is given, all of the neighbors with non-zero probability will be selected.
+        probs : Tensor, optional
+        Tuple[torch.tensor, torch.tensor]
+            A tuple containing the sampled coo graph with type information and
+            their corresponding edge IDs (if required). The first one is an integer
+            tensor of shape (3, |sampled edges|) where each subtensor represents 'rows',
+            'cols' and 'edge types',  the second is an integer tensor with shape
+            (|sampled edges|,), containing all mapped original edge ids.
+
         """
-        return CSCSamplingGraph(
-            self._c_csc_graph.copy_to_shared_memory(shared_memory_name),
-            self._metadata,
+        if not torch.is_tensor(seed_nodes) or not seed_nodes.ndim == 1:
+            raise TypeError("The seed_nodes should be a 1D tensor")
+        if self.metadata and self.metadata.edge_type_to_id:
+            assert len(self.metadata.edge_type_to_id) == len(fanouts), "fanouts should have same length as edge types."
+        if not torch.is_tensor(fanouts) or not fanouts.ndim == 1:
+            raise TypeError("The fanout should be a 1D tensor")
+        assert torch.all((fanouts >= 0) | (fanouts== -1)), "fanouts value should be -1 or >= 0."
+        if probs is not None:
+            assert probs.ndim == 1, "probs should be a 1D tensor."
+            assert probs.shape[0] == self.indices.shape[0],  "probs should have same length as edges."
+        return self._c_csc_graph.sample_etype_neighbors(
+            seed_nodes, fanouts, replace, return_eids, consider_etype, probs
         )
-
 
 def from_csc(
     csc_indptr: torch.Tensor,
@@ -265,28 +272,6 @@ def from_csc(
         torch.ops.graphbolt.from_csc(
             csc_indptr, indices, node_type_offset, type_per_edge
         ),
-        metadata,
-    )
-
-
-def load_from_shared_memory(
-    shared_memory_name: str,
-    metadata: Optional[GraphMetadata] = None,
-) -> CSCSamplingGraph:
-    """Load a CSCSamplingGraph object from shared memory.
-
-    Parameters
-    ----------
-    shared_memory_name : str
-        Name of the shared memory.
-
-    Returns
-    -------
-    CSCSamplingGraph
-        The loaded CSCSamplingGraph object on shared memory.
-    """
-    return CSCSamplingGraph(
-        torch.ops.graphbolt.load_from_shared_memory(shared_memory_name),
         metadata,
     )
 
