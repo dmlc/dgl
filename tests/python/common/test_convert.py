@@ -1,3 +1,5 @@
+import unittest
+
 import backend as F
 import dgl
 
@@ -37,6 +39,10 @@ def check_attr_values_for_edges(edges, attr_name, values):
     )
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="`to_networkx` does not support graphs on GPU",
+)
 @parametrize_idtype
 def test_to_networkx(idtype):
     # TODO: adapt and move code from the _test_nx_conversion function in
