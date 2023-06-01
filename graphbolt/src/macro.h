@@ -32,4 +32,44 @@
     }                                                      \
   } while (0)
 
+/**
+ * Dispatch according to integral type for id
+ *
+ */
+#define ATEN_ID_TYPE_SWITCH(val, IdType, ...)        \
+  do {                                               \
+    if ((val) == torch::kInt32) {                    \
+      typedef int32_t IdType;                        \
+      { __VA_ARGS__ }                                \
+    } else if ((val) == torch::kInt64) {             \
+      typedef int64_t IdType;                        \
+      { __VA_ARGS__ }                                \
+    } else {                                         \
+      LOG(FATAL) << "ID can only be int32 or int64"; \
+    }                                                \
+  } while (0)
+
+/**
+ * Dispatch according to float or bool type for probaility
+ *
+ */
+#define ATEN_PROB_TYPE_SWITCH(val, ProbType, ...)                          \
+  do {                                                                      \
+    if ((val) == torch::kBool || (val) == torch::kUInt8) {                  \
+      typedef uint8_t ProbType;                                             \
+      { __VA_ARGS__ }                                                       \
+    } else if ((val) == torch::kInt8) {                                     \
+      typedef int8_t ProbType;                                              \
+      { __VA_ARGS__ }                                                       \
+    } else if ((val) == torch::kFloat) {                                    \
+      typedef float ProbType;                                               \
+      { __VA_ARGS__ }                                                       \
+    } else if ((val) == torch::kDouble) {                                   \
+      typedef double ProbType;                                              \
+      { __VA_ARGS__ }                                                       \
+    } else {                                                                \
+      LOG(FATAL) << "Probs can only be bool, uint8, int8, float or double"; \
+    }                                                                       \
+  } while (0)
+
 #endif  // GRAPHBOLT_MACRO_H_

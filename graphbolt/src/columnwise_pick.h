@@ -10,6 +10,8 @@
 #include <graphbolt/csc_sampling_graph.h>
 #include <graphbolt/threading_utils.h>
 
+#include "macro.h"
+
 namespace graphbolt {
 namespace sampling {
 
@@ -19,10 +21,11 @@ namespace sampling {
  * @param start The starting value of the range.
  * @param end The ending value of the range.
  * @param num_samples The number of samples to pick from the range.
- * @param out [out] The output tensor to store the picked samples.
+ * @param out [out] The output to store the picked samples.
  */
+template <typename IdxType>
 using RangePickFn = std::function<void(
-    int64_t start, int64_t end, int64_t num_samples, torch::Tensor& out)>;
+    IdxType off, IdxType len, IdxType num_samples, IdxType* out)>;
 
 /**
  * Function used to calculate how many samples will be picked for a given range.
@@ -47,18 +50,8 @@ static constexpr int kDefaultPickGrainSize = 2;
 NumPickFn GetNumPickFn(
     const torch::optional<torch::Tensor>& probs, bool replace);
 
-inline void UniformRangePickWithReplacement(
-    int64_t start, int64_t end, int64_t num_samples, torch::Tensor& out) {
-  torch::randint_out(out, start, end, {num_samples});
-}
-
-inline void UniformRangePickWithoutReplacement(
-    int64_t start, int64_t end, int64_t num_samples, torch::Tensor& out) {
-  auto perm = torch::randperm(end - start) + start;
-  out.copy_(perm.slice(0, 0, num_samples));
-}
-
-RangePickFn GetRangePickFn(
+template <typename IdxType, typename ProbType>
+inline RangePickFn<IdxType> GetRangePickFn(
     const torch::optional<torch::Tensor>& probs, bool replace);
 
 /**
@@ -77,12 +70,18 @@ RangePickFn GetRangePickFn(
  * @param pick_fn The function used for picking.
  * @return A pointer to a 'SampledSubgraph'.
  */
-template <typename EtypeType>
+template <typename NodeIdType, typename EdgeIdType, typename EtypeIdType>
 c10::intrusive_ptr<SampledSubgraph> ColumnWisePickPerEtype(
     const CSCPtr graph, const torch::Tensor& columns,
     const torch::Tensor& fanouts, const torch::optional<torch::Tensor>& probs,
     bool return_eids, bool replace, bool consider_etype, NumPickFn num_pick_fn,
-    RangePickFn pick_fn);
+    RangePickFn<EdgeIdType> pick_fn);
+
+c10::intrusive_ptr<SampledSubgraph> ColumnWiseSampling(
+    const CSCPtr graph, const torch::Tensor& seed_nodes, const torch::Tensor& fanouts, bool replace,
+    bool return_eids, bool consider_etype,
+    const torch::optional<torch::Tensor>& probs);
+
 
 }  // namespace sampling
 }  // namespace graphbolt

@@ -48,21 +48,10 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleEtypeNeighbors(
     const torch::Tensor& seed_nodes, const torch::Tensor& fanouts, bool replace,
     bool return_eids, bool consider_etype,
     const torch::optional<torch::Tensor>& probs) {
-  torch::Tensor picked_row_ptr, picked_cols, picked_etypes, picked_eids;
-  torch::optional<torch::Tensor> picked_eids_or_null = torch::nullopt;
-  if (return_eids) picked_eids_or_null = torch::tensor({}, indptr_.options());
-
-  auto pick_fn = GetRangePickFn(probs, replace);
-  auto num_pick_fn = GetNumPickFn(probs, replace);
-
-  c10::intrusive_ptr<SampledSubgraph> ret;
-  auto dtype =
-      consider_etype ? type_per_edge_.value().scalar_type() : torch::kUInt8;
-  ATEN_ETYPE_TYPE_SWITCH(dtype, EtypeType, {
-    ret = ColumnWisePickPerEtype<EtypeType>(
-        this, seed_nodes, fanouts, probs, return_eids, replace, consider_etype,
-        num_pick_fn, pick_fn);
-  });
+  
+  auto ret = ColumnWiseSampling(
+    this, seed_nodes, fanouts, replace, return_eids,
+    consider_etype, probs);
 
   return ret;
 }
