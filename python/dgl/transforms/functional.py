@@ -1152,21 +1152,22 @@ def khop_adj(g, k):
     >>> import dgl
     >>> g = dgl.graph(([0,1,2,3,4,0,1,2,3,4], [0,1,2,3,4,1,2,3,4,0]))
     >>> dgl.khop_adj(g, 1)
-    tensor([[1., 0., 0., 0., 1.],
-            [1., 1., 0., 0., 0.],
+    tensor([[1., 1., 0., 0., 0.],
             [0., 1., 1., 0., 0.],
             [0., 0., 1., 1., 0.],
-            [0., 0., 0., 1., 1.]])
+            [0., 0., 0., 1., 1.],
+            [1., 0., 0., 0., 1.]])
     >>> dgl.khop_adj(g, 3)
-    tensor([[1., 0., 1., 3., 3.],
+    tensor([[1., 3., 3., 1., 0.],
+            [0., 1., 3., 3., 1.],
+            [1., 0., 1., 3., 3.],
             [3., 1., 0., 1., 3.],
-            [3., 3., 1., 0., 1.],
-            [1., 3., 3., 1., 0.],
-            [0., 1., 3., 3., 1.]])
+            [3., 3., 1., 0., 1.]])
     """
     assert g.is_homogeneous, "only homogeneous graph is supported"
     adj_k = (
-        g.adj_external(transpose=True, scipy_fmt=g.formats()["created"][0]) ** k
+        g.adj_external(transpose=False, scipy_fmt=g.formats()["created"][0])
+        ** k
     )
     return F.tensor(adj_k.todense().astype(np.float32))
 
