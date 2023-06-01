@@ -8,6 +8,12 @@
 
 #include <graphbolt/serialize.h>
 #include <graphbolt/shared_memory.h>
+#include <torch/torch.h>
+
+#include <cstring>
+#include <string>
+#include <tuple>
+#include <vector>
 
 namespace graphbolt {
 namespace sampling {

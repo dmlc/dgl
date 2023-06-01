@@ -7,12 +7,11 @@
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
 #include <graphbolt/sampled_subgraph.h>
+#include <graphbolt/shared_memory.h>
+#include <torch/torch.h>
 
 #include <string>
 #include <vector>
-
-#include "./sampled_subgraph.h"
-#include "./shared_memory.h"
 
 namespace graphbolt {
 namespace sampling {

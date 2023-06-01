@@ -5,6 +5,7 @@
  */
 
 #include <graphbolt/serialize.h>
+#include <torch/torch.h>
 
 namespace torch {
 
