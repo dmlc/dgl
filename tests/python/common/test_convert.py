@@ -1,6 +1,8 @@
 import backend as F
 import dgl
 
+from utils import parametrize_idtype
+
 
 def get_nodes_by_ntype(nodes, ntype):
     return dict((k, v) for k, v in nodes.items() if v["ntype"] == ntype)
@@ -35,7 +37,8 @@ def check_attr_values_for_edges(edges, attr_name, values):
     )
 
 
-def test_to_networkx():
+@parametrize_idtype
+def test_to_networkx(idtype):
     # TODO: adapt and move code from the _test_nx_conversion function in
     # tests/python/common/function/test_basics.py to here
     # (pending resolution of https://github.com/dmlc/dgl/issues/5735).
@@ -44,7 +47,9 @@ def test_to_networkx():
             ("user", "follows", "user"): ([0, 1], [1, 2]),
             ("user", "follows", "topic"): ([1, 1], [1, 2]),
             ("user", "plays", "game"): ([0, 3], [3, 4]),
-        }
+        },
+        idtype=idtype,
+        device=F.ctx(),
     )
 
     n1 = F.randn((5, 3))
@@ -52,8 +57,10 @@ def test_to_networkx():
     e1 = F.randn((2, 3))
     e2 = F.randn((2, 2))
 
-    g.ndata["n"] = {"game": n1, "user": n2}
-    g.edata["e"] = {("user", "follows", "user"): e1, "plays": e2}
+    g.nodes["game"].data["n"] = F.copy_to(n1, ctx=F.ctx())
+    g.nodes["user"].data["n"] = F.copy_to(n2, ctx=F.ctx())
+    g.edges[("user", "follows", "user")].data["e"] = F.copy_to(e1, ctx=F.ctx())
+    g.edges["plays"].data["e"] = F.copy_to(e2, ctx=F.ctx())
 
     nxg = dgl.to_networkx(
         g,
