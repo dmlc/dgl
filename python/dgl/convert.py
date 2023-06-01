@@ -1643,58 +1643,10 @@ def bipartite_from_networkx(
     return g.to(device)
 
 
-def to_networkx(g, node_attrs=None, edge_attrs=None):
-    """Convert a homogeneous graph to a NetworkX graph and return.
-
-    The resulting NetworkX graph also contains the node/edge features of the input graph.
-    Additionally, DGL saves the edge IDs as the ``'id'`` edge attribute in the
-    returned NetworkX graph.
-
-    Parameters
-    ----------
-    g : DGLGraph
-        A homogeneous graph.
-    node_attrs : iterable of str, optional
-        The node attributes to copy from ``g.ndata``. (Default: None)
-    edge_attrs : iterable of str, optional
-        The edge attributes to copy from ``g.edata``. (Default: None)
-
-    Returns
-    -------
-    networkx.DiGraph
-        The converted NetworkX graph.
-
-    Notes
-    -----
-    The function only supports CPU graph input.
-
-    Examples
-    --------
-    The following example uses PyTorch backend.
-
-    >>> import dgl
-    >>> import torch
-
-    >>> g = dgl.graph((torch.tensor([1, 2]), torch.tensor([1, 3])))
-    >>> g.ndata['h'] = torch.zeros(4, 1)
-    >>> g.edata['h1'] = torch.ones(2, 1)
-    >>> g.edata['h2'] = torch.zeros(2, 2)
-    >>> nx_g = dgl.to_networkx(g, node_attrs=['h'], edge_attrs=['h1', 'h2'])
-    >>> nx_g.nodes(data=True)
-    NodeDataView({0: {'h': tensor([0.])},
-                  1: {'h': tensor([0.])},
-                  2: {'h': tensor([0.])},
-                  3: {'h': tensor([0.])}})
-    >>> nx_g.edges(data=True)
-    OutMultiEdgeDataView([(1, 1, {'id': 0, 'h1': tensor([1.]), 'h2': tensor([0., 0.])}),
-                          (2, 3, {'id': 1, 'h1': tensor([1.]), 'h2': tensor([0., 0.])})])
-    """
-    if g.device != F.cpu():
-        raise DGLError(
-            "Cannot convert a CUDA graph to networkx. Call g.cpu() first."
-        )
-    if not g.is_homogeneous:
-        raise DGLError("dgl.to_networkx only supports homogeneous graphs.")
+def _to_networkx_homogeneous(g, node_attrs, edge_attrs):
+    # TODO: consider adding an eid_attr parameter as in
+    #  `_to_networkx_heterogeneous` when this function is properly tested
+    # (see GitHub issue #5735)
     src, dst = g.edges()
     src = F.asnumpy(src)
     dst = F.asnumpy(dst)
@@ -1718,6 +1670,192 @@ def to_networkx(g, node_attrs=None, edge_attrs=None):
                 {key: F.squeeze(feat_dict[key], 0) for key in edge_attrs}
             )
     return nx_graph
+
+
+def _to_networkx_heterogeneous(
+    g, node_attrs, edge_attrs, ntype_attr, etype_attr, eid_attr
+):
+    nx_graph = nx.MultiDiGraph()
+
+    # This implementation does not use `ndata` and `edata` in the call to
+    # `to_homogeneous` because the function expects node and edge attributes
+    # both to be defined for every type and to have the same shape.
+    # If the `to_homogeneous` function is updated to support non-uniform node
+    # and edge attributes, the implementation can be simplified.
+    hom_g = to_homogeneous(g, store_type=True, return_count=False)
+    ntypes = g.ntypes
+    etypes = g.canonical_etypes
+
+    for hom_nid, ndata in enumerate(zip(hom_g.ndata[NID], hom_g.ndata[NTYPE])):
+        orig_nid, ntype = ndata
+        attrs = {ntype_attr: ntypes[ntype]}
+
+        if node_attrs is not None:
+            assert ntype_attr not in node_attrs, (
+                f"'{ntype_attr}' already used as node type attribute, "
+                f"please provide a different value for ntype_attr"
+            )
+
+            feat_dict = g._get_n_repr(ntype, orig_nid)
+            attrs.update(
+                {
+                    key: F.squeeze(feat_dict[key], 0)
+                    for key in node_attrs
+                    if key in feat_dict
+                }
+            )
+
+        nx_graph.add_node(hom_nid, **attrs)
+
+    for hom_eid, edata in enumerate(zip(hom_g.edata[EID], hom_g.edata[ETYPE])):
+        orig_eid, etype = edata
+        attrs = {eid_attr: hom_eid, etype_attr: etypes[etype]}
+
+        if edge_attrs is not None:
+            assert etype_attr not in edge_attrs, (
+                f"'{etype_attr}' already used as edge type attribute, "
+                f"please provide a different value for etype_attr"
+            )
+            assert eid_attr not in edge_attrs, (
+                f"'{eid_attr}' already used as edge ID attribute, "
+                f"please provide a different value for eid_attr"
+            )
+
+            feat_dict = g._get_e_repr(etype, orig_eid)
+            attrs.update(
+                {
+                    key: F.squeeze(feat_dict[key], 0)
+                    for key in edge_attrs
+                    if key in feat_dict
+                }
+            )
+
+        src, dst = hom_g.find_edges(hom_eid)
+        nx_graph.add_edge(int(src), int(dst), **attrs)
+
+    return nx_graph
+
+
+def to_networkx(
+    g,
+    node_attrs=None,
+    edge_attrs=None,
+    ntype_attr="ntype",
+    etype_attr="etype",
+    eid_attr="id",
+):
+    """Convert a graph to a NetworkX graph and return.
+
+    The resulting NetworkX graph also contains the node/edge features of the input graph.
+    Additionally, DGL saves the edge IDs as the ``'id'`` edge attribute in the
+    returned NetworkX graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        A homogeneous or heterogeneous graph.
+    node_attrs : iterable of str, optional
+        The node attributes to copy from ``g.ndata``. (Default: None)
+    edge_attrs : iterable of str, optional
+        The edge attributes to copy from ``g.edata``.
+        (Default: None)
+    ntype_attr : str, optional
+        The name of the node attribute to store the node types in the NetworkX object.
+        (Default: "ntype")
+    etype_attr : str, optional
+        The name of the edge attribute to store the edge canonical types in the NetworkX object.
+        (Default: "etype")
+    eid_attr : str, optional
+        The name of the edge attribute to store the original edge ID in the NetworkX object.
+        (Default: "id")
+
+    Returns
+    -------
+    networkx.DiGraph
+        The converted NetworkX graph.
+
+    Notes
+    -----
+    The function only supports CPU graph input.
+
+    Examples
+    --------
+    The following examples use the PyTorch backend.
+
+    >>> import dgl
+    >>> import torch
+
+    With a homogeneous graph:
+
+    >>> g = dgl.graph((torch.tensor([1, 2]), torch.tensor([1, 3])))
+    >>> g.ndata['h'] = torch.zeros(4, 1)
+    >>> g.edata['h1'] = torch.ones(2, 1)
+    >>> g.edata['h2'] = torch.zeros(2, 2)
+    >>> nx_g = dgl.to_networkx(g, node_attrs=['h'], edge_attrs=['h1', 'h2'])
+    >>> nx_g.nodes(data=True)
+    NodeDataView({
+        0: {'h': tensor([0.])},
+        1: {'h': tensor([0.])},
+        2: {'h': tensor([0.])},
+        3: {'h': tensor([0.])}
+    })
+    >>> nx_g.edges(data=True)
+    OutMultiEdgeDataView([
+        (1, 1, {'id': 0, 'h1': tensor([1.]), 'h2': tensor([0., 0.])}),
+        (2, 3, {'id': 1, 'h1': tensor([1.]), 'h2': tensor([0., 0.])})
+    ])
+
+    With a heterogeneous graph:
+
+    >>> g = dgl.heterograph({
+    ...     ('user', 'follows', 'user'): (torch.tensor([0, 1]), torch.tensor([1, 2])),
+    ...     ('user', 'follows', 'topic'): (torch.tensor([1, 1]), torch.tensor([1, 2])),
+    ...     ('user', 'plays', 'game'): (torch.tensor([0, 3]), torch.tensor([3, 4]))
+    ... })
+    ... g.ndata['n'] = {
+    ...     'game': torch.zeros(5, 1),
+    ...     'user': torch.ones(4, 1)
+    ... }
+    ... g.edata['e'] = {
+    ...     ('user', 'follows', 'user'): torch.zeros(2, 1),
+    ...     'plays': torch.ones(2, 1)
+    ... }
+    >>> nx_g = dgl.to_networkx(g, node_attrs=['n'], edge_attrs=['e'])
+    >>> nx_g.nodes(data=True)
+    NodeDataView({
+        0: {'ntype': 'game', 'n': tensor([0.])},
+        1: {'ntype': 'game', 'n': tensor([0.])},
+        2: {'ntype': 'game', 'n': tensor([0.])},
+        3: {'ntype': 'game', 'n': tensor([0.])},
+        4: {'ntype': 'game', 'n': tensor([0.])},
+        5: {'ntype': 'topic'},
+        6: {'ntype': 'topic'},
+        7: {'ntype': 'topic'},
+        8: {'ntype': 'user', 'n': tensor([1.])},
+        9: {'ntype': 'user', 'n': tensor([1.])},
+        10: {'ntype': 'user', 'n': tensor([1.])},
+        11: {'ntype': 'user', 'n': tensor([1.])}
+    })
+    >>> nx_g.edges(data=True)
+    OutMultiEdgeDataView([
+        (8, 9, {'id': 2, 'etype': ('user', 'follows', 'user'), 'e': tensor([0.])}),
+        (8, 3, {'id': 4, 'etype': ('user', 'plays', 'game'), 'e': tensor([1.])}),
+        (9, 6, {'id': 0, 'etype': ('user', 'follows', 'topic')}),
+        (9, 7, {'id': 1, 'etype': ('user', 'follows', 'topic')}),
+        (9, 10, {'id': 3, 'etype': ('user', 'follows', 'user'), 'e': tensor([0.])}),
+        (11, 4, {'id': 5, 'etype': ('user', 'plays', 'game'), 'e': tensor([1.])})
+    ])
+    """
+    if g.device != F.cpu():
+        raise DGLError(
+            "Cannot convert a CUDA graph to networkx. Call g.cpu() first."
+        )
+    if g.is_homogeneous:
+        return _to_networkx_homogeneous(g, node_attrs, edge_attrs)
+    else:
+        return _to_networkx_heterogeneous(
+            g, node_attrs, edge_attrs, ntype_attr, etype_attr, eid_attr
+        )
 
 
 DGLGraph.to_networkx = to_networkx

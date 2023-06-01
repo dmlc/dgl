@@ -7,7 +7,7 @@
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
 #include <graphbolt/sampled_subgraph.h>
-#include <torch/custom_class.h>
+#include <graphbolt/shared_memory.h>
 #include <torch/torch.h>
 
 #include <string>
@@ -46,7 +46,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * present.
    */
   CSCSamplingGraph(
-      torch::Tensor& indptr, torch::Tensor& indices,
+      const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge);
 
@@ -62,7 +62,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @return CSCSamplingGraph
    */
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
-      torch::Tensor indptr, torch::Tensor indices,
+      const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge);
 
@@ -71,8 +71,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * type into account, where each edge type has a specified pick number.
    *
    * @param seed_nodes The tensor containing the seed nodes.
-   * @param fanouts The tensor containing the number of neighbors to sample per
-   * edge type.
+   * @param fanouts The list containing the number of neighbors to sample.
    * @param replace Boolean indicating if sampling is done with replacement.
    * @param return_eids Boolean indicating if edge IDs are required to return,
    * which is usually used when edge features are required.
@@ -83,7 +82,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * subgraph.
    */
   c10::intrusive_ptr<SampledSubgraph> SampleEtypeNeighbors(
-      torch::Tensor seed_nodes, torch::Tensor fanouts, bool replace,
+      torch::Tensor seed_nodes, const std::vector<int64_t>& fanouts, bool replace,
       bool return_eids, const torch::optional<torch::Tensor>& probs);
 
   /** @brief Get the number of nodes. */
@@ -126,7 +125,48 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    */
   void Save(torch::serialize::OutputArchive& archive) const;
 
+  /**
+   * @brief Return the subgraph induced on the inbound edges of the given nodes.
+   * @param nodes Type agnostic node IDs to form the subgraph.
+   *
+   * @return SampledSubgraph.
+   */
+  c10::intrusive_ptr<SampledSubgraph> InSubgraph(
+      const torch::Tensor& nodes) const;
+
+  /**
+   * @brief Copy the graph to shared memory.
+   * @param shared_memory_name The name of the shared memory.
+   *
+   * @return A new CSCSamplingGraph object on shared memory.
+   */
+  c10::intrusive_ptr<CSCSamplingGraph> CopyToSharedMemory(
+      const std::string& shared_memory_name);
+
+  /**
+   * @brief Load the graph from shared memory.
+   * @param shared_memory_name The name of the shared memory.
+   *
+   * @return A new CSCSamplingGraph object on shared memory.
+   */
+  static c10::intrusive_ptr<CSCSamplingGraph> LoadFromSharedMemory(
+      const std::string& shared_memory_name);
+
  private:
+  /**
+   * @brief Build a CSCSamplingGraph from shared memory tensors.
+   *
+   * @param shared_memory_tensors A tuple of two share memory objects holding
+   * tensor meta information and data respectively, and a vector of optional
+   * tensors on shared memory.
+   *
+   * @return A new CSCSamplingGraph on shared memory.
+   */
+  static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryTensors(
+      std::tuple<
+          SharedMemoryPtr, SharedMemoryPtr,
+          std::vector<torch::optional<torch::Tensor>>>&& shared_memory_tensors);
+
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
 
@@ -148,7 +188,25 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * edge types. The length of it is equal to the number of edges.
    */
   torch::optional<torch::Tensor> type_per_edge_;
+
+  /**
+   * @brief Maximum number of bytes used to serialize the metadata of the
+   * member tensors, including tensor shape and dtype. The constant is estimated
+   * by multiplying the number of tensors in this class and the maximum number
+   * of bytes used to serialize the metadata of a tensor (4 * 8192 for now).
+   */
+  static constexpr int64_t SERIALIZED_METAINFO_SIZE_MAX = 32768;
+
+  /**
+   * @brief Shared memory used to hold the tensor meta information and data of
+   * this class. By storing its shared memory objects, the graph controls the
+   * resources of shared memory, which will be released automatically when the
+   * graph is destroyed.
+   */
+  SharedMemoryPtr tensor_meta_shm_, tensor_data_shm_;
 };
+
+using CSCPtr = CSCSamplingGraph*;
 
 }  // namespace sampling
 }  // namespace graphbolt

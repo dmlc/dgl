@@ -1,11 +1,11 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/rowwise_pick.h
- * @brief Contains the function definition for ColumnWisePick.
+ * @file columnwise_pick.h
+ * @brief Contains the methods definition for column wise pick.
  */
 
-#ifndef GRAPHBOLT_ROWWISE_PICK_H_
-#define GRAPHBOLT_ROWWISE_PICK_H_
+#ifndef GRAPHBOLT_COLUMNWISE_PICK_H_
+#define GRAPHBOLT_COLUMNWISE_PICK_H_
 
 #include <graphbolt/csc_sampling_graph.h>
 #include <graphbolt/sampled_subgraph.h>
@@ -56,4 +56,4 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWisePick(
 }  // namespace sampling
 }  // namespace graphbolt
 
-#endif  // GRAPHBOLT_ROWWISE_PICK_H_
+#endif  // GRAPHBOLT_COLUMNWISE_PICK_H_

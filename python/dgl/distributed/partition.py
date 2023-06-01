@@ -25,6 +25,7 @@ from .graph_partition_book import (
     RangePartitionBook,
 )
 
+
 RESERVED_FIELD_DTYPE = {
     "inner_node": F.uint8,  # A flag indicates whether the node is inside a partition.
     "inner_edge": F.uint8,  # A flag indicates whether the edge is inside a partition.
@@ -1200,3 +1201,57 @@ def partition_graph(
 
     if return_mapping:
         return orig_nids, orig_eids
+
+
+def convert_dgl_partition_to_csc_sampling_graph(part_config):
+    """Convert partitions of dgl to CSCSamplingGraph of GraphBolt.
+
+    This API converts `DGLGraph` partitions to `CSCSamplingGraph` which is
+    dedicated for sampling in `GraphBolt`. New graphs will be stored alongside
+    original graph as `csc_sampling_graph.tar`.
+
+    In the near future, partitions are supposed to be saved as
+    `CSCSamplingGraph` directly. At that time, this API should be deprecated.
+
+    Parameters
+    ----------
+    part_config : str
+        The partition configuration JSON file.
+    """
+    # As only this function requires GraphBolt for now, let's import here.
+    from .. import graphbolt
+
+    part_meta = _load_part_config(part_config)
+    num_parts = part_meta["num_parts"]
+
+    # Utility functions.
+    def init_type_per_edge(graph, gpb):
+        etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
+        return etype_ids
+
+    # Iterate over partitions.
+    for part_id in range(num_parts):
+        graph, _, _, gpb, _, _, _ = load_partition(
+            part_config, part_id, load_feats=False
+        )
+        # Construct GraphMetadata.
+        _, _, ntypes, etypes = load_partition_book(part_config, part_id)
+        metadata = graphbolt.GraphMetadata(ntypes, etypes)
+        # Obtain CSC indtpr and indices.
+        indptr, indices, _ = graph.adj().csc()
+        # Initalize type per edge.
+        type_per_edge = init_type_per_edge(graph, gpb)
+        type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
+        # Sanity check.
+        assert len(type_per_edge) == graph.num_edges()
+        csc_graph = graphbolt.from_csc(
+            indptr, indices, None, type_per_edge, metadata
+        )
+        orig_graph_path = os.path.join(
+            os.path.dirname(part_config),
+            part_meta[f"part-{part_id}"]["part_graph"],
+        )
+        csc_graph_path = os.path.join(
+            os.path.dirname(orig_graph_path), "csc_sampling_graph.tar"
+        )
+        graphbolt.save_csc_sampling_graph(csc_graph, csc_graph_path)

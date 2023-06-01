@@ -7,12 +7,11 @@
 #ifndef GRAPHBOLT_SERIALIZE_H_
 #define GRAPHBOLT_SERIALIZE_H_
 
+#include <graphbolt/csc_sampling_graph.h>
 #include <torch/torch.h>
 
 #include <string>
 #include <vector>
-
-#include "csc_sampling_graph.h"
 
 /**
  * @brief Overload stream operator to enable `torch::save()` and `torch.load()`
