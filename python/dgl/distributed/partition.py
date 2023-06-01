@@ -25,8 +25,6 @@ from .graph_partition_book import (
     RangePartitionBook,
 )
 
-if F.backend_name == "pytorch":
-    from .. import graphbolt
 
 RESERVED_FIELD_DTYPE = {
     "inner_node": F.uint8,  # A flag indicates whether the node is inside a partition.
@@ -1220,6 +1218,9 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
     part_config : str
         The partition configuration JSON file.
     """
+    # As only this function requires GraphBolt for now, let's import here.
+    from .. import graphbolt
+
     part_meta = _load_part_config(part_config)
     num_parts = part_meta["num_parts"]
 
