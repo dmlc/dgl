@@ -197,8 +197,7 @@ class PGExplainer(nn.Module):
         return gate_inputs
 
     def train_step(self, graph, feat, tmp, **kwargs):
-        r"""Training the explanation network by gradient descent(GD)
-        using Adam optimizer
+        r"""Compute the loss of the explanation network
 
         Parameters
         ----------
@@ -387,22 +386,6 @@ class HeteroPGExplainer(PGExplainer):
         Some members of a population are systematically more likely to be selected
         in a sample than others. Default: 0.0.
     """
-
-    def __init__(
-        self,
-        model,
-        num_features,
-        coff_budget=0.01,
-        coff_connect=5e-4,
-        sample_bias=0.0,
-    ):
-        super(HeteroPGExplainer, self).__init__(
-            model,
-            num_features,
-            coff_budget,
-            coff_connect,
-            sample_bias,
-        )
 
     def train_step(self, graph, feat, tmp, **kwargs):
         r"""Compute the loss of the explanation network
