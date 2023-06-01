@@ -237,8 +237,7 @@ class MovieLensDataset(DGLDataset):
         print(f"Starting processing {self.name} ...")
 
         # 0. loading movie features
-        movie_feat = load_info(os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
-
+        movie_feat = load_info(os.path.join(self.raw_path, self.name + '_movie_feat.pkl')).to(torch.float)
         # 1. dataset split: train + (valid + ) test
         if self.name == "ml-100k":
             train_rating_data = self._load_raw_rates(
