@@ -492,7 +492,7 @@ class HeteroPGExplainer(PGExplainer):
         ...             hg = 0
         ...             for ntype in g.ntypes:
         ...                 hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
-        ...             return th.sigmoid(self.fc(hg))
+        ...             return self.fc(hg)
 
         >>> # Load dataset
         >>> input_dim = 5
