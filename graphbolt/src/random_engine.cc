@@ -14,16 +14,15 @@ namespace graphbolt {
 namespace sampling {
 
 template <typename T>
-T RandomEngine::RandInt(T lower, T upper) {
-  std::uniform_int_distribution<T> dist(lower, upper - 1);
+T RandomEngine::RandInt(T min, T max) {
+  std::uniform_int_distribution<T> dist(min, max - 1);
   return dist(rng_);
 }
 
-template <typename IdxType>
-void RandomEngine::UniformChoice(
-    IdxType num, IdxType population, IdxType* out, bool replace) {
+template <typename T>
+void RandomEngine::UniformChoice(T num, T population, T* out, bool replace) {
   if (replace) {
-    for (IdxType i = 0; i < num; ++i) out[i] = RandInt(population);
+    for (T i = 0; i < num; ++i) out[i] = RandInt(population);
   } else {
     if (num < population / 10) {
       if (num && num < 64) {
@@ -48,8 +47,8 @@ void RandomEngine::UniformChoice(
         // steps is roughly k^2 / (1-k) * population, which means in the worst
         // case scenario, the time complexity is O(population^2). In practice,
         // we use 1/10 since std::unordered_set is pretty slow.
-        std::unordered_set<IdxType> selected;
-        while (static_cast<IdxType>(selected.size()) < num) {
+        std::unordered_set<T> selected;
+        while (static_cast<T>(selected.size()) < num) {
           selected.insert(RandInt(population));
         }
         std::copy(selected.begin(), selected.end(), out);
@@ -65,14 +64,14 @@ void RandomEngine::UniformChoice(
       // O(num). In the case of `num >= population/10`, we don't need to worry
       // about memory complexity because `num` is usually small. So is
       // `population`. Allocating a small piece of memory is very efficient.
-      std::vector<IdxType> seq(population);
+      std::vector<T> seq(population);
       for (size_t i = 0; i < seq.size(); i++) seq[i] = i;
-      for (IdxType i = 0; i < num; i++) {
-        IdxType j = RandInt(i, population);
+      for (T i = 0; i < num; i++) {
+        T j = RandInt(i, population);
         std::swap(seq[i], seq[j]);
       }
       // Save the randomly sampled numbers.
-      for (IdxType i = 0; i < num; i++) {
+      for (T i = 0; i < num; i++) {
         out[i] = seq[i];
       }
     }
@@ -86,10 +85,9 @@ template void RandomEngine::UniformChoice<int64_t>(
 
 // Perform a biased choice using probabilities for each element with optional
 // replacement.
-template <typename IdxType, typename ProbType>
-void RandomEngine::Choice(
-    IdxType num, ProbType* prob, IdxType len, IdxType* out, bool replace) {
-  std::discrete_distribution<IdxType> dist(prob, prob + len);
+template <typename T, typename ProbType>
+void RandomEngine::Choice(T num, ProbType* prob, T len, T* out, bool replace) {
+  std::discrete_distribution<T> dist(prob, prob + len);
   if (replace) {
     for (auto i = 0; i < num; i++) out[i] = dist(rng_);
   } else {
@@ -98,8 +96,7 @@ void RandomEngine::Choice(
     for (auto i = 0; i < num; i++) {
       out[i] = dist(rng_);
       prob_vec[out[i]] = 0;
-      dist =
-          std::discrete_distribution<IdxType>(prob_vec.begin(), prob_vec.end());
+      dist = std::discrete_distribution<T>(prob_vec.begin(), prob_vec.end());
     }
   }
 }

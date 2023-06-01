@@ -21,20 +21,19 @@ class RandomEngine {
   }
 
   /**
-   * Generates a random integer between the lower and upper bounds (inclusive).
+   * Generates a random integer within [min, max].
    *
-   * @tparam T The type of the lower and upper bounds. It should be an integral
-   * type (e.g., int, long, etc.).
-   * @param lower The lower bound of the random integer range.
-   * @param upper The upper bound of the random integer range.
-   * @return A random integer between the lower and upper bounds (inclusive).
+   * @tparam T The type of the integer.
+   * @param min The lower bound (inclusive) of the range.
+   * @param max The upper bound (inclusive) of the range.
+   * @return A random integer within [min, max].
    */
   template <typename T>
-  T RandInt(T lower, T upper);
+  T RandInt(T min, T max);
 
   template <typename T>
-  T RandInt(T upper) {
-    return RandInt<T>(0, upper);
+  T RandInt(T max) {
+    return RandInt<T>(0, max);
   }
 
   /**
@@ -42,15 +41,15 @@ class RandomEngine {
    *
    * If replace is false, num must not be larger than population.
    *
-   * @tparam IdxType Return integer type
+   * @tparam T Return integer type
    * @param num Number of integers to choose
    * @param population Total number of elements to choose from.
    * @param out The output buffer to write selected indices.
-   * @param replace If true, choose with replacement.
+   * @param replace Whether the sample is with or without replacement. Default
+   * is True, meaning that a value of a can be selected multiple times.
    */
-  template <typename IdxType>
-  void UniformChoice(
-      IdxType num, IdxType population, IdxType* out, bool replace = true);
+  template <typename T>
+  void UniformChoice(T num, T population, T* out, bool replace = true);
 
   /**
    * @brief Pick random integers between 0 to N-1 according to given
@@ -58,18 +57,17 @@ class RandomEngine {
    *
    * If replace is false, the number of picked integers must not larger than N.
    *
-   * @tparam IdxType Id type
+   * @tparam T Id type
    * @tparam ProbType Probability value type
    * @param num Number of integers to choose
    * @param prob Array of N unnormalized probability of each element.  Must be
    *        non-negative.
    * @param out The output buffer to write selected indices.
-   * @param replace If true, choose with replacement.
+   * @param replace Whether the sample is with or without replacement. Default
+   * is True, meaning that a value of a can be selected multiple times.
    */
-  template <typename IdxType, typename ProbType>
-  void Choice(
-      IdxType num, ProbType* prob, IdxType len, IdxType* out,
-      bool replace = true);
+  template <typename T, typename ProbType>
+  void Choice(T num, ProbType* prob, T len, T* out, bool replace = true);
 
  private:
   std::mt19937 rng_;
