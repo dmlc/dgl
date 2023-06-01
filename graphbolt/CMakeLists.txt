@@ -48,6 +48,6 @@ target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 # when using a standalone installation of MKL.
 if(DEFINED MKL_LIBRARIES)
   target_link_directories(${LIB_GRAPHBOLT_NAME} PRIVATE
-                          ${MKL_ROOT}/lib/)
+                          ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
 
