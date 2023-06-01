@@ -6,6 +6,10 @@
 
 #include <graphbolt/csc_sampling_graph.h>
 #include <graphbolt/serialize.h>
+#include <torch/torch.h>
+
+#include <tuple>
+#include <vector>
 
 #include "./shared_memory_utils.h"
 
