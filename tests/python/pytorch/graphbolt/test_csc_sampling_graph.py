@@ -609,3 +609,7 @@ def test_hetero_graph_on_shared_memory(
     assert metadata.edge_type_to_id == graph1.metadata.edge_type_to_id
     assert metadata.node_type_to_id == graph2.metadata.node_type_to_id
     assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+
+
+if __name__ == '__main__':
+    test_sample_neighbors_replace(True, 12)
