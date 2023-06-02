@@ -536,8 +536,10 @@ def test_sample_etype_neighbors():
     assert torch.equal(
         subgraph.reverse_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
     )
+    assert torch.equal(
+        subgraph.type_per_edge, torch.LongTensor([0, 1, 0, 1, 0, 0, 1])
+    )
     assert subgraph.reverse_row_node_ids is None
-    assert subgraph.type_per_edge is None
 
 
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
