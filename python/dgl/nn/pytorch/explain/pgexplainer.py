@@ -281,12 +281,14 @@ class PGExplainer(nn.Module):
         ...
         ...     def forward(self, g, h, embed=False, edge_weight=None):
         ...         h = self.conv(g, h, edge_weight=edge_weight)
-        ...         if not embed:
+        ...
+        ...         if embed:
+        ...             return h
+        ...
+        ...         with g.local_scope():
         ...             g.ndata['h'] = h
         ...             hg = dgl.mean_nodes(g, 'h')
         ...             return self.fc(hg)
-        ...         else:
-        ...             return h
 
         >>> # Load dataset
         >>> data = GINDataset('MUTAG', self_loop=True)

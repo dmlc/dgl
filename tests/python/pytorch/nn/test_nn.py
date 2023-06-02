@@ -1823,12 +1823,14 @@ def test_pgexplainer(g, idtype, n_classes):
 
         def forward(self, g, h, embed=False, edge_weight=None):
             h = self.conv(g, h, edge_weight=edge_weight)
-            if not embed:
+            
+            if embed:
+                return h
+
+            with g.local_scope():
                 g.ndata["h"] = h
                 hg = dgl.mean_nodes(g, "h")
                 return self.fc(hg)
-            else:
-                return h
 
     model = Model(feat.shape[1], n_classes)
     model = model.to(ctx)
@@ -1877,15 +1879,15 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
             else:
                 h = self.conv(g, h)
 
-            if not embed:
-                with g.local_scope():
-                    g.ndata["h"] = h
-                    hg = 0
-                    for ntype in g.ntypes:
-                        hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
-                    return self.fc(hg)
-            else:
+            if embed:
                 return h
+
+            with g.local_scope():
+                g.ndata["h"] = h
+                hg = 0
+                for ntype in g.ntypes:
+                    hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
+                return self.fc(hg)
 
     embed_dim = input_dim
     model = Model(input_dim, embed_dim, n_classes, g.canonical_etypes)
