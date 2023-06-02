@@ -4,139 +4,159 @@
  * @brief Contains the methods implementation for column wise pick.
  */
 
-#include "columnwise_pick.h"
-
-using namespace graphbolt::utils;
+#include "./columnwise_pick.h"
 
 namespace graphbolt {
 namespace sampling {
 
+inline torch::Tensor UniformRangePickWithRepeat(
+    int64_t start, int64_t end, int64_t num_samples) {
+  return torch::randint(
+      start, end,
+      {
+          num_samples,
+      });
+}
+
+inline torch::Tensor UniformRangePickWithoutRepeat(
+    int64_t start, int64_t end, int64_t num_samples) {
+  auto perm = torch::randperm(end - start) + start;
+  return perm.slice(0, 0, num_samples);
+}
+
+RangePickFn GetRangePickFn(
+    const torch::optional<torch::Tensor>& probs, bool replace) {
+  RangePickFn pick_fn;
+  if (probs.has_value()) {
+    if (probs.value().dtype() == torch::kBool) {
+      pick_fn = [probs, replace](
+                    int64_t start, int64_t end, int64_t num_samples) {
+        auto local_probs = probs.value().slice(0, start, end);
+        auto true_indices = local_probs.nonzero().view(-1);
+        auto true_num = true_indices.size(0);
+        auto choosed =
+            replace ? UniformRangePickWithRepeat(0, true_num, num_samples)
+                    : UniformRangePickWithoutRepeat(0, true_num, num_samples);
+        return true_indices[choosed];
+      };
+    } else {
+      pick_fn = [probs, replace](
+                    int64_t start, int64_t end, int64_t num_samples) {
+        auto local_probs = probs.value().slice(0, start, end);
+        return torch::multinomial(local_probs, num_samples, replace) + start;
+      };
+    }
+  } else {
+    pick_fn =
+        replace ? UniformRangePickWithRepeat : UniformRangePickWithoutRepeat;
+  }
+  return pick_fn;
+}
+
+torch::Tensor Pick(
+    int64_t off, int64_t len, bool replace,
+    const torch::optional<torch::Tensor>& probs,
+    const torch::TensorOptions& options, int64_t num_pick,
+    RangePickFn pick_fn) {
+  torch::Tensor picked_indices;
+  if ((num_pick == -1) || (len <= num_pick && !replace)) {
+    // Fast path.
+    picked_indices = torch::arange(off, off + len, options);
+    if (probs.has_value()) {
+      auto mask_tensor = probs.value().slice(0, off, off + len) > 0;
+      picked_indices = torch::masked_select(picked_indices, mask_tensor);
+    }
+  } else {
+    picked_indices = pick_fn(off, off + len, num_pick);
+  }
+  return picked_indices;
+}
+
+torch::Tensor PickEtype(
+    int64_t off, int64_t len, bool replace,
+    const torch::optional<torch::Tensor>& probs,
+    const torch::TensorOptions& options, const torch::Tensor& type_per_edge,
+    const std::vector<int64_t>& num_picks, RangePickFn pick_fn) {
+  TensorList pick_indices_per_etype(
+      num_picks.size(), torch::tensor({}, options));
+  for (int64_t r = off, l = off; r < len; l = r) {
+    auto cur_et = type_per_edge[off].item<int64_t>();
+    auto cur_num_pick = num_picks[cur_et];
+    while (r < len && type_per_edge[r].item<int64_t>() == cur_et) r++;
+    // Do sampling for one etype.
+    if (cur_num_pick != 0)
+      pick_indices_per_etype[cur_et] =
+          Pick(off, len, replace, probs, options, cur_num_pick, pick_fn);
+  }
+  return torch::cat(pick_indices_per_etype, 0);
+}
+
 c10::intrusive_ptr<SampledSubgraph> ColumnWisePick(
     const CSCPtr graph, const torch::Tensor& columns,
-    const torch::Tensor& num_picks, const torch::optional<torch::Tensor>& probs,
-    bool return_eids, bool replace, RangePickFn pick_fn) {
+    const std::vector<int64_t>& num_picks,
+    const torch::optional<torch::Tensor>& probs, bool return_eids, bool replace,
+    bool consider_etype, RangePickFn pick_fn) {
   const auto indptr = graph->CSCIndptr();
   const auto indices = graph->Indices();
-  const auto type_per_edge = graph->TypePerEdge().value();
+  const auto type_per_edge = graph->TypePerEdge();
   const int64_t num_columns = columns.size(0);
-  const int64_t num_etypes = num_picks.size(0);
-  std::vector<int64_t> picked_num_per_row(num_columns + 1);
-  auto num_picks_accessor = num_picks.accessor<int64_t, 1>();
-
-  auto type_per_edge_accessor = type_per_edge.accessor<int64_t, 1>();
+  const int64_t num_etypes = num_picks.size();
   const bool has_probs = probs.has_value();
-  // Use torch get_num_threads.
-  auto thread_num = compute_num_threads(0, num_columns, kDefaultPickGrainSize);
-  std::vector<size_t> block_offset(thread_num + 1, 0);
-  TensorList picked_cols_per_thread(thread_num);
-  TensorList picked_etypes_per_thread(thread_num);
-  TensorList picked_eids_per_thread;
-  if (return_eids) {
-    picked_eids_per_thread.resize(
-        thread_num, torch::tensor({}, indptr.options()));
-  }
+
+  // Don't do initialization here as it's very time-consuming, but make sure no
+  // elements inside is undefined when using cat.
+  TensorList picked_indices_per_column(num_columns);
+  torch::Tensor picked_num_per_column =
+      torch::zeros({num_columns + 1}, indptr.options());
+
   torch::parallel_for(
       0, num_columns, kDefaultPickGrainSize, [&](size_t b, size_t e) {
-        int64_t sampled_num_this_thread = 0;
-        TensorList picked_indices_this_thread;
+        size_t sampled_num_this_thread = 0;
         for (size_t i = b; i < e; ++i) {
-          const auto rid = columns[i].item<int64_t>();
+          const auto cid = columns[i].item<int64_t>();
           TORCH_CHECK(
-              rid >= 0 && rid < graph->NumNodes(),
+              cid >= 0 && cid < graph->NumNodes(),
               "Seed nodes should be in range [0, num_nodes)");
-          const auto off = indptr[rid].item<int64_t>();
-          const auto len = indptr[rid + 1].item<int64_t>() - off;
+          const auto off = indptr[cid].item<int64_t>();
+          const auto len = indptr[cid + 1].item<int64_t>() - off;
 
-          if (len == 0) continue;
-
-          torch::Tensor picked_indices_this_row;
-          TensorList pick_indices_per_etype(
-              num_etypes, torch::tensor({}, indptr.options()));
-          auto cur_et = type_per_edge_accessor[off];
-          auto cur_num_pick = num_picks_accessor[cur_et];
-          int64_t et_len = 1;
-
-          for (int64_t j = 0; j < len; ++j) {
-            TORCH_CHECK(
-                j + 1 == len || cur_et <= type_per_edge_accessor[off + j + 1],
-                "Edge type is not sorted. Please sort in advance");
-
-            if ((j + 1 == len) ||
-                cur_et != type_per_edge_accessor[off + j + 1]) {
-              // 1 end of the current etype.
-              // 2 end of the row.
-              // Random pick for current etype.
-              if (cur_num_pick != 0) {
-                torch::Tensor picked_indices;
-                int64_t et_end = off + j + 1;
-                int64_t et_start = et_end - et_len;
-                if ((cur_num_pick == -1) ||
-                    (et_len <= cur_num_pick && !replace)) {
-                  // Fast path.
-                  picked_indices =
-                      torch::arange(et_start, et_end, indptr.options());
-                  if (has_probs) {
-                    auto mask_tensor =
-                        probs.value().slice(0, et_start, et_end) > 0;
-                    picked_indices =
-                        torch::masked_select(picked_indices, mask_tensor);
-                  }
-                } else {
-                  picked_indices = pick_fn(et_start, et_end, cur_num_pick);
-                }
-                pick_indices_per_etype[cur_et] = picked_indices;
-              }
-
-              if (j + 1 == len) break;
-
-              cur_et = type_per_edge_accessor[off + j + 1];
-              et_len = 1;
-              cur_num_pick = num_picks_accessor[cur_et];
-            } else {
-              et_len++;
-            }
+          if (len == 0) {
+            // Init, otherwise cat will crash.
+            picked_indices_per_column[i] = torch::tensor({}, indptr.options());
+            continue;
           }
-          picked_indices_this_row = torch::cat(pick_indices_per_etype, 0);
 
-          sampled_num_this_thread += picked_indices_this_row.size(0);
-          picked_indices_this_thread.emplace_back(picked_indices_this_row);
-          picked_num_per_row[i + 1] = sampled_num_this_thread;
-        }  // End of the one row pick.
+          torch::Tensor picked_indices_this_column;
+          if (consider_etype) {
+            picked_indices_this_column = PickEtype(
+                off, len, replace, probs, indptr.options(),
+                type_per_edge.value(), num_picks, pick_fn);
+          } else {
+            picked_indices_this_column = Pick(
+                off, len, replace, probs, indptr.options(), num_picks[0],
+                pick_fn);
+          }
 
-        auto thread_id = torch::get_thread_num();
-        auto picked_indices = torch::cat(picked_indices_this_thread);
-        picked_cols_per_thread[thread_id] =
-            torch::index_select(indices, 0, picked_indices);
-        picked_etypes_per_thread[thread_id] =
-            torch::index_select(type_per_edge, 0, picked_indices);
-        if (return_eids) picked_eids_per_thread[thread_id] = picked_indices;
-        block_offset[thread_id + 1] = sampled_num_this_thread;
+          picked_indices_per_column[i] = picked_indices_this_column;
+          picked_num_per_column[i + 1] = picked_indices_this_column.size(0);
+        }
       });  // End of the thread.
 
-  if (thread_num > 1) {
-    // Get ExclusiveSum of each block.
-    std::partial_sum(
-        block_offset.begin() + 1, block_offset.end(), block_offset.begin() + 1);
+  // Get result csc indptr.
+  torch::Tensor res_indptr = torch::cumsum(picked_num_per_column, 0);
 
-    torch::parallel_for(
-        0, num_columns, kDefaultPickGrainSize, [&](int64_t b, int64_t e) {
-          auto tid = omp_get_thread_num();
-          auto off = block_offset[tid];
-          for (int64_t i = b; i < e; i++) {
-            picked_num_per_row[i + 1] += off;
-          }
-        });
-  }
+  torch::Tensor picked_indices = torch::cat(picked_indices_per_column);
+  torch::Tensor picked_rows = torch::index_select(indices, 0, picked_indices);
 
-  torch::Tensor picked_rows =
-      torch::tensor(picked_num_per_row, {indices.dtype()});
-  torch::Tensor picked_cols = torch::cat(picked_cols_per_thread);
-  torch::Tensor picked_etypes = torch::cat(picked_etypes_per_thread);
+  torch::optional<torch::Tensor> picked_etypes = torch::nullopt;
+  if (consider_etype)
+    picked_etypes =
+        torch::index_select(type_per_edge.value(), 0, picked_indices);
   torch::optional<torch::Tensor> picked_eids = torch::nullopt;
-  if (return_eids) picked_eids = torch::cat(picked_eids_per_thread);
+  if (return_eids) picked_eids = std::move(picked_indices);
 
   return c10::make_intrusive<SampledSubgraph>(
-      picked_rows, picked_cols, columns, torch::nullopt, picked_eids,
+      res_indptr, picked_rows, columns, torch::nullopt, picked_eids,
       picked_etypes);
 }
 

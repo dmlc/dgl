@@ -75,6 +75,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param replace Boolean indicating if sampling is done with replacement.
    * @param return_eids Boolean indicating if edge IDs are required to return,
    * which is usually used when edge features are required.
+   * @param consider_etype Boolean indicating if considering etype during
+   * sampling. If set, pick for each etype for a column, otherwise pick once
+   * against all neighbors for a column.
    * @param probs Optional tensor containing probabilities for sampling. Dtype
    * should be bool or float.
    *
@@ -82,8 +85,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * subgraph.
    */
   c10::intrusive_ptr<SampledSubgraph> SampleEtypeNeighbors(
-      torch::Tensor seed_nodes, const std::vector<int64_t>& fanouts, bool replace,
-      bool return_eids, const torch::optional<torch::Tensor>& probs);
+      torch::Tensor seed_nodes, const std::vector<int64_t>& fanouts,
+      bool replace, bool return_eids, bool consider_etype,
+      const torch::optional<torch::Tensor>& probs);
 
   /** @brief Get the number of nodes. */
   int64_t NumNodes() const { return indptr_.size(0) - 1; }

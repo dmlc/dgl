@@ -11,8 +11,8 @@
 #include <tuple>
 #include <vector>
 
-#include "./shared_memory_utils.h"
 #include "./columnwise_pick.h"
+#include "./shared_memory_utils.h"
 
 namespace graphbolt {
 namespace sampling {
@@ -49,10 +49,12 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleEtypeNeighbors(
     torch::Tensor seed_nodes, const std::vector<int64_t>& fanouts, bool replace,
-    bool return_eids, const torch::optional<torch::Tensor>& probs) {
+    bool return_eids, bool consider_etype,
+    const torch::optional<torch::Tensor>& probs) {
   auto pick_fn = GetRangePickFn(probs, replace);
   return ColumnWisePick(
-            this, seed_nodes, fanouts, probs, return_eids, replace, pick_fn);
+      this, seed_nodes, fanouts, probs, return_eids, replace, consider_etype,
+      pick_fn);
 }
 
 void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
