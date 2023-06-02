@@ -25,7 +25,6 @@ endif()
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
-dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
@@ -250,19 +249,6 @@ if(NOT MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
   endif()
 endif(NOT MSVC)
-
-# Compile TVM Runtime and Featgraph
-# (NOTE) We compile a dynamic library called featgraph_runtime, which the DGL library links to.
-# Kernels are packed in a separate dynamic library called featgraph_kernels, which DGL
-# will load during runtime.
-if(USE_TVM)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_TVM")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_TVM")
-  target_include_directories(dgl PRIVATE "featgraph/include")
-  add_subdirectory("featgraph/")
-  list(APPEND DGL_LINKER_LIBS featgraph_runtime)
-  message(STATUS "Build with TVM runtime and featgraph kernels.")
-endif(USE_TVM)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
