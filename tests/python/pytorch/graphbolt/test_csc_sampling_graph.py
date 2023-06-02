@@ -402,12 +402,11 @@ def test_sample_neighbors():
     num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
-    type_per_edge = torch.zeros((num_edges,))
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+    graph = gb.from_csc(indptr, indices)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
