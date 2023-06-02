@@ -125,7 +125,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace) const {
   const int64_t num_nodes = nodes.size(0);
-  // If true, perform sampling for each edge type of edge node, otherwise just
+  // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
   bool consider_etype = (fanouts.size() > 1);
   std::vector<torch::Tensor> picked_neighbors_per_node(num_nodes);
