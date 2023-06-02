@@ -65,6 +65,7 @@ struct SampledSubgraph : torch::CustomClassHolder {
         type_per_edge(type_per_edge) {}
 
   SampledSubgraph() = default;
+
   /**
    * @brief CSC format index pointer array, where the implicit node ids are
    * already compacted. And the original ids are stored in the
