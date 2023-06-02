@@ -92,7 +92,8 @@ def convert_preds(logits, rate_list):
     return (softmax(logits, dim=1).detach().cpu() * th.tensor(rate_list)).sum(dim=1)
 
 hid_dim, out_dim, epochs, patience, lr = 500, 75, 2000, 100, 0.01
-dataset = MovieLensDataset('ml-1m', valid_ratio=0.2, force_reload=True)
+dataset = MovieLensDataset('ml-100k', valid_ratio=0.2, force_reload=True)
+
 graph = dataset[0]
 in_dim = {'user': graph.nodes['user'].data['feat'].shape[1], 'movie': graph.nodes['movie'].data['feat'].shape[1]}
 rate = graph.edges['user-movie'].data['rate']
