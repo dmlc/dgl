@@ -328,7 +328,7 @@ def run(args, device, data):
                 f"Test Acc {test_acc:.4f}, time: {time.time() - start:.4f}"
             )
 
-    return np.mean(epoch_time[-int(args.num_epochs * 0.8):]), test_acc
+    return np.mean(epoch_time[-int(args.num_epochs * 0.8) :]), test_acc
 
 
 def main(args):
@@ -341,9 +341,7 @@ def main(args):
     print(f"{host_name}: Initializing PyTorch process group.")
     th.distributed.init_process_group(backend=args.backend)
     print(f"{host_name}: Initializing DistGraph.")
-    g = dgl.distributed.DistGraph(
-        args.graph_name, part_config=args.part_config
-    )
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print(f"Rank of {host_name}: {g.rank()}")
 
     # Split train/val/test IDs for each trainer.
