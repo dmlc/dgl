@@ -220,7 +220,46 @@ class CSCSamplingGraph:
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         assert fanout >= 0 or fanout == -1, "Fanout shoud have value >= 0 or -1"
-        return self._c_csc_graph.sample_neighbors(nodes, fanout, replace)
+        return self._c_csc_graph.sample_neighbors(nodes, [fanout], replace)
+
+    def sample_etype_neighbors(
+        self,
+        nodes: torch.Tensor,
+        fanouts: torch.Tensor,
+        replace: bool = False,
+    ) -> torch.ScriptObject:
+        """Sample neighboring edges of the given nodes and return the induced
+        subgraph.
+
+        Parameters
+        ----------
+        nodes: torch.Tensor
+            IDs of the given seed nodes.
+        fanouts: torch.Tensor
+            The number of edges to be sampled for each node per edge type.
+            The value of the it should be greater than or equal to 0 or -1.
+            If set -1, it indicates that all neighbors will be selected.
+            In contrast, if the value is a non-negative integer, it will
+            determine the minimum number of neighbors to select. The minimum
+            value is determined by comparing the fanout value with the total
+            number of neighbors available.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
+        """
+        # Ensure nodes is 1-D tensor.
+        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
+        assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
+        assert (
+            self.type_per_edge is not None
+        ), "To perform etype sampling, the graph must include edge type information."
+        assert torch.all(
+            (fanouts >= 0) | (fanouts == -1)
+        ), "Fanouts should consist of values that are either -1 or greater than or equal to 0."
+        return self._c_csc_graph.sample_neighbors(
+            nodes, fanouts.tolist(), replace
+        )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
         """Copy the graph to shared memory.

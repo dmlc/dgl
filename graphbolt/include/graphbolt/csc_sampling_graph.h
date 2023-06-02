@@ -120,10 +120,17 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * subgraph.
    *
    * @param nodes The nodes from which to sample neighbors.
-   * @param fanout The number of edges to be sampled for each node. It should be
-   * >= 0 or -1. If -1 is given, all neighbors will be selected. Otherwise, it
-   * will pick the minimum number of neighbors between the fanout value and the
-   * total number of neighbors.
+   * @param fanouts The number of edges to be sampled for each node with or
+   * without considering different edge types. The number of it should be 1 or
+   * equal to the number of edge types. A length of 1 means the sampling
+   * process will be performed once for each node without considering the edge
+   * types, otherwise it will be performed the number of edge types times
+   * against different edge types independently. The value of the it should be
+   * greater than or equal to 0 or -1. If the value is -1, it indicates that all
+   * neighbors will be selected. In contrast, if the value is a non-negative
+   * integer, it will determine the minimum number of neighbors to select. The
+   * minimum value is determined by comparing the fanout value with the total
+   * number of neighbors available.
    * @param replace Boolean indicating whether the sample is preformed with or
    * without replacement. If True, a value can be selected multiple
    * times.Otherwise, each value can be selected only once.
@@ -132,7 +139,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * sampled graph's information.
    */
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
-      const torch::Tensor& nodes, int64_t fanout, bool replace) const;
+      const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
+      bool replace) const;
 
   /**
    * @brief Copy the graph to shared memory.
@@ -227,6 +235,31 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 torch::Tensor Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options);
+
+/**
+ * @brief Picks a specified number of neighbors for a node per edge type,
+ * starting from the given offset and having the specified number of neighbors.
+ *
+ * @param offset The starting edge ID for the connected neighbors of the sampled
+ * node.
+ * @param num_neighbors The number of neighbors to pick.
+ * @param fanouts The number of edges to be sampled for each node per edge type.
+ * The value of the it should be greater than or equal to 0 or -1. If the value
+ * is -1, it indicates that all neighbors will be selected. In contrast, if the
+ * value is a non-negative integer, it will determine the minimum number of
+ * neighbors to select. The minimum value is determined by comparing the fanout
+ * value with the total number of neighbors available.
+ * @param replace Boolean indicating whether the sample is preformed with or
+ * without replacement. If True, a value can be selected multiple
+ * times.Otherwise, each value can be selected only once.
+ * @param options Tensor options specifying the desired data type of the result.
+ *
+ * @return A tensor containing the picked neighbors.
+ */
+torch::Tensor PickEtype(
+    int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
+    bool replace, const torch::TensorOptions& options,
+    const torch::Tensor& type_per_edge);
 
 }  // namespace sampling
 }  // namespace graphbolt

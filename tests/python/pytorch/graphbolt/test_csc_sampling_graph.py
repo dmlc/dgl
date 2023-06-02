@@ -494,6 +494,47 @@ def test_sample_neighbors_replace(replace, expected_sampled_num):
     assert sampled_num == expected_sampled_num
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_sample_etype_neighbors():
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+    """
+    # Initialize data.
+    num_nodes = 5
+    num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([1, 3, 4])
+    fanouts = torch.tensor([2, 2, 3])
+    subgraph = graph.sample_etype_neighbors(nodes, fanouts)
+
+    # Verify in subgraph.
+    assert torch.equal(subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
+    assert torch.equal(
+        torch.sort(subgraph.indices)[0],
+        torch.sort(torch.LongTensor([2, 3, 1, 2, 0, 3, 4]))[0],
+    )
+    assert torch.equal(subgraph.reverse_column_node_ids, nodes)
+    assert subgraph.reverse_row_node_ids is None
+    assert subgraph.reverse_edge_ids is None
+    assert subgraph.type_per_edge is None
+
+
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     """Check if two tensors are on the same shared memory.
 
@@ -608,3 +649,7 @@ def test_hetero_graph_on_shared_memory(
     assert metadata.edge_type_to_id == graph1.metadata.edge_type_to_id
     assert metadata.node_type_to_id == graph2.metadata.node_type_to_id
     assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+
+
+if __name__ == "__main__":
+    test_sample_etype_neighbors()
