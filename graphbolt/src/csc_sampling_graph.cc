@@ -122,7 +122,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 }
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
-    const torch::Tensor& nodes) const {
+    const torch::Tensor& nodes, int64_t fanout) const {
   const int64_t num_nodes = nodes.size(0);
 
   std::vector<torch::Tensor> picked_neighbors_per_node(num_nodes);
@@ -148,8 +148,9 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
       }
 
       picked_neighbors_per_node[i] =
-          torch::arange(offset, offset + num_neighbors);
-      num_picked_neighbors_per_node[i + 1] = num_neighbors;
+          Pick(offset, num_neighbors, fanout, indptr_.options());
+      num_picked_neighbors_per_node[i + 1] =
+          picked_neighbors_per_node[i].size(0);
     }
   });  // End of the thread.
 
@@ -193,6 +194,19 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
   auto shared_memory_tensors = LoadTensorsFromSharedMemory(
       shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
   return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
+}
+
+torch::Tensor Pick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout,
+    const torch::TensorOptions& options) {
+  torch::Tensor picked_neighbors;
+  if ((fanout == -1) || (num_neighbors <= fanout)) {
+    picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
+  } else {
+    picked_neighbors = torch::randperm(num_neighbors) + offset;
+    picked_neighbors = picked_neighbors.slice(0, 0, fanout);
+  }
+  return picked_neighbors;
 }
 
 }  // namespace sampling
