@@ -116,7 +116,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const torch::Tensor& nodes) const;
 
   /**
-   * @brief Sample neighbors for a given set of nodes.
+   * @brief Sample neighboring edges of the given nodes and return the induced
+   * subgraph.
    *
    * @param nodes The nodes from which to sample neighbors.
    *
