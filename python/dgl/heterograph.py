@@ -6065,6 +6065,88 @@ class DGLGraph(object):
         self._node_frames = old_nframes
         self._edge_frames = old_eframes
 
+    def new_formats(self, allowed_formats=None, create_formats=None):
+        r"""Get a cloned graph with the specified allowed sparse format(s)
+        and create specific sparse matrices allowed for the graph or query
+        for the usage status of sparse formats.
+
+        The API copies both the graph structure and the features.
+
+        If both ``allowed_formats`` and ``create_formats`` are None, the
+        API returns a dict recording the usage status of sparse formats.
+        In any other case, a DGLGraph is returned. The format(s) of the
+        resulting cloned graph is depends on the ``allowed_formats``,
+        ``create_formats`` and the format(s) of the original graph:
+
+        * If ``create_formats`` isn't None, the cloned graph's sparse
+          formats will be consistent with ``create_formats``.
+        * Otherwise:
+          * If the original graph's format is a subset of ``allowed_formats``,
+            the cloned graph's sparse formats will remain consistent with the
+            original.
+          * If a format in the original graph is also in ``allowed_formats``,
+            any formats not in ``allowed_formats`` will be removed in the cloned
+            graph.
+          * If the original graph has no formats in ``allowed_formats``, a new
+            format will be made for the cloned graph. This will be in the order
+            of ``'coo'``, ``'csr'``, ``'csc'``, regardless of the
+            ``allowed_formats`` order.
+
+        Parameters
+        ----------
+        allowed_formats : str or list of str or None
+
+            * If ``allowed_formats`` is None, return the usage status of sparse
+              formats.
+            * Otherwise, it can be a string ``'coo'``, ``'csr'``, or ``'csc'``
+              or a sublist of them, specifying the allowed sparse formats to
+              use.
+
+        create_formats : str or list of str or None
+
+            * If ``create_formats`` is None:
+              * If ``allowed_formats`` is None, return the usage status of
+                sparse formats.
+              * Otherwise, follow the rules above to create sparse matrices for
+                the cloned graph.
+            * Otherwise, it can be ``'coo'``, ``'csr'``, or ``'csc'`` or a
+              sublist of them, specifying the sparse matrices to create. If
+              ``allowed_formats`` is None or there are some formats in the list
+              that are not allowed for the graph, an error will be raised.
+
+        Returns
+        -------
+        dict or DGLGraph
+
+            * If ``allowed_formats`` is None, the result will be a dict
+              recording the usage status of sparse formats.
+            * Otherwise, a DGLGraph will be returned, which is a clone of the
+              original graph with the specified allowed sparse format(s) and
+              created sparse format(s).
+        """
+        pass
+
+    def new_create_formats_(self, create_formats=None):
+        r"""Create specified sparse matrices allowed for the graph.
+
+        By default, sparse matrices for a graph are created only when necessary.
+        In some cases, such as in a multi-process data loader, we may want to
+        create them immediately. This API allows for that.
+
+        Parameters
+        ----------
+        create_formats : str or list of str or None
+
+            * If ``create_formats`` is None, create all sparse matrices allowed
+              for the graph.
+            * Otherwise, it can be ``'coo'``, ``'csr'``, or ``'csc'`` or a
+              sublist of them, specifying the sparse matrices to create. If
+              there are some formats already created, they will be skipped.
+              If there are some formats in the list that are not allowed for
+              the graph, an error will be raised.
+        """
+        pass
+
     def formats(self, formats=None):
         r"""Get a cloned graph with the specified sparse format(s) or query
         for the usage status of sparse formats
