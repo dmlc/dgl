@@ -209,7 +209,7 @@ class CSCSamplingGraph:
             IDs of the given seed nodes.
         fanout: int
             The number of edges to be sampled for each node. It should be
-            >= 0 or -1. If -1 is given, all neighbors will be selected.
+            >= 0 or -1. "If -1 is given, it is equivalent to when the fanout is greater or equal to the number of neighbors and replacement is false, in which case all the neighbors will be selected.
             Otherwise, it will pick the minimum number of neighbors between
             the fanout value and the total number of neighbors.
         replace: bool
