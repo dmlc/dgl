@@ -123,6 +123,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes) const {
+  // TODO(#5692): implement this.
   return c10::make_intrusive<SampledSubgraph>(
       torch::zeros({nodes.size(0) + 1}, indptr_.options()),
       torch::zeros({1}, indptr_.options()), nodes, torch::nullopt,
