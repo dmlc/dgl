@@ -20,10 +20,6 @@
 
 #include <vector>
 
-#ifdef USE_TVM
-#include <featgraph.h>
-#endif  // USE_TVM
-
 #include "../c_api_common.h"
 #include "./check.h"
 #include "kernel_decl.h"
