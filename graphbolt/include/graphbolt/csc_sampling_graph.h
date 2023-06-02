@@ -120,12 +120,16 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * subgraph.
    *
    * @param nodes The nodes from which to sample neighbors.
+   * @param fanout The number of edges to be sampled for each node. It should be
+   * >= 0 or -1. If -1 is given, all neighbors will be selected. Otherwise, it
+   * will pick the minimum number of neighbors between the fanout value and the
+   * total number of neighbors.
    *
    * @return An intrusive pointer to a SampledSubgraph object containing the
    * sampled graph's information.
    */
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
-      const torch::Tensor& nodes) const;
+      const torch::Tensor& nodes, int64_t fanout) const;
 
   /**
    * @brief Copy the graph to shared memory.
@@ -198,6 +202,24 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    */
   SharedMemoryPtr tensor_meta_shm_, tensor_data_shm_;
 };
+
+/**
+ * @brief Picks a specified number of neighbors for a node, starting from the
+ * given offset and having the specified number of neighbors.
+ *
+ * @param offset The starting edge ID for the connected neighbors of the sampled
+ * node.
+ * @param num_neighbors The number of neighbors to pick.
+ * @param fanout The number of edges to be sampled for each node. It should be
+ * >= 0 or -1. If -1 is given, all neighbors will be selected. Otherwise, it
+ * will pick the minimum number of neighbors between the fanout value and the
+ * total number of neighbors.
+ * @param options Tensor options specifying the desired data type of the result.
+ * @return A tensor containing the picked elements.
+ */
+torch::Tensor Pick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout,
+    const torch::TensorOptions& options);
 
 }  // namespace sampling
 }  // namespace graphbolt
