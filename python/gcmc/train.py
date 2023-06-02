@@ -136,8 +136,6 @@ for _ in range(epochs):
         cnt = 0
     else:
         cnt += 1
-    if best_test_rmse < 0.8:
-        continue
     if cnt == patience:
         break
     print(f'epoch: {_}/{epochs}, best epoch: {best_epoch} | patience: {cnt}/{patience} | loss: {loss.item():.4f}')
