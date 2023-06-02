@@ -221,11 +221,9 @@ class PGExplainer(nn.Module):
 
         pred = self.model(graph, feat, embed=False, **kwargs).argmax(-1).data
 
-        prob, edge_mask = self.explain_graph(
+        prob, _ = self.explain_graph(
             graph, feat, tmp=tmp, training=True, **kwargs
         )
-
-        self.edge_mask = edge_mask
 
         loss_tmp = self.loss(prob, pred)
         return loss_tmp
@@ -348,14 +346,14 @@ class PGExplainer(nn.Module):
         reverse_eids = graph.edge_ids(row, col).long()
         edge_mask = (values + values[reverse_eids]) / 2
 
-        self.clear_masks()
         self.set_masks(graph, edge_mask)
 
         # the model prediction with the updated edge mask
         logits = self.model(graph, feat, edge_weight=self.edge_mask, **kwargs)
         probs = F.softmax(logits, dim=-1)
 
-        self.clear_masks()
+        if not training:
+            self.clear_masks()
 
         return (probs, edge_mask) if training else (probs.data, edge_mask)
 
@@ -416,12 +414,9 @@ class HeteroPGExplainer(PGExplainer):
 
         pred = self.model(graph, feat, embed=False, **kwargs).argmax(-1).data
 
-        prob, hetero_edge_mask = self.explain_graph(
+        prob, _ = self.explain_graph(
             graph, feat, tmp=tmp, training=True, **kwargs
         )
-
-        # store edge mask in homogeneous format
-        self.edge_mask = torch.concat(list(hetero_edge_mask.values()))
 
         loss_tmp = self.loss(prob, pred)
         return loss_tmp
@@ -559,7 +554,6 @@ class HeteroPGExplainer(PGExplainer):
         reverse_eids = homo_graph.edge_ids(row, col).long()
         edge_mask = (values + values[reverse_eids]) / 2
 
-        self.clear_masks()
         self.set_masks(homo_graph, edge_mask)
 
         # convert the edge mask back into heterogeneous format
@@ -576,7 +570,8 @@ class HeteroPGExplainer(PGExplainer):
         logits = self.model(graph, feat, edge_weight=hetero_edge_mask, **kwargs)
         probs = F.softmax(logits, dim=-1)
 
-        self.clear_masks()
+        if not training:
+            self.clear_masks()
 
         return (
             (probs, hetero_edge_mask)
