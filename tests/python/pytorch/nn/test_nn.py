@@ -1823,7 +1823,7 @@ def test_pgexplainer(g, idtype, n_classes):
 
         def forward(self, g, h, embed=False, edge_weight=None):
             h = self.conv(g, h, edge_weight=edge_weight)
-            
+
             if embed:
                 return h
 
@@ -1841,7 +1841,7 @@ def test_pgexplainer(g, idtype, n_classes):
     probs, edge_weight = explainer.explain_graph(g, feat)
 
 
-@pytest.mark.parametrize("g", get_cases(["hetero"], exclude=["zero-degree"]))
+@pytest.mark.parametrize("g", get_cases(["hetero"]))
 @pytest.mark.parametrize("idtype", [F.int64])
 @pytest.mark.parametrize("input_dim", [5])
 @pytest.mark.parametrize("n_classes", [2])
