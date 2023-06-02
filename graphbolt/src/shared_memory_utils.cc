@@ -172,12 +172,9 @@ SharedMemoryTensors LoadTensorsFromSharedMemory(
       metas.push_back({false, {}, torch::ScalarType::Undefined});
     }
   }
-  SharedMemoryPtr data_shm;
-  std::vector<torch::optional<torch::Tensor>> ret_tensors;
-  std::tie(data_shm, ret_tensors) =
-      LoadTensorsDataFromSharedMemory(name + "_data", metas);
-  return std::make_tuple(
-      std::move(meta_shm), std::move(data_shm), std::move(ret_tensors));
+  return std::tuple_cat(
+      std::forward_as_tuple(std::move(meta_shm)),
+      LoadTensorsDataFromSharedMemory(name + "_data", metas));
 }
 
 }  // namespace sampling
