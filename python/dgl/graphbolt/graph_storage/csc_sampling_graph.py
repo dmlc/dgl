@@ -260,10 +260,12 @@ class CSCSamplingGraph:
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
         assert (
             self.type_per_edge is not None
-        ), "To perform etype sampling, the graph must include edge type information."
+        ), "To perform etype sampling, the graph must include \
+            edge type information."
         assert torch.all(
             (fanouts >= 0) | (fanouts == -1)
-        ), "Fanouts should consist of values that are either -1 or greater than or equal to 0."
+        ), "Fanouts should consist of values that are either -1 or \
+            greater than or equal to 0."
         return self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace
         )
