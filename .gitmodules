@@ -13,9 +13,6 @@
 [submodule "third_party/phmap"]
 	path = third_party/phmap
 	url = https://github.com/greg7mdp/parallel-hashmap.git
-[submodule "third_party/tvm"]
-	path = third_party/tvm
-	url = https://github.com/apache/incubator-tvm
 [submodule "third_party/nanoflann"]
 	path = third_party/nanoflann
 	url = https://github.com/jlblancoc/nanoflann
