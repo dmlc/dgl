@@ -409,7 +409,7 @@ def test_sample_neighbors():
     # Construct CSCSamplingGraph.
     graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
 
-    # Extract in subgraph.
+    # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
     subgraph = graph.sample_neighbors(nodes)
 
