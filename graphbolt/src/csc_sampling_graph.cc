@@ -47,7 +47,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
       indptr, indices, node_type_offset, type_per_edge);
 }
 
-c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleEtypeNeighbors(
+c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     torch::Tensor seed_nodes, const std::vector<int64_t>& fanouts, bool replace,
     bool return_eids, bool consider_etype,
     const torch::optional<torch::Tensor>& probs) {

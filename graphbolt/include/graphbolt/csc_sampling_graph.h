@@ -84,7 +84,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @return A pointer to a SampledSubgraph object representing the sampled
    * subgraph.
    */
-  c10::intrusive_ptr<SampledSubgraph> SampleEtypeNeighbors(
+  c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
       torch::Tensor seed_nodes, const std::vector<int64_t>& fanouts,
       bool replace, bool return_eids, bool consider_etype,
       const torch::optional<torch::Tensor>& probs);

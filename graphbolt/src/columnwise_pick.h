@@ -44,7 +44,7 @@ static constexpr int kDefaultPickGrainSize = 32;
  * @param num_samples The number of samples to pick.
  * @return A tensor containing the picked values.
  */
-inline torch::Tensor UniformRangePickWithRepeat(
+inline torch::Tensor UniformPickWithReplace(
     int64_t start, int64_t end, int64_t num_samples);
 
 /**
@@ -56,7 +56,7 @@ inline torch::Tensor UniformRangePickWithRepeat(
  * @param num_samples The number of samples to pick.
  * @return A tensor containing the picked values.
  */
-inline torch::Tensor UniformRangePickWithoutRepeat(
+inline torch::Tensor UniformPick(
     int64_t start, int64_t end, int64_t num_samples);
 
 /**

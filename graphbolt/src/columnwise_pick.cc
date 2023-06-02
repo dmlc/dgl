@@ -9,7 +9,7 @@
 namespace graphbolt {
 namespace sampling {
 
-inline torch::Tensor UniformRangePickWithRepeat(
+inline torch::Tensor UniformPickWithReplace(
     int64_t start, int64_t end, int64_t num_samples) {
   return torch::randint(
       start, end,
@@ -18,7 +18,7 @@ inline torch::Tensor UniformRangePickWithRepeat(
       });
 }
 
-inline torch::Tensor UniformRangePickWithoutRepeat(
+inline torch::Tensor UniformPick(
     int64_t start, int64_t end, int64_t num_samples) {
   auto perm = torch::randperm(end - start) + start;
   return perm.slice(0, 0, num_samples);
@@ -34,9 +34,9 @@ RangePickFn GetRangePickFn(
         auto local_probs = probs.value().slice(0, start, end);
         auto true_indices = local_probs.nonzero().view(-1);
         auto true_num = true_indices.size(0);
-        auto choosed =
-            replace ? UniformRangePickWithRepeat(0, true_num, num_samples)
-                    : UniformRangePickWithoutRepeat(0, true_num, num_samples);
+        auto choosed = replace
+                           ? UniformPickWithReplace(0, true_num, num_samples)
+                           : UniformPick(0, true_num, num_samples);
         return true_indices[choosed];
       };
     } else {
@@ -47,8 +47,7 @@ RangePickFn GetRangePickFn(
       };
     }
   } else {
-    pick_fn =
-        replace ? UniformRangePickWithRepeat : UniformRangePickWithoutRepeat;
+    pick_fn = replace ? UniformPickWithReplace : UniformPick;
   }
   return pick_fn;
 }
