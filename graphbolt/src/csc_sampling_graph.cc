@@ -214,9 +214,9 @@ torch::Tensor Pick(
   } else {
     if (replace) {
       picked_neighbors =
-          torch::randint(offset, offset + num_neighbors, {fanout});
+          torch::randint(offset, offset + num_neighbors, {fanout}, options);
     } else {
-      picked_neighbors = torch::randperm(num_neighbors) + offset;
+      picked_neighbors = torch::randperm(num_neighbors, options) + offset;
       picked_neighbors = picked_neighbors.slice(0, 0, fanout);
     }
   }

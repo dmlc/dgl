@@ -429,7 +429,8 @@ def test_sample_neighbors():
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize(
-    "fanout, expected_sampled_num", [(1, 3), (2, 6), (3, 7), (4, 7), (-1, 7)]
+    "fanout, expected_sampled_num",
+    [(0, 0), (1, 3), (2, 6), (3, 7), (4, 7), (-1, 7)],
 )
 def test_sample_neighbors_fanout(fanout, expected_sampled_num):
     """Original graph in COO:
@@ -653,3 +654,4 @@ def test_hetero_graph_on_shared_memory(
 
 if __name__ == "__main__":
     test_sample_etype_neighbors()
+    test_sample_neighbors_replace(True, 12)

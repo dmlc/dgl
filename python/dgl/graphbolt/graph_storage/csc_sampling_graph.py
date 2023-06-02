@@ -209,7 +209,9 @@ class CSCSamplingGraph:
             IDs of the given seed nodes.
         fanout: int
             The number of edges to be sampled for each node. It should be
-            >= 0 or -1. If -1 is given, all neighbors will be selected.
+            >= 0 or -1. If -1 is given, it is equivalent to when the fanout
+            is greater or equal to the number of neighbors and replacement
+            is false, in which case all the neighbors will be selected.
             Otherwise, it will pick the minimum number of neighbors between
             the fanout value and the total number of neighbors.
         replace: bool
@@ -238,11 +240,13 @@ class CSCSamplingGraph:
         fanouts: torch.Tensor
             The number of edges to be sampled for each node per edge type.
             The value of the it should be greater than or equal to 0 or -1.
-            If set -1, it indicates that all neighbors will be selected.
-            In contrast, if the value is a non-negative integer, it will
-            determine the minimum number of neighbors to select. The minimum
-            value is determined by comparing the fanout value with the total
-            number of neighbors available.
+            If -1 is given, it is equivalent to when the fanout is greater
+            or equal to the number of neighbors and replacement is false,
+            in which case all the neighbors will be selected. In contrast,
+            if the value is a non-negative integer, it will determine the
+            minimum number of neighbors to select. The minimum value is
+            determined by comparing the fanout value with the total number
+            of neighbors available.
         replace: bool
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
