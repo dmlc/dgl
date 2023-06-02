@@ -123,7 +123,6 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes) const {
-  // TODO(#5692): implement this.
   const int64_t num_nodes = nodes.size(0);
   
   std::vector<torch::Tensor> picked_indices_per_node(num_nodes);
