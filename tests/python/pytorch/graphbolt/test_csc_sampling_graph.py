@@ -384,6 +384,7 @@ def test_in_subgraph_heterogeneous():
         in_subgraph.type_per_edge, torch.LongTensor([2, 2, 1, 3, 1, 3, 3])
     )
 
+
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",

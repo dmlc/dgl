@@ -225,6 +225,7 @@ class CSCSamplingGraph:
             self._metadata,
         )
 
+
 def from_csc(
     csc_indptr: torch.Tensor,
     indices: torch.Tensor,
