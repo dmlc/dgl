@@ -155,13 +155,10 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
 
   torch::Tensor picked_indices = torch::cat(picked_indices_per_node);
   torch::Tensor picked_rows = torch::index_select(indices_, 0, picked_indices);
-  torch::Tensor picked_etypes =
-      torch::index_select(type_per_edge_.value(), 0, picked_indices);
-  torch::Tensor picked_eids = std::move(picked_indices);
 
   return c10::make_intrusive<SampledSubgraph>(
-      res_indptr, picked_rows, nodes, torch::nullopt, picked_eids,
-      picked_etypes);
+      res_indptr, picked_rows, nodes, torch::nullopt, torch::nullopt,
+      torch::nullopt);
 }
 
 c10::intrusive_ptr<CSCSamplingGraph>

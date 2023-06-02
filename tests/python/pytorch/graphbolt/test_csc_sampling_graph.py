@@ -402,19 +402,20 @@ def test_sample_neighbors():
     num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    type_per_edge = torch.zeros((num_edges,))
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices)
+    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
 
     # Extract in subgraph.
     nodes = torch.LongTensor([1, 3, 4])
     subgraph = graph.sample_neighbors(nodes)
 
     # Verify in subgraph.
-    assert torch.equal(subgraph.indptr, torch.LongTensor([0, 0, 0, 0]))
-    assert torch.equal(subgraph.indices, torch.LongTensor([0]))
+    assert torch.equal(subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
+    assert torch.equal(subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4]))
     assert torch.equal(subgraph.reverse_column_node_ids, nodes)
     assert subgraph.reverse_row_node_ids is None
     assert subgraph.reverse_edge_ids is None
