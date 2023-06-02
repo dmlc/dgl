@@ -495,7 +495,6 @@ def test_sample_neighbors_replace(replace, expected_sampled_num):
     assert sampled_num == expected_sampled_num
 
 
-<<<<<<< HEAD
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
@@ -537,8 +536,6 @@ def test_sample_etype_neighbors():
     assert subgraph.type_per_edge is None
 
 
-=======
->>>>>>> master
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     """Check if two tensors are on the same shared memory.
 
