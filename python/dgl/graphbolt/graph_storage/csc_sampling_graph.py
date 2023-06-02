@@ -238,14 +238,17 @@ class CSCSamplingGraph:
         nodes: torch.Tensor
             IDs of the given seed nodes.
         fanouts: torch.Tensor
-            The number of edges to be sampled for each node per edge type.
-            The value of the it should be greater than or equal to 0 or -1.
-            If -1 is given, it is equivalent to when the fanout is greater
-            or equal to the number of neighbors and replacement is false,
-            in which case all the neighbors will be selected. In contrast,
-            if the value is a non-negative integer, it will determine the
-            minimum number of neighbors to select. The minimum value is
-            determined by comparing the fanout value with the total number
+            The number of edges to be sampled for each node with or
+            without considering edge types. The length of it should be 1 or
+            equal to the number of edge types. A length of 1 means the sampling
+            will be performed once for each node, regardless of edge types.
+            Otherwise, it will be performed independently for each edge type.
+            The value of it should be greater than or equal to 0 or -1. If -1
+            is given, it is equivalent to when the fanout is greater or equal
+            to the number of neighbors and replacement is false, in which case
+            all the neighbors will be selected. In contrast, a non-negative
+            integer determines the minimum number of neighbors to select, which
+            is determined by comparing the fanout value with the total number
             of neighbors available.
         replace: bool
             Boolean indicating whether the sample is preformed with or
