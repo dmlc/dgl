@@ -413,12 +413,12 @@ def test_sample_neighbors():
     subgraph = graph.sample_neighbors(nodes)
 
     # Verify in subgraph.
-    assert torch.equal(subgraph.indptr, torch.LongTensor([0, 0, 0]))
+    assert torch.equal(subgraph.indptr, torch.LongTensor([0, 0, 0, 0]))
     assert torch.equal(subgraph.indices, torch.LongTensor([0]))
     assert torch.equal(subgraph.reverse_column_node_ids, nodes)
     assert subgraph.reverse_row_node_ids is None
     assert subgraph.reverse_edge_ids is None
-    assert in_subgraph.type_per_edge is None
+    assert subgraph.type_per_edge is None
 
 
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
