@@ -130,8 +130,8 @@ torch::Tensor PickEtype(
 c10::intrusive_ptr<SampledSubgraph> ColumnWisePick(
     const CSCPtr graph, const torch::Tensor& columns,
     const std::vector<int64_t>& num_picks,
-    const torch::optional<torch::Tensor>& probs, bool require_eids,
-    bool replace, bool consider_etype, RangePickFn& pick_fn);
+    const torch::optional<torch::Tensor>& probs, bool return_eids, bool replace,
+    bool consider_etype, RangePickFn pick_fn);
 
 }  // namespace sampling
 }  // namespace graphbolt

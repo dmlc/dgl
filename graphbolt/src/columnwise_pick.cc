@@ -78,14 +78,14 @@ torch::Tensor PickEtype(
     const std::vector<int64_t>& num_picks, RangePickFn pick_fn) {
   TensorList pick_indices_per_etype(
       num_picks.size(), torch::tensor({}, options));
-  for (int64_t r = off, l = off; r < len; l = r) {
-    auto cur_et = type_per_edge[off].item<int64_t>();
+  for (int64_t r = off, l = off; r < off + len; l = r) {
+    auto cur_et = type_per_edge[r].item<int64_t>();
     auto cur_num_pick = num_picks[cur_et];
-    while (r < len && type_per_edge[r].item<int64_t>() == cur_et) r++;
+    while (r < off + len && type_per_edge[r].item<int64_t>() == cur_et) r++;
     // Do sampling for one etype.
     if (cur_num_pick != 0)
       pick_indices_per_etype[cur_et] =
-          Pick(off, len, replace, probs, options, cur_num_pick, pick_fn);
+          Pick(l, r - l, replace, probs, options, cur_num_pick, pick_fn);
   }
   return torch::cat(pick_indices_per_etype, 0);
 }
@@ -99,8 +99,6 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWisePick(
   const auto indices = graph->Indices();
   const auto type_per_edge = graph->TypePerEdge();
   const int64_t num_columns = columns.size(0);
-  const int64_t num_etypes = num_picks.size();
-  const bool has_probs = probs.has_value();
 
   // Don't do initialization here as it's very time-consuming, but make sure no
   // elements inside is undefined when using cat.
@@ -110,7 +108,6 @@ c10::intrusive_ptr<SampledSubgraph> ColumnWisePick(
 
   torch::parallel_for(
       0, num_columns, kDefaultPickGrainSize, [&](size_t b, size_t e) {
-        size_t sampled_num_this_thread = 0;
         for (size_t i = b; i < e; ++i) {
           const auto cid = columns[i].item<int64_t>();
           TORCH_CHECK(
