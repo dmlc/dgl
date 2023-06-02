@@ -121,6 +121,14 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
+c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
+    const torch::Tensor& nodes) const {
+  return c10::make_intrusive<SampledSubgraph>(
+      torch::zeros({nodes.size(0) + 1}, indptr_.options()),
+      torch::zeros({1}, indptr_.options()), nodes, torch::nullopt,
+      torch::nullopt, torch::nullopt);
+}
+
 c10::intrusive_ptr<CSCSamplingGraph>
 CSCSamplingGraph::BuildGraphFromSharedMemoryTensors(
     std::tuple<
