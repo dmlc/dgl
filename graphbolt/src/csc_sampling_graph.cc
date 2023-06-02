@@ -125,8 +125,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes) const {
   const int64_t num_nodes = nodes.size(0);
 
-  std::vector<torch::Tensor> picked_indices_per_node(num_nodes);
-  torch::Tensor picked_num_per_node =
+  std::vector<torch::Tensor> picked_eids_per_node(num_nodes);
+  torch::Tensor picked_number_per_node =
       torch::zeros({num_nodes + 1}, indptr_.options());
 
   torch::parallel_for(0, num_nodes, 32, [&](size_t b, size_t e) {
@@ -143,21 +143,21 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
         // Initialization is performed here because all tensors will be
         // concatenated in the master thread, and having an undefined tensor
         // during concatenation can result in a crash.
-        picked_indices_per_node[i] = torch::tensor({}, indptr_.options());
+        picked_eids_per_node[i] = torch::tensor({}, indptr_.options());
         continue;
       }
 
-      picked_indices_per_node[i] =
+      picked_eids_per_node[i] =
           torch::arange(offset, offset + num_neighbors);
-      picked_num_per_node[i + 1] = num_neighbors;
+      picked_number_per_node[i + 1] = num_neighbors;
     }
   });  // End of the thread.
 
-  torch::Tensor subgraph_indptr = torch::cumsum(picked_num_per_node, 0);
+  torch::Tensor subgraph_indptr = torch::cumsum(picked_number_per_node, 0);
 
-  torch::Tensor picked_indices = torch::cat(picked_indices_per_node);
+  torch::Tensor picked_eids = torch::cat(picked_eids_per_node);
   torch::Tensor subgraph_indices =
-      torch::index_select(indices_, 0, picked_indices);
+      torch::index_select(indices_, 0, picked_eids);
 
   return c10::make_intrusive<SampledSubgraph>(
       subgraph_indptr, subgraph_indices, nodes, torch::nullopt, torch::nullopt,
