@@ -539,6 +539,7 @@ class HeteroPGExplainer(PGExplainer):
         self.elayers = self.elayers.to(graph.device)
 
         embed = self.model(graph, feat, embed=True, **kwargs)
+        embed = {ntype: emb.data for ntype, emb in embed.items()}
         embed_flat = torch.concat(list(embed.values()))
 
         homo_graph = to_homogeneous(graph, store_type=True)
