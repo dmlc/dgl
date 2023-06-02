@@ -121,7 +121,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    *
    * @param nodes The nodes from which to sample neighbors.
    * @param fanout The number of edges to be sampled for each node. It should be
-   * >= 0 or -1. "If -1 is given, it is equivalent to when the fanout is greater
+   * >= 0 or -1. If -1 is given, it is equivalent to when the fanout is greater
    * or equal to the number of neighbors and replacement is false, in which case
    * all the neighbors will be selected. Otherwise, it will pick the minimum
    * number of neighbors between the fanout value and the total number of
@@ -216,7 +216,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  * node.
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
- * >= 0 or -1. "If -1 is given, it is equivalent to when the fanout is greater
+ * >= 0 or -1. If -1 is given, it is equivalent to when the fanout is greater
  * or equal to the number of neighbors and replacement is false, in which case
  * all the neighbors will be selected. Otherwise, it will pick the minimum
  * number of neighbors between the fanout value and the total number of
