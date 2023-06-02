@@ -131,33 +131,36 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
 
   torch::parallel_for(0, num_nodes, 32, [&](size_t b, size_t e) {
     for (size_t i = b; i < e; ++i) {
-      const auto cid = nodes[i].item<int64_t>();
+      const auto nid = nodes[i].item<int64_t>();
       TORCH_CHECK(
-          cid >= 0 && cid < NumNodes(),
-          "Seed nodes should be in range [0, num_nodes)");
-      const auto off = indptr_[cid].item<int64_t>();
-      const auto len = indptr_[cid + 1].item<int64_t>() - off;
+          nid >= 0 && nid < NumNodes(),
+          "The seed nodes' IDs should fall within the range of the graph's "
+          "node IDs.");
+      const auto offset = indptr_[nid].item<int64_t>();
+      const auto num_neighbors = indptr_[nid + 1].item<int64_t>() - offset;
 
-      if (len == 0) {
-        // Init, otherwise cat will crash.
+      if (num_neighbors == 0) {
+        // Initialization is performed here because all tensors will be
+        // concatenated in the master thread, and having an undefined tensor
+        // during concatenation can result in a crash.
         picked_indices_per_node[i] = torch::tensor({}, indptr_.options());
         continue;
       }
 
-      torch::Tensor picked_indices_this_node = torch::arange(off, off + len);
-
-      picked_indices_per_node[i] = picked_indices_this_node;
-      picked_num_per_node[i + 1] = picked_indices_this_node.size(0);
+      picked_indices_per_node[i] =
+          torch::arange(offset, offset + num_neighbors);
+      picked_num_per_node[i + 1] = num_neighbors;
     }
   });  // End of the thread.
 
-  torch::Tensor res_indptr = torch::cumsum(picked_num_per_node, 0);
+  torch::Tensor subgraph_indptr = torch::cumsum(picked_num_per_node, 0);
 
   torch::Tensor picked_indices = torch::cat(picked_indices_per_node);
-  torch::Tensor picked_rows = torch::index_select(indices_, 0, picked_indices);
+  torch::Tensor subgraph_indices =
+      torch::index_select(indices_, 0, picked_indices);
 
   return c10::make_intrusive<SampledSubgraph>(
-      res_indptr, picked_rows, nodes, torch::nullopt, torch::nullopt,
+      subgraph_indptr, subgraph_indices, nodes, torch::nullopt, torch::nullopt,
       torch::nullopt);
 }
 
