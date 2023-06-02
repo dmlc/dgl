@@ -215,7 +215,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  * will pick the minimum number of neighbors between the fanout value and the
  * total number of neighbors.
  * @param options Tensor options specifying the desired data type of the result.
- * @return A tensor containing the picked elements.
+ * @return A tensor containing the picked neighbors.
  */
 torch::Tensor Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
