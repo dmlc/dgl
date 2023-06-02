@@ -28,7 +28,6 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("indices", &CSCSamplingGraph::Indices)
       .def("node_type_offset", &CSCSamplingGraph::NodeTypeOffset)
       .def("type_per_edge", &CSCSamplingGraph::TypePerEdge)
-      .def("sample_etype_neighbors", &CSCSamplingGraph::SampleEtypeNeighbors)
       .def("in_subgraph", &CSCSamplingGraph::InSubgraph)
       .def("copy_to_shared_memory", &CSCSamplingGraph::CopyToSharedMemory);
   m.def("from_csc", &CSCSamplingGraph::FromCSC);
