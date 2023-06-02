@@ -123,11 +123,46 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes) const {
-  // TODO(#5692): implement this.
+  const int64_t num_nodes = nodes.size(0);
+
+  std::vector<torch::Tensor> picked_neighbors_per_node(num_nodes);
+  torch::Tensor num_picked_neighbors_per_node =
+      torch::zeros({num_nodes + 1}, indptr_.options());
+
+  torch::parallel_for(0, num_nodes, 32, [&](size_t b, size_t e) {
+    for (size_t i = b; i < e; ++i) {
+      const auto nid = nodes[i].item<int64_t>();
+      TORCH_CHECK(
+          nid >= 0 && nid < NumNodes(),
+          "The seed nodes' IDs should fall within the range of the graph's "
+          "node IDs.");
+      const auto offset = indptr_[nid].item<int64_t>();
+      const auto num_neighbors = indptr_[nid + 1].item<int64_t>() - offset;
+
+      if (num_neighbors == 0) {
+        // Initialization is performed here because all tensors will be
+        // concatenated in the master thread, and having an undefined tensor
+        // during concatenation can result in a crash.
+        picked_neighbors_per_node[i] = torch::tensor({}, indptr_.options());
+        continue;
+      }
+
+      picked_neighbors_per_node[i] =
+          torch::arange(offset, offset + num_neighbors);
+      num_picked_neighbors_per_node[i + 1] = num_neighbors;
+    }
+  });  // End of the thread.
+
+  torch::Tensor subgraph_indptr =
+      torch::cumsum(num_picked_neighbors_per_node, 0);
+
+  torch::Tensor picked_eids = torch::cat(picked_neighbors_per_node);
+  torch::Tensor subgraph_indices =
+      torch::index_select(indices_, 0, picked_eids);
+
   return c10::make_intrusive<SampledSubgraph>(
-      torch::zeros({nodes.size(0) + 1}, indptr_.options()),
-      torch::zeros({1}, indptr_.options()), nodes, torch::nullopt,
-      torch::nullopt, torch::nullopt);
+      subgraph_indptr, subgraph_indices, nodes, torch::nullopt, torch::nullopt,
+      torch::nullopt);
 }
 
 c10::intrusive_ptr<CSCSamplingGraph>
