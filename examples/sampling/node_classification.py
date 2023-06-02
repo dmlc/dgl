@@ -170,9 +170,8 @@ def train(args, device, g, dataset, model, num_classes):
             total_loss += loss.item()
         acc = evaluate(model, g, val_dataloader, num_classes)
         print(
-            "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(
-                epoch, total_loss / (it + 1), acc.item()
-            )
+            f"Epoch {epoch:05d} | Loss {total_loss:.4f} | "
+            f"Accuracy {acc.item():.4f} "
         )
 
 
@@ -212,4 +211,4 @@ if __name__ == "__main__":
     acc = layerwise_infer(
         device, g, dataset.test_idx, model, num_classes, batch_size=4096
     )
-    print("Test Accuracy {:.4f}".format(acc.item()))
+    print(f"Test Accuracy {acc.item():.4f}")
