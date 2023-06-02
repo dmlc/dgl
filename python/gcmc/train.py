@@ -12,12 +12,11 @@ from torch.optim import Adam
 from torch.nn.functional import softmax
 import numpy as np
 
-'''TODO
-[x] decoder
-[x] deal with edge masks
-[] why all testing edges are rated 5?
-[] when test rmse < 0.8 or some other small numbers, training will be blocked. why?
 '''
+ml-100k, with node features, gcmc
+rmse: 0.9473 (original implementation of gcmc example: 0.9448)
+'''
+
 class BiDecoder(nn.Module):
     # codes adopted from GCMC example
     def __init__(self, in_units, num_classes, num_basis=2, dropout_rate=0.0):

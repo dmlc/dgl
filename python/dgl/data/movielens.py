@@ -314,7 +314,7 @@ class MovieLensDataset(DGLDataset):
         all_rating_values = Tensor(labels)
         
         graph = self.construct_g(all_rating_pairs, all_rating_values, user_feat, movie_feat)
-        self.graph = self.add_edge_labels(graph, train_rating_data, valid_rating_data, test_rating_data)
+        self.graph = self.add_masks(graph, train_rating_data, valid_rating_data, test_rating_data)
         
         print(f"End processing {self.name} ...")
 
@@ -335,30 +335,30 @@ class MovieLensDataset(DGLDataset):
         g.edata['rate'] = edata
         return g
     
-    def add_edge_labels(self, g, train_rating_data, valid_rating_data, test_rating_data):
+    def add_masks(self, g, train_rating_data, valid_rating_data, test_rating_data):
         train_u_indices, train_v_indices, _ = self._generate_pair_value(train_rating_data)
         valid_u_indices, valid_v_indices, _ = self._generate_pair_value(valid_rating_data)
         test_u_indices, test_v_indices, _ = self._generate_pair_value(test_rating_data)
         
         # user-movie
-        train_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.int)
-        train_mask[g.edge_ids(train_u_indices, train_v_indices, etype='user-movie')] = 1
-        valid_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.int)
-        valid_mask[g.edge_ids(valid_u_indices, valid_v_indices, etype='user-movie')] = 1
-        test_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.int)
-        test_mask[g.edge_ids(test_u_indices, test_v_indices, etype='user-movie')] = 1
+        train_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.bool)
+        train_mask[g.edge_ids(train_u_indices, train_v_indices, etype='user-movie')] = True
+        valid_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.bool)
+        valid_mask[g.edge_ids(valid_u_indices, valid_v_indices, etype='user-movie')] = True
+        test_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.bool)
+        test_mask[g.edge_ids(test_u_indices, test_v_indices, etype='user-movie')] = True
 
         g.edges['user-movie'].data['train_mask'] = train_mask
         g.edges['user-movie'].data['valid_mask'] = valid_mask
         g.edges['user-movie'].data['test_mask'] = test_mask
 
         # movie-user
-        train_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.int)
-        train_mask_rev[g.edge_ids(train_v_indices, train_u_indices, etype='movie-user')] = 1
-        valid_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.int)
-        valid_mask_rev[g.edge_ids(valid_v_indices, valid_u_indices, etype='movie-user')] = 1
-        test_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.int)
-        test_mask_rev[g.edge_ids(test_v_indices, test_u_indices, etype='movie-user')] = 1
+        train_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.bool)
+        train_mask_rev[g.edge_ids(train_v_indices, train_u_indices, etype='movie-user')] = True
+        valid_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.bool)
+        valid_mask_rev[g.edge_ids(valid_v_indices, valid_u_indices, etype='movie-user')] = True
+        test_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.bool)
+        test_mask_rev[g.edge_ids(test_v_indices, test_u_indices, etype='movie-user')] = True
 
         g.edges['movie-user'].data['train_mask'] = train_mask_rev
         g.edges['movie-user'].data['valid_mask'] = valid_mask_rev
