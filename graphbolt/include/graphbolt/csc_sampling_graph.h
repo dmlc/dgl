@@ -67,19 +67,20 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const torch::optional<torch::Tensor>& type_per_edge);
 
   /**
-   * @brief Performs neighbor sampling for a given set of seed nodes taking edge
-   * type into account, where each edge type has a specified pick number.
+   * @brief Performs neighbor sampling for a given set of seed nodes.
    *
    * @param seed_nodes The tensor containing the seed nodes.
    * @param fanouts The list containing the number of neighbors to sample.
-   * @param replace Boolean indicating if sampling is done with replacement.
-   * @param return_eids Boolean indicating if edge IDs are required to return,
-   * which is usually used when edge features are required.
-   * @param consider_etype Boolean indicating if considering etype during
-   * sampling. If set, pick for each etype for a column, otherwise pick once
-   * against all neighbors for a column.
+   * @param replace Boolean indicating  whether the sample is with or without
+   * replacement. If True, a value can be selected multiple times.
+   * @param return_eids Boolean indicating whether sampled edges' IDs are
+   * required to return, which is usually set when edge features are required.
+   * @param consider_etype Boolean indicating whether performing sampling
+   * against each edge types. If True, the sampling for each node is performed
+   * independently for each edge type. Otherwise it will be performed once
+   * against all neighbors with no regard of different edge types.
    * @param probs Optional tensor containing probabilities for sampling. Dtype
-   * should be bool or float.
+   * should be bool or float and shape is (num_edges,).
    *
    * @return A pointer to a SampledSubgraph object representing the sampled
    * subgraph.
