@@ -124,12 +124,15 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * >= 0 or -1. If -1 is given, all neighbors will be selected. Otherwise, it
    * will pick the minimum number of neighbors between the fanout value and the
    * total number of neighbors.
+   * @param replace Boolean indicating whether the sample is preformed with or
+   * without replacement. If True, a value can be selected multiple
+   * times.Otherwise, each value can be selected only once.
    *
    * @return An intrusive pointer to a SampledSubgraph object containing the
    * sampled graph's information.
    */
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
-      const torch::Tensor& nodes, int64_t fanout) const;
+      const torch::Tensor& nodes, int64_t fanout, bool replace) const;
 
   /**
    * @brief Copy the graph to shared memory.
@@ -214,11 +217,15 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  * >= 0 or -1. If -1 is given, all neighbors will be selected. Otherwise, it
  * will pick the minimum number of neighbors between the fanout value and the
  * total number of neighbors.
+ * @param replace Boolean indicating whether the sample is preformed with or
+ * without replacement. If True, a value can be selected multiple
+ * times.Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
+ *
  * @return A tensor containing the picked neighbors.
  */
 torch::Tensor Pick(
-    int64_t offset, int64_t num_neighbors, int64_t fanout,
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options);
 
 }  // namespace sampling

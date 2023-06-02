@@ -195,7 +195,10 @@ class CSCSamplingGraph:
         return self._c_csc_graph.in_subgraph(nodes)
 
     def sample_neighbors(
-        self, nodes: torch.Tensor, fanout: int
+        self,
+        nodes: torch.Tensor,
+        fanout: int,
+        replace: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -209,11 +212,15 @@ class CSCSamplingGraph:
             >= 0 or -1. If -1 is given, all neighbors will be selected.
             Otherwise, it will pick the minimum number of neighbors between
             the fanout value and the total number of neighbors.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
         """
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         assert fanout >= 0 or fanout == -1, "Fanout shoud have value >= 0 or -1"
-        return self._c_csc_graph.sample_neighbors(nodes, fanout)
+        return self._c_csc_graph.sample_neighbors(nodes, fanout, replace)
 
     def copy_to_shared_memory(self, shared_memory_name: str):
         """Copy the graph to shared memory.

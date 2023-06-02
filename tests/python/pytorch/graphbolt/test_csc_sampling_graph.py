@@ -459,6 +459,41 @@ def test_sample_neighbors_fanout(fanout, expected_sampled_num):
     assert sampled_num == expected_sampled_num
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
+    "replace, expected_sampled_num", [(False, 7), (True, 12)]
+)
+def test_sample_neighbors_replace(replace, expected_sampled_num):
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+    """
+    # Initialize data.
+    num_nodes = 5
+    num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(indptr, indices)
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([1, 3, 4])
+    subgraph = graph.sample_neighbors(nodes, fanout=4, replace=replace)
+
+    # Verify in subgraph.
+    sampled_num = subgraph.indices.size(0)
+    assert sampled_num == expected_sampled_num
+
+
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     """Check if two tensors are on the same shared memory.
 
