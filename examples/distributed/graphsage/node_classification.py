@@ -31,6 +31,7 @@ class DistSAGE(nn.Module):
     dropout : float
         Dropout value.
     """
+
     def __init__(
         self, in_feats, n_hidden, n_classes, n_layers, activation, dropout
     ):
