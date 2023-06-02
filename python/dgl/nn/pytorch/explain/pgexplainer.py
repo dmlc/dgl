@@ -409,17 +409,7 @@ class HeteroPGExplainer(PGExplainer):
         Tensor
             A scalar tensor representing the loss.
         """
-        self.model = self.model.to(graph.device)
-        self.elayers = self.elayers.to(graph.device)
-
-        pred = self.model(graph, feat, embed=False, **kwargs).argmax(-1).data
-
-        prob, _ = self.explain_graph(
-            graph, feat, tmp=tmp, training=True, **kwargs
-        )
-
-        loss_tmp = self.loss(prob, pred)
-        return loss_tmp
+        return super().train_step(graph, feat, tmp=tmp, **kwargs)
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
         r"""Learn and return an edge mask that plays a crucial role to
