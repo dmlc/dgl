@@ -147,8 +147,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
         continue;
       }
 
-      picked_eids_per_node[i] =
-          torch::arange(offset, offset + num_neighbors);
+      picked_eids_per_node[i] = torch::arange(offset, offset + num_neighbors);
       picked_number_per_node[i + 1] = num_neighbors;
     }
   });  // End of the thread.
