@@ -126,7 +126,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
   const int64_t num_nodes = nodes.size(0);
 
   std::vector<torch::Tensor> picked_neighbors_per_node(num_nodes);
-  torch::Tensor num_picked_neighbor_per_node =
+  torch::Tensor num_picked_neighbors_per_node =
       torch::zeros({num_nodes + 1}, indptr_.options());
 
   torch::parallel_for(0, num_nodes, 32, [&](size_t b, size_t e) {
@@ -149,12 +149,12 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
 
       picked_neighbors_per_node[i] =
           torch::arange(offset, offset + num_neighbors);
-      num_picked_neighbor_per_node[i + 1] = num_neighbors;
+      num_picked_neighbors_per_node[i + 1] = num_neighbors;
     }
   });  // End of the thread.
 
   torch::Tensor subgraph_indptr =
-      torch::cumsum(num_picked_neighbor_per_node, 0);
+      torch::cumsum(num_picked_neighbors_per_node, 0);
 
   torch::Tensor picked_eids = torch::cat(picked_neighbors_per_node);
   torch::Tensor subgraph_indices =
