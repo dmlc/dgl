@@ -124,39 +124,39 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes) const {
   const int64_t num_nodes = nodes.size(0);
-  
+
   std::vector<torch::Tensor> picked_indices_per_node(num_nodes);
   torch::Tensor picked_num_per_node =
       torch::zeros({num_nodes + 1}, indptr_.options());
-  
-  torch::parallel_for(
-    0, num_nodes, 32, [&](size_t b, size_t e) {
-      for (size_t i = b; i < e; ++i) {
-        const auto cid = nodes[i].item<int64_t>();
-        TORCH_CHECK(
-            cid >= 0 && cid < NumNodes(),
-            "Seed nodes should be in range [0, num_nodes)");
-        const auto off = indptr_[cid].item<int64_t>();
-        const auto len = indptr_[cid + 1].item<int64_t>() - off;
 
-        if (len == 0) {
-          // Init, otherwise cat will crash.
-          picked_indices_per_node[i] = torch::tensor({}, indptr_.options());
-          continue;
-        }
+  torch::parallel_for(0, num_nodes, 32, [&](size_t b, size_t e) {
+    for (size_t i = b; i < e; ++i) {
+      const auto cid = nodes[i].item<int64_t>();
+      TORCH_CHECK(
+          cid >= 0 && cid < NumNodes(),
+          "Seed nodes should be in range [0, num_nodes)");
+      const auto off = indptr_[cid].item<int64_t>();
+      const auto len = indptr_[cid + 1].item<int64_t>() - off;
 
-        torch::Tensor picked_indices_this_node = torch::arange(off, off+len);
-
-        picked_indices_per_node[i] = picked_indices_this_node;
-        picked_num_per_node[i + 1] = picked_indices_this_node.size(0);
+      if (len == 0) {
+        // Init, otherwise cat will crash.
+        picked_indices_per_node[i] = torch::tensor({}, indptr_.options());
+        continue;
       }
-    });  // End of the thread.
+
+      torch::Tensor picked_indices_this_node = torch::arange(off, off + len);
+
+      picked_indices_per_node[i] = picked_indices_this_node;
+      picked_num_per_node[i + 1] = picked_indices_this_node.size(0);
+    }
+  });  // End of the thread.
 
   torch::Tensor res_indptr = torch::cumsum(picked_num_per_node, 0);
 
   torch::Tensor picked_indices = torch::cat(picked_indices_per_node);
   torch::Tensor picked_rows = torch::index_select(indices_, 0, picked_indices);
-  torch::Tensor picked_etypes = torch::index_select(type_per_edge_.value(), 0, picked_indices);
+  torch::Tensor picked_etypes =
+      torch::index_select(type_per_edge_.value(), 0, picked_indices);
   torch::Tensor picked_eids = std::move(picked_indices);
 
   return c10::make_intrusive<SampledSubgraph>(
