@@ -385,6 +385,42 @@ def test_in_subgraph_heterogeneous():
     )
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_sample_neighbors():
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+    """
+    # Initialize data.
+    num_nodes = 5
+    num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(indptr, indices)
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([1, 3, 4])
+    subgraph = graph.sample_neighbors(nodes)
+
+    # Verify in subgraph.
+    assert torch.equal(subgraph.indptr, torch.LongTensor([0, 0, 0, 0]))
+    assert torch.equal(subgraph.indices, torch.LongTensor([0]))
+    assert torch.equal(subgraph.reverse_column_node_ids, nodes)
+    assert subgraph.reverse_row_node_ids is None
+    assert subgraph.reverse_edge_ids is None
+    assert subgraph.type_per_edge is None
+
+
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     """Check if two tensors are on the same shared memory.
 

@@ -116,6 +116,18 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const torch::Tensor& nodes) const;
 
   /**
+   * @brief Sample neighboring edges of the given nodes and return the induced
+   * subgraph.
+   *
+   * @param nodes The nodes from which to sample neighbors.
+   *
+   * @return An intrusive pointer to a SampledSubgraph object containing the
+   * sampled graph's information.
+   */
+  c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
+      const torch::Tensor& nodes) const;
+
+  /**
    * @brief Copy the graph to shared memory.
    * @param shared_memory_name The name of the shared memory.
    *
