@@ -415,7 +415,9 @@ def test_sample_neighbors():
 
     # Verify in subgraph.
     assert torch.equal(subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
-    assert torch.equal(subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4]))
+    assert torch.equal(
+        subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
+    )
     assert torch.equal(subgraph.reverse_column_node_ids, nodes)
     assert subgraph.reverse_row_node_ids is None
     assert subgraph.reverse_edge_ids is None
