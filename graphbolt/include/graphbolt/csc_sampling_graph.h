@@ -256,6 +256,8 @@ torch::Tensor Pick(
  * without replacement. If True, a value can be selected multiple
  * times.Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
+ * @param type_per_edge Tensor representing the type of each edge in the
+ * original graph.
  *
  * @return A tensor containing the picked neighbors.
  */
