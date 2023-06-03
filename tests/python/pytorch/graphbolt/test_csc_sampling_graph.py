@@ -499,6 +499,66 @@ def test_sample_neighbors_replace(replace, expected_sampled_num):
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
+@pytest.mark.parametrize("replace", [True, False])
+@pytest.mark.parametrize(
+    "probs",
+    [
+        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
+        torch.tensor(
+            [
+                True,
+                False,
+                True,
+                False,
+                True,
+                True,
+                True,
+                False,
+                True,
+                False,
+                True,
+                True,
+            ]
+        ),
+    ],
+)
+def test_sample_neighbors_probs(replace, probs):
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+    """
+    # Initialize data.
+    num_nodes = 5
+    num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(indptr, indices)
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([1, 3, 4])
+    subgraph = graph.sample_neighbors(
+        nodes, fanout=5, replace=replace, probs=probs
+    )
+
+    # Verify in subgraph.
+    sampled_num = subgraph.indices.size(0)
+    if replace:
+        assert sampled_num == 15
+    else:
+        assert sampled_num == 4
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
 def test_sample_etype_neighbors():
     """Original graph in COO:
     1   0   1   0   1

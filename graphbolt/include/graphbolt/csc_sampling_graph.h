@@ -144,7 +144,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    */
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-      bool replace, const tensor::Tensor& probs) const;
+      bool replace, const torch::optional<torch::Tensor>& probs) const;
 
   /**
    * @brief Copy the graph to shared memory.
@@ -236,15 +236,16 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  * times.Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
  * @param probs Optional tensor containing the (unnormalized) probabilities
- * associated with each neighboring edge of a node. It must be a 1D
- * floating-point tensor with the number of elements equal to the number of
- * edges.
+ * associated with each neighboring edge of a node in the original graph. It
+ * must be a 1D floating-point tensor with the number of elements equal to the
+ * number of edges in the graph.
  *
  * @return A tensor containing the picked neighbors.
  */
 torch::Tensor Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
-    const torch::TensorOptions& options, const tensor::Tensor& probs);
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs);
 
 /**
  * @brief Picks a specified number of neighbors for a node per edge type,
@@ -265,17 +266,20 @@ torch::Tensor Pick(
  * without replacement. If True, a value can be selected multiple
  * times.Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
+ * @param type_per_edge Tensor representing the type of each edge in the
+ * original graph.
  * @param probs Optional tensor containing the (unnormalized) probabilities
- * associated with each neighboring edge of a node. It must be a 1D
- * floating-point tensor with the number of elements equal to the number of
- * edges.
+ * associated with each neighboring edge of a node in the original graph. It
+ * must be a 1D floating-point tensor with the number of elements equal to the
+ * number of edges in the graph.
  *
  * @return A tensor containing the picked neighbors.
  */
 torch::Tensor PickEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
-    const torch::Tensor& type_per_edge, const tensor::Tensor& probs);
+    const torch::Tensor& type_per_edge,
+    const torch::optional<torch::Tensor>& probs);
 
 }  // namespace sampling
 }  // namespace graphbolt
