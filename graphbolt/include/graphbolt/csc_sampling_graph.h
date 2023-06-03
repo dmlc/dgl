@@ -120,17 +120,17 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * subgraph.
    *
    * @param nodes The nodes from which to sample neighbors.
-   * @param fanouts  The number of edges to be sampled for each node with or
-   * without considering edge types. The length of it should be 1 or
-   * equal to the number of edge types. A length of 1 means the sampling
-   * will be performed once for each node, regardless of edge types.
-   * Otherwise, it will be performed independently for each edge type.
-   * The value of it should be greater than or equal to 0 or -1. If -1 is given,
-   * it is equivalent to when the fanout is greater or equal to the number of
-   * neighbors and replacement is false, in which case all the neighbors will be
-   * selected. In contrast, a non-negative integer determines the minimum number
-   * of neighbors to select, which is determined by comparing the fanout value
-   * with the total number of neighbors available.
+   * @param fanouts The number of edges to be sampled for each node with or
+   * without considering edge types. The length of it should be 1 or equal
+   * to the number of edge types. A length of 1 means the sampling will be
+   * performed once for each node, regardless of edge types. Otherwise, it
+   * will be performed independently for each edge type. The value of it should
+   * be greater than or equal to 0 or -1. If -1 is given, it is equivalent to
+   * when the fanout is greater or equal to the number of neighbors and
+   * replacement is false, in which case all the neighbors will be selected. In
+   * contrast, a non-negative integer determines the minimum number of neighbors
+   * to select, which is determined by comparing the fanout value with the total
+   * number of neighbors available.
    * @param replace Boolean indicating whether the sample is preformed with or
    * without replacement. If True, a value can be selected multiple
    * times.Otherwise, each value can be selected only once.
@@ -247,11 +247,11 @@ torch::Tensor Pick(
  * @param num_neighbors The number of neighbors to pick.
  * @param fanouts The number of edges to be sampled for each node per edge type.
  * The value of it should be greater than or equal to 0 or -1. If -1 is given,
- * it is equivalent to when the fanout is greater or equal to the number
- * of neighbors and replacement is false, in which case all the neighbors will
- * be selected.. In contrast, a non-negative integer determines the minimum
- * number of neighbors to select. The minimum value is determined by comparing
- * the fanout value with the total number of neighbors available.
+ * it is equivalent to when the fanout is greater or equal to the number of
+ * eighbors and replacement is false, in which case all the neighbors will be
+ * selected. In contrast, a non-negative integer determines the minimum number
+ * of neighbors to select. The minimum value is determined by comparing the
+ * fanout value with the total number of neighbors available.
  * @param replace Boolean indicating whether the sample is preformed with or
  * without replacement. If True, a value can be selected multiple
  * times.Otherwise, each value can be selected only once.
