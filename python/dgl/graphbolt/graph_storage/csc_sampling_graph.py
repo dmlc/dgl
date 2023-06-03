@@ -208,12 +208,14 @@ class CSCSamplingGraph:
         nodes: torch.Tensor
             IDs of the given seed nodes.
         fanout: int
-            The number of edges to be sampled for each node. It should be
-            >= 0 or -1. If -1 is given, it is equivalent to when the fanout
-            is greater or equal to the number of neighbors and replacement
-            is false, in which case all the neighbors will be selected.
-            Otherwise, it will pick the minimum number of neighbors between
-            the fanout value and the total number of neighbors.
+            The number of edges to be sampled for each node. The value of each
+            fanout should be >= 0 or = -1.
+              - When the value is -1, all neighbors will be chosen for
+              sampling. It is equivalent to selecting all neighbors when the
+              fanout is >= the number of neighbors (and replacement is set
+              to false).
+              - When the value is a non-negative integer, it serves as a
+              minimum threshold for selecting neighbors.
         replace: bool
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
@@ -239,18 +241,21 @@ class CSCSamplingGraph:
             IDs of the given seed nodes.
         fanouts: torch.Tensor
             The number of edges to be sampled for each node with or without
-            considering edge types. The length of it should be 1 or equal to
-            the number of edge types. A length of 1 means the sampling will be
-            performed once for each node, regardless of edge types. Otherwise,
-            it will be performed independently for each edge type. The value of
-            it should be greater than or equal to 0 or -1. If -1 is given, it
-            isequivalent to when the fanout is greater or equal to the number
-            of neighbors and replacement is false, in which case all the
-            neighbors will be selected. In contrast, a non-negative integer
-            determines the minimum number of neighbors to select, which is
-            determined by comparing the fanout value with the total number of
-            neighbors available.
-        replace: bool
+            considering edge types.
+              - When the length is 1, it indicates that the fanout applies to
+              all neighbors of the node as a collective, regardless of the edge
+              type.
+            - Otherwise, the length should equal to the number of edge types,
+            and each fanout value corresponds to a specific edge type of the
+            nodes.
+            The value of each fanout should be >= 0 or = -1.
+              - When the value is -1, all neighbors will be chosen for
+              sampling. It is equivalent to selecting all neighbors when the
+              fanout is >= the number of neighbors (and replacement is set
+              to false).
+              - When the value is a non-negative integer, it serves as a
+              minimum threshold for selecting neighbors.
+        replce: bool
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
