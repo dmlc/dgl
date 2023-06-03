@@ -208,8 +208,8 @@ class CSCSamplingGraph:
         nodes: torch.Tensor
             IDs of the given seed nodes.
         fanout: int
-            The number of edges to be sampled for each node. The value of each
-            fanout should be >= 0 or = -1.
+            The number of edges to be sampled for each node. The value of it
+            should be >= 0 or = -1.
               - When the value is -1, all neighbors will be chosen for
               sampling. It is equivalent to selecting all neighbors when the
               fanout is >= the number of neighbors (and replacement is set
@@ -243,16 +243,16 @@ class CSCSamplingGraph:
             The number of edges to be sampled for each node with or without
             considering edge types.
               - When the length is 1, it indicates that the fanout applies to
-              all neighbors of the node as a collective, regardless of the edge
-              type.
-            - Otherwise, the length should equal to the number of edge types,
-            and each fanout value corresponds to a specific edge type of the
-            nodes.
+              all neighbors of the node as a collective, regardless of the
+              edge type.
+              - Otherwise, the length should equal to the number of edge
+              types, and each fanout value corresponds to a specific edge
+              type of the nodes.
             The value of each fanout should be >= 0 or = -1.
               - When the value is -1, all neighbors will be chosen for
-              sampling. It is equivalent to selecting all neighbors when the
-              fanout is >= the number of neighbors (and replacement is set
-              to false).
+              sampling. It is equivalent to selecting all neighbors when
+              the fanout is >= the number of neighbors (and replacement
+              is set to false).
               - When the value is a non-negative integer, it serves as a
               minimum threshold for selecting neighbors.
         replce: bool
