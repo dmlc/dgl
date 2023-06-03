@@ -197,38 +197,6 @@ class CSCSamplingGraph:
     def sample_neighbors(
         self,
         nodes: torch.Tensor,
-        fanout: int,
-        replace: bool = False,
-    ) -> torch.ScriptObject:
-        """Sample neighboring edges of the given nodes and return the induced
-        subgraph.
-
-        Parameters
-        ----------
-        nodes: torch.Tensor
-            IDs of the given seed nodes.
-        fanout: int
-            The number of edges to be sampled for each node. The value of it
-            should be >= 0 or = -1.
-              - When the value is -1, all neighbors will be chosen for
-              sampling. It is equivalent to selecting all neighbors when the
-              fanout is >= the number of neighbors (and replacement is set
-              to false).
-              - When the value is a non-negative integer, it serves as a
-              minimum threshold for selecting neighbors.
-        replace: bool
-            Boolean indicating whether the sample is preformed with or
-            without replacement. If True, a value can be selected multiple
-            times. Otherwise, each value can be selected only once.
-        """
-        # Ensure nodes is 1-D tensor.
-        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
-        assert fanout >= 0 or fanout == -1, "Fanout shoud have value >= 0 or -1"
-        return self._c_csc_graph.sample_neighbors(nodes, [fanout], replace)
-
-    def sample_etype_neighbors(
-        self,
-        nodes: torch.Tensor,
         fanouts: torch.Tensor,
         replace: bool = False,
     ) -> torch.ScriptObject:
@@ -263,10 +231,11 @@ class CSCSamplingGraph:
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
-        assert (
-            self.type_per_edge is not None
-        ), "To perform etype sampling, the graph must include \
-            edge type information."
+        if fanouts.size(0) > 1:
+            assert (
+                self.type_per_edge is not None
+            ), "To perform sampling for each edge type (when the length of \
+                `fanouts` > 1), the graph must include edge type information."
         assert torch.all(
             (fanouts >= 0) | (fanouts == -1)
         ), "Fanouts should consist of values that are either -1 or \

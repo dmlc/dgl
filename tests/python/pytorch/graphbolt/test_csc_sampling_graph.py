@@ -402,21 +402,23 @@ def test_sample_neighbors():
     num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices)
+    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
-    fanout = -1
-    subgraph = graph.sample_neighbors(nodes, fanout)
+    fanouts = torch.tensor([2, 2, 3])
+    subgraph = graph.sample_neighbors(nodes, fanouts)
 
     # Verify in subgraph.
     assert torch.equal(subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
     assert torch.equal(
-        subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
+        torch.sort(subgraph.indices)[0],
+        torch.sort(torch.LongTensor([2, 3, 1, 2, 0, 3, 4]))[0],
     )
     assert torch.equal(subgraph.reverse_column_node_ids, nodes)
     assert subgraph.reverse_row_node_ids is None
@@ -429,10 +431,21 @@ def test_sample_neighbors():
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize(
-    "fanout, expected_sampled_num",
-    [(0, 0), (1, 3), (2, 6), (3, 7), (4, 7), (-1, 7)],
+    "fanouts, expected_sampled_num",
+    [
+        ([0], 0),
+        ([1], 3),
+        ([2], 6),
+        ([4], 7),
+        ([-1], 7),
+        ([0, 0], 0),
+        ([1, 0], 3),
+        ([1, 1], 6),
+        ([2, 2], 7),
+        ([-1, -1], 7),
+    ],
 )
-def test_sample_neighbors_fanout(fanout, expected_sampled_num):
+def test_sample_neighbors_fanouts(fanouts, expected_sampled_num):
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -445,15 +458,17 @@ def test_sample_neighbors_fanout(fanout, expected_sampled_num):
     num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices)
+    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
-    subgraph = graph.sample_neighbors(nodes, fanout)
+    fanouts = torch.LongTensor(fanouts)
+    subgraph = graph.sample_neighbors(nodes, fanouts)
 
     # Verify in subgraph.
     sampled_num = subgraph.indices.size(0)
@@ -488,52 +503,13 @@ def test_sample_neighbors_replace(replace, expected_sampled_num):
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
-    subgraph = graph.sample_neighbors(nodes, fanout=4, replace=replace)
+    subgraph = graph.sample_neighbors(
+        nodes, fanouts=torch.LongTensor([4]), replace=replace
+    )
 
     # Verify in subgraph.
     sampled_num = subgraph.indices.size(0)
     assert sampled_num == expected_sampled_num
-
-
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
-def test_sample_etype_neighbors():
-    """Original graph in COO:
-    1   0   1   0   1
-    1   0   1   1   0
-    0   1   0   1   0
-    0   1   0   0   1
-    1   0   0   0   1
-    """
-    # Initialize data.
-    num_nodes = 5
-    num_edges = 12
-    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
-    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
-    type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
-    assert indptr[-1] == num_edges
-    assert indptr[-1] == len(indices)
-
-    # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
-
-    # Generate subgraph via sample neighbors.
-    nodes = torch.LongTensor([1, 3, 4])
-    fanouts = torch.tensor([2, 2, 3])
-    subgraph = graph.sample_etype_neighbors(nodes, fanouts)
-
-    # Verify in subgraph.
-    assert torch.equal(subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
-    assert torch.equal(
-        torch.sort(subgraph.indices)[0],
-        torch.sort(torch.LongTensor([2, 3, 1, 2, 0, 3, 4]))[0],
-    )
-    assert torch.equal(subgraph.reverse_column_node_ids, nodes)
-    assert subgraph.reverse_row_node_ids is None
-    assert subgraph.reverse_edge_ids is None
-    assert subgraph.type_per_edge is None
 
 
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
