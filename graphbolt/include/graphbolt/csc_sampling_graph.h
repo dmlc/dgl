@@ -134,9 +134,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * threshold for selecting neighbors.
    * @param replace Boolean indicating whether the sample is preformed with or
    * without replacement. If True, a value can be selected multiple times.
-   * Otherwise, each value can be selected only once
+   * Otherwise, each value can be selected only once.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
-   * typically used when edge features are required..
+   * typically used when edge features are required.
    *
    * @return An intrusive pointer to a SampledSubgraph object containing the
    * sampled graph's information.
