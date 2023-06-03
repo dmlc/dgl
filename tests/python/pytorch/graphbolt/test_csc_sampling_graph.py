@@ -629,5 +629,4 @@ def test_hetero_graph_on_shared_memory(
 
 
 if __name__ == "__main__":
-    test_sample_etype_neighbors()
     test_sample_neighbors_replace(True, 12)
