@@ -275,6 +275,10 @@ class CSCSamplingGraph:
             (fanouts >= 0) | (fanouts == -1)
         ), "Fanouts should consist of values that are either -1 or \
             greater than or equal to 0."
+        if self.metadata and self.metadata.edge_type_to_id:
+            assert len(self.metadata.edge_type_to_id) == fanouts.size(
+                0
+            ), "Fanouts should have the same number of elements as etypes."
         if probs is not None:
             assert probs.dim() == 1, "Probs should be 1-D tensor."
             assert (
