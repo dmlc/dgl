@@ -412,7 +412,7 @@ def test_sample_neighbors():
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
     fanouts = torch.tensor([2, 2, 3])
-    subgraph = graph.sample_neighbors(nodes, fanouts)
+    subgraph = graph.sample_neighbors(nodes, fanouts, return_eids=True)
 
     # Verify in subgraph.
     assert torch.equal(subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
@@ -421,8 +421,10 @@ def test_sample_neighbors():
         torch.sort(torch.LongTensor([2, 3, 1, 2, 0, 3, 4]))[0],
     )
     assert torch.equal(subgraph.reverse_column_node_ids, nodes)
+    assert torch.equal(
+        subgraph.reverse_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
+    )
     assert subgraph.reverse_row_node_ids is None
-    assert subgraph.reverse_edge_ids is None
     assert subgraph.type_per_edge is None
 
 

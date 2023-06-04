@@ -199,6 +199,7 @@ class CSCSamplingGraph:
         nodes: torch.Tensor,
         fanouts: torch.Tensor,
         replace: bool = False,
+        return_eids: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -227,6 +228,10 @@ class CSCSamplingGraph:
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
+        return_eids: bool
+            Boolean indicating whether the edge IDs of sampled edges,
+            represented as a 1D tensor, should be returned. This is
+            typically used when edge features are required
         """
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
@@ -241,7 +246,7 @@ class CSCSamplingGraph:
         ), "Fanouts should consist of values that are either -1 or \
             greater than or equal to 0."
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace
+            nodes, fanouts.tolist(), replace, return_eids
         )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
