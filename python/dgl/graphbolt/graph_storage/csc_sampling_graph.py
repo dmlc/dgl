@@ -229,8 +229,9 @@ class CSCSamplingGraph:
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
         return_eids: bool
-            Boolean indicating whether edge IDs need to be returned, typically
-            used when edge features are required.
+            Boolean indicating whether the edge IDs of sampled edges,
+            represented as a 1D tensor, should be returned. This is
+            typically used when edge features are required
         """
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
