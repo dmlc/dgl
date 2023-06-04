@@ -232,6 +232,30 @@ class CSCSamplingGraph:
             Boolean indicating whether the edge IDs of sampled edges,
             represented as a 1D tensor, should be returned. This is
             typically used when edge features are required
+        Returns
+            -------
+            SampledSubgraph
+                The sampled subgraph.
+
+        Examples
+            --------
+        >>> indptr = torch.LongTensor([0, 3, 5, 7])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1])
+        >>> type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1])
+        >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+        >>> nodes = torch.LongTensor([1, 2])
+        >>> fanouts = torch.tensor([1, 1])
+        >>> subgraph = graph.sample_neighbors(nodes, fanouts, return_eids=True)
+        >>> print(subgraph.indptr)
+        tensor([0, 2, 4])
+        >>> print(subgraph.indices)
+        tensor([2, 3, 0, 1])
+        >>> print(subgraph.reverse_column_node_ids)
+        tensor([1, 2])
+        >>> print(subgraph.reverse_edge_ids)
+        tensor([3, 4, 5, 6])
+        >>> print(subgraph.type_per_edge)
+        tensor([0, 1, 0, 1])
         """
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
