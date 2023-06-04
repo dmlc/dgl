@@ -211,19 +211,19 @@ class CSCSamplingGraph:
             The number of edges to be sampled for each node with or without
             considering edge types.
               - When the length is 1, it indicates that the fanout applies to
-              all neighbors of the node as a collective, regardless of the
-              edge type.
+                all neighbors of the node as a collective, regardless of the
+                edge type.
               - Otherwise, the length should equal to the number of edge
-              types, and each fanout value corresponds to a specific edge
-              type of the nodes.
+                types, and each fanout value corresponds to a specific edge
+                type of the nodes.
             The value of each fanout should be >= 0 or = -1.
               - When the value is -1, all neighbors will be chosen for
-              sampling. It is equivalent to selecting all neighbors when
-              the fanout is >= the number of neighbors (and replacement
-              is set to false).
+                sampling. It is equivalent to selecting all neighbors when
+                the fanout is >= the number of neighbors (and replace is set to
+                false).
               - When the value is a non-negative integer, it serves as a
-              minimum threshold for selecting neighbors.
-        replce: bool
+                minimum threshold for selecting neighbors.
+        replace: bool
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
