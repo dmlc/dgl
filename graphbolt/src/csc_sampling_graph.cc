@@ -212,38 +212,55 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
   return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
 }
 
-torch::Tensor Pick(
+torch::Tensor UniformPick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options) {
+  torch::Tensor picked_neighbors;
+  if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
+    picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
+  } else {
+    if (replace) {
+      picked_neighbors =
+          torch::randint(offset, offset + num_neighbors, {fanout}, options);
+    } else {
+      picked_neighbors = torch::randperm(num_neighbors, options);
+      picked_neighbors = picked_neighbors.slice(0, 0, fanout) + offset;
+    }
+  }
+  return picked_neighbors;
+}
+
+torch::Tensor NonUniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs) {
   torch::Tensor picked_neighbors;
+  auto local_probs = probs.value().slice(0, offset, offset + num_neighbors);
+  auto positive_probs_mask = (local_probs > 0);
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
     picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
-    if (probs.has_value()) {
-      auto positive_probs_mask =
-          (probs.value().slice(0, offset, offset + num_neighbors) > 0);
-      picked_neighbors =
-          torch::masked_select(picked_neighbors, positive_probs_mask);
-    }
+    picked_neighbors =
+        torch::masked_select(picked_neighbors, positive_probs_mask);
   } else {
-    if (probs.has_value()) {
-      auto local_probs = probs.value().slice(0, offset, offset + num_neighbors);
-      auto num_positive_probs = torch::nonzero(local_probs).size(0);
-      if (num_positive_probs == 0) return torch::tensor({}, options);
-      if (!replace) fanout = std::min(fanout, num_positive_probs);
-      picked_neighbors =
-          torch::multinomial(local_probs, fanout, replace) + offset;
-    } else {
-      if (replace) {
-        picked_neighbors =
-            torch::randint(offset, offset + num_neighbors, {fanout}, options);
-      } else {
-        picked_neighbors = torch::randperm(num_neighbors, options);
-        picked_neighbors = picked_neighbors.slice(0, 0, fanout) + offset;
-      }
-    }
+    auto num_positive_probs = positive_probs_mask.size(0);
+    if (num_positive_probs == 0) return torch::tensor({}, options);
+    if (!replace) fanout = std::min(fanout, num_positive_probs);
+    picked_neighbors =
+        torch::multinomial(local_probs, fanout, replace) + offset;
   }
   return picked_neighbors;
+}
+
+torch::Tensor Pick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs) {
+  if (probs.has_value()) {
+    return NonUniformPick(
+        offset, num_neighbors, fanout, replace, options, probs);
+  } else {
+    return UniformPick(offset, num_neighbors, fanout, replace, options);
+  }
 }
 
 torch::Tensor PickByEtype(
