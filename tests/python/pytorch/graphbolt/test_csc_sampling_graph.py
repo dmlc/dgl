@@ -411,7 +411,7 @@ def test_sample_neighbors():
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
-    fanouts = torch.tensor([2, 2, 3])
+    fanouts = torch.tensor([2, 2])
     subgraph = graph.sample_neighbors(nodes, fanouts, return_eids=True)
 
     # Verify in subgraph.
@@ -693,4 +693,5 @@ def test_hetero_graph_on_shared_memory(
 
 
 if __name__ == "__main__":
+    test_sample_neighbors()
     test_sample_neighbors_replace(True, 12)

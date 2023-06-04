@@ -213,30 +213,55 @@ class CSCSamplingGraph:
             The number of edges to be sampled for each node with or without
             considering edge types.
               - When the length is 1, it indicates that the fanout applies to
-              all neighbors of the node as a collective, regardless of the
-              edge type.
+                all neighbors of the node as a collective, regardless of the
+                edge type.
               - Otherwise, the length should equal to the number of edge
-              types, and each fanout value corresponds to a specific edge
-              type of the nodes.
+                types, and each fanout value corresponds to a specific edge
+                type of the nodes.
             The value of each fanout should be >= 0 or = -1.
               - When the value is -1, all neighbors will be chosen for
-              sampling. It is equivalent to selecting all neighbors when
-              the fanout is >= the number of neighbors (and replacement
-              is set to false).
+                sampling. It is equivalent to selecting all neighbors when
+                the fanout is >= the number of neighbors (and replace is set to
+                false).
               - When the value is a non-negative integer, it serves as a
-              minimum threshold for selecting neighbors.
-        replce: bool
+                minimum threshold for selecting neighbors.
+        replace: bool
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
         return_eids: bool
-            Boolean indicating whether edge IDs need to be returned, typically
-            used when edge features are required.
+            Boolean indicating whether the edge IDs of sampled edges,
+            represented as a 1D tensor, should be returned. This is
+            typically used when edge features are required.
         probs: torch.Tensor, optional
             Optional tensor containing the (unnormalized) probabilities
             associated with each neighboring edge of a node. It must be a 1D
             floating-point tensor with the number of elements equal to the
             number of edges.
+        Returns
+            -------
+            SampledSubgraph
+                The sampled subgraph.
+
+        Examples
+            --------
+        >>> indptr = torch.LongTensor([0, 3, 5, 7])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1])
+        >>> type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1])
+        >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+        >>> nodes = torch.LongTensor([1, 2])
+        >>> fanouts = torch.tensor([1, 1])
+        >>> subgraph = graph.sample_neighbors(nodes, fanouts, return_eids=True)
+        >>> print(subgraph.indptr)
+        tensor([0, 2, 4])
+        >>> print(subgraph.indices)
+        tensor([2, 3, 0, 1])
+        >>> print(subgraph.reverse_column_node_ids)
+        tensor([1, 2])
+        >>> print(subgraph.reverse_edge_ids)
+        tensor([3, 4, 5, 6])
+        >>> print(subgraph.type_per_edge)
+        tensor([0, 1, 0, 1])
         """
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
