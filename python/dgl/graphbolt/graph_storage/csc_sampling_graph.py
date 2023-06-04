@@ -236,8 +236,8 @@ class CSCSamplingGraph:
         probs: torch.Tensor, optional
             Optional tensor containing the (unnormalized) probabilities
             associated with each neighboring edge of a node. It must be a 1D
-            floating-point tensor with the number of elements equal to the
-            number of edges.
+            floating-point or boolean tensor with the number of elements equal
+            to the number of edges.
         Returns
             -------
             SampledSubgraph

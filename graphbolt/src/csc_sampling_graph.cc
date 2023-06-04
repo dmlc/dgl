@@ -238,8 +238,8 @@ torch::Tensor Pick(
         picked_neighbors =
             torch::randint(offset, offset + num_neighbors, {fanout}, options);
       } else {
-        picked_neighbors = torch::randperm(num_neighbors, options) + offset;
-        picked_neighbors = picked_neighbors.slice(0, 0, fanout);
+        picked_neighbors = torch::randperm(num_neighbors, options);
+        picked_neighbors = picked_neighbors.slice(0, 0, fanout) + offset;
       }
     }
   }
@@ -263,10 +263,12 @@ torch::Tensor PickByEtype(
       etype_end++;
     }
     // Do sampling for one etype.
-    if (fanout != 0)
+    if (fanout != 0) {
       picked_neighbors[etype] = Pick(
           etype_begin, etype_end - etype_begin, fanout, replace, options,
           probs);
+    }
+    etype_begin = etype_end;
   }
 
   return torch::cat(picked_neighbors, 0);
