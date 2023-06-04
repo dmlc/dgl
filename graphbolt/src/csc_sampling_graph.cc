@@ -123,7 +123,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-    bool replace, const torch::optional<torch::Tensor>& probs) const {
+    bool replace, bool return_eids,
+    const torch::optional<torch::Tensor>& probs) const {
   const int64_t num_nodes = nodes.size(0);
   // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
@@ -151,7 +152,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
       }
 
       if (consider_etype) {
-        picked_neighbors_per_node[i] = PickEtype(
+        picked_neighbors_per_node[i] = PickByEtype(
             offset, num_neighbors, fanouts, replace, indptr_.options(),
             type_per_edge_.value(), probs);
       } else {
@@ -170,10 +171,15 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
   torch::Tensor picked_eids = torch::cat(picked_neighbors_per_node);
   torch::Tensor subgraph_indices =
       torch::index_select(indices_, 0, picked_eids);
-
+  torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
+  if (type_per_edge_.has_value())
+    subgraph_type_per_edge =
+        torch::index_select(type_per_edge_.value(), 0, picked_eids);
+  torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
+  if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
   return c10::make_intrusive<SampledSubgraph>(
-      subgraph_indptr, subgraph_indices, nodes, torch::nullopt, torch::nullopt,
-      torch::nullopt);
+      subgraph_indptr, subgraph_indices, nodes, torch::nullopt,
+      subgraph_reverse_edge_ids, subgraph_type_per_edge);
 }
 
 c10::intrusive_ptr<CSCSamplingGraph>
@@ -240,27 +246,30 @@ torch::Tensor Pick(
   return picked_neighbors;
 }
 
-torch::Tensor PickEtype(
+torch::Tensor PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs) {
-  std::vector<torch::Tensor> picked_neighbors_per_etype(
+  std::vector<torch::Tensor> picked_neighbors(
       fanouts.size(), torch::tensor({}, options));
-  for (int64_t etype_end = offset, etype_begin = offset;
-       etype_end < offset + num_neighbors; etype_begin = etype_end) {
-    auto etype = type_per_edge[etype_end].item<int64_t>();
-    auto fanout = fanouts[etype];
+  int64_t etype_begin = offset;
+  int64_t etype_end = offset;
+  while (etype_end < offset + num_neighbors) {
+    int64_t etype = type_per_edge[etype_end].item<int64_t>();
+    int64_t fanout = fanouts[etype];
     while (etype_end < offset + num_neighbors &&
-           type_per_edge[etype_end].item<int64_t>() == etype)
+           type_per_edge[etype_end].item<int64_t>() == etype) {
       etype_end++;
+    }
     // Do sampling for one etype.
     if (fanout != 0)
-      picked_neighbors_per_etype[etype] = Pick(
+      picked_neighbors[etype] = Pick(
           etype_begin, etype_end - etype_begin, fanout, replace, options,
           probs);
   }
-  return torch::cat(picked_neighbors_per_etype, 0);
+
+  return torch::cat(picked_neighbors, 0);
 }
 
 }  // namespace sampling
