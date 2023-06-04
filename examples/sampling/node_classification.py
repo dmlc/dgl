@@ -36,9 +36,10 @@ class SAGE(nn.Module):
 
     def forward(self, blocks, x):
         h = x
-        for l, (layer, block) in enumerate(zip(self.layers, blocks)):
+        for layer_idx, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
-            if l != len(self.layers) - 1:
+            is_last_layer = layer_idx == len(self.layers) - 1
+            if not is_last_layer:
                 h = F.relu(h)
                 h = self.dropout(h)
         return h
@@ -47,10 +48,23 @@ class SAGE(nn.Module):
         """Conduct layer-wise inference to get all the node embeddings."""
         feat = g.ndata["feat"]
         #####################################################################
-        # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the
-        # GCNIIforward process.
+        # (HIGHLIGHT) Creating a MultiLayerFullNeighborSampler instance.
+        # This sampler is used in the Graph Neural Networks (GNN) training 
+        # process to provide neighbor sampling, which is crucial for 
+        # efficient training of GNN on large graphs.
+        #
+        # The first argument '1' indicates the number of layers for 
+        # the neighbor sampling. In this case, it's set to 1, meaning 
+        # only the direct neighbors of each node will be included in the 
+        # sampling.
+        #
+        # The 'prefetch_node_feats' parameter specifies the node features 
+        # that need to be pre-fetched during sampling. In this case, the 
+        # feature named 'feat' will be pre-fetched, which should be part 
+        # of the nodes' data.
         #####################################################################
         sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=["feat"])
+
         dataloader = DataLoader(
             g,
             torch.arange(g.num_nodes()).to(g.device),
@@ -64,10 +78,11 @@ class SAGE(nn.Module):
         buffer_device = torch.device("cpu")
         pin_memory = buffer_device != device
 
-        for l, layer in enumerate(self.layers):
+        for layer_idx, layer in enumerate(self.layers):
+            is_last_layer = layer_idx == len(self.layers) - 1
             y = torch.empty(
                 g.num_nodes(),
-                self.hid_size if l != len(self.layers) - 1 else self.out_size,
+                self.hid_size if is_last_layer else self.out_size,
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
@@ -75,7 +90,7 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 x = feat[input_nodes]
                 h = layer(blocks[0], x)  # len(blocks) = 1
-                if l != len(self.layers) - 1:
+                if layer_idx != len(self.layers) - 1:
                     h = F.relu(h)
                     h = self.dropout(h)
                 # By design, our output nodes are contiguous.
@@ -118,10 +133,22 @@ def train(args, device, g, dataset, model, num_classes):
     # Create sampler & dataloader.
     train_idx = dataset.train_idx.to(device)
     val_idx = dataset.val_idx.to(device)
-    ############################################################################
-    # (HIGHLIGHT) Take the advantage of DGL sparse APIs to implement the GCNII
-    # forward process.
-    ############################################################################
+    #####################################################################
+    # (HIGHLIGHT) Instantiate a NeighborSampler object for efficient 
+    # training of Graph Neural Networks (GNNs) on large-scale graphs.
+    #
+    # The argument [10, 10, 10] sets the number of neighbors (fanout) 
+    # to be sampled at each layer. Here, we have three layers, and 
+    # 10 neighbors will be randomly selected for each node at each 
+    # layer.
+    #
+    # The 'prefetch_node_feats' and 'prefetch_labels' parameters 
+    # specify the node features and labels that need to be pre-fetched 
+    # during sampling. Pre-fetching data in this way is advantageous 
+    # as it can reduce the I/O overhead during the training process, 
+    # making the whole computation more efficient. In this case, 
+    # the feature 'feat' and the label 'label' will be pre-fetched.
+    #####################################################################
     sampler = NeighborSampler(
         [10, 10, 10],  # fanout for [layer-0, layer-1, layer-2]
         prefetch_node_feats=["feat"],
