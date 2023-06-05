@@ -283,8 +283,8 @@ class CSCSamplingGraph:
             assert probs.dim() == 1, "Probs should be 1-D tensor."
             assert (
                 probs.size(0) == self.num_edges
-            ), "Probs should have the \
-                same number of elements as the number of edges."
+            ), "Probs should have the same number of elements as the number \
+                of edges."
             assert probs.dtype in [
                 torch.bool,
                 torch.float16,

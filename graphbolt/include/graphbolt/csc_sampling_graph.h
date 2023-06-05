@@ -249,6 +249,12 @@ torch::Tensor UniformPick(
 /**
  * @brief Perform non-uniform sampling of elements based on probabilities and
  * return the sampled indices.
+ * 1. When `num_neighbors` is less than or equal to `fanout`, all neighbors with
+ * non-zero probability will be chosen for sampling.
+ * 2. When `num_neighbors` is greater than `fanout`, the sampling process will
+ * choose `fanout` elements based on their corresponding probabilities. The
+ * elements are selected according to their probabilities, where higher
+ * probabilities increase the likelihood of being chosen during the sampling.
  *
  * @param offset The starting edge ID for the connected neighbors of the sampled
  * node.
