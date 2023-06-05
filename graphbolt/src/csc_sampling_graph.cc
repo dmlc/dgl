@@ -123,8 +123,17 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool return_eids) const {
+    bool replace, bool return_eids,
+    torch::optional<torch::Tensor> probs_or_mask) const {
   const int64_t num_nodes = nodes.size(0);
+  // Note probs will be passed as input for 'torch.multinomial' in deeper stack,
+  // which doesn't support 'torch.half' and 'torch.bool' data types. To avoid
+  // crashes, convert 'probs_or_mask' to 'float32' data type.
+  if (probs_or_mask.has_value() &&
+      (probs_or_mask.value().dtype() == torch::kBool ||
+       probs_or_mask.value().dtype() == torch::kFloat16)) {
+    probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
+  }
   // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
   bool consider_etype = (fanouts.size() > 1);
@@ -153,10 +162,11 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
       if (consider_etype) {
         picked_neighbors_per_node[i] = PickByEtype(
             offset, num_neighbors, fanouts, replace, indptr_.options(),
-            type_per_edge_.value());
+            type_per_edge_.value(), probs_or_mask);
       } else {
-        picked_neighbors_per_node[i] =
-            Pick(offset, num_neighbors, fanouts[0], replace, indptr_.options());
+        picked_neighbors_per_node[i] = Pick(
+            offset, num_neighbors, fanouts[0], replace, indptr_.options(),
+            probs_or_mask);
       }
       num_picked_neighbors_per_node[i + 1] =
           picked_neighbors_per_node[i].size(0);
@@ -210,7 +220,27 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
   return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
 }
 
-torch::Tensor Pick(
+/**
+ * @brief Perform uniform sampling of elements and return the sampled indices.
+ *
+ * @param offset The starting edge ID for the connected neighbors of the sampled
+ * node.
+ * @param num_neighbors The number of neighbors to pick.
+ * @param fanout The number of edges to be sampled for each node. It should be
+ * >= 0 or -1.
+ *  - When the value is -1, all neighbors will be chosen for sampling. It is
+ * equivalent to selecting all neighbors with non-zero probability when the
+ * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is a non-negative integer, it serves as a minimum
+ * threshold for selecting neighbors.
+ * @param replace Boolean indicating whether the sample is preformed with or
+ * without replacement. If True, a value can be selected multiple times.
+ * Otherwise, each value can be selected only once.
+ * @param options Tensor options specifying the desired data type of the result.
+ *
+ * @return A tensor containing the picked neighbors.
+ */
+inline torch::Tensor UniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options) {
   torch::Tensor picked_neighbors;
@@ -221,17 +251,86 @@ torch::Tensor Pick(
       picked_neighbors =
           torch::randint(offset, offset + num_neighbors, {fanout}, options);
     } else {
-      picked_neighbors = torch::randperm(num_neighbors, options) + offset;
-      picked_neighbors = picked_neighbors.slice(0, 0, fanout);
+      picked_neighbors = torch::randperm(num_neighbors, options);
+      picked_neighbors = picked_neighbors.slice(0, 0, fanout) + offset;
     }
   }
   return picked_neighbors;
 }
 
+/**
+ * @brief Perform non-uniform sampling of elements based on probabilities and
+ * return the sampled indices.
+ *
+ * If 'probs_or_mask' is provided, it indicates that the sampling is
+ * non-uniform. In such cases:
+ * - When the number of neighbors with non-zero probability is less than or
+ * equal to fanout, all neighbors with non-zero probability will be selected.
+ * - When the number of neighbors with non-zero probability exceeds fanout, the
+ * sampling process will select 'fanout' elements based on their respective
+ * probabilities. Higher probabilities will increase the chances of being chosen
+ * during the sampling process.
+ *
+ * @param offset The starting edge ID for the connected neighbors of the sampled
+ * node.
+ * @param num_neighbors The number of neighbors to pick.
+ * @param fanout The number of edges to be sampled for each node. It should be
+ * >= 0 or -1.
+ *  - When the value is -1, all neighbors will be chosen for sampling. It is
+ * equivalent to selecting all neighbors with non-zero probability when the
+ * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is a non-negative integer, it serves as a minimum
+ * threshold for selecting neighbors.
+ * @param replace Boolean indicating whether the sample is preformed with or
+ * without replacement. If True, a value can be selected multiple times.
+ * Otherwise, each value can be selected only once.
+ * @param options Tensor options specifying the desired data type of the result.
+ * @param probs_or_mask Optional tensor containing the (unnormalized)
+ * probabilities associated with each neighboring edge of a node in the original
+ * graph. It must be a 1D floating-point tensor with the number of elements
+ * equal to the number of edges in the graph.
+ *
+ * @return A tensor containing the picked neighbors.
+ */
+inline torch::Tensor NonUniformPick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask) {
+  torch::Tensor picked_neighbors;
+  auto local_probs =
+      probs_or_mask.value().slice(0, offset, offset + num_neighbors);
+  auto positive_probs_indices = local_probs.nonzero().squeeze(1);
+  auto num_positive_probs = positive_probs_indices.size(0);
+  if (num_positive_probs == 0) return torch::tensor({}, options);
+  if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
+    picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
+    picked_neighbors =
+        torch::index_select(picked_neighbors, 0, positive_probs_indices);
+  } else {
+    if (!replace) fanout = std::min(fanout, num_positive_probs);
+    picked_neighbors =
+        torch::multinomial(local_probs, fanout, replace) + offset;
+  }
+  return picked_neighbors;
+}
+
+torch::Tensor Pick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask) {
+  if (probs_or_mask.has_value()) {
+    return NonUniformPick(
+        offset, num_neighbors, fanout, replace, options, probs_or_mask);
+  } else {
+    return UniformPick(offset, num_neighbors, fanout, replace, options);
+  }
+}
+
 torch::Tensor PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
-    const torch::Tensor& type_per_edge) {
+    const torch::Tensor& type_per_edge,
+    const torch::optional<torch::Tensor>& probs_or_mask) {
   std::vector<torch::Tensor> picked_neighbors(
       fanouts.size(), torch::tensor({}, options));
   int64_t etype_begin = offset;
@@ -245,8 +344,9 @@ torch::Tensor PickByEtype(
     }
     // Do sampling for one etype.
     if (fanout != 0) {
-      picked_neighbors[etype] =
-          Pick(etype_begin, etype_end - etype_begin, fanout, replace, options);
+      picked_neighbors[etype] = Pick(
+          etype_begin, etype_end - etype_begin, fanout, replace, options,
+          probs_or_mask);
     }
     etype_begin = etype_end;
   }
