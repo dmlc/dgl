@@ -200,7 +200,7 @@ class CSCSamplingGraph:
         fanouts: torch.Tensor,
         replace: bool = False,
         return_eids: bool = False,
-        probs: Optional[torch.Tensor] = None,
+        probs_or_mask: Optional[torch.Tensor] = None,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -233,7 +233,7 @@ class CSCSamplingGraph:
             Boolean indicating whether the edge IDs of sampled edges,
             represented as a 1D tensor, should be returned. This is
             typically used when edge features are required.
-        probs: torch.Tensor, optional
+        probs_or_mask: torch.Tensor, optional
             Optional tensor containing the (unnormalized) probabilities
             associated with each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor with the number of elements equal
@@ -279,27 +279,21 @@ class CSCSamplingGraph:
             assert len(self.metadata.edge_type_to_id) == fanouts.size(
                 0
             ), "Fanouts should have the same number of elements as etypes."
-        if probs is not None:
-            assert probs.dim() == 1, "Probs should be 1-D tensor."
+        if probs_or_mask is not None:
+            assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
-                probs.size(0) == self.num_edges
+                probs_or_mask.size(0) == self.num_edges
             ), "Probs should have the same number of elements as the number \
                 of edges."
-            assert probs.dtype in [
+            assert probs_or_mask.dtype in [
                 torch.bool,
                 torch.float16,
                 torch.bfloat16,
                 torch.float32,
                 torch.float64,
             ], "Probs should have a floating-point or boolean data type."
-            # Note probs will be passed as input for 'torch.multinomial'
-            # in deeper stack, which doesn't support 'torch.half' and
-            # torch.bool' data types.To avoid crashes, convert 'probs' to
-            # 'bfloat16' data type.
-            if probs.dtype in [torch.bool, torch.float16]:
-                probs = probs.to(torch.bfloat16)
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, return_eids, probs
+            nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
         )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
