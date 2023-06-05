@@ -6,11 +6,11 @@ Graph Isomorphism Network (GIN)
 
 Dependencies
 ------------
-- sklearn
+- scikit-learn
 
 Install as follows:
 ```bash
-pip install sklearn
+pip install scikit-learn
 ```
 
 How to run
