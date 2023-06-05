@@ -19,7 +19,7 @@ DGL is an easy-to-use, high performance and scalable Python package for deep lea
   <b>Figure</b>: DGL Overall Architecture
 </p>
 
-## Highlighted Features
+## Highlighted Features...
 
 ### A GPU-ready graph library
 
