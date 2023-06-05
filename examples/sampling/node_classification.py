@@ -93,7 +93,7 @@ class SAGE(nn.Module):
                     h = F.relu(h)
                     h = self.dropout(h)
                 # By design, our output nodes are contiguous.
-                y[output_nodes[0]:output_nodes[-1] + 1] = h.to(buffer_device)
+                y[output_nodes[0] : output_nodes[-1] + 1] = h.to(buffer_device)
             feat = y
         return y
 
