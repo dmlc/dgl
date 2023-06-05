@@ -200,6 +200,7 @@ class CSCSamplingGraph:
         fanouts: torch.Tensor,
         replace: bool = False,
         return_eids: bool = False,
+        probs_or_mask: Optional[torch.Tensor] = None,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -231,7 +232,12 @@ class CSCSamplingGraph:
         return_eids: bool
             Boolean indicating whether the edge IDs of sampled edges,
             represented as a 1D tensor, should be returned. This is
-            typically used when edge features are required
+            typically used when edge features are required.
+        probs_or_mask: torch.Tensor, optional
+            Optional tensor containing the (unnormalized) probabilities
+            associated with each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor with the number of elements equal
+            to the number of edges.
         Returns
             -------
             SampledSubgraph
@@ -273,8 +279,21 @@ class CSCSamplingGraph:
             assert len(self.metadata.edge_type_to_id) == fanouts.size(
                 0
             ), "Fanouts should have the same number of elements as etypes."
+        if probs_or_mask is not None:
+            assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
+            assert (
+                probs_or_mask.size(0) == self.num_edges
+            ), "Probs should have the same number of elements as the number \
+                of edges."
+            assert probs_or_mask.dtype in [
+                torch.bool,
+                torch.float16,
+                torch.bfloat16,
+                torch.float32,
+                torch.float64,
+            ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, return_eids
+            nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
         )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
