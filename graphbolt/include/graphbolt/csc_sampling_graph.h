@@ -228,9 +228,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  *
  * If 'probs_or_mask' is provided, it indicates that the sampling is
  * non-uniform. In such cases:
- * - When the number of neighbors with non-zero
- * probability is less than or equal to fanout, all neighbors with non-zero
- * probability will be selected.
+ * - When the number of neighbors with non-zero probability is less than or
+ * equal to fanout all neighbors with non-zero probability will be selected.
  * - When the number of neighbors with non-zero probability exceeds fanout, the
  * sampling process will select 'fanout' elements based on their respective
  * probabilities. Higher probabilities will increase the chances of being chosen
