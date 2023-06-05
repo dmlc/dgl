@@ -127,7 +127,7 @@ def is_authorized(name) {
               'kkranen',
               'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
               'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
-              'VoVAllen', 'keli-wen', 'jingyucao'
+              'VoVAllen', 'keli-wen', 'caojy1998',
               ]
   return (name in devs)
 }
