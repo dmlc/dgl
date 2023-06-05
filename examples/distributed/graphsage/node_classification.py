@@ -106,6 +106,8 @@ class DistSAGE(nn.Module):
             )
             print(f"|V|={g.num_nodes()}, inference batch size: {batch_size}")
 
+            # `-1` indicates all inbound edges will be inlcuded, namely, full
+            # neighbor sampling.
             sampler = dgl.dataloading.NeighborSampler([-1])
             dataloader = dgl.dataloading.DistNodeDataLoader(
                 g,
