@@ -250,9 +250,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
  * @param probs_or_mask Optional tensor containing the (unnormalized)
- * probabilities or boolean mask associated with each neighboring edge of a node
- * in the original graph. It must be a 1D floating-point or boolean tensor with
- * the number of elements equal to the number of edges in the graph.
+ * probabilities associated with each neighboring edge of a node in the original
+ * graph. It must be a 1D floating-point tensor with the number of elements
+ * equal to the number of edges in the graph.
  *
  * @return A tensor containing the picked neighbors.
  */
@@ -282,9 +282,9 @@ torch::Tensor Pick(
  * @param type_per_edge Tensor representing the type of each edge in the
  * original graph.
  * @param probs_or_mask Optional tensor containing the (unnormalized)
- * probabilities or boolean mask associated with each neighboring edge of a node
- * in the original graph. It must be a 1D floating-point or boolean tensor with
- * the number of elements equal to the number of edges in the graph.
+ * probabilities associated with each neighboring edge of a node in the original
+ * graph. It must be a 1D floating-point tensor with the number of elements
+ * equal to the number of edges in the graph.
  *
  * @return A tensor containing the picked neighbors.
  */
