@@ -1,7 +1,6 @@
 """
-If you want a deeper understanding of node classification.
-You can read the example in the  ``examples/core/graphsage/node_
-classification.py``
+If you want a deeper understanding of node classification. You can
+read the example in the  ``examples/pytorch/graphsage/node_classification.py``
 """
 
 import argparse
@@ -49,18 +48,18 @@ class SAGE(nn.Module):
         feat = g.ndata["feat"]
         #####################################################################
         # (HIGHLIGHT) Creating a MultiLayerFullNeighborSampler instance.
-        # This sampler is used in the Graph Neural Networks (GNN) training 
-        # process to provide neighbor sampling, which is crucial for 
+        # This sampler is used in the Graph Neural Networks (GNN) training
+        # process to provide neighbor sampling, which is crucial for
         # efficient training of GNN on large graphs.
         #
-        # The first argument '1' indicates the number of layers for 
-        # the neighbor sampling. In this case, it's set to 1, meaning 
-        # only the direct neighbors of each node will be included in the 
+        # The first argument '1' indicates the number of layers for
+        # the neighbor sampling. In this case, it's set to 1, meaning
+        # only the direct neighbors of each node will be included in the
         # sampling.
         #
-        # The 'prefetch_node_feats' parameter specifies the node features 
-        # that need to be pre-fetched during sampling. In this case, the 
-        # feature named 'feat' will be pre-fetched, which should be part 
+        # The 'prefetch_node_feats' parameter specifies the node features
+        # that need to be pre-fetched during sampling. In this case, the
+        # feature named 'feat' will be pre-fetched, which should be part
         # of the nodes' data.
         #####################################################################
         sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=["feat"])
@@ -134,19 +133,19 @@ def train(args, device, g, dataset, model, num_classes):
     train_idx = dataset.train_idx.to(device)
     val_idx = dataset.val_idx.to(device)
     #####################################################################
-    # (HIGHLIGHT) Instantiate a NeighborSampler object for efficient 
+    # (HIGHLIGHT) Instantiate a NeighborSampler object for efficient
     # training of Graph Neural Networks (GNNs) on large-scale graphs.
     #
-    # The argument [10, 10, 10] sets the number of neighbors (fanout) 
-    # to be sampled at each layer. Here, we have three layers, and 
-    # 10 neighbors will be randomly selected for each node at each 
+    # The argument [10, 10, 10] sets the number of neighbors (fanout)
+    # to be sampled at each layer. Here, we have three layers, and
+    # 10 neighbors will be randomly selected for each node at each
     # layer.
     #
-    # The 'prefetch_node_feats' and 'prefetch_labels' parameters 
-    # specify the node features and labels that need to be pre-fetched 
-    # during sampling. Pre-fetching data in this way is advantageous 
-    # as it can reduce the I/O overhead during the training process, 
-    # making the whole computation more efficient. In this case, 
+    # The 'prefetch_node_feats' and 'prefetch_labels' parameters
+    # specify the node features and labels that need to be pre-fetched
+    # during sampling. Pre-fetching data in this way is advantageous
+    # as it can reduce the I/O overhead during the training process,
+    # making the whole computation more efficient. In this case,
     # the feature 'feat' and the label 'label' will be pre-fetched.
     #####################################################################
     sampler = NeighborSampler(
