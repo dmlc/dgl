@@ -227,12 +227,14 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  * given offset and having the specified number of neighbors.
  *
  * If 'probs_or_mask' is provided, it indicates that the sampling is
- * non-uniform. In such cases: If the number of neighbors with non-zero
+ * non-uniform. In such cases:
+ * - When the number of neighbors with non-zero
  * probability is less than or equal to fanout, all neighbors with non-zero
- * probability will be selected. Otherwise, the sampling process will select
- * 'fanout' elements based on their respective probabilities. Higher
- * probabilities will increase the chances of being chosen during the sampling
- * process.
+ * probability will be selected.
+ * - When the number of neighbors with non-zero probability exceeds fanout, the
+ * sampling process will select 'fanout' elements based on their respective
+ * probabilities. Higher probabilities will increase the chances of being chosen
+ * during the sampling process.
  *
  * @param offset The starting edge ID for the connected neighbors of the sampled
  * node.
