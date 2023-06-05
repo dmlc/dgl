@@ -81,7 +81,7 @@ class SAGE(nn.Module):
             is_last_layer = layer_idx == len(self.layers) - 1
             y = torch.empty(
                 g.num_nodes(),
-                self.hid_size if is_last_layer else self.out_size,
+                self.hid_size if (not is_last_layer) else self.out_size,
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
@@ -196,7 +196,7 @@ def train(args, device, g, dataset, model, num_classes):
             total_loss += loss.item()
         acc = evaluate(model, g, val_dataloader, num_classes)
         print(
-            f"Epoch {epoch:05d} | Loss {total_loss:.4f} | "
+            f"Epoch {epoch:05d} | Loss {total_loss / (it + 1):.4f} | "
             f"Accuracy {acc.item():.4f} "
         )
 
@@ -207,8 +207,8 @@ if __name__ == "__main__":
         "--mode",
         default="mixed",
         choices=["cpu", "mixed", "puregpu"],
-        help="Training mode. 'cpu' for CPU training, 'mixed' for CPU-GPU mixed "
-        "training, 'puregpu' for pure-GPU training.",
+        help="Training mode. 'cpu' for CPU training, 'mixed' for "
+        "CPU-GPU mixed training, 'puregpu' for pure-GPU training.",
     )
     args = parser.parse_args()
     if not torch.cuda.is_available():
