@@ -7,15 +7,15 @@ import backend as F
 import dgl
 import dgl.function as fn
 import dgl.nn.pytorch as nn
-from dgl import shortest_dist
 import networkx as nx
 import pytest
 import scipy as sp
 import torch
 import torch as th
+from dgl import shortest_dist
+from torch.nn.utils.rnn import pad_sequence
 from torch.optim import Adam, SparseAdam
 from torch.utils.data import DataLoader
-from torch.nn.utils.rnn import pad_sequence
 from utils import parametrize_idtype
 from utils.graph_cases import (
     get_cases,
@@ -2339,12 +2339,16 @@ def test_degree_encoder(max_degree, embedding_dim, direction):
     )
     g2 = dgl.graph(
         (
-            th.tensor([0,1]),
-            th.tensor([1,0]),
+            th.tensor([0, 1]),
+            th.tensor([1, 0]),
         )
     )
-    in_degree = pad_sequence([g1.in_degrees(), g2.in_degrees()], batch_first=True)
-    out_degree = pad_sequence([g1.out_degrees(), g2.out_degrees()], batch_first=True)
+    in_degree = pad_sequence(
+        [g1.in_degrees(), g2.in_degrees()], batch_first=True
+    )
+    out_degree = pad_sequence(
+        [g1.out_degrees(), g2.out_degrees()], batch_first=True
+    )
     model = nn.DegreeEncoder(max_degree, embedding_dim, direction=direction)
     if direction == "in":
         de_g = model(in_degree)
@@ -2465,9 +2469,7 @@ def test_PathEncoder(max_len, feat_dim, num_heads):
         )
     ).to(dev)
     edge_feat = th.rand(g.num_edges(), feat_dim).to(dev)
-    edge_feat = th.cat(
-        (edge_feat, th.zeros(1, 16).to(dev)), dim=0
-    )
+    edge_feat = th.cat((edge_feat, th.zeros(1, 16).to(dev)), dim=0)
     dist, path = shortest_dist(g, root=None, return_paths=True)
     path_data = edge_feat[path[:, :, :max_len]]
     model = nn.PathEncoder(max_len, feat_dim, num_heads=num_heads).to(dev)

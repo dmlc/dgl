@@ -72,11 +72,13 @@ class PathEncoder(nn.Module):
             :math:`H` is :attr:`num_heads`.
         """
         shortest_distance = th.clamp(dist, min=1, max=self.max_len)
-        edge_embedding = self.embedding_table.weight.reshape(self.max_len, self.num_heads, -1)
+        edge_embedding = self.embedding_table.weight.reshape(
+            self.max_len, self.num_heads, -1
+        )
         path_encoding = th.div(
-            th.einsum(
-                'bxyld,lhd->bxyh', path_data, edge_embedding
-            ).permute(3, 0, 1, 2),
-            shortest_distance
+            th.einsum("bxyld,lhd->bxyh", path_data, edge_embedding).permute(
+                3, 0, 1, 2
+            ),
+            shortest_distance,
         ).permute(1, 2, 3, 0)
         return path_encoding
