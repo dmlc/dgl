@@ -34,6 +34,8 @@ export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1
 export DMLC_LOG_DEBUG=1
 
+python3 -m pip install torchdata
+
 python3 -m pytest -v --capture=tee-sys --junitxml=pytest_distributed.xml --durations=100 tests/distributed/*.py || fail "distributed"
 
 PYTHONPATH=tools:tools/distpartitioning:$PYTHONPATH python3 -m pytest -v --capture=tee-sys --junitxml=pytest_tools.xml --durations=100 tests/tools/*.py || fail "tools"

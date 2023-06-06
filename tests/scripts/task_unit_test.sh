@@ -33,6 +33,10 @@ fi
 
 conda activate ${DGLBACKEND}-ci
 
+if [ $DGLBACKEND == "pytorch" ]; then
+  python3 -m pip install torchdata
+fi
+
 if [ $DGLBACKEND == "mxnet" ]
 then
   python3 -m pytest -v --junitxml=pytest_compute.xml --durations=100 --ignore=tests/python/common/test_ffi.py tests/python/common || fail "common"
