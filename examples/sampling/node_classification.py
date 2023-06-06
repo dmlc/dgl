@@ -1,6 +1,34 @@
 """
+This script trains and tests a GraphSAGE model for node classification on
+large graphs using efficient neighbor sampling.
+
+Paper: [Inductive Representation Learning on Large Graphs]
+(https://arxiv.org/abs/1706.02216)
+
 If you want a deeper understanding of node classification. You can
-read the example in the  ``examples/pytorch/graphsage/node_classification.py``
+read the example in the `examples/pytorch/graphsage/node_classification.py`
+TODO(#5797): Move `graphsage/node_classification.py` to the `examples/core/`.
+
+This flowchart describes the main functional sequence of the provided example.
+main
+│
+├───> Load and preprocess dataset
+│
+├───> Instantiate SAGE model
+│
+├───> train
+│     │
+│     ├───> NeighborSampler (HIGHLIGHT)
+│     │
+│     └───> Training loop
+│           │
+│           └───> SAGE.forward
+│
+└───> layerwise_infer
+      │
+      └───> SAGE.inference
+            │
+            └───> MultiLayerFullNeighborSampler (HIGHLIGHT)
 """
 
 import argparse
@@ -22,26 +50,26 @@ from ogb.nodeproppred import DglNodePropPredDataset
 
 
 class SAGE(nn.Module):
-    def __init__(self, in_size, hid_size, out_size):
+    def __init__(self, in_size, hidden_size, out_size):
         super().__init__()
         self.layers = nn.ModuleList()
         # Three-layer GraphSAGE-mean.
-        self.layers.append(dglnn.SAGEConv(in_size, hid_size, "mean"))
-        self.layers.append(dglnn.SAGEConv(hid_size, hid_size, "mean"))
-        self.layers.append(dglnn.SAGEConv(hid_size, out_size, "mean"))
+        self.layers.append(dglnn.SAGEConv(in_size, hidden_size, "mean"))
+        self.layers.append(dglnn.SAGEConv(hidden_size, hidden_size, "mean"))
+        self.layers.append(dglnn.SAGEConv(hidden_size, out_size, "mean"))
         self.dropout = nn.Dropout(0.5)
-        self.hid_size = hid_size
+        self.hidden_size = hidden_size
         self.out_size = out_size
 
     def forward(self, blocks, x):
-        h = x
+        hidden_x = x
         for layer_idx, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h)
+            hidden_x = layer(block, hidden_x)
             is_last_layer = layer_idx == len(self.layers) - 1
             if not is_last_layer:
-                h = F.relu(h)
-                h = self.dropout(h)
-        return h
+                hidden_x = F.relu(hidden_x)
+                hidden_x = self.dropout(hidden_x)
+        return hidden_x
 
     def inference(self, g, device, batch_size):
         """Conduct layer-wise inference to get all the node embeddings."""
@@ -75,38 +103,41 @@ class SAGE(nn.Module):
             num_workers=0,
         )
         buffer_device = torch.device("cpu")
+        # Enable pin_memory for faster CPU to GPU data transfer if the
+        # model is running on a GPU.
         pin_memory = buffer_device != device
 
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
             y = torch.empty(
                 g.num_nodes(),
-                self.hid_size if (not is_last_layer) else self.out_size,
+                self.out_size if is_last_layer else self.hidden_size,
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
             feat = feat.to(device)
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 x = feat[input_nodes]
-                h = layer(blocks[0], x)  # len(blocks) = 1
+                hidden_x = layer(blocks[0], x)  # len(blocks) = 1
                 if layer_idx != len(self.layers) - 1:
-                    h = F.relu(h)
-                    h = self.dropout(h)
+                    hidden_x = F.relu(hidden_x)
+                    hidden_x = self.dropout(hidden_x)
                 # By design, our output nodes are contiguous.
-                y[output_nodes[0] : output_nodes[-1] + 1] = h.to(buffer_device)
+                y[output_nodes[0] : output_nodes[-1] + 1] \
+                    = hidden_x.to(buffer_device)
             feat = y
         return y
 
 
+@torch.no_grad()
 def evaluate(model, graph, dataloader, num_classes):
     model.eval()
     ys = []
     y_hats = []
     for it, (input_nodes, output_nodes, blocks) in enumerate(dataloader):
-        with torch.no_grad():
-            x = blocks[0].srcdata["feat"]
-            ys.append(blocks[-1].dstdata["label"])
-            y_hats.append(model(blocks, x))
+        x = blocks[0].srcdata["feat"]
+        ys.append(blocks[-1].dstdata["label"])
+        y_hats.append(model(blocks, x))
     return MF.accuracy(
         torch.cat(y_hats),
         torch.cat(ys),
@@ -115,20 +146,20 @@ def evaluate(model, graph, dataloader, num_classes):
     )
 
 
+@torch.no_grad()
 def layerwise_infer(device, graph, nid, model, num_classes, batch_size):
     model.eval()
-    with torch.no_grad():
-        pred = model.inference(
-            graph, device, batch_size
-        )  # pred in buffer_device.
-        pred = pred[nid]
-        label = graph.ndata["label"][nid].to(pred.device)
-        return MF.accuracy(
-            pred, label, task="multiclass", num_classes=num_classes
-        )
+    pred = model.inference(
+        graph, device, batch_size
+    )  # pred in buffer_device.
+    pred = pred[nid]
+    label = graph.ndata["label"][nid].to(pred.device)
+    return MF.accuracy(
+        pred, label, task="multiclass", num_classes=num_classes
+    )
 
 
-def train(args, device, g, dataset, model, num_classes):
+def train(args, device, g, dataset, model, num_classes, use_uva):
     # Create sampler & dataloader.
     train_idx = dataset.train_idx.to(device)
     val_idx = dataset.val_idx.to(device)
@@ -153,7 +184,7 @@ def train(args, device, g, dataset, model, num_classes):
         prefetch_node_feats=["feat"],
         prefetch_labels=["label"],
     )
-    use_uva = args.mode == "mixed"
+
     train_dataloader = DataLoader(
         g,
         train_idx,
@@ -162,6 +193,8 @@ def train(args, device, g, dataset, model, num_classes):
         batch_size=1024,
         shuffle=True,
         drop_last=False,
+        # If `g` is on gpu or `use_uva` is True,
+        # `num_workers` must be zero else it will cause error.
         num_workers=0,
         use_uva=use_uva,
     )
@@ -172,7 +205,8 @@ def train(args, device, g, dataset, model, num_classes):
         sampler,
         device=device,
         batch_size=1024,
-        shuffle=True,
+        # No need to shuffle for validation.
+        shuffle=False,
         drop_last=False,
         num_workers=0,
         use_uva=use_uva,
@@ -183,11 +217,22 @@ def train(args, device, g, dataset, model, num_classes):
     for epoch in range(10):
         model.train()
         total_loss = 0
+        # A block is a graph consisting of two sets of nodes: the
+        # source nodes and destination nodes. The source and destination
+        # nodes can have multiple node types. All the edges connect from
+        # source nodes to destination nodes.
+        # For more details: https://discuss.dgl.ai/t/what-is-the-block/2932.
         for it, (input_nodes, output_nodes, blocks) in enumerate(
             train_dataloader
         ):
+            # The input features from the source nodes in the
+            # first layer's computation graph.
             x = blocks[0].srcdata["feat"]
+
+            # The ground truth labels from the destination nodes
+            # in the last layer's computation graph.
             y = blocks[-1].dstdata["label"]
+
             y_hat = model(blocks, x)
             loss = F.cross_entropy(y_hat, y)
             opt.zero_grad()
@@ -206,9 +251,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         default="mixed",
-        choices=["cpu", "mixed", "puregpu"],
+        choices=["cpu", "mixed", "gpu"],
         help="Training mode. 'cpu' for CPU training, 'mixed' for "
-        "CPU-GPU mixed training, 'puregpu' for pure-GPU training.",
+        "CPU-GPU mixed training, 'gpu' for pure-GPU training.",
     )
     args = parser.parse_args()
     if not torch.cuda.is_available():
@@ -219,8 +264,10 @@ if __name__ == "__main__":
     print("Loading data")
     dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
     g = dataset[0]
-    g = g.to("cuda" if args.mode == "puregpu" else "cpu")
+    g = g.to("cuda" if args.mode == "gpu" else "cpu")
     num_classes = dataset.num_classes
+    # Whether use Unified Virtual Addressing (UVA) for CUDA computation.
+    use_uva = args.mode == "mixed"
     device = torch.device("cpu" if args.mode == "cpu" else "cuda")
 
     # Create GraphSAGE model.
@@ -230,7 +277,7 @@ if __name__ == "__main__":
 
     # Model training.
     print("Training...")
-    train(args, device, g, dataset, model, num_classes)
+    train(args, device, g, dataset, model, num_classes, use_uva)
 
     # Test the model.
     print("Testing...")
