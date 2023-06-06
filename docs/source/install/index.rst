@@ -60,13 +60,13 @@ For Fedora/RHEL/CentOS users, run:
 
    sudo yum install -y gcc-c++ python3-devel make cmake
 
-Create conda environment for development, run:
+Create conda environment for development. To see the usage of the create script, run:
 
 .. code:: bash
 
    bash script/create_dev_conda_env.sh -h
 
-Build the shared library, run:
+Build the shared library. To see the usage of the build script, run:
 
 .. code:: bash
 
