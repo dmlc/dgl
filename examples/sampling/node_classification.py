@@ -87,8 +87,23 @@ class SAGE(nn.Module):
         #
         # The 'prefetch_node_feats' parameter specifies the node features
         # that need to be pre-fetched during sampling. In this case, the
-        # feature named 'feat' will be pre-fetched, which should be part
-        # of the nodes' data.
+        # feature named 'feat' will be pre-fetched.
+        #
+        # `prefetch` in DGL initiates data fetching operations in parallel
+        # with model computations. This ensures data is ready when the
+        # computation needs it, thereby eliminating waiting times between
+        # fetching and computing steps and reducing the I/O overhead during
+        # the training process.
+        #
+        # The difference between whether to use prefetch or not is shown:
+        #
+        # Without Prefetch:
+        # Fetch1 ──> Compute1 ──> Fetch2 ──> Compute2 ──> Fetch3 ──> Compute3
+        #
+        # With Prefetch:
+        # Fetch1 ──> Fetch2 ──> Fetch3
+        #    │          │          │
+        #    └─Compute1 └─Compute2 └─Compute3
         #####################################################################
         sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=["feat"])
 
@@ -171,10 +186,8 @@ def train(args, device, g, dataset, model, num_classes, use_uva):
     #
     # The 'prefetch_node_feats' and 'prefetch_labels' parameters
     # specify the node features and labels that need to be pre-fetched
-    # during sampling. Pre-fetching data in this way is advantageous
-    # as it can reduce the I/O overhead during the training process,
-    # making the whole computation more efficient. In this case,
-    # the feature 'feat' and the label 'label' will be pre-fetched.
+    # during sampling. More details about `prefetch` can be found in the
+    # `SAGE.inference` function.
     #####################################################################
     sampler = NeighborSampler(
         [10, 10, 10],  # fanout for [layer-0, layer-1, layer-2]
@@ -190,8 +203,8 @@ def train(args, device, g, dataset, model, num_classes, use_uva):
         batch_size=1024,
         shuffle=True,
         drop_last=False,
-        # If `g` is on gpu or `use_uva` is True,
-        # `num_workers` must be zero else it will cause error.
+        # If `g` is on gpu or `use_uva` is True, `num_workers` must be zero,
+        # otherwise it will cause error.
         num_workers=0,
         use_uva=use_uva,
     )
@@ -222,8 +235,8 @@ def train(args, device, g, dataset, model, num_classes, use_uva):
         for it, (input_nodes, output_nodes, blocks) in enumerate(
             train_dataloader
         ):
-            # The input features from the source nodes in the
-            # first layer's computation graph.
+            # The input features from the source nodes in the first layer's
+            # computation graph.
             x = blocks[0].srcdata["feat"]
 
             # The ground truth labels from the destination nodes
