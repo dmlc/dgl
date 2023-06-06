@@ -126,6 +126,7 @@ class MinibatchSampler(IterDataPipe):
     def __iter__(self):
         data_pipe = IterableWrapper(self._item_set)
         if self._shuffle:
+            # `torchdata.datapipes.iter.Shuffler` works with stream too.
             data_pipe = data_pipe.shuffle()
         data_pipe = data_pipe.batch(
             batch_size=self._batch_size,
