@@ -39,6 +39,5 @@ dependencies:
     - pillow
     - seaborn
     - jupyter_http_over_ws
-    - torchdata
 variables:
   DGL_HOME: __DGL_HOME__
