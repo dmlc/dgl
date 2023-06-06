@@ -239,12 +239,12 @@ class CSCSamplingGraph:
             floating-point or boolean tensor with the number of elements equal
             to the number of edges.
         Returns
-            -------
-            SampledSubgraph
-                The sampled subgraph.
+        -------
+        SampledSubgraph
+            The sampled subgraph.
 
         Examples
-            --------
+        --------
         >>> indptr = torch.LongTensor([0, 3, 5, 7])
         >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1])
         >>> type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1])
