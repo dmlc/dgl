@@ -16,5 +16,6 @@ requests[security]
 scikit-learn
 scipy
 torch==1.12.0+cu102
+torchdata
 torchmetrics
 tqdm

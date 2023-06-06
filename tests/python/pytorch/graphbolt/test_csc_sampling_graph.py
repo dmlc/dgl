@@ -516,6 +516,107 @@ def test_sample_neighbors_replace(replace, expected_sampled_num):
     assert sampled_num == expected_sampled_num
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize("replace", [True, False])
+@pytest.mark.parametrize(
+    "probs_or_mask",
+    [
+        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0.5, 0.4, 1.2]),
+        torch.tensor(
+            [
+                True,
+                False,
+                True,
+                False,
+                True,
+                True,
+                True,
+                False,
+                True,
+                True,
+                True,
+                True,
+            ]
+        ),
+    ],
+)
+def test_sample_neighbors_probs(replace, probs_or_mask):
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+    """
+    # Initialize data.
+    num_nodes = 5
+    num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(indptr, indices)
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([1, 3, 4])
+    subgraph = graph.sample_neighbors(
+        nodes,
+        fanouts=torch.tensor([2]),
+        replace=replace,
+        probs_or_mask=probs_or_mask,
+    )
+
+    # Verify in subgraph.
+    sampled_num = subgraph.indices.size(0)
+    if replace:
+        assert sampled_num == 6
+    else:
+        assert sampled_num == 4
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize("replace", [True, False])
+@pytest.mark.parametrize(
+    "probs_or_mask",
+    [
+        torch.zeros(12, dtype=torch.float32),
+        torch.zeros(12, dtype=torch.bool),
+    ],
+)
+def test_sample_neighbors_zero_probs(replace, probs_or_mask):
+    # Initialize data.
+    num_nodes = 5
+    num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(indptr, indices)
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([1, 3, 4])
+    subgraph = graph.sample_neighbors(
+        nodes,
+        fanouts=torch.tensor([5]),
+        replace=replace,
+        probs_or_mask=probs_or_mask,
+    )
+
+    # Verify in subgraph.
+    sampled_num = subgraph.indices.size(0)
+    assert sampled_num == 0
+
+
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     """Check if two tensors are on the same shared memory.
 
@@ -633,4 +734,10 @@ def test_hetero_graph_on_shared_memory(
 
 
 if __name__ == "__main__":
+    test_sample_neighbors()
     test_sample_neighbors_replace(True, 12)
+    test_sample_neighbors_probs(
+        False,
+        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
+    )
+    test_sample_neighbors_zero_probs(True, torch.zeros(12, dtype=torch.float32))
