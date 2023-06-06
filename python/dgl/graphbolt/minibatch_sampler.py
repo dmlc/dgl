@@ -4,9 +4,10 @@ from typing import Mapping, Optional
 
 from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
-from .itemset import ItemSet
+
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
+from .itemset import ItemSet
 
 __all__ = ["MinibatchSampler"]
 
