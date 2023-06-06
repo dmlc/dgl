@@ -4,7 +4,7 @@ from typing import Mapping, Optional
 
 from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
-from .itemset import *
+from .itemset import ItemSet
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
 
