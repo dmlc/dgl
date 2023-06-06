@@ -11,7 +11,7 @@ from ..heterograph import DGLGraph
 __all__ = ["MinibatchSampler"]
 
 
-def _colloate(batch):
+def _collate(batch):
     """Collate batch."""
     data = next(iter(batch))
     if isinstance(data, DGLGraph):
@@ -35,7 +35,7 @@ class MinibatchSampler(IterDataPipe):
 
     Parameters
     ----------
-    item_set : ItemSet or DictItemSet
+    item_set : ItemSet
         Data to be sampled for mini-batches.
     batch_size : int
         The size of each batch.
@@ -66,22 +66,52 @@ class MinibatchSampler(IterDataPipe):
     tensor([12, 15, 17, 14])], [tensor([0, 6]), tensor([10, 16])]
 
     3. Node pairs and labels.
+    >>> item_set = gb.ItemSet(
+    ...     (torch.arange(0, 5), torch.arange(5, 10), torch.arange(10, 15))
+    ... )
+    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 3)
+    >>> list(minibatch_sampler)
+    [[tensor([0, 1, 2]), tensor([5, 6, 7]), tensor([10, 11, 12])],
+    [tensor([3, 4]), tensor([8, 9]), tensor([13, 14])]]
 
     4. Head, tail and negative tails
+    >>> heads = torch.arange(0, 5)
+    >>> tails = torch.arange(5, 10)
+    >>> negative_tails = torch.stack((heads + 1, heads + 2), dim=-1)
+    >>> item_set = gb.ItemSet((heads, tails, negative_tails))
+    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 3)
+    >>> list(minibatch_sampler)
+    [[tensor([0, 1, 2]), tensor([5, 6, 7]),
+        tensor([[1, 2], [2, 3], [3, 4]])],
+    [tensor([3, 4]), tensor([8, 9]), tensor([[4, 5], [5, 6]])]]
 
     5. DGLGraphs.
+    >>> import dgl
+    >>> graphs = [ dgl.rand_graph(10, 20) for _ in range(5) ]
+    >>> item_set = gb.ItemSet(graphs)
+    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 3)
+    >>> list(minibatch_sampler)
+    [Graph(num_nodes=30, num_edges=60,
+      ndata_schemes={}
+      edata_schemes={}),
+     Graph(num_nodes=20, num_edges=40,
+      ndata_schemes={}
+      edata_schemes={})]
 
-    6. Append other datapipes.
+    6. Further process batches with other datapipes such as
+    `torchdata.datapipes.iter.Mapper`.
     >>> item_set = gb.ItemSet(torch.arange(0, 10))
     >>> data_pipe = gb.MinibatchSampler(item_set, 4)
-    >>> data_pipe = data_pipe.enumerate()
+    >>> def add_one(batch):
+    ...     return batch + 1
+    >>> data_pipe = data_pipe.map(add_one)
     >>> list(data_pipe)
-    [(0, tensor([0, 1, 2, 3])), (1, tensor([4, 5, 6, 7])), (2, tensor([8, 9]))]
+    [tensor([1, 2, 3, 4]), tensor([5, 6, 7, 8]), tensor([ 9, 10])]
     """
 
     def __init__(
         self,
-        item_set: ItemSet or DictItemSet,
+        item_set: ItemSet,
         batch_size: int,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
@@ -99,6 +129,5 @@ class MinibatchSampler(IterDataPipe):
         data_pipe = data_pipe.batch(
             batch_size=self._batch_size,
             drop_last=self._drop_last,
-        )
-        data_pipe = data_pipe.collate(collate_fn=_colloate)
+        ).collate(collate_fn=_collate)
         return iter(data_pipe)
