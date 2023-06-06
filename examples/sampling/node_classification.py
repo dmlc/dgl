@@ -123,8 +123,9 @@ class SAGE(nn.Module):
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
                 # By design, our output nodes are contiguous.
-                y[output_nodes[0] : output_nodes[-1] + 1] \
-                    = hidden_x.to(buffer_device)
+                y[output_nodes[0] : output_nodes[-1] + 1] = hidden_x.to(
+                    buffer_device
+                )
             feat = y
         return y
 
@@ -149,14 +150,10 @@ def evaluate(model, graph, dataloader, num_classes):
 @torch.no_grad()
 def layerwise_infer(device, graph, nid, model, num_classes, batch_size):
     model.eval()
-    pred = model.inference(
-        graph, device, batch_size
-    )  # pred in buffer_device.
+    pred = model.inference(graph, device, batch_size)  # pred in buffer_device.
     pred = pred[nid]
     label = graph.ndata["label"][nid].to(pred.device)
-    return MF.accuracy(
-        pred, label, task="multiclass", num_classes=num_classes
-    )
+    return MF.accuracy(pred, label, task="multiclass", num_classes=num_classes)
 
 
 def train(args, device, g, dataset, model, num_classes, use_uva):
