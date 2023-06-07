@@ -1,6 +1,5 @@
 """MovieLens dataset"""
 import os
-import zipfile
 import shutil
 
 import numpy as np
@@ -8,8 +7,7 @@ import pandas as pd
 
 
 from torch import LongTensor, Tensor
-from ..convert import graph, heterograph
-from ..transforms.functional import add_reverse_edges
+from ..convert import heterograph
 from .dgl_dataset import DGLDataset
 from ..base import dgl_warning
 
@@ -62,11 +60,11 @@ def check_pytorch():
         )
 
 class MovieLensDataset(DGLDataset):
-    r"""MovieLens dataset for edge prediction tasks. The raw datasets are extracted from 
+    r"""MovieLens dataset for edge prediction tasks. The raw datasets are extracted from
     `MovieLens <https://grouplens.org/datasets/movielens/>`, introduced by
     `Movielens unplugged: experiences with an occasionally connected recommender system <https://dl.acm.org/doi/10.1145/604045.604094>`.
 
-    The datasets consist of user ratings for movies and incorporate additional user/movie information in the form of features. 
+    The datasets consist of user ratings for movies and incorporate additional user/movie information in the form of features.
     The nodes represent users and movies, and the edges store ratings that users assign to movies.
 
     Statistics:
@@ -85,26 +83,26 @@ class MovieLensDataset(DGLDataset):
 
     MovieLens-10M (ml-10m)
 
-    - Users: 69,878 
+    - Users: 69,878
     - Movies: 10,677
     - Ratings: 10,000,054 (0.5, 1, 1.5, ..., 4.5, 5.0)
 
     Parameters
     ----------
     name: str
-        Dataset name. (:obj:`"ml-100k"`, :obj:`"ml-1m"`, :obj:`"ml-10m"`). 
+        Dataset name. (:obj:`"ml-100k"`, :obj:`"ml-1m"`, :obj:`"ml-10m"`).
     valid_ratio: int
         Ratio of validation samples out of the whole dataset. Should be in (0.0, 1.0).
     test_ratio: int, optional
-        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0). And its sum with 
+        Ratio of testing samples out of the whole dataset. Should be in (0.0, 1.0). And its sum with
         :obj:`valid_ratio` should be in (0.0, 1.0) as well. This parameter is invalid
-        when :obj:`name` is :obj:`"ml-100k"`, since its testing samples are pre-specified. 
+        when :obj:`name` is :obj:`"ml-100k"`, since its testing samples are pre-specified.
         Default: None
     raw_dir : str, optional
         Raw file directory to download/store the data.
         Default: ~/.dgl/
     force_reload : bool, optional
-        Whether to re-download(if the dataset has not been downloaded) and re-process the dataset. 
+        Whether to re-download(if the dataset has not been downloaded) and re-process the dataset.
         Default: False
     verbose : bool, optional
         Whether to print progress information. Default: True.
@@ -117,8 +115,8 @@ class MovieLensDataset(DGLDataset):
 
     Notes
     -----
-    - When :obj:`name` is :obj:`"ml-100k"`, the :obj:`test_ratio` is invalid, and the training ratio is equal to 1-:obj:`valid_ratio`. 
-    When :obj:`name` is :obj:`"ml-1m"` or :obj:`"ml-10m"`, the :obj:`test_ratio` is valid, 
+    - When :obj:`name` is :obj:`"ml-100k"`, the :obj:`test_ratio` is invalid, and the training ratio is equal to 1-:obj:`valid_ratio`.
+    When :obj:`name` is :obj:`"ml-1m"` or :obj:`"ml-10m"`, the :obj:`test_ratio` is valid,
     and the training ratio is equal to 1-:obj:`valid_ratio`-:obj:`test_ratio`.
     - The number of edges is doubled to form an undirected(bidirected) graph structure.
 
@@ -219,25 +217,17 @@ class MovieLensDataset(DGLDataset):
                   f"(valid: {valid_ratio}, test: {test_ratio}, ignore test if using ml-100k). "
                    "MovieLens will be re-processed with the new dataset split setting.")
             return False
-    
+
     def download(self):
         zip_file_path = os.path.join(self.raw_dir, self.name + ".zip")
         download(self.url, path=zip_file_path)
         extract_archive(zip_file_path, self.raw_dir, overwrite=True)
 
-        '''
-        TODO: Here are codes downloading movie features from dgl s3. 
-        Right now codes are used for testing only.
-        '''
-        dir = os.path.join(self.raw_dir, "movie_feat")
-        shutil.copyfile(os.path.join(dir, self.name + '_movie_feat.pkl'), 
-                        os.path.join(self.raw_path, self.name + '_movie_feat.pkl'))
-
     def process(self):
         print(f"Starting processing {self.name} ...")
 
         # 0. loading movie features
-        movie_feat = load_info(os.path.join(self.raw_path, self.name + '_movie_feat.pkl')).to(torch.float)
+        movie_feat = load_info(os.path.join(self.raw_path, 'movie_feat.pkl')).to(torch.float)
         # 1. dataset split: train + (valid + ) test
         if self.name == "ml-100k":
             train_rating_data = self._load_raw_rates(
@@ -294,7 +284,7 @@ class MovieLensDataset(DGLDataset):
             reserved_ids_set=set(all_rating_data["movie_id"].values),
         )
 
-        user_feat = Tensor(self._process_user_feat(user_data)) 
+        user_feat = Tensor(self._process_user_feat(user_data))
 
         # 3. generate rating pairs
         # Map user/movie to the global id
@@ -312,17 +302,17 @@ class MovieLensDataset(DGLDataset):
             LongTensor(v_indices),
         )
         all_rating_values = Tensor(labels)
-        
+
         graph = self.construct_g(all_rating_pairs, all_rating_values, user_feat, movie_feat)
         self.graph = self.add_masks(graph, train_rating_data, valid_rating_data, test_rating_data)
-        
+
         print(f"End processing {self.name} ...")
 
     def construct_g(self, rate_pairs, rate_values, user_feat, movie_feat):
         g = heterograph({
             ('user', 'user-movie', 'movie'): (rate_pairs[0], rate_pairs[1]),
             ('movie', 'movie-user', 'user'): (rate_pairs[1], rate_pairs[0])
-        }) 
+        })
         ndata = {
             'user': user_feat,
             'movie': movie_feat
@@ -334,12 +324,12 @@ class MovieLensDataset(DGLDataset):
         g.ndata['feat'] = ndata
         g.edata['rate'] = edata
         return g
-    
+
     def add_masks(self, g, train_rating_data, valid_rating_data, test_rating_data):
         train_u_indices, train_v_indices, _ = self._generate_pair_value(train_rating_data)
         valid_u_indices, valid_v_indices, _ = self._generate_pair_value(valid_rating_data)
         test_u_indices, test_v_indices, _ = self._generate_pair_value(test_rating_data)
-        
+
         # user-movie
         train_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.bool)
         train_mask[g.edge_ids(train_u_indices, train_v_indices, etype='user-movie')] = True
@@ -406,7 +396,7 @@ class MovieLensDataset(DGLDataset):
     @property
     def graph_path(self):
         return os.path.join(self.raw_path, self.name + ".bin")
-    
+
     @property
     def version_path(self):
         return os.path.join(self.raw_path, self.name + "_version.pkl")
@@ -576,7 +566,7 @@ class MovieLensDataset(DGLDataset):
         )
         rating_values = rating_data["rating"].values.astype(np.float32)
         return rating_pairs[0], rating_pairs[1], rating_values
-    
+
     def __repr__(self):
         return (
             f'Dataset("{self.name}", num_graphs={len(self)},'
