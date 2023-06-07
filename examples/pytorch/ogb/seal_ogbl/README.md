@@ -6,7 +6,7 @@ This is an example of implementing [SEAL](https://arxiv.org/pdf/2010.16103.pdf) 
 
 Requirements
 ------------
-[PyTorch](https://pytorch.org/), [DGL](https://www.dgl.ai/), [OGB](https://ogb.stanford.edu/docs/home/), and other python libraries: numpy, scipy, tqdm, sklearn, etc.
+[PyTorch](https://pytorch.org/), [DGL](https://www.dgl.ai/), [OGB](https://ogb.stanford.edu/docs/home/), and other python libraries: numpy, scipy, tqdm, scikit-learn, etc.
 
 Usages
 ------
