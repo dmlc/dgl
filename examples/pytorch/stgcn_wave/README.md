@@ -6,7 +6,7 @@ Spatio-Temporal Graph Convolutional Networks
 - See [this blog](https://towardsdatascience.com/build-your-first-graph-neural-network-model-to-predict-traffic-speed-in-20-minutes-b593f8f838e5) for more details about running the code.
 - Dependencies
   - PyTorch 1.1.0+
-  - sklearn
+  - scikit-learn
   - dgl
   - tables
 
