@@ -26,6 +26,7 @@ dependencies:
     - scikit-learn
     - scipy
     - torch==__TORCH_VERSION__
+    - torchdata
     - torchmetrics
     - tqdm
     - boto3 # AWS SDK for python

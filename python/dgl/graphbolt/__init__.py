@@ -7,6 +7,7 @@ import torch
 from .._ffi import libinfo
 from .graph_storage import *
 from .itemset import *
+from .minibatch_sampler import *
 
 
 def load_graphbolt():
