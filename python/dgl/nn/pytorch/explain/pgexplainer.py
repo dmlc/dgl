@@ -30,6 +30,8 @@ class PGExplainer(nn.Module):
           the intermediate node embeddings.
     num_features : int
         Node embedding size used by :attr:`model`.
+    explain_graph : bool, optional
+        Whether to initialize the model in graph or node explanation
     coff_budget : float, optional
         Size regularization to constrain the explanation size. Default: 0.01.
     coff_connect : float, optional
@@ -43,6 +45,7 @@ class PGExplainer(nn.Module):
         self,
         model,
         num_features,
+        explain_graph=True,
         coff_budget=0.01,
         coff_connect=5e-4,
         sample_bias=0.0,
@@ -50,7 +53,8 @@ class PGExplainer(nn.Module):
         super(PGExplainer, self).__init__()
 
         self.model = model
-        self.num_features = num_features * 2
+        self.graph_explanation = explain_graph
+        self.num_features = num_features * (2 if self.graph_explanation else 3)
 
         # training hyperparameters for PGExplainer
         self.coff_budget = coff_budget
@@ -221,12 +225,99 @@ class PGExplainer(nn.Module):
 
         pred = self.model(graph, feat, embed=False, **kwargs).argmax(-1).data
 
-        prob, _ = self.explain_graph(
-            graph, feat, tmp=tmp, training=True, **kwargs
-        )
+        if self.graph_explanation:
+            prob, _ = self.explain_graph(
+                graph, feat, tmp=tmp, training=True, **kwargs
+            )
 
-        loss_tmp = self.loss(prob, pred)
-        return loss_tmp
+            loss = self.loss(prob, pred)
+        else:
+            loss = 0.0
+            for node_id in graph.nodes():
+                prob, _ = self.explain_node(
+                    node_id, graph, feat, tmp=tmp, training=True, **kwargs
+                )
+                iter_loss = self.loss(prob, pred)
+                loss += iter_loss
+
+        return loss
+
+    def explain_node(
+        self, node_id, graph, feat, tmp=1.0, training=False, **kwargs
+    ):
+        r"""Learn and return an edge mask that plays a crucial role to
+        explain the prediction made by the GNN for node :attr:`node_id`.
+        Also, return the prediction made with the edges chosen based on
+        the edge mask.
+
+        Parameters
+        ----------
+        node_id : int
+            The ID of the node to explain.
+        graph : DGLGraph
+            A homogeneous graph.
+        feat : Tensor
+            The input feature of shape :math:`(N, D)`. :math:`N` is the
+            number of nodes, and :math:`D` is the feature size.
+        tmp : float
+            The temperature parameter fed to the sampling procedure.
+        training : bool
+            Training the explanation network.
+        kwargs : dict
+            Additional arguments passed to the GNN model.
+
+        Returns
+        -------
+        Tensor
+            Classification probabilities given the masked graph. It is a tensor of
+            shape :math:`(B, L)`, where :math:`L` is the different types of label
+            in the dataset, and :math:`B` is the batch size.
+        Tensor
+            Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
+            is the number of edges in the graph. A higher weight suggests a larger
+            contribution of the edge.
+
+        Examples
+        --------
+
+        """
+        assert (
+            not self.graph_explanation
+        ), '"graph_explanation" must be False to call this method.'
+
+        self.model = self.model.to(graph.device)
+        self.elayers = self.elayers.to(graph.device)
+
+        embed = self.model(graph, feat, embed=True, **kwargs)
+        embed = embed.data
+
+        edge_idx = graph.edges()
+
+        col, row = edge_idx
+        col_emb = embed[col.long()]
+        row_emb = embed[row.long()]
+        self_emb = embed[node_id].repeat(graph.num_edges(), 1)
+        emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
+
+        emb = self.elayers(emb)
+        values = emb.reshape(-1)
+
+        values = self.concrete_sample(values, beta=tmp, training=training)
+        self.sparse_mask_values = values
+
+        reverse_eids = graph.edge_ids(row, col).long()
+        edge_mask = (values + values[reverse_eids]) / 2
+
+        self.set_masks(graph, edge_mask)
+
+        # the model prediction with the updated edge mask
+        logits = self.model(graph, feat, edge_weight=self.edge_mask, **kwargs)
+        probs = F.softmax(logits, dim=-1)
+
+        if not training:
+            self.clear_masks()
+
+        return (probs, edge_mask) if training else (probs.data, edge_mask)
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
         r"""Learn and return an edge mask that plays a crucial role to
@@ -324,6 +415,10 @@ class PGExplainer(nn.Module):
         >>> graph_feat = graph.ndata.pop("attr")
         >>> probs, edge_weight = explainer.explain_graph(graph, graph_feat)
         """
+        assert (
+            self.graph_explanation
+        ), '"graph_explanation" must be True to call this method.'
+
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
@@ -336,7 +431,6 @@ class PGExplainer(nn.Module):
         col_emb = embed[col.long()]
         row_emb = embed[row.long()]
         emb = torch.cat([col_emb, row_emb], dim=-1)
-
         emb = self.elayers(emb)
         values = emb.reshape(-1)
 
@@ -409,7 +503,129 @@ class HeteroPGExplainer(PGExplainer):
         Tensor
             A scalar tensor representing the loss.
         """
-        return super().train_step(graph, feat, tmp=tmp, **kwargs)
+        self.model = self.model.to(graph.device)
+        self.elayers = self.elayers.to(graph.device)
+
+        pred = self.model(graph, feat, embed=False, **kwargs).argmax(-1).data
+
+        if self.graph_explanation:
+            prob, _ = self.explain_graph(
+                graph, feat, tmp=tmp, training=True, **kwargs
+            )
+
+            loss = self.loss(prob, pred)
+        else:
+            loss = 0.0
+            for ntype in graph.ntypes:
+                for node_id in graph.nodes(ntype):
+                    prob, _ = self.explain_node(
+                        ntype,
+                        node_id,
+                        graph,
+                        feat,
+                        tmp=tmp,
+                        training=True,
+                        **kwargs
+                    )
+                    iter_loss = self.loss(prob, pred)
+                    loss += iter_loss
+
+        return loss
+
+    def explain_node(
+        self, ntype, node_id, graph, feat, tmp=1.0, training=False, **kwargs
+    ):
+        r"""Learn and return an edge mask that plays a crucial role to
+        explain the prediction made by the GNN for node :attr:`node_id`.
+        Also, return the prediction made with the edges chosen based on
+        the edge mask.
+
+        Parameters
+        ----------
+        ntype : str
+            The type of the node to explain.
+        node_id : int
+            The ID of the node to explain.
+        graph : DGLGraph
+            A homogeneous graph.
+        feat : Tensor
+            The input feature of shape :math:`(N, D)`. :math:`N` is the
+            number of nodes, and :math:`D` is the feature size.
+        tmp : float
+            The temperature parameter fed to the sampling procedure.
+        training : bool
+            Training the explanation network.
+        kwargs : dict
+            Additional arguments passed to the GNN model.
+
+        Returns
+        -------
+        Tensor
+            Classification probabilities given the masked graph. It is a tensor of
+            shape :math:`(B, L)`, where :math:`L` is the different types of label
+            in the dataset, and :math:`B` is the batch size.
+        Tensor
+            Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
+            is the number of edges in the graph. A higher weight suggests a larger
+            contribution of the edge.
+
+        Examples
+        --------
+
+        """
+        assert (
+            not self.graph_explanation
+        ), '"graph_explanation" must be False to call this method.'
+
+        self.model = self.model.to(graph.device)
+        self.elayers = self.elayers.to(graph.device)
+
+        embed = self.model(graph, feat, embed=True, **kwargs)
+        for ntype, emb in embed.items():
+            graph.nodes[ntype].data["emb"] = emb.data
+        homo_graph = to_homogeneous(graph, ndata=["emb"])
+        homo_embed = homo_graph.ndata["emb"]
+
+        edge_idx = homo_graph.edges()
+
+        col, row = edge_idx
+        col_emb = homo_embed[col.long()]
+        row_emb = homo_embed[row.long()]
+        self_emb = embed[ntype][node_id].repeat(homo_graph.num_edges(), 1)
+        emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
+        emb = self.elayers(emb)
+        values = emb.reshape(-1)
+
+        values = self.concrete_sample(values, beta=tmp, training=training)
+        self.sparse_mask_values = values
+
+        reverse_eids = homo_graph.edge_ids(row, col).long()
+        edge_mask = (values + values[reverse_eids]) / 2
+
+        self.set_masks(homo_graph, edge_mask)
+
+        # convert the edge mask back into heterogeneous format
+        hetero_edge_mask = {
+            etype: edge_mask[
+                (homo_graph.edata[ETYPE] == graph.get_etype_id(etype))
+                .nonzero()
+                .squeeze(1)
+            ]
+            for etype in graph.canonical_etypes
+        }
+
+        # the model prediction with the updated edge mask
+        logits = self.model(graph, feat, edge_weight=hetero_edge_mask, **kwargs)
+        probs = F.softmax(logits, dim=-1)
+
+        if not training:
+            self.clear_masks()
+
+        return (
+            (probs, hetero_edge_mask)
+            if training
+            else (probs.data, hetero_edge_mask)
+        )
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
         r"""Learn and return an edge mask that plays a crucial role to
@@ -520,6 +736,10 @@ class HeteroPGExplainer(PGExplainer):
         >>> feat = g.ndata.pop("h")
         >>> probs, edge_mask = explainer.explain_graph(g, feat)
         """
+        assert (
+            self.graph_explanation
+        ), '"graph_explanation" must be True to call this method.'
+
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 

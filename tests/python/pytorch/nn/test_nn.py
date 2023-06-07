@@ -1840,6 +1840,11 @@ def test_pgexplainer(g, idtype, n_classes):
 
     probs, edge_weight = explainer.explain_graph(g, feat)
 
+    explainer = nn.PGExplainer(model, n_classes, explain_graph=False)
+    explainer.train_step(g, g.ndata["attr"], 5.0)
+
+    probs, edge_weight = explainer.explain_node(0, g, feat)
+
 
 @pytest.mark.parametrize("g", get_cases(["hetero"]))
 @pytest.mark.parametrize("idtype", [F.int64])
@@ -1897,6 +1902,11 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     explainer.train_step(g, feat, 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)
+
+    explainer = nn.HeteroPGExplainer(model, embed_dim, explain_graph=False)
+    explainer.train_step(g, feat, 5.0)
+
+    probs, edge_weight = explainer.explain_node(g.ntypes[0], 0, g, feat)
 
 
 def test_jumping_knowledge():
