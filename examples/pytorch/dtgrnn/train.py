@@ -87,7 +87,7 @@ def train(
             scheduler.step()
         total_loss.append(float(loss))
         batch_cnt[0] += 1
-        print("Batch: ", i)
+        print("\rBatch: ", i, end="")
     return np.mean(total_loss)
 
 
@@ -284,7 +284,7 @@ if __name__ == "__main__":
             dcrnn, g, test_loader, normalizer, loss_fn, device, args
         )
         print(
-            "Epoch: {} Train Loss: {} Valid Loss: {} Test Loss: {}".format(
+            "\rEpoch: {} Train Loss: {} Valid Loss: {} Test Loss: {}".format(
                 e, train_loss, valid_loss, test_loss
             )
         )
