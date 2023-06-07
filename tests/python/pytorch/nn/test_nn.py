@@ -2495,7 +2495,7 @@ def test_SpatialEncoder(max_dist, num_kernels, num_heads):
     ndata = th.rand(bg.num_nodes(), 3).to(dev)
     num_nodes = bg.num_nodes()
     node_type = th.randint(0, 512, (num_nodes,)).to(dev)
-    dist = -th.ones((2, 6, 6), dtype=th.long)
+    dist = -th.ones((2, 6, 6), dtype=th.long).to(dev)
     dist[0, :4, :4] = shortest_dist(g1, root=None, return_paths=False)
     dist[1, :6, :6] = shortest_dist(g2, root=None, return_paths=False)
     model_1 = nn.SpatialEncoder(max_dist, num_heads=num_heads).to(dev)
