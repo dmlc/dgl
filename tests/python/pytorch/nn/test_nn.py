@@ -8,6 +8,7 @@ import dgl
 import dgl.function as fn
 import dgl.nn.pytorch as nn
 import networkx as nx
+import numpy as np  # For setting seed for scipy
 import pytest
 import scipy as sp
 import torch
@@ -23,6 +24,11 @@ from utils.graph_cases import (
     random_dglgraph,
     random_graph,
 )
+
+# Set seeds to make tests fully reproducible.
+np.random.seed(12345)  # for scipy.sparse.random
+dgl.seed(12345)
+F.seed(12345)
 
 tmp_buffer = io.BytesIO()
 
@@ -1320,9 +1326,9 @@ def test_sequential():
             n_feat += graph.ndata["h"]
             return n_feat.view(graph.num_nodes() // 2, 2, -1).sum(1)
 
-    g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05)).to(F.ctx())
-    g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2)).to(F.ctx())
-    g3 = dgl.DGLGraph(nx.erdos_renyi_graph(8, 0.8)).to(F.ctx())
+    g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05, seed=12345)).to(F.ctx())
+    g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2, seed=12345)).to(F.ctx())
+    g3 = dgl.DGLGraph(nx.erdos_renyi_graph(8, 0.8, seed=12345)).to(F.ctx())
     net = nn.Sequential(ExampleLayer(), ExampleLayer(), ExampleLayer())
     net = net.to(ctx)
     n_feat = F.randn((32, 4))
