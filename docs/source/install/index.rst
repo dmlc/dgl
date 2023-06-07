@@ -60,13 +60,38 @@ For Fedora/RHEL/CentOS users, run:
 
    sudo yum install -y gcc-c++ python3-devel make cmake
 
-Create conda environment for development, run:
+To create a Conda environment for CPU development, run:
+
+.. code:: bash
+
+   bash script/create_dev_conda_env.sh -c
+
+To create a Conda environment for GPU development, run:
+
+.. code:: bash
+
+   bash script/create_dev_conda_env.sh -g 11.7
+
+
+To further configure the conda environment, run the following command for more details:
 
 .. code:: bash
 
    bash script/create_dev_conda_env.sh -h
 
-Build the shared library, run:
+To build the shared library for CPU development, run:
+
+.. code:: bash
+
+   bash script/build_dgl.sh -c
+
+To build the shared library for GPU development, run:
+
+.. code:: bash
+
+   bash script/build_dgl.sh -g
+
+To further build the shared library, run the following command for more details:
 
 .. code:: bash
 
