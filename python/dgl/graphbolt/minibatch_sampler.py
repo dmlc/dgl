@@ -39,7 +39,7 @@ class MinibatchSampler(IterDataPipe):
 
     Examples
     --------
-    1. Node/edge IDs.
+    1. Node IDs.
     >>> import torch
     >>> from dgl import graphbolt as gb
     >>> item_set = gb.ItemSet(torch.arange(0, 10))
@@ -101,18 +101,17 @@ class MinibatchSampler(IterDataPipe):
     >>> list(data_pipe)
     [tensor([1, 2, 3, 4]), tensor([5, 6, 7, 8]), tensor([ 9, 10])]
 
-    7. Heterogeneous node/edge IDs.
+    7. Heterogeneous node IDs.
     >>> ids = {
-    ...     ("user", "like", "item"): gb.ItemSet(torch.arange(0, 5)),
-    ...     ("user", "follow", "user"): gb.ItemSet(torch.arange(5, 10)),
+    ...     "user": gb.ItemSet(torch.arange(0, 5)),
+    ...     "item": gb.ItemSet(torch.arange(0, 5)),
     ... }
     >>> item_set = gb.DictItemSet(ids)
     >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
     >>> list(minibatch_sampler)
-    [{('user', 'like', 'item'): tensor([0, 1, 2, 3])},
-    {('user', 'follow', 'user'): tensor([5, 6, 7]),
-        ('user', 'like', 'item'): tensor([4])},
-    {('user', 'follow', 'user'): tensor([8, 9])}]
+    [{'user': tensor([0, 1, 2, 3])},
+    {'item': tensor([0, 1, 2]), 'user': tensor([4])},
+    {'item': tensor([3, 4])}]
 
     8. Heterogeneous node pairs.
     >>> node_pairs = (torch.arange(0, 5), torch.arange(5, 10))

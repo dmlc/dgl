@@ -8,8 +8,8 @@ from torch.testing import assert_close
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSet_node_edge_ids(batch_size, shuffle, drop_last):
-    # Node or edge IDs.
+def test_ItemSet_node_ids(batch_size, shuffle, drop_last):
+    # Node IDs.
     num_ids = 103
     item_set = gb.ItemSet(torch.arange(0, num_ids))
     minibatch_sampler = gb.MinibatchSampler(
@@ -215,12 +215,12 @@ def test_append_with_other_datapipes():
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_DictItemSet_node_edge_ids(batch_size, shuffle, drop_last):
-    # Node or edge IDs
+def test_DictItemSet_node_ids(batch_size, shuffle, drop_last):
+    # Node IDs.
     num_ids = 205
     ids = {
-        ("user", "like", "item"): gb.ItemSet(torch.arange(0, 99)),
-        ("user", "follow", "user"): gb.ItemSet(torch.arange(99, num_ids)),
+        "user": gb.ItemSet(torch.arange(0, 99)),
+        "item": gb.ItemSet(torch.arange(99, num_ids)),
     }
     chained_ids = []
     for key, value in ids.items():
