@@ -32,6 +32,8 @@ class PathEncoder(nn.Module):
 
     >>> g = dgl.graph(([0,0,0,1,1,2,3,3], [1,2,3,0,3,0,0,1]))
     >>> edata = th.rand(8, 16)
+    >>> # Since shortest_dist returns -1 for unreachable node pairs,
+    >>> # edata[-1] should be filled with zero padding.
     >>> edata = th.cat(
             (edata, th.zeros(1, 16)), dim=0
         )

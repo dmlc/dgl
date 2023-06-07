@@ -36,6 +36,8 @@ class DegreeEncoder(nn.Module):
     >>> g2 = dgl.graph(([0,1], [1,0]))
     >>> in_degree = pad_sequence([g1.in_degrees(), g2.in_degrees()], batch_first=True)
     >>> out_degree = pad_sequence([g1.out_degrees(), g2.out_degrees()], batch_first=True)
+    >>> print(in_degree.shape)
+    torch.Size([2, 4])
     >>> degree_encoder = DegreeEncoder(5, 16)
     >>> degree_embedding = degree_encoder(th.stack((in_degree, out_degree)))
     >>> print(degree_embedding.shape)
@@ -63,11 +65,11 @@ class DegreeEncoder(nn.Module):
         Parameters
         ----------
         degrees : Tensor
-            If direction is ``both``, it should be the stack of in degrees and out degrees
-            of the batched graph with zero padding, of shape :math:`(2, B, N)`.
-            Otherwise, it can be the in degrees or out degrees of the batched graph
-            with zero padding, of shape :math:`(B, N)`, where :math:`B` is the
-            batch size of the batched graph, and :math:`N` is the maximum number of nodes.
+            If :attr:`direction` is ``both``, it should be stacked in degrees and out degrees
+            of the batched graph with zero padding, a tensor of shape :math:`(2, B, N)`.
+            Otherwise, it should be zero-padded in degrees or out degrees of the batched
+            graph, a tensor of shape :math:`(B, N)`, where :math:`B` is the batch size
+            of the batched graph, and :math:`N` is the maximum number of nodes.
 
         Returns
         -------

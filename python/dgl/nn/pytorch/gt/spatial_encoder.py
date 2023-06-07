@@ -37,6 +37,7 @@ class SpatialEncoder(nn.Module):
     >>> g1 = dgl.graph(([0,0,0,1,1,2,3,3], [1,2,3,0,3,0,0,1]))
     >>> g2 = dgl.graph(([0,1], [1,0]))
     >>> n1, n2 = g1.num_nodes(), g2.num_nodes()
+    >>> # use -1 padding since shortest_dist returns -1 for unreachable node pairs
     >>> dist = -th.ones((2, 4, 4), dtype=th.long)
     >>> dist[0, :n1, :n1] = shortest_dist(g1, root=None, return_paths=False)
     >>> dist[1, :n2, :n2] = shortest_dist(g2, root=None, return_paths=False)
@@ -60,7 +61,7 @@ class SpatialEncoder(nn.Module):
         Parameters
         ----------
         dist : Tensor
-            Shortest path distance matrix of the batched graph with -1 padding,
+            Shortest path distance of the batched graph with -1 padding, a tensor
             of shape :math:`(B, N, N)`, where :math:`B` is the batch size of
             the batched graph, and :math:`N` is the maximum number of nodes.
 
