@@ -80,10 +80,13 @@ class DegreeEncoder(nn.Module):
         degrees = th.clamp(degrees, min=0, max=self.max_degree)
 
         if self.direction == "in":
+            assert len(degrees.shape) == 2
             degree_embedding = self.encoder(degrees)
         elif self.direction == "out":
+            assert len(degrees.shape) == 2
             degree_embedding = self.encoder(degrees)
         elif self.direction == "both":
+            assert len(degrees.shape) == 3 and degrees.shape[0] == 2
             degree_embedding = self.encoder1(degrees[0]) + self.encoder2(
                 degrees[1]
             )
