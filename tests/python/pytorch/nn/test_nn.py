@@ -1823,18 +1823,78 @@ def test_pgexplainer(g, idtype, n_classes):
 
         def forward(self, g, h, embed=False, edge_weight=None):
             h = self.conv(g, h, edge_weight=edge_weight)
-            if not embed:
+
+            if embed:
+                return h
+
+            with g.local_scope():
                 g.ndata["h"] = h
                 hg = dgl.mean_nodes(g, "h")
                 return self.fc(hg)
-            else:
-                return h
 
     model = Model(feat.shape[1], n_classes)
     model = model.to(ctx)
 
     explainer = nn.PGExplainer(model, n_classes)
     explainer.train_step(g, g.ndata["attr"], 5.0)
+
+    probs, edge_weight = explainer.explain_graph(g, feat)
+
+
+@pytest.mark.parametrize("g", get_cases(["hetero"]))
+@pytest.mark.parametrize("idtype", [F.int64])
+@pytest.mark.parametrize("input_dim", [5])
+@pytest.mark.parametrize("n_classes", [2])
+def test_heteropgexplainer(g, idtype, input_dim, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    feat = {
+        ntype: F.randn((g.num_nodes(ntype), input_dim)) for ntype in g.ntypes
+    }
+
+    # add self-loop and reverse edges
+    transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
+    g = transform1(g)
+    transform2 = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform2(g)
+
+    class Model(th.nn.Module):
+        def __init__(self, in_feats, embed_dim, out_feats, canonical_etypes):
+            super(Model, self).__init__()
+            self.conv = nn.HeteroGraphConv(
+                {
+                    c_etype: nn.GraphConv(in_feats, embed_dim)
+                    for c_etype in canonical_etypes
+                }
+            )
+            self.fc = th.nn.Linear(embed_dim, out_feats)
+
+        def forward(self, g, h, embed=False, edge_weight=None):
+            if edge_weight is not None:
+                mod_kwargs = {
+                    etype: {"edge_weight": mask}
+                    for etype, mask in edge_weight.items()
+                }
+                h = self.conv(g, h, mod_kwargs=mod_kwargs)
+            else:
+                h = self.conv(g, h)
+
+            if embed:
+                return h
+
+            with g.local_scope():
+                g.ndata["h"] = h
+                hg = 0
+                for ntype in g.ntypes:
+                    hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
+                return self.fc(hg)
+
+    embed_dim = input_dim
+    model = Model(input_dim, embed_dim, n_classes, g.canonical_etypes)
+    model = model.to(ctx)
+
+    explainer = nn.HeteroPGExplainer(model, embed_dim)
+    explainer.train_step(g, feat, 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)
 
