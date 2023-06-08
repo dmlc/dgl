@@ -199,7 +199,7 @@ def test_batch_setter_autograd(idtype):
     assert F.array_equal(F.grad(hh)[:, 0], F.tensor([2.0, 2.0, 2.0]))
 
 
-def _test_nx_conversion():
+def test_nx_conversion():
     # check conversion between networkx and DGLGraph
 
     def _check_nx_feature(nxg, nf, ef):
@@ -302,7 +302,7 @@ def _test_nx_conversion():
 
     # Test converting from a networkx graph whose nodes are
     # not labeled with consecutive-integers.
-    nxg = nx.cycle_graph(5)
+    nxg = nx.cycle_graph(5).to_directed()
     nxg.remove_nodes_from([0, 4])
     for u in nxg.nodes():
         nxg.nodes[u]["h"] = F.tensor([u])
@@ -314,9 +314,9 @@ def _test_nx_conversion():
     assert g.num_edges() == 4
     assert g.has_edge_between(0, 1)
     assert g.has_edge_between(1, 2)
-    assert F.allclose(g.ndata["h"], F.tensor([[1.0], [2.0], [3.0]]))
+    assert F.allclose(g.ndata["h"], F.tensor([[1], [2], [3]]))
     assert F.allclose(
-        g.edata["h"], F.tensor([[1.0, 2.0], [1.0, 2.0], [2.0, 3.0], [2.0, 3.0]])
+        g.edata["h"], F.tensor([[1, 2], [2, 1], [2, 3], [3, 2]])
     )
 
 
