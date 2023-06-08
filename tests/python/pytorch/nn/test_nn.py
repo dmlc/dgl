@@ -1797,12 +1797,13 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
     model = Model(input_dim, n_classes, g.canonical_etypes)
     model = model.to(ctx)
     explainer = nn.HeteroSubgraphX(
-        model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
+        model, num_hops=2, shapley_steps=20, num_rollouts=5, coef=2.0
     )
     # Explain graph prediction
     explainer.explain_graph(g, feat, target_class=0)
     # Explain node prediction
-    explainer.explain_node(g.ntypes[0], 0, g, feat, target_class=0)
+    # * node_id 0 from g.ntypes[0] will not pass the node_min requirement.
+    explainer.explain_node(g.ntypes[0], 1, g, feat, target_class=0)
 
 
 @parametrize_idtype

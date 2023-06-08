@@ -393,6 +393,49 @@ class SubgraphX(nn.Module):
         Examples
         --------
 
+        >>> import torch
+        >>> import torch.nn as nn
+        >>> import torch.nn.functional as F
+        >>> from dgl.data import GINDataset
+        >>> from dgl.dataloading import GraphDataLoader
+        >>> from dgl.nn import GraphConv, AvgPooling, SubgraphX
+
+        >>> # Define the model
+        >>> class Model(nn.Module):
+        ...     def __init__(self, in_dim, n_classes, hidden_dim=128):
+        ...         super().__init__()
+        ...         self.conv1 = GraphConv(in_dim, hidden_dim)
+        ...         self.conv2 = GraphConv(hidden_dim, n_classes)
+        ...         self.pool = AvgPooling()
+        ...
+        ...     def forward(self, g, h):
+        ...         h = F.relu(self.conv1(g, h))
+        ...         h = self.conv2(g, h)
+        ...         return self.pool(g, h)
+
+        >>> # Load dataset
+        >>> data = GINDataset("MUTAG", self_loop=True)
+        >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
+
+        >>> # Train the model
+        >>> feat_size = data[0][0].ndata["attr"].shape[1]
+        >>> model = Model(feat_size, data.gclasses)
+        >>> criterion = nn.CrossEntropyLoss()
+        >>> optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+        >>> for bg, labels in dataloader:
+        ...     logits = model(bg, bg.ndata["attr"])
+        ...     loss = criterion(logits, labels)
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
+
+        >>> # Initialize the explainer
+        >>> explainer = SubgraphX(model, num_hops=2)
+
+        >>> # Explain the prediction for node 0 in graph 0
+        >>> graph, l = data[0]
+        >>> graph_feat = graph.ndata.pop("attr")
+        >>> g_nodes_explain = explainer.explain_node(0, graph, graph_feat, target_class=l)
         """
         # Extract node-centered k-hop subgraph and its associated node features.
         sg, _ = khop_out_subgraph(graph, node_id, self.num_hops)
@@ -876,6 +919,64 @@ class HeteroSubgraphX(nn.Module):
         Examples
         --------
 
+        >>> import dgl
+        >>> import dgl.function as fn
+        >>> import torch as th
+        >>> import torch.nn as nn
+        >>> import torch.nn.functional as F
+        >>> from dgl.nn import HeteroSubgraphX
+
+        >>> class Model(nn.Module):
+        ...     def __init__(self, in_dim, num_classes, canonical_etypes):
+        ...         super(Model, self).__init__()
+        ...         self.etype_weights = nn.ModuleDict(
+        ...             {
+        ...                 "_".join(c_etype): nn.Linear(in_dim, num_classes)
+        ...                 for c_etype in canonical_etypes
+        ...             }
+        ...         )
+        ...
+        ...     def forward(self, graph, feat):
+        ...         with graph.local_scope():
+        ...             c_etype_func_dict = {}
+        ...             for c_etype in graph.canonical_etypes:
+        ...                 src_type, etype, dst_type = c_etype
+        ...                 wh = self.etype_weights["_".join(c_etype)](feat[src_type])
+        ...                 graph.nodes[src_type].data[f"h_{c_etype}"] = wh
+        ...                 c_etype_func_dict[c_etype] = (
+        ...                     fn.copy_u(f"h_{c_etype}", "m"),
+        ...                     fn.mean("m", "h"),
+        ...                 )
+        ...             graph.multi_update_all(c_etype_func_dict, "sum")
+        ...             hg = 0
+        ...             for ntype in graph.ntypes:
+        ...                 if graph.num_nodes(ntype):
+        ...                     hg = hg + dgl.mean_nodes(graph, "h", ntype=ntype)
+        ...             return hg
+
+        >>> input_dim = 5
+        >>> num_classes = 2
+        >>> g = dgl.heterograph({("user", "plays", "game"): ([0, 1, 1, 2], [0, 0, 1, 1])})
+        >>> g.nodes["user"].data["h"] = th.randn(g.num_nodes("user"), input_dim)
+        >>> g.nodes["game"].data["h"] = th.randn(g.num_nodes("game"), input_dim)
+
+        >>> transform = dgl.transforms.AddReverse()
+        >>> g = transform(g)
+
+        >>> # define and train the model
+        >>> model = Model(input_dim, num_classes, g.canonical_etypes)
+        >>> feat = g.ndata["h"]
+        >>> optimizer = th.optim.Adam(model.parameters())
+        >>> for epoch in range(10):
+        ...     logits = model(g, feat)
+        ...     loss = F.cross_entropy(logits, th.tensor([1]))
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
+
+        >>> # Explain for node 0 of the first node type in the graph
+        >>> explainer = HeteroSubgraphX(model, num_hops=2)
+        >>> g_nodes_explain = explainer.explain_node(g.ntypes[0], 0, g, feat, target_class=1)
         """
         # Extract node-centered k-hop subgraph and its associated node features.
         sg, _ = khop_out_subgraph(graph, {ntype: node_id}, self.num_hops)
