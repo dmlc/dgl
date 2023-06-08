@@ -1739,7 +1739,10 @@ def test_subgraphx(g, idtype, n_classes):
     explainer = nn.SubgraphX(
         model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
     )
+    # Explain graph prediction
     explainer.explain_graph(g, feat, target_class=0)
+    # Explain node prediction
+    explainer.explain_node(0, g, feat, target_class=0)
 
 
 @pytest.mark.parametrize("g", get_cases(["hetero"], exclude=["zero-degree"]))
@@ -1796,7 +1799,10 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
     explainer = nn.HeteroSubgraphX(
         model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
     )
+    # Explain graph prediction
     explainer.explain_graph(g, feat, target_class=0)
+    # Explain node prediction
+    explainer.explain_node(g.ntypes[0], 0, g, feat, target_class=0)
 
 
 @parametrize_idtype
