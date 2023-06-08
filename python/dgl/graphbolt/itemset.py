@@ -1,6 +1,6 @@
 """GraphBolt Itemset."""
 
-__all__ = ["ItemSet", "DictItemSet"]
+__all__ = ["ItemSet", "ItemSetDict"]
 
 
 class ItemSet:
@@ -36,7 +36,7 @@ class ItemSet:
         raise NotImplementedError
 
 
-class DictItemSet:
+class ItemSetDict:
     r"""Itemset wrapping multiple itemsets with keys.
 
     Each item is retrieved by iterating over each itemset and returned with

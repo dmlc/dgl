@@ -215,7 +215,7 @@ def test_append_with_other_datapipes():
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_DictItemSet_node_ids(batch_size, shuffle, drop_last):
+def test_ItemSetDict_node_ids(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 205
     ids = {
@@ -225,7 +225,7 @@ def test_DictItemSet_node_ids(batch_size, shuffle, drop_last):
     chained_ids = []
     for key, value in ids.items():
         chained_ids += [(key, v) for v in value]
-    item_set = gb.DictItemSet(ids)
+    item_set = gb.ItemSetDict(ids)
     minibatch_sampler = gb.MinibatchSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -253,7 +253,7 @@ def test_DictItemSet_node_ids(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_DictItemSet_node_pairs(batch_size, shuffle, drop_last):
+def test_ItemSetDict_node_pairs(batch_size, shuffle, drop_last):
     # Node pairs.
     num_ids = 103
     total_ids = 2 * num_ids
@@ -269,7 +269,7 @@ def test_DictItemSet_node_pairs(batch_size, shuffle, drop_last):
         ("user", "like", "item"): gb.ItemSet(node_pairs_0),
         ("user", "follow", "user"): gb.ItemSet(node_pairs_1),
     }
-    item_set = gb.DictItemSet(node_pairs_dict)
+    item_set = gb.ItemSetDict(node_pairs_dict)
     minibatch_sampler = gb.MinibatchSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -305,7 +305,7 @@ def test_DictItemSet_node_pairs(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_DictItemSet_node_pairs_labels(batch_size, shuffle, drop_last):
+def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
     # Node pairs and labels
     num_ids = 103
     total_ids = 2 * num_ids
@@ -326,7 +326,7 @@ def test_DictItemSet_node_pairs_labels(batch_size, shuffle, drop_last):
             (node_pairs_1[0], node_pairs_1[1], labels + num_ids * 2)
         ),
     }
-    item_set = gb.DictItemSet(node_pairs_dict)
+    item_set = gb.ItemSetDict(node_pairs_dict)
     minibatch_sampler = gb.MinibatchSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
@@ -371,7 +371,7 @@ def test_DictItemSet_node_pairs_labels(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_DictItemSet_head_tail_neg_tails(batch_size, shuffle, drop_last):
+def test_ItemSetDict_head_tail_neg_tails(batch_size, shuffle, drop_last):
     # Head, tail and negative tails.
     num_ids = 103
     total_ids = 2 * num_ids
@@ -383,7 +383,7 @@ def test_DictItemSet_head_tail_neg_tails(batch_size, shuffle, drop_last):
         ("user", "like", "item"): gb.ItemSet((heads, tails, neg_tails)),
         ("user", "follow", "user"): gb.ItemSet((heads, tails, neg_tails)),
     }
-    item_set = gb.DictItemSet(data_dict)
+    item_set = gb.ItemSetDict(data_dict)
     minibatch_sampler = gb.MinibatchSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
