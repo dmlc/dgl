@@ -9,7 +9,7 @@ from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
-from .itemset import ItemSetDict, ItemSet
+from .itemset import ItemSet, ItemSetDict
 
 __all__ = ["MinibatchSampler"]
 
