@@ -315,9 +315,7 @@ def test_nx_conversion():
     assert g.has_edge_between(0, 1)
     assert g.has_edge_between(1, 2)
     assert F.allclose(g.ndata["h"], F.tensor([[1], [2], [3]]))
-    assert F.allclose(
-        g.edata["h"], F.tensor([[1, 2], [2, 1], [2, 3], [3, 2]])
-    )
+    assert F.allclose(g.edata["h"], F.tensor([[1, 2], [2, 1], [2, 3], [3, 2]]))
 
 
 @parametrize_idtype
