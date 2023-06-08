@@ -104,62 +104,68 @@ class MinibatchSampler(IterDataPipe):
     7. Heterogeneous node IDs.
     >>> ids = {
     ...     "user": gb.ItemSet(torch.arange(0, 5)),
-    ...     "item": gb.ItemSet(torch.arange(0, 5)),
+    ...     "item": gb.ItemSet(torch.arange(0, 6)),
     ... }
     >>> item_set = gb.DictItemSet(ids)
     >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
     >>> list(minibatch_sampler)
     [{'user': tensor([0, 1, 2, 3])},
     {'item': tensor([0, 1, 2]), 'user': tensor([4])},
-    {'item': tensor([3, 4])}]
+    {'item': tensor([3, 4, 5])}]
 
     8. Heterogeneous node pairs.
-    >>> node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
+    >>> node_pairs_like = (torch.arange(0, 5), torch.arange(0, 5))
+    >>> node_pairs_follow = (torch.arange(0, 6), torch.arange(6, 12))
     >>> item_set = gb.DictItemSet({
-    ...     ("user", "like", "item"): gb.ItemSet(node_pairs),
-    ...     ("user", "follow", "user"): gb.ItemSet(node_pairs),
+    ...     ("user", "like", "item"): gb.ItemSet(node_pairs_like),
+    ...     ("user", "follow", "user"): gb.ItemSet(node_pairs_follow),
     ... })
     >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
     >>> list(minibatch_sampler)
-    [{('user', 'like', 'item'): [tensor([0, 1, 2, 3]), tensor([5, 6, 7, 8])]},
-    {('user', 'follow', 'user'): [tensor([0, 1, 2]), tensor([5, 6, 7])],
-        ('user', 'like', 'item'): [tensor([4]), tensor([9])]},
-    {('user', 'follow', 'user'): [tensor([3, 4]), tensor([8, 9])]}]
+    [{('user', 'like', 'item'): [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3])]},
+    {('user', 'like', 'item'): [tensor([4]), tensor([4])],
+     ('user', 'follow', 'user'): [tensor([0, 1, 2]), tensor([6, 7, 8])]},
+    {('user', 'follow', 'user'): [tensor([3, 4, 5]), tensor([ 9, 10, 11])]}]
 
     9. Heterogeneous node pairs and labels.
-    >>> node_pairs_labels = (
-    ...     torch.arange(0, 5), torch.arange(5, 10), torch.arange(10, 15))
+    >>> like = (
+    ...     torch.arange(0, 5), torch.arange(0, 5), torch.arange(0, 5))
+    >>> follow = (
+    ...     torch.arange(0, 6), torch.arange(6, 12), torch.arange(0, 6))
     >>> item_set = gb.DictItemSet({
-    ...     ("user", "like", "item"): gb.ItemSet(node_pairs_labels),
-    ...     ("user", "follow", "user"): gb.ItemSet(node_pairs_labels),
+    ...     ("user", "like", "item"): gb.ItemSet(like),
+    ...     ("user", "follow", "user"): gb.ItemSet(follow),
     ... })
     >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
     >>> list(minibatch_sampler)
     [{('user', 'like', 'item'):
-        [tensor([0, 1, 2, 3]), tensor([5, 6, 7, 8]), tensor([10, 11, 12, 13])]},
-    {('user', 'follow', 'user'):
-        [tensor([0, 1, 2]), tensor([5, 6, 7]), tensor([10, 11, 12])],
-     ('user', 'like', 'item'): [tensor([4]), tensor([9]), tensor([14])]},
-    {('user', 'follow', 'user'):
-        [tensor([3, 4]), tensor([8, 9]), tensor([13, 14])]}]
+        [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3])]},
+     {('user', 'like', 'item'): [tensor([4]), tensor([4]), tensor([4])],
+      ('user', 'follow', 'user'):
+        [tensor([0, 1, 2]), tensor([6, 7, 8]), tensor([0, 1, 2])]},
+     {('user', 'follow', 'user'):
+        [tensor([3, 4, 5]), tensor([ 9, 10, 11]), tensor([3, 4, 5])]}]
 
     10. Heterogeneous head, tail and negative tails.
-    >>> head_tail_neg_tails = (
-    ...     torch.arange(0, 5), torch.arange(5, 10),
-    ...     torch.arange(10, 20).reshape(-1, 2))
+    >>> like = (
+    ...     torch.arange(0, 5), torch.arange(0, 5),
+    ...     torch.arange(5, 15).reshape(-1, 2))
+    >>> follow = (
+    ...     torch.arange(0, 6), torch.arange(6, 12),
+    ...     torch.arange(12, 24).reshape(-1, 2))
     >>> item_set = gb.DictItemSet({
-    ...     ("user", "like", "item"): gb.ItemSet(head_tail_neg_tails),
-    ...     ("user", "follow", "user"): gb.ItemSet(head_tail_neg_tails),
+    ...     ("user", "like", "item"): gb.ItemSet(like),
+    ...     ("user", "follow", "user"): gb.ItemSet(follow),
     ... })
     >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
     >>> list(minibatch_sampler)
-    [{('user', 'like', 'item'): [tensor([0, 1, 2, 3]), tensor([5, 6, 7, 8]),
-        tensor([[10, 11], [12, 13], [14, 15], [16, 17]])]},
-    {('user', 'follow', 'user'): [tensor([0, 1, 2]), tensor([5, 6, 7]),
-        tensor([[10, 11], [12, 13], [14, 15]])],
-     ('user', 'like', 'item'): [tensor([4]), tensor([9]), tensor([[18, 19]])]},
-    {('user', 'follow', 'user'): [tensor([3, 4]), tensor([8, 9]),
-        tensor([[16, 17], [18, 19]])]}]
+    [{('user', 'like', 'item'): [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3]),
+        tensor([[ 5,  6], [ 7,  8], [ 9, 10], [11, 12]])]},
+     {('user', 'like', 'item'): [tensor([4]), tensor([4]), tensor([[13, 14]])],
+      ('user', 'follow', 'user'): [tensor([0, 1, 2]), tensor([6, 7, 8]),
+        tensor([[12, 13], [14, 15], [16, 17]])]},
+     {('user', 'follow', 'user'): [tensor([3, 4, 5]), tensor([ 9, 10, 11]),
+        tensor([[18, 19], [20, 21], [22, 23]])]}]
     """
 
     def __init__(
