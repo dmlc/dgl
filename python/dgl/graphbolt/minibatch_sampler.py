@@ -9,7 +9,7 @@ from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
-from .itemset import DictItemSet, ItemSet
+from .itemset import ItemSet, ItemSetDict
 
 __all__ = ["MinibatchSampler"]
 
@@ -28,7 +28,7 @@ class MinibatchSampler(IterDataPipe):
 
     Parameters
     ----------
-    item_set : ItemSet or DictItemSet
+    item_set : ItemSet or ItemSetDict
         Data to be sampled for mini-batches.
     batch_size : int
         The size of each batch.
@@ -106,7 +106,7 @@ class MinibatchSampler(IterDataPipe):
     ...     "user": gb.ItemSet(torch.arange(0, 5)),
     ...     "item": gb.ItemSet(torch.arange(0, 6)),
     ... }
-    >>> item_set = gb.DictItemSet(ids)
+    >>> item_set = gb.ItemSetDict(ids)
     >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
     >>> list(minibatch_sampler)
     [{'user': tensor([0, 1, 2, 3])},
@@ -116,7 +116,7 @@ class MinibatchSampler(IterDataPipe):
     8. Heterogeneous node pairs.
     >>> node_pairs_like = (torch.arange(0, 5), torch.arange(0, 5))
     >>> node_pairs_follow = (torch.arange(0, 6), torch.arange(6, 12))
-    >>> item_set = gb.DictItemSet({
+    >>> item_set = gb.ItemSetDict({
     ...     ("user", "like", "item"): gb.ItemSet(node_pairs_like),
     ...     ("user", "follow", "user"): gb.ItemSet(node_pairs_follow),
     ... })
@@ -132,7 +132,7 @@ class MinibatchSampler(IterDataPipe):
     ...     torch.arange(0, 5), torch.arange(0, 5), torch.arange(0, 5))
     >>> follow = (
     ...     torch.arange(0, 6), torch.arange(6, 12), torch.arange(0, 6))
-    >>> item_set = gb.DictItemSet({
+    >>> item_set = gb.ItemSetDict({
     ...     ("user", "like", "item"): gb.ItemSet(like),
     ...     ("user", "follow", "user"): gb.ItemSet(follow),
     ... })
@@ -153,7 +153,7 @@ class MinibatchSampler(IterDataPipe):
     >>> follow = (
     ...     torch.arange(0, 6), torch.arange(6, 12),
     ...     torch.arange(12, 24).reshape(-1, 2))
-    >>> item_set = gb.DictItemSet({
+    >>> item_set = gb.ItemSetDict({
     ...     ("user", "like", "item"): gb.ItemSet(like),
     ...     ("user", "follow", "user"): gb.ItemSet(follow),
     ... })
@@ -170,7 +170,7 @@ class MinibatchSampler(IterDataPipe):
 
     def __init__(
         self,
-        item_set: ItemSet or DictItemSet,
+        item_set: ItemSet or ItemSetDict,
         batch_size: int,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,

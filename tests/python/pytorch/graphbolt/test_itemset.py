@@ -51,7 +51,7 @@ def test_ItemSet_head_tail_neg_tails():
         assert_close(neg_tails[i], negs)
 
 
-def test_DictItemSet_node_edge_ids():
+def test_ItemSetDict_node_edge_ids():
     # Node or edge IDs
     ids = {
         ("user", "like", "item"): ItemSet(torch.arange(0, 5)),
@@ -60,7 +60,7 @@ def test_DictItemSet_node_edge_ids():
     chained_ids = []
     for key, value in ids.items():
         chained_ids += [(key, v) for v in value]
-    item_set = DictItemSet(ids)
+    item_set = ItemSetDict(ids)
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -68,7 +68,7 @@ def test_DictItemSet_node_edge_ids():
         assert item[chained_ids[i][0]] == chained_ids[i][1]
 
 
-def test_DictItemSet_node_pairs():
+def test_ItemSetDict_node_pairs():
     # Node pairs.
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     node_pairs_dict = {
@@ -78,7 +78,7 @@ def test_DictItemSet_node_pairs():
     expected_data = []
     for key, value in node_pairs_dict.items():
         expected_data += [(key, v) for v in value]
-    item_set = DictItemSet(node_pairs_dict)
+    item_set = ItemSetDict(node_pairs_dict)
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -86,7 +86,7 @@ def test_DictItemSet_node_pairs():
         assert item[expected_data[i][0]] == expected_data[i][1]
 
 
-def test_DictItemSet_node_pairs_labels():
+def test_ItemSetDict_node_pairs_labels():
     # Node pairs and labels
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     labels = torch.randint(0, 3, (5,))
@@ -101,7 +101,7 @@ def test_DictItemSet_node_pairs_labels():
     expected_data = []
     for key, value in node_pairs_dict.items():
         expected_data += [(key, v) for v in value]
-    item_set = DictItemSet(node_pairs_dict)
+    item_set = ItemSetDict(node_pairs_dict)
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -109,7 +109,7 @@ def test_DictItemSet_node_pairs_labels():
         assert item[expected_data[i][0]] == expected_data[i][1]
 
 
-def test_DictItemSet_head_tail_neg_tails():
+def test_ItemSetDict_head_tail_neg_tails():
     # Head, tail and negative tails.
     heads = torch.arange(0, 5)
     tails = torch.arange(5, 10)
@@ -122,7 +122,7 @@ def test_DictItemSet_head_tail_neg_tails():
     expected_data = []
     for key, value in data_dict.items():
         expected_data += [(key, v) for v in value]
-    item_set = DictItemSet(data_dict)
+    item_set = ItemSetDict(data_dict)
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
