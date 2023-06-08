@@ -1791,7 +1791,6 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
     # Explain graph prediction
     explainer.explain_graph(g, feat, target_class=0)
     # Explain node prediction
-    # * node_id 0 from g.ntypes[0] will not pass the node_min requirement.
     explainer.explain_node(g.ntypes[0], 1, g, feat, target_class=0)
 
 
