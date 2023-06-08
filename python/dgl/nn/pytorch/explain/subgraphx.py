@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .... import to_heterogeneous, to_homogeneous
+from .... import to_heterogeneous, to_homogeneous, khop_out_subgraph
 from ....base import NID
 from ....convert import to_networkx
 from ....subgraph import node_subgraph
@@ -365,6 +365,43 @@ class SubgraphX(nn.Module):
                 best_immediate_reward = best_leaf.immediate_reward
 
         return best_leaf.nodes
+
+    def explain_node(self, node_id, graph, feat, target_class, **kwargs):
+        r"""Find the most important subgraph from a k-hop neighborhood
+        rooted at a given node of the original graph for the model to
+        classify the graph into the target class.
+
+        Parameters
+        ----------
+        node_id : int
+            The ID of the node to explain.
+        graph : DGLGraph
+            A homogeneous graph
+        feat : Tensor
+            The input node feature of shape :math:`(N, D)`, :math:`N` is the
+            number of nodes, and :math:`D` is the feature size
+        target_class : int
+            The target class to explain
+        kwargs : dict
+            Additional arguments passed to the GNN model
+
+        Returns
+        -------
+        Tensor
+            Nodes that represent the most important subgraph
+
+        Examples
+        --------
+
+        """
+        # Extract node-centered k-hop subgraph and its associated node features.
+        sg, _ = khop_out_subgraph(graph, node_id, self.num_hops)
+        sg_nodes = sg.ndata[NID].long()
+        sg_feat = feat[sg_nodes]
+
+        eg_nodes = self.explain_graph(sg, sg_feat, target_class, **kwargs)
+        original_nodes = sg_nodes[eg_nodes]
+        return original_nodes
 
 
 class HeteroSubgraphX(nn.Module):
@@ -805,3 +842,52 @@ class HeteroSubgraphX(nn.Module):
                 best_immediate_reward = best_leaf.immediate_reward
 
         return best_leaf.nodes
+
+    def explain_node(self, ntype, node_id, graph, feat, target_class, **kwargs):
+        r"""Find the most important subgraph from a k-hop neighborhood
+        rooted at a given node of the original graph for the model to
+        classify the graph into the target class.
+
+        Parameters
+        ----------
+        ntype : str
+            The type of the node to explain.
+        node_id : int
+            The ID of the node to explain.
+        graph : DGLGraph
+            A heterogeneous graph
+        feat : dict[str, Tensor]
+            The dictionary that associates input node features (values) with
+            the respective node types (keys) present in the graph.
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
+            number of nodes for node type :math:`t`, and :math:`D_t` is the feature size for
+            node type :math:`t`
+        target_class : int
+            The target class to explain
+        kwargs : dict
+            Additional arguments passed to the GNN model
+
+        Returns
+        -------
+        dict[str, Tensor]
+            The dictionary associating tensor node ids (values) to
+            node types (keys) that represents the most important subgraph
+
+        Examples
+        --------
+
+        """
+        # Extract node-centered k-hop subgraph and its associated node features.
+        sg, _ = khop_out_subgraph(graph, {ntype: node_id}, self.num_hops)
+        sg_nodes = sg.ndata[NID]
+        sg_feat = {
+            ntype: feat[ntype][node_ids.long()]
+            for ntype, node_ids in sg_nodes.items()
+        }
+
+        eg_nodes = self.explain_graph(sg, sg_feat, target_class, **kwargs)
+        original_nodes = {
+            ntype: sg_nodes[ntype][eg_node_ids]
+            for ntype, eg_node_ids in eg_nodes.items()
+        }
+        return original_nodes
