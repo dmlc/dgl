@@ -37,7 +37,7 @@ class ItemSet:
 
 
 class ItemSetDict:
-    r"""Itemset wrapping multiple itemsets with keys.
+    r"""An iterable ItemsetDict.
 
     Each item is retrieved by iterating over each itemset and returned with
     corresponding key as a dict.
