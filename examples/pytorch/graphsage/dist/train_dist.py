@@ -293,7 +293,7 @@ def run(args, device, data):
 
 def main(args):
     print(socket.gethostname(), "Initializing DGL dist")
-    dgl.distributed.initialize(args.ip_config, net_type=args.net_type)
+    dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         print(socket.gethostname(), "Initializing DGL process group")
         th.distributed.init_process_group(backend=args.backend)
@@ -414,12 +414,6 @@ if __name__ == "__main__":
         action="store_true",
         help="Pad train nid to the same length across machine, to ensure num "
              "of batches to be the same.",
-    )
-    parser.add_argument(
-        "--net_type",
-        type=str,
-        default="socket",
-        help="backend net type, 'socket' or 'tensorpipe'",
     )
     args = parser.parse_args()
 
