@@ -3,8 +3,6 @@
 import torch as th
 import torch.nn as nn
 
-from ....base import DGLError
-
 
 class DegreeEncoder(nn.Module):
     r"""Degree Encoder, as introduced in
@@ -31,10 +29,19 @@ class DegreeEncoder(nn.Module):
     -------
     >>> import dgl
     >>> from dgl.nn import DegreeEncoder
+    >>> import torch as th
+    >>> from torch.nn.utils.rnn import pad_sequence
 
-    >>> g = dgl.graph(([0,0,0,1,1,2,3,3], [1,2,3,0,3,0,0,1]))
+    >>> g1 = dgl.graph(([0,0,0,1,1,2,3,3], [1,2,3,0,3,0,0,1]))
+    >>> g2 = dgl.graph(([0,1], [1,0]))
+    >>> in_degree = pad_sequence([g1.in_degrees(), g2.in_degrees()], batch_first=True)
+    >>> out_degree = pad_sequence([g1.out_degrees(), g2.out_degrees()], batch_first=True)
+    >>> print(in_degree.shape)
+    torch.Size([2, 4])
     >>> degree_encoder = DegreeEncoder(5, 16)
-    >>> degree_embedding = degree_encoder(g)
+    >>> degree_embedding = degree_encoder(th.stack((in_degree, out_degree)))
+    >>> print(degree_embedding.shape)
+    torch.Size([2, 4, 16])
     """
 
     def __init__(self, max_degree, embedding_dim, direction="both"):
@@ -53,36 +60,35 @@ class DegreeEncoder(nn.Module):
             )
         self.max_degree = max_degree
 
-    def forward(self, g):
+    def forward(self, degrees):
         """
         Parameters
         ----------
-        g : DGLGraph
-            A DGLGraph to be encoded. Graphs with more than one type of edges
-            are not allowed.
+        degrees : Tensor
+            If :attr:`direction` is ``both``, it should be stacked in degrees and out degrees
+            of the batched graph with zero padding, a tensor of shape :math:`(2, B, N)`.
+            Otherwise, it should be zero-padded in degrees or out degrees of the batched
+            graph, a tensor of shape :math:`(B, N)`, where :math:`B` is the batch size
+            of the batched graph, and :math:`N` is the maximum number of nodes.
 
         Returns
         -------
         Tensor
-            Return degree embedding vectors of shape :math:`(N, d)`,
-            where :math:`N` is the number of nodes in the input graph and
-            :math:`d` is :attr:`embedding_dim`.
+            Return degree embedding vectors of shape :math:`(B, N, d)`,
+            where :math:`d` is :attr:`embedding_dim`.
         """
-        if len(g.etypes) > 1:
-            raise DGLError(
-                "The input graph should have no more than one type of edges."
-            )
-
-        in_degree = th.clamp(g.in_degrees(), min=0, max=self.max_degree)
-        out_degree = th.clamp(g.out_degrees(), min=0, max=self.max_degree)
+        degrees = th.clamp(degrees, min=0, max=self.max_degree)
 
         if self.direction == "in":
-            degree_embedding = self.encoder(in_degree)
+            assert len(degrees.shape) == 2
+            degree_embedding = self.encoder(degrees)
         elif self.direction == "out":
-            degree_embedding = self.encoder(out_degree)
+            assert len(degrees.shape) == 2
+            degree_embedding = self.encoder(degrees)
         elif self.direction == "both":
-            degree_embedding = self.encoder1(in_degree) + self.encoder2(
-                out_degree
+            assert len(degrees.shape) == 3 and degrees.shape[0] == 2
+            degree_embedding = self.encoder1(degrees[0]) + self.encoder2(
+                degrees[1]
             )
         else:
             raise ValueError(
