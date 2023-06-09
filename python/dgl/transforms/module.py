@@ -544,7 +544,7 @@ class AddSelfLoop(BaseTransform):
     >>> g.edata['he'] = torch.arange(3).float().reshape(-1, 1)
     >>> new_g = transform(g)
     >>> print(new_g.edges())
-    (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
+    (tensor([0, 0, 2, 0, 1, 2]), tensor([2, 1, 0, 0, 1, 2]))
     >>> print(new_g.edata('he'))
     tensor([[0.],
             [1.],
@@ -569,7 +569,7 @@ class AddSelfLoop(BaseTransform):
     >>> print(new_g.edges(etype='plays'))
     (tensor([0, 1]), tensor([0, 1]))
     >>> print(new_g.edges(etype='follows'))
-    (tensor([1, 2]), tensor([0, 1]))
+    (tensor([1, 2, 0, 1, 2]), tensor([0, 1, 0, 1, 2]))
     >>> print(new_g.edata['feat'][('user', 'follows', 'user')].shape)
     torch.Size([5, 5])
 
@@ -578,7 +578,7 @@ class AddSelfLoop(BaseTransform):
     >>> transform = AddSelfLoop(new_etypes=True)
     >>> new_g = transform(g)
     >>> print(new_g.edges(etype='follows'))
-    (tensor([1, 0, 1, 2]), tensor([2, 0, 1, 2]))
+    (tensor([1, 2, 0, 1, 2]), tensor([0, 1, 0, 1, 2]))
     >>> print(new_g.edges(etype=('game', 'self', 'game')))
     (tensor([0, 1]), tensor([0, 1]))
     """
