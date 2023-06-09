@@ -255,7 +255,7 @@ def shutdown_servers(ip_config, num_servers):
     rpc.register_sig_handler()
     server_namebook = rpc.read_ip_config(ip_config, num_servers)
     num_servers = len(server_namebook)
-    rpc.create_sender(MAX_QUEUE_SIZE, "socket")
+    rpc.create_sender(MAX_QUEUE_SIZE)
     # Get connected with all server nodes
     for server_id, addr in server_namebook.items():
         server_ip = addr[1]
