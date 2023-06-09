@@ -312,8 +312,8 @@ def test_nx_conversion():
     g = dgl.from_networkx(nxg, node_attrs=["h"], edge_attrs=["h"])
     assert g.num_nodes() == 3
     assert g.num_edges() == 4
-    assert g.has_edge_between(0, 1)
-    assert g.has_edge_between(1, 2)
+    assert g.has_edges_between(0, 1)
+    assert g.has_edges_between(1, 2)
     assert F.allclose(g.ndata["h"], F.tensor([[1], [2], [3]]))
     assert F.allclose(g.edata["h"], F.tensor([[1, 2], [2, 1], [2, 3], [3, 2]]))
 
