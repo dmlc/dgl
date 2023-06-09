@@ -557,14 +557,14 @@ class AddSelfLoop(BaseTransform):
 
      >>> transform = AddSelfLoop(fill_data='sum')
      >>> g = dgl.heterograph({
-    ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]),
-    ...                                   torch.tensor([0, 1])),
-    ...     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
-    ...                                 torch.tensor([0, 1]))})
-    >>> g.edata['feat'] = {('user', 'follows', 'user'): torch.randn(2, 5),
-    ...                    ('user', 'plays', 'game'): torch.randn(2, 5)}
-    >>> g.edata['feat1'] = {('user', 'follows', 'user'): torch.randn(2, 15),
-      ...                   ('user', 'plays', 'game'): torch.randn(2, 15)}
+     ...     ('user', 'follows', 'user'): (torch.tensor([1, 2]),
+     ...                                   torch.tensor([0, 1])),
+     ...     ('user', 'plays', 'game'): (torch.tensor([0, 1]),
+     ...                                 torch.tensor([0, 1]))})
+     >>> g.edata['feat'] = {('user', 'follows', 'user'): torch.randn(2, 5),
+     ...                    ('user', 'plays', 'game'): torch.randn(2, 5)}
+     >>> g.edata['feat1'] = {('user', 'follows', 'user'): torch.randn(2, 15),
+     ...                     ('user', 'plays', 'game'): torch.randn(2, 15)}
      >>> new_g = transform(g)
      >>> print(new_g.edges(etype='plays'))
      (tensor([0, 1]), tensor([0, 1]))
