@@ -47,9 +47,7 @@ def _init_rpc(
     try:
         utils.set_num_threads(num_threads)
         if os.environ.get("DGL_DIST_MODE", "standalone") != "standalone":
-            connect_to_server(
-                ip_config, num_servers, max_queue_size, group_id
-            )
+            connect_to_server(ip_config, num_servers, max_queue_size, group_id)
         init_role(role)
         init_kvstore(ip_config, num_servers, role)
     except Exception as e:

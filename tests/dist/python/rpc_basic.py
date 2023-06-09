@@ -49,9 +49,7 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 
-def start_server(
-    server_id, ip_config, num_servers, num_clients, keep_alive
-):
+def start_server(server_id, ip_config, num_servers, num_clients, keep_alive):
     server_state = dgl.distributed.ServerState(
         None, local_g=None, partition_book=None, keep_alive=keep_alive
     )
@@ -119,9 +117,7 @@ def main():
         server_id = int(os.environ.get("DIST_DGL_TEST_SERVER_ID"))
         num_clients = int(os.environ.get("DIST_DGL_TEST_NUM_CLIENTS"))
         keep_alive = "DIST_DGL_TEST_KEEP_ALIVE" in os.environ
-        start_server(
-            server_id, ip_config, num_servers, num_clients, keep_alive
-        )
+        start_server(server_id, ip_config, num_servers, num_clients, keep_alive)
     else:
         group_id = int(os.environ.get("DIST_DGL_TEST_GROUP_ID", "0"))
         start_client(ip_config, num_servers, group_id)

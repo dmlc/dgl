@@ -199,9 +199,7 @@ def start_client(ip_config, group_id=0, num_servers=1):
         assert_array_equal(F.asnumpy(res.tensor), F.asnumpy(TENSOR))
 
 
-def start_client_timeout(
-    ip_config, group_id=0, num_servers=1
-):
+def start_client_timeout(ip_config, group_id=0, num_servers=1):
     dgl.distributed.register_service(
         TIMEOUT_SERVICE_ID, TimeoutRequest, TimeoutResponse
     )
@@ -260,12 +258,8 @@ def test_rpc_timeout():
     ip_config = "rpc_ip_config.txt"
     generate_ip_config(ip_config, 1, 1)
     ctx = mp.get_context("spawn")
-    pserver = ctx.Process(
-        target=start_server, args=(1, ip_config, 0, False, 1)
-    )
-    pclient = ctx.Process(
-        target=start_client_timeout, args=(ip_config, 0, 1)
-    )
+    pserver = ctx.Process(target=start_server, args=(1, ip_config, 0, False, 1))
+    pclient = ctx.Process(target=start_client_timeout, args=(ip_config, 0, 1))
     pserver.start()
     pclient.start()
     pserver.join()
@@ -333,9 +327,7 @@ def test_multi_client():
     )
     pclient_list = []
     for i in range(num_clients):
-        pclient = ctx.Process(
-            target=start_client, args=(ip_config, 0, 1)
-        )
+        pclient = ctx.Process(target=start_client, args=(ip_config, 0, 1))
         pclient_list.append(pclient)
     pserver.start()
     for i in range(num_clients):
@@ -365,7 +357,8 @@ def test_multi_thread_rpc():
         import threading
 
         dgl.distributed.connect_to_server(
-            ip_config=ip_config, num_servers=1,
+            ip_config=ip_config,
+            num_servers=1,
         )
         dgl.distributed.register_service(
             HELLO_SERVICE_ID, HelloRequest, HelloResponse
