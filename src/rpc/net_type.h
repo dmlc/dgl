@@ -20,11 +20,6 @@ struct RPCBase {
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
   virtual void Finalize() = 0;
-
-  /**
-   * @brief Communicator type: 'socket', 'tensorpipe', etc
-   */
-  virtual const std::string &NetType() const = 0;
 };
 
 struct RPCSender : RPCBase {

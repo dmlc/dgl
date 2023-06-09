@@ -147,7 +147,7 @@ def create_sender(max_queue_size):
         Maximal size (bytes) of network queue buffer.
     """
     max_thread_count = int(os.getenv("DGL_SOCKET_MAX_THREAD_COUNT", "0"))
-    _CAPI_DGLRPCCreateSender(int(max_queue_size), "socket", max_thread_count)
+    _CAPI_DGLRPCCreateSender(int(max_queue_size), max_thread_count)
 
 
 def create_receiver(max_queue_size):
@@ -159,7 +159,7 @@ def create_receiver(max_queue_size):
         Maximal size (bytes) of network queue buffer.
     """
     max_thread_count = int(os.getenv("DGL_SOCKET_MAX_THREAD_COUNT", "0"))
-    _CAPI_DGLRPCCreateReceiver(int(max_queue_size), "socket", max_thread_count)
+    _CAPI_DGLRPCCreateReceiver(int(max_queue_size), max_thread_count)
 
 
 def finalize_sender():
