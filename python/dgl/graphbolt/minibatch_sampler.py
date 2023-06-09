@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from functools import partial
-from typing import Optional
+from typing import Iterator, Optional
 
 from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
@@ -174,14 +174,14 @@ class MinibatchSampler(IterDataPipe):
         batch_size: int,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
-    ):
+    ) -> None:
         super().__init__()
         self._item_set = item_set
         self._batch_size = batch_size
         self._drop_last = drop_last
         self._shuffle = shuffle
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator:
         data_pipe = IterableWrapper(self._item_set)
         # Shuffle before batch.
         if self._shuffle:
