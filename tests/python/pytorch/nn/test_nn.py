@@ -12,6 +12,8 @@ import pytest
 import scipy as sp
 import torch
 import torch as th
+from dgl import shortest_dist
+from torch.nn.utils.rnn import pad_sequence
 from torch.optim import Adam, SparseAdam
 from torch.utils.data import DataLoader
 from utils import parametrize_idtype
@@ -2278,15 +2280,32 @@ def test_DeepWalk():
 @pytest.mark.parametrize("embedding_dim", [8, 16])
 @pytest.mark.parametrize("direction", ["in", "out", "both"])
 def test_degree_encoder(max_degree, embedding_dim, direction):
-    g = dgl.graph(
+    g1 = dgl.graph(
         (
             th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
             th.tensor([1, 2, 3, 0, 3, 0, 0, 1]),
         )
     )
+    g2 = dgl.graph(
+        (
+            th.tensor([0, 1]),
+            th.tensor([1, 0]),
+        )
+    )
+    in_degree = pad_sequence(
+        [g1.in_degrees(), g2.in_degrees()], batch_first=True
+    )
+    out_degree = pad_sequence(
+        [g1.out_degrees(), g2.out_degrees()], batch_first=True
+    )
     model = nn.DegreeEncoder(max_degree, embedding_dim, direction=direction)
-    de_g = model(g)
-    assert de_g.shape == (4, embedding_dim)
+    if direction == "in":
+        de_g = model(in_degree)
+    elif direction == "out":
+        de_g = model(out_degree)
+    elif direction == "both":
+        de_g = model(th.stack((in_degree, out_degree)))
+    assert de_g.shape == (2, 4, embedding_dim)
 
 
 @parametrize_idtype
@@ -2387,25 +2406,24 @@ def test_GraphormerLayer(attn_bias_type, norm_first):
     assert out.shape == (batch_size, num_nodes, feat_size)
 
 
-@pytest.mark.parametrize("max_len", [1, 4])
+@pytest.mark.parametrize("max_len", [1, 2])
 @pytest.mark.parametrize("feat_dim", [16])
 @pytest.mark.parametrize("num_heads", [1, 8])
 def test_PathEncoder(max_len, feat_dim, num_heads):
     dev = F.ctx()
-    g1 = dgl.graph(
+    g = dgl.graph(
         (
             th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
             th.tensor([1, 2, 3, 0, 3, 0, 0, 1]),
         )
     ).to(dev)
-    g2 = dgl.graph(
-        (th.tensor([0, 1, 2, 3, 2, 5]), th.tensor([1, 2, 3, 4, 0, 3]))
-    ).to(dev)
-    bg = dgl.batch([g1, g2])
-    edge_feat = th.rand(bg.num_edges(), feat_dim).to(dev)
+    edge_feat = th.rand(g.num_edges(), feat_dim).to(dev)
+    edge_feat = th.cat((edge_feat, th.zeros(1, 16).to(dev)), dim=0)
+    dist, path = shortest_dist(g, root=None, return_paths=True)
+    path_data = edge_feat[path[:, :, :max_len]]
     model = nn.PathEncoder(max_len, feat_dim, num_heads=num_heads).to(dev)
-    bias = model(bg, edge_feat)
-    assert bias.shape == (2, 6, 6, num_heads)
+    bias = model(dist.unsqueeze(0), path_data.unsqueeze(0))
+    assert bias.shape == (1, 4, 4, num_heads)
 
 
 @pytest.mark.parametrize("max_dist", [1, 4])
@@ -2426,12 +2444,15 @@ def test_SpatialEncoder(max_dist, num_kernels, num_heads):
     ndata = th.rand(bg.num_nodes(), 3).to(dev)
     num_nodes = bg.num_nodes()
     node_type = th.randint(0, 512, (num_nodes,)).to(dev)
+    dist = -th.ones((2, 6, 6), dtype=th.long).to(dev)
+    dist[0, :4, :4] = shortest_dist(g1, root=None, return_paths=False)
+    dist[1, :6, :6] = shortest_dist(g2, root=None, return_paths=False)
     model_1 = nn.SpatialEncoder(max_dist, num_heads=num_heads).to(dev)
     model_2 = nn.SpatialEncoder3d(num_kernels, num_heads=num_heads).to(dev)
     model_3 = nn.SpatialEncoder3d(
         num_kernels, num_heads=num_heads, max_node_type=512
     ).to(dev)
-    encoding = model_1(bg)
+    encoding = model_1(dist)
     encoding3d_1 = model_2(bg, ndata)
     encoding3d_2 = model_3(bg, ndata, node_type)
     assert encoding.shape == (2, 6, 6, num_heads)
