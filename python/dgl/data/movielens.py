@@ -124,19 +124,28 @@ class MovieLensDataset(DGLDataset):
     --------
     >>> from dgl.data import MovieLensDataset
     >>> dataset = MovieLensDataset(name='ml-100k', valid_ratio=0.2)
-    >>> train_g, valid_g, test_g = dataset[0]
-    >>> train_g
-    Graph(num_nodes={'movie': 1617, 'user': 943},
-          num_edges={('movie', 'movie-user', 'user'): 64000, ('user', 'user-movie', 'movie'): 64000},
+    >>> g = dataset[0]
+    >>> g
+    Graph(num_nodes={'movie': 1682, 'user': 943},
+          num_edges={('movie', 'movie-user', 'user'): 100000, ('user', 'user-movie', 'movie'): 100000},
           metagraph=[('movie', 'user', 'movie-user'), ('user', 'movie', 'user-movie')])
 
     >>> # get ratings of edges in the training graph.
-    >>> ratings = train_g.edges["user-movie"].data["rate"] # or train_g.edges["movie-user"].data["rate"]
-    >>> ratings
+    >>> rate = g.edges['user-movie'].data['rate'] # or rate = g.edges['movie-user'].data['rate']
+    >>> rate
     tensor([5., 5., 3.,  ..., 3., 5., 3.])
 
+    >>> # get train, valid and test mask of edges
+    >>> train_mask, valid_mask, test_mask =\
+            g.edges['user-movie'].data['train_mask'],\
+            g.edges['user-movie'].data['valid_mask'],\
+            g.edges['user-movie'].data['test_mask']
+    >>> # get train, valid and test ratings
+    >>> train_ratings, valid_ratings, test_ratings =\
+            rate[train_mask], rate[valid_mask], rate[test_mask]
+
     >>> # get input features of users
-    >>> train_g.nodes["user"].data["feat"]
+    >>> g.nodes["user"].data["feat"] # or g.nodes["movie"].data["feat"] for movie nodes
     tensor([[0.4800, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [1.0600, 1.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
             [0.4600, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 0.0000],
@@ -374,6 +383,16 @@ class MovieLensDataset(DGLDataset):
     def load(self):
         g_list, _ = load_graphs(self.graph_path)
         self.graph = g_list[0]
+
+        '''
+        To avoid the problem each time loading boolean tensor from the disk, boolean values
+        would be automatically converted into torch.uint8 types, and a deprecation warning would
+        be raised for using torch.uint8
+        '''
+        for e in self.graph.etypes:
+            self.graph.edges[e].data['train_mask'] = self.graph.edges[e].data['train_mask'].to(torch.bool)
+            self.graph.edges[e].data['valid_mask'] = self.graph.edges[e].data['valid_mask'].to(torch.bool)
+            self.graph.edges[e].data['test_mask'] = self.graph.edges[e].data['test_mask'].to(torch.bool)
 
     def __getitem__(self, idx):
         assert (
