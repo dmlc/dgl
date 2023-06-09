@@ -1,5 +1,7 @@
 """GraphBolt Itemset."""
 
+from typing import Dict, Iterable, Iterator, Tuple
+
 __all__ = ["ItemSet", "ItemSetDict"]
 
 
@@ -45,7 +47,7 @@ class ItemSet:
      (tensor(4), tensor(9), tensor([18, 19]))]
     """
 
-    def __init__(self, items):
+    def __init__(self, items: Iterable or Tuple[Iterable]) -> None:
         if isinstance(items, tuple):
             assert all(
                 items[0].size(0) == item.size(0) for item in items
@@ -54,7 +56,7 @@ class ItemSet:
         else:
             self._items = (items,)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator:
         if len(self._items) == 1:
             yield from self._items[0]
             return
@@ -119,10 +121,10 @@ class ItemSetDict:
      {('user', 'follow', 'user'): (tensor(2), tensor(5), tensor([4, 5]))}]
     """
 
-    def __init__(self, itemsets):
+    def __init__(self, itemsets: Dict[str, ItemSet]) -> None:
         self._itemsets = itemsets
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator:
         for key, itemset in self._itemsets.items():
             for item in itemset:
                 yield {key: item}
