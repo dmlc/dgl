@@ -443,7 +443,7 @@ class SubgraphX(nn.Module):
         sg_feat = feat[sg_nodes]
 
         eg_nodes = self.explain_graph(sg, sg_feat, target_class, **kwargs)
-        original_nodes = sg_nodes[eg_nodes]
+        original_nodes = sg_nodes[eg_nodes.long()]
         return original_nodes
 
 
@@ -988,7 +988,7 @@ class HeteroSubgraphX(nn.Module):
 
         eg_nodes = self.explain_graph(sg, sg_feat, target_class, **kwargs)
         original_nodes = {
-            ntype: sg_nodes[ntype][eg_node_ids]
+            ntype: sg_nodes[ntype][eg_node_ids.long()]
             for ntype, eg_node_ids in eg_nodes.items()
         }
         return original_nodes
