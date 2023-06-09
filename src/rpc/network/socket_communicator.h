@@ -86,14 +86,6 @@ class SocketSender : public Sender {
   void Finalize() override;
 
   /**
-   * @brief Communicator type: 'socket'
-   */
-  const std::string& NetType() const override {
-    static const std::string net_type = "socket";
-    return net_type;
-  }
-
-  /**
    * @brief Send data to specified Receiver. Actually pushing message to message
    * queue.
    * @param msg data message.
@@ -218,14 +210,6 @@ class SocketReceiver : public Receiver {
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
   void Finalize() override;
-
-  /**
-   * @brief Communicator type: 'socket'
-   */
-  const std::string& NetType() const override {
-    static const std::string net_type = "socket";
-    return net_type;
-  }
 
  private:
   struct RecvContext {
