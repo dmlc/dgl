@@ -125,7 +125,6 @@ struct RPCContext {
     t->num_servers_per_machine = 0;
     t->sender.reset();
     t->receiver.reset();
-    t->ctx.reset();
     t->server_state.reset();
     t->group_id = -1;
     t->curr_client_id = -1;
