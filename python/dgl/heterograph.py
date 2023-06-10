@@ -6153,9 +6153,9 @@ class DGLGraph(object):
         >>> # Only the intersection 'csr' will be retained.
         >>> csr_csc_g.formats()
         {'created': ['csr'], 'not created': ['csc']}
-        
+
         **When formats doesn't intersect with created formats**
-        
+
         >>> g = dgl.graph(([0, 0, 1], [2, 3, 2]))
         >>> g = g.formats('coo')
         >>> g.formats()
