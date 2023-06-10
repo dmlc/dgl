@@ -96,12 +96,11 @@ def create_graph(num_part, dist_graph_path, hetero):
 
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-@pytest.mark.parametrize("net_type", ["tensorpipe", "socket"])
 @pytest.mark.parametrize("num_servers", [1, 4])
 @pytest.mark.parametrize("num_clients", [1, 4])
 @pytest.mark.parametrize("hetero", [False, True])
 @pytest.mark.parametrize("shared_mem", [False, True])
-def test_dist_objects(net_type, num_servers, num_clients, hetero, shared_mem):
+def test_dist_objects(num_servers, num_clients, hetero, shared_mem):
     if not shared_mem and num_servers > 1:
         pytest.skip(
             f"Backup servers are not supported when shared memory is disabled"
@@ -126,7 +125,6 @@ def test_dist_objects(net_type, num_servers, num_clients, hetero, shared_mem):
         f"DIST_DGL_TEST_NUM_PART={num_part} "
         f"DIST_DGL_TEST_NUM_SERVER={num_servers} "
         f"DIST_DGL_TEST_NUM_CLIENT={num_clients} "
-        f"DIST_DGL_TEST_NET_TYPE={net_type} "
         f"DIST_DGL_TEST_GRAPH_PATH={dist_graph_path} "
         f"DIST_DGL_TEST_IP_CONFIG={ip_config} "
     )
