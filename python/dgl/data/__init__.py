@@ -66,6 +66,15 @@ from .wikics import WikiCSDataset
 from .yelp import YelpDataset
 from .zinc import ZINCDataset
 
+from .heterophilous_graphs import (
+    HeterophilousGraphDataset,
+    RomanEmpireDataset,
+    AmazonRatingsDataset,
+    MinesweeperDataset,
+    TolokersDataset,
+    QuestionsDataset
+)
+
 
 def register_data_args(parser):
     parser.add_argument(
