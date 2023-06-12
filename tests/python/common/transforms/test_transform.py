@@ -2494,7 +2494,7 @@ def test_module_add_self_loop(idtype):
 
     # Case5: add self-loops for a homogeneous graph
     transform = dgl.AddSelfLoop(fill_data="sum")
-    g = dgl.graph(([0, 0, 2], [2, 1, 0]))
+    g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
     new_g = transform(g)
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
