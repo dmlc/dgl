@@ -2651,7 +2651,6 @@ def test_module_add_reverse(idtype):
     assert eset == {(2, 1), (2, 2)}
 
 
-
 @unittest.skipIf(
     F._default_context_str == "gpu", reason="GPU not supported for to_simple"
 )
