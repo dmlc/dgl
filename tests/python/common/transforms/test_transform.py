@@ -2493,9 +2493,9 @@ def test_module_add_self_loop(idtype):
     assert "w2" in new_g.edges["follows"].data
 
     # Case5: add self-loops for a homogeneous graph
-    # transform = dgl.AddSelfLoop(fill_data="sum")
-    # g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
-    # new_g = transform(g)
+    transform = dgl.AddSelfLoop(fill_data="sum")
+    g = dgl.graph(([0, 0, 2], [2, 1, 0]), idtype=idtype, device=F.ctx())
+    new_g = transform(g)
     # assert new_g.device == g.device
     # assert new_g.idtype == g.idtype
     # assert new_g.num_nodes() == g.num_nodes()
