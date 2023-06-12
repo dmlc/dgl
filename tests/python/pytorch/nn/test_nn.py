@@ -1714,24 +1714,36 @@ def test_subgraphx(g, idtype, n_classes):
     feat = F.randn((g.num_nodes(), 5))
 
     class Model(th.nn.Module):
-        def __init__(self, in_dim, n_classes):
+        def __init__(self, in_dim, n_classes, graph=False):
             super().__init__()
+            self.graph = graph
             self.conv = nn.GraphConv(in_dim, n_classes)
             self.pool = nn.AvgPooling()
 
         def forward(self, g, h):
-            h = th.nn.functional.relu(self.conv(g, h))
+            h = self.conv(g, h)
+
+            if not self.graph:
+                return h
+
+            h = th.nn.functional.relu(h)
             return self.pool(g, h)
 
-    model = Model(feat.shape[1], n_classes)
+    # Explain node prediction
+    model = Model(feat.shape[1], n_classes, graph=False)
     model = model.to(ctx)
     explainer = nn.SubgraphX(
         model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
     )
-    # Explain graph prediction
-    explainer.explain_graph(g, feat, target_class=0)
-    # Explain node prediction
     explainer.explain_node(0, g, feat, target_class=0)
+
+    # Explain graph prediction
+    model = Model(feat.shape[1], n_classes, graph=True)
+    model = model.to(ctx)
+    explainer = nn.SubgraphX(
+        model, num_hops=1, shapley_steps=20, num_rollouts=5, coef=2.0
+    )
+    explainer.explain_graph(g, feat, target_class=0)
 
 
 @pytest.mark.parametrize("g", get_cases(["hetero"], exclude=["zero-degree"]))
@@ -1755,8 +1767,9 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
     }
 
     class Model(th.nn.Module):
-        def __init__(self, in_dim, n_classes, canonical_etypes):
+        def __init__(self, in_dim, n_classes, canonical_etypes, graph):
             super(Model, self).__init__()
+            self.graph = graph
             self.etype_weights = th.nn.ModuleDict(
                 {
                     "_".join(c_etype): th.nn.Linear(in_dim, n_classes)
@@ -1776,22 +1789,30 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
                         fn.mean("m", "h"),
                     )
                 graph.multi_update_all(c_etype_func_dict, "sum")
+
+                if not self.graph:
+                    return graph.ndata["h"]
+
                 hg = 0
                 for ntype in graph.ntypes:
-                    if graph.num_nodes(ntype):
-                        hg = hg + dgl.mean_nodes(graph, "h", ntype=ntype)
-
+                    hg = hg + dgl.mean_nodes(graph, "h", ntype=ntype)
                 return hg
 
-    model = Model(input_dim, n_classes, g.canonical_etypes)
+    # Explain node prediction
+    model = Model(input_dim, n_classes, g.canonical_etypes, graph=False)
     model = model.to(ctx)
     explainer = nn.HeteroSubgraphX(
         model, num_hops=2, shapley_steps=20, num_rollouts=5, coef=2.0
     )
-    # Explain graph prediction
-    explainer.explain_graph(g, feat, target_class=0)
-    # Explain node prediction
     explainer.explain_node(g.ntypes[0], 1, g, feat, target_class=0)
+
+    # Explain graph prediction
+    model = Model(input_dim, n_classes, g.canonical_etypes, graph=True)
+    model = model.to(ctx)
+    explainer = nn.HeteroSubgraphX(
+        model, num_hops=2, shapley_steps=20, num_rollouts=5, coef=2.0
+    )
+    explainer.explain_graph(g, feat, target_class=0)
 
 
 @parametrize_idtype
