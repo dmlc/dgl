@@ -2504,7 +2504,6 @@ def test_module_add_self_loop(idtype):
     assert eset == {(0, 2), (0, 1), (2, 0), (0, 0), (1, 1), (2, 2)}
 
 
-
 @parametrize_idtype
 def test_module_remove_self_loop(idtype):
     transform = dgl.RemoveSelfLoop()
