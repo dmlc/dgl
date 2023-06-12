@@ -12,7 +12,6 @@
 #include <dgl/runtime/container.h>
 #include <dgl/runtime/parallel_for.h>
 #include <dgl/zerocopy_serializer.h>
-#include <tensorpipe/tensorpipe.h>
 #include <unistd.h>
 
 #include <csignal>
@@ -27,41 +26,10 @@ using namespace dgl::runtime;
 namespace dgl {
 namespace rpc {
 
-using namespace tensorpipe;
-
 // Borrow from PyTorch
 
 const char kSocketIfnameEnvVar[] = "TP_SOCKET_IFNAME";
 const char kDefaultUvAddress[] = "127.0.0.1";
-
-const std::string& guessAddress() {
-  static const std::string uvAddress = []() {
-    tensorpipe::Error error;
-    std::string result;
-    char* ifnameEnv = std::getenv(kSocketIfnameEnvVar);
-    if (ifnameEnv != nullptr) {
-      std::tie(error, result) =
-          tensorpipe::transport::uv::lookupAddrForIface(ifnameEnv);
-      if (error) {
-        LOG(WARNING) << "Failed to look up the IP address for interface "
-                     << ifnameEnv << " (" << error.what() << "), defaulting to "
-                     << kDefaultUvAddress;
-        return std::string(kDefaultUvAddress);
-      }
-    } else {
-      std::tie(error, result) =
-          tensorpipe::transport::uv::lookupAddrForHostname();
-      if (error) {
-        LOG(WARNING) << "Failed to look up the IP address for the hostname ("
-                     << error.what() << "), defaulting to "
-                     << kDefaultUvAddress;
-        return std::string(kDefaultUvAddress);
-      }
-    }
-    return result;
-  }();
-  return uvAddress;
-}
 
 RPCStatus SendRPCMessage(const RPCMessage& msg, const int32_t target_id) {
   RPCContext::getInstance()->sender->Send(msg, target_id);
@@ -87,38 +55,6 @@ RPCStatus RecvRPCMessage(RPCMessage* msg, int32_t timeout) {
   return status;
 }
 
-void InitGlobalTpContext() {
-  if (!RPCContext::getInstance()->ctx) {
-    RPCContext::getInstance()->ctx = std::make_shared<tensorpipe::Context>();
-    auto context = RPCContext::getInstance()->ctx;
-    auto transportContext = tensorpipe::transport::uv::create();
-    auto shmtransport = tensorpipe::transport::shm::create();
-    context->registerTransport(0 /* priority */, "tcp", transportContext);
-    // Register basic uv channel
-    auto basicChannel = tensorpipe::channel::basic::create();
-    context->registerChannel(0 /* low priority */, "basic", basicChannel);
-
-    char* numUvThreads_str = std::getenv("DGL_SOCKET_NTHREADS");
-    if (numUvThreads_str) {
-      int numUvThreads = std::atoi(numUvThreads_str);
-      CHECK(numUvThreads > 0)
-          << "DGL_SOCKET_NTHREADS should be positive integer if set";
-      // Register multiplex uv channel
-      std::vector<std::shared_ptr<tensorpipe::transport::Context>> contexts;
-      std::vector<std::shared_ptr<tensorpipe::transport::Listener>> listeners;
-      for (int i = 0; i < numUvThreads; i++) {
-        auto context = tensorpipe::transport::uv::create();
-        std::string address = guessAddress();
-        contexts.push_back(std::move(context));
-        listeners.push_back(contexts.back()->listen(address));
-      }
-      auto mptChannel = tensorpipe::channel::mpt::create(
-          std::move(contexts), std::move(listeners));
-      context->registerChannel(20 /* high priority */, "mpt", mptChannel);
-    }
-  }
-}
-
 //////////////////////////// C APIs ////////////////////////////
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReset")
     .set_body([](DGLArgs args, DGLRetValue* rv) { RPCContext::Reset(); });
@@ -126,41 +62,17 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCReset")
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateSender")
     .set_body([](DGLArgs args, DGLRetValue* rv) {
       int64_t msg_queue_size = args[0];
-      std::string type = args[1];
-      int max_thread_count = args[2];
-      if (type == "tensorpipe") {
-        InitGlobalTpContext();
-        RPCContext::getInstance()->sender.reset(
-            new TPSender(RPCContext::getInstance()->ctx));
-      } else if (type == "socket") {
-        RPCContext::getInstance()->sender.reset(
-            new network::SocketSender(msg_queue_size, max_thread_count));
-      } else {
-        LOG(FATAL) << "Unknown communicator type for rpc sender: " << type;
-      }
-      LOG(INFO) << "Sender with NetType~"
-                << RPCContext::getInstance()->sender->NetType()
-                << " is created.";
+      int max_thread_count = args[1];
+      RPCContext::getInstance()->sender.reset(
+          new network::SocketSender(msg_queue_size, max_thread_count));
     });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCCreateReceiver")
     .set_body([](DGLArgs args, DGLRetValue* rv) {
       int64_t msg_queue_size = args[0];
-      std::string type = args[1];
-      int max_thread_count = args[2];
-      if (type == "tensorpipe") {
-        InitGlobalTpContext();
-        RPCContext::getInstance()->receiver.reset(
-            new TPReceiver(RPCContext::getInstance()->ctx));
-      } else if (type == "socket") {
-        RPCContext::getInstance()->receiver.reset(
-            new network::SocketReceiver(msg_queue_size, max_thread_count));
-      } else {
-        LOG(FATAL) << "Unknown communicator type for rpc receiver: " << type;
-      }
-      LOG(INFO) << "Receiver with NetType~"
-                << RPCContext::getInstance()->receiver->NetType()
-                << " is created.";
+      int max_thread_count = args[1];
+      RPCContext::getInstance()->receiver.reset(
+          new network::SocketReceiver(msg_queue_size, max_thread_count));
     });
 
 DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCFinalizeSender")
