@@ -130,7 +130,7 @@ class PGExplainer(nn.Module):
             different types of label in the dataset and :math:`B` is
             the batch size.
         ori_pred: Tensor
-            Tensor of shape ::math:`(B, 1)`, representing the original prediction
+            Tensor of shape :math:`(B, 1)`, representing the original prediction
             for the graph, where :math:`B` is the batch size.
 
         Returns
@@ -275,7 +275,6 @@ class PGExplainer(nn.Module):
         prob = prob[node_id]
 
         loss = self.loss(prob, pred)
-
         return loss
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
