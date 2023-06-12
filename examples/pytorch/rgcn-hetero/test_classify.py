@@ -6,7 +6,7 @@ from functools import partial
 import torch as th
 import torch.nn.functional as F
 
-from dgl.data.rdf import AIFB, AM, BGS, MUTAG
+from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
 from entity_classify import EntityClassify
 
 
