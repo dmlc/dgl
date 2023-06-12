@@ -5,11 +5,86 @@ from dgl import graphbolt as gb
 from torch.testing import assert_close
 
 
-def test_mismatch_size_in_tuple():
-    # Size mismatch.
-    node_pairs = (torch.arange(0, 5), torch.arange(5, 11))
-    with pytest.raises(AssertionError):
-        _ = gb.ItemSet(node_pairs)
+def test_ItemSet_valid_length():
+    # Single iterable.
+    ids = torch.arange(0, 5)
+    item_set = gb.ItemSet(ids)
+    assert len(item_set) == 5
+
+    # Tuple of iterables.
+    node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
+    item_set = gb.ItemSet(node_pairs)
+    assert len(item_set) == 5
+
+
+def test_ItemSet_invalid_length():
+    class InvalidLength:
+        def __iter__(self):
+            return iter([0, 1, 2])
+
+    # Single iterable.
+    item_set = gb.ItemSet(InvalidLength())
+    with pytest.raises(TypeError):
+        _ = len(item_set)
+
+    # Tuple of iterables.
+    item_set = gb.ItemSet((InvalidLength(), InvalidLength()))
+    with pytest.raises(TypeError):
+        _ = len(item_set)
+
+
+def test_ItemSetDict_valid_length():
+    # Single iterable.
+    user_ids = torch.arange(0, 5)
+    item_ids = torch.arange(0, 5)
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(user_ids),
+            "item": gb.ItemSet(item_ids),
+        }
+    )
+    assert len(item_set) == len(user_ids) + len(item_ids)
+
+    # Tuple of iterables.
+    like = (torch.arange(0, 5), torch.arange(0, 5))
+    follow = (torch.arange(0, 5), torch.arange(5, 10))
+    item_set = gb.ItemSetDict(
+        {
+            ("user", "like", "item"): gb.ItemSet(like),
+            ("user", "follow", "user"): gb.ItemSet(follow),
+        }
+    )
+    assert len(item_set) == len(like[0]) + len(follow[0])
+
+
+def test_ItemSetDict_invalid_length():
+    class InvalidLength:
+        def __iter__(self):
+            return iter([0, 1, 2])
+
+    # Single iterable.
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(InvalidLength()),
+            "item": gb.ItemSet(InvalidLength()),
+        }
+    )
+    with pytest.raises(TypeError):
+        _ = len(item_set)
+
+    # Tuple of iterables.
+    item_set = gb.ItemSetDict(
+        {
+            ("user", "like", "item"): gb.ItemSet(
+                (InvalidLength(), InvalidLength())
+            ),
+            ("user", "follow", "user"): gb.ItemSet(
+                (InvalidLength(), InvalidLength())
+            ),
+        }
+    )
+    with pytest.raises(TypeError):
+        _ = len(item_set)
 
 
 def test_ItemSet_node_edge_ids():
