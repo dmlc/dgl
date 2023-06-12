@@ -49,9 +49,7 @@ class HelloRequest(dgl.distributed.Request):
         return res
 
 
-def start_server(
-    server_id, ip_config, num_servers, num_clients, net_type, keep_alive
-):
+def start_server(server_id, ip_config, num_servers, num_clients, keep_alive):
     server_state = dgl.distributed.ServerState(
         None, local_g=None, partition_book=None, keep_alive=keep_alive
     )
@@ -65,11 +63,10 @@ def start_server(
         num_servers=num_servers,
         num_clients=num_clients,
         server_state=server_state,
-        net_type=net_type,
     )
 
 
-def start_client(ip_config, num_servers, group_id, net_type):
+def start_client(ip_config, num_servers, group_id):
     dgl.distributed.register_service(
         HELLO_SERVICE_ID, HelloRequest, HelloResponse
     )
@@ -77,7 +74,6 @@ def start_client(ip_config, num_servers, group_id, net_type):
         ip_config=ip_config,
         num_servers=num_servers,
         group_id=group_id,
-        net_type=net_type,
     )
     req = HelloRequest(STR, INTEGER, TENSOR, tensor_func)
     server_namebook = dgl.distributed.read_ip_config(ip_config, num_servers)
@@ -117,17 +113,14 @@ def start_client(ip_config, num_servers, group_id, net_type):
 def main():
     ip_config = os.environ.get("DIST_DGL_TEST_IP_CONFIG")
     num_servers = int(os.environ.get("DIST_DGL_TEST_NUM_SERVERS"))
-    net_type = os.environ.get("DIST_DGL_TEST_NET_TYPE", "tensorpipe")
     if os.environ.get("DIST_DGL_TEST_ROLE", "server") == "server":
         server_id = int(os.environ.get("DIST_DGL_TEST_SERVER_ID"))
         num_clients = int(os.environ.get("DIST_DGL_TEST_NUM_CLIENTS"))
         keep_alive = "DIST_DGL_TEST_KEEP_ALIVE" in os.environ
-        start_server(
-            server_id, ip_config, num_servers, num_clients, net_type, keep_alive
-        )
+        start_server(server_id, ip_config, num_servers, num_clients, keep_alive)
     else:
         group_id = int(os.environ.get("DIST_DGL_TEST_GROUP_ID", "0"))
-        start_client(ip_config, num_servers, group_id, net_type)
+        start_client(ip_config, num_servers, group_id)
 
 
 if __name__ == "__main__":
