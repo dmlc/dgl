@@ -220,129 +220,44 @@ class PGExplainer(nn.Module):
         Tensor
             A scalar tensor representing the loss.
         """
+        assert (
+            self.graph_explanation
+        ), '"graph_explanation" must be True to call this method.'
+
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        pred = self.model(graph, feat, embed=False, **kwargs).argmax(-1).data
+        pred = self.model(graph, feat, embed=False, **kwargs)
+        pred = pred.argmax(-1).data
 
-        if self.graph_explanation:
-            prob, _ = self.explain_graph(
-                graph, feat, tmp=tmp, training=True, **kwargs
-            )
+        prob, _ = self.explain_graph(
+            graph, feat, tmp=tmp, training=True, **kwargs
+        )
 
-            loss = self.loss(prob, pred)
-        else:
-            loss = 0.0
-            for node_id in graph.nodes():
-                prob, _ = self.explain_node(
-                    node_id, graph, feat, tmp=tmp, training=True, **kwargs
-                )
-                iter_loss = self.loss(prob, pred)
-                loss += iter_loss
-
+        loss = self.loss(prob, pred)
         return loss
 
-    def explain_node(
-        self, node_id, graph, feat, tmp=1.0, training=False, **kwargs
-    ):
-        r"""Learn and return an edge mask that plays a crucial role to
-        explain the prediction made by the GNN for node :attr:`node_id`.
-        Also, return the prediction made with the edges chosen based on
-        the edge mask.
+    def train_step_node(self, node_id, graph, feat, tmp, **kwargs):
+        r"""Compute the loss of the explanation network
 
         Parameters
         ----------
         node_id : int
-            The ID of the node to explain.
+            The ID of the node to target for training.
         graph : DGLGraph
-            A homogeneous graph.
+            Input batched homogeneous graph.
         feat : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
         tmp : float
             The temperature parameter fed to the sampling procedure.
-        training : bool
-            Training the explanation network.
         kwargs : dict
             Additional arguments passed to the GNN model.
 
         Returns
         -------
         Tensor
-            Classification probabilities given the masked graph. It is a tensor of
-            shape :math:`(B, L)`, where :math:`L` is the different types of label
-            in the dataset, and :math:`B` is the batch size.
-        Tensor
-            Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
-            is the number of edges in the graph. A higher weight suggests a larger
-            contribution of the edge.
-
-        Examples
-        --------
-
-        >>> import torch as th
-        >>> import torch.nn as nn
-        >>> import dgl
-        >>> from dgl.data import GINDataset
-        >>> from dgl.dataloading import GraphDataLoader
-        >>> from dgl.nn import GraphConv, PGExplainer
-        >>> import numpy as np
-
-        >>> # Define the model
-        >>> class Model(nn.Module):
-        ...     def __init__(self, in_feats, out_feats):
-        ...         super().__init__()
-        ...         self.conv = GraphConv(in_feats, out_feats)
-        ...         self.fc = nn.Linear(out_feats, out_feats)
-        ...         nn.init.xavier_uniform_(self.fc.weight)
-        ...
-        ...     def forward(self, g, h, embed=False, edge_weight=None):
-        ...         h = self.conv(g, h, edge_weight=edge_weight)
-        ...
-        ...         if embed:
-        ...             return h
-        ...
-        ...         with g.local_scope():
-        ...             g.ndata["h"] = h
-        ...             hg = dgl.mean_nodes(g, "h")
-        ...             return self.fc(hg)
-
-        >>> # Load dataset
-        >>> data = GINDataset("MUTAG", self_loop=True)
-        >>> dataloader = GraphDataLoader(data, batch_size=64, shuffle=True)
-
-        >>> # Train the model
-        >>> feat_size = data[0][0].ndata["attr"].shape[1]
-        >>> model = Model(feat_size, data.gclasses)
-        >>> criterion = nn.CrossEntropyLoss()
-        >>> optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
-        >>> for bg, labels in dataloader:
-        ...     preds = model(bg, bg.ndata["attr"])
-        ...     loss = criterion(preds, labels)
-        ...     optimizer.zero_grad()
-        ...     loss.backward()
-        ...     optimizer.step()
-
-        >>> # Initialize the explainer
-        >>> explainer = PGExplainer(model, data.gclasses, explain_graph=False)
-
-        >>> # Data for graph 0
-        >>> graph, labels = data[0]
-
-        >>> # Train the explainer
-        >>> # Define explainer temperature parameter
-        >>> init_tmp, final_tmp = 5.0, 1.0
-        >>> optimizer_exp = th.optim.Adam(explainer.parameters(), lr=0.01)
-        >>> for epoch in range(20):
-        ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
-        ...     loss = explainer.train_step(graph, graph.ndata["attr"], tmp)
-        ...     optimizer_exp.zero_grad()
-        ...     loss.backward()
-        ...     optimizer_exp.step()
-
-        >>> graph_feat = graph.ndata.pop("attr")
-        >>> # Explain the prediction for graph 0
-        >>> probs, edge_weight = explainer.explain_node(0, graph, graph_feat)
+            A scalar tensor representing the loss.
         """
         assert (
             not self.graph_explanation
@@ -351,36 +266,17 @@ class PGExplainer(nn.Module):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        embed = self.model(graph, feat, embed=True, **kwargs)
-        embed = embed.data
+        pred = self.model(graph, feat, embed=False, **kwargs)
+        pred = pred[node_id].argmax(-1).data
 
-        edge_idx = graph.edges()
+        prob, _ = self.explain_node(
+            node_id, graph, feat, tmp=tmp, training=True, **kwargs
+        )
+        prob = prob[node_id]
 
-        col, row = edge_idx
-        col_emb = embed[col.long()]
-        row_emb = embed[row.long()]
-        self_emb = embed[node_id].repeat(graph.num_edges(), 1)
-        emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
+        loss = self.loss(prob, pred)
 
-        emb = self.elayers(emb)
-        values = emb.reshape(-1)
-
-        values = self.concrete_sample(values, beta=tmp, training=training)
-        self.sparse_mask_values = values
-
-        reverse_eids = graph.edge_ids(row, col).long()
-        edge_mask = (values + values[reverse_eids]) / 2
-
-        self.set_masks(graph, edge_mask)
-
-        # the model prediction with the updated edge mask
-        logits = self.model(graph, feat, edge_weight=self.edge_mask, **kwargs)
-        probs = F.softmax(logits, dim=-1)
-
-        if not training:
-            self.clear_masks()
-
-        return (probs, edge_mask) if training else (probs.data, edge_mask)
+        return loss
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
         r"""Learn and return an edge mask that plays a crucial role to
@@ -514,6 +410,135 @@ class PGExplainer(nn.Module):
 
         return (probs, edge_mask) if training else (probs.data, edge_mask)
 
+    def explain_node(
+        self, node_id, graph, feat, tmp=1.0, training=False, **kwargs
+    ):
+        r"""Learn and return an edge mask that plays a crucial role to
+        explain the prediction made by the GNN for node :attr:`node_id`.
+        Also, return the prediction made with the edges chosen based on
+        the edge mask.
+
+        Parameters
+        ----------
+        node_id : int
+            The ID of the node to explain.
+        graph : DGLGraph
+            A homogeneous graph.
+        feat : Tensor
+            The input feature of shape :math:`(N, D)`. :math:`N` is the
+            number of nodes, and :math:`D` is the feature size.
+        tmp : float
+            The temperature parameter fed to the sampling procedure.
+        training : bool
+            Training the explanation network.
+        kwargs : dict
+            Additional arguments passed to the GNN model.
+
+        Returns
+        -------
+        Tensor
+            Classification probabilities given the masked graph. It is a tensor of
+            shape :math:`(B, L)`, where :math:`L` is the different types of label
+            in the dataset, and :math:`B` is the batch size.
+        Tensor
+            Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
+            is the number of edges in the graph. A higher weight suggests a larger
+            contribution of the edge.
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import numpy as np
+        >>> import torch
+
+        >>> # Define the model
+        >>> class Model(torch.nn.Module):
+        ...     def __init__(self, in_feats, out_feats):
+        ...         super().__init__()
+        ...         self.conv1 = dgl.nn.GraphConv(in_feats, out_feats)
+        ...         self.conv2 = dgl.nn.GraphConv(out_feats, out_feats)
+        ...
+        ...     def forward(self, g, h, embed=False, edge_weight=None):
+        ...         h = self.conv1(g, h, edge_weight=edge_weight)
+        ...         if embed:
+        ...             return h
+        ...         return self.conv2(g, h)
+
+        >>> # Load dataset
+        >>> data = dgl.data.CoraGraphDataset()
+        >>> g = data[0]
+        >>> features = g.ndata["feat"]
+        >>> labels = g.ndata["label"]
+
+        >>> # Train the model
+        >>> model = Model(features.shape[1], data.num_classes)
+        >>> criterion = torch.nn.CrossEntropyLoss()
+        >>> optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+        >>> for epoch in range(20):
+        ...     logits = model(g, features)
+        ...     loss = criterion(logits, labels)
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
+
+        >>> # Initialize the explainer
+        >>> explainer = dgl.nn.PGExplainer(model, data.num_classes, explain_graph=False)
+
+        >>> # Train the explainer
+        >>> # Define explainer temperature parameter
+        >>> init_tmp, final_tmp = 5.0, 1.0
+        >>> optimizer_exp = torch.optim.Adam(explainer.parameters(), lr=0.01)
+        >>> epochs = 10
+        >>> for epoch in range(epochs):
+        ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / epochs))
+        ...     for node_id in g.nodes():
+        ...         loss = explainer.train_step_node(node_id, g, features, tmp)
+        ...         optimizer_exp.zero_grad()
+        ...         loss.backward()
+        ...         optimizer_exp.step()
+
+        >>> # Explain the prediction for graph 0
+        >>> probs, edge_weight = explainer.explain_node(0, g, features)
+        """
+        assert (
+            not self.graph_explanation
+        ), '"graph_explanation" must be False to call this method.'
+
+        self.model = self.model.to(graph.device)
+        self.elayers = self.elayers.to(graph.device)
+
+        embed = self.model(graph, feat, embed=True, **kwargs)
+        embed = embed.data
+
+        edge_idx = graph.edges()
+
+        col, row = edge_idx
+        col_emb = embed[col.long()]
+        row_emb = embed[row.long()]
+        self_emb = embed[node_id].repeat(graph.num_edges(), 1)
+        emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
+
+        emb = self.elayers(emb)
+        values = emb.reshape(-1)
+
+        values = self.concrete_sample(values, beta=tmp, training=training)
+        self.sparse_mask_values = values
+
+        reverse_eids = graph.edge_ids(row, col).long()
+        edge_mask = (values + values[reverse_eids]) / 2
+
+        self.set_masks(graph, edge_mask)
+
+        # the model prediction with the updated edge mask
+        logits = self.model(graph, feat, edge_weight=self.edge_mask, **kwargs)
+        probs = F.softmax(logits, dim=-1)
+
+        if not training:
+            self.clear_masks()
+
+        return (probs, edge_mask) if training else (probs.data, edge_mask)
+
 
 class HeteroPGExplainer(PGExplainer):
     r"""PGExplainer from `Parameterized Explainer for Graph Neural Network
@@ -566,149 +591,49 @@ class HeteroPGExplainer(PGExplainer):
         Tensor
             A scalar tensor representing the loss.
         """
+        assert (
+            self.graph_explanation
+        ), '"graph_explanation" must be True to call this method.'
+
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        pred = self.model(graph, feat, embed=False, **kwargs).argmax(-1).data
+        pred = self.model(graph, feat, embed=False, **kwargs)
+        pred = pred.argmax(-1).data
 
-        if self.graph_explanation:
-            prob, _ = self.explain_graph(
-                graph, feat, tmp=tmp, training=True, **kwargs
-            )
+        prob, _ = self.explain_graph(
+            graph, feat, tmp=tmp, training=True, **kwargs
+        )
 
-            loss = self.loss(prob, pred)
-        else:
-            loss = 0.0
-            for ntype in graph.ntypes:
-                for node_id in graph.nodes(ntype):
-                    prob, _ = self.explain_node(
-                        ntype,
-                        node_id,
-                        graph,
-                        feat,
-                        tmp=tmp,
-                        training=True,
-                        **kwargs
-                    )
-                    iter_loss = self.loss(prob, pred)
-                    loss += iter_loss
+        loss = self.loss(prob, pred)
 
         return loss
 
-    def explain_node(
-        self, ntype, node_id, graph, feat, tmp=1.0, training=False, **kwargs
-    ):
-        r"""Learn and return an edge mask that plays a crucial role to
-        explain the prediction made by the GNN for node :attr:`node_id`.
-        Also, return the prediction made with the edges chosen based on
-        the edge mask.
+    def train_step_node(self, ntype, node_id, graph, feat, tmp, **kwargs):
+        r"""Compute the loss of the explanation network
 
         Parameters
         ----------
         ntype : str
-            The type of the node to explain.
+            The type of the node to target for training.
         node_id : int
-            The ID of the node to explain.
+            The ID of the node to target for training.
         graph : DGLGraph
-            A homogeneous graph.
-        feat : Tensor
-            The input feature of shape :math:`(N, D)`. :math:`N` is the
-            number of nodes, and :math:`D` is the feature size.
+            Input batched heterogeneous graph.
+        feat : dict[str, Tensor]
+            A dict mapping node types (keys) to feature tensors (values).
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
+            number of nodes for node type :math:`t`, and :math:`D_t` is the feature
+            size for node type :math:`t`
         tmp : float
             The temperature parameter fed to the sampling procedure.
-        training : bool
-            Training the explanation network.
         kwargs : dict
             Additional arguments passed to the GNN model.
 
         Returns
         -------
         Tensor
-            Classification probabilities given the masked graph. It is a tensor of
-            shape :math:`(B, L)`, where :math:`L` is the different types of label
-            in the dataset, and :math:`B` is the batch size.
-        Tensor
-            Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
-            is the number of edges in the graph. A higher weight suggests a larger
-            contribution of the edge.
-
-        Examples
-        --------
-
-        >>> import dgl
-        >>> import torch as th
-        >>> import torch.nn as nn
-        >>> import numpy as np
-
-        >>> # Define the model
-        >>> class Model(nn.Module):
-        ...     def __init__(self, in_feats, hid_feats, out_feats, rel_names):
-        ...         super().__init__()
-        ...         self.conv = dgl.nn.HeteroGraphConv(
-        ...             {rel: dgl.nn.GraphConv(in_feats, hid_feats) for rel in rel_names},
-        ...             aggregate="sum",
-        ...         )
-        ...         self.fc = nn.Linear(hid_feats, out_feats)
-        ...         nn.init.xavier_uniform_(self.fc.weight)
-        ...
-        ...     def forward(self, g, h, embed=False, edge_weight=None):
-        ...         if edge_weight:
-        ...             mod_kwargs = {
-        ...                 etype: {"edge_weight": mask}
-        ...                 for etype, mask in edge_weight.items()
-        ...             }
-        ...             h = self.conv(g, h, mod_kwargs=mod_kwargs)
-        ...         else:
-        ...             h = self.conv(g, h)
-        ...
-        ...         if embed:
-        ...             return h
-        ...
-        ...         with g.local_scope():
-        ...             g.ndata["h"] = h
-        ...             hg = 0
-        ...             for ntype in g.ntypes:
-        ...                 hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
-        ...             return self.fc(hg)
-
-        >>> # Load dataset
-        >>> input_dim = 5
-        >>> hidden_dim = 5
-        >>> num_classes = 2
-        >>> g = dgl.heterograph({("user", "plays", "game"): ([0, 1, 1, 2], [0, 0, 1, 1])})
-        >>> g.nodes["user"].data["h"] = th.randn(g.num_nodes("user"), input_dim)
-        >>> g.nodes["game"].data["h"] = th.randn(g.num_nodes("game"), input_dim)
-
-        >>> transform = dgl.transforms.AddReverse()
-        >>> g = transform(g)
-
-        >>> # define and train the model
-        >>> model = Model(input_dim, hidden_dim, num_classes, g.canonical_etypes)
-        >>> optimizer = th.optim.Adam(model.parameters())
-        >>> for epoch in range(10):
-        ...     logits = model(g, g.ndata["h"])
-        ...     loss = th.nn.functional.cross_entropy(logits, th.tensor([1]))
-        ...     optimizer.zero_grad()
-        ...     loss.backward()
-        ...     optimizer.step()
-
-        >>> # Initialize the explainer
-        >>> explainer = dgl.nn.HeteroPGExplainer(model, hidden_dim, explain_graph=False)
-
-        >>> # Train the explainer
-        >>> # Define explainer temperature parameter
-        >>> init_tmp, final_tmp = 5.0, 1.0
-        >>> optimizer_exp = th.optim.Adam(explainer.parameters(), lr=0.01)
-        >>> for epoch in range(20):
-        ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
-        ...     loss = explainer.train_step(g, g.ndata["h"], tmp)
-        ...     optimizer_exp.zero_grad()
-        ...     loss.backward()
-        ...     optimizer_exp.step()
-
-        >>> # Explain the graph
-        >>> feat = g.ndata.pop("h")
-        >>> probs, edge_weight = explainer.explain_node(g.ntypes[0], 0, g, feat)
+            A scalar tensor representing the loss.
         """
         assert (
             not self.graph_explanation
@@ -717,52 +642,16 @@ class HeteroPGExplainer(PGExplainer):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        embed = self.model(graph, feat, embed=True, **kwargs)
-        for ntype, emb in embed.items():
-            graph.nodes[ntype].data["emb"] = emb.data
-        homo_graph = to_homogeneous(graph, ndata=["emb"])
-        homo_embed = homo_graph.ndata["emb"]
+        pred = self.model(graph, feat, embed=False, **kwargs)
+        pred = pred[ntype][node_id].argmax(-1).data
 
-        edge_idx = homo_graph.edges()
-
-        col, row = edge_idx
-        col_emb = homo_embed[col.long()]
-        row_emb = homo_embed[row.long()]
-        self_emb = embed[ntype][node_id].repeat(homo_graph.num_edges(), 1)
-        emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
-        emb = self.elayers(emb)
-        values = emb.reshape(-1)
-
-        values = self.concrete_sample(values, beta=tmp, training=training)
-        self.sparse_mask_values = values
-
-        reverse_eids = homo_graph.edge_ids(row, col).long()
-        edge_mask = (values + values[reverse_eids]) / 2
-
-        self.set_masks(homo_graph, edge_mask)
-
-        # convert the edge mask back into heterogeneous format
-        hetero_edge_mask = {
-            etype: edge_mask[
-                (homo_graph.edata[ETYPE] == graph.get_etype_id(etype))
-                .nonzero()
-                .squeeze(1)
-            ]
-            for etype in graph.canonical_etypes
-        }
-
-        # the model prediction with the updated edge mask
-        logits = self.model(graph, feat, edge_weight=hetero_edge_mask, **kwargs)
-        probs = F.softmax(logits, dim=-1)
-
-        if not training:
-            self.clear_masks()
-
-        return (
-            (probs, hetero_edge_mask)
-            if training
-            else (probs.data, hetero_edge_mask)
+        prob, _ = self.explain_node(
+            ntype, node_id, graph, feat, tmp=tmp, training=True, **kwargs
         )
+        prob = prob[ntype][node_id]
+
+        loss = self.loss(prob, pred)
+        return loss
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
         r"""Learn and return an edge mask that plays a crucial role to
@@ -924,4 +813,187 @@ class HeteroPGExplainer(PGExplainer):
             (probs, hetero_edge_mask)
             if training
             else (probs.data, hetero_edge_mask)
+        )
+
+    def explain_node(
+        self, ntype, node_id, graph, feat, tmp=1.0, training=False, **kwargs
+    ):
+        r"""Learn and return an edge mask that plays a crucial role to
+        explain the prediction made by the GNN for node :attr:`node_id`.
+        Also, return the prediction made with the edges chosen based on
+        the edge mask.
+
+        Parameters
+        ----------
+        ntype : str
+            The type of the node to explain.
+        node_id : int
+            The ID of the node to explain.
+        graph : DGLGraph
+            A homogeneous graph.
+        feat : Tensor
+            The input feature of shape :math:`(N, D)`. :math:`N` is the
+            number of nodes, and :math:`D` is the feature size.
+        tmp : float
+            The temperature parameter fed to the sampling procedure.
+        training : bool
+            Training the explanation network.
+        kwargs : dict
+            Additional arguments passed to the GNN model.
+
+        Returns
+        -------
+        Tensor
+            Classification probabilities given the masked graph. It is a tensor of
+            shape :math:`(B, L)`, where :math:`L` is the different types of label
+            in the dataset, and :math:`B` is the batch size.
+        Tensor
+            Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
+            is the number of edges in the graph. A higher weight suggests a larger
+            contribution of the edge.
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import torch
+        >>> import torch.nn as nn
+        >>> import numpy as np
+
+        >>> # Define the model
+        >>> class Model(nn.Module):
+        ...     def __init__(self, in_feats, hid_feats, out_feats, rel_names):
+        ...         super().__init__()
+        ...         self.conv1 = dgl.nn.HeteroGraphConv(
+        ...             {rel: dgl.nn.GraphConv(in_feats, hid_feats) for rel in rel_names},
+        ...             aggregate="sum",
+        ...         )
+        ...         self.conv2 = dgl.nn.HeteroGraphConv(
+        ...             {rel: dgl.nn.GraphConv(in_feats, hid_feats) for rel in rel_names},
+        ...             aggregate="sum",
+        ...         )
+        ...         self.fc = nn.Linear(hid_feats, out_feats)
+        ...         nn.init.xavier_uniform_(self.fc.weight)
+        ...
+        ...     def forward(self, g, h, embed=False, edge_weight=None):
+        ...         if edge_weight:
+        ...             mod_kwargs = {
+        ...                 etype: {"edge_weight": mask}
+        ...                 for etype, mask in edge_weight.items()
+        ...             }
+        ...             h = self.conv1(g, h, mod_kwargs=mod_kwargs)
+        ...         else:
+        ...             h = self.conv1(g, h)
+        ...
+        ...         if embed:
+        ...             return h
+        ...
+        ...         return self.conv2(g, h)
+
+        >>> # Load dataset
+        >>> input_dim = 5
+        >>> hidden_dim = 5
+        >>> num_classes = 2
+        >>> g = dgl.heterograph({("user", "plays", "game"): ([0, 1, 1, 2], [0, 0, 1, 1])})
+        >>> g.nodes["user"].data["h"] = torch.randn(g.num_nodes("user"), input_dim)
+        >>> g.nodes["game"].data["h"] = torch.randn(g.num_nodes("game"), input_dim)
+
+        >>> transform = dgl.transforms.AddReverse()
+        >>> g = transform(g)
+
+        >>> # define and train the model
+        >>> model = Model(input_dim, hidden_dim, num_classes, g.canonical_etypes)
+        >>> optimizer = torch.optim.Adam(model.parameters())
+        >>> for epoch in range(20):
+        ...     logits = model(g, g.ndata["h"])
+        ...     loss = 0.0
+        ...     for nlogits in logits.values():
+        ...         loss += torch.nn.functional.cross_entropy(
+        ...             nlogits, torch.ones(nlogits.shape[0]).long()
+        ...         )
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
+
+        >>> # Initialize the explainer
+        >>> explainer = dgl.nn.HeteroPGExplainer(model, hidden_dim, explain_graph=False)
+
+        >>> # Train the explainer
+        >>> # Define explainer temperature parameter
+        >>> init_tmp, final_tmp = 5.0, 1.0
+        >>> optimizer_exp = torch.optim.Adam(explainer.parameters(), lr=0.01)
+        >>> epochs = 20
+        >>> for epoch in range(epochs):
+        ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / epochs))
+        ...     for ntype in g.ntypes:
+        ...         for node_id in g.nodes(ntype):
+        ...             loss = explainer.train_step_node(
+        ...                 ntype, node_id, g, g.ndata["h"], tmp
+        ...             )
+        ...             optimizer_exp.zero_grad()
+        ...             loss.backward()
+        ...             optimizer_exp.step()
+
+        >>> # Explain a node
+        >>> feat = g.ndata.pop("h")
+        >>> probs, edge_weight = explainer.explain_node(g.ntypes[0], 0, g, feat)
+        """
+        assert (
+            not self.graph_explanation
+        ), '"graph_explanation" must be False to call this method.'
+
+        self.model = self.model.to(graph.device)
+        self.elayers = self.elayers.to(graph.device)
+
+        embed = self.model(graph, feat, embed=True, **kwargs)
+        for ntype, emb in embed.items():
+            graph.nodes[ntype].data["emb"] = emb.data
+        homo_graph = to_homogeneous(graph, ndata=["emb"])
+        homo_embed = homo_graph.ndata["emb"]
+
+        edge_idx = homo_graph.edges()
+
+        col, row = edge_idx
+        col_emb = homo_embed[col.long()]
+        row_emb = homo_embed[row.long()]
+        self_emb = embed[ntype][node_id].repeat(homo_graph.num_edges(), 1)
+        emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
+        emb = self.elayers(emb)
+        values = emb.reshape(-1)
+
+        values = self.concrete_sample(values, beta=tmp, training=training)
+        self.sparse_mask_values = values
+
+        reverse_eids = homo_graph.edge_ids(row, col).long()
+        edge_mask = (values + values[reverse_eids]) / 2
+
+        self.set_masks(homo_graph, edge_mask)
+
+        # convert the edge mask back into heterogeneous format
+        hetero_edge_mask = {
+            etype: edge_mask[
+                (homo_graph.edata[ETYPE] == graph.get_etype_id(etype))
+                .nonzero()
+                .squeeze(1)
+            ]
+            for etype in graph.canonical_etypes
+        }
+
+        # the model prediction with the updated edge mask
+        logits = self.model(graph, feat, edge_weight=hetero_edge_mask, **kwargs)
+        probs = {
+            ntype: F.softmax(nlogits, dim=-1)
+            for ntype, nlogits in logits.items()
+        }
+
+        if not training:
+            self.clear_masks()
+
+        return (
+            (probs, hetero_edge_mask)
+            if training
+            else (
+                {ntype: nlogits.data for ntype, nlogits in probs.items()},
+                hetero_edge_mask,
+            )
         )

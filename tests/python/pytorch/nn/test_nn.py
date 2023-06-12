@@ -1815,8 +1815,9 @@ def test_pgexplainer(g, idtype, n_classes):
     g = transform(g)
 
     class Model(th.nn.Module):
-        def __init__(self, in_feats, out_feats):
+        def __init__(self, in_feats, out_feats, graph=False):
             super(Model, self).__init__()
+            self.graph = graph
             self.conv = nn.GraphConv(in_feats, out_feats)
             self.fc = th.nn.Linear(out_feats, out_feats)
             th.nn.init.xavier_uniform_(self.fc.weight)
@@ -1824,7 +1825,7 @@ def test_pgexplainer(g, idtype, n_classes):
         def forward(self, g, h, embed=False, edge_weight=None):
             h = self.conv(g, h, edge_weight=edge_weight)
 
-            if embed:
+            if not self.graph or embed:
                 return h
 
             with g.local_scope():
@@ -1832,16 +1833,19 @@ def test_pgexplainer(g, idtype, n_classes):
                 hg = dgl.mean_nodes(g, "h")
                 return self.fc(hg)
 
-    model = Model(feat.shape[1], n_classes)
+    # graph explainer
+    model = Model(feat.shape[1], n_classes, graph=True)
     model = model.to(ctx)
-
     explainer = nn.PGExplainer(model, n_classes)
     explainer.train_step(g, g.ndata["attr"], 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)
 
+    # node explainer
+    model = Model(feat.shape[1], n_classes, graph=False)
+    model = model.to(ctx)
     explainer = nn.PGExplainer(model, n_classes, explain_graph=False)
-    explainer.train_step(g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(0, g, g.ndata["attr"], 5.0)
 
     probs, edge_weight = explainer.explain_node(0, g, feat)
 
@@ -1864,8 +1868,11 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     g = transform2(g)
 
     class Model(th.nn.Module):
-        def __init__(self, in_feats, embed_dim, out_feats, canonical_etypes):
+        def __init__(
+            self, in_feats, embed_dim, out_feats, canonical_etypes, graph=False
+        ):
             super(Model, self).__init__()
+            self.graph = graph
             self.conv = nn.HeteroGraphConv(
                 {
                     c_etype: nn.GraphConv(in_feats, embed_dim)
@@ -1884,7 +1891,7 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
             else:
                 h = self.conv(g, h)
 
-            if embed:
+            if not self.graph or embed:
                 return h
 
             with g.local_scope():
@@ -1895,16 +1902,24 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
                 return self.fc(hg)
 
     embed_dim = input_dim
-    model = Model(input_dim, embed_dim, n_classes, g.canonical_etypes)
-    model = model.to(ctx)
 
+    # graph explainer
+    model = Model(
+        input_dim, embed_dim, n_classes, g.canonical_etypes, graph=True
+    )
+    model = model.to(ctx)
     explainer = nn.HeteroPGExplainer(model, embed_dim)
     explainer.train_step(g, feat, 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)
 
+    # node explainer
+    model = Model(
+        input_dim, embed_dim, n_classes, g.canonical_etypes, graph=False
+    )
+    model = model.to(ctx)
     explainer = nn.HeteroPGExplainer(model, embed_dim, explain_graph=False)
-    explainer.train_step(g, feat, 5.0)
+    explainer.train_step_node(g.ntypes[0], 0, g, feat, 5.0)
 
     probs, edge_weight = explainer.explain_node(g.ntypes[0], 0, g, feat)
 
