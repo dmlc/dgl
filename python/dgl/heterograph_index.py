@@ -1102,11 +1102,17 @@ class HeteroGraphIndex(ObjectBase):
         )
 
     def formats(self, formats=None):
-        """Get a graph index with the specified sparse format(s) or query
-        for the usage status of sparse formats
+        """Get a graph index with the specified allowed sparse format(s) or
+        query for the usage status of sparse formats.
 
         If the graph has multiple edge types, they will have the same
         sparse format.
+
+        When ``formats`` is not None, if the intersection between `formats` and
+        the current graph's created sparse format(s) is not empty, the returned
+        cloned graph only retains all sparse format(s) in the intersection. If
+        the intersection is empty, a sparse format will be selected to be
+        created following the order of ``'coo' -> 'csr' -> 'csc'``.
 
         Parameters
         ----------
@@ -1123,7 +1129,8 @@ class HeteroGraphIndex(ObjectBase):
             * If formats is None, the result will be a dict recording the usage
               status of sparse formats.
             * Otherwise, a GraphIndex will be returned, which is a clone of the
-              original graph with the specified sparse format(s) ``formats``.
+              original graph with the specified allowed sparse format(s)
+              ``formats``.
 
         """
         formats_allowed = _CAPI_DGLHeteroGetAllowedFormats(self)
