@@ -67,7 +67,6 @@ from .yelp import YelpDataset
 from .zinc import ZINCDataset
 
 from .heterophilous_graphs import (
-    HeterophilousGraphDataset,
     RomanEmpireDataset,
     AmazonRatingsDataset,
     MinesweeperDataset,
