@@ -2498,10 +2498,10 @@ def test_module_add_self_loop(idtype):
     new_g = transform(g)
     assert new_g.device == g.device
     assert new_g.idtype == g.idtype
-    # assert new_g.num_nodes() == g.num_nodes()
+    assert new_g.num_nodes() == g.num_nodes()
     src, dst = new_g.edges()
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
-    # assert eset == {(0, 2), (0, 1), (2, 0), (0, 0), (1, 1), (2, 2)}
+    assert eset == {(0, 2), (0, 1), (2, 0), (0, 0), (1, 1), (2, 2)}
 
 
 @parametrize_idtype
