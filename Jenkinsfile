@@ -119,16 +119,22 @@ def go_test_linux() {
 }
 
 def is_authorized(name) {
-  def devs = ['dgl-bot', 'noreply', 'Rhett-Ying', 'BarclayII', 'jermainewang',
-              'mufeili', 'isratnisa', 'rudongyu', 'classicsong', 'HuXiangkun',
-              'hetong007', 'kylasa', 'frozenbugs', 'peizhou001', 'zheng-da',
-              'czkkkkkk', 'thvasilo',
-              'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa',
-              'kkranen',
-              'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
-              'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
-              'VoVAllen', 'keli-wen', 'caojy1998',
-              ]
+  def devs = [
+    // System:
+    'dgl-bot', 'noreply',
+    // Core:
+    'Rhett-Ying', 'BarclayII', 'jermainewang', 'mufeili', 'isratnisa',
+    'rudongyu', 'classicsong', 'HuXiangkun', 'hetong007', 'kylasa',
+    'frozenbugs', 'peizhou001', 'zheng-da', 'czkkkkkk', 'thvasilo',
+    // Intern:
+    'keli-wen', 'caojy1998',
+    // Friends:
+    'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
+    'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
+    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
+    // Emeritus:
+    'VoVAllen',
+  ]
   return (name in devs)
 }
 
@@ -281,7 +287,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230606"
                   args "-u root"
                   alwaysPull true
                 }
@@ -299,7 +305,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-gpu:cu102_v230210"
+                  image "dgllib/dgl-ci-gpu:cu102_v230606"
                   args "-u root"
                   alwaysPull true
                 }
@@ -354,7 +360,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230606"
                   alwaysPull true
                 }
               }
@@ -371,7 +377,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu102_v230210"
+                  image "dgllib/dgl-ci-gpu:cu102_v230606"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -400,7 +406,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230606"
                   alwaysPull true
                 }
               }
@@ -443,7 +449,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230606"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -495,7 +501,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu102_v230210"
+                  image "dgllib/dgl-ci-gpu:cu102_v230606"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -523,7 +529,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230606"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -568,7 +574,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230606"
                   alwaysPull true
                 }
               }
