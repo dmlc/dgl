@@ -24,7 +24,6 @@
 #include "./server_state.h"
 #include "net_type.h"
 #include "network/socket_communicator.h"
-#include "tensorpipe/tp_communicator.h"
 
 namespace dgl {
 namespace rpc {
@@ -90,11 +89,6 @@ struct RPCContext {
   std::shared_ptr<RPCReceiver> receiver;
 
   /**
-   * @brief Tensorpipe global context
-   */
-  std::shared_ptr<tensorpipe::Context> ctx;
-
-  /**
    * @brief Server state data.
    *
    * If the process is a server, this stores necessary
@@ -131,7 +125,6 @@ struct RPCContext {
     t->num_servers_per_machine = 0;
     t->sender.reset();
     t->receiver.reset();
-    t->ctx.reset();
     t->server_state.reset();
     t->group_id = -1;
     t->curr_client_id = -1;

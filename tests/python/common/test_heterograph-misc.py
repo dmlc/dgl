@@ -499,6 +499,41 @@ def test_formats():
     finally:
         assert not fail
 
+    # If the intersection of created formats and allowed formats is
+    # not empty, then retain the intersection.
+    # Case1: intersection is not empty and intersected is equal to
+    # created formats.
+    g = g.formats(["coo", "csr"])
+    g.create_formats_()
+    g = g.formats(["coo", "csr", "csc"])
+    assert sorted(g.formats()["created"]) == sorted(["coo", "csr"])
+    assert sorted(g.formats()["not created"]) == sorted(["csc"])
+
+    # Case2: intersection is not empty and intersected is not equal
+    # to created formats.
+    g = g.formats(["coo", "csr"])
+    g.create_formats_()
+    g = g.formats(["coo", "csc"])
+    assert sorted(g.formats()["created"]) == sorted(["coo"])
+    assert sorted(g.formats()["not created"]) == sorted(["csc"])
+
+    # If the intersection of created formats and allowed formats is
+    # empty, then create a format in the order of `coo` -> `csr` ->
+    # `csc`.
+    # Case1: intersection is empty and just one format is allowed.
+    g = g.formats(["coo", "csr"])
+    g.create_formats_()
+    g = g.formats(["csc"])
+    assert sorted(g.formats()["created"]) == sorted(["csc"])
+    assert sorted(g.formats()["not created"]) == sorted([])
+
+    # Case2: intersection is empty and more than one format is allowed.
+    g = g.formats("csc")
+    g.create_formats_()
+    g = g.formats(["csr", "coo"])
+    assert sorted(g.formats()["created"]) == sorted(["coo"])
+    assert sorted(g.formats()["not created"]) == sorted(["csr"])
+
 
 if __name__ == "__main__":
     test_query()

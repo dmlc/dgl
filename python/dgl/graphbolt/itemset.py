@@ -1,6 +1,6 @@
 """GraphBolt Itemset."""
 
-from typing import Dict, Iterable, Iterator, Tuple
+from typing import Dict, Iterable, Iterator, Sized, Tuple
 
 __all__ = ["ItemSet", "ItemSetDict"]
 
@@ -49,9 +49,6 @@ class ItemSet:
 
     def __init__(self, items: Iterable or Tuple[Iterable]) -> None:
         if isinstance(items, tuple):
-            assert all(
-                items[0].size(0) == item.size(0) for item in items
-            ), "Size mismatch between items in tuple."
             self._items = items
         else:
             self._items = (items,)
@@ -63,6 +60,13 @@ class ItemSet:
         zip_items = zip(*self._items)
         for item in zip_items:
             yield tuple(item)
+
+    def __len__(self) -> int:
+        if isinstance(self._items[0], Sized):
+            return len(self._items[0])
+        raise TypeError(
+            f"{type(self).__name__} instance doesn't have valid length."
+        )
 
 
 class ItemSetDict:
@@ -128,3 +132,6 @@ class ItemSetDict:
         for key, itemset in self._itemsets.items():
             for item in itemset:
                 yield {key: item}
+
+    def __len__(self) -> int:
+        return sum(len(itemset) for itemset in self._itemsets.values())
