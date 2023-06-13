@@ -945,8 +945,8 @@ class HeteroPGExplainer(PGExplainer):
         self.elayers = self.elayers.to(graph.device)
 
         embed = self.model(graph, feat, embed=True, **kwargs)
-        for ntype, emb in embed.items():
-            graph.nodes[ntype].data["emb"] = emb.data
+        for nty, emb in embed.items():
+            graph.nodes[nty].data["emb"] = emb.data
         homo_graph = to_homogeneous(graph, ndata=["emb"])
         homo_embed = homo_graph.ndata["emb"]
 
