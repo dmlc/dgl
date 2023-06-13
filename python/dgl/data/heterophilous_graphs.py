@@ -115,7 +115,7 @@ class RomanEmpireDataset(HeterophilousGraphDataset):
     Statistics:
 
     - Nodes: 22662
-    - Edges: 32927
+    - Edges: 65854
     - Classes: 18
     - Node features: 300
     - 10 train/val/test splits
@@ -182,7 +182,7 @@ class AmazonRatingsDataset(HeterophilousGraphDataset):
     Statistics:
 
     - Nodes: 24492
-    - Edges: 93050
+    - Edges: 186100
     - Classes: 5
     - Node features: 300
     - 10 train/val/test splits
@@ -250,7 +250,7 @@ class MinesweeperDataset(HeterophilousGraphDataset):
     Statistics:
 
     - Nodes: 10000
-    - Edges: 39402
+    - Edges: 78804
     - Classes: 2
     - Node features: 7
     - 10 train/val/test splits
@@ -316,7 +316,7 @@ class TolokersDataset(HeterophilousGraphDataset):
     Statistics:
 
     - Nodes: 11758
-    - Edges: 519000
+    - Edges: 1038000
     - Classes: 2
     - Node features: 10
     - 10 train/val/test splits
@@ -383,7 +383,7 @@ class QuestionsDataset(HeterophilousGraphDataset):
     Statistics:
 
     - Nodes: 48921
-    - Edges: 153540
+    - Edges: 307080
     - Classes: 2
     - Node features: 301
     - 10 train/val/test splits
