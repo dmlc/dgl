@@ -93,8 +93,8 @@ if __name__ == "__main__":
     print(f"Training with DGL built-in GraphSage module")
 
     #####################################################################
-    # (HIGHLIGHT) This is a node classification task in which we read in 
-    # the whole graph and train it on device. AddSelfLoop() will add 
+    # (HIGHLIGHT) This is a node classification task in which we read in
+    # the whole graph and train it on device. AddSelfLoop() will add
     # self-loops for each of the node.
     #####################################################################
 
