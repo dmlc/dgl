@@ -1537,13 +1537,9 @@ HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
   // If the intersection of formats and created_formats is not empty.
   // The format(s) in the intersection will be retained.
   if (intersection != 0) {
-    COOPtr coo_ptr = nullptr;
-    CSRPtr in_csr_ptr = nullptr;
-    CSRPtr out_csr_ptr = nullptr;
-
-    if (COO_CODE & intersection) coo_ptr = GetCOO(false);
-    if (CSC_CODE & intersection) in_csr_ptr = GetInCSR(false);
-    if (CSR_CODE & intersection) out_csr_ptr = GetOutCSR(false);
+    COOPtr coo_ptr = COO_CODE & intersection ? GetCOO(false) : nullptr;
+    CSRPtr in_csr_ptr = CSC_CODE & intersection ? GetInCSR(false) : nullptr;
+    CSRPtr out_csr_ptr = CSR_CODE & intersection ? GetOutCSR(false) : nullptr;
 
     return HeteroGraphPtr(
         new UnitGraph(meta_graph_, in_csr_ptr, out_csr_ptr, coo_ptr, formats));
