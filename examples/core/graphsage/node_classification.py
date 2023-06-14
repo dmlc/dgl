@@ -39,7 +39,7 @@ class SAGE(nn.Module):
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, graph, x):
-        hidden_x = self.dropout(x)
+        hidden_x = x
         for layer_idx, layer in enumerate(self.layers):
             hidden_x = layer(graph, hidden_x)
             is_last_layer = layer_idx == len(self.layers) - 1
