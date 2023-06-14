@@ -737,3 +737,78 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
                 assert g.get_etype_id(edge_type) == type_id
             assert new_g.node_type_offset is None
             assert th.equal(orig_g.edata[dgl.ETYPE], new_g.type_per_edge)
+
+
+def test_not_sorted_node_edge_map():
+    # Partition configure file which includes not sorted node/edge map.
+    part_config_str = """
+{
+    "edge_map": {
+        "item:likes-rev:user": [
+            [
+                0,
+                10000
+            ]
+        ],
+        "user:follows-rev:user": [
+            [
+                20000,
+                30000
+            ]
+        ],
+        "user:follows:user": [
+            [
+                10000,
+                20000
+            ]
+        ],
+        "user:likes:item": [
+            [
+                30000,
+                40000
+            ]
+        ]
+    },
+    "etypes": {
+        "item:likes-rev:user": 0,
+        "user:follows-rev:user": 2,
+        "user:follows:user": 1,
+        "user:likes:item": 3
+    },
+    "graph_name": "test_graph",
+    "halo_hops": 1,
+    "node_map": {
+    "user": [
+            [
+                10000,
+                30000
+            ]
+        ],
+        "item": [
+            [
+                0,
+                10000
+            ]
+        ]
+    },
+    "ntypes": {
+        "user": 1,
+        "item": 0
+    },
+    "num_edges": 40000,
+    "num_nodes": 30000,
+    "num_parts": 1,
+    "part-0": {
+        "edge_feats": "part0/edge_feat.dgl",
+        "node_feats": "part0/node_feat.dgl",
+        "part_graph": "part0/graph.dgl"
+    },
+    "part_method": "metis"
+}
+    """
+    with tempfile.TemporaryDirectory() as test_dir:
+        part_config = os.path.join(test_dir, "test_graph.json")
+        print(part_config)
+        with open(part_config, "w") as file:
+            file.write(part_config_str)
+        load_partition_book(part_config, 0)
