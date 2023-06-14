@@ -6,8 +6,7 @@ Paper: [Inductive Representation Learning on Large Graphs]
 (https://arxiv.org/abs/1706.02216)
 
 If you want a deeper understanding of node classification. You can
-read the example in the `examples/pytorch/graphsage/node_classification.py`
-TODO(#5797): Move `graphsage/node_classification.py` to the `examples/core/`.
+read the example in the `examples/core/graphsage/node_classification.py`
 
 This flowchart describes the main functional sequence of the provided example.
 main
