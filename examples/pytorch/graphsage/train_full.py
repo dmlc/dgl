@@ -1,23 +1,3 @@
-"""
-This script trains and tests a GraphSAGE model based on the information of 
-a full graph.
-
-This flowchart describes the main functional sequence of the provided example.
-main
-│
-├───> Load and preprocess full dataset
-│
-├───> Instantiate SAGE model
-│
-├───> train
-│     │
-│     └───> Training loop
-│           │
-│           └───> SAGE.forward
-└───> test
-      │
-      └───> Evaluate the model
-"""
 import argparse
 
 import dgl.nn as dglnn
@@ -91,12 +71,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     print(f"Training with DGL built-in GraphSage module")
-
-    #####################################################################
-    # (HIGHLIGHT) This is a node classification task in which we read in
-    # the whole graph and train it on device. AddSelfLoop() will add
-    # self-loops for each of the node.
-    #####################################################################
 
     # load and preprocess dataset
     transform = (
