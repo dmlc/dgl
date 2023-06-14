@@ -92,15 +92,20 @@ if __name__ == "__main__":
     print(f"Training with DGL built-in GraphSage module")
 
     #####################################################################
-    # (HIGHLIGHT) This is a node classification task in which we read in
-    # the whole graph and train it on device. AddSelfLoop() will add
-    # self-loops for each of the node.
+    # (HIGHLIGHT) Node classification task is a supervise learning task
+    # in which the model try to predict the label of a certain node.
+    # In this example, graph sage algorithm is applied to this task.
+    # A good accuracy can be achieved after a few steps of training.
+    # 
+    # First, the whole graph is loaded and transformed. Then the training
+    # process is performed on a model which is composed of 2 GraphSAGE-gcn
+    # layer. Finally, the performance of the model is evaluated on test set.
     #####################################################################
 
-    # load and preprocess dataset
+    # Load and preprocess dataset.
     transform = (
         AddSelfLoop()
-    )  # by default, it will first remove self-loops to prevent duplication
+    )  # By default, it will first remove self-loops to prevent duplication.
     if args.dataset == "cora":
         data = CoraGraphDataset(transform=transform)
     elif args.dataset == "citeseer":
@@ -108,13 +113,13 @@ if __name__ == "__main__":
     elif args.dataset == "pubmed":
         data = PubmedGraphDataset(transform=transform)
     else:
-        raise ValueError("Unknown dataset: {}".format(args.dataset))
+        raise ValueError(f"Unknown dataset: {args.dataset}")
     g = data[0]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     g = g.int().to(device)
     features = g.ndata["feat"]
     labels = g.ndata["label"]
-    masks = g.ndata["train_mask"], g.ndata["val_mask"]
+    masks = (g.ndata["train_mask"], g.ndata["val_mask"])
 
     # Create GraphSAGE model.
     in_size = features.shape[1]
