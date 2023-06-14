@@ -96,7 +96,7 @@ if __name__ == "__main__":
     # in which the model try to predict the label of a certain node.
     # In this example, graph sage algorithm is applied to this task.
     # A good accuracy can be achieved after a few steps of training.
-    # 
+    #
     # First, the whole graph is loaded and transformed. Then the training
     # process is performed on a model which is composed of 2 GraphSAGE-gcn
     # layer. Finally, the performance of the model is evaluated on test set.
