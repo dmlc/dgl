@@ -33,9 +33,16 @@ class HeterophilousGraphDataset(DGLBuiltinDataset):
         transformed before every access.
     """
 
-    def __init__(self, name, raw_dir=None, force_reload=False, verbose=True, transform=None):
-        name = name.lower().replace('-', '_')
-        url = f'https://github.com/yandex-research/heterophilous-graphs/raw/main/data/{name}.npz'
+    def __init__(
+        self,
+        name,
+        raw_dir=None,
+        force_reload=False,
+        verbose=True,
+        transform=None,
+    ):
+        name = name.lower().replace("-", "_")
+        url = f"https://github.com/yandex-research/heterophilous-graphs/raw/main/data/{name}.npz"
         super(HeterophilousGraphDataset, self).__init__(
             name=name,
             url=url,
@@ -46,7 +53,9 @@ class HeterophilousGraphDataset(DGLBuiltinDataset):
         )
 
     def download(self):
-        download(url=self.url, path=os.path.join(self.raw_path, f'{self.name}.npz'))
+        download(
+            url=self.url, path=os.path.join(self.raw_path, f"{self.name}.npz")
+        )
 
     def process(self):
         """Load and process the data."""
@@ -57,14 +66,14 @@ class HeterophilousGraphDataset(DGLBuiltinDataset):
                 "This dataset requires PyTorch to be the backend."
             )
 
-        data = np.load(os.path.join(self.raw_path, f'{self.name}.npz'))
-        src = torch.from_numpy(data['edges'][:, 0])
-        dst = torch.from_numpy(data['edges'][:, 1])
-        features = torch.from_numpy(data['node_features'])
-        labels = torch.from_numpy(data['node_labels'])
-        train_masks = torch.from_numpy(data['train_masks'].T)
-        val_masks = torch.from_numpy(data['val_masks'].T)
-        test_masks = torch.from_numpy(data['test_masks'].T)
+        data = np.load(os.path.join(self.raw_path, f"{self.name}.npz"))
+        src = torch.from_numpy(data["edges"][:, 0])
+        dst = torch.from_numpy(data["edges"][:, 1])
+        features = torch.from_numpy(data["node_features"])
+        labels = torch.from_numpy(data["node_labels"])
+        train_masks = torch.from_numpy(data["train_masks"].T)
+        val_masks = torch.from_numpy(data["val_masks"].T)
+        test_masks = torch.from_numpy(data["test_masks"].T)
         num_nodes = len(labels)
         num_classes = len(labels.unique())
 
@@ -159,7 +168,9 @@ class RomanEmpireDataset(HeterophilousGraphDataset):
     >>> label = g.ndata['label']
     """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True, transform=None):
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
         super(RomanEmpireDataset, self).__init__(
             name="roman-empire",
             raw_dir=raw_dir,
@@ -226,7 +237,9 @@ class AmazonRatingsDataset(HeterophilousGraphDataset):
     >>> label = g.ndata['label']
     """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True, transform=None):
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
         super(AmazonRatingsDataset, self).__init__(
             name="amazon-ratings",
             raw_dir=raw_dir,
@@ -294,7 +307,9 @@ class MinesweeperDataset(HeterophilousGraphDataset):
     >>> label = g.ndata['label']
     """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True, transform=None):
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
         super(MinesweeperDataset, self).__init__(
             name="minesweeper",
             raw_dir=raw_dir,
@@ -360,7 +375,9 @@ class TolokersDataset(HeterophilousGraphDataset):
     >>> label = g.ndata['label']
     """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True, transform=None):
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
         super(TolokersDataset, self).__init__(
             name="tolokers",
             raw_dir=raw_dir,
@@ -427,7 +444,9 @@ class QuestionsDataset(HeterophilousGraphDataset):
     >>> label = g.ndata['label']
     """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=True, transform=None):
+    def __init__(
+        self, raw_dir=None, force_reload=False, verbose=True, transform=None
+    ):
         super(QuestionsDataset, self).__init__(
             name="questions",
             raw_dir=raw_dir,

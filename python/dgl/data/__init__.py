@@ -61,18 +61,18 @@ from .geom_gcn import (
     TexasDataset,
     WisconsinDataset,
 )
+
+from .heterophilous_graphs import (
+    AmazonRatingsDataset,
+    MinesweeperDataset,
+    QuestionsDataset,
+    RomanEmpireDataset,
+    TolokersDataset,
+)
 from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
 from .zinc import ZINCDataset
-
-from .heterophilous_graphs import (
-    RomanEmpireDataset,
-    AmazonRatingsDataset,
-    MinesweeperDataset,
-    TolokersDataset,
-    QuestionsDataset
-)
 
 
 def register_data_args(parser):

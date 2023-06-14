@@ -10,7 +10,8 @@ import dgl
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(
-    dgl.backend.backend_name != "pytorch", reason="Only supports PyTorch backend."
+    dgl.backend.backend_name != "pytorch",
+    reason="Only supports PyTorch backend.",
 )
 def test_roman_empire():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
@@ -27,7 +28,8 @@ def test_roman_empire():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(
-    dgl.backend.backend_name != "pytorch", reason="Only supports PyTorch backend."
+    dgl.backend.backend_name != "pytorch",
+    reason="Only supports PyTorch backend.",
 )
 def test_amazon_ratings():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
@@ -35,7 +37,9 @@ def test_amazon_ratings():
     g = dgl.data.AmazonRatingsDataset(force_reload=True)[0]
     assert g.num_nodes() == 24492
     assert g.num_edges() == 186100
-    g2 = dgl.data.AmazonRatingsDataset(force_reload=True, transform=transform)[0]
+    g2 = dgl.data.AmazonRatingsDataset(force_reload=True, transform=transform)[
+        0
+    ]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 
@@ -44,7 +48,8 @@ def test_amazon_ratings():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(
-    dgl.backend.backend_name != "pytorch", reason="Only supports PyTorch backend."
+    dgl.backend.backend_name != "pytorch",
+    reason="Only supports PyTorch backend.",
 )
 def test_minesweeper():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
@@ -61,7 +66,8 @@ def test_minesweeper():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(
-    dgl.backend.backend_name != "pytorch", reason="Only supports PyTorch backend."
+    dgl.backend.backend_name != "pytorch",
+    reason="Only supports PyTorch backend.",
 )
 def test_tolokers():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
@@ -78,7 +84,8 @@ def test_tolokers():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(
-    dgl.backend.backend_name != "pytorch", reason="Only supports PyTorch backend."
+    dgl.backend.backend_name != "pytorch",
+    reason="Only supports PyTorch backend.",
 )
 def test_questions():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
