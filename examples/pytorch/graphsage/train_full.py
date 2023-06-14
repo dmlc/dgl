@@ -104,4 +104,3 @@ if __name__ == "__main__":
     print("Testing...")
     acc = evaluate(g, features, labels, g.ndata["test_mask"], model)
     print("Test accuracy {:.4f}".format(acc))
-    
