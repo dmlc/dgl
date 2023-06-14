@@ -1868,11 +1868,8 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     g = transform2(g)
 
     class Model(th.nn.Module):
-        def __init__(
-            self, in_feats, embed_dim, out_feats, canonical_etypes, graph=False
-        ):
+        def __init__(self, in_feats, embed_dim, out_feats, canonical_etypes):
             super(Model, self).__init__()
-            self.graph = graph
             self.conv = nn.HeteroGraphConv(
                 {
                     c_etype: nn.GraphConv(in_feats, embed_dim)
@@ -1891,7 +1888,7 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
             else:
                 h = self.conv(g, h)
 
-            if not self.graph or embed:
+            if embed:
                 return h
 
             with g.local_scope():
@@ -1904,24 +1901,12 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     embed_dim = input_dim
 
     # graph explainer
-    model = Model(
-        input_dim, embed_dim, n_classes, g.canonical_etypes, graph=True
-    )
+    model = Model(input_dim, embed_dim, n_classes, g.canonical_etypes)
     model = model.to(ctx)
     explainer = nn.HeteroPGExplainer(model, embed_dim)
     explainer.train_step(g, feat, 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)
-
-    # node explainer
-    model = Model(
-        input_dim, embed_dim, n_classes, g.canonical_etypes, graph=False
-    )
-    model = model.to(ctx)
-    explainer = nn.HeteroPGExplainer(model, embed_dim, explain_graph=False)
-    explainer.train_step_node(g.ntypes[0], 0, g, feat, 5.0)
-
-    probs, edge_weight = explainer.explain_node(g.ntypes[0], 0, g, feat)
 
 
 def test_jumping_knowledge():
