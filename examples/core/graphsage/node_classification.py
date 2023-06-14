@@ -30,22 +30,23 @@ from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 
 class SAGE(nn.Module):
-    def __init__(self, in_size, hid_size, out_size):
+    def __init__(self, in_size, hidden_size, out_size):
         super().__init__()
         self.layers = nn.ModuleList()
-        # two-layer GraphSAGE-mean
-        self.layers.append(dglnn.SAGEConv(in_size, hid_size, "gcn"))
-        self.layers.append(dglnn.SAGEConv(hid_size, out_size, "gcn"))
+        # Two-layer GraphSAGE-gcn.
+        self.layers.append(dglnn.SAGEConv(in_size, hidden_size, "gcn"))
+        self.layers.append(dglnn.SAGEConv(hidden_size, out_size, "gcn"))
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, graph, x):
-        h = self.dropout(x)
-        for l, layer in enumerate(self.layers):
-            h = layer(graph, h)
-            if l != len(self.layers) - 1:
-                h = F.relu(h)
-                h = self.dropout(h)
-        return h
+        hidden_x = self.dropout(x)
+        for layer_idx, layer in enumerate(self.layers):
+            hidden_x = layer(graph, hidden_x)
+            is_last_layer = layer_idx == len(self.layers) - 1
+            if not is_last_layer:
+                hidden_x = F.relu(hidden_x)
+                hidden_x = self.dropout(hidden_x)
+        return hidden_x
 
 
 def evaluate(g, features, labels, mask, model):
@@ -60,12 +61,12 @@ def evaluate(g, features, labels, mask, model):
 
 
 def train(g, features, labels, masks, model):
-    # define train/val samples, loss function and optimizer
+    # Define train/val samples, loss function and optimizer.
     train_mask, val_mask = masks
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
-    # training loop
+    # Training loop.
     for epoch in range(200):
         model.train()
         logits = model(g, features)
@@ -75,9 +76,7 @@ def train(g, features, labels, masks, model):
         optimizer.step()
         acc = evaluate(g, features, labels, val_mask, model)
         print(
-            "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(
-                epoch, loss.item(), acc
-            )
+            f"Epoch {epoch:05d} | Loss {loss.item():.4f} | Accuracy {acc:.4f} "
         )
 
 
@@ -117,16 +116,16 @@ if __name__ == "__main__":
     labels = g.ndata["label"]
     masks = g.ndata["train_mask"], g.ndata["val_mask"]
 
-    # create GraphSAGE model
+    # Create GraphSAGE model.
     in_size = features.shape[1]
     out_size = data.num_classes
     model = SAGE(in_size, 16, out_size).to(device)
 
-    # model training
+    # Model training.
     print("Training...")
     train(g, features, labels, masks, model)
 
-    # test the model
+    # Test the model.
     print("Testing...")
     acc = evaluate(g, features, labels, g.ndata["test_mask"], model)
-    print("Test accuracy {:.4f}".format(acc))
+    print(f"Test accuracy {acc:.4f}")
