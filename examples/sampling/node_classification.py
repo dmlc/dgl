@@ -5,8 +5,12 @@ large graphs using efficient neighbor sampling.
 Paper: [Inductive Representation Learning on Large Graphs]
 (https://arxiv.org/abs/1706.02216)
 
-If you want a deeper understanding of node classification. You can
-read the example in the `examples/core/graphsage/node_classification.py`
+Before reading this example, please familiar yourself with graphsage node
+classification by reading the example in the
+`examples/core/graphsage/node_classification.py`
+
+If you want to train graphsage on a large graph in a distributed fashion, read
+the example in the `examples/distributed/graphsage/`.
 
 This flowchart describes the main functional sequence of the provided example.
 main
