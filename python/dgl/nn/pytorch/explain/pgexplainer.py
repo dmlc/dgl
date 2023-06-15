@@ -222,7 +222,7 @@ class PGExplainer(nn.Module):
         """
         assert (
             self.graph_explanation
-        ), '"graph_explanation" must be True to call this method.'
+        ), '"explain_graph" must be True in initializing the module.'
 
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
@@ -261,7 +261,7 @@ class PGExplainer(nn.Module):
         """
         assert (
             not self.graph_explanation
-        ), '"graph_explanation" must be False to call this method.'
+        ), '"explain_graph" must be False in initializing the module.'
 
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
@@ -375,7 +375,7 @@ class PGExplainer(nn.Module):
         """
         assert (
             self.graph_explanation
-        ), '"graph_explanation" must be True to call this method.'
+        ), '"explain_graph" must be True in initializing the module.'
 
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
@@ -502,7 +502,7 @@ class PGExplainer(nn.Module):
         """
         assert (
             not self.graph_explanation
-        ), '"graph_explanation" must be False to call this method.'
+        ), '"explain_graph" must be False in initializing the module.'
 
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
