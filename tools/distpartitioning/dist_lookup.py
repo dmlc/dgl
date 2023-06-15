@@ -64,7 +64,7 @@ class DistLookupService:
         for ntype in ntype_names:
 
             filename = f"{ntype}.txt"
-            logging.info(
+            logging.debug(
                 f"[Rank: {rank}] Reading file: {os.path.join(input_dir, filename)}"
             )
 
@@ -109,7 +109,7 @@ class DistLookupService:
             # Explicitly release the array read from the file.
             del ntype_partids
 
-        logging.info(
+        logging.debug(
             f"[Rank: {rank}] ntypeid begin - {type_nid_begin} - {type_nid_end}"
         )
 
@@ -168,7 +168,7 @@ class DistLookupService:
         max_count = np.amax(all_sizes)
 
         if max_count <= 0:
-            logging.info(
+            logging.debug(
                 f"[Rank: {self.rank}] No process has global_nids to process !!!"
             )
             return
@@ -177,7 +177,7 @@ class DistLookupService:
         LOCAL_CHUNK_SIZE = np.ceil(local_rows / num_splits).astype(np.int64)
         agg_partition_ids = []
 
-        logging.info(
+        logging.debug(
             f"[Rank: {self.rank}] BatchSize: {CHUNK_SIZE}, \
                             max_count: {max_count}, \
                             splits: {num_splits}, \

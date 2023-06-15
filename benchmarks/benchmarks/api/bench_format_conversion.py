@@ -9,7 +9,9 @@ from .. import utils
 
 
 @utils.benchmark("time", timeout=600)
-@utils.parametrize_cpu("graph_name", ["cora", "livejournal", "friendster"])
+@utils.parametrize_cpu(
+    "graph_name", ["cora", "pubmed", "ogbn-arxiv", "livejournal", "friendster"]
+)
 @utils.parametrize_gpu("graph_name", ["cora", "livejournal"])
 @utils.parametrize(
     "format",
@@ -27,6 +29,10 @@ def track_time(graph_name, format):
     device = utils.get_bench_device()
     graph = utils.get_graph(graph_name, from_format)
     graph = graph.to(device)
+    if format == ("coo", "csr") and graph_name == "friendster":
+        # Mark graph as sorted to check performance for COO matrix marked as
+        # sorted. Note that friendster dataset is already sorted.
+        graph = dgl.graph(graph.edges(), row_sorted=True)
     graph = graph.formats([from_format])
     # dry run
     graph.formats([to_format])

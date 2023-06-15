@@ -12,9 +12,10 @@ pydantic
 pytest
 pyyaml
 rdflib
-requests[security]
+requests[security]==2.28
 scikit-learn
 scipy
 torch==1.12.0+cu102
+torchdata
 torchmetrics
 tqdm

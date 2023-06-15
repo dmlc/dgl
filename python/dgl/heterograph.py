@@ -6066,13 +6066,19 @@ class DGLGraph(object):
         self._edge_frames = old_eframes
 
     def formats(self, formats=None):
-        r"""Get a cloned graph with the specified sparse format(s) or query
-        for the usage status of sparse formats
+        r"""Get a cloned graph with the specified allowed sparse format(s) or
+        query for the usage status of sparse formats.
 
         The API copies both the graph structure and the features.
 
         If the input graph has multiple edge types, they will have the same
         sparse format.
+
+        When ``formats`` is not None, if the intersection between `formats` and
+        the current graph's created sparse format(s) is not empty, the returned
+        cloned graph only retains all sparse format(s) in the intersection. If
+        the intersection is empty, a sparse format will be selected to be
+        created following the order of ``'coo' -> 'csr' -> 'csc'``.
 
         Parameters
         ----------
@@ -6089,7 +6095,8 @@ class DGLGraph(object):
             * If formats is None, the result will be a dict recording the usage
               status of sparse formats.
             * Otherwise, a DGLGraph will be returned, which is a clone of the
-              original graph with the specified sparse format(s) ``formats``.
+              original graph with the specified allowed sparse format(s)
+              ``formats``.
 
         Examples
         --------
@@ -6103,15 +6110,15 @@ class DGLGraph(object):
 
         >>> g = dgl.graph(([0, 0, 1], [2, 3, 2]))
         >>> g.ndata['h'] = torch.ones(4, 1)
-        >>> # Check status of format usage
+        >>> # Check status of format usage.
         >>> g.formats()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
-        >>> # Get a clone of the graph with 'csr' format
+        >>> # Get a clone of the graph with 'csr' format.
         >>> csr_g = g.formats('csr')
-        >>> # Only allowed formats will be displayed in the status query
+        >>> # Only allowed formats will be displayed in the status query.
         >>> csr_g.formats()
         {'created': ['csr'], 'not created': []}
-        >>> # Features are copied as well
+        >>> # Features are copied as well.
         >>> csr_g.ndata['h']
         tensor([[1.],
                 [1.],
@@ -6128,17 +6135,43 @@ class DGLGraph(object):
         ...     })
         >>> g.formats()
         {'created': ['coo'], 'not created': ['csr', 'csc']}
-        >>> # Get a clone of the graph with 'csr' format
+        >>> # Get a clone of the graph with 'csr' format.
         >>> csr_g = g.formats('csr')
-        >>> # Only allowed formats will be displayed in the status query
+        >>> # Only allowed formats will be displayed in the status query.
         >>> csr_g.formats()
         {'created': ['csr'], 'not created': []}
+
+        **When formats intersects with created formats**
+
+        >>> g = dgl.graph(([0, 0, 1], [2, 3, 2]))
+        >>> g = g.formats(['coo', 'csr'])
+        >>> g.create_formats_()
+        >>> g.formats()
+        {'created': ['coo', 'csr'], 'not created': []}
+        >>> # Get a clone of the graph allowed formats 'csr' and 'csc'.
+        >>> csr_csc_g = g.formats(['csr', 'csc'])
+        >>> # Only the intersection 'csr' will be retained.
+        >>> csr_csc_g.formats()
+        {'created': ['csr'], 'not created': ['csc']}
+
+        **When formats doesn't intersect with created formats**
+
+        >>> g = dgl.graph(([0, 0, 1], [2, 3, 2]))
+        >>> g = g.formats('coo')
+        >>> g.formats()
+        {'created': ['coo'], 'not created': []}
+        >>> # Get a clone of the graph allowed formats 'csr' and 'csc'.
+        >>> csr_csc_g = g.formats(['csr', 'csc'])
+        >>> # Since the intersection is empty, 'csr' will be created as it is
+        >>> # first in the order of 'coo' -> 'csr' -> 'csc'.
+        >>> csr_csc_g.formats()
+        {'created': ['csr'], 'not created': ['csc']}
         """
         if formats is None:
-            # Return the format information
+            # Return the format information.
             return self._graph.formats()
         else:
-            # Convert the graph to use another format
+            # Convert the graph to use another allowed format.
             ret = copy.copy(self)
             ret._graph = self._graph.formats(formats)
             return ret

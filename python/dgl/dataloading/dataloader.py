@@ -24,7 +24,6 @@ from ..batch import batch as batch_graphs
 from ..distributed import DistGraph
 from ..frame import LazyFeature
 from ..heterograph import DGLGraph
-from ..multiprocessing import call_once_and_share
 from ..storages import wrap_storage
 from ..utils import (
     dtype_of,
@@ -34,10 +33,8 @@ from ..utils import (
     recursive_apply,
     recursive_apply_pair,
     set_num_threads,
-    version,
 )
 
-PYTORCH_VER = version.parse(torch.__version__)
 PYTHON_EXIT_STATUS = False
 
 
@@ -87,17 +84,7 @@ class _TensorizedDatasetIter(object):
         # convert the type-ID pairs to dictionary
         type_ids = batch[:, 0]
         indices = batch[:, 1]
-        if PYTORCH_VER >= version.parse("1.10.0"):
-            _, type_ids_sortidx = torch.sort(type_ids, stable=True)
-        else:
-            if not self.shuffle:
-                dgl_warning(
-                    "The current output_nodes are out of order even if set shuffle "
-                    "to False in Dataloader, the reason is that the current version "
-                    "of torch dose not support stable sort. "
-                    "Please update torch to 1.10.0 or higher to fix it."
-                )
-            type_ids_sortidx = torch.argsort(type_ids)
+        _, type_ids_sortidx = torch.sort(type_ids, stable=True)
         type_ids = type_ids[type_ids_sortidx]
         indices = indices[type_ids_sortidx]
         type_id_uniq, type_id_count = torch.unique_consecutive(
@@ -130,6 +117,52 @@ def _get_id_tensor_from_mapping(indices, device, keys):
         id_tensor[offset : offset + length, 0] = i
         id_tensor[offset : offset + length, 1] = index
         offset += length
+    return id_tensor
+
+
+def _split_to_local_id_tensor_from_mapping(
+    indices, keys, local_lower_bound, local_upper_bound
+):
+    dtype = dtype_of(indices)
+    device = next(iter(indices.values())).device
+    num_samples = local_upper_bound - local_lower_bound
+    id_tensor = torch.empty(num_samples, 2, dtype=dtype, device=device)
+
+    index_offset = 0
+    split_id_offset = 0
+    for i, k in enumerate(keys):
+        if k not in indices:
+            continue
+        index = indices[k]
+        length = index.shape[0]
+        index_offset2 = index_offset + length
+        lower = max(local_lower_bound, index_offset)
+        upper = min(local_upper_bound, index_offset2)
+        if upper > lower:
+            split_id_offset2 = split_id_offset + (upper - lower)
+            assert split_id_offset2 <= num_samples
+            id_tensor[split_id_offset:split_id_offset2, 0] = i
+            id_tensor[split_id_offset:split_id_offset2, 1] = index[
+                lower - index_offset : upper - index_offset
+            ]
+            split_id_offset += upper - lower
+            if split_id_offset2 == num_samples:
+                break
+        index_offset = index_offset2
+    return id_tensor
+
+
+def _split_to_local_id_tensor(indices, local_lower_bound, local_upper_bound):
+    dtype = dtype_of(indices)
+    device = indices.device
+    num_samples = local_upper_bound - local_lower_bound
+    id_tensor = torch.empty(num_samples, dtype=dtype, device=device)
+
+    if local_upper_bound > len(indices):
+        remainder = len(indices) - local_lower_bound
+        id_tensor[0:remainder] = indices[local_lower_bound:]
+    else:
+        id_tensor = indices[local_lower_bound:local_upper_bound]
     return id_tensor
 
 
@@ -206,6 +239,16 @@ class TensorizedDataset(torch.utils.data.IterableDataset):
         ) // self.batch_size
 
 
+def _decompose_one_dimension(length, world_size, rank, drop_last):
+    if drop_last:
+        num_samples = math.floor(length / world_size)
+    else:
+        num_samples = math.ceil(length / world_size)
+    sta = rank * num_samples
+    end = (rank + 1) * num_samples
+    return sta, end
+
+
 class DDPTensorizedDataset(torch.utils.data.IterableDataset):
     """Custom Dataset wrapper that returns a minibatch as tensors or dicts of tensors.
     When the dataset is on the GPU, this significantly reduces the overhead.
@@ -229,64 +272,54 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         self.batch_size = batch_size
         self.drop_last = drop_last
         self._shuffle = shuffle
-
-        if self.drop_last and len_indices % self.num_replicas != 0:
-            self.num_samples = math.ceil(
-                (len_indices - self.num_replicas) / self.num_replicas
-            )
-        else:
-            self.num_samples = math.ceil(len_indices / self.num_replicas)
-        self.total_size = self.num_samples * self.num_replicas
-        # If drop_last is True, we create a shared memory array larger than the number
-        # of indices since we will need to pad it after shuffling to make it evenly
-        # divisible before every epoch.  If drop_last is False, we create an array
-        # with the same size as the indices so we can trim it later.
-        self.shared_mem_size = (
-            self.total_size if not self.drop_last else len_indices
+        (
+            self.local_lower_bound,
+            self.local_upper_bound,
+        ) = _decompose_one_dimension(
+            len_indices, self.num_replicas, self.rank, drop_last
         )
-        self.num_indices = len_indices
+        self.num_samples = self.local_upper_bound - self.local_lower_bound
+        self.local_num_indices = self.num_samples
+        if self.local_upper_bound > len_indices:
+            assert not drop_last
+            self.local_num_indices = len_indices - self.local_lower_bound
 
         if isinstance(indices, Mapping):
-            self._device = next(iter(indices.values())).device
-            self._id_tensor = call_once_and_share(
-                lambda: _get_id_tensor_from_mapping(
-                    indices, self._device, self._mapping_keys
-                ),
-                (self.num_indices, 2),
-                dtype_of(indices),
+            self._id_tensor = _split_to_local_id_tensor_from_mapping(
+                indices,
+                self._mapping_keys,
+                self.local_lower_bound,
+                self.local_upper_bound,
             )
         else:
-            self._id_tensor = indices
-            self._device = self._id_tensor.device
-
-        self._indices = call_once_and_share(
-            self._create_shared_indices, (self.shared_mem_size,), torch.int64
+            self._id_tensor = _split_to_local_id_tensor(
+                indices, self.local_lower_bound, self.local_upper_bound
+            )
+        self._device = self._id_tensor.device
+        # padding self._indices when drop_last = False (self._indices always on cpu)
+        self._indices = torch.empty(self.num_samples, dtype=torch.int64)
+        torch.arange(
+            self.local_num_indices, out=self._indices[: self.local_num_indices]
         )
-
-    def _create_shared_indices(self):
-        indices = torch.empty(self.shared_mem_size, dtype=torch.int64)
-        num_ids = self._id_tensor.shape[0]
-        torch.arange(num_ids, out=indices[:num_ids])
-        torch.arange(self.shared_mem_size - num_ids, out=indices[num_ids:])
-        return indices
+        if not drop_last:
+            torch.arange(
+                self.num_samples - self.local_num_indices,
+                out=self._indices[self.local_num_indices :],
+            )
+        assert len(self._id_tensor) == self.num_samples
 
     def shuffle(self):
         """Shuffles the dataset."""
-        # Only rank 0 does the actual shuffling.  The other ranks wait for it.
-        if self.rank == 0:
-            np.random.shuffle(self._indices[: self.num_indices].numpy())
-            if not self.drop_last:
-                # pad extra
-                self._indices[self.num_indices :] = self._indices[
-                    : self.total_size - self.num_indices
-                ]
-        dist.barrier()
+        np.random.shuffle(self._indices[: self.local_num_indices].numpy())
+        if not self.drop_last:
+            # pad extra from local indices
+            self._indices[self.local_num_indices :] = self._indices[
+                : self.num_samples - self.local_num_indices
+            ]
 
     def __iter__(self):
-        start = self.num_samples * self.rank
-        end = self.num_samples * (self.rank + 1)
         indices = _divide_by_worker(
-            self._indices[start:end], self.batch_size, self.drop_last
+            self._indices, self.batch_size, self.drop_last
         )
         id_tensor = self._id_tensor[indices]
         return _TensorizedDatasetIter(

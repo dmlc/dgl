@@ -23,7 +23,6 @@ def generate_graph():
     return g
 
 
-@pytest.mark.skip()
 @pytest.mark.parametrize(",".join(options.keys()), product(*options.values()))
 def test_SAGEConv_equality(idtype_int, max_in_degree, to_block):
     device = "cuda:0"

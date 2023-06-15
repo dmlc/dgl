@@ -26,6 +26,7 @@ Conv Layers
     ~dgl.nn.pytorch.conv.GINConv
     ~dgl.nn.pytorch.conv.GINEConv
     ~dgl.nn.pytorch.conv.GatedGraphConv
+    ~dgl.nn.pytorch.conv.GatedGCNConv
     ~dgl.nn.pytorch.conv.GMMConv
     ~dgl.nn.pytorch.conv.ChebConv
     ~dgl.nn.pytorch.conv.AGNNConv
@@ -128,6 +129,8 @@ Utility Modules
     ~dgl.nn.pytorch.explain.HeteroGNNExplainer
     ~dgl.nn.pytorch.explain.SubgraphX
     ~dgl.nn.pytorch.explain.HeteroSubgraphX
+    ~dgl.nn.pytorch.explain.PGExplainer
+    ~dgl.nn.pytorch.explain.HeteroPGExplainer
     ~dgl.nn.pytorch.utils.LabelPropagation
     ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
     ~dgl.nn.pytorch.utils.LaplacianPosEnc

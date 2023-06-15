@@ -588,6 +588,6 @@ def create_chunked_dataset(
         vector_rows=vector_rows,
         **kwargs,
     )
-    print("Done with creating chunked graph")
+    logging.debug("Done with creating chunked graph")
 
     return g

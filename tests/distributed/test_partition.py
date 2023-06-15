@@ -9,6 +9,7 @@ import pytest
 import torch as th
 from dgl import function as fn
 from dgl.distributed import (
+    convert_dgl_partition_to_csc_sampling_graph,
     load_partition,
     load_partition_book,
     load_partition_feats,
@@ -604,13 +605,13 @@ def test_RangePartitionBook():
     expect_except = False
     try:
         gpb.to_canonical_etype(("node1", "edge2", "node2"))
-    except:
+    except BaseException:
         expect_except = True
     assert expect_except
     expect_except = False
     try:
         gpb.to_canonical_etype("edge2")
-    except:
+    except BaseException:
         expect_except = True
     assert expect_except
 
@@ -645,7 +646,7 @@ def test_RangePartitionBook():
     expect_except = False
     try:
         HeteroDataName(False, "edge1", "feat")
-    except:
+    except BaseException:
         expect_except = True
     assert expect_except
     data_name = HeteroDataName(False, c_etype, "feat")
@@ -674,3 +675,175 @@ def test_UnknownPartitionBook():
         except Exception as e:
             if not isinstance(e, TypeError):
                 raise e
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+def test_convert_dgl_partition_to_csc_sampling_graph_homo(
+    part_method, num_parts
+):
+    with tempfile.TemporaryDirectory() as test_dir:
+        g = create_random_graph(1000)
+        graph_name = "test"
+        partition_graph(
+            g, graph_name, num_parts, test_dir, part_method=part_method
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        convert_dgl_partition_to_csc_sampling_graph(part_config)
+        for part_id in range(num_parts):
+            orig_g = dgl.load_graphs(
+                os.path.join(test_dir, f"part{part_id}/graph.dgl")
+            )[0][0]
+            new_g = dgl.graphbolt.load_csc_sampling_graph(
+                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            )
+            orig_indptr, orig_indices, _ = orig_g.adj().csc()
+            assert th.equal(orig_indptr, new_g.csc_indptr)
+            assert th.equal(orig_indices, new_g.indices)
+            assert new_g.node_type_offset is None
+            assert all(new_g.type_per_edge == 0)
+            for node_type, type_id in new_g.metadata.node_type_to_id.items():
+                assert g.get_ntype_id(node_type) == type_id
+            for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
+                assert g.get_etype_id(edge_type) == type_id
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
+    part_method, num_parts
+):
+    with tempfile.TemporaryDirectory() as test_dir:
+        g = create_random_hetero()
+        graph_name = "test"
+        partition_graph(
+            g, graph_name, num_parts, test_dir, part_method=part_method
+        )
+        part_config = os.path.join(test_dir, f"{graph_name}.json")
+        convert_dgl_partition_to_csc_sampling_graph(part_config)
+        for part_id in range(num_parts):
+            orig_g = dgl.load_graphs(
+                os.path.join(test_dir, f"part{part_id}/graph.dgl")
+            )[0][0]
+            new_g = dgl.graphbolt.load_csc_sampling_graph(
+                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            )
+            orig_indptr, orig_indices, _ = orig_g.adj().csc()
+            assert th.equal(orig_indptr, new_g.csc_indptr)
+            assert th.equal(orig_indices, new_g.indices)
+            for node_type, type_id in new_g.metadata.node_type_to_id.items():
+                assert g.get_ntype_id(node_type) == type_id
+            for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
+                assert g.get_etype_id(edge_type) == type_id
+            assert new_g.node_type_offset is None
+            assert th.equal(orig_g.edata[dgl.ETYPE], new_g.type_per_edge)
+
+
+def test_not_sorted_node_edge_map():
+    # Partition configure file which includes not sorted node/edge map.
+    part_config_str = """
+{
+    "edge_map": {
+        "item:likes-rev:user": [
+            [
+                0,
+                100
+            ],
+            [
+                1000,
+                1500
+            ]
+        ],
+        "user:follows-rev:user": [
+            [
+                300,
+                600
+            ],
+            [
+                2100,
+                2800
+            ]
+        ],
+        "user:follows:user": [
+            [
+                100,
+                300
+            ],
+            [
+                1500,
+                2100
+            ]
+        ],
+        "user:likes:item": [
+            [
+                600,
+                1000
+            ],
+            [
+                2800,
+                3600
+            ]
+        ]
+    },
+    "etypes": {
+        "item:likes-rev:user": 0,
+        "user:follows-rev:user": 2,
+        "user:follows:user": 1,
+        "user:likes:item": 3
+    },
+    "graph_name": "test_graph",
+    "halo_hops": 1,
+    "node_map": {
+        "user": [
+            [
+                100,
+                300
+            ],
+            [
+                600,
+                1000
+            ]
+        ],
+        "item": [
+            [
+                0,
+                100
+            ],
+            [
+                300,
+                600
+            ]
+        ]
+    },
+    "ntypes": {
+        "user": 1,
+        "item": 0
+    },
+    "num_edges": 3600,
+    "num_nodes": 1000,
+    "num_parts": 2,
+    "part-0": {
+        "edge_feats": "part0/edge_feat.dgl",
+        "node_feats": "part0/node_feat.dgl",
+        "part_graph": "part0/graph.dgl"
+    },
+    "part-1": {
+        "edge_feats": "part1/edge_feat.dgl",
+        "node_feats": "part1/node_feat.dgl",
+        "part_graph": "part1/graph.dgl"
+    },
+    "part_method": "metis"
+}
+    """
+    with tempfile.TemporaryDirectory() as test_dir:
+        part_config = os.path.join(test_dir, "test_graph.json")
+        with open(part_config, "w") as file:
+            file.write(part_config_str)
+        # Part 0.
+        gpb, _, _, _ = load_partition_book(part_config, 0)
+        assert gpb.local_ntype_offset == [0, 100, 300]
+        assert gpb.local_etype_offset == [0, 100, 300, 600, 1000]
+        # Patr 1.
+        gpb, _, _, _ = load_partition_book(part_config, 1)
+        assert gpb.local_ntype_offset == [0, 300, 700]
+        assert gpb.local_etype_offset == [0, 500, 1100, 1800, 2600]

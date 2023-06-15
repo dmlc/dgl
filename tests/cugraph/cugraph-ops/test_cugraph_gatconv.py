@@ -24,7 +24,6 @@ def generate_graph():
     return g
 
 
-@pytest.mark.skip()
 @pytest.mark.parametrize(",".join(options.keys()), product(*options.values()))
 def test_gatconv_equality(idtype_int, max_in_degree, num_heads, to_block):
     device = "cuda:0"

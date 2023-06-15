@@ -3,14 +3,16 @@ import socket
 import time
 from contextlib import contextmanager
 
+import dgl
+import dgl.nn.pytorch as dglnn
+
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
-import dgl
-import dgl.nn.pytorch as dglnn
+
 
 def load_subtensor(g, seeds, input_nodes, device, load_feat=True):
     """
@@ -83,9 +85,7 @@ class DistSAGE(nn.Module):
                     "h_last",
                     persistent=True,
                 )
-            print(
-                f"|V|={g.num_nodes()}, eval batch size: {batch_size}"
-            )
+            print(f"|V|={g.num_nodes()}, eval batch size: {batch_size}")
 
             sampler = dgl.dataloading.NeighborSampler([-1])
             dataloader = dgl.dataloading.DistNodeDataLoader(
@@ -249,7 +249,7 @@ def run(args, device, data):
                             acc.item(),
                             np.mean(iter_tput[3:]),
                             gpu_mem_alloc,
-                            np.sum(step_time[-args.log_every:]),
+                            np.sum(step_time[-args.log_every :]),
                         )
                     )
                 start = time.time()
@@ -284,8 +284,7 @@ def run(args, device, data):
                 device,
             )
             print(
-                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format
-                (
+                "Part {}, Val Acc {:.4f}, Test Acc {:.4f}, time: {:.4f}".format(
                     g.rank(), val_acc, test_acc, time.time() - start
                 )
             )
@@ -293,15 +292,12 @@ def run(args, device, data):
 
 def main(args):
     print(socket.gethostname(), "Initializing DGL dist")
-    dgl.distributed.initialize(args.ip_config, net_type=args.net_type)
+    dgl.distributed.initialize(args.ip_config)
     if not args.standalone:
         print(socket.gethostname(), "Initializing DGL process group")
         th.distributed.init_process_group(backend=args.backend)
     print(socket.gethostname(), "Initializing DistGraph")
-    g = dgl.distributed.DistGraph(
-            args.graph_name,
-            part_config=args.part_config
-        )
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
     print(socket.gethostname(), "rank:", g.rank())
 
     pb = g.get_partition_book()
@@ -413,13 +409,7 @@ if __name__ == "__main__":
         default=False,
         action="store_true",
         help="Pad train nid to the same length across machine, to ensure num "
-             "of batches to be the same.",
-    )
-    parser.add_argument(
-        "--net_type",
-        type=str,
-        default="socket",
-        help="backend net type, 'socket' or 'tensorpipe'",
+        "of batches to be the same.",
     )
     args = parser.parse_args()
 

@@ -1,6 +1,7 @@
 """Functions for partitions. """
 
 import json
+import logging
 import os
 import time
 
@@ -23,6 +24,7 @@ from .graph_partition_book import (
     _etype_tuple_to_str,
     RangePartitionBook,
 )
+
 
 RESERVED_FIELD_DTYPE = {
     "inner_node": F.uint8,  # A flag indicates whether the node is inside a partition.
@@ -72,7 +74,7 @@ def _dump_part_config(part_config, part_metadata):
     """Format and dump part config."""
     part_metadata = _format_part_metadata(part_metadata, _etype_tuple_to_str)
     with open(part_config, "w") as outfile:
-        json.dump(part_metadata, outfile, sort_keys=True, indent=4)
+        json.dump(part_metadata, outfile, sort_keys=False, indent=4)
 
 
 def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
@@ -191,13 +193,15 @@ def load_partition(part_config, part_id, load_feats=True):
         "part_graph" in part_files
     ), "the partition does not contain graph structure."
     partition_path = relative_to_config(part_files["part_graph"])
-    print(
-        f"Start to load partition from {partition_path} which is "
-        f"{os.path.getsize(partition_path)} bytes. It may take non-trivial "
-        "time for large partition."
+    logging.info(
+        "Start to load partition from %s which is "
+        "%d bytes. It may take non-trivial "
+        "time for large partition.",
+        partition_path,
+        os.path.getsize(partition_path),
     )
     graph = load_graphs(partition_path)[0][0]
-    print("Finished loading partition.")
+    logging.info("Finished loading partition.")
 
     assert (
         NID in graph.ndata
@@ -302,21 +306,23 @@ def load_partition_feats(
     node_feats = None
     if load_nodes:
         feat_path = relative_to_config(part_files["node_feats"])
-        print(
-            f"Start to load node data from {feat_path} which is "
-            f"{os.path.getsize(feat_path)} bytes."
+        logging.debug(
+            "Start to load node data from %s which is " "%d bytes.",
+            feat_path,
+            os.path.getsize(feat_path),
         )
         node_feats = load_tensors(feat_path)
-        print("Finished loading node data.")
+        logging.info("Finished loading node data.")
     edge_feats = None
     if load_edges:
         feat_path = relative_to_config(part_files["edge_feats"])
-        print(
-            f"Start to load edge data from {feat_path} which is "
-            f"{os.path.getsize(feat_path)} bytes."
+        logging.debug(
+            "Start to load edge data from %s which is " "%d bytes.",
+            feat_path,
+            os.path.getsize(feat_path),
         )
         edge_feats = load_tensors(feat_path)
-        print("Finished loading edge data.")
+        logging.info("Finished loading edge data.")
     # In the old format, the feature name doesn't contain node/edge type.
     # For compatibility, let's add node/edge types to the feature names.
     if node_feats is not None:
@@ -414,6 +420,24 @@ def load_partition_book(part_config, part_id):
 
     node_map = _get_part_ranges(node_map)
     edge_map = _get_part_ranges(edge_map)
+
+    # Sort the node/edge maps by the node/edge type ID.
+    node_map = dict(sorted(node_map.items(), key=lambda x: ntypes[x[0]]))
+    edge_map = dict(sorted(edge_map.items(), key=lambda x: etypes[x[0]]))
+
+    def _assert_is_sorted(id_map):
+        id_ranges = np.array(list(id_map.values()))
+        ids = []
+        for i in range(num_parts):
+            ids.append(id_ranges[:, i, :])
+        ids = np.array(ids).flatten()
+        assert np.all(
+            ids[:-1] <= ids[1:]
+        ), f"The node/edge map is not sorted: {ids}"
+
+    _assert_is_sorted(node_map)
+    _assert_is_sorted(edge_map)
+
     return (
         RangePartitionBook(
             part_id, num_parts, node_map, edge_map, ntypes, etypes
@@ -1195,3 +1219,57 @@ def partition_graph(
 
     if return_mapping:
         return orig_nids, orig_eids
+
+
+def convert_dgl_partition_to_csc_sampling_graph(part_config):
+    """Convert partitions of dgl to CSCSamplingGraph of GraphBolt.
+
+    This API converts `DGLGraph` partitions to `CSCSamplingGraph` which is
+    dedicated for sampling in `GraphBolt`. New graphs will be stored alongside
+    original graph as `csc_sampling_graph.tar`.
+
+    In the near future, partitions are supposed to be saved as
+    `CSCSamplingGraph` directly. At that time, this API should be deprecated.
+
+    Parameters
+    ----------
+    part_config : str
+        The partition configuration JSON file.
+    """
+    # As only this function requires GraphBolt for now, let's import here.
+    from .. import graphbolt
+
+    part_meta = _load_part_config(part_config)
+    num_parts = part_meta["num_parts"]
+
+    # Utility functions.
+    def init_type_per_edge(graph, gpb):
+        etype_ids = gpb.map_to_per_etype(graph.edata[EID])[0]
+        return etype_ids
+
+    # Iterate over partitions.
+    for part_id in range(num_parts):
+        graph, _, _, gpb, _, _, _ = load_partition(
+            part_config, part_id, load_feats=False
+        )
+        # Construct GraphMetadata.
+        _, _, ntypes, etypes = load_partition_book(part_config, part_id)
+        metadata = graphbolt.GraphMetadata(ntypes, etypes)
+        # Obtain CSC indtpr and indices.
+        indptr, indices, _ = graph.adj().csc()
+        # Initalize type per edge.
+        type_per_edge = init_type_per_edge(graph, gpb)
+        type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
+        # Sanity check.
+        assert len(type_per_edge) == graph.num_edges()
+        csc_graph = graphbolt.from_csc(
+            indptr, indices, None, type_per_edge, metadata
+        )
+        orig_graph_path = os.path.join(
+            os.path.dirname(part_config),
+            part_meta[f"part-{part_id}"]["part_graph"],
+        )
+        csc_graph_path = os.path.join(
+            os.path.dirname(orig_graph_path), "csc_sampling_graph.tar"
+        )
+        graphbolt.save_csc_sampling_graph(csc_graph, csc_graph_path)

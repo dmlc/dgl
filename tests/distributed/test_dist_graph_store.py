@@ -1080,7 +1080,8 @@ def test_standalone_node_emb():
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
 @pytest.mark.parametrize("hetero", [True, False])
-def test_split(hetero):
+@pytest.mark.parametrize("empty_mask", [True, False])
+def test_split(hetero, empty_mask):
     if hetero:
         g = create_random_hetero()
         ntype = "n1"
@@ -1100,8 +1101,9 @@ def test_split(hetero):
         part_method="metis",
     )
 
-    node_mask = np.random.randint(0, 100, size=g.num_nodes(ntype)) > 30
-    edge_mask = np.random.randint(0, 100, size=g.num_edges(etype)) > 30
+    mask_thd = 100 if empty_mask else 30
+    node_mask = np.random.randint(0, 100, size=g.num_nodes(ntype)) > mask_thd
+    edge_mask = np.random.randint(0, 100, size=g.num_edges(etype)) > mask_thd
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
 
@@ -1173,7 +1175,8 @@ def test_split(hetero):
 
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-def test_split_even():
+@pytest.mark.parametrize("empty_mask", [True, False])
+def test_split_even(empty_mask):
     g = create_random_graph(10000)
     num_parts = 4
     num_hops = 2
@@ -1186,10 +1189,9 @@ def test_split_even():
         part_method="metis",
     )
 
-    node_mask = np.random.randint(0, 100, size=g.num_nodes()) > 30
-    edge_mask = np.random.randint(0, 100, size=g.num_edges()) > 30
-    selected_nodes = np.nonzero(node_mask)[0]
-    selected_edges = np.nonzero(edge_mask)[0]
+    mask_thd = 100 if empty_mask else 30
+    node_mask = np.random.randint(0, 100, size=g.num_nodes()) > mask_thd
+    edge_mask = np.random.randint(0, 100, size=g.num_edges()) > mask_thd
     all_nodes1 = []
     all_nodes2 = []
     all_edges1 = []

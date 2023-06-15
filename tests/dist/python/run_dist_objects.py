@@ -16,7 +16,6 @@ num_client_per_machine = int(os.environ.get("DIST_DGL_TEST_NUM_CLIENT"))
 shared_workspace = os.environ.get("DIST_DGL_TEST_WORKSPACE")
 graph_path = os.environ.get("DIST_DGL_TEST_GRAPH_PATH")
 part_id = int(os.environ.get("DIST_DGL_TEST_PART_ID"))
-net_type = os.environ.get("DIST_DGL_TEST_NET_TYPE")
 ip_config = os.environ.get("DIST_DGL_TEST_IP_CONFIG", "ip_config.txt")
 
 os.environ["DGL_DIST_MODE"] = "distributed"
@@ -57,7 +56,6 @@ def run_server(
         disable_shared_mem=not shared_mem,
         graph_format=["csc", "coo"],
         keep_alive=keep_alive,
-        net_type=net_type,
     )
     print("start server", server_id)
     g.start()
@@ -780,7 +778,7 @@ if mode == "server":
     )
 elif mode == "client":
     os.environ["DGL_NUM_SERVER"] = str(num_servers_per_machine)
-    dgl.distributed.initialize(ip_config, net_type=net_type)
+    dgl.distributed.initialize(ip_config)
 
     gpb, graph_name, _, _ = load_partition_book(
         graph_path + "/{}.json".format(graph_name), part_id

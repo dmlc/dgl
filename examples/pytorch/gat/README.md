@@ -10,6 +10,8 @@ Graph Attention Networks (GAT)
 How to run
 -------
 
+> **_NOTE:_**  `train.py` is deprecated and please check the new version in `//examples/core/gat/train.py`.
+
 Run with the following for multiclass node classification (available datasets: "cora", "citeseer", "pubmed")
 ```bash
 python3 train.py --dataset cora

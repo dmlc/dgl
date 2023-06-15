@@ -332,8 +332,6 @@ class DistGraphServer(KVServer):
         The graph formats.
     keep_alive : bool
         Whether to keep server alive when clients exit
-    net_type : str
-        Backend rpc type: ``'socket'`` or ``'tensorpipe'``
     """
 
     def __init__(
@@ -346,7 +344,6 @@ class DistGraphServer(KVServer):
         disable_shared_mem=False,
         graph_format=("csc", "coo"),
         keep_alive=False,
-        net_type="socket",
     ):
         super(DistGraphServer, self).__init__(
             server_id=server_id,
@@ -357,7 +354,6 @@ class DistGraphServer(KVServer):
         self.ip_config = ip_config
         self.num_servers = num_servers
         self.keep_alive = keep_alive
-        self.net_type = net_type
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
@@ -474,7 +470,6 @@ class DistGraphServer(KVServer):
             num_servers=self.num_servers,
             num_clients=self.num_clients,
             server_state=server_state,
-            net_type=self.net_type,
         )
 
 
@@ -1500,7 +1495,7 @@ def _split_even_to_part(partition_book, elements):
     x = y = 0
     num_elements = len(elements)
     block_size = num_elements // partition_book.num_partitions()
-    part_eles = None
+    part_eles = F.tensor([], dtype=elements.dtype)
     # compute the nonzero tensor of each partition instead of whole tensor to save memory
     for idx in range(0, num_elements, block_size):
         nonzero_block = F.nonzero_1d(
@@ -1512,10 +1507,7 @@ def _split_even_to_part(partition_book, elements):
             start = max(x, left) - x
             end = min(y, right) - x
             tmp = nonzero_block[start:end] + idx
-            if part_eles is None:
-                part_eles = tmp
-            else:
-                part_eles = F.cat((part_eles, tmp), 0)
+            part_eles = F.cat((part_eles, tmp), 0)
         elif x >= right:
             break
 
