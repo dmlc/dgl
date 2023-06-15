@@ -31,7 +31,6 @@ dgl_option(USE_S3 "Build with S3 support" OFF)
 dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
-dgl_option(TP_BUILD_LIBUV "Build libuv together with tensorpipe (only impacts Linux)" ON)
 dgl_option(BUILD_TORCH "Build the PyTorch plugin" OFF)
 dgl_option(BUILD_SPARSE "Build DGL sparse library" ON)
 dgl_option(BUILD_GRAPHBOLT "Build Graphbolt library" OFF)
@@ -85,8 +84,6 @@ if(MSVC)
   endif()
 else(MSVC)
   include(CheckCXXCompilerFlag)
-  # tensorpipe's dependencies require C++14
-  check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
   if(NOT APPLE)
@@ -223,28 +220,8 @@ if((NOT MSVC) AND USE_LIBXSMM)
   list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm.a)
 endif((NOT MSVC) AND USE_LIBXSMM)
 
+# Avoid exposing third-party symbols when using DGL as a library.
 if(NOT MSVC)
-  # Only build tensorpipe on linux
-  string(REPLACE "-pedantic" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-  # Disable -Wall for third-party tensorpipe due to too many warnings
-  string(REPLACE "-Wall" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-  string(REPLACE "-Wall" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-  set(WNOERROR_FLAGS "-Wno-error=sign-compare")
-  if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0)
-      set(WNOERROR_FLAGS "${WNOERROR_FLAGS} -Wno-error=dangling-pointer")
-  endif()
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WNOERROR_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WNOERROR_FLAGS}")
-  set(TP_STATIC_OR_SHARED STATIC)
-  add_subdirectory(third_party/tensorpipe)
-  list(APPEND DGL_LINKER_LIBS tensorpipe)
-  target_include_directories(dgl PRIVATE third_party/tensorpipe)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-  string(REPLACE "${WNOERROR_FLAGS}" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-  string(REPLACE "${WNOERROR_FLAGS}" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-
-  # Avoid exposing third-party symbols when using DGL as a library.
   if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
