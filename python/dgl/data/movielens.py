@@ -1,6 +1,5 @@
 """MovieLens dataset"""
 import os
-import shutil
 
 import numpy as np
 import pandas as pd
@@ -18,7 +17,8 @@ from .utils import (
     save_graphs,
     save_info,
     split_dataset,
-    extract_archive
+    extract_archive,
+    _get_dgl_url
 )
 
 GENRES_ML_100K = [
@@ -133,16 +133,17 @@ class MovieLensDataset(DGLDataset):
     >>> # get ratings of edges in the training graph.
     >>> rate = g.edges['user-movie'].data['rate'] # or rate = g.edges['movie-user'].data['rate']
     >>> rate
-    tensor([5., 5., 3.,  ..., 3., 5., 3.])
+    tensor([5., 5., 3.,  ..., 3., 3., 5.])
 
     >>> # get train, valid and test mask of edges
-    >>> train_mask, valid_mask, test_mask =\
-            g.edges['user-movie'].data['train_mask'],\
-            g.edges['user-movie'].data['valid_mask'],\
-            g.edges['user-movie'].data['test_mask']
+    >>> train_mask = g.edges['user-movie'].data['train_mask']
+    >>> valid_mask = g.edges['user-movie'].data['valid_mask']
+    >>> test_mask = g.edges['user-movie'].data['test_mask']
+            
     >>> # get train, valid and test ratings
-    >>> train_ratings, valid_ratings, test_ratings =\
-            rate[train_mask], rate[valid_mask], rate[test_mask]
+    >>> train_ratings = rate[train_mask]
+    >>> valid_ratings = rate[valid_mask]
+    >>> test_ratings = rate[test_mask]
 
     >>> # get input features of users
     >>> g.nodes["user"].data["feat"] # or g.nodes["movie"].data["feat"] for movie nodes
@@ -156,10 +157,16 @@ class MovieLensDataset(DGLDataset):
 
     """
 
+    # _url = {
+    #     "ml-100k": "http://files.grouplens.org/datasets/movielens/ml-100k.zip",
+    #     "ml-1m": "http://files.grouplens.org/datasets/movielens/ml-1m.zip",
+    #     "ml-10m": "http://files.grouplens.org/datasets/movielens/ml-10m.zip",
+    # }
+
     _url = {
-        "ml-100k": "http://files.grouplens.org/datasets/movielens/ml-100k.zip",
-        "ml-1m": "http://files.grouplens.org/datasets/movielens/ml-1m.zip",
-        "ml-10m": "http://files.grouplens.org/datasets/movielens/ml-10m.zip",
+        "ml-100k": "dataset/ml-100k.zip",
+        "ml-1m": "dataset/ml-1m.zip",
+        "ml-10m": "dataset/ml-10m.zip",
     }
 
     def __init__(
@@ -185,13 +192,13 @@ class MovieLensDataset(DGLDataset):
 
         if name in ['ml-1m', 'ml-10m']:
             assert test_ratio is not None and test_ratio > 0.0 and test_ratio < 1.0, \
-                f"test_ratio({test_ratio}) must be set to (0.0, 1.0) when using ml-1m and ml-10m"
+                f"test_ratio({test_ratio}) must be set to a value in (0.0, 1.0) when using ml-1m and ml-10m"
             assert test_ratio + valid_ratio > 0.0 and test_ratio + valid_ratio < 1.0, \
                 f"test_ratio({test_ratio}) + valid_ratio({valid_ratio}) must be set to (0.0, 1.0) when using ml-1m and ml-10m"
 
         if name == 'ml-100k' and test_ratio is not None:
-            dgl_warning(f"test_ratio({test_ratio}) is not set to None for ml-100k, "
-                           "while testing samples would not be affected by test_ratio since "
+            dgl_warning(f"test_ratio ({test_ratio}) is not set to None for ml-100k. "
+                           "Note that dataset split would not be affected by the test_ratio since "
                            "testing samples of ml-100k have been pre-specified.")
 
         self.valid_ratio = valid_ratio
@@ -209,7 +216,7 @@ class MovieLensDataset(DGLDataset):
 
         super(MovieLensDataset, self).__init__(
             name=name,
-            url=self._url[name],
+            url=_get_dgl_url(self._url[name]),
             raw_dir=raw_dir,
             force_reload=force_reload,
             verbose=verbose,
@@ -221,10 +228,16 @@ class MovieLensDataset(DGLDataset):
         if self.valid_ratio == valid_ratio and (self.test_ratio == test_ratio if self.name != "ml-100k" else True):
             return True
         else:
-            print(f"At least one of current valid({self.valid_ratio}) and test({self.test_ratio}, ignored if using ml-100k) ratio "
-                   "are not the same as the last setting"
-                  f"(valid: {valid_ratio}, test: {test_ratio}, ignore test if using ml-100k). "
-                   "MovieLens will be re-processed with the new dataset split setting.")
+            if self.name == 'ml-100k':
+                print(f"The current valid ratio ({self.valid_ratio}) "
+                    "is not the same as the last setting "
+                    f"(valid: {valid_ratio}). "
+                    f"MovieLens {self.name} will be re-processed with the new dataset split setting.")
+            else:
+                print(f"At least one of current valid ({self.valid_ratio}) and test ({self.test_ratio}) ratio "
+                    "are not the same as the last setting "
+                    f"(valid: {valid_ratio}, test: {test_ratio}). "
+                    f"MovieLens {self.name} will be re-processed with the new dataset split setting.")
             return False
 
     def download(self):
@@ -408,8 +421,6 @@ class MovieLensDataset(DGLDataset):
 
     @property
     def raw_path(self):
-        if self.name == "ml-10m":
-            return os.path.join(self.raw_dir, "ml-10M100K")
         return os.path.join(self.raw_dir, self.name)
 
     @property
@@ -530,11 +541,6 @@ class MovieLensDataset(DGLDataset):
                     if ele in genre_map:
                         movie_genres[i, genre_map[ele]] = 1.0
                     else:
-                        print(
-                            "genres not found, filled with unknown: {}".format(
-                                genres
-                            )
-                        )
                         movie_genres[i, genre_map["unknown"]] = 1.0
             for idx, genre_name in enumerate(self.genres):
                 movie_data[genre_name] = movie_genres[:, idx]
