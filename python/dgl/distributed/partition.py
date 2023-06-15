@@ -67,8 +67,8 @@ def _dump_part_config(part_config, part_metadata):
     '''Format and dump part config.
     '''
     part_metadata = _format_part_metadata(part_metadata, _etype_tuple_to_str)
-    with open(part_config, 'w') as outfile:
-        json.dump(part_metadata, outfile, sort_keys=True, indent=4)
+    with open(part_config, "w") as outfile:
+        json.dump(part_metadata, outfile, sort_keys=False, indent=4)
 
 def _save_graphs(filename, g_list, formats=None, sort_etypes=False):
     '''Preprocess partitions before saving:
@@ -335,8 +335,32 @@ def load_partition_book(part_config, part_id):
 
     node_map = _get_part_ranges(node_map)
     edge_map = _get_part_ranges(edge_map)
-    return RangePartitionBook(part_id, num_parts, node_map, edge_map, ntypes, etypes), \
-            part_metadata['graph_name'], ntypes, etypes
+
+    # Sort the node/edge maps by the node/edge type ID.
+    node_map = dict(sorted(node_map.items(), key=lambda x: ntypes[x[0]]))
+    edge_map = dict(sorted(edge_map.items(), key=lambda x: etypes[x[0]]))
+
+    def _assert_is_sorted(id_map):
+        id_ranges = np.array(list(id_map.values()))
+        ids = []
+        for i in range(num_parts):
+            ids.append(id_ranges[:, i, :])
+        ids = np.array(ids).flatten()
+        assert np.all(
+            ids[:-1] <= ids[1:]
+        ), f"The node/edge map is not sorted: {ids}"
+
+    _assert_is_sorted(node_map)
+    _assert_is_sorted(edge_map)
+
+    return (
+        RangePartitionBook(
+            part_id, num_parts, node_map, edge_map, ntypes, etypes
+        ),
+        part_metadata["graph_name"],
+        ntypes,
+        etypes,
+    )
 
 def _get_orig_ids(g, sim_g, orig_nids, orig_eids):
     '''Convert/construct the original node IDs and edge IDs.

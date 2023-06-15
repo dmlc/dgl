@@ -683,3 +683,115 @@ def test_UnknownPartitionBook():
         except Exception as e:
             if not isinstance(e, TypeError):
                 raise e
+
+
+def test_not_sorted_node_edge_map():
+    # Partition configure file which includes not sorted node/edge map.
+    part_config_str = """
+{
+    "edge_map": {
+        "item:likes-rev:user": [
+            [
+                0,
+                100
+            ],
+            [
+                1000,
+                1500
+            ]
+        ],
+        "user:follows-rev:user": [
+            [
+                300,
+                600
+            ],
+            [
+                2100,
+                2800
+            ]
+        ],
+        "user:follows:user": [
+            [
+                100,
+                300
+            ],
+            [
+                1500,
+                2100
+            ]
+        ],
+        "user:likes:item": [
+            [
+                600,
+                1000
+            ],
+            [
+                2800,
+                3600
+            ]
+        ]
+    },
+    "etypes": {
+        "item:likes-rev:user": 0,
+        "user:follows-rev:user": 2,
+        "user:follows:user": 1,
+        "user:likes:item": 3
+    },
+    "graph_name": "test_graph",
+    "halo_hops": 1,
+    "node_map": {
+        "user": [
+            [
+                100,
+                300
+            ],
+            [
+                600,
+                1000
+            ]
+        ],
+        "item": [
+            [
+                0,
+                100
+            ],
+            [
+                300,
+                600
+            ]
+        ]
+    },
+    "ntypes": {
+        "user": 1,
+        "item": 0
+    },
+    "num_edges": 3600,
+    "num_nodes": 1000,
+    "num_parts": 2,
+    "part-0": {
+        "edge_feats": "part0/edge_feat.dgl",
+        "node_feats": "part0/node_feat.dgl",
+        "part_graph": "part0/graph.dgl"
+    },
+    "part-1": {
+        "edge_feats": "part1/edge_feat.dgl",
+        "node_feats": "part1/node_feat.dgl",
+        "part_graph": "part1/graph.dgl"
+    },
+    "part_method": "metis"
+}
+    """
+    with tempfile.TemporaryDirectory() as test_dir:
+        part_config = os.path.join(test_dir, "test_graph.json")
+        print(part_config)
+        with open(part_config, "w") as file:
+            file.write(part_config_str)
+        # Part 0.
+        gpb, _, _, _ = load_partition_book(part_config, 0)
+        assert gpb.local_ntype_offset == [0, 100, 300]
+        assert gpb.local_etype_offset == [0, 100, 300, 600, 1000]
+        # Patr 1.
+        gpb, _, _, _ = load_partition_book(part_config, 1)
+        assert gpb.local_ntype_offset == [0, 300, 700]
+        assert gpb.local_etype_offset == [0, 500, 1100, 1800, 2600]
+
