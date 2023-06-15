@@ -157,12 +157,6 @@ class MovieLensDataset(DGLDataset):
 
     """
 
-    # _url = {
-    #     "ml-100k": "http://files.grouplens.org/datasets/movielens/ml-100k.zip",
-    #     "ml-1m": "http://files.grouplens.org/datasets/movielens/ml-1m.zip",
-    #     "ml-10m": "http://files.grouplens.org/datasets/movielens/ml-10m.zip",
-    # }
-
     _url = {
         "ml-100k": "dataset/ml-100k.zip",
         "ml-1m": "dataset/ml-1m.zip",
