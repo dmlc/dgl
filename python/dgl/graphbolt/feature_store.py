@@ -26,19 +26,6 @@ class FeatureStore:
         """
         raise NotImplementedError
 
-    def add_feature(self, key: str, value: torch.Tensor):
-        """Add a new feature to the feature store. If the feature already
-        exists, it will be overwritten.
-
-        Parameters
-        ----------
-        key : str
-            The key that uniquely identifies the feature in the feature store.
-        value : torch.Tensor
-            The value of the new feature.
-        """
-        raise NotImplementedError
-
     def update_feature(
         self, key: str, value: torch.Tensor, ids: torch.Tensor = None
     ):
@@ -126,19 +113,6 @@ class InMemoryFeatureStore(FeatureStore):
         if ids is None:
             return self._feature_dict[key]
         return self._feature_dict[key][ids]
-
-    def add_feature(self, key: str, value: torch.Tensor):
-        """Add a new feature to the feature store. If the feature already
-        exists, it will be overwritten.
-
-        Parameters
-        ----------
-        key : str
-            The key that uniquely identifies the feature in the feature store.
-        value : torch.Tensor
-            The value of the new feature.
-        """
-        self._feature_dict[key] = value
 
     def update_feature(
         self, key: str, value: torch.Tensor, ids: torch.Tensor = None
