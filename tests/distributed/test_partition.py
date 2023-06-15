@@ -747,24 +747,24 @@ def test_not_sorted_node_edge_map():
         "item:likes-rev:user": [
             [
                 0,
-                10000
+                10001
             ]
         ],
         "user:follows-rev:user": [
             [
-                20000,
-                30000
+                20004,
+                30009
             ]
         ],
         "user:follows:user": [
             [
-                10000,
-                20000
+                10001,
+                20004
             ]
         ],
         "user:likes:item": [
             [
-                30000,
+                30009,
                 40000
             ]
         ]
@@ -811,4 +811,6 @@ def test_not_sorted_node_edge_map():
         print(part_config)
         with open(part_config, "w") as file:
             file.write(part_config_str)
-        load_partition_book(part_config, 0)
+        gpb, _, _, _ = load_partition_book(part_config, 0)
+        assert gpb.local_ntype_offset == [0, 10000, 30000]
+        assert gpb.local_etype_offset == [0, 10001, 20004, 30009, 40000]
