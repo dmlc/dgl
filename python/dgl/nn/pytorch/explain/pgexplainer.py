@@ -31,7 +31,7 @@ class PGExplainer(nn.Module):
     num_features : int
         Node embedding size used by :attr:`model`.
     explain_graph : bool, optional
-        Whether to initialize the model in graph or node explanation
+        Whether to initialize the model for graph-level or node-level predictions.
     coff_budget : float, optional
         Size regularization to constrain the explanation size. Default: 0.01.
     coff_connect : float, optional
