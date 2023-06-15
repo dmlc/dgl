@@ -53,14 +53,18 @@ class InMemoryFeatureStore(FeatureStore):
     r"""In-memory key-value feature store, where the key is a string and value
     is Pytorch tensor."""
 
-    def __init__(self, feature_dict: dict = None):
+    def __init__(self, feature_dict: dict):
         """Initialize an in-memory feature store.
+
+        The feature store is initialized with a dictionary of tensors, where the
+        key is the name of a feature and the value is the tensor. The value can
+        be multi-dimensional, where the first dimension is the index of the
+        feature.
 
         Parameters
         ----------
         feature_dict : dict, optional
-            A dictionary of tensors, where the key is the name of a feature and
-            the value is the tensor. If None, creates an empty feature store.
+            A dictionary of tensors.
 
         Examples
         --------
@@ -68,18 +72,25 @@ class InMemoryFeatureStore(FeatureStore):
         >>> feature_dict = {
         ...     "user": torch.arange(0, 5),
         ...     "item": torch.arange(0, 6),
+        ...     "rel": torch.arange(0, 6).view(2, 3),
         ... }
         >>> feature_store = InMemoryFeatureStore(feature_dict)
-        >>> feature_store.get_items("user", torch.tensor([0, 1, 2]))
+        >>> feature_store.read_feature("user", torch.tensor([0, 1, 2]))
         tensor([0, 1, 2])
-        >>> feature_store.get_items("item", torch.tensor([0, 1, 2]))
+        >>> feature_store.read_feature("item", torch.tensor([0, 1, 2]))
         tensor([0, 1, 2])
-        >>> feature_store.set_items("user", torch.tensor([0, 1, 2]),
-        ... torch.ones(3))
-        >>> feature_store.get_items("user", torch.tensor([0, 1, 2]))
-        tensor([1., 1., 1.])
+        >>> feature_store.read_feature("rel", torch.tensor([0]))
+        tensor([[0, 1, 2]])
+        >>> feature_store.update_feature("user",
+        ... torch.ones(3, dtype=torch.long), torch.tensor([0, 1, 2]))
+        >>> feature_store.read_feature("user", torch.tensor([0, 1, 2]))
+        tensor([1, 1, 1])
         """
         super(InMemoryFeatureStore, self).__init__()
+        assert isinstance(feature_dict, dict), (
+            f"feature_dict in InMemoryFeatureStore must be dict, "
+            f"but got {type(feature_dict)}."
+        )
         for k, v in feature_dict.items():
             assert isinstance(
                 k, str
