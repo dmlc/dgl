@@ -837,7 +837,6 @@ def test_not_sorted_node_edge_map():
     """
     with tempfile.TemporaryDirectory() as test_dir:
         part_config = os.path.join(test_dir, "test_graph.json")
-        print(part_config)
         with open(part_config, "w") as file:
             file.write(part_config_str)
         # Part 0.
