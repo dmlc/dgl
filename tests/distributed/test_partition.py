@@ -747,25 +747,41 @@ def test_not_sorted_node_edge_map():
         "item:likes-rev:user": [
             [
                 0,
-                10001
+                100
+            ],
+            [
+                1000,
+                1500
             ]
         ],
         "user:follows-rev:user": [
             [
-                20004,
-                30009
+                300,
+                600
+            ],
+            [
+                2100,
+                2800
             ]
         ],
         "user:follows:user": [
             [
-                10001,
-                20004
+                100,
+                300
+            ],
+            [
+                1500,
+                2100
             ]
         ],
         "user:likes:item": [
             [
-                30009,
-                40000
+                600,
+                1000
+            ],
+            [
+                2800,
+                3600
             ]
         ]
     },
@@ -778,16 +794,24 @@ def test_not_sorted_node_edge_map():
     "graph_name": "test_graph",
     "halo_hops": 1,
     "node_map": {
-    "user": [
+        "user": [
             [
-                10000,
-                30000
+                100,
+                300
+            ],
+            [
+                600,
+                1000
             ]
         ],
         "item": [
             [
                 0,
-                10000
+                100
+            ],
+            [
+                300,
+                600
             ]
         ]
     },
@@ -795,13 +819,18 @@ def test_not_sorted_node_edge_map():
         "user": 1,
         "item": 0
     },
-    "num_edges": 40000,
-    "num_nodes": 30000,
-    "num_parts": 1,
+    "num_edges": 3600,
+    "num_nodes": 1000,
+    "num_parts": 2,
     "part-0": {
         "edge_feats": "part0/edge_feat.dgl",
         "node_feats": "part0/node_feat.dgl",
         "part_graph": "part0/graph.dgl"
+    },
+    "part-1": {
+        "edge_feats": "part1/edge_feat.dgl",
+        "node_feats": "part1/node_feat.dgl",
+        "part_graph": "part1/graph.dgl"
     },
     "part_method": "metis"
 }
@@ -811,6 +840,11 @@ def test_not_sorted_node_edge_map():
         print(part_config)
         with open(part_config, "w") as file:
             file.write(part_config_str)
+        # Part 0.
         gpb, _, _, _ = load_partition_book(part_config, 0)
-        assert gpb.local_ntype_offset == [0, 10000, 30000]
-        assert gpb.local_etype_offset == [0, 10001, 20004, 30009, 40000]
+        assert gpb.local_ntype_offset == [0, 100, 300]
+        assert gpb.local_etype_offset == [0, 100, 300, 600, 1000]
+        # Patr 1.
+        gpb, _, _, _ = load_partition_book(part_config, 1)
+        assert gpb.local_ntype_offset == [0, 300, 700]
+        assert gpb.local_etype_offset == [0, 500, 1100, 1800, 2600]

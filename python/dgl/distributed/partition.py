@@ -426,12 +426,14 @@ def load_partition_book(part_config, part_id):
     edge_map = dict(sorted(edge_map.items(), key=lambda x: etypes[x[0]]))
 
     def _assert_is_sorted(id_map):
-        ids = [[]] * num_parts
-        for values in id_map.values():
-            for i, v in enumerate(values):
-                ids[i].append(v)
+        id_ranges = np.array(list(id_map.values()))
+        ids = []
+        for i in range(num_parts):
+            ids.append(id_ranges[:, i, :])
         ids = np.array(ids).flatten()
-        assert np.all(ids[:-1] <= ids[1:]), "The node/edge map is not sorted."
+        assert np.all(
+            ids[:-1] <= ids[1:]
+        ), f"The node/edge map is not sorted: {ids}"
 
     _assert_is_sorted(node_map)
     _assert_is_sorted(edge_map)
