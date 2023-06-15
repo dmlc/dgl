@@ -221,12 +221,10 @@ if((NOT MSVC) AND USE_LIBXSMM)
 endif((NOT MSVC) AND USE_LIBXSMM)
 
 # Avoid exposing third-party symbols when using DGL as a library.
-if(NOT MSVC)
-  if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
-  endif()
-endif(NOT MSVC)
+if((NOT MSVC) AND (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
+endif()
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
