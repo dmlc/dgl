@@ -3,7 +3,6 @@ import argparse
 import json
 import logging
 import os
-import sys
 
 import numpy as np
 from base import dump_partition_meta, PartitionMeta
@@ -12,7 +11,7 @@ from files import setdir
 
 
 def _random_partition(metadata, num_parts):
-    num_nodes_per_type = [sum(_) for _ in metadata["num_nodes_per_chunk"]]
+    num_nodes_per_type = metadata["num_nodes_per_type"]
     ntypes = metadata["node_type"]
     for ntype, n in zip(ntypes, num_nodes_per_type):
         logging.info("Generating partition for node type %s" % ntype)

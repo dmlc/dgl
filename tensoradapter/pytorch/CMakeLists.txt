@@ -44,5 +44,5 @@ target_include_directories(
 target_include_directories(
   ${TORCH_TARGET_NAME} PRIVATE "${TORCH_INCLUDE_DIRS}")
 target_link_libraries(${TORCH_TARGET_NAME} PRIVATE "${TENSORADAPTER_TORCH_LIBS}")
-set_property(TARGET ${TORCH_TARGET_NAME} PROPERTY CXX_STANDARD 14)
+set_property(TARGET ${TORCH_TARGET_NAME} PROPERTY CXX_STANDARD 17)
 message(STATUS "Configured target ${TORCH_TARGET_NAME}")

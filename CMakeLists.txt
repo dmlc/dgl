@@ -25,16 +25,15 @@ endif()
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
-dgl_option(USE_TVM "Build with TVM kernels" OFF)
 dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
 dgl_option(USE_S3 "Build with S3 support" OFF)
 dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
 dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
-dgl_option(TP_BUILD_LIBUV "Build libuv together with tensorpipe (only impacts Linux)" ON)
 dgl_option(BUILD_TORCH "Build the PyTorch plugin" OFF)
 dgl_option(BUILD_SPARSE "Build DGL sparse library" ON)
+dgl_option(BUILD_GRAPHBOLT "Build Graphbolt library" OFF)
 dgl_option(TORCH_PYTHON_INTERPS "Python interpreter used to build tensoradapter and DGL sparse library" python3)
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
@@ -85,8 +84,6 @@ if(MSVC)
   endif()
 else(MSVC)
   include(CheckCXXCompilerFlag)
-  # tensorpipe's dependencies require C++14
-  check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
   if(NOT APPLE)
@@ -102,6 +99,11 @@ if(USE_OPENMP)
   endif(OPENMP_FOUND)
   message(STATUS "Build with OpenMP.")
 endif(USE_OPENMP)
+
+if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
+  message(STATUS "Disabling LIBXSMM on ${CMAKE_SYSTEM_PROCESSOR}.")
+  set(USE_LIBXSMM OFF)
+endif()
 
 if(USE_LIBXSMM)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_LIBXSMM -DDGL_CPU_LLC_SIZE=40000000")
@@ -175,7 +177,6 @@ target_include_directories(dgl PRIVATE "include")
 target_include_directories(dgl PRIVATE "third_party/dlpack/include")
 target_include_directories(dgl PRIVATE "third_party/dmlc-core/include")
 target_include_directories(dgl PRIVATE "third_party/phmap/")
-target_include_directories(dgl PRIVATE "third_party/xbyak/")
 target_include_directories(dgl PRIVATE "third_party/METIS/include/")
 target_include_directories(dgl PRIVATE "tensoradapter/include")
 target_include_directories(dgl PRIVATE "third_party/nanoflann/include")
@@ -202,59 +203,28 @@ endif(NOT MSVC)
 
 # Compile LIBXSMM
 if((NOT MSVC) AND USE_LIBXSMM)
+  set(LIBXSMM_COMPILER "${CMAKE_C_COMPILER}")
+  if (APPLE)
+    set(LIBXSMM_COMPILER "${CMAKE_C_COMPILER} -isysroot ${CMAKE_OSX_SYSROOT}")
+  endif()
   if(REBUILD_LIBXSMM)
-    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${CMAKE_C_COMPILER}
+    add_custom_target(libxsmm COMMAND make realclean COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${LIBXSMM_COMPILER}
                       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                       )
   else(REBUILD_LIBXSMM)
-    add_custom_target(libxsmm COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${CMAKE_C_COMPILER}
+    add_custom_target(libxsmm COMMAND make -j ECFLAGS="-Wno-error=deprecated-declarations" BLAS=0 CC=${LIBXSMM_COMPILER}
                       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/libxsmm
                       )
   endif(REBUILD_LIBXSMM)
   add_dependencies(dgl libxsmm)
-  list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm)
+  list(APPEND DGL_LINKER_LIBS -L${CMAKE_SOURCE_DIR}/third_party/libxsmm/lib/ xsmm.a)
 endif((NOT MSVC) AND USE_LIBXSMM)
 
-if(NOT MSVC)
-  # Only build tensorpipe on linux
-  string(REPLACE "-pedantic" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-  # Disable -Wall for third-party tensorpipe due to too many warnings
-  string(REPLACE "-Wall" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-  string(REPLACE "-Wall" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-  set(WNOERROR_FLAGS "-Wno-error=sign-compare")
-  if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0)
-      set(WNOERROR_FLAGS "${WNOERROR_FLAGS} -Wno-error=dangling-pointer")
-  endif()
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WNOERROR_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WNOERROR_FLAGS}")
-  set(TP_STATIC_OR_SHARED STATIC)
-  add_subdirectory(third_party/tensorpipe)
-  list(APPEND DGL_LINKER_LIBS tensorpipe)
-  target_include_directories(dgl PRIVATE third_party/tensorpipe)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-  string(REPLACE "${WNOERROR_FLAGS}" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-  string(REPLACE "${WNOERROR_FLAGS}" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-
-  # Avoid exposing third-party symbols when using DGL as a library.
-  if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
-  endif()
-endif(NOT MSVC)
-
-# Compile TVM Runtime and Featgraph
-# (NOTE) We compile a dynamic library called featgraph_runtime, which the DGL library links to.
-# Kernels are packed in a separate dynamic library called featgraph_kernels, which DGL
-# will load during runtime.
-if(USE_TVM)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_TVM")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_TVM")
-  target_include_directories(dgl PRIVATE "featgraph/include")
-  add_subdirectory("featgraph/")
-  list(APPEND DGL_LINKER_LIBS featgraph_runtime)
-  message(STATUS "Build with TVM runtime and featgraph kernels.")
-endif(USE_TVM)
+# Avoid exposing third-party symbols when using DGL as a library.
+if((NOT MSVC) AND (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
+endif()
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)
@@ -316,7 +286,6 @@ if(BUILD_CPP_TEST)
   include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
   include_directories("include")
   include_directories("third_party/dlpack/include")
-  include_directories("third_party/xbyak")
   include_directories("third_party/dmlc-core/include")
   include_directories("third_party/phmap")
   include_directories("third_party/libxsmm/include")
@@ -326,16 +295,6 @@ if(BUILD_CPP_TEST)
   target_link_libraries(runUnitTests gtest gtest_main)
   target_link_libraries(runUnitTests dgl)
   add_test(UnitTests runUnitTests)
-
-  if(NOT MSVC)
-    message(STATUS "Building dist/rpc tests")
-    file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/dist/cpp/rpc_client.cc)
-    add_executable(rpc_client ${TEST_SRC_FILES})
-    target_link_libraries(rpc_client dgl)
-    file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/dist/cpp/rpc_server.cc)
-    add_executable(rpc_server ${TEST_SRC_FILES})
-    target_link_libraries(rpc_server dgl)
-  endif(NOT MSVC)
 endif(BUILD_CPP_TEST)
 
 if(BUILD_SPARSE)
@@ -382,3 +341,38 @@ if(BUILD_SPARSE)
   endif(MSVC)
   add_dependencies(dgl_sparse dgl)
 endif(BUILD_SPARSE)
+
+if(BUILD_GRAPHBOLT)
+  message(STATUS "Configuring graphbolt library")
+  file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} BINDIR)
+  file(TO_NATIVE_PATH ${CMAKE_COMMAND} CMAKE_CMD)
+  if(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.bat BUILD_SCRIPT)
+    add_custom_target(
+      graphbolt
+      ALL
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      BINDIR=${BINDIR}
+      CFLAGS=${CMAKE_C_FLAGS}
+      CXXFLAGS=${CMAKE_CXX_FLAGS}
+      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+      cmd /e:on /c ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
+  else(MSVC)
+    file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/graphbolt/build.sh BUILD_SCRIPT)
+    add_custom_target(
+      graphbolt
+      ALL
+      ${CMAKE_COMMAND} -E env
+      CMAKE_COMMAND=${CMAKE_CMD}
+      BINDIR=${CMAKE_CURRENT_BINARY_DIR}
+      CFLAGS=${CMAKE_C_FLAGS}
+      CXXFLAGS=${CMAKE_CXX_FLAGS}
+      LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}
+      bash ${BUILD_SCRIPT} ${TORCH_PYTHON_INTERPS}
+      DEPENDS ${BUILD_SCRIPT}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/graphbolt)
+  endif(MSVC)
+endif(BUILD_GRAPHBOLT)

@@ -42,8 +42,12 @@ struct CSRMatrixInternal {
 };
 
 int32_t GetLLCSize() {
+#ifdef _SC_LEVEL3_CACHE_SIZE
   int32_t cache_size = sysconf(_SC_LEVEL3_CACHE_SIZE);
   if (cache_size < 0) cache_size = DGL_CPU_LLC_SIZE;
+#else
+  int32_t cache_size = DGL_CPU_LLC_SIZE;
+#endif
   return cache_size;
 }
 
@@ -256,12 +260,12 @@ inline libxsmm_meltwfunction_opreduce_vecs_idx SpMMCreateLibxsmmKernel(
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
         N, &_ld, &_ld, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32,
         (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32,
-        opredop_flags);
+        opredop_flags, 0);
   } else {  // assume bf16
     kernel = libxsmm_dispatch_meltw_opreduce_vecs_idx(
         N, &_ld, &_ld, LIBXSMM_DATATYPE_BF16, LIBXSMM_DATATYPE_BF16,
         (sizeof(IdType) == 8) ? LIBXSMM_DATATYPE_I64 : LIBXSMM_DATATYPE_I32,
-        opredop_flags);
+        opredop_flags, 0);
   }
 
   if (kernel == nullptr) {
@@ -292,9 +296,9 @@ inline void SpMMBlockwiseOpSum(
     const DType *E, DType *C, bool has_idx, IdType N, IdType num_M_blocks,
     IdType num_K_blocks, IdType M_block_size,
     libxsmm_meltwfunction_opreduce_vecs_idx kernel) {
-  DType(*in_matrix1)[N] = (DType(*)[N])B;
-  DType(*in_matrix2)[N] = (DType(*)[N])E;
-  DType(*output)[N] = (DType(*)[N])C;
+  const DType *in_matrix1 = B;
+  const DType *in_matrix2 = E;
+  DType *output = C;
 #pragma omp parallel
   {
     for (IdType k = 0; k < num_K_blocks; k++) {
@@ -313,13 +317,13 @@ inline void SpMMBlockwiseOpSum(
           params.n = row_end - row_start;
           params.indices = &cur_csr.indices[row_start];
           params.in_matrix = in_matrix1;
-          params.out_vec = &output[dst][0];
+          params.out_vec = &output[dst * N];
           params.scale_vals = nullptr;
           if (has_idx) {
             params.in_matrix2 = in_matrix2;
             params.indices2 = &cur_csr.data[row_start];
           } else {
-            params.in_matrix2 = &in_matrix2[row_start];
+            params.in_matrix2 = &in_matrix2[row_start * N];
           }
           kernel(&params);
         }
@@ -351,11 +355,11 @@ inline void SpMMBlockwiseOpCmp(
     const DType *E, DType *C, IdType *argB, IdType *argE, bool has_idx,
     IdType N, IdType num_M_blocks, IdType num_K_blocks, IdType M_block_size,
     libxsmm_meltwfunction_opreduce_vecs_idx kernel) {
-  DType(*in_matrix1)[N] = (DType(*)[N])B;
-  DType(*in_matrix2)[N] = (DType(*)[N])E;
-  DType(*output)[N] = (DType(*)[N])C;
-  IdType(*out_matrix1)[N] = (IdType(*)[N])argB;
-  IdType(*out_matrix2)[N] = (IdType(*)[N])argE;
+  const DType *in_matrix1 = B;
+  const DType *in_matrix2 = E;
+  DType *output = C;
+  IdType *out_matrix1 = argB;
+  IdType *out_matrix2 = argE;
 
 #pragma omp parallel
   {
@@ -375,15 +379,15 @@ inline void SpMMBlockwiseOpCmp(
           params.n = row_end - row_start;
           params.indices = &cur_csr.indices[row_start];
           params.in_matrix = in_matrix1;
-          params.out_vec = &output[dst][0];
-          params.argop_off_vec_0 = &out_matrix1[dst][0];
-          params.argop_off_vec_1 = &out_matrix2[dst][0];
+          params.out_vec = &output[dst * N];
+          params.argop_off_vec_0 = &out_matrix1[dst * N];
+          params.argop_off_vec_1 = &out_matrix2[dst * N];
           params.scale_vals = nullptr;
           if (has_idx) {
             params.in_matrix2 = in_matrix2;
             params.indices2 = &cur_csr.data[row_start];
           } else {
-            params.in_matrix2 = &in_matrix2[row_start];
+            params.in_matrix2 = &in_matrix2[row_start * N];
           }
           kernel(&params);
         }

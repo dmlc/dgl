@@ -62,6 +62,14 @@ from .geom_gcn import (
     TexasDataset,
     WisconsinDataset,
 )
+
+from .heterophilous_graphs import (
+    AmazonRatingsDataset,
+    MinesweeperDataset,
+    QuestionsDataset,
+    RomanEmpireDataset,
+    TolokersDataset,
+)
 from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset

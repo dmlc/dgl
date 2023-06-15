@@ -22,7 +22,7 @@ struct RPCBase {
   virtual void Finalize() = 0;
 
   /**
-   * @brief Communicator type: 'socket', 'tensorpipe', etc
+   * @brief Communicator type such as 'socket'.
    */
   virtual const std::string &NetType() const = 0;
 };

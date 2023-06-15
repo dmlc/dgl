@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ....batch import unbatch
-from ....transforms import shortest_dist
 
 
 class SpatialEncoder(nn.Module):
@@ -33,14 +32,19 @@ class SpatialEncoder(nn.Module):
     >>> import torch as th
     >>> import dgl
     >>> from dgl.nn import SpatialEncoder
+    >>> from dgl import shortest_dist
 
-    >>> u = th.tensor([0, 0, 0, 1, 1, 2, 3, 3])
-    >>> v = th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
-    >>> g = dgl.graph((u, v))
+    >>> g1 = dgl.graph(([0,0,0,1,1,2,3,3], [1,2,3,0,3,0,0,1]))
+    >>> g2 = dgl.graph(([0,1], [1,0]))
+    >>> n1, n2 = g1.num_nodes(), g2.num_nodes()
+    >>> # use -1 padding since shortest_dist returns -1 for unreachable node pairs
+    >>> dist = -th.ones((2, 4, 4), dtype=th.long)
+    >>> dist[0, :n1, :n1] = shortest_dist(g1, root=None, return_paths=False)
+    >>> dist[1, :n2, :n2] = shortest_dist(g2, root=None, return_paths=False)
     >>> spatial_encoder = SpatialEncoder(max_dist=2, num_heads=8)
-    >>> out = spatial_encoder(g)
+    >>> out = spatial_encoder(dist)
     >>> print(out.shape)
-    torch.Size([1, 4, 4, 8])
+    torch.Size([2, 4, 4, 8])
     """
 
     def __init__(self, max_dist, num_heads=1):
@@ -52,41 +56,29 @@ class SpatialEncoder(nn.Module):
             max_dist + 2, num_heads, padding_idx=0
         )
 
-    def forward(self, g):
+    def forward(self, dist):
         """
         Parameters
         ----------
-        g : DGLGraph
-            A DGLGraph to be encoded, which must be a homogeneous one.
+        dist : Tensor
+            Shortest path distance of the batched graph with -1 padding, a tensor
+            of shape :math:`(B, N, N)`, where :math:`B` is the batch size of
+            the batched graph, and :math:`N` is the maximum number of nodes.
 
         Returns
         -------
         torch.Tensor
             Return attention bias as spatial encoding of shape
-            :math:`(B, N, N, H)`, where :math:`N` is the maximum number of
-            nodes, :math:`B` is the batch size of the input graph, and
-            :math:`H` is :attr:`num_heads`.
+            :math:`(B, N, N, H)`, where :math:`H` is :attr:`num_heads`.
         """
-        device = g.device
-        g_list = unbatch(g)
-        max_num_nodes = th.max(g.batch_num_nodes())
-        spatial_encoding = th.zeros(
-            len(g_list), max_num_nodes, max_num_nodes, self.num_heads
-        ).to(device)
-
-        for i, ubg in enumerate(g_list):
-            num_nodes = ubg.num_nodes()
-            dist = (
-                th.clamp(
-                    shortest_dist(ubg, root=None, return_paths=False),
-                    min=-1,
-                    max=self.max_dist,
-                )
-                + 1
+        spatial_encoding = self.embedding_table(
+            th.clamp(
+                dist,
+                min=-1,
+                max=self.max_dist,
             )
-            # shape: [n, n, h], n = num_nodes, h = num_heads
-            dist_embedding = self.embedding_table(dist)
-            spatial_encoding[i, :num_nodes, :num_nodes] = dist_embedding
+            + 1
+        )
         return spatial_encoding
 
 

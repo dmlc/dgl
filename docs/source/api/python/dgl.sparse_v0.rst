@@ -33,6 +33,8 @@ Creation Ops
     from_coo
     from_csr
     from_csc
+    diag
+    identity
 
 Attributes and methods
 ``````````````````````
@@ -70,47 +72,6 @@ Attributes and methods
     SparseMatrix.smin
     SparseMatrix.smean
     SparseMatrix.softmax
-
-Diagonal matrix class
--------------------------
-.. currentmodule:: dgl.sparse
-
-.. class:: DiagMatrix
-
-Creators
-````````
-
-.. autosummary::
-    :toctree: ../../generated/
-
-    diag
-    identity
-
-Attributes and methods
-``````````````````````
-
-.. autosummary::
-    :toctree: ../../generated/
-
-    DiagMatrix.shape
-    DiagMatrix.nnz
-    DiagMatrix.dtype
-    DiagMatrix.device
-    DiagMatrix.val
-    DiagMatrix.to_sparse
-    DiagMatrix.to_dense
-    DiagMatrix.to
-    DiagMatrix.cuda
-    DiagMatrix.cpu
-    DiagMatrix.float
-    DiagMatrix.double
-    DiagMatrix.int
-    DiagMatrix.long
-    DiagMatrix.transpose
-    DiagMatrix.t
-    DiagMatrix.T
-    DiagMatrix.neg
-    DiagMatrix.inv
 
 Operators
 ---------

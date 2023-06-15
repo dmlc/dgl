@@ -5,16 +5,18 @@ primitives in cugraph-ops"""
 import torch
 from torch import nn
 
+from .cugraph_base import CuGraphBaseConv
+
 try:
-    from pylibcugraphops import make_fg_csr, make_mfg_csr
-    from pylibcugraphops.torch.autograd import mha_gat_n2n as GATConvAgg
+    from pylibcugraphops.pytorch import SampledCSC, StaticCSC
+    from pylibcugraphops.pytorch.operators import mha_gat_n2n as GATConvAgg
+
+    HAS_PYLIBCUGRAPHOPS = True
 except ImportError:
-    has_pylibcugraphops = False
-else:
-    has_pylibcugraphops = True
+    HAS_PYLIBCUGRAPHOPS = False
 
 
-class CuGraphGATConv(nn.Module):
+class CuGraphGATConv(CuGraphBaseConv):
     r"""Graph attention layer from `Graph Attention Networks
     <https://arxiv.org/pdf/1710.10903.pdf>`__, with the sparse aggregation
     accelerated by cugraph-ops.
@@ -22,7 +24,8 @@ class CuGraphGATConv(nn.Module):
     See :class:`dgl.nn.pytorch.conv.GATConv` for mathematical model.
 
     This module depends on :code:`pylibcugraphops` package, which can be
-    installed via :code:`conda install -c nvidia pylibcugraphops>=23.02`.
+    installed via :code:`conda install -c nvidia pylibcugraphops=23.04`.
+    :code:`pylibcugraphops` 23.04 requires python 3.8.x or 3.10.x.
 
     .. note::
         This is an **experimental** feature.
@@ -78,7 +81,7 @@ class CuGraphGATConv(nn.Module):
             [ 1.6477, -1.9986],
             [ 1.1138, -1.9302]]], device='cuda:0', grad_fn=<ViewBackward0>)
     """
-    MAX_IN_DEGREE_MFG = 500
+    MAX_IN_DEGREE_MFG = 200
 
     def __init__(
         self,
@@ -91,10 +94,11 @@ class CuGraphGATConv(nn.Module):
         activation=None,
         bias=True,
     ):
-        if has_pylibcugraphops is False:
+        if HAS_PYLIBCUGRAPHOPS is False:
             raise ModuleNotFoundError(
-                f"{self.__class__.__name__} requires pylibcugraphops >= 23.02. "
-                f"Install via `conda install -c nvidia 'pylibcugraphops>=23.02'`."
+                f"{self.__class__.__name__} requires pylibcugraphops=23.04. "
+                f"Install via `conda install -c nvidia 'pylibcugraphops=23.04'`."
+                f"pylibcugraphops requires Python 3.8 or 3.10."
             )
         super().__init__()
         self.in_feats = in_feats
@@ -170,25 +174,17 @@ class CuGraphGATConv(nn.Module):
                 max_in_degree = g.in_degrees().max().item()
 
             if max_in_degree < self.MAX_IN_DEGREE_MFG:
-                _graph = make_mfg_csr(
-                    g.dstnodes(),
+                _graph = SampledCSC(
                     offsets,
                     indices,
                     max_in_degree,
                     g.num_src_nodes(),
                 )
             else:
-                offsets_fg = torch.empty(
-                    g.num_src_nodes() + 1,
-                    dtype=offsets.dtype,
-                    device=offsets.device,
-                )
-                offsets_fg[: offsets.numel()] = offsets
-                offsets_fg[offsets.numel() :] = offsets[-1]
-
-                _graph = make_fg_csr(offsets_fg, indices)
+                offsets_fg = self.pad_offsets(offsets, g.num_src_nodes() + 1)
+                _graph = StaticCSC(offsets_fg, indices)
         else:
-            _graph = make_fg_csr(offsets, indices)
+            _graph = StaticCSC(offsets, indices)
 
         feat = self.feat_drop(feat)
         feat_transformed = self.fc(feat)
@@ -199,7 +195,6 @@ class CuGraphGATConv(nn.Module):
             self.num_heads,
             "LeakyReLU",
             self.negative_slope,
-            add_own_node=False,
             concat_heads=True,
         )[: g.num_dst_nodes()].view(-1, self.num_heads, self.out_feats)
 

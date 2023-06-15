@@ -177,7 +177,7 @@ def linkx_homophily(graph, y):
         num_nodes = graph.num_nodes()
         num_classes = y.max(dim=0).values.item() + 1
 
-        value = 0
+        value = torch.tensor(0.0).to(graph.device)
         for k in range(num_classes):
             # Get the nodes that belong to class k.
             class_mask = y == k

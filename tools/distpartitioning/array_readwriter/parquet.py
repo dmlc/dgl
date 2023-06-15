@@ -14,7 +14,7 @@ class ParquetArrayParser(object):
         pass
 
     def read(self, path):
-        logging.info("Reading from %s using parquet format" % path)
+        logging.debug("Reading from %s using parquet format" % path)
         metadata = pyarrow.parquet.read_metadata(path)
         metadata = metadata.schema.to_arrow_schema().metadata
 
@@ -36,16 +36,16 @@ class ParquetArrayParser(object):
         else:
             arr = table.to_pandas().to_numpy()
         if not shape:
-            logging.warning(
+            logging.debug(
                 "Shape information not found in the metadata, read the data as "
                 "a 2 dim array."
             )
-        logging.info("Done reading from %s" % path)
+        logging.debug("Done reading from %s" % path)
         shape = tuple(eval(shape.decode())) if shape else arr.shape
         return arr.reshape(shape)
 
     def write(self, path, array, vector_rows=False):
-        logging.info("Writing to %s using parquet format" % path)
+        logging.debug("Writing to %s using parquet format" % path)
         shape = array.shape
         if len(shape) > 2:
             array = array.reshape(shape[0], -1)
@@ -53,10 +53,10 @@ class ParquetArrayParser(object):
             table = pyarrow.table(
                 [pyarrow.array(array.tolist())], names=["vector"]
             )
-            logging.info("Writing to %s using single-vector rows..." % path)
+            logging.debug("Writing to %s using single-vector rows..." % path)
         else:
             table = pyarrow.Table.from_pandas(pd.DataFrame(array))
             table = table.replace_schema_metadata({"shape": str(shape)})
 
         pyarrow.parquet.write_table(table, path)
-        logging.info("Done writing to %s" % path)
+        logging.debug("Done writing to %s" % path)

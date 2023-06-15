@@ -27,7 +27,6 @@ def generate_graph():
     return g
 
 
-@pytest.mark.skip()
 @pytest.mark.parametrize(",".join(options.keys()), product(*options.values()))
 def test_relgraphconv_equality(
     idtype_int, max_in_degree, num_bases, regularizer, self_loop, to_block

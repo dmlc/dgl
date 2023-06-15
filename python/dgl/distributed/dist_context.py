@@ -12,7 +12,7 @@ import traceback
 from enum import Enum
 
 from .. import utils
-from ..base import DGLError
+from ..base import dgl_warning, DGLError
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import close_kvstore, init_kvstore
@@ -39,7 +39,6 @@ def _init_rpc(
     ip_config,
     num_servers,
     max_queue_size,
-    net_type,
     role,
     num_threads,
     group_id,
@@ -48,9 +47,7 @@ def _init_rpc(
     try:
         utils.set_num_threads(num_threads)
         if os.environ.get("DGL_DIST_MODE", "standalone") != "standalone":
-            connect_to_server(
-                ip_config, num_servers, max_queue_size, net_type, group_id
-            )
+            connect_to_server(ip_config, num_servers, max_queue_size, group_id)
         init_role(role)
         init_kvstore(ip_config, num_servers, role)
     except Exception as e:
@@ -211,7 +208,7 @@ class CustomPool:
 def initialize(
     ip_config,
     max_queue_size=MAX_QUEUE_SIZE,
-    net_type="socket",
+    net_type=None,
     num_worker_threads=1,
 ):
     """Initialize DGL's distributed module
@@ -231,9 +228,7 @@ def initialize(
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
     net_type : str, optional
-        Networking type. Valid options are: ``'socket'``, ``'tensorpipe'``.
-
-        Default: ``'socket'``
+        [Deprecated] Networking type, can be 'socket' only.
     num_worker_threads: int
         The number of OMP threads in each sampler process.
 
@@ -243,6 +238,10 @@ def initialize(
     distributed API. For example, when used with Pytorch, users have to invoke this function
     before Pytorch's `pytorch.distributed.init_process_group`.
     """
+    if net_type is not None:
+        dgl_warning(
+            "net_type is deprecated and will be removed in future release."
+        )
     if os.environ.get("DGL_ROLE", "client") == "server":
         from .dist_graph import DistGraphServer
 
@@ -273,7 +272,6 @@ def initialize(
             os.environ.get("DGL_CONF_PATH"),
             graph_format=formats,
             keep_alive=keep_alive,
-            net_type=net_type,
         )
         serv.start()
         sys.exit()
@@ -294,7 +292,6 @@ def initialize(
                     ip_config,
                     num_servers,
                     max_queue_size,
-                    net_type,
                     "sampler",
                     num_worker_threads,
                     group_id,
@@ -311,7 +308,6 @@ def initialize(
                 ip_config,
                 num_servers,
                 max_queue_size,
-                net_type,
                 group_id=group_id,
             )
         init_role("default")

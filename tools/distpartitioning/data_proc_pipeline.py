@@ -23,7 +23,7 @@ def log_params(params):
     print("No. partitions: ", params.num_parts)
     print("Output Dir: ", params.output)
     print("WorldSize: ", params.world_size)
-    print("Metis partitions: ", params.partitions_file)
+    print("Metis partitions: ", params.partitions_dir)
 
 
 if __name__ == "__main__":
