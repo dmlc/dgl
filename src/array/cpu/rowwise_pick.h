@@ -314,97 +314,112 @@ COOMatrix CSRRowWisePerEtypePick(
         std::vector<IdxType> et_idx(len);
         std::vector<IdxType> et_eid(len);
         std::iota(et_idx.begin(), et_idx.end(), 0);
-        for (int64_t j = 0; j < len; ++j) {
-          const IdxType homogenized_eid = eid ? eid[off + j] : off + j;
-          auto it = std::upper_bound(
+        // heterogenized eid is needed when
+        // 1. neighbors of each node is not sorted.
+        // 2. probs_or_mask is not empty as it is indexed by heterogenized eid.
+        if (!rowwise_etype_sorted || has_probs) {
+          for (int64_t j = 0; j < len; ++j) {
+            const IdxType homogenized_eid = eid ? eid[off + j] : off + j;
+            auto it = std::upper_bound(
+                eid2etype_offset.begin(), eid2etype_offset.end(),
+                homogenized_eid);
+            const IdxType heterogenized_etype = it - eid2etype_offset.begin() - 1;
+            const IdxType heterogenized_eid =
+                homogenized_eid - eid2etype_offset[heterogenized_etype];
+            et[j] = heterogenized_etype;
+            et_eid[j] = heterogenized_eid;
+          }
+          if (!rowwise_etype_sorted)  // the edge type is sorted, not need to sort
+                                      // it
+            std::sort(
+                et_idx.begin(), et_idx.end(),
+                [&et](IdxType i1, IdxType i2) { return et[i1] < et[i2]; });
+          CHECK_LT(et[et_idx[len - 1]], num_etypes)
+              << "etype values exceed the number of fanouts";
+        }
+
+        IdxType cur_et;
+        int64_t et_offset;
+        int64_t et_end = 0;
+        int64_t et_len;
+        while (et_end < len) {
+          et_offset = et_end;
+          if (!et.empty()) cur_et = et[et_idx[et_offset]];
+          else {
+            const IdxType eid_offset = off + et_idx[0];;
+            const IdxType homogenized_eid =
+                eid ? eid[eid_offset] : eid_offset;
+            auto it = std::upper_bound(
               eid2etype_offset.begin(), eid2etype_offset.end(),
               homogenized_eid);
-          const IdxType heterogenized_etype = it - eid2etype_offset.begin() - 1;
-          const IdxType heterogenized_eid =
-              homogenized_eid - eid2etype_offset[heterogenized_etype];
-          et[j] = heterogenized_etype;
-          et_eid[j] = heterogenized_eid;
-        }
-        if (!rowwise_etype_sorted)  // the edge type is sorted, not need to sort
-                                    // it
-          std::sort(
-              et_idx.begin(), et_idx.end(),
-              [&et](IdxType i1, IdxType i2) { return et[i1] < et[i2]; });
-        CHECK_LT(et[et_idx[len - 1]], num_etypes)
-            << "etype values exceed the number of fanouts";
-
-        IdxType cur_et = et[et_idx[0]];
-        int64_t et_offset = 0;
-        int64_t et_len = 1;
-        for (int64_t j = 0; j < len; ++j) {
-          CHECK((j + 1 == len) || (et[et_idx[j]] <= et[et_idx[j + 1]]))
-              << "Edge type is not sorted. Please sort in advance or specify "
-                 "'rowwise_etype_sorted' as false.";
-          if ((j + 1 == len) || cur_et != et[et_idx[j + 1]]) {
-            // 1 end of the current etype
-            // 2 end of the row
-            // random pick for current etype
-            if ((num_picks[cur_et] == -1) ||
-                (et_len <= num_picks[cur_et] && !replace)) {
-              // fast path, select all
-              for (int64_t k = 0; k < et_len; ++k) {
-                const IdxType eid_offset = off + et_idx[et_offset + k];
+            cur_et = it - eid2etype_offset.begin() - 1;
+          }
+          // Get et_end by binary search
+          auto cur_it = et_idx.begin() + et_offset;
+          auto next_it = std::upper_bound(
+              cur_it, et_idx.end(),
+              cur_et, [&](const IdxType v, const IdxType e) {
+                const IdxType eid_offset = off + et_idx[e];;
                 const IdxType homogenized_eid =
                     eid ? eid[eid_offset] : eid_offset;
                 auto it = std::upper_bound(
-                    eid2etype_offset.begin(), eid2etype_offset.end(),
-                    homogenized_eid);
-                const IdxType heterogenized_etype =
-                    it - eid2etype_offset.begin() - 1;
-                const IdxType heterogenized_eid =
-                    homogenized_eid - eid2etype_offset[heterogenized_etype];
-
-                if (!has_probs ||
-                    IsNullArray(prob_or_mask[heterogenized_etype])) {
-                  // No probability, select all
+                  eid2etype_offset.begin(), eid2etype_offset.end(),
+                  homogenized_eid);
+                auto element_et = it - eid2etype_offset.begin() - 1;
+                return v < element_et;
+              });
+          et_len = next_it - cur_it;
+          et_end = et_offset + et_len;
+          // 1 end of the current etype
+          // 2 end of the row
+          // random pick for current etype
+          if ((num_picks[cur_et] == -1) ||
+              (et_len <= num_picks[cur_et] && !replace)) {
+            // fast path, select all
+            for (int64_t k = 0; k < et_len; ++k) {
+              const IdxType neighbor_offset = et_idx[et_offset + k];
+              const IdxType eid_offset = off + neighbor_offset;
+              const IdxType homogenized_eid =
+                  eid ? eid[eid_offset] : eid_offset;
+              const auto heterogenized_etype = et[neighbor_offset];
+              const auto heterogenized_eid = et_eid[neighbor_offset];
+              if (!has_probs ||
+                  IsNullArray(prob_or_mask[heterogenized_etype])) {
+                // No probability, select all
+                rows.push_back(rid);
+                cols.push_back(indices[eid_offset]);
+                idx.push_back(homogenized_eid);
+              } else {
+                // Select the entries with non-zero probability
+                const NDArray& p = prob_or_mask[heterogenized_etype];
+                const DType* pdata = p.Ptr<DType>();
+                if (pdata[heterogenized_eid] > 0) {
                   rows.push_back(rid);
                   cols.push_back(indices[eid_offset]);
                   idx.push_back(homogenized_eid);
-                } else {
-                  // Select the entries with non-zero probability
-                  const NDArray& p = prob_or_mask[heterogenized_etype];
-                  const DType* pdata = p.Ptr<DType>();
-                  if (pdata[heterogenized_eid] > 0) {
-                    rows.push_back(rid);
-                    cols.push_back(indices[eid_offset]);
-                    idx.push_back(homogenized_eid);
-                  }
-                }
-              }
-            } else {
-              IdArray picked_idx =
-                  Full(-1, num_picks[cur_et], sizeof(IdxType) * 8, ctx);
-              IdxType* picked_idata = picked_idx.Ptr<IdxType>();
-
-              // need call random pick
-              pick_fn(
-                  off, et_offset, cur_et, et_len, et_idx, et_eid, eid,
-                  picked_idata);
-              for (int64_t k = 0; k < num_picks[cur_et]; ++k) {
-                const IdxType picked = picked_idata[k];
-                if (picked == -1) continue;
-                rows.push_back(rid);
-                cols.push_back(indices[off + et_idx[et_offset + picked]]);
-                if (eid) {
-                  idx.push_back(eid[off + et_idx[et_offset + picked]]);
-                } else {
-                  idx.push_back(off + et_idx[et_offset + picked]);
                 }
               }
             }
-
-            if (j + 1 == len) break;
-            // next etype
-            cur_et = et[et_idx[j + 1]];
-            et_offset = j + 1;
-            et_len = 1;
           } else {
-            et_len++;
+            IdArray picked_idx =
+                Full(-1, num_picks[cur_et], sizeof(IdxType) * 8, ctx);
+            IdxType* picked_idata = picked_idx.Ptr<IdxType>();
+
+            // need call random pick
+            pick_fn(
+                off, et_offset, cur_et, et_len, et_idx, et_eid, eid,
+                picked_idata);
+            for (int64_t k = 0; k < num_picks[cur_et]; ++k) {
+              const IdxType picked = picked_idata[k];
+              if (picked == -1) continue;
+              rows.push_back(rid);
+              cols.push_back(indices[off + et_idx[et_offset + picked]]);
+              if (eid) {
+                idx.push_back(eid[off + et_idx[et_offset + picked]]);
+              } else {
+                idx.push_back(off + et_idx[et_offset + picked]);
+              }
+            }
           }
         }
 
