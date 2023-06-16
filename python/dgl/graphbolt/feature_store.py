@@ -41,8 +41,9 @@ class FeatureStore:
             The updated value of the feature.
         ids : torch.Tensor, optional
             The indices of the feature to update. If specified, only the
-            specified indices of the feature will be updated and the indices and
-            value must have the same length. If None, the entire feature will be
+            specified indices of the feature will be updated. For the feature,
+            the `ids[i]` row is updated to `value[i]`. So the indices and value
+            must have the same length. If None, the entire feature will be
             updated.
         """
         raise NotImplementedError
@@ -139,8 +140,9 @@ class InMemoryFeatureStore(FeatureStore):
             The updated value of the feature.
         ids : torch.Tensor, optional
             The indices of the feature to update. If specified, only the
-            specified indices of the feature will be updated and the indices and
-            value must have the same length. If None, the entire feature will be
+            specified indices of the feature will be updated. For the feature,
+            the `ids[i]` row is updated to `value[i]`. So the indices and value
+            must have the same length. If None, the entire feature will be
             updated.
         """
         assert (
