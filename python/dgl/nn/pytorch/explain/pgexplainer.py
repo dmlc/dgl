@@ -272,17 +272,15 @@ class PGExplainer(nn.Module):
         if isinstance(nodes, int):
             nodes = [nodes]
 
+        pred = self.model(graph, feat, embed=False, **kwargs)
+        pred = pred.argmax(-1).data
+
         loss = 0.0
         for node_id in nodes:
-            pred = self.model(graph, feat, embed=False, **kwargs)
-            pred = pred[node_id].argmax(-1).data
-
             prob, _ = self.explain_node(
                 node_id, graph, feat, tmp=tmp, training=True, **kwargs
             )
-            prob = prob[node_id]
-
-            loss += self.loss(prob, pred)
+            loss += self.loss(prob[node_id], pred[node_id])
 
         return loss
 
