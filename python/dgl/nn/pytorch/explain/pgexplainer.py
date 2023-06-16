@@ -243,10 +243,10 @@ class PGExplainer(nn.Module):
         Parameters
         ----------
         nodes : int, iterable[int], tensor
-            The nodes from the graph used to train explanations, which cannot
+            The nodes from the graph used to train the explanation network, which cannot
             have any duplicate value.
         graph : DGLGraph
-            Input batched homogeneous graph.
+            Input homogeneous graph.
         feat : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
