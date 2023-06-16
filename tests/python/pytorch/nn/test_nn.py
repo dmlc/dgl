@@ -1846,6 +1846,9 @@ def test_pgexplainer(g, idtype, n_classes):
     model = model.to(ctx)
     explainer = nn.PGExplainer(model, n_classes, explain_graph=False)
     explainer.train_step_node(0, g, g.ndata["attr"], 5.0)
+    explainer.train_step_node([0], g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(th.tensor(0), g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(th.tensor([0]), g, g.ndata["attr"], 5.0)
 
     probs, edge_weight = explainer.explain_node(0, g, feat)
 

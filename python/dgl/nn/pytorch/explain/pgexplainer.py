@@ -237,13 +237,14 @@ class PGExplainer(nn.Module):
         loss = self.loss(prob, pred)
         return loss
 
-    def train_step_node(self, node_id, graph, feat, tmp, **kwargs):
+    def train_step_node(self, nodes, graph, feat, tmp, **kwargs):
         r"""Compute the loss of the explanation network
 
         Parameters
         ----------
-        node_id : int
-            The ID of the node to target for training.
+        nodes : int, iterable[int], tensor
+            The nodes from the graph used to train explanations, which cannot
+            have any duplicate value.
         graph : DGLGraph
             Input batched homogeneous graph.
         feat : Tensor
@@ -266,15 +267,23 @@ class PGExplainer(nn.Module):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        pred = self.model(graph, feat, embed=False, **kwargs)
-        pred = pred[node_id].argmax(-1).data
+        if isinstance(nodes, torch.Tensor):
+            nodes = nodes.tolist()
+        if isinstance(nodes, int):
+            nodes = [nodes]
 
-        prob, _ = self.explain_node(
-            node_id, graph, feat, tmp=tmp, training=True, **kwargs
-        )
-        prob = prob[node_id]
+        loss = 0.0
+        for node_id in nodes:
+            pred = self.model(graph, feat, embed=False, **kwargs)
+            pred = pred[node_id].argmax(-1).data
 
-        loss = self.loss(prob, pred)
+            prob, _ = self.explain_node(
+                node_id, graph, feat, tmp=tmp, training=True, **kwargs
+            )
+            prob = prob[node_id]
+
+            loss += self.loss(prob, pred)
+
         return loss
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
