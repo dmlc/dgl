@@ -1,3 +1,4 @@
+import pytest
 import torch
 from dgl import graphbolt as gb
 
@@ -27,14 +28,8 @@ def test_in_memory_feature_store():
         feature_store.read("a", torch.tensor([0, 2])),
         torch.tensor([0, 2]),
     )
-    try:
+    with pytest.raises(AssertionError):
         feature_store.read("d")
-        assert False
-    except AssertionError:
-        pass
 
-    try:
+    with pytest.raises(IndexError):
         feature_store.read("a", torch.tensor([0, 1, 2, 3]))
-        assert False
-    except IndexError:
-        pass
