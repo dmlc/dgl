@@ -22,7 +22,6 @@
 #include "./network/common.h"
 #include "./rpc_msg.h"
 #include "./server_state.h"
-#include "net_type.h"
 #include "network/socket_communicator.h"
 
 namespace dgl {
@@ -81,12 +80,12 @@ struct RPCContext {
   /**
    * @brief Sender communicator.
    */
-  std::shared_ptr<RPCSender> sender;
+  std::shared_ptr<network::SocketSender> sender;
 
   /**
    * @brief Receiver communicator.
    */
-  std::shared_ptr<RPCReceiver> receiver;
+  std::shared_ptr<network::SocketReceiver> receiver;
 
   /**
    * @brief Server state data.
