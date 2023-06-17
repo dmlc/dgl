@@ -21,7 +21,8 @@ namespace impl {
 template <typename DType, typename IdType>
 __global__ void IndexSelectMultiKernelAligned(
     const DType* const array, const int64_t num_feat, const IdType* const index,
-    const int64_t length, const int64_t arr_len, DType* const out) {
+    const int64_t length, const int64_t arr_len, DType* const out,
+    const int64_t* perm = nullptr) {
   int64_t out_row = blockIdx.x * blockDim.y + threadIdx.y;
 
   const int64_t stride = blockDim.y * gridDim.x;
@@ -34,9 +35,10 @@ __global__ void IndexSelectMultiKernelAligned(
         ((uint64_t)(&array[in_row * num_feat]) % CACHE_LINE_SIZE) /
         sizeof(DType);
     col = col - idx_offset;
+    const auto out_row_ = perm ? perm[out_row] : out_row;
     while (col < num_feat) {
       if (col >= 0)
-        out[out_row * num_feat + col] = array[in_row * num_feat + col];
+        out[out_row_ * num_feat + col] = array[in_row * num_feat + col];
       col += blockDim.x;
     }
     out_row += stride;
