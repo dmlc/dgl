@@ -6,7 +6,6 @@
 #include <dgl/array.h>
 
 #include "../../../runtime/cuda/cuda_common.h"
-#include "../../array_op.h"
 #include "../array_index_select.cuh"
 #include "../utils.h"
 #include "./array_index_select_uvm.cuh"
@@ -37,7 +36,7 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   if (len == 0 || arr_len * num_feat == 0) return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
 
-  auto res = dgl::aten::Sort(index, (int)sizeof(IdType) * 8);
+  auto res = Sort(index, cuda::_NumberOfBits(arr_len));
   const IdType* idx_data = static_cast<IdType*>(res.first->data);
   const int64_t* perm_data = static_cast<int64_t*>(res.second->data);
 
