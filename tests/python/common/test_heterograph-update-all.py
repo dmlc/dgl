@@ -339,7 +339,8 @@ def test_issue_5873():
         {
             ("A", "AB", "B"): ([0, 1, 2, 3], [0, 0, 1, 1]),
             ("C", "CB", "B"): ([0, 1, 2, 3], [2, 2, 3, 3]),
-        }
+        },
+        device=F.ctx(),
     )
     g.nodes["A"].data["x"] = F.randn((4, 16))
     g.nodes["C"].data["x"] = F.randn((4, 16))
