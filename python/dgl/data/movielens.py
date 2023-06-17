@@ -4,21 +4,21 @@ import os
 import numpy as np
 import pandas as pd
 
-
 from torch import LongTensor, Tensor
+
+from ..base import dgl_warning
 from ..convert import heterograph
 from .dgl_dataset import DGLDataset
-from ..base import dgl_warning
 
 from .utils import (
+    _get_dgl_url,
     download,
+    extract_archive,
     load_graphs,
     load_info,
     save_graphs,
     save_info,
     split_dataset,
-    extract_archive,
-    _get_dgl_url
 )
 
 GENRES_ML_100K = [
@@ -52,12 +52,14 @@ except ImportError:
 else:
     HAS_TORCH = True
 
+
 def check_pytorch():
     """Check if PyTorch is the backend."""
     if not HAS_TORCH:
         raise ModuleNotFoundError(
             "MovieLensDataset requires PyTorch to be the backend."
         )
+
 
 class MovieLensDataset(DGLDataset):
     r"""MovieLens dataset for edge prediction tasks. The raw datasets are extracted from
@@ -139,7 +141,7 @@ class MovieLensDataset(DGLDataset):
     >>> train_mask = g.edges['user-movie'].data['train_mask']
     >>> valid_mask = g.edges['user-movie'].data['valid_mask']
     >>> test_mask = g.edges['user-movie'].data['test_mask']
-            
+
     >>> # get train, valid and test ratings
     >>> train_ratings = rate[train_mask]
     >>> valid_ratings = rate[valid_mask]
@@ -172,7 +174,7 @@ class MovieLensDataset(DGLDataset):
         force_reload=None,
         verbose=None,
         transform=None,
-        random_state=0
+        random_state=0,
     ):
         check_pytorch()
         assert name in [
@@ -182,18 +184,25 @@ class MovieLensDataset(DGLDataset):
         ], f"currently movielens does not support {name}"
 
         # test regarding valid and test split ratio
-        assert valid_ratio > 0.0 and valid_ratio < 1.0, f"valid_ratio {valid_ratio} must be in (0.0, 1.0)"
+        assert (
+            valid_ratio > 0.0 and valid_ratio < 1.0
+        ), f"valid_ratio {valid_ratio} must be in (0.0, 1.0)"
 
-        if name in ['ml-1m', 'ml-10m']:
-            assert test_ratio is not None and test_ratio > 0.0 and test_ratio < 1.0, \
-                f"test_ratio({test_ratio}) must be set to a value in (0.0, 1.0) when using ml-1m and ml-10m"
-            assert test_ratio + valid_ratio > 0.0 and test_ratio + valid_ratio < 1.0, \
-                f"test_ratio({test_ratio}) + valid_ratio({valid_ratio}) must be set to (0.0, 1.0) when using ml-1m and ml-10m"
+        if name in ["ml-1m", "ml-10m"]:
+            assert (
+                test_ratio is not None and test_ratio > 0.0 and test_ratio < 1.0
+            ), f"test_ratio({test_ratio}) must be set to a value in (0.0, 1.0) when using ml-1m and ml-10m"
+            assert (
+                test_ratio + valid_ratio > 0.0
+                and test_ratio + valid_ratio < 1.0
+            ), f"test_ratio({test_ratio}) + valid_ratio({valid_ratio}) must be set to (0.0, 1.0) when using ml-1m and ml-10m"
 
-        if name == 'ml-100k' and test_ratio is not None:
-            dgl_warning(f"test_ratio ({test_ratio}) is not set to None for ml-100k. "
-                           "Note that dataset split would not be affected by the test_ratio since "
-                           "testing samples of ml-100k have been pre-specified.")
+        if name == "ml-100k" and test_ratio is not None:
+            dgl_warning(
+                f"test_ratio ({test_ratio}) is not set to None for ml-100k. "
+                "Note that dataset split would not be affected by the test_ratio since "
+                "testing samples of ml-100k have been pre-specified."
+            )
 
         self.valid_ratio = valid_ratio
         self.test_ratio = test_ratio
@@ -219,19 +228,25 @@ class MovieLensDataset(DGLDataset):
 
     def check_version(self):
         valid_ratio, test_ratio = load_info(self.version_path)
-        if self.valid_ratio == valid_ratio and (self.test_ratio == test_ratio if self.name != "ml-100k" else True):
+        if self.valid_ratio == valid_ratio and (
+            self.test_ratio == test_ratio if self.name != "ml-100k" else True
+        ):
             return True
         else:
-            if self.name == 'ml-100k':
-                print(f"The current valid ratio ({self.valid_ratio}) "
+            if self.name == "ml-100k":
+                print(
+                    f"The current valid ratio ({self.valid_ratio}) "
                     "is not the same as the last setting "
                     f"(valid: {valid_ratio}). "
-                    f"MovieLens {self.name} will be re-processed with the new dataset split setting.")
+                    f"MovieLens {self.name} will be re-processed with the new dataset split setting."
+                )
             else:
-                print(f"At least one of current valid ({self.valid_ratio}) and test ({self.test_ratio}) ratio "
+                print(
+                    f"At least one of current valid ({self.valid_ratio}) and test ({self.test_ratio}) ratio "
                     "are not the same as the last setting "
                     f"(valid: {valid_ratio}, test: {test_ratio}). "
-                    f"MovieLens {self.name} will be re-processed with the new dataset split setting.")
+                    f"MovieLens {self.name} will be re-processed with the new dataset split setting."
+                )
             return False
 
     def download(self):
@@ -243,7 +258,9 @@ class MovieLensDataset(DGLDataset):
         print(f"Starting processing {self.name} ...")
 
         # 0. loading movie features
-        movie_feat = load_info(os.path.join(self.raw_path, 'movie_feat.pkl')).to(torch.float)
+        movie_feat = load_info(
+            os.path.join(self.raw_path, "movie_feat.pkl")
+        ).to(torch.float)
         # 1. dataset split: train + (valid + ) test
         if self.name == "ml-100k":
             train_rating_data = self._load_raw_rates(
@@ -256,7 +273,8 @@ class MovieLensDataset(DGLDataset):
             train, valid, _ = split_dataset(
                 indices,
                 [1 - self.valid_ratio, self.valid_ratio, 0.0],
-                shuffle=True, random_state=self.random_state
+                shuffle=True,
+                random_state=self.random_state,
             )
             train_rating_data, valid_rating_data = (
                 train_rating_data.iloc[train.indices],
@@ -278,7 +296,8 @@ class MovieLensDataset(DGLDataset):
                     self.valid_ratio,
                     self.test_ratio,
                 ],
-                shuffle=True, random_state=self.random_state
+                shuffle=True,
+                random_state=self.random_state,
             )
             train_rating_data, valid_rating_data, test_rating_data = (
                 all_rating_data.iloc[train.indices],
@@ -312,77 +331,105 @@ class MovieLensDataset(DGLDataset):
         }
 
         # pair value is idx rather than id
-        u_indices, v_indices, labels = self._generate_pair_value(all_rating_data)
+        u_indices, v_indices, labels = self._generate_pair_value(
+            all_rating_data
+        )
         all_rating_pairs = (
             LongTensor(u_indices),
             LongTensor(v_indices),
         )
         all_rating_values = Tensor(labels)
 
-        graph = self.construct_g(all_rating_pairs, all_rating_values, user_feat, movie_feat)
-        self.graph = self.add_masks(graph, train_rating_data, valid_rating_data, test_rating_data)
+        graph = self.construct_g(
+            all_rating_pairs, all_rating_values, user_feat, movie_feat
+        )
+        self.graph = self.add_masks(
+            graph, train_rating_data, valid_rating_data, test_rating_data
+        )
 
         print(f"End processing {self.name} ...")
 
     def construct_g(self, rate_pairs, rate_values, user_feat, movie_feat):
-        g = heterograph({
-            ('user', 'user-movie', 'movie'): (rate_pairs[0], rate_pairs[1]),
-            ('movie', 'movie-user', 'user'): (rate_pairs[1], rate_pairs[0])
-        })
-        ndata = {
-            'user': user_feat,
-            'movie': movie_feat
-        }
-        edata = {
-            'user-movie': rate_values,
-            'movie-user': rate_values
-        }
-        g.ndata['feat'] = ndata
-        g.edata['rate'] = edata
+        g = heterograph(
+            {
+                ("user", "user-movie", "movie"): (rate_pairs[0], rate_pairs[1]),
+                ("movie", "movie-user", "user"): (rate_pairs[1], rate_pairs[0]),
+            }
+        )
+        ndata = {"user": user_feat, "movie": movie_feat}
+        edata = {"user-movie": rate_values, "movie-user": rate_values}
+        g.ndata["feat"] = ndata
+        g.edata["rate"] = edata
         return g
 
-    def add_masks(self, g, train_rating_data, valid_rating_data, test_rating_data):
-        train_u_indices, train_v_indices, _ = self._generate_pair_value(train_rating_data)
-        valid_u_indices, valid_v_indices, _ = self._generate_pair_value(valid_rating_data)
-        test_u_indices, test_v_indices, _ = self._generate_pair_value(test_rating_data)
+    def add_masks(
+        self, g, train_rating_data, valid_rating_data, test_rating_data
+    ):
+        train_u_indices, train_v_indices, _ = self._generate_pair_value(
+            train_rating_data
+        )
+        valid_u_indices, valid_v_indices, _ = self._generate_pair_value(
+            valid_rating_data
+        )
+        test_u_indices, test_v_indices, _ = self._generate_pair_value(
+            test_rating_data
+        )
 
         # user-movie
-        train_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.bool)
-        train_mask[g.edge_ids(train_u_indices, train_v_indices, etype='user-movie')] = True
-        valid_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.bool)
-        valid_mask[g.edge_ids(valid_u_indices, valid_v_indices, etype='user-movie')] = True
-        test_mask = torch.zeros((g.num_edges('user-movie'),), dtype=torch.bool)
-        test_mask[g.edge_ids(test_u_indices, test_v_indices, etype='user-movie')] = True
+        train_mask = torch.zeros((g.num_edges("user-movie"),), dtype=torch.bool)
+        train_mask[
+            g.edge_ids(train_u_indices, train_v_indices, etype="user-movie")
+        ] = True
+        valid_mask = torch.zeros((g.num_edges("user-movie"),), dtype=torch.bool)
+        valid_mask[
+            g.edge_ids(valid_u_indices, valid_v_indices, etype="user-movie")
+        ] = True
+        test_mask = torch.zeros((g.num_edges("user-movie"),), dtype=torch.bool)
+        test_mask[
+            g.edge_ids(test_u_indices, test_v_indices, etype="user-movie")
+        ] = True
 
-        g.edges['user-movie'].data['train_mask'] = train_mask
-        g.edges['user-movie'].data['valid_mask'] = valid_mask
-        g.edges['user-movie'].data['test_mask'] = test_mask
+        g.edges["user-movie"].data["train_mask"] = train_mask
+        g.edges["user-movie"].data["valid_mask"] = valid_mask
+        g.edges["user-movie"].data["test_mask"] = test_mask
 
         # movie-user
-        train_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.bool)
-        train_mask_rev[g.edge_ids(train_v_indices, train_u_indices, etype='movie-user')] = True
-        valid_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.bool)
-        valid_mask_rev[g.edge_ids(valid_v_indices, valid_u_indices, etype='movie-user')] = True
-        test_mask_rev = torch.zeros((g.num_edges('movie-user'),), dtype=torch.bool)
-        test_mask_rev[g.edge_ids(test_v_indices, test_u_indices, etype='movie-user')] = True
+        train_mask_rev = torch.zeros(
+            (g.num_edges("movie-user"),), dtype=torch.bool
+        )
+        train_mask_rev[
+            g.edge_ids(train_v_indices, train_u_indices, etype="movie-user")
+        ] = True
+        valid_mask_rev = torch.zeros(
+            (g.num_edges("movie-user"),), dtype=torch.bool
+        )
+        valid_mask_rev[
+            g.edge_ids(valid_v_indices, valid_u_indices, etype="movie-user")
+        ] = True
+        test_mask_rev = torch.zeros(
+            (g.num_edges("movie-user"),), dtype=torch.bool
+        )
+        test_mask_rev[
+            g.edge_ids(test_v_indices, test_u_indices, etype="movie-user")
+        ] = True
 
-        g.edges['movie-user'].data['train_mask'] = train_mask_rev
-        g.edges['movie-user'].data['valid_mask'] = valid_mask_rev
-        g.edges['movie-user'].data['test_mask'] = test_mask_rev
+        g.edges["movie-user"].data["train_mask"] = train_mask_rev
+        g.edges["movie-user"].data["valid_mask"] = valid_mask_rev
+        g.edges["movie-user"].data["test_mask"] = test_mask_rev
 
         return g
 
     def has_cache(self):
-        if os.path.exists(self.graph_path) and \
-           os.path.exists(self.version_path) and self.check_version():
+        if (
+            os.path.exists(self.graph_path)
+            and os.path.exists(self.version_path)
+            and self.check_version()
+        ):
             return True
         return False
 
     def save(self):
-        save_graphs(
-            self.graph_path,
-            [self.graph]
-        )
+        save_graphs(self.graph_path, [self.graph])
         save_info(self.version_path, [self.valid_ratio, self.test_ratio])
         if self.verbose:
             print(f"Done saving data into {self.raw_path}.")
@@ -391,15 +438,21 @@ class MovieLensDataset(DGLDataset):
         g_list, _ = load_graphs(self.graph_path)
         self.graph = g_list[0]
 
-        '''
+        """
         To avoid the problem each time loading boolean tensor from the disk, boolean values
         would be automatically converted into torch.uint8 types, and a deprecation warning would
         be raised for using torch.uint8
-        '''
+        """
         for e in self.graph.etypes:
-            self.graph.edges[e].data['train_mask'] = self.graph.edges[e].data['train_mask'].to(torch.bool)
-            self.graph.edges[e].data['valid_mask'] = self.graph.edges[e].data['valid_mask'].to(torch.bool)
-            self.graph.edges[e].data['test_mask'] = self.graph.edges[e].data['test_mask'].to(torch.bool)
+            self.graph.edges[e].data["train_mask"] = (
+                self.graph.edges[e].data["train_mask"].to(torch.bool)
+            )
+            self.graph.edges[e].data["valid_mask"] = (
+                self.graph.edges[e].data["valid_mask"].to(torch.bool)
+            )
+            self.graph.edges[e].data["test_mask"] = (
+                self.graph.edges[e].data["test_mask"].to(torch.bool)
+            )
 
     def __getitem__(self, idx):
         assert (
