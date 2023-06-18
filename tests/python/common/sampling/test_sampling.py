@@ -685,9 +685,7 @@ def _test_sample_labors(hypersparse, prob):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, False)
 
     def _test1(p):
-        subg = dgl.sampling.sample_labors(
-            g, [0, 1], -1, prob=p
-        )[0]
+        subg = dgl.sampling.sample_labors(g, [0, 1], -1, prob=p)[0]
         assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.in_edges([0, 1], form="all")
@@ -702,9 +700,7 @@ def _test_sample_labors(hypersparse, prob):
         assert uv == uv_ans
 
         for i in range(10):
-            subg = dgl.sampling.sample_labors(
-                g, [0, 1], 2, prob=p
-            )[0]
+            subg = dgl.sampling.sample_labors(g, [0, 1], 2, prob=p)[0]
             assert subg.num_nodes() == g.num_nodes()
             assert subg.num_edges() >= 0
             u, v = subg.edges()
@@ -724,9 +720,7 @@ def _test_sample_labors(hypersparse, prob):
     _test1(prob)
 
     def _test2(p):  # fanout > #neighbors
-        subg = dgl.sampling.sample_labors(
-            g, [0, 2], -1, prob=p
-        )[0]
+        subg = dgl.sampling.sample_labors(g, [0, 2], -1, prob=p)[0]
         assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
         u_ans, v_ans, e_ans = g.in_edges([0, 2], form="all")
@@ -741,9 +735,7 @@ def _test_sample_labors(hypersparse, prob):
         assert uv == uv_ans
 
         for i in range(10):
-            subg = dgl.sampling.sample_labors(
-                g, [0, 2], 2, prob=p
-            )[0]
+            subg = dgl.sampling.sample_labors(g, [0, 2], 2, prob=p)[0]
             assert subg.num_nodes() == g.num_nodes()
             assert subg.num_edges() >= 0
             u, v = subg.edges()
@@ -790,7 +782,7 @@ def _test_sample_labors(hypersparse, prob):
         subg = dgl.sampling.sample_labors(
             hg,
             {"user": [0, 1], "game": 0, "coin": 0},
-            {"follow": 1, "play": 2, "liked-by": 0, "flips": g.num_nodes()}
+            {"follow": 1, "play": 2, "liked-by": 0, "flips": g.num_nodes()},
         )[0]
         assert len(subg.ntypes) == 3
         assert len(subg.etypes) == 4
@@ -1085,15 +1077,19 @@ def test_sample_neighbors_noprob():
     _test_sample_neighbors(False, None)
     # _test_sample_neighbors(True)
 
+
 def test_sample_labors_noprob():
     _test_sample_labors(False, None)
+
 
 def test_sample_neighbors_prob():
     _test_sample_neighbors(False, "prob")
     # _test_sample_neighbors(True)
 
+
 def test_sample_labors_prob():
     _test_sample_labors(False, "prob")
+
 
 def test_sample_neighbors_outedge():
     _test_sample_neighbors_outedge(False)
