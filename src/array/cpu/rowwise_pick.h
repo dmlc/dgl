@@ -257,7 +257,6 @@ COOMatrix CSRRowWisePerEtypePick(
       CHECK_LT(rid, mat.num_rows);
       const IdxType off = indptr[rid];
       const IdxType len = indptr[rid + 1] - off;
-
       // do something here
       if (len == 0) {
         picked_rows[i] = NewIdArray(0, ctx, sizeof(IdxType) * 8);
@@ -310,14 +309,16 @@ COOMatrix CSRRowWisePerEtypePick(
         std::vector<IdxType> cols;
         std::vector<IdxType> idx;
 
-        std::vector<IdxType> et(len);
+        std::vector<IdxType> et;
         std::vector<IdxType> et_idx(len);
-        std::vector<IdxType> et_eid(len);
+        std::vector<IdxType> et_eid;
         std::iota(et_idx.begin(), et_idx.end(), 0);
         // heterogenized eid is needed when
         // 1. neighbors of each node is not sorted.
         // 2. probs_or_mask is not empty as it is indexed by heterogenized eid.
         if (!rowwise_etype_sorted || has_probs) {
+          et.resize(len);
+          et_eid.resize(len);
           for (int64_t j = 0; j < len; ++j) {
             const IdxType homogenized_eid = eid ? eid[off + j] : off + j;
             auto it = std::upper_bound(
@@ -346,7 +347,7 @@ COOMatrix CSRRowWisePerEtypePick(
           et_offset = et_end;
           if (!et.empty()) cur_et = et[et_idx[et_offset]];
           else {
-            const IdxType eid_offset = off + et_idx[0];;
+            const IdxType eid_offset = off + et_idx[et_offset];
             const IdxType homogenized_eid =
                 eid ? eid[eid_offset] : eid_offset;
             auto it = std::upper_bound(
@@ -370,11 +371,10 @@ COOMatrix CSRRowWisePerEtypePick(
               });
           et_len = next_it - cur_it;
           et_end = et_offset + et_len;
-          // 1 end of the current etype
-          // 2 end of the row
-          // random pick for current etype
+
           if ((num_picks[cur_et] == -1) ||
               (et_len <= num_picks[cur_et] && !replace)) {
+            std::cout << "fast path" << std::endl;
             // fast path, select all
             for (int64_t k = 0; k < et_len; ++k) {
               const IdxType neighbor_offset = et_idx[et_offset + k];
@@ -404,13 +404,14 @@ COOMatrix CSRRowWisePerEtypePick(
             IdArray picked_idx =
                 Full(-1, num_picks[cur_et], sizeof(IdxType) * 8, ctx);
             IdxType* picked_idata = picked_idx.Ptr<IdxType>();
-
+            std::cout << "pick_fn" << std::endl;
             // need call random pick
             pick_fn(
                 off, et_offset, cur_et, et_len, et_idx, et_eid, eid,
                 picked_idata);
             for (int64_t k = 0; k < num_picks[cur_et]; ++k) {
               const IdxType picked = picked_idata[k];
+              std::cout << picked << std::endl;
               if (picked == -1) continue;
               rows.push_back(rid);
               cols.push_back(indices[off + et_idx[et_offset + picked]]);
