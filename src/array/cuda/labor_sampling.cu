@@ -248,8 +248,7 @@ template <typename IdType, typename FloatType>
 __global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
     const IdType hop_size, const IdType num_rows, const IdType* const indptr,
     const IdType* const subindptr, const IdType* const subindptr_aligned,
-    const IdType* const in_deg, const IdType* const indices,
-    IdType* const hop) {
+    const IdType* const indices, IdType* const hop) {
   constexpr int num_elements = CACHE_LINE_SIZE / sizeof(IdType);
   IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
@@ -257,7 +256,8 @@ __global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
   while (tx < hop_size) {
     const IdType rpos =
         dgl::cuda::_UpperBound(subindptr_aligned, num_rows, tx) - 1;
-    const auto d = in_deg[rpos];
+    const auto out_row = subindptr[rpos];
+    const auto d = subindptr[rpos + 1] - out_row;
     const int offset =
         ((uint64_t)(indices + indptr[rpos] - subindptr_aligned[rpos] % num_elements + num_elements) %
          CACHE_LINE_SIZE) /
@@ -267,7 +267,7 @@ __global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
       const auto in_idx = indptr[rpos] + rofs;
       assert((uint64_t)(indices + in_idx - tx) % CACHE_LINE_SIZE == 0);
       const auto u = indices[in_idx];
-      hop[subindptr[rpos] + rofs] = u;
+      hop[out_row + rofs] = u;
     }
     tx += stride_x;
   }
@@ -631,7 +631,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CUDA_KERNEL_CALL(
         (_CSRRowWiseOneHopExtractorAlignedKernel<IdType, FloatType>), grid,
         block, 0, stream, hop_size, num_rows, indptr.get(), subindptr,
-        subindptr_aligned.get(), in_deg.get(), indices_, hop_1);
+        subindptr_aligned.get(), indices_, hop_1);
   }
   const auto indices = is_pinned ? hop_1 : indices_;
 
