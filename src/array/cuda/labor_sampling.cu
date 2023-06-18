@@ -318,7 +318,7 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
           for (int idx = threadIdx.x; idx < degree; idx += CTA_SIZE) {
             const auto w = A[in_row_start + idx];
             const auto ps = probs ? probs[out_row_start + idx] : w;
-            var_1 += w * w / min(ONE, c * ps);
+            var_1 += w > 0 ? w * w / min(ONE, c * ps) : 0;
           }
         } else {
           for (int idx = threadIdx.x; idx < degree; idx += CTA_SIZE) {

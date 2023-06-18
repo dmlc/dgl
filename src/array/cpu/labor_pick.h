@@ -31,7 +31,6 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <numeric>
 #include <string>
@@ -124,7 +123,9 @@ auto compute_importance_sampling_probabilities(
         var_1 = 0;
         if (weighted) {
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-            var_1 += A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]]);
+            var_1 += A[j] > 0
+                         ? A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]])
+                         : 0;
         } else {
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
             var_1 += ONE / std::min(ONE, c * ps[j - indptr[rid]]);
@@ -209,7 +210,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   IdArray picked_col = NDArray::Empty({hop_size}, vidtype, ctx);
   IdArray picked_idx = NDArray::Empty({hop_size}, vidtype, ctx);
   FloatArray picked_imp =
-      NDArray::Empty({importance_sampling ? hop_size : 0}, dtype, ctx);
+      importance_sampling ? NewFloatArray(hop_size, ctx, sizeof(FloatType) * 8)
+                          : NullArray();
   IdxType* picked_rdata = picked_row.Ptr<IdxType>();
   IdxType* picked_cdata = picked_col.Ptr<IdxType>();
   IdxType* picked_idata = picked_idx.Ptr<IdxType>();
