@@ -66,11 +66,12 @@ struct TransformOp {
   const IdType* subindptr;
   const IdType* indices;
   const IdType* data_arr;
+  bool is_pinned;
   __host__ __device__ auto operator()(IdType idx) {
     const auto in_row = idx_coo[idx];
     const auto row = rows[in_row];
     const auto in_idx = indptr[in_row] + idx - subindptr[in_row];
-    const auto u = indices[in_idx];
+    const auto u = indices[!is_pinned ? in_idx : idx];
     const auto data = data_arr ? data_arr[in_idx] : in_idx;
     return thrust::make_tuple(row, u, data);
   }
@@ -90,13 +91,14 @@ struct TransformOpImp {
   const IdType* subindptr;
   const IdType* indices;
   const IdType* data_arr;
+  bool is_pinned;
   __host__ __device__ auto operator()(IdType idx) {
     const auto ps = probs[idx];
     const auto in_row = idx_coo[idx];
     const auto c = cs[in_row];
     const auto row = rows[in_row];
     const auto in_idx = indptr[in_row] + idx - subindptr[in_row];
-    const auto u = indices[in_idx];
+    const auto u = indices[!is_pinned ? in_idx : idx];
     const auto w = A[in_idx];
     const auto w2 = B[in_idx];
     const auto data = data_arr ? data_arr[in_idx] : in_idx;
@@ -126,12 +128,13 @@ struct StencilOpFused {
   const IdType* indptr;
   const IdType* indices;
   const IdType* nids;
+  bool is_pinned;
   __device__ auto operator()(IdType idx) {
     const auto in_row = idx_coo[idx];
     const auto ps = probs[idx];
     IdType rofs = idx - subindptr[in_row];
     const auto in_idx = indptr[in_row] + rofs;
-    const auto u = indices[in_idx];
+    const auto u = indices[!is_pinned ? in_idx : idx];
     const auto t = nids ? nids[u] : u;  // t in the paper
     curandStatePhilox4_32_10_t rng;
     // rolled random number r_t is a function of the random_seed and t
@@ -216,14 +219,56 @@ __global__ void _CSRRowWiseOneHopExtractorKernel(
     IdType rpos = idx_coo[tx];
     IdType rofs = tx - subindptr[rpos];
     const auto in_idx = indptr[rpos] + rofs;
-    const auto u = indices[in_idx];
-    hop[tx] = u;
+    const auto not_pinned = indices != hop;
+    const auto u = indices[not_pinned ? in_idx : tx];
+    if (not_pinned) hop[tx] = u;
     const auto v = nids ? nids[u] : u;
     // 123123 is just a number with no significance.
     curand_init(123123, rand_seed, v, &rng);
     const float rnd = curand_uniform(&rng);
     if (A) A_l[tx] = A[in_idx];
     rands[tx] = (FloatType)rnd;
+    tx += stride_x;
+  }
+}
+
+constexpr int CACHE_LINE_SIZE = 128;
+
+template <typename IdType>
+struct AlignmentFunc {
+  static_assert(CACHE_LINE_SIZE % sizeof(IdType) == 0);
+  const IdType* in_deg;
+  __host__ __device__ auto operator()(IdType row) {
+    constexpr int num_elements = CACHE_LINE_SIZE / sizeof(IdType);
+    return in_deg[row] + num_elements - 1;
+  }
+};
+
+template <typename IdType, typename FloatType>
+__global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
+    const IdType hop_size, const IdType num_rows, const IdType* const indptr,
+    const IdType* const subindptr, const IdType* const subindptr_aligned,
+    const IdType* const in_deg, const IdType* const indices,
+    IdType* const hop) {
+  constexpr int num_elements = CACHE_LINE_SIZE / sizeof(IdType);
+  IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+
+  while (tx < hop_size) {
+    const IdType rpos =
+        dgl::cuda::_UpperBound(subindptr_aligned, num_rows, tx) - 1;
+    const auto d = in_deg[rpos];
+    const int offset =
+        ((uint64_t)(indices + indptr[rpos] - subindptr_aligned[rpos] % num_elements + num_elements) %
+         CACHE_LINE_SIZE) /
+        sizeof(IdType);
+    const IdType rofs = tx - subindptr_aligned[rpos] - offset;
+    if (rofs >= 0 && rofs < d) {
+      const auto in_idx = indptr[rpos] + rofs;
+      assert((uint64_t)(indices + in_idx - tx) % CACHE_LINE_SIZE == 0);
+      const auto u = indices[in_idx];
+      hop[subindptr[rpos] + rofs] = u;
+    }
     tx += stride_x;
   }
 }
@@ -485,7 +530,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   FloatType* const A = prob_arr.Ptr<FloatType>();
 
   IdType* const indptr_ = mat.indptr.Ptr<IdType>();
-  IdType* const indices = mat.indices.Ptr<IdType>();
+  IdType* const indices_ = mat.indices.Ptr<IdType>();
   IdType* const data = CSRHasData(mat) ? mat.data.Ptr<IdType>() : nullptr;
 
   // Read indptr only once in case it is pinned and access is slow.
@@ -561,6 +606,35 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   auto idx_coo = idx_coo_arr.Ptr<IdType>();
 
   auto hop_1 = hop_arr.Ptr<IdType>();
+  const bool is_pinned = mat.indices.IsPinned();
+  if (is_pinned) {
+    IdType hop_size;
+    auto subindptr_aligned = allocator.alloc_unique<IdType>(num_rows + 1);
+    {
+      auto modified_in_deg = thrust::make_transform_iterator(
+          iota, AlignmentFunc<IdType>{in_deg.get()});
+      size_t prefix_temp_size = 0;
+      CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+          nullptr, prefix_temp_size, modified_in_deg, subindptr_aligned.get(),
+          num_rows + 1, stream));
+      auto temp = allocator.alloc_unique<char>(prefix_temp_size);
+      CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+          temp.get(), prefix_temp_size, modified_in_deg,
+          subindptr_aligned.get(), num_rows + 1, stream));
+
+      device->CopyDataFromTo(
+          subindptr_aligned.get(), num_rows * sizeof(hop_size), &hop_size, 0,
+          sizeof(hop_size), ctx, DGLContext{kDGLCPU, 0}, mat.indptr->dtype);
+    }
+    const dim3 block(BLOCK_SIZE);
+    const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    CUDA_KERNEL_CALL(
+        (_CSRRowWiseOneHopExtractorAlignedKernel<IdType, FloatType>), grid,
+        block, 0, stream, hop_size, num_rows, indptr.get(), subindptr,
+        subindptr_aligned.get(), in_deg.get(), indices_, hop_1);
+  }
+  const auto indices = is_pinned ? hop_1 : indices_;
+
   auto rands =
       allocator.alloc_unique<FloatType>(importance_sampling ? hop_size : 1);
   auto probs_found =
@@ -623,7 +697,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
             TransformOpImp<
                 IdType, FloatType, FloatType*, FloatType*, decltype(one)>{
                 probs_found.get(), A, one, idx_coo, rows, cs, indptr.get(),
-                subindptr, indices, data});
+                subindptr, indices, data, is_pinned});
         auto stencil =
             thrust::make_zip_iterator(idx_coo, probs_found.get(), rands.get());
         num_edges =
@@ -637,7 +711,7 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
             TransformOpImp<
                 IdType, FloatType, FloatType*, decltype(one), decltype(one)>{
                 probs_found.get(), one, one, idx_coo, rows, cs, indptr.get(),
-                subindptr, indices, data});
+                subindptr, indices, data, is_pinned});
         auto stencil =
             thrust::make_zip_iterator(idx_coo, probs_found.get(), rands.get());
         num_edges =
@@ -656,11 +730,11 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
             TransformOpImp<
                 IdType, FloatType, decltype(one), FloatType*, FloatType*>{
                 one, A, A, idx_coo, rows, cs, indptr.get(), subindptr, indices,
-                data});
+                data, is_pinned});
         const auto pred =
             StencilOpFused<IdType, FloatType, decltype(one), FloatType*>{
-                random_seed, idx_coo,      cs,      one, A,
-                subindptr,   indptr.get(), indices, nids};
+                random_seed, idx_coo,      cs,      one,  A,
+                subindptr,   indptr.get(), indices, nids, is_pinned};
         num_edges = thrust::copy_if(
                         exec_policy, iota, iota + hop_size, iota,
                         transformed_output, pred) -
@@ -670,11 +744,12 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
             picked_row_data, picked_col_data, picked_idx_data);
         auto transformed_output = thrust::make_transform_output_iterator(
             output, TransformOp<IdType>{
-                        idx_coo, rows, indptr.get(), subindptr, indices, data});
+                        idx_coo, rows, indptr.get(), subindptr, indices, data,
+                        is_pinned});
         const auto pred =
             StencilOpFused<IdType, FloatType, decltype(one), decltype(one)>{
-                random_seed, idx_coo,      cs,      one, one,
-                subindptr,   indptr.get(), indices, nids};
+                random_seed, idx_coo,      cs,      one,  one,
+                subindptr,   indptr.get(), indices, nids, is_pinned};
         num_edges = thrust::copy_if(
                         exec_policy, iota, iota + hop_size, iota,
                         transformed_output, pred) -
