@@ -374,7 +374,6 @@ COOMatrix CSRRowWisePerEtypePick(
 
           if ((num_picks[cur_et] == -1) ||
               (et_len <= num_picks[cur_et] && !replace)) {
-            std::cout << "fast path" << std::endl;
             // fast path, select all
             for (int64_t k = 0; k < et_len; ++k) {
               const IdxType neighbor_offset = et_idx[et_offset + k];
@@ -404,14 +403,12 @@ COOMatrix CSRRowWisePerEtypePick(
             IdArray picked_idx =
                 Full(-1, num_picks[cur_et], sizeof(IdxType) * 8, ctx);
             IdxType* picked_idata = picked_idx.Ptr<IdxType>();
-            std::cout << "pick_fn" << std::endl;
             // need call random pick
             pick_fn(
                 off, et_offset, cur_et, et_len, et_idx, et_eid, eid,
                 picked_idata);
             for (int64_t k = 0; k < num_picks[cur_et]; ++k) {
               const IdxType picked = picked_idata[k];
-              std::cout << picked << std::endl;
               if (picked == -1) continue;
               rows.push_back(rid);
               cols.push_back(indices[off + et_idx[et_offset + picked]]);
