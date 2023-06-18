@@ -22,7 +22,7 @@ def test_in_memory_feature_store():
         feature_store.read("c", torch.tensor([1])),
         torch.tensor([[4, 5, 6]]),
     )
-    feature_store.write("a", torch.tensor([0, 1, 2]))
+    feature_store.update("a", torch.tensor([0, 1, 2]))
     assert torch.equal(feature_store.read("a"), torch.tensor([0, 1, 2]))
     assert torch.equal(
         feature_store.read("a", torch.tensor([0, 2])),
