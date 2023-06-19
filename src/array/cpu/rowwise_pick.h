@@ -324,14 +324,15 @@ COOMatrix CSRRowWisePerEtypePick(
             auto it = std::upper_bound(
                 eid2etype_offset.begin(), eid2etype_offset.end(),
                 homogenized_eid);
-            const IdxType heterogenized_etype = it - eid2etype_offset.begin() - 1;
+            const IdxType heterogenized_etype =
+                it - eid2etype_offset.begin() - 1;
             const IdxType heterogenized_eid =
                 homogenized_eid - eid2etype_offset[heterogenized_etype];
             et[j] = heterogenized_etype;
             et_eid[j] = heterogenized_eid;
           }
-          if (!rowwise_etype_sorted)  // the edge type is sorted, not need to sort
-                                      // it
+          if (!rowwise_etype_sorted)  // the edge type is sorted, not need to
+                                      // sort it
             std::sort(
                 et_idx.begin(), et_idx.end(),
                 [&et](IdxType i1, IdxType i2) { return et[i1] < et[i2]; });
@@ -345,27 +346,28 @@ COOMatrix CSRRowWisePerEtypePick(
         int64_t et_len;
         while (et_end < len) {
           et_offset = et_end;
-          if (!et.empty()) cur_et = et[et_idx[et_offset]];
+          if (!et.empty())
+            cur_et = et[et_idx[et_offset]];
           else {
             const IdxType eid_offset = off + et_idx[et_offset];
-            const IdxType homogenized_eid =
-                eid ? eid[eid_offset] : eid_offset;
+            const IdxType homogenized_eid = eid ? eid[eid_offset] : eid_offset;
             auto it = std::upper_bound(
-              eid2etype_offset.begin(), eid2etype_offset.end(),
-              homogenized_eid);
+                eid2etype_offset.begin(), eid2etype_offset.end(),
+                homogenized_eid);
             cur_et = it - eid2etype_offset.begin() - 1;
           }
           // Get et_end by binary search
           auto cur_it = et_idx.begin() + et_offset;
           auto next_it = std::upper_bound(
-              cur_it, et_idx.end(),
-              cur_et, [&](const IdxType v, const IdxType e) {
-                const IdxType eid_offset = off + et_idx[e];;
+              cur_it, et_idx.end(), cur_et,
+              [&](const IdxType v, const IdxType e) {
+                const IdxType eid_offset = off + et_idx[e];
+                ;
                 const IdxType homogenized_eid =
                     eid ? eid[eid_offset] : eid_offset;
                 auto it = std::upper_bound(
-                  eid2etype_offset.begin(), eid2etype_offset.end(),
-                  homogenized_eid);
+                    eid2etype_offset.begin(), eid2etype_offset.end(),
+                    homogenized_eid);
                 auto element_et = it - eid2etype_offset.begin() - 1;
                 return v < element_et;
               });
