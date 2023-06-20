@@ -238,31 +238,33 @@ template <typename IdType>
 struct AlignmentFunc {
   static_assert(CACHE_LINE_SIZE % sizeof(IdType) == 0);
   const IdType* in_deg;
+  const int64_t* perm;
+  IdType num_rows;
   __host__ __device__ auto operator()(IdType row) {
     constexpr int num_elements = CACHE_LINE_SIZE / sizeof(IdType);
-    return in_deg[row] + num_elements - 1;
+    return in_deg[perm ? perm[row % num_rows] : row] + num_elements - 1;
   }
 };
 
-template <typename IdType, typename FloatType>
+template <typename IdType>
 __global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
     const IdType hop_size, const IdType num_rows, const IdType* const indptr,
     const IdType* const subindptr, const IdType* const subindptr_aligned,
-    const IdType* const indices, IdType* const hop) {
-  constexpr int num_elements = CACHE_LINE_SIZE / sizeof(IdType);
+    const IdType* const indices, IdType* const hop, const int64_t* const perm) {
   IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
 
   while (tx < hop_size) {
-    const IdType rpos =
+    const IdType rpos_ =
         dgl::cuda::_UpperBound(subindptr_aligned, num_rows, tx) - 1;
+    const IdType rpos = perm ? perm[rpos_] : rpos_;
     const auto out_row = subindptr[rpos];
     const auto d = subindptr[rpos + 1] - out_row;
     const int offset =
-        ((uint64_t)(indices + indptr[rpos] - subindptr_aligned[rpos] % num_elements + num_elements) %
+        ((uint64_t)(indices + indptr[rpos] - subindptr_aligned[rpos_]) %
          CACHE_LINE_SIZE) /
         sizeof(IdType);
-    const IdType rofs = tx - subindptr_aligned[rpos] - offset;
+    const IdType rofs = tx - subindptr_aligned[rpos_] - offset;
     if (rofs >= 0 && rofs < d) {
       const auto in_idx = indptr[rpos] + rofs;
       assert((uint64_t)(indices + in_idx - tx) % CACHE_LINE_SIZE == 0);
@@ -343,6 +345,13 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
 
 }  // namespace
 
+template <typename IdType>
+int log_size(const IdType size) {
+  for (int i = 0; i < static_cast<int>(sizeof(IdType)) * 8; i++)
+    if ((size >> i) <= (IdType)1) return i;
+  return sizeof(IdType) * 8;
+}
+
 template <typename IdType, typename FloatType, typename exec_policy_t>
 void compute_importance_sampling_probabilities(
     CSRMatrix mat, const IdType hop_size, cudaStream_t stream,
@@ -367,11 +376,7 @@ void compute_importance_sampling_probabilities(
                            : NullArray();
   auto A_l = A_l_arr.Ptr<FloatType>();
 
-  const uint64_t max_log_num_vertices = [&]() -> int {
-    for (int i = 0; i < static_cast<int>(sizeof(IdType)) * 8; i++)
-      if (mat.num_cols <= ((IdType)1) << i) return i;
-    return sizeof(IdType) * 8;
-  }();
+  const int max_log_num_vertices = log_size(mat.num_cols);
 
   {  // extracts the onehop neighborhood cols to a contiguous range into hop_1
     const dim3 block(BLOCK_SIZE);
@@ -608,11 +613,14 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   auto hop_1 = hop_arr.Ptr<IdType>();
   const bool is_pinned = mat.indices.IsPinned();
   if (is_pinned) {
-    IdType hop_size;
+    const auto res = Sort(rows_arr, log_size(mat.num_rows));
+    const int64_t* perm = static_cast<int64_t*>(res.second->data);
+
+    IdType hop_size;  // Shadows the original one as this is temporary
     auto subindptr_aligned = allocator.alloc_unique<IdType>(num_rows + 1);
     {
       auto modified_in_deg = thrust::make_transform_iterator(
-          iota, AlignmentFunc<IdType>{in_deg.get()});
+          iota, AlignmentFunc<IdType>{in_deg.get(), perm, num_rows});
       size_t prefix_temp_size = 0;
       CUDA_CALL(cub::DeviceScan::ExclusiveSum(
           nullptr, prefix_temp_size, modified_in_deg, subindptr_aligned.get(),
@@ -629,9 +637,9 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     const dim3 block(BLOCK_SIZE);
     const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
     CUDA_KERNEL_CALL(
-        (_CSRRowWiseOneHopExtractorAlignedKernel<IdType, FloatType>), grid,
-        block, 0, stream, hop_size, num_rows, indptr.get(), subindptr,
-        subindptr_aligned.get(), indices_, hop_1);
+        (_CSRRowWiseOneHopExtractorAlignedKernel<IdType>), grid, block, 0,
+        stream, hop_size, num_rows, indptr.get(), subindptr,
+        subindptr_aligned.get(), indices_, hop_1, perm);
   }
   const auto indices = is_pinned ? hop_1 : indices_;
 
