@@ -313,6 +313,20 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     else:
         raise ValueError("unsupported mode {}".format(exclude_mode))
 
+class SpotTarget(object):
+    def __init__(self, g, degree_threshold=10):
+        self.g = g
+        self.degree_threshold = degree_threshold
+
+    def __call__(self, seed_edges, reverse_eids, reverse_etypes, output_device):
+        g = self.g
+        src, dst = g.find_edges(seed_edges)
+        head_degree = g.in_degrees(src)
+        tail_degree = g.in_degrees(dst)
+        degree = torch.min(head_degree, tail_degree)
+        degree_mask = degree < self.degree_threshold
+        edges_need_to_exclude = seed_edges[degree_mask]
+        return find_exclude_eids(g, edges_need_to_exclude, "reverse_id", reverse_eids, reverse_etypes, output_device)
 
 def find_exclude_eids(
     g,
@@ -476,14 +490,22 @@ class EdgePredictionSampler(Sampler):
         pair_graph.edata[EID] = eids
         seed_nodes = pair_graph.ndata[NID]
 
-        exclude_eids = find_exclude_eids(
-            g,
-            seed_edges,
-            exclude,
-            self.reverse_eids,
-            self.reverse_etypes,
-            self.output_device,
-        )
+        if isinstance(exclude, str) is False:
+            exclude_eids = exclude(
+                seed_edges,
+                self.reverse_eids,
+                self.reverse_etypes,
+                self.output_device,
+            )
+        else:
+            exclude_eids = find_exclude_eids(
+                g,
+                seed_edges,
+                exclude,
+                self.reverse_eids,
+                self.reverse_etypes,
+                self.output_device,
+            )
 
         input_nodes, _, blocks = self.sampler.sample(
             g, seed_nodes, exclude_eids
@@ -495,7 +517,6 @@ class EdgePredictionSampler(Sampler):
             return self.assign_lazy_features(
                 (input_nodes, pair_graph, neg_graph, blocks)
             )
-
 
 def as_edge_prediction_sampler(
     sampler,
