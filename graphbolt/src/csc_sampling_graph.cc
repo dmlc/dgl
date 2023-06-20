@@ -144,10 +144,9 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr_.scalar_type(), "parallel_for", ([&] {
         torch::parallel_for(0, num_nodes, 32, [&](scalar_t b, scalar_t e) {
-          const int64_t* nodes_data = nodes.data_ptr<int64_t>();
           const scalar_t* indptr_data = indptr_.data_ptr<scalar_t>();
           for (scalar_t i = b; i < e; ++i) {
-            const auto nid = nodes_data[i];
+            const auto nid = nodes[i].item<int64_t>();
             TORCH_CHECK(
                 nid >= 0 && nid < NumNodes(),
                 "The seed nodes' IDs should fall within the range of the "
