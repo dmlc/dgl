@@ -346,9 +346,9 @@ COOMatrix CSRRowWisePerEtypePick(
         int64_t et_len;
         while (et_end < len) {
           et_offset = et_end;
-          if (!et.empty())
+          if (!et.empty()) {
             cur_et = et[et_idx[et_offset]];
-          else {
+          } else {
             const IdxType eid_offset = off + et_idx[et_offset];
             const IdxType homogenized_eid = eid ? eid[eid_offset] : eid_offset;
             auto it = std::upper_bound(
@@ -362,7 +362,6 @@ COOMatrix CSRRowWisePerEtypePick(
               cur_it, et_idx.end(), cur_et,
               [&](const IdxType v, const IdxType e) {
                 const IdxType eid_offset = off + et_idx[e];
-                ;
                 const IdxType homogenized_eid =
                     eid ? eid[eid_offset] : eid_offset;
                 auto it = std::upper_bound(
