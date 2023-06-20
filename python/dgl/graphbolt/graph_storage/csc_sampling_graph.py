@@ -265,6 +265,9 @@ class CSCSamplingGraph:
         """
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
+        assert (
+            nodes.dtype == torch.long
+        ), f"Nodes is expected to be of type 'long' but got '{nodes.dtype}'."
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
         if fanouts.size(0) > 1:
             assert (
