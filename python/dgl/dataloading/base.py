@@ -323,6 +323,7 @@ class SpotTarget(object):
         src, dst = g.find_edges(seed_edges)
         head_degree = g.in_degrees(src)
         tail_degree = g.in_degrees(dst)
+        import torch
         degree = torch.min(head_degree, tail_degree)
         degree_mask = degree < self.degree_threshold
         edges_need_to_exclude = seed_edges[degree_mask]
