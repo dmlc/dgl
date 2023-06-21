@@ -9,6 +9,12 @@ import torch.nn.functional as F
 from ....batch import unbatch
 
 
+def gaussian(x, mean, std):
+    pi = 3.14159
+    a = (2*pi) ** 0.5
+    return th.exp(-0.5 * (((x - mean) / std) ** 2)) / (a * std)
+
+
 class SpatialEncoder(nn.Module):
     r"""Spatial Encoder, as introduced in
     `Do Transformers Really Perform Bad for Graph Representation?
@@ -90,7 +96,7 @@ class SpatialEncoder3d(nn.Module):
     This module encodes pair-wise relation between atom pair :math:`(i,j)` in
     the 3D geometric space, according to the Gaussian Basis Kernel function:
 
-    :math:`\psi _{(i,j)} ^k = -\frac{1}{\sqrt{2\pi} \lvert \sigma^k \rvert}
+    :math:`\psi _{(i,j)} ^k = \frac{1}{\sqrt{2\pi} \lvert \sigma^k \rvert}
     \exp{\left ( -\frac{1}{2} \left( \frac{\gamma_{(i,j)} \lvert \lvert r_i -
     r_j \rvert \rvert + \beta_{(i,j)} - \mu^k}{\lvert \sigma^k \rvert} \right)
     ^2 \right)}，k=1,...,K,`
@@ -103,14 +109,14 @@ class SpatialEncoder3d(nn.Module):
     Parameters
     ----------
     num_kernels : int
-        Number of Gaussian Basis Kernels to be applied.
-        Each Gaussian Basis Kernel contains a learnable kernel center
-        and a learnable scaling factor.
+        Number of Gaussian Basis Kernels to be applied. Each Gaussian Basis 
+        Kernel contains a learnable kernel center and a learnable scaling 
+        factor.
     num_heads : int, optional
         Number of attention heads if multi-head attention mechanism is applied.
         Default : 1.
     max_node_type : int, optional
-        Maximum number of node types. Default : 1.
+        Maximum number of node types. Default : 100.
 
     Examples
     --------
@@ -118,20 +124,17 @@ class SpatialEncoder3d(nn.Module):
     >>> import dgl
     >>> from dgl.nn import SpatialEncoder3d
 
-    >>> u = th.tensor([0, 0, 0, 1, 1, 2, 3, 3])
-    >>> v = th.tensor([1, 2, 3, 0, 3, 0, 0, 1])
-    >>> g = dgl.graph((u, v))
-    >>> coordinate = th.rand(4, 3)
-    >>> node_type = th.tensor([1, 0, 2, 1])
+    >>> coordinate = th.rand(1, 4, 3)
+    >>> node_type = th.tensor([[1, 0, 2, 1]])
     >>> spatial_encoder = SpatialEncoder3d(num_kernels=4,
     ...                                    num_heads=8,
     ...                                    max_node_type=3)
-    >>> out = spatial_encoder(g, coordinate, node_type=node_type)
+    >>> out = spatial_encoder(coordinate, node_type=node_type)
     >>> print(out.shape)
     torch.Size([1, 4, 4, 8])
     """
 
-    def __init__(self, num_kernels, num_heads=1, max_node_type=1):
+    def __init__(self, num_kernels, num_heads=1, max_node_type=100):
         super().__init__()
         self.num_kernels = num_kernels
         self.num_heads = num_heads
@@ -140,107 +143,62 @@ class SpatialEncoder3d(nn.Module):
         self.gaussian_stds = nn.Embedding(1, num_kernels)
         self.linear_layer_1 = nn.Linear(num_kernels, num_kernels)
         self.linear_layer_2 = nn.Linear(num_kernels, num_heads)
-        if max_node_type == 1:
-            self.mul = nn.Embedding(1, 1)
-            self.bias = nn.Embedding(1, 1)
-        else:
-            self.mul = nn.Embedding(max_node_type + 1, 2)
-            self.bias = nn.Embedding(max_node_type + 1, 2)
+        # default mul/bias at position 0 (no node type given)
+        # src mul/bias at position 1 (pad) ~ max_node_type+1
+        # tgt mul/bias at position max_node_type+2 (pad) ~ 2*max_node_type+2
+        self.mul = nn.Embedding(2 * max_node_type + 3, 1, padding_idx=0)
+        self.bias = nn.Embedding(2 * max_node_type + 3, 1, padding_idx=0)
+
         nn.init.uniform_(self.gaussian_means.weight, 0, 3)
         nn.init.uniform_(self.gaussian_stds.weight, 0, 3)
-        nn.init.constant_(self.mul.weight, 0)
-        nn.init.constant_(self.bias.weight, 1)
+        nn.init.constant_(self.mul.weight, 1)
+        nn.init.constant_(self.bias.weight, 0)
 
-    def forward(self, g, coord, node_type=None):
+    def forward(self, coord, node_type=None):
         """
         Parameters
         ----------
-        g : DGLGraph
-            A DGLGraph to be encoded, which must be a homogeneous one.
         coord : torch.Tensor
-            3D coordinates of nodes in :attr:`g`,
-            of shape :math:`(N, 3)`,
-            where :math:`N`: is the number of nodes in :attr:`g`.
+            3D coordinates of nodes in shape :math:`(B, N, 3)`, where :math:`B` is the batch size, :math:`N`: is the maximum number of nodes.
         node_type : torch.Tensor, optional
-            Node types of :attr:`g`. Default : None.
+            Node type ids of nodes. Default : None.
 
-            * If :attr:`max_node_type` is not 1, :attr:`node_type` needs to
-              be a tensor in shape :math:`(N,)`. The scaling factors of
-              each pair of nodes are determined by their node types.
-            * Otherwise, :attr:`node_type` should be None.
+            * If specified, :attr:`node_type` should be a tensor in shape
+              :math:`(B, N,)`. The scaling factors in gaussian kernels of each
+              pair of nodes are determined by their node types.
+            * Otherwise, :attr:`node_type` will be set to zeros in the same
+              shape.
 
         Returns
         -------
         torch.Tensor
             Return attention bias as 3D spatial encoding of shape
-            :math:`(B, n, n, H)`, where :math:`B` is the batch size, :math:`n`
-            is the maximum number of nodes in unbatched graphs from :attr:`g`,
-            and :math:`H` is :attr:`num_heads`.
+            :math:`(B, N, N, H)`, where :math:`H` is :attr:`num_heads`.
         """
+        bsz, N = coord.shape[:2]
+        euc_dist = th.cdist(coord, coord, p=2.) # shape: [B, n, n]
+        if node_type is None:
+            node_type = th.zeros([bsz, N, N, 2], device=coord.device).long()
+        else:
+            src_node_type = node_type.unsqueeze(-1).repeat(1, 1, N)
+            tgt_node_type = node_type.unsqueeze(1).repeat(1, N, 1)
+            node_type = th.stack(
+                [src_node_type + 2, tgt_node_type + self.max_node_type + 3],
+                dim=-1
+            ) # shape: [B, n, n, 2]
 
-        device = g.device
-        g_list = unbatch(g)
-        max_num_nodes = th.max(g.batch_num_nodes())
-        spatial_encoding = th.zeros(
-            len(g_list), max_num_nodes, max_num_nodes, self.num_heads
-        ).to(device)
-        sum_num_nodes = 0
-        if (self.max_node_type == 1) != (node_type is None):
-            raise ValueError(
-                "input node_type should be None if and only if "
-                "max_node_type is 1."
-            )
-        for i, ubg in enumerate(g_list):
-            num_nodes = ubg.num_nodes()
-            sub_coord = coord[sum_num_nodes : sum_num_nodes + num_nodes]
-            # shape: [n, n], n = num_nodes
-            euc_dist = th.cdist(sub_coord, sub_coord, p=2)
-            if node_type is None:
-                # shape: [1]
-                mul = self.mul.weight[0, 0]
-                bias = self.bias.weight[0, 0]
-            else:
-                sub_node_type = node_type[
-                    sum_num_nodes : sum_num_nodes + num_nodes
-                ]
-                mul_embedding = self.mul(sub_node_type)
-                bias_embedding = self.bias(sub_node_type)
-                # shape: [n, n]
-                mul = mul_embedding[:, 0].unsqueeze(-1).repeat(
-                    1, num_nodes
-                ) + mul_embedding[:, 1].unsqueeze(0).repeat(num_nodes, 1)
-                bias = bias_embedding[:, 0].unsqueeze(-1).repeat(
-                    1, num_nodes
-                ) + bias_embedding[:, 1].unsqueeze(0).repeat(num_nodes, 1)
-            # shape: [n, n, k], k = num_kernels
-            scaled_dist = (
-                (mul * euc_dist + bias)
-                .repeat(self.num_kernels, 1, 1)
-                .permute((1, 2, 0))
-            )
-            # shape: [k]
-            gaussian_mean = self.gaussian_means.weight.float().view(-1)
-            gaussian_var = (
-                self.gaussian_stds.weight.float().view(-1).abs() + 1e-2
-            )
-            # shape: [n, n, k]
-            gaussian_kernel = (
-                (
-                    -0.5
-                    * (
-                        th.div(
-                            scaled_dist - gaussian_mean, gaussian_var
-                        ).square()
-                    )
-                )
-                .exp()
-                .div(-math.sqrt(2 * math.pi) * gaussian_var)
-            )
+        # scaled euclidean distance
+        mul = self.mul(node_type).sum(dim=-2) # shape: [B, n, n, 1]
+        bias = self.bias(node_type).sum(dim=-2) # shape: [B, n, n, 1]
+        euc_dist = mul * euc_dist.unsqueeze(-1) + bias # shape: [B, n, n, 1]
+        # gaussian basis kernel
+        euc_dist = euc_dist.expand(-1, -1, -1, self.num_kernels)
+        mean = self.gaussian_means.weight.float().view(-1)
+        std = self.gaussian_stds.weight.float().view(-1).abs() + 1e-2
+        gaussian_kernel = gaussian(euc_dist, mean, std) # shape: [B, n, n, K]
+        # linear projection
+        encoding = self.linear_layer_1(gaussian_kernel)
+        encoding = F.gelu(encoding)
+        encoding = self.linear_layer_2(encoding) # shape: [B, n, n, H]
 
-            encoding = self.linear_layer_1(gaussian_kernel)
-            encoding = F.gelu(encoding)
-            # [n, n, k] -> [n, n, a], a = num_heads
-            encoding = self.linear_layer_2(encoding)
-            spatial_encoding[i, :num_nodes, :num_nodes] = encoding
-            sum_num_nodes += num_nodes
-        return spatial_encoding
+        return encoding

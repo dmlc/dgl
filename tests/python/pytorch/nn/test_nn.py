@@ -2551,10 +2551,8 @@ def test_SpatialEncoder(max_dist, num_kernels, num_heads):
     g2 = dgl.graph(
         (th.tensor([0, 1, 2, 3, 2, 5]), th.tensor([1, 2, 3, 4, 0, 3]))
     ).to(dev)
-    bg = dgl.batch([g1, g2])
-    ndata = th.rand(bg.num_nodes(), 3).to(dev)
-    num_nodes = bg.num_nodes()
-    node_type = th.randint(0, 512, (num_nodes,)).to(dev)
+    coord = th.rand(2, 6, 3).to(dev)
+    node_type = th.randint(0, 512, (2, 6,)).to(dev)
     dist = -th.ones((2, 6, 6), dtype=th.long).to(dev)
     dist[0, :4, :4] = shortest_dist(g1, root=None, return_paths=False)
     dist[1, :6, :6] = shortest_dist(g2, root=None, return_paths=False)
@@ -2564,8 +2562,8 @@ def test_SpatialEncoder(max_dist, num_kernels, num_heads):
         num_kernels, num_heads=num_heads, max_node_type=512
     ).to(dev)
     encoding = model_1(dist)
-    encoding3d_1 = model_2(bg, ndata)
-    encoding3d_2 = model_3(bg, ndata, node_type)
+    encoding3d_1 = model_2(coord)
+    encoding3d_2 = model_3(coord, node_type)
     assert encoding.shape == (2, 6, 6, num_heads)
     assert encoding3d_1.shape == (2, 6, 6, num_heads)
     assert encoding3d_2.shape == (2, 6, 6, num_heads)
