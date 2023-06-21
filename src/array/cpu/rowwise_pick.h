@@ -381,17 +381,15 @@ COOMatrix CSRRowWisePerEtypePick(
               const IdxType eid_offset = off + neighbor_offset;
               const IdxType homogenized_eid =
                   eid ? eid[eid_offset] : eid_offset;
-              const auto heterogenized_etype = et[neighbor_offset];
-              const auto heterogenized_eid = et_eid[neighbor_offset];
-              if (!has_probs ||
-                  IsNullArray(prob_or_mask[heterogenized_etype])) {
+              if (!has_probs || IsNullArray(prob_or_mask[cur_et])) {
                 // No probability, select all
                 rows.push_back(rid);
                 cols.push_back(indices[eid_offset]);
                 idx.push_back(homogenized_eid);
               } else {
                 // Select the entries with non-zero probability
-                const NDArray& p = prob_or_mask[heterogenized_etype];
+                const auto heterogenized_eid = et_eid[neighbor_offset];
+                const NDArray& p = prob_or_mask[cur_et];
                 const DType* pdata = p.Ptr<DType>();
                 if (pdata[heterogenized_eid] > 0) {
                   rows.push_back(rid);
