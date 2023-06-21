@@ -2552,7 +2552,14 @@ def test_SpatialEncoder(max_dist, num_kernels, num_heads):
         (th.tensor([0, 1, 2, 3, 2, 5]), th.tensor([1, 2, 3, 4, 0, 3]))
     ).to(dev)
     coord = th.rand(2, 6, 3).to(dev)
-    node_type = th.randint(0, 512, (2, 6,)).to(dev)
+    node_type = th.randint(
+        0,
+        512,
+        (
+            2,
+            6,
+        ),
+    ).to(dev)
     dist = -th.ones((2, 6, 6), dtype=th.long).to(dev)
     dist[0, :4, :4] = shortest_dist(g1, root=None, return_paths=False)
     dist[1, :6, :6] = shortest_dist(g2, root=None, return_paths=False)

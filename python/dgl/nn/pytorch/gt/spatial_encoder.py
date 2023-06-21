@@ -11,7 +11,7 @@ from ....batch import unbatch
 
 def gaussian(x, mean, std):
     pi = 3.14159
-    a = (2*pi) ** 0.5
+    a = (2 * pi) ** 0.5
     return th.exp(-0.5 * (((x - mean) / std) ** 2)) / (a * std)
 
 
@@ -109,8 +109,8 @@ class SpatialEncoder3d(nn.Module):
     Parameters
     ----------
     num_kernels : int
-        Number of Gaussian Basis Kernels to be applied. Each Gaussian Basis 
-        Kernel contains a learnable kernel center and a learnable scaling 
+        Number of Gaussian Basis Kernels to be applied. Each Gaussian Basis
+        Kernel contains a learnable kernel center and a learnable scaling
         factor.
     num_heads : int, optional
         Number of attention heads if multi-head attention mechanism is applied.
@@ -176,7 +176,7 @@ class SpatialEncoder3d(nn.Module):
             :math:`(B, N, N, H)`, where :math:`H` is :attr:`num_heads`.
         """
         bsz, N = coord.shape[:2]
-        euc_dist = th.cdist(coord, coord, p=2.) # shape: [B, n, n]
+        euc_dist = th.cdist(coord, coord, p=2.0)  # shape: [B, n, n]
         if node_type is None:
             node_type = th.zeros([bsz, N, N, 2], device=coord.device).long()
         else:
@@ -184,21 +184,21 @@ class SpatialEncoder3d(nn.Module):
             tgt_node_type = node_type.unsqueeze(1).repeat(1, N, 1)
             node_type = th.stack(
                 [src_node_type + 2, tgt_node_type + self.max_node_type + 3],
-                dim=-1
-            ) # shape: [B, n, n, 2]
+                dim=-1,
+            )  # shape: [B, n, n, 2]
 
         # scaled euclidean distance
-        mul = self.mul(node_type).sum(dim=-2) # shape: [B, n, n, 1]
-        bias = self.bias(node_type).sum(dim=-2) # shape: [B, n, n, 1]
-        euc_dist = mul * euc_dist.unsqueeze(-1) + bias # shape: [B, n, n, 1]
+        mul = self.mul(node_type).sum(dim=-2)  # shape: [B, n, n, 1]
+        bias = self.bias(node_type).sum(dim=-2)  # shape: [B, n, n, 1]
+        euc_dist = mul * euc_dist.unsqueeze(-1) + bias  # shape: [B, n, n, 1]
         # gaussian basis kernel
         euc_dist = euc_dist.expand(-1, -1, -1, self.num_kernels)
         mean = self.gaussian_means.weight.float().view(-1)
         std = self.gaussian_stds.weight.float().view(-1).abs() + 1e-2
-        gaussian_kernel = gaussian(euc_dist, mean, std) # shape: [B, n, n, K]
+        gaussian_kernel = gaussian(euc_dist, mean, std)  # shape: [B, n, n, K]
         # linear projection
         encoding = self.linear_layer_1(gaussian_kernel)
         encoding = F.gelu(encoding)
-        encoding = self.linear_layer_2(encoding) # shape: [B, n, n, H]
+        encoding = self.linear_layer_2(encoding)  # shape: [B, n, n, H]
 
         return encoding
