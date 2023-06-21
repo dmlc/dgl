@@ -209,9 +209,9 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   IdArray picked_row = NDArray::Empty({hop_size}, vidtype, ctx);
   IdArray picked_col = NDArray::Empty({hop_size}, vidtype, ctx);
   IdArray picked_idx = NDArray::Empty({hop_size}, vidtype, ctx);
-  FloatArray picked_imp =
-      importance_sampling ? NewFloatArray(hop_size, ctx, sizeof(FloatType) * 8)
-                          : NullArray();
+  FloatArray picked_imp = importance_sampling
+                              ? NDArray::Empty({hop_size}, dtype, ctx)
+                              : NullArray();
   IdxType* picked_rdata = picked_row.Ptr<IdxType>();
   IdxType* picked_cdata = picked_col.Ptr<IdxType>();
   IdxType* picked_idata = picked_idx.Ptr<IdxType>();
