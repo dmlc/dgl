@@ -4,10 +4,9 @@ import os
 
 import torch
 
-from .cuda import *
-from .datapipe_utils import *
-from .feature_fetcher import *
-from .thread_wrapper import *
+from .cuda import CopyToDevice, WaitStreamEvent
+from .feature_fetcher import FeatureFetcher
+from .thread_wrapper import ThreadWrapper
 
 prefetcher_timeout = int(os.environ.get("DGL_PREFETCHER_TIMEOUT", "30"))
 
