@@ -212,7 +212,7 @@ function-naming-style=snake_case
 # us, vs, es, gs - plural form of u, v, g, e
 # op - operators
 # ty - type
-# dp - DataPipes
+# dp - DataPipes (see e.g. https://pytorch.org/data/main/torchdata.datapipes.iter.html)
 # it - iterators
 # A, B, C, W - for tensor operators like matmul
 good-names=f,i,j,k,u,v,e,n,m,w,x,y,z,s,d,t,r,g,G,hg,sg,fn,ex,Run,_,us,vs,gs,es,op,ty,A,B,C,W,a,b,N,D1,D2,R,dp,it
