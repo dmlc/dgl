@@ -43,6 +43,11 @@ class MultiprocessingDataLoader(torch.utils.data.DataLoader):
             super().__init__(wait_stream_event, batch_size=None, num_workers=0)
         else:
             fetcher_dp = CopyToDevice(fetcher_dp, device)
+            fetcher_dp = ThreadWrapper(
+                fetcher_dp,
+                torch_num_threads=torch.get_num_threads(),
+                timeout=prefetcher_timeout,
+            )
             super().__init__(fetcher_dp, batch_size=None, num_workers=0)
 
 
