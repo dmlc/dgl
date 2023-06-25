@@ -360,15 +360,20 @@ COOMatrix CSRRowWisePerEtypePick(
           auto cur_it = et_idx.begin() + et_offset;
           auto next_it = std::upper_bound(
               cur_it, et_idx.end(), cur_et,
-              [&](const IdxType v, const IdxType e) {
-                const IdxType eid_offset = off + et_idx[e];
-                const IdxType homogenized_eid =
-                    eid ? eid[eid_offset] : eid_offset;
-                auto it = std::upper_bound(
-                    eid2etype_offset.begin(), eid2etype_offset.end(),
-                    homogenized_eid);
-                auto element_et = it - eid2etype_offset.begin() - 1;
-                return v < element_et;
+              [&](const IdxType value, const IdxType element) {
+                IdxType element_et;
+                if (!et.empty()) {
+                  element_et = et[element];
+                } else {
+                  const IdxType eid_offset = off + element;
+                  const IdxType homogenized_eid =
+                      eid ? eid[eid_offset] : eid_offset;
+                  auto it = std::upper_bound(
+                      eid2etype_offset.begin(), eid2etype_offset.end(),
+                      homogenized_eid);
+                  element_et = it - eid2etype_offset.begin() - 1;
+                }
+                return value < element_et;
               });
           et_len = next_it - cur_it;
           et_end = et_offset + et_len;
