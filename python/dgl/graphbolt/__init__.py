@@ -8,7 +8,11 @@ from .._ffi import libinfo
 from .graph_storage import *
 from .itemset import *
 from .minibatch_sampler import *
+from .subgraph_sampler import *
+from .feature_fetcher import *
 from .feature_store import *
+from .dataloader import *
+from .cuda import *
 
 
 def load_graphbolt():
