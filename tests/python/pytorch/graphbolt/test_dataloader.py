@@ -37,7 +37,7 @@ def test_DataLoader():
     )
 
     if F.ctx() != F.cpu():
-        dataloader = dgl.graphbolt.MultiprocessingDataLoader(
+        dataloader = dgl.graphbolt.MockDataLoader(
             subgraph_sampler,
             fetch,
             num_workers=4,
