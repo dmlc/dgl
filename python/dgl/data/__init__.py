@@ -6,6 +6,7 @@ from __future__ import absolute_import
 
 from . import citation_graph as citegrh
 from .actor import ActorDataset
+from .movielens import MovieLensDataset
 from .adapter import *
 from .bitcoinotc import BitcoinOTC, BitcoinOTCDataset
 from .citation_graph import (
