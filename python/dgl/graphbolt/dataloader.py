@@ -12,6 +12,8 @@ prefetcher_timeout = int(os.environ.get("DGL_PREFETCHER_TIMEOUT", "30"))
 
 
 class MultiprocessingDataLoader(torch.utils.data.DataLoader):
+    """Data loading implemented with multiprocessing.
+    """
     def __init__(
         self,
         sampler_dp,
@@ -51,6 +53,14 @@ class MultiprocessingDataLoader(torch.utils.data.DataLoader):
 
 
 class MockDataLoader(torch.utils.data.DataLoader):
+    """Mock data loading class.
+
+    Later on, we will have data loader implementations other than
+    multiprocessing. For example, when the graph is on GPU, we will
+    have to use single processing. This class will then become a
+    dispatcher which selects the appropriate data loader implementations
+    based on the input arguments.
+    """
     def __new__(
         cls,
         sampler_dp,

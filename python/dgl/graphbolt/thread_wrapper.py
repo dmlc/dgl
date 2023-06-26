@@ -1,8 +1,8 @@
 """Wraps a GraphBolt DataPipe in a daemonic thread."""
 
 import atexit
-from queue import Empty, Full, Queue
 import threading
+from queue import Empty, Full, Queue
 
 import torch
 from torchdata.datapipes.iter import IterDataPipe
