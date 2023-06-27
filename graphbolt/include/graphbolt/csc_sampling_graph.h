@@ -14,8 +14,6 @@
 #include <vector>
 
 // Add for RandomEngine.
-#include <dgl/array.h>
-#include <dmlc/logging.h>
 #include <dmlc/thread_local.h>
 
 #include <pcg_random.hpp>
