@@ -150,8 +150,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
             TORCH_CHECK(
                 nid >= 0 && nid < NumNodes(),
                 "The seed nodes' IDs should fall within the range of the "
-                "graph's "
-                "node IDs.");
+                "graph's node IDs.");
             const auto offset = indptr_data[nid];
             const auto num_neighbors = indptr_data[nid + 1] - offset;
 
