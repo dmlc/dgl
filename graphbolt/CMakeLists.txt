@@ -42,8 +42,7 @@ add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
                            ${BOLT_HEADERS}
                            "../third_party/dmlc-core/include"
-                           "../third_party/pcg/include"
-                           "../include")
+                           "../third_party/pcg/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 
 # The Torch CMake configuration only sets up the path for the MKL library when
