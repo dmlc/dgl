@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "../../runtime/semaphore_wrapper.h"
+#include "../rpc_msg.h"
 #include "common.h"
 #include "communicator.h"
 #include "msg_queue.h"
@@ -62,7 +63,7 @@ class SocketSender : public Sender {
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
    */
-  bool ConnectReceiver(const std::string& addr, int recv_id) override;
+  bool ConnectReceiver(const std::string& addr, int recv_id);
 
   /**
    * @brief Finalize the action to connect to receivers. Make sure that either
@@ -71,27 +72,19 @@ class SocketSender : public Sender {
    *
    * The function is *not* thread-safe; only one thread can invoke this API.
    */
-  bool ConnectReceiverFinalize(const int max_try_times) override;
+  bool ConnectReceiverFinalize(const int max_try_times);
 
   /**
    * @brief Send RPCMessage to specified Receiver.
    * @param msg data message
    * @param recv_id receiver's ID
    */
-  void Send(const rpc::RPCMessage& msg, int recv_id) override;
+  void Send(const rpc::RPCMessage& msg, int recv_id);
 
   /**
    * @brief Finalize TPSender
    */
-  void Finalize() override;
-
-  /**
-   * @brief Communicator type: 'socket'
-   */
-  const std::string& NetType() const override {
-    static const std::string net_type = "socket";
-    return net_type;
-  }
+  void Finalize();
 
   /**
    * @brief Send data to specified Receiver. Actually pushing message to message
@@ -171,8 +164,7 @@ class SocketReceiver : public Receiver {
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(
-      const std::string& addr, int num_sender, bool blocking = true) override;
+  bool Wait(const std::string& addr, int num_sender, bool blocking = true);
 
   /**
    * @brief Recv RPCMessage from Sender. Actually removing data from queue.
@@ -181,7 +173,7 @@ class SocketReceiver : public Receiver {
    * indefinitely.
    * @return RPCStatus: kRPCSuccess or kRPCTimeOut.
    */
-  rpc::RPCStatus Recv(rpc::RPCMessage* msg, int timeout) override;
+  rpc::RPCStatus Recv(rpc::RPCMessage* msg, int timeout);
 
   /**
    * @brief Recv data from Sender. Actually removing data from msg_queue.
@@ -217,15 +209,7 @@ class SocketReceiver : public Receiver {
    *
    * Finalize() is not thread-safe and only one thread can invoke this API.
    */
-  void Finalize() override;
-
-  /**
-   * @brief Communicator type: 'socket'
-   */
-  const std::string& NetType() const override {
-    static const std::string net_type = "socket";
-    return net_type;
-  }
+  void Finalize();
 
  private:
   struct RecvContext {

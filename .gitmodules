@@ -19,9 +19,6 @@
 [submodule "third_party/libxsmm"]
 	path = third_party/libxsmm
 	url = https://github.com/hfp/libxsmm.git
-[submodule "third_party/tensorpipe"]
-	path = third_party/tensorpipe
-	url = https://github.com/pytorch/tensorpipe
 [submodule "third_party/thrust"]
 	path = third_party/thrust
 	url = https://github.com/NVIDIA/thrust.git
