@@ -9,6 +9,7 @@ from .graph_storage import *
 from .itemset import *
 from .minibatch_sampler import *
 from .feature_store import *
+from .feature_fetcher import *
 
 
 def load_graphbolt():
