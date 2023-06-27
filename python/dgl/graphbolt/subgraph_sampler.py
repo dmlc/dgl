@@ -12,6 +12,15 @@ class SubgraphSampler(IterDataPipe):
 
        for data in dp:
            yield sampler_func(graph, data)
+
+    Parameters
+    ----------
+    dp : DataPipe
+        The datapipe.
+    graph : GraphStorage
+        The graph storage.
+    sampler_func : callable
+        The subgraph sampling function.
     """
 
     def __init__(self, dp, graph, sampler_func):
