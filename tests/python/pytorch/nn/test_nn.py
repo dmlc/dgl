@@ -1,5 +1,6 @@
 import io
 import pickle
+import random
 from copy import deepcopy
 
 import backend as F
@@ -8,6 +9,7 @@ import dgl
 import dgl.function as fn
 import dgl.nn.pytorch as nn
 import networkx as nx
+import numpy as np  # For setting seed for scipy
 import pytest
 import scipy as sp
 import torch
@@ -23,6 +25,13 @@ from utils.graph_cases import (
     random_dglgraph,
     random_graph,
 )
+
+# Set seeds to make tests fully reproducible.
+SEED = 12345  # random.randint(1, 99999)
+random.seed(SEED)  # For networkx
+np.random.seed(SEED)  # For scipy
+dgl.seed(SEED)
+F.seed(SEED)
 
 tmp_buffer = io.BytesIO()
 
