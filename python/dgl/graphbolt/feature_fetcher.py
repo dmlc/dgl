@@ -3,7 +3,7 @@
 from torchdata.datapipes.iter import Mapper
 
 
-class FeatureFetcher(IterDataPipe):
+class FeatureFetcher(Mapper):
     """Base feature fetcher.
 
     This is equivalent to the following iterator:
