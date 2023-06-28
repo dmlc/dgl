@@ -19,15 +19,15 @@ class NegativeSampler(IterDataPipe):
     .. code:: python
 
     for data in data_pipe:
-        yield negative_sampler_func(data, graph,negative_ratio,
+        yield negative_sample_generator(data, graph,negative_ratio,
             linked_data_format)
 
     Parameters
     ----------
     data_pipe : IterDataPipe
         The data pipe, which always refers to a minibatch sampler.
-    negative_sampler_func : callable
-        The function used to generate negative samples.
+    negative_sample_generator : callable
+        A callable used to generate negative samples.
     graph : CSCSamplingGraph
         The graph for negative sampling.
     negative_ratio : int
@@ -51,15 +51,15 @@ class NegativeSampler(IterDataPipe):
     def __init__(
         self,
         data_pipe: IterDataPipe,
-        negative_sampler_func: callable,
+        negative_sample_generator: callable,
         graph: CSCSamplingGraph,
         negative_ratio: int,
         linked_data_format: LinkedDataFormat,
     ):
         super().__init__()
         self.data_pipe = data_pipe
-        self.negative_sampler_func = partial(
-            negative_sampler_func,
+        self.negative_sample_generator = partial(
+            negative_sample_generator,
             graph=graph,
             negative_ratio=negative_ratio,
             linked_data_format=linked_data_format,
@@ -71,4 +71,4 @@ class NegativeSampler(IterDataPipe):
         function to each data item.
         """
         for data in self.data_pipe:
-            yield self.negative_sampler_func(data)
+            yield self.negative_sample_generator(data)
