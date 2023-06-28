@@ -491,7 +491,7 @@ def add_nodepred_split(dataset, ratio, ntype=None):
 def mask_nodes_by_property(property_values, part_ratios, random_seed=None):
     """Provide the split masks for a node split with distributional shift based on a given
     node property, as proposed in `Evaluating Robustness and Uncertainty of Graph Models
-    Under Structural Distributional Shifts <https://arxiv.org/abs/2302.13875v1>`__
+    Under Structural Distributional Shifts <https://arxiv.org/abs/2302.13875>`__
 
     It considers the in-distribution (ID) and out-of-distribution (OOD) subsets of nodes.
     The ID subset includes training, validation and testing parts, while the OOD subset
@@ -569,7 +569,7 @@ def add_node_property_split(
 ):
     """Create a node split with distributional shift based on a given node property,
     as proposed in `Evaluating Robustness and Uncertainty of Graph Models Under
-    Structural Distributional Shifts <https://arxiv.org/abs/2302.13875v1>`__
+    Structural Distributional Shifts <https://arxiv.org/abs/2302.13875>`__
 
     It splits the nodes of each graph in the given dataset into 5 non-intersecting
     parts based on their structural properties. This can be used for transductive node
