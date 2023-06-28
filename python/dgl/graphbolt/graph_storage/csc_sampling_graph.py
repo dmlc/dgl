@@ -296,6 +296,38 @@ class CSCSamplingGraph:
             nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
         )
 
+    def sample_negative_per_source_uniform(self, pos_pairs, negative_ratio):
+        """
+        Sample negative edges by randomly choosing negative source-destination
+        pairs according to a uniform distribution. For each edge ``(u, v)``,
+        it is supposed to generate `negative_ratio` pairs of negative edges
+        ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
+        the graph.
+
+        Parameters
+        ----------
+        pos_pairs : Tuple[Tensor]
+            A tuple of two 1D tensors representing source-destination positive
+            edges, where positive means the edge must exist in the graph.
+        negative_ratio: int
+            The ratio of the number of negative samples to positive samples.
+
+        Returns
+        -------
+        Tuple[Tensor]
+            A tuple consisting of two 1D tensors represents the source and
+            destination of negative edges. Note that negative refers to false
+            negatives, which means the edge could be present or not present in
+            the graph.
+        """
+        assert (
+            negative_ratio >= 0
+        ), "Negative_ratio should shoubld be non-negative Integer."
+        return self._c_csc_graph.sample_negative_per_source_uniform(
+            pos_pairs,
+            negative_ratio,
+        )
+
     def copy_to_shared_memory(self, shared_memory_name: str):
         """Copy the graph to shared memory.
 
