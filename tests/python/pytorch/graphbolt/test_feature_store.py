@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import numpy as np
 import pytest
 import torch
@@ -5,11 +8,12 @@ from dgl import graphbolt as gb
 
 
 def to_on_disk_tensor(name, t):
-    path = f"/tmp/{name}.npy"
-    t = t.numpy()
-    np.save(path, t)
-    t = torch.as_tensor(np.load(path, mmap_mode="r+"))
-    return t
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = os.path.join(test_dir, name + ".npy")
+        t = t.numpy()
+        np.save(path, t)
+        t = torch.as_tensor(np.load(path, mmap_mode="r+"))
+        return t
 
 
 @pytest.mark.parametrize("in_memory", [True, False])
