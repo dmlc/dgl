@@ -43,8 +43,8 @@ class NegativeSampler(IterDataPipe):
             - Independent format: The output data is displayed as triples
                 `[u, v, label]`. Here, 'u' and 'v' denote the source and
                 destination nodes of edges. The 'label' is normally set to
-                0 or1. A label of0 signifies a negative edge, while 1 indicates
-                a positive edge.
+                0 or 1. A label of 0 signifies a negative edge, while 1
+                indicates a positive edge.
 
     """
 

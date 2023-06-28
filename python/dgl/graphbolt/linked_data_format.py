@@ -7,7 +7,7 @@ __all__ = ["LinkedDataFormat"]
 
 class LinkedDataFormat(Enum):
     """
-    An Enum class representing the two linked data formats:
+    An Enum class representing the two data formats used in link prediction:
 
     Attributes:
     CONDITIONED: Represents the 'conditioned' format where data is
