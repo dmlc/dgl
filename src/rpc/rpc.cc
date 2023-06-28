@@ -92,8 +92,8 @@ DGL_REGISTER_GLOBAL("distributed.rpc._CAPI_DGLRPCWaitForSenders")
       int num_sender = args[2];
       std::string addr;
       addr = StringPrintf("tcp://%s:%d", ip.c_str(), port);
-      if (RPCContext::getInstance()->receiver->Wait(
-              addr, num_sender) == false) {
+      if (RPCContext::getInstance()->receiver->Wait(addr, num_sender) ==
+          false) {
         LOG(FATAL) << "Wait sender socket failed.";
       }
     });
