@@ -572,7 +572,7 @@ def submit_jobs(args, udf_command, dry_run=False):
                     args.ssh_port,
                     username=args.ssh_username,
                 )
-                )
+            )
 
     # launch client tasks
     client_env_vars = construct_dgl_client_env_vars(
