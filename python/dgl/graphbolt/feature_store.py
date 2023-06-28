@@ -49,17 +49,19 @@ class FeatureStore:
         raise NotImplementedError
 
 
-class InMemoryFeatureStore(FeatureStore):
-    r"""In-memory key-value feature store, where the key is a string and value
-    is Pytorch tensor."""
+class TorchBasedFeatureStore(FeatureStore):
+    r"""Torch based key-value feature store, where the key are strings and
+    values are Pytorch tensors."""
 
     def __init__(self, feature_dict: dict):
-        """Initialize an in-memory feature store.
+        """Initialize a torch based feature store.
 
         The feature store is initialized with a dictionary of tensors, where the
         key is the name of a feature and the value is the tensor. The value can
         be multi-dimensional, where the first dimension is the index of the
         feature.
+
+        Note that the values can be in memory or on disk.
 
         Parameters
         ----------
@@ -74,7 +76,7 @@ class InMemoryFeatureStore(FeatureStore):
         ...     "item": torch.arange(0, 6),
         ...     "rel": torch.arange(0, 6).view(2, 3),
         ... }
-        >>> feature_store = InMemoryFeatureStore(feature_dict)
+        >>> feature_store = TorchBasedFeatureStore(feature_dict)
         >>> feature_store.read("user", torch.tensor([0, 1, 2]))
         tensor([0, 1, 2])
         >>> feature_store.read("item", torch.tensor([0, 1, 2]))
@@ -85,18 +87,35 @@ class InMemoryFeatureStore(FeatureStore):
         ... torch.ones(3, dtype=torch.long), torch.tensor([0, 1, 2]))
         >>> feature_store.read("user", torch.tensor([0, 1, 2]))
         tensor([1, 1, 1])
+
+        >>> import numpy as np
+        >>> user = np.arange(0, 5)
+        >>> item = np.arange(0, 6)
+        >>> np.save("/tmp/user.npy", user)
+        >>. np.save("/tmp/item.npy", item)
+        >>> feature_dict = {
+        ...     "user": torch.as_tensor(np.load("/tmp/user.npy",
+        ...             mmap_mode="r+")),
+        ...     "item": torch.as_tensor(np.load("/tmp/item.npy",
+        ...             mmap_mode="r+")),
+        ... }
+        >>> feature_store = TorchBasedFeatureStore(feature_dict)
+        >>> feature_store.read("user", torch.tensor([0, 1, 2]))
+        tensor([0, 1, 2])
+        >>> feature_store.read("item", torch.tensor([3, 4, 2]))
+        tensor([3, 4, 2])
         """
-        super(InMemoryFeatureStore, self).__init__()
+        super(TorchBasedFeatureStore, self).__init__()
         assert isinstance(feature_dict, dict), (
-            f"feature_dict in InMemoryFeatureStore must be dict, "
+            f"feature_dict in TorchBasedFeatureStore must be dict, "
             f"but got {type(feature_dict)}."
         )
         for k, v in feature_dict.items():
             assert isinstance(
                 k, str
-            ), f"Key in InMemoryFeatureStore must be str, but got {k}."
+            ), f"Key in TorchBasedFeatureStore must be str, but got {k}."
             assert isinstance(v, torch.Tensor), (
-                f"Value in InMemoryFeatureStore must be torch.Tensor,"
+                f"Value in TorchBasedFeatureStore must be torch.Tensor,"
                 f"but got {v}."
             )
 
@@ -104,6 +123,9 @@ class InMemoryFeatureStore(FeatureStore):
 
     def read(self, key: str, ids: torch.Tensor = None):
         """Read a feature from the feature store by index.
+
+        The returned feature is always in memory, no matter whether the feature
+        to read is in memory or on disk.
 
         Parameters
         ----------
