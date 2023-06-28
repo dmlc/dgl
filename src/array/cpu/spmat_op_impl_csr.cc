@@ -523,7 +523,7 @@ CSRMatrix CSRSliceMatrix(
       const IdType oldj = indices_data[p];
       const IdType newj = hashmap.Map(oldj, kInvalidId);
       if (newj != kInvalidId) {
-        if(relabel_nodes == true) {
+        if (relabel_nodes == true) {
           ++sub_indptr[i];
           sub_indices.push_back(newj);
         } else {

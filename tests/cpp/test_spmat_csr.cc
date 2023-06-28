@@ -672,8 +672,8 @@ void _TestCSRSliceMatrix1(DGLContext ctx) {
     // data: []
     ASSERT_EQ(x.num_rows, 4);
     ASSERT_EQ(x.num_cols, 5);
-    auto tp =
-        aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 0, 0}), sizeof(IDX) * 8, ctx);
+    auto tp = aten::VecToIdArray(
+        std::vector<IDX>({0, 0, 0, 0, 0}), sizeof(IDX) * 8, ctx);
     auto ti = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX) * 8, ctx);
     auto td = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX) * 8, ctx);
     ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
