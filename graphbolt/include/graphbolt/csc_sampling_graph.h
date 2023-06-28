@@ -151,6 +151,28 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       torch::optional<torch::Tensor> probs_or_mask) const;
 
   /**
+   * @brief Sample negative edges by randomly choosing negative
+   * source-destination pairs according to a uniform distribution. For each edge
+   * ``(u, v)``, it is supposed to generate `negative_ratio` pairs of negative
+   * edges ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
+   * the graph.
+   *
+   * @param pos_pairs: A tuple consisting of two 1D tensors representing
+   * source-destination positive edges, where positive means the edge must exist
+   * in the graph.
+   * @param negative_ratio The ratio of the number of negative samples to
+   * positive samples.
+   *
+   * @return A tuple consisting of two 1D tensors represents the source and
+   * destination of negative edges. Note that negative refers to false
+   * negatives, which means the edge could be present or not present in the
+   * graph.
+   */
+  std::tuple<torch::Tensor, torch::Tensor> SampleNegativePerSourceUniform(
+      const std::tuple<torch::Tensor, torch::Tensor>& pos_pairs,
+      int64_t negative_ratio) const;
+
+  /**
    * @brief Copy the graph to shared memory.
    * @param shared_memory_name The name of the shared memory.
    *
