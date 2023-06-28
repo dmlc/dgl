@@ -19,7 +19,7 @@ class NegativeSampler(IterDataPipe):
     .. code:: python
 
     for data in data_pipe:
-        yield negative_sample_generator(data, graph,negative_ratio,
+        yield negative_sample_generator(data, graph, negative_ratio,
             linked_data_format)
 
     Parameters
