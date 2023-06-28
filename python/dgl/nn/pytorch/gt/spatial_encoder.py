@@ -199,7 +199,8 @@ class SpatialEncoder3d(nn.Module):
         # gaussian basis kernel
         euc_dist = euc_dist.expand(-1, -1, -1, self.num_kernels)
         gaussian_kernel = gaussian(
-            euc_dist, self.means, self.stds.abs() + 1e-2)  # shape: [B, n, n, K]
+            euc_dist, self.means, self.stds.abs() + 1e-2
+        )  # shape: [B, n, n, K]
         # linear projection
         encoding = self.linear_layer_1(gaussian_kernel)
         encoding = F.gelu(encoding)
