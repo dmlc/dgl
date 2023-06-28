@@ -150,8 +150,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
             TORCH_CHECK(
                 nid >= 0 && nid < NumNodes(),
                 "The seed nodes' IDs should fall within the range of the "
-                "graph's "
-                "node IDs.");
+                "graph's node IDs.");
             const auto offset = indptr_data[nid];
             const auto num_neighbors = indptr_data[nid + 1] - offset;
 
@@ -344,6 +343,7 @@ torch::Tensor PickByEtype(
   AT_DISPATCH_INTEGRAL_TYPES(
       type_per_edge.scalar_type(), "PickByEtype", ([&] {
         const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
+<<<<<<< HEAD
         const auto end = offset + num_neighbors;
         while (etype_begin < end) {
           scalar_t etype = type_per_edge_data[etype_begin];
@@ -352,6 +352,15 @@ torch::Tensor PickByEtype(
               type_per_edge_data + etype_begin, type_per_edge_data + end,
               etype);
           etype_end = etype_end_it - type_per_edge_data;
+=======
+        while (etype_end < offset + num_neighbors) {
+          scalar_t etype = type_per_edge_data[etype_end];
+          int64_t fanout = fanouts[etype];
+          while (etype_end < offset + num_neighbors &&
+                 type_per_edge_data[etype_end] == etype) {
+            etype_end++;
+          }
+>>>>>>> master
           // Do sampling for one etype.
           if (fanout != 0) {
             picked_neighbors[etype] = Pick(

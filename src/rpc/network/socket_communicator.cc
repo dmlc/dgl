@@ -202,10 +202,8 @@ void SocketSender::SendLoop(
 
 /////////////////////////////////////// SocketReceiver
 //////////////////////////////////////////////
-bool SocketReceiver::Wait(
-    const std::string& addr, int num_sender, bool blocking) {
+bool SocketReceiver::Wait(const std::string& addr, int num_sender) {
   CHECK_GT(num_sender, 0);
-  CHECK_EQ(blocking, true);
   std::vector<std::string> substring;
   std::vector<std::string> ip_and_port;
   SplitStringUsing(addr, "//", &substring);
