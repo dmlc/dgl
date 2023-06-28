@@ -17,9 +17,7 @@ class FeatureFetcher(Mapper):
     ----------
     dp : DataPipe
         The datapipe.
-    feature_fetch_func : callable
+    fn : callable
         The function that performs feature fetching.
     """
-
-    def __init__(self, dp, feature_fetch_func):
-        super().__init__(dp, feature_fetch_func)
+    pass
