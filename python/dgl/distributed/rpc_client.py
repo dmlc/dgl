@@ -206,7 +206,7 @@ def connect_to_server(
     for server_id in range(num_servers):
         rpc.send_request(server_id, register_req)
     # wait server connect back
-    rpc.wait_for_senders(client_ip, client_port, num_servers, blocking=True)
+    rpc.wait_for_senders(client_ip, client_port, num_servers)
     print(
         "Client [{}] waits on {}:{}".format(os.getpid(), client_ip, client_port)
     )
