@@ -159,12 +159,11 @@ class SocketReceiver : public Receiver {
    * @brief Wait for all the Senders to connect
    * @param addr Networking address, e.g., 'tcp://127.0.0.1:50051', 'mpi://0'
    * @param num_sender total number of Senders
-   * @param blocking whether wait blockingly
    * @return True for success and False for fail
    *
    * Wait() is not thread-safe and only one thread can invoke this API.
    */
-  bool Wait(const std::string& addr, int num_sender, bool blocking = true);
+  bool Wait(const std::string& addr, int num_sender);
 
   /**
    * @brief Recv RPCMessage from Sender. Actually removing data from queue.
