@@ -1,6 +1,6 @@
 """Feature fetchers"""
 
-from torchdata.datapipes.iter import IterDataPipe
+from torchdata.datapipes.iter import Mapper
 
 
 class FeatureFetcher(IterDataPipe):
@@ -22,10 +22,4 @@ class FeatureFetcher(IterDataPipe):
     """
 
     def __init__(self, dp, feature_fetch_func):
-        super().__init__()
-        self.dp = dp
-        self.feature_fetch_func = feature_fetch_func
-
-    def __iter__(self):
-        for data in self.dp:
-            yield self.feature_fetch_func(data)
+        super().__init__(dp, feature_fetch_func)
