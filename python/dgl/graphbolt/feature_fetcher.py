@@ -10,7 +10,7 @@ class FeatureFetcher(Mapper):
 
     .. code:: python
 
-       for data in dp:
+       for data in datapipe:
            yield feature_fetch_func(data)
 
     Parameters
