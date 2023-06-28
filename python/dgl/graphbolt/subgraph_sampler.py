@@ -1,9 +1,9 @@
 """Subgraph samplers"""
 
-from torchdata.datapipes.iter import IterDataPipe
+from torchdata.datapipes.iter import Mapper
 
 
-class SubgraphSampler(IterDataPipe):
+class SubgraphSampler(Mapper):
     """A subgraph sampler.
 
     It is an iterator equivalent to the following:
@@ -22,10 +22,4 @@ class SubgraphSampler(IterDataPipe):
     """
 
     def __init__(self, dp, sampler_func):
-        super().__init__()
-        self.dp = dp
-        self.sampler_func = sampler_func
-
-    def __iter__(self):
-        for data in self.dp:
-            yield self.sampler_func(data)
+        super().__init__(dp, sampler_func)
