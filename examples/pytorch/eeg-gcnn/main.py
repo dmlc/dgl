@@ -95,6 +95,7 @@ if __name__ == "__main__":
     if os.path.getsize(memmap_x) == 86528478:
         # File is not byte aligned. To avoid the warning let's fix this.
         import joblib
+
         joblib.dump(joblib.load(memmap_x), memmap_x)
 
     x = load(memmap_x, mmap_mode="r")
