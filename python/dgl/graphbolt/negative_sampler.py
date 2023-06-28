@@ -106,7 +106,7 @@ class _BaseNegativeSampleGenerator:
 
         Returns
         -------
-        Iterable
+        Iterable(Tensor)
             An iterable of edges, which includes both positive and negative
             samples. The format of it is determined by the provided
             `linked_data_format`.
@@ -124,7 +124,7 @@ class _BaseNegativeSampleGenerator:
         elif linked_data_format == LinkedDataFormat.CONDITIONED:
             neg_src = neg_src.view(-1, negative_ratio)
             neg_dst = neg_dst.view(-1, negative_ratio)
-            return (src, dst, neg_src, neg_dst)
+            return (pos_src, pos_dst, neg_src, neg_dst)
         else:
             raise ValueError(f"Unsupported data format: {linked_data_format}")
 
