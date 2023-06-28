@@ -15,7 +15,7 @@ class SubgraphSampler(Mapper):
 
     Parameters
     ----------
-    dp : DataPipe
+    datapipe : DataPipe
         The datapipe.
     fn : callable
         The subgraph sampling function.
