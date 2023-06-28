@@ -98,7 +98,7 @@ using EtypeRangePickFn = std::function<void(
 template <typename IdxType, bool map_seed_nodes>
 std::pair<CSRMatrix, IdArray> CSRRowWisePickFused(
     CSRMatrix mat, IdArray rows, IdArray seed_mapping,
-    std::vector<IdxType>& new_seed_nodes, int64_t num_picks, bool replace,
+    std::vector<IdxType>* new_seed_nodes, int64_t num_picks, bool replace,
     PickFn<IdxType> pick_fn, NumPicksFn<IdxType> num_picks_fn) {
   using namespace aten;
 
@@ -195,8 +195,8 @@ std::pair<CSRMatrix, IdArray> CSRRowWisePickFused(
 
   const IdxType num_cols = picked_col->shape[0];
   if (map_seed_nodes) {
-    new_seed_nodes.resize(num_rows);
-    memcpy(new_seed_nodes.data(), rows_data, sizeof(IdxType) * num_rows);
+    (*new_seed_nodes).resize(num_rows);
+    memcpy((*new_seed_nodes).data(), rows_data, sizeof(IdxType) * num_rows);
   }
 
   return std::make_pair(

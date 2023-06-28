@@ -600,7 +600,7 @@ COOMatrix CSRRowWiseSampling(
 template <typename IdType, bool map_seed_nodes>
 std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused(
     CSRMatrix mat, IdArray rows, IdArray seed_mapping,
-    std::vector<IdType>& new_seed_nodes, int64_t num_samples,
+    std::vector<IdType>* new_seed_nodes, int64_t num_samples,
     NDArray prob_or_mask, bool replace) {
   std::pair<CSRMatrix, IdArray> ret;
   if (IsNullArray(prob_or_mask)) {
@@ -627,16 +627,16 @@ std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused(
 }
 
 template std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused<int64_t, true>(
-    CSRMatrix, IdArray, IdArray, std::vector<int64_t>&, int64_t, NDArray, bool);
+    CSRMatrix, IdArray, IdArray, std::vector<int64_t>*, int64_t, NDArray, bool);
 
 template std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused<int64_t, false>(
-    CSRMatrix, IdArray, IdArray, std::vector<int64_t>&, int64_t, NDArray, bool);
+    CSRMatrix, IdArray, IdArray, std::vector<int64_t>*, int64_t, NDArray, bool);
 
 template std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused<int32_t, true>(
-    CSRMatrix, IdArray, IdArray, std::vector<int32_t>&, int64_t, NDArray, bool);
+    CSRMatrix, IdArray, IdArray, std::vector<int32_t>*, int64_t, NDArray, bool);
 
 template std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused<int32_t, false>(
-    CSRMatrix, IdArray, IdArray, std::vector<int32_t>&, int64_t, NDArray, bool);
+    CSRMatrix, IdArray, IdArray, std::vector<int32_t>*, int64_t, NDArray, bool);
 
 COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat, IdArray rows, const std::vector<int64_t>& eid2etype_offset,

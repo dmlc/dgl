@@ -93,7 +93,7 @@ template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 SampleNeighborsFused(
     const HeteroGraphPtr hg, const std::vector<IdArray>& nodes,
-    std::vector<IdArray>& mapping, const std::vector<int64_t>& fanouts,
+    const std::vector<IdArray>& mapping, const std::vector<int64_t>& fanouts,
     EdgeDir dir, const std::vector<NDArray>& prob_or_mask,
     const std::vector<IdArray>& exclude_edges, bool replace = true);
 

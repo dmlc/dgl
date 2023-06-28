@@ -26,11 +26,11 @@ namespace sampling {
 
 template <typename IdType>
 void ExcludeCertainEdgesFused(
-    std::vector<CSRMatrix>& sampled_graphs, std::vector<IdArray>& induced_edges,
-    std::vector<IdArray>& sampled_coo_rows,
+    std::vector<CSRMatrix>* sampled_graphs, std::vector<IdArray>* induced_edges,
+    std::vector<IdArray>* sampled_coo_rows,
     const std::vector<IdArray>& exclude_edges,
     std::vector<FloatArray>* weights = nullptr) {
-  int etypes = sampled_graphs.size();
+  int etypes = (*sampled_graphs).size();
   std::vector<IdArray> remain_induced_edges(etypes);
   std::vector<IdArray> remain_indptrs(etypes);
   std::vector<IdArray> remain_indices(etypes);
@@ -38,8 +38,8 @@ void ExcludeCertainEdgesFused(
   std::vector<FloatArray> remain_weights(etypes);
   for (int etype = 0; etype < etypes; ++etype) {
     if (exclude_edges[etype].GetSize() == 0 ||
-        sampled_graphs[etype].num_rows == 0) {
-      remain_induced_edges[etype] = induced_edges[etype];
+        (*sampled_graphs)[etype].num_rows == 0) {
+      remain_induced_edges[etype] = (*induced_edges)[etype];
       if (weights) remain_weights[etype] = (*weights)[etype];
       continue;
     }
@@ -47,10 +47,10 @@ void ExcludeCertainEdgesFused(
                            ? (*weights)[etype]->dtype
                            : DGLDataType{kDGLFloat, 8 * sizeof(float), 1};
     ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "weights", {
-      IdType* indptr = sampled_graphs[etype].indptr.Ptr<IdType>();
-      IdType* indices = sampled_graphs[etype].indices.Ptr<IdType>();
-      IdType* coo_rows = sampled_coo_rows[etype].Ptr<IdType>();
-      IdType* induced_edges_data = induced_edges[etype].Ptr<IdType>();
+      IdType* indptr = (*sampled_graphs)[etype].indptr.Ptr<IdType>();
+      IdType* indices = (*sampled_graphs)[etype].indices.Ptr<IdType>();
+      IdType* coo_rows = (*sampled_coo_rows)[etype].Ptr<IdType>();
+      IdType* induced_edges_data = (*induced_edges)[etype].Ptr<IdType>();
       FloatType* weights_data = weights && (*weights)[etype]->shape[0]
                                     ? (*weights)[etype].Ptr<FloatType>()
                                     : nullptr;
@@ -60,7 +60,7 @@ void ExcludeCertainEdgesFused(
           exclude_edges[etype].Ptr<IdType>() + exclude_edges_len);
       const IdType* exclude_edges_data = exclude_edges[etype].Ptr<IdType>();
       IdType outIndices = 0;
-      for (IdType row = 0; row < sampled_graphs[etype].indptr->shape[0] - 1;
+      for (IdType row = 0; row < (*sampled_graphs)[etype].indptr->shape[0] - 1;
            ++row) {
         auto tmp_row = indptr[row];
         if (outIndices != indptr[row]) indptr[row] = outIndices;
@@ -76,19 +76,19 @@ void ExcludeCertainEdgesFused(
           }
         }
       }
-      indptr[sampled_graphs[etype].indptr->shape[0] - 1] = outIndices;
+      indptr[(*sampled_graphs)[etype].indptr->shape[0] - 1] = outIndices;
       remain_induced_edges[etype] =
-          aten::IndexSelect(induced_edges[etype], 0, outIndices);
+          aten::IndexSelect((*induced_edges)[etype], 0, outIndices);
       remain_weights[etype] =
           weights_data ? aten::IndexSelect((*weights)[etype], 0, outIndices)
                        : NullArray();
       remain_indices[etype] =
-          aten::IndexSelect(sampled_graphs[etype].indices, 0, outIndices);
-      sampled_coo_rows[etype] =
-          aten::IndexSelect(sampled_coo_rows[etype], 0, outIndices);
-      sampled_graphs[etype] = CSRMatrix(
-          sampled_graphs[etype].num_rows, outIndices,
-          sampled_graphs[etype].indptr, remain_indices[etype],
+          aten::IndexSelect((*sampled_graphs)[etype].indices, 0, outIndices);
+      (*sampled_coo_rows)[etype] =
+          aten::IndexSelect((*sampled_coo_rows)[etype], 0, outIndices);
+      (*sampled_graphs)[etype] = CSRMatrix(
+          (*sampled_graphs)[etype].num_rows, outIndices,
+          (*sampled_graphs)[etype].indptr, remain_indices[etype],
           remain_induced_edges[etype]);
     });
   }
@@ -342,7 +342,7 @@ template <typename IdType>
 std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
 SampleNeighborsFused(
     const HeteroGraphPtr hg, const std::vector<IdArray>& nodes,
-    std::vector<IdArray>& mapping, const std::vector<int64_t>& fanouts,
+    const std::vector<IdArray>& mapping, const std::vector<int64_t>& fanouts,
     EdgeDir dir, const std::vector<NDArray>& prob_or_mask,
     const std::vector<IdArray>& exclude_edges, bool replace) {
   CHECK_EQ(nodes.size(), hg->NumVertexTypes())
@@ -393,14 +393,14 @@ SampleNeighborsFused(
           // therefore two diffrent mappings and node vectors are needed
           sampled_graph = sampling_fn(
               hg->GetCSRMatrix(etype), nodes_ntype, mapping[src_vtype],
-              new_nodes_vec[src_vtype], fanouts[etype], prob_or_mask[etype],
+              &new_nodes_vec[src_vtype], fanouts[etype], prob_or_mask[etype],
               replace);
           break;
         case SparseFormat::kCSC:
           CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           sampled_graph = sampling_fn(
               hg->GetCSCMatrix(etype), nodes_ntype, mapping[dst_vtype],
-              new_nodes_vec[dst_vtype], fanouts[etype], prob_or_mask[etype],
+              &new_nodes_vec[dst_vtype], fanouts[etype], prob_or_mask[etype],
               replace);
           break;
         default:
@@ -419,7 +419,7 @@ SampleNeighborsFused(
 
   if (!exclude_edges.empty()) {
     ExcludeCertainEdgesFused<IdType>(
-        sampled_graphs, induced_edges, sampled_coo_rows, exclude_edges);
+        &sampled_graphs, &induced_edges, &sampled_coo_rows, exclude_edges);
     for (size_t i = 0; i < hg->NumEdgeTypes(); i++) {
       if (sampled_graphs[i].data.defined())
         induced_edges[i] = std::move(sampled_graphs[i].data);
@@ -560,6 +560,18 @@ SampleNeighborsFused(
       CreateHeteroGraph(new_meta_graph, subrels, num_nodes_per_type);
   return std::make_tuple(new_graph, induced_edges, induced_vertices);
 }
+
+template std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+SampleNeighborsFused<int64_t>(
+    const HeteroGraphPtr, const std::vector<IdArray>&,
+    const std::vector<IdArray>&, const std::vector<int64_t>&, EdgeDir,
+    const std::vector<NDArray>&, const std::vector<IdArray>&, bool);
+
+template std::tuple<HeteroGraphPtr, std::vector<IdArray>, std::vector<IdArray>>
+SampleNeighborsFused<int32_t>(
+    const HeteroGraphPtr, const std::vector<IdArray>&,
+    const std::vector<IdArray>&, const std::vector<int64_t>&, EdgeDir,
+    const std::vector<NDArray>&, const std::vector<IdArray>&, bool);
 
 HeteroSubgraph SampleNeighborsEType(
     const HeteroGraphPtr hg, const IdArray nodes,
