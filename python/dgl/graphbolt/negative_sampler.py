@@ -5,7 +5,7 @@ from functools import partial
 from torchdata.datapipes.iter import IterDataPipe
 
 from .graph_storage import CSCSamplingGraph
-from .linked_data_format import *
+from .linked_data_format import LinkedDataFormat
 
 __all__ = ["NegativeSampler"]
 
@@ -18,13 +18,13 @@ class NegativeSampler(IterDataPipe):
 
     .. code:: python
 
-    for data in dp:
+    for data in data_pipe:
         yield negative_sampler_func(data, graph,negative_ratio,
             linked_data_format)
 
     Parameters
     ----------
-    dp : IterDataPipe
+    data_pipe : IterDataPipe
         The data pipe, which always refers to a minibatch sampler.
     negative_sampler_func : callable
         The function used to generate negative samples.
@@ -50,14 +50,14 @@ class NegativeSampler(IterDataPipe):
 
     def __init__(
         self,
-        dp: IterDataPipe,
+        data_pipe: IterDataPipe,
         negative_sampler_func: callable,
         graph: CSCSamplingGraph,
         negative_ratio: int,
         linked_data_format: LinkedDataFormat,
     ):
         super().__init__()
-        self.dp = dp
+        self.data_pipe = data_pipe
         self.negative_sampler_func = partial(
             negative_sampler_func,
             graph=graph,
@@ -70,5 +70,5 @@ class NegativeSampler(IterDataPipe):
         Iterate over the data pipe and apply the negative sampling
         function to each data item.
         """
-        for data in self.dp:
+        for data in self.data_pipe:
             yield self.negative_sampler_func(data)
