@@ -613,6 +613,73 @@ void _TestCSRSliceMatrix1(DGLContext ctx) {
     ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
     ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
   }
+  if (ctx.device_id == 1) {
+    // square
+    auto r =
+        aten::VecToIdArray(std::vector<IDX>({0, 1, 3}), sizeof(IDX) * 8, ctx);
+    auto c =
+        aten::VecToIdArray(std::vector<IDX>({1, 2, 3}), sizeof(IDX) * 8, ctx);
+    auto x = aten::CSRSliceMatrix(csr, r, c, false);
+    // [[0, 1, 2, 0, 0],
+    //  [0, 0, 0, 0, 0],
+    //  [0, 0, 0, 0, 0],
+    //  [0, 0, 0, 0, 0]]
+    // data: [0, 2, 5]
+    ASSERT_EQ(x.num_rows, 4);
+    ASSERT_EQ(x.num_cols, 5);
+    auto tp = aten::VecToIdArray(
+        std::vector<IDX>({0, 3, 3, 3, 3}), sizeof(IDX) * 8, ctx);
+    auto ti =
+        aten::VecToIdArray(std::vector<IDX>({1, 2, 2}), sizeof(IDX) * 8, ctx);
+    auto td =
+        aten::VecToIdArray(std::vector<IDX>({0, 2, 5}), sizeof(IDX) * 8, ctx);
+    ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+    ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+    ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+  }
+  if (ctx.device_id == 1) {
+    // non-square
+    auto r =
+        aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX) * 8, ctx);
+    auto c = aten::VecToIdArray(std::vector<IDX>({0, 1}), sizeof(IDX) * 8, ctx);
+    auto x = aten::CSRSliceMatrix(csr, r, c, false);
+    // [[0, 1, 0, 0, 0],
+    //  [1, 0, 0, 0, 0],
+    //  [0, 0, 0, 0, 0],
+    //  [0, 0, 0, 0, 0]]
+    // data: [0, 3]
+    ASSERT_EQ(x.num_rows, 4);
+    ASSERT_EQ(x.num_cols, 5);
+    auto tp = aten::VecToIdArray(
+        std::vector<IDX>({0, 1, 2, 2, 2}), sizeof(IDX) * 8, ctx);
+    auto ti =
+        aten::VecToIdArray(std::vector<IDX>({1, 0}), sizeof(IDX) * 8, ctx);
+    auto td =
+        aten::VecToIdArray(std::vector<IDX>({0, 3}), sizeof(IDX) * 8, ctx);
+    ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+    ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+    ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+  }
+  if (ctx.device_id == 1) {
+    // empty slice
+    auto r = aten::VecToIdArray(std::vector<IDX>({2, 3}), sizeof(IDX) * 8, ctx);
+    auto c = aten::VecToIdArray(std::vector<IDX>({0, 1}), sizeof(IDX) * 8, ctx);
+    auto x = aten::CSRSliceMatrix(csr, r, c, false);
+    // [[0, 0, 0, 0, 0],
+    //  [0, 0, 0, 0, 0],
+    //  [0, 0, 0, 0, 0],
+    //  [0, 0, 0, 0, 0]]
+    // data: []
+    ASSERT_EQ(x.num_rows, 4);
+    ASSERT_EQ(x.num_cols, 5);
+    auto tp =
+        aten::VecToIdArray(std::vector<IDX>({0, 0, 0, 0, 0}), sizeof(IDX) * 8, ctx);
+    auto ti = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX) * 8, ctx);
+    auto td = aten::VecToIdArray(std::vector<IDX>({}), sizeof(IDX) * 8, ctx);
+    ASSERT_TRUE(ArrayEQ<IDX>(x.indptr, tp));
+    ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
+    ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
+  }
 }
 
 template <typename IDX>

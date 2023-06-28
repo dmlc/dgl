@@ -419,7 +419,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
  * @return submatrix
  */
 CSRMatrix CSRSliceMatrix(
-    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    bool relabel_nodes = true);
 
 /** @return True if the matrix has duplicate entries */
 bool CSRHasDuplicate(CSRMatrix csr);

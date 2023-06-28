@@ -146,7 +146,8 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, runtime::NDArray rows);
 
 template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(
-    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    bool relabel_nodes);
 
 template <DGLDeviceType XPU, typename IdType>
 void CSRSort_(CSRMatrix* csr);

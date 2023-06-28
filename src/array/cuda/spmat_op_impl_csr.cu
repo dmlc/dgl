@@ -556,7 +556,8 @@ __global__ void _SegmentMaskColKernel(
 
 template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(
-    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    bool relabel_nodes) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
   const auto& ctx = rows->ctx;
   const auto& dtype = rows->dtype;
@@ -645,9 +646,11 @@ CSRMatrix CSRSliceMatrix(
 }
 
 template CSRMatrix CSRSliceMatrix<kDGLCUDA, int32_t>(
-    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    bool relabel_nodes);
 template CSRMatrix CSRSliceMatrix<kDGLCUDA, int64_t>(
-    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    bool relabel_nodes);
 
 }  // namespace impl
 }  // namespace aten

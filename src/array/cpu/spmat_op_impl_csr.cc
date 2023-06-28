@@ -492,10 +492,17 @@ template CSRMatrix CSRSliceRows<kDGLCPU, int64_t>(CSRMatrix, NDArray);
 
 template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(
-    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols) {
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    bool relabel_nodes) {
+  int64_t new_nrows_temp = rows->shape[0];
+  int64_t new_ncols_temp = cols->shape[0];
+  if (relabel_nodes == false) {
+    new_nrows_temp = csr.num_rows;
+    new_ncols_temp = csr.num_cols;
+  }
   IdHashMap<IdType> hashmap(cols);
-  const int64_t new_nrows = rows->shape[0];
-  const int64_t new_ncols = cols->shape[0];
+  const int64_t new_nrows = new_nrows_temp;
+  const int64_t new_ncols = new_ncols_temp;
   const IdType* rows_data = static_cast<IdType*>(rows->data);
   const bool has_data = CSRHasData(csr);
 
@@ -508,7 +515,7 @@ CSRMatrix CSRSliceMatrix(
   std::vector<IdType> sub_data;
   sub_indptr.resize(new_nrows + 1, 0);
   const IdType kInvalidId = new_ncols + 1;
-  for (int64_t i = 0; i < new_nrows; ++i) {
+  for (int64_t i = 0; i < rows->shape[0]; ++i) {
     // NOTE: newi == i
     const IdType oldi = rows_data[i];
     CHECK(oldi >= 0 && oldi < csr.num_rows) << "Invalid row index: " << oldi;
@@ -516,8 +523,13 @@ CSRMatrix CSRSliceMatrix(
       const IdType oldj = indices_data[p];
       const IdType newj = hashmap.Map(oldj, kInvalidId);
       if (newj != kInvalidId) {
-        ++sub_indptr[i];
-        sub_indices.push_back(newj);
+        if(relabel_nodes == true) {
+          ++sub_indptr[i];
+          sub_indices.push_back(newj);
+        } else {
+          ++sub_indptr[oldi];
+          sub_indices.push_back(oldj);
+        }
         sub_data.push_back(has_data ? data[p] : p);
       }
     }
@@ -542,9 +554,11 @@ CSRMatrix CSRSliceMatrix(
 }
 
 template CSRMatrix CSRSliceMatrix<kDGLCPU, int32_t>(
-    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    bool relabel_nodes);
 template CSRMatrix CSRSliceMatrix<kDGLCPU, int64_t>(
-    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols);
+    CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
+    bool relabel_nodes);
 
 ///////////////////////////// CSRReorder /////////////////////////////
 

@@ -504,13 +504,14 @@ CSRMatrix CSRSliceRows(CSRMatrix csr, NDArray rows) {
   return ret;
 }
 
-CSRMatrix CSRSliceMatrix(CSRMatrix csr, NDArray rows, NDArray cols) {
+CSRMatrix CSRSliceMatrix(
+    CSRMatrix csr, NDArray rows, NDArray cols, bool relabel_nodes) {
   CHECK_SAME_DTYPE(csr.indices, rows);
   CHECK_SAME_DTYPE(csr.indices, cols);
   CHECK_SAME_CONTEXT(rows, cols);
   CSRMatrix ret;
   ATEN_CSR_SWITCH_CUDA_UVA(csr, rows, XPU, IdType, "CSRSliceMatrix", {
-    ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols);
+    ret = impl::CSRSliceMatrix<XPU, IdType>(csr, rows, cols, relabel_nodes);
   });
   return ret;
 }
