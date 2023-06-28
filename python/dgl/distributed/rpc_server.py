@@ -85,7 +85,7 @@ def start_server(
     print(
         "Server is waiting for connections on [{}:{}]...".format(ip_addr, port)
     )
-    rpc.wait_for_senders(ip_addr, port, num_clients, blocking=True)
+    rpc.wait_for_senders(ip_addr, port, num_clients)
     rpc.set_num_client(num_clients)
     recv_clients = {}
     while True:
