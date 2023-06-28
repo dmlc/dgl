@@ -17,9 +17,7 @@ class SubgraphSampler(Mapper):
     ----------
     dp : DataPipe
         The datapipe.
-    sampler_func : callable
+    fn : callable
         The subgraph sampling function.
     """
-
-    def __init__(self, dp, sampler_func):
-        super().__init__(dp, sampler_func)
+    pass
