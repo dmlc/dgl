@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import numpy as np
 import pandas as pd
@@ -77,7 +78,7 @@ if __name__ == "__main__":
     print(f" Using device: {_DEVICE} {torch.cuda.get_device_name(_DEVICE)}")
 
     # load patient level indices
-    _DATASET_INDEX = pd.read_csv("master_metadata_index.csv")
+    _DATASET_INDEX = pd.read_csv("master_metadata_index.csv", low_memory=False)
     all_subjects = _DATASET_INDEX["patient_ID"].astype("str").unique()
     print(f"Subject list fetched! Total subjects are {len(all_subjects)}.")
 
@@ -91,6 +92,11 @@ if __name__ == "__main__":
     # set up input and targets from files
     memmap_x = f"psd_features_data_X"
     memmap_y = f"labels_y"
+    if os.path.getsize(memmap_x) == 86528478:
+        # File is not byte aligned. To avoid the warning let's fix this.
+        import joblib
+        joblib.dump(joblib.load(memmap_x), memmap_x)
+
     x = load(memmap_x, mmap_mode="r")
     y = load(memmap_y, mmap_mode="r")
 
