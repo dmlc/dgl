@@ -2546,7 +2546,7 @@ def test_SpatialEncoder(max_dist, num_kernels, num_heads):
     num_nodes = 4
     coord = th.rand(1, num_nodes, 3).to(dev)
     node_type = th.tensor([[1, 0, 2, 1]]).to(dev)
-    spatial_encoder = SpatialEncoder3d(
+    spatial_encoder = nn.SpatialEncoder3d(
         num_kernels=num_kernels, num_heads=num_heads, max_node_type=3
     ).to(dev)
     out = spatial_encoder(coord, node_type=node_type)
