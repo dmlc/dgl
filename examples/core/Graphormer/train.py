@@ -286,7 +286,7 @@ def train_val_pipeline(params):
 
     # load pretrain model
     download(url="https://data.dgl.ai/pre_trained/graphormer_pcqm.pth")
-    filename = "new_graphormer_pcqm.pkl"
+    filename = "graphormer_pcqm.pth"
     model = Graphormer()
     state_dict = th.load(filename)
     model.load_state_dict(state_dict)
