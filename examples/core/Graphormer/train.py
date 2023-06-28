@@ -155,6 +155,7 @@ def train_epoch(model, optimizer, data_loader, lr_scheduler):
     epoch_loss = 0
     list_scores = []
     list_labels = []
+    loss_fn = nn.BCEWithLogitsLoss()
     for iter, (
         batch_labels,
         attn_mask,
@@ -176,7 +177,7 @@ def train_epoch(model, optimizer, data_loader, lr_scheduler):
             attn_mask=attn_mask,
         )
 
-        loss = nn.BCEWithLogitsLoss()(batch_scores, batch_labels.float())
+        loss = loss_fn(batch_scores, batch_labels.float())
 
         accelerator.backward(loss)
         optimizer.step()
@@ -212,6 +213,7 @@ def train_epoch(model, optimizer, data_loader, lr_scheduler):
 def evaluate_network(model, data_loader):
     model.eval()
     epoch_test_loss = 0
+    loss_fn = nn.BCEWithLogitsLoss()
     with th.no_grad():
         list_scores = []
         list_labels = []
@@ -239,7 +241,7 @@ def evaluate_network(model, data_loader):
             all_predictions, all_targets = accelerator.gather_for_metrics(
                 (batch_scores, batch_labels)
             )
-            loss = nn.BCEWithLogitsLoss()(all_predictions, all_targets.float())
+            loss = loss_fn(all_predictions, all_targets.float())
 
             epoch_test_loss += loss.item()
             list_scores.append(all_predictions)
@@ -286,9 +288,8 @@ def train_val_pipeline(params):
 
     # load pretrain model
     download(url="https://data.dgl.ai/pre_trained/graphormer_pcqm.pth")
-    filename = "graphormer_pcqm.pth"
     model = Graphormer()
-    state_dict = th.load(filename)
+    state_dict = th.load("graphormer_pcqm.pth")
     model.load_state_dict(state_dict)
     # reset output layer parameters
     model.reset_output_layer_parameters()
