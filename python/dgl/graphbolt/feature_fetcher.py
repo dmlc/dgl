@@ -15,7 +15,7 @@ class FeatureFetcher(Mapper):
 
     Parameters
     ----------
-    dp : DataPipe
+    datapipe : DataPipe
         The datapipe.
     fn : callable
         The function that performs feature fetching.
