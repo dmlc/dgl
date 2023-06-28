@@ -6,7 +6,7 @@ import torch
 
 from .. import backend as F, ndarray as nd, utils
 from .._ffi.function import _init_api
-from ..base import DGLError, EID, NID
+from ..base import DGLError, EID
 from ..heterograph import DGLBlock, DGLGraph
 from .utils import EidExcluder
 
@@ -478,7 +478,7 @@ def _sample_neighbors(
         if F.device_type(g.device) != "cpu":
             raise DGLError("Only cpu is supported in fused sampling")
 
-        if mapping == None:
+        if mapping is None:
             mapping = {}
         mapping_name = "__mapping" + str(os.getpid())
         if mapping_name not in mapping.keys():
