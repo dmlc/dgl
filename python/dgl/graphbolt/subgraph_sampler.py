@@ -10,7 +10,7 @@ class SubgraphSampler(Mapper):
 
     .. code:: python
 
-       for data in dp:
+       for data in datapipe:
            yield sampler_func(data)
 
     Parameters
