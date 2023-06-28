@@ -46,7 +46,22 @@ class NegativeSampler(IterDataPipe):
                 destination nodes of edges. The 'label' is normally set to
                 0 or 1. A label of 0 signifies a negative edge, while 1
                 indicates a positive edge.
-
+    Examples
+    --------
+    >>> from dgl import graphbolt as gb
+    >>> indptr = torch.LongTensor([0, 2, 4, 5])
+    >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
+    >>> graph = gb.from_csc(indptr, indices)
+    >>> pos_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
+    >>> item_set = gb.ItemSet(pos_pairs)
+    >>> minibatch_sampler = gb.MinibatchSampler(
+    ... item_set, batch_size=1, shuffle=True, drop_last=False)
+    >>> negative_sampler = gb.NegativeSampler(
+    ... minibatch_sampler, gb.negative_sampler.PerSourceUniformGenerator(),
+    ... graph, 2, gb.LinkedDataFormat.INDEPENDENT,)
+    >>> [pairs for pairs in negative_sampler]
+    [(tensor([0, 0, 0]), tensor([1, 0, 1]), tensor([1, 0, 0])),
+    (tensor([1, 1, 1]), tensor([2, 1, 1]), tensor([1, 0, 0]))]
     """
 
     def __init__(
