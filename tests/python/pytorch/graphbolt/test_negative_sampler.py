@@ -28,7 +28,7 @@ def negative_sampler_func(
 
 
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
-def test_SubgraphSampler(negative_ratio):
+def test_NegativeSampler(negative_ratio):
     # Construct CSCSamplingGraph.
     graph = rand_graph(100, 500)
 
@@ -64,4 +64,4 @@ def test_SubgraphSampler(negative_ratio):
 
 
 if __name__ == "__main__":
-    test_SubgraphSampler(1)
+    test_NegativeSampler(1)
