@@ -138,18 +138,23 @@ class SpatialEncoder3d(nn.Module):
         self.num_kernels = num_kernels
         self.num_heads = num_heads
         self.max_node_type = max_node_type
-        self.gaussian_means = nn.Embedding(1, num_kernels)
-        self.gaussian_stds = nn.Embedding(1, num_kernels)
+        self.means = nn.Parameter(th.empty(num_kernels))
+        self.stds = nn.Parameter(th.empty(num_kernels))
         self.linear_layer_1 = nn.Linear(num_kernels, num_kernels)
         self.linear_layer_2 = nn.Linear(num_kernels, num_heads)
-        # default mul/bias at position 0 (no node type given)
-        # src mul/bias at position [1 (pad) ~ max_node_type+1]
-        # tgt mul/bias at position [max_node_type+2 (pad) ~ 2*max_node_type+2]
-        self.mul = nn.Embedding(2 * max_node_type + 3, 1, padding_idx=0)
-        self.bias = nn.Embedding(2 * max_node_type + 3, 1, padding_idx=0)
+        # There are 2 * max_node_type + 3 pairs of gamma and beta parameters:
+        # 1. Parameters at position 0 are for default gamma/beta when no node
+        #    type is given
+        # 2. Parameters at position 1 to max_node_type+1 are for src node types.
+        #    (position 1 is for padded unexisting nodes)
+        # 3. Parameters at position max_node_type+2 to 2*max_node_type+2 are
+        #    for tgt node types. (position max_node_type+2 is for padded)
+        #    unexisting nodes)
+        self.gamma = nn.Embedding(2 * max_node_type + 3, 1, padding_idx=0)
+        self.beta = nn.Embedding(2 * max_node_type + 3, 1, padding_idx=0)
 
-        nn.init.uniform_(self.gaussian_means.weight, 0, 3)
-        nn.init.uniform_(self.gaussian_stds.weight, 0, 3)
+        nn.init.uniform_(self.means, 0, 3)
+        nn.init.uniform_(self.stds, 0, 3)
         nn.init.constant_(self.mul.weight, 1)
         nn.init.constant_(self.bias.weight, 0)
 
@@ -167,7 +172,7 @@ class SpatialEncoder3d(nn.Module):
               :math:`(B, N,)`. The scaling factors in gaussian kernels of each
               pair of nodes are determined by their node types.
             * Otherwise, :attr:`node_type` will be set to zeros of the same
-            shape by default.
+              shape by default.
 
         Returns
         -------
@@ -188,14 +193,13 @@ class SpatialEncoder3d(nn.Module):
             )  # shape: [B, n, n, 2]
 
         # scaled euclidean distance
-        mul = self.mul(node_type).sum(dim=-2)  # shape: [B, n, n, 1]
-        bias = self.bias(node_type).sum(dim=-2)  # shape: [B, n, n, 1]
-        euc_dist = mul * euc_dist.unsqueeze(-1) + bias  # shape: [B, n, n, 1]
+        gamma = self.gamma(node_type).sum(dim=-2)  # shape: [B, n, n, 1]
+        beta = self.beta(node_type).sum(dim=-2)  # shape: [B, n, n, 1]
+        euc_dist = gamma * euc_dist.unsqueeze(-1) + beta  # shape: [B, n, n, 1]
         # gaussian basis kernel
         euc_dist = euc_dist.expand(-1, -1, -1, self.num_kernels)
-        mean = self.gaussian_means.weight.float().view(-1)
-        std = self.gaussian_stds.weight.float().view(-1).abs() + 1e-2
-        gaussian_kernel = gaussian(euc_dist, mean, std)  # shape: [B, n, n, K]
+        gaussian_kernel = gaussian(
+            euc_dist, self.means, self.stds.abs() + 1e-2)  # shape: [B, n, n, K]
         # linear projection
         encoding = self.linear_layer_1(gaussian_kernel)
         encoding = F.gelu(encoding)
