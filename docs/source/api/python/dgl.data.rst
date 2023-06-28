@@ -67,6 +67,7 @@ Datasets for node classification/regression tasks
     MinesweeperDataset
     TolokersDataset
     QuestionsDataset
+    MovieLensDataset
 
 Edge Prediction Datasets
 ---------------------------------------
