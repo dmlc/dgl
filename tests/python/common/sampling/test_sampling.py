@@ -555,15 +555,18 @@ def _gen_neighbor_topk_test_graph(hypersparse, reverse):
     return g, hg
 
 
-def _test_sample_neighbors(hypersparse, prob):
+def _test_sample_neighbors(hypersparse, prob, fused):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, False)
 
     def _test1(p, replace):
         subg = dgl.sampling.sample_neighbors(
-            g, [0, 1], -1, prob=p, replace=replace
+            g, [0, 1], -1, prob=p, replace=replace, fused=fused
         )
-        assert subg.num_nodes() == g.num_nodes()
+        if not fused:
+            assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
+        if fused:
+            u, v = subg.srcdata[dgl.NID][u], subg.dstdata[dgl.NID][v]
         u_ans, v_ans, e_ans = g.in_edges([0, 1], form="all")
         if p is not None:
             emask = F.gather_row(g.edata[p], e_ans)
@@ -577,11 +580,16 @@ def _test_sample_neighbors(hypersparse, prob):
 
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(
-                g, [0, 1], 2, prob=p, replace=replace
+                g, [0, 1], 2, prob=p, replace=replace, fused=fused
             )
-            assert subg.num_nodes() == g.num_nodes()
+            if not fused:
+                assert subg.num_nodes() == g.num_nodes()
+
             assert subg.num_edges() == 4
             u, v = subg.edges()
+            if fused:
+                u, v = subg.srcdata[dgl.NID][u], subg.dstdata[dgl.NID][v]
+
             assert set(F.asnumpy(F.unique(v))) == {0, 1}
             assert F.array_equal(
                 F.astype(g.has_edges_between(u, v), F.int64),
@@ -601,10 +609,13 @@ def _test_sample_neighbors(hypersparse, prob):
 
     def _test2(p, replace):  # fanout > #neighbors
         subg = dgl.sampling.sample_neighbors(
-            g, [0, 2], -1, prob=p, replace=replace
+            g, [0, 2], -1, prob=p, replace=replace, fused=fused
         )
-        assert subg.num_nodes() == g.num_nodes()
+        if not fused:
+            assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
+        if fused:
+            u, v = subg.srcdata[dgl.NID][u], subg.dstdata[dgl.NID][v]
         u_ans, v_ans, e_ans = g.in_edges([0, 2], form="all")
         if p is not None:
             emask = F.gather_row(g.edata[p], e_ans)
@@ -618,12 +629,15 @@ def _test_sample_neighbors(hypersparse, prob):
 
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(
-                g, [0, 2], 2, prob=p, replace=replace
+                g, [0, 2], 2, prob=p, replace=replace, fused=fused
             )
-            assert subg.num_nodes() == g.num_nodes()
+            if not fused:
+                assert subg.num_nodes() == g.num_nodes()
             num_edges = 4 if replace else 3
             assert subg.num_edges() == num_edges
             u, v = subg.edges()
+            if fused:
+                u, v = subg.srcdata[dgl.NID][u], subg.dstdata[dgl.NID][v]
             assert set(F.asnumpy(F.unique(v))) == {0, 2}
             assert F.array_equal(
                 F.astype(g.has_edges_between(u, v), F.int64),
@@ -642,9 +656,17 @@ def _test_sample_neighbors(hypersparse, prob):
 
     def _test3(p, replace):
         subg = dgl.sampling.sample_neighbors(
-            hg, {"user": [0, 1], "game": 0}, -1, prob=p, replace=replace
+            hg,
+            {"user": [0, 1], "game": 0},
+            -1,
+            prob=p,
+            replace=replace,
+            fused=fused,
         )
-        assert len(subg.ntypes) == 3
+        if not fused:
+            assert len(subg.ntypes) == 3
+        assert len(subg.srctypes) == 3
+        assert len(subg.dsttypes) == 3
         assert len(subg.etypes) == 4
         assert subg["follow"].num_edges() == 6 if p is None else 4
         assert subg["play"].num_edges() == 1
@@ -653,9 +675,17 @@ def _test_sample_neighbors(hypersparse, prob):
 
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(
-                hg, {"user": [0, 1], "game": 0}, 2, prob=p, replace=replace
+                hg,
+                {"user": [0, 1], "game": 0},
+                2,
+                prob=p,
+                replace=replace,
+                fused=fused,
             )
-            assert len(subg.ntypes) == 3
+            if not fused:
+                assert len(subg.ntypes) == 3
+            assert len(subg.srctypes) == 3
+            assert len(subg.dsttypes) == 3
             assert len(subg.etypes) == 4
             assert subg["follow"].num_edges() == 4
             assert subg["play"].num_edges() == 2 if replace else 1
@@ -672,8 +702,12 @@ def _test_sample_neighbors(hypersparse, prob):
             {"user": [0, 1], "game": 0, "coin": 0},
             {"follow": 1, "play": 2, "liked-by": 0, "flips": -1},
             replace=True,
+            fused=fused,
         )
-        assert len(subg.ntypes) == 3
+        if not fused:
+            assert len(subg.ntypes) == 3
+        assert len(subg.srctypes) == 3
+        assert len(subg.dsttypes) == 3
         assert len(subg.etypes) == 4
         assert subg["follow"].num_edges() == 2
         assert subg["play"].num_edges() == 2
@@ -795,15 +829,19 @@ def _test_sample_labors(hypersparse, prob):
         assert subg["flips"].num_edges() == 4
 
 
-def _test_sample_neighbors_outedge(hypersparse):
+def _test_sample_neighbors_outedge(hypersparse, fused):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, True)
 
     def _test1(p, replace):
         subg = dgl.sampling.sample_neighbors(
-            g, [0, 1], -1, prob=p, replace=replace, edge_dir="out"
+            g, [0, 1], -1, prob=p, replace=replace, edge_dir="out", fused=fused
         )
-        assert subg.num_nodes() == g.num_nodes()
+        if not fused:
+            assert subg.num_nodes() == g.num_nodes()
+
         u, v = subg.edges()
+        if fused:
+            u, v = subg.dstdata[dgl.NID][u], subg.srcdata[dgl.NID][v]
         u_ans, v_ans, e_ans = g.out_edges([0, 1], form="all")
         if p is not None:
             emask = F.gather_row(g.edata[p], e_ans)
@@ -817,11 +855,20 @@ def _test_sample_neighbors_outedge(hypersparse):
 
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(
-                g, [0, 1], 2, prob=p, replace=replace, edge_dir="out"
+                g,
+                [0, 1],
+                2,
+                prob=p,
+                replace=replace,
+                edge_dir="out",
+                fused=fused,
             )
-            assert subg.num_nodes() == g.num_nodes()
+            if not fused:
+                assert subg.num_nodes() == g.num_nodes()
             assert subg.num_edges() == 4
             u, v = subg.edges()
+            if fused:
+                u, v = subg.dstdata[dgl.NID][u], subg.srcdata[dgl.NID][v]
             assert set(F.asnumpy(F.unique(u))) == {0, 1}
             assert F.array_equal(
                 F.astype(g.has_edges_between(u, v), F.int64),
@@ -843,10 +890,13 @@ def _test_sample_neighbors_outedge(hypersparse):
 
     def _test2(p, replace):  # fanout > #neighbors
         subg = dgl.sampling.sample_neighbors(
-            g, [0, 2], -1, prob=p, replace=replace, edge_dir="out"
+            g, [0, 2], -1, prob=p, replace=replace, edge_dir="out", fused=fused
         )
-        assert subg.num_nodes() == g.num_nodes()
+        if not fused:
+            assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
+        if fused:
+            u, v = subg.dstdata[dgl.NID][u], subg.srcdata[dgl.NID][v]
         u_ans, v_ans, e_ans = g.out_edges([0, 2], form="all")
         if p is not None:
             emask = F.gather_row(g.edata[p], e_ans)
@@ -860,12 +910,22 @@ def _test_sample_neighbors_outedge(hypersparse):
 
         for i in range(10):
             subg = dgl.sampling.sample_neighbors(
-                g, [0, 2], 2, prob=p, replace=replace, edge_dir="out"
+                g,
+                [0, 2],
+                2,
+                prob=p,
+                replace=replace,
+                edge_dir="out",
+                fused=fused,
             )
-            assert subg.num_nodes() == g.num_nodes()
+            if not fused:
+                assert subg.num_nodes() == g.num_nodes()
             num_edges = 4 if replace else 3
             assert subg.num_edges() == num_edges
             u, v = subg.edges()
+            if fused:
+                u, v = subg.dstdata[dgl.NID][u], subg.srcdata[dgl.NID][v]
+
             assert set(F.asnumpy(F.unique(u))) == {0, 2}
             assert F.array_equal(
                 F.astype(g.has_edges_between(u, v), F.int64),
@@ -892,8 +952,13 @@ def _test_sample_neighbors_outedge(hypersparse):
             prob=p,
             replace=replace,
             edge_dir="out",
+            fused=fused,
         )
-        assert len(subg.ntypes) == 3
+
+        if not fused:
+            assert len(subg.ntypes) == 3
+        assert len(subg.srctypes) == 3
+        assert len(subg.dsttypes) == 3
         assert len(subg.etypes) == 4
         assert subg["follow"].num_edges() == 6 if p is None else 4
         assert subg["play"].num_edges() == 1
@@ -908,8 +973,12 @@ def _test_sample_neighbors_outedge(hypersparse):
                 prob=p,
                 replace=replace,
                 edge_dir="out",
+                fused=fused,
             )
-            assert len(subg.ntypes) == 3
+            if not fused:
+                assert len(subg.ntypes) == 3
+            assert len(subg.srctypes) == 3
+            assert len(subg.dsttypes) == 3
             assert len(subg.etypes) == 4
             assert subg["follow"].num_edges() == 4
             assert subg["play"].num_edges() == 2 if replace else 1
@@ -1077,7 +1146,9 @@ def _test_sample_neighbors_topk_outedge(hypersparse):
 
 
 def test_sample_neighbors_noprob():
-    _test_sample_neighbors(False, None)
+    _test_sample_neighbors(False, None, False)
+    if F._default_context_str != "gpu":
+        _test_sample_neighbors(False, None, True)
     # _test_sample_neighbors(True)
 
 
@@ -1086,7 +1157,9 @@ def test_sample_labors_noprob():
 
 
 def test_sample_neighbors_prob():
-    _test_sample_neighbors(False, "prob")
+    _test_sample_neighbors(False, "prob", False)
+    if F._default_context_str != "gpu":
+        _test_sample_neighbors(False, "prob", True)
     # _test_sample_neighbors(True)
 
 
@@ -1095,7 +1168,9 @@ def test_sample_labors_prob():
 
 
 def test_sample_neighbors_outedge():
-    _test_sample_neighbors_outedge(False)
+    _test_sample_neighbors_outedge(False, False)
+    if F._default_context_str != "gpu":
+        _test_sample_neighbors_outedge(False, True)
     # _test_sample_neighbors_outedge(True)
 
 
@@ -1107,7 +1182,8 @@ def test_sample_neighbors_outedge():
     reason="GPU sample neighbors with mask not implemented",
 )
 def test_sample_neighbors_mask():
-    _test_sample_neighbors(False, "mask")
+    _test_sample_neighbors(False, "mask", False)
+    _test_sample_neighbors(False, "mask", True)
 
 
 @unittest.skipIf(
@@ -1128,22 +1204,45 @@ def test_sample_neighbors_topk_outedge():
     # _test_sample_neighbors_topk_outedge(True)
 
 
-def test_sample_neighbors_with_0deg():
+@pytest.mark.parametrize("fused", [False, True])
+def test_sample_neighbors_with_0deg(fused):
+    if fused and F._default_context_str == "gpu":
+        pytest.skip("Fused sampling doesn't support GPU.")
     g = dgl.graph(([], []), num_nodes=5).to(F.ctx())
     sg = dgl.sampling.sample_neighbors(
-        g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="in", replace=False
+        g,
+        F.tensor([1, 2], dtype=F.int64),
+        2,
+        edge_dir="in",
+        replace=False,
+        fused=fused,
     )
     assert sg.num_edges() == 0
     sg = dgl.sampling.sample_neighbors(
-        g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="in", replace=True
+        g,
+        F.tensor([1, 2], dtype=F.int64),
+        2,
+        edge_dir="in",
+        replace=True,
+        fused=fused,
     )
     assert sg.num_edges() == 0
     sg = dgl.sampling.sample_neighbors(
-        g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="out", replace=False
+        g,
+        F.tensor([1, 2], dtype=F.int64),
+        2,
+        edge_dir="out",
+        replace=False,
+        fused=fused,
     )
     assert sg.num_edges() == 0
     sg = dgl.sampling.sample_neighbors(
-        g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="out", replace=True
+        g,
+        F.tensor([1, 2], dtype=F.int64),
+        2,
+        edge_dir="out",
+        replace=True,
+        fused=fused,
     )
     assert sg.num_edges() == 0
 
@@ -1274,7 +1373,7 @@ def test_sample_neighbors_biased_homogeneous():
 )
 def test_sample_neighbors_biased_bipartite():
     g = create_test_graph(100, 30, True)
-    num_dst = g.number_of_dst_nodes()
+    num_dst = g.num_dst_nodes()
     bias = F.tensor([0, 0.01, 10, 10], dtype=F.float32)
 
     def check_num(nodes, tag):
@@ -1492,7 +1591,10 @@ def test_sample_neighbors_etype_sorted_homogeneous(format_, direction):
 
 
 @pytest.mark.parametrize("dtype", ["int32", "int64"])
-def test_sample_neighbors_exclude_edges_heteroG(dtype):
+@pytest.mark.parametrize("fused", [False, True])
+def test_sample_neighbors_exclude_edges_heteroG(dtype, fused):
+    if fused and F._default_context_str == "gpu":
+        pytest.skip("Fused sampling doesn't support GPU.")
     d_i_d_u_nodes = F.zerocopy_from_numpy(
         np.unique(np.random.randint(300, size=100, dtype=dtype))
     )
@@ -1574,39 +1676,85 @@ def test_sample_neighbors_exclude_edges_heteroG(dtype):
         },
         sampled_amount,
         exclude_edges=excluded_edges,
+        fused=fused,
     )
 
-    assert not np.any(
-        F.asnumpy(
-            sg.has_edges_between(
-                did_excluded_nodes_U,
-                did_excluded_nodes_V,
-                etype=("drug", "interacts", "drug"),
+    if fused:
+
+        def contain_edge(g, sg, etype, u, v):
+            # set of subgraph graph edges deduced from original graph
+            org_edges = set(
+                map(
+                    tuple,
+                    np.stack(
+                        g.find_edges(sg.edges[etype].data[dgl.EID], etype),
+                        axis=1,
+                    ),
+                )
+            )
+            # set of excluded edges
+            excluded_edges = set(map(tuple, np.stack((u, v), axis=1)))
+
+            diff_set = org_edges - excluded_edges
+
+            return len(diff_set) != len(org_edges)
+
+        assert not contain_edge(
+            g,
+            sg,
+            ("drug", "interacts", "drug"),
+            did_excluded_nodes_U,
+            did_excluded_nodes_V,
+        )
+        assert not contain_edge(
+            g,
+            sg,
+            ("drug", "interacts", "gene"),
+            dig_excluded_nodes_U,
+            dig_excluded_nodes_V,
+        )
+        assert not contain_edge(
+            g,
+            sg,
+            ("drug", "treats", "disease"),
+            dtd_excluded_nodes_U,
+            dtd_excluded_nodes_V,
+        )
+    else:
+        assert not np.any(
+            F.asnumpy(
+                sg.has_edges_between(
+                    did_excluded_nodes_U,
+                    did_excluded_nodes_V,
+                    etype=("drug", "interacts", "drug"),
+                )
             )
         )
-    )
-    assert not np.any(
-        F.asnumpy(
-            sg.has_edges_between(
-                dig_excluded_nodes_U,
-                dig_excluded_nodes_V,
-                etype=("drug", "interacts", "gene"),
+        assert not np.any(
+            F.asnumpy(
+                sg.has_edges_between(
+                    dig_excluded_nodes_U,
+                    dig_excluded_nodes_V,
+                    etype=("drug", "interacts", "gene"),
+                )
             )
         )
-    )
-    assert not np.any(
-        F.asnumpy(
-            sg.has_edges_between(
-                dtd_excluded_nodes_U,
-                dtd_excluded_nodes_V,
-                etype=("drug", "treats", "disease"),
+        assert not np.any(
+            F.asnumpy(
+                sg.has_edges_between(
+                    dtd_excluded_nodes_U,
+                    dtd_excluded_nodes_V,
+                    etype=("drug", "treats", "disease"),
+                )
             )
         )
-    )
 
 
 @pytest.mark.parametrize("dtype", ["int32", "int64"])
-def test_sample_neighbors_exclude_edges_homoG(dtype):
+@pytest.mark.parametrize("fused", [False, True])
+def test_sample_neighbors_exclude_edges_homoG(dtype, fused):
+    if fused and F._default_context_str == "gpu":
+        pytest.skip("Fused sampling doesn't support GPU.")
     u_nodes = F.zerocopy_from_numpy(
         np.unique(np.random.randint(300, size=100, dtype=dtype))
     )
@@ -1630,12 +1778,36 @@ def test_sample_neighbors_exclude_edges_homoG(dtype):
     excluded_nodes_V = g_edges[V][b_idx:e_idx]
 
     sg = dgl.sampling.sample_neighbors(
-        g, sampled_node, sampled_amount, exclude_edges=excluded_edges
+        g,
+        sampled_node,
+        sampled_amount,
+        exclude_edges=excluded_edges,
+        fused=fused,
     )
+    if fused:
 
-    assert not np.any(
-        F.asnumpy(sg.has_edges_between(excluded_nodes_U, excluded_nodes_V))
-    )
+        def contain_edge(g, sg, u, v):
+            # set of subgraph graph edges deduced from original graph
+            org_edges = set(
+                map(
+                    tuple,
+                    np.stack(
+                        g.find_edges(sg.edges["_E"].data[dgl.EID]), axis=1
+                    ),
+                )
+            )
+            # set of excluded edges
+            excluded_edges = set(map(tuple, np.stack((u, v), axis=1)))
+
+            diff_set = org_edges - excluded_edges
+
+            return len(diff_set) != len(org_edges)
+
+        assert not contain_edge(g, sg, excluded_nodes_U, excluded_nodes_V)
+    else:
+        assert not np.any(
+            F.asnumpy(sg.has_edges_between(excluded_nodes_U, excluded_nodes_V))
+        )
 
 
 @pytest.mark.parametrize("dtype", ["int32", "int64"])

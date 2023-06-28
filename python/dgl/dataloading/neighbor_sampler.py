@@ -1,4 +1,5 @@
 """Data loading components for neighbor sampling"""
+from .. import backend as F
 from ..base import EID, NID
 from ..transforms import to_block
 from .base import BlockSampler
@@ -54,6 +55,9 @@ class NeighborSampler(BlockSampler):
     output_device : device, optional
         The device of the output subgraphs or MFGs.  Default is the same as the
         minibatch of seed nodes.
+    fused : bool, default True
+        If True and device is CPU fused sample neighbors is invoked. This version
+        requires seed_nodes to be unique
 
     Examples
     --------
@@ -120,6 +124,7 @@ class NeighborSampler(BlockSampler):
         prefetch_labels=None,
         prefetch_edge_feats=None,
         output_device=None,
+        fused=True,
     ):
         super().__init__(
             prefetch_node_feats=prefetch_node_feats,
@@ -137,25 +142,47 @@ class NeighborSampler(BlockSampler):
             )
         self.prob = prob or mask
         self.replace = replace
+        self.fused = fused
+        self.mapping = {}
+        self.g = None
 
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         output_nodes = seed_nodes
         blocks = []
-        for fanout in reversed(self.fanouts):
-            frontier = g.sample_neighbors(
-                seed_nodes,
-                fanout,
-                edge_dir=self.edge_dir,
-                prob=self.prob,
-                replace=self.replace,
-                output_device=self.output_device,
-                exclude_edges=exclude_eids,
-            )
-            eid = frontier.edata[EID]
-            block = to_block(frontier, seed_nodes)
-            block.edata[EID] = eid
-            seed_nodes = block.srcdata[NID]
-            blocks.insert(0, block)
+        if F.device_type(g.device) == "cpu" and self.fused:
+            if self.g != g:
+                self.mapping = {}
+                self.g = g
+            for fanout in reversed(self.fanouts):
+                block = g.sample_neighbors(
+                    seed_nodes,
+                    fanout,
+                    edge_dir=self.edge_dir,
+                    prob=self.prob,
+                    replace=self.replace,
+                    output_device=self.output_device,
+                    fused=True,
+                    exclude_edges=exclude_eids,
+                    mapping=self.mapping,
+                )
+                seed_nodes = block.srcdata[NID]
+                blocks.insert(0, block)
+        else:
+            for fanout in reversed(self.fanouts):
+                frontier = g.sample_neighbors(
+                    seed_nodes,
+                    fanout,
+                    edge_dir=self.edge_dir,
+                    prob=self.prob,
+                    replace=self.replace,
+                    output_device=self.output_device,
+                    exclude_edges=exclude_eids,
+                )
+                eid = frontier.edata[EID]
+                block = to_block(frontier, seed_nodes)
+                block.edata[EID] = eid
+                seed_nodes = block.srcdata[NID]
+                blocks.insert(0, block)
 
         return seed_nodes, output_nodes, blocks
 
