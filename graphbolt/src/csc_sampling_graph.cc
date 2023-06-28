@@ -340,21 +340,25 @@ torch::Tensor PickByEtype(
       fanouts.size(), torch::tensor({}, options));
   int64_t etype_begin = offset;
   int64_t etype_end = offset;
-  while (etype_end < offset + num_neighbors) {
-    int64_t etype = type_per_edge[etype_end].item<int64_t>();
-    int64_t fanout = fanouts[etype];
-    while (etype_end < offset + num_neighbors &&
-           type_per_edge[etype_end].item<int64_t>() == etype) {
-      etype_end++;
-    }
-    // Do sampling for one etype.
-    if (fanout != 0) {
-      picked_neighbors[etype] = Pick(
-          etype_begin, etype_end - etype_begin, fanout, replace, options,
-          probs_or_mask);
-    }
-    etype_begin = etype_end;
-  }
+  AT_DISPATCH_INTEGRAL_TYPES(
+      type_per_edge.scalar_type(), "PickByEtype", ([&] {
+        const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
+        while (etype_end < offset + num_neighbors) {
+          scalar_t etype = type_per_edge_data[etype_end];
+          int64_t fanout = fanouts[etype];
+          while (etype_end < offset + num_neighbors &&
+                 type_per_edge_data[etype_end] == etype) {
+            etype_end++;
+          }
+          // Do sampling for one etype.
+          if (fanout != 0) {
+            picked_neighbors[etype] = Pick(
+                etype_begin, etype_end - etype_begin, fanout, replace, options,
+                probs_or_mask);
+          }
+          etype_begin = etype_end;
+        }
+      }));
 
   return torch::cat(picked_neighbors, 0);
 }
