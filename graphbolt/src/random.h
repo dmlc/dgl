@@ -1,4 +1,12 @@
-// Add for RandomEngine.
+
+/**
+ *  Copyright (c) 2023 by Contributors
+ *
+ * @file random.h
+ * @brief Random Engine class.
+ */
+#ifndef GRAPHBOLT_RANDOM_H_
+#define GRAPHBOLT_RANDOM_H_
 #include <dmlc/thread_local.h>
 
 #include <pcg_random.hpp>
@@ -63,5 +71,6 @@ class RandomEngine {
  private:
   pcg32 rng_;
 };
-
 }  // namespace graphbolt
+
+#endif  // GRAPHBOLT_RANDOM_H_
