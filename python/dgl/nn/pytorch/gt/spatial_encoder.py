@@ -155,8 +155,8 @@ class SpatialEncoder3d(nn.Module):
 
         nn.init.uniform_(self.means, 0, 3)
         nn.init.uniform_(self.stds, 0, 3)
-        nn.init.constant_(self.mul.weight, 1)
-        nn.init.constant_(self.bias.weight, 0)
+        nn.init.constant_(self.gamma.weight, 1)
+        nn.init.constant_(self.beta.weight, 0)
 
     def forward(self, coord, node_type=None):
         """
