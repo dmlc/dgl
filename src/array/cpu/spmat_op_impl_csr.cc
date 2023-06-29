@@ -496,7 +496,7 @@ CSRMatrix CSRSliceMatrix(
     bool relabel_nodes) {
   int64_t new_nrows_temp = rows->shape[0];
   int64_t new_ncols_temp = cols->shape[0];
-  if (relabel_nodes == false) {
+  if (!relabel_nodes) {
     new_nrows_temp = csr.num_rows;
     new_ncols_temp = csr.num_cols;
   }
@@ -523,7 +523,7 @@ CSRMatrix CSRSliceMatrix(
       const IdType oldj = indices_data[p];
       const IdType newj = hashmap.Map(oldj, kInvalidId);
       if (newj != kInvalidId) {
-        if (relabel_nodes == true) {
+        if (relabel_nodes) {
           ++sub_indptr[i];
           sub_indices.push_back(newj);
         } else {
