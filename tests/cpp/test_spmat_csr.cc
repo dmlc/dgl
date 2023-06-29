@@ -613,7 +613,7 @@ void _TestCSRSliceMatrix1(DGLContext ctx) {
     ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
     ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
   }
-  if (ctx == CPU) return;
+  if (ctx == GPU) return;
   {
     // square
     auto r =
