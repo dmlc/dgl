@@ -20,5 +20,3 @@ class SubgraphSampler(Mapper):
     fn : callable
         The subgraph sampling function.
     """
-
-    pass
