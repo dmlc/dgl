@@ -26,13 +26,13 @@ class Graphormer(nn.Module):
         max_degree=512,
         num_spatial=511,
         multi_hop_max_dist=5,
-        num_encoder_layers: int = 12,
-        embedding_dim: int = 768,
-        ffn_embedding_dim: int = 768,
-        num_attention_heads: int = 32,
-        dropout: float = 0.1,
-        pre_layernorm: bool = True,
-        activation_fn=th.nn.GELU(),
+        num_encoder_layers=12,
+        embedding_dim=768,
+        ffn_embedding_dim=768,
+        num_attention_heads=32,
+        dropout=0.1,
+        pre_layernorm=True,
+        activation_fn=nn.GELU(),
     ):
 
         super().__init__()
@@ -106,7 +106,7 @@ class Graphormer(nn.Module):
         num_graphs, max_num_nodes, _ = node_feat.shape
         deg_emb = self.degree_encoder(th.stack((in_degree, out_degree)))
 
-        # node feauture + graph token
+        # node feature + graph token
         node_feat = self.atom_encoder(node_feat.int()).sum(dim=-2)
         node_feat = node_feat + deg_emb
         graph_token_feat = self.graph_token.weight.unsqueeze(0).repeat(
@@ -129,6 +129,7 @@ class Graphormer(nn.Module):
         t = self.graph_token_virtual_distance.weight.reshape(
             1, 1, self.num_heads
         )
+        # add spatial encoding between the virtual node and other nodes to attn_bias
         attn_bias[:, 1:, 0, :] = attn_bias[:, 1:, 0, :] + t
         attn_bias[:, 0, :, :] = attn_bias[:, 0, :, :] + t
 
@@ -286,7 +287,7 @@ def train_val_pipeline(params):
         num_workers=16,
     )
 
-    # load pretrain model
+    # load pretrained model
     download(url="https://data.dgl.ai/pre_trained/graphormer_pcqm.pth")
     model = Graphormer()
     state_dict = th.load("graphormer_pcqm.pth")
@@ -378,7 +379,7 @@ class MolHIVDataset(th.utils.data.Dataset):
             len(self.test),
             len(self.val),
         )
-        accelerator.print("[I] Finished loading.")
+        accelerator.print("Finished loading.")
 
     def collate(self, samples):
         graphs, labels = map(list, zip(*samples))
@@ -392,13 +393,16 @@ class MolHIVDataset(th.utils.data.Dataset):
         node_feat = []
         in_degree, out_degree = [], []
         path_data = []
+        # use -1 padding since shortest_dist returns -1 for unreachable node pairs
         dist = -th.ones(
             (num_graphs, max_num_nodes, max_num_nodes), dtype=th.long
         )
 
         for i in range(num_graphs):
+            # positions outside num_nodes should be masked with non-zero values
             attn_mask[i, :, num_nodes[i] + 1 :] = 1
 
+            # +1 to distinguish the padding value and the node feature
             node_feat.append(graphs[i].ndata["feat"] + 1)
 
             in_degree.append(
@@ -415,9 +419,10 @@ class MolHIVDataset(th.utils.data.Dataset):
             # shape: [n, n, max_len]
             max_len = 5
             if path_len >= max_len:
-                shortest_path = path[:, :, 0:max_len]
+                shortest_path = path[:, :, :max_len]
             else:
                 p1d = (0, max_len - path_len)
+                # use the same -1 padding as shortest_dist
                 shortest_path = F.pad(path, p1d, "constant", -1)
             p3d = (
                 0,
@@ -428,7 +433,10 @@ class MolHIVDataset(th.utils.data.Dataset):
                 max_num_nodes - num_nodes[i],
             )
             shortest_path = F.pad(shortest_path, p3d, "constant", -1)
+            # +1 to distinguish the padding value and the edge feature
             edata = graphs[i].edata["feat"] + 1
+            # Since shortest_dist returns -1 for unreachable node pairs,
+            # edata[-1] should be filled with zero padding.
             edata = th.cat(
                 (edata, th.zeros(1, edata.shape[1]).to(edata.device)), dim=0
             )
@@ -461,7 +469,7 @@ if __name__ == "__main__":
         "--seed",
         default=1,
         type=int,
-        help="Please give a value for seed",
+        help="Please give a value for random seed",
     )
     parser.add_argument(
         "--batch_size",

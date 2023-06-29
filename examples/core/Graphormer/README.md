@@ -22,7 +22,7 @@ How to run
 ```bash
 accelerate launch --multi_gpu --mixed_precision=fp16 train.py
 ```
-> **_NOTE:_**  The script will automatically download pre-trained weights on PCQM4Mv2.
+> **_NOTE:_**  The script will automatically download weights pre-trained on PCQM4Mv2.
 
 ## Summary
 
