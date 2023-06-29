@@ -11,6 +11,8 @@ def to_on_disk_tensor(test_dir, name, t):
     path = os.path.join(test_dir, name + ".npy")
     t = t.numpy()
     np.save(path, t)
+    # The Pytorch tensor is a view of the numpy array on disk, which does not
+    # consume memory.
     t = torch.as_tensor(np.load(path, mmap_mode="r+"))
     return t
 
