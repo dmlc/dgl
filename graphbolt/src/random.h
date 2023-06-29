@@ -7,6 +7,7 @@
  */
 #ifndef GRAPHBOLT_RANDOM_H_
 #define GRAPHBOLT_RANDOM_H_
+
 #include <dmlc/thread_local.h>
 
 #include <pcg_random.hpp>
