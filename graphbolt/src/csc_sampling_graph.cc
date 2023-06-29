@@ -343,13 +343,14 @@ torch::Tensor PickByEtype(
   AT_DISPATCH_INTEGRAL_TYPES(
       type_per_edge.scalar_type(), "PickByEtype", ([&] {
         const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
-        while (etype_end < offset + num_neighbors) {
-          scalar_t etype = type_per_edge_data[etype_end];
+        const auto end = offset + num_neighbors;
+        while (etype_begin < end) {
+          scalar_t etype = type_per_edge_data[etype_begin];
           int64_t fanout = fanouts[etype];
-          while (etype_end < offset + num_neighbors &&
-                 type_per_edge_data[etype_end] == etype) {
-            etype_end++;
-          }
+          auto etype_end_it = std::upper_bound(
+              type_per_edge_data + etype_begin, type_per_edge_data + end,
+              etype);
+          etype_end = etype_end_it - type_per_edge_data;
           // Do sampling for one etype.
           if (fanout != 0) {
             picked_neighbors[etype] = Pick(
