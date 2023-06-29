@@ -100,7 +100,6 @@ class TestConstructDglServerEnvVars(unittest.TestCase):
                 ip_config="path/to/ip.config",
                 num_servers=5,
                 graph_format="csc",
-                keep_alive=False,
             ),
             (
                 "DGL_ROLE=server "
@@ -111,7 +110,6 @@ class TestConstructDglServerEnvVars(unittest.TestCase):
                 "DGL_IP_CONFIG=path/to/ip.config "
                 "DGL_NUM_SERVER=5 "
                 "DGL_GRAPH_FORMAT=csc "
-                "DGL_KEEP_ALIVE=0 "
             ),
         )
 
@@ -195,8 +193,6 @@ def test_submit_jobs():
         args.workspace = test_dir
         args.part_config = "ogb-products.json"
         args.ip_config = "ip_config.txt"
-        args.server_name = "ogb-products"
-        args.keep_alive = False
         args.num_server_threads = 1
         args.graph_format = "csc"
         args.extra_envs = ["NCCL_DEBUG=INFO"]
@@ -233,7 +229,6 @@ def test_submit_jobs():
         for cmd in servers_cmd:
             common_checks()
             assert "DGL_ROLE=server" in cmd
-            assert "DGL_KEEP_ALIVE=0" in cmd
             assert "DGL_SERVER_ID=" in cmd
 
 
