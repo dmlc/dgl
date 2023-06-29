@@ -347,8 +347,9 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
 
 template <typename IdType>
 int log_size(const IdType size) {
+  if (size <= 0) return 0;
   for (int i = 0; i < static_cast<int>(sizeof(IdType)) * 8; i++)
-    if ((size >> i) <= (IdType)1) return i;
+    if (((size - 1) >> i) == 0) return i;
   return sizeof(IdType) * 8;
 }
 
