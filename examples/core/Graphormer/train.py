@@ -129,7 +129,7 @@ class Graphormer(nn.Module):
         t = self.graph_token_virtual_distance.weight.reshape(
             1, 1, self.num_heads
         )
-        # Since the virtual node comes first, the spatial encodings between it 
+        # Since the virtual node comes first, the spatial encodings between it
         # and other nodes need to fill the 1st row and 1st column (omit num_graphs
         # and num_heads dimensions) of attn_bias matrix by broadcasting.
         attn_bias[:, 1:, 0, :] = attn_bias[:, 1:, 0, :] + t
