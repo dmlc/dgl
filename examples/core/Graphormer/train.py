@@ -129,7 +129,9 @@ class Graphormer(nn.Module):
         t = self.graph_token_virtual_distance.weight.reshape(
             1, 1, self.num_heads
         )
-        # add spatial encoding between the virtual node and other nodes to attn_bias
+        # Since the virtual node comes first, the spatial encodings between it 
+        # and other nodes need to fill the 1st row and 1st column (omit num_graphs
+        # and num_heads dimensions) of attn_bias matrix by broadcasting.
         attn_bias[:, 1:, 0, :] = attn_bias[:, 1:, 0, :] + t
         attn_bias[:, 0, :, :] = attn_bias[:, 0, :, :] + t
 
@@ -399,10 +401,10 @@ class MolHIVDataset(th.utils.data.Dataset):
         )
 
         for i in range(num_graphs):
-            # positions outside num_nodes should be masked with non-zero values
+            # a binary mask where invalid positions are indicated by True values
             attn_mask[i, :, num_nodes[i] + 1 :] = 1
 
-            # +1 to distinguish the padding value and the node feature
+            # +1 to distinguish padded non-existing nodes from real nodes
             node_feat.append(graphs[i].ndata["feat"] + 1)
 
             in_degree.append(
@@ -433,10 +435,10 @@ class MolHIVDataset(th.utils.data.Dataset):
                 max_num_nodes - num_nodes[i],
             )
             shortest_path = F.pad(shortest_path, p3d, "constant", -1)
-            # +1 to distinguish the padding value and the edge feature
+            # +1 to distinguish padded non-existing edges from real edges
             edata = graphs[i].edata["feat"] + 1
-            # Since shortest_dist returns -1 for unreachable node pairs,
-            # edata[-1] should be filled with zero padding.
+            # shortest_dist pads non-existing edges (at the end of the shortest paths) with
+            # edge IDs -1, and th.zeros(1, edata.shape[1]) stands for all padded edge features.
             edata = th.cat(
                 (edata, th.zeros(1, edata.shape[1]).to(edata.device)), dim=0
             )
