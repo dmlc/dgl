@@ -613,7 +613,8 @@ void _TestCSRSliceMatrix1(DGLContext ctx) {
     ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
     ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
   }
-  // Below is the test for relabel_nodes == false, currently it is not available for GPU case.
+  // Below is the test for relabel_nodes == false, currently it is not available
+  // for GPU case.
   if (ctx == GPU) return;
   {
     // square
