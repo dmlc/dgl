@@ -256,10 +256,9 @@ class DistSparseGradOptimizer(abc.ABC):
         of the embeddings involved in a mini-batch to DGL's servers and update the embeddings.
         """
         with th.no_grad():
-            dev = "cuda" if th.distributed.get_backend() == "nccl" else "cpu"
+            device = "cuda" if th.distributed.get_backend() == "nccl" else "cpu"
             local_indics = {emb.name: [] for emb in self._params}
             local_grads = {emb.name: [] for emb in self._params}
-            device = dev #th.device("cpu")
             for emb in self._params:
                 name = emb.weight.name
                 kvstore = emb.weight.kvstore
@@ -311,7 +310,9 @@ class DistSparseGradOptimizer(abc.ABC):
 
                         if trainers_per_server <= 1:
                             idx_split_size.append(
-                                th.tensor([idx_i.shape[0]], dtype=th.int64, device=dev)
+                                th.tensor(
+                                    [idx_i.shape[0]], dtype=th.int64, device=device
+                                )
                             )
                             idics_list.append(idx_i)
                             grad_list.append(grad_i)
@@ -324,7 +325,11 @@ class DistSparseGradOptimizer(abc.ABC):
                                 idx_j = idx_i[mask]
                                 grad_j = grad_i[mask]
                                 idx_split_size.append(
-                                    th.tensor([idx_j.shape[0]], dtype=th.int64, device=dev)
+                                    th.tensor(
+                                        [idx_j.shape[0]],
+                                        dtype=th.int64,
+                                        device=device,
+                                    )
                                 )
                                 idics_list.append(idx_j)
                                 grad_list.append(grad_j)
@@ -337,13 +342,14 @@ class DistSparseGradOptimizer(abc.ABC):
                     # Note: If we have GPU nccl support, we can use all_to_all to
                     # sync information here
                     gather_list = list(
-                        th.empty([self._world_size], dtype=th.int64, device=dev).chunk(
-                            self._world_size
-                        )
+                        th.empty(
+                            [self._world_size], dtype=th.int64, device=device
+                        ).chunk(self._world_size)
                     )
                     if th.distributed.get_backend() == "nccl":
                         idx_split_size = [
-                            tensor.to(th.device(dev)) for tensor in idx_split_size
+                            tensor.to(th.device(device))
+                                for tensor in idx_split_size
                         ]
                         th.distributed.all_to_all(gather_list, idx_split_size)
                     else:
@@ -355,13 +361,13 @@ class DistSparseGradOptimizer(abc.ABC):
                         )
                     # use cpu until we have GPU alltoallv
                     idx_gather_list = [
-                        th.empty((int(num_emb),), dtype=idics.dtype, device=dev)
+                        th.empty((int(num_emb),), dtype=idics.dtype, device=device)
                         for num_emb in gather_list
                     ]
 
                     if th.distributed.get_backend() == "nccl":
                         idics_list = [
-                            tensor.to(th.device(dev)) for tensor in idics_list
+                            tensor.to(th.device(device)) for tensor in idics_list
                         ]
                         th.distributed.all_to_all(idx_gather_list, idics_list)
                     else:
@@ -374,13 +380,15 @@ class DistSparseGradOptimizer(abc.ABC):
                     local_indics[name] = idx_gather_list
                     grad_gather_list = [
                         th.empty(
-                            (int(num_emb), grads.shape[1]), dtype=grads.dtype, device=dev
+                            (int(num_emb), grads.shape[1]),
+                            dtype=grads.dtype,
+                            device=device,
                         )
                         for num_emb in gather_list
                     ]
                     if th.distributed.get_backend() == "nccl":
                         grad_list = [
-                            tensor.to(th.device(dev)) for tensor in grad_list
+                            tensor.to(th.device(device)) for tensor in grad_list
                         ]
                         th.distributed.all_to_all(grad_gather_list, grad_list)
                     else:
