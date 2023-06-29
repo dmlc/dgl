@@ -20,5 +20,3 @@ class FeatureFetcher(Mapper):
     fn : callable
         The function that performs feature fetching.
     """
-
-    pass
