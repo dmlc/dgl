@@ -684,6 +684,7 @@ def _test_sample_neighbors(hypersparse, prob):
 def _test_sample_labors(hypersparse, prob):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, False)
 
+    # test with seed nodes [0, 1]
     def _test1(p):
         subg = dgl.sampling.sample_labors(g, [0, 1], -1, prob=p)[0]
         assert subg.num_nodes() == g.num_nodes()
@@ -719,7 +720,8 @@ def _test_sample_labors(hypersparse, prob):
 
     _test1(prob)
 
-    def _test2(p):  # fanout > #neighbors
+    # test with seed nodes [0, 2]
+    def _test2(p):
         subg = dgl.sampling.sample_labors(g, [0, 2], -1, prob=p)[0]
         assert subg.num_nodes() == g.num_nodes()
         u, v = subg.edges()
@@ -753,6 +755,7 @@ def _test_sample_labors(hypersparse, prob):
 
     _test2(prob)
 
+    # test with heterogenous seed nodes
     def _test3(p):
         subg = dgl.sampling.sample_labors(
             hg, {"user": [0, 1], "game": 0}, -1, prob=p
