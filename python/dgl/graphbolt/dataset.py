@@ -1,8 +1,6 @@
 """GraphBolt Dataset."""
 
-from dgl import DGLGraph
 from .feature_store import FeatureStore
-from .graph_storage import CSCSamplingGraph
 from .itemset import ItemSet, ItemSetDict
 
 __all__ = ["Dataset"]
@@ -43,7 +41,7 @@ class Dataset:
         """Return the test set."""
         raise NotImplementedError
 
-    def graph(self) -> CSCSamplingGraph or DGLGraph:
+    def graph(self) -> object:
         """Return the graph."""
         raise NotImplementedError
 
