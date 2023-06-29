@@ -613,7 +613,8 @@ void _TestCSRSliceMatrix1(DGLContext ctx) {
     ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
     ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
   }
-  if (ctx.device_id == 1) {
+  if (ctx == CPU) return;
+  {
     // square
     auto r =
         aten::VecToIdArray(std::vector<IDX>({0, 1, 3}), sizeof(IDX) * 8, ctx);
@@ -637,7 +638,7 @@ void _TestCSRSliceMatrix1(DGLContext ctx) {
     ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
     ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
   }
-  if (ctx.device_id == 1) {
+  {
     // non-square
     auto r =
         aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX) * 8, ctx);
@@ -660,7 +661,7 @@ void _TestCSRSliceMatrix1(DGLContext ctx) {
     ASSERT_TRUE(ArrayEQ<IDX>(x.indices, ti));
     ASSERT_TRUE(ArrayEQ<IDX>(x.data, td));
   }
-  if (ctx.device_id == 1) {
+  {
     // empty slice
     auto r = aten::VecToIdArray(std::vector<IDX>({2, 3}), sizeof(IDX) * 8, ctx);
     auto c = aten::VecToIdArray(std::vector<IDX>({0, 1}), sizeof(IDX) * 8, ctx);
