@@ -3672,7 +3672,7 @@ def lap_pe(g, k, padding=False, return_eigval=False):
     L = sparse.eye(g.num_nodes()) - N * A * N
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
-    EigVal, EigVec = scipy.sparse.linalg.eigs(L, k=pos_enc_dim+1, which='SR', tol=1e-2)
+    EigVal, EigVec = scipy.sparse.linalg.eigs(L, k=k+1, which='SR', tol=1e-2)
     max_freqs = min(n - 1, k)
     kpartition_indices = np.argpartition(EigVal, max_freqs)[: max_freqs + 1]
     topk_eigvals = EigVal[kpartition_indices]
