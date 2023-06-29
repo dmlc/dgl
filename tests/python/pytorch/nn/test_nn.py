@@ -2547,10 +2547,21 @@ def test_PathEncoder(max_len, feat_dim, num_heads):
 
 
 @pytest.mark.parametrize("max_dist", [1, 4])
-@pytest.mark.parametrize("num_kernels", [8, 16])
+@pytest.mark.parametrize("num_kernels", [4, 16])
 @pytest.mark.parametrize("num_heads", [1, 8])
 def test_SpatialEncoder(max_dist, num_kernels, num_heads):
     dev = F.ctx()
+    # single graph encoding 3d
+    num_nodes = 4
+    coord = th.rand(1, num_nodes, 3).to(dev)
+    node_type = th.tensor([[1, 0, 2, 1]]).to(dev)
+    spatial_encoder = nn.SpatialEncoder3d(
+        num_kernels=num_kernels, num_heads=num_heads, max_node_type=3
+    ).to(dev)
+    out = spatial_encoder(coord, node_type=node_type)
+    assert out.shape == (1, num_nodes, num_nodes, num_heads)
+
+    # encoding on a batch of graphs
     g1 = dgl.graph(
         (
             th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
@@ -2560,21 +2571,29 @@ def test_SpatialEncoder(max_dist, num_kernels, num_heads):
     g2 = dgl.graph(
         (th.tensor([0, 1, 2, 3, 2, 5]), th.tensor([1, 2, 3, 4, 0, 3]))
     ).to(dev)
-    bg = dgl.batch([g1, g2])
-    ndata = th.rand(bg.num_nodes(), 3).to(dev)
-    num_nodes = bg.num_nodes()
-    node_type = th.randint(0, 512, (num_nodes,)).to(dev)
-    dist = -th.ones((2, 6, 6), dtype=th.long).to(dev)
+    bsz, max_num_nodes = 2, 6
+    # 2d encoding
+    dist = -th.ones((bsz, max_num_nodes, max_num_nodes), dtype=th.long).to(dev)
     dist[0, :4, :4] = shortest_dist(g1, root=None, return_paths=False)
     dist[1, :6, :6] = shortest_dist(g2, root=None, return_paths=False)
     model_1 = nn.SpatialEncoder(max_dist, num_heads=num_heads).to(dev)
+    encoding = model_1(dist)
+    assert encoding.shape == (bsz, max_num_nodes, max_num_nodes, num_heads)
+    # 3d encoding
+    coord = th.rand(bsz, max_num_nodes, 3).to(dev)
+    node_type = th.randint(
+        0,
+        512,
+        (
+            bsz,
+            max_num_nodes,
+        ),
+    ).to(dev)
     model_2 = nn.SpatialEncoder3d(num_kernels, num_heads=num_heads).to(dev)
     model_3 = nn.SpatialEncoder3d(
         num_kernels, num_heads=num_heads, max_node_type=512
     ).to(dev)
-    encoding = model_1(dist)
-    encoding3d_1 = model_2(bg, ndata)
-    encoding3d_2 = model_3(bg, ndata, node_type)
-    assert encoding.shape == (2, 6, 6, num_heads)
-    assert encoding3d_1.shape == (2, 6, 6, num_heads)
-    assert encoding3d_2.shape == (2, 6, 6, num_heads)
+    encoding3d_1 = model_2(coord)
+    encoding3d_2 = model_3(coord, node_type)
+    assert encoding3d_1.shape == (bsz, max_num_nodes, max_num_nodes, num_heads)
+    assert encoding3d_2.shape == (bsz, max_num_nodes, max_num_nodes, num_heads)
