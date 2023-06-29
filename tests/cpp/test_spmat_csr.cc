@@ -615,7 +615,7 @@ void _TestCSRSliceMatrix1(DGLContext ctx) {
   }
   // Below is the test for relabel_nodes == false, currently it is not available
   // for GPU case.
-  if (ctx == GPU) return;
+  if (ctx.device_type == kDGLCUDA) return;
   {
     // square
     auto r =
