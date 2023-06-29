@@ -54,3 +54,7 @@ def test_torch_based_feature_store(in_memory):
 
         with pytest.raises(IndexError):
             feature_store.read("a", torch.tensor([0, 1, 2, 3]))
+
+        # For windows, the file is locked by the numpy.load. We need to delete
+        # it before closing the temporary directory.
+        a = b = c = feature_store = None
