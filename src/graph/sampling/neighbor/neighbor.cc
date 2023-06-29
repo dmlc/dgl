@@ -15,6 +15,7 @@
 #include <tuple>
 #include <utility>
 
+#include "../../../array/cpu/concurrent_id_hash_map.h"
 #include "../../../c_api_common.h"
 #include "../../unit_graph.h"
 
@@ -438,7 +439,7 @@ SampleNeighborsFused(
         (dir == EdgeDir::kIn) ? src_vtype : dst_vtype;
     if (sampled_graphs[etype].num_cols != 0) {
       auto num_cols = sampled_graphs[etype].num_cols;
-      const int num_threads_col = runtime::compute_num_threads(0, num_cols, 1);
+      int num_threads_col = runtime::compute_num_threads(0, num_cols, 1);
       std::vector<IdType> global_prefix_col(num_threads_col + 1, 0);
       std::vector<std::vector<IdType>> src_nodes_local(num_threads_col);
       IdType* mapping_data_dst = mapping[lhs_node_type].Ptr<IdType>();
@@ -446,6 +447,7 @@ SampleNeighborsFused(
 #pragma omp parallel num_threads(num_threads_col)
       {
         const int thread_id = omp_get_thread_num();
+        num_threads_col = omp_get_num_threads();
 
         const int64_t start_i =
             thread_id * (num_cols / num_threads_col) +
@@ -458,8 +460,8 @@ SampleNeighborsFused(
         assert(thread_id + 1 < num_threads_col || end_i == num_cols);
         for (int64_t i = start_i; i < end_i; ++i) {
           int64_t picked_idx = cdata[i];
-          bool spot_claimed = __sync_bool_compare_and_swap(
-              &mapping_data_dst[picked_idx], -1, 0);
+          bool spot_claimed =
+              BoolCompareAndSwap<IdType>(&mapping_data_dst[picked_idx]);
           if (spot_claimed) src_nodes_local[thread_id].push_back(picked_idx);
         }
         global_prefix_col[thread_id + 1] = src_nodes_local[thread_id].size();
