@@ -30,20 +30,20 @@ __global__ void IndexSelectMultiKernel(
     const DType* const array, const int64_t num_feat, const IdType* const index,
     const int64_t length, const int64_t arr_len, DType* const out,
     const int64_t* perm = nullptr) {
-  int64_t out_row = blockIdx.x * blockDim.y + threadIdx.y;
+  int64_t out_row_index = blockIdx.x * blockDim.y + threadIdx.y;
 
   const int64_t stride = blockDim.y * gridDim.x;
 
-  while (out_row < length) {
+  while (out_row_index < length) {
     int64_t col = threadIdx.x;
-    const int64_t in_row = index[out_row];
+    const int64_t in_row = index[out_row_index];
     assert(in_row >= 0 && in_row < arr_len);
-    const auto out_row_ = perm ? perm[out_row] : out_row;
+    const auto out_row = perm ? perm[out_row_index] : out_row_index;
     while (col < num_feat) {
-      out[out_row_ * num_feat + col] = array[in_row * num_feat + col];
+      out[out_row * num_feat + col] = array[in_row * num_feat + col];
       col += blockDim.x;
     }
-    out_row += stride;
+    out_row_index += stride;
   }
 }
 
