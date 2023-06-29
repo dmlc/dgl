@@ -494,15 +494,9 @@ template <DGLDeviceType XPU, typename IdType>
 CSRMatrix CSRSliceMatrix(
     CSRMatrix csr, runtime::NDArray rows, runtime::NDArray cols,
     bool relabel_nodes) {
-  int64_t new_nrows_temp = rows->shape[0];
-  int64_t new_ncols_temp = cols->shape[0];
-  if (!relabel_nodes) {
-    new_nrows_temp = csr.num_rows;
-    new_ncols_temp = csr.num_cols;
-  }
   IdHashMap<IdType> hashmap(cols);
-  const int64_t new_nrows = new_nrows_temp;
-  const int64_t new_ncols = new_ncols_temp;
+  const int64_t new_nrows = relabel_nodes ? rows->shape[0] : csr.num_rows;
+  const int64_t new_ncols = relabel_nodes ? cols->shape[0] : csr.num_cols;
   const IdType* rows_data = static_cast<IdType*>(rows->data);
   const bool has_data = CSRHasData(csr);
 
