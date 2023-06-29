@@ -71,7 +71,7 @@ struct TransformOp {
     const auto in_row = idx_coo[idx];
     const auto row = rows[in_row];
     const auto in_idx = indptr[in_row] + idx - subindptr[in_row];
-    const auto u = indices[!is_pinned ? in_idx : idx];
+    const auto u = indices[is_pinned ? idx : in_idx];
     const auto data = data_arr ? data_arr[in_idx] : in_idx;
     return thrust::make_tuple(row, u, data);
   }
@@ -98,7 +98,7 @@ struct TransformOpImp {
     const auto c = cs[in_row];
     const auto row = rows[in_row];
     const auto in_idx = indptr[in_row] + idx - subindptr[in_row];
-    const auto u = indices[!is_pinned ? in_idx : idx];
+    const auto u = indices[is_pinned ? idx : in_idx];
     const auto w = A[in_idx];
     const auto w2 = B[in_idx];
     const auto data = data_arr ? data_arr[in_idx] : in_idx;
@@ -134,7 +134,7 @@ struct StencilOpFused {
     const auto ps = probs[idx];
     IdType rofs = idx - subindptr[in_row];
     const auto in_idx = indptr[in_row] + rofs;
-    const auto u = indices[!is_pinned ? in_idx : idx];
+    const auto u = indices[is_pinned ? idx : in_idx];
     const auto t = nids ? nids[u] : u;  // t in the paper
     curandStatePhilox4_32_10_t rng;
     // rolled random number r_t is a function of the random_seed and t

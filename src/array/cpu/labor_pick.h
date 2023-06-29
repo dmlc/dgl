@@ -123,6 +123,7 @@ auto compute_importance_sampling_probabilities(
         var_1 = 0;
         if (weighted) {
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
+            // The check for zero is necessary for numerical stability
             var_1 += A[j] > 0
                          ? A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]])
                          : 0;
