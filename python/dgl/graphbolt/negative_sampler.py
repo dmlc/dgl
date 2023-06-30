@@ -44,10 +44,10 @@ class _BaseNegativeSampler:
         super().__init__()
         self.graph = graph
         self.negative_ratio = negative_ratio
-        assert (
-            linked_data_format == LinkedDataFormat.CONDITIONED
-            or linked_data_format == LinkedDataFormat.INDEPENDENT
-        ), f"Unsupported data format: {self.linked_data_format}"
+        assert linked_data_format in [
+            LinkedDataFormat.CONDITIONED,
+            LinkedDataFormat.INDEPENDENT,
+        ], f"Unsupported data format: {linked_data_format}"
         self.linked_data_format = linked_data_format
 
     def _generate(self, pos_pairs):
@@ -111,7 +111,7 @@ class PerSourceUniformSampler(_BaseNegativeSampler):
     """
 
     def _generate(self, pos_pairs):
-        return self.graph.sample_negative_per_source_uniform(
+        return self.graph.sample_negative_edges_uniform(
             pos_pairs,
             self.negative_ratio,
         )
