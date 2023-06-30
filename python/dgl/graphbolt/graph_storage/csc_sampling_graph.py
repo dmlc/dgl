@@ -323,7 +323,7 @@ class CSCSamplingGraph:
         assert (
             negative_ratio >= 0
         ), "Negative_ratio should shoubld be non-negative Integer."
-        return self._c_csc_graph.sample_negative_per_source_uniform(
+        return self._c_csc_graph.sample_negative_edges_uniform(
             pos_pairs,
             negative_ratio,
         )
