@@ -1,6 +1,5 @@
 """Graph Bolt CUDA-related Data Pipelines"""
 
-import torch
 from torchdata.datapipes.iter import IterDataPipe
 
 from ..utils import recursive_apply
@@ -27,11 +26,9 @@ class CopyTo(IterDataPipe):
         The DataPipe.
     device : torch.device
         The PyTorch CUDA device.
-    stream : torch.cuda.Stream
-        The CUDA stream to perform transfer on.
     """
 
-    def __init__(self, dp, device, stream=None):
+    def __init__(self, dp, device):
         super().__init__()
         self.dp = dp
         self.device = device
