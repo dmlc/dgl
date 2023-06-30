@@ -196,7 +196,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
 }
 
 std::tuple<torch::Tensor, torch::Tensor>
-CSCSamplingGraph::SampleNegativePerSourceUniform(
+CSCSamplingGraph::SampleNegativeEdgesUniform(
     const std::tuple<torch::Tensor, torch::Tensor>& pos_pairs,
     int64_t negative_ratio) const {
   torch::Tensor pos_src;
