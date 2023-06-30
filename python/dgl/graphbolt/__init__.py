@@ -11,6 +11,7 @@ from .linked_data_format import *
 from .minibatch_sampler import *
 from .negative_sampler import *
 from .feature_store import *
+from .subgraph_sampler import *
 
 
 def load_graphbolt():
