@@ -296,7 +296,7 @@ class CSCSamplingGraph:
             nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
         )
 
-    def sample_negative_per_source_uniform(self, pos_pairs, negative_ratio):
+    def sample_negative_edges_uniform(self, pos_pairs, negative_ratio):
         """
         Sample negative edges by randomly choosing negative source-destination
         pairs according to a uniform distribution. For each edge ``(u, v)``,
@@ -323,7 +323,7 @@ class CSCSamplingGraph:
         assert (
             negative_ratio >= 0
         ), "Negative_ratio should shoubld be non-negative Integer."
-        return self._c_csc_graph.sample_negative_per_source_uniform(
+        return self._c_csc_graph.sample_negative_edges_uniform(
             pos_pairs,
             negative_ratio,
         )
