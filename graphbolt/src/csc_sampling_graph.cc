@@ -11,6 +11,7 @@
 #include <tuple>
 #include <vector>
 
+#include "./random.h"
 #include "./shared_memory_utils.h"
 
 namespace graphbolt {
@@ -256,8 +257,76 @@ inline torch::Tensor UniformPick(
       picked_neighbors =
           torch::randint(offset, offset + num_neighbors, {fanout}, options);
     } else {
-      picked_neighbors = torch::randperm(num_neighbors, options);
-      picked_neighbors = picked_neighbors.slice(0, 0, fanout) + offset;
+      picked_neighbors = torch::empty({fanout}, options);
+      AT_DISPATCH_INTEGRAL_TYPES(
+          picked_neighbors.scalar_type(), "UniformPick", ([&] {
+            scalar_t* picked_neighbors_data =
+                picked_neighbors.data_ptr<scalar_t>();
+            if (fanout < num_neighbors / 10) {
+              // If set of numbers is small (up to 64) use linear search to
+              // verify uniqueness this operation is cheaper for CPU.
+              if (fanout && fanout < 64) {
+                *picked_neighbors_data = RandomEngine::ThreadLocal()->RandInt(
+                    offset, offset + num_neighbors);
+                auto b = picked_neighbors_data + 1;
+                auto e = picked_neighbors_data + fanout;
+
+                while (b != e) {
+                  // Put the new random number in the last position.
+                  *b = RandomEngine::ThreadLocal()->RandInt(
+                      offset, offset + num_neighbors);
+                  // Check if a new value doesn't exist in current
+                  // range(picked_neighbors_data, b). Otherwise get a new
+                  // value until we haven't unique range of elements.
+                  auto it = std::find(picked_neighbors_data, b, *b);
+                  if (it != b) continue;
+                  ++b;
+                }
+
+              } else {
+                // Use hash set.
+                // In the best scenario, time complexity is O(fanout), i.e., no
+                // conflict.
+                //
+                // Let k be fanout / num_neighbors, the expected number of extra
+                // sampling steps is roughly k^2 / (1-k) * num_neighbors, which
+                // means in the worst case scenario, the time complexity is
+                // O(num_neighbors^2). In practice,
+                // we use 1/10 since std::unordered_set is pretty slow.
+                std::unordered_set<scalar_t> picked_set;
+                while (static_cast<int64_t>(picked_set.size()) < fanout) {
+                  picked_set.insert(RandomEngine::ThreadLocal()->RandInt(
+                      offset, offset + num_neighbors));
+                }
+                std::copy(
+                    picked_set.begin(), picked_set.end(),
+                    picked_neighbors_data);
+              }
+
+            } else {
+              // In this case, `fanout >= num_neighbors / 10`. To reduce the
+              // computation overhead, we should reduce the number of random
+              // number generations. Even though reservior algorithm is more
+              // memory effficient (it has O(fanout) memory complexity), it
+              // generates O(num_neighbors) random numbers, which is
+              // computationally expensive. This algorithm has memory complexity
+              // of O(num_neighbors) but generates much fewer random numbers
+              // O(fanout). In the case of `fanout >= num_neighbors/10`, we
+              // don't need to worry about memory complexity because `fanout`
+              // is usually small. So is `num_neighbors`. Allocating a small
+              // piece of memory is very efficient.
+              std::vector<scalar_t> seq(num_neighbors);
+              // Assign the seq with [offset, offset + num_neighbors].
+              std::iota(seq.begin(), seq.end(), offset);
+              for (int64_t i = 0; i < fanout; ++i) {
+                auto j = RandomEngine::ThreadLocal()->RandInt(i, num_neighbors);
+                std::swap(seq[i], seq[j]);
+              }
+              // Save the randomly sampled fanout elements to the output tensor.
+              std::copy(
+                  seq.begin(), seq.begin() + fanout, picked_neighbors_data);
+            }
+          }));
     }
   }
   return picked_neighbors;
