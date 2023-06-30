@@ -5,7 +5,7 @@ import torch
 
 
 def get_graphbolt_fetch_func():
-    feature_store = dgl.graphbolt.feature_store.InMemoryFeatureStore(
+    feature_store = dgl.graphbolt.feature_store.TorchBasedFeatureStore(
         {
             "feature": torch.randn(200, 4),
             "label": torch.randint(0, 10, (200,)),
