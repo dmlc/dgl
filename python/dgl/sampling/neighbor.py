@@ -475,8 +475,10 @@ def _sample_neighbors(
             raise DGLError(
                 "distributed training not supported in fused sampling"
             )
-        if F.device_type(g.device) != "cpu":
-            raise DGLError("Only cpu is supported in fused sampling")
+        if F.device_type(g.device) != "cpu" or F.backend_name != "pytorch":
+            raise DGLError(
+                "Only PyTorch backend and cpu is supported in fused sampling"
+            )
 
         if mapping is None:
             mapping = {}
@@ -500,7 +502,7 @@ def _sample_neighbors(
         for mapping_vector, src_nodes in zip(
             mapping[mapping_name], induced_nodes
         ):
-            mapping_vector[F.from_dgl_nd(src_nodes).type(torch.int64)] = -1
+            mapping_vector[F.from_dgl_nd(src_nodes).type(F.int64)] = -1
 
         new_ntypes = (g.ntypes, g.ntypes)
         ret = DGLBlock(subgidx, new_ntypes, g.etypes)
