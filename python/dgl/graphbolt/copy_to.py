@@ -17,23 +17,23 @@ class CopyTo(IterDataPipe):
 
     .. code:: python
 
-       for data in dp:
+       for data in datapipe:
            yield data.to(device)
 
     Parameters
     ----------
-    dp : DataPipe
+    datapipe : DataPipe
         The DataPipe.
     device : torch.device
         The PyTorch CUDA device.
     """
 
-    def __init__(self, dp, device):
+    def __init__(self, datapipe, device):
         super().__init__()
-        self.dp = dp
+        self.datapipe = datapipe
         self.device = device
 
     def __iter__(self):
-        for data in self.dp:
+        for data in self.datapipe:
             data = recursive_apply(data, _to, self.device)
             yield data
