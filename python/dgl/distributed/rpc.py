@@ -11,7 +11,7 @@ from .. import backend as F
 from .._ffi.function import _init_api
 from .._ffi.object import ObjectBase, register_object
 from ..base import DGLError
-from .constants import SERVER_EXIT, SERVER_KEEP_ALIVE
+from .constants import SERVER_EXIT
 
 __all__ = [
     "set_rank",
@@ -1256,8 +1256,6 @@ class ShutDownRequest(Request):
 
     def process_request(self, server_state):
         assert self.client_id == 0
-        if server_state.keep_alive and not self.force_shutdown_server:
-            return SERVER_KEEP_ALIVE
         finalize_server()
         return SERVER_EXIT
 

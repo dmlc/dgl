@@ -133,13 +133,12 @@ def start_server(
     num_clients,
     ip_config,
     server_id=0,
-    keep_alive=False,
     num_servers=1,
 ):
     print("Sleep 1 seconds to test client re-connect.")
     time.sleep(1)
     server_state = dgl.distributed.ServerState(
-        None, local_g=None, partition_book=None, keep_alive=keep_alive
+        None, local_g=None, partition_book=None
     )
     dgl.distributed.register_service(
         HELLO_SERVICE_ID, HelloRequest, HelloResponse
@@ -384,49 +383,6 @@ def test_multi_thread_rpc():
 
     start_client_multithread(ip_config)
     pserver.join()
-
-
-@unittest.skipIf(
-    True,
-    reason="Tests of multiple groups may fail and let's disable them for now.",
-)
-@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-def test_multi_client_groups():
-    reset_envs()
-    os.environ["DGL_DIST_MODE"] = "distributed"
-    ip_config = "rpc_ip_config_mul_client_groups.txt"
-    num_machines = 5
-    # should test with larger number but due to possible port in-use issue.
-    num_servers = 1
-    generate_ip_config(ip_config, num_machines, num_servers)
-    # presssue test
-    num_clients = 2
-    num_groups = 2
-    ctx = mp.get_context("spawn")
-    pserver_list = []
-    for i in range(num_servers * num_machines):
-        pserver = ctx.Process(
-            target=start_server,
-            args=(num_clients, ip_config, i, True, num_servers),
-        )
-        pserver.start()
-        pserver_list.append(pserver)
-    pclient_list = []
-    for i in range(num_clients):
-        for group_id in range(num_groups):
-            pclient = ctx.Process(
-                target=start_client, args=(ip_config, group_id, num_servers)
-            )
-            pclient.start()
-            pclient_list.append(pclient)
-    for p in pclient_list:
-        p.join()
-    for p in pserver_list:
-        assert p.is_alive()
-    # force shutdown server
-    dgl.distributed.shutdown_servers(ip_config, num_servers)
-    for p in pserver_list:
-        p.join()
 
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
