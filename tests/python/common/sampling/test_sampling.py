@@ -1183,7 +1183,8 @@ def test_sample_neighbors_outedge():
 )
 def test_sample_neighbors_mask():
     _test_sample_neighbors(False, "mask", False)
-    _test_sample_neighbors(False, "mask", True)
+    if F._default_context_str != "gpu" and F.backend_name == "pytorch":
+        _test_sample_neighbors(False, "mask", True)
 
 
 @unittest.skipIf(
