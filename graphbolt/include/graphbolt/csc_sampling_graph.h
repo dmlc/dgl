@@ -168,7 +168,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * negatives, which means the edge could be present or not present in the
    * graph.
    */
-  std::tuple<torch::Tensor, torch::Tensor> SampleNegativePerSourceUniform(
+  std::tuple<torch::Tensor, torch::Tensor> SampleNegativeEdgesUniform(
       const std::tuple<torch::Tensor, torch::Tensor>& pos_pairs,
       int64_t negative_ratio) const;
 
