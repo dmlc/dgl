@@ -25,8 +25,8 @@ class Dataset:
     A key-value store which stores node/edge/graph features.
 
     *Graph Topology*:
-    Graph topology is eihter used by the subgraph sampling algorithm to
-    generate a subgraph or used by model train directly.
+    Graph topology is used by the subgraph sampling algorithm to
+    generate a subgraph.
     """
 
     def train_set(self) -> ItemSet or ItemSetDict:
