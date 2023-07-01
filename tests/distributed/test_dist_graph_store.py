@@ -972,7 +972,6 @@ def check_dist_optim_server_client(
                 num_servers,
                 num_clients,
                 True,
-                False,
             ),
         )
         serv_ps.append(p)
