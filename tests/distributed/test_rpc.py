@@ -346,9 +346,7 @@ def test_multi_thread_rpc():
     ctx = mp.get_context("spawn")
     pserver_list = []
     for i in range(num_servers):
-        pserver = ctx.Process(
-            target=start_server, args=(1, ip_config, i, 1)
-        )
+        pserver = ctx.Process(target=start_server, args=(1, ip_config, i, 1))
         pserver.start()
         pserver_list.append(pserver)
 
