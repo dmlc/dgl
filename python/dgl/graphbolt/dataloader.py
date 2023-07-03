@@ -2,6 +2,7 @@
 
 import torch.utils.data
 
+
 class SingleProcessDataLoader(torch.utils.data.DataLoader):
     """Single process DataLoader.
 
@@ -12,6 +13,7 @@ class SingleProcessDataLoader(torch.utils.data.DataLoader):
     datapipe : DataPipe
         The data pipeline.
     """
+
     # In the single process dataloader case, we don't need to do any
     # modifications to the datapipe, and we just PyTorch's native
     # dataloader as-is.
