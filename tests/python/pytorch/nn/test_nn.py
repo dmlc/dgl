@@ -1836,7 +1836,7 @@ def test_pgexplainer(g, idtype, n_classes):
     # graph explainer
     model = Model(feat.shape[1], n_classes, graph=True)
     model = model.to(ctx)
-    explainer = nn.PGExplainer(model, n_classes)
+    explainer = nn.PGExplainer(model, n_classes, num_hops=1)
     explainer.train_step(g, g.ndata["attr"], 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)
@@ -1844,13 +1844,26 @@ def test_pgexplainer(g, idtype, n_classes):
     # node explainer
     model = Model(feat.shape[1], n_classes, graph=False)
     model = model.to(ctx)
-    explainer = nn.PGExplainer(model, n_classes, explain_graph=False)
+    explainer = nn.PGExplainer(
+        model, n_classes, num_hops=1, explain_graph=False
+    )
     explainer.train_step_node(0, g, g.ndata["attr"], 5.0)
-    explainer.train_step_node([0], g, g.ndata["attr"], 5.0)
+    explainer.train_step_node([0, 1], g, g.ndata["attr"], 5.0)
     explainer.train_step_node(th.tensor(0), g, g.ndata["attr"], 5.0)
-    explainer.train_step_node(th.tensor([0]), g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(th.tensor([0, 1]), g, g.ndata["attr"], 5.0)
 
-    probs, edge_weight = explainer.explain_node(0, g, feat)
+    probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
+        0, g, feat
+    )
+    probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
+        [0, 1], g, feat
+    )
+    probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
+        th.tensor(0), g, feat
+    )
+    probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
+        th.tensor([0, 1]), g, feat
+    )
 
 
 @pytest.mark.parametrize("g", get_cases(["hetero"]))
@@ -1906,7 +1919,7 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     # graph explainer
     model = Model(input_dim, embed_dim, n_classes, g.canonical_etypes)
     model = model.to(ctx)
-    explainer = nn.HeteroPGExplainer(model, embed_dim)
+    explainer = nn.HeteroPGExplainer(model, embed_dim, num_hops=1)
     explainer.train_step(g, feat, 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)

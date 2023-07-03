@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .... import ETYPE, to_homogeneous
+from .... import batch, ETYPE, khop_in_subgraph, NID, to_homogeneous
 
 __all__ = ["PGExplainer", "HeteroPGExplainer"]
 
@@ -30,6 +30,8 @@ class PGExplainer(nn.Module):
           the intermediate node embeddings.
     num_features : int
         Node embedding size used by :attr:`model`.
+    num_hops : int
+        The number of hops for GNN information aggregation.
     explain_graph : bool, optional
         Whether to initialize the model for graph-level or node-level predictions.
     coff_budget : float, optional
@@ -45,6 +47,7 @@ class PGExplainer(nn.Module):
         self,
         model,
         num_features,
+        num_hops,
         explain_graph=True,
         coff_budget=0.01,
         coff_connect=5e-4,
@@ -55,6 +58,7 @@ class PGExplainer(nn.Module):
         self.model = model
         self.graph_explanation = explain_graph
         self.num_features = num_features * (2 if self.graph_explanation else 3)
+        self.num_hops = num_hops
 
         # training hyperparameters for PGExplainer
         self.coff_budget = coff_budget
@@ -83,13 +87,14 @@ class PGExplainer(nn.Module):
             graph. The values are within range :math:`(0, 1)`. The higher,
             the more important. Default: None.
         """
-        num_nodes = graph.num_nodes()
-        num_edges = graph.num_edges()
-
-        init_bias = self.init_bias
-        std = nn.init.calculate_gain("relu") * math.sqrt(2.0 / (2 * num_nodes))
-
         if edge_mask is None:
+            num_nodes = graph.num_nodes()
+            num_edges = graph.num_edges()
+
+            init_bias = self.init_bias
+            std = nn.init.calculate_gain("relu") * math.sqrt(
+                2.0 / (2 * num_nodes)
+            )
             self.edge_mask = torch.randn(num_edges) * std + init_bias
         else:
             self.edge_mask = edge_mask
@@ -272,16 +277,20 @@ class PGExplainer(nn.Module):
         if isinstance(nodes, int):
             nodes = [nodes]
 
-        pred = self.model(graph, feat, embed=False, **kwargs)
+        (
+            prob,
+            _,
+            batched_graph,
+            batched_feats,
+            inverse_indicies,
+        ) = self.explain_node(
+            nodes, graph, feat, tmp=tmp, training=True, **kwargs
+        )
+
+        pred = self.model(batched_graph, batched_feats, embed=False, **kwargs)
         pred = pred.argmax(-1).data
 
-        loss = 0.0
-        for node_id in nodes:
-            prob, _ = self.explain_node(
-                node_id, graph, feat, tmp=tmp, training=True, **kwargs
-            )
-            loss += self.loss(prob[node_id], pred[node_id])
-
+        loss = self.loss(prob[inverse_indicies], pred[inverse_indicies])
         return loss
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
@@ -361,7 +370,7 @@ class PGExplainer(nn.Module):
         ...     optimizer.step()
 
         >>> # Initialize the explainer
-        >>> explainer = PGExplainer(model, data.gclasses)
+        >>> explainer = PGExplainer(model, data.gclasses, num_hops=1)
 
         >>> # Train the explainer
         >>> # Define explainer temperature parameter
@@ -390,9 +399,7 @@ class PGExplainer(nn.Module):
         embed = self.model(graph, feat, embed=True, **kwargs)
         embed = embed.data
 
-        edge_idx = graph.edges()
-
-        col, row = edge_idx
+        col, row = graph.edges()
         col_emb = embed[col.long()]
         row_emb = embed[row.long()]
         emb = torch.cat([col_emb, row_emb], dim=-1)
@@ -417,7 +424,7 @@ class PGExplainer(nn.Module):
         return (probs, edge_mask) if training else (probs.data, edge_mask)
 
     def explain_node(
-        self, node_id, graph, feat, tmp=1.0, training=False, **kwargs
+        self, nodes, graph, feat, tmp=1.0, training=False, **kwargs
     ):
         r"""Learn and return an edge mask that plays a crucial role to
         explain the prediction made by the GNN for node :attr:`node_id`.
@@ -426,8 +433,8 @@ class PGExplainer(nn.Module):
 
         Parameters
         ----------
-        node_id : int
-            The ID of the node to explain.
+        nodes : int, iterable[int], tensor
+            The nodes from the graph, which cannot have any duplicate value.
         graph : DGLGraph
             A homogeneous graph.
         feat : Tensor
@@ -450,6 +457,13 @@ class PGExplainer(nn.Module):
             Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
             is the number of edges in the graph. A higher weight suggests a larger
             contribution of the edge.
+        DGLGraph
+            The batched set of subgraphs induced on the k-hop in-neighborhood
+            of the input center nodes.
+        Tensor
+            The batched list of node features.
+        Tensor
+            The new IDs of the subgraph center nodes.
 
         Examples
         --------
@@ -489,7 +503,9 @@ class PGExplainer(nn.Module):
         ...     optimizer.step()
 
         >>> # Initialize the explainer
-        >>> explainer = dgl.nn.PGExplainer(model, data.num_classes, explain_graph=False)
+        >>> explainer = dgl.nn.PGExplainer(
+        ...     model, data.num_classes, num_hops=2, explain_graph=False
+        ... )
 
         >>> # Train the explainer
         >>> # Define explainer temperature parameter
@@ -498,52 +514,90 @@ class PGExplainer(nn.Module):
         >>> epochs = 10
         >>> for epoch in range(epochs):
         ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / epochs))
-        ...     for node_id in g.nodes():
-        ...         loss = explainer.train_step_node(node_id, g, features, tmp)
+        ...     for node in g.nodes():
+        ...         loss = explainer.train_step_node(node, g, features, tmp)
         ...         optimizer_exp.zero_grad()
         ...         loss.backward()
         ...         optimizer_exp.step()
 
         >>> # Explain the prediction for graph 0
-        >>> probs, edge_weight = explainer.explain_node(0, g, features)
+        >>> probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
+        ...     0, g, features
+        ... )
         """
         assert (
             not self.graph_explanation
         ), '"explain_graph" must be False in initializing the module.'
 
+        if isinstance(nodes, torch.Tensor):
+            nodes = nodes.tolist()
+        if isinstance(nodes, int):
+            nodes = [nodes]
+
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        embed = self.model(graph, feat, embed=True, **kwargs)
-        embed = embed.data
+        batched_graph = []
+        batched_feats = []
+        batched_embed = []
+        batched_node_ids = []
+        node_idx = 0
+        for node_id in nodes:
+            sg, inverse_indicies = khop_in_subgraph(
+                graph, node_id, self.num_hops
+            )
+            sg_feat = feat[sg.ndata[NID].long()]
 
-        edge_idx = graph.edges()
+            embed = self.model(sg, sg_feat, embed=True, **kwargs)
+            embed = embed.data
 
-        col, row = edge_idx
-        col_emb = embed[col.long()]
-        row_emb = embed[row.long()]
-        self_emb = embed[node_id].repeat(graph.num_edges(), 1)
-        emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
+            col, row = sg.edges()
+            col_emb = embed[col.long()]
+            row_emb = embed[row.long()]
+            self_emb = embed[inverse_indicies[0]].repeat(sg.num_edges(), 1)
+            emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
+            batched_embed.append(emb)
+            batched_graph.append(sg)
+            batched_feats.append(sg_feat)
+            batched_node_ids.append(inverse_indicies[0] + node_idx)
+            node_idx += sg.num_nodes()
 
-        emb = self.elayers(emb)
-        values = emb.reshape(-1)
+        batched_graph = batch(batched_graph)
+        batched_feats = torch.cat(batched_feats)
+        batched_embed = torch.cat(batched_embed)
+
+        batched_embed = self.elayers(batched_embed)
+        values = batched_embed.reshape(-1)
 
         values = self.concrete_sample(values, beta=tmp, training=training)
         self.sparse_mask_values = values
 
-        reverse_eids = graph.edge_ids(row, col).long()
+        col, row = batched_graph.edges()
+        reverse_eids = batched_graph.edge_ids(row, col).long()
         edge_mask = (values + values[reverse_eids]) / 2
 
-        self.set_masks(graph, edge_mask)
+        self.set_masks(batched_graph, edge_mask)
 
         # the model prediction with the updated edge mask
-        logits = self.model(graph, feat, edge_weight=self.edge_mask, **kwargs)
+        logits = self.model(
+            batched_graph, batched_feats, edge_weight=self.edge_mask, **kwargs
+        )
         probs = F.softmax(logits, dim=-1)
 
         if not training:
             self.clear_masks()
 
-        return (probs, edge_mask) if training else (probs.data, edge_mask)
+        return (
+            (probs, edge_mask, batched_graph, batched_feats, inverse_indicies)
+            if training
+            else (
+                probs.data,
+                edge_mask,
+                batched_graph,
+                batched_feats,
+                inverse_indicies,
+            )
+        )
 
 
 class HeteroPGExplainer(PGExplainer):
