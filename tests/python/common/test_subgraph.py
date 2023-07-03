@@ -880,7 +880,6 @@ def test_uva_subgraph(idtype, device):
 
 
 if __name__ == "__main__":
-    # test_edge_subgraph()
-    # test_uva_subgraph(F.int64, F.cpu())
-    # test_uva_subgraph(F.int64, F.cuda())
-    test_subgraph_not_relabel_nodes()
+    test_edge_subgraph()
+    test_uva_subgraph(F.int64, F.cpu())
+    test_uva_subgraph(F.int64, F.cuda())
