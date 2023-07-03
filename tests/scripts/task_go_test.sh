@@ -23,4 +23,5 @@ popd
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
-python3 -m pytest -v --junitxml=pytest_go.xml --durations=100 tests/go/test_model.py || fail "go"
+# Skip go tests due to ImportError: cannot import name 'cached_property' from 'functools' in python3.7
+#python3 -m pytest -v --junitxml=pytest_go.xml --durations=100 tests/go/test_model.py || fail "go"

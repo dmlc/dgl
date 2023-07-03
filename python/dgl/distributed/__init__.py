@@ -16,6 +16,6 @@ from .partition import (
     partition_graph,
 )
 from .rpc import *
-from .rpc_client import connect_to_server, shutdown_servers
+from .rpc_client import connect_to_server
 from .rpc_server import start_server
 from .server_state import ServerState
