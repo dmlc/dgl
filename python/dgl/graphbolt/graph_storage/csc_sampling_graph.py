@@ -296,7 +296,9 @@ class CSCSamplingGraph:
             nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
         )
 
-    def sample_negative_edges_uniform(self, pos_pairs, negative_ratio):
+    def sample_negative_edges_uniform(
+        self, pos_pairs, negative_ratio, edge_type
+    ):
         """
         Sample negative edges by randomly choosing negative source-destination
         pairs according to a uniform distribution. For each edge ``(u, v)``,
@@ -311,9 +313,9 @@ class CSCSamplingGraph:
             edges, where positive means the edge must exist in the graph.
         negative_ratio: int
             The ratio of the number of negative samples to positive samples.
-        num_nodes: int
-            The total count of nodes that can be selected. It should correspond
-            to the number of nodes of a specific type.
+        edge_type: (str, str, str)
+            The type of edges of the given `pos_pairs`. Any sampled negative
+            edges will be of the same type.
 
         Returns
         -------
@@ -326,9 +328,16 @@ class CSCSamplingGraph:
         assert (
             negative_ratio >= 0
         ), "Negative_ratio should shoubld be non-negative Integer."
+        _, _, dst_node_type = edge_type
+        dst_node_id = self.metadata.node_type_to_id(dst_node_type)
+        num_nodes = (
+            self.node_type_offset[dst_node_id + 1]
+            - self.node_type_offset[dst_node_id + 1]
+        )
         return self._c_csc_graph.sample_negative_edges_uniform(
             pos_pairs,
             negative_ratio,
+            num_nodes,
         )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
