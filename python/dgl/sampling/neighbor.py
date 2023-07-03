@@ -475,7 +475,15 @@ def _sample_neighbors(
             raise DGLError(
                 "distributed training not supported in fused sampling"
             )
-        if F.device_type(g.device) != "cpu" or F.backend_name != "pytorch":
+        cpu = F.device_type(g.device) == "cpu"
+        if type(nodes) is dict:
+            for ntype in list(nodes.keys()):
+                if not cpu:
+                    break
+                cpu = cpu and F.device_type(nodes[ntype].device) == "cpu"
+        else:
+            cpu = cpu and F.device_type(nodes.device) == "cpu"
+        if not cpu or F.backend_name != "pytorch":
             raise DGLError(
                 "Only PyTorch backend and cpu is supported in fused sampling"
             )
