@@ -31,7 +31,6 @@ def start_server(
     disable_shared_mem,
     graph_name,
     graph_format=["csc", "coo"],
-    keep_alive=False,
 ):
     g = DistGraphServer(
         rank,
@@ -41,7 +40,6 @@ def start_server(
         tmpdir / (graph_name + ".json"),
         disable_shared_mem=disable_shared_mem,
         graph_format=graph_format,
-        keep_alive=keep_alive,
     )
     g.start()
 
@@ -399,7 +397,6 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
 
     pserver_list = []
     ctx = mp.get_context("spawn")
-    keep_alive = num_groups > 1
     for i in range(num_server):
         p = ctx.Process(
             target=start_server,
@@ -409,7 +406,6 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
                 num_server > 1,
                 "test_sampling",
                 ["csc", "coo"],
-                keep_alive,
             ),
         )
         p.start()
@@ -439,11 +435,6 @@ def check_rpc_sampling_shuffle(tmpdir, num_server, num_groups=1):
     for p in pclient_list:
         p.join()
         assert p.exitcode == 0
-    if keep_alive:
-        for p in pserver_list:
-            assert p.is_alive()
-        # force shutdown server
-        dgl.distributed.shutdown_servers("rpc_ip_config.txt", 1)
     for p in pserver_list:
         p.join()
         assert p.exitcode == 0
