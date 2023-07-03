@@ -3590,11 +3590,11 @@ def random_walk_pe(g, k, eweight_name=None):
         )
         A = A.multiply(W)
     # 1-step transition probability
-    if scipy.__version__ < '1.11.0':
+    if scipy.__version__ < "1.11.0":
         RW = np.array(A / (A.sum(1) + 1e-30))
     else:
         # sparse matrix divided by a dense array returns a sparse matrix in scipy since 1.11.0
-        RW = (A / (A.sum(1) + 1e-30)).toarray()  
+        RW = (A / (A.sum(1) + 1e-30)).toarray()
 
     # Iterate for k steps
     PE = [F.astype(F.tensor(RW.diagonal()), F.float32)]
