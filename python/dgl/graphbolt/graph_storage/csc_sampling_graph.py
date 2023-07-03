@@ -312,8 +312,8 @@ class CSCSamplingGraph:
         negative_ratio: int
             The ratio of the number of negative samples to positive samples.
         num_nodes: int
-        The total count of nodes that can be selected. It should correspond
-        to the number of nodes of a specific type.
+            The total count of nodes that can be selected. It should correspond
+            to the number of nodes of a specific type.
 
         Returns
         -------
