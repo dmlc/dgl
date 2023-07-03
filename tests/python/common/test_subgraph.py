@@ -104,9 +104,10 @@ def test_subgraph_not_relabel_nodes():
     eid = {2, 3, 4, 5, 10, 11, 12, 13, 16}
     assert set(F.asnumpy(sg.edata[dgl.EID])) == eid
     eid = sg.edata[dgl.EID]
-    # the subgraph is empty initially except for NID/EID field
+    # the subgraph is empty initially except for EID field
     assert len(sg.edata) == 2
     sh = sg.ndata["h"]
+    # the subgraph has the same node information as the original graph
     assert F.allclose(
         F.gather_row(h, F.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])), sh
     )
