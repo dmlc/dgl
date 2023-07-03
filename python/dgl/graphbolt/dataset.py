@@ -1,9 +1,14 @@
 """GraphBolt Dataset."""
 
+from typing import Dict, List, Optional
+
+import pydantic
+import pydantic_yaml
+
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
 
-__all__ = ["Dataset"]
+__all__ = ["Dataset", "OnDiskDataset"]
 
 
 class Dataset:
@@ -48,3 +53,47 @@ class Dataset:
     def feature(self) -> FeatureStore:
         """Return the feature."""
         raise NotImplementedError
+
+
+class OnDiskDataFormatEnum(pydantic_yaml.YamlStrEnum):
+    """Enum of data format."""
+
+    TORCH = "torch"
+    NUMPY = "numpy"
+
+
+class OnDiskTVTSet(pydantic.BaseModel):
+    """Train-Validation-Test set."""
+
+    type_name: str
+    format: OnDiskDataFormatEnum
+    path: str
+
+
+class OnDiskMetaData(pydantic_yaml.YamlModel):
+    """Metadata specification in YAML.
+
+    As multiple node/edge types and multiple splits are supported, each TVT set
+    is a list of list of ``OnDiskTVTSet``.
+    """
+
+    train_set: Optional[List[List[OnDiskTVTSet]]]
+    validation_set: Optional[List[List[OnDiskTVTSet]]]
+    test_set: Optional[List[List[OnDiskTVTSet]]]
+
+
+class OnDiskDataset(Dataset):
+    """An on-disk dataset.
+
+    An on-disk dataset is a dataset which stores the data on disk. It is
+    usually used when the dataset is too large to fit into the memory.
+
+    Parameters
+    ----------
+    path: str
+        The YAML file path.
+    """
+
+    def __init__(self, path: str) -> None:
+        with open(path, "r") as f:
+            self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
