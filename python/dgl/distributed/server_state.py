@@ -38,15 +38,12 @@ class ServerState:
         Total number of edges
     partition_book : GraphPartitionBook
         Graph Partition book
-    keep_alive : bool
-        whether to keep alive which supports any number of client groups connect
     """
 
-    def __init__(self, kv_store, local_g, partition_book, keep_alive=False):
+    def __init__(self, kv_store, local_g, partition_book):
         self._kv_store = kv_store
         self._graph = local_g
         self.partition_book = partition_book
-        self._keep_alive = keep_alive
         self._roles = {}
 
     @property
@@ -71,11 +68,6 @@ class ServerState:
     @graph.setter
     def graph(self, graph):
         self._graph = graph
-
-    @property
-    def keep_alive(self):
-        """Flag of whether keep alive"""
-        return self._keep_alive
 
 
 _init_api("dgl.distributed.server_state")

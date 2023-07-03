@@ -12,7 +12,7 @@ import traceback
 from enum import Enum
 
 from .. import utils
-from ..base import DGLError
+from ..base import dgl_warning, DGLError
 from . import rpc
 from .constants import MAX_QUEUE_SIZE
 from .kvstore import close_kvstore, init_kvstore
@@ -208,6 +208,7 @@ class CustomPool:
 def initialize(
     ip_config,
     max_queue_size=MAX_QUEUE_SIZE,
+    net_type=None,
     num_worker_threads=1,
 ):
     """Initialize DGL's distributed module
@@ -226,6 +227,8 @@ def initialize(
 
         Note that the 20 GB is just an upper-bound and DGL uses zero-copy and
         it will not allocate 20GB memory at once.
+    net_type : str, optional
+        [Deprecated] Networking type, can be 'socket' only.
     num_worker_threads: int
         The number of OMP threads in each sampler process.
 
@@ -235,6 +238,10 @@ def initialize(
     distributed API. For example, when used with Pytorch, users have to invoke this function
     before Pytorch's `pytorch.distributed.init_process_group`.
     """
+    if net_type is not None:
+        dgl_warning(
+            "net_type is deprecated and will be removed in future release."
+        )
     if os.environ.get("DGL_ROLE", "client") == "server":
         from .dist_graph import DistGraphServer
 
@@ -256,7 +263,6 @@ def initialize(
         formats = os.environ.get("DGL_GRAPH_FORMAT", "csc").split(",")
         formats = [f.strip() for f in formats]
         rpc.reset()
-        keep_alive = bool(int(os.environ.get("DGL_KEEP_ALIVE", 0)))
         serv = DistGraphServer(
             int(os.environ.get("DGL_SERVER_ID")),
             os.environ.get("DGL_IP_CONFIG"),
@@ -264,7 +270,6 @@ def initialize(
             int(os.environ.get("DGL_NUM_CLIENT")),
             os.environ.get("DGL_CONF_PATH"),
             graph_format=formats,
-            keep_alive=keep_alive,
         )
         serv.start()
         sys.exit()

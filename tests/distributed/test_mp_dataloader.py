@@ -52,7 +52,6 @@ def start_server(
     part_config,
     disable_shared_mem,
     num_clients,
-    keep_alive=False,
 ):
     print("server: #clients=" + str(num_clients))
     g = DistGraphServer(
@@ -63,7 +62,6 @@ def start_server(
         part_config,
         disable_shared_mem=disable_shared_mem,
         graph_format=["csc", "coo"],
-        keep_alive=keep_alive,
     )
     g.start()
 
@@ -344,7 +342,6 @@ def test_dist_dataloader(num_server, num_workers, drop_last, num_groups):
         part_config = os.path.join(test_dir, "test_sampling.json")
         pserver_list = []
         ctx = mp.get_context("spawn")
-        keep_alive = num_groups > 1
         for i in range(num_server):
             p = ctx.Process(
                 target=start_server,
@@ -354,7 +351,6 @@ def test_dist_dataloader(num_server, num_workers, drop_last, num_groups):
                     part_config,
                     num_server > 1,
                     num_workers + 1,
-                    keep_alive,
                 ),
             )
             p.start()
@@ -389,11 +385,6 @@ def test_dist_dataloader(num_server, num_workers, drop_last, num_groups):
         for p in ptrainer_list:
             p.join()
             assert p.exitcode == 0
-        if keep_alive:
-            for p in pserver_list:
-                assert p.is_alive()
-            # force shutdown server
-            dgl.distributed.shutdown_servers("mp_ip_config.txt", 1)
         for p in pserver_list:
             p.join()
             assert p.exitcode == 0
