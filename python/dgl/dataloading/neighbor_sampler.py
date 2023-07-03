@@ -153,7 +153,7 @@ class NeighborSampler(BlockSampler):
 
         if self.fused:
             cpu = F.device_type(g.device) == "cpu"
-            if type(seed_nodes) is dict:
+            if isinstance(seed_nodes, dict):
                 for ntype in list(seed_nodes.keys()):
                     if not cpu:
                         break
@@ -162,7 +162,7 @@ class NeighborSampler(BlockSampler):
                     )
             else:
                 cpu = cpu and F.device_type(seed_nodes.device) == "cpu"
-            if cpu and type(g) == DGLGraph and F.backend_name == "pytorch":
+            if cpu and isinstance(g, DGLGraph) and F.backend_name == "pytorch":
                 if self.g != g:
                     self.mapping = {}
                     self.g = g

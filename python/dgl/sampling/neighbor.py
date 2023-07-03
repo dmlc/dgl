@@ -476,7 +476,7 @@ def _sample_neighbors(
                 "distributed training not supported in fused sampling"
             )
         cpu = F.device_type(g.device) == "cpu"
-        if type(nodes) is dict:
+        if isinstance(nodes, dict):
             for ntype in list(nodes.keys()):
                 if not cpu:
                     break
