@@ -311,6 +311,9 @@ class CSCSamplingGraph:
             edges, where positive means the edge must exist in the graph.
         negative_ratio: int
             The ratio of the number of negative samples to positive samples.
+        num_nodes: int
+        The total count of nodes that can be selected. It should correspond
+        to the number of nodes of a specific type.
 
         Returns
         -------
