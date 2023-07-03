@@ -1,6 +1,6 @@
 """GraphBolt Dataset."""
 
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import pydantic
 import pydantic_yaml
@@ -97,3 +97,23 @@ class OnDiskDataset(Dataset):
     def __init__(self, path: str) -> None:
         with open(path, "r") as f:
             self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
+
+    def train_set(self) -> ItemSet or ItemSetDict:
+        """Return the training set."""
+        raise NotImplementedError
+
+    def validation_set(self) -> ItemSet or ItemSetDict:
+        """Return the validation set."""
+        raise NotImplementedError
+
+    def test_set(self) -> ItemSet or ItemSetDict:
+        """Return the test set."""
+        raise NotImplementedError
+
+    def graph(self) -> object:
+        """Return the graph."""
+        raise NotImplementedError
+
+    def feature(self) -> FeatureStore:
+        """Return the feature."""
+        raise NotImplementedError
