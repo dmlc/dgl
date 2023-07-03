@@ -57,3 +57,42 @@ def test_torch_based_feature_store(in_memory):
         # it before closing the temporary directory.
         a = b = None
         feat_store_a = feat_store_b = None
+
+
+def write_tensor_to_disk(dir, name, t, fmt="pt"):
+    if fmt == "pt":
+        torch.save(t, os.path.join(dir, name + ".pt"))
+    else:
+        t = t.numpy()
+        np.save(os.path.join(dir, name + ".npy"), t)
+
+
+@pytest.mark.parametrize("in_memory", [True, False])
+def test_load_feature_stores(in_memory):
+    with tempfile.TemporaryDirectory() as test_dir:
+        a = torch.tensor([1, 2, 3])
+        b = torch.tensor([2, 5, 3])
+        write_tensor_to_disk(test_dir, "a", a, fmt="pt")
+        write_tensor_to_disk(test_dir, "b", b, fmt="npy")
+        feat_data = [
+            gb.OnDiskFeatureData(
+                name="a",
+                format="pt",
+                path=os.path.join(test_dir, "a.pt"),
+                in_memory=True,
+            ),
+            gb.OnDiskFeatureData(
+                name="b",
+                format="npy",
+                path=os.path.join(test_dir, "b.npy"),
+                in_memory=in_memory,
+            ),
+        ]
+        feat_stores = gb.load_feature_stores(feat_data)
+        assert torch.equal(feat_stores["a"].read(), torch.tensor([1, 2, 3]))
+        assert torch.equal(feat_stores["b"].read(), torch.tensor([2, 5, 3]))
+
+        # For windows, the file is locked by the numpy.load. We need to delete
+        # it before closing the temporary directory.
+        a = b = None
+        feat_stores = None
