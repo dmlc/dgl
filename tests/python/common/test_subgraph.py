@@ -73,6 +73,7 @@ def test_subgraph_relabel_nodes(relabel_nodes):
     if relabel_nodes:
         assert F.allclose(F.gather_row(h, F.tensor(nid)), sh)
     else:
+    
     # The node number is not reduced. The subgraph keeps the same node information as the original graph.
         assert F.allclose(
             F.gather_row(h, F.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])), sh
