@@ -54,20 +54,32 @@ def test_edge_subgraph():
     sg.edata["h"] = F.arange(0, sg.num_edges())
 
 
-def test_subgraph():
+@pytest.mark.parametrize("relabel_nodes", [True, False])
+def test_subgraph_relabel_nodes(relabel_nodes):
     g = generate_graph()
     h = g.ndata["h"]
     l = g.edata["l"]
     nid = [0, 2, 3, 6, 7, 9]
-    sg = g.subgraph(nid)
+    sg = g.subgraph(nid, relabel_nodes=relabel_nodes)
     eid = {2, 3, 4, 5, 10, 11, 12, 13, 16}
     assert set(F.asnumpy(sg.edata[dgl.EID])) == eid
     eid = sg.edata[dgl.EID]
-    # the subgraph is empty initially except for NID/EID field
-    assert len(sg.ndata) == 2
+    # the subgraph is empty initially except for EID field
+    # the subgraph is empty initially except for NID field if relabel_nodes
+    if relabel_nodes:
+        assert len(sg.ndata) == 2
     assert len(sg.edata) == 2
     sh = sg.ndata["h"]
-    assert F.allclose(F.gather_row(h, F.tensor(nid)), sh)
+    # The node number is not reduced if relabel_node=False.
+    # The subgraph keeps the same node information as the original graph.
+    if relabel_nodes:
+        assert F.allclose(F.gather_row(h, F.tensor(nid)), sh)
+    else:
+        assert F.allclose(
+            F.gather_row(h, F.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])), sh
+        )
+    # The s,d,eid means the source node, destination node and edge id of the subgraph.
+    # The edges labeled 1 are those selected by the subgraph.
     """
     s, d, eid
     0, 1, 0
@@ -91,7 +103,10 @@ def test_subgraph():
     assert F.allclose(F.gather_row(l, eid), sg.edata["l"])
     # update the node/edge features on the subgraph should NOT
     # reflect to the parent graph.
-    sg.ndata["h"] = F.zeros((6, D))
+    if relabel_nodes:
+        sg.ndata["h"] = F.zeros((6, D))
+    else:
+        sg.ndata["h"] = F.zeros((10, D))
     assert F.allclose(h, g.ndata["h"])
 
 
