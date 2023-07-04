@@ -10,11 +10,11 @@ def test_DataLoader():
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N))
     graph = gb_test_utils.rand_csc_graph(200, 0.15)
-    feature_store = dgl.graphbolt.feature_store.TorchBasedFeatureStore(
-        {
-            "feature": torch.randn(200, 4),
-            "label": torch.randint(0, 10, (200,)),
-        }
+    features = dgl.graphbolt.feature_store.TorchBasedFeatureStore(
+        torch.randn(200, 4)
+    )
+    labels = dgl.graphbolt.feature_store.TorchBasedFeatureStore(
+        torch.randint(0, 10, (200,))
     )
 
     def sampler_func(data):
@@ -32,8 +32,8 @@ def test_DataLoader():
 
     def fetch_func(data):
         input_nodes, output_nodes, adjs = data
-        input_features = feature_store.read("feature", input_nodes)
-        output_labels = feature_store.read("label", output_nodes)
+        input_features = features.read(input_nodes)
+        output_labels = labels.read(output_nodes)
         return input_features, output_labels, adjs
 
     minibatch_dp = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
