@@ -36,10 +36,10 @@ def test_DataLoader():
         output_labels = labels.read(output_nodes)
         return input_features, output_labels, adjs
 
-    minibatch_dp = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
-    sampler_dp = dgl.graphbolt.SubgraphSampler(minibatch_dp, sampler_func)
-    fetcher_dp = dgl.graphbolt.FeatureFetcher(sampler_dp, fetch_func)
-    transfer_dp = dgl.graphbolt.CopyTo(fetcher_dp, F.ctx())
+    minibatch_sampler = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
+    subgraph_sampler = dgl.graphbolt.SubgraphSampler(minibatch_sampler, sampler_func)
+    feature_fetcher = dgl.graphbolt.FeatureFetcher(subgraph_sampler, fetch_func)
+    device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 
-    dataloader = dgl.graphbolt.SingleProcessDataLoader(transfer_dp)
+    dataloader = dgl.graphbolt.SingleProcessDataLoader(device_transferrer)
     assert len(list(dataloader)) == N // B
