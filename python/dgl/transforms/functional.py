@@ -3673,12 +3673,10 @@ def lap_pe(g, k, padding=False, return_eigval=False):
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
     EigVal, EigVec = scipy.sparse.linalg.eigs(L, k=k+1, which='SR', tol=1e-2)
-    max_freqs = min(n - 1, k)
-    kpartition_indices = np.argpartition(EigVal, max_freqs)[: max_freqs + 1]
-    topk_eigvals = EigVal[kpartition_indices]
-    topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    topk_EigVec = EigVec[:, topk_indices]
-    eigvals = F.tensor(EigVal[topk_indices], dtype=F.float32)
+    topk_indices = EigVal.argsort()[1:]
+    topk_eigvals = EigVal[topk_indices].real  # scipy may give complex
+    topk_EigVec = EigVec[:, topk_indices].real
+    eigvals = F.tensor(topk_eigvals, dtype=F.float32)
 
     # get random flip signs
     rand_sign = 2 * (np.random.rand(max_freqs) > 0.5) - 1.0
