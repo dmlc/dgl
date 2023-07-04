@@ -334,7 +334,8 @@ def test_binary_op(idtype):
                 _test(lhs, rhs, binary_op, reducer)
 
 
-def test_issue_5873():
+# Issue #5873
+def test_multi_update_all_minmax_reduce_with_isolated_nodes():
     g = dgl.heterograph(
         {
             ("A", "AB", "B"): ([0, 1, 2, 3], [0, 0, 1, 1]),
