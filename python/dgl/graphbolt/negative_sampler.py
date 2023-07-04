@@ -1,6 +1,8 @@
 """Negative samplers"""
 
 
+from collections.abc import Mapping
+
 import torch
 
 from .graph_storage import CSCSamplingGraph
@@ -50,41 +52,50 @@ class _BaseNegativeSampler:
         ], f"Unsupported data format: {linked_data_format}"
         self.linked_data_format = linked_data_format
 
-    def _generate(self, pos_pairs):
+    def _generate(self, pos_edges, etype=None):
         raise NotImplementedError
 
-    def __call__(self, pos_pairs):
+    def __call__(self, pos_edges):
         """
         Generates a mix of positive and negative samples, the format of which
         depends on the specified `linked_data_format`.
 
         Parameters
         ----------
-        pos_pairs : Iterable[Tensor]
+        pos_edges : List[Tensor] or Dict[etype, List[Tensor]]
             Represents source-destination node pairs of positive edges, where
             positive means the edge must exist in the graph.
 
         Returns
         -------
-        Iterable(Tensor)
-            An iterable of edges, which includes both positive and negative
-            samples. The format of it is determined by the provided
-            `linked_data_format`.
+        List[Tensor] or Dict[etype, List[Tensor]]
+            A collection of edges or a dictionary that maps etypes to lists of
+            edges which includes both positive and negative samples. The format
+            of it is determined by the provided 'linked_data_format'.
         """
 
-        neg_src, neg_dst = self._generate(pos_pairs)
-        pos_src, pos_dst = pos_pairs
-        if self.linked_data_format == LinkedDataFormat.INDEPENDENT:
-            pos_labels = torch.ones_like(pos_src)
-            neg_labels = torch.zeros_like(neg_src)
-            src = torch.cat([pos_src, neg_src])
-            dst = torch.cat([pos_dst, neg_dst])
-            labels = torch.cat([pos_labels, neg_labels])
-            return (src, dst, labels)
+        def generate_negative_pairs(pos_edge, etype):
+            neg_src, neg_dst = self._generate(pos_edge, etype)
+            pos_src, pos_dst = pos_edge
+            if self.linked_data_format == LinkedDataFormat.INDEPENDENT:
+                pos_label = torch.ones_like(pos_src)
+                neg_label = torch.zeros_like(neg_src)
+                src = torch.cat([pos_src, neg_src])
+                dst = torch.cat([pos_dst, neg_dst])
+                labels = torch.cat([pos_label, neg_label])
+                return (src, dst, labels)
+            else:
+                neg_src = neg_src.view(-1, self.negative_ratio)
+                neg_dst = neg_dst.view(-1, self.negative_ratio)
+                return (pos_src, pos_dst, neg_src, neg_dst)
+
+        if isinstance(pos_edges, Mapping):
+            return {
+                etype: generate_negative_pairs(pos_edge, etype)
+                for etype, pos_edge in pos_edges.items()
+            }
         else:
-            neg_src = neg_src.view(-1, self.negative_ratio)
-            neg_dst = neg_dst.view(-1, self.negative_ratio)
-            return (pos_src, pos_dst, neg_src, neg_dst)
+            return generate_negative_pairs(pos_edges, None)
 
 
 class PerSourceUniformSampler(_BaseNegativeSampler):
@@ -103,15 +114,16 @@ class PerSourceUniformSampler(_BaseNegativeSampler):
     >>> indptr = torch.LongTensor([0, 2, 4, 5])
     >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
     >>> graph = gb.from_csc(indptr, indices)
-    >>> pos_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
+    >>> pos_edges = (torch.tensor([0, 1]), torch.tensor([1, 2]))
     >>> linked_data_format = gb.LinkedDataFormat.INDEPENDENT
     >>> neg_sampler = gb.PerSourceUniformSampler(graph, 1, linked_data_format)
-    >>> neg_sampler(pos_pairs)
+    >>> neg_sampler(pos_edges)
     (tensor([0, 1, 0, 1]), tensor([1, 2, 1, 0]), tensor([1, 1, 0, 0]))
     """
 
-    def _generate(self, pos_pairs):
+    def _generate(self, pos_edges, etype=None):
         return self.graph.sample_negative_edges_uniform(
-            pos_pairs,
+            pos_edges,
             self.negative_ratio,
+            etype,
         )
