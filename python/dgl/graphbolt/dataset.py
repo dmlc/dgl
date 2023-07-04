@@ -85,8 +85,43 @@ class OnDiskMetaData(pydantic_yaml.YamlModel):
 class OnDiskDataset(Dataset):
     """An on-disk dataset.
 
-    An on-disk dataset is a dataset which stores the data on disk. It is
-    usually used when the dataset is too large to fit into the memory.
+    An on-disk dataset is a dataset which reads graph topology, feature data
+    and TVT set from disk. Due to limited resources, the data which are too
+    large to fit into RAM will remain on disk while others reside in RAM once
+    ``OnDiskDataset`` is initialized. This behavior could be controled by user
+    via ``in_memory`` field in YAML file.
+
+    A full example of YAML file is as follows:
+
+    .. code-block:: yaml
+
+        train_set: [
+            [
+                {
+                    type_name: "paper",
+                    format: "numpy",
+                    path: "set/paper-train.npy"
+                }
+            ]
+        ]
+        validation_set: [
+            [
+                {
+                    type_name: "paper",
+                    format: "numpy",
+                    path: "set/paper-validation.npy"
+                }
+            ]
+        ]
+        test_set: [
+            [
+                {
+                    type_name: "paper",
+                    format: "numpy",
+                    path: "set/paper-test.npy"
+                }
+            ]
+        ]
 
     Parameters
     ----------
