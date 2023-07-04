@@ -797,13 +797,3 @@ def test_from_dglgraph_heterogeneous():
         ("n2", "r21", "n1"): 2,
         ("n2", "r23", "n3"): 3,
     }
-
-
-if __name__ == "__main__":
-    test_sample_neighbors()
-    test_sample_neighbors_replace(True, 12)
-    test_sample_neighbors_probs(
-        False,
-        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
-    )
-    test_sample_neighbors_zero_probs(True, torch.zeros(12, dtype=torch.float32))
