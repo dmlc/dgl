@@ -330,7 +330,7 @@ class CSCSamplingGraph:
                 node_type_to_id is not None
             ), "Please note that sampling with different edge types is \
                 not supported in a homogeneous graph."
-        for ntype, ntype_id in range(node_type_to_id.items()):
+        for ntype, ntype_id in node_type_to_id.items():
             nodes_dict[ntype] = []
             # 1.Collect nodes of a specific type.
             for etype, node_pair in node_pairs.items():
@@ -340,6 +340,8 @@ class CSCSamplingGraph:
                     nodes_dict[ntype].append(u)
                 if v_type == ntype:
                     nodes_dict[ntype].append(v)
+            if not nodes_dict[ntype]:
+                continue
             collected_nodes = torch.cat(nodes_dict[ntype])
             # 2.Compact and find unique nodes
             unique_nodes, collected_nodes = torch.unique(
@@ -348,8 +350,10 @@ class CSCSamplingGraph:
             # 3. Convert heterogeneous unqiue node id to homogeneous node id
             unique_nodes = unique_nodes + self.node_type_offset[ntype_id]
             unique_nodes_all_types.append(unique_nodes)
+
             # 4. Map back in same order as collect
             def map_back(nodes):
+                nonlocal collected_nodes
                 count = nodes.numel()
                 nodes = collected_nodes[:count]
                 collected_nodes = collected_nodes[count:]
