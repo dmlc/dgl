@@ -314,8 +314,9 @@ class CSCSamplingGraph:
         negative_ratio: int
             The ratio of the number of negative samples to positive samples.
         edge_type: (str, str, str)
-            The type of edges of the given `pos_pairs`. Any sampled negative
-            edges will be of the same type.
+            The type of edges in the provided pos_pairs. Any negative edges
+            sampled will also have the same type. If set to None, it will be
+            considered as a homogeneous graph.
 
         Returns
         -------
@@ -328,12 +329,15 @@ class CSCSamplingGraph:
         assert (
             negative_ratio >= 0
         ), "Negative_ratio should shoubld be non-negative Integer."
-        _, _, dst_node_type = edge_type
-        dst_node_id = self.metadata.node_type_to_id(dst_node_type)
-        num_nodes = (
-            self.node_type_offset[dst_node_id + 1]
-            - self.node_type_offset[dst_node_id + 1]
-        )
+        if edge_type:
+            _, _, dst_node_type = edge_type
+            dst_node_id = self.metadata.node_type_to_id(dst_node_type)
+            num_nodes = (
+                self.node_type_offset[dst_node_id + 1]
+                - self.node_type_offset[dst_node_id + 1]
+            )
+        else:
+            num_nodes = self.num_nodes
         return self._c_csc_graph.sample_negative_edges_uniform(
             pos_pairs,
             negative_ratio,
