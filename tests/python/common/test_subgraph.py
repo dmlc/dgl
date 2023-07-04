@@ -60,7 +60,7 @@ def test_subgraph_relabel_nodes(relabel_nodes):
     h = g.ndata["h"]
     l = g.edata["l"]
     nid = [0, 2, 3, 6, 7, 9]
-    sg = g.subgraph(nid, relabel_nodes = relabel_nodes)
+    sg = g.subgraph(nid, relabel_nodes=relabel_nodes)
     eid = {2, 3, 4, 5, 10, 11, 12, 13, 16}
     assert set(F.asnumpy(sg.edata[dgl.EID])) == eid
     eid = sg.edata[dgl.EID]
