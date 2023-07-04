@@ -19,7 +19,7 @@ dependencies:
     - psutil
     - pyarrow
     - pydantic
-    - pydantic_yaml
+    - pydantic-yaml
     - pytest
     - pyyaml
     - rdflib
