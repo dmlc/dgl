@@ -70,7 +70,7 @@ def test_subgraph_relabel_nodes(relabel_nodes):
         assert len(sg.ndata) == 2
     assert len(sg.edata) == 2
     sh = sg.ndata["h"]
-    # The node number is not reduced is relabel_node=False. 
+    # The node number is not reduced if relabel_node=False.
     # The subgraph keeps the same node information as the original graph.
     if relabel_nodes:
         assert F.allclose(F.gather_row(h, F.tensor(nid)), sh)
