@@ -262,59 +262,22 @@ inline torch::Tensor UniformPick(
           picked_neighbors.scalar_type(), "UniformPick", ([&] {
             scalar_t* picked_neighbors_data =
                 picked_neighbors.data_ptr<scalar_t>();
-            if (fanout < num_neighbors / 10) {
-              // If set of numbers is small (up to 64) use linear search to
-              // verify uniqueness this operation is cheaper for CPU.
-              if (fanout && fanout < 64) {
-                *picked_neighbors_data = RandomEngine::ThreadLocal()->RandInt(
-                    offset, offset + num_neighbors);
-                auto b = picked_neighbors_data + 1;
-                auto e = picked_neighbors_data + fanout;
-
-                while (b != e) {
-                  // Put the new random number in the last position.
-                  *b = RandomEngine::ThreadLocal()->RandInt(
-                      offset, offset + num_neighbors);
-                  // Check if a new value doesn't exist in current
-                  // range(picked_neighbors_data, b). Otherwise get a new
-                  // value until we haven't unique range of elements.
-                  auto it = std::find(picked_neighbors_data, b, *b);
-                  if (it != b) continue;
-                  ++b;
-                }
-
-              } else {
-                // Use hash set.
-                // In the best scenario, time complexity is O(fanout), i.e., no
-                // conflict.
-                //
-                // Let k be fanout / num_neighbors, the expected number of extra
-                // sampling steps is roughly k^2 / (1-k) * num_neighbors, which
-                // means in the worst case scenario, the time complexity is
-                // O(num_neighbors^2). In practice,
-                // we use 1/10 since std::unordered_set is pretty slow.
-                std::unordered_set<scalar_t> picked_set;
-                while (static_cast<int64_t>(picked_set.size()) < fanout) {
-                  picked_set.insert(RandomEngine::ThreadLocal()->RandInt(
-                      offset, offset + num_neighbors));
-                }
-                std::copy(
-                    picked_set.begin(), picked_set.end(),
-                    picked_neighbors_data);
-              }
-
-            } else {
-              // In this case, `fanout >= num_neighbors / 10`. To reduce the
-              // computation overhead, we should reduce the number of random
-              // number generations. Even though reservior algorithm is more
-              // memory effficient (it has O(fanout) memory complexity), it
-              // generates O(num_neighbors) random numbers, which is
-              // computationally expensive. This algorithm has memory complexity
-              // of O(num_neighbors) but generates much fewer random numbers
-              // O(fanout). In the case of `fanout >= num_neighbors/10`, we
-              // don't need to worry about memory complexity because `fanout`
-              // is usually small. So is `num_neighbors`. Allocating a small
-              // piece of memory is very efficient.
+            // We use different sampling strategies for different sampling case.
+            if (fanout >= num_neighbors / 10) {
+              // Use this algorithm when `fanout >= num_neighbors / 10` to
+              // reduce computation.
+              //
+              // The reservior algorithm is memory-efficient (O(fanout)) but
+              // creates many random numbers (O(num_neighbors)), which is
+              // costly.
+              //
+              // This algorithm's memory complexity is O(num_neighbors), but
+              // it generates fewer random numbers (O(fanout)).
+              //
+              // In scenarios where `fanout >= num_neighbors/10`, memory
+              // complexity is not a concern due to the small size of both
+              // `fanout` and `num_neighbors`. And it's efficient to allocate
+              // a small amount of memory.
               std::vector<scalar_t> seq(num_neighbors);
               // Assign the seq with [offset, offset + num_neighbors].
               std::iota(seq.begin(), seq.end(), offset);
@@ -325,6 +288,42 @@ inline torch::Tensor UniformPick(
               // Save the randomly sampled fanout elements to the output tensor.
               std::copy(
                   seq.begin(), seq.begin() + fanout, picked_neighbors_data);
+            } else if (fanout && fanout < 64) {
+              // If set of numbers is small (up to 64) use linear search to
+              // verify uniqueness this operation is cheaper for CPU.
+              *picked_neighbors_data = RandomEngine::ThreadLocal()->RandInt(
+                  offset, offset + num_neighbors);
+              auto begin = picked_neighbors_data + 1;
+              auto end = picked_neighbors_data + fanout;
+
+              while (begin != end) {
+                // Put the new random number in the last position.
+                *begin = RandomEngine::ThreadLocal()->RandInt(
+                    offset, offset + num_neighbors);
+                // Check if a new value doesn't exist in current
+                // range(picked_neighbors_data, begin). Otherwise get a new
+                // value until we haven't unique range of elements.
+                auto it = std::find(picked_neighbors_data, begin, *begin);
+                if (it != begin) continue;
+                ++begin;
+              }
+            } else {
+              // Use hash set.
+              // In the best scenario, time complexity is O(fanout), i.e., no
+              // conflict.
+              //
+              // Let k be fanout / num_neighbors, the expected number of extra
+              // sampling steps is roughly k^2 / (1-k) * num_neighbors, which
+              // means in the worst case scenario, the time complexity is
+              // O(num_neighbors^2). In practice,
+              // we use 1/10 since std::unordered_set is pretty slow.
+              std::unordered_set<scalar_t> picked_set;
+              while (static_cast<int64_t>(picked_set.size()) < fanout) {
+                picked_set.insert(RandomEngine::ThreadLocal()->RandInt(
+                    offset, offset + num_neighbors));
+              }
+              std::copy(
+                  picked_set.begin(), picked_set.end(), picked_neighbors_data);
             }
           }));
     }
