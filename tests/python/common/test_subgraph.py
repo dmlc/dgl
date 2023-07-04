@@ -70,16 +70,16 @@ def test_subgraph_relabel_nodes(relabel_nodes):
         assert len(sg.ndata) == 2
     assert len(sg.edata) == 2
     sh = sg.ndata["h"]
+    # The node number is not reduced is relabel_node=False. 
+    # The subgraph keeps the same node information as the original graph.
     if relabel_nodes:
         assert F.allclose(F.gather_row(h, F.tensor(nid)), sh)
     else:
-    
-    # The node number is not reduced. The subgraph keeps the same node information as the original graph.
         assert F.allclose(
             F.gather_row(h, F.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])), sh
         )
     # The s,d,eid means the source node, destination node and edge id of the subgraph.
-    #  The edges labeled 1 are those selected by the subgraph.
+    # The edges labeled 1 are those selected by the subgraph.
     """
     s, d, eid
     0, 1, 0
