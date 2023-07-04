@@ -5,16 +5,18 @@ import torch
 
 
 def get_graphbolt_fetch_func():
-    feature_store = dgl.graphbolt.feature_store.TorchBasedFeatureStore(
-        {
-            "feature": torch.randn(200, 4),
-            "label": torch.randint(0, 10, (200,)),
-        }
-    )
+    feature_store = {
+        "feature": dgl.graphbolt.feature_store.TorchBasedFeatureStore(
+            torch.randn(200, 4)
+        ),
+        "label": dgl.graphbolt.feature_store.TorchBasedFeatureStore(
+            torch.randint(0, 10, (200,))
+        ),
+    }
 
     def fetch_func(data):
-        return feature_store.read("feature", data), feature_store.read(
-            "label", data
+        return feature_store["feature"].read(data), feature_store["label"].read(
+            data
         )
 
     return fetch_func
