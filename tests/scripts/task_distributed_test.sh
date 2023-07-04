@@ -35,7 +35,7 @@ export OMP_NUM_THREADS=1
 export DMLC_LOG_DEBUG=1
 
 # Install required dependencies
-python3 -m pytest pydantic-yaml
+python3 -m pip install pydantic-yaml
 
 python3 -m pytest -v --capture=tee-sys --junitxml=pytest_distributed.xml --durations=100 tests/distributed/*.py || fail "distributed"
 
