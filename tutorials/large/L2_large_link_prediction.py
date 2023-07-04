@@ -51,7 +51,7 @@ Sampling for Node Classification <L1_large_node_classification>`.
 # This tutorial loads the dataset from the ``ogb`` package as in the
 # :doc:`previous tutorial <L1_large_node_classification>`.
 #
-exit(0)
+
 import os
 
 os.environ["DGLBACKEND"] = "pytorch"
