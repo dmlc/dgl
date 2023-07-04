@@ -37,7 +37,10 @@ def test_DataLoader():
         return input_features, output_labels, adjs
 
     minibatch_sampler = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
-    subgraph_sampler = dgl.graphbolt.SubgraphSampler(minibatch_sampler, sampler_func)
+    subgraph_sampler = dgl.graphbolt.SubgraphSampler(
+        minibatch_sampler,
+        sampler_func,
+    )
     feature_fetcher = dgl.graphbolt.FeatureFetcher(subgraph_sampler, fetch_func)
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 
