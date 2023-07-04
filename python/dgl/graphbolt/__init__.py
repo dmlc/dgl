@@ -11,6 +11,7 @@ from .linked_data_format import *
 from .minibatch_sampler import *
 from .negative_sampler import *
 from .feature_store import *
+from .feature_fetcher import *
 from .copy_to import *
 from .dataset import *
 from .subgraph_sampler import *
