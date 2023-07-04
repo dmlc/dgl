@@ -331,10 +331,10 @@ class CSCSamplingGraph:
         ), "Negative_ratio should shoubld be non-negative Integer."
         if edge_type:
             _, _, dst_node_type = edge_type
-            dst_node_id = self.metadata.node_type_to_id(dst_node_type)
+            dst_node_type_id = self.metadata.node_type_to_id[dst_node_type]
             num_nodes = (
-                self.node_type_offset[dst_node_id + 1]
-                - self.node_type_offset[dst_node_id + 1]
+                self.node_type_offset[dst_node_type_id + 1]
+                - self.node_type_offset[dst_node_type_id]
             )
         else:
             num_nodes = self.num_nodes
