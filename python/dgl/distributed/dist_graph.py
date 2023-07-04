@@ -330,8 +330,6 @@ class DistGraphServer(KVServer):
         Disable shared memory.
     graph_format : str or list of str
         The graph formats.
-    keep_alive : bool
-        Whether to keep server alive when clients exit
     """
 
     def __init__(
@@ -343,7 +341,6 @@ class DistGraphServer(KVServer):
         part_config,
         disable_shared_mem=False,
         graph_format=("csc", "coo"),
-        keep_alive=False,
     ):
         super(DistGraphServer, self).__init__(
             server_id=server_id,
@@ -353,7 +350,6 @@ class DistGraphServer(KVServer):
         )
         self.ip_config = ip_config
         self.num_servers = num_servers
-        self.keep_alive = keep_alive
         # Load graph partition data.
         if self.is_backup_server():
             # The backup server doesn't load the graph partition. It'll initialized afterwards.
@@ -457,7 +453,6 @@ class DistGraphServer(KVServer):
             kv_store=self,
             local_g=self.client_g,
             partition_book=self.gpb,
-            keep_alive=self.keep_alive,
         )
         print(
             "start graph service on server {} for part {}".format(
