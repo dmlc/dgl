@@ -3,6 +3,7 @@
 import os
 import tarfile
 import tempfile
+from collections.abc import Mapping
 from typing import Dict, Optional, Tuple
 
 import torch
@@ -294,6 +295,79 @@ class CSCSamplingGraph:
             ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
+        )
+
+    def sample_neighbors_from_pairs(
+        self,
+        node_pairs,
+    ):
+        """
+        Sample the neighboring edges of the nodes formed by all connected
+        nodes in the provided node pairs. Return the induced subgraph and the
+        compacted node pairs.
+
+        Parameters
+        ----------
+        node_pairs : Tuple[torch.Tensor] or Dict(etype, Tuple[torch.Tensor])
+            Node pairs representing source-destination edges.
+
+        Returns
+        -------
+        Tuple[node_pairs, CSCSamplingGraph]
+            The compacted node pairs and the created CSCSamplingGraph object.
+        """
+
+        nodes_dict = {}
+        unique_nodes_all_types = []
+        if self.metadata:
+            node_type_to_id = self.metadata.node_type_to_id
+        # Treat it as an homogeneous graph
+        if not isinstance(node_pairs, Mapping):
+            node_type_to_id = {"_N": 0}
+            edges = {("_N", "_E", "_N"): edges}
+        else:
+            assert (
+                node_type_to_id is not None
+            ), "Please note that sampling with different edge types is \
+                not supported in a homogeneous graph."
+        for ntype, ntype_id in range(node_type_to_id.items()):
+            nodes_dict[ntype] = []
+            # 1.Collect nodes of a specific type.
+            for etype, node_pair in node_pairs.items():
+                u_type, _, v_type = etype
+                u, v = node_pair
+                if u_type == ntype:
+                    nodes_dict[ntype].append(u)
+                if v_type == ntype:
+                    nodes_dict[ntype].append(v)
+            collected_nodes = torch.cat(nodes_dict[ntype])
+            # 2.Compact and find unique nodes
+            unique_nodes, collected_nodes = torch.unique(
+                collected_nodes, return_inverse=True
+            )
+            # 3. Convert heterogeneous unqiue node id to homogeneous node id
+            unique_nodes = unique_nodes + self.node_type_offset[ntype_id]
+            unique_nodes_all_types.append(unique_nodes)
+            # 4. Map back in same order as collect
+            def map_back(nodes):
+                count = nodes.numel()
+                nodes = collected_nodes[:count]
+                collected_nodes = collected_nodes[count:]
+                return nodes
+
+            for etype, node_pair in node_pairs.items():
+                u_type, _, v_type = etype
+                u, v = node_pair
+                if u_type == ntype:
+                    u = map_back(u)
+                if v_type == ntype:
+                    v = map_back(v)
+                node_pairs[etype] = (u, v)
+        # Perform negighbor sampling
+        unique_nodes = torch.cat(unique_nodes_all_types)
+        return (
+            node_pairs,
+            self.sample_neighbors(unique_nodes, torch.LongTensor([-1])),
         )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
