@@ -24,20 +24,13 @@ def test_OnDiskDataset_TVTSet():
     """Test OnDiskDataset with TVTSet."""
     with tempfile.TemporaryDirectory() as test_dir:
         yaml_content = """
-        train_set: [
-            [
-                {
-                    type_name: "paper",
-                    format: "torch",
-                    path: "set/paper-train.pt"
-                },
-                {
-                    type_name: "paper:cites:paper",
-                    format: "numpy",
-                    path: "set/cites-train.pt"
-                }
-            ]
-        ]
+        train_set:
+          - - type_name: paper
+              format: torch
+              path: set/paper-train.pt
+            - type_name: 'paper:cites:paper'
+              format: numpy
+              path: set/cites-train.pt
         """
         yaml_file = os.path.join(test_dir, "test.yaml")
         with open(yaml_file, "w") as f:
@@ -46,15 +39,13 @@ def test_OnDiskDataset_TVTSet():
 
         # Invalid format.
         yaml_content = """
-        train_set: [
-            [
-                {
-                    type_name: "paper",
-                    format: "torch_invalid",
-                    path: "set/paper-train.pt"
-                }
-            ]
-        ]
+        train_set:
+          - - type_name: paper
+              format: torch_invalid
+              path: set/paper-train.pt
+            - type_name: 'paper:cites:paper'
+              format: numpy_invalid
+              path: set/cites-train.pt
         """
         with open(yaml_file, "w") as f:
             f.write(yaml_content)

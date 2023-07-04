@@ -95,33 +95,18 @@ class OnDiskDataset(Dataset):
 
     .. code-block:: yaml
 
-        train_set: [
-            [
-                {
-                    type_name: "paper",
-                    format: "numpy",
-                    path: "set/paper-train.npy"
-                }
-            ]
-        ]
-        validation_set: [
-            [
-                {
-                    type_name: "paper",
-                    format: "numpy",
-                    path: "set/paper-validation.npy"
-                }
-            ]
-        ]
-        test_set: [
-            [
-                {
-                    type_name: "paper",
-                    format: "numpy",
-                    path: "set/paper-test.npy"
-                }
-            ]
-        ]
+        train_set:
+          - - type_name: paper
+              format: numpy
+              path: set/paper-train.npy
+        validation_set:
+          - - type_name: paper
+              format: numpy
+              path: set/paper-validation.npy
+        test_set:
+          - - type_name: paper
+              format: numpy
+              path: set/paper-test.npy
 
     Parameters
     ----------
