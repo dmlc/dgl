@@ -2,11 +2,8 @@
 
 from typing import List, Optional
 
-import numpy as np
-
 import pydantic
 import pydantic_yaml
-import torch
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
