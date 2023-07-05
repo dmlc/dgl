@@ -3672,10 +3672,21 @@ def lap_pe(g, k, padding=False, return_eigval=False):
     L = sparse.eye(g.num_nodes()) - N * A * N
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
-    EigVal, EigVec = scipy.sparse.linalg.eigs(L, k=k+1, which='SR', tol=1e-2)
-    topk_indices = EigVal.argsort()[1:]
-    topk_eigvals = EigVal[topk_indices].real  # scipy may give complex
-    topk_EigVec = EigVec[:, topk_indices].real
+
+    if k + 1 < n - 1:
+        # Use scipy if k + 1 < n - 1 for memory efficiency.
+        EigVal, EigVec = scipy.sparse.linalg.eigs(L, k=k+1, which='SR', tol=1e-2)
+        topk_indices = EigVal.argsort()[1:]
+        topk_eigvals = EigVal[topk_indices].real  # scipy may give complex
+        topk_EigVec = EigVec[:, topk_indices].real
+    else:
+        # Fallback to numpy since scipy.sparse do not support this case.
+        EigVal, EigVec = np.linalg.eig(L.toarray())
+        max_freqs = min(n - 1, k)
+        kpartition_indices = np.argpartition(EigVal, max_freqs)[: max_freqs + 1]
+        topk_eigvals = EigVal[kpartition_indices]
+        topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
+        topk_EigVec = EigVec[:, topk_indices]
     eigvals = F.tensor(topk_eigvals, dtype=F.float32)
 
     # get random flip signs
