@@ -3594,7 +3594,8 @@ def random_walk_pe(g, k, eweight_name=None):
     if Version(scipy.__version__) < Version("1.11.0"):
         RW = np.array(A / (A.sum(1) + 1e-30))
     else:
-        # sparse matrix divided by a dense array returns a sparse matrix in scipy since 1.11.0
+        # Sparse matrix divided by a dense array returns a sparse matrix in
+        # scipy since 1.11.0.
         RW = (A / (A.sum(1) + 1e-30)).toarray()
 
     # Iterate for k steps
