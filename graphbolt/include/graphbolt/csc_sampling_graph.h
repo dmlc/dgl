@@ -157,7 +157,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * edges ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
    * the graph.
    *
-   * @param node_pairs: A tuple of two 1D tensors that represent the source and
+   * @param node_pairs A tuple of two 1D tensors that represent the source and
    * destination of positive edges, with 'positive' indicating that these edges
    * are present in the graph. It's important to note that within the context of
    * a heterogeneous graph, the ids in these tensors signify heterogeneous ids.
@@ -169,7 +169,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @return A tuple consisting of two 1D tensors represents the source and
    * destination of negative edges. In the context of a heterogeneous
    * graph, both the input nodes and the selected nodes are represented
-   * by heterogeneous IDsNote that negative refers to false negatives,
+   * by heterogeneous IDs. Note that negative refers to false negatives,
    * which means the edge could be present or not present in the graph.
    */
   std::tuple<torch::Tensor, torch::Tensor> SampleNegativeEdgesUniform(
