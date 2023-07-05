@@ -239,7 +239,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
  * fanout is >= the number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
- * @param replace Boolean indicating whether the sample is preformed with or
+ * @param replace Boolean indicating whether the sample is performed with or
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
@@ -285,7 +285,7 @@ inline torch::Tensor UniformPick(
  * fanout is >= the number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
- * @param replace Boolean indicating whether the sample is preformed with or
+ * @param replace Boolean indicating whether the sample is performed with or
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
