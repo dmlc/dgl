@@ -5,7 +5,7 @@ import unittest
 import backend as F
 
 import dgl.graphbolt as gb
-
+import gb_test_utils
 import pytest
 import torch
 
@@ -617,6 +617,98 @@ def test_sample_neighbors_zero_probs(replace, probs_or_mask):
     assert sampled_num == 0
 
 
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_sample_neighbors_for_pairs():
+    N = 100
+    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+    etypes = {
+        ("n1", "e1", "n2"): 0,
+        ("n1", "e2", "n3"): 1,
+        ("n3", "e3", "n1"): 2,
+    }
+    metadata = gb.GraphMetadata(ntypes, etypes)
+
+    graph = gb_test_utils.rand_hetero_csc_graph(N, 0.05, metadata)
+
+    N1 = torch.randint(0, 33, (15,))
+    N2 = torch.randint(0, 33, (5,))
+    N3 = torch.randint(0, 33, (10,))
+    unique_N1, compacted_N1 = torch.unique(N1, return_inverse=True)
+    unique_N2, compacted_N2 = torch.unique(N2, return_inverse=True)
+    unique_N3, compacted_N3 = torch.unique(N3, return_inverse=True)
+    unique_N1 = unique_N1 + graph.node_type_offset[0]
+    unique_N2 = unique_N2 + graph.node_type_offset[1]
+    unique_N3 = unique_N3 + graph.node_type_offset[2]
+    expected_unique_nodes = torch.sort(
+        torch.cat([unique_N1, unique_N2, unique_N3])
+    )[0]
+    expected_compacted_pairs = {
+        ("n1", "e1", "n2"): (
+            compacted_N1[:5],
+            compacted_N2[:5],
+        ),
+        ("n1", "e2", "n3"): (
+            compacted_N1[5:10],
+            compacted_N3[:5],
+        ),
+        ("n3", "e3", "n1"): (
+            compacted_N3[5:10],
+            compacted_N1[10:15],
+        ),
+    }
+
+    node_pairs = {
+        ("n1", "e1", "n2"): (
+            N1[:5],
+            N2[:5],
+        ),
+        ("n1", "e2", "n3"): (
+            N1[5:10],
+            N3[:5],
+        ),
+        ("n3", "e3", "n1"): (
+            N3[5:10],
+            N1[10:15],
+        ),
+    }
+
+    compacted_pairs, sub_g = graph.sample_neighbors_for_pairs(node_pairs)
+    assert torch.equal(
+        expected_unique_nodes, torch.sort(sub_g.reverse_column_node_ids)[0]
+    )
+    assert len(expected_compacted_pairs) == len(compacted_pairs)
+    for etype, pairs in compacted_pairs.items():
+        u, v = pairs
+        expected_u, expected_v = expected_compacted_pairs[etype]
+        assert torch.equal(u, expected_u)
+        assert torch.equal(v, expected_v)
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_sample_neighbors_for_pairs_homo():
+    N = 100
+    graph = gb_test_utils.rand_csc_graph(N, 0.05)
+
+    N = torch.randint(0, 33, (20,))
+    expected_unique_N, compacted_N = torch.unique(N, return_inverse=True)
+    expected_compacted_pairs = tuple(compacted_N.split(10))
+
+    node_pairs = tuple(N.split(10))
+    compacted_pairs, sub_g = graph.sample_neighbors_for_pairs(node_pairs)
+
+    assert torch.equal(expected_unique_N, sub_g.reverse_column_node_ids)
+    u, v = compacted_pairs
+    expected_u, expected_v = expected_compacted_pairs
+    assert torch.equal(u, expected_u)
+    assert torch.equal(v, expected_v)
+
+
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     """Check if two tensors are on the same shared memory.
 
@@ -734,10 +826,11 @@ def test_hetero_graph_on_shared_memory(
 
 
 if __name__ == "__main__":
-    test_sample_neighbors()
-    test_sample_neighbors_replace(True, 12)
-    test_sample_neighbors_probs(
-        False,
-        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
-    )
-    test_sample_neighbors_zero_probs(True, torch.zeros(12, dtype=torch.float32))
+    # test_sample_neighbors()
+    # test_sample_neighbors_replace(True, 12)
+    # test_sample_neighbors_probs(
+    #     False,
+    #     torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
+    # )
+    # test_sample_neighbors_zero_probs(True, torch.zeros(12, dtype=torch.float32))
+    test_sample_neighbors_for_pairs_homo()

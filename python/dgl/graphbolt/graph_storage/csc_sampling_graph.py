@@ -298,7 +298,7 @@ class CSCSamplingGraph:
             nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
         )
 
-    def sample_neighbors_from_pairs(
+    def sample_neighbors_for_pairs(
         self,
         node_pairs,
     ):
@@ -327,7 +327,7 @@ class CSCSamplingGraph:
         # Treat it as a homogeneous graph.
         if is_mapping:
             assert (
-                node_type_to_id and node_type_offset
+                node_type_to_id is not None and node_type_offset is not None
             ), "Please note that sampling with different edge types is \
                 not supported in a homogeneous graph."
         else:
@@ -349,7 +349,7 @@ class CSCSamplingGraph:
             unique_nodes, collected_nodes = torch.unique(
                 collected_nodes, return_inverse=True
             )
-            ntype_id = self.metadata.node_type_to_id[ntype]
+            ntype_id = node_type_to_id[ntype]
             # Convert heterogeneous unqiue node id to homogeneous node id.
             unique_nodes = unique_nodes + node_type_offset[ntype_id]
             unique_nodes_all_types.append(unique_nodes)
