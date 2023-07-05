@@ -330,9 +330,6 @@ class CSCSamplingGraph:
             negatives, which means the edge could be present or not present in
             the graph.
         """
-        assert (
-            negative_ratio >= 0
-        ), "Negative_ratio should shoubld be non-negative Integer."
         if edge_type:
             _, _, dst_node_type = edge_type
             dst_node_type_id = self.metadata.node_type_to_id[dst_node_type]
