@@ -331,6 +331,10 @@ class CSCSamplingGraph:
             the graph.
         """
         if edge_type:
+            assert (
+                self.node_type_offset is not None
+            ), "The 'node_type_offset' array is necessary for performing \
+                negative sampling by edge type."
             _, _, dst_node_type = edge_type
             dst_node_type_id = self.metadata.node_type_to_id[dst_node_type]
             num_nodes = (
