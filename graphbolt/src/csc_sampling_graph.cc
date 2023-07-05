@@ -253,8 +253,8 @@ inline torch::Tensor UniformPick(
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
     picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
   } else if (replace) {
-      picked_neighbors =
-          torch::randint(offset, offset + num_neighbors, {fanout}, options);
+    picked_neighbors =
+        torch::randint(offset, offset + num_neighbors, {fanout}, options);
   } else {
     picked_neighbors = torch::randperm(num_neighbors, options);
     picked_neighbors = picked_neighbors.slice(0, 0, fanout) + offset;
