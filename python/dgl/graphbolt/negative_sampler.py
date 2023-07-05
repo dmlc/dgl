@@ -45,11 +45,14 @@ class _BaseNegativeSampler:
         """
         super().__init__()
         self.graph = graph
+        assert (
+            negative_ratio > 0
+        ), "Negative_ratio should shoubld be positive Integer."
         self.negative_ratio = negative_ratio
         assert linked_data_format in [
             LinkedDataFormat.CONDITIONED,
             LinkedDataFormat.INDEPENDENT,
-        ], f"Unsupported data format: {linked_data_format}"
+        ], f"Unsupported data format: {linked_data_format}."
         self.linked_data_format = linked_data_format
 
     def _generate(self, pos_edges, etype=None):
