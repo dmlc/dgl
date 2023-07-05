@@ -355,7 +355,7 @@ class CSCSamplingGraph:
             unique_nodes_all_types.append(unique_nodes)
             compacted_nodes_dict[ntype] = collected_nodes
 
-        # 4. Map back in same order as collect.
+        # Map back in same order as collect.
         compacted_node_pairs = {}
         for etype, node_pair in node_pairs.items():
             u_type, _, v_type = etype
