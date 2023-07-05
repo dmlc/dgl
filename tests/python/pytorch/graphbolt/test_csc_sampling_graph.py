@@ -826,11 +826,12 @@ def test_hetero_graph_on_shared_memory(
 
 
 if __name__ == "__main__":
-    # test_sample_neighbors()
-    # test_sample_neighbors_replace(True, 12)
-    # test_sample_neighbors_probs(
-    #     False,
-    #     torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
-    # )
-    # test_sample_neighbors_zero_probs(True, torch.zeros(12, dtype=torch.float32))
+    test_sample_neighbors()
+    test_sample_neighbors_replace(True, 12)
+    test_sample_neighbors_probs(
+        False,
+        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
+    )
+    test_sample_neighbors_zero_probs(True, torch.zeros(12, dtype=torch.float32))
+    test_sample_neighbors_for_pairs()
     test_sample_neighbors_for_pairs_homo()
