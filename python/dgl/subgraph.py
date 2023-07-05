@@ -163,6 +163,8 @@ def node_subgraph(
     ]
     sgi = graph._graph.node_subgraph(induced_nodes, relabel_nodes)
     induced_edges = sgi.induced_edges
+    if not relabel_nodes:
+        sgi = graph._graph.edge_subgraph(induced_edges, True)
     # (BarclayII) should not write induced_nodes = sgi.induced_nodes due to the same
     # bug in #1453.
     induced_nodes_or_device = induced_nodes if relabel_nodes else device

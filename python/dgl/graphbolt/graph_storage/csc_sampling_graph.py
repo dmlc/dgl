@@ -9,6 +9,10 @@ from typing import Dict, Optional, Tuple
 
 import torch
 
+from ...base import ETYPE
+from ...convert import to_homogeneous
+from ...heterograph import DGLGraph
+
 
 class GraphMetadata:
     r"""Class for metadata of csc sampling graph."""
@@ -531,3 +535,27 @@ def save_csc_sampling_graph(graph, filename):
                 metadata_filename, arcname=os.path.basename(metadata_filename)
             )
     print(f"CSCSamplingGraph has been saved to {filename}.")
+
+
+def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
+    """Convert a DGLGraph to CSCSamplingGraph."""
+    homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
+    # Initialize metadata.
+    node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
+    edge_type_to_id = {
+        etype: g.get_etype_id(etype) for etype in g.canonical_etypes
+    }
+    metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
+
+    # Obtain CSC matrix.
+    indptr, indices, _ = homo_g.adj_tensors("csc")
+    ntype_count.insert(0, 0)
+    node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
+    type_per_edge = homo_g.edata[ETYPE]
+
+    return CSCSamplingGraph(
+        torch.ops.graphbolt.from_csc(
+            indptr, indices, node_type_offset, type_per_edge
+        ),
+        metadata,
+    )
