@@ -2,11 +2,15 @@
 
 from typing import List, Optional
 
+import numpy as np
+
 import pydantic
 import pydantic_yaml
+import torch
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
+from .utils import read_data, tensor_to_tuple
 
 __all__ = ["Dataset", "OnDiskDataset"]
 
@@ -65,8 +69,9 @@ class OnDiskDataFormatEnum(pydantic_yaml.YamlStrEnum):
 class OnDiskTVTSet(pydantic.BaseModel):
     """Train-Validation-Test set."""
 
-    type_name: str
+    type_name: Optional[str]
     format: OnDiskDataFormatEnum
+    in_memory: Optional[bool] = True
     path: str
 
 
@@ -96,16 +101,19 @@ class OnDiskDataset(Dataset):
     .. code-block:: yaml
 
         train_set:
-          - - type_name: paper
+          - - type_name: paper # could be null for homogeneous graph.
               format: numpy
+              in_memory: true # If not specified, default to true.
               path: set/paper-train.npy
         validation_set:
           - - type_name: paper
               format: numpy
+              in_memory: true
               path: set/paper-validation.npy
         test_set:
           - - type_name: paper
               format: numpy
+              in_memory: true
               path: set/paper-test.npy
 
     Parameters
@@ -117,18 +125,21 @@ class OnDiskDataset(Dataset):
     def __init__(self, path: str) -> None:
         with open(path, "r") as f:
             self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
+        self._train_set = self._init_tvt_sets(self._meta.train_set)
+        self._validation_set = self._init_tvt_sets(self._meta.validation_set)
+        self._test_set = self._init_tvt_sets(self._meta.test_set)
 
     def train_set(self) -> ItemSet or ItemSetDict:
         """Return the training set."""
-        raise NotImplementedError
+        return self._train_set
 
     def validation_set(self) -> ItemSet or ItemSetDict:
         """Return the validation set."""
-        raise NotImplementedError
+        return self._validation_set
 
     def test_set(self) -> ItemSet or ItemSetDict:
         """Return the test set."""
-        raise NotImplementedError
+        return self._test_set
 
     def graph(self) -> object:
         """Return the graph."""
@@ -137,3 +148,32 @@ class OnDiskDataset(Dataset):
     def feature(self) -> FeatureStore:
         """Return the feature."""
         raise NotImplementedError
+
+    def _init_tvt_sets(
+        self, tvt_sets: List[List[OnDiskTVTSet]]
+    ) -> List[ItemSet] or List[ItemSetDict]:
+        """Initialize the TVT sets."""
+        if (tvt_sets is None) or (len(tvt_sets) == 0):
+            return None
+        ret = []
+        for tvt_set in tvt_sets:
+            if (tvt_set is None) or (len(tvt_set) == 0):
+                ret.append(None)
+            if tvt_set[0].type_name is None:
+                assert (
+                    len(tvt_set) == 1
+                ), "Only one TVT set is allowed if type_name is not specified."
+                data = read_data(
+                    tvt_set[0].path, tvt_set[0].format, tvt_set[0].in_memory
+                )
+                ret.append(ItemSet(tensor_to_tuple(data)))
+            else:
+                data = {}
+                for tvt in tvt_set:
+                    data[tvt.type_name] = ItemSet(
+                        tensor_to_tuple(
+                            read_data(tvt.path, tvt.format, tvt.in_memory)
+                        )
+                    )
+                ret.append(ItemSetDict(data))
+        return ret
