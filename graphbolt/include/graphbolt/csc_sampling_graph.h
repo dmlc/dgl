@@ -162,8 +162,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * in the graph.
    * @param negative_ratio The ratio of the number of negative samples to
    * positive samples.
-   * @param negative_ratio The total count of nodes that can be selected.
-   * It should correspond to the number of nodes of a specific type.
+   * @param max_node_id The maximum ID of the node to be selected. It
+   * should correspond to the number of nodes of a specific type.
    *
    * @return A tuple consisting of two 1D tensors represents the source and
    * destination of negative edges. Note that negative refers to false
@@ -172,7 +172,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    */
   std::tuple<torch::Tensor, torch::Tensor> SampleNegativeEdgesUniform(
       const std::tuple<torch::Tensor, torch::Tensor>& pos_pairs,
-      int64_t negative_ratio, int64_t num_nodes) const;
+      int64_t negative_ratio, int64_t max_node_id) const;
 
   /**
    * @brief Copy the graph to shared memory.

@@ -301,7 +301,7 @@ class CSCSamplingGraph:
         )
 
     def sample_negative_edges_uniform(
-        self, pos_pairs, negative_ratio, edge_type
+        self, node_pairs, negative_ratio, edge_type
     ):
         """
         Sample negative edges by randomly choosing negative source-destination
@@ -312,13 +312,13 @@ class CSCSamplingGraph:
 
         Parameters
         ----------
-        pos_pairs : Tuple[Tensor]
+        node_pairs : Tuple[Tensor]
             A tuple of two 1D tensors representing source-destination positive
             edges, where positive means the edge must exist in the graph.
         negative_ratio: int
             The ratio of the number of negative samples to positive samples.
         edge_type: (str, str, str)
-            The type of edges in the provided pos_pairs. Any negative edges
+            The type of edges in the provided node_pairs. Any negative edges
             sampled will also have the same type. If set to None, it will be
             considered as a homogeneous graph.
 
@@ -340,7 +340,7 @@ class CSCSamplingGraph:
         else:
             num_nodes = self.num_nodes
         return self._c_csc_graph.sample_negative_edges_uniform(
-            pos_pairs,
+            node_pairs,
             negative_ratio,
             num_nodes,
         )
