@@ -157,21 +157,23 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * edges ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
    * the graph.
    *
-   * @param pos_pairs: A tuple consisting of two 1D tensors representing
-   * source-destination positive edges, where positive means the edge must exist
-   * in the graph.
+   * @param node_pairs: A tuple of two 1D tensors that represent the source and
+   * destination of positive edges, with 'positive' indicating that these edges
+   * are present in the graph. It's important to note that within the context of
+   * a heterogeneous graph, the ids in these tensors signify heterogeneous ids.
    * @param negative_ratio The ratio of the number of negative samples to
    * positive samples.
    * @param max_node_id The maximum ID of the node to be selected. It
    * should correspond to the number of nodes of a specific type.
    *
    * @return A tuple consisting of two 1D tensors represents the source and
-   * destination of negative edges. Note that negative refers to false
-   * negatives, which means the edge could be present or not present in the
-   * graph.
+   * destination of negative edges. In the context of a heterogeneous
+   * graph, both the input nodes and the selected nodes are represented
+   * by heterogeneous IDsNote that negative refers to false negatives,
+   * which means the edge could be present or not present in the graph.
    */
   std::tuple<torch::Tensor, torch::Tensor> SampleNegativeEdgesUniform(
-      const std::tuple<torch::Tensor, torch::Tensor>& pos_pairs,
+      const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
       int64_t negative_ratio, int64_t max_node_id) const;
 
   /**

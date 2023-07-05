@@ -313,8 +313,11 @@ class CSCSamplingGraph:
         Parameters
         ----------
         node_pairs : Tuple[Tensor]
-            A tuple of two 1D tensors representing source-destination positive
-            edges, where positive means the edge must exist in the graph.
+            A tuple of two 1D tensors that represent the source and destination
+            of positive edges, with 'positive' indicating that these edges are
+            present in the graph. It's important to note that within the
+            context of a heterogeneous graph, the ids in these tensors signify
+            heterogeneous ids.
         negative_ratio: int
             The ratio of the number of negative samples to positive samples.
         edge_type: (str, str, str)
@@ -326,9 +329,10 @@ class CSCSamplingGraph:
         -------
         Tuple[Tensor]
             A tuple consisting of two 1D tensors represents the source and
-            destination of negative edges. Note that negative refers to false
-            negatives, which means the edge could be present or not present in
-            the graph.
+            destination of negative edges. In the context of a heterogeneous
+            graph, both the input nodes and the selected nodes are represented
+            by heterogeneous IDs. Note that negative refers to false negatives,
+            which means the edge could be present or not present in the graph.
         """
         if edge_type:
             assert (
