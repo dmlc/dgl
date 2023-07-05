@@ -3,6 +3,7 @@
 import os
 import tarfile
 import tempfile
+from collections import defaultdict
 from collections.abc import Mapping
 from typing import Dict, Optional, Tuple
 
@@ -317,60 +318,60 @@ class CSCSamplingGraph:
             The compacted node pairs and the created CSCSamplingGraph object.
         """
 
-        nodes_dict = {}
+        nodes_dict = defaultdict(list)
         unique_nodes_all_types = []
         if self.metadata:
             node_type_to_id = self.metadata.node_type_to_id
-        # Treat it as an homogeneous graph
-        if not isinstance(node_pairs, Mapping):
-            node_type_to_id = {"_N": 0}
-            edges = {("_N", "_E", "_N"): edges}
-        else:
+        node_type_offset = self.node_type_offset
+        is_mapping = isinstance(node_pairs, Mapping)
+        # Treat it as a homogeneous graph.
+        if is_mapping:
             assert (
-                node_type_to_id is not None
+                node_type_to_id and node_type_offset
             ), "Please note that sampling with different edge types is \
                 not supported in a homogeneous graph."
-        for ntype, ntype_id in node_type_to_id.items():
-            nodes_dict[ntype] = []
-            # 1.Collect nodes of a specific type.
-            for etype, node_pair in node_pairs.items():
-                u_type, _, v_type = etype
-                u, v = node_pair
-                if u_type == ntype:
-                    nodes_dict[ntype].append(u)
-                if v_type == ntype:
-                    nodes_dict[ntype].append(v)
-            if not nodes_dict[ntype]:
-                continue
-            collected_nodes = torch.cat(nodes_dict[ntype])
-            # 2.Compact and find unique nodes
+        else:
+            node_type_to_id = {"_N": 0}
+            node_pairs = {("_N", "_E", "_N"): node_pairs}
+            node_type_offset = [0, self.num_nodes]
+
+        # Collect nodes for each node type.
+        for etype, node_pair in node_pairs.items():
+            u_type, _, v_type = etype
+            u, v = node_pair
+            nodes_dict[u_type].append(u)
+            nodes_dict[v_type].append(v)
+
+        compacted_nodes_dict = defaultdict(list)
+        for ntype, nodes in nodes_dict.items():
+            collected_nodes = torch.cat(nodes)
+            # Compact and find unique nodes.
             unique_nodes, collected_nodes = torch.unique(
                 collected_nodes, return_inverse=True
             )
-            # 3. Convert heterogeneous unqiue node id to homogeneous node id
-            unique_nodes = unique_nodes + self.node_type_offset[ntype_id]
+            ntype_id = self.metadata.node_type_to_id[ntype]
+            # Convert heterogeneous unqiue node id to homogeneous node id.
+            unique_nodes = unique_nodes + node_type_offset[ntype_id]
             unique_nodes_all_types.append(unique_nodes)
+            compacted_nodes_dict[ntype] = collected_nodes
 
-            # 4. Map back in same order as collect
-            def map_back(nodes):
-                nonlocal collected_nodes
-                count = nodes.numel()
-                nodes = collected_nodes[:count]
-                collected_nodes = collected_nodes[count:]
-                return nodes
-
-            for etype, node_pair in node_pairs.items():
-                u_type, _, v_type = etype
-                u, v = node_pair
-                if u_type == ntype:
-                    u = map_back(u)
-                if v_type == ntype:
-                    v = map_back(v)
-                node_pairs[etype] = (u, v)
-        # Perform negighbor sampling
+        # 4. Map back in same order as collect.
+        compacted_node_pairs = {}
+        for etype, node_pair in node_pairs.items():
+            u_type, _, v_type = etype
+            u, v = node_pair
+            u_size, v_size = u.numel(), v.numel()
+            u = compacted_nodes_dict[u_type][:u_size]
+            compacted_nodes_dict[u_type] = compacted_nodes_dict[u_type][u_size:]
+            v = compacted_nodes_dict[v_type][:v_size]
+            compacted_nodes_dict[v_type] = compacted_nodes_dict[v_type][v_size:]
+            compacted_node_pairs[etype] = (u, v)
+        if not is_mapping:
+            compacted_node_pairs = list(compacted_node_pairs.values())[0]
+        # Perform negighbor sampling.
         unique_nodes = torch.cat(unique_nodes_all_types)
         return (
-            node_pairs,
+            compacted_node_pairs,
             self.sample_neighbors(unique_nodes, torch.LongTensor([-1])),
         )
 
