@@ -1,33 +1,25 @@
 import dgl.graphbolt as gb
+import gb_test_utils
 import pytest
 import torch
 
 
-def rand_graph(num_nodes, num_edges):
+def rand_graph(N, density):
     # Graph metadata
     ntypes = {"n1": 0, "n2": 1, "n3": 2}
-    etypes = {("n1", "e1", "n2"): 0, ("n1", "e2", "n3"): 1}
+    etypes = {
+        ("n1", "e1", "n2"): 0,
+        ("n1", "e2", "n3"): 1,
+        ("n3", "e3", "n1"): 2,
+    }
     metadata = gb.GraphMetadata(ntypes, etypes)
-    # Graph content
-    indptr = torch.randint(0, num_edges, (num_nodes + 1,))
-    indptr = torch.sort(indptr)[0]
-    indptr[0] = 0
-    indptr[-1] = num_edges
-    indices = torch.randint(0, num_nodes, (num_edges,))
-    num_nodes_per_type = num_nodes // len(ntypes)
-    node_type_offset = torch.LongTensor(
-        [0, num_nodes_per_type, num_nodes_per_type * 2, num_nodes]
-    )
-    type_per_edge = torch.randint(0, len(etypes), (num_edges,))
-    return gb.from_csc(
-        indptr, indices, node_type_offset, type_per_edge, metadata
-    )
+    return gb_test_utils.rand_hetero_csc_graph(N, density, metadata)
 
 
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
 def test_NegativeSampler_Independent_Format(negative_ratio):
     # Construct CSCSamplingGraph.
-    graph = rand_graph(100, 500)
+    graph = rand_graph(100, 0.05)
 
     # Construct NegativeSampler.
     negative_sampler = gb.PerSourceUniformSampler(
@@ -64,7 +56,7 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
 def test_NegativeSampler_Conditioned_Format(negative_ratio):
     # Construct CSCSamplingGraph.
-    graph = rand_graph(100, 500)
+    graph = rand_graph(100, 0.05)
 
     # Construct NegativeSampler.
     negative_sampler = gb.PerSourceUniformSampler(
