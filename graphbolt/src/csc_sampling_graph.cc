@@ -195,6 +195,18 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
       subgraph_reverse_edge_ids, subgraph_type_per_edge);
 }
 
+std::tuple<torch::Tensor, torch::Tensor>
+CSCSamplingGraph::SampleNegativeEdgesUniform(
+    const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
+    int64_t negative_ratio, int64_t max_node_id) const {
+  torch::Tensor pos_src;
+  std::tie(pos_src, std::ignore) = node_pairs;
+  auto neg_len = pos_src.size(0) * negative_ratio;
+  auto neg_src = pos_src.repeat(negative_ratio);
+  auto neg_dst = torch::randint(0, max_node_id, {neg_len}, pos_src.options());
+  return std::make_tuple(neg_src, neg_dst);
+}
+
 c10::intrusive_ptr<CSCSamplingGraph>
 CSCSamplingGraph::BuildGraphFromSharedMemoryTensors(
     std::tuple<
