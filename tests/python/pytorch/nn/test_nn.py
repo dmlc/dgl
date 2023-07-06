@@ -1836,7 +1836,7 @@ def test_pgexplainer(g, idtype, n_classes):
     # graph explainer
     model = Model(feat.shape[1], n_classes, graph=True)
     model = model.to(ctx)
-    explainer = nn.PGExplainer(model, n_classes, num_hops=1)
+    explainer = nn.PGExplainer(model, n_classes)
     explainer.train_step(g, g.ndata["attr"], 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)
@@ -1852,16 +1852,14 @@ def test_pgexplainer(g, idtype, n_classes):
     explainer.train_step_node(th.tensor(0), g, g.ndata["attr"], 5.0)
     explainer.train_step_node(th.tensor([0, 1]), g, g.ndata["attr"], 5.0)
 
-    probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
-        0, g, feat
-    )
-    probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(0, g, feat)
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
         [0, 1], g, feat
     )
-    probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
         th.tensor(0), g, feat
     )
-    probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
         th.tensor([0, 1]), g, feat
     )
 
@@ -1919,7 +1917,7 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     # graph explainer
     model = Model(input_dim, embed_dim, n_classes, g.canonical_etypes)
     model = model.to(ctx)
-    explainer = nn.HeteroPGExplainer(model, embed_dim, num_hops=1)
+    explainer = nn.HeteroPGExplainer(model, embed_dim)
     explainer.train_step(g, feat, 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)

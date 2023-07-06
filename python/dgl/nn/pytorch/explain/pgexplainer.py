@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .... import batch, ETYPE, khop_in_subgraph, NID, to_homogeneous
+from .... import batch, ETYPE, khop_in_subgraph, NID, to_homogeneous, unbatch
 
 __all__ = ["PGExplainer", "HeteroPGExplainer"]
 
@@ -30,8 +30,9 @@ class PGExplainer(nn.Module):
           the intermediate node embeddings.
     num_features : int
         Node embedding size used by :attr:`model`.
-    num_hops : int
-        The number of hops for GNN information aggregation.
+    num_hops : int, optional
+        The number of hops for GNN information aggregation, which must match the
+        number of message passing layers employed by the GNN to be explained.
     explain_graph : bool, optional
         Whether to initialize the model for graph-level or node-level predictions.
     coff_budget : float, optional
@@ -47,7 +48,7 @@ class PGExplainer(nn.Module):
         self,
         model,
         num_features,
-        num_hops,
+        num_hops=None,
         explain_graph=True,
         coff_budget=0.01,
         coff_connect=5e-4,
@@ -277,20 +278,17 @@ class PGExplainer(nn.Module):
         if isinstance(nodes, int):
             nodes = [nodes]
 
-        (
-            prob,
-            _,
-            batched_graph,
-            batched_feats,
-            inverse_indicies,
-        ) = self.explain_node(
+        prob, _, batched_graph, inverse_indices = self.explain_node(
             nodes, graph, feat, tmp=tmp, training=True, **kwargs
         )
 
+        batched_feats = torch.cat(
+            [feat[sg.ndata[NID].long()] for sg in unbatch(batched_graph)]
+        )
         pred = self.model(batched_graph, batched_feats, embed=False, **kwargs)
         pred = pred.argmax(-1).data
 
-        loss = self.loss(prob[inverse_indicies], pred[inverse_indicies])
+        loss = self.loss(prob[inverse_indices], pred[inverse_indices])
         return loss
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
@@ -370,7 +368,7 @@ class PGExplainer(nn.Module):
         ...     optimizer.step()
 
         >>> # Initialize the explainer
-        >>> explainer = PGExplainer(model, data.gclasses, num_hops=1)
+        >>> explainer = PGExplainer(model, data.gclasses)
 
         >>> # Train the explainer
         >>> # Define explainer temperature parameter
@@ -418,10 +416,12 @@ class PGExplainer(nn.Module):
         logits = self.model(graph, feat, edge_weight=self.edge_mask, **kwargs)
         probs = F.softmax(logits, dim=-1)
 
-        if not training:
+        if training:
+            probs = probs.data
+        else:
             self.clear_masks()
 
-        return (probs, edge_mask) if training else (probs.data, edge_mask)
+        return (probs, edge_mask)
 
     def explain_node(
         self, nodes, graph, feat, tmp=1.0, training=False, **kwargs
@@ -486,7 +486,7 @@ class PGExplainer(nn.Module):
         ...         return self.conv2(g, h)
 
         >>> # Load dataset
-        >>> data = dgl.data.CoraGraphDataset()
+        >>> data = dgl.data.CoraGraphDataset(verbose=False)
         >>> g = data[0]
         >>> features = g.ndata["feat"]
         >>> labels = g.ndata["label"]
@@ -514,20 +514,22 @@ class PGExplainer(nn.Module):
         >>> epochs = 10
         >>> for epoch in range(epochs):
         ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / epochs))
-        ...     for node in g.nodes():
-        ...         loss = explainer.train_step_node(node, g, features, tmp)
-        ...         optimizer_exp.zero_grad()
-        ...         loss.backward()
-        ...         optimizer_exp.step()
+        ...     loss = explainer.train_step_node(g.nodes(), g, features, tmp)
+        ...     optimizer_exp.zero_grad()
+        ...     loss.backward()
+        ...     optimizer_exp.step()
 
         >>> # Explain the prediction for graph 0
-        >>> probs, edge_weight, bg, bf, inverse_indicies = explainer.explain_node(
+        >>> probs, edge_weight, bg, inverse_indices = explainer.explain_node(
         ...     0, g, features
         ... )
         """
         assert (
             not self.graph_explanation
         ), '"explain_graph" must be False in initializing the module.'
+        assert (
+            self.num_hops is not None
+        ), '"num_hops" must be provided in initializing the module.'
 
         if isinstance(nodes, torch.Tensor):
             nodes = nodes.tolist()
@@ -540,10 +542,10 @@ class PGExplainer(nn.Module):
         batched_graph = []
         batched_feats = []
         batched_embed = []
-        batched_node_ids = []
+        batched_inverse_indices = []
         node_idx = 0
         for node_id in nodes:
-            sg, inverse_indicies = khop_in_subgraph(
+            sg, inverse_indices = khop_in_subgraph(
                 graph, node_id, self.num_hops
             )
             sg_feat = feat[sg.ndata[NID].long()]
@@ -554,12 +556,14 @@ class PGExplainer(nn.Module):
             col, row = sg.edges()
             col_emb = embed[col.long()]
             row_emb = embed[row.long()]
-            self_emb = embed[inverse_indicies[0]].repeat(sg.num_edges(), 1)
+            self_emb = embed[inverse_indices[0]].repeat(sg.num_edges(), 1)
             emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
             batched_embed.append(emb)
             batched_graph.append(sg)
             batched_feats.append(sg_feat)
-            batched_node_ids.append(inverse_indicies[0] + node_idx)
+            # node id's of subgraph mapped to batch:
+            # https://docs.dgl.ai/en/latest/generated/dgl.batch.html#dgl.batch
+            batched_inverse_indices.append(inverse_indices[0].item() + node_idx)
             node_idx += sg.num_nodes()
 
         batched_graph = batch(batched_graph)
@@ -584,19 +588,16 @@ class PGExplainer(nn.Module):
         )
         probs = F.softmax(logits, dim=-1)
 
-        if not training:
+        if training:
+            probs = probs.data
+        else:
             self.clear_masks()
 
         return (
-            (probs, edge_mask, batched_graph, batched_feats, inverse_indicies)
-            if training
-            else (
-                probs.data,
-                edge_mask,
-                batched_graph,
-                batched_feats,
-                inverse_indicies,
-            )
+            probs.data,
+            edge_mask,
+            batched_graph,
+            batched_inverse_indices,
         )
 
 
@@ -802,11 +803,9 @@ class HeteroPGExplainer(PGExplainer):
         logits = self.model(graph, feat, edge_weight=hetero_edge_mask, **kwargs)
         probs = F.softmax(logits, dim=-1)
 
-        if not training:
+        if training:
+            probs = probs.data
+        else:
             self.clear_masks()
 
-        return (
-            (probs, hetero_edge_mask)
-            if training
-            else (probs.data, hetero_edge_mask)
-        )
+        return (probs, hetero_edge_mask)
