@@ -311,15 +311,17 @@ class CSCSamplingGraph:
         node_pairs,
     ):
         """
-        Sample the neighboring edges of the nodes formed by all connected
-        nodes in the provided node pairs. Return the induced subgraph and the
-        compacted node pairs.
+        Sample neighboring edges for a given list or dictionary of node pairs.
+        Return the induced subgraph and the compacted node pairs.
 
         Parameters
         ----------
         node_pairs : Tuple[torch.Tensor] or Dict(etype, Tuple[torch.Tensor])
             Node pairs representing source-destination edges.
-
+            - If `node_pairs` is a tuple: It should be in the format ('u', 'v')
+            representing source and destination pairs.
+            - If `node_pairs` is a dictionary: The keys should be edge type and
+            the values should be corresponding node pairs.
         Returns
         -------
         Tuple[node_pairs, CSCSamplingGraph]
@@ -376,7 +378,7 @@ class CSCSamplingGraph:
             compacted_node_pairs[etype] = (u, v)
         if not is_mapping:
             compacted_node_pairs = list(compacted_node_pairs.values())[0]
-        # Perform negighbor sampling.
+        # Perform neighbor sampling.
         unique_nodes = torch.cat(unique_nodes_all_types)
         return (
             compacted_node_pairs,
