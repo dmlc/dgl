@@ -126,7 +126,7 @@ class PerSourceUniformSampler(_BaseNegativeSampler):
 
     def _generate(self, pos_edges, etype=None):
         return self.graph.sample_negative_edges_uniform(
+            etype,
             pos_edges,
             self.negative_ratio,
-            etype,
         )
