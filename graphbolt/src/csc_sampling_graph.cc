@@ -358,6 +358,9 @@ torch::Tensor PickByEtype(
         const auto end = offset + num_neighbors;
         while (etype_begin < end) {
           scalar_t etype = type_per_edge_data[etype_begin];
+          TORCH_CHECK(
+              etype >= 0 && etype < fanouts.size(),
+              "Etype values exceed the number of fanouts.");
           int64_t fanout = fanouts[etype];
           auto etype_end_it = std::upper_bound(
               type_per_edge_data + etype_begin, type_per_edge_data + end,
