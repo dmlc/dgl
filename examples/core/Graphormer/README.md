@@ -1,6 +1,10 @@
 Graphormer
 ==============================
 
+## Introduction
+
+* Graphormer is a Transformer model designed for graph-structured data, which encodes the structural information of a graph into the standard Transformer. Specifically, Graphormer utilizes Degree Encoding to measure the importance of nodes, Spatial Encoding and Path Encoding to measure the relation between node pairs. The former plus the node features serve as input to Graphormer, while the latter acts as bias terms in the self-attention module.
+
 * paper link: [https://arxiv.org/abs/2106.05234](https://arxiv.org/abs/2106.05234)
 
 ## Requirements
@@ -22,7 +26,7 @@ How to run
 ```bash
 accelerate launch --multi_gpu --mixed_precision=fp16 train.py
 ```
-> **_NOTE:_**  The script will automatically download weights pre-trained on PCQM4Mv2.
+> **_NOTE:_**  The script will automatically download weights pre-trained on PCQM4Mv2. If you want the same result as us, make sure the total batch size is 64.
 
 ## Summary
 
