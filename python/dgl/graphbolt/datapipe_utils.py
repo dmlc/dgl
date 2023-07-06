@@ -1,5 +1,12 @@
 """DataPipe utilities"""
 
+try:
+    from torchdata.dataloader2.graph import traverse_dps
+except ImportError:
+    from torchdata.dataloader2.graph import traverse    # PyTorch 1.12-
+    def traverse_dps(datapipe):
+        return traverse(datapipe, True)
+
 
 def datapipe_graph_to_adjlist(datapipe_graph):
     """Given a DataPipe graph returned by
