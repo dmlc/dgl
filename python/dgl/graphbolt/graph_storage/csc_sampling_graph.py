@@ -270,6 +270,14 @@ class CSCSamplingGraph:
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
+        expected_fanout_len = 1
+        if self.metadata and self.metadata.edge_type_to_id:
+            expected_fanout_len = len(self.metadata.edge_type_to_id)
+        assert len(fanouts) in [
+            expected_fanout_len,
+            1,
+        ], "Fanouts should have the same number of elements as etypes or \
+            should have a length of 1."
         if fanouts.size(0) > 1:
             assert (
                 self.type_per_edge is not None
@@ -279,10 +287,6 @@ class CSCSamplingGraph:
             (fanouts >= 0) | (fanouts == -1)
         ), "Fanouts should consist of values that are either -1 or \
             greater than or equal to 0."
-        if self.metadata and self.metadata.edge_type_to_id:
-            assert len(self.metadata.edge_type_to_id) == fanouts.size(
-                0
-            ), "Fanouts should have the same number of elements as etypes."
         if probs_or_mask is not None:
             assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
