@@ -35,16 +35,16 @@ class Dataset:
     generate a subgraph.
     """
 
-    def train_set(self) -> ItemSet or ItemSetDict:
-        """Return the training set."""
+    def train_sets(self) -> List[ItemSet] or List[ItemSetDict]:
+        """Return the training sets."""
         raise NotImplementedError
 
-    def validation_set(self) -> ItemSet or ItemSetDict:
-        """Return the validation set."""
+    def validation_sets(self) -> List[ItemSet] or List[ItemSetDict]:
+        """Return the validation sets."""
         raise NotImplementedError
 
-    def test_set(self) -> ItemSet or ItemSetDict:
-        """Return the test set."""
+    def test_sets(self) -> List[ItemSet] or List[ItemSetDict]:
+        """Return the test sets."""
         raise NotImplementedError
 
     def graph(self) -> object:
@@ -79,9 +79,9 @@ class OnDiskMetaData(pydantic_yaml.YamlModel):
     is a list of list of ``OnDiskTVTSet``.
     """
 
-    train_set: Optional[List[List[OnDiskTVTSet]]]
-    validation_set: Optional[List[List[OnDiskTVTSet]]]
-    test_set: Optional[List[List[OnDiskTVTSet]]]
+    train_sets: Optional[List[List[OnDiskTVTSet]]]
+    validation_sets: Optional[List[List[OnDiskTVTSet]]]
+    test_sets: Optional[List[List[OnDiskTVTSet]]]
 
 
 class OnDiskDataset(Dataset):
@@ -97,17 +97,17 @@ class OnDiskDataset(Dataset):
 
     .. code-block:: yaml
 
-        train_set:
+        train_sets:
           - - type_name: paper # could be null for homogeneous graph.
               format: numpy
               in_memory: true # If not specified, default to true.
               path: set/paper-train.npy
-        validation_set:
+        validation_sets:
           - - type_name: paper
               format: numpy
               in_memory: true
               path: set/paper-validation.npy
-        test_set:
+        test_sets:
           - - type_name: paper
               format: numpy
               in_memory: true
@@ -122,21 +122,21 @@ class OnDiskDataset(Dataset):
     def __init__(self, path: str) -> None:
         with open(path, "r") as f:
             self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
-        self._train_set = self._init_tvt_sets(self._meta.train_set)
-        self._validation_set = self._init_tvt_sets(self._meta.validation_set)
-        self._test_set = self._init_tvt_sets(self._meta.test_set)
+        self._train_sets = self._init_tvt_sets(self._meta.train_sets)
+        self._validation_sets = self._init_tvt_sets(self._meta.validation_sets)
+        self._test_sets = self._init_tvt_sets(self._meta.test_sets)
 
-    def train_set(self) -> ItemSet or ItemSetDict:
+    def train_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the training set."""
-        return self._train_set
+        return self._train_sets
 
-    def validation_set(self) -> ItemSet or ItemSetDict:
+    def validation_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the validation set."""
-        return self._validation_set
+        return self._validation_sets
 
-    def test_set(self) -> ItemSet or ItemSetDict:
+    def test_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the test set."""
-        return self._test_set
+        return self._test_sets
 
     def graph(self) -> object:
         """Return the graph."""

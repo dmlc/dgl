@@ -11,11 +11,11 @@ from dgl import graphbolt as gb
 def test_Dataset():
     dataset = gb.Dataset()
     with pytest.raises(NotImplementedError):
-        _ = dataset.train_set()
+        _ = dataset.train_sets()
     with pytest.raises(NotImplementedError):
-        _ = dataset.validation_set()
+        _ = dataset.validation_sets()
     with pytest.raises(NotImplementedError):
-        _ = dataset.test_set()
+        _ = dataset.test_sets()
     with pytest.raises(NotImplementedError):
         _ = dataset.graph()
     with pytest.raises(NotImplementedError):
@@ -29,7 +29,7 @@ def test_OnDiskDataset_TVTSet_exceptions():
 
         # Case 1: ``format`` is invalid.
         yaml_content = """
-        train_set:
+        train_sets:
           - - type_name: paper
               format: torch_invalid
               path: set/paper-train.pt
@@ -42,7 +42,7 @@ def test_OnDiskDataset_TVTSet_exceptions():
 
         # Case 2: ``type_name`` is not specified while multiple TVT sets are specified.
         yaml_content = """
-            train_set:
+            train_sets:
               - - type_name: null
                   format: numpy
                   path: set/train.npy
@@ -85,7 +85,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         #   ``type_name`` is not specified or specified as ``null``.
         #   ``in_memory`` could be ``true`` and ``false``.
         yaml_content = f"""
-            train_set:
+            train_sets:
               - - type_name: null
                   format: numpy
                   in_memory: true
@@ -93,13 +93,13 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
               - - type_name: null
                   format: numpy
                   path: {train_path}
-            validation_set:
+            validation_sets:
               - - format: numpy
                   path: {validation_path}
               - - type_name: null
                   format: numpy
                   path: {validation_path}
-            test_set:
+            test_sets:
               - - type_name: null
                   format: numpy
                   in_memory: false
@@ -115,7 +115,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         dataset = gb.OnDiskDataset(yaml_file)
 
         # Verify train set.
-        train_sets = dataset.train_set()
+        train_sets = dataset.train_sets()
         assert len(train_sets) == 2
         for train_set in train_sets:
             assert len(train_set) == 1000
@@ -125,7 +125,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
                 assert label == train_labels[i]
 
         # Verify validation set.
-        validation_sets = dataset.validation_set()
+        validation_sets = dataset.validation_sets()
         assert len(validation_sets) == 2
         for validation_set in validation_sets:
             assert len(validation_set) == 1000
@@ -135,7 +135,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
                 assert label == validation_labels[i]
 
         # Verify test set.
-        test_sets = dataset.test_set()
+        test_sets = dataset.test_sets()
         assert len(test_sets) == 2
         for test_set in test_sets:
             assert len(test_set) == 1000
@@ -146,7 +146,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
 
         # Case 2: Some TVT sets are None.
         yaml_content = f"""
-            train_set:
+            train_sets:
               - - type_name: null
                   format: numpy
                   path: {train_path}
@@ -156,9 +156,9 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
             f.write(yaml_content)
 
         dataset = gb.OnDiskDataset(yaml_file)
-        assert dataset.train_set() is not None
-        assert dataset.validation_set() is None
-        assert dataset.test_set() is None
+        assert dataset.train_sets() is not None
+        assert dataset.validation_sets() is None
+        assert dataset.test_sets() is None
 
 
 def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
@@ -183,7 +183,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
         np.save(test_path, test_data)
 
         yaml_content = f"""
-            train_set:
+            train_sets:
               - - type_name: null
                   format: numpy
                   in_memory: true
@@ -191,13 +191,13 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
               - - type_name: null
                   format: numpy
                   path: {train_path}
-            validation_set:
+            validation_sets:
               - - format: numpy
                   path: {validation_path}
               - - type_name: null
                   format: numpy
                   path: {validation_path}
-            test_set:
+            test_sets:
               - - type_name: null
                   format: numpy
                   in_memory: false
@@ -213,7 +213,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
         dataset = gb.OnDiskDataset(yaml_file)
 
         # Verify train set.
-        train_sets = dataset.train_set()
+        train_sets = dataset.train_sets()
         assert len(train_sets) == 2
         for train_set in train_sets:
             assert len(train_set) == 1000
@@ -224,7 +224,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
                 assert label == train_labels[i]
 
         # Verify validation set.
-        validation_sets = dataset.validation_set()
+        validation_sets = dataset.validation_sets()
         assert len(validation_sets) == 2
         for validation_set in validation_sets:
             assert len(validation_set) == 1000
@@ -235,7 +235,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
                 assert label == validation_labels[i]
 
         # Verify test set.
-        test_sets = dataset.test_set()
+        test_sets = dataset.test_sets()
         assert len(test_sets) == 2
         for test_set in test_sets:
             assert len(test_set) == 1000
@@ -268,7 +268,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
         np.save(test_path, test_data)
 
         yaml_content = f"""
-            train_set:
+            train_sets:
               - - type_name: paper
                   format: numpy
                   in_memory: true
@@ -276,14 +276,14 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
               - - type_name: author
                   format: numpy
                   path: {train_path}
-            validation_set:
+            validation_sets:
               - - type_name: paper
                   format: numpy
                   path: {validation_path}
               - - type_name: author
                   format: numpy
                   path: {validation_path}
-            test_set:
+            test_sets:
               - - type_name: paper
                   format: numpy
                   in_memory: false
@@ -299,7 +299,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
         dataset = gb.OnDiskDataset(yaml_file)
 
         # Verify train set.
-        train_sets = dataset.train_set()
+        train_sets = dataset.train_sets()
         assert len(train_sets) == 2
         for train_set in train_sets:
             assert len(train_set) == 1000
@@ -315,7 +315,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
                 assert label == train_labels[i]
 
         # Verify validation set.
-        validation_sets = dataset.validation_set()
+        validation_sets = dataset.validation_sets()
         assert len(validation_sets) == 2
         for validation_set in validation_sets:
             assert len(validation_set) == 1000
@@ -331,7 +331,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
                 assert label == validation_labels[i]
 
         # Verify test set.
-        test_sets = dataset.test_set()
+        test_sets = dataset.test_sets()
         assert len(test_sets) == 2
         for test_set in test_sets:
             assert len(test_set) == 1000
