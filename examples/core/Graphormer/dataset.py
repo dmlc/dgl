@@ -9,6 +9,7 @@ from dgl import shortest_dist
 from ogb.graphproppred import DglGraphPropPredDataset
 from torch.nn.utils.rnn import pad_sequence
 
+
 class MolHIVDataset(th.utils.data.Dataset):
     def __init__(self):
         dataset = DglGraphPropPredDataset(name="ogbg-molhiv")

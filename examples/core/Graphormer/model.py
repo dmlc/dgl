@@ -6,6 +6,7 @@ import torch as th
 import torch.nn as nn
 from dgl.nn import DegreeEncoder, GraphormerLayer, PathEncoder, SpatialEncoder
 
+
 class Graphormer(nn.Module):
     def __init__(
         self,
@@ -112,9 +113,7 @@ class Graphormer(nn.Module):
         attn_bias[:, 1:, 1:, :] = path_encoding + spatial_encoding
 
         # spatial encoding of the virtual node
-        t = self.graph_token_virtual_dist.weight.reshape(
-            1, 1, self.num_heads
-        )
+        t = self.graph_token_virtual_dist.weight.reshape(1, 1, self.num_heads)
         # Since the virtual node comes first, the spatial encodings between it
         # and other nodes will fill the 1st row and 1st column (omit num_graphs
         # and num_heads dimensions) of attn_bias matrix by broadcasting.

@@ -28,15 +28,15 @@ import random
 import torch as th
 import torch.nn as nn
 from accelerate import Accelerator
+from dataset import MolHIVDataset
 from dgl.data import download
 from dgl.dataloading import GraphDataLoader
+from model import Graphormer
 from ogb.graphproppred import Evaluator
 from transformers.optimization import (
     AdamW,
     get_polynomial_decay_schedule_with_warmup,
 )
-from dataset import MolHIVDataset
-from model import Graphormer
 
 
 def train_epoch(model, optimizer, data_loader, lr_scheduler):
@@ -150,8 +150,10 @@ def train_val_pipeline(params):
 
     dataset = MolHIVDataset()
 
-    accelerator.print(f"train, test, val sizes: {len(dataset.train)}, "
-                      f"{len(dataset.test)}, {len(dataset.val)}.")
+    accelerator.print(
+        f"train, test, val sizes: {len(dataset.train)}, "
+        f"{len(dataset.test)}, {len(dataset.val)}."
+    )
     accelerator.print("Finished loading.")
 
     train_loader = GraphDataLoader(
