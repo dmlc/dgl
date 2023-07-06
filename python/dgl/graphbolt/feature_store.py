@@ -1,9 +1,9 @@
 """Feature store for GraphBolt."""
-import os
 from typing import List
 
 import numpy as np
 import pydantic
+import pydantic_yaml
 
 import torch
 
@@ -142,10 +142,19 @@ class TorchBasedFeatureStore(FeatureStore):
             self._tensor[ids] = value
 
 
+# FIXME(Rui): To avoid circular import, we make a copy of `OnDiskDataFormatEnum`
+# from dataset.py. We need to merge the two definitions later.
+class OnDiskDataFormatEnum(pydantic_yaml.YamlStrEnum):
+    """Enum of data format."""
+
+    TORCH = "torch"
+    NUMPY = "numpy"
+
+
 class OnDiskFeatureData(pydantic.BaseModel):
     r"""The description of an on-disk feature."""
     name: str
-    format: str
+    format: OnDiskDataFormatEnum
     path: str
     in_memory: bool = True
 
@@ -182,9 +191,9 @@ def load_feature_stores(feat_data: List[OnDiskFeatureData]):
     >>> torch.save(a, "/tmp/a.pt")
     >>> np.save("/tmp/b.npy", b.numpy())
     >>> feat_data = [
-    ...     gb.OnDiskFeatureData(name="a", format="pt", path="/tmp/a.pt",
+    ...     gb.OnDiskFeatureData(name="a", format="torch", path="/tmp/a.pt",
     ...         in_memory=True),
-    ...     gb.OnDiskFeatureData(name="b", format="npy", path="/tmp/b.npy",
+    ...     gb.OnDiskFeatureData(name="b", format="numpy", path="/tmp/b.npy",
     ...         in_memory=False),
     ... ]
     >>> gb.load_feature_stores(feat_data)
@@ -196,13 +205,13 @@ def load_feature_stores(feat_data: List[OnDiskFeatureData]):
     feat_stores = {}
     for spec in feat_data:
         key = spec.name
-        if spec.format == "pt":
+        if spec.format == "torch":
             assert spec.in_memory, (
                 f"Pytorch tensor can only be loaded in memory, "
                 f"but the feature {key} is loaded on disk."
             )
             feat_stores[key] = TorchBasedFeatureStore(torch.load(spec.path))
-        elif spec.format == "npy":
+        elif spec.format == "numpy":
             mmap_mode = "r+" if not spec.in_memory else None
             feat_stores[key] = TorchBasedFeatureStore(
                 torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode))

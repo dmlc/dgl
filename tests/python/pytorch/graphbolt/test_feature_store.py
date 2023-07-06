@@ -77,13 +77,13 @@ def test_load_feature_stores(in_memory):
         feat_data = [
             gb.OnDiskFeatureData(
                 name="a",
-                format="pt",
+                format="torch",
                 path=os.path.join(test_dir, "a.pt"),
                 in_memory=True,
             ),
             gb.OnDiskFeatureData(
                 name="b",
-                format="npy",
+                format="numpy",
                 path=os.path.join(test_dir, "b.npy"),
                 in_memory=in_memory,
             ),
