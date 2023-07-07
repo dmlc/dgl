@@ -11,7 +11,6 @@
 #include <torch/torch.h>
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace graphbolt {
@@ -92,7 +91,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
     return type_per_edge_;
   }
 
-  /** @brief Get the edge attributes dictionary */
+  /** @brief Get the edge attributes dictionary. */
   inline const torch::optional<edge_attrs_map> EdgeAttributes() const {
     return edge_attributes_;
   }
