@@ -264,20 +264,29 @@ inline torch::Tensor UniformPick(
                 picked_neighbors.data_ptr<scalar_t>();
             // We use different sampling strategies for different sampling case.
             if (fanout >= num_neighbors / 10) {
-              // Use this algorithm when `fanout >= num_neighbors / 10` to
-              // reduce computation.
+              // [Algorithm]
+              // This algorithm is conceptually related to the Fisher-Yates
+              // shuffle.
               //
-              // The reservior algorithm is memory-efficient (O(fanout)) but
-              // creates many random numbers (O(num_neighbors)), which is
-              // costly.
-              //
+              // [Complexity Analysis]
               // This algorithm's memory complexity is O(num_neighbors), but
               // it generates fewer random numbers (O(fanout)).
               //
-              // In scenarios where `fanout >= num_neighbors/10`, memory
-              // complexity is not a concern due to the small size of both
-              // `fanout` and `num_neighbors`. And it's efficient to allocate
-              // a small amount of memory.
+              // (Compare) Reservoir algorithm is one of the most classical
+              // sampling algorithms. Both the reservoir algorithm and our
+              // algorithm offer distinct advantages, we need to compare to
+              // illustrate our trade-offs.
+              // The reservoir algorithm is memory-efficient (O(fanout)) but
+              // creates many random numbers (O(num_neighbors)), which is
+              // costly.
+              //
+              // [Practical Consideration]
+              // Use this algorithm when `fanout >= num_neighbors / 10` to
+              // reduce computation.
+              // In this scenarios above, memory complexity is not a concern due
+              // to the small size of both `fanout` and `num_neighbors`. And it
+              // is efficient to allocate a small amount of memory. So the
+              // algorithm performence is great in this case.
               std::vector<scalar_t> seq(num_neighbors);
               // Assign the seq with [offset, offset + num_neighbors].
               std::iota(seq.begin(), seq.end(), offset);
@@ -288,12 +297,14 @@ inline torch::Tensor UniformPick(
               // Save the randomly sampled fanout elements to the output tensor.
               std::copy(
                   seq.begin(), seq.begin() + fanout, picked_neighbors_data);
-            } else if (fanout && fanout < 64) {
-              // If set of numbers is small (up to 64) use linear search to
-              // verify uniqueness this operation is cheaper for CPU.
-              *picked_neighbors_data = RandomEngine::ThreadLocal()->RandInt(
-                  offset, offset + num_neighbors);
-              auto begin = picked_neighbors_data + 1;
+            } else if (fanout < 64) {
+              // [Algorithm]
+              // Use linear search to verify uniqueness.
+              //
+              // [Complexity Analysis]
+              // Since the set of numbers is small (up to 64), so it is more
+              // cost-effective for the CPU to use this algorithm.
+              auto begin = picked_neighbors_data;
               auto end = picked_neighbors_data + fanout;
 
               while (begin != end) {
@@ -304,19 +315,25 @@ inline torch::Tensor UniformPick(
                 // range(picked_neighbors_data, begin). Otherwise get a new
                 // value until we haven't unique range of elements.
                 auto it = std::find(picked_neighbors_data, begin, *begin);
-                if (it != begin) continue;
-                ++begin;
+                if (it == begin) ++begin;
               }
             } else {
-              // Use hash set.
-              // In the best scenario, time complexity is O(fanout), i.e., no
-              // conflict.
+              // [Algorithm]
+              // Use hash-set to verify uniqueness. In the best scenario, the
+              // time complexity is O(fanout), assuming no conflicts occur.
               //
-              // Let k be fanout / num_neighbors, the expected number of extra
-              // sampling steps is roughly k^2 / (1-k) * num_neighbors, which
+              // [Complexity Analysis]
+              // Let K = (fanout / num_neighbors), the expected number of extra
+              // sampling steps is roughly K^2 / (1-K) * num_neighbors, which
               // means in the worst case scenario, the time complexity is
-              // O(num_neighbors^2). In practice,
-              // we use 1/10 since std::unordered_set is pretty slow.
+              // O(num_neighbors^2).
+              //
+              // [Practical Consideration]
+              // In practice, we set the threshold K to 1/10. This trade-off is
+              // due to the slower performance of std::unordered_set, which
+              // would otherwise increase the sampling cost. By doing so, we
+              // achieve a balance between theoretical efficiency and practical
+              // performance.
               std::unordered_set<scalar_t> picked_set;
               while (static_cast<int64_t>(picked_set.size()) < fanout) {
                 picked_set.insert(RandomEngine::ThreadLocal()->RandInt(
