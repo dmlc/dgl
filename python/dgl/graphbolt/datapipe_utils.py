@@ -1,9 +1,12 @@
 """DataPipe utilities"""
 
+# pylint: disable=unused-import
 try:
     from torchdata.dataloader2.graph import traverse_dps
 except ImportError:
-    from torchdata.dataloader2.graph import traverse    # PyTorch 1.12-
+    # PyTorch 1.12-
+    from torchdata.dataloader2.graph import traverse
+
     def traverse_dps(datapipe):
         return traverse(datapipe, True)
 
