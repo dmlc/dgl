@@ -5,10 +5,10 @@ from typing import List, Optional
 import pydantic
 import pydantic_yaml
 
-from .dataset import Dataset
-from .feature_store import FeatureStore
-from .itemset import ItemSet, ItemSetDict
-from .utils import read_data, tensor_to_tuple
+from ..dataset import Dataset
+from ..feature_store import FeatureStore
+from ..itemset import ItemSet, ItemSetDict
+from ..utils import read_data, tensor_to_tuple
 
 __all__ = ["OnDiskDataset"]
 
