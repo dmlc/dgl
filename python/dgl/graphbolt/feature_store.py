@@ -141,6 +141,7 @@ class TorchBasedFeatureStore(FeatureStore):
             )
             self._tensor[ids] = value
 
+
 # [TODO] Move code to 'impl/' and separate OnDisk-related code to another file.
 class FeatureDataFormatEnum(pydantic_yaml.YamlStrEnum):
     """Enum of feature data format."""
