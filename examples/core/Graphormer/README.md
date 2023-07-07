@@ -16,9 +16,9 @@ Graphormer
 
 Task: Graph Property Prediction
 
-|   Dataset   | #Graphs | #Node Feats | #Edge Feats | Metric |
+|   Dataset   | #Graphs | #Node Feats | #Edge Feats | Metric  |
 | :---------: | :-----: | :---------: | :---------: | :-----: |
-| ogbg-molhiv | 41,127 |      9      |      3      | ROC-AUC |
+| ogbg-molhiv | 41,127  |      9      |      3      | ROC-AUC |
 
 How to run
 ----------
@@ -26,7 +26,7 @@ How to run
 ```bash
 accelerate launch --multi_gpu --mixed_precision=fp16 train.py
 ```
-> **_NOTE:_**  The script will automatically download weights pre-trained on PCQM4Mv2. If you want the same result as us, make sure the total batch size is 64.
+> **_NOTE:_**  The script will automatically download weights pre-trained on PCQM4Mv2. To reproduce the same result, set the total batch size to 64.
 
 ## Summary
 

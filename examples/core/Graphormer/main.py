@@ -38,6 +38,9 @@ from transformers.optimization import (
     get_polynomial_decay_schedule_with_warmup,
 )
 
+# Instantiate an accelerator object to support distributed
+# training and inference.
+accelerator = Accelerator()
 
 def train_epoch(model, optimizer, data_loader, lr_scheduler):
     model.train()
@@ -45,7 +48,7 @@ def train_epoch(model, optimizer, data_loader, lr_scheduler):
     list_scores = []
     list_labels = []
     loss_fn = nn.BCEWithLogitsLoss()
-    for iter, (
+    for counter, (
         batch_labels,
         attn_mask,
         node_feat,
@@ -75,7 +78,7 @@ def train_epoch(model, optimizer, data_loader, lr_scheduler):
         list_scores.append(batch_scores)
         list_labels.append(batch_labels)
 
-        # release GPU memory
+        # Release GPU memory.
         del (
             batch_labels,
             batch_scores,
@@ -89,24 +92,24 @@ def train_epoch(model, optimizer, data_loader, lr_scheduler):
         )
         th.cuda.empty_cache()
 
-    epoch_loss /= iter + 1
+    epoch_loss /= len(data_loader)
 
     evaluator = Evaluator(name="ogbg-molhiv")
-    epoch_train_metric = evaluator.eval(
+    epoch_auc = evaluator.eval(
         {"y_pred": th.cat(list_scores), "y_true": th.cat(list_labels)}
     )["rocauc"]
 
-    return epoch_loss, epoch_train_metric
+    return epoch_loss, epoch_auc
 
 
 def evaluate_network(model, data_loader):
     model.eval()
-    epoch_test_loss = 0
+    epoch_loss = 0
     loss_fn = nn.BCEWithLogitsLoss()
     with th.no_grad():
         list_scores = []
         list_labels = []
-        for iter, (
+        for counter, (
             batch_labels,
             attn_mask,
             node_feat,
@@ -126,24 +129,24 @@ def evaluate_network(model, data_loader):
                 attn_mask=attn_mask,
             )
 
-            # Gather all predictions and targets
+            # Gather all predictions and targets.
             all_predictions, all_targets = accelerator.gather_for_metrics(
                 (batch_scores, batch_labels)
             )
             loss = loss_fn(all_predictions, all_targets.float())
 
-            epoch_test_loss += loss.item()
+            epoch_loss += loss.item()
             list_scores.append(all_predictions)
             list_labels.append(all_targets)
 
-        epoch_test_loss /= iter + 1
+        epoch_loss /= len(data_loader)
 
         evaluator = Evaluator(name="ogbg-molhiv")
-        epoch_test_metric = evaluator.eval(
+        epoch_auc = evaluator.eval(
             {"y_pred": th.cat(list_scores), "y_true": th.cat(list_labels)}
         )["rocauc"]
 
-    return epoch_test_loss, epoch_test_metric
+    return epoch_loss, epoch_auc
 
 
 def train_val_pipeline(params):
@@ -181,29 +184,32 @@ def train_val_pipeline(params):
         num_workers=16,
     )
 
-    # load pretrained model
+    # Load pre-trained model.
     download(url="https://data.dgl.ai/pre_trained/graphormer_pcqm.pth")
     model = Graphormer()
     state_dict = th.load("graphormer_pcqm.pth")
     model.load_state_dict(state_dict)
-    # reset output layer parameters
+
     model.reset_output_layer_parameters()
     num_epochs = 16
-    tot_updates = 33000 * num_epochs / params.batch_size
-    warmup_updates = tot_updates * 0.16
+    total_updates = 33000 * num_epochs / params.batch_size
+    # Use warmup schedule to avoid overfitting at the very beginning
+    # of training, the ratio 0.16 is the same as the paper.
+    warmup_updates = total_updates * 0.16
 
     optimizer = AdamW(model.parameters(), lr=1e-4, eps=1e-8, weight_decay=0)
     lr_scheduler = get_polynomial_decay_schedule_with_warmup(
         optimizer,
         num_warmup_steps=warmup_updates,
-        num_training_steps=tot_updates,
+        num_training_steps=total_updates,
         lr_end=1e-9,
         power=1.0,
     )
 
     epoch_train_AUCs, epoch_val_AUCs, epoch_test_AUCs = [], [], []
 
-    # multi-GPUs
+    # Pass all objects relevant to training to the prepare() method as required
+    # by Accelerate.
     (
         model,
         optimizer,
@@ -216,7 +222,6 @@ def train_val_pipeline(params):
     )
 
     for epoch in range(num_epochs):
-
         epoch_train_loss, epoch_train_auc = train_epoch(
             model, optimizer, train_loader, lr_scheduler
         )
@@ -232,7 +237,7 @@ def train_val_pipeline(params):
             f"val_AUC={epoch_val_auc:.3f} | test_AUC={epoch_test_auc:.3f}"
         )
 
-    # Return test and train metrics at best val metric
+    # Return test and train AUCs with best val AUC.
     index = epoch_val_AUCs.index(max(epoch_val_AUCs))
     val_auc = epoch_val_AUCs[index]
     train_auc = epoch_train_AUCs[index]
@@ -260,10 +265,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # multi-GPUs
-    accelerator = Accelerator()
-
-    # setting seeds
+    # Set manual seed to bind the order of training data to the random seed.
     random.seed(args.seed)
     th.manual_seed(args.seed)
     if th.cuda.is_available():

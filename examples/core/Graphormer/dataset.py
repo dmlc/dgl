@@ -15,7 +15,8 @@ class MolHIVDataset(th.utils.data.Dataset):
         dataset = DglGraphPropPredDataset(name="ogbg-molhiv")
         split_idx = dataset.get_idx_split()
 
-        # compute the shortest path distance during preprocessing
+        # Compute the shortest path distances and their corresponding paths
+        # of all graphs during preprocessing.
         for g, label in dataset:
             spd, path = shortest_dist(g, root=None, return_paths=True)
             g.ndata["spd"] = spd
@@ -28,10 +29,11 @@ class MolHIVDataset(th.utils.data.Dataset):
         )
 
     def collate(self, samples):
-        # To be consistent with the input style of Graphormer, all graph
-        # features need to be padded into the same size (different number
-        # of nodes may make them inconsistent, and we align them with max
-        # number of nodes).
+        # To match Graphormer's input style, all graph features should be
+        # padded to the same size. Keep in mind that different graphs may
+        # have varying feature sizes since they have different number of
+        # nodes, so they will be aligned with the graph having the maximum
+        # number of nodes.
         graphs, labels = map(list, zip(*samples))
         labels = th.stack(labels)
 
@@ -39,18 +41,22 @@ class MolHIVDataset(th.utils.data.Dataset):
         num_nodes = [g.num_nodes() for g in graphs]
         max_num_nodes = max(num_nodes)
 
-        # +1 for the virtual node
+        # Graphormer adds a virual node to the graph, which is connected to
+        # all other nodes and supposed to represent the graph embedding. So
+        # here +1 is for the virtual node.
         attn_mask = th.zeros(num_graphs, max_num_nodes + 1, max_num_nodes + 1)
         node_feat = []
         in_degree, out_degree = [], []
         path_data = []
-        # -1 padding since shortest_dist returns -1 for unreachable node pairs
+        # Since shortest_dist returns -1 for unreachable node pairs and padded
+        # nodes are unreachable to others, distance relevant to padded nodes
+        # use -1 padding as well.
         dist = -th.ones(
             (num_graphs, max_num_nodes, max_num_nodes), dtype=th.long
         )
 
         for i in range(num_graphs):
-            # a binary mask where invalid positions are indicated by True
+            # A binary mask where invalid positions are indicated by True.
             attn_mask[i, :, num_nodes[i] + 1 :] = 1
 
             # +1 to distinguish padded non-existing nodes from real nodes
@@ -63,7 +69,7 @@ class MolHIVDataset(th.utils.data.Dataset):
                 th.clamp(graphs[i].out_degrees() + 1, min=0, max=512)
             )
 
-            # path & spatial padding
+            # Path padding to make all paths to the same length "max_len".
             path = graphs[i].ndata["path"]
             path_len = path.size(dim=2)
             # shape of shortest_path: [n, n, max_len]
@@ -72,7 +78,8 @@ class MolHIVDataset(th.utils.data.Dataset):
                 shortest_path = path[:, :, :max_len]
             else:
                 p1d = (0, max_len - path_len)
-                # use the same -1 padding as shortest_dist
+                # Use the same -1 padding as shortest_dist for
+                # invalid edge IDs.
                 shortest_path = F.pad(path, p1d, "constant", -1)
             pad_num_nodes = max_num_nodes - num_nodes[i]
             p3d = (0, 0, 0, pad_num_nodes, 0, pad_num_nodes)
