@@ -1,9 +1,6 @@
 """GraphBolt OnDiskDataset."""
 
-from typing import List, Optional
-
-import pydantic
-import pydantic_yaml
+from typing import List
 
 from ..dataset import Dataset
 from ..feature_store import FeatureStore
