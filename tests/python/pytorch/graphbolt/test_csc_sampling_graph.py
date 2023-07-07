@@ -64,6 +64,7 @@ def test_hetero_empty_graph(num_nodes):
         indices,
         node_type_offset,
         type_per_edge,
+        None,
         metadata,
     )
     assert graph.num_edges == 0
@@ -177,7 +178,7 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         metadata,
     ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     assert graph.num_nodes == num_nodes
@@ -210,7 +211,7 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
     )
     with pytest.raises(Exception):
         gb.from_csc(
-            csc_indptr, indices, node_type_offset, type_per_edge, metadata
+            csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
         )
 
 
@@ -258,7 +259,7 @@ def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         metadata,
     ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -363,7 +364,7 @@ def test_in_subgraph_heterogeneous():
     # Construct CSCSamplingGraph.
     metadata = gb.GraphMetadata(ntypes, etypes)
     graph = gb.from_csc(
-        indptr, indices, node_type_offset, type_per_edge, metadata
+        indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     # Extract in subgraph.
@@ -702,7 +703,7 @@ def test_hetero_graph_on_shared_memory(
         metadata,
     ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     shm_name = "test_hetero_g"
