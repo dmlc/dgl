@@ -8,6 +8,9 @@ except ImportError:
     from torchdata.dataloader2.graph import traverse
 
     def traverse_dps(datapipe):
+        """Wrapper of PyTorch 1.12 ``traverse`` function to PyTorch 1.13
+        ``traverse_dps`` interface.
+        """
         return traverse(datapipe, True)
 
 
