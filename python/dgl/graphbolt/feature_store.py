@@ -1,4 +1,10 @@
 """Feature store for GraphBolt."""
+from typing import List
+
+import numpy as np
+import pydantic
+import pydantic_yaml
+
 import torch
 
 
@@ -134,3 +140,82 @@ class TorchBasedFeatureStore(FeatureStore):
                 f"but got {ids.shape[0]} and {value.shape[0]}."
             )
             self._tensor[ids] = value
+
+
+# FIXME(Rui): To avoid circular import, we make a copy of `OnDiskDataFormatEnum`
+# from dataset.py. We need to merge the two definitions later.
+class OnDiskDataFormatEnum(pydantic_yaml.YamlStrEnum):
+    """Enum of data format."""
+
+    TORCH = "torch"
+    NUMPY = "numpy"
+
+
+class OnDiskFeatureData(pydantic.BaseModel):
+    r"""The description of an on-disk feature."""
+    name: str
+    format: OnDiskDataFormatEnum
+    path: str
+    in_memory: bool = True
+
+
+def load_feature_stores(feat_data: List[OnDiskFeatureData]):
+    r"""Load feature stores from disk.
+
+    The feature stores are described by the `feat_data`. The `feat_data` is a
+    list of `OnDiskFeatureData`.
+
+    For a feature store, its format must be either "pt" or "npy" for Pytorch or
+    Numpy formats. If the format is "pt", the feature store must be loaded in
+    memory. If the format is "npy", the feature store can be loaded in memory or
+    on disk.
+
+    Parameters
+    ----------
+    feat_data : List[OnDiskFeatureData]
+        The description of the feature stores.
+
+    Returns
+    -------
+    dict
+        The loaded feature stores. The keys are the names of the feature stores,
+        and the values are the feature stores.
+
+    Examples
+    --------
+    >>> import torch
+    >>> import numpy as np
+    >>> from dgl import graphbolt as gb
+    >>> a = torch.tensor([1, 2, 3])
+    >>> b = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    >>> torch.save(a, "/tmp/a.pt")
+    >>> np.save("/tmp/b.npy", b.numpy())
+    >>> feat_data = [
+    ...     gb.OnDiskFeatureData(name="a", format="torch", path="/tmp/a.pt",
+    ...         in_memory=True),
+    ...     gb.OnDiskFeatureData(name="b", format="numpy", path="/tmp/b.npy",
+    ...         in_memory=False),
+    ... ]
+    >>> gb.load_feature_stores(feat_data)
+    ... {'a': <dgl.graphbolt.feature_store.TorchBasedFeatureStore object at
+    ... 0x7ff093cb4df0>, 'b':
+    ... <dgl.graphbolt.feature_store.TorchBasedFeatureStore object at
+    ... 0x7ff093cb4dc0>}
+    """
+    feat_stores = {}
+    for spec in feat_data:
+        key = spec.name
+        if spec.format == "torch":
+            assert spec.in_memory, (
+                f"Pytorch tensor can only be loaded in memory, "
+                f"but the feature {key} is loaded on disk."
+            )
+            feat_stores[key] = TorchBasedFeatureStore(torch.load(spec.path))
+        elif spec.format == "numpy":
+            mmap_mode = "r+" if not spec.in_memory else None
+            feat_stores[key] = TorchBasedFeatureStore(
+                torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode))
+            )
+        else:
+            raise ValueError(f"Unknown feature format {spec.format}")
+    return feat_stores
