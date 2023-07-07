@@ -4,7 +4,7 @@ import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
 
-from .datapipe_utils import datapipe_graph_to_adjlist
+from .datapipe_utils import datapipe_graph_to_adjlist, traverse_dps
 from .feature_fetcher import FeatureFetcher
 
 from .minibatch_sampler import MinibatchSampler
@@ -82,7 +82,7 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
         # 2. Cut the datapipe at FeatureFetcher, and wrap the inner datapipe
         #    of the FeatureFetcher with a multiprocessing PyTorch DataLoader.
 
-        datapipe_graph = dp_utils.traverse_dps(datapipe)
+        datapipe_graph = traverse_dps(datapipe)
         datapipe_adjlist = datapipe_graph_to_adjlist(datapipe_graph)
 
         # (1) Insert minibatch distribution.
