@@ -7,11 +7,32 @@ except ImportError:
     # PyTorch 1.12-
     from torchdata.dataloader2.graph import traverse
 
+    def _traverse_helper(graph, new_graph):
+        for datapipe, parent_graph in graph.items():
+            new_parent_graph = {}
+            new_graph[id(k)] = (k, new_parent_graph)
+            _traverse_helper(parent_graph, new_parent_graph)
+
     def traverse_dps(datapipe):
         """Wrapper of PyTorch 1.12 ``traverse`` function to PyTorch 1.13
         ``traverse_dps`` interface.
+
+        The traversal function in PyTorch 1.12 returns
+
+        .. code::
+
+           {datapipe_object: {parent_object1: ..., parent_object2: ..., ...}
+
+        But in PyTorch 1.13 and later it returns
+
+        .. code::
+
+           {id(datapipe_object): (datapipe_object, {...})}
         """
-        return traverse(datapipe, True)
+        graph = traverse(datapipe, True)
+        new_graph = {}
+        _traverse_helper(graph, new_graph)
+        return new_graph
 
 
 def datapipe_graph_to_adjlist(datapipe_graph):
