@@ -186,14 +186,27 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
   torch::Tensor subgraph_indices =
       torch::index_select(indices_, 0, picked_eids);
   torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
-  if (type_per_edge_.has_value())
+  if (type_per_edge_.has_value()) {
     subgraph_type_per_edge =
         torch::index_select(type_per_edge_.value(), 0, picked_eids);
+  }
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
   return c10::make_intrusive<SampledSubgraph>(
       subgraph_indptr, subgraph_indices, nodes, torch::nullopt,
       subgraph_reverse_edge_ids, subgraph_type_per_edge);
+}
+
+std::tuple<torch::Tensor, torch::Tensor>
+CSCSamplingGraph::SampleNegativeEdgesUniform(
+    const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
+    int64_t negative_ratio, int64_t max_node_id) const {
+  torch::Tensor pos_src;
+  std::tie(pos_src, std::ignore) = node_pairs;
+  auto neg_len = pos_src.size(0) * negative_ratio;
+  auto neg_src = pos_src.repeat(negative_ratio);
+  auto neg_dst = torch::randint(0, max_node_id, {neg_len}, pos_src.options());
+  return std::make_tuple(neg_src, neg_dst);
 }
 
 c10::intrusive_ptr<CSCSamplingGraph>
@@ -239,7 +252,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
  * fanout is >= the number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
- * @param replace Boolean indicating whether the sample is preformed with or
+ * @param replace Boolean indicating whether the sample is performed with or
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
@@ -252,6 +265,9 @@ inline torch::Tensor UniformPick(
   torch::Tensor picked_neighbors;
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
     picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
+  } else if (replace) {
+    picked_neighbors =
+        torch::randint(offset, offset + num_neighbors, {fanout}, options);
   } else {
     if (replace) {
       picked_neighbors =
@@ -371,7 +387,7 @@ inline torch::Tensor UniformPick(
  * fanout is >= the number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
- * @param replace Boolean indicating whether the sample is preformed with or
+ * @param replace Boolean indicating whether the sample is performed with or
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
@@ -431,6 +447,9 @@ torch::Tensor PickByEtype(
         const auto end = offset + num_neighbors;
         while (etype_begin < end) {
           scalar_t etype = type_per_edge_data[etype_begin];
+          TORCH_CHECK(
+              etype >= 0 && etype < fanouts.size(),
+              "Etype values exceed the number of fanouts.");
           int64_t fanout = fanouts[etype];
           auto etype_end_it = std::upper_bound(
               type_per_edge_data + etype_begin, type_per_edge_data + end,

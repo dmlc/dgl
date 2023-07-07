@@ -1,4 +1,10 @@
 """Feature store for GraphBolt."""
+from typing import List, Optional
+
+import numpy as np
+import pydantic
+import pydantic_yaml
+
 import torch
 
 
@@ -134,3 +140,93 @@ class TorchBasedFeatureStore(FeatureStore):
                 f"but got {ids.shape[0]} and {value.shape[0]}."
             )
             self._tensor[ids] = value
+
+
+# [TODO] Move code to 'impl/' and separate OnDisk-related code to another file.
+class FeatureDataFormatEnum(pydantic_yaml.YamlStrEnum):
+    """Enum of feature data format."""
+
+    TORCH = "torch"
+    NUMPY = "numpy"
+
+
+class FeatureDataDomainEnum(pydantic_yaml.YamlStrEnum):
+    """Enum of feature data domain."""
+
+    NODE = "node"
+    EDGE = "edge"
+    GRAPH = "graph"
+
+
+class OnDiskFeatureData(pydantic.BaseModel):
+    r"""The description of an on-disk feature."""
+    domain: FeatureDataDomainEnum
+    type: Optional[str]
+    name: str
+    format: FeatureDataFormatEnum
+    path: str
+    in_memory: Optional[bool] = True
+
+
+def load_feature_stores(feat_data: List[OnDiskFeatureData]):
+    r"""Load feature stores from disk.
+
+    The feature stores are described by the `feat_data`. The `feat_data` is a
+    list of `OnDiskFeatureData`.
+
+    For a feature store, its format must be either "pt" or "npy" for Pytorch or
+    Numpy formats. If the format is "pt", the feature store must be loaded in
+    memory. If the format is "npy", the feature store can be loaded in memory or
+    on disk.
+
+    Parameters
+    ----------
+    feat_data : List[OnDiskFeatureData]
+        The description of the feature stores.
+
+    Returns
+    -------
+    dict
+        The loaded feature stores. The keys are the names of the feature stores,
+        and the values are the feature stores.
+
+    Examples
+    --------
+    >>> import torch
+    >>> import numpy as np
+    >>> from dgl import graphbolt as gb
+    >>> edge_label = torch.tensor([1, 2, 3])
+    >>> node_feat = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    >>> torch.save(edge_label, "/tmp/edge_label.pt")
+    >>> np.save("/tmp/node_feat.npy", node_feat.numpy())
+    >>> feat_data = [
+    ...     gb.OnDiskFeatureData(domain="edge", type="author:writes:paper",
+    ...         name="label", format="torch", path="/tmp/edge_label.pt",
+    ...         in_memory=True),
+    ...     gb.OnDiskFeatureData(domain="node", type="paper", name="feat",
+    ...         format="numpy", path="/tmp/node_feat.npy", in_memory=False),
+    ... ]
+    >>> gb.load_feature_stores(feat_data)
+    ... {("edge", "author:writes:paper", "label"):
+    ... <dgl.graphbolt.feature_store.TorchBasedFeatureStore object at
+    ... 0x7ff093cb4df0>, ("node", "paper", "feat"):
+    ... <dgl.graphbolt.feature_store.TorchBasedFeatureStore object at
+    ... 0x7ff093cb4dc0>}
+    """
+    feat_stores = {}
+    for spec in feat_data:
+        key = (spec.domain, spec.type, spec.name)
+        if spec.format == "torch":
+            assert spec.in_memory, (
+                f"Pytorch tensor can only be loaded in memory, "
+                f"but the feature {key} is loaded on disk."
+            )
+            feat_stores[key] = TorchBasedFeatureStore(torch.load(spec.path))
+        elif spec.format == "numpy":
+            mmap_mode = "r+" if not spec.in_memory else None
+            feat_stores[key] = TorchBasedFeatureStore(
+                torch.as_tensor(np.load(spec.path, mmap_mode=mmap_mode))
+            )
+        else:
+            raise ValueError(f"Unknown feature format {spec.format}")
+    return feat_stores

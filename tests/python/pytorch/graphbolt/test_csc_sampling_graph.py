@@ -407,9 +407,13 @@ def test_sample_neighbors():
     type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
-
+    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+    etypes = {("n1", "e1", "n2"): 0, ("n1", "e2", "n3"): 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+    graph = gb.from_csc(
+        indptr, indices, type_per_edge=type_per_edge, metadata=metadata
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -467,9 +471,14 @@ def test_sample_neighbors_fanouts(fanouts, expected_sampled_num):
     type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
+    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+    etypes = {("n1", "e1", "n2"): 0, ("n1", "e2", "n3"): 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
 
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+    graph = gb.from_csc(
+        indptr, indices, type_per_edge=type_per_edge, metadata=metadata
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -797,13 +806,3 @@ def test_from_dglgraph_heterogeneous():
         ("n2", "r21", "n1"): 2,
         ("n2", "r23", "n3"): 3,
     }
-
-
-if __name__ == "__main__":
-    test_sample_neighbors()
-    test_sample_neighbors_replace(True, 12)
-    test_sample_neighbors_probs(
-        False,
-        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
-    )
-    test_sample_neighbors_zero_probs(True, torch.zeros(12, dtype=torch.float32))
