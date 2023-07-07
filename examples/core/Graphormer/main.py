@@ -42,6 +42,7 @@ from transformers.optimization import (
 # training and inference.
 accelerator = Accelerator()
 
+
 def train_epoch(model, optimizer, data_loader, lr_scheduler):
     model.train()
     epoch_loss = 0
