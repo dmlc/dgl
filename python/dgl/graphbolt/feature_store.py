@@ -1,5 +1,5 @@
 """Feature store for GraphBolt."""
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import pydantic
@@ -142,21 +142,30 @@ class TorchBasedFeatureStore(FeatureStore):
             self._tensor[ids] = value
 
 
-# FIXME(Rui): To avoid circular import, we make a copy of `OnDiskDataFormatEnum`
-# from dataset.py. We need to merge the two definitions later.
-class OnDiskDataFormatEnum(pydantic_yaml.YamlStrEnum):
-    """Enum of data format."""
+# [TODO] Move code to 'impl/' and separate OnDisk-related code to another file.
+class FeatureDataFormatEnum(pydantic_yaml.YamlStrEnum):
+    """Enum of feature data format."""
 
     TORCH = "torch"
     NUMPY = "numpy"
 
 
+class FeatureDataDomainEnum(pydantic_yaml.YamlStrEnum):
+    """Enum of feature data domain."""
+
+    NODE = "node"
+    EDGE = "edge"
+    GRAPH = "graph"
+
+
 class OnDiskFeatureData(pydantic.BaseModel):
     r"""The description of an on-disk feature."""
+    domain: FeatureDataDomainEnum
+    type: Optional[str]
     name: str
-    format: OnDiskDataFormatEnum
+    format: FeatureDataFormatEnum
     path: str
-    in_memory: bool = True
+    in_memory: Optional[bool] = True
 
 
 def load_feature_stores(feat_data: List[OnDiskFeatureData]):
@@ -186,25 +195,27 @@ def load_feature_stores(feat_data: List[OnDiskFeatureData]):
     >>> import torch
     >>> import numpy as np
     >>> from dgl import graphbolt as gb
-    >>> a = torch.tensor([1, 2, 3])
-    >>> b = torch.tensor([[1, 2, 3], [4, 5, 6]])
-    >>> torch.save(a, "/tmp/a.pt")
-    >>> np.save("/tmp/b.npy", b.numpy())
+    >>> edge_label = torch.tensor([1, 2, 3])
+    >>> node_feat = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    >>> torch.save(edge_label, "/tmp/edge_label.pt")
+    >>> np.save("/tmp/node_feat.npy", node_feat.numpy())
     >>> feat_data = [
-    ...     gb.OnDiskFeatureData(name="a", format="torch", path="/tmp/a.pt",
+    ...     gb.OnDiskFeatureData(domain="edge", type="author:writes:paper",
+    ...         name="label", format="torch", path="/tmp/edge_label.pt",
     ...         in_memory=True),
-    ...     gb.OnDiskFeatureData(name="b", format="numpy", path="/tmp/b.npy",
-    ...         in_memory=False),
+    ...     gb.OnDiskFeatureData(domain="node", type="paper", name="feat",
+    ...         format="numpy", path="/tmp/node_feat.npy", in_memory=False),
     ... ]
     >>> gb.load_feature_stores(feat_data)
-    ... {'a': <dgl.graphbolt.feature_store.TorchBasedFeatureStore object at
-    ... 0x7ff093cb4df0>, 'b':
+    ... {("edge", "author:writes:paper", "label"):
+    ... <dgl.graphbolt.feature_store.TorchBasedFeatureStore object at
+    ... 0x7ff093cb4df0>, ("node", "paper", "feat"):
     ... <dgl.graphbolt.feature_store.TorchBasedFeatureStore object at
     ... 0x7ff093cb4dc0>}
     """
     feat_stores = {}
     for spec in feat_data:
-        key = spec.name
+        key = (spec.domain, spec.type, spec.name)
         if spec.format == "torch":
             assert spec.in_memory, (
                 f"Pytorch tensor can only be loaded in memory, "
