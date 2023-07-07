@@ -1,3 +1,5 @@
+"""Heterogeneous sampled subgraph."""
+# pylint: disable= invalid-name
 from collections.abc import Mapping
 
 
@@ -11,15 +13,17 @@ class SampledSubGraph:
         reverse_row_node_ids=None,
         reverse_edge_ids=None,
     ):
-        """Initialize the SampledSubGraph object.
+        """ ""Initialize the SampledSubGraph object. In the context of a
+        heterogeneous graph, each field should be of `Dict` type. For
+        homogeneous graphs, each field should correspond to its respective
+        value type."
 
         Parameters
         ----------
         node_pairs :  Tuple[Tensor] or Dict[(str, str, str), Tuple[Tensor]]
             Node pairs representing source-destination edges.
             - If `node_pairs` is a tuple: It should be in the format ('u', 'v')
-                representing source and destination pairs. The ids inside is
-                homogeneous ids.
+                representing source and destination pairs.
             - If `node_pairs` is a dictionary: The keys should be edge type and
                 the values should be corresponding node pairs. The ids inside
                 is heterogeneous ids.
@@ -28,7 +32,7 @@ class SampledSubGraph:
             can be treated as a coordinated row and column pair, and this is
             the mapped ids of the column.
             - If `reverse_column_node_ids` is a tensor: It represents the
-                original homogeneous node ids.
+                original node ids.
             - If `reverse_column_node_ids` is a dictionary: The keys should be
                 node type and the values should be corresponding original
                 heterogeneous node ids.
@@ -37,7 +41,7 @@ class SampledSubGraph:
             can be treated as a coordinated row and column pair, and this is
             the mapped ids of the row.
             - If `reverse_row_node_ids` is a tensor: It represents the
-                original homogeneous node ids.
+                original node ids.
             - If `reverse_row_node_ids` is a dictionary: The keys should be
                 node type and the values should be corresponding original
                 heterogeneous node ids.
@@ -45,7 +49,7 @@ class SampledSubGraph:
             Reverse edge ids in the original graph.This is useful when edge
             features are needed.
             - If `reverse_edge_ids` is a tensor: It represents the
-                original homogeneous edge ids.
+                original edge ids.
             - If `reverse_edge_ids` is a dictionary: The keys should be
                 edge type and the values should be corresponding original
                 heterogeneous edge ids.
@@ -91,8 +95,7 @@ class SampledSubGraph:
         Tuple[Tensor] or Dict[(str, str, str), Tuple[Tensor]]
             Node pairs representing source-destination edges.
             - If `node_pairs` is a tuple: It should be in the format ('u', 'v')
-                representing source and destination pairs. The ids inside is
-                homogeneous ids.
+                representing source and destination pairs.
             - If `node_pairs` is a dictionary: The keys should be edge type and
                 the values should be corresponding node pairs. The ids inside
                 is heterogeneous ids.
@@ -110,7 +113,7 @@ class SampledSubGraph:
             can be treated as a coordinated row and column pair, and this is
             the mapped ids of the column.
             - If `reverse_column_node_ids` is a tensor: It represents the
-                original homogeneous node ids.
+                original node ids.
             - If `reverse_column_node_ids` is a dictionary: The keys should be
                 node type and the values should be corresponding original
                 heterogeneous node ids.
@@ -128,7 +131,7 @@ class SampledSubGraph:
             can be treated as a coordinated row and column pair, and this is
             the mapped ids of the row.
             - If `reverse_row_node_ids` is a tensor: It represents the
-                original homogeneous node ids.
+                original node ids.
             - If `reverse_row_node_ids` is a dictionary: The keys should be
                 node type and the values should be corresponding original
                 heterogeneous node ids.
@@ -145,7 +148,7 @@ class SampledSubGraph:
             Reverse edge ids in the original graph.This is useful when edge
             features are needed.
             - If `reverse_edge_ids` is a tensor: It represents the
-                original homogeneous edge ids.
+                original edge ids.
             - If `reverse_edge_ids` is a dictionary: The keys should be
                 edge type and the values should be corresponding original
                 heterogeneous edge ids.
