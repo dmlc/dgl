@@ -14,7 +14,7 @@ from .copy_to import *
 from .dataset import *
 from .dataloader import *
 from .subgraph_sampler import *
-
+from .sampled_sub_graph import *
 
 def load_graphbolt():
     """Load Graphbolt C++ library"""

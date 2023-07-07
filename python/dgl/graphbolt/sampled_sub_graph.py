@@ -1,6 +1,9 @@
 """Heterogeneous sampled subgraph."""
 # pylint: disable= invalid-name
 from collections.abc import Mapping
+from typing import Dict, Tuple, Union
+
+import torch
 
 
 class SampledSubGraph:
@@ -8,19 +11,28 @@ class SampledSubGraph:
 
     def __init__(
         self,
-        node_pairs,
-        reverse_column_node_ids=None,
-        reverse_row_node_ids=None,
-        reverse_edge_ids=None,
+        node_pairs: Union[
+            Dict[Tuple[str, str, str], Tuple[torch.tensor, torch.tensor]],
+            Tuple[torch.tensor, torch.tensor],
+        ],
+        reverse_column_node_ids: Union[
+            Dict[str, torch.tensor], torch.tensor
+        ] = None,
+        reverse_row_node_ids: Union[
+            Dict[str, torch.tensor], torch.tensor
+        ] = None,
+        reverse_edge_ids: Union[
+            Dict[Tuple[str, str, str], torch.tensor], torch.tensor
+        ] = None,
     ):
-        """ ""Initialize the SampledSubGraph object. In the context of a
+        """Initialize the SampledSubGraph object. In the context of a
         heterogeneous graph, each field should be of `Dict` type. For
         homogeneous graphs, each field should correspond to its respective
-        value type."
+        value type.
 
         Parameters
         ----------
-        node_pairs :  Tuple[Tensor] or Dict[(str, str, str), Tuple[Tensor]]
+        node_pairs :  Tuple[Tensor, Tensor] or Dict[(str, str, str), Tuple[Tensor, Tensor]]
             Node pairs representing source-destination edges.
             - If `node_pairs` is a tuple: It should be in the format ('u', 'v')
                 representing source and destination pairs.
@@ -36,6 +48,8 @@ class SampledSubGraph:
             - If `reverse_column_node_ids` is a dictionary: The keys should be
                 node type and the values should be corresponding original
                 heterogeneous node ids.
+            If present, it means column IDs are compacted, and `node_pairs`
+            column IDs match these compacted ones.
         reverse_row_node_ids : Optional[Tensor or Dict[str, Tensor]]
             Row's reverse node ids in the original graph. A graph structure
             can be treated as a coordinated row and column pair, and this is
@@ -45,8 +59,10 @@ class SampledSubGraph:
             - If `reverse_row_node_ids` is a dictionary: The keys should be
                 node type and the values should be corresponding original
                 heterogeneous node ids.
+            If present, it means row IDs are compacted, and `node_pairs`
+            row IDs match these compacted ones.
         reverse_edge_ids: Optional[Tensor or Dict[(str, str, str), Tensor]]
-            Reverse edge ids in the original graph.This is useful when edge
+            Reverse edge ids in the original graph. This is useful when edge
             features are needed.
             - If `reverse_edge_ids` is a tensor: It represents the
                 original edge ids.
