@@ -148,7 +148,11 @@ def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
 )
 def test_homo_graph(num_nodes, num_edges):
     csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
-    graph = gb.from_csc(csc_indptr, indices)
+    edge_attributes = {
+        "A1": torch.randn(num_edges),
+        "A2": torch.randn(num_edges),
+    }
+    graph = gb.from_csc(csc_indptr, indices, edge_attributes=edge_attributes)
 
     assert graph.num_nodes == num_nodes
     assert graph.num_edges == num_edges
@@ -156,6 +160,7 @@ def test_homo_graph(num_nodes, num_edges):
     assert torch.equal(csc_indptr, graph.csc_indptr)
     assert torch.equal(indices, graph.indices)
 
+    assert graph.edge_attributes == edge_attributes
     assert graph.metadata is None
     assert graph.node_type_offset is None
     assert graph.type_per_edge is None
@@ -177,8 +182,17 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         type_per_edge,
         metadata,
     ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    edge_attributes = {
+        "A1": torch.randn(num_edges),
+        "A2": torch.randn(num_edges),
+    }
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
     )
 
     assert graph.num_nodes == num_nodes
@@ -188,6 +202,7 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert torch.equal(indices, graph.indices)
     assert torch.equal(node_type_offset, graph.node_type_offset)
     assert torch.equal(type_per_edge, graph.type_per_edge)
+    assert graph.edge_attributes == edge_attributes
     assert metadata.node_type_to_id == graph.metadata.node_type_to_id
     assert metadata.edge_type_to_id == graph.metadata.edge_type_to_id
 
@@ -807,3 +822,6 @@ def test_from_dglgraph_heterogeneous():
         ("n2", "r21", "n1"): 2,
         ("n2", "r23", "n3"): 3,
     }
+
+
+test_homo_graph(10, 50)
