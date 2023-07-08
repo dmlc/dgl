@@ -10,7 +10,7 @@ except ImportError:
     def _traverse_helper(graph, new_graph):
         for datapipe, parent_graph in graph.items():
             new_parent_graph = {}
-            new_graph[id(k)] = (k, new_parent_graph)
+            new_graph[id(datapipe)] = (datapipe, new_parent_graph)
             _traverse_helper(parent_graph, new_parent_graph)
 
     def traverse_dps(datapipe):
