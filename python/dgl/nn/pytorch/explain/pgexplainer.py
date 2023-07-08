@@ -282,10 +282,9 @@ class PGExplainer(nn.Module):
             nodes, graph, feat, tmp=tmp, training=True, **kwargs
         )
 
-        batched_feats = torch.cat(
-            [feat[sg.ndata[NID].long()] for sg in unbatch(batched_graph)]
+        pred = self.model(
+            batched_graph, self.batched_feats, embed=False, **kwargs
         )
-        pred = self.model(batched_graph, batched_feats, embed=False, **kwargs)
         pred = pred.argmax(-1).data
 
         loss = self.loss(prob[inverse_indices], pred[inverse_indices])
@@ -461,8 +460,6 @@ class PGExplainer(nn.Module):
             The batched set of subgraphs induced on the k-hop in-neighborhood
             of the input center nodes.
         Tensor
-            The batched list of node features.
-        Tensor
             The new IDs of the subgraph center nodes.
 
         Examples
@@ -589,6 +586,7 @@ class PGExplainer(nn.Module):
         probs = F.softmax(logits, dim=-1)
 
         if training:
+            self.batched_feats = batched_feats
             probs = probs.data
         else:
             self.clear_masks()
