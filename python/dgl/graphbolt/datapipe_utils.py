@@ -3,36 +3,33 @@
 # pylint: disable=unused-import
 try:
     from torchdata.dataloader2.graph import traverse_dps
+    DATAPIPE_COMPATIBILITY = "0.5"
 except ImportError:
     # PyTorch 1.12-
     from torchdata.dataloader2.graph import traverse
-
-    def _traverse_helper(graph, new_graph):
-        for datapipe, parent_graph in graph.items():
-            new_parent_graph = {}
-            new_graph[id(datapipe)] = (datapipe, new_parent_graph)
-            _traverse_helper(parent_graph, new_parent_graph)
+    DATAPIPE_COMPATIBILITY = "0.4"
 
     def traverse_dps(datapipe):
         """Wrapper of PyTorch 1.12 ``traverse`` function to PyTorch 1.13
         ``traverse_dps`` interface.
-
-        The traversal function in PyTorch 1.12 returns
-
-        .. code::
-
-           {datapipe_object: {parent_object1: ..., parent_object2: ..., ...}
-
-        But in PyTorch 1.13 and later it returns
-
-        .. code::
-
-           {id(datapipe_object): (datapipe_object, {...})}
         """
-        graph = traverse(datapipe, True)
-        new_graph = {}
-        _traverse_helper(graph, new_graph)
-        return new_graph
+        return traverse(datapipe, True)
+
+if DATAPIPE_COMPATIBILITY == "0.4":
+    def _get_parents(result_dict, datapipe_graph):
+        for k, parents in datapipe_graph.items():
+            if k not in result_dict:
+                result_dict[id(k)] = (
+                    k,
+                    [id(datapipe) for datapipe in parents.keys()],
+                )
+                _get_parents(result_dict, parents)
+else:
+    def _get_parents(result_dict, datapipe_graph):
+        for k, (v, parents) in datapipe_graph.items():
+            if k not in result_dict:
+                result_dict[k] = (v, list(parents.keys()))
+                _get_parents(result_dict, parents)
 
 
 def datapipe_graph_to_adjlist(datapipe_graph):
@@ -72,12 +69,6 @@ def datapipe_graph_to_adjlist(datapipe_graph):
            ...
        }
     """
-
-    def _get_parents(result_dict, datapipe_graph):
-        for k, (v, parents) in datapipe_graph.items():
-            if k not in result_dict:
-                result_dict[k] = (v, list(parents.keys()))
-                _get_parents(result_dict, parents)
 
     result_dict = {}
     _get_parents(result_dict, datapipe_graph)
