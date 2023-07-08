@@ -3,10 +3,12 @@
 # pylint: disable=unused-import
 try:
     from torchdata.dataloader2.graph import traverse_dps
+
     DATAPIPE_COMPATIBILITY = "0.5"
 except ImportError:
     # PyTorch 1.12-
     from torchdata.dataloader2.graph import traverse
+
     DATAPIPE_COMPATIBILITY = "0.4"
 
     def traverse_dps(datapipe):
@@ -15,7 +17,9 @@ except ImportError:
         """
         return traverse(datapipe, True)
 
+
 if DATAPIPE_COMPATIBILITY == "0.4":
+
     def _get_parents(result_dict, datapipe_graph):
         for k, parents in datapipe_graph.items():
             if k not in result_dict:
@@ -24,7 +28,9 @@ if DATAPIPE_COMPATIBILITY == "0.4":
                     [id(datapipe) for datapipe in parents.keys()],
                 )
                 _get_parents(result_dict, parents)
+
 else:
+
     def _get_parents(result_dict, datapipe_graph):
         for k, (v, parents) in datapipe_graph.items():
             if k not in result_dict:
