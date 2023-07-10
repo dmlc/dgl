@@ -88,7 +88,7 @@ class OnDiskDataset(Dataset):
         """Return the test set."""
         return self._test_sets
 
-    def graph(self) -> CSCSamplingGraph:
+    def graph(self) -> object:
         """Return the graph."""
         return self._graph
 
