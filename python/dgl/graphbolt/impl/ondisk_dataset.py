@@ -29,6 +29,9 @@ class OnDiskDataset(Dataset):
 
     .. code-block:: yaml
 
+        graph_topology:
+          type: CSCSamplingGraph
+          path: graph_topology/csc_sampling_graph.tar
         feature_data:
           - domain: node
             type: paper
