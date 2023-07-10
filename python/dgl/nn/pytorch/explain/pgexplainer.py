@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .... import batch, ETYPE, khop_in_subgraph, NID, to_homogeneous, unbatch
+from .... import batch, ETYPE, khop_in_subgraph, NID, to_homogeneous
 
 __all__ = ["PGExplainer", "HeteroPGExplainer"]
 
