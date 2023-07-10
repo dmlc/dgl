@@ -63,6 +63,7 @@ def test_hetero_empty_graph(num_nodes):
         indices,
         node_type_offset,
         type_per_edge,
+        None,
         metadata,
     )
     assert graph.num_edges == 0
@@ -146,7 +147,11 @@ def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
 )
 def test_homo_graph(num_nodes, num_edges):
     csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
-    graph = gb.from_csc(csc_indptr, indices)
+    edge_attributes = {
+        "A1": torch.randn(num_edges),
+        "A2": torch.randn(num_edges),
+    }
+    graph = gb.from_csc(csc_indptr, indices, edge_attributes=edge_attributes)
 
     assert graph.num_nodes == num_nodes
     assert graph.num_edges == num_edges
@@ -154,6 +159,7 @@ def test_homo_graph(num_nodes, num_edges):
     assert torch.equal(csc_indptr, graph.csc_indptr)
     assert torch.equal(indices, graph.indices)
 
+    assert graph.edge_attributes == edge_attributes
     assert graph.metadata is None
     assert graph.node_type_offset is None
     assert graph.type_per_edge is None
@@ -175,8 +181,17 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         type_per_edge,
         metadata,
     ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    edge_attributes = {
+        "A1": torch.randn(num_edges),
+        "A2": torch.randn(num_edges),
+    }
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
     )
 
     assert graph.num_nodes == num_nodes
@@ -186,6 +201,7 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert torch.equal(indices, graph.indices)
     assert torch.equal(node_type_offset, graph.node_type_offset)
     assert torch.equal(type_per_edge, graph.type_per_edge)
+    assert graph.edge_attributes == edge_attributes
     assert metadata.node_type_to_id == graph.metadata.node_type_to_id
     assert metadata.edge_type_to_id == graph.metadata.edge_type_to_id
 
@@ -209,7 +225,7 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
     )
     with pytest.raises(Exception):
         gb.from_csc(
-            csc_indptr, indices, node_type_offset, type_per_edge, metadata
+            csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
         )
 
 
@@ -257,7 +273,7 @@ def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         metadata,
     ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -362,7 +378,7 @@ def test_in_subgraph_heterogeneous():
     # Construct CSCSamplingGraph.
     metadata = gb.GraphMetadata(ntypes, etypes)
     graph = gb.from_csc(
-        indptr, indices, node_type_offset, type_per_edge, metadata
+        indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     # Extract in subgraph.
@@ -531,29 +547,8 @@ def test_sample_neighbors_replace(replace, expected_sampled_num):
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize("replace", [True, False])
-@pytest.mark.parametrize(
-    "probs_or_mask",
-    [
-        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0.5, 0.4, 1.2]),
-        torch.tensor(
-            [
-                True,
-                False,
-                True,
-                False,
-                True,
-                True,
-                True,
-                False,
-                True,
-                True,
-                True,
-                True,
-            ]
-        ),
-    ],
-)
-def test_sample_neighbors_probs(replace, probs_or_mask):
+@pytest.mark.parametrize("probs_name", ["weight", "mask"])
+def test_sample_neighbors_probs(replace, probs_name):
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -569,8 +564,15 @@ def test_sample_neighbors_probs(replace, probs_or_mask):
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
+    edge_attributes = {
+        "weight": torch.FloatTensor(
+            [2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0.5, 0.4, 1.2]
+        ),
+        "mask": torch.BoolTensor([1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1]),
+    }
+
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices)
+    graph = gb.from_csc(indptr, indices, edge_attributes=edge_attributes)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -578,7 +580,7 @@ def test_sample_neighbors_probs(replace, probs_or_mask):
         nodes,
         fanouts=torch.tensor([2]),
         replace=replace,
-        probs_or_mask=probs_or_mask,
+        probs_name=probs_name,
     )
 
     # Verify in subgraph.
@@ -610,8 +612,10 @@ def test_sample_neighbors_zero_probs(replace, probs_or_mask):
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
+    edge_attributes = {"probs_or_mask": probs_or_mask}
+
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices)
+    graph = gb.from_csc(indptr, indices, edge_attributes=edge_attributes)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -619,7 +623,7 @@ def test_sample_neighbors_zero_probs(replace, probs_or_mask):
         nodes,
         fanouts=torch.tensor([5]),
         replace=replace,
-        probs_or_mask=probs_or_mask,
+        probs_name="probs_or_mask",
     )
 
     # Verify in subgraph.
@@ -701,7 +705,7 @@ def test_hetero_graph_on_shared_memory(
         metadata,
     ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     shm_name = "test_hetero_g"
@@ -805,3 +809,6 @@ def test_from_dglgraph_heterogeneous():
         ("n2", "r21", "n1"): 2,
         ("n2", "r23", "n3"): 3,
     }
+
+
+test_homo_graph(10, 50)

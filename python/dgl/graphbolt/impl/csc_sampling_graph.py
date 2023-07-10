@@ -164,6 +164,20 @@ class CSCSamplingGraph:
         return self._c_csc_graph.type_per_edge()
 
     @property
+    def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Returns the edge attributes dictionary.
+
+        Returns
+        -------
+        torch.Tensor or None
+            If present, returns a dictionary of edge attributes. Each key
+            represents the attribute's name, while the corresponding value
+            holds the attribute's specific value. The length of each value
+            should match the total number of edges."
+        """
+        return self._c_csc_graph.edge_attributes()
+
+    @property
     def metadata(self) -> Optional[GraphMetadata]:
         """Returns the metadata of the graph.
 
@@ -205,7 +219,7 @@ class CSCSamplingGraph:
         fanouts: torch.Tensor,
         replace: bool = False,
         return_eids: bool = False,
-        probs_or_mask: Optional[torch.Tensor] = None,
+        probs_name: Optional[str] = None,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -238,11 +252,12 @@ class CSCSamplingGraph:
             Boolean indicating whether the edge IDs of sampled edges,
             represented as a 1D tensor, should be returned. This is
             typically used when edge features are required.
-        probs_or_mask: torch.Tensor, optional
-            Optional tensor containing the (unnormalized) probabilities
-            associated with each neighboring edge of a node. It must be a 1D
-            floating-point or boolean tensor with the number of elements equal
-            to the number of edges.
+        probs_name: str, optional
+            An optional string specifying the name of an edge attribute used a. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
         Returns
         -------
         C_SampledSubgraph
@@ -288,7 +303,12 @@ class CSCSamplingGraph:
             (fanouts >= 0) | (fanouts == -1)
         ), "Fanouts should consist of values that are either -1 or \
             greater than or equal to 0."
-        if probs_or_mask is not None:
+        if probs_name:
+            assert (
+                probs_name in self.edge_attributes
+            ), f"Unknown edge \
+                attribute '{probs_name}''."
+            probs_or_mask = self.edge_attributes[probs_name]
             assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
                 probs_or_mask.size(0) == self.num_edges
@@ -302,7 +322,7 @@ class CSCSamplingGraph:
                 torch.float64,
             ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
+            nodes, fanouts.tolist(), replace, return_eids, probs_name
         )
 
     def sample_negative_edges_uniform(
@@ -383,6 +403,7 @@ def from_csc(
     indices: torch.Tensor,
     node_type_offset: Optional[torch.tensor] = None,
     type_per_edge: Optional[torch.tensor] = None,
+    edge_attributes: Optional[Dict[str, torch.tensor]] = None,
     metadata: Optional[GraphMetadata] = None,
 ) -> CSCSamplingGraph:
     """Create a CSCSamplingGraph object from a CSC representation.
@@ -401,6 +422,8 @@ def from_csc(
         Type ids of each edge in the graph, by default None.
     metadata: Optional[GraphMetadata], optional
         Metadata of the graph, by default None.
+    edge_attributes: Optional[Dict[str, torch.tensor]], optional
+        Edge attributes of the graph, by default None.
     Returns
     -------
     CSCSamplingGraph
@@ -416,7 +439,7 @@ def from_csc(
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
     >>> graph = graphbolt.from_csc(csc_indptr, indices, node_type_offset, \
-    >>>                            type_per_edge, metadata)
+    >>>                            type_per_edge, None, metadata)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
@@ -428,7 +451,11 @@ def from_csc(
         ), "node_type_offset length should be |ntypes| + 1."
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
-            csc_indptr, indices, node_type_offset, type_per_edge
+            csc_indptr,
+            indices,
+            node_type_offset,
+            type_per_edge,
+            edge_attributes,
         ),
         metadata,
     )
@@ -535,7 +562,11 @@ def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
-            indptr, indices, node_type_offset, type_per_edge
+            indptr,
+            indices,
+            node_type_offset,
+            type_per_edge,
+            None,
         ),
         metadata,
     )
