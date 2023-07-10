@@ -1,6 +1,6 @@
 """GraphBolt Dataset."""
 
-from typing import List
+from typing import Dict, List
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
@@ -47,6 +47,6 @@ class Dataset:
         """Return the graph."""
         raise NotImplementedError
 
-    def feature(self) -> FeatureStore:
+    def feature(self) -> Dict[object, FeatureStore]:
         """Return the feature."""
         raise NotImplementedError
