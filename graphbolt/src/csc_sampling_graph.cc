@@ -265,9 +265,6 @@ inline torch::Tensor UniformPick(
   torch::Tensor picked_neighbors;
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
     picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
-  } else if (replace) {
-    picked_neighbors =
-        torch::randint(offset, offset + num_neighbors, {fanout}, options);
   } else {
     if (replace) {
       picked_neighbors =
