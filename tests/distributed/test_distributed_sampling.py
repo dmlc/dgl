@@ -16,10 +16,12 @@ from dgl.distributed import (
     DistGraph,
     DistGraphServer,
     load_partition,
+    load_partition_graphbolt,
     load_partition_book,
     partition_graph,
     sample_etype_neighbors,
     sample_neighbors,
+    convert_dgl_partition_to_csc_sampling_graph,
 )
 from scipy import sparse as spsp
 from utils import generate_ip_config, reset_envs
@@ -1276,6 +1278,73 @@ def test_standalone_etype_sampling():
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ["DGL_DIST_MODE"] = "standalone"
         check_standalone_etype_sampling(Path(tmpdirname))
+
+
+def start_num_nodes_client(rank, tmpdir, disable_shared_mem, nids=None):
+    gpb = None
+    if disable_shared_mem:
+        part_g, _, _, gpb, _, _, _ = load_partition(
+            tmpdir / "test_num_nodes.json", rank
+        )
+        part_g_gb, _, _, gpb_gb, _, _, _ = load_partition_graphbolt(
+            tmpdir / "test_num_nodes.json", rank
+        )
+    dgl.distributed.initialize("rpc_ip_config.txt")
+    # dist_graph = DistGraph("test_num_nodes", part_config=tmpdir / "test_num_nodes.json")
+    dist_g = DistGraph("test", gpb=gpb)
+    dist_g_gb = DistGraph("test_gb", gpb=gpb_gb)
+    if isinstance(part_g_gb, dgl.graphbolt.CSCSamplingGraph):
+        print("loading GraphBolt graph")
+    assert dist_g.num_nodes() == dist_g_gb.num_nodes()
+    dgl.distributed.exit_client()
+
+
+@pytest.mark.parametrize("num_server", [1])  #[1, 4])
+def check_rpc_sampling_GraphBolt(tmpdir, num_server):
+    num_server = 2
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
+    tmpdir = Path('/tmp/gb')
+    g = CitationGraphDataset("cora")[0]
+    print(g.idtype)
+    num_parts = num_server
+    num_hops = 1
+
+    partition_graph(
+        g,
+        "test_num_nodes",
+        num_parts,
+        tmpdir,
+        num_hops=num_hops,
+        part_method="metis",
+    )
+    # TODO (Israt): Directly save partitions in GraphBolt structure
+    convert_dgl_partition_to_csc_sampling_graph(tmpdir / "test_num_nodes.json")
+
+    pserver_list = []
+    ctx = mp.get_context("spawn")
+    for i in range(num_server):
+        p = ctx.Process(
+            target=start_server,
+            args=(i, tmpdir, num_server > 1, "test_num_nodes"),
+        )
+        p.start()
+        time.sleep(1)
+        pserver_list.append(p)
+
+    sampled_graph = start_num_nodes_client(0, tmpdir, num_server > 1)
+
+    for p in pserver_list:
+        p.join()
+        assert p.exitcode == 0
+
+
+def test_GraphBolt():
+    reset_envs()
+    import tempfile
+
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        check_rpc_sampling_GraphBolt(Path(tmpdirname), 2)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ import os
 import time
 
 import numpy as np
+import dgl.graphbolt as gb
 
 from .. import backend as F
 from ..base import DGLError, EID, ETYPE, NID, NTYPE
@@ -256,6 +257,93 @@ def load_partition(part_config, part_id, load_feats=True):
 
     return (
         graph,
+        node_feats,
+        edge_feats,
+        gpb,
+        graph_name,
+        ntypes_list,
+        etypes_list,
+    )
+
+
+# TODO (Israt): Temporary solution. Merge with load_partition().
+# `convert_dgl_partition_to_csc_sampling_graph` expects load_partition() to return dglGraph
+# which is later converted to CSCSamplingGraph.
+def load_partition_graphbolt(part_config, part_id, load_feats=True):
+    """Load data of a partition from the data path.
+
+    A partition data includes a graph structure of the partition, a dict of node tensors,
+    a dict of edge tensors and some metadata. The partition may contain the HALO nodes,
+    which are the nodes replicated from other partitions. However, the dict of node tensors
+    only contains the node data that belongs to the local partition. Similarly, edge tensors
+    only contains the edge data that belongs to the local partition. The metadata include
+    the information of the global graph (not the local partition), which includes the number
+    of nodes, the number of edges as well as the node assignment of the global graph.
+
+    The function currently loads data through the local filesystem interface.
+
+    Parameters
+    ----------
+    part_config : str
+        The path of the partition config file.
+    part_id : int
+        The partition ID.
+    load_feats : bool, optional
+        Whether to load node/edge feats. If False, the returned node/edge feature
+        dictionaries will be empty. Default: True.
+
+    Returns
+    -------
+    DGLGraph
+        The graph partition structure.
+    Dict[str, Tensor]
+        Node features.
+    Dict[(str, str, str), Tensor]
+        Edge features.
+    GraphPartitionBook
+        The graph partition information.
+    str
+        The graph name
+    List[str]
+        The node types
+    List[(str, str, str)]
+        The edge types
+    """
+    config_path = os.path.dirname(part_config)
+    relative_to_config = lambda path: os.path.join(config_path, path)
+    with open(part_config) as conf_f:
+        part_metadata = json.load(conf_f)
+    assert (
+        "part-{}".format(part_id) in part_metadata
+    ), "part-{} does not exist".format(part_id)
+    part_files = part_metadata["part-{}".format(part_id)]
+
+    assert (
+        "part_graph" in part_files
+    ), "the partition does not contain graph structure."
+    partition_path = relative_to_config(part_files["part_graph"])
+    logging.info(
+        "Start to load partition from %s which is "
+        "%d bytes. It may take non-trivial "
+        "time for large partition.",
+        partition_path,
+        os.path.getsize(partition_path),
+    )
+    graph_gb = gb.load_csc_sampling_graph(os.path.join(
+            os.path.dirname(partition_path), "csc_sampling_graph.tar"))
+    logging.info("Finished loading partition.")
+
+    gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id)
+    ntypes_list = list(ntypes.keys())
+    etypes_list = list(etypes.keys())
+
+    node_feats = {}
+    edge_feats = {}
+    if load_feats:
+        node_feats, edge_feats = load_partition_feats(part_config, part_id)
+
+    return (
+        graph_gb,
         node_feats,
         edge_feats,
         gpb,

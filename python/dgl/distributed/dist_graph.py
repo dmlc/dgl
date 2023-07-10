@@ -7,6 +7,7 @@ from collections import namedtuple
 from collections.abc import MutableMapping
 
 import numpy as np
+from dgl.graphbolt import load_from_shared_memory
 
 from .. import backend as F, heterograph_index
 from .._ffi.ndarray import empty_shared_mem
@@ -36,6 +37,7 @@ from .graph_services import (
 from .kvstore import get_kvstore, KVServer
 from .partition import (
     load_partition,
+    load_partition_graphbolt,
     load_partition_book,
     load_partition_feats,
     RESERVED_FIELD_DTYPE,
@@ -367,33 +369,32 @@ class DistGraphServer(KVServer):
                 graph_name,
                 ntypes,
                 etypes,
-            ) = load_partition(part_config, self.part_id, load_feats=False)
+            ) = load_partition_graphbolt(part_config, self.part_id, load_feats=False)
             print("load " + graph_name)
             # formatting dtype
             # TODO(Rui) Formatting forcely is not a perfect solution.
             #   We'd better store all dtypes when mapping to shared memory
             #   and map back with original dtypes.
-            for k, dtype in RESERVED_FIELD_DTYPE.items():
-                if k in self.client_g.ndata:
-                    self.client_g.ndata[k] = F.astype(
-                        self.client_g.ndata[k], dtype
-                    )
-                if k in self.client_g.edata:
-                    self.client_g.edata[k] = F.astype(
-                        self.client_g.edata[k], dtype
-                    )
+            # for k, dtype in RESERVED_FIELD_DTYPE.items():
+            #     if k in self.client_g.ndata:
+            #         self.client_g.ndata[k] = F.astype(
+            #             self.client_g.ndata[k], dtype
+            #         )
+            #     if k in self.client_g.edata:
+            #         self.client_g.edata[k] = F.astype(
+            #             self.client_g.edata[k], dtype
+            #         )
             # Create the graph formats specified the users.
-            print(
-                "Start to create specified graph formats which may take "
-                "non-trivial time."
-            )
-            self.client_g = self.client_g.formats(graph_format)
-            self.client_g.create_formats_()
-            print("Finished creating specified graph formats.")
+            # print(
+            #     "Start to create specified graph formats which may take "
+            #     "non-trivial time."
+            # )
+            # Israt: For previous sampling issues. Keep both COO and CSC.
+            # self.client_g = self.client_g.formats(graph_format)
+            # self.client_g.create_formats_()
+            # print("Finished creating specified graph formats.")
             if not disable_shared_mem:
-                self.client_g = _copy_graph_to_shared_mem(
-                    self.client_g, graph_name, graph_format
-                )
+                self.client_g = self.client_g.copy_to_shared_memory("sh_mem_name")
 
         if not disable_shared_mem:
             self.gpb.shared_memory(graph_name)
@@ -610,11 +611,13 @@ class DistGraph:
         assert (
             self._client is not None
         ), "Distributed module is not initialized. Please call dgl.distributed.initialize."
+        # TODO (Israt): Fix for GraphBolt
+        # self._g = load_from_shared_memory("sh_mem_name")
         self._g = _get_graph_from_shared_mem(self.graph_name)
         self._gpb = get_shared_mem_partition_book(self.graph_name)
         if self._gpb is None:
             self._gpb = gpb
-        self._client.map_shared_data(self._gpb)
+        # self._client.map_shared_data(self._gpb)
 
     def _init_ndata_store(self):
         """Initialize node data store."""
