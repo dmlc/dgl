@@ -56,6 +56,7 @@ class OnDiskMetaData(pydantic_yaml.YamlModel):
     is a list of list of ``OnDiskTVTSet``.
     """
 
-    train_sets: Optional[List[List[OnDiskTVTSet]]]
-    validation_sets: Optional[List[List[OnDiskTVTSet]]]
-    test_sets: Optional[List[List[OnDiskTVTSet]]]
+    feature_data: Optional[List[OnDiskFeatureData]] = []
+    train_sets: Optional[List[List[OnDiskTVTSet]]] = []
+    validation_sets: Optional[List[List[OnDiskTVTSet]]] = []
+    test_sets: Optional[List[List[OnDiskTVTSet]]] = []
