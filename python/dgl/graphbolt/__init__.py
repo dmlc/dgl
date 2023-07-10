@@ -14,7 +14,6 @@ from .dataset import *
 from .impl import *
 from .dataloader import *
 from .subgraph_sampler import *
-from .sampled_subgraph import *
 
 
 def load_graphbolt():
@@ -45,4 +44,3 @@ def load_graphbolt():
 
 load_graphbolt()
 
-C_SampledSubgraph = torch.classes.graphbolt.SampledSubgraph

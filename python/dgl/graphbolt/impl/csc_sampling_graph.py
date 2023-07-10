@@ -187,7 +187,7 @@ class CSCSamplingGraph:
 
         Returns
         -------
-        C_SampledSubgraph
+        torch.classes.graphbolt.SampledSubgraph
             The in subgraph.
         """
         # Ensure nodes is 1-D tensor.
@@ -245,7 +245,7 @@ class CSCSamplingGraph:
             to the number of edges.
         Returns
         -------
-        C_SampledSubgraph
+        torch.classes.graphbolt.SampledSubgraph
             The sampled subgraph.
 
         Examples
