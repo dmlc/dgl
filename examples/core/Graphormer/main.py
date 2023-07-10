@@ -49,7 +49,7 @@ def train_epoch(model, optimizer, data_loader, lr_scheduler):
     list_scores = []
     list_labels = []
     loss_fn = nn.BCEWithLogitsLoss()
-    for counter, (
+    for (
         batch_labels,
         attn_mask,
         node_feat,
@@ -57,7 +57,7 @@ def train_epoch(model, optimizer, data_loader, lr_scheduler):
         out_degree,
         path_data,
         dist,
-    ) in enumerate(data_loader):
+    ) in data_loader:
         optimizer.zero_grad()
         device = accelerator.device
 
@@ -110,7 +110,7 @@ def evaluate_network(model, data_loader):
     with th.no_grad():
         list_scores = []
         list_labels = []
-        for counter, (
+        for (
             batch_labels,
             attn_mask,
             node_feat,
@@ -118,7 +118,7 @@ def evaluate_network(model, data_loader):
             out_degree,
             path_data,
             dist,
-        ) in enumerate(data_loader):
+        ) in data_loader:
             device = accelerator.device
 
             batch_scores = model(
