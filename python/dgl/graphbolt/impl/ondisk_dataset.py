@@ -3,7 +3,6 @@
 from typing import Dict, List, Tuple
 
 from ..dataset import Dataset
-from ..feature_store import FeatureStore
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, tensor_to_tuple
 from .ondisk_metadata import OnDiskMetaData, OnDiskTVTSet
