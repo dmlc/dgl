@@ -3,10 +3,8 @@ import tempfile
 import unittest
 
 import backend as F
-
 import dgl
 import dgl.graphbolt as gb
-
 import pytest
 import torch
 from scipy import sparse as spsp
@@ -613,8 +611,10 @@ def test_sample_neighbors_zero_probs(replace, probs_or_mask):
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
+    edge_attributes = {"probs_or_mask": probs_or_mask}
+
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices)
+    graph = gb.from_csc(indptr, indices, edge_attributes=edge_attributes)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -622,7 +622,7 @@ def test_sample_neighbors_zero_probs(replace, probs_or_mask):
         nodes,
         fanouts=torch.tensor([5]),
         replace=replace,
-        probs_or_mask=probs_or_mask,
+        probs_name="probs_or_mask",
     )
 
     # Verify in subgraph.
