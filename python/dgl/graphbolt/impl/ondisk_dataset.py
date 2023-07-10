@@ -1,44 +1,14 @@
 """GraphBolt OnDiskDataset."""
 
-from typing import List, Optional
-
-import pydantic
-import pydantic_yaml
+from typing import List
 
 from ..dataset import Dataset
 from ..feature_store import FeatureStore
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, tensor_to_tuple
+from .ondisk_metadata import OnDiskMetaData, OnDiskTVTSet
 
 __all__ = ["OnDiskDataset"]
-
-
-class OnDiskDataFormatEnum(pydantic_yaml.YamlStrEnum):
-    """Enum of data format."""
-
-    TORCH = "torch"
-    NUMPY = "numpy"
-
-
-class OnDiskTVTSet(pydantic.BaseModel):
-    """Train-Validation-Test set."""
-
-    type_name: Optional[str]
-    format: OnDiskDataFormatEnum
-    in_memory: Optional[bool] = True
-    path: str
-
-
-class OnDiskMetaData(pydantic_yaml.YamlModel):
-    """Metadata specification in YAML.
-
-    As multiple node/edge types and multiple splits are supported, each TVT set
-    is a list of list of ``OnDiskTVTSet``.
-    """
-
-    train_sets: Optional[List[List[OnDiskTVTSet]]]
-    validation_sets: Optional[List[List[OnDiskTVTSet]]]
-    test_sets: Optional[List[List[OnDiskTVTSet]]]
 
 
 class OnDiskDataset(Dataset):
