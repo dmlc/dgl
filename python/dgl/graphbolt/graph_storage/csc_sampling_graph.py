@@ -7,6 +7,10 @@ from typing import Dict, Optional, Tuple
 
 import torch
 
+from ...base import ETYPE
+from ...convert import to_homogeneous
+from ...heterograph import DGLGraph
+
 
 class GraphMetadata:
     r"""Class for metadata of csc sampling graph."""
@@ -266,6 +270,14 @@ class CSCSamplingGraph:
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
+        expected_fanout_len = 1
+        if self.metadata and self.metadata.edge_type_to_id:
+            expected_fanout_len = len(self.metadata.edge_type_to_id)
+        assert len(fanouts) in [
+            expected_fanout_len,
+            1,
+        ], "Fanouts should have the same number of elements as etypes or \
+            should have a length of 1."
         if fanouts.size(0) > 1:
             assert (
                 self.type_per_edge is not None
@@ -275,10 +287,6 @@ class CSCSamplingGraph:
             (fanouts >= 0) | (fanouts == -1)
         ), "Fanouts should consist of values that are either -1 or \
             greater than or equal to 0."
-        if self.metadata and self.metadata.edge_type_to_id:
-            assert len(self.metadata.edge_type_to_id) == fanouts.size(
-                0
-            ), "Fanouts should have the same number of elements as etypes."
         if probs_or_mask is not None:
             assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
@@ -294,6 +302,60 @@ class CSCSamplingGraph:
             ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
+        )
+
+    def sample_negative_edges_uniform(
+        self, edge_type, node_pairs, negative_ratio
+    ):
+        """
+        Sample negative edges by randomly choosing negative source-destination
+        pairs according to a uniform distribution. For each edge ``(u, v)``,
+        it is supposed to generate `negative_ratio` pairs of negative edges
+        ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
+        the graph.
+
+        Parameters
+        ----------
+        edge_type: Tuple[str]
+            The type of edges in the provided node_pairs. Any negative edges
+            sampled will also have the same type. If set to None, it will be
+            considered as a homogeneous graph.
+        node_pairs : Tuple[Tensor]
+            A tuple of two 1D tensors that represent the source and destination
+            of positive edges, with 'positive' indicating that these edges are
+            present in the graph. It's important to note that within the
+            context of a heterogeneous graph, the ids in these tensors signify
+            heterogeneous ids.
+        negative_ratio: int
+            The ratio of the number of negative samples to positive samples.
+
+        Returns
+        -------
+        Tuple[Tensor]
+            A tuple consisting of two 1D tensors represents the source and
+            destination of negative edges. In the context of a heterogeneous
+            graph, both the input nodes and the selected nodes are represented
+            by heterogeneous IDs, and the formed edges are of the input type
+            `edge_type`. Note that negative refers to false negatives, which
+            means the edge could be present or not present in the graph.
+        """
+        if edge_type:
+            assert (
+                self.node_type_offset is not None
+            ), "The 'node_type_offset' array is necessary for performing \
+                negative sampling by edge type."
+            _, _, dst_node_type = edge_type
+            dst_node_type_id = self.metadata.node_type_to_id[dst_node_type]
+            max_node_id = (
+                self.node_type_offset[dst_node_type_id + 1]
+                - self.node_type_offset[dst_node_type_id]
+            )
+        else:
+            max_node_id = self.num_nodes
+        return self._c_csc_graph.sample_negative_edges_uniform(
+            node_pairs,
+            negative_ratio,
+            max_node_id,
         )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
@@ -452,3 +514,27 @@ def save_csc_sampling_graph(graph, filename):
                 metadata_filename, arcname=os.path.basename(metadata_filename)
             )
     print(f"CSCSamplingGraph has been saved to {filename}.")
+
+
+def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
+    """Convert a DGLGraph to CSCSamplingGraph."""
+    homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
+    # Initialize metadata.
+    node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
+    edge_type_to_id = {
+        etype: g.get_etype_id(etype) for etype in g.canonical_etypes
+    }
+    metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
+
+    # Obtain CSC matrix.
+    indptr, indices, _ = homo_g.adj_tensors("csc")
+    ntype_count.insert(0, 0)
+    node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
+    type_per_edge = homo_g.edata[ETYPE]
+
+    return CSCSamplingGraph(
+        torch.ops.graphbolt.from_csc(
+            indptr, indices, node_type_offset, type_per_edge
+        ),
+        metadata,
+    )

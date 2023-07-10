@@ -5,7 +5,7 @@ import time
 
 from ..base import DGLError
 from . import rpc
-from .constants import MAX_QUEUE_SIZE, SERVER_EXIT, SERVER_KEEP_ALIVE
+from .constants import MAX_QUEUE_SIZE, SERVER_EXIT
 
 
 def start_server(
@@ -52,8 +52,6 @@ def start_server(
     assert max_queue_size > 0, (
         "queue_size (%d) cannot be a negative number." % max_queue_size
     )
-    if server_state.keep_alive:
-        assert False, "Long live server is not supported any more."
     # Register signal handler.
     rpc.register_sig_handler()
     # Register some basic services
@@ -146,12 +144,6 @@ def start_server(
                 if res == SERVER_EXIT:
                     print("Server is exiting...")
                     return
-                elif res == SERVER_KEEP_ALIVE:
-                    print(
-                        "Server keeps alive while client group~{} is exiting...".format(
-                            group_id
-                        )
-                    )
                 else:
                     raise DGLError("Unexpected response: {}".format(res))
             else:

@@ -4,25 +4,16 @@ import unittest
 
 import backend as F
 
+import dgl
 import dgl.graphbolt as gb
+
+import gb_test_utils as gbt
 
 import pytest
 import torch
+from scipy import sparse as spsp
 
 torch.manual_seed(3407)
-
-
-def get_metadata(num_ntypes, num_etypes):
-    ntypes = {f"n{i}": i for i in range(num_ntypes)}
-    etypes = {}
-    count = 0
-    for n1 in range(num_ntypes):
-        for n2 in range(n1, num_ntypes):
-            if count >= num_etypes:
-                break
-            etypes.update({(f"n{n1}", f"e{count}", f"n{n2}"): count})
-            count += 1
-    return gb.GraphMetadata(ntypes, etypes)
 
 
 @unittest.skipIf(
@@ -48,7 +39,7 @@ def test_empty_graph(num_nodes):
 def test_hetero_empty_graph(num_nodes):
     csc_indptr = torch.zeros((num_nodes + 1,), dtype=int)
     indices = torch.tensor([])
-    metadata = get_metadata(num_ntypes=3, num_etypes=5)
+    metadata = gbt.get_metadata(num_ntypes=3, num_etypes=5)
     # Some node types have no nodes.
     if num_nodes == 0:
         node_type_offset = torch.zeros((4,), dtype=int)
@@ -107,35 +98,6 @@ def test_metadata_with_etype_exception(etypes):
         gb.GraphMetadata({"n1": 0, "n2": 1, "n3": 2}, etypes)
 
 
-def random_homo_graph(num_nodes, num_edges):
-    csc_indptr = torch.randint(0, num_edges, (num_nodes + 1,))
-    csc_indptr = torch.sort(csc_indptr)[0]
-    csc_indptr[0] = 0
-    csc_indptr[-1] = num_edges
-    indices = torch.randint(0, num_nodes, (num_edges,))
-    return csc_indptr, indices
-
-
-def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
-    csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
-    metadata = get_metadata(num_ntypes, num_etypes)
-    # Randomly get node type split point.
-    node_type_offset = torch.sort(
-        torch.randint(0, num_nodes, (num_ntypes + 1,))
-    )[0]
-    node_type_offset[0] = 0
-    node_type_offset[-1] = num_nodes
-
-    type_per_edge = []
-    for i in range(num_nodes):
-        num = csc_indptr[i + 1] - csc_indptr[i]
-        type_per_edge.append(
-            torch.sort(torch.randint(0, num_etypes, (num,)))[0]
-        )
-    type_per_edge = torch.cat(type_per_edge, dim=0)
-    return (csc_indptr, indices, node_type_offset, type_per_edge, metadata)
-
-
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
@@ -144,7 +106,7 @@ def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
 def test_homo_graph(num_nodes, num_edges):
-    csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
     graph = gb.from_csc(csc_indptr, indices)
 
     assert graph.num_nodes == num_nodes
@@ -173,7 +135,7 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         node_type_offset,
         type_per_edge,
         metadata,
-    ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
         csc_indptr, indices, node_type_offset, type_per_edge, metadata
     )
@@ -203,7 +165,7 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
 )
 def test_node_type_offset_wrong_legnth(node_type_offset):
     num_ntypes = 3
-    csc_indptr, indices, _, type_per_edge, metadata = random_hetero_graph(
+    csc_indptr, indices, _, type_per_edge, metadata = gbt.random_hetero_graph(
         10, 50, num_ntypes, 5
     )
     with pytest.raises(Exception):
@@ -220,7 +182,7 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
 def test_load_save_homo_graph(num_nodes, num_edges):
-    csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
     graph = gb.from_csc(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -254,7 +216,7 @@ def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         node_type_offset,
         type_per_edge,
         metadata,
-    ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
         csc_indptr, indices, node_type_offset, type_per_edge, metadata
     )
@@ -405,9 +367,13 @@ def test_sample_neighbors():
     type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
-
+    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+    etypes = {("n1", "e1", "n2"): 0, ("n1", "e2", "n3"): 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+    graph = gb.from_csc(
+        indptr, indices, type_per_edge=type_per_edge, metadata=metadata
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -465,9 +431,14 @@ def test_sample_neighbors_fanouts(fanouts, expected_sampled_num):
     type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
+    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+    etypes = {("n1", "e1", "n2"): 0, ("n1", "e2", "n3"): 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
 
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+    graph = gb.from_csc(
+        indptr, indices, type_per_edge=type_per_edge, metadata=metadata
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -641,7 +612,7 @@ def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
 def test_homo_graph_on_shared_memory(num_nodes, num_edges):
-    csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
     graph = gb.from_csc(csc_indptr, indices)
 
     shm_name = "test_homo_g"
@@ -689,7 +660,7 @@ def test_hetero_graph_on_shared_memory(
         node_type_offset,
         type_per_edge,
         metadata,
-    ) = random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
         csc_indptr, indices, node_type_offset, type_per_edge, metadata
     )
@@ -733,11 +704,65 @@ def test_hetero_graph_on_shared_memory(
     assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
 
 
-if __name__ == "__main__":
-    test_sample_neighbors()
-    test_sample_neighbors_replace(True, 12)
-    test_sample_neighbors_probs(
-        False,
-        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph on GPU is not supported yet.",
+)
+def test_from_dglgraph_homogeneous():
+    dgl_g = dgl.rand_graph(1000, 10 * 1000)
+    gb_g = gb.from_dglgraph(dgl_g)
+
+    assert gb_g.num_nodes == dgl_g.num_nodes()
+    assert gb_g.num_edges == dgl_g.num_edges()
+    assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 1000]))
+    assert torch.all(gb_g.type_per_edge == 0)
+    assert gb_g.metadata.node_type_to_id == {"_N": 0}
+    assert gb_g.metadata.edge_type_to_id == {("_N", "_E", "_N"): 0}
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph on GPU is not supported yet.",
+)
+def test_from_dglgraph_heterogeneous():
+    def create_random_hetero():
+        num_nodes = {"n1": 1000, "n2": 1010, "n3": 1020}
+        etypes = [
+            ("n1", "r12", "n2"),
+            ("n2", "r21", "n1"),
+            ("n1", "r13", "n3"),
+            ("n2", "r23", "n3"),
+        ]
+        edges = {}
+        for etype in etypes:
+            src_ntype, _, dst_ntype = etype
+            arr = spsp.random(
+                num_nodes[src_ntype],
+                num_nodes[dst_ntype],
+                density=0.001,
+                format="coo",
+                random_state=100,
+            )
+            edges[etype] = (arr.row, arr.col)
+        return dgl.heterograph(edges, num_nodes)
+
+    dgl_g = create_random_hetero()
+    gb_g = gb.from_dglgraph(dgl_g)
+
+    assert gb_g.num_nodes == dgl_g.num_nodes()
+    assert gb_g.num_edges == dgl_g.num_edges()
+    assert torch.equal(
+        gb_g.node_type_offset, torch.tensor([0, 1000, 2010, 3030])
     )
-    test_sample_neighbors_zero_probs(True, torch.zeros(12, dtype=torch.float32))
+    assert torch.all(gb_g.type_per_edge[:-1] <= gb_g.type_per_edge[1:])
+    assert gb_g.metadata.node_type_to_id == {
+        "n1": 0,
+        "n2": 1,
+        "n3": 2,
+    }
+    assert gb_g.metadata.edge_type_to_id == {
+        ("n1", "r12", "n2"): 0,
+        ("n1", "r13", "n3"): 1,
+        ("n2", "r21", "n1"): 2,
+        ("n2", "r23", "n3"): 3,
+    }
