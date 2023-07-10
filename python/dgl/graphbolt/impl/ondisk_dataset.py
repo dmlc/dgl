@@ -3,9 +3,11 @@
 from typing import Dict, List, Tuple
 
 from ..dataset import Dataset
+
+from ..graph_storage import CSCSamplingGraph, load_csc_sampling_graph
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, tensor_to_tuple
-from .ondisk_metadata import OnDiskMetaData, OnDiskTVTSet
+from .ondisk_metadata import OnDiskGraphTopology, OnDiskMetaData, OnDiskTVTSet
 from .torch_based_feature_store import (
     load_feature_stores,
     TorchBasedFeatureStore,
@@ -65,6 +67,7 @@ class OnDiskDataset(Dataset):
     def __init__(self, path: str) -> None:
         with open(path, "r") as f:
             self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
+        self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = load_feature_stores(self._meta.feature_data)
         self._train_sets = self._init_tvt_sets(self._meta.train_sets)
         self._validation_sets = self._init_tvt_sets(self._meta.validation_sets)
@@ -82,13 +85,21 @@ class OnDiskDataset(Dataset):
         """Return the test set."""
         return self._test_sets
 
-    def graph(self) -> object:
+    def graph(self) -> CSCSamplingGraph:
         """Return the graph."""
-        raise NotImplementedError
+        return self._graph
 
     def feature(self) -> Dict[Tuple, TorchBasedFeatureStore]:
         """Return the feature."""
         return self._feature
+
+    def _load_graph(
+        self, graph_topology: OnDiskGraphTopology
+    ) -> CSCSamplingGraph:
+        """Load the graph topology."""
+        if graph_topology is None:
+            return None
+        return load_csc_sampling_graph(graph_topology.path)
 
     def _init_tvt_sets(
         self, tvt_sets: List[List[OnDiskTVTSet]]
