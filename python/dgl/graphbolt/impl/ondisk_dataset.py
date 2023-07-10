@@ -1,12 +1,15 @@
 """GraphBolt OnDiskDataset."""
 
-from typing import List
+from typing import Dict, List, Tuple
 
 from ..dataset import Dataset
-from ..feature_store import FeatureStore
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, tensor_to_tuple
 from .ondisk_metadata import OnDiskMetaData, OnDiskTVTSet
+from .torch_based_feature_store import (
+    load_feature_stores,
+    TorchBasedFeatureStore,
+)
 
 __all__ = ["OnDiskDataset"]
 
@@ -24,6 +27,19 @@ class OnDiskDataset(Dataset):
 
     .. code-block:: yaml
 
+        feature_data:
+          - domain: node
+            type: paper
+            name: feat
+            format: numpy
+            in_memory: false
+            path: node_data/paper-feat.npy
+          - domain: edge
+            type: "author:writes:paper"
+            name: feat
+            format: numpy
+            in_memory: false
+            path: edge_data/author-writes-paper-feat.npy
         train_sets:
           - - type_name: paper # could be null for homogeneous graph.
               format: numpy
@@ -49,6 +65,7 @@ class OnDiskDataset(Dataset):
     def __init__(self, path: str) -> None:
         with open(path, "r") as f:
             self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
+        self._feature = load_feature_stores(self._meta.feature_data)
         self._train_sets = self._init_tvt_sets(self._meta.train_sets)
         self._validation_sets = self._init_tvt_sets(self._meta.validation_sets)
         self._test_sets = self._init_tvt_sets(self._meta.test_sets)
@@ -69,9 +86,9 @@ class OnDiskDataset(Dataset):
         """Return the graph."""
         raise NotImplementedError
 
-    def feature(self) -> FeatureStore:
+    def feature(self) -> Dict[Tuple, TorchBasedFeatureStore]:
         """Return the feature."""
-        raise NotImplementedError
+        return self._feature
 
     def _init_tvt_sets(
         self, tvt_sets: List[List[OnDiskTVTSet]]
