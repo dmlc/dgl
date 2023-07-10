@@ -532,6 +532,13 @@ def test_OnDiskDataset_Feature_heterograph():
             edge_writes_label.read(), torch.tensor(edge_data_label)
         )
 
+        node_paper_feat = None
+        node_paper_label = None
+        edge_writes_feat = None
+        edge_writes_label = None
+        feature_data = None
+        dataset = None
+
 
 def test_OnDiskDataset_Feature_homograph():
     """Test Feature storage."""
@@ -602,3 +609,10 @@ def test_OnDiskDataset_Feature_homograph():
         edge_label = feature_data[("edge", None, "label")]
         assert isinstance(edge_label, gb.TorchBasedFeatureStore)
         assert torch.equal(edge_label.read(), torch.tensor(edge_data_label))
+
+        node_feat = None
+        node_label = None
+        edge_feat = None
+        edge_label = None
+        feature_data = None
+        dataset = None
