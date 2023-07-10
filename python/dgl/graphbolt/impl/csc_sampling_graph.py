@@ -3,13 +3,15 @@
 import os
 import tarfile
 import tempfile
-from typing import Dict, Optional, Tuple
+from collections import defaultdict
+from typing import Dict, Optional, Tuple, Union
 
 import torch
 
 from ...base import ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
+from .csc_sampling_graph_sampled_subgraph import CSCSamplingGraphSampledSubgraph
 
 
 class GraphMetadata:
@@ -215,6 +217,107 @@ class CSCSamplingGraph:
 
     def sample_neighbors(
         self,
+        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        fanouts: torch.Tensor,
+        replace: bool = False,
+        probs_name: Optional[str] = None,
+    ) -> CSCSamplingGraphSampledSubgraph:
+        """Sample neighboring edges of the given nodes and return the induced
+        subgraph.
+
+        Parameters
+        ----------
+        nodes: torch.Tensor or Dict[str, torch.Tensor]
+            IDs of the given seed nodes.
+            - If `nodes` is a tensor: It means the graph is homogeneous
+            graph, and ids inside are homogeneous ids.
+            - If `nodes` is a dictionary: The keys should be node type and
+            ids inside are heterogeneous ids.
+        fanouts: torch.Tensor
+            The number of edges to be sampled for each node with or without
+            considering edge types.
+              - When the length is 1, it indicates that the fanout applies to
+                all neighbors of the node as a collective, regardless of the
+                edge type.
+              - Otherwise, the length should equal to the number of edge
+                types, and each fanout value corresponds to a specific edge
+                type of the nodes.
+            The value of each fanout should be >= 0 or = -1.
+              - When the value is -1, all neighbors will be chosen for
+                sampling. It is equivalent to selecting all neighbors when
+                the fanout is >= the number of neighbors (and replace is set to
+                false).
+              - When the value is a non-negative integer, it serves as a
+                minimum threshold for selecting neighbors.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
+        probs_name: str, optional
+            An optional string specifying the name of an edge attribute used a. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
+        Returns
+        -------
+        CSCSamplingGraphSampledSubgraph
+            The sampled subgraph.
+
+        Examples
+        --------
+        >>> import dgl.graphbolt as gb
+        >>> ntypes = {'n1': 0, 'n2': 1, 'n3': 2}
+        >>> etypes = {('n1', 'e1', 'n2'): 0, ('n1', 'e2', 'n3'): 1}
+        >>> metadata = gb.GraphMetadata(ntypes, etypes)
+        >>> indptr = torch.LongTensor([0, 3, 5, 7])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1])
+        >>> type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1])
+        >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge,
+        ... metadata=metadata)
+        >>> nodes = torch.LongTensor([1, 2])
+        >>> fanouts = torch.tensor([1, 1])
+        >>> subgraph = graph.sample_neighbors(nodes, fanouts)
+        >>> print(subgraph.node_pairs)
+        """
+        def convert_to_homogeneous_nodes():
+            homogeneous_nodes = []
+            for ntype, ids in nodes.items():
+                ntype_id = self.metadata.node_type_to_id[ntype]
+                homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
+            nodes = torch.cat(homogeneous_nodes)               
+        if isinstance(nodes, dict):
+           nodes = convert_to_homogeneous_nodes()                     
+        C_sampled_subgraph = self._sample_neighbors(
+            nodes, fanouts, replace, False, probs_name
+        )
+        def convert_to_sampled_subgraph():
+            column_num = (
+                C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
+            )
+            column = (
+                C_sampled_subgraph.reverse_column_node_ids.repeat_interleave(
+                    column_num
+                )
+            )
+            row = C_sampled_subgraph.indices
+            type_per_edge = C_sampled_subgraph.type_per_edge
+            if type_per_edge is None:
+                node_pairs = (row, column)
+            else:
+                node_pairs = defaultdict(list)
+                for etype, etype_id in self.metadata.edge_type_to_id.items():
+                    mask = type_per_edge == etype_id
+                    node_pairs[etype] = (row[mask], column[mask])
+            return node_pairs
+
+        return CSCSamplingGraphSampledSubgraph(
+            node_pairs=convert_to_sampled_subgraph()
+        )
+
+
+    def _sample_neighbors(
+        self,
         nodes: torch.Tensor,
         fanouts: torch.Tensor,
         replace: bool = False,
@@ -261,27 +364,7 @@ class CSCSamplingGraph:
         Returns
         -------
         C_SampledSubgraph
-            The sampled subgraph.
-
-        Examples
-        --------
-        >>> indptr = torch.LongTensor([0, 3, 5, 7])
-        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1])
-        >>> type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1])
-        >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
-        >>> nodes = torch.LongTensor([1, 2])
-        >>> fanouts = torch.tensor([1, 1])
-        >>> subgraph = graph.sample_neighbors(nodes, fanouts, return_eids=True)
-        >>> print(subgraph.indptr)
-        tensor([0, 2, 4])
-        >>> print(subgraph.indices)
-        tensor([2, 3, 0, 1])
-        >>> print(subgraph.reverse_column_node_ids)
-        tensor([1, 2])
-        >>> print(subgraph.reverse_edge_ids)
-        tensor([3, 4, 5, 6])
-        >>> print(subgraph.type_per_edge)
-        tensor([0, 1, 0, 1])
+            The sampled C subgraph.
         """
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
@@ -324,6 +407,7 @@ class CSCSamplingGraph:
         return self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, return_eids, probs_name
         )
+
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
