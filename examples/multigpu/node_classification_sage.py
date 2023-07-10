@@ -95,8 +95,8 @@ class SAGE(nn.Module):
                 use_ddp=True,  # use DDP
                 use_uva=use_uva,
             )
-            # In order to prevent running out of GPU memory, allocate a
-            # shared output tensor 'y' in host memory
+            # In order to prevent running out of GPU memory, allocate a shared
+            # output tensor 'y' in host memory.
             y = shared_tensor(
                 (
                     g.num_nodes(),
@@ -215,8 +215,8 @@ def train(
         # (HIGHLIGHT) Collect accuracy values from sub-processes and obtain
         # overall accuracy.
         #
-        # `torch.distributed.reduce` can help us reduce tensors (addition by
-        # default) from all the sub-processes to a specified process.
+        # `torch.distributed.reduce` is used to reduce tensors from all the
+        # sub-processes to a specified process, ReduceOp.SUM is used by default.
         #
         # Other multiprocess functions supported by the backend are also
         # available. Please refer to
@@ -227,7 +227,7 @@ def train(
             evaluate(model, g, num_classes, val_dataloader).to(device) / nprocs
         )
         t1 = time.time()
-        # Reduce `acc` tensors. Only process 0 will get the result
+        # Reduce `acc` tensors to process 0.
         dist.reduce(tensor=acc, dst=0)
         if proc_id == 0:
             print(
@@ -237,7 +237,7 @@ def train(
 
 
 def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
-    # Find corresponding device for my rank
+    # Find corresponding device for current process.
     device = devices[proc_id]
     torch.cuda.set_device(device)
     #########################################################################
@@ -247,11 +247,13 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
     # by the `process_group`. Gradients are synchronized across each model
     # replica.
     #
-    # We first initialize process group and unpack data for sub-processes.
-    # Then instantiate a GraphSAGE model on the device and parallelize it
-    # with `DistributedDataParallel`.
+    # To prepare a training sub-process, there are four steps involved:
+    # 1. Initialize the process group
+    # 2. Unpack data for the sub-process.
+    # 3. Instantiate a GraphSAGE model on the corresponding device.
+    # 4. Parallelize the model with `DistributedDataParallel`.
     #
-    # For detailed usage of `DistributedDataParallel`, please refer to
+    # For the detailed usage of `DistributedDataParallel`, please refer to
     # PyTorch documentation.
     #########################################################################
     dist.init_process_group(
@@ -270,7 +272,7 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
         model, device_ids=[device], output_device=device
     )
 
-    # Training
+    # Training.
     use_uva = mode == "mixed"
     if proc_id == 0:
         print("Training...")
@@ -287,12 +289,12 @@ def run(proc_id, nprocs, devices, g, data, mode, num_epochs):
         num_epochs,
     )
 
-    # Testing
+    # Testing.
     if proc_id == 0:
         print("Testing...")
     layerwise_infer(proc_id, device, g, num_classes, test_idx, model, use_uva)
 
-    # Cleanup process group
+    # Cleanup the process group.
     dist.destroy_process_group()
 
 
@@ -338,18 +340,19 @@ if __name__ == "__main__":
     ), f"Must have GPUs to enable multi-gpu training."
     print(f"Training in {args.mode} mode using {nprocs} GPU(s)")
 
-    # Load and preprocess dataset
+    # Load and preprocess the dataset.
     print("Loading data")
     dataset = AsNodePredDataset(
         DglNodePropPredDataset(args.dataset_name, root=args.dataset_dir)
     )
     g = dataset[0]
-    # Avoid creating certain graph formats in each sub-process to save momory
+    # Explicitly create desired graph formats before multi-processing to avoid
+    # redundant creation in each sub-process and to save memory.
     g.create_formats_()
     if args.dataset_name == "ogbn-arxiv":
         g = dgl.to_bidirected(g, copy_ndata=True)
         g = dgl.add_self_loop(g)
-    # Thread limiting to avoid resource competition
+    # Thread limiting to avoid resource competition.
     os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // nprocs)
     data = (
         dataset.num_classes,
@@ -358,7 +361,7 @@ if __name__ == "__main__":
         dataset.test_idx,
     )
 
-    # To use DDP with n GPUs, spawn up n processes
+    # To use DDP with n GPUs, spawn up n processes.
     mp.spawn(
         run,
         args=(nprocs, devices, g, data, args.mode, args.num_epochs),
