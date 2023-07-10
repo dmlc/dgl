@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Union, Dict, Tuple
+from typing import Dict, Tuple, Union
+
 import torch
 
 from ..sampled_subgraph import SampledSubGraph

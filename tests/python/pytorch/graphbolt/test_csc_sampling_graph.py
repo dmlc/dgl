@@ -3,13 +3,12 @@ import tempfile
 import unittest
 
 import backend as F
-
-import dgl
-import dgl.graphbolt as gb
-
 import pytest
 import torch
 from scipy import sparse as spsp
+
+import dgl
+import dgl.graphbolt as gb
 
 torch.manual_seed(3407)
 
