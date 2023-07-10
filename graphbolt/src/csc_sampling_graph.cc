@@ -20,7 +20,7 @@ CSCSamplingGraph::CSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
-    const torch::optional<edge_attrs_map>& edge_attributes)
+    const torch::optional<EdgeAttrMap>& edge_attributes)
     : indptr_(indptr),
       indices_(indices),
       node_type_offset_(node_type_offset),
@@ -35,7 +35,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
-    const torch::optional<edge_attrs_map>& edge_attributes) {
+    const torch::optional<EdgeAttrMap>& edge_attributes) {
   if (node_type_offset.has_value()) {
     auto& offset = node_type_offset.value();
     TORCH_CHECK(offset.dim() == 1);

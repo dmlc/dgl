@@ -413,10 +413,10 @@ def from_csc(
         Offset of node types in the graph, by default None.
     type_per_edge : Optional[torch.tensor], optional
         Type ids of each edge in the graph, by default None.
-    metadata: Optional[GraphMetadata], optional
-        Metadata of the graph, by default None.
     edge_attributes: Optional[Dict[str, torch.tensor]], optional
         Edge attributes of the graph, by default None.
+    metadata: Optional[GraphMetadata], optional
+        Metadata of the graph, by default None.
     Returns
     -------
     CSCSamplingGraph
