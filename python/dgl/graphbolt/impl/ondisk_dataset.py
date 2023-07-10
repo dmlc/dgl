@@ -102,7 +102,11 @@ class OnDiskDataset(Dataset):
         """Load the graph topology."""
         if graph_topology is None:
             return None
-        return load_csc_sampling_graph(graph_topology.path)
+        if graph_topology.type == "CSCSamplingGraph":
+            return load_csc_sampling_graph(graph_topology.path)
+        raise NotImplementedError(
+            f"Graph topology type {graph_topology.type} is not supported."
+        )
 
     def _init_tvt_sets(
         self, tvt_sets: List[List[OnDiskTVTSet]]
