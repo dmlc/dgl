@@ -431,9 +431,6 @@ class GetSharedDataRequest(rpc.Request):
         meta = {}
         kv_store = server_state.kv_store
         for name, data in kv_store.data_store.items():
-            if server_state.keep_alive:
-                if name not in kv_store.orig_data:
-                    continue
             meta[name] = (
                 F.shape(data),
                 F.reverse_data_type_dict[F.dtype(data)],

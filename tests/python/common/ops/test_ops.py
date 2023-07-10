@@ -11,8 +11,12 @@ from dgl.ops import gather_mm, gsddmm, gspmm, segment_reduce
 from utils import parametrize_idtype
 from utils.graph_cases import get_cases
 
-random.seed(42)
-np.random.seed(42)
+# Set seeds to make tests fully reproducible.
+SEED = 12345  # random.randint(1, 99999)
+random.seed(SEED)
+np.random.seed(SEED)
+dgl.seed(SEED)
+F.seed(SEED)
 
 udf_msg = {
     "add": lambda edges: {"m": edges.src["x"] + edges.data["w"]},
@@ -111,13 +115,18 @@ sddmm_shapes = [
 )
 @pytest.mark.parametrize("reducer", ["sum", "min", "max"])
 @parametrize_idtype
-def test_spmm(idtype, g, shp, msg, reducer):
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_spmm(idtype, dtype, g, shp, msg, reducer):
     g = g.astype(idtype).to(F.ctx())
     print(g)
     print(g.idtype)
 
-    hu = F.tensor(np.random.rand(*((g.number_of_src_nodes(),) + shp[0])) + 1)
-    he = F.tensor(np.random.rand(*((g.num_edges(),) + shp[1])) + 1)
+    hu = F.tensor(
+        np.random.rand(*((g.number_of_src_nodes(),) + shp[0])).astype(dtype) + 1
+    )
+    he = F.tensor(
+        np.random.rand(*((g.num_edges(),) + shp[1])).astype(dtype) + 1
+    )
     print("u shape: {}, e shape: {}".format(F.shape(hu), F.shape(he)))
 
     g.srcdata["x"] = F.attach_grad(F.clone(hu))

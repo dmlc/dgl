@@ -25,6 +25,10 @@ from dgl.distributed import (
 from dgl.distributed.optim import SparseAdagrad, SparseAdam
 from scipy import sparse as spsp
 
+# Set seeds to make tests fully reproducible.
+SEED = 12345  # random.randint(1, 99999)
+F.seed(SEED)
+
 
 def create_random_graph(n):
     arr = (

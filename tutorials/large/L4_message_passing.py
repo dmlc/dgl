@@ -12,7 +12,7 @@ for stochastic GNN training. It assumes that
    works <L1_large_node_classification>`.
 
 """
-exit(0)
+
 import os
 
 os.environ["DGLBACKEND"] = "pytorch"

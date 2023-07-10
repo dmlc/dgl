@@ -4,10 +4,12 @@ import unittest
 
 import backend as F
 
+import dgl
 import dgl.graphbolt as gb
 
 import pytest
 import torch
+from scipy import sparse as spsp
 
 torch.manual_seed(3407)
 
@@ -405,9 +407,13 @@ def test_sample_neighbors():
     type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
-
+    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+    etypes = {("n1", "e1", "n2"): 0, ("n1", "e2", "n3"): 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+    graph = gb.from_csc(
+        indptr, indices, type_per_edge=type_per_edge, metadata=metadata
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -465,9 +471,14 @@ def test_sample_neighbors_fanouts(fanouts, expected_sampled_num):
     type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
+    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+    etypes = {("n1", "e1", "n2"): 0, ("n1", "e2", "n3"): 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
 
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge)
+    graph = gb.from_csc(
+        indptr, indices, type_per_edge=type_per_edge, metadata=metadata
+    )
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -733,11 +744,65 @@ def test_hetero_graph_on_shared_memory(
     assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
 
 
-if __name__ == "__main__":
-    test_sample_neighbors()
-    test_sample_neighbors_replace(True, 12)
-    test_sample_neighbors_probs(
-        False,
-        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0, 0.4, 1.2]),
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph on GPU is not supported yet.",
+)
+def test_from_dglgraph_homogeneous():
+    dgl_g = dgl.rand_graph(1000, 10 * 1000)
+    gb_g = gb.from_dglgraph(dgl_g)
+
+    assert gb_g.num_nodes == dgl_g.num_nodes()
+    assert gb_g.num_edges == dgl_g.num_edges()
+    assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 1000]))
+    assert torch.all(gb_g.type_per_edge == 0)
+    assert gb_g.metadata.node_type_to_id == {"_N": 0}
+    assert gb_g.metadata.edge_type_to_id == {("_N", "_E", "_N"): 0}
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph on GPU is not supported yet.",
+)
+def test_from_dglgraph_heterogeneous():
+    def create_random_hetero():
+        num_nodes = {"n1": 1000, "n2": 1010, "n3": 1020}
+        etypes = [
+            ("n1", "r12", "n2"),
+            ("n2", "r21", "n1"),
+            ("n1", "r13", "n3"),
+            ("n2", "r23", "n3"),
+        ]
+        edges = {}
+        for etype in etypes:
+            src_ntype, _, dst_ntype = etype
+            arr = spsp.random(
+                num_nodes[src_ntype],
+                num_nodes[dst_ntype],
+                density=0.001,
+                format="coo",
+                random_state=100,
+            )
+            edges[etype] = (arr.row, arr.col)
+        return dgl.heterograph(edges, num_nodes)
+
+    dgl_g = create_random_hetero()
+    gb_g = gb.from_dglgraph(dgl_g)
+
+    assert gb_g.num_nodes == dgl_g.num_nodes()
+    assert gb_g.num_edges == dgl_g.num_edges()
+    assert torch.equal(
+        gb_g.node_type_offset, torch.tensor([0, 1000, 2010, 3030])
     )
-    test_sample_neighbors_zero_probs(True, torch.zeros(12, dtype=torch.float32))
+    assert torch.all(gb_g.type_per_edge[:-1] <= gb_g.type_per_edge[1:])
+    assert gb_g.metadata.node_type_to_id == {
+        "n1": 0,
+        "n2": 1,
+        "n3": 2,
+    }
+    assert gb_g.metadata.edge_type_to_id == {
+        ("n1", "r12", "n2"): 0,
+        ("n1", "r13", "n3"): 1,
+        ("n2", "r21", "n1"): 2,
+        ("n2", "r23", "n3"): 3,
+    }
