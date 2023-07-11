@@ -290,9 +290,10 @@ class CSCSamplingGraph:
                 ntype_id = self.metadata.node_type_to_id[ntype]
                 homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
             return torch.cat(homogeneous_nodes)
+
         if isinstance(nodes, dict):
             nodes = convert_to_homogeneous_nodes(nodes)
-        
+
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, False, probs_name
         )
@@ -323,6 +324,7 @@ class CSCSamplingGraph:
                     )
                     node_pairs[etype] = (hetero_row, hetero_column)
             return node_pairs
+
         return CSCSamplingGraphSampledSubgraph(
             node_pairs=convert_to_sampled_subgraph()
         )
