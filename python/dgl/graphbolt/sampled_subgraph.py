@@ -39,7 +39,7 @@ class SampledSubGraph:
         If present, it means column IDs are compacted, and `node_pairs`
         column IDs match these compacted ones.
         """
-        raise NotImplementedError
+        return None
 
     @property
     def reverse_row_node_ids(self) -> torch.Tensor or Dict[str, torch.Tensor]:
@@ -54,7 +54,7 @@ class SampledSubGraph:
             heterogeneous node ids.
         If present, it means row IDs are compacted, and `node_pairs`
         row IDs match these compacted ones."""
-        raise NotImplementedError
+        return None
 
     @property
     def reverse_edge_ids(self) -> torch.Tensor or Dict[str, torch.Tensor]:
@@ -67,4 +67,4 @@ class SampledSubGraph:
                 edge type and the values should be corresponding original
                 heterogeneous edge ids.
         """
-        raise NotImplementedError
+        return None
