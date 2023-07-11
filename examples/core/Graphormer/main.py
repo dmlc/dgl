@@ -151,7 +151,6 @@ def evaluate_network(model, data_loader):
 
 
 def train_val_pipeline(params):
-
     dataset = MolHIVDataset()
 
     accelerator.print(
