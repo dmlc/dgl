@@ -1,6 +1,6 @@
 name: pytorch-ci
 dependencies:
-  - python=3.7.0
+  - python=3.8
   - pip
   - pip:
     - --find-links https://download.pytorch.org/whl/torch_stable.html
