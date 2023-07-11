@@ -27,7 +27,7 @@ class OnDiskFeatureDataFormat(pydantic_yaml.YamlStrEnum):
 class OnDiskTVTSet(pydantic.BaseModel):
     """Train-Validation-Test set."""
 
-    type_name: Optional[str]
+    type: Optional[str]
     format: OnDiskFeatureDataFormat
     in_memory: Optional[bool] = True
     path: str
