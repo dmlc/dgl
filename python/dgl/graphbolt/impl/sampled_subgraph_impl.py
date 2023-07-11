@@ -9,7 +9,7 @@ from ..sampled_subgraph import SampledSubGraph
 
 
 @dataclass
-class CSCSamplingGraphSampledSubgraph(SampledSubGraph):
+class SampledSubgraphImpl(SampledSubGraph):
     r"""Class for sampled subgraph specific for CSCSamplingGraph.
 
     Examples
@@ -21,7 +21,7 @@ class CSCSamplingGraphSampledSubgraph(SampledSubGraph):
     >>> reverse_row_node_ids = {'A': torch.tensor([13, 14, 15]),
     ... 'B': torch.tensor([16, 17, 18])}
     >>> reverse_edge_ids = {('A', 'B', 'relation'): torch.tensor([19, 20, 21])}
-    >>> subgraph = gb.CSCSamplingGraphSampledSubgraph(
+    >>> subgraph = gb.SampledSubgraphImpl(
     ... node_pairs=node_pairs,
     ... reverse_column_node_ids=reverse_column_node_ids,
     ... reverse_row_node_ids=reverse_row_node_ids,
