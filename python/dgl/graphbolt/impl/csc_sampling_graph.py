@@ -374,7 +374,7 @@ class CSCSamplingGraph:
             equalling the total number of edges.
         Returns
         -------
-        C_SampledSubgraph
+        torch.classes.graphbolt.SampledSubgraph
             The sampled C subgraph.
         """
         # Ensure nodes is 1-D tensor.
