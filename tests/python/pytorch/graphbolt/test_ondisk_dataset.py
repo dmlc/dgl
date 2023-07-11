@@ -712,3 +712,38 @@ def test_OnDiskDataset_Graph_heterogeneous():
         assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
         assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
         assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+
+
+def test_OnDiskDataset_Metadata():
+    """Test metadata of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_classes = 10
+        num_labels = 9
+        yaml_content = f"""
+            dataset_name: {dataset_name}
+            num_classes: {num_classes}
+            num_labels: {num_labels}
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(yaml_file)
+        assert dataset.dataset_name == dataset_name
+        assert dataset.num_classes == num_classes
+        assert dataset.num_labels == num_labels
+
+        # Only dataset_name is specified.
+        yaml_content = f"""
+            dataset_name: {dataset_name}
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(yaml_file)
+        assert dataset.dataset_name == dataset_name
+        assert dataset.num_classes is None
+        assert dataset.num_labels is None
