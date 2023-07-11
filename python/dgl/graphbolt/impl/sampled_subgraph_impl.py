@@ -5,11 +5,11 @@ from typing import Dict, Tuple, Union
 
 import torch
 
-from ..sampled_subgraph import SampledSubGraph
+from ..sampled_subgraph import SampledSubgraph
 
 
 @dataclass
-class SampledSubgraphImpl(SampledSubGraph):
+class SampledSubgraphImpl(SampledSubgraph):
     r"""Class for sampled subgraph specific for CSCSamplingGraph.
 
     Examples
