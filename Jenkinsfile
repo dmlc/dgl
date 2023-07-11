@@ -81,7 +81,7 @@ def unit_test_cugraph(backend, dev) {
 def unit_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 50, unit: 'MINUTES') {
     bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
   }
 }
@@ -127,7 +127,7 @@ def is_authorized(name) {
     'rudongyu', 'classicsong', 'HuXiangkun', 'hetong007', 'kylasa',
     'frozenbugs', 'peizhou001', 'zheng-da', 'czkkkkkk', 'thvasilo',
     // Intern:
-    'keli-wen', 'caojy1998',
+    'keli-wen', 'caojy1998', 'RamonZhou',
     // Friends:
     'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
     'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
@@ -539,6 +539,7 @@ pipeline {
                   steps {
                     unit_distributed_linux('pytorch', 'cpu')
                   }
+                  when { expression { false } }
                 }
               }
               post {

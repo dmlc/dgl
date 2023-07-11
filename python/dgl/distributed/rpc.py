@@ -11,7 +11,7 @@ from .. import backend as F
 from .._ffi.function import _init_api
 from .._ffi.object import ObjectBase, register_object
 from ..base import DGLError
-from .constants import SERVER_EXIT, SERVER_KEEP_ALIVE
+from .constants import SERVER_EXIT
 
 __all__ = [
     "set_rank",
@@ -172,7 +172,7 @@ def finalize_receiver():
     _CAPI_DGLRPCFinalizeReceiver()
 
 
-def wait_for_senders(ip_addr, port, num_senders, blocking=True):
+def wait_for_senders(ip_addr, port, num_senders):
     """Wait all of the senders' connections.
 
     This api will be blocked until all the senders connect to the receiver.
@@ -185,10 +185,8 @@ def wait_for_senders(ip_addr, port, num_senders, blocking=True):
         receiver's port
     num_senders : int
         total number of senders
-    blocking : bool
-        whether to wait blockingly
     """
-    _CAPI_DGLRPCWaitForSenders(ip_addr, int(port), int(num_senders), blocking)
+    _CAPI_DGLRPCWaitForSenders(ip_addr, int(port), int(num_senders))
 
 
 def connect_receiver(ip_addr, port, recv_id, group_id=-1):
@@ -1258,8 +1256,6 @@ class ShutDownRequest(Request):
 
     def process_request(self, server_state):
         assert self.client_id == 0
-        if server_state.keep_alive and not self.force_shutdown_server:
-            return SERVER_KEEP_ALIVE
         finalize_server()
         return SERVER_EXIT
 
