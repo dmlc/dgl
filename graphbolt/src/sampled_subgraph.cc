@@ -63,13 +63,13 @@ void SampledSubgraph::SetState(std::vector<torch::Tensor>& state) {
       torch::ones(1, torch::TensorOptions().dtype(torch::kInt64)) *
       SampledSubgraph::kSampledSubgraphSerializeVersionNumber;
   TORCH_CHECK(
-      version_num_tensor.equal(state[i ++]),
+      version_num_tensor.equal(state[i++]),
       "Version number mismatch when deserializing SampledSubgraph.");
 
   // Tensors.
-  indptr = state[i ++];
-  indices = state[i ++];
-  reverse_column_node_ids = state[i ++];
+  indptr = state[i++];
+  indices = state[i++];
+  reverse_column_node_ids = state[i++];
 
   // Optional tensors.
   static torch::Tensor true_tensor =
@@ -77,14 +77,14 @@ void SampledSubgraph::SetState(std::vector<torch::Tensor>& state) {
   reverse_row_node_ids = torch::nullopt;
   reverse_edge_ids = torch::nullopt;
   type_per_edge = torch::nullopt;
-  if (state[i ++].equal(true_tensor)) {
-    reverse_row_node_ids = state[i ++];
+  if (state[i++].equal(true_tensor)) {
+    reverse_row_node_ids = state[i++];
   }
-  if (state[i ++].equal(true_tensor)) {
-    reverse_edge_ids = state[i ++];
+  if (state[i++].equal(true_tensor)) {
+    reverse_edge_ids = state[i++];
   }
-  if (state[i ++].equal(true_tensor)) {
-    type_per_edge = state[i ++];
+  if (state[i++].equal(true_tensor)) {
+    type_per_edge = state[i++];
   }
 }
 
