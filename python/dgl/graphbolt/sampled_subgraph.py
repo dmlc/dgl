@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 import torch
 
 
-class SampledSubGraph:
+class SampledSubgraph:
     r"""An abstract class for sampled subgraph. In the context of a
     heterogeneous graph, each field should be of `Dict` type. Otherwise,
     for homogeneous graphs, each field should correspond to its respective
