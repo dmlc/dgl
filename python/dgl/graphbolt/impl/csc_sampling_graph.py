@@ -218,7 +218,7 @@ class CSCSamplingGraph:
     def _convert_to_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
-    ):
+    ) -> SampledSubgraphImpl:
         """An internal function used to convert a fused homogeneous sampled
         subgraph to general struct 'SampledSubgraphImpl'."""
         column_num = (
@@ -482,7 +482,7 @@ class CSCSamplingGraph:
         self,
         node_pairs: Union[
             Tuple[torch.Tensor, torch.Tensor],
-            Dict(Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]),
+            Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
         ],
         fanouts: torch.Tensor,
         replace: bool = False,
@@ -564,7 +564,8 @@ class CSCSamplingGraph:
                 collected_nodes = torch.cat(nodes)
                 # Compact and find unique nodes.
                 unique_nodes, collected_nodes = torch.unique(
-                    collected_nodes, return_inverse=True
+                    collected_nodes,
+                    return_inverse=True,
                 )
                 ntype_id = node_type_to_id[ntype]
                 # Convert heterogeneous unqiue node id to homogeneous node id.
@@ -594,7 +595,7 @@ class CSCSamplingGraph:
             return unique_nodes, compacted_node_pairs
 
         unique_nodes, compacted_node_pairs = unique_and_compact_node_pairs()
-        compacted_node_pairs, C_sampled_graph = self._sample_neighbors(
+        C_sampled_graph = self._sample_neighbors(
             unique_nodes, fanouts, replace, False, probs_name
         )
         return (

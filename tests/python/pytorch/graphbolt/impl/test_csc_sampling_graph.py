@@ -7,7 +7,7 @@ import backend as F
 import dgl
 import dgl.graphbolt as gb
 
-import gbt as gbt
+import gb_test_utils as gbt
 
 import pytest
 import torch
@@ -680,64 +680,66 @@ def test_sample_neighbors_zero_probs(replace, probs_or_mask):
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-def test_sample_neighbors_for_pairs():
-    N = 100
-    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+def test_sample_neighbors_with_node_pairs():
+    ntypes = {"n1": 0, "n2": 1}
     etypes = {
         ("n1", "e1", "n2"): 0,
-        ("n1", "e2", "n3"): 1,
-        ("n3", "e3", "n1"): 2,
+        ("n2", "e2", "n1"): 1,
     }
+    # Ensure every nodes has neighbors.
+    csc_indptr = torch.arange(0, 505, 5)
+    num_N2 = csc_indptr[50].item()
+    indices = torch.zeros((500,), dtype=torch.long)
+    type_per_edge = torch.zeros_like(indices)
+    type_per_edge[:num_N2] = 1
+    indices[:num_N2] = torch.randint(50, 100, (num_N2,))
+    indices[num_N2:] = torch.randint(0, 50, (500 - num_N2,))
+    node_type_offset = torch.LongTensor([0, 50, 100])
     metadata = gb.GraphMetadata(ntypes, etypes)
-
-    graph = gbt.rand_hetero_csc_graph(N, 0.05, metadata)
-
-    N1 = torch.randint(0, 33, (15,))
-    N2 = torch.randint(0, 33, (5,))
-    N3 = torch.randint(0, 33, (10,))
+    graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        None,
+        metadata,
+    )
+    N1 = torch.randint(0, 50, (20,))
+    N2 = torch.randint(0, 50, (20,))
     unique_N1, compacted_N1 = torch.unique(N1, return_inverse=True)
     unique_N2, compacted_N2 = torch.unique(N2, return_inverse=True)
-    unique_N3, compacted_N3 = torch.unique(N3, return_inverse=True)
-    unique_N1 = unique_N1 + graph.node_type_offset[0]
-    unique_N2 = unique_N2 + graph.node_type_offset[1]
-    unique_N3 = unique_N3 + graph.node_type_offset[2]
-    expected_unique_nodes = torch.sort(
-        torch.cat([unique_N1, unique_N2, unique_N3])
-    )[0]
+    expected_unique_nodes = {
+        "n1": unique_N1,
+        "n2": unique_N2,
+    }
     expected_compacted_pairs = {
         ("n1", "e1", "n2"): (
-            compacted_N1[:5],
-            compacted_N2[:5],
+            compacted_N1[:10],
+            compacted_N2[10:],
         ),
-        ("n1", "e2", "n3"): (
-            compacted_N1[5:10],
-            compacted_N3[:5],
-        ),
-        ("n3", "e3", "n1"): (
-            compacted_N3[5:10],
-            compacted_N1[10:15],
+        ("n2", "e2", "n1"): (
+            compacted_N2[:10],
+            compacted_N1[10:],
         ),
     }
-
     node_pairs = {
         ("n1", "e1", "n2"): (
-            N1[:5],
-            N2[:5],
+            N1[:10],
+            N2[10:],
         ),
-        ("n1", "e2", "n3"): (
-            N1[5:10],
-            N3[:5],
-        ),
-        ("n3", "e3", "n1"): (
-            N3[5:10],
-            N1[10:15],
+        ("n2", "e2", "n1"): (
+            N2[0:10],
+            N1[10:],
         ),
     }
-
-    compacted_pairs, sub_g = graph.sample_neighbors_for_pairs(node_pairs)
-    assert torch.equal(
-        expected_unique_nodes, torch.sort(sub_g.reverse_column_node_ids)[0]
+    compacted_pairs, sub_g = graph.sample_neighbors_with_node_pairs(
+        node_pairs, fanouts=torch.LongTensor([-1])
     )
+    for etype, pair in sub_g.node_pairs.items():
+        _, _, v_type = etype
+        expected_v = expected_unique_nodes[v_type]
+        v = torch.unique(pair[1])
+        assert torch.equal(v, expected_v)
     assert len(expected_compacted_pairs) == len(compacted_pairs)
     for etype, pairs in compacted_pairs.items():
         u, v = pairs
@@ -750,26 +752,33 @@ def test_sample_neighbors_for_pairs():
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-def test_sample_neighbors_for_pairs_homo():
-    N = 100
-    graph = gbt.rand_csc_graph(N, 0.05)
+def test_sample_neighbors_with_node_pairs_homo():
+    csc_indptr = torch.arange(0, 505, 5)
+    indices = torch.randint(0, 100, (500,))
+    graph = gb.from_csc(csc_indptr, indices)
 
-    N = torch.randint(0, 33, (20,))
+    N = torch.randint(0, 100, (20,))
     expected_unique_N, compacted_N = torch.unique(N, return_inverse=True)
     expected_compacted_pairs = tuple(compacted_N.split(10))
 
     node_pairs = tuple(N.split(10))
-    compacted_pairs, sub_g = graph.sample_neighbors_for_pairs(node_pairs)
+    compacted_pairs, sub_g = graph.sample_neighbors_with_node_pairs(
+        node_pairs, fanouts=torch.LongTensor([-1])
+    )
 
-    assert torch.equal(expected_unique_N, sub_g.reverse_column_node_ids)
+    unique_N = torch.unique(sub_g.node_pairs[1])
+    assert torch.equal(expected_unique_N, unique_N)
     u, v = compacted_pairs
     expected_u, expected_v = expected_compacted_pairs
     assert torch.equal(u, expected_u)
     assert torch.equal(v, expected_v)
 
 
+test_sample_neighbors_with_node_pairs_homo()
+
+
 def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
-    """Check if two tensors are on the same shared memory.
+    """Check if two tenssors are on the same shared memory.
 
     This function copies a random tensor value to `t1` and checks whether `t2`
     holds the same random value and checks whether t2 is a distinct tensor
