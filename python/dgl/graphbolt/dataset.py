@@ -50,3 +50,18 @@ class Dataset:
     def feature(self) -> Dict[object, FeatureStore]:
         """Return the feature."""
         raise NotImplementedError
+
+    @property
+    def dataset_name(self) -> str:
+        """Return the dataset name."""
+        raise NotImplementedError
+
+    @property
+    def num_classes(self) -> int:
+        """Return the number of classes."""
+        raise NotImplementedError
+
+    @property
+    def num_labels(self) -> int:
+        """Return the number of labels."""
+        raise NotImplementedError
