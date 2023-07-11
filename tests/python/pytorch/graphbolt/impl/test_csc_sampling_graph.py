@@ -53,6 +53,7 @@ def test_hetero_empty_graph(num_nodes):
         indices,
         node_type_offset,
         type_per_edge,
+        None,
         metadata,
     )
     assert graph.num_edges == 0
@@ -107,7 +108,11 @@ def test_metadata_with_etype_exception(etypes):
 )
 def test_homo_graph(num_nodes, num_edges):
     csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
-    graph = gb.from_csc(csc_indptr, indices)
+    edge_attributes = {
+        "A1": torch.randn(num_edges),
+        "A2": torch.randn(num_edges),
+    }
+    graph = gb.from_csc(csc_indptr, indices, edge_attributes=edge_attributes)
 
     assert graph.num_nodes == num_nodes
     assert graph.num_edges == num_edges
@@ -115,6 +120,7 @@ def test_homo_graph(num_nodes, num_edges):
     assert torch.equal(csc_indptr, graph.csc_indptr)
     assert torch.equal(indices, graph.indices)
 
+    assert graph.edge_attributes == edge_attributes
     assert graph.metadata is None
     assert graph.node_type_offset is None
     assert graph.type_per_edge is None
@@ -136,8 +142,17 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         type_per_edge,
         metadata,
     ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    edge_attributes = {
+        "A1": torch.randn(num_edges),
+        "A2": torch.randn(num_edges),
+    }
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
     )
 
     assert graph.num_nodes == num_nodes
@@ -147,6 +162,7 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert torch.equal(indices, graph.indices)
     assert torch.equal(node_type_offset, graph.node_type_offset)
     assert torch.equal(type_per_edge, graph.type_per_edge)
+    assert graph.edge_attributes == edge_attributes
     assert metadata.node_type_to_id == graph.metadata.node_type_to_id
     assert metadata.edge_type_to_id == graph.metadata.edge_type_to_id
 
@@ -170,7 +186,7 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
     )
     with pytest.raises(Exception):
         gb.from_csc(
-            csc_indptr, indices, node_type_offset, type_per_edge, metadata
+            csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
         )
 
 
@@ -218,7 +234,7 @@ def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         metadata,
     ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -323,7 +339,7 @@ def test_in_subgraph_heterogeneous():
     # Construct CSCSamplingGraph.
     metadata = gb.GraphMetadata(ntypes, etypes)
     graph = gb.from_csc(
-        indptr, indices, node_type_offset, type_per_edge, metadata
+        indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     # Extract in subgraph.
@@ -662,7 +678,7 @@ def test_hetero_graph_on_shared_memory(
         metadata,
     ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     shm_name = "test_hetero_g"
