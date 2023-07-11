@@ -478,9 +478,15 @@ class CSCSamplingGraph:
             max_node_id,
         )
 
-    def sample_neighbors_for_pairs(
+    def sample_neighbors_with_node_pairs(
         self,
-        node_pairs,
+        node_pairs: Union[
+            Tuple[torch.Tensor, torch.Tensor],
+            Dict(Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]),
+        ],
+        fanouts: torch.Tensor,
+        replace: bool = False,
+        probs_name: Optional[str] = None,
     ):
         """
         Sample neighboring edges for a given list or dictionary of node pairs.
@@ -488,26 +494,54 @@ class CSCSamplingGraph:
 
         Parameters
         ----------
-        node_pairs : Tuple[torch.Tensor] or Dict(etype, Tuple[torch.Tensor])
+        node_pairs : Tuple[torch.Tensor, torch.Tensor] or \
+            Dict(Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor])
             Node pairs representing source-destination edges.
-            - If `node_pairs` is a tuple: It should be in the format ('u', 'v')
-            representing source and destination pairs.
+            - If `node_pairs` is a tuple: It means the graph is homogeneous.
+            Also, it should be in the format ('u', 'v') representing source
+            and destination pairs. And IDs inside are homogeneous ids.
             - If `node_pairs` is a dictionary: The keys should be edge type and
-            the values should be corresponding node pairs.
+            the values should be corresponding node pairs. And IDs inside are
+            heterogeneous ids.
+        fanouts: torch.Tensor
+            The number of edges to be sampled for each node with or without
+            considering edge types.
+              - When the length is 1, it indicates that the fanout applies to
+                all neighbors of the node as a collective, regardless of the
+                edge type.
+              - Otherwise, the length should equal to the number of edge
+                types, and each fanout value corresponds to a specific edge
+                type of the nodes.
+            The value of each fanout should be >= 0 or = -1.
+              - When the value is -1, all neighbors will be chosen for
+                sampling. It is equivalent to selecting all neighbors when
+                the fanout is >= the number of neighbors (and replace is set to
+                false).
+              - When the value is a non-negative integer, it serves as a
+                minimum threshold for selecting neighbors.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
+        probs_name: str, optional
+            An optional string specifying the name of an edge attribute used a. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
         Returns
         -------
-        Tuple[node_pairs, CSCSamplingGraph]
-            The compacted node pairs and the created CSCSamplingGraph object.
+        Tuple[node_pairs, SampledSubgraphImpl]
+            The compacted node pairs and the created SampledSubgraphImpl object.
         """
-
         nodes_dict = defaultdict(list)
         unique_nodes_all_types = []
         if self.metadata:
             node_type_to_id = self.metadata.node_type_to_id
         node_type_offset = self.node_type_offset
-        is_mapping = isinstance(node_pairs, Dict)
+        is_homogeneous = isinstance(node_pairs, Dict)
         # Treat it as a homogeneous graph.
-        if is_mapping:
+        if is_homogeneous:
             assert (
                 node_type_to_id is not None and node_type_offset is not None
             ), "Please note that sampling with different edge types is \
@@ -517,44 +551,55 @@ class CSCSamplingGraph:
             node_pairs = {("_N", "_E", "_N"): node_pairs}
             node_type_offset = [0, self.num_nodes]
 
-        # Collect nodes for each node type.
-        for etype, node_pair in node_pairs.items():
-            u_type, _, v_type = etype
-            u, v = node_pair
-            nodes_dict[u_type].append(u)
-            nodes_dict[v_type].append(v)
+        def unique_and_compact_node_pairs():
+            # Collect nodes for each node type.
+            for etype, node_pair in node_pairs.items():
+                u_type, _, v_type = etype
+                u, v = node_pair
+                nodes_dict[u_type].append(u)
+                nodes_dict[v_type].append(v)
 
-        compacted_nodes_dict = defaultdict(list)
-        for ntype, nodes in nodes_dict.items():
-            collected_nodes = torch.cat(nodes)
-            # Compact and find unique nodes.
-            unique_nodes, collected_nodes = torch.unique(
-                collected_nodes, return_inverse=True
-            )
-            ntype_id = node_type_to_id[ntype]
-            # Convert heterogeneous unqiue node id to homogeneous node id.
-            unique_nodes = unique_nodes + node_type_offset[ntype_id]
-            unique_nodes_all_types.append(unique_nodes)
-            compacted_nodes_dict[ntype] = collected_nodes
+            compacted_nodes_dict = defaultdict(list)
+            for ntype, nodes in nodes_dict.items():
+                collected_nodes = torch.cat(nodes)
+                # Compact and find unique nodes.
+                unique_nodes, collected_nodes = torch.unique(
+                    collected_nodes, return_inverse=True
+                )
+                ntype_id = node_type_to_id[ntype]
+                # Convert heterogeneous unqiue node id to homogeneous node id.
+                unique_nodes = unique_nodes + node_type_offset[ntype_id]
+                unique_nodes_all_types.append(unique_nodes)
+                compacted_nodes_dict[ntype] = collected_nodes
 
-        # Map back in same order as collect.
-        compacted_node_pairs = {}
-        for etype, node_pair in node_pairs.items():
-            u_type, _, v_type = etype
-            u, v = node_pair
-            u_size, v_size = u.numel(), v.numel()
-            u = compacted_nodes_dict[u_type][:u_size]
-            compacted_nodes_dict[u_type] = compacted_nodes_dict[u_type][u_size:]
-            v = compacted_nodes_dict[v_type][:v_size]
-            compacted_nodes_dict[v_type] = compacted_nodes_dict[v_type][v_size:]
-            compacted_node_pairs[etype] = (u, v)
-        if not is_mapping:
-            compacted_node_pairs = list(compacted_node_pairs.values())[0]
-        # Perform neighbor sampling.
-        unique_nodes = torch.cat(unique_nodes_all_types)
+            # Map back in same order as collect.
+            compacted_node_pairs = {}
+            for etype, node_pair in node_pairs.items():
+                u_type, _, v_type = etype
+                u, v = node_pair
+                u_size, v_size = u.numel(), v.numel()
+                u = compacted_nodes_dict[u_type][:u_size]
+                compacted_nodes_dict[u_type] = compacted_nodes_dict[u_type][
+                    u_size:
+                ]
+                v = compacted_nodes_dict[v_type][:v_size]
+                compacted_nodes_dict[v_type] = compacted_nodes_dict[v_type][
+                    v_size:
+                ]
+                compacted_node_pairs[etype] = (u, v)
+            if not is_homogeneous:
+                compacted_node_pairs = list(compacted_node_pairs.values())[0]
+            # Perform neighbor sampling.
+            unique_nodes = torch.cat(unique_nodes_all_types)
+            return unique_nodes, compacted_node_pairs
+
+        unique_nodes, compacted_node_pairs = unique_and_compact_node_pairs()
+        compacted_node_pairs, C_sampled_graph = self._sample_neighbors(
+            unique_nodes, fanouts, replace, False, probs_name
+        )
         return (
             compacted_node_pairs,
-            self._sample_neighbors(unique_nodes, torch.LongTensor([-1])),
+            self._convert_to_sampled_subgraph(C_sampled_graph),
         )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
