@@ -304,6 +304,60 @@ class CSCSamplingGraph:
             nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
         )
 
+    def sample_negative_edges_uniform(
+        self, edge_type, node_pairs, negative_ratio
+    ):
+        """
+        Sample negative edges by randomly choosing negative source-destination
+        pairs according to a uniform distribution. For each edge ``(u, v)``,
+        it is supposed to generate `negative_ratio` pairs of negative edges
+        ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
+        the graph.
+
+        Parameters
+        ----------
+        edge_type: Tuple[str]
+            The type of edges in the provided node_pairs. Any negative edges
+            sampled will also have the same type. If set to None, it will be
+            considered as a homogeneous graph.
+        node_pairs : Tuple[Tensor]
+            A tuple of two 1D tensors that represent the source and destination
+            of positive edges, with 'positive' indicating that these edges are
+            present in the graph. It's important to note that within the
+            context of a heterogeneous graph, the ids in these tensors signify
+            heterogeneous ids.
+        negative_ratio: int
+            The ratio of the number of negative samples to positive samples.
+
+        Returns
+        -------
+        Tuple[Tensor]
+            A tuple consisting of two 1D tensors represents the source and
+            destination of negative edges. In the context of a heterogeneous
+            graph, both the input nodes and the selected nodes are represented
+            by heterogeneous IDs, and the formed edges are of the input type
+            `edge_type`. Note that negative refers to false negatives, which
+            means the edge could be present or not present in the graph.
+        """
+        if edge_type:
+            assert (
+                self.node_type_offset is not None
+            ), "The 'node_type_offset' array is necessary for performing \
+                negative sampling by edge type."
+            _, _, dst_node_type = edge_type
+            dst_node_type_id = self.metadata.node_type_to_id[dst_node_type]
+            max_node_id = (
+                self.node_type_offset[dst_node_type_id + 1]
+                - self.node_type_offset[dst_node_type_id]
+            )
+        else:
+            max_node_id = self.num_nodes
+        return self._c_csc_graph.sample_negative_edges_uniform(
+            node_pairs,
+            negative_ratio,
+            max_node_id,
+        )
+
     def copy_to_shared_memory(self, shared_memory_name: str):
         """Copy the graph to shared memory.
 
