@@ -8,6 +8,7 @@
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
 
+#include <limits>
 #include <tuple>
 #include <vector>
 
@@ -129,22 +130,15 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
-c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
+template <bool labor>
+c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool return_eids,
-    torch::optional<std::string> probs_name) const {
+    torch::optional<torch::Tensor> probs_or_mask) const {
+  TORCH_CHECK(
+      !replace || !labor,
+      "Sampling with replacement is not supported for labor.");
   const int64_t num_nodes = nodes.size(0);
-  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
-  if (probs_name.has_value() && !probs_name.value().empty()) {
-    probs_or_mask = edge_attributes_.value().at(probs_name.value());
-    // Note probs will be passed as input for 'torch.multinomial' in deeper
-    // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
-    // avoid crashes, convert 'probs_or_mask' to 'float32' data type.
-    if (probs_or_mask.value().dtype() == torch::kBool ||
-        probs_or_mask.value().dtype() == torch::kFloat16) {
-      probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
-    }
-  }
   // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
   bool consider_etype = (fanouts.size() > 1);
@@ -152,6 +146,10 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
   torch::Tensor num_picked_neighbors_per_node =
       torch::zeros({num_nodes + 1}, indptr_.options());
 
+  const int64_t random_seed =
+      labor ? RandomEngine::ThreadLocal()->RandInt(
+                  static_cast<int64_t>(0), std::numeric_limits<int64_t>::max())
+            : replace;
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr_.scalar_type(), "parallel_for", ([&] {
         torch::parallel_for(0, num_nodes, 32, [&](scalar_t b, scalar_t e) {
@@ -175,13 +173,13 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
             }
 
             if (consider_etype) {
-              picked_neighbors_per_node[i] = PickByEtype(
-                  offset, num_neighbors, fanouts, replace, indptr_.options(),
-                  type_per_edge_.value(), probs_or_mask);
+              picked_neighbors_per_node[i] = PickByEtype<labor>(
+                  offset, num_neighbors, fanouts, random_seed,
+                  indptr_.options(), type_per_edge_.value(), probs_or_mask);
             } else {
-              picked_neighbors_per_node[i] = Pick(
-                  offset, num_neighbors, fanouts[0], replace, indptr_.options(),
-                  probs_or_mask);
+              picked_neighbors_per_node[i] = Pick<labor>(
+                  offset, num_neighbors, fanouts[0], random_seed,
+                  indptr_.options(), probs_or_mask);
             }
             num_picked_neighbors_per_node[i + 1] =
                 picked_neighbors_per_node[i].size(0);
@@ -205,6 +203,30 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
   return c10::make_intrusive<SampledSubgraph>(
       subgraph_indptr, subgraph_indices, nodes, torch::nullopt,
       subgraph_reverse_edge_ids, subgraph_type_per_edge);
+}
+
+c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
+    const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
+    bool replace, bool labor, bool return_eids,
+    torch::optional<torch::Tensor> probs_or_mask) const {
+  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
+  if (probs_name.has_value() && !probs_name.value().empty()) {
+    probs_or_mask = edge_attributes_.value().at(probs_name.value());
+    // Note probs will be passed as input for 'torch.multinomial' in deeper
+    // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
+    // avoid crashes, convert 'probs_or_mask' to 'float32' data type.
+    if (probs_or_mask.value().dtype() == torch::kBool ||
+        probs_or_mask.value().dtype() == torch::kFloat16) {
+      probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
+    }
+  }
+  if (labor) {
+    return SampleNeighborsImpl<true>(
+        nodes, fanouts, replace, return_eids, probs_or_mask);
+  } else {
+    return SampleNeighborsImpl<false>(
+        nodes, fanouts, replace, return_eids, probs_or_mask);
+  }
 }
 
 std::tuple<torch::Tensor, torch::Tensor>
@@ -424,23 +446,108 @@ inline torch::Tensor NonUniformPick(
   return picked_neighbors;
 }
 
-torch::Tensor Pick(
-    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+template <bool nonuniform, typename float_t = float>
+inline torch::Tensor CSCSamplingGraph::LaborPick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t random_seed,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask) {
-  if (probs_or_mask.has_value()) {
-    return NonUniformPick(
-        offset, num_neighbors, fanout, replace, options, probs_or_mask);
+    const torch::optional<torch::Tensor>& probs_or_mask) const {
+  if (!nonuniform && fanout >= num_neighbors) {
+    return torch::arange(offset, offset + num_neighbors, options);
+  }
+  fanout = fanout < 0 ? num_neighbors : std::min(fanout, num_neighbors);
+  torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt);
+  std::pair<float, int32_t>* heap_data =
+      reinterpret_cast<std::pair<float, int32_t>*>(
+          heap_tensor.data_ptr<int32_t>());
+  const float_t* local_probs_data =
+      nonuniform ? probs_or_mask.value().data_ptr<float_t>() + offset : nullptr;
+  AT_DISPATCH_INTEGRAL_TYPES(
+      indices_.scalar_type(), "LaborPickMain", ([&] {
+        const scalar_t* local_indices_data =
+            indices_.data_ptr<scalar_t>() + offset;
+        for (int32_t i = 0; i < fanout; ++i) {
+          const auto t = local_indices_data[i];
+          pcg32 ng(random_seed, t);
+          std::uniform_real_distribution<float> uni;
+          const auto rnd = uni(ng);  // r_t
+          if constexpr (nonuniform) {
+            heap_data[i] = std::make_pair(
+                local_probs_data[i] > 0
+                    ? (float)(rnd / local_probs_data[i])
+                    : std::numeric_limits<float>::infinity(),
+                i);
+          } else {
+            heap_data[i] = std::make_pair(rnd, i);
+          }
+        }
+        std::make_heap(heap_data, heap_data + fanout);
+        for (int32_t i = fanout; i < num_neighbors; ++i) {
+          const auto t = local_indices_data[i];
+          pcg32 ng(random_seed, t);
+          std::uniform_real_distribution<float> uni;
+          const auto rnd = uni(ng);  // r_t
+          if (rnd < heap_data[0].first) {
+            std::pop_heap(heap_data, heap_data + fanout);
+            if constexpr (nonuniform) {
+              heap_data[fanout - 1] = std::make_pair(
+                  local_probs_data[i] > 0
+                      ? (float)(rnd / local_probs_data[i])
+                      : std::numeric_limits<float>::infinity(),
+                  i);
+            } else {
+              heap_data[fanout - 1] = std::make_pair(rnd, i);
+            }
+            std::push_heap(heap_data, heap_data + fanout);
+          }
+        }
+      }));
+  int64_t num_sampled = 0;
+  torch::Tensor picked_neighbors = torch::empty({fanout}, options);
+  AT_DISPATCH_INTEGRAL_TYPES(
+      picked_neighbors.scalar_type(), "LaborPickOutput", ([&] {
+        scalar_t* picked_neighbors_data = picked_neighbors.data_ptr<scalar_t>();
+        for (int64_t i = 0; i < fanout; ++i) {
+          const auto [rnd, j] = heap_data[i];
+          if (rnd < std::numeric_limits<float>::infinity()) {
+            picked_neighbors_data[num_sampled++] = offset + j;
+          }
+        }
+      }));
+  return picked_neighbors.slice(0, 0, num_sampled);
+}
+
+template <bool labor>
+torch::Tensor CSCSamplingGraph::Pick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask) const {
+  if constexpr (labor) {
+    if (probs_or_mask.has_value()) {
+      AT_DISPATCH_INTEGRAL_TYPES(
+          probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
+            return LaborPick<true, scalar_t>(
+                offset, num_neighbors, fanout, replace, options, probs_or_mask);
+          }));
+    } else {
+      return LaborPick<false>(
+          offset, num_neighbors, fanout, replace, options, probs_or_mask);
+    }
   } else {
-    return UniformPick(offset, num_neighbors, fanout, replace, options);
+    if (probs_or_mask.has_value()) {
+      return NonUniformPick(
+          offset, num_neighbors, fanout, replace, options, probs_or_mask);
+    } else {
+      return UniformPick(offset, num_neighbors, fanout, replace, options);
+    }
   }
 }
 
-torch::Tensor PickByEtype(
+template <bool labor>
+torch::Tensor CSCSamplingGraph::PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
-    bool replace, const torch::TensorOptions& options,
+    int64_t replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask) {
+    const torch::optional<torch::Tensor>& probs_or_mask) const {
   std::vector<torch::Tensor> picked_neighbors(
       fanouts.size(), torch::tensor({}, options));
   int64_t etype_begin = offset;
@@ -452,7 +559,7 @@ torch::Tensor PickByEtype(
         while (etype_begin < end) {
           scalar_t etype = type_per_edge_data[etype_begin];
           TORCH_CHECK(
-              etype >= 0 && etype < fanouts.size(),
+              etype >= 0 && etype < (int64_t)fanouts.size(),
               "Etype values exceed the number of fanouts.");
           int64_t fanout = fanouts[etype];
           auto etype_end_it = std::upper_bound(
@@ -461,7 +568,7 @@ torch::Tensor PickByEtype(
           etype_end = etype_end_it - type_per_edge_data;
           // Do sampling for one etype.
           if (fanout != 0) {
-            picked_neighbors[etype] = Pick(
+            picked_neighbors[etype] = Pick<labor>(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
                 probs_or_mask);
           }

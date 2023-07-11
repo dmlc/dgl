@@ -156,7 +156,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    */
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool return_eids,
+      bool replace, bool labor, bool return_eids,
       torch::optional<std::string> probs_name) const;
 
   /**
@@ -204,6 +204,97 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const std::string& shared_memory_name);
 
  private:
+  template <bool labor>
+  c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
+      const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
+      bool replace, bool return_eids,
+      const torch::optional<torch::Tensor>& probs_or_mask) const;
+
+  template <bool nonuniform, typename float_t = float>
+  inline torch::Tensor LaborPick(
+      int64_t offset, int64_t num_neighbors, int64_t fanout,
+      int64_t random_seed, const torch::TensorOptions& options,
+      const torch::optional<torch::Tensor>& probs_or_mask) const;
+
+  /**
+   * @brief Picks a specified number of neighbors for a node, starting from
+   * the given offset and having the specified number of neighbors.
+   *
+   * If 'probs_or_mask' is provided, it indicates that the sampling is
+   * non-uniform. In such cases:
+   * - When the number of neighbors with non-zero probability is less than
+   * or equal to fanout, all neighbors with non-zero probability will be
+   * selected.
+   * - When the number of neighbors with non-zero probability exceeds
+   * fanout, the sampling process will select 'fanout' elements based on
+   * their respective probabilities. Higher probabilities will increase the
+   * chances of being chosen during the sampling process.
+   *
+   * @param offset The starting edge ID for the connected neighbors of the
+   * sampled node.
+   * @param num_neighbors The number of neighbors to pick.
+   * @param fanout The number of edges to be sampled for each node. It
+   * should be
+   * >= 0 or -1.
+   *  - When the value is -1, all neighbors will be chosen for sampling. It
+   * is equivalent to selecting all neighbors with non-zero probability when
+   * the fanout is >= the number of neighbors (and replacement is set to
+   * false).
+   *  - When the value is a non-negative integer, it serves as a minimum
+   * threshold for selecting neighbors.
+   * @param replace Boolean indicating whether the sample is preformed with
+   * or without replacement. If True, a value can be selected multiple
+   * times. Otherwise, each value can be selected only once.
+   * @param options Tensor options specifying the desired data type of the
+   * result.
+   * @param probs_or_mask Optional tensor containing the (unnormalized)
+   * probabilities associated with each neighboring edge of a node in the
+   * original graph. It must be a 1D floating-point tensor with the number
+   * of elements equal to the number of edges in the graph.
+   *
+   * @return A tensor containing the picked neighbors.
+   */
+  template <bool labor>
+  torch::Tensor Pick(
+      int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t replace,
+      const torch::TensorOptions& options,
+      const torch::optional<torch::Tensor>& probs_or_mask) const;
+
+  /**
+   * @brief Picks a specified number of neighbors for a node per edge type,
+   * starting from the given offset and having the specified number of
+   * neighbors.
+   *
+   * @param offset The starting edge ID for the connected neighbors of the
+   * sampled node.
+   * @param num_neighbors The number of neighbors to pick.
+   * @param fanouts The edge sampling numbers corresponding to each edge type
+   * for a single node. The value of each fanout should be >= 0 or = 1.
+   *  - When the value is -1, all neighbors with non-zero probability will be
+   * chosen for sampling. It is equivalent to selecting all neighbors when the
+   * fanout is >= the number of neighbors (and replacement is set to false).
+   *  - When the value is a non-negative integer, it serves as a minimum
+   * threshold for selecting neighbors.
+   * @param replace Boolean indicating whether the sample is preformed with or
+   * without replacement. If True, a value can be selected multiple times.
+   * Otherwise, each value can be selected only once.
+   * @param options Tensor options specifying the desired data type of the
+   * result.
+   * @param type_per_edge Tensor representing the type of each edge in the
+   * original graph.
+   * @param probs_or_mask Optional tensor containing the (unnormalized)
+   * probabilities associated with each neighboring edge of a node in the
+   * original graph. It must be a 1D floating-point tensor with the number of
+   * elements equal to the number of edges in the graph.
+   *
+   * @return A tensor containing the picked neighbors.
+   */
+  template <bool labor>
+  torch::Tensor PickByEtype(
+      int64_t offset, int64_t num_neighbors,
+      const std::vector<int64_t>& fanouts, int64_t replace,
+      const torch::TensorOptions& options, const torch::Tensor& type_per_edge,
+      const torch::optional<torch::Tensor>& probs_or_mask) const;
   /**
    * @brief Build a CSCSamplingGraph from shared memory tensors.
    *
@@ -263,78 +354,6 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    */
   SharedMemoryPtr tensor_meta_shm_, tensor_data_shm_;
 };
-
-/**
- * @brief Picks a specified number of neighbors for a node, starting from the
- * given offset and having the specified number of neighbors.
- *
- * If 'probs_or_mask' is provided, it indicates that the sampling is
- * non-uniform. In such cases:
- * - When the number of neighbors with non-zero probability is less than or
- * equal to fanout, all neighbors with non-zero probability will be selected.
- * - When the number of neighbors with non-zero probability exceeds fanout, the
- * sampling process will select 'fanout' elements based on their respective
- * probabilities. Higher probabilities will increase the chances of being chosen
- * during the sampling process.
- *
- * @param offset The starting edge ID for the connected neighbors of the sampled
- * node.
- * @param num_neighbors The number of neighbors to pick.
- * @param fanout The number of edges to be sampled for each node. It should be
- * >= 0 or -1.
- *  - When the value is -1, all neighbors will be chosen for sampling. It is
- * equivalent to selecting all neighbors with non-zero probability when the
- * fanout is >= the number of neighbors (and replacement is set to false).
- *  - When the value is a non-negative integer, it serves as a minimum
- * threshold for selecting neighbors.
- * @param replace Boolean indicating whether the sample is preformed with or
- * without replacement. If True, a value can be selected multiple times.
- * Otherwise, each value can be selected only once.
- * @param options Tensor options specifying the desired data type of the result.
- * @param probs_or_mask Optional tensor containing the (unnormalized)
- * probabilities associated with each neighboring edge of a node in the original
- * graph. It must be a 1D floating-point tensor with the number of elements
- * equal to the number of edges in the graph.
- *
- * @return A tensor containing the picked neighbors.
- */
-torch::Tensor Pick(
-    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
-    const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask);
-
-/**
- * @brief Picks a specified number of neighbors for a node per edge type,
- * starting from the given offset and having the specified number of neighbors.
- *
- * @param offset The starting edge ID for the connected neighbors of the sampled
- * node.
- * @param num_neighbors The number of neighbors to pick.
- * @param fanouts The edge sampling numbers corresponding to each edge type for
- * a single node. The value of each fanout should be >= 0 or = 1.
- *  - When the value is -1, all neighbors with non-zero probability will be
- * chosen for sampling. It is equivalent to selecting all neighbors when the
- * fanout is >= the number of neighbors (and replacement is set to false).
- *  - When the value is a non-negative integer, it serves as a minimum threshold
- * for selecting neighbors.
- * @param replace Boolean indicating whether the sample is preformed with or
- * without replacement. If True, a value can be selected multiple times.
- * Otherwise, each value can be selected only once.
- * @param options Tensor options specifying the desired data type of the result.
- * @param type_per_edge Tensor representing the type of each edge in the
- * original graph.
- * @param probs_or_mask Optional tensor containing the (unnormalized)
- * probabilities associated with each neighboring edge of a node in the original
- * graph. It must be a 1D floating-point tensor with the number of elements
- * equal to the number of edges in the graph.
- *
- * @return A tensor containing the picked neighbors.
- */
-torch::Tensor PickByEtype(
-    int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
-    bool replace, const torch::TensorOptions& options,
-    const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask);
 
 }  // namespace sampling
 }  // namespace graphbolt
