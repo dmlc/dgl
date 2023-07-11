@@ -1,3 +1,5 @@
+"""Sampled subgraph for CSCSamplingGraph."""
+# pylint: disable= invalid-name
 from dataclasses import dataclass
 from typing import Dict, Tuple, Union
 
