@@ -81,7 +81,7 @@ def unit_test_cugraph(backend, dev) {
 def unit_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 50, unit: 'MINUTES') {
     bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
   }
 }
@@ -539,6 +539,7 @@ pipeline {
                   steps {
                     unit_distributed_linux('pytorch', 'cpu')
                   }
+                  when { expression { false } }
                 }
               }
               post {

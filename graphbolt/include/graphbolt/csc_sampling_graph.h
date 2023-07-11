@@ -33,6 +33,7 @@ namespace sampling {
  */
 class CSCSamplingGraph : public torch::CustomClassHolder {
  public:
+  using EdgeAttrMap = torch::Dict<std::string, torch::Tensor>;
   /** @brief Default constructor. */
   CSCSamplingGraph() = default;
 
@@ -48,7 +49,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   CSCSamplingGraph(
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
-      const torch::optional<torch::Tensor>& type_per_edge);
+      const torch::optional<torch::Tensor>& type_per_edge,
+      const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /**
    * @brief Create a homogeneous CSC graph from tensors of CSC format.
@@ -64,7 +66,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   static c10::intrusive_ptr<CSCSamplingGraph> FromCSC(
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
-      const torch::optional<torch::Tensor>& type_per_edge);
+      const torch::optional<torch::Tensor>& type_per_edge,
+      const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /** @brief Get the number of nodes. */
   int64_t NumNodes() const { return indptr_.size(0) - 1; }
@@ -86,6 +89,11 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   /** @brief Get the edge type tensor for a heterogeneous graph. */
   inline const torch::optional<torch::Tensor> TypePerEdge() const {
     return type_per_edge_;
+  }
+
+  /** @brief Get the edge attributes dictionary. */
+  inline const torch::optional<EdgeAttrMap> EdgeAttributes() const {
+    return edge_attributes_;
   }
 
   /**
@@ -137,10 +145,11 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * Otherwise, each value can be selected only once.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
    * typically used when edge features are required.
-   * @param probs_or_mask Optional tensor containing the (unnormalized)
-   * probabilities or boolean mask associated with each neighboring edge of a
-   * node. It must be a 1D floating-point or boolean tensor with the number of
-   * elements equal to the number of edges.
+   * @param probs_name An optional string specifying the name of an edge
+   * attribute. This attribute tensor should contain (unnormalized)
+   * probabilities corresponding to each neighboring edge of a node. It must be
+   * a 1D floating-point or boolean tensor, with the number of elements
+   * equalling the total number of edges.
    *
    * @return An intrusive pointer to a SampledSubgraph object containing the
    * sampled graph's information.
@@ -148,7 +157,33 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
       bool replace, bool return_eids,
-      torch::optional<torch::Tensor> probs_or_mask) const;
+      torch::optional<std::string> probs_name) const;
+
+  /**
+   * @brief Sample negative edges by randomly choosing negative
+   * source-destination pairs according to a uniform distribution. For each edge
+   * ``(u, v)``, it is supposed to generate `negative_ratio` pairs of negative
+   * edges ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
+   * the graph.
+   *
+   * @param node_pairs A tuple of two 1D tensors that represent the source and
+   * destination of positive edges, with 'positive' indicating that these edges
+   * are present in the graph. It's important to note that within the context of
+   * a heterogeneous graph, the ids in these tensors signify heterogeneous ids.
+   * @param negative_ratio The ratio of the number of negative samples to
+   * positive samples.
+   * @param max_node_id The maximum ID of the node to be selected. It
+   * should correspond to the number of nodes of a specific type.
+   *
+   * @return A tuple consisting of two 1D tensors represents the source and
+   * destination of negative edges. In the context of a heterogeneous
+   * graph, both the input nodes and the selected nodes are represented
+   * by heterogeneous IDs. Note that negative refers to false negatives,
+   * which means the edge could be present or not present in the graph.
+   */
+  std::tuple<torch::Tensor, torch::Tensor> SampleNegativeEdgesUniform(
+      const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
+      int64_t negative_ratio, int64_t max_node_id) const;
 
   /**
    * @brief Copy the graph to shared memory.
@@ -204,6 +239,13 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * edge types. The length of it is equal to the number of edges.
    */
   torch::optional<torch::Tensor> type_per_edge_;
+
+  /**
+   * @brief A dictionary of edge attributes. Each key represents the attribute's
+   * name, while the corresponding value holds the attribute's specific value.
+   * The length of each value should match the total number of edges."
+   */
+  torch::optional<EdgeAttrMap> edge_attributes_;
 
   /**
    * @brief Maximum number of bytes used to serialize the metadata of the
