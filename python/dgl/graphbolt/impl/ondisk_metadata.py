@@ -12,6 +12,8 @@ __all__ = [
     "OnDiskFeatureDataDomain",
     "OnDiskFeatureData",
     "OnDiskMetaData",
+    "OnDiskGraphTopologyType",
+    "OnDiskGraphTopology",
 ]
 
 
@@ -49,6 +51,19 @@ class OnDiskFeatureData(pydantic.BaseModel):
     in_memory: Optional[bool] = True
 
 
+class OnDiskGraphTopologyType(pydantic_yaml.YamlStrEnum):
+    """Enum of graph topology type."""
+
+    CSC_SAMPLING = "CSCSamplingGraph"
+
+
+class OnDiskGraphTopology(pydantic.BaseModel):
+    """The description of an on-disk graph topology."""
+
+    type: OnDiskGraphTopologyType
+    path: str
+
+
 class OnDiskMetaData(pydantic_yaml.YamlModel):
     """Metadata specification in YAML.
 
@@ -56,6 +71,8 @@ class OnDiskMetaData(pydantic_yaml.YamlModel):
     is a list of list of ``OnDiskTVTSet``.
     """
 
-    train_sets: Optional[List[List[OnDiskTVTSet]]]
-    validation_sets: Optional[List[List[OnDiskTVTSet]]]
-    test_sets: Optional[List[List[OnDiskTVTSet]]]
+    graph_topology: Optional[OnDiskGraphTopology] = None
+    feature_data: Optional[List[OnDiskFeatureData]] = []
+    train_sets: Optional[List[List[OnDiskTVTSet]]] = []
+    validation_sets: Optional[List[List[OnDiskTVTSet]]] = []
+    test_sets: Optional[List[List[OnDiskTVTSet]]] = []
