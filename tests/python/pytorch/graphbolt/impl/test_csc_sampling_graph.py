@@ -6,6 +6,9 @@ import backend as F
 
 import dgl
 import dgl.graphbolt as gb
+
+import gb_test_utils as gbt
+
 import pytest
 import torch
 from scipy import sparse as spsp
