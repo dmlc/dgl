@@ -216,7 +216,8 @@ class CSCSamplingGraph:
         return self._c_csc_graph.in_subgraph(nodes)
 
     def _convert_to_sampled_subgraph(
-        self, C_sampled_subgraph: torch.classes.graphbolt.SampledSubgraph
+        self,
+        C_sampled_subgraph: torch.ScriptObject,
     ):
         """An internal function used to convert a fused homogeneous sampled
         subgraph to general struct 'SampledSubgraphImpl'."""
