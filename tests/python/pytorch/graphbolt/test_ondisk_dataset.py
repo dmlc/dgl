@@ -19,7 +19,7 @@ def test_OnDiskDataset_TVTSet_exceptions():
         # Case 1: ``format`` is invalid.
         yaml_content = """
         train_sets:
-          - - type_name: paper
+          - - type: paper
               format: torch_invalid
               path: set/paper-train.pt
         """
@@ -29,13 +29,13 @@ def test_OnDiskDataset_TVTSet_exceptions():
         with pytest.raises(pydantic.ValidationError):
             _ = gb.OnDiskDataset(yaml_file)
 
-        # Case 2: ``type_name`` is not specified while multiple TVT sets are specified.
+        # Case 2: ``type`` is not specified while multiple TVT sets are specified.
         yaml_content = """
             train_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: set/train.npy
-                - type_name: null
+                - type: null
                   format: numpy
                   path: set/train.npy
         """
@@ -43,7 +43,7 @@ def test_OnDiskDataset_TVTSet_exceptions():
             f.write(yaml_content)
         with pytest.raises(
             AssertionError,
-            match=r"Only one TVT set is allowed if type_name is not specified.",
+            match=r"Only one TVT set is allowed if type is not specified.",
         ):
             _ = gb.OnDiskDataset(yaml_file)
 
@@ -71,29 +71,29 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
 
         # Case 1:
         #   all TVT sets are specified.
-        #   ``type_name`` is not specified or specified as ``null``.
+        #   ``type`` is not specified or specified as ``null``.
         #   ``in_memory`` could be ``true`` and ``false``.
         yaml_content = f"""
             train_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   in_memory: true
                   path: {train_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {train_path}
             validation_sets:
               - - format: numpy
                   path: {validation_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {validation_path}
             test_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   in_memory: false
                   path: {test_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {test_path}
         """
@@ -140,7 +140,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         # Case 2: Some TVT sets are None.
         yaml_content = f"""
             train_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {train_path}
         """
@@ -178,25 +178,25 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
 
         yaml_content = f"""
             train_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   in_memory: true
                   path: {train_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {train_path}
             validation_sets:
               - - format: numpy
                   path: {validation_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {validation_path}
             test_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   in_memory: false
                   path: {test_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {test_path}
         """
@@ -267,26 +267,26 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
 
         yaml_content = f"""
             train_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   in_memory: true
                   path: {train_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {train_path}
             validation_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   path: {validation_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {validation_path}
             test_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   in_memory: false
                   path: {test_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {test_path}
         """
@@ -369,26 +369,26 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
 
         yaml_content = f"""
             train_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   in_memory: true
                   path: {train_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {train_path}
             validation_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   path: {validation_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {validation_path}
             test_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   in_memory: false
                   path: {test_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {test_path}
         """
