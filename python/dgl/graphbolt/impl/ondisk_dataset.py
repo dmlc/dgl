@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple
 
 from ..dataset import Dataset
 
-from ..graph_storage import CSCSamplingGraph, load_csc_sampling_graph
+from .csc_sampling_graph import CSCSamplingGraph, load_csc_sampling_graph
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, tensor_to_tuple
 from .ondisk_metadata import OnDiskGraphTopology, OnDiskMetaData, OnDiskTVTSet
