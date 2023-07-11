@@ -13,7 +13,16 @@ from .torch_based_feature_store import (
     TorchBasedFeatureStore,
 )
 
-__all__ = ["OnDiskDataset"]
+__all__ = ["OnDiskDataset", "preprocess_ondisk_dataset"]
+
+
+def preprocess_ondisk_dataset(metadata_path: str) -> str:
+    """Preprocess the on-disk dataset."""
+    # [TODO]
+    print("Start to preprocess the on-disk dataset.")
+    new_metadata_path = metadata_path
+    print("Finish preprocessing the on-disk dataset.")
+    return new_metadata_path
 
 
 class OnDiskDataset(Dataset):
@@ -49,17 +58,17 @@ class OnDiskDataset(Dataset):
             in_memory: false
             path: edge_data/author-writes-paper-feat.npy
         train_sets:
-          - - type_name: paper # could be null for homogeneous graph.
+          - - type: paper # could be null for homogeneous graph.
               format: numpy
               in_memory: true # If not specified, default to true.
               path: set/paper-train.npy
         validation_sets:
-          - - type_name: paper
+          - - type: paper
               format: numpy
               in_memory: true
               path: set/paper-validation.npy
         test_sets:
-          - - type_name: paper
+          - - type: paper
               format: numpy
               in_memory: true
               path: set/paper-test.npy
@@ -71,6 +80,9 @@ class OnDiskDataset(Dataset):
     """
 
     def __init__(self, path: str) -> None:
+        # Always call the preprocess function first. If already preprocessed,
+        # the function will return the original path directly.
+        path = preprocess_ondisk_dataset(path)
         with open(path, "r") as f:
             self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
         self._dataset_name = self._meta.dataset_name
@@ -139,10 +151,10 @@ class OnDiskDataset(Dataset):
         for tvt_set in tvt_sets:
             if (tvt_set is None) or (len(tvt_set) == 0):
                 ret.append(None)
-            if tvt_set[0].type_name is None:
+            if tvt_set[0].type is None:
                 assert (
                     len(tvt_set) == 1
-                ), "Only one TVT set is allowed if type_name is not specified."
+                ), "Only one TVT set is allowed if type is not specified."
                 data = read_data(
                     tvt_set[0].path, tvt_set[0].format, tvt_set[0].in_memory
                 )
@@ -150,7 +162,7 @@ class OnDiskDataset(Dataset):
             else:
                 data = {}
                 for tvt in tvt_set:
-                    data[tvt.type_name] = ItemSet(
+                    data[tvt.type] = ItemSet(
                         tensor_to_tuple(
                             read_data(tvt.path, tvt.format, tvt.in_memory)
                         )
