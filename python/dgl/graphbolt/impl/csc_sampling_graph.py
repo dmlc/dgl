@@ -270,27 +270,33 @@ class CSCSamplingGraph:
         >>> ntypes = {'n1': 0, 'n2': 1, 'n3': 2}
         >>> etypes = {('n1', 'e1', 'n2'): 0, ('n1', 'e2', 'n3'): 1}
         >>> metadata = gb.GraphMetadata(ntypes, etypes)
-        >>> indptr = torch.LongTensor([0, 3, 5, 7])
-        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1])
+        >>> indptr = torch.LongTensor([0, 3, 4, 5, 7])
+        >>> indices = torch.LongTensor([0, 1, 3, 2, 3, 0, 1])
+        >>> node_type_offset = torch.LongTensor([0, 2, 3, 4])
         >>> type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1])
         >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge,
-        ... metadata=metadata)
-        >>> nodes = torch.LongTensor([1, 2])
+        ... node_type_offset=node_type_offset, metadata=metadata)
+        >>> nodes = {'n1': torch.LongTensor([1]), 'n2': torch.LongTensor([0])}
         >>> fanouts = torch.tensor([1, 1])
         >>> subgraph = graph.sample_neighbors(nodes, fanouts)
         >>> print(subgraph.node_pairs)
+        defaultdict(<class 'list'>, {('n1', 'e1', 'n2'): (tensor([2]), \
+        tensor([1])), ('n1', 'e2', 'n3'): (tensor([3]), tensor([2]))})
         """
-        def convert_to_homogeneous_nodes():
+
+        def convert_to_homogeneous_nodes(nodes):
             homogeneous_nodes = []
             for ntype, ids in nodes.items():
                 ntype_id = self.metadata.node_type_to_id[ntype]
                 homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
-            nodes = torch.cat(homogeneous_nodes)               
+            return torch.cat(homogeneous_nodes)
         if isinstance(nodes, dict):
-           nodes = convert_to_homogeneous_nodes()                     
+            nodes = convert_to_homogeneous_nodes(nodes)
+        
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, False, probs_name
         )
+
         def convert_to_sampled_subgraph():
             column_num = (
                 C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
@@ -307,14 +313,19 @@ class CSCSamplingGraph:
             else:
                 node_pairs = defaultdict(list)
                 for etype, etype_id in self.metadata.edge_type_to_id.items():
+                    src_ntype, _, dst_ntype = etype
+                    src_ntype_id = self.metadata.node_type_to_id[src_ntype]
+                    dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
                     mask = type_per_edge == etype_id
-                    node_pairs[etype] = (row[mask], column[mask])
+                    hetero_row = row[mask] - self.node_type_offset[src_ntype_id]
+                    hetero_column = (
+                        column[mask] - self.node_type_offset[dst_ntype_id]
+                    )
+                    node_pairs[etype] = (hetero_row, hetero_column)
             return node_pairs
-
         return CSCSamplingGraphSampledSubgraph(
             node_pairs=convert_to_sampled_subgraph()
         )
-
 
     def _sample_neighbors(
         self,
@@ -407,7 +418,6 @@ class CSCSamplingGraph:
         return self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, return_eids, probs_name
         )
-
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
