@@ -68,7 +68,7 @@ def squash(s, dim=1):
 
 
 def init_graph(in_nodes, out_nodes, f_size, device="cpu"):
-    g = dgl.DGLGraph()
+    g = dgl.graph()
     g.set_n_initializer(dgl.frame.zero_initializer)
     all_nodes = in_nodes + out_nodes
     g.add_nodes(all_nodes)
