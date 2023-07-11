@@ -11,7 +11,7 @@ import torch
 from ...base import ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
-from .csc_sampling_graph_sampled_subgraph import CSCSamplingGraphSampledSubgraph
+from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
 class GraphMetadata:
@@ -215,13 +215,45 @@ class CSCSamplingGraph:
         # TODO: change the result to 'SampledSubgraphImpl'.
         return self._c_csc_graph.in_subgraph(nodes)
 
+    def _convert_to_sampled_subgraph(
+        self,
+        C_sampled_subgraph: torch.ScriptObject,
+    ):
+        """An internal function used to convert a fused homogeneous sampled
+        subgraph to general struct 'SampledSubgraphImpl'."""
+        column_num = (
+            C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
+        )
+        column = C_sampled_subgraph.reverse_column_node_ids.repeat_interleave(
+            column_num
+        )
+        row = C_sampled_subgraph.indices
+        type_per_edge = C_sampled_subgraph.type_per_edge
+        if type_per_edge is None:
+            node_pairs = (row, column)
+        else:
+            node_pairs = defaultdict(list)
+            for etype, etype_id in self.metadata.edge_type_to_id.items():
+                src_ntype, _, dst_ntype = etype
+                src_ntype_id = self.metadata.node_type_to_id[src_ntype]
+                dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
+                mask = type_per_edge == etype_id
+                hetero_row = row[mask] - self.node_type_offset[src_ntype_id]
+                hetero_column = (
+                    column[mask] - self.node_type_offset[dst_ntype_id]
+                )
+                node_pairs[etype] = (hetero_row, hetero_column)
+        return SampledSubgraphImpl(
+            node_pairs=node_pairs,
+        )
+
     def sample_neighbors(
         self,
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-    ) -> CSCSamplingGraphSampledSubgraph:
+    ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
 
@@ -261,7 +293,7 @@ class CSCSamplingGraph:
             equalling the total number of edges.
         Returns
         -------
-        CSCSamplingGraphSampledSubgraph
+        SampledSubgraphImpl
             The sampled subgraph.
 
         Examples
@@ -298,36 +330,7 @@ class CSCSamplingGraph:
             nodes, fanouts, replace, False, probs_name
         )
 
-        def convert_to_sampled_subgraph():
-            column_num = (
-                C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
-            )
-            column = (
-                C_sampled_subgraph.reverse_column_node_ids.repeat_interleave(
-                    column_num
-                )
-            )
-            row = C_sampled_subgraph.indices
-            type_per_edge = C_sampled_subgraph.type_per_edge
-            if type_per_edge is None:
-                node_pairs = (row, column)
-            else:
-                node_pairs = defaultdict(list)
-                for etype, etype_id in self.metadata.edge_type_to_id.items():
-                    src_ntype, _, dst_ntype = etype
-                    src_ntype_id = self.metadata.node_type_to_id[src_ntype]
-                    dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
-                    mask = type_per_edge == etype_id
-                    hetero_row = row[mask] - self.node_type_offset[src_ntype_id]
-                    hetero_column = (
-                        column[mask] - self.node_type_offset[dst_ntype_id]
-                    )
-                    node_pairs[etype] = (hetero_row, hetero_column)
-            return node_pairs
-
-        return CSCSamplingGraphSampledSubgraph(
-            node_pairs=convert_to_sampled_subgraph()
-        )
+        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def _sample_neighbors(
         self,
