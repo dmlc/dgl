@@ -27,12 +27,8 @@ def test_DataLoader():
     # TODO(BarclayII): temporarily using DGLGraph.  Should test using
     # GraphBolt's storage as well once issue #5953 is resolved.
     graph = dgl.add_reverse_edges(dgl.rand_graph(200, 6000))
-    features = dgl.graphbolt.TorchBasedFeatureStore(
-        torch.randn(200, 4)
-    )
-    labels = dgl.graphbolt.TorchBasedFeatureStore(
-        torch.randint(0, 10, (200,))
-    )
+    features = dgl.graphbolt.TorchBasedFeatureStore(torch.randn(200, 4))
+    labels = dgl.graphbolt.TorchBasedFeatureStore(torch.randint(0, 10, (200,)))
 
     minibatch_sampler = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
     subgraph_sampler = dgl.graphbolt.SubgraphSampler(
