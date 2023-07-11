@@ -20,3 +20,9 @@ def test_Dataset():
         _ = dataset.graph()
     with pytest.raises(NotImplementedError):
         _ = dataset.feature()
+    with pytest.raises(NotImplementedError):
+        _ = dataset.dataset_name
+    with pytest.raises(NotImplementedError):
+        _ = dataset.num_classes
+    with pytest.raises(NotImplementedError):
+        _ = dataset.num_labels
