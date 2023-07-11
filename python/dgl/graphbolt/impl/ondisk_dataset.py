@@ -13,7 +13,16 @@ from .torch_based_feature_store import (
     TorchBasedFeatureStore,
 )
 
-__all__ = ["OnDiskDataset"]
+__all__ = ["OnDiskDataset", "preprocess_ondisk_dataset"]
+
+
+def preprocess_ondisk_dataset(metadata_path: str) -> str:
+    """Preprocess the on-disk dataset."""
+    # [TODO]
+    print("Start to preprocess the on-disk dataset.")
+    new_metadata_path = metadata_path
+    print("Finish preprocessing the on-disk dataset.")
+    return new_metadata_path
 
 
 class OnDiskDataset(Dataset):
@@ -71,6 +80,9 @@ class OnDiskDataset(Dataset):
     """
 
     def __init__(self, path: str) -> None:
+        # Always call the preprocess function first. If already preprocessed,
+        # the function will return the original path directly.
+        path = preprocess_ondisk_dataset(path)
         with open(path, "r") as f:
             self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
         self._dataset_name = self._meta.dataset_name
