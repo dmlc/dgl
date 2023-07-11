@@ -212,7 +212,7 @@ class CSCSamplingGraph:
         assert len(torch.unique(nodes)) == len(
             nodes
         ), "Nodes cannot have duplicate values."
-        # TODO: change the result to 'CSCSamplingGraphSampledSubgraph'.
+        # TODO: change the result to 'SampledSubgraphImpl'.
         return self._c_csc_graph.in_subgraph(nodes)
 
     def sample_neighbors(
