@@ -1,10 +1,13 @@
 import os
 import tempfile
 
+import gb_test_utils as gbt
+
 import numpy as np
 
 import pydantic
 import pytest
+import torch
 from dgl import graphbolt as gb
 
 
@@ -446,3 +449,266 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
                 assert label == test_labels[i]
         test_sets = None
         dataset = None
+
+
+def test_OnDiskDataset_Feature_heterograph():
+    """Test Feature storage."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # Generate node data.
+        node_data_paper = np.random.rand(1000, 10)
+        node_data_paper_path = os.path.join(test_dir, "node_data_paper.npy")
+        np.save(node_data_paper_path, node_data_paper)
+        node_data_label = np.random.randint(0, 10, size=1000)
+        node_data_label_path = os.path.join(test_dir, "node_data_label.npy")
+        np.save(node_data_label_path, node_data_label)
+
+        # Generate edge data.
+        edge_data_writes = np.random.rand(1000, 10)
+        edge_data_writes_path = os.path.join(test_dir, "edge_writes_paper.npy")
+        np.save(edge_data_writes_path, edge_data_writes)
+        edge_data_label = np.random.randint(0, 10, size=1000)
+        edge_data_label_path = os.path.join(test_dir, "edge_data_label.npy")
+        np.save(edge_data_label_path, edge_data_label)
+
+        # Generate YAML.
+        yaml_content = f"""
+            feature_data:
+              - domain: node
+                type: paper
+                name: feat
+                format: numpy
+                in_memory: false
+                path: {node_data_paper_path}
+              - domain: node
+                type: paper
+                name: label
+                format: numpy
+                in_memory: true
+                path: {node_data_label_path}
+              - domain: edge
+                type: "author:writes:paper"
+                name: feat
+                format: numpy
+                in_memory: false
+                path: {edge_data_writes_path}
+              - domain: edge
+                type: "author:writes:paper"
+                name: label
+                format: numpy
+                in_memory: true
+                path: {edge_data_label_path}
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(yaml_file)
+
+        # Verify feature data storage.
+        feature_data = dataset.feature()
+        assert len(feature_data) == 4
+
+        # Verify node feature data.
+        node_paper_feat = feature_data[("node", "paper", "feat")]
+        assert isinstance(node_paper_feat, gb.TorchBasedFeatureStore)
+        assert torch.equal(
+            node_paper_feat.read(), torch.tensor(node_data_paper)
+        )
+        node_paper_label = feature_data[("node", "paper", "label")]
+        assert isinstance(node_paper_label, gb.TorchBasedFeatureStore)
+        assert torch.equal(
+            node_paper_label.read(), torch.tensor(node_data_label)
+        )
+
+        # Verify edge feature data.
+        edge_writes_feat = feature_data[("edge", "author:writes:paper", "feat")]
+        assert isinstance(edge_writes_feat, gb.TorchBasedFeatureStore)
+        assert torch.equal(
+            edge_writes_feat.read(), torch.tensor(edge_data_writes)
+        )
+        edge_writes_label = feature_data[
+            ("edge", "author:writes:paper", "label")
+        ]
+        assert isinstance(edge_writes_label, gb.TorchBasedFeatureStore)
+        assert torch.equal(
+            edge_writes_label.read(), torch.tensor(edge_data_label)
+        )
+
+        node_paper_feat = None
+        node_paper_label = None
+        edge_writes_feat = None
+        edge_writes_label = None
+        feature_data = None
+        dataset = None
+
+
+def test_OnDiskDataset_Feature_homograph():
+    """Test Feature storage."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # Generate node data.
+        node_data_feat = np.random.rand(1000, 10)
+        node_data_feat_path = os.path.join(test_dir, "node_data_feat.npy")
+        np.save(node_data_feat_path, node_data_feat)
+        node_data_label = np.random.randint(0, 10, size=1000)
+        node_data_label_path = os.path.join(test_dir, "node_data_label.npy")
+        np.save(node_data_label_path, node_data_label)
+
+        # Generate edge data.
+        edge_data_feat = np.random.rand(1000, 10)
+        edge_data_feat_path = os.path.join(test_dir, "edge_data_feat.npy")
+        np.save(edge_data_feat_path, edge_data_feat)
+        edge_data_label = np.random.randint(0, 10, size=1000)
+        edge_data_label_path = os.path.join(test_dir, "edge_data_label.npy")
+        np.save(edge_data_label_path, edge_data_label)
+
+        # Generate YAML.
+        # ``type`` is not specified in the YAML.
+        yaml_content = f"""
+            feature_data:
+              - domain: node
+                name: feat
+                format: numpy
+                in_memory: false
+                path: {node_data_feat_path}
+              - domain: node
+                name: label
+                format: numpy
+                in_memory: true
+                path: {node_data_label_path}
+              - domain: edge
+                name: feat
+                format: numpy
+                in_memory: false
+                path: {edge_data_feat_path}
+              - domain: edge
+                name: label
+                format: numpy
+                in_memory: true
+                path: {edge_data_label_path}
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(yaml_file)
+
+        # Verify feature data storage.
+        feature_data = dataset.feature()
+        assert len(feature_data) == 4
+
+        # Verify node feature data.
+        node_feat = feature_data[("node", None, "feat")]
+        assert isinstance(node_feat, gb.TorchBasedFeatureStore)
+        assert torch.equal(node_feat.read(), torch.tensor(node_data_feat))
+        node_label = feature_data[("node", None, "label")]
+        assert isinstance(node_label, gb.TorchBasedFeatureStore)
+        assert torch.equal(node_label.read(), torch.tensor(node_data_label))
+
+        # Verify edge feature data.
+        edge_feat = feature_data[("edge", None, "feat")]
+        assert isinstance(edge_feat, gb.TorchBasedFeatureStore)
+        assert torch.equal(edge_feat.read(), torch.tensor(edge_data_feat))
+        edge_label = feature_data[("edge", None, "label")]
+        assert isinstance(edge_label, gb.TorchBasedFeatureStore)
+        assert torch.equal(edge_label.read(), torch.tensor(edge_data_label))
+
+        node_feat = None
+        node_label = None
+        edge_feat = None
+        edge_label = None
+        feature_data = None
+        dataset = None
+
+
+def test_OnDiskDataset_Graph_Exceptions():
+    """Test exceptions in parsing graph topology."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # Invalid graph type.
+        yaml_content = """
+            graph_topology:
+              type: CSRSamplingGraph
+              path: /path/to/graph
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        with pytest.raises(
+            pydantic.ValidationError,
+            match="value is not a valid enumeration member",
+        ):
+            _ = gb.OnDiskDataset(yaml_file)
+
+
+def test_OnDiskDataset_Graph_homogeneous():
+    """Test homogeneous graph topology."""
+    csc_indptr, indices = gbt.random_homo_graph(1000, 10 * 1000)
+    graph = gb.from_csc(csc_indptr, indices)
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
+        gb.save_csc_sampling_graph(graph, graph_path)
+
+        yaml_content = f"""
+            graph_topology:
+              type: CSCSamplingGraph
+              path: {graph_path}
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(yaml_file)
+        graph2 = dataset.graph()
+
+        assert graph.num_nodes == graph2.num_nodes
+        assert graph.num_edges == graph2.num_edges
+
+        assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
+        assert torch.equal(graph.indices, graph2.indices)
+
+        assert graph.metadata is None and graph2.metadata is None
+        assert (
+            graph.node_type_offset is None and graph2.node_type_offset is None
+        )
+        assert graph.type_per_edge is None and graph2.type_per_edge is None
+
+
+def test_OnDiskDataset_Graph_heterogeneous():
+    """Test heterogeneous graph topology."""
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
+    graph = gb.from_csc(
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+    )
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
+        gb.save_csc_sampling_graph(graph, graph_path)
+
+        yaml_content = f"""
+            graph_topology:
+              type: CSCSamplingGraph
+              path: {graph_path}
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(yaml_file)
+        graph2 = dataset.graph()
+
+        assert graph.num_nodes == graph2.num_nodes
+        assert graph.num_edges == graph2.num_edges
+
+        assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
+        assert torch.equal(graph.indices, graph2.indices)
+        assert torch.equal(graph.node_type_offset, graph2.node_type_offset)
+        assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
+        assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
+        assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
