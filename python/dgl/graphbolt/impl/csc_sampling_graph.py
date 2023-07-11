@@ -164,6 +164,20 @@ class CSCSamplingGraph:
         return self._c_csc_graph.type_per_edge()
 
     @property
+    def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Returns the edge attributes dictionary.
+
+        Returns
+        -------
+        torch.Tensor or None
+            If present, returns a dictionary of edge attributes. Each key
+            represents the attribute's name, while the corresponding value
+            holds the attribute's specific value. The length of each value
+            should match the total number of edges."
+        """
+        return self._c_csc_graph.edge_attributes()
+
+    @property
     def metadata(self) -> Optional[GraphMetadata]:
         """Returns the metadata of the graph.
 
@@ -187,7 +201,7 @@ class CSCSamplingGraph:
 
         Returns
         -------
-        SampledSubgraph
+        torch.classes.graphbolt.SampledSubgraph
             The in subgraph.
         """
         # Ensure nodes is 1-D tensor.
@@ -196,6 +210,7 @@ class CSCSamplingGraph:
         assert len(torch.unique(nodes)) == len(
             nodes
         ), "Nodes cannot have duplicate values."
+        # TODO: change the result to 'SampledSubgraphImpl'.
         return self._c_csc_graph.in_subgraph(nodes)
 
     def sample_neighbors(
@@ -244,7 +259,7 @@ class CSCSamplingGraph:
             to the number of edges.
         Returns
         -------
-        SampledSubgraph
+        torch.classes.graphbolt.SampledSubgraph
             The sampled subgraph.
 
         Examples
@@ -270,6 +285,14 @@ class CSCSamplingGraph:
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
+        expected_fanout_len = 1
+        if self.metadata and self.metadata.edge_type_to_id:
+            expected_fanout_len = len(self.metadata.edge_type_to_id)
+        assert len(fanouts) in [
+            expected_fanout_len,
+            1,
+        ], "Fanouts should have the same number of elements as etypes or \
+            should have a length of 1."
         if fanouts.size(0) > 1:
             assert (
                 self.type_per_edge is not None
@@ -279,10 +302,6 @@ class CSCSamplingGraph:
             (fanouts >= 0) | (fanouts == -1)
         ), "Fanouts should consist of values that are either -1 or \
             greater than or equal to 0."
-        if self.metadata and self.metadata.edge_type_to_id:
-            assert len(self.metadata.edge_type_to_id) == fanouts.size(
-                0
-            ), "Fanouts should have the same number of elements as etypes."
         if probs_or_mask is not None:
             assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
@@ -298,6 +317,60 @@ class CSCSamplingGraph:
             ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
+        )
+
+    def sample_negative_edges_uniform(
+        self, edge_type, node_pairs, negative_ratio
+    ):
+        """
+        Sample negative edges by randomly choosing negative source-destination
+        pairs according to a uniform distribution. For each edge ``(u, v)``,
+        it is supposed to generate `negative_ratio` pairs of negative edges
+        ``(u, v')``, where ``v'`` is chosen uniformly from all the nodes in
+        the graph.
+
+        Parameters
+        ----------
+        edge_type: Tuple[str]
+            The type of edges in the provided node_pairs. Any negative edges
+            sampled will also have the same type. If set to None, it will be
+            considered as a homogeneous graph.
+        node_pairs : Tuple[Tensor]
+            A tuple of two 1D tensors that represent the source and destination
+            of positive edges, with 'positive' indicating that these edges are
+            present in the graph. It's important to note that within the
+            context of a heterogeneous graph, the ids in these tensors signify
+            heterogeneous ids.
+        negative_ratio: int
+            The ratio of the number of negative samples to positive samples.
+
+        Returns
+        -------
+        Tuple[Tensor]
+            A tuple consisting of two 1D tensors represents the source and
+            destination of negative edges. In the context of a heterogeneous
+            graph, both the input nodes and the selected nodes are represented
+            by heterogeneous IDs, and the formed edges are of the input type
+            `edge_type`. Note that negative refers to false negatives, which
+            means the edge could be present or not present in the graph.
+        """
+        if edge_type:
+            assert (
+                self.node_type_offset is not None
+            ), "The 'node_type_offset' array is necessary for performing \
+                negative sampling by edge type."
+            _, _, dst_node_type = edge_type
+            dst_node_type_id = self.metadata.node_type_to_id[dst_node_type]
+            max_node_id = (
+                self.node_type_offset[dst_node_type_id + 1]
+                - self.node_type_offset[dst_node_type_id]
+            )
+        else:
+            max_node_id = self.num_nodes
+        return self._c_csc_graph.sample_negative_edges_uniform(
+            node_pairs,
+            negative_ratio,
+            max_node_id,
         )
 
     def copy_to_shared_memory(self, shared_memory_name: str):
@@ -324,6 +397,7 @@ def from_csc(
     indices: torch.Tensor,
     node_type_offset: Optional[torch.tensor] = None,
     type_per_edge: Optional[torch.tensor] = None,
+    edge_attributes: Optional[Dict[str, torch.tensor]] = None,
     metadata: Optional[GraphMetadata] = None,
 ) -> CSCSamplingGraph:
     """Create a CSCSamplingGraph object from a CSC representation.
@@ -340,6 +414,8 @@ def from_csc(
         Offset of node types in the graph, by default None.
     type_per_edge : Optional[torch.tensor], optional
         Type ids of each edge in the graph, by default None.
+    edge_attributes: Optional[Dict[str, torch.tensor]], optional
+        Edge attributes of the graph, by default None.
     metadata: Optional[GraphMetadata], optional
         Metadata of the graph, by default None.
     Returns
@@ -357,7 +433,7 @@ def from_csc(
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
     >>> graph = graphbolt.from_csc(csc_indptr, indices, node_type_offset, \
-    >>>                            type_per_edge, metadata)
+    >>>                            type_per_edge, None, metadata)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
@@ -369,7 +445,11 @@ def from_csc(
         ), "node_type_offset length should be |ntypes| + 1."
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
-            csc_indptr, indices, node_type_offset, type_per_edge
+            csc_indptr,
+            indices,
+            node_type_offset,
+            type_per_edge,
+            edge_attributes,
         ),
         metadata,
     )
@@ -476,7 +556,11 @@ def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
-            indptr, indices, node_type_offset, type_per_edge
+            indptr,
+            indices,
+            node_type_offset,
+            type_per_edge,
+            None,
         ),
         metadata,
     )

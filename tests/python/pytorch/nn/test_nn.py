@@ -1826,8 +1826,9 @@ def test_pgexplainer(g, idtype, n_classes):
     g = transform(g)
 
     class Model(th.nn.Module):
-        def __init__(self, in_feats, out_feats):
+        def __init__(self, in_feats, out_feats, graph=False):
             super(Model, self).__init__()
+            self.graph = graph
             self.conv = nn.GraphConv(in_feats, out_feats)
             self.fc = th.nn.Linear(out_feats, out_feats)
             th.nn.init.xavier_uniform_(self.fc.weight)
@@ -1835,7 +1836,7 @@ def test_pgexplainer(g, idtype, n_classes):
         def forward(self, g, h, embed=False, edge_weight=None):
             h = self.conv(g, h, edge_weight=edge_weight)
 
-            if embed:
+            if not self.graph or embed:
                 return h
 
             with g.local_scope():
@@ -1843,13 +1844,35 @@ def test_pgexplainer(g, idtype, n_classes):
                 hg = dgl.mean_nodes(g, "h")
                 return self.fc(hg)
 
-    model = Model(feat.shape[1], n_classes)
+    # graph explainer
+    model = Model(feat.shape[1], n_classes, graph=True)
     model = model.to(ctx)
-
     explainer = nn.PGExplainer(model, n_classes)
     explainer.train_step(g, g.ndata["attr"], 5.0)
 
     probs, edge_weight = explainer.explain_graph(g, feat)
+
+    # node explainer
+    model = Model(feat.shape[1], n_classes, graph=False)
+    model = model.to(ctx)
+    explainer = nn.PGExplainer(
+        model, n_classes, num_hops=1, explain_graph=False
+    )
+    explainer.train_step_node(0, g, g.ndata["attr"], 5.0)
+    explainer.train_step_node([0, 1], g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(th.tensor(0), g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(th.tensor([0, 1]), g, g.ndata["attr"], 5.0)
+
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(0, g, feat)
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        [0, 1], g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        th.tensor(0), g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        th.tensor([0, 1]), g, feat
+    )
 
 
 @pytest.mark.parametrize("g", get_cases(["hetero"]))
@@ -1901,9 +1924,10 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
                 return self.fc(hg)
 
     embed_dim = input_dim
+
+    # graph explainer
     model = Model(input_dim, embed_dim, n_classes, g.canonical_etypes)
     model = model.to(ctx)
-
     explainer = nn.HeteroPGExplainer(model, embed_dim)
     explainer.train_step(g, feat, 5.0)
 

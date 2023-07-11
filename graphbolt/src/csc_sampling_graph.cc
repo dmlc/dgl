@@ -11,6 +11,7 @@
 #include <tuple>
 #include <vector>
 
+#include "./random.h"
 #include "./shared_memory_utils.h"
 
 namespace graphbolt {
@@ -19,11 +20,13 @@ namespace sampling {
 CSCSamplingGraph::CSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
-    const torch::optional<torch::Tensor>& type_per_edge)
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<EdgeAttrMap>& edge_attributes)
     : indptr_(indptr),
       indices_(indices),
       node_type_offset_(node_type_offset),
-      type_per_edge_(type_per_edge) {
+      type_per_edge_(type_per_edge),
+      edge_attributes_(edge_attributes) {
   TORCH_CHECK(indptr.dim() == 1);
   TORCH_CHECK(indices.dim() == 1);
   TORCH_CHECK(indptr.device() == indices.device());
@@ -32,7 +35,8 @@ CSCSamplingGraph::CSCSamplingGraph(
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
-    const torch::optional<torch::Tensor>& type_per_edge) {
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<EdgeAttrMap>& edge_attributes) {
   if (node_type_offset.has_value()) {
     auto& offset = node_type_offset.value();
     TORCH_CHECK(offset.dim() == 1);
@@ -41,9 +45,13 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
     TORCH_CHECK(type_per_edge.value().dim() == 1);
     TORCH_CHECK(type_per_edge.value().size(0) == indices.size(0));
   }
-
+  if (edge_attributes.has_value()) {
+    for (const auto& pair : edge_attributes.value()) {
+      TORCH_CHECK(pair.value().size(0) == indices.size(0));
+    }
+  }
   return c10::make_intrusive<CSCSamplingGraph>(
-      indptr, indices, node_type_offset, type_per_edge);
+      indptr, indices, node_type_offset, type_per_edge, edge_attributes);
 }
 
 void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
@@ -185,14 +193,27 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
   torch::Tensor subgraph_indices =
       torch::index_select(indices_, 0, picked_eids);
   torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
-  if (type_per_edge_.has_value())
+  if (type_per_edge_.has_value()) {
     subgraph_type_per_edge =
         torch::index_select(type_per_edge_.value(), 0, picked_eids);
+  }
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
   return c10::make_intrusive<SampledSubgraph>(
       subgraph_indptr, subgraph_indices, nodes, torch::nullopt,
       subgraph_reverse_edge_ids, subgraph_type_per_edge);
+}
+
+std::tuple<torch::Tensor, torch::Tensor>
+CSCSamplingGraph::SampleNegativeEdgesUniform(
+    const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
+    int64_t negative_ratio, int64_t max_node_id) const {
+  torch::Tensor pos_src;
+  std::tie(pos_src, std::ignore) = node_pairs;
+  auto neg_len = pos_src.size(0) * negative_ratio;
+  auto neg_src = pos_src.repeat(negative_ratio);
+  auto neg_dst = torch::randint(0, max_node_id, {neg_len}, pos_src.options());
+  return std::make_tuple(neg_src, neg_dst);
 }
 
 c10::intrusive_ptr<CSCSamplingGraph>
@@ -203,7 +224,7 @@ CSCSamplingGraph::BuildGraphFromSharedMemoryTensors(
   auto& optional_tensors = std::get<2>(shared_memory_tensors);
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
       optional_tensors[0].value(), optional_tensors[1].value(),
-      optional_tensors[2], optional_tensors[3]);
+      optional_tensors[2], optional_tensors[3], torch::nullopt);
   graph->tensor_meta_shm_ = std::move(std::get<0>(shared_memory_tensors));
   graph->tensor_data_shm_ = std::move(std::get<1>(shared_memory_tensors));
   return graph;
@@ -238,7 +259,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
  * fanout is >= the number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
- * @param replace Boolean indicating whether the sample is preformed with or
+ * @param replace Boolean indicating whether the sample is performed with or
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
@@ -251,14 +272,95 @@ inline torch::Tensor UniformPick(
   torch::Tensor picked_neighbors;
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
     picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
+  } else if (replace) {
+    picked_neighbors =
+        torch::randint(offset, offset + num_neighbors, {fanout}, options);
   } else {
-    if (replace) {
-      picked_neighbors =
-          torch::randint(offset, offset + num_neighbors, {fanout}, options);
-    } else {
-      picked_neighbors = torch::randperm(num_neighbors, options);
-      picked_neighbors = picked_neighbors.slice(0, 0, fanout) + offset;
-    }
+    picked_neighbors = torch::empty({fanout}, options);
+    AT_DISPATCH_INTEGRAL_TYPES(
+        picked_neighbors.scalar_type(), "UniformPick", ([&] {
+          scalar_t* picked_neighbors_data =
+              picked_neighbors.data_ptr<scalar_t>();
+          // We use different sampling strategies for different sampling case.
+          if (fanout >= num_neighbors / 10) {
+            // [Algorithm]
+            // This algorithm is conceptually related to the Fisher-Yates
+            // shuffle.
+            //
+            // [Complexity Analysis]
+            // This algorithm's memory complexity is O(num_neighbors), but
+            // it generates fewer random numbers (O(fanout)).
+            //
+            // (Compare) Reservoir algorithm is one of the most classical
+            // sampling algorithms. Both the reservoir algorithm and our
+            // algorithm offer distinct advantages, we need to compare to
+            // illustrate our trade-offs.
+            // The reservoir algorithm is memory-efficient (O(fanout)) but
+            // creates many random numbers (O(num_neighbors)), which is
+            // costly.
+            //
+            // [Practical Consideration]
+            // Use this algorithm when `fanout >= num_neighbors / 10` to
+            // reduce computation.
+            // In this scenarios above, memory complexity is not a concern due
+            // to the small size of both `fanout` and `num_neighbors`. And it
+            // is efficient to allocate a small amount of memory. So the
+            // algorithm performence is great in this case.
+            std::vector<scalar_t> seq(num_neighbors);
+            // Assign the seq with [offset, offset + num_neighbors].
+            std::iota(seq.begin(), seq.end(), offset);
+            for (int64_t i = 0; i < fanout; ++i) {
+              auto j = RandomEngine::ThreadLocal()->RandInt(i, num_neighbors);
+              std::swap(seq[i], seq[j]);
+            }
+            // Save the randomly sampled fanout elements to the output tensor.
+            std::copy(seq.begin(), seq.begin() + fanout, picked_neighbors_data);
+          } else if (fanout < 64) {
+            // [Algorithm]
+            // Use linear search to verify uniqueness.
+            //
+            // [Complexity Analysis]
+            // Since the set of numbers is small (up to 64), so it is more
+            // cost-effective for the CPU to use this algorithm.
+            auto begin = picked_neighbors_data;
+            auto end = picked_neighbors_data + fanout;
+
+            while (begin != end) {
+              // Put the new random number in the last position.
+              *begin = RandomEngine::ThreadLocal()->RandInt(
+                  offset, offset + num_neighbors);
+              // Check if a new value doesn't exist in current
+              // range(picked_neighbors_data, begin). Otherwise get a new
+              // value until we haven't unique range of elements.
+              auto it = std::find(picked_neighbors_data, begin, *begin);
+              if (it == begin) ++begin;
+            }
+          } else {
+            // [Algorithm]
+            // Use hash-set to verify uniqueness. In the best scenario, the
+            // time complexity is O(fanout), assuming no conflicts occur.
+            //
+            // [Complexity Analysis]
+            // Let K = (fanout / num_neighbors), the expected number of extra
+            // sampling steps is roughly K^2 / (1-K) * num_neighbors, which
+            // means in the worst case scenario, the time complexity is
+            // O(num_neighbors^2).
+            //
+            // [Practical Consideration]
+            // In practice, we set the threshold K to 1/10. This trade-off is
+            // due to the slower performance of std::unordered_set, which
+            // would otherwise increase the sampling cost. By doing so, we
+            // achieve a balance between theoretical efficiency and practical
+            // performance.
+            std::unordered_set<scalar_t> picked_set;
+            while (static_cast<int64_t>(picked_set.size()) < fanout) {
+              picked_set.insert(RandomEngine::ThreadLocal()->RandInt(
+                  offset, offset + num_neighbors));
+            }
+            std::copy(
+                picked_set.begin(), picked_set.end(), picked_neighbors_data);
+          }
+        }));
   }
   return picked_neighbors;
 }
@@ -286,7 +388,7 @@ inline torch::Tensor UniformPick(
  * fanout is >= the number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
- * @param replace Boolean indicating whether the sample is preformed with or
+ * @param replace Boolean indicating whether the sample is performed with or
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
@@ -346,6 +448,9 @@ torch::Tensor PickByEtype(
         const auto end = offset + num_neighbors;
         while (etype_begin < end) {
           scalar_t etype = type_per_edge_data[etype_begin];
+          TORCH_CHECK(
+              etype >= 0 && etype < fanouts.size(),
+              "Etype values exceed the number of fanouts.");
           int64_t fanout = fanouts[etype];
           auto etype_end_it = std::upper_bound(
               type_per_edge_data + etype_begin, type_per_edge_data + end,
