@@ -203,7 +203,7 @@ class CSCSamplingGraph:
 
         Returns
         -------
-        C_SampledSubgraph
+        torch.classes.graphbolt.SampledSubgraph
             The in subgraph.
         """
         # Ensure nodes is 1-D tensor.
@@ -212,7 +212,7 @@ class CSCSamplingGraph:
         assert len(torch.unique(nodes)) == len(
             nodes
         ), "Nodes cannot have duplicate values."
-        # TODO: change the result to 'CSCSamplingGraphSampledSubgraph'
+        # TODO: change the result to 'CSCSamplingGraphSampledSubgraph'.
         return self._c_csc_graph.in_subgraph(nodes)
 
     def sample_neighbors(

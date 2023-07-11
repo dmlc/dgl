@@ -44,5 +44,3 @@ def load_graphbolt():
 
 
 load_graphbolt()
-
-C_SampledSubgraph = torch.classes.graphbolt.SampledSubgraph

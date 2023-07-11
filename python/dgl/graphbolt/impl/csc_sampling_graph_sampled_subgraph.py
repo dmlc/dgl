@@ -1,3 +1,5 @@
+"""Sampled subgraph for CSCSamplingGraph."""
+# pylint: disable= invalid-name
 from dataclasses import dataclass
 from typing import Dict, Tuple, Union
 
@@ -12,7 +14,7 @@ class CSCSamplingGraphSampledSubgraph(SampledSubGraph):
 
     Examples
     --------
-    >>> node_pairs = {('A', 'B', 'relation'): (torch.tensor([1, 2, 3]), 
+    >>> node_pairs = {('A', 'B', 'relation'): (torch.tensor([1, 2, 3]),
     ... torch.tensor([4, 5, 6]))}
     >>> reverse_column_node_ids = {'A': torch.tensor([7, 8, 9]),
     ... 'B': torch.tensor([10, 11, 12])}
@@ -38,12 +40,8 @@ class CSCSamplingGraphSampledSubgraph(SampledSubGraph):
         Dict[Tuple[str, str, str], Tuple[torch.tensor, torch.tensor]],
         Tuple[torch.tensor, torch.tensor],
     ] = None
-    reverse_column_node_ids: Union[
-        Dict[str, torch.tensor], torch.tensor
-    ] = None
-    reverse_row_node_ids: Union[
-        Dict[str, torch.tensor], torch.tensor
-    ] = None
+    reverse_column_node_ids: Union[Dict[str, torch.tensor], torch.tensor] = None
+    reverse_row_node_ids: Union[Dict[str, torch.tensor], torch.tensor] = None
     reverse_edge_ids: Union[
         Dict[Tuple[str, str, str], torch.tensor], torch.tensor
     ] = None
