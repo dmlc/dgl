@@ -784,4 +784,3 @@ def test_from_dglgraph_heterogeneous():
     }
 
 
-test_homo_graph(10, 50)
