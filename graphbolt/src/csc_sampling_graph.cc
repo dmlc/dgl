@@ -499,7 +499,7 @@ inline torch::Tensor CSCSamplingGraph::LaborPick(
         scalar_t* picked_neighbors_data = picked_neighbors.data_ptr<scalar_t>();
         for (int64_t i = 0; i < fanout; ++i) {
           const auto [rnd, j] = heap_data[i];
-          if (rnd < std::numeric_limits<float>::infinity()) {
+          if (!nonuniform || rnd < std::numeric_limits<float>::infinity()) {
             picked_neighbors_data[num_sampled++] = offset + j;
           }
         }
