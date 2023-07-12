@@ -164,6 +164,20 @@ class CSCSamplingGraph:
         return self._c_csc_graph.type_per_edge()
 
     @property
+    def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Returns the edge attributes dictionary.
+
+        Returns
+        -------
+        torch.Tensor or None
+            If present, returns a dictionary of edge attributes. Each key
+            represents the attribute's name, while the corresponding value
+            holds the attribute's specific value. The length of each value
+            should match the total number of edges."
+        """
+        return self._c_csc_graph.edge_attributes()
+
+    @property
     def metadata(self) -> Optional[GraphMetadata]:
         """Returns the metadata of the graph.
 
@@ -383,6 +397,7 @@ def from_csc(
     indices: torch.Tensor,
     node_type_offset: Optional[torch.tensor] = None,
     type_per_edge: Optional[torch.tensor] = None,
+    edge_attributes: Optional[Dict[str, torch.tensor]] = None,
     metadata: Optional[GraphMetadata] = None,
 ) -> CSCSamplingGraph:
     """Create a CSCSamplingGraph object from a CSC representation.
@@ -399,6 +414,8 @@ def from_csc(
         Offset of node types in the graph, by default None.
     type_per_edge : Optional[torch.tensor], optional
         Type ids of each edge in the graph, by default None.
+    edge_attributes: Optional[Dict[str, torch.tensor]], optional
+        Edge attributes of the graph, by default None.
     metadata: Optional[GraphMetadata], optional
         Metadata of the graph, by default None.
     Returns
@@ -416,7 +433,7 @@ def from_csc(
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
     >>> graph = graphbolt.from_csc(csc_indptr, indices, node_type_offset, \
-    >>>                            type_per_edge, metadata)
+    >>>                            type_per_edge, None, metadata)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
@@ -428,7 +445,11 @@ def from_csc(
         ), "node_type_offset length should be |ntypes| + 1."
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
-            csc_indptr, indices, node_type_offset, type_per_edge
+            csc_indptr,
+            indices,
+            node_type_offset,
+            type_per_edge,
+            edge_attributes,
         ),
         metadata,
     )
@@ -535,7 +556,11 @@ def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
-            indptr, indices, node_type_offset, type_per_edge
+            indptr,
+            indices,
+            node_type_offset,
+            type_per_edge,
+            None,
         ),
         metadata,
     )

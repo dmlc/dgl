@@ -20,11 +20,13 @@ namespace sampling {
 CSCSamplingGraph::CSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
-    const torch::optional<torch::Tensor>& type_per_edge)
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<EdgeAttrMap>& edge_attributes)
     : indptr_(indptr),
       indices_(indices),
       node_type_offset_(node_type_offset),
-      type_per_edge_(type_per_edge) {
+      type_per_edge_(type_per_edge),
+      edge_attributes_(edge_attributes) {
   TORCH_CHECK(indptr.dim() == 1);
   TORCH_CHECK(indices.dim() == 1);
   TORCH_CHECK(indptr.device() == indices.device());
@@ -33,7 +35,8 @@ CSCSamplingGraph::CSCSamplingGraph(
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
-    const torch::optional<torch::Tensor>& type_per_edge) {
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<EdgeAttrMap>& edge_attributes) {
   if (node_type_offset.has_value()) {
     auto& offset = node_type_offset.value();
     TORCH_CHECK(offset.dim() == 1);
@@ -42,9 +45,13 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
     TORCH_CHECK(type_per_edge.value().dim() == 1);
     TORCH_CHECK(type_per_edge.value().size(0) == indices.size(0));
   }
-
+  if (edge_attributes.has_value()) {
+    for (const auto& pair : edge_attributes.value()) {
+      TORCH_CHECK(pair.value().size(0) == indices.size(0));
+    }
+  }
   return c10::make_intrusive<CSCSamplingGraph>(
-      indptr, indices, node_type_offset, type_per_edge);
+      indptr, indices, node_type_offset, type_per_edge, edge_attributes);
 }
 
 void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
@@ -217,7 +224,7 @@ CSCSamplingGraph::BuildGraphFromSharedMemoryTensors(
   auto& optional_tensors = std::get<2>(shared_memory_tensors);
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
       optional_tensors[0].value(), optional_tensors[1].value(),
-      optional_tensors[2], optional_tensors[3]);
+      optional_tensors[2], optional_tensors[3], torch::nullopt);
   graph->tensor_meta_shm_ = std::move(std::get<0>(shared_memory_tensors));
   graph->tensor_data_shm_ = std::move(std::get<1>(shared_memory_tensors));
   return graph;
