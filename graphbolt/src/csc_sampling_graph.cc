@@ -133,11 +133,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 template <bool labor>
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool return_eids,
+    int64_t replace, bool return_eids,
     torch::optional<torch::Tensor> probs_or_mask) const {
-  TORCH_CHECK(
-      !replace || !labor,
-      "Sampling with replacement is not supported for labor.");
   const int64_t num_nodes = nodes.size(0);
   // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
@@ -146,10 +143,6 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
   torch::Tensor num_picked_neighbors_per_node =
       torch::zeros({num_nodes + 1}, indptr_.options());
 
-  const int64_t random_seed =
-      labor ? RandomEngine::ThreadLocal()->RandInt(
-                  static_cast<int64_t>(0), std::numeric_limits<int64_t>::max())
-            : replace;
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr_.scalar_type(), "parallel_for", ([&] {
         torch::parallel_for(0, num_nodes, 32, [&](scalar_t b, scalar_t e) {
@@ -174,12 +167,12 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
 
             if (consider_etype) {
               picked_neighbors_per_node[i] = PickByEtype<labor>(
-                  offset, num_neighbors, fanouts, random_seed,
-                  indptr_.options(), type_per_edge_.value(), probs_or_mask);
+                  offset, num_neighbors, fanouts, replace, indptr_.options(),
+                  type_per_edge_.value(), probs_or_mask);
             } else {
               picked_neighbors_per_node[i] = Pick<labor>(
-                  offset, num_neighbors, fanouts[0], random_seed,
-                  indptr_.options(), probs_or_mask);
+                  offset, num_neighbors, fanouts[0], replace, indptr_.options(),
+                  probs_or_mask);
             }
             num_picked_neighbors_per_node[i + 1] =
                 picked_neighbors_per_node[i].size(0);
@@ -221,8 +214,12 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     }
   }
   if (labor) {
+    TORCH_CHECK(
+        !replace, "Sampling with replacement is not supported for labor.");
+    const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
+        static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
     return SampleNeighborsImpl<true>(
-        nodes, fanouts, replace, return_eids, probs_or_mask);
+        nodes, fanouts, random_seed, return_eids, probs_or_mask);
   } else {
     return SampleNeighborsImpl<false>(
         nodes, fanouts, replace, return_eids, probs_or_mask);

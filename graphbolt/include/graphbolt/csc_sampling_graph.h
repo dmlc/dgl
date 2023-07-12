@@ -207,7 +207,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   template <bool labor>
   c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool return_eids,
+      int64_t replace, bool return_eids,
       const torch::optional<torch::Tensor>& probs_or_mask) const;
 
   template <bool nonuniform, typename float_t = float>
