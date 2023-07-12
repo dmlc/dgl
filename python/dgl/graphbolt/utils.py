@@ -27,6 +27,7 @@ def read_data(path, fmt, in_memory=True):
 
 
 def save_data(data, path, fmt):
+    """Save data into disk."""
     # Make sure the directory exists.
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
