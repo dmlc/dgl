@@ -41,7 +41,7 @@ def unique_and_compact_node_pairs(
     >>> import dgl.graphbolt as gb
     >>> N1 = torch.LongTensor([1, 2, 2])
     >>> N2 = torch.LongTensor([5, 6, 5])
-    >>> node_pairs = {("n1", "e1", "n2"): (N1, N2), 
+    >>> node_pairs = {("n1", "e1", "n2"): (N1, N2),
     ...  ("n2", "e2", "n1"): (N2, N1)}
     >>> unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(
     ... node_pairs
