@@ -1,20 +1,15 @@
 import multiprocessing as mp
-import os
-import tempfile
-import time
 import unittest
 
 import backend as F
 
 import dgl
 import dgl.graphbolt as gb
-import gb_test_utils as gbt
 
-import pytest
 import torch
 
 
-def subprocess_entry(q):
+def subprocess_entry(q, barrier):
     num_nodes = 5
     num_edges = 12
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
@@ -40,13 +35,17 @@ def subprocess_entry(q):
         seeds = sg.indices
         adjs.append(sg)
 
-    # 1. Put.
+    # Send the data twice (back and forth) and then verify.
+    # Method get() and put() of mp.Queue is blocking by default.
+    # Step 1. Put the data.
     q.put(adjs)
-    time.sleep(2)
-    # 4. Get.
+    # Step 2. Another process gets the data.
+    # Step 3. Barrier. Wait for another process to get the data.
+    barrier.wait()
+    # Step 4. Another process puts the data.
+    # Step 5. Get the data.
     result = q.get()
-
-    # Verification.
+    # Step 6. Verification.
     for hop in range(2):
         # Tensors.
         assert torch.equal(adjs[hop].indptr, result[hop].indptr)
@@ -81,13 +80,19 @@ def subprocess_entry(q):
 def test_subgraph_serialization():
     # Create a sub-process.
     q = mp.Queue()
-    proc = mp.Process(target=subprocess_entry, args=(q,))
+    barrier = mp.Barrier(2)
+    proc = mp.Process(target=subprocess_entry, args=(q, barrier))
     proc.start()
 
-    # 2. Get.
+    # Send the data twice (back and forth) and then verify.
+    # Method get() and put() of mp.Queue is blocking by default.
+    # Step 1. Another process puts the data.
+    # Step 2. Get the data. This operation will block if the queue is empty.
     items = q.get()
-    # 3. Put again.
+    # Step 3. Barrier.
+    barrier.wait()
+    # Step 4. Put the data again.
     q.put(items)
-
-    time.sleep(1)
+    # Step 5. Another process gets the final data.
+    # Step 6. Wait for another process to end
     proc.join()

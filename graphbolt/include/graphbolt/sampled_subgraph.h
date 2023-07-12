@@ -115,12 +115,6 @@ struct SampledSubgraph : torch::CustomClassHolder {
   torch::optional<torch::Tensor> type_per_edge;
 
   /**
-   * @brief Version number to indicate graph version in serialization and
-   * deserialization.
-   */
-  static constexpr int64_t kSampledSubgraphSerializeVersionNumber = 1;
-
-  /**
    * @brief Get graph state (for pickle serialization).
    * @return A vector of Tensors.
    */

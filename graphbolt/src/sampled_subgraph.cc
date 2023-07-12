@@ -13,6 +13,12 @@
 namespace graphbolt {
 namespace sampling {
 
+/**
+ * @brief Version number to indicate graph version in serialization and
+ * deserialization.
+ */
+static constexpr int64_t kSampledSubgraphSerializeVersionNumber = 1;
+
 std::vector<torch::Tensor> SampledSubgraph::GetState() {
   std::vector<torch::Tensor> state;
 
@@ -59,11 +65,12 @@ void SampledSubgraph::SetState(std::vector<torch::Tensor>& state) {
   uint32_t i = 0;
 
   // Version number.
-  torch::Tensor version_num_tensor =
+  torch::Tensor& version_num_tensor = state[i++];
+  torch::Tensor current_version_num_tensor =
       torch::ones(1, torch::TensorOptions().dtype(torch::kInt64)) *
       SampledSubgraph::kSampledSubgraphSerializeVersionNumber;
   TORCH_CHECK(
-      version_num_tensor.equal(state[i++]),
+      version_num_tensor.equal(current_version_num_tensor),
       "Version number mismatch when deserializing SampledSubgraph.");
 
   // Tensors.
