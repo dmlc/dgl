@@ -1,2 +1,2 @@
 """Utility functions for GraphBolt."""
-from .internal import*
+from .internal import *
