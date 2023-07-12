@@ -219,7 +219,7 @@ class CSCSamplingGraph:
         fanouts: torch.Tensor,
         replace: bool = False,
         return_eids: bool = False,
-        probs_or_mask: Optional[torch.Tensor] = None,
+        probs_name: Optional[str] = None,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -252,11 +252,12 @@ class CSCSamplingGraph:
             Boolean indicating whether the edge IDs of sampled edges,
             represented as a 1D tensor, should be returned. This is
             typically used when edge features are required.
-        probs_or_mask: torch.Tensor, optional
-            Optional tensor containing the (unnormalized) probabilities
-            associated with each neighboring edge of a node. It must be a 1D
-            floating-point or boolean tensor with the number of elements equal
-            to the number of edges.
+        probs_name: str, optional
+            An optional string specifying the name of an edge attribute. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
         Returns
         -------
         torch.classes.graphbolt.SampledSubgraph
@@ -302,7 +303,11 @@ class CSCSamplingGraph:
             (fanouts >= 0) | (fanouts == -1)
         ), "Fanouts should consist of values that are either -1 or \
             greater than or equal to 0."
-        if probs_or_mask is not None:
+        if probs_name:
+            assert (
+                probs_name in self.edge_attributes
+            ), f"Unknown edge attribute '{probs_name}'."
+            probs_or_mask = self.edge_attributes[probs_name]
             assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
                 probs_or_mask.size(0) == self.num_edges
@@ -316,7 +321,7 @@ class CSCSamplingGraph:
                 torch.float64,
             ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, return_eids, probs_or_mask
+            nodes, fanouts.tolist(), replace, return_eids, probs_name
         )
 
     def sample_negative_edges_uniform(
