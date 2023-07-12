@@ -1,8 +1,9 @@
 """Torch-based feature store for GraphBolt."""
 import torch
 
-from ..feature_store import FeatureStore
 from dgl.contrib import GPUCache
+
+from ..feature_store import FeatureStore
 
 __all__ = ["GPUCachedFeatureStore"]
 
@@ -67,9 +68,9 @@ class GPUCachedFeatureStore(FeatureStore):
         """
         if ids is None:
             return self._fallback_store.read()
-        keys = ids.to('cuda')
+        keys = ids.to("cuda")
         values, missing_index, missing_keys = self._store.query(keys)
-        missing_values = self._fallback_store.read(missing_keys).to('cuda')
+        missing_values = self._fallback_store.read(missing_keys).to("cuda")
         values[missing_index] = missing_values
         self._store.replace(missing_keys, missing_values)
         return torch.reshape(values, (values.shape[0],) + self.item_shape)
@@ -90,11 +91,15 @@ class GPUCachedFeatureStore(FeatureStore):
         """
         if ids is None:
             self._fallback_store.update(value)
-            self._store.replace(torch.arange(0, self.cache_size, device='cuda'), value[:self.cache_size].to('cuda'))
+            size = min(self.cache_size, value.shape[0])
+            self._store.replace(
+                torch.arange(0, size, device="cuda"),
+                value[:size].to("cuda"),
+            )
         else:
             assert ids.shape[0] == value.shape[0], (
                 f"ids and value must have the same length, "
                 f"but got {ids.shape[0]} and {value.shape[0]}."
             )
             self._fallback_store.update(value, ids)
-            self._store.replace(ids.to('cuda'), value.to('cuda'))
+            self._store.replace(ids.to("cuda"), value.to("cuda"))
