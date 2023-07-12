@@ -3,7 +3,6 @@ import tempfile
 import unittest
 
 import backend as F
-
 import dgl
 import dgl.graphbolt as gb
 
