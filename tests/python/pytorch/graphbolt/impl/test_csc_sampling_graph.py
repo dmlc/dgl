@@ -11,6 +11,7 @@ import gb_test_utils as gbt
 
 import pytest
 import torch
+from torch import multiprocessing as mp
 from scipy import sparse as spsp
 
 torch.manual_seed(3407)
@@ -618,6 +619,48 @@ def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
     t1[:] = v
     assert torch.equal(t1, t2)
     t1[:] = old_t1
+
+import time
+def copy_g_to_shm(graph_path: str, shm_name: str):
+    """Copy a graph to shared memory."""
+    graph = gb.load_csc_sampling_graph(graph_path)
+    g = graph.copy_to_shared_memory(shm_name)
+
+    # Sleep
+    time.sleep(10)
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="CSCSamplingGraph is only supported on CPU.",
+)
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(1000, 50000)]
+)
+def test_dist_graph_on_shared_memory_mp(num_nodes, num_edges):
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
+    graph = gb.from_csc(csc_indptr, indices)
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        filename = os.path.join(test_dir, "csc_sampling_graph.tar")
+        gb.save_csc_sampling_graph(graph, filename)
+
+        shm_name = "test_dist_g"
+        ctx = mp.get_context("spawn")
+        p_server = ctx.Process(target=copy_g_to_shm, args=(filename, shm_name))
+        p_server.start()
+
+        # Load in client.
+        time.sleep(5) # barrier.
+        graph2 = gb.load_from_shared_memory(shm_name)
+
+        assert graph2.num_nodes == num_nodes
+        assert graph2.num_nodes == num_nodes
+
+        # Test the value of graph1 is correct
+        assert torch.equal(graph2.csc_indptr, csc_indptr)
+        assert torch.equal(graph2.indices, indices)
+
+        p_server.join()
 
 
 @unittest.skipIf(
