@@ -60,3 +60,6 @@ endif()
 
 target_link_libraries(${LIB_DGL_SPARSE_NAME} dmlc dgl)
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
+
+# Configure dgl_sparse library to use C++17 standard for compatibility with PyTorch
+set_property(TARGET ${LIB_DGL_SPARSE_NAME} PROPERTY CXX_STANDARD 17)

@@ -9,12 +9,13 @@ from .graph_services import *
 from .kvstore import KVClient, KVServer
 from .nn import *
 from .partition import (
+    convert_dgl_partition_to_csc_sampling_graph,
     load_partition,
     load_partition_book,
     load_partition_feats,
     partition_graph,
 )
 from .rpc import *
-from .rpc_client import connect_to_server, shutdown_servers
+from .rpc_client import connect_to_server
 from .rpc_server import start_server
 from .server_state import ServerState

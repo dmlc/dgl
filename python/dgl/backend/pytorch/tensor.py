@@ -12,8 +12,8 @@ from ... import ndarray as nd
 from ...function.base import TargetCode
 from ...utils import version
 
-if version.parse(th.__version__) < version.parse("1.9.0"):
-    raise RuntimeError("DGL requires PyTorch >= 1.9.0")
+if version.parse(th.__version__) < version.parse("1.12.0"):
+    raise RuntimeError("DGL requires PyTorch >= 1.12.0")
 
 
 def data_type_dict():
@@ -428,17 +428,26 @@ def zerocopy_from_numpy(np_array):
     return th.as_tensor(np_array)
 
 
-if version.parse(th.__version__) >= version.parse("1.10.0"):
+def zerocopy_to_dgl_ndarray(data):
+    if data.dtype == th.bool:
+        data = data.byte()
+    return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
 
-    def zerocopy_to_dgl_ndarray(data):
-        if data.dtype == th.bool:
-            data = data.byte()
-        return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
+
+# NGC PyTorch containers are shipping alpha version PyTorch.
+if version.parse(th.__version__) >= version.parse("2.0.0a0"):
+
+    def check_is_view(input):
+        assert (
+            input.data_ptr() == input.untyped_storage().data_ptr()
+        ), "Cannot convert view tensors to dgl ndarray for write."
 
 else:
 
-    def zerocopy_to_dgl_ndarray(data):
-        return nd.from_dlpack(dlpack.to_dlpack(data.contiguous()))
+    def check_is_view(input):
+        assert (
+            input.data_ptr() == input._storage().data_ptr()
+        ), "Cannot convert view tensors to dgl ndarray for write."
 
 
 def zerocopy_to_dgl_ndarray_for_write(input):
@@ -446,9 +455,7 @@ def zerocopy_to_dgl_ndarray_for_write(input):
         "Cannot convert non-contiguous tensors "
         "to dgl ndarray for write. Call .to_contiguous() first."
     )
-    assert input.numel() == input.storage().size(), (
-        "Cannot convert view " "tensors to dgl ndarray for write."
-    )
+    check_is_view(input)
     return zerocopy_to_dgl_ndarray(input)
 
 

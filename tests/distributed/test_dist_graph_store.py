@@ -44,7 +44,6 @@ def run_server(
     server_count,
     num_clients,
     shared_mem,
-    keep_alive=False,
 ):
     g = DistGraphServer(
         server_id,
@@ -54,7 +53,6 @@ def run_server(
         "/tmp/dist_graph/{}.json".format(graph_name),
         disable_shared_mem=not shared_mem,
         graph_format=["csc", "coo"],
-        keep_alive=keep_alive,
     )
     print("start server", server_id)
     # verify dtype of underlying graph
@@ -479,7 +477,6 @@ def check_dist_emb_server_client(
     # We cannot run multiple servers and clients on the same machine.
     serv_ps = []
     ctx = mp.get_context("spawn")
-    keep_alive = num_groups > 1
     for serv_id in range(num_servers):
         p = ctx.Process(
             target=run_server,
@@ -489,7 +486,6 @@ def check_dist_emb_server_client(
                 num_servers,
                 num_clients,
                 shared_mem,
-                keep_alive,
             ),
         )
         serv_ps.append(p)
@@ -519,11 +515,6 @@ def check_dist_emb_server_client(
         p.join()
         assert p.exitcode == 0
 
-    if keep_alive:
-        for p in serv_ps:
-            assert p.is_alive()
-        # force shutdown server
-        dgl.distributed.shutdown_servers("kv_ip_config.txt", num_servers)
     for p in serv_ps:
         p.join()
         assert p.exitcode == 0
@@ -546,7 +537,6 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
     # We cannot run multiple servers and clients on the same machine.
     serv_ps = []
     ctx = mp.get_context("spawn")
-    keep_alive = num_groups > 1
     for serv_id in range(num_servers):
         p = ctx.Process(
             target=run_server,
@@ -556,7 +546,6 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
                 num_servers,
                 num_clients,
                 shared_mem,
-                keep_alive,
             ),
         )
         serv_ps.append(p)
@@ -586,11 +575,6 @@ def check_server_client(shared_mem, num_servers, num_clients, num_groups=1):
         p.join()
         assert p.exitcode == 0
 
-    if keep_alive:
-        for p in serv_ps:
-            assert p.is_alive()
-        # force shutdown server
-        dgl.distributed.shutdown_servers("kv_ip_config.txt", num_servers)
     for p in serv_ps:
         p.join()
         assert p.exitcode == 0
@@ -988,7 +972,6 @@ def check_dist_optim_server_client(
                 num_servers,
                 num_clients,
                 True,
-                False,
             ),
         )
         serv_ps.append(p)
@@ -1080,7 +1063,8 @@ def test_standalone_node_emb():
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
 @pytest.mark.parametrize("hetero", [True, False])
-def test_split(hetero):
+@pytest.mark.parametrize("empty_mask", [True, False])
+def test_split(hetero, empty_mask):
     if hetero:
         g = create_random_hetero()
         ntype = "n1"
@@ -1100,8 +1084,9 @@ def test_split(hetero):
         part_method="metis",
     )
 
-    node_mask = np.random.randint(0, 100, size=g.num_nodes(ntype)) > 30
-    edge_mask = np.random.randint(0, 100, size=g.num_edges(etype)) > 30
+    mask_thd = 100 if empty_mask else 30
+    node_mask = np.random.randint(0, 100, size=g.num_nodes(ntype)) > mask_thd
+    edge_mask = np.random.randint(0, 100, size=g.num_edges(etype)) > mask_thd
     selected_nodes = np.nonzero(node_mask)[0]
     selected_edges = np.nonzero(edge_mask)[0]
 
@@ -1173,7 +1158,8 @@ def test_split(hetero):
 
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-def test_split_even():
+@pytest.mark.parametrize("empty_mask", [True, False])
+def test_split_even(empty_mask):
     g = create_random_graph(10000)
     num_parts = 4
     num_hops = 2
@@ -1186,10 +1172,9 @@ def test_split_even():
         part_method="metis",
     )
 
-    node_mask = np.random.randint(0, 100, size=g.num_nodes()) > 30
-    edge_mask = np.random.randint(0, 100, size=g.num_edges()) > 30
-    selected_nodes = np.nonzero(node_mask)[0]
-    selected_edges = np.nonzero(edge_mask)[0]
+    mask_thd = 100 if empty_mask else 30
+    node_mask = np.random.randint(0, 100, size=g.num_nodes()) > mask_thd
+    edge_mask = np.random.randint(0, 100, size=g.num_edges()) > mask_thd
     all_nodes1 = []
     all_nodes2 = []
     all_edges1 = []

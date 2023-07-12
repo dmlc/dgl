@@ -13,21 +13,12 @@
 [submodule "third_party/phmap"]
 	path = third_party/phmap
 	url = https://github.com/greg7mdp/parallel-hashmap.git
-[submodule "third_party/xbyak"]
-	path = third_party/xbyak
-	url = https://github.com/herumi/xbyak
-[submodule "third_party/tvm"]
-	path = third_party/tvm
-	url = https://github.com/apache/incubator-tvm
 [submodule "third_party/nanoflann"]
 	path = third_party/nanoflann
 	url = https://github.com/jlblancoc/nanoflann
 [submodule "third_party/libxsmm"]
 	path = third_party/libxsmm
 	url = https://github.com/hfp/libxsmm.git
-[submodule "third_party/tensorpipe"]
-	path = third_party/tensorpipe
-	url = https://github.com/pytorch/tensorpipe
 [submodule "third_party/thrust"]
 	path = third_party/thrust
 	url = https://github.com/NVIDIA/thrust.git

@@ -11,7 +11,7 @@ from .. import backend as F
 from .._ffi.function import _init_api
 from .._ffi.object import ObjectBase, register_object
 from ..base import DGLError
-from .constants import SERVER_EXIT, SERVER_KEEP_ALIVE
+from .constants import SERVER_EXIT
 
 __all__ = [
     "set_rank",
@@ -138,32 +138,28 @@ def reset():
     _CAPI_DGLRPCReset()
 
 
-def create_sender(max_queue_size, net_type):
+def create_sender(max_queue_size):
     """Create rpc sender of this process.
 
     Parameters
     ----------
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
-    net_type : str
-        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv("DGL_SOCKET_MAX_THREAD_COUNT", "0"))
-    _CAPI_DGLRPCCreateSender(int(max_queue_size), net_type, max_thread_count)
+    _CAPI_DGLRPCCreateSender(int(max_queue_size), max_thread_count)
 
 
-def create_receiver(max_queue_size, net_type):
+def create_receiver(max_queue_size):
     """Create rpc receiver of this process.
 
     Parameters
     ----------
     max_queue_size : int
         Maximal size (bytes) of network queue buffer.
-    net_type : str
-        Networking type. Current options are: 'socket', 'tensorpipe'.
     """
     max_thread_count = int(os.getenv("DGL_SOCKET_MAX_THREAD_COUNT", "0"))
-    _CAPI_DGLRPCCreateReceiver(int(max_queue_size), net_type, max_thread_count)
+    _CAPI_DGLRPCCreateReceiver(int(max_queue_size), max_thread_count)
 
 
 def finalize_sender():
@@ -176,7 +172,7 @@ def finalize_receiver():
     _CAPI_DGLRPCFinalizeReceiver()
 
 
-def wait_for_senders(ip_addr, port, num_senders, blocking=True):
+def wait_for_senders(ip_addr, port, num_senders):
     """Wait all of the senders' connections.
 
     This api will be blocked until all the senders connect to the receiver.
@@ -189,10 +185,8 @@ def wait_for_senders(ip_addr, port, num_senders, blocking=True):
         receiver's port
     num_senders : int
         total number of senders
-    blocking : bool
-        whether to wait blockingly
     """
-    _CAPI_DGLRPCWaitForSenders(ip_addr, int(port), int(num_senders), blocking)
+    _CAPI_DGLRPCWaitForSenders(ip_addr, int(port), int(num_senders))
 
 
 def connect_receiver(ip_addr, port, recv_id, group_id=-1):
@@ -1262,8 +1256,6 @@ class ShutDownRequest(Request):
 
     def process_request(self, server_state):
         assert self.client_id == 0
-        if server_state.keep_alive and not self.force_shutdown_server:
-            return SERVER_KEEP_ALIVE
         finalize_server()
         return SERVER_EXIT
 

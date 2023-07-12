@@ -1529,18 +1529,28 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
 }
 
 HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
-  if (formats == ALL_CODE)
+  // Get the created formats.
+  auto created_formats = GetCreatedFormats();
+  // Get the intersection of formats and created_formats.
+  auto intersection = formats & created_formats;
+
+  // If the intersection of formats and created_formats is not empty.
+  // The format(s) in the intersection will be retained.
+  if (intersection != 0) {
+    COOPtr coo_ptr = COO_CODE & intersection ? GetCOO(false) : nullptr;
+    CSRPtr in_csr_ptr = CSC_CODE & intersection ? GetInCSR(false) : nullptr;
+    CSRPtr out_csr_ptr = CSR_CODE & intersection ? GetOutCSR(false) : nullptr;
+
     return HeteroGraphPtr(
-        // TODO(xiangsx) Make it as graph storage.Clone()
-        new UnitGraph(
-            meta_graph_,
-            (in_csr_->defined()) ? CSRPtr(new CSR(*in_csr_)) : nullptr,
-            (out_csr_->defined()) ? CSRPtr(new CSR(*out_csr_)) : nullptr,
-            (coo_->defined()) ? COOPtr(new COO(*coo_)) : nullptr, formats));
+        new UnitGraph(meta_graph_, in_csr_ptr, out_csr_ptr, coo_ptr, formats));
+  }
+
+  // If the intersection of formats and created_formats is empty.
+  // Create a format in the order of COO -> CSR -> CSC.
   int64_t num_vtypes = NumVertexTypes();
-  if (formats & COO_CODE)
+  if (COO_CODE & formats)
     return CreateFromCOO(num_vtypes, GetCOO(false)->adj(), formats);
-  if (formats & CSR_CODE)
+  if (CSR_CODE & formats)
     return CreateFromCSR(num_vtypes, GetOutCSR(false)->adj(), formats);
   return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
 }

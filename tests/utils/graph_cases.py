@@ -238,3 +238,29 @@ def two_hetero_batch_with_isolated_ntypes():
         num_nodes_dict={"user": 3, "game": 2, "developer": 3, "platform": 3},
     )
     return [g1, g2]
+
+
+@register_case(["batched", "hetero"])
+def batched_heterograph0():
+    g1 = dgl.heterograph(
+        {
+            ("user", "follows", "user"): ([0, 1], [1, 2]),
+            ("user", "follows", "developer"): ([0, 1], [1, 2]),
+            ("user", "plays", "game"): ([0, 1, 2, 3], [0, 0, 1, 1]),
+        }
+    )
+    g2 = dgl.heterograph(
+        {
+            ("user", "follows", "user"): ([0, 1], [1, 2]),
+            ("user", "follows", "developer"): ([0, 1], [1, 2]),
+            ("user", "plays", "game"): ([0, 1, 2], [0, 0, 1]),
+        }
+    )
+    g3 = dgl.heterograph(
+        {
+            ("user", "follows", "user"): ([1], [2]),
+            ("user", "follows", "developer"): ([0, 1, 2], [0, 2, 2]),
+            ("user", "plays", "game"): ([0, 1], [0, 0]),
+        }
+    )
+    return dgl.batch([g1, g2, g3])

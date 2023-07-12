@@ -1,8 +1,8 @@
 #!/bin/bash
 
-readonly CUDA_VERSIONS="10.2,11.3,11.6,11.7"
-readonly TORCH_VERSION="1.12.0"
-readonly PYTHON_VERSION="3.7"
+readonly CUDA_VERSIONS="11.6,11.7,11.8"
+readonly TORCH_VERSION="1.13.0"
+readonly PYTHON_VERSION="3.8"
 
 usage() {
 cat << EOF
@@ -12,6 +12,7 @@ examples:
   bash $0 -g 11.7
   bash $0 -g 11.7 -p 3.8
   bash $0 -g 11.7 -p 3.8 -t 1.13.0
+  bash $0 -c -n dgl-dev-cpu
 
 Create a developement environment for DGL developers.
 
@@ -23,6 +24,7 @@ OPTIONS:
                environment of the same name).
   -g           Create dev environment in GPU mode with specified CUDA version,
                supported: ${CUDA_VERSIONS}.
+  -n           Specify the name of the environment.
   -o           Save environment YAML file to specified path.
   -p           Create dev environment based on specified python version.
   -s           Run silently which indicates always 'yes' for any confirmation.
@@ -51,7 +53,7 @@ confirm() {
 }
 
 # Parse flags.
-while getopts "cdfg:ho:p:st:" flag; do
+while getopts "cdfg:hn:o:p:st:" flag; do
   case "${flag}" in
     c)
       cpu=1
@@ -68,6 +70,9 @@ while getopts "cdfg:ho:p:st:" flag; do
     h)
       usage
       exit 0
+      ;;
+    n)
+      name=${OPTARG}
       ;;
     o)
       output_path=${OPTARG}
@@ -109,7 +114,9 @@ fi
 # Set up CPU mode.
 if [[ ${cpu} -eq 1 ]]; then
   torchversion=${torch_version}"+cpu"
-  name="dgl-dev-cpu"
+  if [[ -z "${name}" ]]; then
+    name="dgl-dev-cpu"
+  fi
 fi
 
 # Set up GPU mode.
@@ -124,7 +131,9 @@ if [[ -n ${cuda_version} ]]; then
   [[ -n "${always_yes}" ]] || confirm
 
   torchversion=${torch_version}"+cu"${cuda_version//[-._]/}
-  name="dgl-dev-gpu"
+  if [[ -z "${name}" ]]; then
+    name="dgl-dev-gpu-"${cuda_version//[-._]/}
+  fi
 fi
 
 # Set python version.

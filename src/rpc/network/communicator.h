@@ -10,7 +10,6 @@
 
 #include <string>
 
-#include "../net_type.h"
 #include "msg_queue.h"
 
 namespace dgl {
@@ -25,7 +24,7 @@ namespace network {
  * multiple receivers and it can send data to specified receiver via receiver's
  * ID.
  */
-class Sender : public rpc::RPCSender {
+class Sender {
  public:
   /**
    * @brief Sender constructor
@@ -77,7 +76,7 @@ class Sender : public rpc::RPCSender {
  * with multiple Senders and it can receive data from multiple Senders
  * concurrently.
  */
-class Receiver : public rpc::RPCReceiver {
+class Receiver {
  public:
   /**
    * @brief Receiver constructor

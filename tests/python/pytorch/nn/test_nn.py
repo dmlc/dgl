@@ -1,5 +1,6 @@
 import io
 import pickle
+import random
 from copy import deepcopy
 
 import backend as F
@@ -8,10 +9,13 @@ import dgl
 import dgl.function as fn
 import dgl.nn.pytorch as nn
 import networkx as nx
+import numpy as np  # For setting seed for scipy
 import pytest
 import scipy as sp
 import torch
 import torch as th
+from dgl import shortest_dist
+from torch.nn.utils.rnn import pad_sequence
 from torch.optim import Adam, SparseAdam
 from torch.utils.data import DataLoader
 from utils import parametrize_idtype
@@ -21,6 +25,13 @@ from utils.graph_cases import (
     random_dglgraph,
     random_graph,
 )
+
+# Set seeds to make tests fully reproducible.
+SEED = 12345  # random.randint(1, 99999)
+random.seed(SEED)  # For networkx
+np.random.seed(SEED)  # For scipy
+dgl.seed(SEED)
+F.seed(SEED)
 
 tmp_buffer = io.BytesIO()
 
@@ -1788,6 +1799,141 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
     explainer.explain_graph(g, feat, target_class=0)
 
 
+@parametrize_idtype
+@pytest.mark.parametrize(
+    "g",
+    get_cases(
+        ["homo"],
+        exclude=[
+            "zero-degree",
+            "homo-zero-degree",
+            "has_feature",
+            "has_scalar_e_feature",
+            "row_sorted",
+            "col_sorted",
+        ],
+    ),
+)
+@pytest.mark.parametrize("n_classes", [2])
+def test_pgexplainer(g, idtype, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    feat = F.randn((g.num_nodes(), 5))
+    g.ndata["attr"] = feat
+
+    # add reverse edges
+    transform = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform(g)
+
+    class Model(th.nn.Module):
+        def __init__(self, in_feats, out_feats, graph=False):
+            super(Model, self).__init__()
+            self.graph = graph
+            self.conv = nn.GraphConv(in_feats, out_feats)
+            self.fc = th.nn.Linear(out_feats, out_feats)
+            th.nn.init.xavier_uniform_(self.fc.weight)
+
+        def forward(self, g, h, embed=False, edge_weight=None):
+            h = self.conv(g, h, edge_weight=edge_weight)
+
+            if not self.graph or embed:
+                return h
+
+            with g.local_scope():
+                g.ndata["h"] = h
+                hg = dgl.mean_nodes(g, "h")
+                return self.fc(hg)
+
+    # graph explainer
+    model = Model(feat.shape[1], n_classes, graph=True)
+    model = model.to(ctx)
+    explainer = nn.PGExplainer(model, n_classes)
+    explainer.train_step(g, g.ndata["attr"], 5.0)
+
+    probs, edge_weight = explainer.explain_graph(g, feat)
+
+    # node explainer
+    model = Model(feat.shape[1], n_classes, graph=False)
+    model = model.to(ctx)
+    explainer = nn.PGExplainer(
+        model, n_classes, num_hops=1, explain_graph=False
+    )
+    explainer.train_step_node(0, g, g.ndata["attr"], 5.0)
+    explainer.train_step_node([0, 1], g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(th.tensor(0), g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(th.tensor([0, 1]), g, g.ndata["attr"], 5.0)
+
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(0, g, feat)
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        [0, 1], g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        th.tensor(0), g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        th.tensor([0, 1]), g, feat
+    )
+
+
+@pytest.mark.parametrize("g", get_cases(["hetero"]))
+@pytest.mark.parametrize("idtype", [F.int64])
+@pytest.mark.parametrize("input_dim", [5])
+@pytest.mark.parametrize("n_classes", [2])
+def test_heteropgexplainer(g, idtype, input_dim, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    feat = {
+        ntype: F.randn((g.num_nodes(ntype), input_dim)) for ntype in g.ntypes
+    }
+
+    # add self-loop and reverse edges
+    transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
+    g = transform1(g)
+    transform2 = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform2(g)
+
+    class Model(th.nn.Module):
+        def __init__(self, in_feats, embed_dim, out_feats, canonical_etypes):
+            super(Model, self).__init__()
+            self.conv = nn.HeteroGraphConv(
+                {
+                    c_etype: nn.GraphConv(in_feats, embed_dim)
+                    for c_etype in canonical_etypes
+                }
+            )
+            self.fc = th.nn.Linear(embed_dim, out_feats)
+
+        def forward(self, g, h, embed=False, edge_weight=None):
+            if edge_weight is not None:
+                mod_kwargs = {
+                    etype: {"edge_weight": mask}
+                    for etype, mask in edge_weight.items()
+                }
+                h = self.conv(g, h, mod_kwargs=mod_kwargs)
+            else:
+                h = self.conv(g, h)
+
+            if embed:
+                return h
+
+            with g.local_scope():
+                g.ndata["h"] = h
+                hg = 0
+                for ntype in g.ntypes:
+                    hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
+                return self.fc(hg)
+
+    embed_dim = input_dim
+
+    # graph explainer
+    model = Model(input_dim, embed_dim, n_classes, g.canonical_etypes)
+    model = model.to(ctx)
+    explainer = nn.HeteroPGExplainer(model, embed_dim)
+    explainer.train_step(g, feat, 5.0)
+
+    probs, edge_weight = explainer.explain_graph(g, feat)
+
+
 def test_jumping_knowledge():
     ctx = F.ctx()
     num_layers = 2
@@ -2278,15 +2424,32 @@ def test_DeepWalk():
 @pytest.mark.parametrize("embedding_dim", [8, 16])
 @pytest.mark.parametrize("direction", ["in", "out", "both"])
 def test_degree_encoder(max_degree, embedding_dim, direction):
-    g = dgl.graph(
+    g1 = dgl.graph(
         (
             th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
             th.tensor([1, 2, 3, 0, 3, 0, 0, 1]),
         )
     )
+    g2 = dgl.graph(
+        (
+            th.tensor([0, 1]),
+            th.tensor([1, 0]),
+        )
+    )
+    in_degree = pad_sequence(
+        [g1.in_degrees(), g2.in_degrees()], batch_first=True
+    )
+    out_degree = pad_sequence(
+        [g1.out_degrees(), g2.out_degrees()], batch_first=True
+    )
     model = nn.DegreeEncoder(max_degree, embedding_dim, direction=direction)
-    de_g = model(g)
-    assert de_g.shape == (4, embedding_dim)
+    if direction == "in":
+        de_g = model(in_degree)
+    elif direction == "out":
+        de_g = model(out_degree)
+    elif direction == "both":
+        de_g = model(th.stack((in_degree, out_degree)))
+    assert de_g.shape == (2, 4, embedding_dim)
 
 
 @parametrize_idtype
@@ -2387,32 +2550,42 @@ def test_GraphormerLayer(attn_bias_type, norm_first):
     assert out.shape == (batch_size, num_nodes, feat_size)
 
 
-@pytest.mark.parametrize("max_len", [1, 4])
+@pytest.mark.parametrize("max_len", [1, 2])
 @pytest.mark.parametrize("feat_dim", [16])
 @pytest.mark.parametrize("num_heads", [1, 8])
 def test_PathEncoder(max_len, feat_dim, num_heads):
     dev = F.ctx()
-    g1 = dgl.graph(
+    g = dgl.graph(
         (
             th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
             th.tensor([1, 2, 3, 0, 3, 0, 0, 1]),
         )
     ).to(dev)
-    g2 = dgl.graph(
-        (th.tensor([0, 1, 2, 3, 2, 5]), th.tensor([1, 2, 3, 4, 0, 3]))
-    ).to(dev)
-    bg = dgl.batch([g1, g2])
-    edge_feat = th.rand(bg.num_edges(), feat_dim).to(dev)
+    edge_feat = th.rand(g.num_edges(), feat_dim).to(dev)
+    edge_feat = th.cat((edge_feat, th.zeros(1, 16).to(dev)), dim=0)
+    dist, path = shortest_dist(g, root=None, return_paths=True)
+    path_data = edge_feat[path[:, :, :max_len]]
     model = nn.PathEncoder(max_len, feat_dim, num_heads=num_heads).to(dev)
-    bias = model(bg, edge_feat)
-    assert bias.shape == (2, 6, 6, num_heads)
+    bias = model(dist.unsqueeze(0), path_data.unsqueeze(0))
+    assert bias.shape == (1, 4, 4, num_heads)
 
 
 @pytest.mark.parametrize("max_dist", [1, 4])
-@pytest.mark.parametrize("num_kernels", [8, 16])
+@pytest.mark.parametrize("num_kernels", [4, 16])
 @pytest.mark.parametrize("num_heads", [1, 8])
 def test_SpatialEncoder(max_dist, num_kernels, num_heads):
     dev = F.ctx()
+    # single graph encoding 3d
+    num_nodes = 4
+    coord = th.rand(1, num_nodes, 3).to(dev)
+    node_type = th.tensor([[1, 0, 2, 1]]).to(dev)
+    spatial_encoder = nn.SpatialEncoder3d(
+        num_kernels=num_kernels, num_heads=num_heads, max_node_type=3
+    ).to(dev)
+    out = spatial_encoder(coord, node_type=node_type)
+    assert out.shape == (1, num_nodes, num_nodes, num_heads)
+
+    # encoding on a batch of graphs
     g1 = dgl.graph(
         (
             th.tensor([0, 0, 0, 1, 1, 2, 3, 3]),
@@ -2422,18 +2595,29 @@ def test_SpatialEncoder(max_dist, num_kernels, num_heads):
     g2 = dgl.graph(
         (th.tensor([0, 1, 2, 3, 2, 5]), th.tensor([1, 2, 3, 4, 0, 3]))
     ).to(dev)
-    bg = dgl.batch([g1, g2])
-    ndata = th.rand(bg.num_nodes(), 3).to(dev)
-    num_nodes = bg.num_nodes()
-    node_type = th.randint(0, 512, (num_nodes,)).to(dev)
+    bsz, max_num_nodes = 2, 6
+    # 2d encoding
+    dist = -th.ones((bsz, max_num_nodes, max_num_nodes), dtype=th.long).to(dev)
+    dist[0, :4, :4] = shortest_dist(g1, root=None, return_paths=False)
+    dist[1, :6, :6] = shortest_dist(g2, root=None, return_paths=False)
     model_1 = nn.SpatialEncoder(max_dist, num_heads=num_heads).to(dev)
+    encoding = model_1(dist)
+    assert encoding.shape == (bsz, max_num_nodes, max_num_nodes, num_heads)
+    # 3d encoding
+    coord = th.rand(bsz, max_num_nodes, 3).to(dev)
+    node_type = th.randint(
+        0,
+        512,
+        (
+            bsz,
+            max_num_nodes,
+        ),
+    ).to(dev)
     model_2 = nn.SpatialEncoder3d(num_kernels, num_heads=num_heads).to(dev)
     model_3 = nn.SpatialEncoder3d(
         num_kernels, num_heads=num_heads, max_node_type=512
     ).to(dev)
-    encoding = model_1(bg)
-    encoding3d_1 = model_2(bg, ndata)
-    encoding3d_2 = model_3(bg, ndata, node_type)
-    assert encoding.shape == (2, 6, 6, num_heads)
-    assert encoding3d_1.shape == (2, 6, 6, num_heads)
-    assert encoding3d_2.shape == (2, 6, 6, num_heads)
+    encoding3d_1 = model_2(coord)
+    encoding3d_2 = model_3(coord, node_type)
+    assert encoding3d_1.shape == (bsz, max_num_nodes, max_num_nodes, num_heads)
+    assert encoding3d_2.shape == (bsz, max_num_nodes, max_num_nodes, num_heads)

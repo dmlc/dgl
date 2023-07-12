@@ -62,6 +62,12 @@ Datasets for node classification/regression tasks
     CornellDataset
     TexasDataset
     WisconsinDataset
+    RomanEmpireDataset
+    AmazonRatingsDataset
+    MinesweeperDataset
+    TolokersDataset
+    QuestionsDataset
+    MovieLensDataset
 
 Edge Prediction Datasets
 ---------------------------------------

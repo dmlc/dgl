@@ -9,7 +9,7 @@ Dependencies
 ------------
 - Python 3.7+(for string formatting features)
 - PyTorch 1.9.0+
-- sklearn
+- scikit-learn
 - TorchMetrics 0.11.4
 
 ## Run Experiments

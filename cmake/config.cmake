@@ -43,8 +43,5 @@ set(USE_OPENMP ON)
 # Whether to build PyTorch plugins.
 set(BUILD_TORCH ON)
 
-# Whether to enable CUDA kernels compiled with TVM.
-set(USE_TVM OFF)
-
 # Whether to build DGL sparse library.
 set(BUILD_SPARSE ON)
