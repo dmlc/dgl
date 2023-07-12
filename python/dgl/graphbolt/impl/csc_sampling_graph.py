@@ -253,7 +253,7 @@ class CSCSamplingGraph:
             represented as a 1D tensor, should be returned. This is
             typically used when edge features are required.
         probs_name: str, optional
-            An optional string specifying the name of an edge attribute used a. This
+            An optional string specifying the name of an edge attribute. This
             attribute tensor should contain (unnormalized) probabilities
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
@@ -306,8 +306,7 @@ class CSCSamplingGraph:
         if probs_name:
             assert (
                 probs_name in self.edge_attributes
-            ), f"Unknown edge \
-                attribute '{probs_name}''."
+            ), f"Unknown edge attribute '{probs_name}'."
             probs_or_mask = self.edge_attributes[probs_name]
             assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
