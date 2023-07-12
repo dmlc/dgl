@@ -13,6 +13,7 @@ import gb_test_utils as gbt
 import pytest
 import torch
 
+
 def subprocess_entry(q):
     num_nodes = 5
     num_edges = 12
