@@ -527,7 +527,6 @@ def test_sample_neighbors_fanouts(
     )
 
 
-# test_sample_neighbors_fanouts([4], 4)
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
