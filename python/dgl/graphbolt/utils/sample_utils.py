@@ -26,11 +26,31 @@ def unique_and_compact_node_pairs(
         - If `node_pairs` is a dictionary: The keys should be edge type and
         the values should be corresponding node pairs. And IDs inside are
         heterogeneous ids.
-    
+
     Returns
-        -------
-        Tuple[node_pairs, unique_nodes]
-            The compacted node pairs and the unique nodes (per type).
+    -------
+    Tuple[node_pairs, unique_nodes]
+        The compacted node pairs, where node IDs are replaced with mapped node
+        IDs, and the unique nodes (per type).
+        "Compacted node pairs" indicates that the node IDs in the input node
+        pairs are replaced with mapped node IDs, where each type of node is
+        mapped to a contiguous space of IDs ranging from 0 to N.
+
+    Examples
+    --------
+    >>> import dgl.graphbolt as gb
+    >>> N1 = torch.LongTensor([1, 2, 2])
+    >>> N2 = torch.LongTensor([5, 6, 5])
+    >>> node_pairs = {("n1", "e1", "n2"): (N1, N2), 
+    ...  ("n2", "e2", "n1"): (N2, N1)}
+    >>> unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(
+    ... node_pairs
+    ... )
+    >>> print(unique_nodes)
+    {'n1': tensor([1, 2]), 'n2': tensor([5, 6])}
+    >>> print(compacted_node_pairs)
+    {('n1', 'e1', 'n2'): (tensor([0, 1, 1]), tensor([0, 1, 0])),
+    ('n2', 'e2', 'n1'): (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
     is_heterogeneous = isinstance(node_pairs, Dict)
     if not is_heterogeneous:
@@ -44,16 +64,16 @@ def unique_and_compact_node_pairs(
         nodes_dict[v_type].append(v)
 
     unique_nodes_dict = {}
-    compacted_nodes_dict = {}
+    inverse_indices_dict = {}
     for ntype, nodes in nodes_dict.items():
         collected_nodes = torch.cat(nodes)
         # Compact and find unique nodes.
-        unique_nodes, collected_nodes = torch.unique(
+        unique_nodes, inverse_indices = torch.unique(
             collected_nodes,
             return_inverse=True,
         )
         unique_nodes_dict[ntype] = unique_nodes
-        compacted_nodes_dict[ntype] = collected_nodes
+        inverse_indices_dict[ntype] = inverse_indices
 
     # Map back in same order as collect.
     compacted_node_pairs = {}
@@ -62,10 +82,10 @@ def unique_and_compact_node_pairs(
         u_type, _, v_type = etype
         u, v = node_pair
         u_size, v_size = u.numel(), v.numel()
-        u = compacted_nodes_dict[u_type][:u_size]
-        compacted_nodes_dict[u_type] = compacted_nodes_dict[u_type][u_size:]
-        v = compacted_nodes_dict[v_type][:v_size]
-        compacted_nodes_dict[v_type] = compacted_nodes_dict[v_type][v_size:]
+        u = inverse_indices_dict[u_type][:u_size]
+        inverse_indices_dict[u_type] = inverse_indices_dict[u_type][u_size:]
+        v = inverse_indices_dict[v_type][:v_size]
+        inverse_indices_dict[v_type] = inverse_indices_dict[v_type][v_size:]
         compacted_node_pairs[etype] = (u, v)
     if not is_heterogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
