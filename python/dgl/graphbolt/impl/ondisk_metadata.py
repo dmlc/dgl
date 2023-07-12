@@ -27,7 +27,7 @@ class OnDiskFeatureDataFormat(pydantic_yaml.YamlStrEnum):
 class OnDiskTVTSet(pydantic.BaseModel):
     """Train-Validation-Test set."""
 
-    type_name: Optional[str]
+    type: Optional[str]
     format: OnDiskFeatureDataFormat
     in_memory: Optional[bool] = True
     path: str
@@ -71,6 +71,9 @@ class OnDiskMetaData(pydantic_yaml.YamlModel):
     is a list of list of ``OnDiskTVTSet``.
     """
 
+    dataset_name: Optional[str] = None
+    num_classes: Optional[int] = None
+    num_labels: Optional[int] = None
     graph_topology: Optional[OnDiskGraphTopology] = None
     feature_data: Optional[List[OnDiskFeatureData]] = []
     train_sets: Optional[List[List[OnDiskTVTSet]]] = []

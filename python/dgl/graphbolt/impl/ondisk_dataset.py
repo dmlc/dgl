@@ -3,17 +3,26 @@
 from typing import Dict, List, Tuple
 
 from ..dataset import Dataset
-
-from ..graph_storage import CSCSamplingGraph, load_csc_sampling_graph
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, tensor_to_tuple
+
+from .csc_sampling_graph import CSCSamplingGraph, load_csc_sampling_graph
 from .ondisk_metadata import OnDiskGraphTopology, OnDiskMetaData, OnDiskTVTSet
 from .torch_based_feature_store import (
     load_feature_stores,
     TorchBasedFeatureStore,
 )
 
-__all__ = ["OnDiskDataset"]
+__all__ = ["OnDiskDataset", "preprocess_ondisk_dataset"]
+
+
+def preprocess_ondisk_dataset(metadata_path: str) -> str:
+    """Preprocess the on-disk dataset."""
+    # [TODO]
+    print("Start to preprocess the on-disk dataset.")
+    new_metadata_path = metadata_path
+    print("Finish preprocessing the on-disk dataset.")
+    return new_metadata_path
 
 
 class OnDiskDataset(Dataset):
@@ -29,6 +38,9 @@ class OnDiskDataset(Dataset):
 
     .. code-block:: yaml
 
+        dataset_name: graphbolt_test
+        num_classes: 10
+        num_labels: 10
         graph_topology:
           type: CSCSamplingGraph
           path: graph_topology/csc_sampling_graph.tar
@@ -46,17 +58,17 @@ class OnDiskDataset(Dataset):
             in_memory: false
             path: edge_data/author-writes-paper-feat.npy
         train_sets:
-          - - type_name: paper # could be null for homogeneous graph.
+          - - type: paper # could be null for homogeneous graph.
               format: numpy
               in_memory: true # If not specified, default to true.
               path: set/paper-train.npy
         validation_sets:
-          - - type_name: paper
+          - - type: paper
               format: numpy
               in_memory: true
               path: set/paper-validation.npy
         test_sets:
-          - - type_name: paper
+          - - type: paper
               format: numpy
               in_memory: true
               path: set/paper-test.npy
@@ -68,8 +80,14 @@ class OnDiskDataset(Dataset):
     """
 
     def __init__(self, path: str) -> None:
+        # Always call the preprocess function first. If already preprocessed,
+        # the function will return the original path directly.
+        path = preprocess_ondisk_dataset(path)
         with open(path, "r") as f:
             self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
+        self._dataset_name = self._meta.dataset_name
+        self._num_classes = self._meta.num_classes
+        self._num_labels = self._meta.num_labels
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = load_feature_stores(self._meta.feature_data)
         self._train_sets = self._init_tvt_sets(self._meta.train_sets)
@@ -96,6 +114,21 @@ class OnDiskDataset(Dataset):
         """Return the feature."""
         return self._feature
 
+    @property
+    def dataset_name(self) -> str:
+        """Return the dataset name."""
+        return self._dataset_name
+
+    @property
+    def num_classes(self) -> int:
+        """Return the number of classes."""
+        return self._num_classes
+
+    @property
+    def num_labels(self) -> int:
+        """Return the number of labels."""
+        return self._num_labels
+
     def _load_graph(
         self, graph_topology: OnDiskGraphTopology
     ) -> CSCSamplingGraph:
@@ -118,10 +151,10 @@ class OnDiskDataset(Dataset):
         for tvt_set in tvt_sets:
             if (tvt_set is None) or (len(tvt_set) == 0):
                 ret.append(None)
-            if tvt_set[0].type_name is None:
+            if tvt_set[0].type is None:
                 assert (
                     len(tvt_set) == 1
-                ), "Only one TVT set is allowed if type_name is not specified."
+                ), "Only one TVT set is allowed if type is not specified."
                 data = read_data(
                     tvt_set[0].path, tvt_set[0].format, tvt_set[0].in_memory
                 )
@@ -129,7 +162,7 @@ class OnDiskDataset(Dataset):
             else:
                 data = {}
                 for tvt in tvt_set:
-                    data[tvt.type_name] = ItemSet(
+                    data[tvt.type] = ItemSet(
                         tensor_to_tuple(
                             read_data(tvt.path, tvt.format, tvt.in_memory)
                         )
