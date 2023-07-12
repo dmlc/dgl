@@ -230,8 +230,11 @@ class CSCSamplingGraph:
         row = C_sampled_subgraph.indices
         type_per_edge = C_sampled_subgraph.type_per_edge
         if type_per_edge is None:
+            # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
         else:
+            # The sampled graph is a fused homogenized graph, which need to be
+            # converted to heterogeneous graphs.
             node_pairs = defaultdict(list)
             for etype, etype_id in self.metadata.edge_type_to_id.items():
                 src_ntype, _, dst_ntype = etype
@@ -243,9 +246,7 @@ class CSCSamplingGraph:
                     column[mask] - self.node_type_offset[dst_ntype_id]
                 )
                 node_pairs[etype] = (hetero_row, hetero_column)
-        return SampledSubgraphImpl(
-            node_pairs=node_pairs,
-        )
+        return SampledSubgraphImpl(node_pairs=node_pairs)
 
     def sample_neighbors(
         self,
@@ -372,7 +373,7 @@ class CSCSamplingGraph:
             represented as a 1D tensor, should be returned. This is
             typically used when edge features are required.
         probs_name: str, optional
-            An optional string specifying the name of an edge attribute used a. This
+            An optional string specifying the name of an edge attribute. This
             attribute tensor should contain (unnormalized) probabilities
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
@@ -405,8 +406,7 @@ class CSCSamplingGraph:
         if probs_name:
             assert (
                 probs_name in self.edge_attributes
-            ), f"Unknown edge \
-                attribute '{probs_name}''."
+            ), f"Unknown edge attribute '{probs_name}'."
             probs_or_mask = self.edge_attributes[probs_name]
             assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
