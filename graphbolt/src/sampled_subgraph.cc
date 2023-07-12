@@ -68,7 +68,7 @@ void SampledSubgraph::SetState(std::vector<torch::Tensor>& state) {
   torch::Tensor& version_num_tensor = state[i++];
   torch::Tensor current_version_num_tensor =
       torch::ones(1, torch::TensorOptions().dtype(torch::kInt64)) *
-      SampledSubgraph::kSampledSubgraphSerializeVersionNumber;
+      kSampledSubgraphSerializeVersionNumber;
   TORCH_CHECK(
       version_num_tensor.equal(current_version_num_tensor),
       "Version number mismatch when deserializing SampledSubgraph.");
