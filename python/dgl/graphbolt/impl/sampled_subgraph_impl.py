@@ -73,7 +73,7 @@ class SampledSubgraphImpl(SampledSubgraph):
 def exclude_edges(
     subgraph: SampledSubgraphImpl,
     edges: Union[
-        Dict[Tuple[str, str, str], torch.Tensor],
+        Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
         Tuple[torch.Tensor, torch.Tensor],
     ],
 ) -> SampledSubgraphImpl:
@@ -84,8 +84,8 @@ def exclude_edges(
     ----------
     subgraph : SampledSubgraphImpl
         The sampled subgraph.
-    edges : Union[Dict[Tuple[str, str, str], torch.Tensor], Tuple[torch.Tensor,
-    torch.Tensor]]
+    edges : Union[Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
+    Tuple[torch.Tensor, torch.Tensor]]
         Edges to exclude. If sampled subgraph is homogeneous, then `edges`
         should be a pair of tensors representing the edges to exclude. If
         sampled subgraph is heterogeneous, then `edges` should be a dictionary
