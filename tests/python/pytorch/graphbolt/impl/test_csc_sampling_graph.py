@@ -3,7 +3,6 @@ import tempfile
 import unittest
 
 import backend as F
-
 import dgl
 import dgl.graphbolt as gb
 
@@ -508,29 +507,8 @@ def test_sample_neighbors_replace(replace, expected_sampled_num):
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize("replace", [True, False])
-@pytest.mark.parametrize(
-    "probs_or_mask",
-    [
-        torch.tensor([2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0.5, 0.4, 1.2]),
-        torch.tensor(
-            [
-                True,
-                False,
-                True,
-                False,
-                True,
-                True,
-                True,
-                False,
-                True,
-                True,
-                True,
-                True,
-            ]
-        ),
-    ],
-)
-def test_sample_neighbors_probs(replace, probs_or_mask):
+@pytest.mark.parametrize("probs_name", ["weight", "mask"])
+def test_sample_neighbors_probs(replace, probs_name):
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -546,8 +524,15 @@ def test_sample_neighbors_probs(replace, probs_or_mask):
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
+    edge_attributes = {
+        "weight": torch.FloatTensor(
+            [2.5, 0, 8.4, 0, 0.4, 1.2, 2.5, 0, 8.4, 0.5, 0.4, 1.2]
+        ),
+        "mask": torch.BoolTensor([1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1]),
+    }
+
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices)
+    graph = gb.from_csc(indptr, indices, edge_attributes=edge_attributes)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -555,7 +540,7 @@ def test_sample_neighbors_probs(replace, probs_or_mask):
         nodes,
         fanouts=torch.tensor([2]),
         replace=replace,
-        probs_or_mask=probs_or_mask,
+        probs_name=probs_name,
     )
 
     # Verify in subgraph.
@@ -587,8 +572,10 @@ def test_sample_neighbors_zero_probs(replace, probs_or_mask):
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
+    edge_attributes = {"probs_or_mask": probs_or_mask}
+
     # Construct CSCSamplingGraph.
-    graph = gb.from_csc(indptr, indices)
+    graph = gb.from_csc(indptr, indices, edge_attributes=edge_attributes)
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
@@ -596,7 +583,7 @@ def test_sample_neighbors_zero_probs(replace, probs_or_mask):
         nodes,
         fanouts=torch.tensor([5]),
         replace=replace,
-        probs_or_mask=probs_or_mask,
+        probs_name="probs_or_mask",
     )
 
     # Verify in subgraph.
