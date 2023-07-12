@@ -42,25 +42,29 @@ def test_unique_and_compact_node_pairs_hetero():
             N3,
         ),
     }
-    
-    unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(node_pairs)
+
+    unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(
+        node_pairs
+    )
     for etype, pair in compacted_node_pairs.items():
-      expected_u, expected_v = expected_compacted_pairs[etype]
-      u, v = pair
-      assert torch.equal(u, expected_u)
-      assert torch.equal(v, expected_v)
+        expected_u, expected_v = expected_compacted_pairs[etype]
+        u, v = pair
+        assert torch.equal(u, expected_u)
+        assert torch.equal(v, expected_v)
     for ntype, nodes in unique_nodes.items():
-      expected_nodes = expected_unique_nodes[ntype]
-      assert torch.equal(nodes, expected_nodes)
-                  
+        expected_nodes = expected_unique_nodes[ntype]
+        assert torch.equal(nodes, expected_nodes)
+
 
 def test_unique_and_compact_node_pairs_homo():
     N = torch.randint(0, 50, (20,))
     expected_unique_N, compacted_N = torch.unique(N, return_inverse=True)
     expected_compacted_pairs = tuple(compacted_N.split(10))
-    
-    node_pairs = tuple(N.split(10)) 
-    unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(node_pairs)
+
+    node_pairs = tuple(N.split(10))
+    unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(
+        node_pairs
+    )
     expected_u, expected_v = expected_compacted_pairs
     u, v = compacted_node_pairs
     assert torch.equal(u, expected_u)
