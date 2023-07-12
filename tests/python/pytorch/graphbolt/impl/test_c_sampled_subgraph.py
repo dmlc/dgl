@@ -13,8 +13,23 @@ import gb_test_utils as gbt
 import pytest
 import torch
 
+def subprocess_entry(q):
+    num_nodes = 5
+    num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+    ntypes = {"n1": 0, "n2": 1, "n3": 2}
+    etypes = {("n1", "e1", "n2"): 0, ("n1", "e2", "n3"): 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
 
-def subprocess_entry(graph, q):
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(
+        indptr, indices, type_per_edge=type_per_edge, metadata=metadata
+    )
+
     adjs = []
     seeds = torch.arange(5)
 
@@ -63,25 +78,9 @@ def subprocess_entry(graph, q):
     reason="Graph is CPU only at present.",
 )
 def test_subgraph_serialization():
-    num_nodes = 5
-    num_edges = 12
-    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
-    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
-    type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1])
-    assert indptr[-1] == num_edges
-    assert indptr[-1] == len(indices)
-    ntypes = {"n1": 0, "n2": 1, "n3": 2}
-    etypes = {("n1", "e1", "n2"): 0, ("n1", "e2", "n3"): 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-
-    # Construct CSCSamplingGraph.
-    graph = gb.from_csc(
-        indptr, indices, type_per_edge=type_per_edge, metadata=metadata
-    )
-
-    # Pass the data twice and then verify.
+    # Create a sub-process.
     q = mp.Queue()
-    proc = mp.Process(target=subprocess_entry, args=(graph, q))
+    proc = mp.Process(target=subprocess_entry, args=(q,))
     proc.start()
 
     # 2. Get.
