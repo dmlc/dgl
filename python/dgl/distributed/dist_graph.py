@@ -612,8 +612,8 @@ class DistGraph:
             self._client is not None
         ), "Distributed module is not initialized. Please call dgl.distributed.initialize."
         # TODO (Israt): Fix for GraphBolt
-        # self._g = load_from_shared_memory("sh_mem_name")
-        self._g = _get_graph_from_shared_mem(self.graph_name)
+        self._g = load_from_shared_memory("sh_mem_name")
+        # self._g = _get_graph_from_shared_mem(self.graph_name)
         self._gpb = get_shared_mem_partition_book(self.graph_name)
         if self._gpb is None:
             self._gpb = gpb

@@ -800,17 +800,20 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
 
     def local_access(local_g, partition_book, local_nids):
         # See NOTE 1
-        _prob = [g.edata[prob].local_partition] if prob is not None else None
-        return _sample_neighbors(
-            local_g,
-            partition_book,
-            local_nids,
-            fanout,
-            edge_dir,
-            _prob,
-            replace,
-        )
+        _prob = None #[g.edata[prob].local_partition] if prob is not None else None
 
+        # TODO (add prob)
+        return local_g.sample_neighbors(local_nids, fanouts, replace, return_eids=True)
+
+        # return _sample_neighbors(
+        #     local_g,
+        #     partition_book,
+        #     local_nids,
+        #     fanout,
+        #     edge_dir,
+        #     _prob,
+        #     replace,
+        # )
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)

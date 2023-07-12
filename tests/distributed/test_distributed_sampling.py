@@ -1299,6 +1299,44 @@ def start_num_nodes_client(rank, tmpdir, disable_shared_mem, nids=None):
     dgl.distributed.exit_client()
 
 
+def start_sample_client_graphbolt(rank, tmpdir, disable_shared_mem):
+    gpb = None
+    if disable_shared_mem:
+        part_g, _, _, gpb, _, _, _ = load_partition_graphbolt(
+            tmpdir / "test_num_nodes.json", rank
+        )
+    dgl.distributed.initialize("rpc_ip_config.txt")
+    dist_graph = DistGraph("test", gpb=gpb)
+    try:
+        sampled_graph = sample_neighbors(
+            dist_graph, [0, 10, 99, 66, 1024, 2008], 3
+        )
+    except Exception as e:
+        print(traceback.format_exc())
+        sampled_graph = None
+    dgl.distributed.exit_client()
+    return sampled_graph
+
+
+def start_num_nodes_client(rank, tmpdir, disable_shared_mem, nids=None):
+    gpb = None
+    if disable_shared_mem:
+        part_g, _, _, gpb, _, _, _ = load_partition(
+            tmpdir / "test_num_nodes.json", rank
+        )
+        part_g_gb, _, _, gpb_gb, _, _, _ = load_partition_graphbolt(
+            tmpdir / "test_num_nodes.json", rank
+        )
+    dgl.distributed.initialize("rpc_ip_config.txt")
+    # dist_graph = DistGraph("test_num_nodes", part_config=tmpdir / "test_num_nodes.json")
+    dist_g = DistGraph("test", gpb=gpb)
+    dist_g_gb = DistGraph("test_gb", gpb=gpb_gb)
+    if isinstance(part_g_gb, dgl.graphbolt.CSCSamplingGraph):
+        print("loading GraphBolt graph")
+    assert dist_g.num_nodes() == dist_g_gb.num_nodes()
+    dgl.distributed.exit_client()
+
+
 @pytest.mark.parametrize("num_server", [1])  #[1, 4])
 def check_rpc_sampling_GraphBolt(tmpdir, num_server):
     num_server = 2
@@ -1318,7 +1356,7 @@ def check_rpc_sampling_GraphBolt(tmpdir, num_server):
         part_method="metis",
     )
     # TODO (Israt): Directly save partitions in GraphBolt structure
-    convert_dgl_partition_to_csc_sampling_graph(tmpdir / "test_num_nodes.json")
+    # convert_dgl_partition_to_csc_sampling_graph(tmpdir / "test_num_nodes.json")
 
     pserver_list = []
     ctx = mp.get_context("spawn")
@@ -1331,11 +1369,20 @@ def check_rpc_sampling_GraphBolt(tmpdir, num_server):
         time.sleep(1)
         pserver_list.append(p)
 
-    sampled_graph = start_num_nodes_client(0, tmpdir, num_server > 1)
+    start_num_nodes_client(0, tmpdir, num_server > 1)
+    sampled_graph = start_sample_client_graphbolt(0, tmpdir, num_server > 1)
 
     for p in pserver_list:
         p.join()
         assert p.exitcode == 0
+
+    src, dst = sampled_graph.edges()
+    assert sampled_graph.num_nodes() == g.num_nodes()
+    assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
+    eids = g.edge_ids(src, dst)
+    assert np.array_equal(
+        F.asnumpy(sampled_graph.edata[dgl.EID]), F.asnumpy(eids)
+    )
 
 
 def test_GraphBolt():
