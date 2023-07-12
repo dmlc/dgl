@@ -338,6 +338,7 @@ class CSCSamplingGraph:
         nodes: torch.Tensor,
         fanouts: torch.Tensor,
         replace: bool = False,
+        labor: bool = False,
         return_eids: bool = False,
         probs_name: Optional[str] = None,
     ) -> torch.ScriptObject:
@@ -421,7 +422,7 @@ class CSCSamplingGraph:
                 torch.float64,
             ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, return_eids, probs_name
+            nodes, fanouts.tolist(), replace, labor, return_eids, probs_name
         )
 
     def sample_negative_edges_uniform(

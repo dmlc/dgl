@@ -478,8 +478,9 @@ def test_sample_neighbors_hetero():
         ([-1, -1], 2, 2),
     ],
 )
+@pytest.mark.parametrize("labor", [False, True])
 def test_sample_neighbors_fanouts(
-    fanouts, expected_sampled_num1, expected_sampled_num2
+    fanouts, expected_sampled_num1, expected_sampled_num2, labor
 ):
     """Original graph in COO:
     ("n1", "e1", "n2"):[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
@@ -514,7 +515,7 @@ def test_sample_neighbors_fanouts(
 
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.LongTensor(fanouts)
-    subgraph = graph.sample_neighbors(nodes, fanouts)
+    subgraph = graph.sample_neighbors(nodes, fanouts, labor=labor)
 
     # Verify in subgraph.
     assert (
@@ -589,9 +590,9 @@ def test_sample_neighbors_replace(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-@pytest.mark.parametrize("replace", [True, False])
+@pytest.mark.parametrize("replace, labor", [(True, False), (False, False), (False, True)])
 @pytest.mark.parametrize("probs_name", ["weight", "mask"])
-def test_sample_neighbors_probs(replace, probs_name):
+def test_sample_neighbors_probs(replace, labor, probs_name):
     """Original graph in COO:
     1   0   1   0   1
     1   0   1   1   0
@@ -623,6 +624,7 @@ def test_sample_neighbors_probs(replace, probs_name):
         nodes,
         fanouts=torch.tensor([2]),
         replace=replace,
+        labor=labor,
         probs_name=probs_name,
     )
 
@@ -638,7 +640,7 @@ def test_sample_neighbors_probs(replace, probs_name):
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-@pytest.mark.parametrize("replace", [True, False])
+@pytest.mark.parametrize("replace, labor", [(True, False), (False, False), (False, True)])
 @pytest.mark.parametrize(
     "probs_or_mask",
     [
@@ -646,7 +648,7 @@ def test_sample_neighbors_probs(replace, probs_name):
         torch.zeros(12, dtype=torch.bool),
     ],
 )
-def test_sample_neighbors_zero_probs(replace, probs_or_mask):
+def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
     # Initialize data.
     num_nodes = 5
     num_edges = 12
@@ -666,6 +668,7 @@ def test_sample_neighbors_zero_probs(replace, probs_or_mask):
         nodes,
         fanouts=torch.tensor([5]),
         replace=replace,
+        labor=labor,
         probs_name="probs_or_mask",
     )
 
