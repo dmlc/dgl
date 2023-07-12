@@ -2,6 +2,7 @@
 from collections import namedtuple
 
 import numpy as np
+import torch as th
 
 from .. import backend as F
 from ..base import EID, NID
@@ -449,18 +450,15 @@ def merge_graphs(res_list, num_nodes):
             eids.append(res.global_eids)
         src_tensor = F.cat(srcs, 0)
         dst_tensor = F.cat(dsts, 0)
-        eid_tensor = F.cat(eids, 0)
     else:
         src_tensor = res_list[0].global_src
         dst_tensor = res_list[0].global_dst
-        eid_tensor = res_list[0].global_eids
     g = graph((src_tensor, dst_tensor), num_nodes=num_nodes)
-    g.edata[EID] = eid_tensor
     return g
 
 
 LocalSampledGraph = namedtuple(
-    "LocalSampledGraph", "global_src global_dst global_eids"
+    "LocalSampledGraph", "global_src global_dst"
 )
 
 
@@ -515,10 +513,11 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
     # sample neighbors for the nodes in the local partition.
     res_list = []
     if local_nids is not None:
-        src, dst, eids = local_access(
+        sampled_subg = local_access(
             g.local_partition, partition_book, local_nids
         )
-        res_list.append(LocalSampledGraph(src, dst, eids))
+        src, dst = sampled_subg.node_pairs
+        res_list.append(LocalSampledGraph(src, dst))
 
     # receive responses from remote machines.
     if msgseq2pos is not None:
@@ -800,20 +799,14 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
 
     def local_access(local_g, partition_book, local_nids):
         # See NOTE 1
+        # TODO (Israt): Fix prob, fix fanout for  multiple layer
         _prob = None #[g.edata[prob].local_partition] if prob is not None else None
 
-        # TODO (add prob)
-        return local_g.sample_neighbors(local_nids, fanouts, replace, return_eids=True)
-
-        # return _sample_neighbors(
-        #     local_g,
-        #     partition_book,
-        #     local_nids,
-        #     fanout,
-        #     edge_dir,
-        #     _prob,
-        #     replace,
-        # )
+        return local_g.sample_neighbors(
+            local_nids,
+            th.tensor([fanout]),
+            replace,
+        )
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)

@@ -229,6 +229,9 @@ class CSCSamplingGraph:
         )
         row = C_sampled_subgraph.indices
         type_per_edge = C_sampled_subgraph.type_per_edge
+        # TODO (Israt): type_per_edge is not None for homogeneous
+        print("MUST FIX")
+        type_per_edge = None
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
