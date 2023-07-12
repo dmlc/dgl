@@ -134,7 +134,7 @@ template <bool labor>
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     int64_t replace, bool return_eids,
-    torch::optional<torch::Tensor> probs_or_mask) const {
+    const torch::optional<torch::Tensor>& probs_or_mask) const {
   const int64_t num_nodes = nodes.size(0);
   // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
@@ -201,7 +201,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool labor, bool return_eids,
-    torch::optional<torch::Tensor> probs_or_mask) const {
+    torch::optional<std::string> probs_name) const {
   torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
   if (probs_name.has_value() && !probs_name.value().empty()) {
     probs_or_mask = edge_attributes_.value().at(probs_name.value());

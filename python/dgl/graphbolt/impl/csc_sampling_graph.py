@@ -253,6 +253,7 @@ class CSCSamplingGraph:
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
+        labor: bool = False,
         probs_name: Optional[str] = None,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
@@ -328,7 +329,7 @@ class CSCSamplingGraph:
             nodes = convert_to_homogeneous_nodes(nodes)
 
         C_sampled_subgraph = self._sample_neighbors(
-            nodes, fanouts, replace, False, probs_name
+            nodes, fanouts, replace, labor, False, probs_name
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)

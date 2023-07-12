@@ -590,7 +590,9 @@ def test_sample_neighbors_replace(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-@pytest.mark.parametrize("replace, labor", [(True, False), (False, False), (False, True)])
+@pytest.mark.parametrize(
+    "replace, labor", [(True, False), (False, False), (False, True)]
+)
 @pytest.mark.parametrize("probs_name", ["weight", "mask"])
 def test_sample_neighbors_probs(replace, labor, probs_name):
     """Original graph in COO:
