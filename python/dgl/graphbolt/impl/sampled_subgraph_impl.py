@@ -16,10 +16,8 @@ class SampledSubgraphImpl(SampledSubgraph):
     --------
     >>> node_pairs = {('A', 'relation', 'B'): (torch.tensor([1, 2, 3]),
     ... torch.tensor([4, 5, 6]))}
-    >>> reverse_column_node_ids = {'A': torch.tensor([7, 8, 9]),
-    ... 'B': torch.tensor([10, 11, 12])}
-    >>> reverse_row_node_ids = {'A': torch.tensor([13, 14, 15]),
-    ... 'B': torch.tensor([16, 17, 18])}
+    >>> reverse_column_node_ids = {'B': torch.tensor([10, 11, 12])}
+    >>> reverse_row_node_ids = {'A': torch.tensor([13, 14, 15])}
     >>> reverse_edge_ids = {('A', 'relation', 'B'): torch.tensor([19, 20, 21])}
     >>> subgraph = gb.SampledSubgraphImpl(
     ... node_pairs=node_pairs,
@@ -30,9 +28,9 @@ class SampledSubgraphImpl(SampledSubgraph):
     >>> print(subgraph.node_pairs)
     {('A', 'relation', 'B'): (tensor([1, 2, 3]), tensor([4, 5, 6]))}
     >>> print(subgraph.reverse_column_node_ids)
-    {'A': tensor([7, 8, 9]), 'B': tensor([10, 11, 12])}
+    {'B': tensor([10, 11, 12])}
     >>> print(subgraph.reverse_row_node_ids)
-    {'A': tensor([13, 14, 15]), 'B': tensor([16, 17, 18])}
+    {'A': tensor([13, 14, 15])}
     >>> print(subgraph.reverse_edge_ids)
     {('A', 'relation', 'B'): tensor([19, 20, 21])}
     """
