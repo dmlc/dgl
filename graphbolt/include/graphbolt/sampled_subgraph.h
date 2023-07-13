@@ -113,18 +113,6 @@ struct SampledSubgraph : torch::CustomClassHolder {
    * subgraph.
    */
   torch::optional<torch::Tensor> type_per_edge;
-
-  /**
-   * @brief Get graph state (for pickle serialization).
-   * @return A vector of Tensors.
-   */
-  std::vector<torch::Tensor> GetState();
-
-  /**
-   * @brief Set graph state (for pickle deserialization).
-   * @param state A vector of Tensors.
-   */
-  void SetState(std::vector<torch::Tensor>& state);
 };
 
 }  // namespace sampling
