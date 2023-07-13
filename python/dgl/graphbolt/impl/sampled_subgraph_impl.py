@@ -14,13 +14,11 @@ class SampledSubgraphImpl(SampledSubgraph):
 
     Examples
     --------
-    >>> node_pairs = {('A', 'B', 'relation'): (torch.tensor([1, 2, 3]),
-    ... torch.tensor([4, 5, 6]))}
-    >>> reverse_column_node_ids = {'A': torch.tensor([7, 8, 9]),
-    ... 'B': torch.tensor([10, 11, 12])}
-    >>> reverse_row_node_ids = {'A': torch.tensor([13, 14, 15]),
-    ... 'B': torch.tensor([16, 17, 18])}
-    >>> reverse_edge_ids = {('A', 'B', 'relation'): torch.tensor([19, 20, 21])}
+    >>> node_pairs = {('A', 'relation', 'B'): (torch.tensor([0, 1, 2]),
+    ... torch.tensor([0, 1, 2]))}
+    >>> reverse_column_node_ids = {'B': torch.tensor([10, 11, 12])}
+    >>> reverse_row_node_ids = {'A': torch.tensor([13, 14, 15])}
+    >>> reverse_edge_ids = {('A', 'relation', 'B'): torch.tensor([19, 20, 21])}
     >>> subgraph = gb.SampledSubgraphImpl(
     ... node_pairs=node_pairs,
     ... reverse_column_node_ids=reverse_column_node_ids,
@@ -28,22 +26,22 @@ class SampledSubgraphImpl(SampledSubgraph):
     ... reverse_edge_ids=reverse_edge_ids
     ... )
     >>> print(subgraph.node_pairs)
-    {('A', 'B', 'relation'): (tensor([1, 2, 3]), tensor([4, 5, 6]))}
+    {('A', 'relation', 'B'): (tensor([0, 1, 2]), tensor([0, 1, 2]))}
     >>> print(subgraph.reverse_column_node_ids)
-    {'A': tensor([7, 8, 9]), 'B': tensor([10, 11, 12])}
+    {'B': tensor([10, 11, 12])}
     >>> print(subgraph.reverse_row_node_ids)
-    {'A': tensor([13, 14, 15]), 'B': tensor([16, 17, 18])}
+    {'A': tensor([13, 14, 15])}
     >>> print(subgraph.reverse_edge_ids)
-    {('A', 'B', 'relation'): tensor([19, 20, 21])}
+    {('A', 'relation', 'B'): tensor([19, 20, 21])}
     """
     node_pairs: Union[
-        Dict[Tuple[str, str, str], Tuple[torch.tensor, torch.tensor]],
-        Tuple[torch.tensor, torch.tensor],
+        Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
+        Tuple[torch.Tensor, torch.Tensor],
     ] = None
-    reverse_column_node_ids: Union[Dict[str, torch.tensor], torch.tensor] = None
-    reverse_row_node_ids: Union[Dict[str, torch.tensor], torch.tensor] = None
+    reverse_column_node_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
+    reverse_row_node_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
     reverse_edge_ids: Union[
-        Dict[Tuple[str, str, str], torch.tensor], torch.tensor
+        Dict[Tuple[str, str, str], torch.Tensor], torch.Tensor
     ] = None
 
     def __post_init__(self):
@@ -68,3 +66,33 @@ class SampledSubgraphImpl(SampledSubgraph):
             assert all(
                 isinstance(item, torch.Tensor) for item in self.node_pairs
             ), "Nodes in pairs should be of type torch.Tensor."
+
+
+def exclude_edges(
+    subgraph: SampledSubgraphImpl,
+    edges: Union[
+        Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
+        Tuple[torch.Tensor, torch.Tensor],
+    ],
+) -> SampledSubgraphImpl:
+    r"""Exclude edges from the sampled subgraph.
+
+
+    Parameters
+    ----------
+    subgraph : SampledSubgraphImpl
+        The sampled subgraph.
+    edges : Union[Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
+    Tuple[torch.Tensor, torch.Tensor]]
+        Edges to exclude. If sampled subgraph is homogeneous, then `edges`
+        should be a pair of tensors representing the edges to exclude. If
+        sampled subgraph is heterogeneous, then `edges` should be a dictionary
+        of edge types and the corresponding edges to exclude.
+
+    Returns
+    -------
+    SampledSubgraphImpl
+        The sampled subgraph with the excluded edges.
+    """
+    # TODO(zhenkun): Implement this.
+    raise NotImplementedError
