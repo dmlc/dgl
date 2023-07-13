@@ -32,7 +32,7 @@ models with multi-GPU with ``DistributedDataParallel``.
 # Classification <../large/L1_large_node_classification>`
 # tutorial.
 #
-exit(0)
+
 import os
 
 os.environ["DGLBACKEND"] = "pytorch"

@@ -1789,7 +1789,6 @@ def test_as_nodepred2():
     assert len(ds.train_idx) == int(ds[0].num_nodes("Personen") * 0.1)
 
 
-@unittest.skip("ogb is not available")
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch", reason="ogb only supports pytorch"
 )
@@ -1842,7 +1841,6 @@ def test_as_linkpred():
     assert 4000 < ds.test_edges[1][0].shape[0] <= 4224
 
 
-@unittest.skip("ogb is not available")
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch", reason="ogb only supports pytorch"
 )
@@ -2076,7 +2074,6 @@ def test_as_graphpred_reprocess():
     assert len(ds.train_idx) == int(len(ds) * 0.1)
 
 
-@unittest.skip("ogb is not available")
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch", reason="ogb only supports pytorch"
 )

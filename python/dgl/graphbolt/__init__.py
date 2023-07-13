@@ -5,14 +5,16 @@ import sys
 import torch
 
 from .._ffi import libinfo
-from .graph_storage import *
 from .itemset import *
 from .minibatch_sampler import *
 from .feature_store import *
 from .feature_fetcher import *
 from .copy_to import *
 from .dataset import *
+from .impl import *
+from .dataloader import *
 from .subgraph_sampler import *
+from .sampled_subgraph import *
 
 
 def load_graphbolt():
@@ -42,5 +44,3 @@ def load_graphbolt():
 
 
 load_graphbolt()
-
-SampledSubgraph = torch.classes.graphbolt.SampledSubgraph
