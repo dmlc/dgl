@@ -132,15 +132,18 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool return_eids,
-    torch::optional<torch::Tensor> probs_or_mask) const {
+    torch::optional<std::string> probs_name) const {
   const int64_t num_nodes = nodes.size(0);
-  // Note probs will be passed as input for 'torch.multinomial' in deeper stack,
-  // which doesn't support 'torch.half' and 'torch.bool' data types. To avoid
-  // crashes, convert 'probs_or_mask' to 'float32' data type.
-  if (probs_or_mask.has_value() &&
-      (probs_or_mask.value().dtype() == torch::kBool ||
-       probs_or_mask.value().dtype() == torch::kFloat16)) {
-    probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
+  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
+  if (probs_name.has_value() && !probs_name.value().empty()) {
+    probs_or_mask = edge_attributes_.value().at(probs_name.value());
+    // Note probs will be passed as input for 'torch.multinomial' in deeper
+    // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
+    // avoid crashes, convert 'probs_or_mask' to 'float32' data type.
+    if (probs_or_mask.value().dtype() == torch::kBool ||
+        probs_or_mask.value().dtype() == torch::kFloat16) {
+      probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
+    }
   }
   // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
