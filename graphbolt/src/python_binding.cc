@@ -20,7 +20,18 @@ TORCH_LIBRARY(graphbolt, m) {
       .def_readwrite(
           "reverse_column_node_ids", &SampledSubgraph::reverse_column_node_ids)
       .def_readwrite("reverse_edge_ids", &SampledSubgraph::reverse_edge_ids)
-      .def_readwrite("type_per_edge", &SampledSubgraph::type_per_edge);
+      .def_readwrite("type_per_edge", &SampledSubgraph::type_per_edge)
+      .def_pickle(
+          // __getstate__
+          [](const c10::intrusive_ptr<SampledSubgraph>& self)
+              -> std::vector<torch::Tensor> { return self->GetState(); },
+          // __setstate__
+          [](std::vector<torch::Tensor> state)
+              -> c10::intrusive_ptr<SampledSubgraph> {
+            auto g = c10::make_intrusive<SampledSubgraph>();
+            g->SetState(state);
+            return g;
+          });
   m.class_<CSCSamplingGraph>("CSCSamplingGraph")
       .def("num_nodes", &CSCSamplingGraph::NumNodes)
       .def("num_edges", &CSCSamplingGraph::NumEdges)
@@ -28,6 +39,7 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("indices", &CSCSamplingGraph::Indices)
       .def("node_type_offset", &CSCSamplingGraph::NodeTypeOffset)
       .def("type_per_edge", &CSCSamplingGraph::TypePerEdge)
+      .def("edge_attributes", &CSCSamplingGraph::EdgeAttributes)
       .def("in_subgraph", &CSCSamplingGraph::InSubgraph)
       .def("sample_neighbors", &CSCSamplingGraph::SampleNeighbors)
       .def(
