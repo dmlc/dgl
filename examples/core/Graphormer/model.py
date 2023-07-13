@@ -24,7 +24,6 @@ class Graphormer(nn.Module):
         pre_layernorm=True,
         activation_fn=nn.GELU(),
     ):
-
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.embedding_dim = embedding_dim

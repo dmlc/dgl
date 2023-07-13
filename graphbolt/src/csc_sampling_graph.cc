@@ -20,11 +20,13 @@ namespace sampling {
 CSCSamplingGraph::CSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
-    const torch::optional<torch::Tensor>& type_per_edge)
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<EdgeAttrMap>& edge_attributes)
     : indptr_(indptr),
       indices_(indices),
       node_type_offset_(node_type_offset),
-      type_per_edge_(type_per_edge) {
+      type_per_edge_(type_per_edge),
+      edge_attributes_(edge_attributes) {
   TORCH_CHECK(indptr.dim() == 1);
   TORCH_CHECK(indices.dim() == 1);
   TORCH_CHECK(indptr.device() == indices.device());
@@ -33,7 +35,8 @@ CSCSamplingGraph::CSCSamplingGraph(
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
-    const torch::optional<torch::Tensor>& type_per_edge) {
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<EdgeAttrMap>& edge_attributes) {
   if (node_type_offset.has_value()) {
     auto& offset = node_type_offset.value();
     TORCH_CHECK(offset.dim() == 1);
@@ -42,9 +45,13 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
     TORCH_CHECK(type_per_edge.value().dim() == 1);
     TORCH_CHECK(type_per_edge.value().size(0) == indices.size(0));
   }
-
+  if (edge_attributes.has_value()) {
+    for (const auto& pair : edge_attributes.value()) {
+      TORCH_CHECK(pair.value().size(0) == indices.size(0));
+    }
+  }
   return c10::make_intrusive<CSCSamplingGraph>(
-      indptr, indices, node_type_offset, type_per_edge);
+      indptr, indices, node_type_offset, type_per_edge, edge_attributes);
 }
 
 void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
@@ -125,15 +132,18 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool return_eids,
-    torch::optional<torch::Tensor> probs_or_mask) const {
+    torch::optional<std::string> probs_name) const {
   const int64_t num_nodes = nodes.size(0);
-  // Note probs will be passed as input for 'torch.multinomial' in deeper stack,
-  // which doesn't support 'torch.half' and 'torch.bool' data types. To avoid
-  // crashes, convert 'probs_or_mask' to 'float32' data type.
-  if (probs_or_mask.has_value() &&
-      (probs_or_mask.value().dtype() == torch::kBool ||
-       probs_or_mask.value().dtype() == torch::kFloat16)) {
-    probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
+  torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
+  if (probs_name.has_value() && !probs_name.value().empty()) {
+    probs_or_mask = edge_attributes_.value().at(probs_name.value());
+    // Note probs will be passed as input for 'torch.multinomial' in deeper
+    // stack, which doesn't support 'torch.half' and 'torch.bool' data types. To
+    // avoid crashes, convert 'probs_or_mask' to 'float32' data type.
+    if (probs_or_mask.value().dtype() == torch::kBool ||
+        probs_or_mask.value().dtype() == torch::kFloat16) {
+      probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
+    }
   }
   // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
@@ -217,7 +227,7 @@ CSCSamplingGraph::BuildGraphFromSharedMemoryTensors(
   auto& optional_tensors = std::get<2>(shared_memory_tensors);
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
       optional_tensors[0].value(), optional_tensors[1].value(),
-      optional_tensors[2], optional_tensors[3]);
+      optional_tensors[2], optional_tensors[3], torch::nullopt);
   graph->tensor_meta_shm_ = std::move(std::get<0>(shared_memory_tensors));
   graph->tensor_data_shm_ = std::move(std::get<1>(shared_memory_tensors));
   return graph;
