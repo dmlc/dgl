@@ -16,6 +16,8 @@
 namespace graphbolt {
 namespace sampling {
 
+enum sampler_t { NEIGHBOR, LABOR };
+
 /**
  * @brief A sampling oriented csc format graph.
  *
@@ -204,7 +206,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const std::string& shared_memory_name);
 
  private:
-  template <bool labor>
+  template <sampler_t sampler>
   c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
       int64_t replace, bool return_eids,
@@ -254,7 +256,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    *
    * @return A tensor containing the picked neighbors.
    */
-  template <bool labor>
+  template <sampler_t sampler>
   torch::Tensor Pick(
       int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t replace,
       const torch::TensorOptions& options,
@@ -289,7 +291,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    *
    * @return A tensor containing the picked neighbors.
    */
-  template <bool labor>
+  template <sampler_t sampler>
   torch::Tensor PickByEtype(
       int64_t offset, int64_t num_neighbors,
       const std::vector<int64_t>& fanouts, int64_t replace,

@@ -253,7 +253,7 @@ class CSCSamplingGraph:
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
-        labor: bool = False,
+        layer: bool = False,
         probs_name: Optional[str] = None,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
@@ -287,6 +287,10 @@ class CSCSamplingGraph:
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
+        layer: bool
+            Boolean indicating whether neighbors should be sampled in a layer
+            sampling fashion. Uses the LABOR-0 algorithm to increase overlap
+            of sampled edges.
         probs_name: str, optional
             An optional string specifying the name of an edge attribute used a. This
             attribute tensor should contain (unnormalized) probabilities
@@ -329,7 +333,7 @@ class CSCSamplingGraph:
             nodes = convert_to_homogeneous_nodes(nodes)
 
         C_sampled_subgraph = self._sample_neighbors(
-            nodes, fanouts, replace, labor, False, probs_name
+            nodes, fanouts, replace, layer, False, probs_name
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
@@ -339,7 +343,7 @@ class CSCSamplingGraph:
         nodes: torch.Tensor,
         fanouts: torch.Tensor,
         replace: bool = False,
-        labor: bool = False,
+        layer: bool = False,
         return_eids: bool = False,
         probs_name: Optional[str] = None,
     ) -> torch.ScriptObject:
@@ -370,6 +374,10 @@ class CSCSamplingGraph:
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
+        layer: bool
+            Boolean indicating whether neighbors should be sampled in a layer
+            sampling fashion. Uses the LABOR-0 algorithm to increase overlap
+            of sampled edges.
         return_eids: bool
             Boolean indicating whether the edge IDs of sampled edges,
             represented as a 1D tensor, should be returned. This is
@@ -423,7 +431,7 @@ class CSCSamplingGraph:
                 torch.float64,
             ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, labor, return_eids, probs_name
+            nodes, fanouts.tolist(), replace, layer, return_eids, probs_name
         )
 
     def sample_negative_edges_uniform(

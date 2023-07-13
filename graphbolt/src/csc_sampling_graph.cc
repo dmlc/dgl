@@ -130,7 +130,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
-template <bool labor>
+template <sampler_t sampler>
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     int64_t replace, bool return_eids,
@@ -166,11 +166,11 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
             }
 
             if (consider_etype) {
-              picked_neighbors_per_node[i] = PickByEtype<labor>(
+              picked_neighbors_per_node[i] = PickByEtype<sampler>(
                   offset, num_neighbors, fanouts, replace, indptr_.options(),
                   type_per_edge_.value(), probs_or_mask);
             } else {
-              picked_neighbors_per_node[i] = Pick<labor>(
+              picked_neighbors_per_node[i] = Pick<sampler>(
                   offset, num_neighbors, fanouts[0], replace, indptr_.options(),
                   probs_or_mask);
             }
@@ -218,10 +218,10 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
         !replace, "Sampling with replacement is not supported for labor.");
     const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
-    return SampleNeighborsImpl<true>(
+    return SampleNeighborsImpl<sampler_t::LABOR>(
         nodes, fanouts, random_seed, return_eids, probs_or_mask);
   } else {
-    return SampleNeighborsImpl<false>(
+    return SampleNeighborsImpl<sampler_t::NEIGHBOR>(
         nodes, fanouts, replace, return_eids, probs_or_mask);
   }
 }
@@ -509,36 +509,40 @@ inline torch::Tensor CSCSamplingGraph::LaborPick(
   return picked_neighbors.narrow(0, 0, num_sampled);
 }
 
-template <bool labor>
-torch::Tensor CSCSamplingGraph::Pick(
+template <>
+torch::Tensor CSCSamplingGraph::Pick<sampler_t::NEIGHBOR>(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask) const {
+  if (probs_or_mask.has_value()) {
+    return NonUniformPick(
+        offset, num_neighbors, fanout, replace, options, probs_or_mask);
+  } else {
+    return UniformPick(offset, num_neighbors, fanout, replace, options);
+  }
+}
+
+template <>
+torch::Tensor CSCSamplingGraph::Pick<sampler_t::LABOR>(
     int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask) const {
   if (fanout == 0) return torch::tensor({}, options);
-  if constexpr (labor) {
-    if (probs_or_mask.has_value()) {
-      torch::Tensor picked_neighbors;
-      AT_DISPATCH_FLOATING_TYPES(
-          probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
-            picked_neighbors = LaborPick<true, scalar_t>(
-                offset, num_neighbors, fanout, replace, options, probs_or_mask);
-          }));
-      return picked_neighbors;
-    } else {
-      return LaborPick<false>(
-          offset, num_neighbors, fanout, replace, options, probs_or_mask);
-    }
+  if (probs_or_mask.has_value()) {
+    torch::Tensor picked_neighbors;
+    AT_DISPATCH_FLOATING_TYPES(
+        probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
+          picked_neighbors = LaborPick<true, scalar_t>(
+              offset, num_neighbors, fanout, replace, options, probs_or_mask);
+        }));
+    return picked_neighbors;
   } else {
-    if (probs_or_mask.has_value()) {
-      return NonUniformPick(
-          offset, num_neighbors, fanout, replace, options, probs_or_mask);
-    } else {
-      return UniformPick(offset, num_neighbors, fanout, replace, options);
-    }
+    return LaborPick<false>(
+        offset, num_neighbors, fanout, replace, options, probs_or_mask);
   }
 }
 
-template <bool labor>
+template <sampler_t sampler>
 torch::Tensor CSCSamplingGraph::PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     int64_t replace, const torch::TensorOptions& options,
@@ -564,7 +568,7 @@ torch::Tensor CSCSamplingGraph::PickByEtype(
           etype_end = etype_end_it - type_per_edge_data;
           // Do sampling for one etype.
           if (fanout != 0) {
-            picked_neighbors[etype] = Pick<labor>(
+            picked_neighbors[etype] = Pick<sampler>(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
                 probs_or_mask);
           }
