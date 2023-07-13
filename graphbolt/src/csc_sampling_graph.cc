@@ -133,8 +133,9 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 template <sampler_t sampler>
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-    sampler_args<sampler> args, bool return_eids,
-    const torch::optional<torch::Tensor>& probs_or_mask) const {
+    bool replace, bool return_eids,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    sampler_args<sampler> args) const {
   const int64_t num_nodes = nodes.size(0);
   // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
@@ -167,12 +168,12 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
 
             if (consider_etype) {
               picked_neighbors_per_node[i] = PickByEtype(
-                  offset, num_neighbors, fanouts, args, indptr_.options(),
-                  type_per_edge_.value(), probs_or_mask);
+                  offset, num_neighbors, fanouts, replace, indptr_.options(),
+                  type_per_edge_.value(), probs_or_mask, args);
             } else {
               picked_neighbors_per_node[i] = Pick(
-                  offset, num_neighbors, fanouts[0], args, indptr_.options(),
-                  probs_or_mask);
+                  offset, num_neighbors, fanouts[0], replace, indptr_.options(),
+                  probs_or_mask, args);
             }
             num_picked_neighbors_per_node[i + 1] =
                 picked_neighbors_per_node[i].size(0);
@@ -220,11 +221,11 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
     sampler_args<sampler_t::LABOR> args{random_seed, indices_};
     return SampleNeighborsImpl(
-        nodes, fanouts, args, return_eids, probs_or_mask);
+        nodes, fanouts, replace, return_eids, probs_or_mask, args);
   } else {
-    sampler_args<sampler_t::NEIGHBOR> args{replace};
+    sampler_args<sampler_t::NEIGHBOR> args;
     return SampleNeighborsImpl(
-        nodes, fanouts, args, return_eids, probs_or_mask);
+        nodes, fanouts, replace, return_eids, probs_or_mask, args);
   }
 }
 
@@ -447,23 +448,25 @@ inline torch::Tensor NonUniformPick(
 
 template <>
 torch::Tensor Pick<sampler_t::NEIGHBOR>(
-    int64_t offset, int64_t num_neighbors, int64_t fanout,
-    sampler_args<sampler_t::NEIGHBOR> args, const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask) {
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    sampler_args<sampler_t::NEIGHBOR> args) {
   if (probs_or_mask.has_value()) {
     return NonUniformPick(
-        offset, num_neighbors, fanout, args.replace, options, probs_or_mask);
+        offset, num_neighbors, fanout, replace, options, probs_or_mask);
   } else {
-    return UniformPick(offset, num_neighbors, fanout, args.replace, options);
+    return UniformPick(offset, num_neighbors, fanout, replace, options);
   }
 }
 
 template <sampler_t sampler>
 torch::Tensor PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
-    sampler_args<sampler> args, const torch::TensorOptions& options,
+    bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask) {
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    sampler_args<sampler> args) {
   std::vector<torch::Tensor> picked_neighbors(
       fanouts.size(), torch::tensor({}, options));
   int64_t etype_begin = offset;
@@ -485,8 +488,8 @@ torch::Tensor PickByEtype(
           // Do sampling for one etype.
           if (fanout != 0) {
             picked_neighbors[etype] = Pick<sampler>(
-                etype_begin, etype_end - etype_begin, fanout, args, options,
-                probs_or_mask);
+                etype_begin, etype_end - etype_begin, fanout, replace, options,
+                probs_or_mask, args);
           }
           etype_begin = etype_end;
         }
@@ -497,9 +500,10 @@ torch::Tensor PickByEtype(
 
 template <>
 torch::Tensor Pick<sampler_t::LABOR>(
-    int64_t offset, int64_t num_neighbors, int64_t fanout,
-    sampler_args<sampler_t::LABOR> args, const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask) {
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    sampler_args<sampler_t::LABOR> args) {
   if (fanout == 0) return torch::tensor({}, options);
   if (probs_or_mask.has_value()) {
     torch::Tensor picked_neighbors;
