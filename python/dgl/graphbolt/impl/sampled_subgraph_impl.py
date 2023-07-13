@@ -14,8 +14,8 @@ class SampledSubgraphImpl(SampledSubgraph):
 
     Examples
     --------
-    >>> node_pairs = {('A', 'relation', 'B'): (torch.tensor([1, 2, 3]),
-    ... torch.tensor([4, 5, 6]))}
+    >>> node_pairs = {('A', 'relation', 'B'): (torch.tensor([0, 1, 2]),
+    ... torch.tensor([0, 1, 2]))}
     >>> reverse_column_node_ids = {'B': torch.tensor([10, 11, 12])}
     >>> reverse_row_node_ids = {'A': torch.tensor([13, 14, 15])}
     >>> reverse_edge_ids = {('A', 'relation', 'B'): torch.tensor([19, 20, 21])}
@@ -26,7 +26,7 @@ class SampledSubgraphImpl(SampledSubgraph):
     ... reverse_edge_ids=reverse_edge_ids
     ... )
     >>> print(subgraph.node_pairs)
-    {('A', 'relation', 'B'): (tensor([1, 2, 3]), tensor([4, 5, 6]))}
+    {('A', 'relation', 'B'): (tensor([0, 1, 2]), tensor([0, 1, 2]))}
     >>> print(subgraph.reverse_column_node_ids)
     {'B': tensor([10, 11, 12])}
     >>> print(subgraph.reverse_row_node_ids)
