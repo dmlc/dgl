@@ -443,72 +443,6 @@ inline torch::Tensor NonUniformPick(
   return picked_neighbors;
 }
 
-template <bool nonuniform, typename fp_t = float>
-inline torch::Tensor CSCSamplingGraph::LaborPick(
-    int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t random_seed,
-    const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask) const {
-  fanout = fanout < 0 ? num_neighbors : std::min(fanout, num_neighbors);
-  if (!nonuniform && fanout >= num_neighbors) {
-    return torch::arange(offset, offset + num_neighbors, options);
-  }
-  torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
-  // Assuming max_degree of a vertex is <= 4 billion
-  auto heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
-      heap_tensor.data_ptr<int32_t>());
-  const fp_t* local_probs_data =
-      nonuniform ? probs_or_mask.value().data_ptr<fp_t>() + offset : nullptr;
-  AT_DISPATCH_INTEGRAL_TYPES(
-      indices_.scalar_type(), "LaborPickMain", ([&] {
-        const scalar_t* local_indices_data =
-            indices_.data_ptr<scalar_t>() + offset;
-        for (uint32_t i = 0; i < fanout; ++i) {
-          const auto t = local_indices_data[i];
-          pcg32 ng(random_seed, t);
-          std::uniform_real_distribution<float> uni;
-          auto rnd = uni(ng);  // r_t
-          if constexpr (nonuniform) {
-            rnd = local_probs_data[i] > 0
-                      ? (float)(rnd / local_probs_data[i])
-                      : std::numeric_limits<float>::infinity();
-          }  // r_t / \pi_t
-          heap_data[i] = std::make_pair(rnd, i);
-        }
-        if (!nonuniform || fanout < num_neighbors) {
-          std::make_heap(heap_data, heap_data + fanout);
-        }
-        for (uint32_t i = fanout; i < num_neighbors; ++i) {
-          const auto t = local_indices_data[i];
-          pcg32 ng(random_seed, t);
-          std::uniform_real_distribution<float> uni;
-          auto rnd = uni(ng);  // r_t
-          if constexpr (nonuniform) {
-            rnd = local_probs_data[i] > 0
-                      ? (float)(rnd / local_probs_data[i])
-                      : std::numeric_limits<float>::infinity();
-          }  // r_t / \pi_t
-          if (rnd < heap_data[0].first) {
-            std::pop_heap(heap_data, heap_data + fanout);
-            heap_data[fanout - 1] = std::make_pair(rnd, i);
-            std::push_heap(heap_data, heap_data + fanout);
-          }
-        }
-      }));
-  int64_t num_sampled = 0;
-  torch::Tensor picked_neighbors = torch::empty({fanout}, options);
-  AT_DISPATCH_INTEGRAL_TYPES(
-      picked_neighbors.scalar_type(), "LaborPickOutput", ([&] {
-        scalar_t* picked_neighbors_data = picked_neighbors.data_ptr<scalar_t>();
-        for (int64_t i = 0; i < fanout; ++i) {
-          const auto [rnd, j] = heap_data[i];
-          if (!nonuniform || rnd < std::numeric_limits<float>::infinity()) {
-            picked_neighbors_data[num_sampled++] = offset + j;
-          }
-        }
-      }));
-  return picked_neighbors.narrow(0, 0, num_sampled);
-}
-
 template <>
 torch::Tensor CSCSamplingGraph::Pick<sampler_t::NEIGHBOR>(
     int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t replace,
@@ -577,6 +511,72 @@ torch::Tensor CSCSamplingGraph::PickByEtype(
       }));
 
   return torch::cat(picked_neighbors, 0);
+}
+
+template <bool nonuniform, typename fp_t = float>
+inline torch::Tensor CSCSamplingGraph::LaborPick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t random_seed,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask) const {
+  fanout = fanout < 0 ? num_neighbors : std::min(fanout, num_neighbors);
+  if (!nonuniform && fanout >= num_neighbors) {
+    return torch::arange(offset, offset + num_neighbors, options);
+  }
+  torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
+  // Assuming max_degree of a vertex is <= 4 billion
+  auto heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
+      heap_tensor.data_ptr<int32_t>());
+  const fp_t* local_probs_data =
+      nonuniform ? probs_or_mask.value().data_ptr<fp_t>() + offset : nullptr;
+  AT_DISPATCH_INTEGRAL_TYPES(
+      indices_.scalar_type(), "LaborPickMain", ([&] {
+        const scalar_t* local_indices_data =
+            indices_.data_ptr<scalar_t>() + offset;
+        for (uint32_t i = 0; i < fanout; ++i) {
+          const auto t = local_indices_data[i];
+          pcg32 ng(random_seed, t);
+          std::uniform_real_distribution<float> uni;
+          auto rnd = uni(ng);  // r_t
+          if constexpr (nonuniform) {
+            rnd = local_probs_data[i] > 0
+                      ? (float)(rnd / local_probs_data[i])
+                      : std::numeric_limits<float>::infinity();
+          }  // r_t / \pi_t
+          heap_data[i] = std::make_pair(rnd, i);
+        }
+        if (!nonuniform || fanout < num_neighbors) {
+          std::make_heap(heap_data, heap_data + fanout);
+        }
+        for (uint32_t i = fanout; i < num_neighbors; ++i) {
+          const auto t = local_indices_data[i];
+          pcg32 ng(random_seed, t);
+          std::uniform_real_distribution<float> uni;
+          auto rnd = uni(ng);  // r_t
+          if constexpr (nonuniform) {
+            rnd = local_probs_data[i] > 0
+                      ? (float)(rnd / local_probs_data[i])
+                      : std::numeric_limits<float>::infinity();
+          }  // r_t / \pi_t
+          if (rnd < heap_data[0].first) {
+            std::pop_heap(heap_data, heap_data + fanout);
+            heap_data[fanout - 1] = std::make_pair(rnd, i);
+            std::push_heap(heap_data, heap_data + fanout);
+          }
+        }
+      }));
+  int64_t num_sampled = 0;
+  torch::Tensor picked_neighbors = torch::empty({fanout}, options);
+  AT_DISPATCH_INTEGRAL_TYPES(
+      picked_neighbors.scalar_type(), "LaborPickOutput", ([&] {
+        scalar_t* picked_neighbors_data = picked_neighbors.data_ptr<scalar_t>();
+        for (int64_t i = 0; i < fanout; ++i) {
+          const auto [rnd, j] = heap_data[i];
+          if (!nonuniform || rnd < std::numeric_limits<float>::infinity()) {
+            picked_neighbors_data[num_sampled++] = offset + j;
+          }
+        }
+      }));
+  return picked_neighbors.narrow(0, 0, num_sampled);
 }
 
 }  // namespace sampling
