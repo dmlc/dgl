@@ -474,7 +474,9 @@ inline torch::Tensor CSCSamplingGraph::LaborPick(
           }  // r_t / \pi_t
           heap_data[i] = std::make_pair(rnd, i);
         }
-        std::make_heap(heap_data, heap_data + fanout);
+        if (!nonuniform || fanout < num_neighbors) {
+          std::make_heap(heap_data, heap_data + fanout);
+        }
         for (uint32_t i = fanout; i < num_neighbors; ++i) {
           const auto t = local_indices_data[i];
           pcg32 ng(random_seed, t);
