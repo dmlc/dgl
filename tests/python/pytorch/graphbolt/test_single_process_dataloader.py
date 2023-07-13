@@ -19,7 +19,7 @@ def test_DataLoader():
 
         for hop in range(2):
             sg = graph.sample_neighbors(seeds, torch.LongTensor([2]))
-            seeds = sg.indices
+            seeds = sg.node_pairs[0]
             adjs.insert(0, sg)
 
         input_nodes = seeds
