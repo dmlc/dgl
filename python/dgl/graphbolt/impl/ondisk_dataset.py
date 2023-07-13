@@ -46,17 +46,21 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
     output_config_path : str
         The path to the output config file.
     """
+    # 0. Load the input_config.
+    with open(input_config_path, "r") as f:
+        input_config = yaml.safe_load(f)
+
+    if "graph" not in input_config:
+        print("Don't need to preprocess the on-disk dataset.")
+        return input_config_path
+
     print("Start to preprocess the on-disk dataset.")
     # Infer the dataset path from the input config path.
     dataset_path = Path(os.path.dirname(input_config_path))
     processed_dir_prefix = Path("preprocessed")
 
-    # 0. Make `processed_dir_prefix` directory if it does not exist.
+    # 1. Make `processed_dir_prefix` directory if it does not exist.
     os.makedirs(dataset_path / processed_dir_prefix, exist_ok=True)
-
-    # 1. Load the input_config.
-    with open(input_config_path, "r") as f:
-        input_config = yaml.safe_load(f)
     output_config = deepcopy(input_config)
 
     # 2. Load the edge data and create a DGLGraph.
@@ -90,7 +94,7 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
         g = dgl.heterograph(data_dict, num_nodes_dict)
 
     # 3. Load the node/edge features and add them to the sampling-graph.
-    if input_config["graph"]["feature_data"] is not None:
+    if input_config["graph"].get("feature_data", None):
         for graph_feature in input_config["graph"]["feature_data"]:
             if graph_feature["domain"] == "node":
                 node_data = read_data(
@@ -121,9 +125,10 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
         csc_sampling_graph,
         dataset_path / output_config["graph_topology"]["path"],
     )
+    del output_config["graph"]
 
     # 6. Load the node/edge features and do necessary conversion.
-    if input_config["feature_data"] is not None:
+    if input_config.get("feature_data", None):
         for (feature, out_feature) in zip(
             input_config["feature_data"], output_config["feature_data"]
         ):
@@ -161,6 +166,8 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
 
     # 7. Save the train/val/test split according to the output_config.
     for set_name in ["train_sets", "validation_sets", "test_sets"]:
+        if set_name not in input_config:
+            continue
         for intput_set_split, output_set_split in zip(
             input_config[set_name], output_config[set_name]
         ):
@@ -197,7 +204,6 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
                     )
 
     # 8. Save the output_config.
-    del output_config["graph"]
     output_config_path = dataset_path / "output_config.yaml"
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
