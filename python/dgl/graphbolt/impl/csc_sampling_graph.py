@@ -421,7 +421,7 @@ class CSCSamplingGraph:
                 torch.float64,
             ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, return_eids, probs_name
+            nodes, fanouts.tolist(), replace, False, return_eids, probs_name
         )
 
     def sample_labor(
@@ -430,8 +430,7 @@ class CSCSamplingGraph:
         fanouts: torch.Tensor,
         probs_name: Optional[str] = None,
     ) -> SampledSubgraphImpl:
-        """Sample neighboring edges of the given nodes and return the induced
-        subgraph.
+        """TODO: Add detailed ellaboration about how labor sampling works.
 
         Parameters
         ----------
@@ -470,22 +469,7 @@ class CSCSamplingGraph:
 
         Examples
         --------
-        >>> import dgl.graphbolt as gb
-        >>> ntypes = {'n1': 0, 'n2': 1, 'n3': 2}
-        >>> etypes = {('n1', 'e1', 'n2'): 0, ('n1', 'e2', 'n3'): 1}
-        >>> metadata = gb.GraphMetadata(ntypes, etypes)
-        >>> indptr = torch.LongTensor([0, 3, 4, 5, 7])
-        >>> indices = torch.LongTensor([0, 1, 3, 2, 3, 0, 1])
-        >>> node_type_offset = torch.LongTensor([0, 2, 3, 4])
-        >>> type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1])
-        >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge,
-        ... node_type_offset=node_type_offset, metadata=metadata)
-        >>> nodes = {'n1': torch.LongTensor([1]), 'n2': torch.LongTensor([0])}
-        >>> fanouts = torch.tensor([1, 1])
-        >>> subgraph = graph.sample_neighbors(nodes, fanouts)
-        >>> print(subgraph.node_pairs)
-        defaultdict(<class 'list'>, {('n1', 'e1', 'n2'): (tensor([2]), \
-        tensor([1])), ('n1', 'e2', 'n3'): (tensor([3]), tensor([2]))})
+        TODO: Provide typical examples.
         """
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)
@@ -529,7 +513,7 @@ class CSCSamplingGraph:
             ], "Probs should have a floating-point or boolean data type."
         # TODO(#????): Support replace for sample labor.
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), False, return_eids, probs_name
+            nodes, fanouts.tolist(), False, True, return_eids, probs_name
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
