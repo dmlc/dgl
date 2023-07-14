@@ -681,6 +681,120 @@ def _test_sample_neighbors(hypersparse, prob):
         assert subg["flips"].num_edges() == 4
 
 
+def _test_sample_labors(hypersparse, prob):
+    g, hg = _gen_neighbor_sampling_test_graph(hypersparse, False)
+
+    # test with seed nodes [0, 1]
+    def _test1(p):
+        subg = dgl.sampling.sample_labors(g, [0, 1], -1, prob=p)[0]
+        assert subg.num_nodes() == g.num_nodes()
+        u, v = subg.edges()
+        u_ans, v_ans, e_ans = g.in_edges([0, 1], form="all")
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == "prob":
+                emask = emask != 0
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
+        uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
+        uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
+        assert uv == uv_ans
+
+        for i in range(10):
+            subg = dgl.sampling.sample_labors(g, [0, 1], 2, prob=p)[0]
+            assert subg.num_nodes() == g.num_nodes()
+            assert subg.num_edges() >= 0
+            u, v = subg.edges()
+            assert set(F.asnumpy(F.unique(v))).issubset({0, 1})
+            assert F.array_equal(
+                F.astype(g.has_edges_between(u, v), F.int64),
+                F.ones((subg.num_edges(),), dtype=F.int64),
+            )
+            assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+            edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+            # check no duplication
+            assert len(edge_set) == subg.num_edges()
+            if p is not None:
+                assert not (3, 0) in edge_set
+                assert not (3, 1) in edge_set
+
+    _test1(prob)
+
+    # test with seed nodes [0, 2]
+    def _test2(p):
+        subg = dgl.sampling.sample_labors(g, [0, 2], -1, prob=p)[0]
+        assert subg.num_nodes() == g.num_nodes()
+        u, v = subg.edges()
+        u_ans, v_ans, e_ans = g.in_edges([0, 2], form="all")
+        if p is not None:
+            emask = F.gather_row(g.edata[p], e_ans)
+            if p == "prob":
+                emask = emask != 0
+            u_ans = F.boolean_mask(u_ans, emask)
+            v_ans = F.boolean_mask(v_ans, emask)
+        uv = set(zip(F.asnumpy(u), F.asnumpy(v)))
+        uv_ans = set(zip(F.asnumpy(u_ans), F.asnumpy(v_ans)))
+        assert uv == uv_ans
+
+        for i in range(10):
+            subg = dgl.sampling.sample_labors(g, [0, 2], 2, prob=p)[0]
+            assert subg.num_nodes() == g.num_nodes()
+            assert subg.num_edges() >= 0
+            u, v = subg.edges()
+            assert set(F.asnumpy(F.unique(v))).issubset({0, 2})
+            assert F.array_equal(
+                F.astype(g.has_edges_between(u, v), F.int64),
+                F.ones((subg.num_edges(),), dtype=F.int64),
+            )
+            assert F.array_equal(g.edge_ids(u, v), subg.edata[dgl.EID])
+            edge_set = set(zip(list(F.asnumpy(u)), list(F.asnumpy(v))))
+            # check no duplication
+            assert len(edge_set) == subg.num_edges()
+            if p is not None:
+                assert not (3, 0) in edge_set
+
+    _test2(prob)
+
+    # test with heterogenous seed nodes
+    def _test3(p):
+        subg = dgl.sampling.sample_labors(
+            hg, {"user": [0, 1], "game": 0}, -1, prob=p
+        )[0]
+        assert len(subg.ntypes) == 3
+        assert len(subg.etypes) == 4
+        assert subg["follow"].num_edges() == 6 if p is None else 4
+        assert subg["play"].num_edges() == 1
+        assert subg["liked-by"].num_edges() == 4
+        assert subg["flips"].num_edges() == 0
+
+        for i in range(10):
+            subg = dgl.sampling.sample_labors(
+                hg, {"user": [0, 1], "game": 0}, 2, prob=p
+            )[0]
+            assert len(subg.ntypes) == 3
+            assert len(subg.etypes) == 4
+            assert subg["follow"].num_edges() >= 0
+            assert subg["play"].num_edges() >= 0
+            assert subg["liked-by"].num_edges() >= 0
+            assert subg["flips"].num_edges() >= 0
+
+    _test3(prob)
+
+    # test different fanouts for different relations
+    for i in range(10):
+        subg = dgl.sampling.sample_labors(
+            hg,
+            {"user": [0, 1], "game": 0, "coin": 0},
+            {"follow": 1, "play": 2, "liked-by": 0, "flips": g.num_nodes()},
+        )[0]
+        assert len(subg.ntypes) == 3
+        assert len(subg.etypes) == 4
+        assert subg["follow"].num_edges() >= 0
+        assert subg["play"].num_edges() >= 0
+        assert subg["liked-by"].num_edges() == 0
+        assert subg["flips"].num_edges() == 4
+
+
 def _test_sample_neighbors_outedge(hypersparse):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, True)
 
@@ -967,9 +1081,17 @@ def test_sample_neighbors_noprob():
     # _test_sample_neighbors(True)
 
 
+def test_sample_labors_noprob():
+    _test_sample_labors(False, None)
+
+
 def test_sample_neighbors_prob():
     _test_sample_neighbors(False, "prob")
     # _test_sample_neighbors(True)
+
+
+def test_sample_labors_prob():
+    _test_sample_labors(False, "prob")
 
 
 def test_sample_neighbors_outedge():
@@ -1575,7 +1697,9 @@ if __name__ == "__main__":
     from itertools import product
 
     test_sample_neighbors_noprob()
+    test_sample_labors_noprob()
     test_sample_neighbors_prob()
+    test_sample_labors_prob()
     test_sample_neighbors_mask()
     for args in product(["coo", "csr", "csc"], ["in", "out"], [False, True]):
         test_sample_neighbors_etype_homogeneous(*args)

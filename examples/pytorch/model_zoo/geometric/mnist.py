@@ -109,7 +109,7 @@ class MoNet(nn.Module):
             )
 
         self.cls = nn.Sequential(
-            nn.Linear(hiddens[-1], out_feats), nn.LogSoftmax()
+            nn.Linear(hiddens[-1], out_feats), nn.LogSoftmax(dim=1)
         )
 
     def forward(self, g_arr, feat):
@@ -137,7 +137,7 @@ class ChebNet(nn.Module):
             self.layers.append(ChebConv(hiddens[i - 1], hiddens[i], k))
 
         self.cls = nn.Sequential(
-            nn.Linear(hiddens[-1], out_feats), nn.LogSoftmax()
+            nn.Linear(hiddens[-1], out_feats), nn.LogSoftmax(dim=1)
         )
 
     def forward(self, g_arr, feat):
