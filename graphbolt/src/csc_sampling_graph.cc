@@ -589,9 +589,10 @@ inline torch::Tensor LaborPick(
         // random number will replace any number in the heap is fanout / i.
         // Summing from i=fanout to num_neighbors, we get f * (H_n - H_f), where
         // n is num_neighbors and f is fanout, H_f is \sum_j=1^f 1/j. In the end
-        // H_n - H_f = O(log n/f), there are n - f iterations, so the total
-        // complexity is O(f + (n - f) + f log(n/f)) = O(n) if one carefully
-        // computes the maximum with respect to f. So the average complexity is
+        // H_n - H_f = O(log n/f), there are n - f iterations, each heap
+        // operation takes time log f, so the total complexity is O(f + (n - f)
+        // + f log(n/f) log f) = O(n + f log(f) log(n/f)). If f << n (f is a
+        // constant in almost all cases), then the average complexity is
         // O(num_neighbors).
         const scalar_t* local_indices_data =
             indices.data_ptr<scalar_t>() + offset;
