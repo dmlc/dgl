@@ -16,16 +16,16 @@
 namespace graphbolt {
 namespace sampling {
 
-enum sampler_t { NEIGHBOR, LABOR };
+enum SamplerType { NEIGHBOR, LABOR };
 
-template <sampler_t sampler>
-struct sampler_args;
-
-template <>
-struct sampler_args<sampler_t::NEIGHBOR> {};
+template <SamplerType S>
+struct SamplerArgs;
 
 template <>
-struct sampler_args<sampler_t::LABOR> {
+struct SamplerArgs<SamplerType::NEIGHBOR> {};
+
+template <>
+struct SamplerArgs<SamplerType::LABOR> {
   int64_t random_seed;
   const torch::Tensor& indices;
 };
@@ -218,12 +218,12 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const std::string& shared_memory_name);
 
  private:
-  template <sampler_t sampler>
+  template <SamplerType S>
   c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
       bool replace, bool return_eids,
       const torch::optional<torch::Tensor>& probs_or_mask,
-      sampler_args<sampler> args) const;
+      SamplerArgs<S> args) const;
 
   /**
    * @brief Build a CSCSamplingGraph from shared memory tensors.
@@ -319,12 +319,11 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  *
  * @return A tensor containing the picked neighbors.
  */
-template <sampler_t sampler>
+template <SamplerType S>
 torch::Tensor Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    sampler_args<sampler> args);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args);
 
 /**
  * @brief Picks a specified number of neighbors for a node per edge type,
@@ -353,13 +352,12 @@ torch::Tensor Pick(
  *
  * @return A tensor containing the picked neighbors.
  */
-template <sampler_t sampler>
+template <SamplerType S>
 torch::Tensor PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    sampler_args<sampler> args);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args);
 
 template <bool nonuniform, typename float_t = float>
 torch::Tensor LaborPick(

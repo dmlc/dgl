@@ -130,12 +130,12 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
-template <sampler_t sampler>
+template <SamplerType S>
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool return_eids,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    sampler_args<sampler> args) const {
+    SamplerArgs<S> args) const {
   const int64_t num_nodes = nodes.size(0);
   // If true, perform sampling for each edge type of each node, otherwise just
   // sample once for each node with no regard of edge types.
@@ -216,14 +216,14 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
   }
   if (labor) {
     TORCH_CHECK(
-        !replace, "Sampling with replacement is not supported for labor.");
+        !replace, "Sampling with replacement is not supported for labor yet.");
     const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
-    sampler_args<sampler_t::LABOR> args{random_seed, indices_};
+    SamplerArgs<SamplerType::LABOR> args{random_seed, indices_};
     return SampleNeighborsImpl(
         nodes, fanouts, replace, return_eids, probs_or_mask, args);
   } else {
-    sampler_args<sampler_t::NEIGHBOR> args;
+    SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl(
         nodes, fanouts, replace, return_eids, probs_or_mask, args);
   }
@@ -447,11 +447,11 @@ inline torch::Tensor NonUniformPick(
 }
 
 template <>
-torch::Tensor Pick<sampler_t::NEIGHBOR>(
+torch::Tensor Pick<SamplerType::NEIGHBOR>(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    sampler_args<sampler_t::NEIGHBOR> args) {
+    SamplerArgs<SamplerType::NEIGHBOR> args) {
   if (probs_or_mask.has_value()) {
     return NonUniformPick(
         offset, num_neighbors, fanout, replace, options, probs_or_mask);
@@ -460,13 +460,12 @@ torch::Tensor Pick<sampler_t::NEIGHBOR>(
   }
 }
 
-template <sampler_t sampler>
+template <SamplerType S>
 torch::Tensor PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    sampler_args<sampler> args) {
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
   std::vector<torch::Tensor> picked_neighbors(
       fanouts.size(), torch::tensor({}, options));
   int64_t etype_begin = offset;
@@ -487,7 +486,7 @@ torch::Tensor PickByEtype(
           etype_end = etype_end_it - type_per_edge_data;
           // Do sampling for one etype.
           if (fanout != 0) {
-            picked_neighbors[etype] = Pick<sampler>(
+            picked_neighbors[etype] = Pick<S>(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
                 probs_or_mask, args);
           }
@@ -499,11 +498,11 @@ torch::Tensor PickByEtype(
 }
 
 template <>
-torch::Tensor Pick<sampler_t::LABOR>(
+torch::Tensor Pick<SamplerType::LABOR>(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    sampler_args<sampler_t::LABOR> args) {
+    SamplerArgs<SamplerType::LABOR> args) {
   if (fanout == 0) return torch::tensor({}, options);
   if (probs_or_mask.has_value()) {
     torch::Tensor picked_neighbors;
@@ -521,50 +520,54 @@ torch::Tensor Pick<sampler_t::LABOR>(
   }
 }
 
-template <bool nonuniform, typename fp_t = float>
+template <typename T>
+inline T labor_uniform_random(int64_t random_seed, int64_t t) {
+  pcg32 ng(random_seed, t);
+  std::uniform_real_distribution<T> uni;
+  return uni(ng);
+}
+
+template <typename T, typename U>
+inline void safe_divide(T& a, U b) {
+  a = b > 0 ? (T)(a / b) : std::numeric_limits<T>::infinity();
+}
+
+template <bool NonUniform, typename T = float>
 inline torch::Tensor LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t random_seed,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     const torch::Tensor& indices) {
   fanout = fanout < 0 ? num_neighbors : std::min(fanout, num_neighbors);
-  if (!nonuniform && fanout >= num_neighbors) {
+  if (!NonUniform && fanout >= num_neighbors) {
     return torch::arange(offset, offset + num_neighbors, options);
   }
   torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
-  // Assuming max_degree of a vertex is <= 4 billion
+  // Assuming max_degree of a vertex is <= 4 billion.
   auto heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
       heap_tensor.data_ptr<int32_t>());
-  const fp_t* local_probs_data =
-      nonuniform ? probs_or_mask.value().data_ptr<fp_t>() + offset : nullptr;
+  const T* local_probs_data =
+      NonUniform ? probs_or_mask.value().data_ptr<T>() + offset : nullptr;
   AT_DISPATCH_INTEGRAL_TYPES(
       indices.scalar_type(), "LaborPickMain", ([&] {
         const scalar_t* local_indices_data =
             indices.data_ptr<scalar_t>() + offset;
         for (uint32_t i = 0; i < fanout; ++i) {
           const auto t = local_indices_data[i];
-          pcg32 ng(random_seed, t);
-          std::uniform_real_distribution<float> uni;
-          auto rnd = uni(ng);  // r_t
-          if constexpr (nonuniform) {
-            rnd = local_probs_data[i] > 0
-                      ? (float)(rnd / local_probs_data[i])
-                      : std::numeric_limits<float>::infinity();
+          auto rnd = labor_uniform_random<float>(random_seed, t);  // r_t
+          if constexpr (NonUniform) {
+            safe_divide(rnd, local_probs_data[i]);
           }  // r_t / \pi_t
           heap_data[i] = std::make_pair(rnd, i);
         }
-        if (!nonuniform || fanout < num_neighbors) {
+        if (!NonUniform || fanout < num_neighbors) {
           std::make_heap(heap_data, heap_data + fanout);
         }
         for (uint32_t i = fanout; i < num_neighbors; ++i) {
           const auto t = local_indices_data[i];
-          pcg32 ng(random_seed, t);
-          std::uniform_real_distribution<float> uni;
-          auto rnd = uni(ng);  // r_t
-          if constexpr (nonuniform) {
-            rnd = local_probs_data[i] > 0
-                      ? (float)(rnd / local_probs_data[i])
-                      : std::numeric_limits<float>::infinity();
+          auto rnd = labor_uniform_random<float>(random_seed, t);  // r_t
+          if constexpr (NonUniform) {
+            safe_divide(rnd, local_probs_data[i]);
           }  // r_t / \pi_t
           if (rnd < heap_data[0].first) {
             std::pop_heap(heap_data, heap_data + fanout);
@@ -580,7 +583,7 @@ inline torch::Tensor LaborPick(
         scalar_t* picked_neighbors_data = picked_neighbors.data_ptr<scalar_t>();
         for (int64_t i = 0; i < fanout; ++i) {
           const auto [rnd, j] = heap_data[i];
-          if (!nonuniform || rnd < std::numeric_limits<float>::infinity()) {
+          if (!NonUniform || rnd < std::numeric_limits<float>::infinity()) {
             picked_neighbors_data[num_sampled++] = offset + j;
           }
         }
