@@ -23,14 +23,19 @@ def _assert_container_equal(lhs, rhs):
             _assert_container_equal(value, rhs[key])
 
 
-@pytest.mark.parametrize("is_reverse", [True, False])
-def test_exclude_edges_homo(is_reverse):
+@pytest.mark.parametrize("reverse_row", [True, False])
+@pytest.mark.parametrize("reverse_column", [True, False])
+def test_exclude_edges_homo(reverse_row, reverse_column):
     node_pairs = (torch.tensor([0, 2, 3]), torch.tensor([1, 4, 2]))
-    if is_reverse:
+    if reverse_row:
         reverse_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
+    else:
+        reverse_row_node_ids = None
+
+    if reverse_column:
         reverse_column_node_ids = torch.tensor([10, 15, 11, 24, 9])
     else:
-        reverse_row_node_ids = reverse_column_node_ids = None
+        reverse_column_node_ids = None
     reverse_edge_ids = torch.Tensor([5, 9, 10])
     subgraph = SampledSubgraphImpl(
         node_pairs,
@@ -38,17 +43,19 @@ def test_exclude_edges_homo(is_reverse):
         reverse_row_node_ids,
         reverse_edge_ids,
     )
-    if is_reverse:
-        excluded_edges = (torch.tensor([11]), torch.tensor([9]))
-    else:
-        excluded_edges = (torch.tensor([2]), torch.tensor([4]))
+    src_to_exclude = torch.tensor([11]) if reverse_row else torch.tensor([2])
+    dst_to_exclude = torch.tensor([9]) if reverse_column else torch.tensor([4])
+    excluded_edges = (src_to_exclude, dst_to_exclude)
     result = exclude_edges(subgraph, excluded_edges)
     expected_node_pairs = (torch.tensor([0, 3]), torch.tensor([1, 2]))
-    if is_reverse:
+    if reverse_row:
         expected_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
+    else:
+        expected_row_node_ids = None
+    if reverse_column:
         expected_column_node_ids = torch.tensor([10, 15, 11, 24, 9])
     else:
-        expected_row_node_ids = expected_column_node_ids = None
+        expected_column_node_ids = None
     expected_edge_ids = torch.Tensor([5, 10])
 
     _assert_container_equal(result.node_pairs, expected_node_pairs)
@@ -59,23 +66,27 @@ def test_exclude_edges_homo(is_reverse):
     _assert_container_equal(result.reverse_edge_ids, expected_edge_ids)
 
 
-@pytest.mark.parametrize("is_reverse", [True, False])
-def test_exclude_edges_hetero(is_reverse):
+@pytest.mark.parametrize("reverse_row", [True, False])
+@pytest.mark.parametrize("reverse_column", [True, False])
+def test_exclude_edges_hetero(reverse_row, reverse_column):
     node_pairs = {
         ("A", "relation", "B"): (
             torch.tensor([0, 1, 2]),
             torch.tensor([2, 1, 0]),
         )
     }
-    if is_reverse:
+    if reverse_row:
         reverse_row_node_ids = {
             "A": torch.tensor([13, 14, 15]),
         }
+    else:
+        reverse_row_node_ids = None
+    if reverse_column:
         reverse_column_node_ids = {
             "B": torch.tensor([10, 11, 12]),
         }
     else:
-        reverse_row_node_ids = reverse_column_node_ids = None
+        reverse_column_node_ids = None
     reverse_edge_ids = {("A", "relation", "B"): torch.tensor([19, 20, 21])}
     subgraph = SampledSubgraphImpl(
         node_pairs=node_pairs,
@@ -83,18 +94,19 @@ def test_exclude_edges_hetero(is_reverse):
         reverse_row_node_ids=reverse_row_node_ids,
         reverse_edge_ids=reverse_edge_ids,
     )
+    src_to_exclude = (
+        torch.tensor([15, 13]) if reverse_row else torch.tensor([2, 0])
+    )
+    dst_to_exclude = (
+        torch.tensor([10, 12]) if reverse_column else torch.tensor([0, 2])
+    )
 
-    if is_reverse:
-        excluded_edges = {
-            ("A", "relation", "B"): (
-                torch.tensor([15, 13]),
-                torch.tensor([10, 12]),
-            )
-        }
-    else:
-        excluded_edges = {
-            ("A", "relation", "B"): (torch.tensor([2, 0]), torch.tensor([0, 2]))
-        }
+    excluded_edges = {
+        ("A", "relation", "B"): (
+            src_to_exclude,
+            dst_to_exclude,
+        )
+    }
     result = exclude_edges(subgraph, excluded_edges)
     expected_node_pairs = {
         ("A", "relation", "B"): (
@@ -102,15 +114,18 @@ def test_exclude_edges_hetero(is_reverse):
             torch.tensor([1]),
         )
     }
-    if is_reverse:
+    if reverse_row:
         expected_row_node_ids = {
             "A": torch.tensor([13, 14, 15]),
         }
+    else:
+        expected_row_node_ids = None
+    if reverse_column:
         expected_column_node_ids = {
             "B": torch.tensor([10, 11, 12]),
         }
     else:
-        expected_row_node_ids = expected_column_node_ids = None
+        expected_column_node_ids = None
     expected_edge_ids = {("A", "relation", "B"): torch.tensor([20])}
 
     _assert_container_equal(result.node_pairs, expected_node_pairs)
