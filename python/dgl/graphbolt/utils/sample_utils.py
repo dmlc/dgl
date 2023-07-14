@@ -87,6 +87,8 @@ def unique_and_compact_node_pairs(
         v = inverse_indices_dict[v_type][:v_size]
         inverse_indices_dict[v_type] = inverse_indices_dict[v_type][v_size:]
         compacted_node_pairs[etype] = (u, v)
+
+    # Return singleton for homogeneous graph.
     if is_homogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
         unique_nodes = list(unique_nodes_dict.values())[0]
