@@ -290,7 +290,7 @@ class CSCSamplingGraph:
         layer: bool
             Boolean indicating whether neighbors should be sampled in a layer
             sampling fashion. Uses the LABOR-0 algorithm to increase overlap
-            of sampled edges.
+            of sampled edges, see arXiv:2210.13339.
         probs_name: str, optional
             An optional string specifying the name of an edge attribute used a. This
             attribute tensor should contain (unnormalized) probabilities

@@ -532,6 +532,34 @@ inline void safe_divide(T& a, U b) {
   a = b > 0 ? (T)(a / b) : std::numeric_limits<T>::infinity();
 }
 
+/**
+ * @brief Perform uniform-nonuniform sampling of elements depending on the
+ * template parameter NonUniform and return the sampled indices.
+ *
+ * @param offset The starting edge ID for the connected neighbors of the sampled
+ * node.
+ * @param num_neighbors The number of neighbors to pick.
+ * @param fanout The number of edges to be sampled for each node. It should be
+ * >= 0 or -1.
+ *  - When the value is -1, all neighbors will be chosen for sampling. It is
+ * equivalent to selecting all neighbors with non-zero probability when the
+ * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is a non-negative integer, it serves as a minimum
+ * threshold for selecting neighbors.
+ * @param random_seed Integer determining the neighborhoods of vertices. The
+ * use of identical random seed ensures that random variates r_t used during
+ * sampling are identical, even in the distributed setting with no
+ * communication.
+ * @param options Tensor options specifying the desired data type of the result.
+ * @param probs_or_mask Optional tensor containing the (unnormalized)
+ * probabilities associated with each neighboring edge of a node in the original
+ * graph. It must be a 1D floating-point tensor with the number of elements
+ * equal to the number of edges in the graph.
+ * @param indices Tensor containing the indices array so that LaborPick can look
+ * up `t` to form `r_t` as a function of the random_seed and t.
+ *
+ * @return A tensor containing the picked neighbors.
+ */
 template <bool NonUniform, typename T = float>
 inline torch::Tensor LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t random_seed,
@@ -550,6 +578,21 @@ inline torch::Tensor LaborPick(
       NonUniform ? probs_or_mask.value().data_ptr<T>() + offset : nullptr;
   AT_DISPATCH_INTEGRAL_TYPES(
       indices.scalar_type(), "LaborPickMain", ([&] {
+        // [Algorithm]
+        // Use a max-heap to get rid of the big random numbers and filter the
+        // smallest fanout of them. Implements arXiv:2210.13339 Section A.3.
+        //
+        // [Complexity Analysis]
+        // the first for loop and std::make_heap runs in time O(fanouts).
+        // The next for loop compares each random number to the current minimum
+        // fanout numbers. For any given i, the probability that the current
+        // random number will replace any number in the heap is fanout / i.
+        // Summing from i=fanout to num_neighbors, we get f * (H_n - H_f), where
+        // n is num_neighbors and f is fanout, H_f is \sum_j=1^f 1/j. In the end
+        // H_n - H_f = O(log n/f), there are n - f iterations, so the total
+        // complexity is O(f + (n - f) + f log(n/f)) = O(n) if one carefully
+        // computes the maximum with respect to f. So the average complexity is
+        // O(num_neighbors).
         const scalar_t* local_indices_data =
             indices.data_ptr<scalar_t>() + offset;
         for (uint32_t i = 0; i < fanout; ++i) {

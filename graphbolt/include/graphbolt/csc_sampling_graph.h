@@ -157,6 +157,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param replace Boolean indicating whether the sample is preformed with or
    * without replacement. If True, a value can be selected multiple times.
    * Otherwise, each value can be selected only once.
+   * @param layer Boolean indicating whether neighbors should be sampled in a
+   * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
+   * sampled edges, see arXiv:2210.13339.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
    * typically used when edge features are required.
    * @param probs_name An optional string specifying the name of an edge
@@ -170,7 +173,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    */
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool labor, bool return_eids,
+      bool replace, bool layer, bool return_eids,
       torch::optional<std::string> probs_name) const;
 
   /**
