@@ -42,9 +42,9 @@ def unique_and_compact_node_pairs(
     >>> N1 = torch.LongTensor([1, 2, 2])
     >>> N2 = torch.LongTensor([5, 6, 5])
     >>> node_pairs = {("n1", "e1", "n2"): (N1, N2),
-    ...  ("n2", "e2", "n1"): (N2, N1)}
+    ...     ("n2", "e2", "n1"): (N2, N1)}
     >>> unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(
-    ... node_pairs
+    ...     node_pairs
     ... )
     >>> print(unique_nodes)
     {'n1': tensor([1, 2]), 'n2': tensor([5, 6])}
@@ -52,8 +52,8 @@ def unique_and_compact_node_pairs(
     {('n1', 'e1', 'n2'): (tensor([0, 1, 1]), tensor([0, 1, 0])),
     ('n2', 'e2', 'n1'): (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
-    is_heterogeneous = isinstance(node_pairs, Dict)
-    if not is_heterogeneous:
+    is_homogeneous = not isinstance(node_pairs, Dict)
+    if is_homogeneous:
         node_pairs = {("_N", "_E", "_N"): node_pairs}
     nodes_dict = defaultdict(list)
     # Collect nodes for each node type.
@@ -87,7 +87,7 @@ def unique_and_compact_node_pairs(
         v = inverse_indices_dict[v_type][:v_size]
         inverse_indices_dict[v_type] = inverse_indices_dict[v_type][v_size:]
         compacted_node_pairs[etype] = (u, v)
-    if not is_heterogeneous:
+    if is_homogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
         unique_nodes = list(unique_nodes_dict.values())[0]
     return unique_nodes, compacted_node_pairs
