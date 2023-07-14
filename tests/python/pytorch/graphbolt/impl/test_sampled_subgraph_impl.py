@@ -29,13 +29,17 @@ def test_exclude_edges_homo(reverse_row, reverse_column):
     node_pairs = (torch.tensor([0, 2, 3]), torch.tensor([1, 4, 2]))
     if reverse_row:
         reverse_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
+        src_to_exclude = torch.tensor([11])
     else:
         reverse_row_node_ids = None
+        src_to_exclude = torch.tensor([2])
 
     if reverse_column:
         reverse_column_node_ids = torch.tensor([10, 15, 11, 24, 9])
+        dst_to_exclude = torch.tensor([9])
     else:
         reverse_column_node_ids = None
+        dst_to_exclude = torch.tensor([4])
     reverse_edge_ids = torch.Tensor([5, 9, 10])
     subgraph = SampledSubgraphImpl(
         node_pairs,
@@ -43,10 +47,8 @@ def test_exclude_edges_homo(reverse_row, reverse_column):
         reverse_row_node_ids,
         reverse_edge_ids,
     )
-    src_to_exclude = torch.tensor([11]) if reverse_row else torch.tensor([2])
-    dst_to_exclude = torch.tensor([9]) if reverse_column else torch.tensor([4])
-    excluded_edges = (src_to_exclude, dst_to_exclude)
-    result = exclude_edges(subgraph, excluded_edges)
+    edges_to_exclude = (src_to_exclude, dst_to_exclude)
+    result = exclude_edges(subgraph, edges_to_exclude)
     expected_node_pairs = (torch.tensor([0, 3]), torch.tensor([1, 2]))
     if reverse_row:
         expected_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
@@ -79,14 +81,18 @@ def test_exclude_edges_hetero(reverse_row, reverse_column):
         reverse_row_node_ids = {
             "A": torch.tensor([13, 14, 15]),
         }
+        src_to_exclude = torch.tensor([15, 13])
     else:
         reverse_row_node_ids = None
+        src_to_exclude = torch.tensor([2, 0])
     if reverse_column:
         reverse_column_node_ids = {
             "B": torch.tensor([10, 11, 12]),
         }
+        dst_to_exclude = torch.tensor([10, 12])
     else:
         reverse_column_node_ids = None
+        dst_to_exclude = torch.tensor([0, 2])
     reverse_edge_ids = {("A", "relation", "B"): torch.tensor([19, 20, 21])}
     subgraph = SampledSubgraphImpl(
         node_pairs=node_pairs,
@@ -94,20 +100,14 @@ def test_exclude_edges_hetero(reverse_row, reverse_column):
         reverse_row_node_ids=reverse_row_node_ids,
         reverse_edge_ids=reverse_edge_ids,
     )
-    src_to_exclude = (
-        torch.tensor([15, 13]) if reverse_row else torch.tensor([2, 0])
-    )
-    dst_to_exclude = (
-        torch.tensor([10, 12]) if reverse_column else torch.tensor([0, 2])
-    )
 
-    excluded_edges = {
+    edges_to_exclude = {
         ("A", "relation", "B"): (
             src_to_exclude,
             dst_to_exclude,
         )
     }
-    result = exclude_edges(subgraph, excluded_edges)
+    result = exclude_edges(subgraph, edges_to_exclude)
     expected_node_pairs = {
         ("A", "relation", "B"): (
             torch.tensor([1]),
