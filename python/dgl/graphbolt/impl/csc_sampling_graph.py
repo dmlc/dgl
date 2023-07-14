@@ -330,7 +330,7 @@ class CSCSamplingGraph:
         tensor([1])), ('n1', 'e2', 'n3'): (tensor([3]), tensor([2]))})
         """
         if isinstance(nodes, dict):
-            nodes = _convert_to_homogeneous_nodes(nodes)
+            nodes = self._convert_to_homogeneous_nodes(nodes)
 
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, layer, False, probs_name
@@ -498,7 +498,7 @@ class CSCSamplingGraph:
         tensor([1])), ('n1', 'e2', 'n3'): (tensor([3]), tensor([2]))})
         """
         if isinstance(nodes, dict):
-            nodes = _convert_to_homogeneous_nodes(nodes)
+            nodes = self._convert_to_homogeneous_nodes(nodes)
 
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
