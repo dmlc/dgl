@@ -248,7 +248,7 @@ class CSCSamplingGraph:
                 node_pairs[etype] = (hetero_row, hetero_column)
         return SampledSubgraphImpl(node_pairs=node_pairs)
 
-    def _convert_to_homogeneous_nodes(nodes):
+    def _convert_to_homogeneous_nodes(self, nodes):
         homogeneous_nodes = []
         for ntype, ids in nodes.items():
             ntype_id = self.metadata.node_type_to_id[ntype]
@@ -261,7 +261,6 @@ class CSCSamplingGraph:
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
-        layer: bool = False,
         probs_name: Optional[str] = None,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
@@ -295,10 +294,6 @@ class CSCSamplingGraph:
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
-        layer: bool
-            Boolean indicating whether neighbors should be sampled in a layer
-            sampling fashion. Uses the LABOR-0 algorithm to increase overlap
-            of sampled edges, see arXiv:2210.13339.
         probs_name: str, optional
             An optional string specifying the name of an edge attribute used a. This
             attribute tensor should contain (unnormalized) probabilities
@@ -333,10 +328,48 @@ class CSCSamplingGraph:
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
         C_sampled_subgraph = self._sample_neighbors(
-            nodes, fanouts, replace, layer, False, probs_name
+            nodes, fanouts, replace, False, probs_name
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+
+    def _check_sampler_arguments(self, nodes, fanouts, probs_name):
+        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
+        assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
+        expected_fanout_len = 1
+        if self.metadata and self.metadata.edge_type_to_id:
+            expected_fanout_len = len(self.metadata.edge_type_to_id)
+        assert len(fanouts) in [
+            expected_fanout_len,
+            1,
+        ], "Fanouts should have the same number of elements as etypes or \
+            should have a length of 1."
+        if fanouts.size(0) > 1:
+            assert (
+                self.type_per_edge is not None
+            ), "To perform sampling for each edge type (when the length of \
+                `fanouts` > 1), the graph must include edge type information."
+        assert torch.all(
+            (fanouts >= 0) | (fanouts == -1)
+        ), "Fanouts should consist of values that are either -1 or \
+            greater than or equal to 0."
+        if probs_name:
+            assert (
+                probs_name in self.edge_attributes
+            ), f"Unknown edge attribute '{probs_name}'."
+            probs_or_mask = self.edge_attributes[probs_name]
+            assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
+            assert (
+                probs_or_mask.size(0) == self.num_edges
+            ), "Probs should have the same number of elements as the number \
+                of edges."
+            assert probs_or_mask.dtype in [
+                torch.bool,
+                torch.float16,
+                torch.bfloat16,
+                torch.float32,
+                torch.float64,
+            ], "Probs should have a floating-point or boolean data type."
 
     def _sample_neighbors(
         self,
@@ -373,10 +406,6 @@ class CSCSamplingGraph:
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
-        layer: bool
-            Boolean indicating whether neighbors should be sampled in a layer
-            sampling fashion. Uses the LABOR-0 algorithm to increase overlap
-            of sampled edges.
         return_eids: bool
             Boolean indicating whether the edge IDs of sampled edges,
             represented as a 1D tensor, should be returned. This is
@@ -393,50 +422,16 @@ class CSCSamplingGraph:
             The sampled C subgraph.
         """
         # Ensure nodes is 1-D tensor.
-        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
-        assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
-        expected_fanout_len = 1
-        if self.metadata and self.metadata.edge_type_to_id:
-            expected_fanout_len = len(self.metadata.edge_type_to_id)
-        assert len(fanouts) in [
-            expected_fanout_len,
-            1,
-        ], "Fanouts should have the same number of elements as etypes or \
-            should have a length of 1."
-        if fanouts.size(0) > 1:
-            assert (
-                self.type_per_edge is not None
-            ), "To perform sampling for each edge type (when the length of \
-                `fanouts` > 1), the graph must include edge type information."
-        assert torch.all(
-            (fanouts >= 0) | (fanouts == -1)
-        ), "Fanouts should consist of values that are either -1 or \
-            greater than or equal to 0."
-        if probs_name:
-            assert (
-                probs_name in self.edge_attributes
-            ), f"Unknown edge attribute '{probs_name}'."
-            probs_or_mask = self.edge_attributes[probs_name]
-            assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
-            assert (
-                probs_or_mask.size(0) == self.num_edges
-            ), "Probs should have the same number of elements as the number \
-                of edges."
-            assert probs_or_mask.dtype in [
-                torch.bool,
-                torch.float16,
-                torch.bfloat16,
-                torch.float32,
-                torch.float64,
-            ], "Probs should have a floating-point or boolean data type."
+        self._check_sampler_arguments(nodes, fanouts, probs_name)
         return self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, False, return_eids, probs_name
         )
 
-    def sample_labor(
+    def sample_layer_neighbors(
         self,
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
+        replace: bool = False,
         probs_name: Optional[str] = None,
     ) -> SampledSubgraphImpl:
         """TODO: Add detailed ellaboration about how labor sampling works.
@@ -465,8 +460,12 @@ class CSCSamplingGraph:
                 false).
               - When the value is a non-negative integer, it serves as a
                 minimum threshold for selecting neighbors.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
         probs_name: str, optional
-            An optional string specifying the name of an edge attribute used a. This
+            An optional string specifying the name of an edge attribute. This
             attribute tensor should contain (unnormalized) probabilities
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
@@ -483,46 +482,10 @@ class CSCSamplingGraph:
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
-        # Ensure nodes is 1-D tensor.
-        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
-        assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
-        expected_fanout_len = 1
-        if self.metadata and self.metadata.edge_type_to_id:
-            expected_fanout_len = len(self.metadata.edge_type_to_id)
-        assert len(fanouts) in [
-            expected_fanout_len,
-            1,
-        ], "Fanouts should have the same number of elements as etypes or \
-            should have a length of 1."
-        if fanouts.size(0) > 1:
-            assert (
-                self.type_per_edge is not None
-            ), "To perform sampling for each edge type (when the length of \
-                `fanouts` > 1), the graph must include edge type information."
-        assert torch.all(
-            (fanouts >= 0) | (fanouts == -1)
-        ), "Fanouts should consist of values that are either -1 or \
-            greater than or equal to 0."
-        if probs_name:
-            assert (
-                probs_name in self.edge_attributes
-            ), f"Unknown edge attribute '{probs_name}'."
-            probs_or_mask = self.edge_attributes[probs_name]
-            assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
-            assert (
-                probs_or_mask.size(0) == self.num_edges
-            ), "Probs should have the same number of elements as the number \
-                of edges."
-            assert probs_or_mask.dtype in [
-                torch.bool,
-                torch.float16,
-                torch.bfloat16,
-                torch.float32,
-                torch.float64,
-            ], "Probs should have a floating-point or boolean data type."
-        # TODO(#????): Support replace for sample labor.
+        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        # TODO(#mfbalin): Support replace for sample labor.
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), False, True, return_eids, probs_name
+            nodes, fanouts.tolist(), replace, True, False, probs_name
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)

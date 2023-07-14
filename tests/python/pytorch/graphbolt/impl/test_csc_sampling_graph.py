@@ -515,7 +515,8 @@ def test_sample_neighbors_fanouts(
 
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.LongTensor(fanouts)
-    subgraph = graph.sample_neighbors(nodes, fanouts, layer=labor)
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
     assert (
@@ -622,11 +623,12 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
-    subgraph = graph.sample_neighbors(
+    
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    subgraph = sampler(
         nodes,
         fanouts=torch.tensor([2]),
         replace=replace,
-        layer=labor,
         probs_name=probs_name,
     )
 
@@ -668,11 +670,11 @@ def test_sample_neighbors_zero_probs(replace, labor, probs_or_mask):
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
-    subgraph = graph.sample_neighbors(
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    subgraph = sampler(
         nodes,
         fanouts=torch.tensor([5]),
         replace=replace,
-        layer=labor,
         probs_name="probs_or_mask",
     )
 
