@@ -255,7 +255,6 @@ class CSCSamplingGraph:
             homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
         return torch.cat(homogeneous_nodes)
 
-
     def sample_neighbors(
         self,
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],

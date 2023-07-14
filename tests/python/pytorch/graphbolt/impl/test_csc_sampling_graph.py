@@ -623,7 +623,7 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
 
     # Generate subgraph via sample neighbors.
     nodes = torch.LongTensor([1, 3, 4])
-    
+
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
     subgraph = sampler(
         nodes,
