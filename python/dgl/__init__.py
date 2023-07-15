@@ -63,6 +63,7 @@ from .frame import LazyFeature
 from .global_config import is_libxsmm_enabled, use_libxsmm
 from .utils import apply_each
 from .mpops import *
+from .contrib import *
 
 if backend_name == "pytorch":
     from . import distributed

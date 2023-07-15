@@ -19,7 +19,7 @@ import unittest
 import backend as F
 
 import dgl
-from test_utils import parametrize_idtype
+from utils import parametrize_idtype
 
 D = 5
 
@@ -27,12 +27,17 @@ D = 5
 def generate_graph(idtype, grad=False, add_data=True):
     g = dgl.DGLGraph().to(F.ctx(), dtype=idtype)
     g.add_nodes(10)
+    u, v = [], []
     # create a graph where 0 is the source and 9 is the sink
     for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
+        u.append(0)
+        v.append(i)
+        u.append(i)
+        v.append(9)
     # add a back flow from 9 to 0
-    g.add_edge(9, 0)
+    u.append(9)
+    v.append(0)
+    g.add_edges(u, v)
     if add_data:
         ncol = F.randn((10, D))
         ecol = F.randn((17, D))

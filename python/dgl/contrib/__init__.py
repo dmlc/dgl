@@ -1,3 +1,3 @@
 """ Experimental Features """
 
-from gpu_cache import GPUCache
+from .gpu_cache import GPUCache
