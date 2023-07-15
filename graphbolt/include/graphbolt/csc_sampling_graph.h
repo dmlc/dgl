@@ -26,8 +26,9 @@ struct SamplerArgs<SamplerType::NEIGHBOR> {};
 
 template <>
 struct SamplerArgs<SamplerType::LABOR> {
-  int64_t random_seed;
   const torch::Tensor& indices;
+  int64_t random_seed;
+  int64_t num_nodes;
 };
 
 /**
@@ -362,12 +363,12 @@ torch::Tensor PickByEtype(
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args);
 
-template <bool nonuniform, typename float_t = float>
+template <bool NonUniform, bool Replace, typename T = float>
 torch::Tensor LaborPick(
-    int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t random_seed,
+    int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    const torch::Tensor& indices);
+    SamplerArgs<SamplerType::LABOR> args);
 
 }  // namespace sampling
 }  // namespace graphbolt

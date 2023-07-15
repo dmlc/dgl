@@ -401,7 +401,8 @@ def test_sample_neighbors_homo():
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-def test_sample_neighbors_hetero():
+@pytest.mark.parametrize("labor", [False, True])
+def test_sample_neighbors_hetero(labor):
     """Original graph in COO:
     ("n1", "e1", "n2"):[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
     ("n2", "e2", "n1"):[0, 0, 1, 2], [0, 1, 1 ,0]
@@ -436,7 +437,8 @@ def test_sample_neighbors_hetero():
     # Generate subgraph via sample neighbors.
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.tensor([-1, -1])
-    subgraph = graph.sample_neighbors(nodes, fanouts)
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
     expected_node_pairs = {
@@ -591,9 +593,8 @@ def test_sample_neighbors_replace(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-@pytest.mark.parametrize(
-    "replace, labor", [(True, False), (False, False), (False, True)]
-)
+@pytest.mark.parametrize("replace", [True, False])
+@pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize("probs_name", ["weight", "mask"])
 def test_sample_neighbors_probs(replace, labor, probs_name):
     """Original graph in COO:
@@ -644,9 +645,8 @@ def test_sample_neighbors_probs(replace, labor, probs_name):
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-@pytest.mark.parametrize(
-    "replace, labor", [(True, False), (False, False), (False, True)]
-)
+@pytest.mark.parametrize("replace", [True, False])
+@pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize(
     "probs_or_mask",
     [

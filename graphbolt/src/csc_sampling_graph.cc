@@ -8,6 +8,7 @@
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
 
+#include <cmath>
 #include <limits>
 #include <tuple>
 #include <vector>
@@ -215,11 +216,9 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     }
   }
   if (labor) {
-    TORCH_CHECK(
-        !replace, "Sampling with replacement is not supported for labor yet.");
     const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
-    SamplerArgs<SamplerType::LABOR> args{random_seed, indices_};
+    SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
     return SampleNeighborsImpl(
         nodes, fanouts, replace, return_eids, probs_or_mask, args);
   } else {
@@ -508,15 +507,21 @@ torch::Tensor Pick<SamplerType::LABOR>(
     torch::Tensor picked_neighbors;
     AT_DISPATCH_FLOATING_TYPES(
         probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
-          picked_neighbors = LaborPick<true, scalar_t>(
-              offset, num_neighbors, fanout, args.random_seed, options,
-              probs_or_mask, args.indices);
+          if (replace) {
+            picked_neighbors = LaborPick<true, true, scalar_t>(
+                offset, num_neighbors, fanout, options, probs_or_mask, args);
+          } else {
+            picked_neighbors = LaborPick<true, false, scalar_t>(
+                offset, num_neighbors, fanout, options, probs_or_mask, args);
+          }
         }));
     return picked_neighbors;
-  } else {
-    return LaborPick<false>(
-        offset, num_neighbors, fanout, args.random_seed, options, probs_or_mask,
-        args.indices);
+  } else if (replace) {
+    return LaborPick<false, true>(
+        offset, num_neighbors, fanout, options, probs_or_mask, args);
+  } else {  // replace = false
+    return LaborPick<false, false>(
+        offset, num_neighbors, fanout, options, probs_or_mask, args);
   }
 }
 
@@ -525,6 +530,20 @@ inline T labor_uniform_random(int64_t random_seed, int64_t t) {
   pcg32 ng(random_seed, t);
   std::uniform_real_distribution<T> uni;
   return uni(ng);
+}
+
+template <typename T>
+inline T invcdf(T u, int64_t n, T rem) {
+  constexpr T one = 1;
+  return rem * (one - std::pow(one - u, one / n));
+}
+
+template <typename T>
+inline T labor_jth_sorted_uniform_random(
+    int64_t random_seed, int64_t t, int64_t c, int64_t j, T& rem, int64_t n) {
+  const auto u = labor_uniform_random<T>(random_seed, t + j * c);
+  rem -= invcdf(u, n, rem);
+  return 1 - rem;
 }
 
 template <typename T, typename U>
@@ -546,28 +565,23 @@ inline void safe_divide(T& a, U b) {
  * fanout is >= the number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
- * @param random_seed Integer determining the neighborhoods of vertices. The
- * use of identical random seed ensures that random variates r_t used during
- * sampling are identical, even in the distributed setting with no
- * communication.
  * @param options Tensor options specifying the desired data type of the result.
  * @param probs_or_mask Optional tensor containing the (unnormalized)
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
- * @param indices Tensor containing the indices array so that LaborPick can look
- * up `t` to form `r_t` as a function of the random_seed and t.
+ * @param args Contains labor specific arguments.
  *
  * @return A tensor containing the picked neighbors.
  */
-template <bool NonUniform, typename T = float>
+template <bool NonUniform, bool Replace, typename T>
 inline torch::Tensor LaborPick(
-    int64_t offset, int64_t num_neighbors, int64_t fanout, int64_t random_seed,
+    int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    const torch::Tensor& indices) {
+    SamplerArgs<SamplerType::LABOR> args) {
   fanout = fanout < 0 ? num_neighbors : std::min(fanout, num_neighbors);
-  if (!NonUniform && fanout >= num_neighbors) {
+  if (!NonUniform && !Replace && fanout >= num_neighbors) {
     return torch::arange(offset, offset + num_neighbors, options);
   }
   torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
@@ -577,46 +591,103 @@ inline torch::Tensor LaborPick(
   const T* local_probs_data =
       NonUniform ? probs_or_mask.value().data_ptr<T>() + offset : nullptr;
   AT_DISPATCH_INTEGRAL_TYPES(
-      indices.scalar_type(), "LaborPickMain", ([&] {
-        // [Algorithm]
-        // Use a max-heap to get rid of the big random numbers and filter the
-        // smallest fanout of them. Implements arXiv:2210.13339 Section A.3.
-        //
-        // [Complexity Analysis]
-        // the first for loop and std::make_heap runs in time O(fanouts).
-        // The next for loop compares each random number to the current minimum
-        // fanout numbers. For any given i, the probability that the current
-        // random number will replace any number in the heap is fanout / i.
-        // Summing from i=fanout to num_neighbors, we get f * (H_n - H_f), where
-        // n is num_neighbors and f is fanout, H_f is \sum_j=1^f 1/j. In the end
-        // H_n - H_f = O(log n/f), there are n - f iterations, each heap
-        // operation takes time log f, so the total complexity is O(f + (n - f)
-        // + f log(n/f) log f) = O(n + f log(f) log(n/f)). If f << n (f is a
-        // constant in almost all cases), then the average complexity is
-        // O(num_neighbors).
+      args.indices.scalar_type(), "LaborPickMain", ([&] {
         const scalar_t* local_indices_data =
-            indices.data_ptr<scalar_t>() + offset;
-        for (uint32_t i = 0; i < fanout; ++i) {
-          const auto t = local_indices_data[i];
-          auto rnd = labor_uniform_random<float>(random_seed, t);  // r_t
-          if constexpr (NonUniform) {
-            safe_divide(rnd, local_probs_data[i]);
-          }  // r_t / \pi_t
-          heap_data[i] = std::make_pair(rnd, i);
-        }
-        if (!NonUniform || fanout < num_neighbors) {
-          std::make_heap(heap_data, heap_data + fanout);
-        }
-        for (uint32_t i = fanout; i < num_neighbors; ++i) {
-          const auto t = local_indices_data[i];
-          auto rnd = labor_uniform_random<float>(random_seed, t);  // r_t
-          if constexpr (NonUniform) {
-            safe_divide(rnd, local_probs_data[i]);
-          }  // r_t / \pi_t
-          if (rnd < heap_data[0].first) {
-            std::pop_heap(heap_data, heap_data + fanout);
-            heap_data[fanout - 1] = std::make_pair(rnd, i);
-            std::push_heap(heap_data, heap_data + fanout);
+            args.indices.data_ptr<scalar_t>() + offset;
+        if constexpr (Replace) {
+          // [Algorithm]
+          // Use a max-heap to get rid of the big random numbers and filter the
+          // smallest fanout of them. Implements arXiv:2210.13339 Section A.3.
+          //
+          // [Complexity Analysis]
+          // Will modify the heap at most linear in O(num_neighbors + fanout)
+          // and each modification takes O(log(fanout)). So the total complexity
+          // is O((fanout + num_neighbors) log(fanout))
+          torch::Tensor remaining =
+              torch::ones({num_neighbors}, torch::kFloat32);
+          float* rem_data = remaining.data_ptr<float>();
+          auto heap_end = heap_data;
+          for (uint32_t i = 0; i < num_neighbors; ++i) {
+            const auto t = local_indices_data[i];
+            auto rnd = labor_jth_sorted_uniform_random(
+                args.random_seed, t, args.num_nodes, 0, rem_data[i],
+                fanout);  // r_t
+            if constexpr (NonUniform) {
+              safe_divide(rnd, local_probs_data[i]);
+            }  // r_t / \pi_t
+            if (heap_end < heap_data + fanout) {
+              heap_end[0] = std::make_pair(rnd, i);
+              std::push_heap(heap_data, ++heap_end);
+            } else if (rnd < heap_data[0].first) {
+              std::pop_heap(heap_data, heap_data + fanout);
+              heap_data[fanout - 1] = std::make_pair(rnd, i);
+              std::push_heap(heap_data, heap_data + fanout);
+            } else {
+              rem_data[i] = -1;
+            }
+          }
+          for (uint32_t i = 0; i < num_neighbors; ++i) {
+            if (rem_data[i] == -1) continue;
+            const auto t = local_indices_data[i];
+            for (int64_t j = 1; j < fanout; ++j) {
+              auto rnd = labor_jth_sorted_uniform_random(
+                  args.random_seed, t, args.num_nodes, j, rem_data[i],
+                  fanout - j);  // r_t
+              if constexpr (NonUniform) {
+                safe_divide(rnd, local_probs_data[i]);
+              }  // r_t / \pi_t
+              if (heap_end < heap_data + fanout) {
+                heap_end[0] = std::make_pair(rnd, i);
+                std::push_heap(heap_data, ++heap_end);
+              } else if (rnd < heap_data[0].first) {
+                std::pop_heap(heap_data, heap_data + fanout);
+                heap_data[fanout - 1] = std::make_pair(rnd, i);
+                std::push_heap(heap_data, heap_data + fanout);
+              } else {
+                break;
+              }
+            }
+          }
+        } else {
+          // [Algorithm]
+          // Use a max-heap to get rid of the big random numbers and filter the
+          // smallest fanout of them. Implements arXiv:2210.13339 Section A.3.
+          //
+          // [Complexity Analysis]
+          // the first for loop and std::make_heap runs in time O(fanouts).
+          // The next for loop compares each random number to the current
+          // minimum fanout numbers. For any given i, the probability that the
+          // current random number will replace any number in the heap is fanout
+          // / i. Summing from i=fanout to num_neighbors, we get f * (H_n -
+          // H_f), where n is num_neighbors and f is fanout, H_f is \sum_j=1^f
+          // 1/j. In the end H_n - H_f = O(log n/f), there are n - f iterations,
+          // each heap operation takes time log f, so the total complexity is
+          // O(f + (n - f)
+          // + f log(n/f) log f) = O(n + f log(f) log(n/f)). If f << n (f is a
+          // constant in almost all cases), then the average complexity is
+          // O(num_neighbors).
+          for (uint32_t i = 0; i < fanout; ++i) {
+            const auto t = local_indices_data[i];
+            auto rnd = labor_uniform_random<float>(args.random_seed, t);  // r_t
+            if constexpr (NonUniform) {
+              safe_divide(rnd, local_probs_data[i]);
+            }  // r_t / \pi_t
+            heap_data[i] = std::make_pair(rnd, i);
+          }
+          if (!NonUniform || fanout < num_neighbors) {
+            std::make_heap(heap_data, heap_data + fanout);
+          }
+          for (uint32_t i = fanout; i < num_neighbors; ++i) {
+            const auto t = local_indices_data[i];
+            auto rnd = labor_uniform_random<float>(args.random_seed, t);  // r_t
+            if constexpr (NonUniform) {
+              safe_divide(rnd, local_probs_data[i]);
+            }  // r_t / \pi_t
+            if (rnd < heap_data[0].first) {
+              std::pop_heap(heap_data, heap_data + fanout);
+              heap_data[fanout - 1] = std::make_pair(rnd, i);
+              std::push_heap(heap_data, heap_data + fanout);
+            }
           }
         }
       }));
@@ -632,6 +703,9 @@ inline torch::Tensor LaborPick(
           }
         }
       }));
+  TORCH_CHECK(
+      !Replace || num_sampled == fanout || num_sampled == 0,
+      "Sampling with replacement should sample exactly fanout neighbors or 0!");
   return picked_neighbors.narrow(0, 0, num_sampled);
 }
 

@@ -484,7 +484,6 @@ class CSCSamplingGraph:
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
         self._check_sampler_arguments(nodes, fanouts, probs_name)
-        # TODO(#mfbalin): Support replace for sample labor.
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, True, False, probs_name
         )
