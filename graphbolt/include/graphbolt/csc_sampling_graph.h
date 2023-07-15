@@ -145,10 +145,11 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * Otherwise, each value can be selected only once.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
    * typically used when edge features are required.
-   * @param probs_or_mask Optional tensor containing the (unnormalized)
-   * probabilities or boolean mask associated with each neighboring edge of a
-   * node. It must be a 1D floating-point or boolean tensor with the number of
-   * elements equal to the number of edges.
+   * @param probs_name An optional string specifying the name of an edge
+   * attribute. This attribute tensor should contain (unnormalized)
+   * probabilities corresponding to each neighboring edge of a node. It must be
+   * a 1D floating-point or boolean tensor, with the number of elements
+   * equalling the total number of edges.
    *
    * @return An intrusive pointer to a SampledSubgraph object containing the
    * sampled graph's information.
@@ -156,7 +157,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
       bool replace, bool return_eids,
-      torch::optional<torch::Tensor> probs_or_mask) const;
+      torch::optional<std::string> probs_name) const;
 
   /**
    * @brief Sample negative edges by randomly choosing negative
