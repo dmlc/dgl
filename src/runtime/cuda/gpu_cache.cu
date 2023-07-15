@@ -101,9 +101,11 @@ class GpuCache : public runtime::Object {
       cache;
 };
 
+static_assert(sizeof(unsigned int) == 4);
 DGL_DEFINE_OBJECT_REF(GpuCacheRef32, GpuCache<unsigned int>);
 // The cu file in HugeCTR gpu cache uses unsigned int and long long.
 // Changing to int64_t results in a mismatch of template arguments.
+static_assert(sizeof(long long) == 8);
 DGL_DEFINE_OBJECT_REF(GpuCacheRef64, GpuCache<long long>);  // NOLINT
 
 /* CAPI **********************************************************************/
