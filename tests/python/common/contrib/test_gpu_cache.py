@@ -17,9 +17,9 @@
 import unittest
 
 import backend as F
-from test_utils import parametrize_idtype
 
 import dgl
+from test_utils import parametrize_idtype
 
 D = 5
 
