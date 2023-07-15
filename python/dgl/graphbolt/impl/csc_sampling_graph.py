@@ -433,7 +433,9 @@ class CSCSamplingGraph:
         replace: bool = False,
         probs_name: Optional[str] = None,
     ) -> SampledSubgraphImpl:
-        """TODO: Add detailed ellaboration about how labor sampling works.
+        """Sample neighboring edges of the given nodes and return the induced
+        subgraph via layer-neighbor sampling from arXiv:2210.13339:
+        "Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs"
 
         Parameters
         ----------
