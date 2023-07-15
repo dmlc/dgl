@@ -15,6 +15,7 @@ from .impl import *
 from .dataloader import *
 from .subgraph_sampler import *
 from .sampled_subgraph import *
+from .utils import unique_and_compact_node_pairs
 
 
 def load_graphbolt():
