@@ -595,41 +595,55 @@ inline torch::Tensor LaborPick(
         const scalar_t* local_indices_data =
             args.indices.data_ptr<scalar_t>() + offset;
         if constexpr (Replace) {
-          // [Algorithm]
+          // [Algorithm] @mfbalin
           // Use a max-heap to get rid of the big random numbers and filter the
           // smallest fanout of them. Implements arXiv:2210.13339 Section A.3.
+          // Unlike sampling without replacement below, the same item can be
+          // included fanout many times in our sample. Thus, we sort and pick
+          // the smallest fanout random numbers out of num_neighbors * fanout
+          // of them. Each item has fanout many random numbers in the race and
+          // the smallest fanout of them get picked. Instead of generating
+          // fanout * num_neighbors random numbers and increase the complexity,
+          // I devised an algorithm to generate the fanout numbers for an item
+          // in a sorted manner on demand, meaning we continue generating random
+          // numbers for an item if it has been sampled that many times already.
           //
           // [Complexity Analysis]
           // Will modify the heap at most linear in O(num_neighbors + fanout)
           // and each modification takes O(log(fanout)). So the total complexity
-          // is O((fanout + num_neighbors) log(fanout))
+          // is O((fanout + num_neighbors) log(fanout)). It is possible to
+          // decrease the logarithmic factor down to
+          // O(log(min(fanout, num_neighbors))).
           torch::Tensor remaining =
               torch::ones({num_neighbors}, torch::kFloat32);
           float* rem_data = remaining.data_ptr<float>();
           auto heap_end = heap_data;
+          const auto init_count = (num_neighbors + fanout - 1) / num_neighbors;
           for (uint32_t i = 0; i < num_neighbors; ++i) {
-            const auto t = local_indices_data[i];
-            auto rnd = labor_jth_sorted_uniform_random(
-                args.random_seed, t, args.num_nodes, 0, rem_data[i],
-                fanout);  // r_t
-            if constexpr (NonUniform) {
-              safe_divide(rnd, local_probs_data[i]);
-            }  // r_t / \pi_t
-            if (heap_end < heap_data + fanout) {
-              heap_end[0] = std::make_pair(rnd, i);
-              std::push_heap(heap_data, ++heap_end);
-            } else if (rnd < heap_data[0].first) {
-              std::pop_heap(heap_data, heap_data + fanout);
-              heap_data[fanout - 1] = std::make_pair(rnd, i);
-              std::push_heap(heap_data, heap_data + fanout);
-            } else {
-              rem_data[i] = -1;
+            for (int64_t j = 0; j < init_count; j++) {
+              const auto t = local_indices_data[i];
+              auto rnd = labor_jth_sorted_uniform_random(
+                  args.random_seed, t, args.num_nodes, j, rem_data[i],
+                  fanout - j);  // r_t
+              if constexpr (NonUniform) {
+                safe_divide(rnd, local_probs_data[i]);
+              }  // r_t / \pi_t
+              if (heap_end < heap_data + fanout) {
+                heap_end[0] = std::make_pair(rnd, i);
+                std::push_heap(heap_data, ++heap_end);
+              } else if (rnd < heap_data[0].first) {
+                std::pop_heap(heap_data, heap_data + fanout);
+                heap_data[fanout - 1] = std::make_pair(rnd, i);
+                std::push_heap(heap_data, heap_data + fanout);
+              } else {
+                rem_data[i] = -1;
+              }
             }
           }
           for (uint32_t i = 0; i < num_neighbors; ++i) {
             if (rem_data[i] == -1) continue;
             const auto t = local_indices_data[i];
-            for (int64_t j = 1; j < fanout; ++j) {
+            for (int64_t j = init_count; j < fanout; ++j) {
               auto rnd = labor_jth_sorted_uniform_random(
                   args.random_seed, t, args.num_nodes, j, rem_data[i],
                   fanout - j);  // r_t
