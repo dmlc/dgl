@@ -607,6 +607,7 @@ inline torch::Tensor LaborPick(
           // I devised an algorithm to generate the fanout numbers for an item
           // in a sorted manner on demand, meaning we continue generating random
           // numbers for an item if it has been sampled that many times already.
+          // https://gist.github.com/mfbalin/096dcad5e3b1f6a59ff7ff2f9f541618
           //
           // [Complexity Analysis]
           // Will modify the heap at most linear in O(num_neighbors + fanout)
