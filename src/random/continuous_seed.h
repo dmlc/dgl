@@ -17,8 +17,8 @@
  * @file dgl/continuous_seed.h
  * @brief CPU and CUDA implementation for continuous random seeds
  */
-#ifndef DGL_CONTINUOUS_SEED_H_
-#define DGL_CONTINUOUS_SEED_H_
+#ifndef DGL_RANDOM_CONTINUOUS_SEED_H_
+#define DGL_RANDOM_CONTINUOUS_SEED_H_
 
 #include <dgl/array.h>
 
@@ -27,8 +27,9 @@
 #ifdef __NVCC__
 #include <curand_kernel.h>
 #else
-#include <pcg_random.hpp>
 #include <random>
+
+#include "pcg_random.hpp"
 #endif  // __CUDA_ARCH__
 
 namespace dgl {
@@ -39,7 +40,7 @@ class continuous_seed {
   float c[2];
 
  public:
-  continuous_seed(const uint64_t seed) {
+  /* implicit */ continuous_seed(const int64_t seed) {  // NOLINT
     s[0] = s[1] = seed;
     c[0] = c[1] = 0;
   }
@@ -64,8 +65,9 @@ class continuous_seed {
       curand_init(123123, s[1], t, &rng);
       rnd += c[1] * curand_normal(&rng);
       rnd = normcdff(rnd);
-    } else
+    } else {
       rnd = curand_uniform(&rng);
+    }
     return rnd;
   }
 #else
@@ -78,7 +80,7 @@ class continuous_seed {
       pcg32 ng1(s[1], t);
       norm.reset();
       rnd += c[1] * norm(ng1);
-      rnd = std::erfc(-rnd * (float)M_SQRT1_2) / 2.0f;
+      rnd = std::erfc(-rnd * static_cast<float>(M_SQRT1_2)) / 2.0f;
     } else {
       std::uniform_real_distribution<float> uni;
       rnd = uni(ng0);
@@ -91,4 +93,4 @@ class continuous_seed {
 }  // namespace random
 }  // namespace dgl
 
-#endif  // DGL_CONTINUOUS_SEED_H_
+#endif  // DGL_RANDOM_CONTINUOUS_SEED_H_

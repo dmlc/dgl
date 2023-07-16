@@ -21,7 +21,7 @@
 
 from .. import backend as F, ndarray as nd, utils
 from .._ffi.function import _init_api
-from ..base import DGLError, NID
+from ..base import DGLError
 from ..heterograph import DGLGraph
 from ..random import choice
 from .utils import EidExcluder
