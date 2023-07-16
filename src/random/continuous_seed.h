@@ -22,6 +22,7 @@
 
 #include <dgl/array.h>
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 
 #ifdef __NVCC__
