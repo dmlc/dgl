@@ -463,6 +463,7 @@ COOMatrix COOReorder(
  * @param prob Probability array for nonuniform sampling
  * @param importance_sampling Whether to enable importance sampling
  * @param random_seed The random seed for the sampler
+ * @param seed2_contribution The contribution of the second random seed, [0, 1)
  * @param NIDs global nids if sampling from a subgraph
  * @return A pair of COOMatrix storing the picked row and col indices and edge
  *         weights if importance_sampling != 0 or prob argument was passed.
@@ -472,7 +473,8 @@ COOMatrix COOReorder(
 std::pair<COOMatrix, FloatArray> COOLaborSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples,
     FloatArray prob = NullArray(), int importance_sampling = 0,
-    IdArray random_seed = NullArray(), IdArray NIDs = NullArray());
+    IdArray random_seed = NullArray(), float seed2_contribution = 0,
+    IdArray NIDs = NullArray());
 
 /**
  * @brief Randomly select a fixed number of non-zero entries along each given
