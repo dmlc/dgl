@@ -263,7 +263,6 @@ def initialize(
         formats = os.environ.get("DGL_GRAPH_FORMAT", "csc").split(",")
         formats = [f.strip() for f in formats]
         rpc.reset()
-        keep_alive = bool(int(os.environ.get("DGL_KEEP_ALIVE", 0)))
         serv = DistGraphServer(
             int(os.environ.get("DGL_SERVER_ID")),
             os.environ.get("DGL_IP_CONFIG"),
@@ -271,7 +270,6 @@ def initialize(
             int(os.environ.get("DGL_NUM_CLIENT")),
             os.environ.get("DGL_CONF_PATH"),
             graph_format=formats,
-            keep_alive=keep_alive,
         )
         serv.start()
         sys.exit()

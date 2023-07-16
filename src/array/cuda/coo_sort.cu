@@ -63,32 +63,14 @@ __global__ void _COODecodeEdgesKernel(
   }
 }
 
-template <typename T>
-int _NumberOfBits(const T& range) {
-  if (range <= 1) {
-    // ranges of 0 or 1 require no bits to store
-    return 0;
-  }
-
-  int bits = 1;
-  while (bits < static_cast<int>(sizeof(T) * 8) && (1 << bits) < range) {
-    ++bits;
-  }
-
-  CHECK_EQ((range - 1) >> bits, 0);
-  CHECK_NE((range - 1) >> (bits - 1), 0);
-
-  return bits;
-}
-
 template <DGLDeviceType XPU, typename IdType>
 void COOSort_(COOMatrix* coo, bool sort_column) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
-  const int row_bits = _NumberOfBits(coo->num_rows);
+  const int row_bits = cuda::_NumberOfBits(coo->num_rows);
 
   const int64_t nnz = coo->row->shape[0];
   if (sort_column) {
-    const int col_bits = _NumberOfBits(coo->num_cols);
+    const int col_bits = cuda::_NumberOfBits(coo->num_cols);
     const int num_bits = row_bits + col_bits;
 
     const int nt = 256;

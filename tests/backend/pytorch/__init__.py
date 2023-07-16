@@ -93,3 +93,7 @@ def dot(a, b):
 
 def abs(a):
     return a.abs()
+
+
+def seed(a):
+    return th.manual_seed(a)

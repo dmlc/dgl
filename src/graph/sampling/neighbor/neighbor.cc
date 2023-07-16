@@ -115,47 +115,44 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> SampleLabors(
           hg->NumVertices(src_vtype), hg->NumVertices(dst_vtype),
           hg->DataType(), ctx);
       induced_edges[etype] = aten::NullArray(hg->DataType(), ctx);
-    } else if (fanouts[etype] == -1) {
-      const auto& earr = (dir == EdgeDir::kOut)
-                             ? hg->OutEdges(etype, nodes_ntype)
-                             : hg->InEdges(etype, nodes_ntype);
-      subrels[etype] = UnitGraph::CreateFromCOO(
-          hg->GetRelationGraph(etype)->NumVertexTypes(),
-          hg->NumVertices(src_vtype), hg->NumVertices(dst_vtype), earr.src,
-          earr.dst);
-      induced_edges[etype] = earr.id;
+      subimportances[etype] = NullArray();
     } else {
       // sample from one relation graph
       auto req_fmt = (dir == EdgeDir::kOut) ? CSR_CODE : CSC_CODE;
       auto avail_fmt = hg->SelectFormat(etype, req_fmt);
       COOMatrix sampled_coo;
       FloatArray importances;
+      const int64_t fanout =
+          fanouts[etype] >= 0
+              ? fanouts[etype]
+              : std::max(
+                    hg->NumVertices(dst_vtype), hg->NumVertices(src_vtype));
       switch (avail_fmt) {
         case SparseFormat::kCOO:
           if (dir == EdgeDir::kIn) {
             auto fs = aten::COOLaborSampling(
                 aten::COOTranspose(hg->GetCOOMatrix(etype)), nodes_ntype,
-                fanouts[etype], prob[etype], importance_sampling, random_seed,
+                fanout, prob[etype], importance_sampling, random_seed,
                 NIDs_ntype);
             sampled_coo = aten::COOTranspose(fs.first);
             importances = fs.second;
           } else {
             std::tie(sampled_coo, importances) = aten::COOLaborSampling(
-                hg->GetCOOMatrix(etype), nodes_ntype, fanouts[etype],
-                prob[etype], importance_sampling, random_seed, NIDs_ntype);
+                hg->GetCOOMatrix(etype), nodes_ntype, fanout, prob[etype],
+                importance_sampling, random_seed, NIDs_ntype);
           }
           break;
         case SparseFormat::kCSR:
           CHECK(dir == EdgeDir::kOut)
               << "Cannot sample out edges on CSC matrix.";
           std::tie(sampled_coo, importances) = aten::CSRLaborSampling(
-              hg->GetCSRMatrix(etype), nodes_ntype, fanouts[etype], prob[etype],
+              hg->GetCSRMatrix(etype), nodes_ntype, fanout, prob[etype],
               importance_sampling, random_seed, NIDs_ntype);
           break;
         case SparseFormat::kCSC:
           CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           std::tie(sampled_coo, importances) = aten::CSRLaborSampling(
-              hg->GetCSCMatrix(etype), nodes_ntype, fanouts[etype], prob[etype],
+              hg->GetCSCMatrix(etype), nodes_ntype, fanout, prob[etype],
               importance_sampling, random_seed, NIDs_ntype);
           sampled_coo = aten::COOTranspose(sampled_coo);
           break;

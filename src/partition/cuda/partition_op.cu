@@ -329,14 +329,14 @@ std::pair<IdArray, NDArray> GeneratePermutationFromRemainder(
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
         nullptr, hist_workspace_size, proc_id_out.get(),
         reinterpret_cast<AtomicCount*>(out_counts), num_parts + 1,
-        static_cast<IdType>(0), static_cast<IdType>(num_parts + 1),
+        static_cast<IdType>(0), static_cast<IdType>(num_parts),
         static_cast<int>(num_in), stream));
 
     Workspace<void> hist_workspace(device, ctx, hist_workspace_size);
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
         hist_workspace.get(), hist_workspace_size, proc_id_out.get(),
         reinterpret_cast<AtomicCount*>(out_counts), num_parts + 1,
-        static_cast<IdType>(0), static_cast<IdType>(num_parts + 1),
+        static_cast<IdType>(0), static_cast<IdType>(num_parts),
         static_cast<int>(num_in), stream));
   }
 
@@ -504,14 +504,14 @@ std::pair<IdArray, NDArray> GeneratePermutationFromRange(
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
         nullptr, hist_workspace_size, proc_id_out.get(),
         reinterpret_cast<AtomicCount*>(out_counts), num_parts + 1,
-        static_cast<IdType>(0), static_cast<IdType>(num_parts + 1),
+        static_cast<IdType>(0), static_cast<IdType>(num_parts),
         static_cast<int>(num_in), stream));
 
     Workspace<void> hist_workspace(device, ctx, hist_workspace_size);
     CUDA_CALL(cub::DeviceHistogram::HistogramEven(
         hist_workspace.get(), hist_workspace_size, proc_id_out.get(),
         reinterpret_cast<AtomicCount*>(out_counts), num_parts + 1,
-        static_cast<IdType>(0), static_cast<IdType>(num_parts + 1),
+        static_cast<IdType>(0), static_cast<IdType>(num_parts),
         static_cast<int>(num_in), stream));
   }
 
