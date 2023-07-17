@@ -34,7 +34,7 @@ fi
 conda activate ${DGLBACKEND}-ci
 
 # Install required dependencies
-python3 -m pip install pydantic-yaml
+python3 -m pip install pydantic-yaml==0.11.2
 
 if [ $DGLBACKEND == "mxnet" ]
 then
