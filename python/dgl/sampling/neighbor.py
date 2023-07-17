@@ -13,6 +13,7 @@ from .utils import EidExcluder
 __all__ = [
     "sample_etype_neighbors",
     "sample_neighbors",
+    "sample_neighbors_fused",
     "sample_neighbors_biased",
     "select_topk",
 ]
@@ -218,8 +219,6 @@ def sample_neighbors(
     _dist_training=False,
     exclude_edges=None,
     output_device=None,
-    fused=False,
-    mapping=None,
 ):
     """Sample neighboring edges of the given nodes and return the induced subgraph.
 
@@ -288,18 +287,6 @@ def sample_neighbors(
     output_device : Framework-specific device context object, optional
         The output device.  Default is the same as the input graph.
 
-    fused : bool, optional
-        Enables faster version of NeighborSampler that is also compacting output graph,
-        returning a computational block. Requires nodes to be unique
-
-        (Default: False)
-
-    mapping : dictionary, optional
-        Used by fused version of sample_neighbors. To avoid constant data allocation
-        provide empty dictionary ({}) that will be allocated once with proper data and reused
-        by each function call
-
-        (Default: None)
     Returns
     -------
     DGLGraph
@@ -379,7 +366,123 @@ def sample_neighbors(
             copy_ndata=copy_ndata,
             copy_edata=copy_edata,
             exclude_edges=exclude_edges,
-            fused=fused,
+        )
+    else:
+        frontier = _sample_neighbors(
+            g,
+            nodes,
+            fanout,
+            edge_dir=edge_dir,
+            prob=prob,
+            replace=replace,
+            copy_ndata=copy_ndata,
+            copy_edata=copy_edata,
+        )
+        if exclude_edges is not None:
+            eid_excluder = EidExcluder(exclude_edges)
+            frontier = eid_excluder(frontier)
+    return frontier if output_device is None else frontier.to(output_device)
+
+
+def sample_neighbors_fused(
+    g,
+    nodes,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    replace=False,
+    copy_ndata=True,
+    copy_edata=True,
+    exclude_edges=None,
+    mapping=None,
+):
+    """Sample neighboring edges of the given nodes and return the induced subgraph.
+
+    For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
+    will be randomly chosen.  The graph returned will then contain all the nodes in the
+    original graph, but only the sampled edges. Nodes will be renumbered starting from id 0,
+    which would be new node id of first seed node.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.  Can be either on CPU or GPU.
+    nodes : tensor or dict
+        Node IDs to sample neighbors from.
+
+        This argument can take a single ID tensor or a dictionary of node types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
+    fanout : int or dict[etype, int]
+        The number of edges to be sampled for each node on each edge type.
+
+        This argument can take a single int or a dictionary of edge types and ints.
+        If a single int is given, DGL will sample this number of edges for each node for
+        every edge type.
+
+        If -1 is given for a single edge type, all the neighboring edges with that edge
+        type and non-zero probability will be selected.
+    edge_dir : str, optional
+        Determines whether to sample inbound or outbound edges.
+
+        Can take either ``in`` for inbound edges or ``out`` for outbound edges.
+    prob : str, optional
+        Feature name used as the (unnormalized) probabilities associated with each
+        neighboring edge of a node.  The feature must have only one element for each
+        edge.
+
+        The features must be non-negative floats or boolean.  Otherwise, the result
+        will be undefined.
+    exclude_edges: tensor or dict
+        Edge IDs to exclude during sampling neighbors for the seed nodes.
+
+        This argument can take a single ID tensor or a dictionary of edge types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
+    replace : bool, optional
+        If True, sample with replacement.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: False)
+
+    mapping : dictionary, optional
+        Used by fused version of NeighborSampler. To avoid constant data allocation
+        provide empty dictionary ({}) that will be allocated once with proper data and reused
+        by each function call
+
+        (Default: None)
+    Returns
+    -------
+    DGLGraph
+        A sampled subgraph containing only the sampled neighboring edges.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
+
+    """
+    if not g.is_pinned():
+        frontier = _sample_neighbors(
+            g,
+            nodes,
+            fanout,
+            edge_dir=edge_dir,
+            prob=prob,
+            replace=replace,
+            copy_ndata=copy_ndata,
+            copy_edata=copy_edata,
+            exclude_edges=exclude_edges,
+            fused=True,
             mapping=mapping,
         )
     else:
@@ -392,13 +495,13 @@ def sample_neighbors(
             replace=replace,
             copy_ndata=copy_ndata,
             copy_edata=copy_edata,
-            fused=fused,
+            fused=True,
             mapping=mapping,
         )
         if exclude_edges is not None:
             eid_excluder = EidExcluder(exclude_edges)
             frontier = eid_excluder(frontier)
-    return frontier if output_device is None else frontier.to(output_device)
+    return frontier
 
 
 def _sample_neighbors(
@@ -569,6 +672,7 @@ def _sample_neighbors(
 
 
 DGLGraph.sample_neighbors = utils.alias_func(sample_neighbors)
+DGLGraph.sample_neighbors_fused = utils.alias_func(sample_neighbors_fused)
 
 
 def sample_neighbors_biased(

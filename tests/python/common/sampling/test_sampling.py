@@ -7,6 +7,11 @@ import dgl
 import numpy as np
 import pytest
 
+sample_neighbors_fusing_mode = {
+    True: dgl.sampling.sample_neighbors_fused,
+    False: dgl.sampling.sample_neighbors,
+}
+
 
 def check_random_walk(g, metapath, traces, ntypes, prob=None, trace_eids=None):
     traces = F.asnumpy(traces)
@@ -559,8 +564,8 @@ def _test_sample_neighbors(hypersparse, prob, fused):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, False)
 
     def _test1(p, replace):
-        subg = dgl.sampling.sample_neighbors(
-            g, [0, 1], -1, prob=p, replace=replace, fused=fused
+        subg = sample_neighbors_fusing_mode[fused](
+            g, [0, 1], -1, prob=p, replace=replace
         )
         if not fused:
             assert subg.num_nodes() == g.num_nodes()
@@ -579,8 +584,8 @@ def _test_sample_neighbors(hypersparse, prob, fused):
         assert uv == uv_ans
 
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(
-                g, [0, 1], 2, prob=p, replace=replace, fused=fused
+            subg = sample_neighbors_fusing_mode[fused](
+                g, [0, 1], 2, prob=p, replace=replace
             )
             if not fused:
                 assert subg.num_nodes() == g.num_nodes()
@@ -608,8 +613,8 @@ def _test_sample_neighbors(hypersparse, prob, fused):
     _test1(prob, False)  # w/o replacement, uniform
 
     def _test2(p, replace):  # fanout > #neighbors
-        subg = dgl.sampling.sample_neighbors(
-            g, [0, 2], -1, prob=p, replace=replace, fused=fused
+        subg = sample_neighbors_fusing_mode[fused](
+            g, [0, 2], -1, prob=p, replace=replace
         )
         if not fused:
             assert subg.num_nodes() == g.num_nodes()
@@ -628,8 +633,8 @@ def _test_sample_neighbors(hypersparse, prob, fused):
         assert uv == uv_ans
 
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(
-                g, [0, 2], 2, prob=p, replace=replace, fused=fused
+            subg = sample_neighbors_fusing_mode[fused](
+                g, [0, 2], 2, prob=p, replace=replace
             )
             if not fused:
                 assert subg.num_nodes() == g.num_nodes()
@@ -655,13 +660,8 @@ def _test_sample_neighbors(hypersparse, prob, fused):
     _test2(prob, False)  # w/o replacement, uniform
 
     def _test3(p, replace):
-        subg = dgl.sampling.sample_neighbors(
-            hg,
-            {"user": [0, 1], "game": 0},
-            -1,
-            prob=p,
-            replace=replace,
-            fused=fused,
+        subg = sample_neighbors_fusing_mode[fused](
+            hg, {"user": [0, 1], "game": 0}, -1, prob=p, replace=replace
         )
         if not fused:
             assert len(subg.ntypes) == 3
@@ -674,13 +674,8 @@ def _test_sample_neighbors(hypersparse, prob, fused):
         assert subg["flips"].num_edges() == 0
 
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(
-                hg,
-                {"user": [0, 1], "game": 0},
-                2,
-                prob=p,
-                replace=replace,
-                fused=fused,
+            subg = sample_neighbors_fusing_mode[fused](
+                hg, {"user": [0, 1], "game": 0}, 2, prob=p, replace=replace
             )
             if not fused:
                 assert len(subg.ntypes) == 3
@@ -697,12 +692,11 @@ def _test_sample_neighbors(hypersparse, prob, fused):
 
     # test different fanouts for different relations
     for i in range(10):
-        subg = dgl.sampling.sample_neighbors(
+        subg = sample_neighbors_fusing_mode[fused](
             hg,
             {"user": [0, 1], "game": 0, "coin": 0},
             {"follow": 1, "play": 2, "liked-by": 0, "flips": -1},
             replace=True,
-            fused=fused,
         )
         if not fused:
             assert len(subg.ntypes) == 3
@@ -833,8 +827,8 @@ def _test_sample_neighbors_outedge(hypersparse, fused):
     g, hg = _gen_neighbor_sampling_test_graph(hypersparse, True)
 
     def _test1(p, replace):
-        subg = dgl.sampling.sample_neighbors(
-            g, [0, 1], -1, prob=p, replace=replace, edge_dir="out", fused=fused
+        subg = sample_neighbors_fusing_mode[fused](
+            g, [0, 1], -1, prob=p, replace=replace, edge_dir="out"
         )
         if not fused:
             assert subg.num_nodes() == g.num_nodes()
@@ -854,14 +848,8 @@ def _test_sample_neighbors_outedge(hypersparse, fused):
         assert uv == uv_ans
 
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(
-                g,
-                [0, 1],
-                2,
-                prob=p,
-                replace=replace,
-                edge_dir="out",
-                fused=fused,
+            subg = sample_neighbors_fusing_mode[fused](
+                g, [0, 1], 2, prob=p, replace=replace, edge_dir="out"
             )
             if not fused:
                 assert subg.num_nodes() == g.num_nodes()
@@ -889,8 +877,8 @@ def _test_sample_neighbors_outedge(hypersparse, fused):
     _test1("prob", False)  # w/o replacement
 
     def _test2(p, replace):  # fanout > #neighbors
-        subg = dgl.sampling.sample_neighbors(
-            g, [0, 2], -1, prob=p, replace=replace, edge_dir="out", fused=fused
+        subg = sample_neighbors_fusing_mode[fused](
+            g, [0, 2], -1, prob=p, replace=replace, edge_dir="out"
         )
         if not fused:
             assert subg.num_nodes() == g.num_nodes()
@@ -909,14 +897,8 @@ def _test_sample_neighbors_outedge(hypersparse, fused):
         assert uv == uv_ans
 
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(
-                g,
-                [0, 2],
-                2,
-                prob=p,
-                replace=replace,
-                edge_dir="out",
-                fused=fused,
+            subg = sample_neighbors_fusing_mode[fused](
+                g, [0, 2], 2, prob=p, replace=replace, edge_dir="out"
             )
             if not fused:
                 assert subg.num_nodes() == g.num_nodes()
@@ -945,14 +927,13 @@ def _test_sample_neighbors_outedge(hypersparse, fused):
     _test2("prob", False)  # w/o replacement
 
     def _test3(p, replace):
-        subg = dgl.sampling.sample_neighbors(
+        subg = sample_neighbors_fusing_mode[fused](
             hg,
             {"user": [0, 1], "game": 0},
             -1,
             prob=p,
             replace=replace,
             edge_dir="out",
-            fused=fused,
         )
 
         if not fused:
@@ -966,14 +947,13 @@ def _test_sample_neighbors_outedge(hypersparse, fused):
         assert subg["flips"].num_edges() == 0
 
         for i in range(10):
-            subg = dgl.sampling.sample_neighbors(
+            subg = sample_neighbors_fusing_mode[fused](
                 hg,
                 {"user": [0, 1], "game": 0},
                 2,
                 prob=p,
                 replace=replace,
                 edge_dir="out",
-                fused=fused,
             )
             if not fused:
                 assert len(subg.ntypes) == 3
@@ -1212,40 +1192,20 @@ def test_sample_neighbors_with_0deg(fused):
     ):
         pytest.skip("Fused sampling support CPU with backend PyTorch.")
     g = dgl.graph(([], []), num_nodes=5).to(F.ctx())
-    sg = dgl.sampling.sample_neighbors(
-        g,
-        F.tensor([1, 2], dtype=F.int64),
-        2,
-        edge_dir="in",
-        replace=False,
-        fused=fused,
+    sg = sample_neighbors_fusing_mode[fused](
+        g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="in", replace=False
     )
     assert sg.num_edges() == 0
-    sg = dgl.sampling.sample_neighbors(
-        g,
-        F.tensor([1, 2], dtype=F.int64),
-        2,
-        edge_dir="in",
-        replace=True,
-        fused=fused,
+    sg = sample_neighbors_fusing_mode[fused](
+        g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="in", replace=True
     )
     assert sg.num_edges() == 0
-    sg = dgl.sampling.sample_neighbors(
-        g,
-        F.tensor([1, 2], dtype=F.int64),
-        2,
-        edge_dir="out",
-        replace=False,
-        fused=fused,
+    sg = sample_neighbors_fusing_mode[fused](
+        g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="out", replace=False
     )
     assert sg.num_edges() == 0
-    sg = dgl.sampling.sample_neighbors(
-        g,
-        F.tensor([1, 2], dtype=F.int64),
-        2,
-        edge_dir="out",
-        replace=True,
-        fused=fused,
+    sg = sample_neighbors_fusing_mode[fused](
+        g, F.tensor([1, 2], dtype=F.int64), 2, edge_dir="out", replace=True
     )
     assert sg.num_edges() == 0
 
@@ -1672,7 +1632,7 @@ def test_sample_neighbors_exclude_edges_heteroG(dtype, fused):
         ("drug", "treats", "disease"): excluded_d_t_d_edges,
     }
 
-    sg = dgl.sampling.sample_neighbors(
+    sg = sample_neighbors_fusing_mode[fused](
         g,
         {
             "drug": sampled_drug_node,
@@ -1681,7 +1641,6 @@ def test_sample_neighbors_exclude_edges_heteroG(dtype, fused):
         },
         sampled_amount,
         exclude_edges=excluded_edges,
-        fused=fused,
     )
 
     if fused:
@@ -1784,12 +1743,8 @@ def test_sample_neighbors_exclude_edges_homoG(dtype, fused):
     excluded_nodes_U = g_edges[U][b_idx:e_idx]
     excluded_nodes_V = g_edges[V][b_idx:e_idx]
 
-    sg = dgl.sampling.sample_neighbors(
-        g,
-        sampled_node,
-        sampled_amount,
-        exclude_edges=excluded_edges,
-        fused=fused,
+    sg = sample_neighbors_fusing_mode[fused](
+        g, sampled_node, sampled_amount, exclude_edges=excluded_edges
     )
     if fused:
 

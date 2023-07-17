@@ -167,14 +167,12 @@ class NeighborSampler(BlockSampler):
                     self.mapping = {}
                     self.g = g
                 for fanout in reversed(self.fanouts):
-                    block = g.sample_neighbors(
+                    block = g.sample_neighbors_fused(
                         seed_nodes,
                         fanout,
                         edge_dir=self.edge_dir,
                         prob=self.prob,
                         replace=self.replace,
-                        output_device=self.output_device,
-                        fused=True,
                         exclude_edges=exclude_eids,
                         mapping=self.mapping,
                     )
