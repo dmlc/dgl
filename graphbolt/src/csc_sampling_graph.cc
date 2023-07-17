@@ -600,38 +600,39 @@ inline torch::Tensor LaborPick(
           float* rem_data = remaining.data_ptr<float>();
           auto heap_end = heap_data;
           const auto init_count = (num_neighbors + fanout - 1) / num_neighbors;
-          auto helper = [&](auto t, auto j, auto i) {
-            auto rnd = labor::jth_sorted_uniform_random(
-                args.random_seed, t, args.num_nodes, j, rem_data[i],
-                fanout - j);  // r_t
-            if constexpr (NonUniform) {
-              safe_divide(rnd, local_probs_data[i]);
-            }  // r_t / \pi_t
-            if (heap_end < heap_data + fanout) {
-              heap_end[0] = std::make_pair(rnd, i);
-              std::push_heap(heap_data, ++heap_end);
-              return false;
-            } else if (rnd < heap_data[0].first) {
-              std::pop_heap(heap_data, heap_data + fanout);
-              heap_data[fanout - 1] = std::make_pair(rnd, i);
-              std::push_heap(heap_data, heap_data + fanout);
-              return false;
-            } else {
-              rem_data[i] = -1;
-              return true;
-            }
-          };
+          auto sample_neighbor_i_with_index_t_jth_time =
+              [&](scalar_t t, int64_t j, uint32_t i) {
+                auto rnd = labor::jth_sorted_uniform_random(
+                    args.random_seed, t, args.num_nodes, j, rem_data[i],
+                    fanout - j);  // r_t
+                if constexpr (NonUniform) {
+                  safe_divide(rnd, local_probs_data[i]);
+                }  // r_t / \pi_t
+                if (heap_end < heap_data + fanout) {
+                  heap_end[0] = std::make_pair(rnd, i);
+                  std::push_heap(heap_data, ++heap_end);
+                  return false;
+                } else if (rnd < heap_data[0].first) {
+                  std::pop_heap(heap_data, heap_data + fanout);
+                  heap_data[fanout - 1] = std::make_pair(rnd, i);
+                  std::push_heap(heap_data, heap_data + fanout);
+                  return false;
+                } else {
+                  rem_data[i] = -1;
+                  return true;
+                }
+              };
           for (uint32_t i = 0; i < num_neighbors; ++i) {
             for (int64_t j = 0; j < init_count; j++) {
               const auto t = local_indices_data[i];
-              helper(t, j, i);
+              sample_neighbor_i_with_index_t_jth_time(t, j, i);
             }
           }
           for (uint32_t i = 0; i < num_neighbors; ++i) {
             if (rem_data[i] == -1) continue;
             const auto t = local_indices_data[i];
             for (int64_t j = init_count; j < fanout; ++j) {
-              if (helper(t, j, i)) break;
+              if (sample_neighbor_i_with_index_t_jth_time(t, j, i)) break;
             }
           }
         } else {
