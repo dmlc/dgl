@@ -1,5 +1,6 @@
 """GraphBolt OnDiskDataset."""
 
+from pydantic_yaml import parse_yaml_raw_as
 from typing import Dict, List, Tuple
 
 from ..dataset import Dataset
@@ -84,7 +85,7 @@ class OnDiskDataset(Dataset):
         # the function will return the original path directly.
         path = preprocess_ondisk_dataset(path)
         with open(path, "r") as f:
-            self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
+            self._meta = parse_yaml_raw_as(OnDiskMetaData, f.read())
         self._dataset_name = self._meta.dataset_name
         self._num_classes = self._meta.num_classes
         self._num_labels = self._meta.num_labels

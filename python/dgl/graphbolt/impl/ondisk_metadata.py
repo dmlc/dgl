@@ -64,7 +64,7 @@ class OnDiskGraphTopology(pydantic.BaseModel):
     path: str
 
 
-class OnDiskMetaData(pydantic_yaml.YamlModel):
+class OnDiskMetaData(pydantic.BaseModel):
     """Metadata specification in YAML.
 
     As multiple node/edge types and multiple splits are supported, each TVT set
