@@ -1,7 +1,8 @@
 """GraphBolt OnDiskDataset."""
 
-from pydantic_yaml import parse_yaml_raw_as
 from typing import Dict, List, Tuple
+
+from pydantic_yaml import parse_yaml_raw_as
 
 from ..dataset import Dataset
 from ..itemset import ItemSet, ItemSetDict
