@@ -525,27 +525,6 @@ torch::Tensor Pick<SamplerType::LABOR>(
   }
 }
 
-template <typename T>
-inline T labor_uniform_random(int64_t random_seed, int64_t t) {
-  pcg32 ng(random_seed, t);
-  std::uniform_real_distribution<T> uni;
-  return uni(ng);
-}
-
-template <typename T>
-inline T invcdf(T u, int64_t n, T rem) {
-  constexpr T one = 1;
-  return rem * (one - std::pow(one - u, one / n));
-}
-
-template <typename T>
-inline T labor_jth_sorted_uniform_random(
-    int64_t random_seed, int64_t t, int64_t c, int64_t j, T& rem, int64_t n) {
-  const auto u = labor_uniform_random<T>(random_seed, t + j * c);
-  rem -= invcdf(u, n, rem);
-  return 1 - rem;
-}
-
 template <typename T, typename U>
 inline void safe_divide(T& a, U b) {
   a = b > 0 ? (T)(a / b) : std::numeric_limits<T>::infinity();
@@ -599,14 +578,15 @@ inline torch::Tensor LaborPick(
           // Use a max-heap to get rid of the big random numbers and filter the
           // smallest fanout of them. Implements arXiv:2210.13339 Section A.3.
           // Unlike sampling without replacement below, the same item can be
-          // included fanout many times in our sample. Thus, we sort and pick
-          // the smallest fanout random numbers out of num_neighbors * fanout
-          // of them. Each item has fanout many random numbers in the race and
-          // the smallest fanout of them get picked. Instead of generating
+          // included fanout times in our sample. Thus, we sort and pick the
+          // smallest fanout random numbers out of num_neighbors * fanout of
+          // them. Each item has fanout many random numbers in the race and the
+          // smallest fanout of them get picked. Instead of generating
           // fanout * num_neighbors random numbers and increase the complexity,
           // I devised an algorithm to generate the fanout numbers for an item
           // in a sorted manner on demand, meaning we continue generating random
-          // numbers for an item if it has been sampled that many times already.
+          // numbers for an item only if it has been sampled that many times
+          // already.
           // https://gist.github.com/mfbalin/096dcad5e3b1f6a59ff7ff2f9f541618
           //
           // [Complexity Analysis]
@@ -620,47 +600,38 @@ inline torch::Tensor LaborPick(
           float* rem_data = remaining.data_ptr<float>();
           auto heap_end = heap_data;
           const auto init_count = (num_neighbors + fanout - 1) / num_neighbors;
+          auto helper = [&](auto t, auto j, auto i) {
+            auto rnd = labor::jth_sorted_uniform_random(
+                args.random_seed, t, args.num_nodes, j, rem_data[i],
+                fanout - j);  // r_t
+            if constexpr (NonUniform) {
+              safe_divide(rnd, local_probs_data[i]);
+            }  // r_t / \pi_t
+            if (heap_end < heap_data + fanout) {
+              heap_end[0] = std::make_pair(rnd, i);
+              std::push_heap(heap_data, ++heap_end);
+              return false;
+            } else if (rnd < heap_data[0].first) {
+              std::pop_heap(heap_data, heap_data + fanout);
+              heap_data[fanout - 1] = std::make_pair(rnd, i);
+              std::push_heap(heap_data, heap_data + fanout);
+              return false;
+            } else {
+              rem_data[i] = -1;
+              return true;
+            }
+          };
           for (uint32_t i = 0; i < num_neighbors; ++i) {
             for (int64_t j = 0; j < init_count; j++) {
               const auto t = local_indices_data[i];
-              auto rnd = labor_jth_sorted_uniform_random(
-                  args.random_seed, t, args.num_nodes, j, rem_data[i],
-                  fanout - j);  // r_t
-              if constexpr (NonUniform) {
-                safe_divide(rnd, local_probs_data[i]);
-              }  // r_t / \pi_t
-              if (heap_end < heap_data + fanout) {
-                heap_end[0] = std::make_pair(rnd, i);
-                std::push_heap(heap_data, ++heap_end);
-              } else if (rnd < heap_data[0].first) {
-                std::pop_heap(heap_data, heap_data + fanout);
-                heap_data[fanout - 1] = std::make_pair(rnd, i);
-                std::push_heap(heap_data, heap_data + fanout);
-              } else {
-                rem_data[i] = -1;
-              }
+              helper(t, j, i);
             }
           }
           for (uint32_t i = 0; i < num_neighbors; ++i) {
             if (rem_data[i] == -1) continue;
             const auto t = local_indices_data[i];
             for (int64_t j = init_count; j < fanout; ++j) {
-              auto rnd = labor_jth_sorted_uniform_random(
-                  args.random_seed, t, args.num_nodes, j, rem_data[i],
-                  fanout - j);  // r_t
-              if constexpr (NonUniform) {
-                safe_divide(rnd, local_probs_data[i]);
-              }  // r_t / \pi_t
-              if (heap_end < heap_data + fanout) {
-                heap_end[0] = std::make_pair(rnd, i);
-                std::push_heap(heap_data, ++heap_end);
-              } else if (rnd < heap_data[0].first) {
-                std::pop_heap(heap_data, heap_data + fanout);
-                heap_data[fanout - 1] = std::make_pair(rnd, i);
-                std::push_heap(heap_data, heap_data + fanout);
-              } else {
-                break;
-              }
+              if (helper(t, j, i)) break;
             }
           }
         } else {
@@ -683,7 +654,8 @@ inline torch::Tensor LaborPick(
           // O(num_neighbors).
           for (uint32_t i = 0; i < fanout; ++i) {
             const auto t = local_indices_data[i];
-            auto rnd = labor_uniform_random<float>(args.random_seed, t);  // r_t
+            auto rnd =
+                labor::uniform_random<float>(args.random_seed, t);  // r_t
             if constexpr (NonUniform) {
               safe_divide(rnd, local_probs_data[i]);
             }  // r_t / \pi_t
@@ -694,7 +666,8 @@ inline torch::Tensor LaborPick(
           }
           for (uint32_t i = fanout; i < num_neighbors; ++i) {
             const auto t = local_indices_data[i];
-            auto rnd = labor_uniform_random<float>(args.random_seed, t);  // r_t
+            auto rnd =
+                labor::uniform_random<float>(args.random_seed, t);  // r_t
             if constexpr (NonUniform) {
               safe_divide(rnd, local_probs_data[i]);
             }  // r_t / \pi_t
