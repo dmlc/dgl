@@ -637,7 +637,7 @@ def test_OnDiskDataset_Graph_Exceptions():
 
         with pytest.raises(
             pydantic.ValidationError,
-            match="Input should be 'CSCSamplingGraph'",
+            match="1 validation error for OnDiskMetaData",
         ):
             _ = gb.OnDiskDataset(yaml_file)
 
