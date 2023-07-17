@@ -320,7 +320,9 @@ def _ddp_runner(proc_id, nprocs, g, data, args):
 
 
 @parametrize_idtype
-@pytest.mark.parametrize("sampler_name", ["full", "neighbor", "neighbor2"])
+@pytest.mark.parametrize(
+    "sampler_name", ["full", "neighbor", "neighbor2", "labor"]
+)
 @pytest.mark.parametrize(
     "mode", ["cpu", "uva_cuda_indices", "uva_cpu_indices", "pure_gpu"]
 )
@@ -353,6 +355,7 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
         "full": dgl.dataloading.MultiLayerFullNeighborSampler(2),
         "neighbor": dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
         "neighbor2": dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
+        "labor": dgl.dataloading.LaborSampler([3, 3]),
     }[sampler_name]
     for num_workers in [0, 1, 2] if mode == "cpu" else [0]:
         dataloader = dgl.dataloading.DataLoader(
@@ -405,6 +408,7 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
             [{etype: 3 for etype in g2.etypes}] * 2
         ),
         "neighbor2": dgl.dataloading.MultiLayerNeighborSampler([3, 3]),
+        "labor": dgl.dataloading.LaborSampler([3, 3]),
     }[sampler_name]
     for num_workers in [0, 1, 2] if mode == "cpu" else [0]:
         dataloader = dgl.dataloading.DataLoader(
