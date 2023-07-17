@@ -50,8 +50,10 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
     with open(input_config_path, "r") as f:
         input_config = yaml.safe_load(f)
 
+    # If the input config does not contain the "graph" field, then we
+    # assume that the input config is already preprocessed.
     if "graph" not in input_config:
-        print("Don't need to preprocess the on-disk dataset.")
+        print("The input config is already preprocessed.")
         return input_config_path
 
     print("Start to preprocess the on-disk dataset.")
@@ -93,7 +95,8 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
         # Construct the heterograph.
         g = dgl.heterograph(data_dict, num_nodes_dict)
 
-    # 3. Load the node/edge features and add them to the sampling-graph.
+    # 3. Load the sampling related node/edge features and add them to
+    # the sampling-graph.
     if input_config["graph"].get("feature_data", None):
         for graph_feature in input_config["graph"]["feature_data"]:
             if graph_feature["domain"] == "node":
