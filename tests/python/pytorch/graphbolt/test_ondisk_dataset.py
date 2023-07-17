@@ -637,7 +637,7 @@ def test_OnDiskDataset_Graph_Exceptions():
 
         with pytest.raises(
             pydantic.ValidationError,
-            match="value is not a valid enumeration member",
+            match="Input should be 'CSCSamplingGraph'",
         ):
             _ = gb.OnDiskDataset(yaml_file)
 

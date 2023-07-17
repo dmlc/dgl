@@ -270,8 +270,9 @@ class OnDiskDataset(Dataset):
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         path = preprocess_ondisk_dataset(path)
-        with open(path, "r") as f:
-            self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
+        with open(path) as f:
+            yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
+            self._meta = OnDiskMetaData(**yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._num_classes = self._meta.num_classes
         self._num_labels = self._meta.num_labels
