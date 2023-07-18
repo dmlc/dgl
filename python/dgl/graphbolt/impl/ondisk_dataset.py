@@ -141,18 +141,7 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
                 "path"
             ].replace("pt", "npy")
 
-            if feature["format"] == "torch":
-                data = read_data(
-                    dataset_path / feature["path"],
-                    feature["format"],
-                    in_memory=feature["in_memory"],
-                )
-                save_data(
-                    data,
-                    dataset_path / out_feature["path"],
-                    out_feature["format"],
-                )
-            elif feature["format"] == "numpy":
+            if feature["format"] == "numpy":
                 # If the original format is numpy, just copy the file.
                 os.makedirs(
                     dataset_path / os.path.dirname(out_feature["path"]),
@@ -163,8 +152,16 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
                     dataset_path / out_feature["path"],
                 )
             else:
-                raise ValueError(
-                    f"Unsupported feature format {feature['format']}"
+                # Do the nessary conversion.
+                data = read_data(
+                    dataset_path / feature["path"],
+                    feature["format"],
+                    in_memory=feature["in_memory"],
+                )
+                save_data(
+                    data,
+                    dataset_path / out_feature["path"],
+                    out_feature["format"],
                 )
 
     # 7. Save the train/val/test split according to the output_config.
