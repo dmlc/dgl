@@ -32,7 +32,7 @@ def save_data(data, path, fmt):
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     if fmt not in ["numpy", "torch"]:
-        raise ValueError(f"Unsupported format: {fmt}")
+        raise RuntimeError(f"Unsupported format: {fmt}")
 
     # Perform necessary conversion.
     if fmt == "numpy" and isinstance(element, torch.Tensor):
