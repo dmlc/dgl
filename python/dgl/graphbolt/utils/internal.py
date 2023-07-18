@@ -1,5 +1,7 @@
 """Utility functions for GraphBolt."""
 
+import os
+
 import numpy as np
 import torch
 
@@ -22,6 +24,27 @@ def read_data(path, fmt, in_memory=True):
         return _read_numpy_data(path, in_memory=in_memory)
     else:
         raise RuntimeError(f"Unsupported format: {fmt}")
+
+
+def save_data(data, path, fmt):
+    """Save data into disk."""
+    # Make sure the directory exists.
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    if fmt not in ["numpy", "torch"]:
+        raise RuntimeError(f"Unsupported format: {fmt}")
+
+    # Perform necessary conversion.
+    if fmt == "numpy" and isinstance(element, torch.Tensor):
+        element = element.cpu().numpy()
+    elif fmt == "torch" and isinstance(element, np.ndarray):
+        element = torch.from_numpy(element).cpu()
+
+    # Save the data.
+    if fmt == "numpy":
+        np.save(path, data)
+    elif fmt == "torch":
+        torch.save(data, path)
 
 
 def tensor_to_tuple(data):
