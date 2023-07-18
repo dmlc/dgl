@@ -166,9 +166,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
             const auto num_neighbors = indptr_data[nid + 1] - offset;
 
             if (num_neighbors == 0) {
-              // Initialization is performed here because all tensors will be
-              // concatenated in the master thread, and having an undefined
-              // tensor during concatenation can result in a crash.
+              // To avoid crashing during concatenation in the master thread,
+              // initializing with empty tensors.
               picked_neighbors_per_node[i] =
                   torch::tensor({}, indptr_.options());
               continue;
