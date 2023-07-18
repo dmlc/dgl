@@ -137,9 +137,9 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
         ):
             # Always save the feature in numpy format.
             out_feature["format"] = "numpy"
-            out_feature["path"] = processed_dir_prefix / feature[
-                "path"
-            ].replace("pt", "npy")
+            out_feature["path"] = str(
+                processed_dir_prefix / feature["path"].replace("pt", "npy")
+            )
 
             if feature["format"] == "numpy":
                 # If the original format is numpy, just copy the file.
@@ -176,10 +176,9 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
             ):
                 # Always save the feature in numpy format.
                 output_set_per_type["format"] = "numpy"
-                output_set_per_type[
-                    "path"
-                ] = processed_dir_prefix / input_set_per_type["path"].replace(
-                    "pt", "npy"
+                output_set_per_type["path"] = str(
+                    processed_dir_prefix
+                    / input_set_per_type["path"].replace("pt", "npy")
                 )
                 if input_set_per_type["format"] == "numpy":
                     # If the original format is numpy, just copy the file.
