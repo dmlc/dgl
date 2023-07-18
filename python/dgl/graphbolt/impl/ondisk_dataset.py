@@ -132,7 +132,7 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
 
     # 6. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
-        for (feature, out_feature) in zip(
+        for feature, out_feature in zip(
             input_config["feature_data"], output_config["feature_data"]
         ):
             # Always save the feature in numpy format.
