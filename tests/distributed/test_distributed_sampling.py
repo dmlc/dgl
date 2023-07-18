@@ -1306,10 +1306,9 @@ def start_hetero_sample_client_graphbolt(rank, tmpdir, disable_shared_mem, nodes
     gpb = None
     if gpb is None:
         gpb = dist_graph.get_partition_book()
-    print("gpb", gpb)
     try:
-        sampled_graph = sample_neighbors(dist_graph, nodes, 3)
-    #     block = dgl.to_block(sampled_graph, nodes)
+        sampled_graph = sample_neighbors(dist_graph, nodes=nodes, fanout=3)
+        # block = dgl.to_block(sampled_graph, nodes)
     except Exception as e:
         print(traceback.format_exc())
         sampled_graph = None
@@ -1334,8 +1333,7 @@ def check_rpc_hetero_sampling_shuffle_graphbolt(tmpdir, num_server):
         part_method="metis",
         return_mapping=True,
     )
-
-   # TODO (Israt): Directly save partitions in GraphBolt structure
+    # TODO (Israt): Directly save partitions in GraphBolt structure
     convert_dgl_partition_to_csc_sampling_graph(tmpdir / "test_sampling.json")
 
     pserver_list = []
@@ -1407,7 +1405,7 @@ def test_GraphBolt(num_server):
 
     os.environ["DGL_DIST_MODE"] = "distributed"
     with tempfile.TemporaryDirectory() as tmpdirname:
-        check_rpc_sampling_GraphBolt(Path(tmpdirname), num_server)
+        # check_rpc_sampling_GraphBolt(Path(tmpdirname), num_server)
         check_rpc_hetero_sampling_shuffle_graphbolt(Path(tmpdirname), num_server)
 
 

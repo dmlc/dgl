@@ -230,8 +230,7 @@ class CSCSamplingGraph:
         row = C_sampled_subgraph.indices
         type_per_edge = C_sampled_subgraph.type_per_edge
         # TODO (Israt): type_per_edge is not None for homogeneous
-        print("MUST FIX")
-        type_per_edge = None
+        # type_per_edge = None
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
@@ -244,9 +243,9 @@ class CSCSamplingGraph:
                 src_ntype_id = self.metadata.node_type_to_id[src_ntype]
                 dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
                 mask = type_per_edge == etype_id
-                hetero_row = row[mask] - self.node_type_offset[src_ntype_id]
+                hetero_row = row #[mask] - self.node_type_offset[src_ntype_id]
                 hetero_column = (
-                    column[mask] - self.node_type_offset[dst_ntype_id]
+                    column #[mask] - self.node_type_offset[dst_ntype_id]
                 )
                 node_pairs[etype] = (hetero_row, hetero_column)
         return SampledSubgraphImpl(node_pairs=node_pairs)
@@ -326,7 +325,7 @@ class CSCSamplingGraph:
                 ntype_id = self.metadata.node_type_to_id[ntype]
                 homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
             return torch.cat(homogeneous_nodes)
-
+        # IN: dist_graph.py does this conversion already. Change it?
         if isinstance(nodes, dict):
             nodes = convert_to_homogeneous_nodes(nodes)
 

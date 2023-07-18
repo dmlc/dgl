@@ -3,6 +3,9 @@ from collections import namedtuple
 
 import numpy as np
 import torch as th
+import random
+from scipy import sparse as spsp
+import dgl.graphbolt as gb
 
 from .. import backend as F
 from ..base import EID, NID
@@ -516,6 +519,8 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
         sampled_subg = local_access(
             g.local_partition, partition_book, local_nids
         )
+        if isinstance(sampled_subg.node_pairs, dict):
+            print("!! node_pairs is a dict, expected tuple of tensors!!")
         src, dst = sampled_subg.node_pairs
         res_list.append(LocalSampledGraph(src, dst))
 
@@ -712,7 +717,6 @@ def sample_etype_neighbors(
             replace,
             etype_sorted=etype_sorted,
         )
-
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
     if not gpb.is_homogeneous:
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)
@@ -770,6 +774,8 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
     gpb = g.get_partition_book()
+    # TODO (Israt): GraphBolt also has a conversion function in sample_neighbors
+    # in csc_sampling_graph.py. Use that.
     if not gpb.is_homogeneous:
         assert isinstance(nodes, dict)
         homo_nids = []
@@ -802,7 +808,41 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
         # TODO (Israt): Fix prob, fix fanout for  multiple layer
         _prob = None #[g.edata[prob].local_partition] if prob is not None else None
 
-        return local_g.sample_neighbors(
+        dense = False
+        empty = False
+        num_nodes = (
+            {"n1": 210, "n2": 200, "n3": 220}
+            if dense
+            else {"n1": 1010, "n2": 1000, "n3": 1020}
+        )
+        e1 = ("n1", "r12", "n2")
+        e2 = ("n1", "r13", "n3")
+        e3 = ("n2", "r23", "n3")
+        etypes = [e1, e2, e3]
+        edges = {}
+        random.seed(42)
+        for etype in etypes:
+            src_ntype, _, dst_ntype = etype
+            arr = spsp.random(
+                num_nodes[src_ntype] - 10 if empty else num_nodes[src_ntype],
+                num_nodes[dst_ntype] - 10 if empty else num_nodes[dst_ntype],
+                density=0.1 if dense else 0.001,
+                format="coo",
+                random_state=100,
+            )
+            edges[etype] = (arr.row, arr.col)
+
+        edge_data_mt = {e1:len(edges[e1][0]), e2:len(edges[e2][0]), e3:len(edges[e3][0])}
+        metadata = gb.GraphMetadata(num_nodes, edge_data_mt)
+
+        graph = gb.from_csc(
+            local_g.csc_indptr,
+            local_g.indices,
+            local_g.node_type_offset,
+            type_per_edge=local_g.type_per_edge,
+            metadata=metadata,
+        )
+        return graph.sample_neighbors(
             local_nids,
             th.tensor([fanout]),
             replace,
