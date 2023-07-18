@@ -152,7 +152,7 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
                     dataset_path / out_feature["path"],
                 )
             else:
-                # Do the nessary conversion.
+                # If the original format is not numpy, convert it to numpy.
                 data = read_data(
                     dataset_path / feature["path"],
                     feature["format"],
@@ -181,7 +181,18 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
                 ] = processed_dir_prefix / input_set_per_type["path"].replace(
                     "pt", "npy"
                 )
-                if input_set_per_type["format"] != "numpy":
+                if input_set_per_type["format"] == "numpy":
+                    # If the original format is numpy, just copy the file.
+                    os.makedirs(
+                        dataset_path
+                        / os.path.dirname(output_set_per_type["path"]),
+                        exist_ok=True,
+                    )
+                    shutil.copy(
+                        dataset_path / input_set_per_type["path"],
+                        dataset_path / output_set_per_type["path"],
+                    )
+                else:
                     # If the original format is not numpy, convert it to numpy.
                     input_set = read_data(
                         dataset_path / input_set_per_type["path"],
@@ -191,16 +202,6 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
                         input_set,
                         dataset_path / output_set_per_type["path"],
                         output_set_per_type["format"],
-                    )
-                else:
-                    os.makedirs(
-                        dataset_path
-                        / os.path.dirname(output_set_per_type["path"]),
-                        exist_ok=True,
-                    )
-                    shutil.copy(
-                        dataset_path / input_set_per_type["path"],
-                        dataset_path / output_set_per_type["path"],
                     )
 
     # 8. Save the output_config.
