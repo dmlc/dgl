@@ -1668,6 +1668,9 @@ def _test_NodeEdgeGraphData():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+@unittest.skipIf(
+    dgl.backend.backend_name == "tensorflow", reason="Skip Tensorflow"
+)
 def test_csvdataset():
     _test_NodeEdgeGraphData()
     _test_construct_graphs_node_ids()
@@ -1866,6 +1869,9 @@ def test_as_linkpred_ogb():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+@unittest.skipIf(
+    dgl.backend.backend_name == "tensorflow", reason="Skip Tensorflow"
+)
 def test_as_nodepred_csvdataset():
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs

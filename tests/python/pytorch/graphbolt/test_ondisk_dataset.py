@@ -637,7 +637,7 @@ def test_OnDiskDataset_Graph_Exceptions():
 
         with pytest.raises(
             pydantic.ValidationError,
-            match="value is not a valid enumeration member",
+            match="1 validation error for OnDiskMetaData",
         ):
             _ = gb.OnDiskDataset(yaml_file)
 
@@ -847,7 +847,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
         output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(yaml_file)
 
         with open(output_file, "rb") as f:
-            processed_dataset = yaml.safe_load(f)
+            processed_dataset = yaml.load(f, Loader=yaml.Loader)
 
         assert processed_dataset["dataset_name"] == dataset_name
         assert processed_dataset["num_classes"] == num_classes

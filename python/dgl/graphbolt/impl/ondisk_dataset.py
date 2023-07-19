@@ -132,7 +132,7 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
 
     # 6. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
-        for (feature, out_feature) in zip(
+        for feature, out_feature in zip(
             input_config["feature_data"], output_config["feature_data"]
         ):
             # Always save the feature in numpy format.
@@ -270,8 +270,9 @@ class OnDiskDataset(Dataset):
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         path = preprocess_ondisk_dataset(path)
-        with open(path, "r") as f:
-            self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
+        with open(path) as f:
+            yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
+            self._meta = OnDiskMetaData(**yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._num_classes = self._meta.num_classes
         self._num_labels = self._meta.num_labels
