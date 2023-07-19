@@ -60,13 +60,13 @@ class continuous_seed {
 
 #ifdef __CUDA_ARCH__
   __device__ inline float uniform(const uint64_t t) const {
-    const uint64_t MAGIC_CONSTANT = 999961;  // Could be any random number.
+    const uint64_t kCurandSeed = 999961;  // Could be any random number.
     curandStatePhilox4_32_10_t rng;
-    curand_init(MAGIC_CONSTANT, s[0], t, &rng);
+    curand_init(kCurandSeed, s[0], t, &rng);
     float rnd;
     if (s[0] != s[1]) {
       rnd = c[0] * curand_normal(&rng);
-      curand_init(MAGIC_CONSTANT, s[1], t, &rng);
+      curand_init(kCurandSeed, s[1], t, &rng);
       rnd += c[1] * curand_normal(&rng);
       rnd = normcdff(rnd);
     } else {
