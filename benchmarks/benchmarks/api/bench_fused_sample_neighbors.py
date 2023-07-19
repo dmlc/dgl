@@ -25,15 +25,15 @@ def track_time(graph_name, format, seed_nodes_num, fanout):
 
     # dry run
     for i in range(3):
-        dgl.sampling.sample_neighbors(
-            graph, seed_nodes, fanout, edge_dir=edge_dir, fused=True
+        dgl.sampling.sample_neighbors_fused(
+            graph, seed_nodes, fanout, edge_dir=edge_dir
         )
 
     # timing
     with utils.Timer() as t:
         for i in range(50):
-            dgl.sampling.sample_neighbors(
-                graph, seed_nodes, fanout, edge_dir=edge_dir, fused=True
+            dgl.sampling.sample_neighbors_fused(
+                graph, seed_nodes, fanout, edge_dir=edge_dir
             )
 
     return t.elapsed_secs / 50
