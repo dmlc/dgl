@@ -132,14 +132,14 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
 
     # 6. Load the node/edge features and do necessary conversion.
     if input_config.get("feature_data", None):
-        for (feature, out_feature) in zip(
+        for feature, out_feature in zip(
             input_config["feature_data"], output_config["feature_data"]
         ):
             # Always save the feature in numpy format.
             out_feature["format"] = "numpy"
-            out_feature["path"] = processed_dir_prefix / feature[
-                "path"
-            ].replace("pt", "npy")
+            out_feature["path"] = str(
+                processed_dir_prefix / feature["path"].replace("pt", "npy")
+            )
 
             if feature["format"] == "numpy":
                 # If the original format is numpy, just copy the file.
@@ -176,10 +176,9 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
             ):
                 # Always save the feature in numpy format.
                 output_set_per_type["format"] = "numpy"
-                output_set_per_type[
-                    "path"
-                ] = processed_dir_prefix / input_set_per_type["path"].replace(
-                    "pt", "npy"
+                output_set_per_type["path"] = str(
+                    processed_dir_prefix
+                    / input_set_per_type["path"].replace("pt", "npy")
                 )
                 if input_set_per_type["format"] == "numpy":
                     # If the original format is numpy, just copy the file.
@@ -209,7 +208,7 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
-    return output_config_path
+    return str(output_config_path)
 
 
 class OnDiskDataset(Dataset):
@@ -270,8 +269,9 @@ class OnDiskDataset(Dataset):
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         path = preprocess_ondisk_dataset(path)
-        with open(path, "r") as f:
-            self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
+        with open(path) as f:
+            yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
+            self._meta = OnDiskMetaData(**yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._num_classes = self._meta.num_classes
         self._num_labels = self._meta.num_labels
