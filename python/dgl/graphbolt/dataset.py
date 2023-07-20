@@ -31,22 +31,27 @@ class Dataset:
     generate a subgraph.
     """
 
+    @property
     def train_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the training sets."""
         raise NotImplementedError
 
+    @property
     def validation_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the validation sets."""
         raise NotImplementedError
 
+    @property
     def test_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the test sets."""
         raise NotImplementedError
 
+    @property
     def graph(self) -> object:
         """Return the graph."""
         raise NotImplementedError
 
+    @property
     def feature(self) -> Dict[object, FeatureStore]:
         """Return the feature."""
         raise NotImplementedError
