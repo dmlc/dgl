@@ -18,7 +18,6 @@ namespace impl {
 template <typename DType, typename IdType>
 NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   cudaStream_t stream = runtime::getCurrentCUDAStream();
-  const IdType* idx_data = static_cast<IdType*>(index->data);
   const int64_t arr_len = array->shape[0];
   const int64_t len = index->shape[0];
   int64_t num_feat = 1;
@@ -37,12 +36,16 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
   if (len == 0 || arr_len * num_feat == 0) return ret;
   DType* ret_data = static_cast<DType*>(ret->data);
 
+  auto res = Sort(index, cuda::_NumberOfBits(arr_len));
+  const IdType* idx_data = static_cast<IdType*>(res.first->data);
+  const int64_t* perm_data = static_cast<int64_t*>(res.second->data);
+
   if (num_feat == 1) {
     const int nt = cuda::FindNumThreads(len);
     const int nb = (len + nt - 1) / nt;
     CUDA_KERNEL_CALL(
         IndexSelectSingleKernel, nb, nt, 0, stream, array_data, idx_data, len,
-        arr_len, ret_data);
+        arr_len, ret_data, perm_data);
   } else {
     dim3 block(256, 1);
     while (static_cast<int64_t>(block.x) >= 2 * num_feat) {
@@ -53,11 +56,11 @@ NDArray IndexSelectCPUFromGPU(NDArray array, IdArray index) {
     if (num_feat * sizeof(DType) < 2 * CACHE_LINE_SIZE) {
       CUDA_KERNEL_CALL(
           IndexSelectMultiKernel, grid, block, 0, stream, array_data, num_feat,
-          idx_data, len, arr_len, ret_data);
+          idx_data, len, arr_len, ret_data, perm_data);
     } else {
       CUDA_KERNEL_CALL(
           IndexSelectMultiKernelAligned, grid, block, 0, stream, array_data,
-          num_feat, idx_data, len, arr_len, ret_data);
+          num_feat, idx_data, len, arr_len, ret_data, perm_data);
     }
   }
   return ret;

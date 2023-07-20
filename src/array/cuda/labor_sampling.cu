@@ -15,11 +15,10 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * \file array/cuda/labor_sampling.cu
- * \brief labor sampling
+ * @file array/cuda/labor_sampling.cu
+ * @brief labor sampling
  */
 
-#include <curand_kernel.h>
 #include <dgl/aten/coo.h>
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
@@ -43,6 +42,7 @@
 #include "../../array/cuda/atomic.cuh"
 #include "../../array/cuda/utils.h"
 #include "../../graph/transform/cuda/cuda_map_edges.cuh"
+#include "../../random/continuous_seed.h"
 #include "../../runtime/cuda/cuda_common.h"
 #include "./dgl_cub.cuh"
 #include "./functor.cuh"
@@ -51,6 +51,8 @@
 namespace dgl {
 namespace aten {
 namespace impl {
+
+using dgl::random::continuous_seed;
 
 constexpr int BLOCK_SIZE = 128;
 constexpr int CTA_SIZE = 128;
@@ -66,11 +68,12 @@ struct TransformOp {
   const IdType* subindptr;
   const IdType* indices;
   const IdType* data_arr;
+  bool is_pinned;
   __host__ __device__ auto operator()(IdType idx) {
     const auto in_row = idx_coo[idx];
     const auto row = rows[in_row];
-    const auto in_idx = indptr[row] + idx - subindptr[in_row];
-    const auto u = indices[in_idx];
+    const auto in_idx = indptr[in_row] + idx - subindptr[in_row];
+    const auto u = indices[is_pinned ? idx : in_idx];
     const auto data = data_arr ? data_arr[in_idx] : in_idx;
     return thrust::make_tuple(row, u, data);
   }
@@ -90,13 +93,14 @@ struct TransformOpImp {
   const IdType* subindptr;
   const IdType* indices;
   const IdType* data_arr;
+  bool is_pinned;
   __host__ __device__ auto operator()(IdType idx) {
     const auto ps = probs[idx];
     const auto in_row = idx_coo[idx];
     const auto c = cs[in_row];
     const auto row = rows[in_row];
-    const auto in_idx = indptr[row] + idx - subindptr[in_row];
-    const auto u = indices[in_idx];
+    const auto in_idx = indptr[in_row] + idx - subindptr[in_row];
+    const auto u = indices[is_pinned ? idx : in_idx];
     const auto w = A[in_idx];
     const auto w2 = B[in_idx];
     const auto data = data_arr ? data_arr[in_idx] : in_idx;
@@ -117,28 +121,25 @@ struct StencilOp {
 
 template <typename IdType, typename FloatType, typename ps_t, typename A_t>
 struct StencilOpFused {
-  const uint64_t rand_seed;
+  const continuous_seed seed;
   const IdType* idx_coo;
   const FloatType* cs;
   const ps_t probs;
   const A_t A;
   const IdType* subindptr;
-  const IdType* rows;
   const IdType* indptr;
   const IdType* indices;
   const IdType* nids;
+  bool is_pinned;
   __device__ auto operator()(IdType idx) {
     const auto in_row = idx_coo[idx];
     const auto ps = probs[idx];
     IdType rofs = idx - subindptr[in_row];
-    const IdType row = rows[in_row];
-    const auto in_idx = indptr[row] + rofs;
-    const auto u = indices[in_idx];
+    const auto in_idx = indptr[in_row] + rofs;
+    const auto u = indices[is_pinned ? idx : in_idx];
     const auto t = nids ? nids[u] : u;  // t in the paper
-    curandStatePhilox4_32_10_t rng;
     // rolled random number r_t is a function of the random_seed and t
-    curand_init(123123, rand_seed, t, &rng);
-    const float rnd = curand_uniform(&rng);
+    const float rnd = seed.uniform(t);
     return rnd <= cs[in_row] * A[in_idx] * ps;
   }
 };
@@ -162,7 +163,10 @@ struct TransformOpMinWith1 {
 template <typename IdType>
 struct IndptrFunc {
   const IdType* indptr;
-  __host__ __device__ auto operator()(IdType row) { return indptr[row]; }
+  const IdType* in_deg;
+  __host__ __device__ auto operator()(IdType row) {
+    return indptr[row] + (in_deg ? in_deg[row] : 0);
+  }
 };
 
 template <typename FloatType>
@@ -186,20 +190,22 @@ struct DegreeFunc {
   const IdType num_picks;
   const IdType* rows;
   const IdType* indptr;
-  const FloatType* ds;
   IdType* in_deg;
+  IdType* inrow_indptr;
   FloatType* cs;
   __host__ __device__ auto operator()(IdType tIdx) {
     const auto out_row = rows[tIdx];
-    const auto d = indptr[out_row + 1] - indptr[out_row];
+    const auto indptr_val = indptr[out_row];
+    const auto d = indptr[out_row + 1] - indptr_val;
     in_deg[tIdx] = d;
-    cs[tIdx] = num_picks / (ds ? ds[tIdx] : (FloatType)d);
+    inrow_indptr[tIdx] = indptr_val;
+    cs[tIdx] = num_picks / (FloatType)d;
   }
 };
 
 template <typename IdType, typename FloatType>
 __global__ void _CSRRowWiseOneHopExtractorKernel(
-    const uint64_t rand_seed, const IdType hop_size, const IdType* const rows,
+    const continuous_seed seed, const IdType hop_size,
     const IdType* const indptr, const IdType* const subindptr,
     const IdType* const indices, const IdType* const idx_coo,
     const IdType* const nids, const FloatType* const A, FloatType* const rands,
@@ -207,29 +213,68 @@ __global__ void _CSRRowWiseOneHopExtractorKernel(
   IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
 
-  curandStatePhilox4_32_10_t rng;
-
   while (tx < hop_size) {
     IdType rpos = idx_coo[tx];
     IdType rofs = tx - subindptr[rpos];
-    const IdType row = rows[rpos];
-    const auto in_idx = indptr[row] + rofs;
-    const auto u = indices[in_idx];
-    hop[tx] = u;
-    const auto v = nids ? nids[u] : u;
-    // 123123 is just a number with no significance.
-    curand_init(123123, rand_seed, v, &rng);
-    const float rnd = curand_uniform(&rng);
+    const auto in_idx = indptr[rpos] + rofs;
+    const auto not_pinned = indices != hop;
+    const auto u = indices[not_pinned ? in_idx : tx];
+    if (not_pinned) hop[tx] = u;
+    const auto t = nids ? nids[u] : u;
     if (A) A_l[tx] = A[in_idx];
-    rands[tx] = (FloatType)rnd;
+    // rolled random number r_t is a function of the random_seed and t
+    rands[tx] = (FloatType)seed.uniform(t);
+    tx += stride_x;
+  }
+}
+
+constexpr int CACHE_LINE_SIZE = 128;
+
+template <typename IdType>
+struct AlignmentFunc {
+  static_assert(CACHE_LINE_SIZE % sizeof(IdType) == 0);
+  const IdType* in_deg;
+  const int64_t* perm;
+  IdType num_rows;
+  __host__ __device__ auto operator()(IdType row) {
+    constexpr int num_elements = CACHE_LINE_SIZE / sizeof(IdType);
+    return in_deg[perm ? perm[row % num_rows] : row] + num_elements - 1;
+  }
+};
+
+template <typename IdType>
+__global__ void _CSRRowWiseOneHopExtractorAlignedKernel(
+    const IdType hop_size, const IdType num_rows, const IdType* const indptr,
+    const IdType* const subindptr, const IdType* const subindptr_aligned,
+    const IdType* const indices, IdType* const hop, const int64_t* const perm) {
+  IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const int stride_x = gridDim.x * blockDim.x;
+
+  while (tx < hop_size) {
+    const IdType rpos_ =
+        dgl::cuda::_UpperBound(subindptr_aligned, num_rows, tx) - 1;
+    const IdType rpos = perm ? perm[rpos_] : rpos_;
+    const auto out_row = subindptr[rpos];
+    const auto d = subindptr[rpos + 1] - out_row;
+    const int offset =
+        ((uint64_t)(indices + indptr[rpos] - subindptr_aligned[rpos_]) %
+         CACHE_LINE_SIZE) /
+        sizeof(IdType);
+    const IdType rofs = tx - subindptr_aligned[rpos_] - offset;
+    if (rofs >= 0 && rofs < d) {
+      const auto in_idx = indptr[rpos] + rofs;
+      assert((uint64_t)(indices + in_idx - tx) % CACHE_LINE_SIZE == 0);
+      const auto u = indices[in_idx];
+      hop[out_row + rofs] = u;
+    }
     tx += stride_x;
   }
 }
 
 template <typename IdType, typename FloatType, int BLOCK_CTAS, int TILE_SIZE>
 __global__ void _CSRRowWiseLayerSampleDegreeKernel(
-    const IdType num_picks, const IdType num_rows, const IdType* const rows,
-    FloatType* const cs, const FloatType* const ds, const FloatType* const d2s,
+    const IdType num_picks, const IdType num_rows, FloatType* const cs,
+    const FloatType* const ds, const FloatType* const d2s,
     const IdType* const indptr, const FloatType* const probs,
     const FloatType* const A, const IdType* const subindptr) {
   typedef cub::BlockReduce<FloatType, BLOCK_SIZE> BlockReduce;
@@ -247,21 +292,19 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
   constexpr FloatType ONE = 1;
 
   while (out_row < last_row) {
-    const auto row = rows[out_row];
-
-    const auto in_row_start = indptr[row];
+    const auto in_row_start = indptr[out_row];
     const auto out_row_start = subindptr[out_row];
 
-    const IdType degree = indptr[row + 1] - in_row_start;
+    const IdType degree = subindptr[out_row + 1] - out_row_start;
 
     if (degree > 0) {
       // stands for k in in arXiv:2210.13339, i.e. fanout
       const auto k = min(num_picks, degree);
       // slightly better than NS
-      const FloatType d_ = ds ? ds[row] : degree;
+      const FloatType d_ = ds ? ds[out_row] : degree;
       // stands for right handside of Equation (22) in arXiv:2210.13339
       FloatType var_target =
-          d_ * d_ / k + (ds ? d2s[row] - d_ * d_ / degree : 0);
+          d_ * d_ / k + (ds ? d2s[out_row] - d_ * d_ / degree : 0);
 
       auto c = cs[out_row];
       const int num_valid = min(degree, (IdType)CTA_SIZE);
@@ -273,7 +316,7 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
           for (int idx = threadIdx.x; idx < degree; idx += CTA_SIZE) {
             const auto w = A[in_row_start + idx];
             const auto ps = probs ? probs[out_row_start + idx] : w;
-            var_1 += w * w / min(ONE, c * ps);
+            var_1 += w > 0 ? w * w / min(ONE, c * ps) : 0;
           }
         } else {
           for (int idx = threadIdx.x; idx < degree; idx += CTA_SIZE) {
@@ -298,12 +341,20 @@ __global__ void _CSRRowWiseLayerSampleDegreeKernel(
 
 }  // namespace
 
+template <typename IdType>
+int log_size(const IdType size) {
+  if (size <= 0) return 0;
+  for (int i = 0; i < static_cast<int>(sizeof(IdType)) * 8; i++)
+    if (((size - 1) >> i) == 0) return i;
+  return sizeof(IdType) * 8;
+}
+
 template <typename IdType, typename FloatType, typename exec_policy_t>
 void compute_importance_sampling_probabilities(
     CSRMatrix mat, const IdType hop_size, cudaStream_t stream,
-    const uint64_t random_seed, const IdType num_rows, const IdType* rows,
-    const IdType* indptr, const IdType* subindptr, const IdType* indices,
-    IdArray idx_coo_arr, const IdType* nids,
+    const continuous_seed seed, const IdType num_rows, const IdType* indptr,
+    const IdType* subindptr, const IdType* indices, IdArray idx_coo_arr,
+    const IdType* nids,
     FloatArray cs_arr,  // holds the computed cs values, has size num_rows
     const bool weighted, const FloatType* A, const FloatType* ds,
     const FloatType* d2s, const IdType num_picks, DGLContext ctx,
@@ -322,19 +373,15 @@ void compute_importance_sampling_probabilities(
                            : NullArray();
   auto A_l = A_l_arr.Ptr<FloatType>();
 
-  const uint64_t max_log_num_vertices = [&]() -> int {
-    for (int i = 0; i < static_cast<int>(sizeof(IdType)) * 8; i++)
-      if (mat.num_cols <= ((IdType)1) << i) return i;
-    return sizeof(IdType) * 8;
-  }();
+  const int max_log_num_vertices = log_size(mat.num_cols);
 
   {  // extracts the onehop neighborhood cols to a contiguous range into hop_1
     const dim3 block(BLOCK_SIZE);
     const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
     CUDA_KERNEL_CALL(
         (_CSRRowWiseOneHopExtractorKernel<IdType, FloatType>), grid, block, 0,
-        stream, random_seed, hop_size, rows, indptr, subindptr, indices,
-        idx_coo, nids, weighted ? A : nullptr, rands, hop_1, A_l);
+        stream, seed, hop_size, indptr, subindptr, indices, idx_coo, nids,
+        weighted ? A : nullptr, rands, hop_1, A_l);
   }
   int64_t hop_uniq_size = 0;
   IdArray hop_new_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
@@ -445,7 +492,7 @@ void compute_importance_sampling_probabilities(
       CUDA_KERNEL_CALL(
           (_CSRRowWiseLayerSampleDegreeKernel<
               IdType, FloatType, BLOCK_CTAS, TILE_SIZE>),
-          grid, block, 0, stream, (IdType)num_picks, num_rows, rows, cs,
+          grid, block, 0, stream, (IdType)num_picks, num_rows, cs,
           weighted ? ds : nullptr, weighted ? d2s : nullptr, indptr,
           probs_found, A, subindptr);
     }
@@ -467,7 +514,7 @@ template <DGLDeviceType XPU, typename IdType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CSRMatrix mat, IdArray rows_arr, const int64_t num_picks,
     FloatArray prob_arr, const int importance_sampling, IdArray random_seed_arr,
-    IdArray NIDs) {
+    float seed2_contribution, IdArray NIDs) {
   const bool weighted = !IsNullArray(prob_arr);
 
   const auto& ctx = rows_arr->ctx;
@@ -484,10 +531,12 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   IdType* const nids = IsNullArray(NIDs) ? nullptr : NIDs.Ptr<IdType>();
   FloatType* const A = prob_arr.Ptr<FloatType>();
 
-  IdType* const indptr = mat.indptr.Ptr<IdType>();
-  IdType* const indices = mat.indices.Ptr<IdType>();
+  IdType* const indptr_ = mat.indptr.Ptr<IdType>();
+  IdType* const indices_ = mat.indices.Ptr<IdType>();
   IdType* const data = CSRHasData(mat) ? mat.data.Ptr<IdType>() : nullptr;
 
+  // Read indptr only once in case it is pinned and access is slow.
+  auto indptr = allocator.alloc_unique<IdType>(num_rows);
   // compute in-degrees
   auto in_deg = allocator.alloc_unique<IdType>(num_rows + 1);
   // cs stands for c_s in arXiv:2210.13339
@@ -504,11 +553,17 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
                            : NullArray();
   auto d2s = d2s_arr.Ptr<FloatType>();
 
+  thrust::counting_iterator<IdType> iota(0);
+  thrust::for_each(
+      exec_policy, iota, iota + num_rows,
+      DegreeFunc<IdType, FloatType>{
+          (IdType)num_picks, rows, indptr_, in_deg.get(), indptr.get(), cs});
+
   if (weighted) {
-    auto b_offsets =
-        thrust::make_transform_iterator(rows, IndptrFunc<IdType>{indptr});
-    auto e_offsets =
-        thrust::make_transform_iterator(rows, IndptrFunc<IdType>{indptr + 1});
+    auto b_offsets = thrust::make_transform_iterator(
+        iota, IndptrFunc<IdType>{indptr.get(), nullptr});
+    auto e_offsets = thrust::make_transform_iterator(
+        iota, IndptrFunc<IdType>{indptr.get(), in_deg.get()});
 
     auto A_A2 = thrust::make_transform_iterator(A, SquareFunc<FloatType>{});
     auto ds_d2s = thrust::make_zip_iterator(ds, d2s);
@@ -523,13 +578,6 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
         e_offsets, TupleSum{}, thrust::make_tuple((FloatType)0, (FloatType)0),
         stream));
   }
-
-  thrust::counting_iterator<IdType> iota(0);
-  thrust::for_each(
-      exec_policy, iota, iota + num_rows,
-      DegreeFunc<IdType, FloatType>{
-          (IdType)num_picks, rows, indptr, weighted ? ds : nullptr,
-          in_deg.get(), cs});
 
   // fill subindptr
   IdArray subindptr_arr = NewIdArray(num_rows + 1, ctx, sizeof(IdType) * 8);
@@ -560,6 +608,38 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
   auto idx_coo = idx_coo_arr.Ptr<IdType>();
 
   auto hop_1 = hop_arr.Ptr<IdType>();
+  const bool is_pinned = mat.indices.IsPinned();
+  if (is_pinned) {
+    const auto res = Sort(rows_arr, log_size(mat.num_rows));
+    const int64_t* perm = static_cast<int64_t*>(res.second->data);
+
+    IdType hop_size;  // Shadows the original one as this is temporary
+    auto subindptr_aligned = allocator.alloc_unique<IdType>(num_rows + 1);
+    {
+      auto modified_in_deg = thrust::make_transform_iterator(
+          iota, AlignmentFunc<IdType>{in_deg.get(), perm, num_rows});
+      size_t prefix_temp_size = 0;
+      CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+          nullptr, prefix_temp_size, modified_in_deg, subindptr_aligned.get(),
+          num_rows + 1, stream));
+      auto temp = allocator.alloc_unique<char>(prefix_temp_size);
+      CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+          temp.get(), prefix_temp_size, modified_in_deg,
+          subindptr_aligned.get(), num_rows + 1, stream));
+
+      device->CopyDataFromTo(
+          subindptr_aligned.get(), num_rows * sizeof(hop_size), &hop_size, 0,
+          sizeof(hop_size), ctx, DGLContext{kDGLCPU, 0}, mat.indptr->dtype);
+    }
+    const dim3 block(BLOCK_SIZE);
+    const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    CUDA_KERNEL_CALL(
+        (_CSRRowWiseOneHopExtractorAlignedKernel<IdType>), grid, block, 0,
+        stream, hop_size, num_rows, indptr.get(), subindptr,
+        subindptr_aligned.get(), indices_, hop_1, perm);
+  }
+  const auto indices = is_pinned ? hop_1 : indices_;
+
   auto rands =
       allocator.alloc_unique<FloatType>(importance_sampling ? hop_size : 1);
   auto probs_found =
@@ -575,19 +655,19 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CUDA_KERNEL_CALL(
         (_CSRRowWiseLayerSampleDegreeKernel<
             IdType, FloatType, BLOCK_CTAS, TILE_SIZE>),
-        grid, block, 0, stream, (IdType)num_picks, num_rows, rows, cs, ds, d2s,
-        indptr, nullptr, A, subindptr);
+        grid, block, 0, stream, (IdType)num_picks, num_rows, cs, ds, d2s,
+        indptr.get(), nullptr, A, subindptr);
   }
 
-  const uint64_t random_seed =
+  const continuous_seed random_seed =
       IsNullArray(random_seed_arr)
-          ? RandomEngine::ThreadLocal()->RandInt(1000000000)
-          : random_seed_arr.Ptr<int64_t>()[0];
+          ? continuous_seed(RandomEngine::ThreadLocal()->RandInt(1000000000))
+          : continuous_seed(random_seed_arr, seed2_contribution);
 
   if (importance_sampling)
     compute_importance_sampling_probabilities<
         IdType, FloatType, decltype(exec_policy)>(
-        mat, hop_size, stream, random_seed, num_rows, rows, indptr, subindptr,
+        mat, hop_size, stream, random_seed, num_rows, indptr.get(), subindptr,
         indices, idx_coo_arr, nids, cs_arr, weighted, A, ds, d2s,
         (IdType)num_picks, ctx, allocator, exec_policy, importance_sampling,
         hop_1, rands.get(), probs_found.get());
@@ -621,8 +701,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
             output,
             TransformOpImp<
                 IdType, FloatType, FloatType*, FloatType*, decltype(one)>{
-                probs_found.get(), A, one, idx_coo, rows, cs, indptr, subindptr,
-                indices, data});
+                probs_found.get(), A, one, idx_coo, rows, cs, indptr.get(),
+                subindptr, indices, data, is_pinned});
         auto stencil =
             thrust::make_zip_iterator(idx_coo, probs_found.get(), rands.get());
         num_edges =
@@ -635,8 +715,8 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
             output,
             TransformOpImp<
                 IdType, FloatType, FloatType*, decltype(one), decltype(one)>{
-                probs_found.get(), one, one, idx_coo, rows, cs, indptr,
-                subindptr, indices, data});
+                probs_found.get(), one, one, idx_coo, rows, cs, indptr.get(),
+                subindptr, indices, data, is_pinned});
         auto stencil =
             thrust::make_zip_iterator(idx_coo, probs_found.get(), rands.get());
         num_edges =
@@ -654,12 +734,12 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
             output,
             TransformOpImp<
                 IdType, FloatType, decltype(one), FloatType*, FloatType*>{
-                one, A, A, idx_coo, rows, cs, indptr, subindptr, indices,
-                data});
+                one, A, A, idx_coo, rows, cs, indptr.get(), subindptr, indices,
+                data, is_pinned});
         const auto pred =
             StencilOpFused<IdType, FloatType, decltype(one), FloatType*>{
-                random_seed, idx_coo, cs,     one,     A,
-                subindptr,   rows,    indptr, indices, nids};
+                random_seed, idx_coo,      cs,      one,  A,
+                subindptr,   indptr.get(), indices, nids, is_pinned};
         num_edges = thrust::copy_if(
                         exec_policy, iota, iota + hop_size, iota,
                         transformed_output, pred) -
@@ -669,11 +749,12 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
             picked_row_data, picked_col_data, picked_idx_data);
         auto transformed_output = thrust::make_transform_output_iterator(
             output, TransformOp<IdType>{
-                        idx_coo, rows, indptr, subindptr, indices, data});
+                        idx_coo, rows, indptr.get(), subindptr, indices, data,
+                        is_pinned});
         const auto pred =
             StencilOpFused<IdType, FloatType, decltype(one), decltype(one)>{
-                random_seed, idx_coo, cs,     one,     one,
-                subindptr,   rows,    indptr, indices, nids};
+                random_seed, idx_coo,      cs,      one,  one,
+                subindptr,   indptr.get(), indices, nids, is_pinned};
         num_edges = thrust::copy_if(
                         exec_policy, iota, iota + hop_size, iota,
                         transformed_output, pred) -
@@ -737,16 +818,16 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
 
 template std::pair<COOMatrix, FloatArray>
 CSRLaborSampling<kDGLCUDA, int32_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, IdArray);
+    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, float, IdArray);
 template std::pair<COOMatrix, FloatArray>
 CSRLaborSampling<kDGLCUDA, int64_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, IdArray);
+    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, float, IdArray);
 template std::pair<COOMatrix, FloatArray>
 CSRLaborSampling<kDGLCUDA, int32_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, IdArray);
+    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, float, IdArray);
 template std::pair<COOMatrix, FloatArray>
 CSRLaborSampling<kDGLCUDA, int64_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, IdArray);
+    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, float, IdArray);
 
 }  // namespace impl
 }  // namespace aten
