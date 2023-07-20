@@ -223,5 +223,27 @@ ConcurrentIdHashMap<IdType>::AttemptInsertAt(int64_t pos, IdType key) {
 template class ConcurrentIdHashMap<int32_t>;
 template class ConcurrentIdHashMap<int64_t>;
 
+template <typename IdType>
+bool BoolCompareAndSwap(IdType* ptr) {
+#ifdef _MSC_VER
+  if (sizeof(IdType) == 4) {
+    return _InterlockedCompareExchange(reinterpret_cast<LONG*>(ptr), 0, -1) ==
+           -1;
+  } else if (sizeof(IdType) == 8) {
+    return _InterlockedCompareExchange64(
+               reinterpret_cast<LONGLONG*>(ptr), 0, -1) == -1;
+  } else {
+    LOG(FATAL) << "ID can only be int32 or int64";
+  }
+#elif __GNUC__  // _MSC_VER
+  return __sync_bool_compare_and_swap(ptr, -1, 0);
+#else           // _MSC_VER
+#error "CompareAndSwap is not supported on this platform."
+#endif  // _MSC_VER
+}
+
+template bool BoolCompareAndSwap<int32_t>(int32_t*);
+template bool BoolCompareAndSwap<int64_t>(int64_t*);
+
 }  // namespace aten
 }  // namespace dgl

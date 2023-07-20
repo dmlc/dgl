@@ -120,13 +120,13 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
     # 5. Save the CSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
     output_config["graph_topology"]["type"] = "CSCSamplingGraph"
-    output_config["graph_topology"]["path"] = (
+    output_config["graph_topology"]["path"] = str(
         processed_dir_prefix / "csc_sampling_graph.tar"
     )
 
     save_csc_sampling_graph(
         csc_sampling_graph,
-        dataset_path / output_config["graph_topology"]["path"],
+        str(dataset_path / output_config["graph_topology"]["path"]),
     )
     del output_config["graph"]
 
