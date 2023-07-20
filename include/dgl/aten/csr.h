@@ -572,6 +572,72 @@ COOMatrix CSRRowWiseSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples,
     NDArray prob_or_mask = NDArray(), bool replace = true);
 
+/*!
+ * @brief Randomly select a fixed number of non-zero entries along each given
+ * row independently.
+ *
+ * The function performs random choices along each row independently.
+ * The picked indices are returned in the form of a CSR matrix, with
+ * additional IdArray that is an extended version of CSR's index pointers.
+ *
+ * With template parameter set to True rows are also saved as new seed nodes and
+ * mapped
+ *
+ * If replace is false and a row has fewer non-zero values than num_samples,
+ * all the values are picked.
+ *
+ * Examples:
+ *
+ * // csr.num_rows = 4;
+ * // csr.num_cols = 4;
+ * // csr.indptr = [0, 2, 3, 3, 5]
+ * // csr.indices = [0, 1, 1, 2, 3]
+ * // csr.data = [2, 3, 0, 1, 4]
+ * CSRMatrix csr = ...;
+ * IdArray rows = ... ; // [1, 3]
+ * IdArray seed_mapping = [-1, -1, -1, -1];
+ * std::vector<IdType> new_seed_nodes = {};
+ *
+ * std::pair<CSRMatrix, IdArray> sampled = CSRRowWiseSamplingFused<
+ *                                         typename IdType, True>(
+ *                                         csr, rows, seed_mapping,
+ *                                         new_seed_nodes, 2,
+ *                                         FloatArray(), false);
+ * // possible sampled csr matrix:
+ * // sampled.first.num_rows = 2
+ * // sampled.first.num_cols = 3
+ * // sampled.first.indptr = [0, 1, 3]
+ * // sampled.first.indices = [1, 2, 3]
+ * // sampled.first.data = [0, 1, 4]
+ * // sampled.second = [0, 1, 1]
+ * // seed_mapping = [-1, 0, -1, 1];
+ * // new_seed_nodes = {1, 3};
+ *
+ * @tparam IdType Graph's index data type, can be int32_t or int64_t
+ * @tparam map_seed_nodes If set for true we map and copy rows to new_seed_nodes
+ * @param mat Input CSR matrix.
+ * @param rows Rows to sample from.
+ * @param seed_mapping Mapping array used if map_seed_nodes=true. If so each row
+ * from rows will be set to its position e.g. mapping[rows[i]] = i.
+ * @param new_seed_nodes Vector used if map_seed_nodes=true. If so it will
+ * contain rows.
+ * @param rows Rows to sample from.
+ * @param num_samples Number of samples
+ * @param prob_or_mask Unnormalized probability array or mask array.
+ *                     Should be of the same length as the data array.
+ *                     If an empty array is provided, assume uniform.
+ * @param replace True if sample with replacement
+ * @return A CSRMatrix storing the picked row, col and data indices,
+ *         COO version of picked rows
+ * @note The edges of the entire graph must be ordered by their edge types,
+ *       rows must be unique
+ */
+template <typename IdType, bool map_seed_nodes>
+std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused(
+    CSRMatrix mat, IdArray rows, IdArray seed_mapping,
+    std::vector<IdType>* new_seed_nodes, int64_t num_samples,
+    NDArray prob_or_mask = NDArray(), bool replace = true);
+
 /**
  * @brief Randomly select a fixed number of non-zero entries for each edge type
  *        along each given row independently.

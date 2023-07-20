@@ -1,14 +1,19 @@
 """Neighbor sampling APIs"""
 
+import os
+
+import torch
+
 from .. import backend as F, ndarray as nd, utils
 from .._ffi.function import _init_api
 from ..base import DGLError, EID
-from ..heterograph import DGLGraph
+from ..heterograph import DGLBlock, DGLGraph
 from .utils import EidExcluder
 
 __all__ = [
     "sample_etype_neighbors",
     "sample_neighbors",
+    "sample_neighbors_fused",
     "sample_neighbors_biased",
     "select_topk",
 ]
@@ -379,6 +384,126 @@ def sample_neighbors(
     return frontier if output_device is None else frontier.to(output_device)
 
 
+def sample_neighbors_fused(
+    g,
+    nodes,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    replace=False,
+    copy_ndata=True,
+    copy_edata=True,
+    exclude_edges=None,
+    mapping=None,
+):
+    """Sample neighboring edges of the given nodes and return the induced subgraph.
+
+    For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
+    will be randomly chosen.  The graph returned will then contain all the nodes in the
+    original graph, but only the sampled edges. Nodes will be renumbered starting from id 0,
+    which would be new node id of first seed node.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.  Can be either on CPU or GPU.
+    nodes : tensor or dict
+        Node IDs to sample neighbors from.
+
+        This argument can take a single ID tensor or a dictionary of node types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
+    fanout : int or dict[etype, int]
+        The number of edges to be sampled for each node on each edge type.
+
+        This argument can take a single int or a dictionary of edge types and ints.
+        If a single int is given, DGL will sample this number of edges for each node for
+        every edge type.
+
+        If -1 is given for a single edge type, all the neighboring edges with that edge
+        type and non-zero probability will be selected.
+    edge_dir : str, optional
+        Determines whether to sample inbound or outbound edges.
+
+        Can take either ``in`` for inbound edges or ``out`` for outbound edges.
+    prob : str, optional
+        Feature name used as the (unnormalized) probabilities associated with each
+        neighboring edge of a node.  The feature must have only one element for each
+        edge.
+
+        The features must be non-negative floats or boolean.  Otherwise, the result
+        will be undefined.
+    exclude_edges: tensor or dict
+        Edge IDs to exclude during sampling neighbors for the seed nodes.
+
+        This argument can take a single ID tensor or a dictionary of edge types and ID tensors.
+        If a single tensor is given, the graph must only have one type of nodes.
+    replace : bool, optional
+        If True, sample with replacement.
+    copy_ndata: bool, optional
+        If True, the node features of the new graph are copied from
+        the original graph. If False, the new graph will not have any
+        node features.
+
+        (Default: True)
+    copy_edata: bool, optional
+        If True, the edge features of the new graph are copied from
+        the original graph.  If False, the new graph will not have any
+        edge features.
+
+        (Default: False)
+
+    mapping : dictionary, optional
+        Used by fused version of NeighborSampler. To avoid constant data allocation
+        provide empty dictionary ({}) that will be allocated once with proper data and reused
+        by each function call
+
+        (Default: None)
+    Returns
+    -------
+    DGLGraph
+        A sampled subgraph containing only the sampled neighboring edges.
+
+    Notes
+    -----
+    If :attr:`copy_ndata` or :attr:`copy_edata` is True, same tensors are used as
+    the node or edge features of the original graph and the new graph.
+    As a result, users should avoid performing in-place operations
+    on the node features of the new graph to avoid feature corruption.
+
+    """
+    if not g.is_pinned():
+        frontier = _sample_neighbors(
+            g,
+            nodes,
+            fanout,
+            edge_dir=edge_dir,
+            prob=prob,
+            replace=replace,
+            copy_ndata=copy_ndata,
+            copy_edata=copy_edata,
+            exclude_edges=exclude_edges,
+            fused=True,
+            mapping=mapping,
+        )
+    else:
+        frontier = _sample_neighbors(
+            g,
+            nodes,
+            fanout,
+            edge_dir=edge_dir,
+            prob=prob,
+            replace=replace,
+            copy_ndata=copy_ndata,
+            copy_edata=copy_edata,
+            fused=True,
+            mapping=mapping,
+        )
+        if exclude_edges is not None:
+            eid_excluder = EidExcluder(exclude_edges)
+            frontier = eid_excluder(frontier)
+    return frontier
+
+
 def _sample_neighbors(
     g,
     nodes,
@@ -390,6 +515,8 @@ def _sample_neighbors(
     copy_edata=True,
     _dist_training=False,
     exclude_edges=None,
+    fused=False,
+    mapping=None,
 ):
     if not isinstance(nodes, dict):
         if len(g.ntypes) > 1:
@@ -446,17 +573,64 @@ def _sample_neighbors(
             else:
                 excluded_edges_all_t.append(nd.array([], ctx=ctx))
 
-    subgidx = _CAPI_DGLSampleNeighbors(
-        g._graph,
-        nodes_all_types,
-        fanout_array,
-        edge_dir,
-        prob_arrays,
-        excluded_edges_all_t,
-        replace,
-    )
-    induced_edges = subgidx.induced_edges
-    ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
+    if fused:
+        if _dist_training:
+            raise DGLError(
+                "distributed training not supported in fused sampling"
+            )
+        cpu = F.device_type(g.device) == "cpu"
+        if isinstance(nodes, dict):
+            for ntype in list(nodes.keys()):
+                if not cpu:
+                    break
+                cpu = cpu and F.device_type(nodes[ntype].device) == "cpu"
+        else:
+            cpu = cpu and F.device_type(nodes.device) == "cpu"
+        if not cpu or F.backend_name != "pytorch":
+            raise DGLError(
+                "Only PyTorch backend and cpu is supported in fused sampling"
+            )
+
+        if mapping is None:
+            mapping = {}
+        mapping_name = "__mapping" + str(os.getpid())
+        if mapping_name not in mapping.keys():
+            mapping[mapping_name] = [
+                torch.LongTensor(g.num_nodes(ntype)).fill_(-1)
+                for ntype in g.ntypes
+            ]
+
+        subgidx, induced_nodes, induced_edges = _CAPI_DGLSampleNeighborsFused(
+            g._graph,
+            nodes_all_types,
+            [F.to_dgl_nd(m) for m in mapping[mapping_name]],
+            fanout_array,
+            edge_dir,
+            prob_arrays,
+            excluded_edges_all_t,
+            replace,
+        )
+        for mapping_vector, src_nodes in zip(
+            mapping[mapping_name], induced_nodes
+        ):
+            mapping_vector[F.from_dgl_nd(src_nodes).type(F.int64)] = -1
+
+        new_ntypes = (g.ntypes, g.ntypes)
+        ret = DGLBlock(subgidx, new_ntypes, g.etypes)
+        assert ret.is_unibipartite
+
+    else:
+        subgidx = _CAPI_DGLSampleNeighbors(
+            g._graph,
+            nodes_all_types,
+            fanout_array,
+            edge_dir,
+            prob_arrays,
+            excluded_edges_all_t,
+            replace,
+        )
+        ret = DGLGraph(subgidx.graph, g.ntypes, g.etypes)
+        induced_edges = subgidx.induced_edges
 
     # handle features
     # (TODO) (BarclayII) DGL distributed fails with bus error, freezes, or other
@@ -465,12 +639,31 @@ def _sample_neighbors(
     # only set the edge IDs.
     if not _dist_training:
         if copy_ndata:
-            node_frames = utils.extract_node_subframes(g, device)
-            utils.set_new_frames(ret, node_frames=node_frames)
+            if fused:
+                src_node_ids = [F.from_dgl_nd(src) for src in induced_nodes]
+                dst_node_ids = [
+                    utils.toindex(
+                        nodes.get(ntype, []), g._idtype_str
+                    ).tousertensor(ctx=F.to_backend_ctx(g._graph.ctx))
+                    for ntype in g.ntypes
+                ]
+                node_frames = utils.extract_node_subframes_for_block(
+                    g, src_node_ids, dst_node_ids
+                )
+                utils.set_new_frames(ret, node_frames=node_frames)
+            else:
+                node_frames = utils.extract_node_subframes(g, device)
+                utils.set_new_frames(ret, node_frames=node_frames)
 
         if copy_edata:
-            edge_frames = utils.extract_edge_subframes(g, induced_edges)
-            utils.set_new_frames(ret, edge_frames=edge_frames)
+            if fused:
+                edge_ids = [F.from_dgl_nd(eid) for eid in induced_edges]
+                edge_frames = utils.extract_edge_subframes(g, edge_ids)
+                utils.set_new_frames(ret, edge_frames=edge_frames)
+            else:
+                edge_frames = utils.extract_edge_subframes(g, induced_edges)
+                utils.set_new_frames(ret, edge_frames=edge_frames)
+
     else:
         for i, etype in enumerate(ret.canonical_etypes):
             ret.edges[etype].data[EID] = induced_edges[i]
@@ -479,6 +672,7 @@ def _sample_neighbors(
 
 
 DGLGraph.sample_neighbors = utils.alias_func(sample_neighbors)
+DGLGraph.sample_neighbors_fused = utils.alias_func(sample_neighbors_fused)
 
 
 def sample_neighbors_biased(
