@@ -87,7 +87,8 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> SampleLabors(
     const std::vector<int64_t>& fanouts, EdgeDir dir,
     const std::vector<FloatArray>& prob,
     const std::vector<IdArray>& exclude_edges, const int importance_sampling,
-    const IdArray random_seed, const std::vector<IdArray>& NIDs) {
+    const IdArray random_seed, const float seed2_contribution,
+    const std::vector<IdArray>& NIDs) {
   // sanity check
   CHECK_EQ(nodes.size(), hg->NumVertexTypes())
       << "Number of node ID tensors must match the number of node types.";
@@ -133,13 +134,14 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> SampleLabors(
             auto fs = aten::COOLaborSampling(
                 aten::COOTranspose(hg->GetCOOMatrix(etype)), nodes_ntype,
                 fanout, prob[etype], importance_sampling, random_seed,
-                NIDs_ntype);
+                seed2_contribution, NIDs_ntype);
             sampled_coo = aten::COOTranspose(fs.first);
             importances = fs.second;
           } else {
             std::tie(sampled_coo, importances) = aten::COOLaborSampling(
                 hg->GetCOOMatrix(etype), nodes_ntype, fanout, prob[etype],
-                importance_sampling, random_seed, NIDs_ntype);
+                importance_sampling, random_seed, seed2_contribution,
+                NIDs_ntype);
           }
           break;
         case SparseFormat::kCSR:
@@ -147,13 +149,13 @@ std::pair<HeteroSubgraph, std::vector<FloatArray>> SampleLabors(
               << "Cannot sample out edges on CSC matrix.";
           std::tie(sampled_coo, importances) = aten::CSRLaborSampling(
               hg->GetCSRMatrix(etype), nodes_ntype, fanout, prob[etype],
-              importance_sampling, random_seed, NIDs_ntype);
+              importance_sampling, random_seed, seed2_contribution, NIDs_ntype);
           break;
         case SparseFormat::kCSC:
           CHECK(dir == EdgeDir::kIn) << "Cannot sample in edges on CSR matrix.";
           std::tie(sampled_coo, importances) = aten::CSRLaborSampling(
               hg->GetCSCMatrix(etype), nodes_ntype, fanout, prob[etype],
-              importance_sampling, random_seed, NIDs_ntype);
+              importance_sampling, random_seed, seed2_contribution, NIDs_ntype);
           sampled_coo = aten::COOTranspose(sampled_coo);
           break;
         default:
@@ -523,7 +525,8 @@ DGL_REGISTER_GLOBAL("sampling.labor._CAPI_DGLSampleLabors")
       const auto& exclude_edges = ListValueToVector<IdArray>(args[5]);
       const int importance_sampling = args[6];
       const IdArray random_seed = args[7];
-      const auto& NIDs = ListValueToVector<IdArray>(args[8]);
+      const double seed2_contribution = args[8];
+      const auto& NIDs = ListValueToVector<IdArray>(args[9]);
 
       CHECK(dir_str == "in" || dir_str == "out")
           << "Invalid edge direction. Must be \"in\" or \"out\".";
@@ -533,7 +536,7 @@ DGL_REGISTER_GLOBAL("sampling.labor._CAPI_DGLSampleLabors")
 
       auto&& subg_importances = sampling::SampleLabors(
           hg.sptr(), nodes, fanouts, dir, prob, exclude_edges,
-          importance_sampling, random_seed, NIDs);
+          importance_sampling, random_seed, seed2_contribution, NIDs);
       *subg_ptr = subg_importances.first;
       List<Value> ret_val;
       ret_val.push_back(Value(subg_ptr));

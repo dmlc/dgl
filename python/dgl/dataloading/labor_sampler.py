@@ -17,6 +17,8 @@
 #
 
 """Data loading components for labor sampling"""
+from numpy.random import default_rng
+
 from .. import backend as F
 from ..base import EID, NID
 from ..random import choice
@@ -67,6 +69,10 @@ class LaborSampler(BlockSampler):
         Specifies whether different layers should use same random variates.
         Results into a reduction in the number of vertices sampled, but may
         degrade the quality slightly.
+    batch_dependency : int, default ``1``
+        Specifies whether different minibatches should use similar random
+        variates. Results in a higher temporal access locality of sampled
+        vertices, but may degrade the quality slightly.
     prefetch_node_feats : list[str] or dict[ntype, list[str]], optional
         The source node data to prefetch for the first MFG, corresponding to the
         input node features necessary for the first GNN layer.
@@ -139,6 +145,7 @@ class LaborSampler(BlockSampler):
         prob=None,
         importance_sampling=0,
         layer_dependency=False,
+        batch_dependency=1,
         prefetch_node_feats=None,
         prefetch_labels=None,
         prefetch_edge_feats=None,
@@ -155,7 +162,13 @@ class LaborSampler(BlockSampler):
         self.prob = prob
         self.importance_sampling = importance_sampling
         self.layer_dependency = layer_dependency
-        self.set_seed()
+        self.cnt = F.zeros(2, F.int64, F.cpu())
+        self.cnt[0] = -1
+        self.cnt[1] = batch_dependency
+        self.random_seed = F.zeros(
+            2 if self.cnt[1] > 1 else 1, F.int64, F.cpu()
+        )
+        self.set_seed(None if batch_dependency > 0 else choice(1e18, 1).item())
 
     def set_seed(self, random_seed=None):
         """Updates the underlying seed for the sampler
@@ -184,9 +197,23 @@ class LaborSampler(BlockSampler):
             The random seed to be used for next sampling call.
         """
         if random_seed is None:
-            self.random_seed = choice(1e18, 1)
+            self.cnt[0] += 1
+            if self.cnt[1] > 0 and self.cnt[0] % self.cnt[1] == 0:
+                if self.cnt[0] <= 0 or self.cnt[1] <= 1:
+                    if not hasattr(self, "rng"):
+                        self.rng = default_rng(choice(1e18, 1).item())
+                    self.random_seed[0] = self.rng.integers(1e18)
+                    if self.cnt[1] > 1:
+                        self.random_seed[1] = self.rng.integers(1e18)
+                else:
+                    self.random_seed[0] = self.random_seed[1]
+                    self.random_seed[1] = self.rng.integers(1e18)
         else:
-            self.random_seed = F.tensor(random_seed, F.int64)
+            self.rng = default_rng(random_seed)
+            self.random_seed[0] = self.rng.integers(1e18)
+            if self.cnt[1] > 1:
+                self.random_seed[1] = self.rng.integers(1e18)
+            self.cnt[0] = 0
 
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         output_nodes = seed_nodes
@@ -195,6 +222,10 @@ class LaborSampler(BlockSampler):
             random_seed_i = F.zerocopy_to_dgl_ndarray(
                 self.random_seed + (i if not self.layer_dependency else 0)
             )
+            if self.cnt[1] <= 1:
+                seed2_contr = 0
+            else:
+                seed2_contr = ((self.cnt[0] % self.cnt[1]) / self.cnt[1]).item()
             frontier, importances = g.sample_labors(
                 seed_nodes,
                 fanout,
@@ -202,6 +233,7 @@ class LaborSampler(BlockSampler):
                 prob=self.prob,
                 importance_sampling=self.importance_sampling,
                 random_seed=random_seed_i,
+                seed2_contribution=seed2_contr,
                 output_device=self.output_device,
                 exclude_edges=exclude_eids,
             )
