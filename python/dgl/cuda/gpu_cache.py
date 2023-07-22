@@ -26,7 +26,7 @@ class GPUCache(object):
     """High-level wrapper for GPU embedding cache"""
 
     def __init__(self, num_items, num_feats, idtype=F.int64):
-        assert idtype == F.int32 or idtype == F.int64
+        assert idtype in [F.int32, F.int64]
         self._cache = _CAPI_DGLGpuCacheCreate(
             num_items, num_feats, 32 if idtype == F.int32 else 64
         )
@@ -35,6 +35,20 @@ class GPUCache(object):
         self.total_queries = 0
 
     def query(self, keys):
+        """Queries the GPU cache.
+
+        Parameters
+        ----------
+        keys : Tensor
+            The keys to query the GPU cache with.
+
+        Returns
+        -------
+        tuple(Tensor, Tensor, Tensor)
+            A tuple containing (values, missing_indices, missing_keys) where
+            values[missing_indices] corresponds to cache misses that should be
+            filled by quering another source with missing_keys.
+        """
         self.total_queries += keys.shape[0]
         keys = F.astype(keys, self.idtype)
         values, missing_index, missing_keys = _CAPI_DGLGpuCacheQuery(
@@ -48,6 +62,16 @@ class GPUCache(object):
         )
 
     def replace(self, keys, values):
+        """Inserts key-value pairs into the GPU cache using the Least-Recently
+        Used (LRU) algorithm to remove old key-value pairs if it is full.
+
+        Parameters
+        ----------
+        keys: Tensor
+            The keys to insert to the GPU cache.
+        values: Tensor
+            The values to insert to the GPU cache.
+        """
         keys = F.astype(keys, self.idtype)
         values = F.astype(values, F.float32)
         _CAPI_DGLGpuCacheReplace(
@@ -55,8 +79,9 @@ class GPUCache(object):
         )
 
     @property
-    def hit_rate(self):
-        return 1 - self.total_miss / self.total_queries
+    def miss_rate(self):
+        """Returns the cache miss rate since creation."""
+        return self.total_miss / self.total_queries
 
 
 _init_api("dgl.cuda", __name__)
