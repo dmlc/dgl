@@ -350,11 +350,10 @@ def _init_gpu_cache(graph, gpu_cache):
         for key in frame.keys():
             if key in gpu_cache and gpu_cache[key] > 0:
                 column = frame._columns[key]
-                item_shape = column.shape[1:]
                 cache = GPUCache(
-                    gpu_cache[key], numel_of_shape(item_shape), graph.idtype
+                    gpu_cache[key], numel_of_shape(column.shape), graph.idtype
                 )
-                caches[key, type_] = cache, item_shape
+                caches[key, type_] = cache, column.shape
     return caches
 
 
@@ -388,11 +387,11 @@ def _prefetch_update_feats(
                         missing_keys, device, pin_prefetcher
                     )
                     cache.replace(
-                        missing_keys, F.astype(missing_values, "float32")
+                        missing_keys, F.astype(missing_values, F.float32)
                     )
                     values = F.astype(values, F.dtype(missing_values))
-                    F.scatter_row(values, missing_index, missing_values)
-                    F.reshape(values, (values[0],) + item_shape)
+                    F.scatter_row_inplace(values, missing_index, missing_values)
+                    F.reshape(values, (values.shape[0],) + item_shape)
                     values.__cache_miss__ = missing_keys.shape[0] / ids.shape[0]
                     feats[tid, key] = values
                 else:
