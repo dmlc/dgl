@@ -120,13 +120,13 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
     # 5. Save the CSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
     output_config["graph_topology"]["type"] = "CSCSamplingGraph"
-    output_config["graph_topology"]["path"] = (
+    output_config["graph_topology"]["path"] = str(
         processed_dir_prefix / "csc_sampling_graph.tar"
     )
 
     save_csc_sampling_graph(
         csc_sampling_graph,
-        dataset_path / output_config["graph_topology"]["path"],
+        str(dataset_path / output_config["graph_topology"]["path"]),
     )
     del output_config["graph"]
 
@@ -281,22 +281,27 @@ class OnDiskDataset(Dataset):
         self._validation_sets = self._init_tvt_sets(self._meta.validation_sets)
         self._test_sets = self._init_tvt_sets(self._meta.test_sets)
 
+    @property
     def train_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the training set."""
         return self._train_sets
 
+    @property
     def validation_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the validation set."""
         return self._validation_sets
 
+    @property
     def test_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the test set."""
         return self._test_sets
 
+    @property
     def graph(self) -> object:
         """Return the graph."""
         return self._graph
 
+    @property
     def feature(self) -> Dict[Tuple, TorchBasedFeatureStore]:
         """Return the feature."""
         return self._feature
