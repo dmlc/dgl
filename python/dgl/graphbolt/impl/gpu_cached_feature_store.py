@@ -68,7 +68,7 @@ class GPUCachedFeatureStore(FeatureStore):
             The read feature.
         """
         if ids is None:
-            return self._fallback_store.read()
+            return self._fallback_store.read().to("cuda")
         keys = ids.to("cuda")
         values, missing_index, missing_keys = self._store.query(keys)
         missing_values = self._fallback_store.read(missing_keys).to("cuda")
