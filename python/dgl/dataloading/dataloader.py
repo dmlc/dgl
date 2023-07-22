@@ -9,6 +9,8 @@ import threading
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from queue import Empty, Full, Queue
+from functools import reduce
+import operator
 
 import numpy as np
 import psutil
@@ -21,6 +23,7 @@ from .._ffi.base import is_tensor_adaptor_enabled
 
 from ..base import dgl_warning, DGLError, EID, NID
 from ..batch import batch as batch_graphs
+from ..contrib import GPUCache
 from ..distributed import DistGraph
 from ..frame import LazyFeature
 from ..heterograph import DGLGraph
@@ -335,9 +338,23 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             self.num_samples + (0 if self.drop_last else (self.batch_size - 1))
         ) // self.batch_size
 
+def numel_of_shape(shape):
+    return reduce(operator.mul, shape, 1)
+
+def _init_gpu_cache(graph, gpu_cache):
+    caches = {}
+    for tid, frame in enumerate(graph._node_frames):
+        type_ = graph.ntypes[tid]
+        for key in frame.keys():
+            if key in gpu_cache and gpu_cache[key] > 0:
+                column = frame._columns[key]
+                item_shape = column.shape[1:]
+                cache = GPUCache(gpu_cache[key], numel_of_shape(item_shape), graph.idtype)
+                caches[key, type_] = cache, item_shape
+    return caches
 
 def _prefetch_update_feats(
-    feats, frames, types, get_storage_func, id_name, device, pin_prefetcher
+    feats, frames, types, get_storage_func, id_name, device, pin_prefetcher, gpu_cache={}
 ):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
@@ -351,9 +368,22 @@ def _prefetch_update_feats(
                         "Found a LazyFeature with no ID specified, "
                         "and the graph does not have dgl.NID or dgl.EID columns"
                     )
-                feats[tid, key] = get_storage_func(parent_key, type_).fetch(
-                    column.id_ or default_id, device, pin_prefetcher
-                )
+                ids = column.id_ or default_id
+                if (parent_key, type_) in gpu_cache:
+                    cache, item_shape = gpu_cache[parent_key, type_]
+                    if cache is not None:
+                        values, missing_index, missing_keys = cache.query(ids)
+                        missing_values = get_storage_func(parent_key, type_).fetch(
+                            missing_keys, device, pin_prefetcher
+                        )
+                        cache.replace(missing_keys, missing_values)
+                        values[missing_index] = missing_values
+                        cache_miss = missing_keys.shape[0] / ids.shape[0]
+                        trainer.strategy.model.log('cache_miss', cache_miss, prog_bar=True, on_step=True, on_epoch=False)
+                else:
+                    feats[tid, key] = get_storage_func(parent_key, type_).fetch(
+                        ids, device, pin_prefetcher
+                    )
 
 
 # This class exists to avoid recursion into the feature dictionary returned by the
@@ -376,6 +406,7 @@ def _prefetch_for_subgraph(subg, dataloader):
         NID,
         dataloader.device,
         dataloader.pin_prefetcher,
+        dataloader.gpu_cache,
     )
     _prefetch_update_feats(
         edge_feats,
@@ -725,7 +756,6 @@ def _get_device(device):
         device = torch.device("cuda", torch.cuda.current_device())
     return device
 
-
 class DataLoader(torch.utils.data.DataLoader):
     """Sampled graph data loader. Wrap a :class:`~dgl.DGLGraph` and a
     :class:`~dgl.dataloading.Sampler` into an iterable over mini-batches of samples.
@@ -867,6 +897,7 @@ class DataLoader(torch.utils.data.DataLoader):
         use_alternate_streams=None,
         pin_prefetcher=None,
         use_uva=False,
+        gpu_cache={},
         **kwargs,
     ):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
@@ -895,6 +926,7 @@ class DataLoader(torch.utils.data.DataLoader):
             self.use_alternate_streams = use_alternate_streams
             self.pin_prefetcher = pin_prefetcher
             self.use_uva = use_uva
+            self.gpu_cache = _init_gpu_cache(self.graph, gpu_cache)
             kwargs["batch_size"] = None
             super().__init__(**kwargs)
             return
@@ -1054,6 +1086,8 @@ class DataLoader(torch.utils.data.DataLoader):
         worker_init_fn = WorkerInitWrapper(kwargs.pop("worker_init_fn", None))
 
         self.other_storages = {}
+
+        self.gpu_cache = _init_gpu_cache(self.graph, gpu_cache)
 
         super().__init__(
             self.dataset,
