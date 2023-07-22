@@ -346,12 +346,12 @@ def _numel_of_shape(shape):
 def _init_gpu_cache(graph, gpu_caches):
     caches = {}, {}
     if gpu_caches is None:
-        gpu_caches = {}, {}
-    elif not isinstance(gpu_caches, tuple):
+        return caches
+    if not isinstance(gpu_caches, tuple):
         gpu_caches = gpu_caches, {}
     for i, frames in enumerate([graph._node_frames, graph._edge_frames]):
         for tid, frame in enumerate(frames):
-            type_ = graph.ntypes[tid]
+            type_ = [graph.ntypes, graph.canonical_etypes][i][tid]
             for key in frame.keys():
                 if key in gpu_caches[i] and gpu_caches[i][key] > 0:
                     column = frame._columns[key]
