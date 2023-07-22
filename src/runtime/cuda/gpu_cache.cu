@@ -96,9 +96,9 @@ class GpuCache : public runtime::Object {
     CHECK_EQ(keys->ctx.device_id, cuda_device)
         << "The keys should be on the correct CUDA device";
     CHECK_EQ(values->ctx.device_type, kDGLCUDA)
-        << "The keys should be on a CUDA device";
+        << "The values should be on a CUDA device";
     CHECK_EQ(values->ctx.device_id, cuda_device)
-        << "The keys should be on the correct CUDA device";
+        << "The values should be on the correct CUDA device";
     CHECK_EQ(keys->shape[0], values->shape[0])
         << "First dimensions of keys and values must match";
     CHECK_EQ(values->shape[1], num_feats) << "Embedding dimension must match";
