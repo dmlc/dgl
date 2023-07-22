@@ -3,14 +3,14 @@ import atexit
 import inspect
 import itertools
 import math
+import operator
 import os
 import re
 import threading
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
-from queue import Empty, Full, Queue
 from functools import reduce
-import operator
+from queue import Empty, Full, Queue
 
 import numpy as np
 import psutil
@@ -23,7 +23,7 @@ from .._ffi.base import is_tensor_adaptor_enabled
 
 from ..base import dgl_warning, DGLError, EID, NID
 from ..batch import batch as batch_graphs
-from ..contrib import GPUCache
+from ..cuda import GPUCache
 from ..distributed import DistGraph
 from ..frame import LazyFeature
 from ..heterograph import DGLGraph
@@ -338,8 +338,10 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
             self.num_samples + (0 if self.drop_last else (self.batch_size - 1))
         ) // self.batch_size
 
+
 def numel_of_shape(shape):
     return reduce(operator.mul, shape, 1)
+
 
 def _init_gpu_cache(graph, gpu_cache):
     caches = {}
@@ -349,12 +351,22 @@ def _init_gpu_cache(graph, gpu_cache):
             if key in gpu_cache and gpu_cache[key] > 0:
                 column = frame._columns[key]
                 item_shape = column.shape[1:]
-                cache = GPUCache(gpu_cache[key], numel_of_shape(item_shape), graph.idtype)
+                cache = GPUCache(
+                    gpu_cache[key], numel_of_shape(item_shape), graph.idtype
+                )
                 caches[key, type_] = cache, item_shape
     return caches
 
+
 def _prefetch_update_feats(
-    feats, frames, types, get_storage_func, id_name, device, pin_prefetcher, gpu_cache={}
+    feats,
+    frames,
+    types,
+    get_storage_func,
+    id_name,
+    device,
+    pin_prefetcher,
+    gpu_cache={},
 ):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
@@ -371,15 +383,18 @@ def _prefetch_update_feats(
                 ids = column.id_ or default_id
                 if (parent_key, type_) in gpu_cache:
                     cache, item_shape = gpu_cache[parent_key, type_]
-                    if cache is not None:
-                        values, missing_index, missing_keys = cache.query(ids)
-                        missing_values = get_storage_func(parent_key, type_).fetch(
-                            missing_keys, device, pin_prefetcher
-                        )
-                        cache.replace(missing_keys, missing_values)
-                        values[missing_index] = missing_values
-                        cache_miss = missing_keys.shape[0] / ids.shape[0]
-                        trainer.strategy.model.log('cache_miss', cache_miss, prog_bar=True, on_step=True, on_epoch=False)
+                    values, missing_index, missing_keys = cache.query(ids)
+                    missing_values = get_storage_func(parent_key, type_).fetch(
+                        missing_keys, device, pin_prefetcher
+                    )
+                    cache.replace(
+                        missing_keys, F.astype(missing_values, "float32")
+                    )
+                    values = F.astype(values, F.dtype(missing_values))
+                    F.scatter_row(values, missing_index, missing_values)
+                    F.reshape(values, (values[0],) + item_shape)
+                    values.__cache_miss__ = missing_keys.shape[0] / ids.shape[0]
+                    feats[tid, key] = values
                 else:
                     feats[tid, key] = get_storage_func(parent_key, type_).fetch(
                         ids, device, pin_prefetcher
@@ -755,6 +770,7 @@ def _get_device(device):
     if device.type == "cuda" and device.index is None:
         device = torch.device("cuda", torch.cuda.current_device())
     return device
+
 
 class DataLoader(torch.utils.data.DataLoader):
     """Sampled graph data loader. Wrap a :class:`~dgl.DGLGraph` and a
