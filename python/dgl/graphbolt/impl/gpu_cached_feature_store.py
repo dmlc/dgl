@@ -25,11 +25,12 @@ class GPUCachedFeatureStore(FeatureStore):
         Examples
         --------
         >>> import torch
-        >>> torch_feat = torch.arange(0, 5)
+        >>> torch_feat = torch.arange(0, 8)
+        >>> cache_size = 5
         >>> fallback_store = TorchBasedFeatureStore(torch_feat)
-        >>> feature_store = GPUCachedFeatureStore(fallback_store, device)
+        >>> feature_store = GPUCachedFeatureStore(fallback_store, cache_size)
         >>> feature_store.read()
-        tensor([0, 1, 2, 3, 4])
+        tensor([0, 1, 2, 3, 4, 5, 6, 7])
         >>> feature_store.read(torch.tensor([0, 1, 2]))
         tensor([0, 1, 2])
         >>> feature_store.update(torch.ones(3, dtype=torch.long),
@@ -52,8 +53,8 @@ class GPUCachedFeatureStore(FeatureStore):
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
 
-        The returned tensor is always in memory, no matter whether the feature
-        store is in memory or on disk.
+        The returned tensor is always in GPU memory, no matter whether the
+        fallback feature store is in memory or on disk.
 
         Parameters
         ----------
