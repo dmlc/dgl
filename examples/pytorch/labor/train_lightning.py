@@ -168,16 +168,14 @@ class DataModule(LightningDataModule):
         fanouts = [int(_) for _ in fan_out]
         ladouts = [int(_) for _ in lad_out]
         if sampler == 'neighbor':
-            sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
+            sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
         elif 'ladies' in sampler:
             g.edata['w'] = normalized_edata(g)
             sampler = (PoissonLadiesSampler if 'poisson' in sampler else LadiesSampler)(ladouts)
         else:
-            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
-        full_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
+            sampler = dgl.dataloading.LaborSampler(fanouts, importance_sampling=importance_sampling, layer_dependency=layer_dependency, batch_dependency=batch_dependency, prefetch_node_feats=['features'], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
+        full_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(len(fanouts), prefetch_node_feats=['features'], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
         unbiased_sampler = sampler
-        # full_sampler = dgl.dataloading.LaborSampler([30] * len(fanouts), prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
-        # unbiased_sampler = dgl.dataloading.NeighborSampler(fanouts, prefetch_node_feats=['features'] if cache_size <= 0 else [], prefetch_edge_feats=['etype'] if 'etype' in g.edata else [], prefetch_labels=['labels'])
 
         dataloader_device = th.device('cpu')
         g = g.formats(['csc'])
@@ -204,7 +202,7 @@ class DataModule(LightningDataModule):
         self.in_feats = g.ndata['features'].shape[1]
         self.n_classes = n_classes
         self.multilabel = multilabel
-        self.cache = None if cache_size <= 0 else dgl.contrib.GPUCache(cache_size, self.in_feats, g.idtype)
+        self.cache_size = cache_size
 
     def train_dataloader(self):
         return dgl.dataloading.DataLoader(
@@ -216,7 +214,8 @@ class DataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=True,
-            num_workers=self.num_workers)
+            num_workers=self.num_workers,
+            gpu_cache={'features': self.cache_size})
 
     def val_dataloader(self):
         return [dgl.dataloading.DataLoader(
@@ -228,7 +227,8 @@ class DataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             drop_last=False,
-            num_workers=self.num_workers)
+            num_workers=self.num_workers,
+            gpu_cache={'features': self.cache_size})
             for sampler in [self.unbiased_sampler]]
 
     def test_dataloader(self):
@@ -241,7 +241,8 @@ class DataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             drop_last=False,
-            num_workers=self.num_workers)
+            num_workers=self.num_workers,
+            gpu_cache={'features': self.cache_size})
             for sampler in [self.full_sampler]]
 
 class BatchSizeCallback(Callback):
@@ -269,16 +270,12 @@ class BatchSizeCallback(Callback):
     @property
     def std(self):
         return math.sqrt(self.var)
-    
+
     def on_train_batch_start(self, trainer, datamodule, batch, batch_idx):
         input_nodes, output_nodes, mfgs = batch
-        cache = trainer.datamodule.cache
-        if cache is not None:
-            values, missing_index, missing_keys = cache.query(input_nodes)
-            missing_values = cuda_index_tensor(trainer.datamodule.g.ndata['features'], missing_keys.long())
-            cache.replace(missing_keys, missing_values)
-            cache_miss = missing_keys.shape[0] / input_nodes.shape[0]
-            trainer.strategy.model.log('cache_miss', cache_miss, prog_bar=True, on_step=True, on_epoch=False)
+        features = mfgs[0].srcdata['features']
+        if hasattr(features, '__cache_miss__'):
+            trainer.strategy.model.log('cache_miss', features.__cache_miss__, prog_bar=True, on_step=True, on_epoch=False)
     
     def on_train_batch_end(self, trainer, datamodule, outputs, batch, batch_idx):
         input_nodes, output_nodes, mfgs = batch
