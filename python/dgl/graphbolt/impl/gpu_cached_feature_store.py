@@ -1,7 +1,7 @@
 """Torch-based feature store for GraphBolt."""
 import torch
 
-from dgl.contrib import GPUCache
+from dgl.cuda import GPUCache
 
 from ..feature_store import FeatureStore
 
