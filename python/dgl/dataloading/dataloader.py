@@ -845,6 +845,11 @@ class DataLoader(torch.utils.data.DataLoader):
         Whether to pin the feature tensors into pinned memory.
 
         Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
+    gpu_cache : dict or tuple(dict, dict), optional
+        Which node or (node and edge) features to cache using HugeCTR gpu_cache.
+        Is supported only on NVIDIA GPUs with compute capability 70 or above.
+        The dictionary holds the keys of features along with the corresponding
+        cache sizes.
     kwargs : dict
         Key-word arguments to be passed to the parent PyTorch
         :py:class:`torch.utils.data.DataLoader` class. Common arguments are:
