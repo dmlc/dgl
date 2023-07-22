@@ -50,12 +50,18 @@ class GpuCache : public runtime::Object {
 
   GpuCache(size_t num_items, size_t num_feats)
       : num_feats(num_feats),
-        cache((num_items + bucket_size - 1) / bucket_size, num_feats) {}
+        cache((num_items + bucket_size - 1) / bucket_size, num_feats) {
+    CUDA_CALL(cudaGetDevice(&cuda_device));
+  }
 
   std::tuple<NDArray, IdArray, IdArray> Query(IdArray keys) {
     const auto &ctx = keys->ctx;
     cudaStream_t stream = dgl::runtime::getCurrentCUDAStream();
     auto device = dgl::runtime::DeviceAPI::Get(ctx);
+    CHECK_EQ(ctx.device_type, kDGLCUDA)
+        << "The keys should be on a CUDA device";
+    CHECK_EQ(ctx.device_id, cuda_device)
+        << "The keys should be on the correct CUDA device";
     CHECK_EQ(keys->ndim, 1)
         << "The tensor of requested indices must be of dimension one.";
     NDArray values = NDArray::Empty(
@@ -85,6 +91,14 @@ class GpuCache : public runtime::Object {
 
   void Replace(IdArray keys, NDArray values) {
     cudaStream_t stream = dgl::runtime::getCurrentCUDAStream();
+    CHECK_EQ(keys->ctx.device_type, kDGLCUDA)
+        << "The keys should be on a CUDA device";
+    CHECK_EQ(keys->ctx.device_id, cuda_device)
+        << "The keys should be on the correct CUDA device";
+    CHECK_EQ(values->ctx.device_type, kDGLCUDA)
+        << "The keys should be on a CUDA device";
+    CHECK_EQ(values->ctx.device_id, cuda_device)
+        << "The keys should be on the correct CUDA device";
     CHECK_EQ(keys->shape[0], values->shape[0])
         << "First dimensions of keys and values must match";
     CHECK_EQ(values->shape[1], num_feats) << "Embedding dimension must match";
@@ -99,6 +113,7 @@ class GpuCache : public runtime::Object {
       key_t, uint64_t, std::numeric_limits<key_t>::max(), set_associativity,
       WARP_SIZE>
       cache;
+  int cuda_device;
 };
 
 static_assert(sizeof(unsigned int) == 4);
