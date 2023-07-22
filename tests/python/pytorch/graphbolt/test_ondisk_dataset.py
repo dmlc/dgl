@@ -4,10 +4,12 @@ import tempfile
 import gb_test_utils as gbt
 
 import numpy as np
+import pandas as pd
 
 import pydantic
 import pytest
 import torch
+import yaml
 from dgl import graphbolt as gb
 
 
@@ -19,7 +21,7 @@ def test_OnDiskDataset_TVTSet_exceptions():
         # Case 1: ``format`` is invalid.
         yaml_content = """
         train_sets:
-          - - type_name: paper
+          - - type: paper
               format: torch_invalid
               path: set/paper-train.pt
         """
@@ -29,13 +31,13 @@ def test_OnDiskDataset_TVTSet_exceptions():
         with pytest.raises(pydantic.ValidationError):
             _ = gb.OnDiskDataset(yaml_file)
 
-        # Case 2: ``type_name`` is not specified while multiple TVT sets are specified.
+        # Case 2: ``type`` is not specified while multiple TVT sets are specified.
         yaml_content = """
             train_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: set/train.npy
-                - type_name: null
+                - type: null
                   format: numpy
                   path: set/train.npy
         """
@@ -43,7 +45,7 @@ def test_OnDiskDataset_TVTSet_exceptions():
             f.write(yaml_content)
         with pytest.raises(
             AssertionError,
-            match=r"Only one TVT set is allowed if type_name is not specified.",
+            match=r"Only one TVT set is allowed if type is not specified.",
         ):
             _ = gb.OnDiskDataset(yaml_file)
 
@@ -71,29 +73,29 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
 
         # Case 1:
         #   all TVT sets are specified.
-        #   ``type_name`` is not specified or specified as ``null``.
+        #   ``type`` is not specified or specified as ``null``.
         #   ``in_memory`` could be ``true`` and ``false``.
         yaml_content = f"""
             train_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   in_memory: true
                   path: {train_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {train_path}
             validation_sets:
               - - format: numpy
                   path: {validation_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {validation_path}
             test_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   in_memory: false
                   path: {test_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {test_path}
         """
@@ -104,7 +106,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         dataset = gb.OnDiskDataset(yaml_file)
 
         # Verify train set.
-        train_sets = dataset.train_sets()
+        train_sets = dataset.train_sets
         assert len(train_sets) == 2
         for train_set in train_sets:
             assert len(train_set) == 1000
@@ -115,7 +117,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         train_sets = None
 
         # Verify validation set.
-        validation_sets = dataset.validation_sets()
+        validation_sets = dataset.validation_sets
         assert len(validation_sets) == 2
         for validation_set in validation_sets:
             assert len(validation_set) == 1000
@@ -126,7 +128,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         validation_sets = None
 
         # Verify test set.
-        test_sets = dataset.test_sets()
+        test_sets = dataset.test_sets
         assert len(test_sets) == 2
         for test_set in test_sets:
             assert len(test_set) == 1000
@@ -140,7 +142,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         # Case 2: Some TVT sets are None.
         yaml_content = f"""
             train_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {train_path}
         """
@@ -149,9 +151,9 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
             f.write(yaml_content)
 
         dataset = gb.OnDiskDataset(yaml_file)
-        assert dataset.train_sets() is not None
-        assert dataset.validation_sets() is None
-        assert dataset.test_sets() is None
+        assert dataset.train_sets is not None
+        assert dataset.validation_sets is None
+        assert dataset.test_sets is None
         dataset = None
 
 
@@ -178,25 +180,25 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
 
         yaml_content = f"""
             train_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   in_memory: true
                   path: {train_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {train_path}
             validation_sets:
               - - format: numpy
                   path: {validation_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {validation_path}
             test_sets:
-              - - type_name: null
+              - - type: null
                   format: numpy
                   in_memory: false
                   path: {test_path}
-              - - type_name: null
+              - - type: null
                   format: numpy
                   path: {test_path}
         """
@@ -207,7 +209,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
         dataset = gb.OnDiskDataset(yaml_file)
 
         # Verify train set.
-        train_sets = dataset.train_sets()
+        train_sets = dataset.train_sets
         assert len(train_sets) == 2
         for train_set in train_sets:
             assert len(train_set) == 1000
@@ -219,7 +221,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
         train_sets = None
 
         # Verify validation set.
-        validation_sets = dataset.validation_sets()
+        validation_sets = dataset.validation_sets
         assert len(validation_sets) == 2
         for validation_set in validation_sets:
             assert len(validation_set) == 1000
@@ -231,7 +233,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
         validation_sets = None
 
         # Verify test set.
-        test_sets = dataset.test_sets()
+        test_sets = dataset.test_sets
         assert len(test_sets) == 2
         for test_set in test_sets:
             assert len(test_set) == 1000
@@ -267,26 +269,26 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
 
         yaml_content = f"""
             train_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   in_memory: true
                   path: {train_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {train_path}
             validation_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   path: {validation_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {validation_path}
             test_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   in_memory: false
                   path: {test_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {test_path}
         """
@@ -297,7 +299,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         dataset = gb.OnDiskDataset(yaml_file)
 
         # Verify train set.
-        train_sets = dataset.train_sets()
+        train_sets = dataset.train_sets
         assert len(train_sets) == 2
         for train_set in train_sets:
             assert len(train_set) == 1000
@@ -313,7 +315,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         train_sets = None
 
         # Verify validation set.
-        validation_sets = dataset.validation_sets()
+        validation_sets = dataset.validation_sets
         assert len(validation_sets) == 2
         for validation_set in validation_sets:
             assert len(validation_set) == 1000
@@ -329,7 +331,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         validation_sets = None
 
         # Verify test set.
-        test_sets = dataset.test_sets()
+        test_sets = dataset.test_sets
         assert len(test_sets) == 2
         for test_set in test_sets:
             assert len(test_set) == 1000
@@ -369,26 +371,26 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
 
         yaml_content = f"""
             train_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   in_memory: true
                   path: {train_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {train_path}
             validation_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   path: {validation_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {validation_path}
             test_sets:
-              - - type_name: paper
+              - - type: paper
                   format: numpy
                   in_memory: false
                   path: {test_path}
-              - - type_name: author
+              - - type: author
                   format: numpy
                   path: {test_path}
         """
@@ -399,7 +401,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
         dataset = gb.OnDiskDataset(yaml_file)
 
         # Verify train set.
-        train_sets = dataset.train_sets()
+        train_sets = dataset.train_sets
         assert len(train_sets) == 2
         for train_set in train_sets:
             assert len(train_set) == 1000
@@ -416,7 +418,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
         train_sets = None
 
         # Verify validation set.
-        validation_sets = dataset.validation_sets()
+        validation_sets = dataset.validation_sets
         assert len(validation_sets) == 2
         for validation_set in validation_sets:
             assert len(validation_set) == 1000
@@ -433,7 +435,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
         validation_sets = None
 
         # Verify test set.
-        test_sets = dataset.test_sets()
+        test_sets = dataset.test_sets
         assert len(test_sets) == 2
         for test_set in test_sets:
             assert len(test_set) == 1000
@@ -505,7 +507,7 @@ def test_OnDiskDataset_Feature_heterograph():
         dataset = gb.OnDiskDataset(yaml_file)
 
         # Verify feature data storage.
-        feature_data = dataset.feature()
+        feature_data = dataset.feature
         assert len(feature_data) == 4
 
         # Verify node feature data.
@@ -593,7 +595,7 @@ def test_OnDiskDataset_Feature_homograph():
         dataset = gb.OnDiskDataset(yaml_file)
 
         # Verify feature data storage.
-        feature_data = dataset.feature()
+        feature_data = dataset.feature
         assert len(feature_data) == 4
 
         # Verify node feature data.
@@ -635,7 +637,7 @@ def test_OnDiskDataset_Graph_Exceptions():
 
         with pytest.raises(
             pydantic.ValidationError,
-            match="value is not a valid enumeration member",
+            match="1 validation error for OnDiskMetaData",
         ):
             _ = gb.OnDiskDataset(yaml_file)
 
@@ -659,7 +661,7 @@ def test_OnDiskDataset_Graph_homogeneous():
             f.write(yaml_content)
 
         dataset = gb.OnDiskDataset(yaml_file)
-        graph2 = dataset.graph()
+        graph2 = dataset.graph
 
         assert graph.num_nodes == graph2.num_nodes
         assert graph.num_edges == graph2.num_edges
@@ -684,7 +686,7 @@ def test_OnDiskDataset_Graph_heterogeneous():
         metadata,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, metadata
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -701,7 +703,7 @@ def test_OnDiskDataset_Graph_heterogeneous():
             f.write(yaml_content)
 
         dataset = gb.OnDiskDataset(yaml_file)
-        graph2 = dataset.graph()
+        graph2 = dataset.graph
 
         assert graph.num_nodes == graph2.num_nodes
         assert graph.num_edges == graph2.num_edges
@@ -712,3 +714,157 @@ def test_OnDiskDataset_Graph_heterogeneous():
         assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
         assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
         assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+
+
+def test_OnDiskDataset_Metadata():
+    """Test metadata of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_classes = 10
+        num_labels = 9
+        yaml_content = f"""
+            dataset_name: {dataset_name}
+            num_classes: {num_classes}
+            num_labels: {num_labels}
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(yaml_file)
+        assert dataset.dataset_name == dataset_name
+        assert dataset.num_classes == num_classes
+        assert dataset.num_labels == num_labels
+
+        # Only dataset_name is specified.
+        yaml_content = f"""
+            dataset_name: {dataset_name}
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(yaml_file)
+        assert dataset.dataset_name == dataset_name
+        assert dataset.num_classes is None
+        assert dataset.num_labels is None
+
+
+def test_OnDiskDataset_preprocess_homogeneous():
+    """Test preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+        num_labels = 9
+
+        # Generate random edges.
+        nodes = np.repeat(np.arange(num_nodes), 5)
+        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
+        edges = np.stack([nodes, neighbors], axis=1)
+        # Wrtie into edges/edge.csv
+        os.makedirs(os.path.join(test_dir, "edges/"), exist_ok=True)
+        edges = pd.DataFrame(edges, columns=["src", "dst"])
+        edges.to_csv(
+            os.path.join(test_dir, "edges/edge.csv"),
+            index=False,
+            header=False,
+        )
+
+        # Generate random graph edge-feats.
+        edge_feats = np.random.rand(num_edges, 5)
+        os.makedirs(os.path.join(test_dir, "data/"), exist_ok=True)
+        np.save(os.path.join(test_dir, "data/edge-feat.npy"), edge_feats)
+
+        # Generate random node-feats.
+        node_feats = np.random.rand(num_nodes, 10)
+        np.save(os.path.join(test_dir, "data/node-feat.npy"), node_feats)
+
+        # Generate train/test/valid set.
+        os.makedirs(os.path.join(test_dir, "set/"), exist_ok=True)
+        train_pairs = (np.arange(1000), np.arange(1000, 2000))
+        train_labels = np.random.randint(0, 10, size=1000)
+        train_data = np.vstack([train_pairs, train_labels]).T
+        train_path = os.path.join(test_dir, "set/train.npy")
+        np.save(train_path, train_data)
+
+        validation_pairs = (np.arange(1000, 2000), np.arange(2000, 3000))
+        validation_labels = np.random.randint(0, 10, size=1000)
+        validation_data = np.vstack([validation_pairs, validation_labels]).T
+        validation_path = os.path.join(test_dir, "set/validation.npy")
+        np.save(validation_path, validation_data)
+
+        test_pairs = (np.arange(2000, 3000), np.arange(3000, 4000))
+        test_labels = np.random.randint(0, 10, size=1000)
+        test_data = np.vstack([test_pairs, test_labels]).T
+        test_path = os.path.join(test_dir, "set/test.npy")
+        np.save(test_path, test_data)
+
+        yaml_content = f"""
+            dataset_name: {dataset_name}
+            num_classes: {num_classes}
+            num_labels: {num_labels}
+            graph: # graph structure and required attributes.
+                nodes:
+                    - num: {num_nodes}
+                edges:
+                    - format: csv
+                      path: edges/edge.csv
+                feature_data:
+                    - domain: edge
+                      type: null
+                      name: feat
+                      format: numpy
+                      in_memory: true
+                      path: data/edge-feat.npy
+            feature_data:
+                - domain: node
+                  type: null
+                  name: feat
+                  format: numpy
+                  in_memory: false
+                  path: data/node-feat.npy
+            train_sets:
+                - - type_name: null
+                    # shape: (num_trains, 3), 3 for (src, dst, label).
+                    format: numpy
+                    path: set/train.npy
+            validation_sets:
+                - - type_name: null
+                    format: numpy
+                    path: set/validation.npy
+            test_sets:
+                - - type_name: null
+                    format: numpy
+                    path: set/test.npy
+        """
+        yaml_file = os.path.join(test_dir, "test.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+        output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(yaml_file)
+
+        with open(output_file, "rb") as f:
+            processed_dataset = yaml.load(f, Loader=yaml.Loader)
+
+        assert processed_dataset["dataset_name"] == dataset_name
+        assert processed_dataset["num_classes"] == num_classes
+        assert processed_dataset["num_labels"] == num_labels
+        assert "graph" not in processed_dataset
+        assert "graph_topology" in processed_dataset
+
+        csc_sampling_graph = gb.csc_sampling_graph.load_csc_sampling_graph(
+            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
+        )
+        assert csc_sampling_graph.num_nodes == num_nodes
+        assert csc_sampling_graph.num_edges == num_edges
+
+        num_samples = 100
+        fanout = 1
+        subgraph = csc_sampling_graph.sample_neighbors(
+            torch.arange(num_samples),
+            torch.tensor([fanout]),
+        )
+        assert len(list(subgraph.node_pairs.values())[0][0]) <= num_samples

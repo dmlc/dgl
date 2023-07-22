@@ -556,14 +556,16 @@ CSRMatrix CSRRemove(CSRMatrix csr, IdArray entries) {
 
 std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CSRMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob,
-    int importance_sampling, IdArray random_seed, IdArray NIDs) {
+    int importance_sampling, IdArray random_seed, float seed2_contribution,
+    IdArray NIDs) {
   std::pair<COOMatrix, FloatArray> ret;
   ATEN_CSR_SWITCH_CUDA_UVA(mat, rows, XPU, IdType, "CSRLaborSampling", {
     const auto dtype =
         IsNullArray(prob) ? DGLDataTypeTraits<float>::dtype : prob->dtype;
     ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "probability", {
       ret = impl::CSRLaborSampling<XPU, IdType, FloatType>(
-          mat, rows, num_samples, prob, importance_sampling, random_seed, NIDs);
+          mat, rows, num_samples, prob, importance_sampling, random_seed,
+          seed2_contribution, NIDs);
     });
   });
   return ret;
@@ -594,6 +596,47 @@ COOMatrix CSRRowWiseSampling(
   }
   return ret;
 }
+
+template <typename IdType, bool map_seed_nodes>
+std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused(
+    CSRMatrix mat, IdArray rows, IdArray seed_mapping,
+    std::vector<IdType>* new_seed_nodes, int64_t num_samples,
+    NDArray prob_or_mask, bool replace) {
+  std::pair<CSRMatrix, IdArray> ret;
+  if (IsNullArray(prob_or_mask)) {
+    ATEN_XPU_SWITCH(
+        rows->ctx.device_type, XPU, "CSRRowWiseSamplingUniformFused", {
+          ret =
+              impl::CSRRowWiseSamplingUniformFused<XPU, IdType, map_seed_nodes>(
+                  mat, rows, seed_mapping, new_seed_nodes, num_samples,
+                  replace);
+        });
+  } else {
+    CHECK_VALID_CONTEXT(prob_or_mask, rows);
+    ATEN_XPU_SWITCH(rows->ctx.device_type, XPU, "CSRRowWiseSamplingFused", {
+      ATEN_FLOAT_INT8_UINT8_TYPE_SWITCH(
+          prob_or_mask->dtype, FloatType, "probability or mask", {
+            ret = impl::CSRRowWiseSamplingFused<
+                XPU, IdType, FloatType, map_seed_nodes>(
+                mat, rows, seed_mapping, new_seed_nodes, num_samples,
+                prob_or_mask, replace);
+          });
+    });
+  }
+  return ret;
+}
+
+template std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused<int64_t, true>(
+    CSRMatrix, IdArray, IdArray, std::vector<int64_t>*, int64_t, NDArray, bool);
+
+template std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused<int64_t, false>(
+    CSRMatrix, IdArray, IdArray, std::vector<int64_t>*, int64_t, NDArray, bool);
+
+template std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused<int32_t, true>(
+    CSRMatrix, IdArray, IdArray, std::vector<int32_t>*, int64_t, NDArray, bool);
+
+template std::pair<CSRMatrix, IdArray> CSRRowWiseSamplingFused<int32_t, false>(
+    CSRMatrix, IdArray, IdArray, std::vector<int32_t>*, int64_t, NDArray, bool);
 
 COOMatrix CSRRowWisePerEtypeSampling(
     CSRMatrix mat, IdArray rows, const std::vector<int64_t>& eid2etype_offset,
@@ -829,14 +872,16 @@ COOMatrix COORemove(COOMatrix coo, IdArray entries) {
 
 std::pair<COOMatrix, FloatArray> COOLaborSampling(
     COOMatrix mat, IdArray rows, int64_t num_samples, FloatArray prob,
-    int importance_sampling, IdArray random_seed, IdArray NIDs) {
+    int importance_sampling, IdArray random_seed, float seed2_contribution,
+    IdArray NIDs) {
   std::pair<COOMatrix, FloatArray> ret;
   ATEN_COO_SWITCH(mat, XPU, IdType, "COOLaborSampling", {
     const auto dtype =
         IsNullArray(prob) ? DGLDataTypeTraits<float>::dtype : prob->dtype;
     ATEN_FLOAT_TYPE_SWITCH(dtype, FloatType, "probability", {
       ret = impl::COOLaborSampling<XPU, IdType, FloatType>(
-          mat, rows, num_samples, prob, importance_sampling, random_seed, NIDs);
+          mat, rows, num_samples, prob, importance_sampling, random_seed,
+          seed2_contribution, NIDs);
     });
   });
   return ret;
