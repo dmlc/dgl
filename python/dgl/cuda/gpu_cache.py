@@ -1,5 +1,4 @@
 """API wrapping HugeCTR gpu_cache."""
-#
 #    Copyright (c) 2022, NVIDIA Corporation
 #    All rights reserved.
 #
@@ -17,7 +16,6 @@
 #
 #  @file gpu_cache.py
 #  @brief API for managing a GPU Cache
-#
 
 from .. import backend as F
 from .._ffi.function import _init_api
