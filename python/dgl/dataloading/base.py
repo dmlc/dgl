@@ -313,13 +313,14 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
     else:
         raise ValueError("unsupported mode {}".format(exclude_mode))
 
+
 class SpotTarget(object):
     """Callable excluder object to exclude the edges from a graph according to the specified degree threshold
 
-    Besides excluding all the edges or given edges in the edge sampler ``dgl.dataloading.as_edge_prediction_sampler`` 
-    in link prediction training, this excluder can extend the exclusion function by only excluding the edges incident 
-    to low-degree nodes in the graph to bring the performance increase in training link prediction model. 
-    This function will exclude the edge if incident to at least one node with degree larger or equal to ``degree_threshold``. 
+    Besides excluding all the edges or given edges in the edge sampler ``dgl.dataloading.as_edge_prediction_sampler``
+    in link prediction training, this excluder can extend the exclusion function by only excluding the edges incident
+    to low-degree nodes in the graph to bring the performance increase in training link prediction model.
+    This function will exclude the edge if incident to at least one node with degree larger or equal to ``degree_threshold``.
     The performance boost by excluding the target edges incident to low-degree nodes can be found in this paper: https://arxiv.org/abs/2306.00899
 
     Parameters
@@ -327,9 +328,9 @@ class SpotTarget(object):
     g : DGLGraph
         The graph.
     degree_threshold : int
-        The threshold of node degrees, if the source or target node of an edge incident to 
-        has larger or equal degrees than ``degree_threshold``, this edge will be excluded from 
-        the graph 
+        The threshold of node degrees, if the source or target node of an edge incident to
+        has larger or equal degrees than ``degree_threshold``, this edge will be excluded from
+        the graph
     Examples
     --------
     .. code:: python
@@ -337,6 +338,7 @@ class SpotTarget(object):
         sampler = as_edge_prediction_sampler(sampler, exclude=low_degree_excluder, reverse_eids=reverse_eids,
                                                         negative_sampler=negative_sampler.Uniform(1))
     """
+
     def __init__(self, g, degree_threshold=10):
         self.g = g
         self.degree_threshold = degree_threshold
@@ -347,10 +349,19 @@ class SpotTarget(object):
         head_degree = g.in_degrees(src)
         tail_degree = g.in_degrees(dst)
         import torch
+
         degree = torch.min(head_degree, tail_degree)
         degree_mask = degree < self.degree_threshold
         edges_need_to_exclude = seed_edges[degree_mask]
-        return find_exclude_eids(g, edges_need_to_exclude, "reverse_id", reverse_eids, reverse_etypes, output_device)
+        return find_exclude_eids(
+            g,
+            edges_need_to_exclude,
+            "reverse_id",
+            reverse_eids,
+            reverse_etypes,
+            output_device,
+        )
+
 
 def find_exclude_eids(
     g,
@@ -541,6 +552,7 @@ class EdgePredictionSampler(Sampler):
             return self.assign_lazy_features(
                 (input_nodes, pair_graph, neg_graph, blocks)
             )
+
 
 def as_edge_prediction_sampler(
     sampler,
