@@ -1,13 +1,13 @@
+import dgl
+import dgl.nn as dglnn
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
 import torch as th
 import torch.functional as F
 import torch.nn as nn
 
-import dgl
-import dgl.nn as dglnn
-
 from dgl.nn import GATv2Conv
+
 
 class GATv2(nn.Module):
     def __init__(
@@ -84,6 +84,7 @@ class GATv2(nn.Module):
             h = h.flatten(1) if l < self.num_layers - 1 else h.mean(1)
         return h
 
+
 class SAGE(nn.Module):
     def __init__(
         self, in_feats, n_hidden, n_classes, n_layers, activation, dropout
@@ -111,11 +112,18 @@ class SAGE(nn.Module):
     def forward(self, blocks, x):
         h = x
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h, edge_weight=block.edata['edge_weights'] if 'edge_weights' in block.edata else None)
+            h = layer(
+                block,
+                h,
+                edge_weight=block.edata["edge_weights"]
+                if "edge_weights" in block.edata
+                else None,
+            )
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
         return h
+
 
 class RGAT(nn.Module):
     def __init__(
@@ -127,7 +135,7 @@ class RGAT(nn.Module):
         num_layers,
         num_heads,
         dropout,
-        pred_ntype
+        pred_ntype,
     ):
         super().__init__()
         self.convs = nn.ModuleList()
@@ -185,7 +193,7 @@ class RGAT(nn.Module):
             x_dst = x[mfg.dst_in_src]
             for data in [mfg.srcdata, mfg.dstdata]:
                 for k in list(data.keys()):
-                    if k not in ['features', 'labels']:
+                    if k not in ["features", "labels"]:
                         data.pop(k)
             mfg = dgl.block_to_graph(mfg)
             x_skip = self.skips[i](x_dst)
