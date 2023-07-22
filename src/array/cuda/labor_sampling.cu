@@ -15,11 +15,10 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  *
- * \file array/cuda/labor_sampling.cu
- * \brief labor sampling
+ * @file array/cuda/labor_sampling.cu
+ * @brief labor sampling
  */
 
-#include <curand_kernel.h>
 #include <dgl/aten/coo.h>
 #include <dgl/random.h>
 #include <dgl/runtime/device_api.h>
@@ -43,6 +42,7 @@
 #include "../../array/cuda/atomic.cuh"
 #include "../../array/cuda/utils.h"
 #include "../../graph/transform/cuda/cuda_map_edges.cuh"
+#include "../../random/continuous_seed.h"
 #include "../../runtime/cuda/cuda_common.h"
 #include "./dgl_cub.cuh"
 #include "./functor.cuh"
@@ -51,6 +51,8 @@
 namespace dgl {
 namespace aten {
 namespace impl {
+
+using dgl::random::continuous_seed;
 
 constexpr int BLOCK_SIZE = 128;
 constexpr int CTA_SIZE = 128;
@@ -119,7 +121,7 @@ struct StencilOp {
 
 template <typename IdType, typename FloatType, typename ps_t, typename A_t>
 struct StencilOpFused {
-  const uint64_t rand_seed;
+  const continuous_seed seed;
   const IdType* idx_coo;
   const FloatType* cs;
   const ps_t probs;
@@ -136,10 +138,8 @@ struct StencilOpFused {
     const auto in_idx = indptr[in_row] + rofs;
     const auto u = indices[is_pinned ? idx : in_idx];
     const auto t = nids ? nids[u] : u;  // t in the paper
-    curandStatePhilox4_32_10_t rng;
     // rolled random number r_t is a function of the random_seed and t
-    curand_init(123123, rand_seed, t, &rng);
-    const float rnd = curand_uniform(&rng);
+    const float rnd = seed.uniform(t);
     return rnd <= cs[in_row] * A[in_idx] * ps;
   }
 };
@@ -205,15 +205,13 @@ struct DegreeFunc {
 
 template <typename IdType, typename FloatType>
 __global__ void _CSRRowWiseOneHopExtractorKernel(
-    const uint64_t rand_seed, const IdType hop_size, const IdType* const indptr,
-    const IdType* const subindptr, const IdType* const indices,
-    const IdType* const idx_coo, const IdType* const nids,
-    const FloatType* const A, FloatType* const rands, IdType* const hop,
-    FloatType* const A_l) {
+    const continuous_seed seed, const IdType hop_size,
+    const IdType* const indptr, const IdType* const subindptr,
+    const IdType* const indices, const IdType* const idx_coo,
+    const IdType* const nids, const FloatType* const A, FloatType* const rands,
+    IdType* const hop, FloatType* const A_l) {
   IdType tx = static_cast<IdType>(blockIdx.x) * blockDim.x + threadIdx.x;
   const int stride_x = gridDim.x * blockDim.x;
-
-  curandStatePhilox4_32_10_t rng;
 
   while (tx < hop_size) {
     IdType rpos = idx_coo[tx];
@@ -222,12 +220,10 @@ __global__ void _CSRRowWiseOneHopExtractorKernel(
     const auto not_pinned = indices != hop;
     const auto u = indices[not_pinned ? in_idx : tx];
     if (not_pinned) hop[tx] = u;
-    const auto v = nids ? nids[u] : u;
-    // 123123 is just a number with no significance.
-    curand_init(123123, rand_seed, v, &rng);
-    const float rnd = curand_uniform(&rng);
+    const auto t = nids ? nids[u] : u;
     if (A) A_l[tx] = A[in_idx];
-    rands[tx] = (FloatType)rnd;
+    // rolled random number r_t is a function of the random_seed and t
+    rands[tx] = (FloatType)seed.uniform(t);
     tx += stride_x;
   }
 }
@@ -356,7 +352,7 @@ int log_size(const IdType size) {
 template <typename IdType, typename FloatType, typename exec_policy_t>
 void compute_importance_sampling_probabilities(
     CSRMatrix mat, const IdType hop_size, cudaStream_t stream,
-    const uint64_t random_seed, const IdType num_rows, const IdType* indptr,
+    const continuous_seed seed, const IdType num_rows, const IdType* indptr,
     const IdType* subindptr, const IdType* indices, IdArray idx_coo_arr,
     const IdType* nids,
     FloatArray cs_arr,  // holds the computed cs values, has size num_rows
@@ -384,8 +380,8 @@ void compute_importance_sampling_probabilities(
     const dim3 grid((hop_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
     CUDA_KERNEL_CALL(
         (_CSRRowWiseOneHopExtractorKernel<IdType, FloatType>), grid, block, 0,
-        stream, random_seed, hop_size, indptr, subindptr, indices, idx_coo,
-        nids, weighted ? A : nullptr, rands, hop_1, A_l);
+        stream, seed, hop_size, indptr, subindptr, indices, idx_coo, nids,
+        weighted ? A : nullptr, rands, hop_1, A_l);
   }
   int64_t hop_uniq_size = 0;
   IdArray hop_new_arr = NewIdArray(hop_size, ctx, sizeof(IdType) * 8);
@@ -518,7 +514,7 @@ template <DGLDeviceType XPU, typename IdType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborSampling(
     CSRMatrix mat, IdArray rows_arr, const int64_t num_picks,
     FloatArray prob_arr, const int importance_sampling, IdArray random_seed_arr,
-    IdArray NIDs) {
+    float seed2_contribution, IdArray NIDs) {
   const bool weighted = !IsNullArray(prob_arr);
 
   const auto& ctx = rows_arr->ctx;
@@ -663,10 +659,10 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
         indptr.get(), nullptr, A, subindptr);
   }
 
-  const uint64_t random_seed =
+  const continuous_seed random_seed =
       IsNullArray(random_seed_arr)
-          ? RandomEngine::ThreadLocal()->RandInt(1000000000)
-          : random_seed_arr.Ptr<int64_t>()[0];
+          ? continuous_seed(RandomEngine::ThreadLocal()->RandInt(1000000000))
+          : continuous_seed(random_seed_arr, seed2_contribution);
 
   if (importance_sampling)
     compute_importance_sampling_probabilities<
@@ -822,16 +818,16 @@ std::pair<COOMatrix, FloatArray> CSRLaborSampling(
 
 template std::pair<COOMatrix, FloatArray>
 CSRLaborSampling<kDGLCUDA, int32_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, IdArray);
+    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, float, IdArray);
 template std::pair<COOMatrix, FloatArray>
 CSRLaborSampling<kDGLCUDA, int64_t, float>(
-    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, IdArray);
+    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, float, IdArray);
 template std::pair<COOMatrix, FloatArray>
 CSRLaborSampling<kDGLCUDA, int32_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, IdArray);
+    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, float, IdArray);
 template std::pair<COOMatrix, FloatArray>
 CSRLaborSampling<kDGLCUDA, int64_t, double>(
-    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, IdArray);
+    CSRMatrix, IdArray, int64_t, FloatArray, int, IdArray, float, IdArray);
 
 }  // namespace impl
 }  // namespace aten
