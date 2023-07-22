@@ -281,22 +281,27 @@ class OnDiskDataset(Dataset):
         self._validation_sets = self._init_tvt_sets(self._meta.validation_sets)
         self._test_sets = self._init_tvt_sets(self._meta.test_sets)
 
+    @property
     def train_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the training set."""
         return self._train_sets
 
+    @property
     def validation_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the validation set."""
         return self._validation_sets
 
+    @property
     def test_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the test set."""
         return self._test_sets
 
+    @property
     def graph(self) -> object:
         """Return the graph."""
         return self._graph
 
+    @property
     def feature(self) -> Dict[Tuple, TorchBasedFeatureStore]:
         """Return the feature."""
         return self._feature
