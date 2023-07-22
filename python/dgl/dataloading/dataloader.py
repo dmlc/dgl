@@ -339,21 +339,28 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         ) // self.batch_size
 
 
-def numel_of_shape(shape):
+def _numel_of_shape(shape):
     return reduce(operator.mul, shape, 1)
 
 
-def _init_gpu_cache(graph, gpu_cache):
-    caches = {}
-    for tid, frame in enumerate(graph._node_frames):
-        type_ = graph.ntypes[tid]
-        for key in frame.keys():
-            if key in gpu_cache and gpu_cache[key] > 0:
-                column = frame._columns[key]
-                cache = GPUCache(
-                    gpu_cache[key], numel_of_shape(column.shape), graph.idtype
-                )
-                caches[key, type_] = cache, column.shape
+def _init_gpu_cache(graph, gpu_caches):
+    caches = {}, {}
+    if gpu_caches is None:
+        gpu_caches = {}, {}
+    elif not isinstance(gpu_caches, tuple):
+        gpu_caches = gpu_caches, {}
+    for i, frames in enumerate([graph._node_frames, graph._edge_frames]):
+        for tid, frame in enumerate(frames):
+            type_ = graph.ntypes[tid]
+            for key in frame.keys():
+                if key in gpu_caches[i] and gpu_caches[i][key] > 0:
+                    column = frame._columns[key]
+                    cache = GPUCache(
+                        gpu_caches[i][key],
+                        _numel_of_shape(column.shape),
+                        graph.idtype,
+                    )
+                    caches[i][key, type_] = cache, column.shape
     return caches
 
 
@@ -365,7 +372,7 @@ def _prefetch_update_feats(
     id_name,
     device,
     pin_prefetcher,
-    gpu_cache={},
+    gpu_cache,
 ):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
@@ -412,6 +419,7 @@ class _PrefetchedGraphFeatures(object):
 
 def _prefetch_for_subgraph(subg, dataloader):
     node_feats, edge_feats = {}, {}
+    node_gpu_cache, edge_gpu_cache = dataloader.gpu_cache
     _prefetch_update_feats(
         node_feats,
         subg._node_frames,
@@ -420,7 +428,7 @@ def _prefetch_for_subgraph(subg, dataloader):
         NID,
         dataloader.device,
         dataloader.pin_prefetcher,
-        dataloader.gpu_cache,
+        node_gpu_cache,
     )
     _prefetch_update_feats(
         edge_feats,
@@ -430,6 +438,7 @@ def _prefetch_for_subgraph(subg, dataloader):
         EID,
         dataloader.device,
         dataloader.pin_prefetcher,
+        edge_gpu_cache,
     )
     return _PrefetchedGraphFeatures(node_feats, edge_feats)
 
@@ -912,7 +921,7 @@ class DataLoader(torch.utils.data.DataLoader):
         use_alternate_streams=None,
         pin_prefetcher=None,
         use_uva=False,
-        gpu_cache={},
+        gpu_cache=None,
         **kwargs,
     ):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
