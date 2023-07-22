@@ -343,10 +343,11 @@ def _numel_of_shape(shape):
     return reduce(operator.mul, shape, 1)
 
 
-def _init_gpu_cache(graph, gpu_caches):
-    caches = {}, {}
+def _init_gpu_caches(graph, gpu_caches):
+    if not hasattr(graph, "_gpu_caches"):
+        graph._gpu_caches = {}, {}
     if gpu_caches is None:
-        return caches
+        return
     if not isinstance(gpu_caches, tuple):
         gpu_caches = gpu_caches, {}
     for i, frames in enumerate([graph._node_frames, graph._edge_frames]):
@@ -355,13 +356,13 @@ def _init_gpu_cache(graph, gpu_caches):
             for key in frame.keys():
                 if key in gpu_caches[i] and gpu_caches[i][key] > 0:
                     column = frame._columns[key]
-                    cache = GPUCache(
-                        gpu_caches[i][key],
-                        _numel_of_shape(column.shape),
-                        graph.idtype,
-                    )
-                    caches[i][key, type_] = cache, column.shape
-    return caches
+                    if (key, type_) not in graph._gpu_caches[i]:
+                        cache = GPUCache(
+                            gpu_caches[i][key],
+                            _numel_of_shape(column.shape),
+                            graph.idtype,
+                        )
+                        graph._gpu_caches[i][key, type_] = cache, column.shape
 
 
 def _prefetch_update_feats(
@@ -372,7 +373,7 @@ def _prefetch_update_feats(
     id_name,
     device,
     pin_prefetcher,
-    gpu_cache,
+    gpu_caches,
 ):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
@@ -387,8 +388,8 @@ def _prefetch_update_feats(
                         "and the graph does not have dgl.NID or dgl.EID columns"
                     )
                 ids = column.id_ or default_id
-                if (parent_key, type_) in gpu_cache:
-                    cache, item_shape = gpu_cache[parent_key, type_]
+                if (parent_key, type_) in gpu_caches:
+                    cache, item_shape = gpu_caches[parent_key, type_]
                     values, missing_index, missing_keys = cache.query(ids)
                     missing_values = get_storage_func(parent_key, type_).fetch(
                         missing_keys, device, pin_prefetcher
@@ -419,7 +420,6 @@ class _PrefetchedGraphFeatures(object):
 
 def _prefetch_for_subgraph(subg, dataloader):
     node_feats, edge_feats = {}, {}
-    node_gpu_cache, edge_gpu_cache = dataloader.gpu_cache
     _prefetch_update_feats(
         node_feats,
         subg._node_frames,
@@ -428,7 +428,7 @@ def _prefetch_for_subgraph(subg, dataloader):
         NID,
         dataloader.device,
         dataloader.pin_prefetcher,
-        node_gpu_cache,
+        dataloader.graph._gpu_caches[0],
     )
     _prefetch_update_feats(
         edge_feats,
@@ -438,7 +438,7 @@ def _prefetch_for_subgraph(subg, dataloader):
         EID,
         dataloader.device,
         dataloader.pin_prefetcher,
-        edge_gpu_cache,
+        dataloader.graph._gpu_caches[1],
     )
     return _PrefetchedGraphFeatures(node_feats, edge_feats)
 
@@ -955,7 +955,6 @@ class DataLoader(torch.utils.data.DataLoader):
             self.use_alternate_streams = use_alternate_streams
             self.pin_prefetcher = pin_prefetcher
             self.use_uva = use_uva
-            self.gpu_cache = _init_gpu_cache(self.graph, gpu_cache)
             kwargs["batch_size"] = None
             super().__init__(**kwargs)
             return
@@ -1116,7 +1115,7 @@ class DataLoader(torch.utils.data.DataLoader):
 
         self.other_storages = {}
 
-        self.gpu_cache = _init_gpu_cache(self.graph, gpu_cache)
+        _init_gpu_caches(self.graph, gpu_cache)
 
         super().__init__(
             self.dataset,
