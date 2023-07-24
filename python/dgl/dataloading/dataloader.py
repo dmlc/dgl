@@ -345,7 +345,7 @@ def _numel_of_shape(shape):
 
 def _init_gpu_caches(graph, gpu_caches):
     if not hasattr(graph, "_gpu_caches"):
-        graph._gpu_caches = {}, {}
+        graph._gpu_caches = {"node": {}, "edge": {}}
     if gpu_caches is None:
         return
     if not isinstance(gpu_caches, tuple):
@@ -356,13 +356,17 @@ def _init_gpu_caches(graph, gpu_caches):
             for key in frame.keys():
                 if key in gpu_caches[i] and gpu_caches[i][key] > 0:
                     column = frame._columns[key]
-                    if (key, type_) not in graph._gpu_caches[i]:
+                    node_or_edge = ["node", "edge"][i]
+                    if (key, type_) not in graph._gpu_caches[node_or_edge]:
                         cache = GPUCache(
                             gpu_caches[i][key],
                             _numel_of_shape(column.shape),
                             graph.idtype,
                         )
-                        graph._gpu_caches[i][key, type_] = cache, column.shape
+                        graph._gpu_caches[node_or_edge][key, type_] = (
+                            cache,
+                            column.shape,
+                        )
 
 
 def _prefetch_update_feats(
@@ -399,6 +403,7 @@ def _prefetch_update_feats(
                     )
                     values = F.astype(values, F.dtype(missing_values))
                     F.scatter_row_inplace(values, missing_index, missing_values)
+                    # reshape the flattened result to match the original shape.
                     F.reshape(values, (values.shape[0],) + item_shape)
                     values.__cache_miss__ = missing_keys.shape[0] / ids.shape[0]
                     feats[tid, key] = values
@@ -428,7 +433,7 @@ def _prefetch_for_subgraph(subg, dataloader):
         NID,
         dataloader.device,
         dataloader.pin_prefetcher,
-        dataloader.graph._gpu_caches[0],
+        dataloader.graph._gpu_caches["node"],
     )
     _prefetch_update_feats(
         edge_feats,
@@ -438,7 +443,7 @@ def _prefetch_for_subgraph(subg, dataloader):
         EID,
         dataloader.device,
         dataloader.pin_prefetcher,
-        dataloader.graph._gpu_caches[1],
+        dataloader.graph._gpu_caches["edge"],
     )
     return _PrefetchedGraphFeatures(node_feats, edge_feats)
 
@@ -849,7 +854,9 @@ class DataLoader(torch.utils.data.DataLoader):
         Which node or (node and edge) features to cache using HugeCTR gpu_cache.
         Is supported only on NVIDIA GPUs with compute capability 70 or above.
         The dictionary holds the keys of features along with the corresponding
-        cache sizes.
+        cache sizes. Please see
+        https://github.com/NVIDIA-Merlin/HugeCTR/blob/main/gpu_cache/ReadMe.md
+        for further reference.
     kwargs : dict
         Key-word arguments to be passed to the parent PyTorch
         :py:class:`torch.utils.data.DataLoader` class. Common arguments are:
