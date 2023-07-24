@@ -39,6 +39,7 @@ include_patterns = [
     '**/*.cu',
 ]
 exclude_patterns = [
+    'third_party/**',
 ]
 init_command = [
     'python3',
