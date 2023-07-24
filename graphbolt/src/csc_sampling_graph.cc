@@ -156,9 +156,9 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
               const scalar_t* indptr_data = indptr_.data_ptr<scalar_t>();
               // Get current thread id.
               auto t_id = torch::get_thread_num();
-              int64_t cur_grain_size = end - begin;
+              int64_t local_grain_size = end - begin;
               std::vector<torch::Tensor> picked_neighbors_cur_thread(
-                  cur_grain_size);
+                  local_grain_size);
 
               for (scalar_t i = begin; i < end; ++i) {
                 const auto nid = nodes[i].item<int64_t>();
@@ -170,10 +170,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                 const auto num_neighbors = indptr_data[nid + 1] - offset;
 
                 if (num_neighbors == 0) {
-                  // Initialization is performed here because all tensors will
-                  // be concatenated in the current thread, and having an
-                  // undefined tensor during concatenation can result in a
-                  // crash.
+                  // To avoid crashing during concatenation in the master
+                  // thread, initializing with empty tensors.
                   picked_neighbors_cur_thread[i - begin] =
                       torch::tensor({}, indptr_options);
                   continue;
