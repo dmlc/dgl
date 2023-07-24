@@ -1,6 +1,9 @@
+"""EGT Layer"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 
 class EGTLayer(nn.Module):
     r"""EGTLayer for Edge-augmented Graph Transformer (EGT), as introduced in
@@ -54,63 +57,64 @@ class EGTLayer(nn.Module):
     >>> out = net(nfeat, efeat)
     """
 
-    def __init__(self,
-                 ndim,
-                 edim,
-                 num_heads,
-                 num_vns,
-                 dropout=0,
-                 attn_dropout=0,
-                 activation=nn.ELU(),
-                 clip_logits_value=[-5,5],
-                 ffn_multiplier=2.,
-                 scale_dot=True,
-                 scale_degree=False,
-                 edge_update=True,
-                 ):
+    def __init__(
+        self,
+        ndim,
+        edim,
+        num_heads,
+        num_vns,
+        dropout=0,
+        attn_dropout=0,
+        activation=nn.ELU(),
+        clip_logits_value=[-5, 5],
+        ffn_multiplier=2.0,
+        scale_dot=True,
+        scale_degree=False,
+        edge_update=True,
+    ):
         super().__init__()
-        self.ndim = ndim         
-        self.edim = edim          
-        self.num_heads = num_heads  
-        self.num_vns = num_vns           
+        self.ndim = ndim
+        self.edim = edim
+        self.num_heads = num_heads
+        self.num_vns = num_vns
         self.dropout = dropout
-        self.attn_dropout = attn_dropout       
+        self.attn_dropout = attn_dropout
         self.clip_logits_min = clip_logits_value[0]
         self.clip_logits_max = clip_logits_value[1]
         self.ffn_multiplier = ffn_multiplier
         self.scale_dot = scale_dot
-        self.scale_degree = scale_degree      
-        self.edge_update = edge_update        
-        
+        self.scale_degree = scale_degree
+        self.edge_update = edge_update
+
         assert not (self.ndim % self.num_heads)
-        self.dot_dim = self.ndim//self.num_heads
-        
-        self.mha_ln_h   = nn.LayerNorm(self.ndim)
-        self.mha_ln_e   = nn.LayerNorm(self.edim)
-        self.lin_E      = nn.Linear(self.edim, self.num_heads)
-        self.lin_QKV    = nn.Linear(self.ndim, self.ndim*3)
-        self.lin_G      = nn.Linear(self.edim, self.num_heads)
-        
-        self.ffn_fn     = activation
-        self.lin_O_h    = nn.Linear(self.ndim, self.ndim)
-        node_inner_dim  = round(self.ndim*self.ffn_multiplier)
-        self.ffn_ln_h   = nn.LayerNorm(self.ndim)
-        self.lin_W_h_1  = nn.Linear(self.ndim, node_inner_dim)
-        self.lin_W_h_2  = nn.Linear(node_inner_dim, self.ndim)
+        self.dot_dim = self.ndim // self.num_heads
+
+        self.mha_ln_h = nn.LayerNorm(self.ndim)
+        self.mha_ln_e = nn.LayerNorm(self.edim)
+        self.lin_E = nn.Linear(self.edim, self.num_heads)
+        self.lin_QKV = nn.Linear(self.ndim, self.ndim * 3)
+        self.lin_G = nn.Linear(self.edim, self.num_heads)
+
+        self.ffn_fn = activation
+        self.lin_O_h = nn.Linear(self.ndim, self.ndim)
+        node_inner_dim = round(self.ndim * self.ffn_multiplier)
+        self.ffn_ln_h = nn.LayerNorm(self.ndim)
+        self.lin_W_h_1 = nn.Linear(self.ndim, node_inner_dim)
+        self.lin_W_h_2 = nn.Linear(node_inner_dim, self.ndim)
         if self.dropout > 0:
-            self.mha_drp_h  = nn.Dropout(self.dropout)
-            self.ffn_drp_h  = nn.Dropout(self.dropout)
-        
+            self.mha_drp_h = nn.Dropout(self.dropout)
+            self.ffn_drp_h = nn.Dropout(self.dropout)
+
         if self.edge_update:
-            self.lin_O_e    = nn.Linear(self.num_heads, self.edim)
-            edge_inner_dim  = round(self.edim*self.ffn_multiplier)
-            self.ffn_ln_e   = nn.LayerNorm(self.edim)
-            self.lin_W_e_1  = nn.Linear(self.edim, edge_inner_dim)
-            self.lin_W_e_2  = nn.Linear(edge_inner_dim, self.edim)
+            self.lin_O_e = nn.Linear(self.num_heads, self.edim)
+            edge_inner_dim = round(self.edim * self.ffn_multiplier)
+            self.ffn_ln_e = nn.LayerNorm(self.edim)
+            self.lin_W_e_1 = nn.Linear(self.edim, edge_inner_dim)
+            self.lin_W_e_2 = nn.Linear(edge_inner_dim, self.edim)
             if self.dropout > 0:
-                self.mha_drp_e  = nn.Dropout(self.dropout)
-                self.ffn_drp_e  = nn.Dropout(self.dropout)
-    
+                self.mha_drp_e = nn.Dropout(self.dropout)
+                self.ffn_drp_e = nn.Dropout(self.dropout)
+
     def forward(self, h, e, mask=None):
         """Forward computation.
 
@@ -144,31 +148,35 @@ class EGTLayer(nn.Module):
         E = self.lin_E(e_ln)
         G = self.lin_G(e_ln)
         shp = QKV.shape
-        Q, K, V = QKV.view(shp[0],shp[1],-1,self.num_heads).split(self.dot_dim,dim=2)
-        A_hat = torch.einsum('bldh,bmdh->blmh', Q, K)
+        Q, K, V = QKV.view(shp[0], shp[1], -1, self.num_heads).split(
+            self.dot_dim, dim=2
+        )
+        A_hat = torch.einsum("bldh,bmdh->blmh", Q, K)
         if self.scale_dot:
-            A_hat = A_hat * (self.dot_dim ** -0.5)
+            A_hat = A_hat * (self.dot_dim**-0.5)
         H_hat = A_hat.clamp(self.clip_logits_min, self.clip_logits_max) + E
 
         if mask is None:
             gates = torch.sigmoid(G)
             A_tild = F.softmax(H_hat, dim=2) * gates
         else:
-            gates = torch.sigmoid(G+mask)
-            A_tild = F.softmax(H_hat+mask, dim=2) * gates
+            gates = torch.sigmoid(G + mask)
+            A_tild = F.softmax(H_hat + mask, dim=2) * gates
 
         if self.attn_dropout > 0:
-            A_tild = F.dropout(A_tild, p=self.attn_dropout, training=self.training)
+            A_tild = F.dropout(
+                A_tild, p=self.attn_dropout, training=self.training
+            )
 
-        V_att = torch.einsum('blmh,bmkh->blkh', A_tild, V)
+        V_att = torch.einsum("blmh,bmkh->blkh", A_tild, V)
 
         if self.scale_degree:
-            degrees = torch.sum(gates,dim=2,keepdim=True)
-            degree_scalers = torch.log(1+degrees)
-            degree_scalers[:,:self.num_vns] = 1.
+            degrees = torch.sum(gates, dim=2, keepdim=True)
+            degree_scalers = torch.log(1 + degrees)
+            degree_scalers[:, : self.num_vns] = 1.0
             V_att = V_att * degree_scalers
 
-        V_att = V_att.reshape(shp[0],shp[1],self.num_heads*self.dot_dim)
+        V_att = V_att.reshape(shp[0], shp[1], self.num_heads * self.dot_dim)
         h = self.lin_O_h(V_att)
 
         if self.dropout > 0:
