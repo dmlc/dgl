@@ -1,6 +1,6 @@
 """GraphBolt Dataset."""
 
-from typing import List
+from typing import Dict, List
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
@@ -31,22 +31,42 @@ class Dataset:
     generate a subgraph.
     """
 
+    @property
     def train_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the training sets."""
         raise NotImplementedError
 
+    @property
     def validation_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the validation sets."""
         raise NotImplementedError
 
+    @property
     def test_sets(self) -> List[ItemSet] or List[ItemSetDict]:
         """Return the test sets."""
         raise NotImplementedError
 
+    @property
     def graph(self) -> object:
         """Return the graph."""
         raise NotImplementedError
 
-    def feature(self) -> FeatureStore:
+    @property
+    def feature(self) -> Dict[object, FeatureStore]:
         """Return the feature."""
+        raise NotImplementedError
+
+    @property
+    def dataset_name(self) -> str:
+        """Return the dataset name."""
+        raise NotImplementedError
+
+    @property
+    def num_classes(self) -> int:
+        """Return the number of classes."""
+        raise NotImplementedError
+
+    @property
+    def num_labels(self) -> int:
+        """Return the number of labels."""
         raise NotImplementedError

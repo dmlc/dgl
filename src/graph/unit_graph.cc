@@ -1218,6 +1218,21 @@ HeteroGraphPtr UnitGraph::CreateFromCSR(
   return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, formats));
 }
 
+HeteroGraphPtr UnitGraph::CreateFromCSRAndCOO(
+    int64_t num_vtypes, const aten::CSRMatrix& csr, const aten::COOMatrix& coo,
+    dgl_format_code_t formats) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  CHECK_EQ(coo.num_rows, csr.num_rows);
+  CHECK_EQ(coo.num_cols, csr.num_cols);
+  if (num_vtypes == 1) {
+    CHECK_EQ(csr.num_rows, csr.num_cols);
+  }
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csrPtr(new CSR(mg, csr));
+  COOPtr cooPtr(new COO(mg, coo));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csrPtr, cooPtr, formats));
+}
+
 HeteroGraphPtr UnitGraph::CreateFromCSC(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray indptr,
     IdArray indices, IdArray edge_ids, dgl_format_code_t formats) {
@@ -1235,6 +1250,21 @@ HeteroGraphPtr UnitGraph::CreateFromCSC(
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csc(new CSR(mg, mat));
   return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, formats));
+}
+
+HeteroGraphPtr UnitGraph::CreateFromCSCAndCOO(
+    int64_t num_vtypes, const aten::CSRMatrix& csc, const aten::COOMatrix& coo,
+    dgl_format_code_t formats) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  CHECK_EQ(coo.num_rows, csc.num_cols);
+  CHECK_EQ(coo.num_cols, csc.num_rows);
+  if (num_vtypes == 1) {
+    CHECK_EQ(csc.num_rows, csc.num_cols);
+  }
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr cscPtr(new CSR(mg, csc));
+  COOPtr cooPtr(new COO(mg, coo));
+  return HeteroGraphPtr(new UnitGraph(mg, cscPtr, nullptr, cooPtr, formats));
 }
 
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {

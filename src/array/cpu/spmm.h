@@ -267,10 +267,10 @@ void SpMMCmpCsr(
 #if !defined(_WIN32)
 #ifdef USE_LIBXSMM
   int cpu_id = libxsmm_cpuid_x86();
-  const bool no_libxsmm =
-      bcast.use_bcast || std::is_same<DType, double>::value ||
-      (std::is_same<DType, BFloat16>::value && cpu_id < LIBXSMM_X86_AVX512) ||
-      !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
+  const bool no_libxsmm = bcast.use_bcast ||
+                          std::is_same<DType, double>::value ||
+                          cpu_id < LIBXSMM_X86_AVX512 ||
+                          !dgl::runtime::Config::Global()->IsLibxsmmAvailable();
   if (!no_libxsmm) {
     SpMMCmpCsrLibxsmm<IdType, DType, Op, Cmp>(
         bcast, csr, ufeat, efeat, out, argu, arge);
