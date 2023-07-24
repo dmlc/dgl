@@ -42,6 +42,9 @@ class GpuCache : public runtime::Object {
   constexpr static int set_associativity = 2;
   constexpr static int WARP_SIZE = 32;
   constexpr static int bucket_size = WARP_SIZE * set_associativity;
+  using gpu_cache_t = gpu_cache::gpu_cache<
+      key_t, uint64_t, std::numeric_limits<key_t>::max(), set_associativity,
+      WARP_SIZE>;
 
  public:
   static constexpr const char *_type_key =
@@ -50,7 +53,8 @@ class GpuCache : public runtime::Object {
 
   GpuCache(size_t num_items, size_t num_feats)
       : num_feats(num_feats),
-        cache((num_items + bucket_size - 1) / bucket_size, num_feats) {
+        cache(std::make_unique<gpu_cache_t>(
+            (num_items + bucket_size - 1) / bucket_size, num_feats)) {
     CUDA_CALL(cudaGetDevice(&cuda_device));
   }
 
@@ -72,7 +76,7 @@ class GpuCache : public runtime::Object {
         aten::NewIdArray(keys->shape[0], ctx, sizeof(key_t) * 8);
     size_t *missing_len =
         static_cast<size_t *>(device->AllocWorkspace(ctx, sizeof(size_t)));
-    cache.Query(
+    cache->Query(
         static_cast<const key_t *>(keys->data), keys->shape[0],
         static_cast<float *>(values->data),
         static_cast<uint64_t *>(missing_index->data),
@@ -102,17 +106,14 @@ class GpuCache : public runtime::Object {
     CHECK_EQ(keys->shape[0], values->shape[0])
         << "First dimensions of keys and values must match";
     CHECK_EQ(values->shape[1], num_feats) << "Embedding dimension must match";
-    cache.Replace(
+    cache->Replace(
         static_cast<const key_t *>(keys->data), keys->shape[0],
         static_cast<const float *>(values->data), stream);
   }
 
  private:
   size_t num_feats;
-  gpu_cache::gpu_cache<
-      key_t, uint64_t, std::numeric_limits<key_t>::max(), set_associativity,
-      WARP_SIZE>
-      cache;
+  std::unique_ptr<gpu_cache_t> cache;
   int cuda_device;
 };
 
