@@ -147,6 +147,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
       torch::zeros({num_nodes + 1}, indptr_.options());
 
   // Calculate GrainSize for parallel_for.
+  // Set the default grain size to 64.
   const int64_t grain_size = 64;
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr_.scalar_type(), "parallel_for", ([&] {
