@@ -155,7 +155,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
               const auto indptr_options = indptr_.options();
               const scalar_t* indptr_data = indptr_.data_ptr<scalar_t>();
               // Get current thread id.
-              auto t_id = torch::get_thread_num();
+              auto thread_id = torch::get_thread_num();
               int64_t local_grain_size = end - begin;
               std::vector<torch::Tensor> picked_neighbors_cur_thread(
                   local_grain_size);
@@ -189,7 +189,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                 num_picked_neighbors_per_node[i + 1] =
                     picked_neighbors_cur_thread[i - begin].size(0);
               }
-              picked_neighbors_per_thread[t_id] =
+              picked_neighbors_per_thread[thread_id] =
                   torch::cat(picked_neighbors_cur_thread);
             });  // End of parallel_for.
       }));
