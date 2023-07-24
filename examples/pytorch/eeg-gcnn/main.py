@@ -1,5 +1,5 @@
 import argparse
-import os
+import joblib
 
 import numpy as np
 import pandas as pd
@@ -13,6 +13,12 @@ from sklearn import preprocessing
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from torch.utils.data import WeightedRandomSampler
+
+def load_memory_mapped_array(file_name):
+    # Since `file_name` is not always byte-aligned,
+    # let's fix this to avoid the warning.
+    joblib.dump(joblib.load(file_name), file_name)
+    return load(file_name, mmap_mode="r")
 
 if __name__ == "__main__":
     # argparse commandline args
@@ -90,16 +96,8 @@ if __name__ == "__main__":
     num_feats = args.num_feats
 
     # set up input and targets from files
-    memmap_x = f"psd_features_data_X"
-    memmap_y = f"labels_y"
-    if os.path.getsize(memmap_x) == 86528478:
-        # File is not byte aligned. To avoid the warning let's fix this.
-        import joblib
-
-        joblib.dump(joblib.load(memmap_x), memmap_x)
-
-    x = load(memmap_x, mmap_mode="r")
-    y = load(memmap_y, mmap_mode="r")
+    x = load_memory_mapped_array(f"psd_features_data_X")
+    y = load_memory_mapped_array(f"labels_y")
 
     # normalize psd features data
     normd_x = []
