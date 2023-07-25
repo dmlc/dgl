@@ -115,7 +115,7 @@ def main(args):
     )
 
     # initialize graph
-    mean  = 0
+    mean = 0
     for epoch in range(args.epochs):
         model.train()
         if epoch >= 3:
