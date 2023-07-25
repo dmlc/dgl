@@ -1,4 +1,5 @@
 import argparse
+
 import joblib
 
 import numpy as np
@@ -14,11 +15,13 @@ from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from torch.utils.data import WeightedRandomSampler
 
+
 def load_memory_mapped_array(file_name):
     # Since `file_name` is not always byte-aligned,
     # let's fix this to avoid the warning.
     joblib.dump(joblib.load(file_name), file_name)
     return load(file_name, mmap_mode="r")
+
 
 if __name__ == "__main__":
     # argparse commandline args
