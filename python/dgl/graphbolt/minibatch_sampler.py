@@ -189,7 +189,7 @@ class MinibatchSampler(IterDataPipe):
             # To ensure randomness, make sure the buffer size is at least 10
             # times the batch size.
             buffer_size = max(10000, 10 * self._batch_size)
-            data_pipe = data_pipe.shuffle(buffer_size)
+            data_pipe = data_pipe.shuffle(buffer_size=buffer_size)
 
         # Batch.
         data_pipe = data_pipe.batch(
