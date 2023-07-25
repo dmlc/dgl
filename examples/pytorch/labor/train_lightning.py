@@ -372,7 +372,7 @@ class DataModule(LightningDataModule):
         self.in_feats = g.ndata["features"].shape[1]
         self.n_classes = n_classes
         self.multilabel = multilabel
-        self.cache_size = cache_size
+        self.gpu_cache_arg = {"node": {"features": cache_size}}
 
     def train_dataloader(self):
         return dgl.dataloading.DataLoader(
@@ -385,7 +385,7 @@ class DataModule(LightningDataModule):
             shuffle=True,
             drop_last=True,
             num_workers=self.num_workers,
-            gpu_cache={"features": self.cache_size},
+            gpu_cache=self.gpu_cache_arg,
         )
 
     def val_dataloader(self):
@@ -400,7 +400,7 @@ class DataModule(LightningDataModule):
                 shuffle=False,
                 drop_last=False,
                 num_workers=self.num_workers,
-                gpu_cache={"features": self.cache_size},
+                gpu_cache=self.gpu_cache_arg,
             )
             for sampler in [self.unbiased_sampler]
         ]
@@ -417,7 +417,7 @@ class DataModule(LightningDataModule):
                 shuffle=False,
                 drop_last=False,
                 num_workers=self.num_workers,
-                gpu_cache={"features": self.cache_size},
+                gpu_cache=self.gpu_cache_arg,
             )
             for sampler in [self.full_sampler]
         ]
