@@ -31,6 +31,10 @@ def test_pin_view():
     with pytest.raises(dgl.DGLError):
         dgl.utils.pin_memory_inplace(v)
 
+    # make sure an empty view does not generate an error
+    u = t[10:10]
+    u = dgl.utils.pin_memory_inplace(u)
+
 
 @pytest.mark.skipif(
     F._default_context_str == "cpu", reason="Need gpu for this test."
