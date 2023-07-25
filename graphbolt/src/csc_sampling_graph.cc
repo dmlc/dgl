@@ -517,10 +517,12 @@ torch::Tensor Pick<SamplerType::LABOR>(
     return picked_neighbors;
   } else if (replace) {
     return LaborPick<false, true>(
-        offset, num_neighbors, fanout, options, probs_or_mask, args);
+        offset, num_neighbors, fanout, options,
+        /* probs_or_mask= */ torch::nullopt, args);
   } else {  // replace = false
     return LaborPick<false, false>(
-        offset, num_neighbors, fanout, options, probs_or_mask, args);
+        offset, num_neighbors, fanout, options,
+        /* probs_or_mask= */ torch::nullopt, args);
   }
 }
 
