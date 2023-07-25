@@ -186,9 +186,9 @@ class MinibatchSampler(IterDataPipe):
         # Shuffle before batch.
         if self._shuffle:
             # `torchdata.datapipes.iter.Shuffler` works with stream too.
-            # To ensure randomness, make sure the buffer size is at least 100
+            # To ensure randomness, make sure the buffer size is at least 10
             # times the batch size.
-            buffer_size = max(10000, 100 * self._batch_size)
+            buffer_size = max(10000, 10 * self._batch_size)
             data_pipe = data_pipe.shuffle(buffer_size)
 
         # Batch.
