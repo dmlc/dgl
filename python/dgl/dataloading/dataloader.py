@@ -348,18 +348,18 @@ def _init_gpu_caches(graph, gpu_caches):
         graph._gpu_caches = {"node": {}, "edge": {}}
     if gpu_caches is None:
         return
-    if not isinstance(gpu_caches, tuple):
-        gpu_caches = gpu_caches, {}
+    assert isinstance(gpu_caches, dict), "GPU cache argument should be a dict"
     for i, frames in enumerate([graph._node_frames, graph._edge_frames]):
+        node_or_edge = ["node", "edge"][i]
+        cache_inf = gpu_caches.get(node_or_edge, {})
         for tid, frame in enumerate(frames):
             type_ = [graph.ntypes, graph.canonical_etypes][i][tid]
             for key in frame.keys():
-                if key in gpu_caches[i] and gpu_caches[i][key] > 0:
+                if key in cache_inf and cache_inf[key] > 0:
                     column = frame._columns[key]
-                    node_or_edge = ["node", "edge"][i]
                     if (key, type_) not in graph._gpu_caches[node_or_edge]:
                         cache = GPUCache(
-                            gpu_caches[i][key],
+                            cache_inf[key],
                             _numel_of_shape(column.shape),
                             graph.idtype,
                         )
@@ -850,8 +850,12 @@ class DataLoader(torch.utils.data.DataLoader):
         Whether to pin the feature tensors into pinned memory.
 
         Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
-    gpu_cache : dict or tuple(dict, dict), optional
-        Which node or (node and edge) features to cache using HugeCTR gpu_cache.
+    gpu_cache : dict[dict], optional
+        Which node and edge features to cache using HugeCTR gpu_cache. Example:
+        {"node": {"features": 500000}, "edge": {"types": 4000000}} would
+        indicate that we want to cache 500k of the node "features" and 4M of the
+        edge "types" in GPU caches.
+
         Is supported only on NVIDIA GPUs with compute capability 70 or above.
         The dictionary holds the keys of features along with the corresponding
         cache sizes. Please see
