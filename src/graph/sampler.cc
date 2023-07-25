@@ -1169,11 +1169,15 @@ NegSubgraph EdgeSamplerObject::genNegEdgeSubgraph(
       }
       prev_neg_offset = neg_vids.size();
       randomSample(num_tot_nodes, neg_sample_size, exclude, &neg_vids);
-      assert(prev_neg_offset + neg_sample_size == neg_vids.size());
+      assert(
+          static_cast<size_t>(prev_neg_offset + neg_sample_size) ==
+          neg_vids.size());
     } else if (neg_sample_size < num_tot_nodes) {
       prev_neg_offset = neg_vids.size();
       randomSample(num_tot_nodes, neg_sample_size, &neg_vids);
-      assert(prev_neg_offset + neg_sample_size == neg_vids.size());
+      assert(
+          static_cast<size_t>(prev_neg_offset + neg_sample_size) ==
+          neg_vids.size());
     } else if (exclude_positive) {
       LOG(FATAL) << "We can't exclude positive edges"
                     "when sampling negative edges with all nodes.";

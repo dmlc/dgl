@@ -404,6 +404,7 @@ DGL_REGISTER_GLOBAL("heterograph_index._CAPI_DGLHeteroVertexSubgraph")
       HeteroGraphRef hg = args[0];
       List<Value> vids = args[1];
       bool relabel_nodes = args[2];
+      (void)relabel_nodes;
       std::vector<IdArray> vid_vec;
       vid_vec.reserve(vids.size());
       for (Value val : vids) {
