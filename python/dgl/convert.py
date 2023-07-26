@@ -29,7 +29,7 @@ __all__ = [
 
 
 def graph(
-    data=None,
+    data,
     *,
     num_nodes=None,
     idtype=None,
@@ -147,9 +147,6 @@ def graph(
     from_scipy
     from_networkx
     """
-    if data is None:
-        data = []
-
     if isinstance(data, spmatrix):
         raise DGLError(
             "dgl.graph no longer supports graph construction from a SciPy "
