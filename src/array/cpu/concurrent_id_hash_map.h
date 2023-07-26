@@ -195,6 +195,9 @@ class ConcurrentIdHashMap {
   IdType mask_;
 };
 
+template <typename IdType>
+bool BoolCompareAndSwap(IdType* ptr);
+
 }  // namespace aten
 }  // namespace dgl
 

@@ -72,6 +72,33 @@ class RandomEngine {
  private:
   pcg32 rng_;
 };
+
+namespace labor {
+
+template <typename T>
+inline T uniform_random(int64_t random_seed, int64_t t) {
+  pcg32 ng(random_seed, t);
+  std::uniform_real_distribution<T> uni;
+  return uni(ng);
+}
+
+template <typename T>
+inline T invcdf(T u, int64_t n, T rem) {
+  constexpr T one = 1;
+  return rem * (one - std::pow(one - u, one / n));
+}
+
+template <typename T>
+inline T jth_sorted_uniform_random(
+    int64_t random_seed, int64_t t, int64_t c, int64_t j, T& rem, int64_t n) {
+  const auto u = uniform_random<T>(random_seed, t + j * c);
+  // https://mathematica.stackexchange.com/a/256707
+  rem -= invcdf(u, n, rem);
+  return 1 - rem;
+}
+
+};  // namespace labor
+
 }  // namespace graphbolt
 
 #endif  // GRAPHBOLT_RANDOM_H_

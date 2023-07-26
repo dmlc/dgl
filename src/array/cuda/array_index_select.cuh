@@ -14,12 +14,13 @@ namespace impl {
 template <typename DType, typename IdType>
 __global__ void IndexSelectSingleKernel(
     const DType* array, const IdType* index, const int64_t length,
-    const int64_t arr_len, DType* out) {
-  int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int64_t arr_len, DType* out, const int64_t* perm = nullptr) {
+  int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride_x = gridDim.x * blockDim.x;
   while (tx < length) {
     assert(index[tx] >= 0 && index[tx] < arr_len);
-    out[tx] = array[index[tx]];
+    const auto out_row = perm ? perm[tx] : tx;
+    out[out_row] = array[index[tx]];
     tx += stride_x;
   }
 }
@@ -27,20 +28,22 @@ __global__ void IndexSelectSingleKernel(
 template <typename DType, typename IdType>
 __global__ void IndexSelectMultiKernel(
     const DType* const array, const int64_t num_feat, const IdType* const index,
-    const int64_t length, const int64_t arr_len, DType* const out) {
-  int64_t out_row = blockIdx.x * blockDim.y + threadIdx.y;
+    const int64_t length, const int64_t arr_len, DType* const out,
+    const int64_t* perm = nullptr) {
+  int64_t out_row_index = blockIdx.x * blockDim.y + threadIdx.y;
 
   const int64_t stride = blockDim.y * gridDim.x;
 
-  while (out_row < length) {
+  while (out_row_index < length) {
     int64_t col = threadIdx.x;
-    const int64_t in_row = index[out_row];
+    const int64_t in_row = index[out_row_index];
     assert(in_row >= 0 && in_row < arr_len);
+    const auto out_row = perm ? perm[out_row_index] : out_row_index;
     while (col < num_feat) {
       out[out_row * num_feat + col] = array[in_row * num_feat + col];
       col += blockDim.x;
     }
-    out_row += stride;
+    out_row_index += stride;
   }
 }
 

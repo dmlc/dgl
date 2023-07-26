@@ -1,9 +1,9 @@
 """Ondisk metadata of GraphBolt."""
 
+from enum import Enum
 from typing import List, Optional
 
 import pydantic
-import pydantic_yaml
 
 
 __all__ = [
@@ -17,7 +17,7 @@ __all__ = [
 ]
 
 
-class OnDiskFeatureDataFormat(pydantic_yaml.YamlStrEnum):
+class OnDiskFeatureDataFormat(str, Enum):
     """Enum of data format."""
 
     TORCH = "torch"
@@ -27,13 +27,13 @@ class OnDiskFeatureDataFormat(pydantic_yaml.YamlStrEnum):
 class OnDiskTVTSet(pydantic.BaseModel):
     """Train-Validation-Test set."""
 
-    type: Optional[str]
+    type: Optional[str] = None
     format: OnDiskFeatureDataFormat
     in_memory: Optional[bool] = True
     path: str
 
 
-class OnDiskFeatureDataDomain(pydantic_yaml.YamlStrEnum):
+class OnDiskFeatureDataDomain(str, Enum):
     """Enum of feature data domain."""
 
     NODE = "node"
@@ -44,14 +44,14 @@ class OnDiskFeatureDataDomain(pydantic_yaml.YamlStrEnum):
 class OnDiskFeatureData(pydantic.BaseModel):
     r"""The description of an on-disk feature."""
     domain: OnDiskFeatureDataDomain
-    type: Optional[str]
+    type: Optional[str] = None
     name: str
     format: OnDiskFeatureDataFormat
     path: str
     in_memory: Optional[bool] = True
 
 
-class OnDiskGraphTopologyType(pydantic_yaml.YamlStrEnum):
+class OnDiskGraphTopologyType(str, Enum):
     """Enum of graph topology type."""
 
     CSC_SAMPLING = "CSCSamplingGraph"
@@ -64,7 +64,7 @@ class OnDiskGraphTopology(pydantic.BaseModel):
     path: str
 
 
-class OnDiskMetaData(pydantic_yaml.YamlModel):
+class OnDiskMetaData(pydantic.BaseModel):
     """Metadata specification in YAML.
 
     As multiple node/edge types and multiple splits are supported, each TVT set

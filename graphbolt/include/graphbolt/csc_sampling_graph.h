@@ -16,6 +16,21 @@
 namespace graphbolt {
 namespace sampling {
 
+enum SamplerType { NEIGHBOR, LABOR };
+
+template <SamplerType S>
+struct SamplerArgs;
+
+template <>
+struct SamplerArgs<SamplerType::NEIGHBOR> {};
+
+template <>
+struct SamplerArgs<SamplerType::LABOR> {
+  const torch::Tensor& indices;
+  int64_t random_seed;
+  int64_t num_nodes;
+};
+
 /**
  * @brief A sampling oriented csc format graph.
  *
@@ -143,20 +158,24 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param replace Boolean indicating whether the sample is preformed with or
    * without replacement. If True, a value can be selected multiple times.
    * Otherwise, each value can be selected only once.
+   * @param layer Boolean indicating whether neighbors should be sampled in a
+   * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
+   * sampled edges, see arXiv:2210.13339.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
    * typically used when edge features are required.
-   * @param probs_or_mask Optional tensor containing the (unnormalized)
-   * probabilities or boolean mask associated with each neighboring edge of a
-   * node. It must be a 1D floating-point or boolean tensor with the number of
-   * elements equal to the number of edges.
+   * @param probs_name An optional string specifying the name of an edge
+   * attribute. This attribute tensor should contain (unnormalized)
+   * probabilities corresponding to each neighboring edge of a node. It must be
+   * a 1D floating-point or boolean tensor, with the number of elements
+   * equalling the total number of edges.
    *
    * @return An intrusive pointer to a SampledSubgraph object containing the
    * sampled graph's information.
    */
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool return_eids,
-      torch::optional<torch::Tensor> probs_or_mask) const;
+      bool replace, bool layer, bool return_eids,
+      torch::optional<std::string> probs_name) const;
 
   /**
    * @brief Sample negative edges by randomly choosing negative
@@ -203,6 +222,13 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const std::string& shared_memory_name);
 
  private:
+  template <SamplerType S>
+  c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
+      const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
+      bool replace, bool return_eids,
+      const torch::optional<torch::Tensor>& probs_or_mask,
+      SamplerArgs<S> args) const;
+
   /**
    * @brief Build a CSCSamplingGraph from shared memory tensors.
    *
@@ -297,10 +323,11 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  *
  * @return A tensor containing the picked neighbors.
  */
+template <SamplerType S>
 torch::Tensor Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args);
 
 /**
  * @brief Picks a specified number of neighbors for a node per edge type,
@@ -329,11 +356,19 @@ torch::Tensor Pick(
  *
  * @return A tensor containing the picked neighbors.
  */
+template <SamplerType S>
 torch::Tensor PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args);
+
+template <bool NonUniform, bool Replace, typename T = float>
+torch::Tensor LaborPick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    SamplerArgs<SamplerType::LABOR> args);
 
 }  // namespace sampling
 }  // namespace graphbolt
