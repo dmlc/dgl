@@ -13,6 +13,7 @@ from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from torch.utils.data import WeightedRandomSampler
 
+
 def _load_memory_mapped_array(file_name):
     # Due to a legacy problem related to memory alignment in joblib [1], the
     # data provided in the example may not be byte-aligned. This can be risky
