@@ -1,4 +1,9 @@
 import argparse
+<<<<<<< HEAD
+=======
+
+import joblib
+>>>>>>> ebe06bd2d0c72364e78558129f0ea4a0508e647b
 
 import numpy as np
 import pandas as pd
@@ -20,6 +25,7 @@ def _load_memory_mapped_array(file_name):
     # [1] https://joblib.readthedocs.io/en/latest/developing.html#release-1-2-0
     dump(load(file_name), file_name)
     return load(file_name, mmap_mode="r")
+
 
 if __name__ == "__main__":
     # argparse commandline args
