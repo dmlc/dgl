@@ -256,7 +256,7 @@ class GCN2Conv(nn.Module):
             feat_0 = feat_0[: feat.size(0)] * self.alpha
 
             if self._project_initial_features:
-                rst = feat + feat_0
+                feat_sum = feat + feat_0
                 rst = (1 - self.beta) * rst + self.beta * rst @ self.weight1
             else:
                 feat_sum = feat + feat_0
