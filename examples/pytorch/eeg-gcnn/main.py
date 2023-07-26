@@ -1,5 +1,4 @@
 import argparse
-import joblib
 
 import numpy as np
 import pandas as pd
@@ -8,16 +7,18 @@ import torch.nn as nn
 
 from dgl.dataloading import GraphDataLoader
 from EEGGraphDataset import EEGGraphDataset
-from joblib import load
+from joblib import dump, load
 from sklearn import preprocessing
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from torch.utils.data import WeightedRandomSampler
 
-def load_memory_mapped_array(file_name):
-    # Since `file_name` is not always byte-aligned,
-    # let's fix this to avoid the warning.
-    joblib.dump(joblib.load(file_name), file_name)
+def _load_memory_mapped_array(file_name):
+    # Due to a legacy problem related to memory alignment in joblib [1], the
+    # data provided in the example may not be byte-aligned. This can be risky
+    # when loading with mmap_mode. To fix the issue, load and re-dump the data.
+    # [1] https://joblib.readthedocs.io/en/latest/developing.html#release-1-2-0
+    dump(load(file_name), file_name)
     return load(file_name, mmap_mode="r")
 
 if __name__ == "__main__":
@@ -96,8 +97,8 @@ if __name__ == "__main__":
     num_feats = args.num_feats
 
     # set up input and targets from files
-    x = load_memory_mapped_array(f"psd_features_data_X")
-    y = load_memory_mapped_array(f"labels_y")
+    x = _load_memory_mapped_array(f"psd_features_data_X")
+    y = _load_memory_mapped_array(f"labels_y")
 
     # normalize psd features data
     normd_x = []
