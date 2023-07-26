@@ -451,11 +451,13 @@ else:
 
 
 def zerocopy_to_dgl_ndarray_for_write(input):
-    assert input.is_contiguous(), (
-        "Cannot convert non-contiguous tensors "
-        "to dgl ndarray for write. Call .to_contiguous() first."
-    )
-    check_is_view(input)
+    if input.numel() > 0:
+        # only check non-empty tensors
+        assert input.is_contiguous(), (
+            "Cannot convert non-contiguous tensors "
+            "to dgl ndarray for write. Call .to_contiguous() first."
+        )
+        check_is_view(input)
     return zerocopy_to_dgl_ndarray(input)
 
 
