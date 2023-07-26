@@ -1017,7 +1017,7 @@ class HeteroGraphIndex(ObjectBase):
             raise DGLError("Invalid incidence matrix type: %s" % str(typestr))
         return inc, shuffle_idx
 
-    def node_subgraph(self, induced_nodes, relabel_nodes):
+    def node_subgraph(self, induced_nodes):
         """Return the induced node subgraph.
 
         Parameters
@@ -1025,9 +1025,6 @@ class HeteroGraphIndex(ObjectBase):
         induced_nodes : list of utils.Index
             Induced nodes. The length should be equal to the number of
             node types in this heterograph.
-        relabel_nodes : bool
-            If True, the extracted subgraph will only have the nodes in the specified node set
-            and it will relabel the nodes in order.
 
         Returns
         -------
@@ -1035,7 +1032,7 @@ class HeteroGraphIndex(ObjectBase):
             The subgraph index.
         """
         vids = [F.to_dgl_nd(nodes) for nodes in induced_nodes]
-        return _CAPI_DGLHeteroVertexSubgraph(self, vids, relabel_nodes)
+        return _CAPI_DGLHeteroVertexSubgraph(self, vids)
 
     def edge_subgraph(self, induced_edges, preserve_nodes):
         """Return the induced edge subgraph.
