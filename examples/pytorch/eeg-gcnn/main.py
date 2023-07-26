@@ -1,9 +1,4 @@
 import argparse
-<<<<<<< HEAD
-=======
-
-import joblib
->>>>>>> ebe06bd2d0c72364e78558129f0ea4a0508e647b
 
 import numpy as np
 import pandas as pd
