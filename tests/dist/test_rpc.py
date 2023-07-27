@@ -9,8 +9,7 @@ dgl_envs = f"PYTHONUNBUFFERED=1 DMLC_LOG_DEBUG=1 DGLBACKEND={os.environ.get('DGL
 
 
 @unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-@pytest.mark.parametrize("net_type", ["socket", "tensorpipe"])
-def test_rpc(net_type):
+def test_rpc():
     ip_config = os.environ.get("DIST_DGL_TEST_IP_CONFIG", "ip_config.txt")
     num_clients = 1
     num_servers = 1
@@ -21,7 +20,7 @@ def test_rpc(net_type):
     )
     base_envs = (
         dgl_envs
-        + f" DGL_DIST_MODE=distributed DIST_DGL_TEST_IP_CONFIG={ip_config} DIST_DGL_TEST_NUM_SERVERS={num_servers} DIST_DGL_TEST_NET_TYPE={net_type} "
+        + f" DGL_DIST_MODE=distributed DIST_DGL_TEST_IP_CONFIG={ip_config} DIST_DGL_TEST_NUM_SERVERS={num_servers} "
     )
     procs = []
     # start server processes

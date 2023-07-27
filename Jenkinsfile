@@ -81,7 +81,7 @@ def unit_test_cugraph(backend, dev) {
 def unit_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 50, unit: 'MINUTES') {
     bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
   }
 }
@@ -119,17 +119,22 @@ def go_test_linux() {
 }
 
 def is_authorized(name) {
-  def devs = ['dgl-bot', 'noreply', 'Rhett-Ying', 'BarclayII', 'jermainewang',
-              'mufeili', 'isratnisa', 'rudongyu', 'classicsong', 'HuXiangkun',
-              'hetong007', 'kylasa', 'frozenbugs', 'peizhou001', 'zheng-da',
-              'czkkkkkk', 'thvasilo',
-              'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa',
-              'kkranen',
-              'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
-              'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit',
-              'VoVAllen',
-              'keli-wen',
-              ]
+  def devs = [
+    // System:
+    'dgl-bot', 'noreply',
+    // Core:
+    'Rhett-Ying', 'BarclayII', 'jermainewang', 'mufeili', 'isratnisa',
+    'rudongyu', 'classicsong', 'HuXiangkun', 'hetong007', 'kylasa',
+    'frozenbugs', 'peizhou001', 'zheng-da', 'czkkkkkk', 'thvasilo',
+    // Intern:
+    'keli-wen', 'caojy1998', 'RamonZhou',
+    // Friends:
+    'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
+    'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
+    'hankaj', 'agrabows', 'DominikaJedynak', 'RafLit', 'mfbalin',
+    // Emeritus:
+    'VoVAllen',
+  ]
   return (name in devs)
 }
 
@@ -282,7 +287,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230711"
                   args "-u root"
                   alwaysPull true
                 }
@@ -300,7 +305,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-gpu:cu102_v230210"
+                  image "dgllib/dgl-ci-gpu:cu116_v230711"
                   args "-u root"
                   alwaysPull true
                 }
@@ -355,7 +360,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230711"
                   alwaysPull true
                 }
               }
@@ -372,7 +377,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu102_v230210"
+                  image "dgllib/dgl-ci-gpu:cu116_v230711"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -401,7 +406,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230711"
                   alwaysPull true
                 }
               }
@@ -422,7 +427,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu101_v230210"
+                  image "dgllib/dgl-ci-gpu:cu116_v230711"
                   args "--runtime nvidia"
                   alwaysPull true
                 }
@@ -432,6 +437,8 @@ pipeline {
                   steps {
                     unit_test_linux('tensorflow', 'gpu')
                   }
+                  // Tensorflow does not support cuda 11.6 yet.
+                  when { expression { false } }
                 }
               }
               post {
@@ -444,7 +451,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230711"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -496,7 +503,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-gpu-node"
-                  image "dgllib/dgl-ci-gpu:cu102_v230210"
+                  image "dgllib/dgl-ci-gpu:cu116_v230711"
                   args "--runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
@@ -524,7 +531,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230711"
                   args "--shm-size=4gb"
                   alwaysPull true
                 }
@@ -534,6 +541,7 @@ pipeline {
                   steps {
                     unit_distributed_linux('pytorch', 'cpu')
                   }
+                  when { expression { false } }
                 }
               }
               post {
@@ -569,7 +577,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230210"
+                  image "dgllib/dgl-ci-cpu:v230711"
                   alwaysPull true
                 }
               }

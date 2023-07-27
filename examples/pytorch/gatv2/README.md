@@ -9,7 +9,7 @@ Dependencies
 ------------
 - torch
 - requests
-- sklearn
+- scikit-learn
 
 How to run
 ----------

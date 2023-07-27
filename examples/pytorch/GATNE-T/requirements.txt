@@ -1,6 +1,6 @@
 tqdm
 numpy
-sklearn
+scikit-learn
 networkx
 gensim
 requests

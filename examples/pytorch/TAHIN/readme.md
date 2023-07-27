@@ -10,7 +10,7 @@ Dependencies
 ----------------------
 - pytorch 1.7.1
 - dgl 0.6.0
-- sklearn 0.22.1
+- scikit-learn 0.22.1
 
 Datasets
 ---------------------------------------

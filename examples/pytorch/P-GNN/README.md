@@ -16,11 +16,6 @@ networkx 2.6.3
 scikit-learn 1.0.2
 ```
 
-## Instructions to download datasets:
-
-1. Download datasets from [here](https://github.com/RecLusIve-F/P-GNN-dgl/blob/master/data.zip?raw=true)
-2. Extract zip folder in this directory
-
 ## Instructions for experiments
 
 ### Link prediction

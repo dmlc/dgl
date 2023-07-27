@@ -1218,6 +1218,21 @@ HeteroGraphPtr UnitGraph::CreateFromCSR(
   return HeteroGraphPtr(new UnitGraph(mg, nullptr, csr, nullptr, formats));
 }
 
+HeteroGraphPtr UnitGraph::CreateFromCSRAndCOO(
+    int64_t num_vtypes, const aten::CSRMatrix& csr, const aten::COOMatrix& coo,
+    dgl_format_code_t formats) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  CHECK_EQ(coo.num_rows, csr.num_rows);
+  CHECK_EQ(coo.num_cols, csr.num_cols);
+  if (num_vtypes == 1) {
+    CHECK_EQ(csr.num_rows, csr.num_cols);
+  }
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr csrPtr(new CSR(mg, csr));
+  COOPtr cooPtr(new COO(mg, coo));
+  return HeteroGraphPtr(new UnitGraph(mg, nullptr, csrPtr, cooPtr, formats));
+}
+
 HeteroGraphPtr UnitGraph::CreateFromCSC(
     int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray indptr,
     IdArray indices, IdArray edge_ids, dgl_format_code_t formats) {
@@ -1235,6 +1250,21 @@ HeteroGraphPtr UnitGraph::CreateFromCSC(
   auto mg = CreateUnitGraphMetaGraph(num_vtypes);
   CSRPtr csc(new CSR(mg, mat));
   return HeteroGraphPtr(new UnitGraph(mg, csc, nullptr, nullptr, formats));
+}
+
+HeteroGraphPtr UnitGraph::CreateFromCSCAndCOO(
+    int64_t num_vtypes, const aten::CSRMatrix& csc, const aten::COOMatrix& coo,
+    dgl_format_code_t formats) {
+  CHECK(num_vtypes == 1 || num_vtypes == 2);
+  CHECK_EQ(coo.num_rows, csc.num_cols);
+  CHECK_EQ(coo.num_cols, csc.num_rows);
+  if (num_vtypes == 1) {
+    CHECK_EQ(csc.num_rows, csc.num_cols);
+  }
+  auto mg = CreateUnitGraphMetaGraph(num_vtypes);
+  CSRPtr cscPtr(new CSR(mg, csc));
+  COOPtr cooPtr(new COO(mg, coo));
+  return HeteroGraphPtr(new UnitGraph(mg, cscPtr, nullptr, cooPtr, formats));
 }
 
 HeteroGraphPtr UnitGraph::AsNumBits(HeteroGraphPtr g, uint8_t bits) {
@@ -1529,18 +1559,28 @@ HeteroGraphPtr UnitGraph::GetFormat(SparseFormat format) const {
 }
 
 HeteroGraphPtr UnitGraph::GetGraphInFormat(dgl_format_code_t formats) const {
-  if (formats == ALL_CODE)
+  // Get the created formats.
+  auto created_formats = GetCreatedFormats();
+  // Get the intersection of formats and created_formats.
+  auto intersection = formats & created_formats;
+
+  // If the intersection of formats and created_formats is not empty.
+  // The format(s) in the intersection will be retained.
+  if (intersection != 0) {
+    COOPtr coo_ptr = COO_CODE & intersection ? GetCOO(false) : nullptr;
+    CSRPtr in_csr_ptr = CSC_CODE & intersection ? GetInCSR(false) : nullptr;
+    CSRPtr out_csr_ptr = CSR_CODE & intersection ? GetOutCSR(false) : nullptr;
+
     return HeteroGraphPtr(
-        // TODO(xiangsx) Make it as graph storage.Clone()
-        new UnitGraph(
-            meta_graph_,
-            (in_csr_->defined()) ? CSRPtr(new CSR(*in_csr_)) : nullptr,
-            (out_csr_->defined()) ? CSRPtr(new CSR(*out_csr_)) : nullptr,
-            (coo_->defined()) ? COOPtr(new COO(*coo_)) : nullptr, formats));
+        new UnitGraph(meta_graph_, in_csr_ptr, out_csr_ptr, coo_ptr, formats));
+  }
+
+  // If the intersection of formats and created_formats is empty.
+  // Create a format in the order of COO -> CSR -> CSC.
   int64_t num_vtypes = NumVertexTypes();
-  if (formats & COO_CODE)
+  if (COO_CODE & formats)
     return CreateFromCOO(num_vtypes, GetCOO(false)->adj(), formats);
-  if (formats & CSR_CODE)
+  if (CSR_CODE & formats)
     return CreateFromCSR(num_vtypes, GetOutCSR(false)->adj(), formats);
   return CreateFromCSC(num_vtypes, GetInCSR(false)->adj(), formats);
 }
