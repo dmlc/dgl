@@ -15,8 +15,8 @@
 #  *   See the License for the specific language governing permissions and
 #  *   limitations under the License.
 #  *
-#  * \file train_lightning_labor.py
-#  * \brief labor sampling example
+#  * @file train_lightning.py
+#  * @brief labor sampling example
 #  */
 
 import argparse
@@ -39,7 +39,6 @@ from pytorch_lightning.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
-
 
 def cuda_index_tensor(tensor, idx):
     assert idx.device != th.device("cpu")
@@ -528,7 +527,11 @@ if __name__ == "__main__":
     argparser.add_argument("--val-acc-target", type=float, default=1)
     argparser.add_argument("--early-stopping-patience", type=int, default=10)
     argparser.add_argument("--disable-checkpoint", action="store_true")
+    argparser.add_argument("--precision", type=str, default="highest")
     args = argparser.parse_args()
+
+    if args.precision != "highest":
+        th.set_float32_matmul_precision(args.precision)
 
     if args.gpu >= 0:
         device = th.device("cuda:%d" % args.gpu)
@@ -590,7 +593,8 @@ if __name__ == "__main__":
     )
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(
-        gpus=[args.gpu] if args.gpu != -1 else None,
+        accelerator="gpu" if args.gpu != -1 else "cpu",
+        devices=[args.gpu],
         accumulate_grad_batches=args.independent_batches,
         max_epochs=args.num_epochs,
         max_steps=args.num_steps,
