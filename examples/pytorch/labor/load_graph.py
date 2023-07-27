@@ -83,7 +83,7 @@ def load_mag240m(root="dataset"):
     return g, num_labels
 
 
-def load_ogb(name, root="~/.ogb"):
+def load_ogb(name, root="dataset"):
     if name == "ogbn-mag240M":
         return load_mag240m(root)
 
