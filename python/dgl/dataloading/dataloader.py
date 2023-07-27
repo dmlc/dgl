@@ -403,7 +403,7 @@ def _prefetch_update_feats(
                     )
                     values = F.astype(values, F.dtype(missing_values))
                     F.scatter_row_inplace(values, missing_index, missing_values)
-                    # reshape the flattened result to match the original shape.
+                    # Reshape the flattened result to match the original shape.
                     F.reshape(values, (values.shape[0],) + item_shape)
                     values.__cache_miss__ = missing_keys.shape[0] / ids.shape[0]
                     feats[tid, key] = values
