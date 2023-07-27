@@ -6,10 +6,8 @@ cdef const char* _c_str_dltensor = "dltensor"
 cdef const char* _c_str_used_dltensor = "used_dltensor"
 
 
-#cdef void _c_dlpack_deleter(PyObject* ptr):
 cdef void _c_dlpack_deleter(object pycaps):
     cdef DLManagedTensor* dltensor
-    #cdef object pycaps = <object> ptr
     if pycapsule.PyCapsule_IsValid(pycaps, _c_str_dltensor):
         dltensor = <DLManagedTensor*>pycapsule.PyCapsule_GetPointer(pycaps, _c_str_dltensor)
         DGLDLManagedTensorCallDeleter(dltensor)
@@ -82,7 +80,6 @@ cdef class NDArrayBase:
             raise ValueError("to_dlpack do not work with memory views")
         CALL(DGLArrayToDLPack(self.chandle, &dltensor, alignment))
         return pycapsule.PyCapsule_New(dltensor, _c_str_dltensor, <PyCapsule_Destructor>_c_dlpack_deleter)
-        # return pycapsule.PyCapsule_New(dltensor, _c_str_dltensor, _c_dlpack_deleter)
 
 
 cdef c_make_array(void* chandle, is_view):
