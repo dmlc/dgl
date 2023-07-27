@@ -38,6 +38,24 @@ inline int FindNumThreads(int dim, int max_nthrs = CUDA_MAX_NUM_THREADS) {
   return ret;
 }
 
+template <typename T>
+int _NumberOfBits(const T& range) {
+  if (range <= 1) {
+    // ranges of 0 or 1 require no bits to store
+    return 0;
+  }
+
+  int bits = 1;
+  while (bits < static_cast<int>(sizeof(T) * 8) && (1 << bits) < range) {
+    ++bits;
+  }
+
+  CHECK_EQ((range - 1) >> bits, 0);
+  CHECK_NE((range - 1) >> (bits - 1), 0);
+
+  return bits;
+}
+
 /**
  * @brief Find number of blocks is smaller than nblks and max_nblks
  * on the given axis ('x', 'y' or 'z').
