@@ -3,11 +3,13 @@ import atexit
 import inspect
 import itertools
 import math
+import operator
 import os
 import re
 import threading
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
+from functools import reduce
 from queue import Empty, Full, Queue
 
 import numpy as np
@@ -21,6 +23,7 @@ from .._ffi.base import is_tensor_adaptor_enabled
 
 from ..base import dgl_warning, DGLError, EID, NID
 from ..batch import batch as batch_graphs
+from ..cuda import GPUCache
 from ..distributed import DistGraph
 from ..frame import LazyFeature
 from ..heterograph import DGLGraph
@@ -336,8 +339,45 @@ class DDPTensorizedDataset(torch.utils.data.IterableDataset):
         ) // self.batch_size
 
 
+def _numel_of_shape(shape):
+    return reduce(operator.mul, shape, 1)
+
+
+def _init_gpu_caches(graph, gpu_caches):
+    if not hasattr(graph, "_gpu_caches"):
+        graph._gpu_caches = {"node": {}, "edge": {}}
+    if gpu_caches is None:
+        return
+    assert isinstance(gpu_caches, dict), "GPU cache argument should be a dict"
+    for i, frames in enumerate([graph._node_frames, graph._edge_frames]):
+        node_or_edge = ["node", "edge"][i]
+        cache_inf = gpu_caches.get(node_or_edge, {})
+        for tid, frame in enumerate(frames):
+            type_ = [graph.ntypes, graph.canonical_etypes][i][tid]
+            for key in frame.keys():
+                if key in cache_inf and cache_inf[key] > 0:
+                    column = frame._columns[key]
+                    if (key, type_) not in graph._gpu_caches[node_or_edge]:
+                        cache = GPUCache(
+                            cache_inf[key],
+                            _numel_of_shape(column.shape),
+                            graph.idtype,
+                        )
+                        graph._gpu_caches[node_or_edge][key, type_] = (
+                            cache,
+                            column.shape,
+                        )
+
+
 def _prefetch_update_feats(
-    feats, frames, types, get_storage_func, id_name, device, pin_prefetcher
+    feats,
+    frames,
+    types,
+    get_storage_func,
+    id_name,
+    device,
+    pin_prefetcher,
+    gpu_caches,
 ):
     for tid, frame in enumerate(frames):
         type_ = types[tid]
@@ -351,9 +391,26 @@ def _prefetch_update_feats(
                         "Found a LazyFeature with no ID specified, "
                         "and the graph does not have dgl.NID or dgl.EID columns"
                     )
-                feats[tid, key] = get_storage_func(parent_key, type_).fetch(
-                    column.id_ or default_id, device, pin_prefetcher
-                )
+                ids = column.id_ or default_id
+                if (parent_key, type_) in gpu_caches:
+                    cache, item_shape = gpu_caches[parent_key, type_]
+                    values, missing_index, missing_keys = cache.query(ids)
+                    missing_values = get_storage_func(parent_key, type_).fetch(
+                        missing_keys, device, pin_prefetcher
+                    )
+                    cache.replace(
+                        missing_keys, F.astype(missing_values, F.float32)
+                    )
+                    values = F.astype(values, F.dtype(missing_values))
+                    F.scatter_row_inplace(values, missing_index, missing_values)
+                    # Reshape the flattened result to match the original shape.
+                    F.reshape(values, (values.shape[0],) + item_shape)
+                    values.__cache_miss__ = missing_keys.shape[0] / ids.shape[0]
+                    feats[tid, key] = values
+                else:
+                    feats[tid, key] = get_storage_func(parent_key, type_).fetch(
+                        ids, device, pin_prefetcher
+                    )
 
 
 # This class exists to avoid recursion into the feature dictionary returned by the
@@ -376,6 +433,7 @@ def _prefetch_for_subgraph(subg, dataloader):
         NID,
         dataloader.device,
         dataloader.pin_prefetcher,
+        dataloader.graph._gpu_caches["node"],
     )
     _prefetch_update_feats(
         edge_feats,
@@ -385,6 +443,7 @@ def _prefetch_for_subgraph(subg, dataloader):
         EID,
         dataloader.device,
         dataloader.pin_prefetcher,
+        dataloader.graph._gpu_caches["edge"],
     )
     return _PrefetchedGraphFeatures(node_feats, edge_feats)
 
@@ -791,6 +850,17 @@ class DataLoader(torch.utils.data.DataLoader):
         Whether to pin the feature tensors into pinned memory.
 
         Default: True if the graph is on CPU and :attr:`device` is CUDA.  False otherwise.
+    gpu_cache : dict[dict], optional
+        Which node and edge features to cache using HugeCTR gpu_cache. Example:
+        {"node": {"features": 500000}, "edge": {"types": 4000000}} would
+        indicate that we want to cache 500k of the node "features" and 4M of the
+        edge "types" in GPU caches.
+
+        Is supported only on NVIDIA GPUs with compute capability 70 or above.
+        The dictionary holds the keys of features along with the corresponding
+        cache sizes. Please see
+        https://github.com/NVIDIA-Merlin/HugeCTR/blob/main/gpu_cache/ReadMe.md
+        for further reference.
     kwargs : dict
         Key-word arguments to be passed to the parent PyTorch
         :py:class:`torch.utils.data.DataLoader` class. Common arguments are:
@@ -867,6 +937,7 @@ class DataLoader(torch.utils.data.DataLoader):
         use_alternate_streams=None,
         pin_prefetcher=None,
         use_uva=False,
+        gpu_cache=None,
         **kwargs,
     ):
         # (BarclayII) PyTorch Lightning sometimes will recreate a DataLoader from an existing
@@ -1054,6 +1125,8 @@ class DataLoader(torch.utils.data.DataLoader):
         worker_init_fn = WorkerInitWrapper(kwargs.pop("worker_init_fn", None))
 
         self.other_storages = {}
+
+        _init_gpu_caches(self.graph, gpu_cache)
 
         super().__init__(
             self.dataset,
