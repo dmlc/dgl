@@ -652,6 +652,46 @@ class HeteroPGExplainer(PGExplainer):
         """
         return super().train_step(graph, feat, tmp=tmp, **kwargs)
 
+    def train_step_node(self, nodes, graph, feat, tmp, **kwargs):
+        r"""Compute the loss of the explanation network
+
+        Parameters
+        ----------
+        nodes : dict
+            TODO
+        graph : DGLGraph
+            Input heterogeneous graph.
+        feat : Tensor
+            TODO
+        tmp : float
+            The temperature parameter fed to the sampling procedure.
+        kwargs : dict
+            Additional arguments passed to the GNN model.
+
+        Returns
+        -------
+        Tensor
+            A scalar tensor representing the loss.
+        """
+        assert (
+            not self.graph_explanation
+        ), '"explain_graph" must be False in initializing the module.'
+
+        self.model = self.model.to(graph.device)
+        self.elayers = self.elayers.to(graph.device)
+
+        prob, _, batched_graph, inverse_indices = self.explain_node(
+            nodes, graph, feat, tmp=tmp, training=True, **kwargs
+        )
+
+        pred = self.model(
+            batched_graph, self.batched_feats, embed=False, **kwargs
+        )
+        pred = pred.argmax(-1).data
+
+        loss = self.loss(prob[inverse_indices], pred[inverse_indices])
+        return loss
+
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
         r"""Learn and return an edge mask that plays a crucial role to
         explain the prediction made by the GNN for a graph. Also, return
@@ -770,9 +810,7 @@ class HeteroPGExplainer(PGExplainer):
         homo_graph = to_homogeneous(graph, ndata=["emb"])
         homo_embed = homo_graph.ndata["emb"]
 
-        edge_idx = homo_graph.edges()
-
-        col, row = edge_idx
+        col, row = homo_graph.edges()
         col_emb = homo_embed[col.long()]
         row_emb = homo_embed[row.long()]
         emb = torch.cat([col_emb, row_emb], dim=-1)
@@ -807,3 +845,231 @@ class HeteroPGExplainer(PGExplainer):
             self.clear_masks()
 
         return (probs, hetero_edge_mask)
+
+    def explain_node(
+        self, nodes, graph, feat, tmp=1.0, training=False, **kwargs
+    ):
+        r"""Learn and return an edge mask that plays a crucial role to
+        explain the prediction made by the GNN for node :attr:`node_id`.
+        Also, return the prediction made with the edges chosen based on
+        the edge mask.
+
+        Parameters
+        ----------
+        nodes : dict
+            TODO
+        graph : DGLGraph
+            A heterogeneous graph.
+        feat : Tensor
+            TODO
+        tmp : float
+            The temperature parameter fed to the sampling procedure.
+        training : bool
+            Training the explanation network.
+        kwargs : dict
+            Additional arguments passed to the GNN model.
+
+        Returns
+        -------
+        Tensor
+            Classification probabilities given the masked graph. It is a tensor of
+            shape :math:`(B, L)`, where :math:`L` is the different types of label
+            in the dataset, and :math:`B` is the batch size.
+        Tensor
+            Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
+            is the number of edges in the graph. A higher weight suggests a larger
+            contribution of the edge.
+        DGLGraph
+            The batched set of subgraphs induced on the k-hop in-neighborhood
+            of the input center nodes.
+        Tensor
+            The new IDs of the subgraph center nodes.
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import torch as th
+        >>> import torch.nn as nn
+        >>> import numpy as np
+
+        >>> # Define the model
+        >>> class Model(nn.Module):
+        ...     def __init__(self, in_feats, hid_feats, out_feats, rel_names):
+        ...         super().__init__()
+        ...         self.conv = dgl.nn.HeteroGraphConv(
+        ...             {rel: dgl.nn.GraphConv(in_feats, hid_feats) for rel in rel_names},
+        ...             aggregate="sum",
+        ...         )
+        ...         self.fc = nn.Linear(hid_feats, out_feats)
+        ...         nn.init.xavier_uniform_(self.fc.weight)
+        ...
+        ...     def forward(self, g, h, embed=False, edge_weight=None):
+        ...         if edge_weight:
+        ...             mod_kwargs = {
+        ...                 etype: {"edge_weight": mask} for etype, mask in edge_weight.items()
+        ...             }
+        ...             h = self.conv(g, h, mod_kwargs=mod_kwargs)
+        ...         else:
+        ...             h = self.conv(g, h)
+        ...
+        ...         if embed:
+        ...             return h
+        ...
+        ...         with g.local_scope():
+        ...             g.ndata["h"] = h
+        ...             hg = 0
+        ...             for ntype in g.ntypes:
+        ...                 hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
+        ...             return self.fc(hg)
+
+        >>> # Load dataset
+        >>> input_dim = 5
+        >>> hidden_dim = 5
+        >>> num_classes = 2
+        >>> g = dgl.heterograph({("user", "plays", "game"): ([0, 1, 1, 2], [0, 0, 1, 1])})
+        >>> g.nodes["user"].data["h"] = th.randn(g.num_nodes("user"), input_dim)
+        >>> g.nodes["game"].data["h"] = th.randn(g.num_nodes("game"), input_dim)
+
+        >>> transform = dgl.transforms.AddReverse()
+        >>> g = transform(g)
+
+        >>> # define and train the model
+        >>> model = Model(input_dim, hidden_dim, num_classes, g.canonical_etypes)
+        >>> optimizer = th.optim.Adam(model.parameters())
+        >>> for epoch in range(10):
+        ...     logits = model(g, g.ndata["h"])
+        ...     loss = th.nn.functional.cross_entropy(logits, th.tensor([1]))
+        ...     optimizer.zero_grad()
+        ...     loss.backward()
+        ...     optimizer.step()
+
+        >>> # Initialize the explainer
+        >>> explainer = dgl.nn.HeteroPGExplainer(
+        ...     model, hidden_dim, num_hops=2, explain_graph=False
+        ... )
+
+        >>> # Train the explainer
+        >>> # Define explainer temperature parameter
+        >>> init_tmp, final_tmp = 5.0, 1.0
+        >>> optimizer_exp = th.optim.Adam(explainer.parameters(), lr=0.01)
+        >>> for epoch in range(20):
+        ...     tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
+        ...     loss = explainer.train_step_node(
+        ...         { ntype: g.nodes(ntype) for ntype in g.ntypes },
+        ...         g, g.ndata["h"], tmp
+        ...     )
+        ...     optimizer_exp.zero_grad()
+        ...     loss.backward()
+        ...     optimizer_exp.step()
+
+        >>> # Explain the graph
+        >>> feat = g.ndata.pop("h")
+        >>> probs, edge_mask = explainer.explain_node({ "user": [0] }, g, feat)
+        """
+        assert (
+            not self.graph_explanation
+        ), '"explain_graph" must be False in initializing the module.'
+        assert (
+            self.num_hops is not None
+        ), '"num_hops" must be provided in initializing the module.'
+
+        self.model = self.model.to(graph.device)
+        self.elayers = self.elayers.to(graph.device)
+
+        # summary of batched node explanation:
+        # 1. extract a khop-subgraph for each target node.
+        #    these will be heterogeneous subgraphs, which will be converted to
+        #    homogeneous graphs in order to reuse logic from the existing impls.
+        # 2. batch these into a single graph to make evaluation more efficient.
+        #    embeddings and features must also be batched together to perform
+        #    model evaluation.
+        #    we need to track both these homogenous and heterogenous aspects of the
+        #    graph in order to jump between hetero-model evaluation and the flattenned
+        #    embedding space.
+        # 3. use the inverse indices mappings to get the correct node in the batched graph
+        #    to collect classifications results from when computing loss.
+
+        batched_graph = []
+        batched_feats = []
+        batched_embed = []
+        batched_inverse_indices = []
+        node_idx = 0
+        for target_ntype, target_nids in nodes.items():
+            for target_nid in target_nids:
+                sg, inverse_indices = khop_in_subgraph(
+                    graph, {target_ntype: target_nid}, self.num_hops
+                )
+                sg_feat = {
+                    ntype: feat[ntype][sg.ndata[NID][ntype].long()]
+                    for ntype in sg.ntypes
+                }
+
+                embed = self.model(sg, sg_feat, embed=True, **kwargs)
+                for ntype, emb in embed.items():
+                    sg.nodes[ntype].data["emb"] = emb.data
+
+                homo_graph = to_homogeneous(sg, ndata=["emb"])
+                homo_embed = homo_graph.ndata["emb"]
+
+                col, row = homo_graph.edges()
+                col_emb = homo_embed[col.long()]
+                row_emb = homo_embed[row.long()]
+                self_emb = homo_embed[inverse_indices[target_ntype][0]].repeat(
+                    sg.num_edges(), 1
+                )
+                emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
+                batched_embed.append(emb)
+                batched_graph.append(sg)
+                batched_feats.append(homo_graph.ndata[NID])
+                # node id's of subgraph mapped to batch:
+                # https://docs.dgl.ai/en/latest/generated/dgl.batch.html#dgl.batch
+                batched_inverse_indices.append(
+                    inverse_indices[target_ntype][0].item() + node_idx
+                )
+                node_idx += sg.num_nodes()
+
+        batched_graph = batch(batched_graph)
+        batched_feats = torch.cat(batched_feats)
+        batched_embed = torch.cat(batched_embed)
+
+        batched_embed = self.elayers(batched_embed)
+        values = batched_embed.reshape(-1)
+
+        values = self.concrete_sample(values, beta=tmp, training=training)
+        self.sparse_mask_values = values
+
+        col, row = batched_graph.edges()
+        reverse_eids = batched_graph.edge_ids(row, col).long()
+        edge_mask = (values + values[reverse_eids]) / 2
+
+        self.set_masks(batched_graph, edge_mask)
+
+        # convert the edge mask back into heterogeneous format
+        hetero_edge_mask = {
+            etype: edge_mask[
+                (homo_graph.edata[ETYPE] == graph.get_etype_id(etype))
+                .nonzero()
+                .squeeze(1)
+            ]
+            for etype in graph.canonical_etypes
+        }
+
+        # the model prediction with the updated edge mask
+        logits = self.model(
+            batched_graph, batched_feats, edge_weight=hetero_edge_mask, **kwargs
+        )
+        probs = F.softmax(logits, dim=-1)
+
+        if training:
+            self.batched_feats = batched_feats
+            probs = probs.data
+        else:
+            self.clear_masks()
+
+        return (
+            probs.data,
+            hetero_edge_mask,
+            batched_graph,
+            batched_inverse_indices,
+        )
