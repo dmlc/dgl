@@ -334,6 +334,38 @@ def test_binary_op(idtype):
                 _test(lhs, rhs, binary_op, reducer)
 
 
+# Issue #5873
+def test_multi_update_all_minmax_reduce_with_isolated_nodes():
+    g = dgl.heterograph(
+        {
+            ("A", "AB", "B"): ([0, 1, 2, 3], [0, 0, 1, 1]),
+            ("C", "CB", "B"): ([0, 1, 2, 3], [2, 2, 3, 3]),
+        },
+        device=F.ctx(),
+    )
+    g.nodes["A"].data["x"] = F.randn((4, 16))
+    g.nodes["C"].data["x"] = F.randn((4, 16))
+    g.multi_update_all(
+        {
+            "AB": (dgl.function.copy_u("x", "m"), dgl.function.min("m", "a1")),
+            "CB": (dgl.function.copy_u("x", "m"), dgl.function.min("m", "a2")),
+        },
+        cross_reducer="min",
+    )
+    assert not np.isinf(F.asnumpy(g.nodes["B"].data["a1"])).any()
+    assert not np.isinf(F.asnumpy(g.nodes["B"].data["a2"])).any()
+
+    g.multi_update_all(
+        {
+            "AB": (dgl.function.copy_u("x", "m"), dgl.function.max("m", "a1")),
+            "CB": (dgl.function.copy_u("x", "m"), dgl.function.max("m", "a2")),
+        },
+        cross_reducer="max",
+    )
+    assert not np.isinf(F.asnumpy(g.nodes["B"].data["a1"])).any()
+    assert not np.isinf(F.asnumpy(g.nodes["B"].data["a2"])).any()
+
+
 if __name__ == "__main__":
     test_unary_copy_u()
     test_unary_copy_e()

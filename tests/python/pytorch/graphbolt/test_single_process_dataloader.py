@@ -10,12 +10,8 @@ def test_DataLoader():
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N))
     graph = gb_test_utils.rand_csc_graph(200, 0.15)
-    features = dgl.graphbolt.feature_store.TorchBasedFeatureStore(
-        torch.randn(200, 4)
-    )
-    labels = dgl.graphbolt.feature_store.TorchBasedFeatureStore(
-        torch.randint(0, 10, (200,))
-    )
+    features = dgl.graphbolt.TorchBasedFeatureStore(torch.randn(200, 4))
+    labels = dgl.graphbolt.TorchBasedFeatureStore(torch.randint(0, 10, (200,)))
 
     def sampler_func(data):
         adjs = []
@@ -23,7 +19,7 @@ def test_DataLoader():
 
         for hop in range(2):
             sg = graph.sample_neighbors(seeds, torch.LongTensor([2]))
-            seeds = sg.indices
+            seeds = sg.node_pairs[0]
             adjs.insert(0, sg)
 
         input_nodes = seeds

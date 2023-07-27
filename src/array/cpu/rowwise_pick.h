@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace dgl {
@@ -93,6 +94,115 @@ using EtypeRangePickFn = std::function<void(
     IdxType off, IdxType et_offset, IdxType cur_et, IdxType et_len,
     const std::vector<IdxType>& et_idx, const std::vector<IdxType>& et_eid,
     const IdxType* eid, IdxType* out_idx)>;
+
+template <typename IdxType, bool map_seed_nodes>
+std::pair<CSRMatrix, IdArray> CSRRowWisePickFused(
+    CSRMatrix mat, IdArray rows, IdArray seed_mapping,
+    std::vector<IdxType>* new_seed_nodes, int64_t num_picks, bool replace,
+    PickFn<IdxType> pick_fn, NumPicksFn<IdxType> num_picks_fn) {
+  using namespace aten;
+
+  const IdxType* indptr = static_cast<IdxType*>(mat.indptr->data);
+  const IdxType* indices = static_cast<IdxType*>(mat.indices->data);
+  const IdxType* data =
+      CSRHasData(mat) ? static_cast<IdxType*>(mat.data->data) : nullptr;
+  const IdxType* rows_data = static_cast<IdxType*>(rows->data);
+  const int64_t num_rows = rows->shape[0];
+  const auto& ctx = mat.indptr->ctx;
+  const auto& idtype = mat.indptr->dtype;
+  IdxType* seed_mapping_data = nullptr;
+  if (map_seed_nodes) seed_mapping_data = seed_mapping.Ptr<IdxType>();
+
+  const int num_threads = runtime::compute_num_threads(0, num_rows, 1);
+  std::vector<int64_t> global_prefix(num_threads + 1, 0);
+
+  IdArray picked_col, picked_idx, picked_coo_rows;
+
+  IdArray block_csr_indptr = IdArray::Empty({num_rows + 1}, idtype, ctx);
+  IdxType* block_csr_indptr_data = block_csr_indptr.Ptr<IdxType>();
+
+#pragma omp parallel num_threads(num_threads)
+  {
+    const int thread_id = omp_get_thread_num();
+
+    const int64_t start_i =
+        thread_id * (num_rows / num_threads) +
+        std::min(static_cast<int64_t>(thread_id), num_rows % num_threads);
+    const int64_t end_i =
+        (thread_id + 1) * (num_rows / num_threads) +
+        std::min(static_cast<int64_t>(thread_id + 1), num_rows % num_threads);
+    assert(thread_id + 1 < num_threads || end_i == num_rows);
+
+    const int64_t num_local = end_i - start_i;
+
+    std::unique_ptr<int64_t[]> local_prefix(new int64_t[num_local + 1]);
+    local_prefix[0] = 0;
+    for (int64_t i = start_i; i < end_i; ++i) {
+      // build prefix-sum
+      const int64_t local_i = i - start_i;
+      const IdxType rid = rows_data[i];
+      if (map_seed_nodes) seed_mapping_data[rid] = i;
+
+      IdxType len = num_picks_fn(
+          rid, indptr[rid], indptr[rid + 1] - indptr[rid], indices, data);
+      local_prefix[local_i + 1] = local_prefix[local_i] + len;
+    }
+    global_prefix[thread_id + 1] = local_prefix[num_local];
+
+#pragma omp barrier
+#pragma omp master
+    {
+      for (int t = 0; t < num_threads; ++t) {
+        global_prefix[t + 1] += global_prefix[t];
+      }
+      picked_col = IdArray::Empty({global_prefix[num_threads]}, idtype, ctx);
+      picked_idx = IdArray::Empty({global_prefix[num_threads]}, idtype, ctx);
+      picked_coo_rows =
+          IdArray::Empty({global_prefix[num_threads]}, idtype, ctx);
+    }
+
+#pragma omp barrier
+    IdxType* picked_cdata = picked_col.Ptr<IdxType>();
+    IdxType* picked_idata = picked_idx.Ptr<IdxType>();
+    IdxType* picked_rows = picked_coo_rows.Ptr<IdxType>();
+
+    const IdxType thread_offset = global_prefix[thread_id];
+
+    for (int64_t i = start_i; i < end_i; ++i) {
+      const IdxType rid = rows_data[i];
+      const int64_t local_i = i - start_i;
+      block_csr_indptr_data[i] = local_prefix[local_i] + thread_offset;
+
+      const IdxType off = indptr[rid];
+      const IdxType len = indptr[rid + 1] - off;
+      if (len == 0) continue;
+
+      const int64_t row_offset = local_prefix[local_i] + thread_offset;
+      const int64_t num_picks =
+          local_prefix[local_i + 1] + thread_offset - row_offset;
+
+      pick_fn(
+          rid, off, len, num_picks, indices, data, picked_idata + row_offset);
+      for (int64_t j = 0; j < num_picks; ++j) {
+        const IdxType picked = picked_idata[row_offset + j];
+        picked_cdata[row_offset + j] = indices[picked];
+        picked_idata[row_offset + j] = data ? data[picked] : picked;
+        picked_rows[row_offset + j] = i;
+      }
+    }
+  }
+  block_csr_indptr_data[num_rows] = global_prefix.back();
+
+  const IdxType num_cols = picked_col->shape[0];
+  if (map_seed_nodes) {
+    (*new_seed_nodes).resize(num_rows);
+    memcpy((*new_seed_nodes).data(), rows_data, sizeof(IdxType) * num_rows);
+  }
+
+  return std::make_pair(
+      CSRMatrix(num_rows, num_cols, block_csr_indptr, picked_col, picked_idx),
+      picked_coo_rows);
+}
 
 // Template for picking non-zero values row-wise. The implementation utilizes
 // OpenMP parallelization on rows because each row performs computation

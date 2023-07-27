@@ -1,14 +1,11 @@
 """GraphBolt Dataset."""
 
-from typing import List, Optional
-
-import pydantic
-import pydantic_yaml
+from typing import Dict, List
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
 
-__all__ = ["Dataset", "OnDiskDataset"]
+__all__ = ["Dataset"]
 
 
 class Dataset:
@@ -34,106 +31,42 @@ class Dataset:
     generate a subgraph.
     """
 
-    def train_set(self) -> ItemSet or ItemSetDict:
-        """Return the training set."""
+    @property
+    def train_sets(self) -> List[ItemSet] or List[ItemSetDict]:
+        """Return the training sets."""
         raise NotImplementedError
 
-    def validation_set(self) -> ItemSet or ItemSetDict:
-        """Return the validation set."""
+    @property
+    def validation_sets(self) -> List[ItemSet] or List[ItemSetDict]:
+        """Return the validation sets."""
         raise NotImplementedError
 
-    def test_set(self) -> ItemSet or ItemSetDict:
-        """Return the test set."""
+    @property
+    def test_sets(self) -> List[ItemSet] or List[ItemSetDict]:
+        """Return the test sets."""
         raise NotImplementedError
 
+    @property
     def graph(self) -> object:
         """Return the graph."""
         raise NotImplementedError
 
-    def feature(self) -> FeatureStore:
+    @property
+    def feature(self) -> Dict[object, FeatureStore]:
         """Return the feature."""
         raise NotImplementedError
 
-
-class OnDiskDataFormatEnum(pydantic_yaml.YamlStrEnum):
-    """Enum of data format."""
-
-    TORCH = "torch"
-    NUMPY = "numpy"
-
-
-class OnDiskTVTSet(pydantic.BaseModel):
-    """Train-Validation-Test set."""
-
-    type_name: str
-    format: OnDiskDataFormatEnum
-    path: str
-
-
-class OnDiskMetaData(pydantic_yaml.YamlModel):
-    """Metadata specification in YAML.
-
-    As multiple node/edge types and multiple splits are supported, each TVT set
-    is a list of list of ``OnDiskTVTSet``.
-    """
-
-    train_set: Optional[List[List[OnDiskTVTSet]]]
-    validation_set: Optional[List[List[OnDiskTVTSet]]]
-    test_set: Optional[List[List[OnDiskTVTSet]]]
-
-
-class OnDiskDataset(Dataset):
-    """An on-disk dataset.
-
-    An on-disk dataset is a dataset which reads graph topology, feature data
-    and TVT set from disk. Due to limited resources, the data which are too
-    large to fit into RAM will remain on disk while others reside in RAM once
-    ``OnDiskDataset`` is initialized. This behavior could be controled by user
-    via ``in_memory`` field in YAML file.
-
-    A full example of YAML file is as follows:
-
-    .. code-block:: yaml
-
-        train_set:
-          - - type_name: paper
-              format: numpy
-              path: set/paper-train.npy
-        validation_set:
-          - - type_name: paper
-              format: numpy
-              path: set/paper-validation.npy
-        test_set:
-          - - type_name: paper
-              format: numpy
-              path: set/paper-test.npy
-
-    Parameters
-    ----------
-    path: str
-        The YAML file path.
-    """
-
-    def __init__(self, path: str) -> None:
-        with open(path, "r") as f:
-            self._meta = OnDiskMetaData.parse_raw(f.read(), proto="yaml")
-
-    def train_set(self) -> ItemSet or ItemSetDict:
-        """Return the training set."""
+    @property
+    def dataset_name(self) -> str:
+        """Return the dataset name."""
         raise NotImplementedError
 
-    def validation_set(self) -> ItemSet or ItemSetDict:
-        """Return the validation set."""
+    @property
+    def num_classes(self) -> int:
+        """Return the number of classes."""
         raise NotImplementedError
 
-    def test_set(self) -> ItemSet or ItemSetDict:
-        """Return the test set."""
-        raise NotImplementedError
-
-    def graph(self) -> object:
-        """Return the graph."""
-        raise NotImplementedError
-
-    def feature(self) -> FeatureStore:
-        """Return the feature."""
+    @property
+    def num_labels(self) -> int:
+        """Return the number of labels."""
         raise NotImplementedError
