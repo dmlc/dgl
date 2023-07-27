@@ -1,5 +1,6 @@
 from ..runtime_ctypes import DGLArrayHandle as PyDGLArrayHandle
-from cpython cimport PyObject PyCapsule_Destructor
+from cpython cimport PyObject
+from cpython cimport PyCapsule_Destructor
 
 cdef const char* _c_str_dltensor = "dltensor"
 cdef const char* _c_str_used_dltensor = "used_dltensor"
