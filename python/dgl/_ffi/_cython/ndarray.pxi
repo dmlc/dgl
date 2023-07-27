@@ -81,8 +81,8 @@ cdef class NDArrayBase:
         if self.c_is_view != 0:
             raise ValueError("to_dlpack do not work with memory views")
         CALL(DGLArrayToDLPack(self.chandle, &dltensor, alignment))
-        # return pycapsule.PyCapsule_New(dltensor, _c_str_dltensor, <PyCapsule_Destructor>_c_dlpack_deleter)
-        return pycapsule.PyCapsule_New(dltensor, _c_str_dltensor, _c_dlpack_deleter)
+        return pycapsule.PyCapsule_New(dltensor, _c_str_dltensor, <PyCapsule_Destructor>_c_dlpack_deleter)
+        # return pycapsule.PyCapsule_New(dltensor, _c_str_dltensor, _c_dlpack_deleter)
 
 
 cdef c_make_array(void* chandle, is_view):
