@@ -14,4 +14,4 @@ class BaseTensorStorage(FeatureStorage):
     def fetch(
         self, indices, device, pin_memory=False, **kwargs
     ):  # pylint: disable=unused-argument
-        return F.copy_to(F.gather_row(tensor, indices), device, **kwargs)
+        return F.copy_to(F.gather_row(self.storage, indices), device, **kwargs)

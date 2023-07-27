@@ -40,6 +40,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
 
+
 def cuda_index_tensor(tensor, idx):
     assert idx.device != th.device("cpu")
     if tensor.is_pinned():
