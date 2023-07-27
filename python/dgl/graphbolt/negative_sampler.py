@@ -1,7 +1,8 @@
 """Negative samplers."""
 
-import torch
 from _collections_abc import Mapping
+
+import torch
 from torchdata.datapipes.iter import Mapper
 
 

@@ -1,7 +1,9 @@
 """Uniform negative sampler for GraphBolt."""
 
-from ..negative_sampler import (ConditionedNegativeSampler,
-                                IndependentNegativeSampler)
+from ..negative_sampler import (
+    ConditionedNegativeSampler,
+    IndependentNegativeSampler,
+)
 
 
 class UniformIndependentNegativeSampler(IndependentNegativeSampler):
