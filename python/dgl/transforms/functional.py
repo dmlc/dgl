@@ -3687,7 +3687,8 @@ def lap_pe(g, k, padding=False, return_eigval=False):
         topk_eigvals = EigVal[kpartition_indices]
         topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
         topk_EigVec = EigVec[:, topk_indices]
-    eigvals = F.tensor(topk_eigvals, dtype=F.float32)
+        topk_EigVal = EigVal[topk_indices]
+    eigvals = F.tensor(topk_EigVal, dtype=F.float32)
 
     # get random flip signs
     rand_sign = 2 * (np.random.rand(max_freqs) > 0.5) - 1.0
