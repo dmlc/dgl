@@ -310,11 +310,7 @@ class CitationGraphDataset(DGLBuiltinDataset):
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
-    rowsum = np.asarray(features.sum(1))
-    r_inv = np.power(rowsum, -1).flatten()
-    r_inv[np.isinf(r_inv)] = 0.0
-    r_mat_inv = sp.diags(r_inv)
-    features = r_mat_inv.dot(features)
+    features = _normalize(features)
     return np.asarray(features.todense())
 
 
@@ -929,11 +925,12 @@ class CoraBinary(DGLBuiltinDataset):
 def _normalize(mx):
     """Row-normalize sparse matrix"""
     rowsum = np.asarray(mx.sum(1))
+    mask = np.equal(rowsum, 0.0).flatten()
+    rowsum[mask] = np.nan
     r_inv = np.power(rowsum, -1).flatten()
-    r_inv[np.isinf(r_inv)] = 0.0
+    r_inv[mask] = 0.0
     r_mat_inv = sp.diags(r_inv)
-    mx = r_mat_inv.dot(mx)
-    return mx
+    return r_mat_inv.dot(mx)
 
 
 def _encode_onehot(labels):
