@@ -211,27 +211,29 @@ class CitationGraphDataset(DGLBuiltinDataset):
                 )
             )
 
+    @property
+    def graph_path(self):
+        return os.path.join(self.save_path, self.save_name + ".bin")
+
+    @property
+    def info_path(self):
+        return os.path.join(self.save_path, self.save_name + ".pkl")
+
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, self.save_name + ".bin")
-        info_path = os.path.join(self.save_path, self.save_name + ".pkl")
-        if os.path.exists(graph_path) and os.path.exists(info_path):
+        if os.path.exists(self.graph_path) and os.path.exists(self.info_path):
             return True
 
         return False
 
     def save(self):
         """save the graph list and the labels"""
-        graph_path = os.path.join(self.save_path, self.save_name + ".bin")
-        info_path = os.path.join(self.save_path, self.save_name + ".pkl")
-        save_graphs(str(graph_path), self._g)
-        save_info(str(info_path), {"num_classes": self.num_classes})
+        save_graphs(str(self.graph_path), self._g)
+        save_info(str(self.info_path), {"num_classes": self.num_classes})
 
     def load(self):
-        graph_path = os.path.join(self.save_path, self.save_name + ".bin")
-        info_path = os.path.join(self.save_path, self.save_name + ".pkl")
-        graphs, _ = load_graphs(str(graph_path))
+        graphs, _ = load_graphs(str(self.graph_path))
 
-        info = load_info(str(info_path))
+        info = load_info(str(self.info_path))
         graph = graphs[0]
         self._g = graph
         # for compatability
@@ -855,25 +857,22 @@ class CoraBinary(DGLBuiltinDataset):
         assert len(self.graphs) == len(self.labels)
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, self.save_name + ".bin")
-        if os.path.exists(graph_path):
+        if os.path.exists(self.graph_path):
             return True
 
         return False
 
     def save(self):
         """save the graph list and the labels"""
-        graph_path = os.path.join(self.save_path, self.save_name + ".bin")
         labels = {}
         for i, label in enumerate(self.labels):
             labels["{}".format(i)] = F.tensor(label)
-        save_graphs(str(graph_path), self.graphs, labels)
+        save_graphs(str(self.graph_path), self.graphs, labels)
         if self.verbose:
             print("Done saving data into cached files.")
 
     def load(self):
-        graph_path = os.path.join(self.save_path, self.save_name + ".bin")
-        self.graphs, labels = load_graphs(str(graph_path))
+        self.graphs, labels = load_graphs(str(self.graph_path))
 
         self.labels = []
         for i in range(len(labels)):
