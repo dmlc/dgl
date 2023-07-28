@@ -58,7 +58,7 @@ export DGLBACKEND=pytorch
 export DGL_LIBRARY_PATH=${DGL_HOME}/build
 export PYTHONPATH=${DGL_HOME}/python:${DGL_HOME}/tests:$PYTHONPATH
 export DGLTESTDEV=${device}
-export DGL_DOWNLOAD_DIR=${DGL_HOME}/build
+export DGL_DOWNLOAD_DIR=${DGL_HOME}/_download
 
 if [[ -z $@ ]]; then
   echo "ERROR: Missing test targets."
