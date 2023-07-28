@@ -2524,24 +2524,20 @@ def test_BiasedMHA(feat_size, num_heads, bias, attn_bias_type, attn_drop):
     assert out.shape == (16, 100, feat_size)
 
 
-@pytest.mark.parametrize("scale_dot", [True, False])
-@pytest.mark.parametrize("scale_degree", [True, False])
 @pytest.mark.parametrize("edge_update", [True, False])
-def test_EGTLayer(scale_dot, scale_degree, edge_update):
+def test_EGTLayer(edge_update):
     batch_size = 16
     num_nodes = 100
     ndim, edim = 128, 32
     nfeat = th.rand(batch_size, num_nodes, ndim)
     efeat = th.rand(batch_size, num_nodes, num_nodes, edim)
-    mask = (th.rand(batch_size, num_nodes, num_nodes, 1) < 0.5) * -1e9
+    mask = (th.rand(batch_size, num_nodes, num_nodes) < 0.5) * -1e9
 
     net = nn.EGTLayer(
         ndim=ndim,
         edim=edim,
         num_heads=8,
         num_vns=4,
-        scale_dot=scale_dot,
-        scale_degree=scale_degree,
         edge_update=edge_update,
     )
     out_nfeat, out_efeat = net(nfeat, efeat, mask)
