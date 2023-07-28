@@ -281,7 +281,7 @@ def run(args, device, data, nfeat):
                 )
             )
 
-    if epoch >= 5: 
+    if epoch >= 5:
         print("Avg epoch time: {}".format(avg / (epoch - 4)))
     return best_test_acc.to(th.device("cpu"))
 
@@ -379,6 +379,4 @@ if __name__ == "__main__":
     for i in range(10):
         test_accs.append(run(args, device, data, nfeat))
     
-    print(
-        "Average test accuracy:", np.mean(test_accs), "±", np.std(test_accs)
-    )
+    print("Average test accuracy:", np.mean(test_accs), "±", np.std(test_accs))
