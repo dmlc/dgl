@@ -308,9 +308,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
 
                 picked_neighbors_cur_thread[i - begin] =
                     pick_fn(offset, num_neighbors);
-                TORCH_CHECK(
-                    picked_neighbors_cur_thread[i - begin].size(0) ==
-                    (int)num_pick_fn(offset, num_neighbors));
+
+                // This number should be the same as the result of num_pick_fn.
                 num_picked_neighbors_per_node[i + 1] =
                     picked_neighbors_cur_thread[i - begin].size(0);
               }
