@@ -23,7 +23,7 @@ export DGLBACKEND=$1
 export DGLTESTDEV=$2
 export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
-export DGL_DOWNLOAD_DIR=${PWD}
+export DGL_DOWNLOAD_DIR=${PWD}/_download
 unset TORCH_ALLOW_TF32_CUBLAS_OVERRIDE
 
 export CUDA_VISIBLE_DEVICES=-1
