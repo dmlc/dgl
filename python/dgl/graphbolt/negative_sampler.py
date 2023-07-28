@@ -15,7 +15,6 @@ class NegativeSampler(Mapper):
     def __init__(
         self,
         datapipe,
-        graph,
         negative_ratio,
     ):
         """
@@ -23,33 +22,31 @@ class NegativeSampler(Mapper):
 
         Parameters
         ----------
-        graph
-            The graph on which to perform negative sampling.
+        datapipe : DataPipe
+            The datapipe.
         negative_ratio : int
             The proportion of negative samples to positive samples.
         """
         super().__init__(datapipe, self._sample)
-        self.graph = graph
-        assert (
-            negative_ratio > 0
-        ), "Negative_ratio should shoubld be positive Integer."
+        assert negative_ratio > 0, "Negative_ratio should be positive Integer."
         self.negative_ratio = negative_ratio
 
     def _sample(self, node_pairs):
         """
-        Generates a mix of positive and negative samples.
+        Generate a mix of positive and negative samples.
 
         Parameters
         ----------
         node_pairs : Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
-            A tuple of tensors or a dictionary that represents source-destination node pairs
-            of positive edges, where positive means the edge must exist in the graph.
+            A tuple of tensors or a dictionary represents source-destination
+            node pairs of positive edges, where positive means the edge must
+            exist in the graph.
 
         Returns
         -------
         Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
-            A collection of edges or a dictionary that maps etypes to edges, which includes
-            both positive and negative samples.
+            A collection of edges or a dictionary that maps etypes to edges,
+            which includes both positive and negative samples.
         """
         if isinstance(node_pairs, Mapping):
             return {
@@ -65,8 +62,9 @@ class NegativeSampler(Mapper):
         Parameters
         ----------
         node_pairs : Tuple[Tensor]
-            A tuple of tensors or a dictionary that represents source-destination node pairs
-            of positive edges, where positive means the edge must exist in the graph.
+            A tuple of tensors or a dictionary represents source-destination
+            node pairs of positive edges, where positive means the edge must
+            exist in the graph.
         etype : (str, str, str)
             Canonical edge type.
         Returns
@@ -81,8 +79,9 @@ class NegativeSampler(Mapper):
         Parameters
         ----------
         node_pairs : Tuple[Tensor]
-            A tuple of tensors or a dictionary that represents source-destination node pairs
-            of positive edges, where positive means the edge must exist in the graph.
+            A tuple of tensors or a dictionary represents source-destination
+            node pairs of positive edges, where positive means the edge must
+            exist in the graph.
         etype : (str, str, str)
             Canonical edge type.
         Returns
@@ -115,14 +114,15 @@ class IndependentNegativeSampler(NegativeSampler):
 class ConditionedNegativeSampler(NegativeSampler):
     """
     A kind of negative sampler. `Conditioned` denotes the data format, where
-    data is structured as  `[u, v, [neg_v]]`. Here, 'u' and 'v' represent the
-    source-destination positive node pairs, and 'u' combined with each node in
-    'neg_v' creates negative node pairs. The length of 'neg_v' is same as
-    'negative_ratio'.
+    data is structured as `[u, v, [neg_u], [neg_v]]`. Here, 'u' and 'v' denote
+    the source-destination positive node pairs, while 'neg_u' combined with
+    'neg_v' creates corresponding negative node pairs. The length of 'neg_u'
+    and 'neg_v' is same as 'negative_ratio'.
     """
 
     def _generate(self, node_pairs, etype=None):
-        _, neg_dst = self._generate_negative_pairs(node_pairs, etype)
+        neg_src, neg_dst = self._generate_negative_pairs(node_pairs, etype)
         pos_src, pos_dst = node_pairs
+        neg_src = neg_src.view(-1, self.negative_ratio)
         neg_dst = neg_dst.view(-1, self.negative_ratio)
-        return (pos_src, pos_dst, neg_dst)
+        return (pos_src, pos_dst, neg_src, neg_dst)
