@@ -1,16 +1,9 @@
-import os
-import unittest
-from collections.abc import Iterator, Mapping
-from functools import partial
-
-import backend as F
+from collections.abc import Mapping
 
 import dgl
 import numpy as np
 import pytest
 import torch
-import torch.distributed as dist
-import torch.multiprocessing as mp
 
 
 def _create_homogeneous():
@@ -62,7 +55,6 @@ def test_spot_target_excludes(degree_threshold, batch_size):
             subg = blocks
         pair_eids = pair_graph.edata[dgl.EID]
         block_eids = subg.edata[dgl.EID]
-
         edges_to_exclude = _find_edges_to_exclude(
             g, pair_eids, degree_threshold
         )
