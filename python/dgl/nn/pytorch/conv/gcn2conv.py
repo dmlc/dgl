@@ -254,31 +254,14 @@ class GCN2Conv(nn.Module):
 
             # initial residual connection to the first layer
             feat_0 = feat_0[: feat.size(0)] * self.alpha
+            feat_sum = feat + feat_0
 
             if self._project_initial_features:
-                rst = feat.add_(feat_0)
-                rst = th.addmm(
-                    feat,
-                    feat,
-                    self.weight1,
-                    beta=(1 - self.beta),
-                    alpha=self.beta,
-                )
+                feat_proj_sum = feat_sum @ self.weight1
             else:
-                rst = th.addmm(
-                    feat,
-                    feat,
-                    self.weight1,
-                    beta=(1 - self.beta),
-                    alpha=self.beta,
-                )
-                rst += th.addmm(
-                    feat_0,
-                    feat_0,
-                    self.weight2,
-                    beta=(1 - self.beta),
-                    alpha=self.beta,
-                )
+                feat_proj_sum = feat @ self.weight1 + feat_0 @ self.weight2
+
+            rst = (1 - self.beta) * feat_sum + self.beta * feat_proj_sum
 
             if self._bias:
                 rst = rst + self.bias

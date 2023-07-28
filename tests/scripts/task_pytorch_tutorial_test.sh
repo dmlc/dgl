@@ -14,7 +14,7 @@ export MPLBACKEND=Agg
 export DGLBACKEND=pytorch
 export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=${PWD}/python:$PYTHONPATH
-export DGL_DOWNLOAD_DIR=${PWD}
+export DGL_DOWNLOAD_DIR=${PWD}/_download
 
 pushd ${TUTORIAL_ROOT} > /dev/null
 # Install requirements

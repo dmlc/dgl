@@ -383,9 +383,9 @@ List<Value> Libra2dglBuildDict(
   while (!feof(fp) && edge < fsize) {
     int64_t u, v;
     float w;
-    fscanf(
-        fp, "%ld,%ld,%f\n", &u, &v,
-        &w);  // reading an edge - the src and dst global node IDs
+    CHECK_EQ(
+        fscanf(fp, "%ld,%ld,%f\n", &u, &v, &w),
+        3);  // reading an edge - the src and dst global node IDs
 
     if (indices_ptr[u] ==
         -100) {  // if already not assigned a local node ID, local node ID is
