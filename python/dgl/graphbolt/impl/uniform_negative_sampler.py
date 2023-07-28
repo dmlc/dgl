@@ -58,12 +58,12 @@ class UniformIndependentNegativeSampler(
         ...item_set, batch_size=1,
         ...)
     >>> neg_sampler = gb.UniformIndependentNegativeSampler(
-        ...minibatch_sampler, graph, 2)
+        ...minibatch_sampler, 2, graph)
     >>> for data in neg_sampler:
         ...  print(data)
         ...
-    (tensor([0]), tensor([1]), tensor([[0, 0]]), tensor([[2, 1]]))
-    (tensor([1]), tensor([2]), tensor([[1, 1]]), tensor([[1, 2]]))
+    (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([1, 0, 0]))
+    (tensor([1, 1, 1]), tensor([2, 1, 2]), tensor([1, 0, 0]))
     """
 
     pass
@@ -85,12 +85,12 @@ class UniformConditionedNegativeSampler(
         ...item_set, batch_size=1,
         ...)
     >>> neg_sampler = gb.UniformConditionedNegativeSampler(
-        ...minibatch_sampler, graph, 2)
+        ...minibatch_sampler, 2, graph)
     >>> for data in neg_sampler:
         ...  print(data)
         ...
-    (tensor([0]), tensor([1]), tensor([[1, 2]]))
-    (tensor([1]), tensor([2]), tensor([[0, 1]]))
+    (tensor([0]), tensor([1]), tensor([[0, 0]]), tensor([[2, 1]]))
+    (tensor([1]), tensor([2]), tensor([[1, 1]]), tensor([[1, 2]]))
     """
 
     pass
