@@ -528,7 +528,7 @@ class EdgePredictionSampler(Sampler):
         pair_graph.edata[EID] = eids
         seed_nodes = pair_graph.ndata[NID]
 
-        if isinstance(exclude, str) is False:
+        if isinstance(exclude, SpotTarget) is False:
             exclude_eids = exclude(
                 seed_edges,
                 self.reverse_eids,
