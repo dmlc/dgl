@@ -20,7 +20,7 @@ CALL workon %BUILD_TAG%
 SET DGLBACKEND=pytorch
 SET DGL_LIBRARY_PATH=!CD!\build
 SET PYTHONPATH=!CD!\python;!PYTHONPATH!
-SET DGL_DOWNLOAD_DIR=!CD!
+SET DGL_DOWNLOAD_DIR=!CD!\_download
 
 python -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests\examples || GOTO :FAIL
 
