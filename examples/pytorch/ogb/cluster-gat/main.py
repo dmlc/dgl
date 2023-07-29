@@ -378,5 +378,5 @@ if __name__ == "__main__":
     nfeat = graph.ndata.pop("feat").to(device)
     for i in range(10):
         test_accs.append(run(args, device, data, nfeat))
-    
+
     print("Average test accuracy:", np.mean(test_accs), "±", np.std(test_accs))
