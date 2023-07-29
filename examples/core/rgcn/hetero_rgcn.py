@@ -69,23 +69,23 @@ def prepare_data(args, device):
     # - graph: dgl graph object.
     # - label: torch tensor of shape (num_nodes, num_tasks).
     g, labels = dataset[0]
-    
+
     # Flatten the labels for "paper" type nodes. This step reduces the
     # dimensionality of the labels. We need to flatten the labels because
     # the model requires a 1-dimensional label tensor.
     labels = labels["paper"].flatten()
-    
+
     # Apply transformation to the graph.
     # - "ToSimple()" removes multi-edge between two nodes.
     # - "AddReverse()" adds reverse edges to the graph.
     # This could help model learn more information from the graph.
     transform = Compose([ToSimple(), AddReverse()])
     g = transform(g)
-    
+
     print(f"Loaded graph: {g}")
-    
+
     logger = Logger(args.runs)
-    
+
     # Initialize a train sampler that samples neighbors for multi-layer graph
     # convolution. It samples 25 and 20 neighbors for the first and second
     # layers respectively.
@@ -100,7 +100,7 @@ def prepare_data(args, device):
         num_workers=num_workers,
         device=device,
     )
-    
+
     return g, labels, dataset.num_classes, split_idx, logger, train_loader
 
 
@@ -118,24 +118,24 @@ def rel_graph_embed(graph, embed_size):
     The function constructs a dictionary 'node_num', where the keys are node
     types (ntype) and the values are the number of nodes for each type. This
     dictionary is used to create a HeteroEmbedding instance.
-    
+
     (HIGHLIGHT)
     A HeteroEmbedding instance holds separate embedding layers for each node
     type, each with its own feature space of dimensionality
     (node_num[i], embed_size), where 'node_num[i]' is the number of nodes of
     type 'ntype' and 'embed_size' is the embedding dimension.
-    
+
     The "paper" node type is specifically excluded, possibly because these nodes
     might already have predefined feature representations, and therefore, do not
     require an additional embedding layer.
-    
+
     Parameters
     ----------
     graph : DGLGraph
         The graph for which to create the heterogenous embedding layer.
     embed_size : int
         The size of the embedding vectors.
-    
+
     Returns
     --------
     HeteroEmbedding
@@ -179,7 +179,7 @@ class RelGraphConvLayer(nn.Module):
                 for rel in rel_names
             }
         )
-    
+
         # Create a separate Linear layer for each relationship. Each
         # relationship has its own weights which will be applied to the node
         # features before performing convolution.
@@ -189,7 +189,7 @@ class RelGraphConvLayer(nn.Module):
                 for rel_name in self.rel_names
             }
         )
-    
+
         # Create a separate Linear layer for each node type for self-loop
         # connections, i.e., edges that connect nodes to themselves. These
         # weights help the model to carry information from a node to itself
@@ -200,18 +200,18 @@ class RelGraphConvLayer(nn.Module):
                 for ntype in self.ntypes
             }
         )
-    
+
         self.dropout = nn.Dropout(dropout)
         # Initialize parameters of the model.
         self.reset_parameters()
-    
+
     def reset_parameters(self):
         for layer in self.weight.values():
             layer.reset_parameters()
-    
+
         for layer in self.loop_weights.values():
             layer.reset_parameters()
-    
+
     def forward(self, g, inputs):
         """
         Parameters
@@ -220,7 +220,7 @@ class RelGraphConvLayer(nn.Module):
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.
-    
+
         Returns
         -------
         dict[str, torch.Tensor]
@@ -229,14 +229,14 @@ class RelGraphConvLayer(nn.Module):
         # Create a deep copy of the graph g with features saved in local
         # frames to prevent side effects from modifying the graph.
         g = g.local_var()
-    
+
         # Create a dictionary of weights for each relationship. The weights
         # are retrieved from the Linear layers defined earlier.
         wdict = {
             rel_name: {"weight": self.weight[rel_name].weight.T}
             for rel_name in self.rel_names
         }
-    
+
         # Create a dictionary of node features for the destination nodes in
         # the graph. We slice the node features according to the number of
         # destination nodes of each type. This is necessary because when
@@ -247,18 +247,18 @@ class RelGraphConvLayer(nn.Module):
         inputs_dst = {
             k: v[: g.number_of_dst_nodes(k)] for k, v in inputs.items()
         }
-    
+
         # Apply the convolution operation on the graph. mod_kwargs are
         # additional arguments for each relation function defined in the
         # HeteroGraphConv. In this case, it's the weights for each relation.
         hs = self.conv(g, inputs, mod_kwargs=wdict)
-    
+
         def _apply(ntype, h):
             h = h + self.loop_weights[ntype](inputs_dst[ntype])
             if self.activation:
                 h = self.activation(h)
             return self.dropout(h)
-    
+
         # Apply the function defined above for each node type. This will update
         # the node features using the self-loop weights, apply the activation
         # function and dropout.
@@ -277,9 +277,9 @@ class EntityClassify(nn.Module):
         self.rel_names = list(set(g.etypes))
         self.rel_names.sort()
         self.dropout = 0.5
-    
+
         self.layers = nn.ModuleList()
-    
+
         # First layer: transform input features to hidden features. Use ReLU
         # as the activation function and apply dropout for regularization.
         self.layers.append(
@@ -292,7 +292,7 @@ class EntityClassify(nn.Module):
                 dropout=self.dropout,
             )
         )
-    
+
         # Second layer: transform hidden features to output features. No
         # activation function is applied at this stage.
         self.layers.append(
@@ -304,12 +304,12 @@ class EntityClassify(nn.Module):
                 activation=None,
             )
         )
-    
+
     def reset_parameters(self):
         # Reset the parameters of each layer.
         for layer in self.layers:
             layer.reset_parameters()
-    
+
     def forward(self, h, blocks):
         for layer, block in zip(self.layers, blocks):
             h = layer(block, h)
@@ -323,15 +323,15 @@ class Logger(object):
 
     This was done to ensure that performance was measured in precisely the same way
     """
-    
+
     def __init__(self, runs):
         self.results = [[] for _ in range(runs)]
-    
+
     def add_result(self, run, result):
         assert len(result) == 3
         assert run >= 0 and run < len(self.results)
         self.results[run].append(result)
-    
+
     def print_statistics(self, run=None):
         if run is not None:
             result = 100 * th.tensor(self.results[run])
@@ -343,7 +343,7 @@ class Logger(object):
             print(f"   Final Test: {result[argmax, 2]:.2f}")
         else:
             result = 100 * th.tensor(self.results)
-    
+
             best_results = []
             for r in result:
                 train1 = r[:, 0].max().item()
@@ -351,9 +351,9 @@ class Logger(object):
                 train2 = r[r[:, 1].argmax(), 0].item()
                 test = r[r[:, 1].argmax(), 2].item()
                 best_results.append((train1, valid, train2, test))
-    
+
             best_result = th.tensor(best_results)
-    
+
             print(f"All runs:")
             r = best_result[:, 0]
             print(f"Highest Train: {r.mean():.2f} ± {r.std():.2f}")
@@ -386,9 +386,9 @@ def train(
         pbar = tqdm(total=num_train)
         pbar.set_description(f"Epoch {epoch:02d}")
         model.train()
-    
+
         total_loss = 0
-    
+
         for input_nodes, seeds, blocks in train_loader:
             # Move the input data onto the device.
             blocks = [blk.to(device) for blk in blocks]
@@ -397,7 +397,7 @@ def train(
             batch_size = seeds.shape[0]
             input_nodes_indexes = input_nodes[category].to(g.device)
             seeds = seeds.to(labels.device)
-    
+
             # Extract node embeddings for the input nodes.
             emb = extract_embed(node_embed, input_nodes)
             # Add the batch's raw "paper" features. Corresponds to the content
@@ -405,26 +405,26 @@ def train(
             emb.update(
                 {category: g.ndata["feat"][category][input_nodes_indexes]}
             )
-    
+
             emb = {k: e.to(device) for k, e in emb.items()}
             lbl = labels[seeds].to(device)
-    
+
             # Reset gradients.
             optimizer.zero_grad()
             # Generate predictions.
             logits = model(emb, blocks)[category]
-    
+
             y_hat = logits.log_softmax(dim=-1)
             loss = F.nll_loss(y_hat, lbl)
             loss.backward()
             optimizer.step()
-    
+
             total_loss += loss.item() * batch_size
             pbar.update(batch_size)
-    
+
         pbar.close()
         loss = total_loss / num_train
-    
+
         # Evaluate the model on the test set.
         result = test(g, model, node_embed, labels, device, split_idx)
         logger.add_result(run, result)
@@ -437,7 +437,7 @@ def train(
             f"Valid: {100 * valid_acc:.2f}%, "
             f"Test: {100 * test_acc:.2f}%"
         )
-    
+
     return logger
 
 
@@ -470,42 +470,42 @@ def test(g, model, node_embed, y_true, device, split_idx):
         num_workers=0,
         device=device,
     )
-    
+
     # Initialize a progress bar for visual feedback.
     pbar = tqdm(total=y_true.size(0))
     pbar.set_description(f"Inference")
-    
+
     # To store the predictions.
     y_hats = list()
-    
+
     for input_nodes, seeds, blocks in loader:
         blocks = [blk.to(device) for blk in blocks]
         # We only predict the nodes with type "category".
         seeds = seeds[category]
         batch_size = seeds.shape[0]
         input_nodes_indexes = input_nodes[category].to(g.device)
-    
+
         # Extract node embeddings for the input nodes.
         emb = extract_embed(node_embed, input_nodes)
         # Add the batch's raw "paper" features.
         # Corresponds to the content in the function `rel_graph_embed` comment.
         emb.update({category: g.ndata["feat"][category][input_nodes_indexes]})
         emb = {k: e.to(device) for k, e in emb.items()}
-    
+
         # Generate predictions.
         logits = model(emb, blocks)[category]
         # Apply softmax to the logits and get the prediction by selecting the
         # argmax.
         y_hat = logits.log_softmax(dim=-1).argmax(dim=1, keepdims=True)
         y_hats.append(y_hat.cpu())
-    
+
         pbar.update(batch_size)
-    
+
     pbar.close()
-    
+
     y_pred = th.cat(y_hats, dim=0)
     y_true = th.unsqueeze(y_true, 1)
-    
+
     # Calculate the accuracy of the predictions for the train, valid and
     # test splits.
     train_acc = evaluator.eval(
@@ -526,7 +526,7 @@ def test(g, model, node_embed, y_true, device, split_idx):
             "y_pred": y_pred[split_idx["test"]["paper"]],
         }
     )["acc"]
-    
+
     return train_acc, valid_acc, test_acc
 
 
@@ -542,13 +542,13 @@ def main(args):
     g, labels, num_classes, split_idx, logger, train_loader = prepare_data(
         args, device
     )
-    
+
     # Create the embedding layer and move it to the appropriate device.
     embed_layer = rel_graph_embed(g, 128).to(device)
-    
+
     # Initialize the entity classification model.
     model = EntityClassify(g, 128, num_classes).to(device)
-    
+
     print(
         "Number of embedding parameters: "
         f"{sum(p.numel() for p in embed_layer.parameters())}"
@@ -557,7 +557,7 @@ def main(args):
         "Number of model parameters: "
         f"{sum(p.numel() for p in model.parameters())}"
     )
-    
+
     for run in range(args.runs):
         try:
             embed_layer.reset_parameters()
@@ -572,7 +572,7 @@ def main(args):
             # previously stuck in a poor local minimum.
             ##################################################################
             pass
-    
+
         # `itertools.chain()` is a function in Python's itertools module.
         # It is used to flatten a list of iterables, making them act as
         # one big iterable.
@@ -584,7 +584,7 @@ def main(args):
             model.parameters(), embed_layer.parameters()
         )
         optimizer = th.optim.Adam(all_params, lr=0.01)
-    
+
         # If CPU affinity is supported and the device is CPU, execute training
         # with CPU affinity enabled.
         if (
@@ -632,7 +632,7 @@ def main(args):
                 run,
             )
         logger.print_statistics(run)
-    
+
     print("Final performance: ")
     logger.print_statistics()
 
