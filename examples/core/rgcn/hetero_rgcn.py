@@ -641,3 +641,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RGCN")
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--num_workers", type=int, default=0)
+
+    args = parser.parse_args()
+
+    main(args)
