@@ -7,9 +7,6 @@ endif()
 
 ###### Borrowed from MSHADOW project
 
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++14"   SUPPORT_CXX14)
-
 set(dgl_known_gpu_archs "35" "50" "60" "70")
 set(dgl_cuda_arch_ptx "70")
 if (CUDA_VERSION_MAJOR GREATER_EQUAL "11")
@@ -248,7 +245,7 @@ macro(dgl_config_cuda out_variable)
   list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS_ARCH})
 
   # 2. flags in third_party/moderngpu
-  list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda;-Wno-deprecated-declarations")
+  list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda")
 
   message(STATUS "CUDA_NVCC_FLAGS: ${CUDA_NVCC_FLAGS}")
 
