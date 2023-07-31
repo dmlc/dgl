@@ -173,8 +173,6 @@ else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
 
-set_property(TARGET dgl PROPERTY CXX_STANDARD 17)
-
 # include directories
 target_include_directories(dgl PRIVATE "include")
 target_include_directories(dgl PRIVATE "third_party/dlpack/include")
