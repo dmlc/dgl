@@ -27,14 +27,14 @@ def train_test_split_by_time(df, timestamp, user):
         return df
 
     meta_df = {
-        'user_id': np.int64,
-        'movie_id': np.int64,
-        'rating': np.int64,
-        'timestamp': np.int64,
-        'user_id': np.int64,
-        'train_mask': bool,
-        'val_mask': bool,
-        'test_mask': bool,
+        "user_id": np.int64,
+        "movie_id": np.int64,
+        "rating": np.int64,
+        "timestamp": np.int64,
+        "user_id": np.int64,
+        "train_mask": bool,
+        "val_mask": bool,
+        "test_mask": bool,
     }
 
     df = (
