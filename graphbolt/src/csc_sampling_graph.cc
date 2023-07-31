@@ -213,7 +213,7 @@ NumPickFn GetNumPickFnByEtype(
  * @return A lambda function which takes offset and num_neighbors as params and
  * returns the number of neighbors-to-be-sampled.
  */
-NumPickFn GetNumPickFn(
+NumPickFn ChooseNumPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask) {
@@ -247,7 +247,7 @@ NumPickFn GetNumPickFn(
  * returns a tensor of picked neighbors.
  */
 template <SamplerType S>
-PickFn GetPickFn(
+PickFn ChoosePickFn(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& type_per_edge,
@@ -362,16 +362,16 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
     return SampleNeighborsImpl(
         nodes, return_eids,
-        GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
-        GetPickFn(
+        ChooseNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
+        ChoosePickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
             args));
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl(
         nodes, return_eids,
-        GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
-        GetPickFn(
+        ChooseNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
+        ChoosePickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
             args));
   }
