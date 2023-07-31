@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 3.5)
 project(dgl C CXX)
 message(STATUS "Start configuring project ${PROJECT_NAME}")
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # cmake utils
