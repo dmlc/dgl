@@ -50,23 +50,30 @@ class NegativeSampler(Mapper):
         """
         if isinstance(node_pairs, Mapping):
             return {
-                etype: self._post_process(pos_pairs, etype)
+                etype: self._collate(
+                    pos_pairs, self._sample_negative_pairs(pos_pairs, etype)
+                )
                 for etype, pos_pairs in node_pairs.items()
             }
         else:
-            return self._post_process(node_pairs, None)
+            return self._collate(
+                node_pairs, self._sample_negative_pairs(node_pairs, None)
+            )
 
-    def _post_process(self, node_pairs, etype=None):
-        """Generate a mix of positive and negative samples for a given etype.
+    def _collate(self, pos_pairs, neg_pairs):
+        """Collates positive and negative samples.
 
         Parameters
         ----------
-        node_pairs : Tuple[Tensor]
-            A tuple of tensors or a dictionary represents source-destination
-            node pairs of positive edges, where positive means the edge must
-            exist in the graph.
-        etype : (str, str, str)
-            Canonical edge type.
+        pos_pairs : Tuple[Tensor]
+            A tuple of tensors represents source-destination node pairs of
+            positive edges, where positive means the edge must exist in
+            the graph.
+        neg_pairs : Tuple[Tensor]
+            A tuple of tensors represents source-destination node pairs of
+            negative edges, where negative means the edge may not exist in
+            the graph.
+
         Returns
         -------
         Tuple[Tensor]
@@ -75,7 +82,9 @@ class NegativeSampler(Mapper):
         raise NotImplementedError
 
     def _sample_negative_pairs(self, node_pairs, etype=None):
-        """Generate negative pairs for a given etype form positive pairs.
+        """Generate negative pairs for a given etype form positive pairs
+        for a given etype.
+
         Parameters
         ----------
         node_pairs : Tuple[Tensor]
@@ -84,6 +93,7 @@ class NegativeSampler(Mapper):
             exist in the graph.
         etype : (str, str, str)
             Canonical edge type.
+
         Returns
         -------
         Tuple[Tensor]
@@ -100,9 +110,9 @@ class IndependentNegativeSampler(NegativeSampler):
     is negative (0) or positive (1).
     """
 
-    def _post_process(self, node_pairs, etype=None):
-        neg_src, neg_dst = self._sample_negative_pairs(node_pairs, etype)
-        pos_src, pos_dst = node_pairs
+    def _collate(self, pos_pairs, neg_pairs):
+        pos_src, pos_dst = pos_pairs
+        neg_src, neg_dst = neg_pairs
         pos_label = torch.ones_like(pos_src)
         neg_label = torch.zeros_like(neg_src)
         src = torch.cat([pos_src, neg_src])
@@ -120,9 +130,9 @@ class ConditionedNegativeSampler(NegativeSampler):
     and 'neg_v' is same as 'negative_ratio'.
     """
 
-    def _post_process(self, node_pairs, etype=None):
-        neg_src, neg_dst = self._sample_negative_pairs(node_pairs, etype)
-        pos_src, pos_dst = node_pairs
+    def _collate(self, pos_pairs, neg_pairs):
+        pos_src, pos_dst = pos_pairs
+        neg_src, neg_dst = neg_pairs
         neg_src = neg_src.view(-1, self.negative_ratio)
         neg_dst = neg_dst.view(-1, self.negative_ratio)
         return (pos_src, pos_dst, neg_src, neg_dst)

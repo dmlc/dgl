@@ -9,11 +9,13 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
     # Construct CSCSamplingGraph.
     graph = gb_test_utils.rand_csc_graph(100, 0.05)
     num_seeds = 30
-    item_set= gb.ItemSet((
-        torch.arange(0, num_seeds),
-        torch.arange(num_seeds, num_seeds * 2),
-    ))
-    batch_size = 10 
+    item_set = gb.ItemSet(
+        (
+            torch.arange(0, num_seeds),
+            torch.arange(num_seeds, num_seeds * 2),
+        )
+    )
+    batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformIndependentNegativeSampler(
@@ -37,11 +39,13 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
     # Construct CSCSamplingGraph.
     graph = gb_test_utils.rand_csc_graph(100, 0.05)
     num_seeds = 30
-    item_set= gb.ItemSet((
-        torch.arange(0, num_seeds),
-        torch.arange(num_seeds, num_seeds * 2),
-    ))
-    batch_size = 10 
+    item_set = gb.ItemSet(
+        (
+            torch.arange(0, num_seeds),
+            torch.arange(num_seeds, num_seeds * 2),
+        )
+    )
+    batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformConditionedNegativeSampler(
