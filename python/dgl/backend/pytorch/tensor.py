@@ -18,6 +18,7 @@ if version.parse(th.__version__) < version.parse("1.12.0"):
 
 def data_type_dict():
     return {
+        "bfloat16": th.bfloat16,
         "float16": th.float16,
         "float32": th.float32,
         "float64": th.float64,

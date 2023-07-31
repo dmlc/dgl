@@ -2443,7 +2443,7 @@ def test_dtype_cast(idtype):
 
 
 def test_float_cast():
-    for t in [F.float16, F.float32, F.float64]:
+    for t in [F.bfloat16, F.float16, F.float32, F.float64]:
         idtype = F.int32
         g = dgl.heterograph(
             {
@@ -2469,6 +2469,7 @@ def test_float_cast():
             ("c", F.float64),
             ("d", F.int32),
             ("e", F.int64),
+            ("f", F.bfloat16),
         ]
         for name, type in dataNamesTypes:
             g.nodes["user"].data[name] = F.copy_to(
@@ -2487,6 +2488,8 @@ def test_float_cast():
                 F.tensor(pvalues, dtype=type), ctx=F.ctx()
             )
 
+        if t == F.bfloat16:
+            g = dgl.transforms.functional.to_bfloat16(g)
         if t == F.float16:
             g = dgl.transforms.functional.to_half(g)
         if t == F.float32:
@@ -2498,7 +2501,7 @@ def test_float_cast():
             # integer tensors shouldn't be converted
             reqType = (
                 t
-                if (origType in [F.float16, F.float32, F.float64])
+                if (origType in [F.bfloat16, F.float16, F.float32, F.float64])
                 else origType
             )
 
