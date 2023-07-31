@@ -7,9 +7,6 @@ endif()
 
 ###### Borrowed from MSHADOW project
 
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++17"   SUPPORT_CXX17)
-
 set(dgl_known_gpu_archs "35" "50" "60" "70")
 set(dgl_cuda_arch_ptx "70")
 if (CUDA_VERSION_MAJOR GREATER_EQUAL "11")
