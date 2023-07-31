@@ -174,7 +174,7 @@ def main(args):
                         i,
                         train_acc,
                         loss.item(),
-                        time.time() - batch_tic
+                        time.time() - batch_tic,
                     )
                 )
 
