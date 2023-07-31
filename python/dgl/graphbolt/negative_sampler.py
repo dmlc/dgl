@@ -79,7 +79,7 @@ class NegativeSampler(Mapper):
         Tuple[Tensor]
             A mixed collection of positive and negative node pairs.
         """
-        raise NotImplementedError
+        pass
 
     def _sample_negative_pairs(self, node_pairs, etype=None):
         """Generate negative pairs for a given etype form positive pairs
@@ -99,7 +99,7 @@ class NegativeSampler(Mapper):
         Tuple[Tensor]
             A collection of negative node pairs.
         """
-        raise NotImplementedError
+        pass
 
 
 class IndependentNegativeSampler(NegativeSampler):
