@@ -131,60 +131,66 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
-NumPickFn GetNumPickFnWithoutEtype(
+NumPickFn GetNumPickFn(
     int64_t fanout, bool replace,
     const torch::optional<torch::Tensor>& probs_or_mask) {
   if (!probs_or_mask.has_value()) {
     return [fanout, replace](int64_t offset, int64_t num_neighbors) {
       int64_t max_count = fanout == -1 ? num_neighbors : fanout;
       if (replace) {
-        return num_neighbors == 0 ? 0 : max_count;
+        return torch::tensor({num_neighbors == 0 ? 0 : max_count});
       } else {
-        return std::min(num_neighbors, max_count);
+        return torch::tensor({std::min(num_neighbors, max_count)});
       }
     };
   } else {
     return [fanout, replace, probs_or_mask](
                int64_t offset, int64_t num_neighbors) {
       int64_t max_count = fanout == -1 ? num_neighbors : fanout;
-      int64_t cur_count = 0;
-      AT_DISPATCH_ALL_TYPES(
-          probs_or_mask.value().scalar_type(), "NumPickFn", ([&] {
-            const scalar_t* probs_data =
-                probs_or_mask.value().data_ptr<scalar_t>();
-            for (int64_t i = offset; i < offset + num_neighbors; ++i) {
-              if (probs_data[i] != 0) ++cur_count;
-            }
-          }));
+      int64_t nonzero_count = 0;
+      nonzero_count = torch::nonzero(probs_or_mask.value().slice(
+                                         0, offset, offset + num_neighbors))
+                          .size(0);
       if (replace) {
-        return cur_count == 0 ? 0 : max_count;
+        return torch::tensor({nonzero_count == 0 ? 0 : max_count});
       } else {
-        return std::min(cur_count, max_count);
+        return torch::tensor({std::min(nonzero_count, max_count)});
       }
     };
   }
 }
 
-NumPickFn GetNumPickFnWithEtype(
+NumPickFn GetNumPickFnByEtype(
     const std::vector<int64_t>& fanouts, bool replace,
-    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask) {
   return [replace, fanouts, probs_or_mask, &type_per_edge](
              int64_t offset, int64_t num_neighbors) {
-    int64_t sum_count = 0;
+    int64_t etype_begin = offset;
+    int64_t etype_end = offset;
+    const int64_t end = offset + num_neighbors;
+    torch::Tensor count_by_etype = torch::zeros(fanouts.size());
     AT_DISPATCH_ALL_TYPES(
-        type_per_edge.value().scalar_type(), "NumPickFn", ([&] {
-          const scalar_t* etypes_data =
-              type_per_edge.value().data_ptr<scalar_t>();
-          for (int64_t r = offset, l = offset; r < offset + num_neighbors;
-               l = r) {
-            auto etype = etypes_data[l];
-            while (r < offset + num_neighbors && etypes_data[r] == etype) ++r;
-            sum_count += GetNumPickFnWithoutEtype(
-                fanouts[(int64_t)(etype)], replace, probs_or_mask)(l, r - l);
+        type_per_edge.scalar_type(), "NumPickFnByEtype", ([&] {
+          const scalar_t* type_per_edge_data =
+              type_per_edge.data_ptr<scalar_t>();
+          while (etype_begin < end) {
+            scalar_t etype = type_per_edge_data[etype_begin];
+            TORCH_CHECK(
+                etype >= 0 && etype < (int64_t)fanouts.size(),
+                "Etype values exceed the number of fanouts.");
+            auto etype_end_it = std::upper_bound(
+                type_per_edge_data + etype_begin, type_per_edge_data + end,
+                etype);
+            etype_end = etype_end_it - type_per_edge_data;
+            // Do sampling for one etype.
+            count_by_etype[etype] =
+                GetNumPickFn(fanouts[etype], replace, probs_or_mask)(
+                    etype_begin, etype_end - etype_begin)[0];
+            etype_begin = etype_end;
           }
         }));
-    return sum_count;
+    return count_by_etype;
   };
 }
 
@@ -213,11 +219,11 @@ NumPickFn GetNumPickFn(
     const torch::optional<torch::Tensor>& probs_or_mask) {
   // If fanouts.size() > 1, count with sampling for each edge type of each node,
   // otherwise just sample once for each node with no regard of edge types.
-  if (fanouts.size() > 1)
-    return GetNumPickFnWithEtype(
-        fanouts, replace, type_per_edge, probs_or_mask);
+  if (fanouts.size() > 1 && type_per_edge.has_value())
+    return GetNumPickFnByEtype(
+        fanouts, replace, type_per_edge.value(), probs_or_mask);
   else
-    return GetNumPickFnWithoutEtype(fanouts[0], replace, probs_or_mask);
+    return GetNumPickFn(fanouts[0], replace, probs_or_mask);
 }
 
 /**

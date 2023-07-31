@@ -31,7 +31,7 @@ struct SamplerArgs<SamplerType::LABOR> {
   int64_t num_nodes;
 };
 
-using NumPickFn = std::function<int64_t(int64_t, int64_t)>;
+using NumPickFn = std::function<torch::Tensor(int64_t, int64_t)>;
 using PickFn = std::function<torch::Tensor(int64_t, int64_t)>;
 
 /**
