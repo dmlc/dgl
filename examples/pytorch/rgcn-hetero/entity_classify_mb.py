@@ -165,7 +165,9 @@ def main(args):
                 loss.backward()
                 optimizer.step()
 
-                train_acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds)
+                train_acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(
+                    seeds
+                )
                 print(
                     "Epoch {:05d} | Batch {:03d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Time: {:.4f}".format(
                         epoch, i, train_acc, loss.item(), time.time() - batch_tic
@@ -188,7 +190,11 @@ def main(args):
         th.save(model.state_dict(), args.model_path)
 
     output = model.inference(
-        g, args.batch_size, "cuda" if use_cuda else "cpu", args.num_workers, node_embed
+        g,
+        args.batch_size,
+        "cuda" if use_cuda else "cpu",
+        args.num_workers,
+        node_embed
     )
     test_pred = output[category][test_idx]
     test_labels = labels[test_idx].to(test_pred.device)
