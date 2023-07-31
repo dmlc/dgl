@@ -50,13 +50,13 @@ class NegativeSampler(Mapper):
         """
         if isinstance(node_pairs, Mapping):
             return {
-                etype: self._generate(pos_pairs, etype)
+                etype: self._post_process(pos_pairs, etype)
                 for etype, pos_pairs in node_pairs.items()
             }
         else:
-            return self._generate(node_pairs, None)
+            return self._post_process(node_pairs, None)
 
-    def _generate(self, node_pairs, etype=None):
+    def _post_process(self, node_pairs, etype=None):
         """Generate a mix of positive and negative samples for a given etype.
 
         Parameters
@@ -74,7 +74,7 @@ class NegativeSampler(Mapper):
         """
         raise NotImplementedError
 
-    def _generate_negative_pairs(self, node_pairs, etype=None):
+    def _sample_negative_pairs(self, node_pairs, etype=None):
         """Generate negative pairs for a given etype form positive pairs.
         Parameters
         ----------
@@ -100,8 +100,8 @@ class IndependentNegativeSampler(NegativeSampler):
     is negative (0) or positive (1).
     """
 
-    def _generate(self, node_pairs, etype=None):
-        neg_src, neg_dst = self._generate_negative_pairs(node_pairs, etype)
+    def _post_process(self, node_pairs, etype=None):
+        neg_src, neg_dst = self._sample_negative_pairs(node_pairs, etype)
         pos_src, pos_dst = node_pairs
         pos_label = torch.ones_like(pos_src)
         neg_label = torch.zeros_like(neg_src)
@@ -120,8 +120,8 @@ class ConditionedNegativeSampler(NegativeSampler):
     and 'neg_v' is same as 'negative_ratio'.
     """
 
-    def _generate(self, node_pairs, etype=None):
-        neg_src, neg_dst = self._generate_negative_pairs(node_pairs, etype)
+    def _post_process(self, node_pairs, etype=None):
+        neg_src, neg_dst = self._sample_negative_pairs(node_pairs, etype)
         pos_src, pos_dst = node_pairs
         neg_src = neg_src.view(-1, self.negative_ratio)
         neg_dst = neg_dst.view(-1, self.negative_ratio)

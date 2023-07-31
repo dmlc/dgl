@@ -18,7 +18,12 @@ class UniformNegativeSampler(NegativeSampler):
     the nodes in the graph.
     """
 
-    def __init__(self, datapipe, negative_ratio, graph):
+    def __init__(
+        self,
+        datapipe,
+        negative_ratio,
+        graph,
+    ):
         """
         Initlization for a uniform negative sampler.
 
@@ -28,13 +33,13 @@ class UniformNegativeSampler(NegativeSampler):
             The datapipe.
         negative_ratio : int
             The proportion of negative samples to positive samples.
-        graph
+        graph : CSCSamplingGraph
             The graph on which to perform negative sampling.
         """
         super().__init__(datapipe, negative_ratio)
         self.graph = graph
 
-    def _generate_negative_pairs(self, node_pairs, etype=None):
+    def _sample_negative_pairs(self, node_pairs, etype=None):
         return self.graph.sample_negative_edges_uniform(
             etype,
             node_pairs,
@@ -66,8 +71,6 @@ class UniformIndependentNegativeSampler(
     (tensor([1, 1, 1]), tensor([2, 1, 2]), tensor([1, 0, 0]))
     """
 
-    pass
-
 
 class UniformConditionedNegativeSampler(
     UniformNegativeSampler, ConditionedNegativeSampler
@@ -92,5 +95,3 @@ class UniformConditionedNegativeSampler(
     (tensor([0]), tensor([1]), tensor([[0, 0]]), tensor([[2, 1]]))
     (tensor([1]), tensor([2]), tensor([[1, 1]]), tensor([[1, 2]]))
     """
-
-    pass
