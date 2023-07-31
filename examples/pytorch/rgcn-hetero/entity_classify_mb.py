@@ -170,7 +170,11 @@ def main(args):
                 )
                 print(
                     "Epoch {:05d} | Batch {:03d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Time: {:.4f}".format(
-                        epoch, i, train_acc, loss.item(), time.time() - batch_tic
+                        epoch,
+                        i,
+                        train_acc,
+                        loss.item(),
+                        time.time() - batch_tic
                     )
                 )
 
@@ -194,7 +198,7 @@ def main(args):
         args.batch_size,
         "cuda" if use_cuda else "cpu",
         args.num_workers,
-        node_embed
+        node_embed,
     )
     test_pred = output[category][test_idx]
     test_labels = labels[test_idx].to(test_pred.device)
