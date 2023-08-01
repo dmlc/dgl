@@ -2544,7 +2544,12 @@ def test_EGTLayer(edge_update):
     if edge_update:
         out_nfeat, out_efeat = net(nfeat, efeat, mask)
         assert out_nfeat.shape == (batch_size, num_nodes, feat_size)
-        assert out_efeat.shape == (batch_size, num_nodes, num_nodes, edge_feat_size)
+        assert out_efeat.shape == (
+            batch_size,
+            num_nodes,
+            num_nodes,
+            edge_feat_size,
+        )
     else:
         out_nfeat = net(nfeat, efeat, mask)
         assert out_nfeat.shape == (batch_size, num_nodes, feat_size)

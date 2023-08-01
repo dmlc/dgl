@@ -64,7 +64,9 @@ class EGTLayer(nn.Module):
         self.num_virtual_nodes = num_virtual_nodes
         self.edge_update = edge_update
 
-        assert feat_size % num_heads == 0, "feat_size must be divisible by num_heads"
+        assert (
+            feat_size % num_heads == 0
+        ), "feat_size must be divisible by num_heads"
         self.dot_dim = feat_size // num_heads
         self.mha_ln_h = nn.LayerNorm(feat_size)
         self.mha_ln_e = nn.LayerNorm(edge_feat_size)
