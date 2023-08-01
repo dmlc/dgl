@@ -50,7 +50,7 @@ class UniformNegativeSampler(NegativeSampler):
         >>> indptr = torch.LongTensor([0, 2, 4, 5])
         >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
         >>> graph = gb.from_csc(indptr, indices)
-        >>> link_data_format = gb.LinkDataFormat.CONDITIONED
+        >>> link_data_format = gb.LinkDataFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
         >>> minibatch_sampler = gb.MinibatchSampler(
@@ -68,7 +68,7 @@ class UniformNegativeSampler(NegativeSampler):
         >>> indptr = torch.LongTensor([0, 2, 4, 5])
         >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
         >>> graph = gb.from_csc(indptr, indices)
-        >>> link_data_format = gb.LinkDataFormat.INDEPENDENT
+        >>> link_data_format = gb.LinkDataFormat.CONDITIONED
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
         >>> minibatch_sampler = gb.MinibatchSampler(
