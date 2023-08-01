@@ -237,7 +237,7 @@ def check_sha1(filename, sha1_hash):
     return sha1.hexdigest() == sha1_hash
 
 
-def extract_archive(file, target_dir, overwrite=True):
+def extract_archive(file, target_dir, overwrite=False):
     """Extract archive file.
 
     Parameters
