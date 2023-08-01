@@ -84,6 +84,7 @@ class NegativeSampler(Mapper):
         Tuple[Tensor]
             A collection of negative node pairs.
         """
+        raise NotImplementedError
 
     def _collate(self, pos_pairs, neg_pairs):
         """Collates positive and negative samples.
