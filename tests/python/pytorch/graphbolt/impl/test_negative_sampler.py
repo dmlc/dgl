@@ -18,9 +18,10 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
     # Construct NegativeSampler.
-    negative_sampler = gb.UniformIndependentNegativeSampler(
+    negative_sampler = gb.UniformNegativeSampler(
         minibatch_sampler,
         negative_ratio,
+        gb.LinkDataFormat.INDEPENDENT,
         graph,
     )
     # Perform Negative sampling.
@@ -48,9 +49,10 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
     # Construct NegativeSampler.
-    negative_sampler = gb.UniformConditionedNegativeSampler(
+    negative_sampler = gb.UniformNegativeSampler(
         minibatch_sampler,
         negative_ratio,
+        gb.LinkDataFormat.CONDITIONED,
         graph,
     )
     # Perform Negative sampling.
