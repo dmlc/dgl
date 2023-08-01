@@ -30,7 +30,7 @@ class NegativeSampler(Mapper):
         negative_ratio : int
             The proportion of negative samples to positive samples.
         output_format : LinkPredictionEdgeFormat
-            Determines the edge format of the output data:
+            Determines the edge format of the output data.
         """
         super().__init__(datapipe, self._sample)
         assert negative_ratio > 0, "Negative_ratio should be positive Integer."
