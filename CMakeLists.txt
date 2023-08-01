@@ -236,7 +236,6 @@ if(USE_CUDA)
     third_party/HugeCTR/gpu_cache/src/nv_gpu_cache.cu
   )
   cuda_add_library(gpu_cache STATIC ${gpu_cache_src})
-  set_property(TARGET gpu_cache PROPERTY CXX_STANDARD 11)
   target_include_directories(gpu_cache PRIVATE "third_party/HugeCTR/gpu_cache/include")
   target_include_directories(dgl PRIVATE "third_party/HugeCTR/gpu_cache/include")
   list(APPEND DGL_LINKER_LIBS gpu_cache)
