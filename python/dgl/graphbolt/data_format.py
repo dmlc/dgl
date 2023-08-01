@@ -16,18 +16,22 @@ class LinkPredictionEdgeFormat(Enum):
     an edge, with a label (0 or 1) denoting it as negative or positive.
 
     CONDITIONED: Represents the 'conditioned' format where data is
-    structured as quadruples `[u, v, [negative heads], [negative tails]]`
-    indicating the source and destination nodes of positive and negative edges.
+    structured as quadruples `(u, v, neg_u, neg_v)` indicating the source and
+    destination nodes of positive and negative edges. And 'u' and 'v' are 1D
+    tensors with the same shape, while 'neg_u' and 'neg_v' are 2D tensors with
+    the same shape.
 
     HEAD_CONDITIONED: Represents the 'head conditioned' format where data is
-    structured as triples `[u, v, [negative heads]]`, where  '(u, v)' signifies
-    the source and destination nodes of positive edges, while each node in
-    '[negative heads]' collaborates with 'v' to create negative edges.
+    structured as triples `(u, v, neg_u)`, where  '(u, v)' signifies the
+    source and destination nodes of positive edges, while each node in
+    'neg_u' collaborates with 'v' to create negative edges. And 'u' and 'v' are
+    1D tensors with the same shape, while 'neg_u' is a 2D tensor.
 
-    TAIL_CONDITIONED: Represents the 'conditioned' format where data is
-    structured as triples `[u, v, [negative tails]]`, where  '(u, v)' signifies
-    the source and destination nodes of positive edges, while 'u' collaborates
-    with each node in '[negative tails]' to create negative edges.
+    TAIL_CONDITIONED: Represents the 'tail conditioned' format where data is
+    structured as triples `(u, v, neg_v)`, where  '(u, v)' signifies the
+    source and destination nodes of positive edges, while 'u' collaborates
+    with each node in 'neg_v' to create negative edges. And 'u' and 'v' are
+    1D tensors with the same shape, while 'neg_v' is a 2D tensor.
     """
 
     INDEPENDENT = "independent"
