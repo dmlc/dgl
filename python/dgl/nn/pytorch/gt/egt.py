@@ -97,9 +97,10 @@ class EGTLayer(nn.Module):
             )
 
     def forward(self, ndata, edata, mask=None):
-        """Forward computation. Note: :attr:`h` and :attr:`e` should be padded
-        with embedding of virtual nodes if :attr:`num_virtual_nodes` > 0, while
-        :attr:`mask` should be padded with `0` values for virtual nodes.
+        """Forward computation. Note: :attr:`ndata` and :attr:`edata` should be
+        padded with embedding of virtual nodes if :attr:`num_virtual_nodes` > 0,
+        while :attr:`mask` should be padded with `0` values for virtual nodes.
+        The padding should be put at the beginning.
 
         Parameters
         ----------
