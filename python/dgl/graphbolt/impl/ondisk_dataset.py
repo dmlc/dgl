@@ -23,7 +23,12 @@ from .csc_sampling_graph import (
     load_csc_sampling_graph,
     save_csc_sampling_graph,
 )
-from .ondisk_metadata import OnDiskGraphTopology, OnDiskMetaData, OnDiskTVTSet
+from .ondisk_metadata import (
+    OnDiskGraphTopology,
+    OnDiskMetaData,
+    OnDiskTVTSet,
+    OnDiskTVTSetData,
+)
 from .torch_based_feature_store import (
     load_feature_stores,
     TorchBasedFeatureStore,
@@ -174,34 +179,36 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
             for input_set_per_type, output_set_per_type in zip(
                 intput_set_split, output_set_split
             ):
-                # Always save the feature in numpy format.
-                output_set_per_type["format"] = "numpy"
-                output_set_per_type["path"] = str(
-                    processed_dir_prefix
-                    / input_set_per_type["path"].replace("pt", "npy")
-                )
-                if input_set_per_type["format"] == "numpy":
-                    # If the original format is numpy, just copy the file.
-                    os.makedirs(
-                        dataset_path
-                        / os.path.dirname(output_set_per_type["path"]),
-                        exist_ok=True,
+                for input_data, output_data in zip(
+                    input_set_per_type["data"], output_set_per_type["data"]
+                ):
+                    # Always save the feature in numpy format.
+                    output_data["format"] = "numpy"
+                    output_data["path"] = str(
+                        processed_dir_prefix
+                        / input_data["path"].replace("pt", "npy")
                     )
-                    shutil.copy(
-                        dataset_path / input_set_per_type["path"],
-                        dataset_path / output_set_per_type["path"],
-                    )
-                else:
-                    # If the original format is not numpy, convert it to numpy.
-                    input_set = read_data(
-                        dataset_path / input_set_per_type["path"],
-                        input_set_per_type["format"],
-                    )
-                    save_data(
-                        input_set,
-                        dataset_path / output_set_per_type["path"],
-                        output_set_per_type["format"],
-                    )
+                    if input_data["format"] == "numpy":
+                        # If the original format is numpy, just copy the file.
+                        os.makedirs(
+                            dataset_path / os.path.dirname(output_data["path"]),
+                            exist_ok=True,
+                        )
+                        shutil.copy(
+                            dataset_path / input_data["path"],
+                            dataset_path / output_data["path"],
+                        )
+                    else:
+                        # If the original format is not numpy, convert it to numpy.
+                        input_set = read_data(
+                            dataset_path / input_data["path"],
+                            input_data["format"],
+                        )
+                        save_data(
+                            input_set,
+                            dataset_path / output_data["path"],
+                            output_set_per_type["format"],
+                        )
 
     # 8. Save the output_config.
     output_config_path = dataset_path / "output_config.yaml"
@@ -245,19 +252,25 @@ class OnDiskDataset(Dataset):
             path: edge_data/author-writes-paper-feat.npy
         train_sets:
           - - type: paper # could be null for homogeneous graph.
-              format: numpy
-              in_memory: true # If not specified, default to true.
-              path: set/paper-train.npy
+              data: # multiple data sources could be specified.
+                - format: numpy
+                  in_memory: true # If not specified, default to true.
+                  path: set/paper-train-src.npy
+                - format: numpy
+                  in_memory: false
+                  path: set/paper-train-dst.npy
         validation_sets:
           - - type: paper
-              format: numpy
-              in_memory: true
-              path: set/paper-validation.npy
+              data:
+                - format: numpy
+                  in_memory: true
+                  path: set/paper-validation.npy
         test_sets:
           - - type: paper
-              format: numpy
-              in_memory: true
-              path: set/paper-test.npy
+              data:
+                - format: numpy
+                  in_memory: true
+                  path: set/paper-test.npy
 
     Parameters
     ----------
@@ -347,16 +360,21 @@ class OnDiskDataset(Dataset):
                 assert (
                     len(tvt_set) == 1
                 ), "Only one TVT set is allowed if type is not specified."
-                data = read_data(
-                    tvt_set[0].path, tvt_set[0].format, tvt_set[0].in_memory
+                ret.append(
+                    ItemSet(
+                        tuple(
+                            read_data(data.path, data.format, data.in_memory)
+                            for data in tvt_set[0].data
+                        )
+                    )
                 )
-                ret.append(ItemSet(tensor_to_tuple(data)))
             else:
                 data = {}
                 for tvt in tvt_set:
                     data[tvt.type] = ItemSet(
-                        tensor_to_tuple(
-                            read_data(tvt.path, tvt.format, tvt.in_memory)
+                        tuple(
+                            read_data(data.path, data.format, data.in_memory)
+                            for data in tvt.data
                         )
                     )
                 ret.append(ItemSetDict(data))
