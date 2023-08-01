@@ -129,4 +129,4 @@ class NegativeSampler(Mapper):
             neg_dst = neg_dst.view(-1, self.negative_ratio)
             return (pos_src, pos_dst, neg_src, neg_dst)
         else:
-            raise ValueError("Unsupported link data format.")
+            raise ValueError("Unsupported output format.")
