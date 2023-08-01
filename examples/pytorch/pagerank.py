@@ -4,8 +4,8 @@ import networkx as nx
 import torch
 
 N = 100
-g = nx.erdos_renyi_graph(N, 0.05)
-g = dgl.DGLGraph(g)
+network = nx.erdos_renyi_graph(N, 0.05)
+g = dgl.from_networkx(network)
 
 DAMP = 0.85
 K = 10
