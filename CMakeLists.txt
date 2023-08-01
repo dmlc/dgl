@@ -4,10 +4,6 @@ cmake_minimum_required(VERSION 3.5)
 ########################################
 project(dgl C CXX)
 message(STATUS "Start configuring project ${PROJECT_NAME}")
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CUDA_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 # cmake utils
 include(cmake/util/Util.cmake)
@@ -174,6 +170,9 @@ if(USE_CUDA)
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
 endif(USE_CUDA)
+
+set_property(TARGET dgl PROPERTY CXX_STANDARD 14)
+set_property(TARGET dgl PROPERTY CUDA_STANDARD 14)
 
 # include directories
 target_include_directories(dgl PRIVATE "include")
