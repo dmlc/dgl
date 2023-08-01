@@ -12,13 +12,13 @@ class EGTLayer(nn.Module):
 
     Parameters
     ----------
-    ndim : int
-        Node embedding dimension.
-    edim : int
-        Edge embedding dimension.
+    feat_size : int
+        Node feature size.
+    edge_feat_size : int
+        Edge feature size.
     num_heads : int
-        Number of attention heads, by which :attr: `ndim` is divisible.
-    num_vns : int
+        Number of attention heads, by which :attr: `feat_size` is divisible.
+    num_virtual_nodes : int
         Number of virtual nodes.
     dropout : float, optional
         Dropout probability. Default: 0.0.
@@ -26,9 +26,6 @@ class EGTLayer(nn.Module):
         Attention dropout probability. Default: 0.0.
     activation : callable activation layer, optional
         Activation function. Default: nn.ELU().
-    ffn_multiplier : float, optional
-        Multiplier of the inner dimension in Feed Forward Network.
-        Default: 2.0.
     edge_update : bool, optional
         Whether to update the edge embedding. Default: True.
 
@@ -39,80 +36,77 @@ class EGTLayer(nn.Module):
 
     >>> batch_size = 16
     >>> num_nodes = 100
-    >>> ndim, edim = 128, 32
-    >>> nfeat = th.rand(batch_size, num_nodes, ndim)
-    >>> efeat = th.rand(batch_size, num_nodes, num_nodes, edim)
+    >>> feat_size, edge_feat_size = 128, 32
+    >>> nfeat = th.rand(batch_size, num_nodes, feat_size)
+    >>> efeat = th.rand(batch_size, num_nodes, num_nodes, edge_feat_size)
     >>> net = EGTLayer(
-            ndim=ndim,
-            edim=edim,
+            feat_size=feat_size,
+            edge_feat_size=edge_feat_size,
             num_heads=8,
-            num_vns=4,
+            num_virtual_nodes=4,
         )
     >>> out = net(nfeat, efeat)
     """
 
     def __init__(
         self,
-        ndim,
-        edim,
+        feat_size,
+        edge_feat_size,
         num_heads,
-        num_vns,
+        num_virtual_nodes,
         dropout=0,
         attn_dropout=0,
         activation=nn.ELU(),
-        ffn_multiplier=2.0,
         edge_update=True,
     ):
         super().__init__()
         self.num_heads = num_heads
-        self.num_vns = num_vns
+        self.num_virtual_nodes = num_virtual_nodes
         self.edge_update = edge_update
 
-        assert not (ndim % num_heads)
-        self.dot_dim = ndim // num_heads
-        self.mha_ln_h = nn.LayerNorm(ndim)
-        self.mha_ln_e = nn.LayerNorm(edim)
-        self.E = nn.Linear(edim, num_heads)
-        self.QKV = nn.Linear(ndim, ndim * 3)
-        self.G = nn.Linear(edim, num_heads)
+        assert feat_size % num_heads == 0, "feat_size must be divisible by num_heads"
+        self.dot_dim = feat_size // num_heads
+        self.mha_ln_h = nn.LayerNorm(feat_size)
+        self.mha_ln_e = nn.LayerNorm(edge_feat_size)
+        self.edge_input = nn.Linear(edge_feat_size, num_heads)
+        self.qkv_proj = nn.Linear(feat_size, feat_size * 3)
+        self.gate = nn.Linear(edge_feat_size, num_heads)
         self.attn_dropout = nn.Dropout(attn_dropout)
-        self.O_h = nn.Linear(ndim, ndim)
+        self.node_output = nn.Linear(feat_size, feat_size)
         self.mha_dropout_h = nn.Dropout(dropout)
 
-        node_inner_dim = round(ndim * ffn_multiplier)
         self.node_ffn = nn.Sequential(
-            nn.LayerNorm(ndim),
-            nn.Linear(ndim, node_inner_dim),
+            nn.LayerNorm(feat_size),
+            nn.Linear(feat_size, feat_size),
             activation,
-            nn.Linear(node_inner_dim, ndim),
+            nn.Linear(feat_size, feat_size),
             nn.Dropout(dropout),
         )
 
         if self.edge_update:
-            self.O_e = nn.Linear(num_heads, edim)
+            self.edge_output = nn.Linear(num_heads, edge_feat_size)
             self.mha_dropout_e = nn.Dropout(dropout)
-            edge_inner_dim = round(edim * ffn_multiplier)
             self.edge_ffn = nn.Sequential(
-                nn.LayerNorm(edim),
-                nn.Linear(edim, edge_inner_dim),
+                nn.LayerNorm(edge_feat_size),
+                nn.Linear(edge_feat_size, edge_feat_size),
                 activation,
-                nn.Linear(edge_inner_dim, edim),
+                nn.Linear(edge_feat_size, edge_feat_size),
                 nn.Dropout(dropout),
             )
 
-    def forward(self, h, e, mask=None):
+    def forward(self, ndata, edata, mask=None):
         """Forward computation. Note: :attr:`h` and :attr:`e` should be padded
-        with embedding of virtual nodes if :attr:`num_vns` > 0, while
+        with embedding of virtual nodes if :attr:`num_virtual_nodes` > 0, while
         :attr:`mask` should be padded with `0` values for virtual nodes.
 
         Parameters
         ----------
-        h : torch.Tensor
-            A 3D input tensor. Shape: (batch_size, N, :attr:`ndim`), where N
-            is the sum of maximum number of nodes and number of virtual nodes.
-        e : torch.Tensor
+        ndata : torch.Tensor
+            A 3D input tensor. Shape: (batch_size, N, :attr:`feat_size`), where N
+            is the sum of the maximum number of nodes and the number of virtual nodes.
+        edata : torch.Tensor
             Edge embedding used for attention computation and self update.
-            Shape: (batch_size, N, N, :attr:`edim`).
+            Shape: (batch_size, N, N, :attr:`edge_feat_size`).
         mask : torch.Tensor, optional
             The attention mask used for avoiding computation on invalid
             positions, where valid positions are indicated by `0` and
@@ -122,44 +116,45 @@ class EGTLayer(nn.Module):
         Returns
         -------
         h : torch.Tensor
-            The output node embedding. Shape: (batch_size, N, :attr:`ndim`).
-        e : torch.Tensor
-            The output edge embedding. Shape: (batch_size, N, N, :attr:`edim`).
+            The output node embedding. Shape: (batch_size, N, :attr:`feat_size`).
+        e : torch.Tensor, optional
+            The output edge embedding. Shape: (batch_size, N, N, :attr:`edge_feat_size`).
+            It is only returned when :attr:`edge_update` is True.
         """
 
-        h_r1 = h
-        e_r1 = e
+        h_r1 = ndata
+        e_r1 = edata
 
-        h_ln = self.mha_ln_h(h)
-        e_ln = self.mha_ln_e(e)
-        QKV = self.QKV(h_ln)
-        E = self.E(e_ln)
-        G = self.G(e_ln)
-        shp = QKV.shape
-        Q, K, V = QKV.view(shp[0], shp[1], -1, self.num_heads).split(
+        h_ln = self.mha_ln_h(ndata)
+        e_ln = self.mha_ln_e(edata)
+        qkv = self.qkv_proj(h_ln)
+        e_bias = self.edge_input(e_ln)
+        gates = self.gate(e_ln)
+        bsz, N, _ = qkv.shape
+        q_h, k_h, v_h = qkv.view(bsz, N, -1, self.num_heads).split(
             self.dot_dim, dim=2
         )
-        A_hat = torch.einsum("bldh,bmdh->blmh", Q, K)
-        H_hat = A_hat.clamp(-5, 5) + E
+        attn_hat = torch.einsum("bldh,bmdh->blmh", q_h, k_h)
+        attn_hat = attn_hat.clamp(-5, 5) + e_bias
 
         if mask is None:
-            gates = torch.sigmoid(G)
-            A_tild = F.softmax(H_hat, dim=2) * gates
+            gates = torch.sigmoid(gates)
+            attn_tild = F.softmax(attn_hat, dim=2) * gates
         else:
-            gates = torch.sigmoid(G + mask.unsqueeze(-1))
-            A_tild = F.softmax(H_hat + mask.unsqueeze(-1), dim=2) * gates
+            gates = torch.sigmoid(gates + mask.unsqueeze(-1))
+            attn_tild = F.softmax(attn_hat + mask.unsqueeze(-1), dim=2) * gates
 
-        A_tild = self.attn_dropout(A_tild)
-        V_attn = torch.einsum("blmh,bmkh->blkh", A_tild, V)
+        attn_tild = self.attn_dropout(attn_tild)
+        v_attn = torch.einsum("blmh,bmkh->blkh", attn_tild, v_h)
 
         # Scale the aggregated values by degree.
         degrees = torch.sum(gates, dim=2, keepdim=True)
         degree_scalers = torch.log(1 + degrees)
-        degree_scalers[:, : self.num_vns] = 1.0
-        V_attn = V_attn * degree_scalers
+        degree_scalers[:, : self.num_virtual_nodes] = 1.0
+        v_attn = v_attn * degree_scalers
 
-        V_attn = V_attn.reshape(shp[0], shp[1], self.num_heads * self.dot_dim)
-        h = self.O_h(V_attn)
+        v_attn = v_attn.reshape(bsz, N, self.num_heads * self.dot_dim)
+        h = self.node_output(v_attn)
 
         h = self.mha_dropout_h(h)
         h.add_(h_r1)
@@ -168,11 +163,13 @@ class EGTLayer(nn.Module):
         h.add_(h_r2)
 
         if self.edge_update:
-            e = self.O_e(H_hat)
+            e = self.edge_output(attn_hat)
             e = self.mha_dropout_e(e)
             e.add_(e_r1)
             e_r2 = e
             e = self.edge_ffn(e)
             e.add_(e_r2)
 
-        return h, e
+            return h, e
+
+        return h
