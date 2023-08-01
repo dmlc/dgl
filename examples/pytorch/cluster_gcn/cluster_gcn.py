@@ -119,5 +119,5 @@ for epoch in range(10):
 
 print(
     "Average run time for last %d epochs: %.2fs standard deviation: %.3f"
-%((epoch - 3), np.mean(durations[4:]), np.std(durations[4:]))
+    % ((epoch - 3), np.mean(durations[4:]), np.std(durations[4:]))
 )
