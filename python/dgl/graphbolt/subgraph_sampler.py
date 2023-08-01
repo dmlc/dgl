@@ -1,9 +1,10 @@
 """Subgraph samplers"""
 
-from torchdata.datapipes.iter import Mapper
-from .link_data_format import LinkDataFormat
 import torch
+from torchdata.datapipes.iter import Mapper
 
+from .data_format import LinkPredictionEdgeFormat
+from .utils import unique_and_compact_node_pairs
 
 class SubgraphSampler(Mapper):
     """A subgraph sampler.
@@ -22,7 +23,7 @@ class SubgraphSampler(Mapper):
     fn : callable
         The subgraph sampling function.
     """
-    
+
     def __init__(
         self,
         datapipe,
@@ -31,41 +32,42 @@ class SubgraphSampler(Mapper):
         prob_name,
     ):
         """
-        Initlization for a negative sampler.
+        Initlization for a subgraph sampler.
 
         Parameters
         ----------
         datapipe : DataPipe
             The datapipe.
-        negative_ratio : int
-            The proportion of negative samples to positive samples.
-        link_data_format : LinkDataFormat
-            Determines the format of the output data:
-                - Conditioned format: Outputs data as quadruples
-                `[u, v, [negative heads], [negative tails]]`. Here, 'u' and 'v'
-                are the source and destination nodes of positive edges,  while
-                'negative heads' and 'negative tails' refer to the source and
-                destination nodes of negative edges.
-                - Independent format: Outputs data as triples `[u, v, label]`.
-                In this case, 'u' and 'v' are the source and destination nodes
-                of an edge, and 'label' indicates whether the edge is negative
-                (0) or positive (1).
+        fanouts: list[list[int]]
+            The number of edges to be sampled for each node with or without
+            considering edge types.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
+        probs_name: str, optional
+            The name of an edge attribute used a. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
         """
         super().__init__(datapipe, self._sample)
         self.fanouts = fanouts
         self.replace = replace
         self.prob_name = prob_name
-        
-    
+
     def _sample(self, data):
         adjs = []
-        seeds, _ = self._pre_process(data)
         num_layers = len(self.fanouts)
         for hop in range(num_layers):
-            seeds, sg = self._generate(seeds, torch.LongTensor(self.fanout[hop]))
-            adjs.insert(0, sg)
+            seeds, subgraph = self._sample_sub_graph(
+                seeds, hop,
+            )
+            adjs.insert(0, subgraph)
+        return seeds, adjs
 
-    def _generate(self, seeds):
+    def _sample_sub_graph(self, seeds, hop):
         raise NotImplemented
 
 
@@ -76,12 +78,46 @@ class LinkSubgraphSampler(SubgraphSampler):
         fanouts,
         replace,
         probs_name,
-        link_data_format,
+        input_format,
     ):
+        """
+        Initlization for a link prediction oriented subgraph sampler.
+
+        Parameters
+        ----------
+        datapipe : DataPipe
+            The datapipe.
+        fanouts: list[list[int]]
+            The number of edges to be sampled for each node with or without
+            considering edge types.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
+        probs_name: str, optional
+            The name of an edge attribute used a. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
+        input_format:  LinkPredictionEdgeFormat
+            Determines the edge format of the input data.
+        """
         super.__init__(datapipe, fanouts, replace, probs_name)
-        assert link_data_format in [
-            LinkDataFormat.CONDITIONED,
-            LinkDataFormat.INDEPENDENT,
-        ], f"Unsupported data format: {link_data_format}."
-        self.link_data_format = link_data_format
+        self.input_format = input_format
+
+        def _sample(self, data):
+            seeds, compacted_pairs = self._preprocess(data)
+            seeds, adjs = super._sample(seeds)
+            return seeds, compacted_pairs, adjs
+                                    
+        def _preprocess(self, data):
+            u, v = data[:2]
+            if self.output_format == LinkPredictionEdgeFormat.CONDITIONED:
+                neg_u, neg_v = data[2:4]
+                u = torch.cat((u, neg_u.view(-1)))
+                v = torch.cat((v, neg_v.view(-1)))
+                
+            seeds, compacted_pairs = unique_and_compact_node_pairs((u, v))
+            return seeds, compacted_pairs
         
