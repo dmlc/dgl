@@ -21,8 +21,8 @@ def batch(graphs, ndata=ALL, edata=ALL):
                        graphs[0]  graphs[1]          ...  graphs[k]
     =================  =========  =================  ===  =========
     Original node ID   0 ~ N_0    0 ~ N_1            ...  0 ~ N_k
-    New node ID        0 ~ N_0    N_0+1 ~ N_0+N_1+1  ...  1+\sum_{i=0}^{k-1} N_i ~
-                                                          1+\sum_{i=0}^k N_i
+    New node ID        0 ~ N_0    N_0 ~ N_0+N_1      ...  \sum_{i=0}^{k-1} N_i ~
+                                                          \sum_{i=0}^k N_i
     =================  =========  =================  ===  =========
 
     Because of this, many of the computations on a batched graph are the same as if

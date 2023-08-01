@@ -80,7 +80,7 @@ def main(args):
     cnt_wait = 0
     best = 1e9
     best_t = 0
-    dur = []
+    mean = 0
     for epoch in range(args.n_dgi_epochs):
         dgi.train()
         if epoch >= 3:
@@ -104,14 +104,14 @@ def main(args):
             break
 
         if epoch >= 3:
-            dur.append(time.time() - t0)
+            mean = (mean * (epoch - 3) + (time.time() - t0)) / (epoch - 2)
 
-        print(
-            "Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | "
-            "ETputs(KTEPS) {:.2f}".format(
-                epoch, np.mean(dur), loss.item(), n_edges / np.mean(dur) / 1000
+            print(
+                "Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | "
+                "ETputs(KTEPS) {:.2f}".format(
+                    epoch, mean, loss.item(), n_edges / mean / 1000
+                )
             )
-        )
 
     # create classifier model
     classifier = Classifier(args.n_hidden, n_classes)
@@ -129,7 +129,7 @@ def main(args):
     dgi.load_state_dict(torch.load("best_dgi.pkl"))
     embeds = dgi.encoder(features, corrupt=False)
     embeds = embeds.detach()
-    dur = []
+    mean = 0
     for epoch in range(args.n_classifier_epochs):
         classifier.train()
         if epoch >= 3:
@@ -142,19 +142,19 @@ def main(args):
         classifier_optimizer.step()
 
         if epoch >= 3:
-            dur.append(time.time() - t0)
+            mean = (mean * (epoch - 3) + (time.time() - t0)) / (epoch - 2)
 
-        acc = evaluate(classifier, embeds, labels, val_mask)
-        print(
-            "Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-            "ETputs(KTEPS) {:.2f}".format(
-                epoch,
-                np.mean(dur),
-                loss.item(),
-                acc,
-                n_edges / np.mean(dur) / 1000,
+            acc = evaluate(classifier, embeds, labels, val_mask)
+            print(
+                "Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+                "ETputs(KTEPS) {:.2f}".format(
+                    epoch,
+                    mean,
+                    loss.item(),
+                    acc,
+                    n_edges / mean / 1000,
+                )
             )
-        )
 
     print()
     acc = evaluate(classifier, embeds, labels, test_mask)

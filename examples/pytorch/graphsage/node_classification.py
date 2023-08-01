@@ -58,6 +58,7 @@ class SAGE(nn.Module):
             y = torch.empty(
                 g.num_nodes(),
                 self.hid_size if l != len(self.layers) - 1 else self.out_size,
+                dtype=feat.dtype,
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
@@ -171,6 +172,12 @@ if __name__ == "__main__":
         help="Training mode. 'cpu' for CPU training, 'mixed' for CPU-GPU mixed training, "
         "'puregpu' for pure-GPU training.",
     )
+    parser.add_argument(
+        "--dt",
+        type=str,
+        default="float",
+        help="data type(float, bfloat16)",
+    )
     args = parser.parse_args()
     if not torch.cuda.is_available():
         args.mode = "cpu"
@@ -188,6 +195,11 @@ if __name__ == "__main__":
     in_size = g.ndata["feat"].shape[1]
     out_size = dataset.num_classes
     model = SAGE(in_size, 256, out_size).to(device)
+
+    # convert model and graph to bfloat16 if needed
+    if args.dt == "bfloat16":
+        g = dgl.to_bfloat16(g)
+        model = model.to(dtype=torch.bfloat16)
 
     # model training
     print("Training...")
