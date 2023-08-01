@@ -19,12 +19,12 @@ class LinkPredictionEdgeFormat(Enum):
     structured as quadruples `[u, v, [negative heads], [negative tails]]`
     indicating the source and destination nodes of positive and negative edges.
 
-    HEADCONDITIONED: Represents the 'head conditioned' format where data is
+    HEAD_CONDITIONED: Represents the 'head conditioned' format where data is
     structured as triples `[u, v, [negative heads]]`, where  '(u, v)' signifies
     the source and destination nodes of positive edges, while each node in
     '[negative heads]' collaborates with 'v' to create negative edges.
 
-    TAILCONDITIONED: Represents the 'conditioned' format where data is
+    TAIL_CONDITIONED: Represents the 'conditioned' format where data is
     structured as triples `[u, v, [negative tails]]`, where  '(u, v)' signifies
     the source and destination nodes of positive edges, while 'u' collaborates
     with each node in '[negative tails]' to create negative edges.
@@ -32,5 +32,5 @@ class LinkPredictionEdgeFormat(Enum):
 
     INDEPENDENT = "independent"
     CONDITIONED = "conditioned"
-    HEADCONDITIONED = "headconditioned"
-    TAILCONDITIONED = "tailconditioned"
+    HEAD_CONDITIONED = "head_conditioned"
+    TAIL_CONDITIONED = "tail_conditioned"
