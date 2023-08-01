@@ -103,10 +103,10 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
               - - type: null
                   data:
                     - format: numpy
-                      in_memory: false
+                      in_memory: true
                       path: {test_ids_path}
                     - format: numpy
-                      in_memory: false
+                      in_memory: true
                       path: {test_labels_path}
         """
         yaml_file = os.path.join(test_dir, "test.yaml")
@@ -232,7 +232,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
                       in_memory: true
                       path: {test_src_path}
                     - format: numpy
-                      in_memory: false
+                      in_memory: true
                       path: {test_dst_path}
                     - format: numpy
                       in_memory: true
@@ -350,7 +350,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_negs():
                       in_memory: true
                       path: {test_src_path}
                     - format: numpy
-                      in_memory: false
+                      in_memory: true
                       path: {test_dst_path}
                     - format: numpy
                       in_memory: true
