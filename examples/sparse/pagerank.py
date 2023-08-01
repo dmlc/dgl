@@ -9,7 +9,7 @@ K = 10
 
 
 if __name__ == "__main__":
-    g = nx.erdos_renyi_graph(N, 0.05)
+    g = nx.erdos_renyi_graph(N, 0.05, seed=10086)
 
     # Create the adjacency matrix of graph.
     edges = list(g.to_directed().edges())
