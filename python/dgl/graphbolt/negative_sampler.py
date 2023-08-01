@@ -31,15 +31,6 @@ class NegativeSampler(Mapper):
             The proportion of negative samples to positive samples.
         output_format : LinkPredictionEdgeFormat
             Determines the edge format of the output data:
-                - Conditioned format: Outputs data as quadruples
-                `[u, v, [negative heads], [negative tails]]`. Here, 'u' and 'v'
-                are the source and destination nodes of positive edges,  while
-                'negative heads' and 'negative tails' refer to the source and
-                destination nodes of negative edges.
-                - Independent format: Outputs data as triples `[u, v, label]`.
-                In this case, 'u' and 'v' are the source and destination nodes
-                of an edge, and 'label' indicates whether the edge is negative
-                (0) or positive (1).
         """
         super().__init__(datapipe, self._sample)
         assert negative_ratio > 0, "Negative_ratio should be positive Integer."
@@ -66,13 +57,13 @@ class NegativeSampler(Mapper):
         if isinstance(node_pairs, Mapping):
             return {
                 etype: self._collate(
-                    pos_pairs, self._sample_with_etype(pos_pairs, etype)
+                    pos_pairs, *(self._sample_with_etype(pos_pairs, etype))
                 )
                 for etype, pos_pairs in node_pairs.items()
             }
         else:
             return self._collate(
-                node_pairs, self._sample_with_etype(node_pairs, None)
+                node_pairs, *(self._sample_with_etype(node_pairs, None))
             )
 
     def _sample_with_etype(self, node_pairs, etype=None):
@@ -94,7 +85,7 @@ class NegativeSampler(Mapper):
             A collection of negative node pairs.
         """
 
-    def _collate(self, pos_pairs, neg_pairs):
+    def _collate(self, pos_pairs, neg_src, neg_dst):
         """Collates positive and negative samples.
 
         Parameters
@@ -103,10 +94,12 @@ class NegativeSampler(Mapper):
             A tuple of tensors represents source-destination node pairs of
             positive edges, where positive means the edge must exist in
             the graph.
-        neg_pairs : Tuple[Tensor]
-            A tuple of tensors represents source-destination node pairs of
-            negative edges, where negative means the edge may not exist in
-            the graph.
+        neg_src : Optional[Tensor]
+            Am optional Tensor represents the source nodes of negative edges,
+            where negative means the edge may not exist in the graph.
+        neg_dst : Optional[Tensor]
+            Am optional Tensor represents the destination nodes of negative
+            edges, where negative means the edge may not exist in the graph.
 
         Returns
         -------
@@ -115,7 +108,6 @@ class NegativeSampler(Mapper):
         """
         if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
             pos_src, pos_dst = pos_pairs
-            neg_src, neg_dst = neg_pairs
             pos_label = torch.ones_like(pos_src)
             neg_label = torch.zeros_like(neg_src)
             src = torch.cat([pos_src, neg_src])
@@ -124,9 +116,16 @@ class NegativeSampler(Mapper):
             return (src, dst, label)
         elif self.output_format == LinkPredictionEdgeFormat.CONDITIONED:
             pos_src, pos_dst = pos_pairs
-            neg_src, neg_dst = neg_pairs
             neg_src = neg_src.view(-1, self.negative_ratio)
             neg_dst = neg_dst.view(-1, self.negative_ratio)
             return (pos_src, pos_dst, neg_src, neg_dst)
+        elif self.output_format == LinkPredictionEdgeFormat.HEADCONDITIONED:
+            pos_src, pos_dst = pos_pairs
+            neg_src = neg_src.view(-1, self.negative_ratio)
+            return (pos_src, pos_dst, neg_src)
+        elif self.output_format == LinkPredictionEdgeFormat.TAILCONDITIONED:
+            pos_src, pos_dst = pos_pairs
+            neg_dst = neg_dst.view(-1, self.negative_ratio)
+            return (pos_src, pos_dst, neg_dst)
         else:
             raise ValueError("Unsupported output format.")
