@@ -21,7 +21,7 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
     negative_sampler = gb.UniformNegativeSampler(
         minibatch_sampler,
         negative_ratio,
-        gb.LinkDataFormat.INDEPENDENT,
+        gb.LinkPredictionEdgeFormat.INDEPENDENT,
         graph,
     )
     # Perform Negative sampling.
@@ -52,7 +52,7 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
     negative_sampler = gb.UniformNegativeSampler(
         minibatch_sampler,
         negative_ratio,
-        gb.LinkDataFormat.CONDITIONED,
+        gb.LinkPredictionEdgeFormat.CONDITIONED,
         graph,
     )
     # Perform Negative sampling.
