@@ -172,7 +172,6 @@ else(USE_CUDA)
 endif(USE_CUDA)
 
 set_property(TARGET dgl PROPERTY CXX_STANDARD 14)
-set_property(TARGET dgl PROPERTY CUDA_STANDARD 14)
 
 # include directories
 target_include_directories(dgl PRIVATE "include")
