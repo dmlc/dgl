@@ -15,7 +15,7 @@ import dgl
 
 from ..dataset import Dataset
 from ..itemset import ItemSet, ItemSetDict
-from ..utils import read_data, save_data, tensor_to_tuple
+from ..utils import read_data, save_data
 
 from .csc_sampling_graph import (
     CSCSamplingGraph,
@@ -23,12 +23,7 @@ from .csc_sampling_graph import (
     load_csc_sampling_graph,
     save_csc_sampling_graph,
 )
-from .ondisk_metadata import (
-    OnDiskGraphTopology,
-    OnDiskMetaData,
-    OnDiskTVTSet,
-    OnDiskTVTSetData,
-)
+from .ondisk_metadata import OnDiskGraphTopology, OnDiskMetaData, OnDiskTVTSet
 from .torch_based_feature_store import (
     load_feature_stores,
     TorchBasedFeatureStore,
