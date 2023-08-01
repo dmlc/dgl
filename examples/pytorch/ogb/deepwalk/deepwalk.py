@@ -260,7 +260,7 @@ class DeepwalkTrainer:
                     else:
                         print(
                             "\rBatch %d, training time: %.2fs"
-                            % (i, time.time() - start), 
+                            % (i, time.time() - start),
                             end="",
                         )
 
