@@ -86,7 +86,7 @@ if(MSVC)
 else(MSVC)
   include(CheckCXXCompilerFlag)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
   if(NOT APPLE)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
   endif(NOT APPLE)
@@ -172,7 +172,6 @@ else(USE_CUDA)
 endif(USE_CUDA)
 
 set_property(TARGET dgl PROPERTY CXX_STANDARD 14)
-set_property(TARGET dgl PROPERTY CUDA_STANDARD 14)
 
 # include directories
 target_include_directories(dgl PRIVATE "include")
