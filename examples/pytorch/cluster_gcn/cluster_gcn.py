@@ -59,7 +59,7 @@ dataloader = dgl.dataloading.DataLoader(
 )
 
 durations = []
-for epoch in range(5):
+for epoch in range(10):
     t0 = time.time()
     model.train()
     for it, sg in enumerate(dataloader):
