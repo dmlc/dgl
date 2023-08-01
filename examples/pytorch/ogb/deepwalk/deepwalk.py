@@ -254,14 +254,14 @@ class DeepwalkTrainer:
                                 -sum(self.emb_model.loss)
                                 / self.args.print_interval,
                             ),
-                            end = ""
+                            end="",
                         )
                         self.emb_model.loss = []
                     else:
                         print(
                             "\rBatch %d, training time: %.2fs"
                             % (i, time.time() - start), 
-                            end = ""
+                            end="",
                         )
 
                     start = time.time()
