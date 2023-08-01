@@ -117,5 +117,7 @@ for epoch in range(10):
         )
         print("Validation acc:", val_acc.item(), "Test acc:", test_acc.item())
 
-print("Average run time for last %d epochs: %.2fs standard deviation: %.3f" % 
-        ((epoch - 3),  np.mean(durations[4:]), np.std(durations[4:])))
+print(
+    "Average run time for last %d epochs: %.2fs standard deviation: %.3f"
+%((epoch - 3), np.mean(durations[4:]), np.std(durations[4:]))
+)
