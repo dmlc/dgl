@@ -856,6 +856,10 @@ class CoraBinary(DGLBuiltinDataset):
         assert len(self.graphs) == len(self.pmpds)
         assert len(self.graphs) == len(self.labels)
 
+    @property
+    def graph_path(self):
+        return os.path.join(self.save_path, self.save_name + ".bin")
+
     def has_cache(self):
         if os.path.exists(self.graph_path):
             return True
