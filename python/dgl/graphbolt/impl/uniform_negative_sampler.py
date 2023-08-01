@@ -18,7 +18,7 @@ class UniformNegativeSampler(NegativeSampler):
         self,
         datapipe,
         negative_ratio,
-        link_data_format,
+        output_format,
         graph,
     ):
         """
@@ -30,11 +30,11 @@ class UniformNegativeSampler(NegativeSampler):
             The datapipe.
         negative_ratio : int
             The proportion of negative samples to positive samples.
-        link_data_format : LinkDataFormat
+        output_format : LinkPredictionEdgeFormat
             Determines the format of the output data:
                 - Conditioned format: Outputs data as quadruples
                 `[u, v, [negative heads], [negative tails]]`. Here, 'u' and 'v'
-                are the source and destination nodes of positive edges,  while
+                are the source and destination nodes of positive edges, while
                 'negative heads' and 'negative tails' refer to the source and
                 destination nodes of negative edges.
                 - Independent format: Outputs data as triples `[u, v, label]`.
@@ -50,14 +50,14 @@ class UniformNegativeSampler(NegativeSampler):
         >>> indptr = torch.LongTensor([0, 2, 4, 5])
         >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
         >>> graph = gb.from_csc(indptr, indices)
-        >>> link_data_format = gb.LinkDataFormat.INDEPENDENT
+        >>> output_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
         >>> minibatch_sampler = gb.MinibatchSampler(
             ...item_set, batch_size=1,
             ...)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...minibatch_sampler, 2, link_data_format, graph)
+            ...minibatch_sampler, 2, output_format, graph)
         >>> for data in neg_sampler:
             ...  print(data)
             ...
@@ -68,21 +68,21 @@ class UniformNegativeSampler(NegativeSampler):
         >>> indptr = torch.LongTensor([0, 2, 4, 5])
         >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
         >>> graph = gb.from_csc(indptr, indices)
-        >>> link_data_format = gb.LinkDataFormat.CONDITIONED
+        >>> output_format = gb.LinkPredictionEdgeFormat.CONDITIONED
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
         >>> minibatch_sampler = gb.MinibatchSampler(
             ...item_set, batch_size=1,
             ...)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...minibatch_sampler, 2, link_data_format, graph)
+            ...minibatch_sampler, 2, output_format, graph)
         >>> for data in neg_sampler:
             ...  print(data)
             ...
         (tensor([0]), tensor([1]), tensor([[0, 0]]), tensor([[2, 1]]))
         (tensor([1]), tensor([2]), tensor([[1, 1]]), tensor([[1, 2]]))
         """
-        super().__init__(datapipe, negative_ratio, link_data_format)
+        super().__init__(datapipe, negative_ratio, output_format)
         self.graph = graph
 
     def _sample_with_etype(self, node_pairs, etype=None):

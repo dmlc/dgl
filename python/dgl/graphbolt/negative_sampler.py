@@ -5,7 +5,7 @@ from _collections_abc import Mapping
 import torch
 from torchdata.datapipes.iter import Mapper
 
-from .link_data_format import LinkDataFormat
+from .data_format import LinkPredictionEdgeFormat
 
 
 class NegativeSampler(Mapper):
@@ -18,7 +18,7 @@ class NegativeSampler(Mapper):
         self,
         datapipe,
         negative_ratio,
-        link_data_format,
+        output_format,
     ):
         """
         Initlization for a negative sampler.
@@ -29,8 +29,8 @@ class NegativeSampler(Mapper):
             The datapipe.
         negative_ratio : int
             The proportion of negative samples to positive samples.
-        link_data_format : LinkDataFormat
-            Determines the format of the output data:
+        output_format : LinkPredictionEdgeFormat
+            Determines the edge format of the output data:
                 - Conditioned format: Outputs data as quadruples
                 `[u, v, [negative heads], [negative tails]]`. Here, 'u' and 'v'
                 are the source and destination nodes of positive edges,  while
@@ -44,7 +44,7 @@ class NegativeSampler(Mapper):
         super().__init__(datapipe, self._sample)
         assert negative_ratio > 0, "Negative_ratio should be positive Integer."
         self.negative_ratio = negative_ratio
-        self.link_data_format = link_data_format
+        self.output_format = output_format
 
     def _sample(self, node_pairs):
         """
@@ -113,7 +113,7 @@ class NegativeSampler(Mapper):
         Tuple[Tensor]
             A mixed collection of positive and negative node pairs.
         """
-        if self.link_data_format == LinkDataFormat.INDEPENDENT:
+        if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
             pos_src, pos_dst = pos_pairs
             neg_src, neg_dst = neg_pairs
             pos_label = torch.ones_like(pos_src)
@@ -122,11 +122,11 @@ class NegativeSampler(Mapper):
             dst = torch.cat([pos_dst, neg_dst])
             label = torch.cat([pos_label, neg_label])
             return (src, dst, label)
-        elif self.link_data_format == LinkDataFormat.CONDITIONED:
+        elif self.output_format == LinkPredictionEdgeFormat.CONDITIONED:
             pos_src, pos_dst = pos_pairs
             neg_src, neg_dst = neg_pairs
             neg_src = neg_src.view(-1, self.negative_ratio)
             neg_dst = neg_dst.view(-1, self.negative_ratio)
             return (pos_src, pos_dst, neg_src, neg_dst)
         else:
-            raise ValueError("Unsupported link data format.")
+            raise ValueError("Unsupported output format.")
