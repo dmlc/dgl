@@ -1,11 +1,22 @@
+import dgl.sparse as dglsp
 import networkx as nx
 import torch
-
-import dgl.sparse as dglsp
 
 N = 100
 DAMP = 0.85
 K = 10
+
+
+def pagerank(A):
+    D = A.sum(0)
+    V = torch.ones(N) / N
+    for _ in range(K):
+        ########################################################################
+        # (HIGHLIGHT) Take the advantage of DGL sparse APIs to calculate the
+        # page rank.
+        ########################################################################
+        V = (1 - DAMP) / N + DAMP * A @ (V / D)
+    return V
 
 
 if __name__ == "__main__":
@@ -16,13 +27,5 @@ if __name__ == "__main__":
     indices = torch.tensor(edges).transpose(0, 1)
     A = dglsp.spmatrix(indices, shape=(N, N))
 
-    D = A.sum(0)
-    PV = torch.ones(N) / N
-    for _ in range(K):
-        ########################################################################
-        # (HIGHLIGHT) Take the advantage of DGL sparse APIs to calculate the
-        # page rank.
-        ########################################################################
-        PV = (1 - DAMP) / N + DAMP * A @ (PV / D)
-
-    print(PV)
+    V = pagerank(A)
+    print(V)
