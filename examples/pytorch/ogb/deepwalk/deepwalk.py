@@ -247,26 +247,29 @@ class DeepwalkTrainer:
                 if i > 0 and i % self.args.print_interval == 0:
                     if self.args.print_loss:
                         print(
-                            "Batch %d training time: %.2fs loss: %.4f"
+                            "\rBatch %d training time: %.2fs loss: %.4f"
                             % (
                                 i,
                                 time.time() - start,
                                 -sum(self.emb_model.loss)
                                 / self.args.print_interval,
-                            )
+                            ),
+                            end = ""
                         )
                         self.emb_model.loss = []
                     else:
                         print(
-                            "Batch %d, training time: %.2fs"
-                            % (i, time.time() - start)
+                            "\rBatch %d, training time: %.2fs"
+                            % (i, time.time() - start), 
+                            end = ""
                         )
+
                     start = time.time()
 
             if self.args.async_update:
                 self.emb_model.finish_async_update()
 
-        print("Training used time: %.2fs" % (time.time() - start_all))
+        print("\nTraining used time: %.2fs" % (time.time() - start_all))
         if self.args.save_in_txt:
             self.emb_model.save_embedding_txt(
                 self.dataset, self.args.output_emb_file
