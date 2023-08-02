@@ -32,7 +32,8 @@ struct SamplerArgs<SamplerType::LABOR> {
 };
 
 using NumPickFn = std::function<torch::Tensor(int64_t, int64_t)>;
-using PickFn = std::function<torch::Tensor(int64_t, int64_t)>;
+using PickFn = std::function<void(
+    int64_t, int64_t, torch::Tensor&, int64_t, const torch::Tensor&)>;
 
 /**
  * @brief A sampling oriented csc format graph.
@@ -324,10 +325,11 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  * @return A tensor containing the picked neighbors.
  */
 template <SamplerType S>
-torch::Tensor Pick(
+void Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    torch::Tensor& picked_tensor, int64_t picked_offset, int64_t picked_count);
 
 /**
  * @brief Picks a specified number of neighbors for a node per edge type,
@@ -357,18 +359,21 @@ torch::Tensor Pick(
  * @return A tensor containing the picked neighbors.
  */
 template <SamplerType S>
-torch::Tensor PickByEtype(
+void PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    torch::Tensor& picked_tensor, int64_t picked_offset,
+    const torch::Tensor& picked_counts);
 
 template <bool NonUniform, bool Replace, typename T = float>
-torch::Tensor LaborPick(
+void LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args);
+    SamplerArgs<SamplerType::LABOR> args, torch::Tensor& picked_tensor,
+    int64_t picked_offset, int64_t picked_count);
 
 }  // namespace sampling
 }  // namespace graphbolt
