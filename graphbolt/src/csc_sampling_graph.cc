@@ -160,14 +160,14 @@ PickFn GetPickFn(
   // If fanouts.size() > 1, perform sampling for each edge type of each node,
   // otherwise just sample once for each node with no regard of edge types.
   if (fanouts.size() > 1) {
-    return [fanouts, replace, options, &type_per_edge, &probs_or_mask, args](
+    return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
                int64_t offset, int64_t num_neighbors) {
       return PickByEtype(
           offset, num_neighbors, fanouts, replace, options,
           type_per_edge.value(), probs_or_mask, args);
     };
   } else {
-    return [fanouts, replace, options, &probs_or_mask, args](
+    return [&fanouts, replace, &options, &probs_or_mask, args](
                int64_t offset, int64_t num_neighbors) {
       return Pick(
           offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
