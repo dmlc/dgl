@@ -10,7 +10,8 @@ def unique_and_compact_node_pairs(
     node_pairs: Union[
         Tuple[torch.Tensor, torch.Tensor],
         Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
-    ]
+    ],
+    dst_nodes=None,
 ):
     """
     Compact node pairs and return unique nodes (per type).
@@ -55,41 +56,24 @@ def unique_and_compact_node_pairs(
     is_homogeneous = not isinstance(node_pairs, Dict)
     if is_homogeneous:
         node_pairs = {("_N", "_E", "_N"): node_pairs}
-    nodes_dict = defaultdict(list)
-    # Collect nodes for each node type.
+    dst_nodes = defaultdict(list)
+    if dst_nodes is None:
+        # Find all nodes that appeared as destinations.
+        for etype, node_pair in node_pairs.items():
+            dst_nodes[etype[2]].append(node_pair[1])
+        dst_nodes = {
+            ntype: torch.unique(torch.cat(values, 0))
+            for ntype, values in dst_nodes.items()
+        }
+    src_nodes = defaultdict(list)
+    # Colllect all nodes that appeared as sources.
     for etype, node_pair in node_pairs.items():
-        u_type, _, v_type = etype
-        u, v = node_pair
-        nodes_dict[u_type].append(u)
-        nodes_dict[v_type].append(v)
+        src_nodes[etype[0]].append(node_pair[0])
 
-    unique_nodes_dict = {}
-    inverse_indices_dict = {}
-    for ntype, nodes in nodes_dict.items():
-        collected_nodes = torch.cat(nodes)
-        # Compact and find unique nodes.
-        unique_nodes, inverse_indices = torch.unique(
-            collected_nodes,
-            return_inverse=True,
-        )
-        unique_nodes_dict[ntype] = unique_nodes
-        inverse_indices_dict[ntype] = inverse_indices
-
-    # Map back in same order as collect.
-    compacted_node_pairs = {}
-    unique_nodes = unique_nodes_dict
-    for etype, node_pair in node_pairs.items():
-        u_type, _, v_type = etype
-        u, v = node_pair
-        u_size, v_size = u.numel(), v.numel()
-        u = inverse_indices_dict[u_type][:u_size]
-        inverse_indices_dict[u_type] = inverse_indices_dict[u_type][u_size:]
-        v = inverse_indices_dict[v_type][:v_size]
-        inverse_indices_dict[v_type] = inverse_indices_dict[v_type][v_size:]
-        compacted_node_pairs[etype] = (u, v)
+    # unique_nodes, compacted_node_pairs = C function (node_pairs, seed_nodes)
 
     # Return singleton for homogeneous graph.
     if is_homogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
-        unique_nodes = list(unique_nodes_dict.values())[0]
+        unique_nodes = list(unique_nodes.values())[0]
     return unique_nodes, compacted_node_pairs
