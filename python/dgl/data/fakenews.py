@@ -179,11 +179,9 @@ class FakeNewsDataset(DGLBuiltinDataset):
 
     def save(self):
         """save the graph list and the labels"""
-        graph_path = os.path.join(self.save_path, self.name + "_dgl_graph.bin")
-        info_path = os.path.join(self.save_path, self.name + "_dgl_graph.pkl")
-        save_graphs(str(graph_path), self.graphs)
+        save_graphs(str(self.graph_path), self.graphs)
         save_info(
-            info_path,
+            self.info_path,
             {
                 "label": self.labels,
                 "feature": self.feature,
@@ -193,19 +191,24 @@ class FakeNewsDataset(DGLBuiltinDataset):
             },
         )
 
+    @property
+    def graph_path(self):
+        return os.path.join(self.save_path, self.name + "_dgl_graph.bin")
+
+    @property
+    def info_path(self):
+        return os.path.join(self.save_path, self.name + "_dgl_graph.pkl")
+
     def has_cache(self):
         """check whether there are processed data in `self.save_path`"""
-        graph_path = os.path.join(self.save_path, self.name + "_dgl_graph.bin")
-        info_path = os.path.join(self.save_path, self.name + "_dgl_graph.pkl")
-        return os.path.exists(graph_path) and os.path.exists(info_path)
+        return os.path.exists(self.graph_path) and os.path.exists(
+            self.info_path
+        )
 
     def load(self):
         """load processed data from directory `self.save_path`"""
-        graph_path = os.path.join(self.save_path, self.name + "_dgl_graph.bin")
-        info_path = os.path.join(self.save_path, self.name + "_dgl_graph.pkl")
-
-        graphs, _ = load_graphs(str(graph_path))
-        info = load_info(str(info_path))
+        graphs, _ = load_graphs(str(self.graph_path))
+        info = load_info(str(self.info_path))
         self.graphs = graphs
         self.labels = info["label"]
         self.feature = info["feature"]

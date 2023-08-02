@@ -166,11 +166,6 @@ in VS2019 x64 Native tools command prompt.
      CD ..\python
      python setup.py install
 
-Compilation Flags
-`````````````````
-
-See `config.cmake <https://github.com/dmlc/dgl/blob/master/cmake/config.cmake>`_.
-
 
 .. _backends:
 
