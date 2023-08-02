@@ -30,16 +30,7 @@ class NegativeSampler(Mapper):
         negative_ratio : int
             The proportion of negative samples to positive samples.
         output_format : LinkPredictionEdgeFormat
-            Determines the edge format of the output data:
-                - Conditioned format: Outputs data as quadruples
-                `[u, v, [negative heads], [negative tails]]`. Here, 'u' and 'v'
-                are the source and destination nodes of positive edges,  while
-                'negative heads' and 'negative tails' refer to the source and
-                destination nodes of negative edges.
-                - Independent format: Outputs data as triples `[u, v, label]`.
-                In this case, 'u' and 'v' are the source and destination nodes
-                of an edge, and 'label' indicates whether the edge is negative
-                (0) or positive (1).
+            Determines the edge format of the output data.
         """
         super().__init__(datapipe, self._sample)
         assert negative_ratio > 0, "Negative_ratio should be positive Integer."
@@ -129,5 +120,15 @@ class NegativeSampler(Mapper):
             neg_src = neg_src.view(-1, self.negative_ratio)
             neg_dst = neg_dst.view(-1, self.negative_ratio)
             return (pos_src, pos_dst, neg_src, neg_dst)
+        elif self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
+            pos_src, pos_dst = pos_pairs
+            neg_src, _ = neg_pairs
+            neg_src = neg_src.view(-1, self.negative_ratio)
+            return (pos_src, pos_dst, neg_src)
+        elif self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
+            pos_src, pos_dst = pos_pairs
+            _, neg_dst = neg_pairs
+            neg_dst = neg_dst.view(-1, self.negative_ratio)
+            return (pos_src, pos_dst, neg_dst)
         else:
             raise ValueError("Unsupported output format.")

@@ -31,16 +31,7 @@ class UniformNegativeSampler(NegativeSampler):
         negative_ratio : int
             The proportion of negative samples to positive samples.
         output_format : LinkPredictionEdgeFormat
-            Determines the format of the output data:
-                - Conditioned format: Outputs data as quadruples
-                `[u, v, [negative heads], [negative tails]]`. Here, 'u' and 'v'
-                are the source and destination nodes of positive edges, while
-                'negative heads' and 'negative tails' refer to the source and
-                destination nodes of negative edges.
-                - Independent format: Outputs data as triples `[u, v, label]`.
-                In this case, 'u' and 'v' are the source and destination nodes
-                of an edge, and 'label' indicates whether the edge is negative
-                (0) or positive (1).
+            Determines the format of the output data.
         graph : CSCSamplingGraph
             The graph on which to perform negative sampling.
 
