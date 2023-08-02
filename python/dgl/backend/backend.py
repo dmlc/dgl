@@ -21,6 +21,7 @@ def data_type_dict():
     """Returns a dictionary from data type string to the data type.
 
     The dictionary should include at least:
+    bfloat16
     float16
     float32
     float64
