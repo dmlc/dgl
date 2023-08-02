@@ -72,6 +72,7 @@ else
   cmake -DUSE_CUDA=${cuda} ${extra_args} ..
 fi
 
+exit 0
 if [[ ${PWD} == "${DGL_HOME}/build" ]]; then
   make -j
 else
