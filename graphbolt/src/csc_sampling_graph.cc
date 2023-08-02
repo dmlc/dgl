@@ -650,6 +650,7 @@ void PickByEtype(
               etype >= 0 && etype < (int64_t)fanouts.size(),
               "Etype values exceed the number of fanouts.");
           int64_t fanout = fanouts[etype];
+          int64_t picked_count = picked_counts[etype].item<int64_t>();
           auto etype_end_it = std::upper_bound(
               type_per_edge_data + etype_begin, type_per_edge_data + end,
               etype);
