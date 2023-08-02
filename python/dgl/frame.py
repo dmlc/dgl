@@ -990,17 +990,28 @@ class Frame(MutableMapping):
             F.float64,
             F.float32,
             F.float16,
+            F.bfloat16,
         ], "'new_type' must be floating-point type: %s" % str(new_type)
         newframe = self.clone()
         new_columns = {}
         for name, column in self._columns.items():
             dtype = column.dtype
-            if dtype != new_type and dtype in [F.float64, F.float32, F.float16]:
+            if dtype != new_type and dtype in [
+                F.float64,
+                F.float32,
+                F.float16,
+                F.bfloat16,
+            ]:
                 new_columns[name] = column.astype(new_type)
             else:
                 new_columns[name] = column
         newframe._columns = new_columns
         return newframe
+
+    def bfloat16(self):
+        """Return a new frame with all floating-point columns converted
+        to bfloat16"""
+        return self._astype_float(F.bfloat16)
 
     def half(self):
         """Return a new frame with all floating-point columns converted
