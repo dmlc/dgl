@@ -35,8 +35,8 @@ dgl_feature_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" "n
 dgl_feature_option(USE_HDFS "Build with HDFS support" "none") # Set env HADOOP_HDFS_HOME if needed
 dgl_feature_option(USE_S3 "Build with S3 support" "none")
 
-# Build cpp test only in dev and test build.
-dgl_feature_option(BUILD_CPP_TEST "Build cpp unittest executables" "dev" "test")
+# Build cpp test only in test build.
+dgl_feature_option(BUILD_CPP_TEST "Build cpp unittest executables" "test")
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
