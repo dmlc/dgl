@@ -1,6 +1,6 @@
 """GraphBolt Dataset."""
 
-from typing import Dict, List
+from typing import Dict
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
