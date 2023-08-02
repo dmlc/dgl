@@ -8,6 +8,15 @@ Open Graph Benchmark (OGB) dataset "ogbn-mag". For more details on
 Paper [Modeling Relational Data with Graph Convolutional Networks]
 (https://arxiv.org/abs/1703.06103).
 
+Generation of graph embeddings is the main difference between homograph
+node classification and heterograph node classification:
+- Homograph: Since all nodes and edges are of the same type, embeddings
+  can be generated using a unified approach. Type-specific handling is
+  typically not required.
+- Heterograph: Due to the existence of multiple types of nodes and edges,
+  specific embeddings need to be generated for each type. This allows for
+  a more nuanced capture of the complex structure and semantic information
+  within the heterograph.
 
 This flowchart describes the main functional sequence of the provided example.
 main
@@ -20,7 +29,7 @@ main
 │     │
 │     └───> Generate graph embeddings
 │
-├───> Instantiate EntityClassify (RGCN model)
+├───> Instantiate RGCN model
 │     │
 │     ├───> RelGraphConvLayer (input to hidden)
 │     │
@@ -29,17 +38,13 @@ main
 └───> train
       │
       │
-      ├───> Training loop
-      │     │
-      │     ├───> EntityClassify.forward (RGCN model forward pass)
-      │     │
-      │     └───> test
-      │           │
-      │           ├───> MultiLayerFullNeighborSampler
-      │           │
-      │           └───> EntityClassify.evaluate
-      │
-      └───> Logger.add_result
+      └───> Training loop
+            │
+            ├───> EntityClassify.forward (RGCN model forward pass)
+            │
+            └───> test
+                  │
+                  └───> EntityClassify.evaluate
 """
 import argparse
 import itertools
@@ -57,8 +62,6 @@ from dgl import AddReverse, Compose, ToSimple
 from dgl.nn import HeteroEmbedding
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 from tqdm import tqdm
-
-v_t = dgl.__version__
 
 
 def prepare_data(args, device):
@@ -154,13 +157,19 @@ def rel_graph_embed(graph, embed_size):
 
 class RelGraphConvLayer(nn.Module):
     def __init__(
-        self, in_feat, out_feat, ntypes, rel_names, activation=None, dropout=0.0
+        self,
+        in_size,
+        out_size,
+        ntypes,
+        relation_names,
+        activation=None,
+        dropout=0.0,
     ):
         super(RelGraphConvLayer, self).__init__()
-        self.in_feat = in_feat
-        self.out_feat = out_feat
+        self.in_size = in_size
+        self.out_size = out_size
         self.ntypes = ntypes
-        self.rel_names = rel_names
+        self.relation_names = relation_names
         self.activation = activation
 
         ########################################################################
@@ -174,9 +183,9 @@ class RelGraphConvLayer(nn.Module):
         self.conv = dglnn.HeteroGraphConv(
             {
                 rel: dglnn.GraphConv(
-                    in_feat, out_feat, norm="right", weight=False, bias=False
+                    in_size, out_size, norm="right", weight=False, bias=False
                 )
-                for rel in rel_names
+                for rel in relation_names
             }
         )
 
@@ -185,8 +194,8 @@ class RelGraphConvLayer(nn.Module):
         # features before performing convolution.
         self.weight = nn.ModuleDict(
             {
-                rel_name: nn.Linear(in_feat, out_feat, bias=False)
-                for rel_name in self.rel_names
+                rel_name: nn.Linear(in_size, out_size, bias=False)
+                for rel_name in self.relation_names
             }
         )
 
@@ -196,7 +205,7 @@ class RelGraphConvLayer(nn.Module):
         # across layers.
         self.loop_weights = nn.ModuleDict(
             {
-                ntype: nn.Linear(in_feat, out_feat, bias=True)
+                ntype: nn.Linear(in_size, out_size, bias=True)
                 for ntype in self.ntypes
             }
         )
@@ -232,9 +241,9 @@ class RelGraphConvLayer(nn.Module):
 
         # Create a dictionary of weights for each relationship. The weights
         # are retrieved from the Linear layers defined earlier.
-        wdict = {
+        weight_dict = {
             rel_name: {"weight": self.weight[rel_name].weight.T}
-            for rel_name in self.rel_names
+            for rel_name in self.relation_names
         }
 
         # Create a dictionary of node features for the destination nodes in
@@ -251,7 +260,7 @@ class RelGraphConvLayer(nn.Module):
         # Apply the convolution operation on the graph. mod_kwargs are
         # additional arguments for each relation function defined in the
         # HeteroGraphConv. In this case, it's the weights for each relation.
-        hs = self.conv(g, inputs, mod_kwargs=wdict)
+        hs = self.conv(g, inputs, mod_kwargs=weight_dict)
 
         def _apply(ntype, h):
             h = h + self.loop_weights[ntype](inputs_dst[ntype])
@@ -266,16 +275,16 @@ class RelGraphConvLayer(nn.Module):
 
 
 class EntityClassify(nn.Module):
-    def __init__(self, g, in_dim, out_dim):
+    def __init__(self, g, in_size, out_dim):
         super(EntityClassify, self).__init__()
-        self.in_dim = in_dim
-        self.h_dim = 64
+        self.in_size = in_size
+        self.hidden_size = 64
         self.out_dim = out_dim
 
         # Generate and sort a list of unique edge types from the input graph.
         # eg. ['writes', 'cites']
-        self.rel_names = list(set(g.etypes))
-        self.rel_names.sort()
+        self.relation_names = list(set(g.etypes))
+        self.relation_names.sort()
         self.dropout = 0.5
 
         self.layers = nn.ModuleList()
@@ -284,10 +293,10 @@ class EntityClassify(nn.Module):
         # as the activation function and apply dropout for regularization.
         self.layers.append(
             RelGraphConvLayer(
-                self.in_dim,
-                self.h_dim,
+                self.in_size,
+                self.hidden_size,
                 g.ntypes,
-                self.rel_names,
+                self.relation_names,
                 activation=F.relu,
                 dropout=self.dropout,
             )
@@ -297,10 +306,10 @@ class EntityClassify(nn.Module):
         # activation function is applied at this stage.
         self.layers.append(
             RelGraphConvLayer(
-                self.h_dim,
+                self.hidden_size,
                 self.out_dim,
                 g.ntypes,
-                self.rel_names,
+                self.relation_names,
                 activation=None,
             )
         )
@@ -319,9 +328,11 @@ class EntityClassify(nn.Module):
 class Logger(object):
     r"""
     This class was taken directly from the PyG implementation and can be found
-    here: https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppred/mag/logger.py
+    here: https://github.com/snap-stanford/ogb/blob/master/examples/nodeproppre
+    d/mag/logger.py
 
-    This was done to ensure that performance was measured in precisely the same way
+    This was done to ensure that performance was measured in precisely the same
+    way
     """
 
     def __init__(self, runs):
@@ -530,9 +541,9 @@ def test(g, model, node_embed, y_true, device, split_idx):
     return train_acc, valid_acc, test_acc
 
 
-def is_support_affinity(v_t):
+def is_support_affinity():
     # dgl supports enable_cpu_affinity since 0.9.1.
-    return v_t >= "0.9.1"
+    return dgl.__version__ >= "0.9.1"
 
 
 def main(args):
@@ -587,11 +598,7 @@ def main(args):
 
         # If CPU affinity is supported and the device is CPU, execute training
         # with CPU affinity enabled.
-        if (
-            args.num_workers != 0
-            and device == "cpu"
-            and is_support_affinity(v_t)
-        ):
+        if args.num_workers != 0 and device == "cpu" and is_support_affinity():
             # `expected_max`` is the number of physical cores on your machine.
             # The `logical` parameter, when set to False, ensures that the count
             # returned is the number of physical cores instead of logical cores
