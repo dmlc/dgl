@@ -131,7 +131,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
-NumPickFn GetNumPickFn(
+NumPickFn NumPick(
     int64_t fanout, bool replace,
     const torch::optional<torch::Tensor>& probs_or_mask) {
   if (!probs_or_mask.has_value()) {
@@ -160,7 +160,7 @@ NumPickFn GetNumPickFn(
   }
 }
 
-NumPickFn GetNumPickFnByEtype(
+NumPickFn NumPickByEtype(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask) {
@@ -170,7 +170,7 @@ NumPickFn GetNumPickFnByEtype(
     int64_t etype_end = offset;
     const int64_t end = offset + num_neighbors;
     torch::Tensor count_by_etype = torch::zeros(fanouts.size());
-    AT_DISPATCH_ALL_TYPES(
+    AT_DISPATCH_INTEGRAL_TYPES(
         type_per_edge.scalar_type(), "NumPickFnByEtype", ([&] {
           const scalar_t* type_per_edge_data =
               type_per_edge.data_ptr<scalar_t>();
@@ -185,7 +185,7 @@ NumPickFn GetNumPickFnByEtype(
             etype_end = etype_end_it - type_per_edge_data;
             // Do sampling for one etype.
             count_by_etype[etype] =
-                GetNumPickFn(fanouts[etype], replace, probs_or_mask)(
+                NumPick(fanouts[etype], replace, probs_or_mask)(
                     etype_begin, etype_end - etype_begin)[0];
             etype_begin = etype_end;
           }
@@ -213,17 +213,17 @@ NumPickFn GetNumPickFnByEtype(
  * @return A lambda function which takes offset and num_neighbors as params and
  * returns the number of neighbors-to-be-sampled.
  */
-NumPickFn ChooseNumPickFn(
+NumPickFn GetNumPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask) {
   // If fanouts.size() > 1, count with sampling for each edge type of each node,
   // otherwise just sample once for each node with no regard of edge types.
-  if (fanouts.size() > 1 && type_per_edge.has_value())
-    return GetNumPickFnByEtype(
+  if (fanouts.size() > 1)
+    return NumPickByEtype(
         fanouts, replace, type_per_edge.value(), probs_or_mask);
   else
-    return GetNumPickFn(fanouts[0], replace, probs_or_mask);
+    return NumPick(fanouts[0], replace, probs_or_mask);
 }
 
 /**
@@ -247,7 +247,7 @@ NumPickFn ChooseNumPickFn(
  * returns a tensor of picked neighbors.
  */
 template <SamplerType S>
-PickFn ChoosePickFn(
+PickFn GetPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& type_per_edge,
@@ -362,16 +362,16 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
     return SampleNeighborsImpl(
         nodes, return_eids,
-        ChooseNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
-        ChoosePickFn(
+        GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
+        GetPickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
             args));
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl(
         nodes, return_eids,
-        ChooseNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
-        ChoosePickFn(
+        GetNumPickFn(fanouts, replace, type_per_edge_, probs_or_mask),
+        GetPickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
             args));
   }
