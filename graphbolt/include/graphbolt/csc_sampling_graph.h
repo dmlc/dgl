@@ -32,8 +32,8 @@ struct SamplerArgs<SamplerType::LABOR> {
 };
 
 using NumPickFn = std::function<int64_t(int64_t, int64_t)>;
-using PickFn = std::function<void(
-    int64_t, int64_t, torch::Tensor&, int64_t, const torch::Tensor&)>;
+using PickFn =
+    std::function<void(int64_t, int64_t, torch::Tensor&, int64_t, int64_t)>;
 
 /**
  * @brief A sampling oriented csc format graph.

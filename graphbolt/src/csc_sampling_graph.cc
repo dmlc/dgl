@@ -257,21 +257,21 @@ PickFn GetPickFn(
     return
         [fanouts, replace, options, &type_per_edge, &probs_or_mask, args](
             int64_t offset, int64_t num_neighbors, torch::Tensor& picked_tensor,
-            int64_t picked_offset, const torch::Tensor& picked_counts) {
+            int64_t picked_offset, int64_t picked_count) {
           PickByEtype(
               offset, num_neighbors, fanouts, replace, options,
               type_per_edge.value(), probs_or_mask, args, picked_tensor,
-              picked_offset, picked_counts);
+              picked_offset, picked_count);
         };
   } else {
-    return [fanouts, replace, options, &probs_or_mask, args](
-               int64_t offset, int64_t num_neighbors,
-               torch::Tensor& picked_tensor, int64_t picked_offset,
-               const torch::Tensor& picked_counts) {
-      Pick(
-          offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
-          args, picked_tensor, picked_offset, picked_counts[0].item<int64_t>());
-    };
+    return
+        [fanouts, replace, options, &probs_or_mask, args](
+            int64_t offset, int64_t num_neighbors, torch::Tensor& picked_tensor,
+            int64_t picked_offset, int64_t picked_count) {
+          Pick(
+              offset, num_neighbors, fanouts[0], replace, options,
+              probs_or_mask, args, picked_tensor, picked_offset, picked_count);
+        };
   }
 }
 
@@ -316,10 +316,9 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                   continue;
                 }
 
-                auto allocate_size = num_pick_fn(offset, num_neighbors);
-                picked_neighbors_cur_thread[i - begin] = torch::empty(
-                    {torch::sum(allocate_size).item<int64_t>()},
-                    indptr_options);
+                int64_t allocate_size = num_pick_fn(offset, num_neighbors);
+                picked_neighbors_cur_thread[i - begin] =
+                    torch::empty({allocate_size}, indptr_options);
                 pick_fn(
                     offset, num_neighbors,
                     picked_neighbors_cur_thread[i - begin], 0, allocate_size);
@@ -637,8 +636,7 @@ void PickByEtype(
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
-    torch::Tensor& picked_tensor, int64_t picked_offset,
-    const torch::Tensor& picked_counts) {
+    torch::Tensor& picked_tensor, int64_t picked_offset, int64_t picked_count) {
   int64_t etype_begin = offset;
   int64_t etype_end = offset;
   AT_DISPATCH_INTEGRAL_TYPES(
@@ -652,21 +650,21 @@ void PickByEtype(
               etype >= 0 && etype < (int64_t)fanouts.size(),
               "Etype values exceed the number of fanouts.");
           int64_t fanout = fanouts[etype];
-          int64_t picked_count = picked_counts[etype].item<int64_t>();
           auto etype_end_it = std::upper_bound(
               type_per_edge_data + etype_begin, type_per_edge_data + end,
               etype);
           etype_end = etype_end_it - type_per_edge_data;
+          int64_t etype_count = NumPick(fanout, replace, probs_or_mask)(
+              etype_begin, etype_end - etype_begin);
           // Do sampling for one etype.
           if (fanout != 0) {
             TORCH_CHECK(
-                pick_begin + picked_count <=
-                    picked_offset + torch::sum(picked_counts).item<int64_t>(),
-                "Etype exceeds.");
+                pick_begin + etype_count <= picked_offset + picked_count,
+                "Picked count doesn't match");
             Pick<S>(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
-                probs_or_mask, args, picked_tensor, pick_begin, picked_count);
-            pick_begin += picked_count;
+                probs_or_mask, args, picked_tensor, pick_begin, etype_count);
+            pick_begin += etype_count;
           }
           etype_begin = etype_end;
         }
