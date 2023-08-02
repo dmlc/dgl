@@ -214,43 +214,37 @@ class LegacyTUDataset(DGLBuiltinDataset):
         self.graph_labels = F.tensor(self.graph_labels)
 
     def save(self):
-        graph_path = os.path.join(
-            self.save_path, "legacy_tu_{}_{}.bin".format(self.name, self.hash)
-        )
-        info_path = os.path.join(
-            self.save_path, "legacy_tu_{}_{}.pkl".format(self.name, self.hash)
-        )
         label_dict = {"labels": self.graph_labels}
         info_dict = {
             "max_num_node": self.max_num_node,
             "num_labels": self.num_labels,
         }
-        save_graphs(str(graph_path), self.graph_lists, label_dict)
-        save_info(str(info_path), info_dict)
+        save_graphs(str(self.graph_path), self.graph_lists, label_dict)
+        save_info(str(self.info_path), info_dict)
 
     def load(self):
-        graph_path = os.path.join(
-            self.save_path, "legacy_tu_{}_{}.bin".format(self.name, self.hash)
-        )
-        info_path = os.path.join(
-            self.save_path, "legacy_tu_{}_{}.pkl".format(self.name, self.hash)
-        )
-        graphs, label_dict = load_graphs(str(graph_path))
-        info_dict = load_info(str(info_path))
+        graphs, label_dict = load_graphs(str(self.graph_path))
+        info_dict = load_info(str(self.info_path))
 
         self.graph_lists = graphs
         self.graph_labels = label_dict["labels"]
         self.max_num_node = info_dict["max_num_node"]
         self.num_labels = info_dict["num_labels"]
 
-    def has_cache(self):
-        graph_path = os.path.join(
+    @property
+    def graph_path(self):
+        return os.path.join(
             self.save_path, "legacy_tu_{}_{}.bin".format(self.name, self.hash)
         )
-        info_path = os.path.join(
+
+    @property
+    def info_path(self):
+        return os.path.join(
             self.save_path, "legacy_tu_{}_{}.pkl".format(self.name, self.hash)
         )
-        if os.path.exists(graph_path) and os.path.exists(info_path):
+
+    def has_cache(self):
+        if os.path.exists(self.graph_path) and os.path.exists(self.info_path):
             return True
         return False
 
@@ -455,22 +449,26 @@ class TUDataset(DGLBuiltinDataset):
 
         self.graph_lists = [g.subgraph(node_idx) for node_idx in node_idx_list]
 
+    @property
+    def graph_path(self):
+        return os.path.join(self.save_path, "tu_{}.bin".format(self.name))
+
+    @property
+    def info_path(self):
+        return os.path.join(self.save_path, "tu_{}.pkl".format(self.name))
+
     def save(self):
-        graph_path = os.path.join(self.save_path, "tu_{}.bin".format(self.name))
-        info_path = os.path.join(self.save_path, "tu_{}.pkl".format(self.name))
         label_dict = {"labels": self.graph_labels}
         info_dict = {
             "max_num_node": self.max_num_node,
             "num_labels": self.num_labels,
         }
-        save_graphs(str(graph_path), self.graph_lists, label_dict)
-        save_info(str(info_path), info_dict)
+        save_graphs(str(self.graph_path), self.graph_lists, label_dict)
+        save_info(str(self.info_path), info_dict)
 
     def load(self):
-        graph_path = os.path.join(self.save_path, "tu_{}.bin".format(self.name))
-        info_path = os.path.join(self.save_path, "tu_{}.pkl".format(self.name))
-        graphs, label_dict = load_graphs(str(graph_path))
-        info_dict = load_info(str(info_path))
+        graphs, label_dict = load_graphs(str(self.graph_path))
+        info_dict = load_info(str(self.info_path))
 
         self.graph_lists = graphs
         self.graph_labels = label_dict["labels"]
@@ -478,9 +476,7 @@ class TUDataset(DGLBuiltinDataset):
         self.num_labels = info_dict["num_labels"]
 
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, "tu_{}.bin".format(self.name))
-        info_path = os.path.join(self.save_path, "tu_{}.pkl".format(self.name))
-        if os.path.exists(graph_path) and os.path.exists(info_path):
+        if os.path.exists(self.graph_path) and os.path.exists(self.info_path):
             return True
         return False
 
