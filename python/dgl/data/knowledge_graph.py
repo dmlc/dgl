@@ -145,10 +145,16 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
         g.ndata["ntype"] = ntype
         self._g = g
 
+    @property
+    def graph_path(self):
+        return os.path.join(self.save_path, self.save_name + ".bin")
+
+    @property
+    def info_path(self):
+        return os.path.join(self.save_path, self.save_name + ".pkl")
+
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, self.save_name + ".bin")
-        info_path = os.path.join(self.save_path, self.save_name + ".pkl")
-        if os.path.exists(graph_path) and os.path.exists(info_path):
+        if os.path.exists(self.graph_path) and os.path.exists(self.info_path):
             return True
 
         return False
@@ -165,20 +171,16 @@ class KnowledgeGraphDataset(DGLBuiltinDataset):
 
     def save(self):
         """save the graph list and the labels"""
-        graph_path = os.path.join(self.save_path, self.save_name + ".bin")
-        info_path = os.path.join(self.save_path, self.save_name + ".pkl")
-        save_graphs(str(graph_path), self._g)
+        save_graphs(str(self.graph_path), self._g)
         save_info(
-            str(info_path),
+            str(self.info_path),
             {"num_nodes": self.num_nodes, "num_rels": self.num_rels},
         )
 
     def load(self):
-        graph_path = os.path.join(self.save_path, self.save_name + ".bin")
-        info_path = os.path.join(self.save_path, self.save_name + ".pkl")
-        graphs, _ = load_graphs(str(graph_path))
+        graphs, _ = load_graphs(str(self.graph_path))
 
-        info = load_info(str(info_path))
+        info = load_info(str(self.info_path))
         self._num_nodes = info["num_nodes"]
         self._num_rels = info["num_rels"]
         self._g = graphs[0]
