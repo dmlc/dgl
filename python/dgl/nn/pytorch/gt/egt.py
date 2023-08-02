@@ -96,18 +96,18 @@ class EGTLayer(nn.Module):
                 nn.Dropout(dropout),
             )
 
-    def forward(self, ndata, edata, mask=None):
-        """Forward computation. Note: :attr:`ndata` and :attr:`edata` should be
+    def forward(self, nfeat, efeat, mask=None):
+        """Forward computation. Note: :attr:`nfeat` and :attr:`efeat` should be
         padded with embedding of virtual nodes if :attr:`num_virtual_nodes` > 0,
         while :attr:`mask` should be padded with `0` values for virtual nodes.
         The padding should be put at the beginning.
 
         Parameters
         ----------
-        ndata : torch.Tensor
+        nfeat : torch.Tensor
             A 3D input tensor. Shape: (batch_size, N, :attr:`feat_size`), where N
             is the sum of the maximum number of nodes and the number of virtual nodes.
-        edata : torch.Tensor
+        efeat : torch.Tensor
             Edge embedding used for attention computation and self update.
             Shape: (batch_size, N, N, :attr:`edge_feat_size`).
         mask : torch.Tensor, optional
@@ -118,21 +118,20 @@ class EGTLayer(nn.Module):
 
         Returns
         -------
-        h : torch.Tensor
+        nfeat : torch.Tensor
             The output node embedding. Shape: (batch_size, N, :attr:`feat_size`).
-        e : torch.Tensor, optional
+        efeat : torch.Tensor, optional
             The output edge embedding. Shape: (batch_size, N, N, :attr:`edge_feat_size`).
-            It is only returned when :attr:`edge_update` is True.
+            It is returned only if :attr:`edge_update` is True.
         """
+        nfeat_r1 = nfeat
+        efeat_r1 = efeat
 
-        h_r1 = ndata
-        e_r1 = edata
-
-        h_ln = self.mha_ln_h(ndata)
-        e_ln = self.mha_ln_e(edata)
-        qkv = self.qkv_proj(h_ln)
-        e_bias = self.edge_input(e_ln)
-        gates = self.gate(e_ln)
+        nfeat_ln = self.mha_ln_h(nfeat)
+        efeat_ln = self.mha_ln_e(efeat)
+        qkv = self.qkv_proj(nfeat_ln)
+        e_bias = self.edge_input(efeat_ln)
+        gates = self.gate(efeat_ln)
         bsz, N, _ = qkv.shape
         q_h, k_h, v_h = qkv.view(bsz, N, -1, self.num_heads).split(
             self.dot_dim, dim=2
@@ -157,22 +156,22 @@ class EGTLayer(nn.Module):
         v_attn = v_attn * degree_scalers
 
         v_attn = v_attn.reshape(bsz, N, self.num_heads * self.dot_dim)
-        h = self.node_output(v_attn)
+        nfeat = self.node_output(v_attn)
 
-        h = self.mha_dropout_h(h)
-        h.add_(h_r1)
-        h_r2 = h
-        h = self.node_ffn(h)
-        h.add_(h_r2)
+        nfeat = self.mha_dropout_h(nfeat)
+        nfeat.add_(nfeat_r1)
+        nfeat_r2 = nfeat
+        nfeat = self.node_ffn(nfeat)
+        nfeat.add_(nfeat_r2)
 
         if self.edge_update:
-            e = self.edge_output(attn_hat)
-            e = self.mha_dropout_e(e)
-            e.add_(e_r1)
-            e_r2 = e
-            e = self.edge_ffn(e)
-            e.add_(e_r2)
+            efeat = self.edge_output(attn_hat)
+            efeat = self.mha_dropout_e(efeat)
+            efeat.add_(efeat_r1)
+            efeat_r2 = efeat
+            efeat = self.edge_ffn(efeat)
+            efeat.add_(efeat_r2)
 
-            return h, e
+            return nfeat, efeat
 
-        return h
+        return nfeat
