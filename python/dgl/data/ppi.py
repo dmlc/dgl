@@ -131,50 +131,41 @@ class PPIDataset(DGLBuiltinDataset):
             )
             self.graphs.append(g)
 
-    def has_cache(self):
-        graph_list_path = os.path.join(
+    @property
+    def graph_list_path(self):
+        return os.path.join(
             self.save_path, "{}_dgl_graph_list.bin".format(self.mode)
         )
-        g_path = os.path.join(
+
+    @property
+    def g_path(self):
+        return os.path.join(
             self.save_path, "{}_dgl_graph.bin".format(self.mode)
         )
-        info_path = os.path.join(
-            self.save_path, "{}_info.pkl".format(self.mode)
-        )
+
+    @property
+    def info_path(self):
+        return os.path.join(self.save_path, "{}_info.pkl".format(self.mode))
+
+    def has_cache(self):
         return (
-            os.path.exists(graph_list_path)
-            and os.path.exists(g_path)
-            and os.path.exists(info_path)
+            os.path.exists(self.graph_list_path)
+            and os.path.exists(self.g_path)
+            and os.path.exists(self.info_path)
         )
 
     def save(self):
-        graph_list_path = os.path.join(
-            self.save_path, "{}_dgl_graph_list.bin".format(self.mode)
+        save_graphs(self.graph_list_path, self.graphs)
+        save_graphs(self.g_path, self.graph)
+        save_info(
+            self.info_path, {"labels": self._labels, "feats": self._feats}
         )
-        g_path = os.path.join(
-            self.save_path, "{}_dgl_graph.bin".format(self.mode)
-        )
-        info_path = os.path.join(
-            self.save_path, "{}_info.pkl".format(self.mode)
-        )
-        save_graphs(graph_list_path, self.graphs)
-        save_graphs(g_path, self.graph)
-        save_info(info_path, {"labels": self._labels, "feats": self._feats})
 
     def load(self):
-        graph_list_path = os.path.join(
-            self.save_path, "{}_dgl_graph_list.bin".format(self.mode)
-        )
-        g_path = os.path.join(
-            self.save_path, "{}_dgl_graph.bin".format(self.mode)
-        )
-        info_path = os.path.join(
-            self.save_path, "{}_info.pkl".format(self.mode)
-        )
-        self.graphs = load_graphs(graph_list_path)[0]
-        g, _ = load_graphs(g_path)
+        self.graphs = load_graphs(self.graph_list_path)[0]
+        g, _ = load_graphs(self.g_path)
         self.graph = g[0]
-        info = load_info(info_path)
+        info = load_info(self.info_path)
         self._labels = info["labels"]
         self._feats = info["feats"]
 
