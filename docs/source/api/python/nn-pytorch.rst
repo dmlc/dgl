@@ -135,6 +135,7 @@ Utility Modules
     ~dgl.nn.pytorch.graph_transformer.DegreeEncoder
     ~dgl.nn.pytorch.utils.LaplacianPosEnc
     ~dgl.nn.pytorch.graph_transformer.BiasedMultiheadAttention
+    ~dgl.nn.pytorch.graph_transformer.EGTLayer
     ~dgl.nn.pytorch.graph_transformer.GraphormerLayer
     ~dgl.nn.pytorch.graph_transformer.PathEncoder
     ~dgl.nn.pytorch.graph_transformer.SpatialEncoder
@@ -165,3 +166,4 @@ Utility Modules for Graph Transformer
     ~dgl.nn.pytorch.gt.SpatialEncoder3d
     ~dgl.nn.pytorch.gt.BiasedMHA
     ~dgl.nn.pytorch.gt.GraphormerLayer
+    ~dgl.nn.pytorch.gt.EGTLayer

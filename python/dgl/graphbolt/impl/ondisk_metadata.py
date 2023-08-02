@@ -83,6 +83,6 @@ class OnDiskMetaData(pydantic.BaseModel):
     num_labels: Optional[int] = None
     graph_topology: Optional[OnDiskGraphTopology] = None
     feature_data: Optional[List[OnDiskFeatureData]] = []
-    train_sets: Optional[List[List[OnDiskTVTSet]]] = []
-    validation_sets: Optional[List[List[OnDiskTVTSet]]] = []
-    test_sets: Optional[List[List[OnDiskTVTSet]]] = []
+    train_set: Optional[List[OnDiskTVTSet]] = []
+    validation_set: Optional[List[OnDiskTVTSet]] = []
+    test_set: Optional[List[OnDiskTVTSet]] = []
