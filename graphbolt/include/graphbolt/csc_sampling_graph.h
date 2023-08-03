@@ -31,7 +31,7 @@ struct SamplerArgs<SamplerType::LABOR> {
   int64_t num_nodes;
 };
 
-using PickFn = std::function<torch::Tensor(int64_t, int64_t)>;
+// using PickFn = std::function<torch::Tensor(int64_t, int64_t)>;
 
 /**
  * @brief A sampling oriented csc format graph.
@@ -224,6 +224,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const std::string& shared_memory_name);
 
  private:
+  template <typename PickFn>
   c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, bool return_eids, PickFn pick_fn) const;
 
@@ -326,6 +327,20 @@ torch::Tensor Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args);
+
+template <>
+torch::Tensor Pick<SamplerType::NEIGHBOR>(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    SamplerArgs<SamplerType::NEIGHBOR> args);
+
+template <>
+torch::Tensor Pick<SamplerType::LABOR>(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    SamplerArgs<SamplerType::LABOR> args);
 
 /**
  * @brief Picks a specified number of neighbors for a node per edge type,

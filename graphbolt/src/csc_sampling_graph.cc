@@ -131,51 +131,38 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
-/**
- * @brief Get a lambda function which contains the sampling process.
- *
- * @param fanouts The number of edges to be sampled for each node with or
- * without considering edge types.
- * @param replace Boolean indicating whether the sample is performed with or
- * without replacement. If True, a value can be selected multiple times.
- * Otherwise, each value can be selected only once.
- * @param options Tensor options specifying the desired data type of the result.
- * @param type_per_edge A tensor representing the type of each edge, if
- * present.
- * @param probs_or_mask Optional tensor containing the (unnormalized)
- * probabilities associated with each neighboring edge of a node in the original
- * graph. It must be a 1D floating-point tensor with the number of elements
- * equal to the number of edges in the graph.
- * @param args Contains labor specific arguments.
- *
- * @return A lambda function which takes offset and num_neighbors as params and
- * returns a tensor of picked neighbors.
- */
 template <SamplerType S>
-PickFn GetPickFn(
+auto GetPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
-  // If fanouts.size() > 1, perform sampling for each edge type of each node,
-  // otherwise just sample once for each node with no regard of edge types.
-  if (fanouts.size() > 1) {
-    return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
-               int64_t offset, int64_t num_neighbors) {
-      return PickByEtype(
-          offset, num_neighbors, fanouts, replace, options,
-          type_per_edge.value(), probs_or_mask, args);
-    };
-  } else {
-    return [&fanouts, replace, &options, &probs_or_mask, args](
-               int64_t offset, int64_t num_neighbors) {
-      return Pick(
-          offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
-          args);
-    };
-  }
+  // When fanouts.size() == 1, sample once for each node with no regard of edge
+  // types.
+  return [&fanouts, replace, &options, &probs_or_mask, args](
+             int64_t offset, int64_t num_neighbors) {
+    return Pick(
+        offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
+        args);
+  };
 }
 
+template <SamplerType S>
+auto GetPickFnByEtype(
+    const std::vector<int64_t>& fanouts, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
+  // When fanouts.size() > 1, perform sampling for each edge type of each node
+  return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
+             int64_t offset, int64_t num_neighbors) {
+    return PickByEtype(
+        offset, num_neighbors, fanouts, replace, options, type_per_edge.value(),
+        probs_or_mask, args);
+  };
+}
+
+template <typename PickFn>
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, bool return_eids, PickFn pick_fn) const {
   const int64_t num_nodes = nodes.size(0);
@@ -260,22 +247,39 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
       probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
     }
   }
+
   if (layer) {
     const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
     SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
-    return SampleNeighborsImpl(
-        nodes, return_eids,
-        GetPickFn(
-            fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
-            args));
+    if (fanouts.size() == 1) {
+      return SampleNeighborsImpl(
+          nodes, return_eids,
+          GetPickFn(
+              fanouts, replace, indptr_.options(), type_per_edge_,
+              probs_or_mask, args));
+    } else {
+      return SampleNeighborsImpl(
+          nodes, return_eids,
+          GetPickFnByEtype(
+              fanouts, replace, indptr_.options(), type_per_edge_,
+              probs_or_mask, args));
+    }
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
-    return SampleNeighborsImpl(
-        nodes, return_eids,
-        GetPickFn(
-            fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
-            args));
+    if (fanouts.size() == 1) {
+      return SampleNeighborsImpl(
+          nodes, return_eids,
+          GetPickFn(
+              fanouts, replace, indptr_.options(), type_per_edge_,
+              probs_or_mask, args));
+    } else {
+      return SampleNeighborsImpl(
+          nodes, return_eids,
+          GetPickFnByEtype(
+              fanouts, replace, indptr_.options(), type_per_edge_,
+              probs_or_mask, args));
+    }
   }
 }
 
