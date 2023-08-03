@@ -1,6 +1,6 @@
 """GraphBolt Dataset."""
 
-from typing import Dict, List
+from typing import Dict
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
@@ -32,18 +32,18 @@ class Dataset:
     """
 
     @property
-    def train_sets(self) -> List[ItemSet] or List[ItemSetDict]:
-        """Return the training sets."""
+    def train_set(self) -> ItemSet or ItemSetDict:
+        """Return the training set."""
         raise NotImplementedError
 
     @property
-    def validation_sets(self) -> List[ItemSet] or List[ItemSetDict]:
-        """Return the validation sets."""
+    def validation_set(self) -> ItemSet or ItemSetDict:
+        """Return the validation set."""
         raise NotImplementedError
 
     @property
-    def test_sets(self) -> List[ItemSet] or List[ItemSetDict]:
-        """Return the test sets."""
+    def test_set(self) -> ItemSet or ItemSetDict:
+        """Return the test set."""
         raise NotImplementedError
 
     @property

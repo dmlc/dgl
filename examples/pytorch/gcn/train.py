@@ -72,6 +72,12 @@ if __name__ == "__main__":
         default="cora",
         help="Dataset name ('cora', 'citeseer', 'pubmed').",
     )
+    parser.add_argument(
+        "--dt",
+        type=str,
+        default="float",
+        help="data type(float, bfloat16)",
+    )
     args = parser.parse_args()
     print(f"Training with DGL built-in GraphConv module.")
 
@@ -98,6 +104,12 @@ if __name__ == "__main__":
     in_size = features.shape[1]
     out_size = data.num_classes
     model = GCN(in_size, 16, out_size).to(device)
+
+    # convert model and graph to bfloat16 if needed
+    if args.dt == "bfloat16":
+        g = dgl.to_bfloat16(g)
+        features = features.to(dtype=torch.bfloat16)
+        model = model.to(dtype=torch.bfloat16)
 
     # model training
     print("Training...")
