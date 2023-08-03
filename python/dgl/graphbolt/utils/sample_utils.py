@@ -57,6 +57,7 @@ def unique_and_compact_node_pairs(
     if is_homogeneous:
         node_pairs = {("_N", "_E", "_N"): node_pairs}
     dst_nodes = defaultdict(list)
+    num_seeds = defaultdict(int)
     if dst_nodes is None:
         # Find all nodes that appeared as destinations.
         for etype, node_pair in node_pairs.items():
@@ -65,12 +66,27 @@ def unique_and_compact_node_pairs(
             ntype: torch.unique(torch.cat(values, 0))
             for ntype, values in dst_nodes.items()
         }
-    src_nodes = defaultdict(list)
+        num_seeds = {
+            ntype: nodes.size(0)
+            for ntype, nodes in dst_nodes.items()
+        }
+    all_nodes = defaultdict(list)
+    all_nodes = {
+        ntype: [nodes]
+        for ntype, nodes in dst_nodes.items()
+    }
     # Colllect all nodes that appeared as sources.
     for etype, node_pair in node_pairs.items():
-        src_nodes[etype[0]].append(node_pair[0])
-
-    # unique_nodes, compacted_node_pairs = C function (node_pairs, seed_nodes)
+        all_nodes[etype[0]].append(node_pair[0])
+    all_nodes = {
+        ntype: torch.cat(values, 0)
+        for ntype, values in all_nodes.items()
+    }
+    
+    unique_nodes = {}
+    compacted_node_pairs = {}
+    for ntype, nodes in all_nodes.items():
+        unique_nodes, compacted_node_pairs =torch.ops.graphbolt.unique_and_compact(node_pairs, seed_nodes)
 
     # Return singleton for homogeneous graph.
     if is_homogeneous:
