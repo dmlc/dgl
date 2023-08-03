@@ -6,10 +6,8 @@ import shutil
 import sys
 import sysconfig
 
-from setuptools import find_packages
+from setuptools import find_packages, setup
 from setuptools.dist import Distribution
-
-from setuptools import setup
 from setuptools.extension import Extension
 
 
