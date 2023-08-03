@@ -169,13 +169,9 @@ def main(args):
                     seeds
                 )
                 print(
-                    "Epoch {:05d} | Batch {:03d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Time: {:.4f}".format(
-                        epoch,
-                        i,
-                        train_acc,
-                        loss.item(),
-                        time.time() - batch_tic,
-                    )
+                    f"Epoch {epoch:05d} | Batch {i:03d} | Train Acc: "
+                    "{train_acc:.4f} | Train Loss: {loss.item():.4f} | Time: "
+                    "{time.time() - batch_tic:.4f}"
                 )
 
         if epoch > 3:
@@ -185,9 +181,8 @@ def main(args):
                 model, val_loader, node_embed, labels, category, device
             )
             print(
-                "Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".format(
-                    epoch, val_acc, val_loss, mean
-                )
+                f"Epoch {epoch:05d} | Valid Acc: {val_acc:.4f} | Valid loss: "
+                "{val_loss:.4f} | Time: {mean:.4f}"
             )
     print()
     if args.model_path is not None:
