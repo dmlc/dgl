@@ -132,10 +132,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 }
 
 /**
- * @brief Get a lambda function which contains the sampling process. If
- * ByEtype is true, use Pick() to sample once for each node with no
- * regard of edge types; otherwise use PickByEtype() to perform sampling for
- * each edge type of each node.
+ * @brief Get a lambda function which contains the sampling process.
  *
  * @param fanouts The number of edges to be sampled for each node with or
  * without considering edge types.
@@ -163,6 +160,8 @@ auto GetPickFn(
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
   return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
              int64_t offset, int64_t num_neighbors) {
+    // If fanouts.size() > 1, perform sampling for each edge type of each node;
+    // otherwise just sample once for each node with no regard of edge types.
     if (fanouts.size() > 1) {
       return PickByEtype(
           offset, num_neighbors, fanouts, replace, options,
