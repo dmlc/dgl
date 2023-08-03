@@ -278,16 +278,19 @@ class PGExplainer(nn.Module):
         if isinstance(nodes, int):
             nodes = [nodes]
 
-        prob, _, batched_graph, inverse_indices = self.explain_node(
+        prob, _ = self.explain_node(
             nodes, graph, feat, tmp=tmp, training=True, **kwargs
         )
 
         pred = self.model(
-            batched_graph, self.batched_feats, embed=False, **kwargs
+            self.batched_graph, self.batched_feats, embed=False, **kwargs
         )
         pred = pred.argmax(-1).data
 
-        loss = self.loss(prob[inverse_indices], pred[inverse_indices])
+        loss = self.loss(
+            prob[self.batched_inverse_indices],
+            pred[self.batched_inverse_indices],
+        )
         return loss
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
@@ -517,9 +520,7 @@ class PGExplainer(nn.Module):
         ...     optimizer_exp.step()
 
         >>> # Explain the prediction for graph 0
-        >>> probs, edge_weight, bg, inverse_indices = explainer.explain_node(
-        ...     0, g, features
-        ... )
+        >>> probs, edge_weight = explainer.explain_node(0, g, features)
         """
         assert (
             not self.graph_explanation
@@ -537,17 +538,17 @@ class PGExplainer(nn.Module):
         self.elayers = self.elayers.to(graph.device)
 
         batched_graph = []
-        batched_feats = []
         batched_embed = []
-        batched_inverse_indices = []
-        node_idx = 0
         for node_id in nodes:
             sg, inverse_indices = khop_in_subgraph(
                 graph, node_id, self.num_hops
             )
-            sg_feat = feat[sg.ndata[NID].long()]
+            sg.ndata["feat"] = feat[sg.ndata[NID].long()]
+            sg.ndata["train"] = torch.tensor(
+                [nid in inverse_indices for nid in sg.nodes()]
+            )
 
-            embed = self.model(sg, sg_feat, embed=True, **kwargs)
+            embed = self.model(sg, sg.ndata["feat"], embed=True, **kwargs)
             embed = embed.data
 
             col, row = sg.edges()
@@ -557,16 +558,10 @@ class PGExplainer(nn.Module):
             emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
             batched_embed.append(emb)
             batched_graph.append(sg)
-            batched_feats.append(sg_feat)
-            # node id's of subgraph mapped to batch:
-            # https://docs.dgl.ai/en/latest/generated/dgl.batch.html#dgl.batch
-            batched_inverse_indices.append(inverse_indices[0].item() + node_idx)
-            node_idx += sg.num_nodes()
 
         batched_graph = batch(batched_graph)
-        batched_feats = torch.cat(batched_feats)
-        batched_embed = torch.cat(batched_embed)
 
+        batched_embed = torch.cat(batched_embed)
         batched_embed = self.elayers(batched_embed)
         values = batched_embed.reshape(-1)
 
@@ -579,6 +574,7 @@ class PGExplainer(nn.Module):
 
         self.set_masks(batched_graph, edge_mask)
 
+        batched_feats = batched_graph.ndata["feat"]
         # the model prediction with the updated edge mask
         logits = self.model(
             batched_graph, batched_feats, edge_weight=self.edge_mask, **kwargs
@@ -586,17 +582,16 @@ class PGExplainer(nn.Module):
         probs = F.softmax(logits, dim=-1)
 
         if training:
-            self.batched_feats = batched_feats
             probs = probs.data
+            self.batched_feats = batched_feats
+            self.batched_graph = batched_graph
+            self.batched_inverse_indices = (
+                batched_graph.ndata["train"].nonzero().squeeze(1)
+            )
         else:
             self.clear_masks()
 
-        return (
-            probs.data,
-            edge_mask,
-            batched_graph,
-            batched_inverse_indices,
-        )
+        return (probs, edge_mask)
 
 
 class HeteroPGExplainer(PGExplainer):
@@ -680,16 +675,29 @@ class HeteroPGExplainer(PGExplainer):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        prob, _, batched_graph, inverse_indices = self.explain_node(
+        prob, _ = self.explain_node(
             nodes, graph, feat, tmp=tmp, training=True, **kwargs
         )
 
         pred = self.model(
-            batched_graph, self.batched_feats, embed=False, **kwargs
+            self.batched_graph, self.batched_feats, embed=False, **kwargs
         )
-        pred = pred.argmax(-1).data
+        pred = {ntype: pred[ntype].argmax(-1).data for ntype in pred.keys()}
 
-        loss = self.loss(prob[inverse_indices], pred[inverse_indices])
+        loss = self.loss(
+            torch.cat(
+                [
+                    prob[ntype][nid]
+                    for ntype, nid in self.batched_inverse_indices.items()
+                ]
+            ),
+            torch.cat(
+                [
+                    pred[ntype][nid]
+                    for ntype, nid in self.batched_inverse_indices.items()
+                ]
+            ),
+        )
         return loss
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
@@ -826,14 +834,11 @@ class HeteroPGExplainer(PGExplainer):
         self.set_masks(homo_graph, edge_mask)
 
         # convert the edge mask back into heterogeneous format
-        hetero_edge_mask = {
-            etype: edge_mask[
-                (homo_graph.edata[ETYPE] == graph.get_etype_id(etype))
-                .nonzero()
-                .squeeze(1)
-            ]
-            for etype in graph.canonical_etypes
-        }
+        hetero_edge_mask = self._mask_to_hetero(
+            edge_mask=edge_mask,
+            homograph=homo_graph,
+            heterograph=graph,
+        )
 
         # the model prediction with the updated edge mask
         logits = self.model(graph, feat, edge_weight=hetero_edge_mask, **kwargs)
@@ -913,15 +918,7 @@ class HeteroPGExplainer(PGExplainer):
         ...         else:
         ...             h = self.conv(g, h)
         ...
-        ...         if embed:
-        ...             return h
-        ...
-        ...         with g.local_scope():
-        ...             g.ndata["h"] = h
-        ...             hg = 0
-        ...             for ntype in g.ntypes:
-        ...                 hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
-        ...             return self.fc(hg)
+        ...         return h
 
         >>> # Load dataset
         >>> input_dim = 5
@@ -938,8 +935,8 @@ class HeteroPGExplainer(PGExplainer):
         >>> model = Model(input_dim, hidden_dim, num_classes, g.canonical_etypes)
         >>> optimizer = th.optim.Adam(model.parameters())
         >>> for epoch in range(10):
-        ...     logits = model(g, g.ndata["h"])
-        ...     loss = th.nn.functional.cross_entropy(logits, th.tensor([1]))
+        ...     logits = model(g, g.ndata["h"])['user']
+        ...     loss = th.nn.functional.cross_entropy(logits, th.tensor([1,1,1]))
         ...     optimizer.zero_grad()
         ...     loss.backward()
         ...     optimizer.step()
@@ -990,86 +987,104 @@ class HeteroPGExplainer(PGExplainer):
         # 3. use the inverse indices mappings to get the correct node in the batched graph
         #    to collect classifications results from when computing loss.
 
-        batched_graph = []
-        batched_feats = []
+        batched_homo_graph = []
+        batched_hetero_graph = []
         batched_embed = []
-        batched_inverse_indices = []
-        node_idx = 0
         for target_ntype, target_nids in nodes.items():
             for target_nid in target_nids:
                 sg, inverse_indices = khop_in_subgraph(
                     graph, {target_ntype: target_nid}, self.num_hops
                 )
-                sg_feat = {
-                    ntype: feat[ntype][sg.ndata[NID][ntype].long()]
-                    for ntype in sg.ntypes
-                }
 
-                embed = self.model(sg, sg_feat, embed=True, **kwargs)
-                for ntype, emb in embed.items():
-                    sg.nodes[ntype].data["emb"] = emb.data
+                for sg_ntype in sg.ntypes:
+                    sg_feat = feat[sg_ntype][sg.ndata[NID][sg_ntype].long()]
+                    train_mask = [
+                        sg_ntype in inverse_indices
+                        and node_id in inverse_indices[sg_ntype]
+                        for node_id in sg.nodes(sg_ntype)
+                    ]
 
-                homo_graph = to_homogeneous(sg, ndata=["emb"])
-                homo_embed = homo_graph.ndata["emb"]
+                    sg.nodes[sg_ntype].data["feat"] = sg_feat
+                    sg.nodes[sg_ntype].data["train"] = torch.tensor(train_mask)
 
-                col, row = homo_graph.edges()
-                col_emb = homo_embed[col.long()]
-                row_emb = homo_embed[row.long()]
-                self_emb = homo_embed[inverse_indices[target_ntype][0]].repeat(
-                    sg.num_edges(), 1
-                )
+                embed = self.model(sg, sg.ndata["feat"], embed=True, **kwargs)
+                for ntype in embed.keys():
+                    sg.nodes[ntype].data["emb"] = embed[ntype].data
+
+                homo_sg = to_homogeneous(sg, ndata=["emb"])
+                homo_sg_embed = homo_sg.ndata["emb"]
+
+                col, row = homo_sg.edges()
+                col_emb = homo_sg_embed[col.long()]
+                row_emb = homo_sg_embed[row.long()]
+                self_emb = homo_sg_embed[
+                    inverse_indices[target_ntype][0]
+                ].repeat(sg.num_edges(), 1)
                 emb = torch.cat([col_emb, row_emb, self_emb], dim=-1)
                 batched_embed.append(emb)
-                batched_graph.append(sg)
-                batched_feats.append(homo_graph.ndata[NID])
-                # node id's of subgraph mapped to batch:
-                # https://docs.dgl.ai/en/latest/generated/dgl.batch.html#dgl.batch
-                batched_inverse_indices.append(
-                    inverse_indices[target_ntype][0].item() + node_idx
-                )
-                node_idx += sg.num_nodes()
+                batched_homo_graph.append(homo_sg)
+                batched_hetero_graph.append(sg)
 
-        batched_graph = batch(batched_graph)
-        batched_feats = torch.cat(batched_feats)
+        batched_homo_graph = batch(batched_homo_graph)
+        batched_hetero_graph = batch(batched_hetero_graph)
+
         batched_embed = torch.cat(batched_embed)
-
         batched_embed = self.elayers(batched_embed)
         values = batched_embed.reshape(-1)
 
         values = self.concrete_sample(values, beta=tmp, training=training)
         self.sparse_mask_values = values
 
-        col, row = batched_graph.edges()
-        reverse_eids = batched_graph.edge_ids(row, col).long()
+        col, row = batched_homo_graph.edges()
+        reverse_eids = batched_homo_graph.edge_ids(row, col).long()
         edge_mask = (values + values[reverse_eids]) / 2
 
-        self.set_masks(batched_graph, edge_mask)
+        self.set_masks(batched_homo_graph, edge_mask)
 
         # convert the edge mask back into heterogeneous format
-        hetero_edge_mask = {
-            etype: edge_mask[
-                (homo_graph.edata[ETYPE] == graph.get_etype_id(etype))
-                .nonzero()
-                .squeeze(1)
-            ]
-            for etype in graph.canonical_etypes
-        }
+        hetero_edge_mask = self._mask_to_hetero(
+            edge_mask=edge_mask,
+            homograph=batched_homo_graph,
+            heterograph=batched_hetero_graph,
+        )
 
+        batched_feats = {
+            ntype: batched_hetero_graph.nodes[ntype].data["feat"]
+            for ntype in batched_hetero_graph.ntypes
+        }
         # the model prediction with the updated edge mask
         logits = self.model(
-            batched_graph, batched_feats, edge_weight=hetero_edge_mask, **kwargs
+            batched_hetero_graph,
+            batched_feats,
+            edge_weight=hetero_edge_mask,
+            **kwargs,
         )
-        probs = F.softmax(logits, dim=-1)
+        probs = {
+            ntype: F.softmax(logits[ntype], dim=-1) for ntype in logits.keys()
+        }
 
         if training:
+            probs = {ntype: probs[ntype].data for ntype in probs.keys()}
             self.batched_feats = batched_feats
-            probs = probs.data
+            self.batched_graph = batched_hetero_graph
+            self.batched_inverse_indices = {
+                ntype: batched_hetero_graph.nodes[ntype]
+                .data["train"]
+                .nonzero()
+                .squeeze(1)
+                for ntype in batched_hetero_graph.ntypes
+            }
         else:
             self.clear_masks()
 
-        return (
-            probs.data,
-            hetero_edge_mask,
-            batched_graph,
-            batched_inverse_indices,
-        )
+        return (probs, hetero_edge_mask)
+
+    def _mask_to_hetero(self, edge_mask, homograph, heterograph):
+        return {
+            etype: edge_mask[
+                (homograph.edata[ETYPE] == heterograph.get_etype_id(etype))
+                .nonzero()
+                .squeeze(1)
+            ]
+            for etype in heterograph.canonical_etypes
+        }
