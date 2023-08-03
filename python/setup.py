@@ -2,21 +2,13 @@
 # -*- coding: utf-8 -*-
 import glob
 import os
-import platform
 import shutil
 import sys
 import sysconfig
 
-from setuptools import find_packages
+from setuptools import find_packages, setup
 from setuptools.dist import Distribution
-
-# need to use distutils.core for correct placement of cython dll
-if "--inplace" in sys.argv:
-    from distutils.core import setup
-    from distutils.extension import Extension
-else:
-    from setuptools import setup
-    from setuptools.extension import Extension
+from setuptools.extension import Extension
 
 
 class BinaryDistribution(Distribution):
