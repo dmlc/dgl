@@ -2075,7 +2075,7 @@ class DGLGraph(object):
         srcnodes
         """
         if len(self.srctypes) == 1:
-            #ntype = self.srctypes[0]
+            # ntype = self.srctypes[0]
             ntype = self.srctypes
             ntid = [self.get_ntype_id_from_src(ntype[0])]
             # ntid = [self.get_ntype_id_from_src(ntype) for ntype in ntype]
