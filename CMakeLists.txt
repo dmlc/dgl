@@ -10,18 +10,8 @@ include(cmake/util/Util.cmake)
 include(cmake/util/MshadowUtil.cmake)
 include(cmake/util/FindCUDA.cmake)
 
-if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
-  include(${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
-else()
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
-  endif()
-endif()
-
 # NOTE: do not modify this file to change option values.
-# You can create a config.cmake at build folder
-# and add set(OPTION VALUE) to override these build options.
-# Alernatively, use cmake -DOPTION=VALUE through command-line.
+# Use bash script/build_dgl.sh -e '-DOPTION=VALUE' through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 dgl_option(USE_OPENMP "Build with OpenMP" ON)
 dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
@@ -86,7 +76,7 @@ if(MSVC)
 else(MSVC)
   include(CheckCXXCompilerFlag)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
   if(NOT APPLE)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
   endif(NOT APPLE)

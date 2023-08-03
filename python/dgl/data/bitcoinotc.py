@@ -119,17 +119,18 @@ class BitcoinOTCDataset(DGLBuiltinDataset):
             )
             self._graphs.append(g)
 
+    @property
+    def graph_path(self):
+        return os.path.join(self.save_path, "dgl_graph.bin")
+
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, "dgl_graph.bin")
-        return os.path.exists(graph_path)
+        return os.path.exists(self.graph_path)
 
     def save(self):
-        graph_path = os.path.join(self.save_path, "dgl_graph.bin")
-        save_graphs(graph_path, self.graphs)
+        save_graphs(self.graph_path, self.graphs)
 
     def load(self):
-        graph_path = os.path.join(self.save_path, "dgl_graph.bin")
-        self._graphs = load_graphs(graph_path)[0]
+        self._graphs = load_graphs(self.graph_path)[0]
 
     @property
     def graphs(self):
