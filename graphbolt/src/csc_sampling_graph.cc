@@ -131,66 +131,24 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
-NumPickFn NumPick(
+auto NumPick(
     int64_t fanout, bool replace,
     const torch::optional<torch::Tensor>& probs_or_mask) {
-  if (!probs_or_mask.has_value()) {
-    return [fanout, replace](int64_t offset, int64_t num_neighbors) {
-      int64_t max_count = fanout == -1 ? num_neighbors : fanout;
-      if (replace) {
-        return num_neighbors == 0 ? 0 : max_count;
-      } else {
-        return std::min(num_neighbors, max_count);
-      }
-    };
-  } else {
-    return [fanout, replace, probs_or_mask](
-               int64_t offset, int64_t num_neighbors) {
-      int64_t max_count = fanout == -1 ? num_neighbors : fanout;
-      int64_t nonzero_count = 0;
-      nonzero_count = torch::nonzero(probs_or_mask.value().slice(
-                                         0, offset, offset + num_neighbors))
-                          .size(0);
-      if (replace) {
-        return nonzero_count == 0 ? 0 : max_count;
-      } else {
-        return std::min(nonzero_count, max_count);
-      }
-    };
-  }
-}
-
-NumPickFn NumPickByEtype(
-    const std::vector<int64_t>& fanouts, bool replace,
-    const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask) {
-  return [replace, fanouts, probs_or_mask, &type_per_edge](
-             int64_t offset, int64_t num_neighbors) {
-    int64_t etype_begin = offset;
-    int64_t etype_end = offset;
-    const int64_t end = offset + num_neighbors;
-    int64_t total_count = 0;
-    AT_DISPATCH_INTEGRAL_TYPES(
-        type_per_edge.scalar_type(), "NumPickFnByEtype", ([&] {
-          const scalar_t* type_per_edge_data =
-              type_per_edge.data_ptr<scalar_t>();
-          while (etype_begin < end) {
-            scalar_t etype = type_per_edge_data[etype_begin];
-            TORCH_CHECK(
-                etype >= 0 && etype < (int64_t)fanouts.size(),
-                "Etype values exceed the number of fanouts.");
-            auto etype_end_it = std::upper_bound(
-                type_per_edge_data + etype_begin, type_per_edge_data + end,
-                etype);
-            etype_end = etype_end_it - type_per_edge_data;
-            // Do sampling for one etype.
-            total_count += NumPick(fanouts[etype], replace, probs_or_mask)(
-                etype_begin, etype_end - etype_begin);
-            etype_begin = etype_end;
-          }
-        }));
-    return total_count;
-  };
+  return
+      [fanout, replace, &probs_or_mask](int64_t offset, int64_t num_neighbors) {
+        int64_t actual_fanout = fanout == -1 ? num_neighbors : fanout;
+        int64_t max_count =
+            probs_or_mask.has_value()
+                ? torch::nonzero(probs_or_mask.value().slice(
+                                     0, offset, offset + num_neighbors))
+                      .size(0)
+                : num_neighbors;
+        if (replace) {
+          return max_count == 0 ? 0 : actual_fanout;
+        } else {
+          return std::min(max_count, actual_fanout);
+        }
+      };
 }
 
 /**
@@ -212,17 +170,44 @@ NumPickFn NumPickByEtype(
  * @return A lambda function which takes offset and num_neighbors as params and
  * returns the number of neighbors-to-be-sampled.
  */
-NumPickFn GetNumPickFn(
+template <bool ByEtype>
+auto GetNumPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask) {
   // If fanouts.size() > 1, count with sampling for each edge type of each node,
   // otherwise just sample once for each node with no regard of edge types.
-  if (fanouts.size() > 1)
-    return NumPickByEtype(
-        fanouts, replace, type_per_edge.value(), probs_or_mask);
-  else
+  if constexpr (ByEtype) {
+    return [replace, &fanouts, &probs_or_mask, &type_per_edge](
+               int64_t offset, int64_t num_neighbors) {
+      int64_t etype_begin = offset;
+      int64_t etype_end = offset;
+      const int64_t end = offset + num_neighbors;
+      int64_t total_count = 0;
+      AT_DISPATCH_INTEGRAL_TYPES(
+          type_per_edge.value().scalar_type(), "NumPickFnByEtype", ([&] {
+            const scalar_t* type_per_edge_data =
+                type_per_edge.value().data_ptr<scalar_t>();
+            while (etype_begin < end) {
+              scalar_t etype = type_per_edge_data[etype_begin];
+              TORCH_CHECK(
+                  etype >= 0 && etype < (int64_t)fanouts.size(),
+                  "Etype values exceed the number of fanouts.");
+              auto etype_end_it = std::upper_bound(
+                  type_per_edge_data + etype_begin, type_per_edge_data + end,
+                  etype);
+              etype_end = etype_end_it - type_per_edge_data;
+              // Do sampling for one etype.
+              total_count += NumPick(fanouts[etype], replace, probs_or_mask)(
+                  etype_begin, etype_end - etype_begin);
+              etype_begin = etype_end;
+            }
+          }));
+      return total_count;
+    };
+  } else {
     return NumPick(fanouts[0], replace, probs_or_mask);
+  }
 }
 
 /**
@@ -366,6 +351,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
     return SampleNeighborsImpl(
         nodes, return_eids,
+        GetNumPickFn<false>(fanouts, replace, type_per_edge_, probs_or_mask),
         GetPickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
             args));
@@ -373,6 +359,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl(
         nodes, return_eids,
+        GetNumPickFn<false>(fanouts, replace, type_per_edge_, probs_or_mask),
         GetPickFn(
             fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
             args));
