@@ -59,6 +59,11 @@ else()
       "dev" "test" "release"
   )
   dgl_feature_option(
+      BUILD_TORCH
+      "Build the PyTorch plugin"
+      "dev" "test" "release"
+  )
+  dgl_feature_option(
       USE_EPOLL
       "Build with epoll for socket communicator"
       "dev" "test" "release"
@@ -80,11 +85,6 @@ else()
       "dev" "test"
   )
 
-  dgl_feature_option(
-      BUILD_TORCH
-      "Build the PyTorch plugin"
-      "none"
-  )
   dgl_feature_option(
       LIBCXX_ENABLE_PARALLEL_ALGORITHMS
       "Enable the parallel algorithms library. This requires the PSTL to be available."
