@@ -49,9 +49,6 @@ IdType ConcurrentIdHashMap<IdType>::CompareAndSwap(
 }
 
 template <typename IdType>
-ConcurrentIdHashMap<IdType>::ConcurrentIdHashMap() : mask_(0) {}
-
-template <typename IdType>
 torch::Tensor ConcurrentIdHashMap<IdType>::Init(
     const torch::Tensor& ids, size_t num_seeds) {
   const IdType* ids_data = ids.data_ptr<IdType>();
