@@ -36,14 +36,14 @@ __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset"]
 @contextmanager
 def fix_dataset_dir(path):
     """Fix the dataset directory path."""
-    old_Pwd = os.getcwd()
+    old_pwd = os.getcwd()
     if not os.path.isdir(path):
         raise RuntimeError(f"The dataset must be a directory. But got {path}")
     os.chdir(path)
     try:
         yield
     finally:
-        os.chdir(old_Pwd)
+        os.chdir(old_pwd)
 
 
 def preprocess_ondisk_dataset(dataset_dir: str) -> str:
