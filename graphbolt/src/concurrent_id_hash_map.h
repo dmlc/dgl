@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file array/cpu/concurrent_id_hash_map.h
- * @brief Class about concurrent id hash map
+ * @file concurrent_id_hash_map.h
+ * @brief Class about concurrent id hash map.
  */
 
 #ifndef GRAPHBOLT_CONCURRENT_ID_HASH_MAP_H_
