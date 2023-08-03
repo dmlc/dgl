@@ -221,27 +221,31 @@ class SSTDataset(DGLBuiltinDataset):
         ret = from_networkx(g, node_attrs=["x", "y", "mask"])
         return ret
 
+    @property
+    def graph_path(self):
+        return os.path.join(self.save_path, self.mode + "_dgl_graph.bin")
+
+    @property
+    def vocab_path(self):
+        return os.path.join(self.save_path, "vocab.pkl")
+
     def has_cache(self):
-        graph_path = os.path.join(self.save_path, self.mode + "_dgl_graph.bin")
-        vocab_path = os.path.join(self.save_path, "vocab.pkl")
-        return os.path.exists(graph_path) and os.path.exists(vocab_path)
+        return os.path.exists(self.graph_path) and os.path.exists(
+            self.vocab_path
+        )
 
     def save(self):
-        graph_path = os.path.join(self.save_path, self.mode + "_dgl_graph.bin")
-        save_graphs(graph_path, self._trees)
-        vocab_path = os.path.join(self.save_path, "vocab.pkl")
-        save_info(vocab_path, {"vocab": self.vocab})
+        save_graphs(self.graph_path, self._trees)
+        save_info(self.vocab_path, {"vocab": self.vocab})
         if self.pretrained_emb:
             emb_path = os.path.join(self.save_path, "emb.pkl")
             save_info(emb_path, {"embed": self.pretrained_emb})
 
     def load(self):
-        graph_path = os.path.join(self.save_path, self.mode + "_dgl_graph.bin")
-        vocab_path = os.path.join(self.save_path, "vocab.pkl")
         emb_path = os.path.join(self.save_path, "emb.pkl")
 
-        self._trees = load_graphs(graph_path)[0]
-        self._vocab = load_info(vocab_path)["vocab"]
+        self._trees = load_graphs(self.graph_path)[0]
+        self._vocab = load_info(self.vocab_path)["vocab"]
         self._pretrained_emb = None
         if os.path.exists(emb_path):
             self._pretrained_emb = load_info(emb_path)["embed"]

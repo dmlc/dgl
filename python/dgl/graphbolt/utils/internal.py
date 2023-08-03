@@ -45,9 +45,3 @@ def save_data(data, path, fmt):
         np.save(path, data)
     elif fmt == "torch":
         torch.save(data, path)
-
-
-def tensor_to_tuple(data):
-    """Split a torch.Tensor in column-wise to a tuple."""
-    assert isinstance(data, torch.Tensor), "data must be a torch.Tensor"
-    return tuple(data.t())
