@@ -77,7 +77,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
 
         # Check if the metadata.yaml exists.
         if not os.path.exists("metadata.yaml"):
-            raise RuntimeError(f"metadata.yaml does not exist.")
+            raise RuntimeError("metadata.yaml does not exist.")
         with open("metadata.yaml", "r") as f:
             input_config = yaml.safe_load(f)
 
@@ -87,7 +87,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
 
         # 2. Load the edge data and create a DGLGraph.
         if "graph" not in input_config:
-            raise RuntimeError(f"Invalid config: does not contain graph field.")
+            raise RuntimeError("Invalid config: does not contain graph field.")
         is_homogeneous = "type" not in input_config["graph"]["nodes"][0]
         if is_homogeneous:
             # Homogeneous graph.
