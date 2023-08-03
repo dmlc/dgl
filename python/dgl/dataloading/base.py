@@ -314,58 +314,6 @@ def _find_exclude_eids(g, exclude_mode, eids, **kwargs):
         raise ValueError("unsupported mode {}".format(exclude_mode))
 
 
-class SpotTarget(object):
-    """Callable excluder object to exclude the edges by the degree threshold
-
-    Besides excluding all the edges or given edges in the edge sampler
-    ``dgl.dataloading.as_edge_prediction_sampler`` in link prediction training,
-    this excluder can extend the exclusion function by only excluding the edges incident
-    to low-degree nodes in the graph to bring the performance increase in training
-    link prediction model. This function will exclude the edge if incident to at least
-    one node with degree larger or equal to ``degree_threshold``. The performance
-    boost by excluding the target edges incident to low-degree nodes can be found
-    in this paper: https://arxiv.org/abs/2306.00899
-
-    Parameters
-    ----------
-    g : DGLGraph
-        The graph.
-    degree_threshold : int
-        The threshold of node degrees, if the source or target node of an edge incident to
-        has larger or equal degrees than ``degree_threshold``, this edge will be excluded from
-        the graph
-    Examples
-    --------
-    .. code:: python
-        low_degree_excluder = SpotTarget(g, degree_threshold=10)
-        sampler = as_edge_prediction_sampler(sampler, exclude=low_degree_excluder,
-        reverse_eids=reverse_eids, negative_sampler=negative_sampler.Uniform(1))
-    """
-
-    def __init__(self, g, degree_threshold=10):
-        self.g = g
-        self.degree_threshold = degree_threshold
-
-    def __call__(self, seed_edges, reverse_eids, reverse_etypes, output_device):
-        g = self.g
-        src, dst = g.find_edges(seed_edges)
-        head_degree = g.in_degrees(src)
-        tail_degree = g.in_degrees(dst)
-        import torch
-
-        degree = torch.min(head_degree, tail_degree)
-        degree_mask = degree < self.degree_threshold
-        edges_need_to_exclude = seed_edges[degree_mask]
-        return find_exclude_eids(
-            g,
-            edges_need_to_exclude,
-            "reverse_id",
-            reverse_eids,
-            reverse_etypes,
-            output_device,
-        )
-
-
 def find_exclude_eids(
     g,
     seed_edges,
@@ -380,7 +328,7 @@ def find_exclude_eids(
     ----------
     g : DGLGraph
         The graph.
-    exclude_mode : str, optional
+    exclude :
         Can be either of the following,
 
         None (default)
@@ -528,22 +476,14 @@ class EdgePredictionSampler(Sampler):
         pair_graph.edata[EID] = eids
         seed_nodes = pair_graph.ndata[NID]
 
-        if isinstance(exclude, SpotTarget) is True:
-            exclude_eids = exclude(
-                seed_edges,
-                self.reverse_eids,
-                self.reverse_etypes,
-                self.output_device,
-            )
-        else:
-            exclude_eids = find_exclude_eids(
-                g,
-                seed_edges,
-                exclude,
-                self.reverse_eids,
-                self.reverse_etypes,
-                self.output_device,
-            )
+        exclude_eids = find_exclude_eids(
+            g,
+            seed_edges,
+            exclude,
+            self.reverse_eids,
+            self.reverse_etypes,
+            self.output_device,
+        )
 
         input_nodes, _, blocks = self.sampler.sample(
             g, seed_nodes, exclude_eids
@@ -595,7 +535,7 @@ def as_edge_prediction_sampler(
         edge IDs to exclude from neighborhood.  The argument will be either a tensor
         for homogeneous graphs or a dict of edge types and tensors for heterogeneous
         graphs.
-    exclude : str, optional
+    exclude : Union[str, callable], optional
         Whether and how to exclude dependencies related to the sampled edges in the
         minibatch.  Possible values are
 

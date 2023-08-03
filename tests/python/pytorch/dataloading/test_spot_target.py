@@ -34,12 +34,14 @@ def test_spot_target_excludes(degree_threshold, batch_size):
     g, reverse_eids, seed_edges = _create_homogeneous()
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
     low_degree_excluder = dgl.dataloading.SpotTarget(
-        g, degree_threshold=degree_threshold
+        g,
+        exclude='reverse_id',
+        degree_threshold=degree_threshold,
+        reverse_eids=reverse_eids,
     )
     sampler = dgl.dataloading.as_edge_prediction_sampler(
         sampler,
         exclude=low_degree_excluder,
-        reverse_eids=reverse_eids,
         negative_sampler=dgl.dataloading.negative_sampler.Uniform(1),
     )
     dataloader = dgl.dataloading.DataLoader(
