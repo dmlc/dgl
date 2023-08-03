@@ -181,7 +181,7 @@ if __name__ == "__main__":
     evaluator = Evaluator("ogbg-molhiv")
     # laplacian positional encoding
     for g, _ in tqdm(dataset, desc="Computing Laplacian PE"):
-        g.ndata["PE"] = dgl.laplacian_pe(g, k=pos_enc_size, padding=True)
+        g.ndata["PE"] = dgl.lap_pe(g, k=pos_enc_size, padding=True)
 
     # Create model.
     out_size = dataset.num_tasks

@@ -8,6 +8,7 @@ import pydantic
 
 __all__ = [
     "OnDiskFeatureDataFormat",
+    "OnDiskTVTSetData",
     "OnDiskTVTSet",
     "OnDiskFeatureDataDomain",
     "OnDiskFeatureData",
@@ -24,13 +25,19 @@ class OnDiskFeatureDataFormat(str, Enum):
     NUMPY = "numpy"
 
 
+class OnDiskTVTSetData(pydantic.BaseModel):
+    """Train-Validation-Test set data."""
+
+    format: OnDiskFeatureDataFormat
+    in_memory: Optional[bool] = True
+    path: str
+
+
 class OnDiskTVTSet(pydantic.BaseModel):
     """Train-Validation-Test set."""
 
     type: Optional[str] = None
-    format: OnDiskFeatureDataFormat
-    in_memory: Optional[bool] = True
-    path: str
+    data: List[OnDiskTVTSetData]
 
 
 class OnDiskFeatureDataDomain(str, Enum):
@@ -76,6 +83,6 @@ class OnDiskMetaData(pydantic.BaseModel):
     num_labels: Optional[int] = None
     graph_topology: Optional[OnDiskGraphTopology] = None
     feature_data: Optional[List[OnDiskFeatureData]] = []
-    train_sets: Optional[List[List[OnDiskTVTSet]]] = []
-    validation_sets: Optional[List[List[OnDiskTVTSet]]] = []
-    test_sets: Optional[List[List[OnDiskTVTSet]]] = []
+    train_set: Optional[List[OnDiskTVTSet]] = []
+    validation_set: Optional[List[OnDiskTVTSet]] = []
+    test_set: Optional[List[OnDiskTVTSet]] = []
