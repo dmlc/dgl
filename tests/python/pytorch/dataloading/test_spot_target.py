@@ -35,7 +35,7 @@ def test_spot_target_excludes(degree_threshold, batch_size):
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
     low_degree_excluder = dgl.dataloading.SpotTarget(
         g,
-        exclude='reverse_id',
+        exclude="reverse_id",
         degree_threshold=degree_threshold,
         reverse_eids=reverse_eids,
     )
