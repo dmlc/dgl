@@ -86,7 +86,7 @@ class ConcurrentIdHashMap {
    */
   static IdType CompareAndSwap(IdType* ptr, IdType old_val, IdType new_val);
 
-  ConcurrentIdHashMap() : mask_(0){};
+  ConcurrentIdHashMap();
 
   ConcurrentIdHashMap(const ConcurrentIdHashMap& other) = delete;
   ConcurrentIdHashMap& operator=(const ConcurrentIdHashMap& other) = delete;
