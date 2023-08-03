@@ -2524,6 +2524,37 @@ def test_BiasedMHA(feat_size, num_heads, bias, attn_bias_type, attn_drop):
     assert out.shape == (16, 100, feat_size)
 
 
+@pytest.mark.parametrize("edge_update", [True, False])
+def test_EGTLayer(edge_update):
+    batch_size = 16
+    num_nodes = 100
+    feat_size, edge_feat_size = 128, 32
+    nfeat = th.rand(batch_size, num_nodes, feat_size)
+    efeat = th.rand(batch_size, num_nodes, num_nodes, edge_feat_size)
+    mask = (th.rand(batch_size, num_nodes, num_nodes) < 0.5) * -1e9
+
+    net = nn.EGTLayer(
+        feat_size=feat_size,
+        edge_feat_size=edge_feat_size,
+        num_heads=8,
+        num_virtual_nodes=4,
+        edge_update=edge_update,
+    )
+
+    if edge_update:
+        out_nfeat, out_efeat = net(nfeat, efeat, mask)
+        assert out_nfeat.shape == (batch_size, num_nodes, feat_size)
+        assert out_efeat.shape == (
+            batch_size,
+            num_nodes,
+            num_nodes,
+            edge_feat_size,
+        )
+    else:
+        out_nfeat = net(nfeat, efeat, mask)
+        assert out_nfeat.shape == (batch_size, num_nodes, feat_size)
+
+
 @pytest.mark.parametrize("attn_bias_type", ["add", "mul"])
 @pytest.mark.parametrize("norm_first", [True, False])
 def test_GraphormerLayer(attn_bias_type, norm_first):

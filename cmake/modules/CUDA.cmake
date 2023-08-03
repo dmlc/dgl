@@ -203,59 +203,6 @@ function(dgl_select_nvcc_arch_flags out_variable)
 endfunction()
 
 ################################################################################################
-# Short command for cuda compilation
-# Usage:
-#   dgl_cuda_compile(<objlist_variable> <cuda_files>)
-macro(dgl_cuda_compile objlist_variable)
-  foreach(var CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_DEBUG)
-    set(${var}_backup_in_cuda_compile_ "${${var}}")
-
-    # we remove /EHa as it generates warnings under windows
-    string(REPLACE "/EHa" "" ${var} "${${var}}")
-
-  endforeach()
-  if(UNIX OR APPLE)
-    list(APPEND CUDA_NVCC_FLAGS -Xcompiler -fPIC --std=c++14)
-  endif()
-
-  if(APPLE)
-    list(APPEND CUDA_NVCC_FLAGS -Xcompiler -Wno-unused-function)
-  endif()
-
-  set(CUDA_NVCC_FLAGS_DEBUG "${CUDA_NVCC_FLAGS_DEBUG} -G")
-
-  if(MSVC)
-    # disable noisy warnings:
-    # 4819: The file contains a character that cannot be represented in the current code page (number).
-    list(APPEND CUDA_NVCC_FLAGS -Xcompiler "/wd4819")
-    foreach(flag_var
-        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-        CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-      if(${flag_var} MATCHES "/MD")
-        string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-      endif(${flag_var} MATCHES "/MD")
-    endforeach(flag_var)
-  endif()
-
-  # If the build system is a container, make sure the nvcc intermediate files
-  # go into the build output area rather than in /tmp, which may run out of space
-  if(IS_CONTAINER_BUILD)
-    set(CUDA_NVCC_INTERMEDIATE_DIR "${CMAKE_CURRENT_BINARY_DIR}")
-    message(STATUS "Container build enabled, so nvcc intermediate files in: ${CUDA_NVCC_INTERMEDIATE_DIR}")
-    list(APPEND CUDA_NVCC_FLAGS "--keep --keep-dir ${CUDA_NVCC_INTERMEDIATE_DIR}")
-  endif()
-
-  cuda_compile(cuda_objcs ${ARGN})
-
-  foreach(var CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_DEBUG)
-    set(${var} "${${var}_backup_in_cuda_compile_}")
-    unset(${var}_backup_in_cuda_compile_)
-  endforeach()
-
-  set(${objlist_variable} ${cuda_objcs})
-endmacro()
-
-################################################################################################
 # Config cuda compilation.
 # Usage:
 #   dgl_config_cuda(<dgl_cuda_src>)
@@ -289,7 +236,7 @@ macro(dgl_config_cuda out_variable)
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 
   # 0. Add host flags
-  message(STATUS "${CMAKE_CXX_FLAGS}")
+  message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
   string(REGEX REPLACE "[ \t\n\r]" "," CXX_HOST_FLAGS "${CMAKE_CXX_FLAGS}")
   if(MSVC AND NOT USE_MSVC_MT)
     string(CONCAT CXX_HOST_FLAGS ${CXX_HOST_FLAGS} ",/MD")
@@ -301,16 +248,9 @@ macro(dgl_config_cuda out_variable)
   list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS_ARCH})
 
   # 2. flags in third_party/moderngpu
-  list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda;-Wno-deprecated-declarations")
+  list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda;-Wno-deprecated-declarations;-std=c++14")
 
-
-  # 3. CUDA 11 requires c++14 by default
-  include(CheckCXXCompilerFlag)
-  check_cxx_compiler_flag("-std=c++14"    SUPPORT_CXX14)
-  string(REPLACE "-std=c++11" "" CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}")
-  list(APPEND CUDA_NVCC_FLAGS "-std=c++14")
-
-  message(STATUS "CUDA flags: ${CUDA_NVCC_FLAGS}")
+  message(STATUS "CUDA_NVCC_FLAGS: ${CUDA_NVCC_FLAGS}")
 
   list(APPEND DGL_LINKER_LIBS
     ${CUDA_CUDART_LIBRARY}

@@ -30,6 +30,7 @@ def zerocopy_from_dlpack(dlpack_tensor):
 
 def data_type_dict():
     return {
+        "bfloat16": tf.bfloat16,
         "float16": tf.float16,
         "float32": tf.float32,
         "float64": tf.float64,
