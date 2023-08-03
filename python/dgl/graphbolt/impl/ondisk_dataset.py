@@ -34,7 +34,7 @@ __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset"]
 
 
 @contextmanager
-def fix_dataset_path(path):
+def fix_dataset_dir(path):
     oldPwd = os.getcwd()
     if not os.path.isdir(path):
         raise RuntimeError(f"The dataset must be a directory. But got {path}")
@@ -45,14 +45,14 @@ def fix_dataset_path(path):
         os.chdir(oldPwd)
 
 
-def preprocess_ondisk_dataset(dataset_path: str) -> str:
+def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
 
     Parameters
     ----------
-    input_config_path : str
-        The path to the input config file.
+    dataset_dir : str
+        The path to the dataset directory.
 
     Returns
     -------
@@ -60,15 +60,15 @@ def preprocess_ondisk_dataset(dataset_path: str) -> str:
         The path to the output config file.
     """
     # Check if the dataset path is valid.
-    if not os.path.exists(dataset_path):
-        raise RuntimeError(f"Invalid dataset path: {dataset_path}")
+    if not os.path.exists(dataset_dir):
+        raise RuntimeError(f"Invalid dataset path: {dataset_dir}")
 
-    # Fix all paths under dataset_path.
-    with fix_dataset_path(dataset_path):
+    # Fix all paths under dataset_dir.
+    with fix_dataset_dir(dataset_dir):
         # 0. Check if the dataset is already preprocessed.
         if os.path.exists("preprocessed/metadata.yaml"):
             print("The dataset is already preprocessed.")
-            return os.path.join(dataset_path, "preprocessed/metadata.yaml")
+            return os.path.join(dataset_dir, "preprocessed/metadata.yaml")
 
         print("Start to preprocess the on-disk dataset.")
         # Read the input config.
@@ -233,7 +233,7 @@ def preprocess_ondisk_dataset(dataset_path: str) -> str:
         print("Finish preprocessing the on-disk dataset.")
 
         # 9. Return the absolute path of the preprocessing yaml file.
-        return str(dataset_path / output_config_path)
+        return str(dataset_dir / output_config_path)
 
 
 class OnDiskDataset(Dataset):
