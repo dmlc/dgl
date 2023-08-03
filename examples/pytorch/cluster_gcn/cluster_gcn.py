@@ -59,7 +59,7 @@ dataloader = dgl.dataloading.DataLoader(
 )
 
 durations = []
-for _ in range(10):
+for epoch in range(10):
     t0 = time.time()
     model.train()
     for it, sg in enumerate(dataloader):
@@ -80,9 +80,10 @@ for _ in range(10):
             )
             mem = torch.cuda.max_memory_allocated() / 1000000
             print("Loss", loss.item(), "Acc", acc.item(), "GPU Mem", mem, "MB")
-    tt = time.time()
-    print(tt - t0)
-    durations.append(tt - t0)
+
+    tt = time.time() - t0
+    print("Run time for epoch# %d: %.2fs" % (epoch, tt))
+    durations.append(tt)
 
     model.eval()
     with torch.no_grad():
@@ -116,4 +117,7 @@ for _ in range(10):
         )
         print("Validation acc:", val_acc.item(), "Test acc:", test_acc.item())
 
-print(np.mean(durations[4:]), np.std(durations[4:]))
+print(
+    "Average run time for last %d epochs: %.2fs standard deviation: %.3f"
+    % ((epoch - 3), np.mean(durations[4:]), np.std(durations[4:]))
+)
