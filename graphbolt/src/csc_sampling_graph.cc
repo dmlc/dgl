@@ -133,8 +133,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 
 /**
  * @brief Get a lambda function which contains the sampling process. If
- * fanouts.size() == 1, use GetPickFn to sample once for each node with no
- * regard of edge types; otherwise use GetPickFnByEtype to perform sampling for
+ * ByEtype is true, use Pick() to sample once for each node with no
+ * regard of edge types; otherwise use PickByEtype() to perform sampling for
  * each edge type of each node.
  *
  * @param fanouts The number of edges to be sampled for each node with or
