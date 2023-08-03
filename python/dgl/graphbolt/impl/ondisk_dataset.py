@@ -45,7 +45,20 @@ def fix_dataset_path(path):
         os.chdir(oldPwd)
 
 
-def preprocess_ondisk_dataset(dataset_path: str):
+def preprocess_ondisk_dataset(dataset_path: str) -> str:
+    """Preprocess the on-disk dataset. Parse the input config file,
+    load the data, and save the data in the format that GraphBolt supports.
+
+    Parameters
+    ----------
+    input_config_path : str
+        The path to the input config file.
+
+    Returns
+    -------
+    output_config_path : str
+        The path to the output config file.
+    """
     # Check if the dataset path is valid.
     if not os.path.exists(dataset_path):
         raise RuntimeError(f"Invalid dataset path: {dataset_path}")
