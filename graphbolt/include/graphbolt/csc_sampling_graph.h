@@ -31,8 +31,6 @@ struct SamplerArgs<SamplerType::LABOR> {
   int64_t num_nodes;
 };
 
-using NumPickFn = std::function<int64_t(int64_t, int64_t)>;
-
 /**
  * @brief A sampling oriented csc format graph.
  *
@@ -224,7 +222,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const std::string& shared_memory_name);
 
  private:
-  template <typename PickFn>
+  template <typename NumPickFn, typename PickFn>
   c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
       PickFn pick_fn) const;
