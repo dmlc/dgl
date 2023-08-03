@@ -7,10 +7,11 @@
 #ifndef GRAPHBOLT_CONCURRENT_ID_HASH_MAP_H_
 #define GRAPHBOLT_CONCURRENT_ID_HASH_MAP_H_
 
+#include <torch/torch.h>
+
 #include <functional>
 #include <memory>
 #include <vector>
-#include <torch/torch.h>
 
 namespace graphbolt {
 namespace sampling {
@@ -85,7 +86,7 @@ class ConcurrentIdHashMap {
    */
   static IdType CompareAndSwap(IdType* ptr, IdType old_val, IdType new_val);
 
-  ConcurrentIdHashMap();
+  ConcurrentIdHashMap() : mask_(0){};
 
   ConcurrentIdHashMap(const ConcurrentIdHashMap& other) = delete;
   ConcurrentIdHashMap& operator=(const ConcurrentIdHashMap& other) = delete;
@@ -183,7 +184,7 @@ class ConcurrentIdHashMap {
 template <typename IdType>
 bool BoolCompareAndSwap(IdType* ptr);
 
-}  // namespace aten
-}  // namespace dgl
+}  // namespace sampling
+}  // namespace graphbolt
 
 #endif  // GRAPHBOLT_CONCURRENT_ID_HASH_MAP_H_

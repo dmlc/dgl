@@ -49,75 +49,76 @@ IdType ConcurrentIdHashMap<IdType>::CompareAndSwap(
 }
 
 template <typename IdType>
-ConcurrentIdHashMap<IdType>::ConcurrentIdHashMap() : mask_(0) {
-}
-
-template <typename IdType>
 torch::Tensor ConcurrentIdHashMap<IdType>::Init(
     const torch::Tensor& ids, size_t num_seeds) {
-    const IdType* ids_data = ids.data_ptr<IdType>();
-    const size_t num_ids = static_cast<size_t>(ids.size(0));
-    // Make sure `ids` is not 0 dim.
-    TORCH_CHECK(num_seeds > 0, "The number of seed nodes should be greater than 0.");
-    TORCH_CHECK(num_ids > num_seeds);
-    size_t capacity = GetMapSize(num_ids);
-    mask_ = static_cast<IdType>(capacity - 1);
+  const IdType* ids_data = ids.data_ptr<IdType>();
+  const size_t num_ids = static_cast<size_t>(ids.size(0));
+  // Make sure `ids` is not 0 dim.
+  TORCH_CHECK(
+      num_seeds > 0, "The number of seed nodes should be greater than 0.");
+  TORCH_CHECK(num_ids > num_seeds);
+  size_t capacity = GetMapSize(num_ids);
+  mask_ = static_cast<IdType>(capacity - 1);
 
-    hash_map_ =  torch::full({static_cast<int64_t>(capacity * 2)}, -1, ids.options());
+  hash_map_ =
+      torch::full({static_cast<int64_t>(capacity * 2)}, -1, ids.options());
 
-    // This code block is to fill the ids into hash_map_.
-    auto unique_ids = torch::empty_like(ids);
-    IdType* unique_ids_data = unique_ids.data_ptr<IdType>();
-    // Fill in the first `num_seeds` ids.
-    torch::parallel_for(0, num_seeds, kGrainSize, [&](int64_t s, int64_t e) {
-      for (int64_t i = s; i < e; i++) {
-        InsertAndSet(ids_data[i], static_cast<IdType>(i));
-      }
-    });
-    // Place the first `num_seeds` ids.
-    unique_ids.slice(0, 0, num_seeds) = ids.slice(0, 0, num_seeds);
+  // This code block is to fill the ids into hash_map_.
+  auto unique_ids = torch::empty_like(ids);
+  IdType* unique_ids_data = unique_ids.data_ptr<IdType>();
+  // Fill in the first `num_seeds` ids.
+  torch::parallel_for(0, num_seeds, kGrainSize, [&](int64_t s, int64_t e) {
+    for (int64_t i = s; i < e; i++) {
+      InsertAndSet(ids_data[i], static_cast<IdType>(i));
+    }
+  });
+  // Place the first `num_seeds` ids.
+  unique_ids.slice(0, 0, num_seeds) = ids.slice(0, 0, num_seeds);
 
-    // An auxiliary array indicates whether the corresponding elements
-    // are inserted into hash map or not. Use `int16_t` instead of `bool` as
-    // vector<bool> is unsafe when updating different elements from different
-    // threads. See https://en.cppreference.com/w/cpp/container#Thread_safety.
-    std::vector<int16_t> valid(num_ids);
-    
-    const int64_t num_threads = torch::get_num_threads();
-    std::vector<size_t> block_offset(num_threads + 1, 0);
-    // Insert all elements in this loop.
-    torch::parallel_for(num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
-      size_t count = 0;
-      for (int64_t i = s; i < e; i++) {
-        valid[i] = Insert(ids_data[i]);
-        count += valid[i];
-      }
-      auto thread_id = torch::get_thread_num();
-      block_offset[thread_id + 1] = count;
-    });
+  // An auxiliary array indicates whether the corresponding elements
+  // are inserted into hash map or not. Use `int16_t` instead of `bool` as
+  // vector<bool> is unsafe when updating different elements from different
+  // threads. See https://en.cppreference.com/w/cpp/container#Thread_safety.
+  std::vector<int16_t> valid(num_ids);
 
-    // Get ExclusiveSum of each block.
-    std::partial_sum(
-        block_offset.begin() + 1, block_offset.end(), block_offset.begin() + 1);
-    unique_ids = unique_ids.slice(0, 0, num_seeds + block_offset.back());
-
-    // Get unique array from ids and set value for hash map.
-    torch::parallel_for(num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
-      auto thread_id = torch::get_thread_num();
-      auto pos = block_offset[thread_id] + num_seeds;
-      for (int64_t i = s; i < e; i++) {
-        if (valid[i]) {
-          unique_ids_data[pos] = ids_data[i];
-          Set(ids_data[i], pos);
-          pos = pos + 1;
+  const int64_t num_threads = torch::get_num_threads();
+  std::vector<size_t> block_offset(num_threads + 1, 0);
+  // Insert all elements in this loop.
+  torch::parallel_for(
+      num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
+        size_t count = 0;
+        for (int64_t i = s; i < e; i++) {
+          valid[i] = Insert(ids_data[i]);
+          count += valid[i];
         }
-      }
-    });
-    return unique_ids;
+        auto thread_id = torch::get_thread_num();
+        block_offset[thread_id + 1] = count;
+      });
+
+  // Get ExclusiveSum of each block.
+  std::partial_sum(
+      block_offset.begin() + 1, block_offset.end(), block_offset.begin() + 1);
+  unique_ids = unique_ids.slice(0, 0, num_seeds + block_offset.back());
+
+  // Get unique array from ids and set value for hash map.
+  torch::parallel_for(
+      num_seeds, num_ids, kGrainSize, [&](int64_t s, int64_t e) {
+        auto thread_id = torch::get_thread_num();
+        auto pos = block_offset[thread_id] + num_seeds;
+        for (int64_t i = s; i < e; i++) {
+          if (valid[i]) {
+            unique_ids_data[pos] = ids_data[i];
+            Set(ids_data[i], pos);
+            pos = pos + 1;
+          }
+        }
+      });
+  return unique_ids;
 }
 
 template <typename IdType>
-torch::Tensor ConcurrentIdHashMap<IdType>::MapIds(const torch::Tensor& ids) const {
+torch::Tensor ConcurrentIdHashMap<IdType>::MapIds(
+    const torch::Tensor& ids) const {
   const IdType* ids_data = ids.data_ptr<IdType>();
 
   torch::Tensor new_ids = torch::empty_like(ids);
@@ -201,7 +202,8 @@ inline typename ConcurrentIdHashMap<IdType>::InsertState
 ConcurrentIdHashMap<IdType>::AttemptInsertAt(int64_t pos, IdType key) {
   IdType empty_key = static_cast<IdType>(kEmptyKey);
   IdType* hash_map_data = hash_map_.data_ptr<IdType>();
-  IdType old_val = CompareAndSwap(&(hash_map_data[getKeyIndex(pos)]), empty_key, key);
+  IdType old_val =
+      CompareAndSwap(&(hash_map_data[getKeyIndex(pos)]), empty_key, key);
   if (old_val == empty_key) {
     return InsertState::INSERTED;
   } else if (old_val == key) {
@@ -236,5 +238,5 @@ bool BoolCompareAndSwap(IdType* ptr) {
 template bool BoolCompareAndSwap<int32_t>(int32_t*);
 template bool BoolCompareAndSwap<int64_t>(int64_t*);
 
-}  // namespace aten
-}  // namespace dgl
+}  // namespace sampling
+}  // namespace graphbolt
