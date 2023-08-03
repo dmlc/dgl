@@ -42,16 +42,23 @@ def fix_dataset_path(path):
     finally:
         os.chdir(oldPwd)
 
-def preprocess_ondisk_dataset_(dataset_path: str):
+def preprocess_ondisk_dataset(dataset_path: str):
+    # Check if the dataset path is valid.
+    if not os.path.exists(dataset_path):
+        raise RuntimeError(f"Invalid dataset path: {dataset_path}")
     # Fix all paths under dataset_path.
     with fix_dataset_path(dataset_path):
         # 0. Check if the dataset is already preprocessed.
-        if os.path.exists("preprocessed/preprocessed_metadata.yaml"):
+        if os.path.exists("preprocessed/metadata.yaml"):
             print("The dataset is already preprocessed.")
-            return "preprocessed/preprocessed_metadata.yaml"
+            return "preprocessed/metadata.yaml"
         print("Start to preprocess the on-disk dataset.")
         # Read the input config.
         processed_dir_prefix = Path("preprocessed")
+
+        # Check if the metadata.yaml exists.        
+        if not os.path.exists("metadata.yaml"):
+            raise RuntimeError(f"metadata.yaml does not exist.")
         with open("metadata.yaml", "r") as f:
             input_config = yaml.safe_load(f)
 
@@ -199,15 +206,14 @@ def preprocess_ondisk_dataset_(dataset_path: str):
                         )
 
             # 8. Save the output_config.
-            output_config_path = processed_dir_prefix / "output_config.yaml"
+            output_config_path = processed_dir_prefix / "metadata.yaml"
             with open(output_config_path, "w") as f:
                 yaml.dump(output_config, f)
         print("Finish preprocessing the on-disk dataset.")
-        return str(dataset_path / output_config_path)
+    return str(dataset_path / output_config_path)
 
-    return 0
 
-def preprocess_ondisk_dataset(input_config_path: str):
+def preprocess_ondisk_dataset_(input_config_path: str):
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
 

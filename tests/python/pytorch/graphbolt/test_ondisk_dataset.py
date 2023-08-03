@@ -16,7 +16,8 @@ from dgl import graphbolt as gb
 def test_OnDiskDataset_TVTSet_exceptions():
     """Test excpetions thrown when parsing TVTSet."""
     with tempfile.TemporaryDirectory() as test_dir:
-        yaml_file = os.path.join(test_dir, "test.yaml")
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
 
         # Case 1: ``format`` is invalid.
         yaml_content = """
@@ -25,7 +26,7 @@ def test_OnDiskDataset_TVTSet_exceptions():
               format: torch_invalid
               path: set/paper-train.pt
         """
-        yaml_file = os.path.join(test_dir, "test.yaml")
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
         with pytest.raises(pydantic.ValidationError):
