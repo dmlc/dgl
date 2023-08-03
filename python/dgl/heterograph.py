@@ -129,7 +129,6 @@ class DGLGraph(object):
         self._canonical_etypes = None
         self._batch_num_nodes = None
         self._batch_num_edges = None
-
         # Handle node types
         if isinstance(ntypes, tuple):
             if len(ntypes) != 2:
@@ -2076,8 +2075,10 @@ class DGLGraph(object):
         srcnodes
         """
         if len(self.srctypes) == 1:
-            ntype = self.srctypes[0]
-            ntid = self.get_ntype_id_from_src(ntype)
+            #ntype = self.srctypes[0]
+            ntype = self.srctypes
+            ntid = [self.get_ntype_id_from_src(ntype[0])]
+            # ntid = [self.get_ntype_id_from_src(ntype) for ntype in ntype]
             return HeteroNodeDataView(self, ntype, ntid, ALL)
         else:
             ntypes = self.srctypes
