@@ -209,7 +209,7 @@ def preprocess_ondisk_dataset(dataset_path: str) -> str:
                                 os.path.dirname(output_data["path"]),
                                 exist_ok=True,
                             )
-                            shutil.copy(
+                            shutil.copyfile(
                                 input_data["path"],
                                 output_data["path"],
                             )
