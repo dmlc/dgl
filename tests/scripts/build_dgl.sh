@@ -11,7 +11,7 @@ fi
 CMAKE_VARS="-DBUILD_TYPE=test"
 
 if [[ $1 != "cpu" ]]; then
-    CMAKE_VARS="-DUSE_CUDA=ON $CMAKE_VARS"
+    CMAKE_VARS="$CMAKE_VARS -DUSE_CUDA=ON"
 fi
 
 # This is a semicolon-separated list of Python interpreters containing PyTorch.
