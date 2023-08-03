@@ -131,6 +131,30 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
+/**
+ * @brief Get a lambda function which contains the sampling process. If
+ * fanouts.size() == 1, use GetPickFn to sample once for each node with no
+ * regard of edge types; otherwise use GetPickFnByEtype to perform sampling for
+ * each edge type of each node.
+ *
+ * @param fanouts The number of edges to be sampled for each node with or
+ * without considering edge types.
+ * @param replace Boolean indicating whether the sample is performed with or
+ * without replacement. If True, a value can be selected multiple times.
+ * Otherwise, each value can be selected only once.
+ * @param options Tensor options specifying the desired data type of the result.
+ * @param type_per_edge A tensor representing the type of each edge, if
+ * present.
+ * @param probs_or_mask Optional tensor containing the (unnormalized)
+ * probabilities associated with each neighboring edge of a node in the original
+ * graph. It must be a 1D floating-point tensor with the number of elements
+ * equal to the number of edges in the graph.
+ * @param args Contains labor specific arguments.
+ *
+ * @return A lambda function: (int64_t offset, int64_t num_neighbors) ->
+ * torch::Tensor, which takes offset and num_neighbors as params and returns a
+ * tensor of picked neighbors.
+ */
 template <SamplerType S>
 auto GetPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
