@@ -328,7 +328,7 @@ def find_exclude_eids(
     ----------
     g : DGLGraph
         The graph.
-    exclude_mode : str, optional
+    exclude :
         Can be either of the following,
 
         None (default)
@@ -535,7 +535,7 @@ def as_edge_prediction_sampler(
         edge IDs to exclude from neighborhood.  The argument will be either a tensor
         for homogeneous graphs or a dict of edge types and tensors for heterogeneous
         graphs.
-    exclude : str, optional
+    exclude : Union[str, callable], optional
         Whether and how to exclude dependencies related to the sampled edges in the
         minibatch.  Possible values are
 
