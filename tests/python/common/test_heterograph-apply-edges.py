@@ -10,13 +10,13 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-import scipy.sparse as ssp
-from dgl import DGLError
-from scipy.sparse import rand
 import scipy.sparse as spsp
-from utils import get_cases, parametrize_idtype
+import scipy.sparse as ssp
 
 import torch
+from dgl import DGLError
+from scipy.sparse import rand
+from utils import get_cases, parametrize_idtype
 
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}
 fill_value = {"sum": 0, "max": float("-inf")}
@@ -283,7 +283,7 @@ def test_binary_op(idtype):
 @parametrize_idtype
 def test_unibipartite_heterograph_apply_edges():
     hg = create_random_hetero()
-    
+
     hg.nodes["n1"].data["h"] = torch.randn(
         (hg.num_nodes("n1"), 1), device=F.ctx()
     )
@@ -293,8 +293,8 @@ def test_unibipartite_heterograph_apply_edges():
     hg.nodes["n3"].data["h"] = torch.randn(
         (hg.num_nodes("n3"), 1), device=F.ctx()
     )
-    
-    assert type(hg.srcdata['h']) != dict
+
+    assert type(hg.srcdata["h"]) != dict
     hg.apply_edges(fn.u_add_v("h", "h", "x"))
 
 
