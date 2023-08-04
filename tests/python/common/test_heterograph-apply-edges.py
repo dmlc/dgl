@@ -52,11 +52,7 @@ def create_test_heterograph(idtype):
 
 def create_random_hetero():
     num_nodes = {"n1": 5, "n2": 10, "n3": 15}
-    etypes = [
-        ("n1", "r1", "n2"),
-        ("n1", "r2", "n3"),
-        ("n1", "r3", "n2")
-    ]
+    etypes = [("n1", "r1", "n2"), ("n1", "r2", "n3"), ("n1", "r3", "n2")]
     edges = {}
     for etype in etypes:
         src_ntype, _, dst_ntype = etype
@@ -296,7 +292,7 @@ def test_unibipartite_heterograph_apply_edges():
     hg.nodes['n3'].data['h'] = torch.randn(
         (hg.num_nodes("n3"), 1), device=F.ctx()
     )
-    assert(type(hg.srcdata['h']) != dict)
+    assert type(hg.srcdata['h']) != dict
     hg.apply_edges(fn.u_add_v("h", "h", "x"))
 
 
