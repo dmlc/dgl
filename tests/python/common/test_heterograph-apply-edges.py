@@ -63,7 +63,7 @@ def create_random_hetero(idtype):
             random_state=100,
         )
         edges[etype] = (arr.row, arr.col)
-    return dgl.heterograph(edges, idtype=idtype)
+    return dgl.heterograph(edges, idtype=idtype, device=F.ctx())
 
 
 @parametrize_idtype
@@ -283,9 +283,9 @@ def test_binary_op(idtype):
 def test_unibipartite_heterograph_apply_edges(idtype):
     hg = create_random_hetero(idtype)
 
-    hg.nodes["n1"].data["h"] = F.randn((hg.num_nodes("n1"), 1), device=F.ctx())
-    hg.nodes["n2"].data["h"] = F.randn((hg.num_nodes("n2"), 1), device=F.ctx())
-    hg.nodes["n3"].data["h"] = F.randn((hg.num_nodes("n3"), 1), device=F.ctx())
+    hg.nodes["n1"].data["h"] = F.randn((hg.num_nodes("n1"), 1))
+    hg.nodes["n2"].data["h"] = F.randn((hg.num_nodes("n2"), 1))
+    hg.nodes["n3"].data["h"] = F.randn((hg.num_nodes("n3"), 1))
 
     assert type(hg.srcdata["h"]) != dict
     hg.apply_edges(fn.u_add_v("h", "h", "x"))
