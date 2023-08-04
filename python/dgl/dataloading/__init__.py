@@ -9,5 +9,6 @@ from .neighbor_sampler import *
 from .shadow import *
 
 if F.get_preferred_backend() == "pytorch":
+    from .spot_target import *
     from .dataloader import *
     from .dist_dataloader import *
