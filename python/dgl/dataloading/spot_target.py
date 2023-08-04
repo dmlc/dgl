@@ -53,7 +53,6 @@ class SpotTarget(object):
     Examples
     --------
     .. code:: python
-
        low_degree_excluder = SpotTarget(g, degree_threshold=10)
        sampler = as_edge_prediction_sampler(sampler, exclude=low_degree_excluder,
        reverse_eids=reverse_eids, negative_sampler=negative_sampler.Uniform(1))
