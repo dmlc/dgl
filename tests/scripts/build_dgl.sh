@@ -45,8 +45,8 @@ if [[ $1 == "cugraph" ]]; then
     pip uninstall -y dgl
     # test install
     python3 setup.py install
-    # test build (for cython)
-    python3 setup.py build_ext
+    # test inplace build (for cython)
+    python3 setup.py build_ext --inplace
 else
     for backend in pytorch mxnet tensorflow
     do
@@ -55,8 +55,8 @@ else
     pip uninstall -y dgl
     # test install
     python3 setup.py install
-    # test build (for cython)
-    python3 setup.py build_ext
+    # test inplace build (for cython)
+    python3 setup.py build_ext --inplace
     done
 fi
 popd
