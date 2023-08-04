@@ -202,7 +202,7 @@ If you are working on performance critical part, you may want to turn on Cython 
 .. code-block:: bash
 
    cd python
-   python setup.py build_ext
+   python setup.py build_ext --inplace
 
 You could test the build by running the following command and see the path of your local clone.
 
