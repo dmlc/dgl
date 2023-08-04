@@ -222,12 +222,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const std::string& shared_memory_name);
 
  private:
-  template <SamplerType S>
+  template <typename PickFn>
   c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
-      const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool return_eids,
-      const torch::optional<torch::Tensor>& probs_or_mask,
-      SamplerArgs<S> args) const;
+      const torch::Tensor& nodes, bool return_eids, PickFn pick_fn) const;
 
   /**
    * @brief Build a CSCSamplingGraph from shared memory tensors.
@@ -328,6 +325,20 @@ torch::Tensor Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args);
+
+template <>
+torch::Tensor Pick<SamplerType::NEIGHBOR>(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    SamplerArgs<SamplerType::NEIGHBOR> args);
+
+template <>
+torch::Tensor Pick<SamplerType::LABOR>(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    SamplerArgs<SamplerType::LABOR> args);
 
 /**
  * @brief Picks a specified number of neighbors for a node per edge type,
