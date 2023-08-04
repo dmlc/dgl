@@ -1,5 +1,4 @@
-""" SpotTarget: Target edge excluder for link prediction, 
-see details here:  https://arxiv.org/abs/2306.00899"""
+"""SpotTarget: Target edge excluder for link prediction"""
 import torch
 
 from .base import find_exclude_eids
