@@ -4,6 +4,7 @@ import dgl
 import numpy as np
 from utils import parametrize_idtype
 
+
 def create_graph(idtype, num_node):
     g = dgl.graph([])
     g = g.astype(idtype).to(F.ctx())
