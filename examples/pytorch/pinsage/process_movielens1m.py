@@ -113,38 +113,23 @@ if __name__ == "__main__":
 
     # Assign features.
     # Note that variable-sized features such as texts or images are handled elsewhere.
-    g.nodes["user"].data["gender"] = torch.LongTensor(
-        users["gender"].cat.codes.values
-    )
-    g.nodes["user"].data["age"] = torch.LongTensor(
-        users["age"].cat.codes.values
-    )
-    g.nodes["user"].data["occupation"] = torch.LongTensor(
-        users["occupation"].cat.codes.values
-    )
-    g.nodes["user"].data["zip"] = torch.LongTensor(
-        users["zip"].cat.codes.values
-    )
+    for data_type in ["gender", "age", "occupation", "zip"]:
+        g.nodes["user"].data[data_type] = torch.LongTensor(
+            np.array(users[data_type].cat.codes.values)
+        )
 
     g.nodes["movie"].data["year"] = torch.LongTensor(
-        movies["year"].cat.codes.values
+        np.array(movies["year"].cat.codes.values)
     )
     g.nodes["movie"].data["genre"] = torch.FloatTensor(
-        movies[genre_columns].values
+        np.array(movies[genre_columns].values)
     )
 
-    g.edges["watched"].data["rating"] = torch.LongTensor(
-        ratings["rating"].values
-    )
-    g.edges["watched"].data["timestamp"] = torch.LongTensor(
-        ratings["timestamp"].values
-    )
-    g.edges["watched-by"].data["rating"] = torch.LongTensor(
-        ratings["rating"].values
-    )
-    g.edges["watched-by"].data["timestamp"] = torch.LongTensor(
-        ratings["timestamp"].values
-    )
+    for edge_type in ["watched", "watched-by"]:
+        for data_type in ["rating", "timestamp"]:
+            g.edges[edge_type].data[data_type] = torch.LongTensor(
+                np.array(ratings[data_type].values)
+            )
 
     # Train-validation-test split
     # This is a little bit tricky as we want to select the last interaction for test, and the
