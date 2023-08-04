@@ -287,9 +287,15 @@ def test_binary_op(idtype):
 @parametrize_idtype
 def test_unibipartite_heterograph_apply_edges():
     hg = create_random_hetero()
-    hg.nodes['n1'].data['h'] = torch.randn((hg.num_nodes("n1"), 1), device="cpu")
-    hg.nodes['n2'].data['h'] = torch.randn((hg.num_nodes("n2"), 1), device="cpu")
-    hg.nodes['n3'].data['h'] = torch.randn((hg.num_nodes("n3"), 1), device="cpu")
+    hg.nodes['n1'].data['h'] = torch.randn(
+        (hg.num_nodes("n1"), 1), device=F.ctx()
+    )
+    hg.nodes['n2'].data['h'] = torch.randn(
+        (hg.num_nodes("n2"), 1), device=F.ctx()
+    )
+    hg.nodes['n3'].data['h'] = torch.randn(
+        (hg.num_nodes("n3"), 1), device=F.ctx()
+    )
     assert(type(hg.srcdata['h']) != dict)
     hg.apply_edges(fn.u_add_v("h", "h", "x"))
 
