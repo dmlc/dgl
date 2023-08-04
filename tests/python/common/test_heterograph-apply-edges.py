@@ -279,6 +279,9 @@ def test_binary_op(idtype):
             _test(lhs, rhs, binary_op)
 
 
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="Only support PyTorch for now"
+)
 @parametrize_idtype
 def test_unibipartite_heterograph_apply_edges(idtype):
     hg = create_random_hetero(idtype)
