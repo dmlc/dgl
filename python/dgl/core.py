@@ -231,7 +231,10 @@ def data_dict_to_list(graph, data_dict, func, target):
             for srctype, _, dsttype in graph.canonical_etypes:
                 if target == "u":
                     src_id = graph.get_ntype_id(srctype)
-                    output_list[src_id] = data_dict[srctype]
+                    if isinstance(data_dict, dict):
+                        output_list[src_id] = data_dict[srctype]
+                    else:
+                        output_list[src_id] = data_dict
                 else:
                     dst_id = graph.get_ntype_id(dsttype)
                     output_list[dst_id] = data_dict[dsttype]

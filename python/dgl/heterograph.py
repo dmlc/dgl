@@ -2075,10 +2075,8 @@ class DGLGraph(object):
         srcnodes
         """
         if len(self.srctypes) == 1:
-            # ntype = self.srctypes[0]
-            ntype = self.srctypes
-            ntid = [self.get_ntype_id_from_src(ntype[0])]
-            # ntid = [self.get_ntype_id_from_src(ntype) for ntype in ntype]
+            ntype = self.srctypes[0]
+            ntid = self.get_ntype_id_from_src(ntype)
             return HeteroNodeDataView(self, ntype, ntid, ALL)
         else:
             ntypes = self.srctypes
@@ -4332,6 +4330,8 @@ class DGLGraph(object):
         data : dict of tensor
             Node representation.
         """
+        if isinstance(ntid, list) and len(ntid) == 1:
+            ntid = ntid[0]
         if is_all(u):
             num_nodes = self._graph.num_nodes(ntid)
         else:
