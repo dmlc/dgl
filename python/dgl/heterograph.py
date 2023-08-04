@@ -129,6 +129,7 @@ class DGLGraph(object):
         self._canonical_etypes = None
         self._batch_num_nodes = None
         self._batch_num_edges = None
+        
         # Handle node types
         if isinstance(ntypes, tuple):
             if len(ntypes) != 2:
@@ -4330,8 +4331,6 @@ class DGLGraph(object):
         data : dict of tensor
             Node representation.
         """
-        if isinstance(ntid, list) and len(ntid) == 1:
-            ntid = ntid[0]
         if is_all(u):
             num_nodes = self._graph.num_nodes(ntid)
         else:
