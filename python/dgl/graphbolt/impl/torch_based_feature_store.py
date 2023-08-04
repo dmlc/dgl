@@ -148,6 +148,7 @@ class TorchBasedFeatureStore(FeatureStore):
         ... ]
         >>> feature_sotre = gb.TorchBasedFeatureStore(feat_data)
         """
+        super().__init__()
         self._features = {}
         for spec in feat_data:
             key = (spec.domain, spec.type, spec.name)
