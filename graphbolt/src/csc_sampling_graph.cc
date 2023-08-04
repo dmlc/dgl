@@ -146,7 +146,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
- * @param args Contains labor specific arguments.
+ * @param args Contains sampling algorithm specific arguments.
  *
  * @return A lambda function: (int64_t offset, int64_t num_neighbors) ->
  * torch::Tensor, which takes offset and num_neighbors as params and returns a
