@@ -129,7 +129,7 @@ class DGLGraph(object):
         self._canonical_etypes = None
         self._batch_num_nodes = None
         self._batch_num_edges = None
-        
+
         # Handle node types
         if isinstance(ntypes, tuple):
             if len(ntypes) != 2:
