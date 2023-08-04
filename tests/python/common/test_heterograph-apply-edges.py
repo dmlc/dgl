@@ -13,7 +13,10 @@ import pytest
 import scipy.sparse as ssp
 from dgl import DGLError
 from scipy.sparse import rand
+import scipy.sparse as spsp
 from utils import get_cases, parametrize_idtype
+
+import torch
 
 rfuncs = {"sum": fn.sum, "max": fn.max, "min": fn.min, "mean": fn.mean}
 fill_value = {"sum": 0, "max": float("-inf")}
@@ -45,6 +48,27 @@ def create_test_heterograph(idtype):
     assert g.idtype == idtype
     assert g.device == F.ctx()
     return g
+
+
+def create_random_hetero():
+    num_nodes = {"n1": 5, "n2": 10, "n3": 15}
+    etypes = [
+        ("n1", "r1", "n2"),
+        ("n1", "r2", "n3"),
+        ("n1", "r3", "n2")
+    ]
+    edges = {}
+    for etype in etypes:
+        src_ntype, _, dst_ntype = etype
+        arr = spsp.random(
+            num_nodes[src_ntype],
+            num_nodes[dst_ntype],
+            density=1,
+            format="coo",
+            random_state=100,
+        )
+        edges[etype] = (arr.row, arr.col)
+    return dgl.heterograph(edges)
 
 
 @parametrize_idtype
@@ -258,6 +282,16 @@ def test_binary_op(idtype):
         for binary_op in ["add", "sub", "mul", "div", "dot"]:
             print(lhs, rhs, binary_op)
             _test(lhs, rhs, binary_op)
+
+
+@parametrize_idtype
+def test_unibipartite_heterograph_apply_edges():
+    hg = create_random_hetero()
+    hg.nodes['n1'].data['h'] = torch.randn((hg.num_nodes("n1"), 1), device="cpu")
+    hg.nodes['n2'].data['h'] = torch.randn((hg.num_nodes("n2"), 1), device="cpu")
+    hg.nodes['n3'].data['h'] = torch.randn((hg.num_nodes("n3"), 1), device="cpu")
+    assert(type(hg.srcdata['h']) != dict)
+    hg.apply_edges(fn.u_add_v("h", "h", "x"))
 
 
 if __name__ == "__main__":
