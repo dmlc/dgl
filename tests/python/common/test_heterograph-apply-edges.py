@@ -13,7 +13,6 @@ import pytest
 import scipy.sparse as spsp
 import scipy.sparse as ssp
 
-import torch
 from dgl import DGLError
 from scipy.sparse import rand
 from utils import get_cases, parametrize_idtype
@@ -284,13 +283,13 @@ def test_binary_op(idtype):
 def test_unibipartite_heterograph_apply_edges(idtype):
     hg = create_random_hetero(idtype)
 
-    hg.nodes["n1"].data["h"] = torch.randn(
+    hg.nodes["n1"].data["h"] = F.randn(
         (hg.num_nodes("n1"), 1), device=F.ctx()
     )
-    hg.nodes["n2"].data["h"] = torch.randn(
+    hg.nodes["n2"].data["h"] = F.randn(
         (hg.num_nodes("n2"), 1), device=F.ctx()
     )
-    hg.nodes["n3"].data["h"] = torch.randn(
+    hg.nodes["n3"].data["h"] = F.randn(
         (hg.num_nodes("n3"), 1), device=F.ctx()
     )
 
