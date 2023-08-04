@@ -11,16 +11,22 @@ class FeatureStore:
     def __init__(self):
         pass
 
-    def read(self, domain: str, type: str, name: str, ids: torch.Tensor = None):
+    def read(
+        self,
+        domain: str,
+        type_name: str,
+        feature_name: str,
+        ids: torch.Tensor = None,
+    ):
         """Read from the feature store.
 
         Parameters
         ----------
         domain : str
             The domain of the feature. Either "node" or "edge".
-        type : str
+        type_name : str
             The node or edge type name.
-        name : str
+        feature_name : str
             The feature name.
         ids : torch.Tensor, optional
             The index of the feature. If specified, only the specified indices
@@ -36,8 +42,8 @@ class FeatureStore:
     def update(
         self,
         domain: str,
-        type: str,
-        name: str,
+        type_name: str,
+        feature_name: str,
         value: torch.Tensor,
         ids: torch.Tensor = None,
     ):
@@ -47,9 +53,9 @@ class FeatureStore:
         ----------
         domain : str
             The domain of the feature. Either "node" or "edge".
-        type : str
+        type_name : str
             The node or edge type name.
-        name : str
+        feature_name : str
             The feature name.
         value : torch.Tensor
             The updated value of the feature.

@@ -165,16 +165,22 @@ class TorchBasedFeatureStore(FeatureStore):
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")
 
-    def read(self, domain: str, type: str, name: str, ids: torch.Tensor = None):
+    def read(
+        self,
+        domain: str,
+        type_name: str,
+        feature_name: str,
+        ids: torch.Tensor = None,
+    ):
         """Read from the feature store.
 
         Parameters
         ----------
         domain : str
             The domain of the feature. Either "node" or "edge".
-        type : str
+        type_name : str
             The node or edge type name.
-        name : str
+        feature_name : str
             The feature name.
         ids : torch.Tensor, optional
             The index of the feature. If specified, only the specified indices
@@ -185,13 +191,13 @@ class TorchBasedFeatureStore(FeatureStore):
         torch.Tensor
             The read feature.
         """
-        return self._features[(domain, type, name)].read(ids)
+        return self._features[(domain, type_name, feature_name)].read(ids)
 
     def update(
         self,
         domain: str,
-        type: str,
-        name: str,
+        type_name: str,
+        feature_name: str,
         value: torch.Tensor,
         ids: torch.Tensor = None,
     ):
@@ -201,9 +207,9 @@ class TorchBasedFeatureStore(FeatureStore):
         ----------
         domain : str
             The domain of the feature. Either "node" or "edge".
-        type : str
+        type_name : str
             The node or edge type name.
-        name : str
+        feature_name : str
             The feature name.
         value : torch.Tensor
             The updated value of the feature.
@@ -214,7 +220,7 @@ class TorchBasedFeatureStore(FeatureStore):
             must have the same length. If None, the entire feature will be
             updated.
         """
-        self._features[(domain, type, name)].update(value, ids)
+        self._features[(domain, type_name, feature_name)].update(value, ids)
 
     def __len__(self):
         """Return the number of features."""
