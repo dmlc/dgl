@@ -228,16 +228,20 @@ def data_dict_to_list(graph, data_dict, func, target):
     if isinstance(func, fn.BinaryMessageFunction):
         if target in ["u", "v"]:
             output_list = [None] * graph._graph.number_of_ntypes()
-            for srctype, _, dsttype in graph.canonical_etypes:
+            if not isinstance(data_dict, dict):
+                src_id, dst_id = graph._graph.metagraph.find_edge(0)
                 if target == "u":
-                    src_id = graph.get_ntype_id(srctype)
-                    if isinstance(data_dict, dict):
+                    output_list[src_id] = data_dict
+                else:
+                    output_list[dst_id] = data_dict
+            else:
+                for srctype, _, dsttype in graph.canonical_etypes:
+                    if target == "u":
+                        src_id = graph.get_ntype_id(srctype)
                         output_list[src_id] = data_dict[srctype]
                     else:
-                        output_list[src_id] = data_dict
-                else:
-                    dst_id = graph.get_ntype_id(dsttype)
-                    output_list[dst_id] = data_dict[dsttype]
+                        dst_id = graph.get_ntype_id(dsttype)
+                        output_list[dst_id] = data_dict[dsttype]
         else:  # target == 'e'
             output_list = [None] * graph._graph.number_of_etypes()
             for rel in graph.canonical_etypes:
