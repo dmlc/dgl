@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 
 import gb_test_utils as gbt
@@ -1041,7 +1042,8 @@ def test_OnDiskDataset_preprocess_path():
         # Case1. Test the passed in is the yaml file path.
         with pytest.raises(
             RuntimeError,
-            match=rf"The dataset must be a directory. But got {yaml_file}",
+            match="The dataset must be a directory. "
+            rf"But got {re.escape(yaml_file)}",
         ):
             _ = gb.OnDiskDataset(yaml_file)
 
@@ -1049,7 +1051,7 @@ def test_OnDiskDataset_preprocess_path():
         fake_dir = os.path.join(test_dir, "fake_dir")
         with pytest.raises(
             RuntimeError,
-            match=rf"Invalid dataset path: {fake_dir}",
+            match=rf"Invalid dataset path: {re.escape(fake_dir)}",
         ):
             _ = gb.OnDiskDataset(fake_dir)
 
