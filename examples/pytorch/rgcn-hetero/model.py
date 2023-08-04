@@ -423,17 +423,18 @@ class EntityClassify(nn.Module):
                 num_workers=num_workers,
             )
 
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                block = blocks[0].to(device)
+            with dataloader.enable_cpu_affinity():
+                for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+                    block = blocks[0].to(device)
 
-                h = {
-                    k: x[k][input_nodes[k]].to(device)
-                    for k in input_nodes.keys()
-                }
-                h = layer(block, h)
+                    h = {
+                        k: x[k][input_nodes[k]].to(device)
+                        for k in input_nodes.keys()
+                    }
+                    h = layer(block, h)
 
-                for k in output_nodes.keys():
-                    y[k][output_nodes[k]] = h[k].cpu()
+                    for k in output_nodes.keys():
+                        y[k][output_nodes[k]] = h[k].cpu()
 
             x = y
         return y
