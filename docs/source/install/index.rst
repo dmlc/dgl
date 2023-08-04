@@ -104,7 +104,7 @@ Finally, install the Python binding.
    cd python
    python setup.py install
    # Build Cython extension
-   python setup.py build_ext
+   python setup.py build_ext --inplace
 
 macOS
 `````
@@ -139,7 +139,7 @@ install the Python binding for DGL.
    cd ../python
    python setup.py install
    # Build Cython extension
-   python setup.py build_ext
+   python setup.py build_ext --inplace
 
 Windows
 ```````
