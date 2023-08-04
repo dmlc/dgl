@@ -11,11 +11,17 @@ class FeatureStore:
     def __init__(self):
         pass
 
-    def read(self, ids: torch.Tensor = None):
+    def read(self, domain: str, type: str, name: str, ids: torch.Tensor = None):
         """Read from the feature store.
 
         Parameters
         ----------
+        domain : str
+            The domain of the feature. Either "node" or "edge".
+        type : str
+            The node or edge type name.
+        name : str
+            The feature name.
         ids : torch.Tensor, optional
             The index of the feature. If specified, only the specified indices
             of the feature are read. If None, the entire feature is returned.
@@ -27,11 +33,24 @@ class FeatureStore:
         """
         raise NotImplementedError
 
-    def update(self, value: torch.Tensor, ids: torch.Tensor = None):
+    def update(
+        self,
+        domain: str,
+        type: str,
+        name: str,
+        value: torch.Tensor,
+        ids: torch.Tensor = None,
+    ):
         """Update the feature store.
 
         Parameters
         ----------
+        domain : str
+            The domain of the feature. Either "node" or "edge".
+        type : str
+            The node or edge type name.
+        name : str
+            The feature name.
         value : torch.Tensor
             The updated value of the feature.
         ids : torch.Tensor, optional

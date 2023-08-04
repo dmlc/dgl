@@ -52,7 +52,7 @@ class Dataset:
         raise NotImplementedError
 
     @property
-    def feature(self) -> Dict[object, FeatureStore]:
+    def feature(self) -> FeatureStore:
         """Return the feature."""
         raise NotImplementedError
 
