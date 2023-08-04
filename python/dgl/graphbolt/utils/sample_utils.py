@@ -11,7 +11,7 @@ def unique_and_compact_node_pairs(
         Tuple[torch.Tensor, torch.Tensor],
         Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
     ],
-    dst_nodes=None,
+    unique_dst_nodes=None,
 ):
     """
     Compact node pairs and return unique nodes (per type).
@@ -53,43 +53,54 @@ def unique_and_compact_node_pairs(
     {('n1', 'e1', 'n2'): (tensor([0, 1, 1]), tensor([0, 1, 0])),
     ('n2', 'e2', 'n1'): (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
-    is_homogeneous = not isinstance(node_pairs, Dict)
+    is_homogeneous = not isinstance(node_pairs, dict)
+
     if is_homogeneous:
         node_pairs = {("_N", "_E", "_N"): node_pairs}
+
+    # Find all destination nodes.
     dst_nodes = defaultdict(list)
-    num_seeds = defaultdict(int)
-    if dst_nodes is None:
-        # Find all nodes that appeared as destinations.
-        for etype, node_pair in node_pairs.items():
-            dst_nodes[etype[2]].append(node_pair[1])
-        dst_nodes = {
-            ntype: torch.unique(torch.cat(values, 0))
-            for ntype, values in dst_nodes.items()
-        }
-        num_seeds = {
-            ntype: nodes.size(0)
+    for etype, (src_node, dst_node) in node_pairs.items():
+        dst_nodes[etype[2]].append(dst_node)
+
+    # Compute unique destination nodes if not provided.
+    if unique_dst_nodes is None:
+        unique_dst_nodes = {
+            ntype: torch.unique(torch.cat(nodes))
             for ntype, nodes in dst_nodes.items()
         }
-    all_nodes = defaultdict(list)
-    all_nodes = {
-        ntype: [nodes]
-        for ntype, nodes in dst_nodes.items()
-    }
-    # Colllect all nodes that appeared as sources.
-    for etype, node_pair in node_pairs.items():
-        all_nodes[etype[0]].append(node_pair[0])
-    all_nodes = {
-        ntype: torch.cat(values, 0)
-        for ntype, values in all_nodes.items()
-    }
-    
-    unique_nodes = {}
-    compacted_node_pairs = {}
-    for ntype, nodes in all_nodes.items():
-        unique_nodes, compacted_node_pairs =torch.ops.graphbolt.unique_and_compact(node_pairs, seed_nodes)
 
-    # Return singleton for homogeneous graph.
+    # Collect all source nodes.
+    src_nodes = defaultdict(list)
+    for etype, (src_node, dst_node) in node_pairs.items():
+        src_nodes[etype[0]].append(src_node)
+
+    ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
+
+    unique_nodes = {}
+    compacted_src = defaultdict(list)
+    compacted_dst = defaultdict(list)
+    for ntype in ntypes:
+        src, dst = src_nodes[ntype], dst_nodes[ntype]
+        # When 'unique_dst_nodes' is empty, 'dst' must also be empty and 'src' must have value.
+        dtype = src[0].dtype if src else dst[0].dtype
+        unique_dst = unique_dst_nodes.get(ntype, torch.tensor([], dtype=dtype))
+        (
+            unique_nodes[ntype],
+            compacted_src[ntype],
+            compacted_dst[ntype],
+        ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
+
+    compacted_node_pairs = {}
+    # Map back with the same order.
+    for etype, _ in node_pairs.items():
+        u_type, _, v_type = etype
+        u, v = compacted_src[u_type].pop(0), compacted_dst[v_type].pop(0)
+        compacted_node_pairs[etype] = (u, v)
+
+    # Return singleton for a homogeneous graph.
     if is_homogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
         unique_nodes = list(unique_nodes.values())[0]
+
     return unique_nodes, compacted_node_pairs

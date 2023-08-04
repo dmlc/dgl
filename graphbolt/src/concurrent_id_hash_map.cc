@@ -56,10 +56,6 @@ torch::Tensor ConcurrentIdHashMap<IdType>::Init(
     const torch::Tensor& ids, size_t num_seeds) {
   const IdType* ids_data = ids.data_ptr<IdType>();
   const size_t num_ids = static_cast<size_t>(ids.size(0));
-  // Make sure `ids` is not 0 dim.
-  TORCH_CHECK(
-      num_seeds > 0, "The number of seed nodes should be greater than 0.");
-  TORCH_CHECK(num_ids > num_seeds);
   size_t capacity = GetMapSize(num_ids);
   mask_ = static_cast<IdType>(capacity - 1);
 
