@@ -81,13 +81,10 @@ def prepare_data(args, device):
     # Apply transformation to the graph.
     # - "ToSimple()" removes multi-edge between two nodes.
     # - "AddReverse()" adds reverse edges to the graph.
-    # This could help model learn more information from the graph.
     transform = Compose([ToSimple(), AddReverse()])
     g = transform(g)
 
     print(f"Loaded graph: {g}")
-
-    logger = Logger(args.runs)
 
     # Initialize a train sampler that samples neighbors for multi-layer graph
     # convolution. It samples 25 and 20 neighbors for the first and second
@@ -104,7 +101,7 @@ def prepare_data(args, device):
         device=device,
     )
 
-    return g, labels, dataset.num_classes, split_idx, logger, train_loader
+    return g, labels, dataset.num_classes, split_idx, train_loader
 
 
 def extract_embed(node_embed, input_nodes):
@@ -125,8 +122,8 @@ def rel_graph_embed(graph, embed_size):
     (HIGHLIGHT)
     A HeteroEmbedding instance holds separate embedding layers for each node
     type, each with its own feature space of dimensionality
-    (node_num[i], embed_size), where 'node_num[i]' is the number of nodes of
-    type 'ntype' and 'embed_size' is the embedding dimension.
+    (node_num[ntype], embed_size), where 'node_num[ntype]' is the number of
+    nodes of type 'ntype' and 'embed_size' is the embedding dimension.
 
     The "paper" node type is specifically excluded, possibly because these nodes
     might already have predefined feature representations, and therefore, do not
@@ -151,8 +148,7 @@ def rel_graph_embed(graph, embed_size):
         if ntype == "paper":
             continue
         node_num[ntype] = graph.num_nodes(ntype)
-    embeds = HeteroEmbedding(node_num, embed_size)
-    return embeds
+    return HeteroEmbedding(node_num, embed_size)
 
 
 class RelGraphConvLayer(nn.Module):
@@ -365,7 +361,7 @@ class Logger(object):
 
             best_result = th.tensor(best_results)
 
-            print(f"All runs:")
+            print("All runs:")
             r = best_result[:, 0]
             print(f"Highest Train: {r.mean():.2f} ± {r.std():.2f}")
             r = best_result[:, 1]
@@ -393,14 +389,13 @@ def train(
 
     for epoch in range(3):
         num_train = split_idx["train"][category].shape[0]
-        # Initialize a progress bar for visual feedback.
-        pbar = tqdm(total=num_train)
-        pbar.set_description(f"Epoch {epoch:02d}")
         model.train()
 
         total_loss = 0
 
-        for input_nodes, seeds, blocks in train_loader:
+        for input_nodes, seeds, blocks in tqdm(
+            train_loader, desc=f"Epoch {epoch:02d}"
+        ):
             # Move the input data onto the device.
             blocks = [blk.to(device) for blk in blocks]
             # We only predict the nodes with type "category".
@@ -431,9 +426,7 @@ def train(
             optimizer.step()
 
             total_loss += loss.item() * batch_size
-            pbar.update(batch_size)
 
-        pbar.close()
         loss = total_loss / num_train
 
         # Evaluate the model on the test set.
@@ -482,18 +475,13 @@ def test(g, model, node_embed, y_true, device, split_idx):
         device=device,
     )
 
-    # Initialize a progress bar for visual feedback.
-    pbar = tqdm(total=y_true.size(0))
-    pbar.set_description(f"Inference")
-
     # To store the predictions.
     y_hats = list()
 
-    for input_nodes, seeds, blocks in loader:
+    for input_nodes, seeds, blocks in tqdm(loader, desc="Inference"):
         blocks = [blk.to(device) for blk in blocks]
         # We only predict the nodes with type "category".
         seeds = seeds[category]
-        batch_size = seeds.shape[0]
         input_nodes_indexes = input_nodes[category].to(g.device)
 
         # Extract node embeddings for the input nodes.
@@ -509,10 +497,6 @@ def test(g, model, node_embed, y_true, device, split_idx):
         # argmax.
         y_hat = logits.log_softmax(dim=-1).argmax(dim=1, keepdims=True)
         y_hats.append(y_hat.cpu())
-
-        pbar.update(batch_size)
-
-    pbar.close()
 
     y_pred = th.cat(y_hats, dim=0)
     y_true = th.unsqueeze(y_true, 1)
@@ -541,18 +525,14 @@ def test(g, model, node_embed, y_true, device, split_idx):
     return train_acc, valid_acc, test_acc
 
 
-def is_support_affinity():
-    # dgl supports enable_cpu_affinity since 0.9.1.
-    return dgl.__version__ >= "0.9.1"
-
-
 def main(args):
-    device = f"cuda:0" if th.cuda.is_available() else "cpu"
+    device = "cuda:0" if th.cuda.is_available() else "cpu"
+
+    # Initialize a logger.
+    logger = Logger(args.runs)
 
     # Prepare the data.
-    g, labels, num_classes, split_idx, logger, train_loader = prepare_data(
-        args, device
-    )
+    g, labels, num_classes, split_idx, train_loader = prepare_data(args, device)
 
     # Create the embedding layer and move it to the appropriate device.
     embed_layer = rel_graph_embed(g, 128).to(device)
@@ -596,48 +576,29 @@ def main(args):
         )
         optimizer = th.optim.Adam(all_params, lr=0.01)
 
-        # If CPU affinity is supported and the device is CPU, execute training
-        # with CPU affinity enabled.
-        if args.num_workers != 0 and device == "cpu" and is_support_affinity():
-            # `expected_max`` is the number of physical cores on your machine.
-            # The `logical` parameter, when set to False, ensures that the count
-            # returned is the number of physical cores instead of logical cores
-            # (which could be higher due to technologies like Hyper-Threading).
-            expected_max = int(psutil.cpu_count(logical=False))
-            if args.num_workers >= expected_max:
-                print(
-                    "[ERROR] You specified num_workers are larger than physical"
-                    f"cores, please set any number less than {expected_max}",
-                    file=sys.stderr,
-                )
-            with train_loader.enable_cpu_affinity():
-                logger = train(
-                    g,
-                    model,
-                    embed_layer,
-                    optimizer,
-                    train_loader,
-                    split_idx,
-                    labels,
-                    logger,
-                    device,
-                    run,
-                )
-        else:
-            # If CPU affinity is not supported or the device is GPU, execute
-            # normal training.
-            logger = train(
-                g,
-                model,
-                embed_layer,
-                optimizer,
-                train_loader,
-                split_idx,
-                labels,
-                logger,
-                device,
-                run,
+        # `expected_max`` is the number of physical cores on your machine.
+        # The `logical` parameter, when set to False, ensures that the count
+        # returned is the number of physical cores instead of logical cores
+        # (which could be higher due to technologies like Hyper-Threading).
+        expected_max = int(psutil.cpu_count(logical=False))
+        if args.num_workers >= expected_max:
+            print(
+                "[ERROR] You specified num_workers are larger than physical"
+                f"cores, please set any number less than {expected_max}",
+                file=sys.stderr,
             )
+        logger = train(
+            g,
+            model,
+            embed_layer,
+            optimizer,
+            train_loader,
+            split_idx,
+            labels,
+            logger,
+            device,
+            run,
+        )
         logger.print_statistics(run)
 
     print("Final performance: ")
