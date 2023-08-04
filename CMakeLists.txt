@@ -47,33 +47,33 @@ else()
       python3
   )
 
-  # Options for building DGL features.
+  # Options for building DGL features, supported: "none", "dev", "test", "release", "all".
   # NOTE: do not modify this file to change option values.
   # Use bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' through command-line.
   dgl_feature_option(
       BUILD_SPARSE
       "Build DGL sparse library"
-      "dev" "test" "release"
+      "all"
   )
   dgl_feature_option(
       BUILD_TORCH
       "Build the PyTorch plugin"
-      "dev" "test" "release"
+      "all"
   )
   dgl_feature_option(
       USE_EPOLL
       "Build with epoll for socket communicator"
-      "dev" "test" "release"
+      "all"
   )
   dgl_feature_option(
       USE_LIBXSMM
       "Build with LIBXSMM library optimization"
-      "dev" "test" "release"
+      "all"
   )
   dgl_feature_option(
       USE_OPENMP
       "Build with OpenMP"
-      "dev" "test" "release"
+      "all"
   )
 
   dgl_feature_option(
