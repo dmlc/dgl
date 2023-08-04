@@ -50,7 +50,7 @@ def create_test_heterograph(idtype):
     return g
 
 
-def create_random_hetero():
+def create_random_hetero(idtype):
     num_nodes = {"n1": 5, "n2": 10, "n3": 15}
     etypes = [("n1", "r1", "n2"), ("n1", "r2", "n3"), ("n1", "r3", "n2")]
     edges = {}
@@ -64,7 +64,7 @@ def create_random_hetero():
             random_state=100,
         )
         edges[etype] = (arr.row, arr.col)
-    return dgl.heterograph(edges)
+    return dgl.heterograph(edges, idtype=idtype)
 
 
 @parametrize_idtype
@@ -281,8 +281,8 @@ def test_binary_op(idtype):
 
 
 @parametrize_idtype
-def test_unibipartite_heterograph_apply_edges():
-    hg = create_random_hetero()
+def test_unibipartite_heterograph_apply_edges(idtype):
+    hg = create_random_hetero(idtype)
 
     hg.nodes["n1"].data["h"] = torch.randn(
         (hg.num_nodes("n1"), 1), device=F.ctx()
