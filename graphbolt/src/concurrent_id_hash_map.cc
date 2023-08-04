@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file array/cpu/concurrent_id_hash_map.cc
- * @brief Class about id hash map
+ * @file concurrent_id_hash_map.cc
+ * @brief Class about id hash map.
  */
 
 #include "concurrent_id_hash_map.h"
