@@ -2,7 +2,9 @@ Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
 ============
 
 - Paper link: [https://arxiv.org/abs/2210.13339](https://arxiv.org/abs/2210.13339)
-This is the official Labor sampling example to reproduce the results in the original paper.
+This is the official Labor sampling example to reproduce the results in the original
+paper with the GraphSAGE GNN model. The model can be changed to any other model where
+NeighborSampler can be used.
 
 Requirements
 ------------
