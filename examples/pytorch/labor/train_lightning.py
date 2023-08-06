@@ -373,8 +373,10 @@ class BatchSizeCallback(Callback):
             trainer.datamodule.batch_size = int(
                 trainer.datamodule.batch_size * self.limit / self.m
             )
-            trainer.reset_train_dataloader()
-            trainer.reset_val_dataloader()
+            loop = trainer._active_loop
+            assert loop is not None
+            loop._combined_loader = None
+            loop.setup_data()
             self.clear()
 
 

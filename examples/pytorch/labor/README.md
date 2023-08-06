@@ -10,7 +10,7 @@ Requirements
 ------------
 
 ```bash
-pip install requests pytorch-lightning==2.0.6 ogb
+pip install requests lightning==2.0.6 ogb
 ```
 
 How to run
@@ -31,6 +31,11 @@ Test Accuracy: 0.797
 
 Any integer passed as the `--importance-sampling=i` argument runs the corresponding
 LABOR-i variant. `--importance-sampling=-1` runs the LABOR-* variant.
+
+`--vertex-limit` argument is used if a vertex sampling budget is needed. It adjusts
+the batch size at the end of every epoch so that the average number of sampled vertices
+converges to the provided vertex limit. Can be used to replicate the vertex sampling
+budget experiments in the Labor paper.
 
 During training runs, statistics about number of sampled vertices, edges,
 cache miss rates will be reported. One can use tensorboard to look at their plots
