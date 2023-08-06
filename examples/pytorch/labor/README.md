@@ -27,6 +27,9 @@ Results:
 Test Accuracy: 0.797
 ```
 
+Any integer passed as the `--importance-sampling=i` argument runs the corresponding
+LABOR-i variant. `--importance-sampling=-1` runs the LABOR-* variant.
+
 During training runs, statistics about number of sampled vertices, edges,
 cache miss rates will be reported. One can use tensorboard to look at their plots
 during/after training:

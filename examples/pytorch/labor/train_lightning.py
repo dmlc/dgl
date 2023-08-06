@@ -411,7 +411,7 @@ if __name__ == "__main__":
         "be undesired if they cannot fit in GPU memory at once. "
         "This flag disables that.",
     )
-    argparser.add_argument("--sampler", type=str, default="labor")
+    argparser.add_argument("--sampler", type=str, default="labor", choices=["neighbor", "labor", "ladies", "poisson-ladies"])
     argparser.add_argument("--importance-sampling", type=int, default=0)
     argparser.add_argument("--layer-dependency", action="store_true")
     argparser.add_argument("--batch-dependency", type=int, default=1)
