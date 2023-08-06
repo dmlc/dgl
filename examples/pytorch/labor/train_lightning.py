@@ -307,17 +307,17 @@ class DataModule(LightningDataModule):
 
     def val_dataloader(self):
         return dgl.dataloading.DataLoader(
-                self.g,
-                self.val_nid,
-                self.sampler,
-                device=self.device,
-                use_uva=self.use_uva,
-                batch_size=self.batch_size,
-                shuffle=False,
-                drop_last=False,
-                num_workers=self.num_workers,
-                gpu_cache=self.gpu_cache_arg,
-            )
+            self.g,
+            self.val_nid,
+            self.sampler,
+            device=self.device,
+            use_uva=self.use_uva,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_workers,
+            gpu_cache=self.gpu_cache_arg,
+        )
 
 
 class BatchSizeCallback(Callback):
@@ -511,8 +511,17 @@ if __name__ == "__main__":
     with th.no_grad():
         graph = datamodule.g
         test_idx = datamodule.test_nid
-        pred = model.module.inference(graph, f"cuda:{args.gpu}" if args.gpu != -1 else "cpu", 4096, args.num_workers, graph.device)
-        for nid, split_name in zip([datamodule.train_nid, datamodule.val_nid, datamodule.test_nid], ["Train", "Validation", "Test"]):
+        pred = model.module.inference(
+            graph,
+            f"cuda:{args.gpu}" if args.gpu != -1 else "cpu",
+            4096,
+            args.num_workers,
+            graph.device,
+        )
+        for nid, split_name in zip(
+            [datamodule.train_nid, datamodule.val_nid, datamodule.test_nid],
+            ["Train", "Validation", "Test"],
+        ):
             pred_nid = pred[nid]
             label = graph.ndata["labels"][nid]
             f1score = model.f1score_class().to(pred.device)

@@ -1,5 +1,3 @@
-import tqdm
-
 import dgl
 import dgl.nn as dglnn
 import sklearn.linear_model as lm
@@ -7,6 +5,8 @@ import sklearn.metrics as skm
 import torch as th
 import torch.functional as F
 import torch.nn as nn
+import tqdm
+
 
 class SAGE(nn.Module):
     def __init__(
@@ -67,7 +67,7 @@ class SAGE(nn.Module):
         )
         if buffer_device is None:
             buffer_device = device
-        
+
         self.train(False)
 
         for l, layer in enumerate(self.layers):
