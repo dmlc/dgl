@@ -190,7 +190,6 @@ def run(args, device, data):
             avg += toc - tic
         if epoch % args.eval_every == 0 and epoch != 0:
             ############# Validation ################
-
             valid_pred = []
             valid_labels = []
             with th.no_grad():
@@ -215,17 +214,27 @@ def run(args, device, data):
 
     ############# Test ################
     # Change the dataloader to the test set.
-    validation_minibatch_sampler = gb.MinibatchSampler(
-        test_set, batch_size=args.batch_size
+    test_minibatch_sampler = gb.MinibatchSampler(
+        test_set,
+        batch_size=args.batch_size,
+        shuffle=False,
     )
-    validation_subgraph_sampler.datapipe = validation_minibatch_sampler
+    test_subgraph_sampler = gb.SubgraphSampler(
+        test_minibatch_sampler,
+        sampler_func,
+    )
+    test_feature_fetcher = gb.FeatureFetcher(test_subgraph_sampler, fetch_func)
+    test_device_transfer = gb.CopyTo(test_feature_fetcher, th.device("cpu"))
+    test_dataloader = gb.MultiProcessDataLoader(
+        test_device_transfer, num_workers=args.num_workers
+    )
 
     test_pred = []
     test_labels = []
     with th.no_grad():
         model.eval()
         for step, (input_features, batch_labels, blocks) in tqdm.tqdm(
-            enumerate(validation_dataloader), desc="Test"
+            enumerate(test_dataloader), desc="Test"
         ):
             batch_pred = model(blocks, input_features)
             test_pred.append(batch_pred)
