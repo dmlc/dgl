@@ -1,3 +1,4 @@
+# NOTE: __dgl_option will not reset existing variables.
 macro(__dgl_option variable description value)
   if(NOT DEFINED ${variable})
     set(${variable} ${value} CACHE STRING ${description})
@@ -21,6 +22,7 @@ macro(dgl_feature_option variable description)
   if(${BUILD_TYPE} IN_LIST __value)
     __dgl_option(${variable} "${description}" ON)
   else()
+    # NOTE: __dgl_option will not reset existing variables.
     __dgl_option(${variable} "${description}" OFF)
   endif()
 endmacro()
