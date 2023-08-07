@@ -329,18 +329,20 @@ void Pick(
     torch::Tensor& picked_tensor, int64_t picked_offset, int64_t picked_count);
 
 template <>
-torch::Tensor Pick<SamplerType::NEIGHBOR>(
+void Pick<SamplerType::NEIGHBOR>(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::NEIGHBOR> args);
+    SamplerArgs<SamplerType::NEIGHBOR> args, torch::Tensor& picked_tensor,
+    int64_t picked_offset, int64_t picked_count);
 
 template <>
-torch::Tensor Pick<SamplerType::LABOR>(
+void Pick<SamplerType::LABOR>(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args);
+    SamplerArgs<SamplerType::LABOR> args, torch::Tensor& picked_tensor,
+    int64_t picked_offset, int64_t picked_count);
 
 /**
  * @brief Picks a specified number of neighbors for a node per edge type,
@@ -375,8 +377,7 @@ void PickByEtype(
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
-    torch::Tensor& picked_tensor, int64_t picked_offset,
-    const torch::Tensor& picked_counts);
+    torch::Tensor& picked_tensor, int64_t picked_offset, int64_t picked_counts);
 
 template <bool NonUniform, bool Replace, typename T = float>
 void LaborPick(

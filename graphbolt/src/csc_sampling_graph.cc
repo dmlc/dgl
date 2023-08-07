@@ -234,9 +234,10 @@ auto GetNumPickFn(
  * equal to the number of edges in the graph.
  * @param args Contains sampling algorithm specific arguments.
  *
- * @return A lambda function: (int64_t offset, int64_t num_neighbors) ->
- * torch::Tensor, which takes offset and num_neighbors as params and returns a
- * tensor of picked neighbors.
+ * @return A lambda function: (int64_t offset, int64_t num_neighbors,
+ * torch::Tensor picked_tensor, int64_t picked_offset, int64_t picked_count) ->
+ * torch::Tensor, which takes offset and num_neighbors of a node and puts the
+ * picked neighbors in the picked_tensor with picked_offset.
  */
 template <SamplerType S>
 auto GetPickFn(
@@ -244,20 +245,24 @@ auto GetPickFn(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
-  return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
-             int64_t offset, int64_t num_neighbors) {
-    // If fanouts.size() > 1, perform sampling for each edge type of each node;
-    // otherwise just sample once for each node with no regard of edge types.
-    if (fanouts.size() > 1) {
-      return PickByEtype(
-          offset, num_neighbors, fanouts, replace, options,
-          type_per_edge.value(), probs_or_mask, args);
-    } else {
-      return Pick(
-          offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
-          args);
-    }
-  };
+  return
+      [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
+          int64_t offset, int64_t num_neighbors, torch::Tensor& picked_tensor,
+          int64_t picked_offset, int64_t picked_count) {
+        // If fanouts.size() > 1, perform sampling for each edge type of each
+        // node; otherwise just sample once for each node with no regard of edge
+        // types.
+        if (fanouts.size() > 1) {
+          return PickByEtype(
+              offset, num_neighbors, fanouts, replace, options,
+              type_per_edge.value(), probs_or_mask, args, picked_tensor,
+              picked_offset, picked_count);
+        } else {
+          return Pick(
+              offset, num_neighbors, fanouts[0], replace, options,
+              probs_or_mask, args, picked_tensor, picked_offset, picked_count);
+        }
+      };
 }
 
 template <typename NumPickFn, typename PickFn>
@@ -302,6 +307,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                   continue;
                 }
 
+                // Pre-allocate tensors for each node. This is temporary as the
+                // main process hasn't been rewritten.
                 int64_t allocate_size = num_pick_fn(offset, num_neighbors);
                 picked_neighbors_cur_thread[i - begin] =
                     torch::empty({allocate_size}, indptr_options);
@@ -436,6 +443,12 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
+ * @param picked_tensor The tensor storing the picked neighbors.
+ * @param picked_offset The starting position offset for results in the
+ * picked_tensor.
+ * @param picked_count The length of the tensor reserved for results. Hence, the
+ * picked neighbors should be placed in picked_tensor[picked_offset :
+ * picked_offset + picked_count].
  *
  * @return A tensor containing the picked neighbors.
  */
@@ -571,6 +584,12 @@ inline void UniformPick(
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
+ * @param picked_tensor The tensor storing the picked neighbors.
+ * @param picked_offset The starting position offset for results in the
+ * picked_tensor.
+ * @param picked_count The length of the tensor reserved for results. Hence, the
+ * picked neighbors should be placed in picked_tensor[picked_offset :
+ * picked_offset + picked_count].
  *
  * @return A tensor containing the picked neighbors.
  */
@@ -637,13 +656,13 @@ void PickByEtype(
               etype >= 0 && etype < (int64_t)fanouts.size(),
               "Etype values exceed the number of fanouts.");
           int64_t fanout = fanouts[etype];
-          int64_t picked_count = picked_counts[etype].item<int64_t>();
           auto etype_end_it = std::upper_bound(
               type_per_edge_data + etype_begin, type_per_edge_data + end,
               etype);
           etype_end = etype_end_it - type_per_edge_data;
-          int64_t etype_count = NumPick(fanout, replace, probs_or_mask)(
-              etype_begin, etype_end - etype_begin);
+          int64_t etype_count = NumPick(
+              fanout, replace, probs_or_mask, etype_begin,
+              etype_end - etype_begin);
           // Do sampling for one etype.
           if (fanout != 0) {
             TORCH_CHECK(
@@ -719,6 +738,12 @@ inline void safe_divide(T& a, U b) {
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
  * @param args Contains labor specific arguments.
+ * @param picked_tensor The tensor storing the picked neighbors.
+ * @param picked_offset The starting position offset for results in the
+ * picked_tensor.
+ * @param picked_count The length of the tensor reserved for results. Hence, the
+ * picked neighbors should be placed in picked_tensor[picked_offset :
+ * picked_offset + picked_count].
  *
  * @return A tensor containing the picked neighbors.
  */
