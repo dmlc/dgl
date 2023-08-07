@@ -17,8 +17,8 @@ namespace {
 static constexpr int64_t kEmptyKey = -1;
 static constexpr int kGrainSize = 256;
 
-// The formula is established from experience which is used
-// to get the hashmap size from the input array size.
+// The formula is established from experience which is used to get the hashmap
+// size from the input array size.
 inline size_t GetMapSize(size_t num) {
   size_t capacity = 1;
   return capacity << static_cast<size_t>(1 + std::log2(num * 3));
