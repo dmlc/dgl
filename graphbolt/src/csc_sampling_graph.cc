@@ -131,6 +131,29 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
+/**
+ * @brief Calculate the number of the neighbors to be picked for the given node.
+ *
+ * @param fanout The number of edges to be sampled for each node. It should be
+ * >= 0 or -1.
+ *  - When the value is -1, all neighbors will be chosen for sampling. It is
+ * equivalent to selecting all neighbors with non-zero probability when the
+ * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is a non-negative integer, it serves as a minimum
+ * threshold for selecting neighbors.
+ * @param replace Boolean indicating whether the sample is performed with or
+ * without replacement. If True, a value can be selected multiple times.
+ * Otherwise, each value can be selected only once.
+ * @param probs_or_mask Optional tensor containing the (unnormalized)
+ * probabilities associated with each neighboring edge of a node in the original
+ * graph. It must be a 1D floating-point tensor with the number of elements
+ * equal to the number of edges in the graph.
+ * @param offset The starting edge ID for the connected neighbors of the given
+ * node.
+ * @param num_neighbors The number of neighbors of this node.
+ *
+ * @return The pick number of the given node.
+ */
 int64_t NumPick(
     int64_t fanout, bool replace,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
@@ -196,8 +219,10 @@ int64_t NumPickByEtype(
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
  *
- * @return A lambda function which takes offset and num_neighbors as params and
- * returns the number of neighbors-to-be-sampled.
+ * @return A lambda function (int64_t offset, int64_t num_neighbors) ->
+ * torch::Tensor, which takes offset (the starting edge ID of the given node)
+ * and num_neighbors (number of neighbors) as params and returns the pick number
+ * of the given node.
  */
 auto GetNumPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
@@ -235,8 +260,9 @@ auto GetNumPickFn(
  * @param args Contains sampling algorithm specific arguments.
  *
  * @return A lambda function: (int64_t offset, int64_t num_neighbors) ->
- * torch::Tensor, which takes offset and num_neighbors as params and returns a
- * tensor of picked neighbors.
+ * torch::Tensor, which takes offset (the starting edge ID of the given node)
+ * and num_neighbors (number of neighbors) as params and returns a tensor of
+ * picked neighbors.
  */
 template <SamplerType S>
 auto GetPickFn(
@@ -312,7 +338,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                     num_picked_neighbors_per_node[i + 1].item<int64_t>() ==
                         num_pick_fn(offset, num_neighbors),
                     "Return value of num_pick_fn doesn't match the actual "
-                    "number.");
+                    "picked number.");
               }
               picked_neighbors_per_thread[thread_id] =
                   torch::cat(picked_neighbors_cur_thread);
