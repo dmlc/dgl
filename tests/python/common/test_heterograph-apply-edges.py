@@ -291,7 +291,7 @@ def test_heterograph_with_same_source_node_apply_edges(idtype):
     hg.nodes["n2"].data["h"] = F.randn((hg.num_nodes("n2"), 1))
     hg.nodes["n3"].data["h"] = F.randn((hg.num_nodes("n3"), 1))
 
-    assert type(hg.srcdata["h"]) != dict
+    assert type(hg.srcdata["h"]) == F.Tensor
     hg.apply_edges(fn.u_add_v("h", "h", "x"))
 
 
