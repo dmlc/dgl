@@ -130,11 +130,19 @@ class QM9(QM9Dataset):
             verbose=verbose,
         )
 
+    @property
+    def graph_path(self):
+        return f"{self.save_path}/dgl_graph.bin"
+
+    @property
+    def line_graph_path(self):
+        return f"{self.save_path}/dgl_line_graph.bin"
+
     def has_cache(self):
         """step 1, if True, goto step 5; else goto download(step 2), then step 3"""
-        graph_path = f"{self.save_path}/dgl_graph.bin"
-        line_graph_path = f"{self.save_path}/dgl_line_graph.bin"
-        return os.path.exists(graph_path) and os.path.exists(line_graph_path)
+        return os.path.exists(self.graph_path) and os.path.exists(
+            self.line_graph_path
+        )
 
     def process(self):
         """step 3"""
@@ -197,17 +205,13 @@ class QM9(QM9Dataset):
 
     def save(self):
         """step 4"""
-        graph_path = f"{self.save_path}/dgl_graph.bin"
-        line_graph_path = f"{self.save_path}/dgl_line_graph.bin"
-        save_graphs(str(graph_path), self.graphs, self.label_dict)
-        save_graphs(str(line_graph_path), self.line_graphs)
+        save_graphs(str(self.graph_path), self.graphs, self.label_dict)
+        save_graphs(str(self.line_graph_path), self.line_graphs)
 
     def load(self):
         """step 5"""
-        graph_path = f"{self.save_path}/dgl_graph.bin"
-        line_graph_path = f"{self.save_path}/dgl_line_graph.bin"
-        self.graphs, label_dict = load_graphs(graph_path)
-        self.line_graphs, _ = load_graphs(line_graph_path)
+        self.graphs, label_dict = load_graphs(self.graph_path)
+        self.line_graphs, _ = load_graphs(self.line_graph_path)
         self.label = torch.stack(
             [label_dict[key] for key in self.label_keys], dim=1
         )

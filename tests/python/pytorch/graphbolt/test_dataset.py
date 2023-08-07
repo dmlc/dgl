@@ -1,9 +1,3 @@
-import os
-import tempfile
-
-import numpy as np
-
-import pydantic
 import pytest
 from dgl import graphbolt as gb
 
@@ -11,15 +5,15 @@ from dgl import graphbolt as gb
 def test_Dataset():
     dataset = gb.Dataset()
     with pytest.raises(NotImplementedError):
-        _ = dataset.train_sets()
+        _ = dataset.train_set
     with pytest.raises(NotImplementedError):
-        _ = dataset.validation_sets()
+        _ = dataset.validation_set
     with pytest.raises(NotImplementedError):
-        _ = dataset.test_sets()
+        _ = dataset.test_set
     with pytest.raises(NotImplementedError):
-        _ = dataset.graph()
+        _ = dataset.graph
     with pytest.raises(NotImplementedError):
-        _ = dataset.feature()
+        _ = dataset.feature
     with pytest.raises(NotImplementedError):
         _ = dataset.dataset_name
     with pytest.raises(NotImplementedError):
