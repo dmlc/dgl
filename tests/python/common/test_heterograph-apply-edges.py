@@ -11,7 +11,6 @@ import networkx as nx
 import numpy as np
 import pytest
 import scipy.sparse as spsp
-import scipy.sparse as ssp
 
 from dgl import DGLError
 from scipy.sparse import rand
@@ -49,7 +48,7 @@ def create_test_heterograph(idtype):
     return g
 
 
-def create_random_hetero(idtype):
+def create_random_hetero_with_same_source_node(idtype):
     num_nodes = {"n1": 5, "n2": 10, "n3": 15}
     etypes = [("n1", "r1", "n2"), ("n1", "r2", "n3"), ("n1", "r3", "n2")]
     edges = {}
@@ -284,7 +283,7 @@ def test_binary_op(idtype):
 )
 @parametrize_idtype
 def test_unibipartite_heterograph_apply_edges(idtype):
-    hg = create_random_hetero(idtype)
+    hg = create_random_hetero_with_same_source_node(idtype)
 
     hg.nodes["n1"].data["h"] = F.randn((hg.num_nodes("n1"), 1))
     hg.nodes["n2"].data["h"] = F.randn((hg.num_nodes("n2"), 1))
