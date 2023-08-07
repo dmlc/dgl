@@ -4,7 +4,7 @@ import os
 import shutil
 
 from copy import deepcopy
-from typing import Dict, List, Tuple
+from typing import List
 
 import pandas as pd
 import torch
@@ -76,8 +76,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         return os.path.join(dataset_dir, "preprocessed/metadata.yaml")
 
     print("Start to preprocess the on-disk dataset.")
-    processed_dir_prefix = "preprocessed"
-    processed_dir_abs = os.path.join(dataset_dir, processed_dir_prefix)
+    processed_dir_prefix = os.path.join(dataset_dir, "preprocessed")
 
     # Check if the metadata.yaml exists.
     metadata_file_path = os.path.join(dataset_dir, "metadata.yaml")
@@ -89,7 +88,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         input_config = yaml.safe_load(f)
 
     # 1. Make `processed_dir_abs` directory if it does not exist.
-    os.makedirs(processed_dir_abs, exist_ok=True)
+    os.makedirs(processed_dir_prefix, exist_ok=True)
     output_config = deepcopy(input_config)
 
     # 2. Load the edge data and create a DGLGraph.
@@ -158,7 +157,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
 
     save_csc_sampling_graph(
         csc_sampling_graph,
-        os.path.join(processed_dir_abs, "csc_sampling_graph.tar"),
+        os.path.join(processed_dir_prefix, "csc_sampling_graph.tar"),
     )
     del output_config["graph"]
 
@@ -181,30 +180,27 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
             )
 
     # 7. Save the train/val/test split according to the output_config.
-    for set_name in ["train_sets", "validation_sets", "test_sets"]:
+    for set_name in ["train_set", "validation_set", "test_set"]:
         if set_name not in input_config:
             continue
-        for intput_set_split, output_set_split in zip(
+        for input_set_per_type, output_set_per_type in zip(
             input_config[set_name], output_config[set_name]
         ):
-            for input_set_per_type, output_set_per_type in zip(
-                intput_set_split, output_set_split
+            for input_data, output_data in zip(
+                input_set_per_type["data"], output_set_per_type["data"]
             ):
-                for input_data, output_data in zip(
-                    input_set_per_type["data"], output_set_per_type["data"]
-                ):
-                    # Always save the feature in numpy format.
-                    output_data["format"] = "numpy"
-                    output_data["path"] = os.path.join(
-                        processed_dir_prefix,
-                        input_data["path"].replace("pt", "npy"),
-                    )
-                    _copy_or_convert_data(
-                        os.path.join(dataset_dir, input_data["path"]),
-                        os.path.join(dataset_dir, output_data["path"]),
-                        input_data["format"],
-                        output_data["format"],
-                    )
+                # Always save the feature in numpy format.
+                output_data["format"] = "numpy"
+                output_data["path"] = os.path.join(
+                    processed_dir_prefix,
+                    input_data["path"].replace("pt", "npy"),
+                )
+                _copy_or_convert_data(
+                    os.path.join(dataset_dir, input_data["path"]),
+                    os.path.join(dataset_dir, output_data["path"]),
+                    input_data["format"],
+                    output_data["format"],
+                )
 
     # 8. Save the output_config.
     output_config_path = os.path.join(dataset_dir, "preprocessed/metadata.yaml")
