@@ -23,10 +23,7 @@ from .csc_sampling_graph import (
     save_csc_sampling_graph,
 )
 from .ondisk_metadata import OnDiskGraphTopology, OnDiskMetaData, OnDiskTVTSet
-from .torch_based_feature_store import (
-    load_feature_stores,
-    TorchBasedFeatureStore,
-)
+from .torch_based_feature_store import TorchBasedFeatureStore
 
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset"]
 
@@ -290,7 +287,7 @@ class OnDiskDataset(Dataset):
         self._num_classes = self._meta.num_classes
         self._num_labels = self._meta.num_labels
         self._graph = self._load_graph(self._meta.graph_topology)
-        self._feature = load_feature_stores(self._meta.feature_data)
+        self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._train_set = self._init_tvt_set(self._meta.train_set)
         self._validation_set = self._init_tvt_set(self._meta.validation_set)
         self._test_set = self._init_tvt_set(self._meta.test_set)
@@ -316,7 +313,7 @@ class OnDiskDataset(Dataset):
         return self._graph
 
     @property
-    def feature(self) -> Dict[Tuple, TorchBasedFeatureStore]:
+    def feature(self) -> TorchBasedFeatureStore:
         """Return the feature."""
         return self._feature
 

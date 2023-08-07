@@ -49,6 +49,7 @@ Attributes and methods
     SparseMatrix.val
     SparseMatrix.row
     SparseMatrix.col
+    SparseMatrix.indices
     SparseMatrix.coo
     SparseMatrix.csr
     SparseMatrix.csc
