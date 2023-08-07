@@ -199,7 +199,8 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                     # Always save the feature in numpy format.
                     output_data["format"] = "numpy"
                     output_data["path"] = os.path.join(
-                        dataset_dir, input_data["path"].replace("pt", "npy")
+                        processed_dir_prefix,
+                        input_data["path"].replace("pt", "npy"),
                     )
                     _copy_or_convert_data(
                         os.path.join(dataset_dir, input_data["path"]),
@@ -209,7 +210,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                     )
 
     # 8. Save the output_config.
-    output_config_path = "preprocessed/metadata.yaml"
+    output_config_path = os.path.join(dataset_dir, "preprocessed/metadata.yaml")
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
