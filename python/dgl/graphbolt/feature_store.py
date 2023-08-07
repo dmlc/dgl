@@ -23,7 +23,7 @@ class FeatureStore:
         Parameters
         ----------
         domain : str
-            The domain of the feature. Either "node" or "edge".
+            The domain of the feature such as "node", "edge" or "graph".
         type_name : str
             The node or edge type name.
         feature_name : str
@@ -52,7 +52,7 @@ class FeatureStore:
         Parameters
         ----------
         domain : str
-            The domain of the feature. Either "node" or "edge".
+            The domain of the feature such as "node", "edge" or "graph".
         type_name : str
             The node or edge type name.
         feature_name : str
