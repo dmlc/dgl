@@ -138,9 +138,9 @@ int64_t NumPick(
   int64_t actual_fanout = fanout == -1 ? num_neighbors : fanout;
   int64_t max_count =
       probs_or_mask.has_value()
-          ? torch::nonzero(
+          ? torch::count_nonzero(
                 probs_or_mask.value().slice(0, offset, offset + num_neighbors))
-                .size(0)
+                .item<int64_t>()
           : num_neighbors;
   if (replace) {
     return max_count == 0 ? 0 : actual_fanout;
