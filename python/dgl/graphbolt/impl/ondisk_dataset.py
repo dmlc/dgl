@@ -156,8 +156,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     )
 
     save_csc_sampling_graph(
-        csc_sampling_graph,
-        os.path.join(processed_dir_prefix, "csc_sampling_graph.tar"),
+        csc_sampling_graph, output_config["graph_topology"]["path"]
     )
     del output_config["graph"]
 
@@ -173,7 +172,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
             )
             _copy_or_convert_data(
                 os.path.join(dataset_dir, feature["path"]),
-                os.path.join(dataset_dir, out_feature["path"]),
+                out_feature["path"],
                 feature["format"],
                 out_feature["format"],
                 feature["in_memory"],
@@ -197,7 +196,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                 )
                 _copy_or_convert_data(
                     os.path.join(dataset_dir, input_data["path"]),
-                    os.path.join(dataset_dir, output_data["path"]),
+                    output_data["path"],
                     input_data["format"],
                     output_data["format"],
                 )
