@@ -197,8 +197,8 @@ class RelGraphConvLayer(nn.Module):
 
         # Create a separate Linear layer for each node type.
         # loop_weights are used to update the output embedding of each target node
-        # based on its own features, thereby allowing the model to refine the node 
-        # representations. Note that this does not imply the existence of self-loop 
+        # based on its own features, thereby allowing the model to refine the node
+        # representations. Note that this does not imply the existence of self-loop
         # edges in the graph. It is similar to residual connection.
         self.loop_weights = nn.ModuleDict(
             {
