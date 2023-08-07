@@ -517,7 +517,6 @@ if __name__ == "__main__":
         ).to(device)
     with th.no_grad():
         graph = datamodule.g
-        test_idx = datamodule.test_nid
         pred = model.module.inference(
             graph,
             f"cuda:{args.gpu}" if args.gpu != -1 else "cpu",
