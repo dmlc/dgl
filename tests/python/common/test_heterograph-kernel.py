@@ -89,7 +89,7 @@ def generate_feature(g, broadcast="none", binary_op="none"):
 
 def test_copy_src_reduce():
     def _test(red, partial):
-        g = dgl.DGLGraph(nx.erdos_renyi_graph(100, 0.1))
+        g = dgl.from_networkx(nx.erdos_renyi_graph(100, 0.1))
         # NOTE(zihao): add self-loop to avoid zero-degree nodes.
         # https://github.com/dmlc/dgl/issues/761
         g.add_edges(g.nodes(), g.nodes())
@@ -157,7 +157,7 @@ def test_copy_src_reduce():
 
 def test_copy_edge_reduce():
     def _test(red, partial):
-        g = dgl.DGLGraph(nx.erdos_renyi_graph(100, 0.1))
+        g = dgl.from_networkx(nx.erdos_renyi_graph(100, 0.1))
         # NOTE(zihao): add self-loop to avoid zero-degree nodes.
         g.add_edges(g.nodes(), g.nodes())
         g = g.to(F.ctx())
@@ -360,7 +360,7 @@ def test_all_binary_builtins():
             _print_error(rhs_grad_1, rhs_grad_2)
         assert F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol)
 
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g.add_nodes(20)
     # NOTE(zihao): add self-loop to avoid zero-degree nodes.
     g.add_edges(g.nodes(), g.nodes())
