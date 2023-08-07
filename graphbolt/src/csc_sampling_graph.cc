@@ -228,8 +228,8 @@ auto GetNumPickFn(
     const std::vector<int64_t>& fanouts, bool replace,
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask) {
-  // If fanouts.size() > 1, count with sampling for each edge type of each node,
-  // otherwise just sample once for each node with no regard of edge types.
+  // If fanouts.size() > 1, returns the total number of all edge types of the
+  // given node.
   return [&fanouts, replace, &probs_or_mask, &type_per_edge](
              int64_t offset, int64_t num_neighbors) {
     if (fanouts.size() > 1) {
