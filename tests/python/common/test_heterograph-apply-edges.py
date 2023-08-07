@@ -10,7 +10,9 @@ import dgl.function as fn
 import networkx as nx
 import numpy as np
 import pytest
-import scipy.sparse as ssp
+import scipy.sparse as spsp
+import torch
+
 from dgl import DGLError
 from scipy.sparse import rand
 from utils import get_cases, parametrize_idtype
@@ -45,6 +47,23 @@ def create_test_heterograph(idtype):
     assert g.idtype == idtype
     assert g.device == F.ctx()
     return g
+
+
+def create_random_hetero_with_single_source_node_type(idtype):
+    num_nodes = {"n1": 5, "n2": 10, "n3": 15}
+    etypes = [("n1", "r1", "n2"), ("n1", "r2", "n3"), ("n1", "r3", "n2")]
+    edges = {}
+    for etype in etypes:
+        src_ntype, _, dst_ntype = etype
+        arr = spsp.random(
+            num_nodes[src_ntype],
+            num_nodes[dst_ntype],
+            density=1,
+            format="coo",
+            random_state=100,
+        )
+        edges[etype] = (arr.row, arr.col)
+    return dgl.heterograph(edges, idtype=idtype, device=F.ctx())
 
 
 @parametrize_idtype
@@ -258,6 +277,23 @@ def test_binary_op(idtype):
         for binary_op in ["add", "sub", "mul", "div", "dot"]:
             print(lhs, rhs, binary_op)
             _test(lhs, rhs, binary_op)
+
+
+# Here we test heterograph with only single source node type because the format
+# of node feature is a tensor.
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="Only support PyTorch for now"
+)
+@parametrize_idtype
+def test_heterograph_with_single_source_node_type_apply_edges(idtype):
+    hg = create_random_hetero_with_single_source_node_type(idtype)
+
+    hg.nodes["n1"].data["h"] = F.randn((hg.num_nodes("n1"), 1))
+    hg.nodes["n2"].data["h"] = F.randn((hg.num_nodes("n2"), 1))
+    hg.nodes["n3"].data["h"] = F.randn((hg.num_nodes("n3"), 1))
+
+    assert type(hg.srcdata["h"]) == torch.Tensor
+    hg.apply_edges(fn.u_add_v("h", "h", "x"))
 
 
 if __name__ == "__main__":
