@@ -181,9 +181,6 @@ class ConcurrentIdHashMap {
   IdType mask_;
 };
 
-template <typename IdType>
-bool BoolCompareAndSwap(IdType* ptr);
-
 }  // namespace sampling
 }  // namespace graphbolt
 
