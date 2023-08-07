@@ -195,10 +195,18 @@ class RelGraphConvLayer(nn.Module):
             }
         )
 
-        # Create a separate Linear layer for each node type for self-loop
-        # connections, i.e., edges that connect nodes to themselves. These
-        # weights help the model to carry information from a node to itself
-        # across layers.
+        # Create a separate Linear layer for each node type.
+        # loop_weights are used to update the output embedding of each target node
+        # based on its own features, thereby allowing the model to refine the node 
+        # representations. Note that this does not imply the existence of self-loop 
+        # edges in the graph. It is similar to residual connection.
+        self.loop_weights = nn.ModuleDict(
+            {
+                ntype: nn.Linear(in_size, out_size, bias=True)
+                for ntype in self.ntypes
+            }
+        )
+
         self.loop_weights = nn.ModuleDict(
             {
                 ntype: nn.Linear(in_size, out_size, bias=True)
@@ -259,13 +267,16 @@ class RelGraphConvLayer(nn.Module):
         hs = self.conv(g, inputs, mod_kwargs=weight_dict)
 
         def _apply(ntype, h):
+            # Apply the `loop_weight` to the input node features, effectively
+            # acting as a residual connection. This allows the model to refine
+            # node embeddings based on its current features.
             h = h + self.loop_weights[ntype](inputs_dst[ntype])
             if self.activation:
                 h = self.activation(h)
             return self.dropout(h)
 
         # Apply the function defined above for each node type. This will update
-        # the node features using the self-loop weights, apply the activation
+        # the node features using the `loop_weights`, apply the activation
         # function and dropout.
         return {ntype: _apply(ntype, h) for ntype, h in hs.items()}
 
@@ -387,6 +398,8 @@ def train(
     print("start training...")
     category = "paper"
 
+    # Typically, the best Validation performance is obtained after
+    # the 1st or 2nd epoch. This is why the max epoch is set to 3.
     for epoch in range(3):
         num_train = split_idx["train"][category].shape[0]
         model.train()
