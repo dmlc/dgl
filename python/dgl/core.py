@@ -211,10 +211,10 @@ def data_dict_to_list(graph, data_dict, func, target):
     -------------
     graph :  DGLGraph
         The input graph.
-    data_dict : dict[str, Tensor] or dict[(str, str, str), Tensor]]
+    data_dict : dict[str, Tensor] or dict[(str, str, str), Tensor]] or Tensor
         Node or edge data stored in DGLGraph. The key of the dictionary
         is the node type name or edge type name. If there is only 1 source
-        node, data_dict is the value of feature not a dict.
+        node, data_dict is the value of feature(a Tensor) not a dict.
     func : dgl.function.BaseMessageFunction
         Built-in message function.
     target : 'u', 'v' or 'e'
@@ -230,7 +230,7 @@ def data_dict_to_list(graph, data_dict, func, target):
         if target in ["u", "v"]:
             output_list = [None] * graph._graph.number_of_ntypes()
             # If there is only 1 source node, data_dict should be the value of feature,
-            # such as a tensor.
+            # namely, a tensor.
             if not isinstance(data_dict, dict):
                 src_id, dst_id = graph._graph.metagraph.find_edge(0)
                 if target == "u":
