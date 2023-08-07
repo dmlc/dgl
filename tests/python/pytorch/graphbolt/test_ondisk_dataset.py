@@ -647,35 +647,25 @@ def test_OnDiskDataset_Feature_heterograph():
         assert len(feature_data) == 4
 
         # Verify node feature data.
-        node_paper_feat = feature_data[("node", "paper", "feat")]
-        assert isinstance(node_paper_feat, gb.TorchBasedFeatureStore)
         assert torch.equal(
-            node_paper_feat.read(), torch.tensor(node_data_paper)
+            feature_data.read("node", "paper", "feat"),
+            torch.tensor(node_data_paper),
         )
-        node_paper_label = feature_data[("node", "paper", "label")]
-        assert isinstance(node_paper_label, gb.TorchBasedFeatureStore)
         assert torch.equal(
-            node_paper_label.read(), torch.tensor(node_data_label)
+            feature_data.read("node", "paper", "label"),
+            torch.tensor(node_data_label),
         )
 
         # Verify edge feature data.
-        edge_writes_feat = feature_data[("edge", "author:writes:paper", "feat")]
-        assert isinstance(edge_writes_feat, gb.TorchBasedFeatureStore)
         assert torch.equal(
-            edge_writes_feat.read(), torch.tensor(edge_data_writes)
+            feature_data.read("edge", "author:writes:paper", "feat"),
+            torch.tensor(edge_data_writes),
         )
-        edge_writes_label = feature_data[
-            ("edge", "author:writes:paper", "label")
-        ]
-        assert isinstance(edge_writes_label, gb.TorchBasedFeatureStore)
         assert torch.equal(
-            edge_writes_label.read(), torch.tensor(edge_data_label)
+            feature_data.read("edge", "author:writes:paper", "label"),
+            torch.tensor(edge_data_label),
         )
 
-        node_paper_feat = None
-        node_paper_label = None
-        edge_writes_feat = None
-        edge_writes_label = None
         feature_data = None
         dataset = None
 
@@ -735,25 +725,25 @@ def test_OnDiskDataset_Feature_homograph():
         assert len(feature_data) == 4
 
         # Verify node feature data.
-        node_feat = feature_data[("node", None, "feat")]
-        assert isinstance(node_feat, gb.TorchBasedFeatureStore)
-        assert torch.equal(node_feat.read(), torch.tensor(node_data_feat))
-        node_label = feature_data[("node", None, "label")]
-        assert isinstance(node_label, gb.TorchBasedFeatureStore)
-        assert torch.equal(node_label.read(), torch.tensor(node_data_label))
+        assert torch.equal(
+            feature_data.read("node", None, "feat"),
+            torch.tensor(node_data_feat),
+        )
+        assert torch.equal(
+            feature_data.read("node", None, "label"),
+            torch.tensor(node_data_label),
+        )
 
         # Verify edge feature data.
-        edge_feat = feature_data[("edge", None, "feat")]
-        assert isinstance(edge_feat, gb.TorchBasedFeatureStore)
-        assert torch.equal(edge_feat.read(), torch.tensor(edge_data_feat))
-        edge_label = feature_data[("edge", None, "label")]
-        assert isinstance(edge_label, gb.TorchBasedFeatureStore)
-        assert torch.equal(edge_label.read(), torch.tensor(edge_data_label))
+        assert torch.equal(
+            feature_data.read("edge", None, "feat"),
+            torch.tensor(edge_data_feat),
+        )
+        assert torch.equal(
+            feature_data.read("edge", None, "label"),
+            torch.tensor(edge_data_label),
+        )
 
-        node_feat = None
-        node_label = None
-        edge_feat = None
-        edge_label = None
         feature_data = None
         dataset = None
 
