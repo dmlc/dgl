@@ -5,11 +5,16 @@ import numpy as np
 from utils import parametrize_idtype
 
 
+def create_graph(idtype, num_node):
+    g = dgl.graph([])
+    g = g.astype(idtype).to(F.ctx())
+    g.add_nodes(num_node)
+    return g
+
+
 @parametrize_idtype
 def test_node_removal(idtype):
-    g = dgl.DGLGraph()
-    g = g.astype(idtype).to(F.ctx())
-    g.add_nodes(10)
+    g = create_graph(idtype, 10)
     g.add_edges(0, 0)
     assert g.num_nodes() == 10
     g.ndata["id"] = F.arange(0, 10)
@@ -38,9 +43,7 @@ def test_node_removal(idtype):
 
 @parametrize_idtype
 def test_multigraph_node_removal(idtype):
-    g = dgl.DGLGraph()
-    g = g.astype(idtype).to(F.ctx())
-    g.add_nodes(5)
+    g = create_graph(idtype, 5)
     for i in range(5):
         g.add_edges(i, i)
         g.add_edges(i, i)
@@ -67,9 +70,7 @@ def test_multigraph_node_removal(idtype):
 
 @parametrize_idtype
 def test_multigraph_edge_removal(idtype):
-    g = dgl.DGLGraph()
-    g = g.astype(idtype).to(F.ctx())
-    g.add_nodes(5)
+    g = create_graph(idtype, 5)
     for i in range(5):
         g.add_edges(i, i)
         g.add_edges(i, i)
@@ -95,9 +96,7 @@ def test_multigraph_edge_removal(idtype):
 
 @parametrize_idtype
 def test_edge_removal(idtype):
-    g = dgl.DGLGraph()
-    g = g.astype(idtype).to(F.ctx())
-    g.add_nodes(5)
+    g = create_graph(idtype, 5)
     for i in range(5):
         for j in range(5):
             g.add_edges(i, j)
@@ -133,9 +132,7 @@ def test_edge_removal(idtype):
 
 @parametrize_idtype
 def test_node_and_edge_removal(idtype):
-    g = dgl.DGLGraph()
-    g = g.astype(idtype).to(F.ctx())
-    g.add_nodes(10)
+    g = create_graph(idtype, 10)
     for i in range(10):
         for j in range(10):
             g.add_edges(i, j)
@@ -173,9 +170,7 @@ def test_node_and_edge_removal(idtype):
 
 @parametrize_idtype
 def test_node_frame(idtype):
-    g = dgl.DGLGraph()
-    g = g.astype(idtype).to(F.ctx())
-    g.add_nodes(10)
+    g = create_graph(idtype, 10)
     data = np.random.rand(10, 3)
     new_data = data.take([0, 1, 2, 7, 8, 9], axis=0)
     g.ndata["h"] = F.tensor(data)
@@ -187,9 +182,7 @@ def test_node_frame(idtype):
 
 @parametrize_idtype
 def test_edge_frame(idtype):
-    g = dgl.DGLGraph()
-    g = g.astype(idtype).to(F.ctx())
-    g.add_nodes(10)
+    g = create_graph(idtype, 10)
     g.add_edges(list(range(10)), list(range(1, 10)) + [0])
     data = np.random.rand(10, 3)
     new_data = data.take([0, 1, 2, 7, 8, 9], axis=0)
@@ -204,18 +197,14 @@ def test_edge_frame(idtype):
 def test_issue1287(idtype):
     # reproduce https://github.com/dmlc/dgl/issues/1287.
     # setting features after remove nodes
-    g = dgl.DGLGraph()
-    g = g.astype(idtype).to(F.ctx())
-    g.add_nodes(5)
+    g = create_graph(idtype, 5)
     g.add_edges([0, 2, 3, 1, 1], [1, 0, 3, 1, 0])
     g.remove_nodes([0, 1])
     g.ndata["h"] = F.randn((g.num_nodes(), 3))
     g.edata["h"] = F.randn((g.num_edges(), 2))
 
     # remove edges
-    g = dgl.DGLGraph()
-    g = g.astype(idtype).to(F.ctx())
-    g.add_nodes(5)
+    g = create_graph(idtype, 5)
     g.add_edges([0, 2, 3, 1, 1], [1, 0, 3, 1, 0])
     g.remove_edges([0, 1])
     g = g.to(F.ctx())
