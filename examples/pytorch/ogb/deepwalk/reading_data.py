@@ -117,7 +117,7 @@ def net2graph(net_sm):
     G DGLGraph : graph by DGL
     """
     start = time.time()
-    G = dgl.DGLGraph(net_sm)
+    G = dgl.from_scipy(net_sm)
     end = time.time()
     t = end - start
     print("Building DGLGraph in %.2fs" % t)
