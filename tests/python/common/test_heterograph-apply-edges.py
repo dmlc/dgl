@@ -278,11 +278,13 @@ def test_binary_op(idtype):
             _test(lhs, rhs, binary_op)
 
 
+# Here we test heterograph with only 1 source node because the format of node
+# feature is different from ordinary heterograph.
 @unittest.skipIf(
     dgl.backend.backend_name != "pytorch", reason="Only support PyTorch for now"
 )
 @parametrize_idtype
-def test_unibipartite_heterograph_apply_edges(idtype):
+def test_heterograph_with_same_source_node_apply_edges(idtype):
     hg = create_random_hetero_with_same_source_node(idtype)
 
     hg.nodes["n1"].data["h"] = F.randn((hg.num_nodes("n1"), 1))
