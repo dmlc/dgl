@@ -229,7 +229,7 @@ def data_dict_to_list(graph, data_dict, func, target):
     if isinstance(func, fn.BinaryMessageFunction):
         if target in ["u", "v"]:
             output_list = [None] * graph._graph.number_of_ntypes()
-            # If there is only single source node type, data_dict should be the value of 
+            # If there is only single source node type, data_dict should be the value of
             # feature, namely, a tensor.
             if not isinstance(data_dict, dict):
                 src_id, dst_id = graph._graph.metagraph.find_edge(0)
