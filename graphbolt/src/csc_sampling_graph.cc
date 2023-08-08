@@ -329,9 +329,10 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
  * >= 0 or -1.
- *  - When the value is -1, all neighbors will be chosen for sampling. It is
- * equivalent to selecting all neighbors with non-zero probability when the
- * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is -1, all neighbors with non-zero probability will be
+ * sampled once regardless of replacement. It is equivalent to selecting all
+ * neighbors with non-zero probability when the fanout is >= the number of
+ * neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
  * @param replace Boolean indicating whether the sample is performed with or
@@ -458,9 +459,10 @@ inline torch::Tensor UniformPick(
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
  * >= 0 or -1.
- *  - When the value is -1, all neighbors will be chosen for sampling. It is
- * equivalent to selecting all neighbors with non-zero probability when the
- * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is -1, all neighbors with non-zero probability will be
+ * sampled once regardless of replacement. It is equivalent to selecting all
+ * neighbors with non-zero probability when the fanout is >= the number of
+ * neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
  * @param replace Boolean indicating whether the sample is performed with or
@@ -592,9 +594,10 @@ inline void safe_divide(T& a, U b) {
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
  * >= 0 or -1.
- *  - When the value is -1, all neighbors will be chosen for sampling. It is
- * equivalent to selecting all neighbors with non-zero probability when the
- * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is -1, all neighbors with non-zero probability will be
+ * sampled once regardless of replacement. It is equivalent to selecting all
+ * neighbors with non-zero probability when the fanout is >= the number of
+ * neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
  * @param options Tensor options specifying the desired data type of the result.
@@ -612,7 +615,22 @@ inline torch::Tensor LaborPick(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::LABOR> args) {
-  fanout = fanout < 0 ? num_neighbors : std::min(fanout, num_neighbors);
+  // This part of code is used for calculating the picked number, which will
+  // soon be deleted as the picked number will be calculated in advance.
+  int64_t num_valid_neighbors =
+      NonUniform ? torch::count_nonzero(probs_or_mask.value().slice(
+                                            0, offset, offset + num_neighbors))
+                       .item<int64_t>()
+                 : num_neighbors;
+  if (num_valid_neighbors == 0) {
+    return torch::tensor({}, options);
+  }
+  if constexpr (Replace) {
+    fanout = fanout < 0 ? num_valid_neighbors : fanout;
+  } else {
+    fanout = fanout < 0 ? num_valid_neighbors
+                        : std::min(fanout, num_valid_neighbors);
+  }
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
     return torch::arange(offset, offset + num_neighbors, options);
   }

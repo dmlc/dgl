@@ -395,8 +395,7 @@ class CSCSamplingGraph:
                 types, and each fanout value corresponds to a specific edge
                 type of the nodes.
             The value of each fanout should be >= 0 or = -1.
-              - When the value is -1, all neighbors will be chosen for
-                sampling. It is equivalent to selecting all neighbors when
+              - When the value is -1, all neighbors with non-zero probability will be sampled once regardless of replacement. It is equivalent to selecting all neighbors when
                 the fanout is >= the number of neighbors (and replace is set to
                 false).
               - When the value is a non-negative integer, it serves as a
