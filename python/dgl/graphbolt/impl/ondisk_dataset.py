@@ -76,7 +76,6 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         return os.path.join(dataset_dir, "preprocessed/metadata.yaml")
 
     print("Start to preprocess the on-disk dataset.")
-    # processed_dir_prefix = os.path.join(dataset_dir, "preprocessed")
     processed_dir_prefix = "preprocessed"
 
     # Check if the metadata.yaml exists.
