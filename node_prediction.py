@@ -113,7 +113,7 @@ def run(args, device, data):
     )
     # dataloader = gb.SingleProcessDataLoader(device_transfer)
 
-    # Create dgl.graphbolt validation/test dataloader.
+    # Create dgl.graphbolt validation dataloader.
     validation_minibatch_sampler = gb.MinibatchSampler(
         valid_set,
         batch_size=args.batch_size,
@@ -213,7 +213,7 @@ def run(args, device, data):
             )
 
     ############# Test ################
-    # Change the dataloader to the test set.
+    # Create dgl.graphbolt test dataloader.
     test_minibatch_sampler = gb.MinibatchSampler(
         test_set,
         batch_size=args.batch_size,
