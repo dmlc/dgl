@@ -4,8 +4,7 @@ import os
 import shutil
 
 from copy import deepcopy
-from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List
 
 import pandas as pd
 import torch
@@ -15,7 +14,7 @@ import dgl
 
 from ..dataset import Dataset
 from ..itemset import ItemSet, ItemSetDict
-from ..utils import read_data, save_data, tensor_to_tuple
+from ..utils import read_data, save_data
 
 from .csc_sampling_graph import (
     CSCSamplingGraph,
@@ -24,54 +23,85 @@ from .csc_sampling_graph import (
     save_csc_sampling_graph,
 )
 from .ondisk_metadata import OnDiskGraphTopology, OnDiskMetaData, OnDiskTVTSet
-from .torch_based_feature_store import (
-    load_feature_stores,
-    TorchBasedFeatureStore,
-)
+from .torch_based_feature_store import TorchBasedFeatureStore
 
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset"]
 
 
-def preprocess_ondisk_dataset(input_config_path: str) -> str:
+def _copy_or_convert_data(
+    input_path,
+    output_path,
+    input_format,
+    output_format="numpy",
+    in_memory=True,
+):
+    """Copy or convert the data from input_path to output_path."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    if input_format == "numpy":
+        # If the original format is numpy, just copy the file.
+        shutil.copyfile(input_path, output_path)
+    else:
+        # If the original format is not numpy, convert it to numpy.
+        data = read_data(input_path, input_format, in_memory)
+        save_data(data, output_path, output_format)
+
+
+def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
 
     Parameters
     ----------
-    input_config_path : str
-        The path to the input config file.
+    dataset_dir : str
+        The path to the dataset directory.
 
     Returns
     -------
     output_config_path : str
         The path to the output config file.
     """
-    # 0. Load the input_config.
-    with open(input_config_path, "r") as f:
-        input_config = yaml.safe_load(f)
+    # Check if the dataset path is valid.
+    if not os.path.exists(dataset_dir):
+        raise RuntimeError(f"Invalid dataset path: {dataset_dir}")
 
-    # If the input config does not contain the "graph" field, then we
-    # assume that the input config is already preprocessed.
-    if "graph" not in input_config:
-        print("The input config is already preprocessed.")
-        return input_config_path
+    # Check if the dataset_dir is a directory.
+    if not os.path.isdir(dataset_dir):
+        raise RuntimeError(
+            f"The dataset must be a directory. But got {dataset_dir}"
+        )
+
+    # 0. Check if the dataset is already preprocessed.
+    if os.path.exists(os.path.join(dataset_dir, "preprocessed/metadata.yaml")):
+        print("The dataset is already preprocessed.")
+        return os.path.join(dataset_dir, "preprocessed/metadata.yaml")
 
     print("Start to preprocess the on-disk dataset.")
-    # Infer the dataset path from the input config path.
-    dataset_path = Path(os.path.dirname(input_config_path))
-    processed_dir_prefix = Path("preprocessed")
+    processed_dir_prefix = os.path.join(dataset_dir, "preprocessed")
 
-    # 1. Make `processed_dir_prefix` directory if it does not exist.
-    os.makedirs(dataset_path / processed_dir_prefix, exist_ok=True)
+    # Check if the metadata.yaml exists.
+    metadata_file_path = os.path.join(dataset_dir, "metadata.yaml")
+    if not os.path.exists(metadata_file_path):
+        raise RuntimeError("metadata.yaml does not exist.")
+
+    # Read the input config.
+    with open(metadata_file_path, "r") as f:
+        input_config = yaml.safe_load(f)
+
+    # 1. Make `processed_dir_abs` directory if it does not exist.
+    os.makedirs(processed_dir_prefix, exist_ok=True)
     output_config = deepcopy(input_config)
 
     # 2. Load the edge data and create a DGLGraph.
+    if "graph" not in input_config:
+        raise RuntimeError("Invalid config: does not contain graph field.")
     is_homogeneous = "type" not in input_config["graph"]["nodes"][0]
     if is_homogeneous:
         # Homogeneous graph.
         num_nodes = input_config["graph"]["nodes"][0]["num"]
         edge_data = pd.read_csv(
-            dataset_path / input_config["graph"]["edges"][0]["path"],
+            os.path.join(
+                dataset_dir, input_config["graph"]["edges"][0]["path"]
+            ),
             names=["src", "dst"],
         )
         src, dst = edge_data["src"].to_numpy(), edge_data["dst"].to_numpy()
@@ -87,7 +117,8 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
         data_dict = {}
         for edge_info in input_config["graph"]["edges"]:
             edge_data = pd.read_csv(
-                dataset_path / edge_info["path"], names=["src", "dst"]
+                os.path.join(dataset_dir, edge_info["path"]),
+                names=["src", "dst"],
             )
             src = torch.tensor(edge_data["src"])
             dst = torch.tensor(edge_data["dst"])
@@ -101,14 +132,14 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
         for graph_feature in input_config["graph"]["feature_data"]:
             if graph_feature["domain"] == "node":
                 node_data = read_data(
-                    dataset_path / graph_feature["path"],
+                    os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
                     in_memory=graph_feature["in_memory"],
                 )
                 g.ndata[graph_feature["name"]] = node_data
             if graph_feature["domain"] == "edge":
                 edge_data = read_data(
-                    dataset_path / graph_feature["path"],
+                    os.path.join(dataset_dir, graph_feature["path"]),
                     graph_feature["format"],
                     in_memory=graph_feature["in_memory"],
                 )
@@ -120,13 +151,12 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
     # 5. Save the CSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
     output_config["graph_topology"]["type"] = "CSCSamplingGraph"
-    output_config["graph_topology"]["path"] = str(
-        processed_dir_prefix / "csc_sampling_graph.tar"
+    output_config["graph_topology"]["path"] = os.path.join(
+        processed_dir_prefix, "csc_sampling_graph.tar"
     )
 
     save_csc_sampling_graph(
-        csc_sampling_graph,
-        str(dataset_path / output_config["graph_topology"]["path"]),
+        csc_sampling_graph, output_config["graph_topology"]["path"]
     )
     del output_config["graph"]
 
@@ -137,78 +167,48 @@ def preprocess_ondisk_dataset(input_config_path: str) -> str:
         ):
             # Always save the feature in numpy format.
             out_feature["format"] = "numpy"
-            out_feature["path"] = str(
-                processed_dir_prefix / feature["path"].replace("pt", "npy")
+            out_feature["path"] = os.path.join(
+                processed_dir_prefix, feature["path"].replace("pt", "npy")
+            )
+            _copy_or_convert_data(
+                os.path.join(dataset_dir, feature["path"]),
+                out_feature["path"],
+                feature["format"],
+                out_feature["format"],
+                feature["in_memory"],
             )
 
-            if feature["format"] == "numpy":
-                # If the original format is numpy, just copy the file.
-                os.makedirs(
-                    dataset_path / os.path.dirname(out_feature["path"]),
-                    exist_ok=True,
-                )
-                shutil.copyfile(
-                    dataset_path / feature["path"],
-                    dataset_path / out_feature["path"],
-                )
-            else:
-                # If the original format is not numpy, convert it to numpy.
-                data = read_data(
-                    dataset_path / feature["path"],
-                    feature["format"],
-                    in_memory=feature["in_memory"],
-                )
-                save_data(
-                    data,
-                    dataset_path / out_feature["path"],
-                    out_feature["format"],
-                )
-
     # 7. Save the train/val/test split according to the output_config.
-    for set_name in ["train_sets", "validation_sets", "test_sets"]:
+    for set_name in ["train_set", "validation_set", "test_set"]:
         if set_name not in input_config:
             continue
-        for intput_set_split, output_set_split in zip(
+        for input_set_per_type, output_set_per_type in zip(
             input_config[set_name], output_config[set_name]
         ):
-            for input_set_per_type, output_set_per_type in zip(
-                intput_set_split, output_set_split
+            for input_data, output_data in zip(
+                input_set_per_type["data"], output_set_per_type["data"]
             ):
                 # Always save the feature in numpy format.
-                output_set_per_type["format"] = "numpy"
-                output_set_per_type["path"] = str(
-                    processed_dir_prefix
-                    / input_set_per_type["path"].replace("pt", "npy")
+                output_data["format"] = "numpy"
+                output_data["path"] = os.path.join(
+                    processed_dir_prefix,
+                    input_data["path"].replace("pt", "npy"),
                 )
-                if input_set_per_type["format"] == "numpy":
-                    # If the original format is numpy, just copy the file.
-                    os.makedirs(
-                        dataset_path
-                        / os.path.dirname(output_set_per_type["path"]),
-                        exist_ok=True,
-                    )
-                    shutil.copy(
-                        dataset_path / input_set_per_type["path"],
-                        dataset_path / output_set_per_type["path"],
-                    )
-                else:
-                    # If the original format is not numpy, convert it to numpy.
-                    input_set = read_data(
-                        dataset_path / input_set_per_type["path"],
-                        input_set_per_type["format"],
-                    )
-                    save_data(
-                        input_set,
-                        dataset_path / output_set_per_type["path"],
-                        output_set_per_type["format"],
-                    )
+                _copy_or_convert_data(
+                    os.path.join(dataset_dir, input_data["path"]),
+                    output_data["path"],
+                    input_data["format"],
+                    output_data["format"],
+                )
 
     # 8. Save the output_config.
-    output_config_path = dataset_path / "output_config.yaml"
+    output_config_path = os.path.join(dataset_dir, "preprocessed/metadata.yaml")
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
-    return str(output_config_path)
+
+    # 9. Return the absolute path of the preprocessing yaml file.
+    return output_config_path
 
 
 class OnDiskDataset(Dataset):
@@ -243,21 +243,27 @@ class OnDiskDataset(Dataset):
             format: numpy
             in_memory: false
             path: edge_data/author-writes-paper-feat.npy
-        train_sets:
-          - - type: paper # could be null for homogeneous graph.
-              format: numpy
-              in_memory: true # If not specified, default to true.
-              path: set/paper-train.npy
-        validation_sets:
-          - - type: paper
-              format: numpy
-              in_memory: true
-              path: set/paper-validation.npy
-        test_sets:
-          - - type: paper
-              format: numpy
-              in_memory: true
-              path: set/paper-test.npy
+        train_set:
+          - type: paper # could be null for homogeneous graph.
+            data: # multiple data sources could be specified.
+              - format: numpy
+                in_memory: true # If not specified, default to true.
+                path: set/paper-train-src.npy
+              - format: numpy
+                in_memory: false
+                path: set/paper-train-dst.npy
+        validation_set:
+          - type: paper
+            data:
+              - format: numpy
+                in_memory: true
+                path: set/paper-validation.npy
+        test_set:
+          - type: paper
+            data:
+              - format: numpy
+                in_memory: true
+                path: set/paper-test.npy
 
     Parameters
     ----------
@@ -276,25 +282,25 @@ class OnDiskDataset(Dataset):
         self._num_classes = self._meta.num_classes
         self._num_labels = self._meta.num_labels
         self._graph = self._load_graph(self._meta.graph_topology)
-        self._feature = load_feature_stores(self._meta.feature_data)
-        self._train_sets = self._init_tvt_sets(self._meta.train_sets)
-        self._validation_sets = self._init_tvt_sets(self._meta.validation_sets)
-        self._test_sets = self._init_tvt_sets(self._meta.test_sets)
+        self._feature = TorchBasedFeatureStore(self._meta.feature_data)
+        self._train_set = self._init_tvt_set(self._meta.train_set)
+        self._validation_set = self._init_tvt_set(self._meta.validation_set)
+        self._test_set = self._init_tvt_set(self._meta.test_set)
 
     @property
-    def train_sets(self) -> List[ItemSet] or List[ItemSetDict]:
+    def train_set(self) -> ItemSet or ItemSetDict:
         """Return the training set."""
-        return self._train_sets
+        return self._train_set
 
     @property
-    def validation_sets(self) -> List[ItemSet] or List[ItemSetDict]:
+    def validation_set(self) -> ItemSet or ItemSetDict:
         """Return the validation set."""
-        return self._validation_sets
+        return self._validation_set
 
     @property
-    def test_sets(self) -> List[ItemSet] or List[ItemSetDict]:
+    def test_set(self) -> ItemSet or ItemSetDict:
         """Return the test set."""
-        return self._test_sets
+        return self._test_set
 
     @property
     def graph(self) -> object:
@@ -302,7 +308,7 @@ class OnDiskDataset(Dataset):
         return self._graph
 
     @property
-    def feature(self) -> Dict[Tuple, TorchBasedFeatureStore]:
+    def feature(self) -> TorchBasedFeatureStore:
         """Return the feature."""
         return self._feature
 
@@ -333,31 +339,31 @@ class OnDiskDataset(Dataset):
             f"Graph topology type {graph_topology.type} is not supported."
         )
 
-    def _init_tvt_sets(
-        self, tvt_sets: List[List[OnDiskTVTSet]]
-    ) -> List[ItemSet] or List[ItemSetDict]:
-        """Initialize the TVT sets."""
-        if (tvt_sets is None) or (len(tvt_sets) == 0):
-            return None
-        ret = []
-        for tvt_set in tvt_sets:
-            if (tvt_set is None) or (len(tvt_set) == 0):
-                ret.append(None)
-            if tvt_set[0].type is None:
-                assert (
-                    len(tvt_set) == 1
-                ), "Only one TVT set is allowed if type is not specified."
-                data = read_data(
-                    tvt_set[0].path, tvt_set[0].format, tvt_set[0].in_memory
+    def _init_tvt_set(
+        self, tvt_set: List[OnDiskTVTSet]
+    ) -> ItemSet or ItemSetDict:
+        """Initialize the TVT set."""
+        ret = None
+        if (tvt_set is None) or (len(tvt_set) == 0):
+            return ret
+        if tvt_set[0].type is None:
+            assert (
+                len(tvt_set) == 1
+            ), "Only one TVT set is allowed if type is not specified."
+            ret = ItemSet(
+                tuple(
+                    read_data(data.path, data.format, data.in_memory)
+                    for data in tvt_set[0].data
                 )
-                ret.append(ItemSet(tensor_to_tuple(data)))
-            else:
-                data = {}
-                for tvt in tvt_set:
-                    data[tvt.type] = ItemSet(
-                        tensor_to_tuple(
-                            read_data(tvt.path, tvt.format, tvt.in_memory)
-                        )
+            )
+        else:
+            data = {}
+            for tvt in tvt_set:
+                data[tvt.type] = ItemSet(
+                    tuple(
+                        read_data(data.path, data.format, data.in_memory)
+                        for data in tvt.data
                     )
-                ret.append(ItemSetDict(data))
+                )
+            ret = ItemSetDict(data)
         return ret

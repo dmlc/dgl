@@ -28,18 +28,19 @@ def evaluate(model, loader, node_embed, labels, category, device):
     total_loss = 0
     total_acc = 0
     count = 0
-    for input_nodes, seeds, blocks in loader:
-        blocks = [blk.to(device) for blk in blocks]
-        seeds = seeds[category]
-        emb = extract_embed(node_embed, input_nodes)
-        emb = {k: e.to(device) for k, e in emb.items()}
-        lbl = labels[seeds].to(device)
-        logits = model(emb, blocks)[category]
-        loss = F.cross_entropy(logits, lbl)
-        acc = th.sum(logits.argmax(dim=1) == lbl).item()
-        total_loss += loss.item() * len(seeds)
-        total_acc += acc
-        count += len(seeds)
+    with loader.enable_cpu_affinity():
+        for input_nodes, seeds, blocks in loader:
+            blocks = [blk.to(device) for blk in blocks]
+            seeds = seeds[category]
+            emb = extract_embed(node_embed, input_nodes)
+            emb = {k: e.to(device) for k, e in emb.items()}
+            lbl = labels[seeds].to(device)
+            logits = model(emb, blocks)[category]
+            loss = F.cross_entropy(logits, lbl)
+            acc = th.sum(logits.argmax(dim=1) == lbl).item()
+            total_loss += loss.item() * len(seeds)
+            total_acc += acc
+            count += len(seeds)
     return total_loss / count, total_acc / count
 
 
@@ -86,6 +87,12 @@ def main(args):
         labels = labels.to(device)
         embed_layer = embed_layer.to(device)
 
+    if args.num_workers <= 0:
+        raise ValueError(
+            "The '--num_workers' parameter value is expected "
+            "to be >0, but got {}.".format(args.num_workers)
+        )
+
     node_embed = embed_layer()
     # create model
     model = EntityClassify(
@@ -111,7 +118,7 @@ def main(args):
         sampler,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=0,
+        num_workers=args.num_workers,
     )
 
     # validation sampler
@@ -125,7 +132,7 @@ def main(args):
         val_sampler,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=0,
+        num_workers=args.num_workers,
     )
 
     # optimizer
@@ -134,53 +141,59 @@ def main(args):
 
     # training loop
     print("start training...")
-    dur = []
+    mean = 0
     for epoch in range(args.n_epochs):
         model.train()
         optimizer.zero_grad()
         if epoch > 3:
             t0 = time.time()
 
-        for i, (input_nodes, seeds, blocks) in enumerate(loader):
-            blocks = [blk.to(device) for blk in blocks]
-            seeds = seeds[
-                category
-            ]  # we only predict the nodes with type "category"
-            batch_tic = time.time()
-            emb = extract_embed(node_embed, input_nodes)
-            lbl = labels[seeds]
-            if use_cuda:
-                emb = {k: e.cuda() for k, e in emb.items()}
-                lbl = lbl.cuda()
-            logits = model(emb, blocks)[category]
-            loss = F.cross_entropy(logits, lbl)
-            loss.backward()
-            optimizer.step()
+        with loader.enable_cpu_affinity():
+            for i, (input_nodes, seeds, blocks) in enumerate(loader):
+                blocks = [blk.to(device) for blk in blocks]
+                seeds = seeds[
+                    category
+                ]  # we only predict the nodes with type "category"
+                batch_tic = time.time()
+                emb = extract_embed(node_embed, input_nodes)
+                lbl = labels[seeds]
+                if use_cuda:
+                    emb = {k: e.cuda() for k, e in emb.items()}
+                    lbl = lbl.cuda()
+                logits = model(emb, blocks)[category]
+                loss = F.cross_entropy(logits, lbl)
+                loss.backward()
+                optimizer.step()
 
-            train_acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(seeds)
-            print(
-                "Epoch {:05d} | Batch {:03d} | Train Acc: {:.4f} | Train Loss: {:.4f} | Time: {:.4f}".format(
-                    epoch, i, train_acc, loss.item(), time.time() - batch_tic
+                train_acc = th.sum(logits.argmax(dim=1) == lbl).item() / len(
+                    seeds
                 )
-            )
+                print(
+                    f"Epoch {epoch:05d} | Batch {i:03d} | Train Acc: "
+                    "{train_acc:.4f} | Train Loss: {loss.item():.4f} | Time: "
+                    "{time.time() - batch_tic:.4f}"
+                )
 
         if epoch > 3:
-            dur.append(time.time() - t0)
+            mean = (mean * (epoch - 3) + (time.time() - t0)) / (epoch - 2)
 
-        val_loss, val_acc = evaluate(
-            model, val_loader, node_embed, labels, category, device
-        )
-        print(
-            "Epoch {:05d} | Valid Acc: {:.4f} | Valid loss: {:.4f} | Time: {:.4f}".format(
-                epoch, val_acc, val_loss, np.average(dur)
+            val_loss, val_acc = evaluate(
+                model, val_loader, node_embed, labels, category, device
             )
-        )
+            print(
+                f"Epoch {epoch:05d} | Valid Acc: {val_acc:.4f} | Valid loss: "
+                "{val_loss:.4f} | Time: {mean:.4f}"
+            )
     print()
     if args.model_path is not None:
         th.save(model.state_dict(), args.model_path)
 
     output = model.inference(
-        g, args.batch_size, "cuda" if use_cuda else "cpu", 0, node_embed
+        g,
+        args.batch_size,
+        "cuda" if use_cuda else "cpu",
+        args.num_workers,
+        node_embed,
     )
     test_pred = output[category][test_idx]
     test_labels = labels[test_idx].to(test_pred.device)
@@ -245,6 +258,10 @@ if __name__ == "__main__":
         "be undesired if they cannot fit in GPU memory at once. "
         "This flag disables that.",
     )
+    parser.add_argument(
+        "--num_workers", type=int, default=4, help="Number of node dataloader"
+    )
+
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument("--validation", dest="validation", action="store_true")
     fp.add_argument("--testing", dest="validation", action="store_false")

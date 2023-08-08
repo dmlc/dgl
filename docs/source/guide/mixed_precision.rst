@@ -4,8 +4,8 @@ Chapter 8: Mixed Precision Training
 ===================================
 DGL is compatible with the `PyTorch Automatic Mixed Precision (AMP) package
 <https://pytorch.org/docs/stable/amp.html>`_
-for mixed precision training, thus saving both training time and GPU memory
-consumption. This feature requires DGL 0.9+.
+for mixed precision training, thus saving both training time and GPU/CPU memory
+consumption. This feature requires DGL 0.9+ and 1.1+ for CPU bloat16.
 
 Message-Passing with Half Precision
 -----------------------------------
@@ -58,18 +58,19 @@ DGL relies on PyTorch's AMP package for mixed precision training,
 and the user experience is exactly
 the same as `PyTorch's <https://pytorch.org/docs/stable/notes/amp_examples.html>`_.
 
-By wrapping the forward pass with ``torch.cuda.amp.autocast()``, PyTorch automatically
+By wrapping the forward pass with ``torch.amp.autocast()``, PyTorch automatically
 selects the appropriate datatype for each op and tensor. Half precision tensors are memory
-efficient, most operators on half precision tensors are faster as they leverage GPU tensorcores.
+efficient, most operators on half precision tensors are faster as they leverage GPU tensorcores
+and CPU special instructon set.
 
 .. code::
 
     import torch.nn.functional as F
-    from torch.cuda.amp import autocast
+    from torch.amp import autocast
 
-    def forward(g, feat, label, mask, model, amp_dtype):
+    def forward(device_type, g, feat, label, mask, model, amp_dtype):
         amp_enabled = amp_dtype in (torch.float16, torch.bfloat16)
-        with autocast(enabled=amp_enabled, dtype=amp_dtype):
+        with autocast(device_type, enabled=amp_enabled, dtype=amp_dtype):
             logit = model(g, feat)
             loss = F.cross_entropy(logit[mask], label[mask])
             return loss
@@ -104,7 +105,7 @@ Pay attention to the differences in the code when AMP is activated or not.
     from dgl.nn import GATConv
     from dgl.transforms import AddSelfLoop
 
-    amp_dtype = torch.float16  # or torch.bfloat16
+    amp_dtype = torch.bfloat16 # or torch.float16
 
     class GAT(nn.Module):
         def __init__(self,
@@ -130,7 +131,8 @@ Pay attention to the differences in the code when AMP is activated or not.
     # Data loading
     transform = AddSelfLoop()
     data = RedditDataset(transform)
-    dev = torch.device('cuda')
+    device_type = 'cuda' # or 'cpu'
+    dev = torch.device(device_type)
 
     g = data[0]
     g = g.int().to(dev)
@@ -151,7 +153,7 @@ Pay attention to the differences in the code when AMP is activated or not.
 
     for epoch in range(100):
         optimizer.zero_grad()
-        loss = forward(g, feat, label, train_mask, model, amp_dtype)
+        loss = forward(device_type, g, feat, label, train_mask, model, amp_dtype)
 
         if amp_dtype == torch.float16:
             # Backprop w/ gradient scaling
@@ -168,6 +170,88 @@ GPU memory, the loss converges to similar values in both settings.
 If we change the number of heads to ``[2, 2, 2]``, training without fp16
 triggers GPU OOM(out-of-memory) issue while training with fp16 consumes
 15.7G GPU memory.
+
+BFloat16 CPU example
+-----------------------------------
+DGL supports running training in the bfloat16 data type on the CPU.
+This data type doesn't require any CPU feature and can improve the performance of a memory-bound model.
+Starting with Intel Xeon 4th Generation, which has `AMX
+<https://www.intel.com/content/www/us/en/products/docs/accelerator-engines/advanced-matrix-extensions/overview.html>`_ instructon set, bfloat16 should significantly improve training and inference performance without huge code changes.
+Here is an example of simple GCN bfloat16 training:
+
+.. code::
+
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    import dgl
+    from dgl.data import CiteseerGraphDataset
+    from dgl.nn import GraphConv
+    from dgl.transforms import AddSelfLoop
+
+
+    class GCN(nn.Module):
+        def __init__(self, in_size, hid_size, out_size):
+            super().__init__()
+            self.layers = nn.ModuleList()
+            # two-layer GCN
+            self.layers.append(
+                GraphConv(in_size, hid_size, activation=F.relu)
+            )
+            self.layers.append(GraphConv(hid_size, out_size))
+            self.dropout = nn.Dropout(0.5)
+    
+        def forward(self, g, features):
+            h = features
+            for i, layer in enumerate(self.layers):
+                if i != 0:
+                    h = self.dropout(h)
+                h = layer(g, h)
+            return h
+
+
+    # Data loading
+    transform = AddSelfLoop()
+    data = CiteseerGraphDataset(transform=transform)
+
+    g = data[0]
+    g = g.int()
+    train_mask = g.ndata['train_mask']
+    feat = g.ndata['feat']
+    label = g.ndata['label']
+
+    in_size = feat.shape[1]
+    hid_size = 16
+    out_size = data.num_classes
+    model = GCN(in_size, hid_size, out_size)
+    
+    # Convert model and graph to bfloat16
+    g = dgl.to_bfloat16(g)
+    feat = feat.to(dtype=torch.bfloat16)
+    model = model.to(dtype=torch.bfloat16)
+    
+    model.train()
+
+    # Create optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
+    loss_fcn = nn.CrossEntropyLoss()
+
+    for epoch in range(100):
+        logits = model(g, feat)
+        loss = loss_fcn(logits[train_mask], label[train_mask])
+        
+        loss.backward()
+        optimizer.step()
+
+        print('Epoch {} | Loss {}'.format(epoch, loss.item()))
+
+The only difference with common training is model and graph conversion before training/inference.
+
+.. code::
+    g = dgl.to_bfloat16(g)
+    feat = feat.to(dtype=torch.bfloat16)
+    model = model.to(dtype=torch.bfloat16)
+
 
 DGL is still improving its half-precision support and the compute kernel's
 performance is far from optimal, please stay tuned to our future updates.

@@ -104,7 +104,7 @@ def _ns_dataloader(
                     node_ids.append(s)
                 if t not in node_ids:
                     node_ids.append(t)
-            g = dgl.DGLGraph()
+            g = dgl.graph([])
             g.add_nodes(len(node_ids))
             g.ndata["node_id"] = torch.tensor(node_ids, dtype=torch.long)
 
@@ -224,7 +224,7 @@ def _gc_dataloader(
                     node_ids.append(s)
                 if t not in node_ids:
                     node_ids.append(t)
-            g = dgl.DGLGraph()
+            g = dgl.graph([])
             g.add_nodes(len(node_ids))
             g.ndata["node_id"] = torch.tensor(node_ids, dtype=torch.long)
 
@@ -346,7 +346,7 @@ def _path_finding_dataloader(
                     node_ids.append(s)
                 if t not in node_ids:
                     node_ids.append(t)
-            g = dgl.DGLGraph()
+            g = dgl.graph([])
             g.add_nodes(len(node_ids))
             g.ndata["node_id"] = torch.tensor(node_ids, dtype=torch.long)
 
