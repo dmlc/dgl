@@ -861,3 +861,64 @@ def test_from_dglgraph_heterogeneous():
         ("n2", "r21", "n1"): 2,
         ("n2", "r23", "n3"): 3,
     }
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize("replace", [True, False])
+@pytest.mark.parametrize("labor", [False, True])
+@pytest.mark.parametrize(
+    "fanouts, probs_name",
+    [
+        ([2], "mask"),
+        ([3], "mask"),
+        ([4], "mask"),
+        ([-1], "mask"),
+        ([3], "all"),
+        ([-1], "all"),
+        ([3], "zero"),
+        ([-1], "zero"),
+        ([3], "none"),
+        ([-1], "none"),
+    ],
+)
+def test_sample_neighbors_pick_number(fanouts, replace, labor, probs_name):
+    """Original graph in COO:
+    1   1   1   1   1   1
+    0   0   0   0   0   0
+    0   0   0   0   0   0
+    0   0   0   0   0   0
+    0   0   0   0   0   0
+    0   0   0   0   0   0
+    """
+    # Initialize data.
+    num_nodes = 6
+    num_edges = 6
+    indptr = torch.LongTensor([0, 6, 6, 6, 6, 6, 6])
+    indices = torch.LongTensor([0, 1, 2, 3, 4, 5])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    edge_attributes = {
+        "mask": torch.BoolTensor([1, 0, 0, 1, 0, 1]),
+        "all": torch.BoolTensor([1, 1, 1, 1, 1, 1]),
+        "zero": torch.BoolTensor([0, 0, 0, 0, 0, 0]),
+    }
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(indptr, indices, edge_attributes=edge_attributes)
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([0, 1])
+
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    # Make sure the check inside are all passed.
+    subgraph = sampler(
+        nodes,
+        fanouts=torch.LongTensor(fanouts),
+        replace=replace,
+        probs_name=probs_name if probs_name != "none" else None,
+    )

@@ -158,18 +158,14 @@ int64_t NumPick(
     int64_t fanout, bool replace,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
     int64_t num_neighbors) {
-  int64_t actual_fanout = fanout == -1 ? num_neighbors : fanout;
-  int64_t max_count =
+  int64_t num_valid_neighbors =
       probs_or_mask.has_value()
-          ? torch::count_nonzero(
+          ? *torch::count_nonzero(
                 probs_or_mask.value().slice(0, offset, offset + num_neighbors))
-                .item<int64_t>()
+                .data_ptr<int64_t>()
           : num_neighbors;
-  if (replace) {
-    return max_count == 0 ? 0 : actual_fanout;
-  } else {
-    return std::min(max_count, actual_fanout);
-  }
+  if (num_valid_neighbors == 0 || fanout == -1) return num_valid_neighbors;
+  return replace ? fanout : std::min(fanout, num_valid_neighbors);
 }
 
 int64_t NumPickByEtype(
@@ -178,7 +174,6 @@ int64_t NumPickByEtype(
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
     int64_t num_neighbors) {
   int64_t etype_begin = offset;
-  int64_t etype_end = offset;
   const int64_t end = offset + num_neighbors;
   int64_t total_count = 0;
   AT_DISPATCH_INTEGRAL_TYPES(
@@ -192,7 +187,7 @@ int64_t NumPickByEtype(
           auto etype_end_it = std::upper_bound(
               type_per_edge_data + etype_begin, type_per_edge_data + end,
               etype);
-          etype_end = etype_end_it - type_per_edge_data;
+          int64_t etype_end = etype_end_it - type_per_edge_data;
           // Do sampling for one etype.
           total_count += NumPick(
               fanouts[etype], replace, probs_or_mask, etype_begin,
@@ -312,7 +307,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                   local_grain_size);
 
               for (scalar_t i = begin; i < end; ++i) {
-                const auto nid = nodes[i].item<int64_t>();
+                const auto nid = *nodes[i].data_ptr<int64_t>();
                 TORCH_CHECK(
                     nid >= 0 && nid < NumNodes(),
                     "The seed nodes' IDs should fall within the range of the "
@@ -335,7 +330,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                 num_picked_neighbors_per_node[i + 1] =
                     picked_neighbors_cur_thread[i - begin].size(0);
                 TORCH_CHECK(
-                    num_picked_neighbors_per_node[i + 1].item<int64_t>() ==
+                    *num_picked_neighbors_per_node[i + 1].data_ptr<int64_t>() ==
                         num_pick_fn(offset, num_neighbors),
                     "Return value of num_pick_fn doesn't match the actual "
                     "picked number.");
