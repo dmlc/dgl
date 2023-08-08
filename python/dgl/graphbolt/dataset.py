@@ -41,7 +41,7 @@ class TaskMetadata:
     @property
     def task_type(self) -> str:
         """Return the task type."""
-        return self._task_type
+        return self._task_type.value
 
 
 class ClassificationTaskMetadata(TaskMetadata):

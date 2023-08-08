@@ -12,12 +12,7 @@ import yaml
 
 import dgl
 
-from ..dataset import (
-    ClassificationTaskMetadata,
-    Dataset,
-    Task,
-    TaskMetadata,
-)
+from ..dataset import ClassificationTaskMetadata, Dataset, Task, TaskMetadata
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, save_data
 
