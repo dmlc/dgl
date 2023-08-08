@@ -19,7 +19,7 @@ def to_on_disk_tensor(test_dir, name, t):
 
 
 @pytest.mark.parametrize("in_memory", [True, False])
-def test_torch_based_feature_store(in_memory):
+def test_torch_based_feature(in_memory):
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([1, 2, 3])
         b = torch.tensor([[1, 2, 3], [4, 5, 6]])
@@ -27,8 +27,8 @@ def test_torch_based_feature_store(in_memory):
             a = to_on_disk_tensor(test_dir, "a", a)
             b = to_on_disk_tensor(test_dir, "b", b)
 
-        feat_store_a = gb.TorchBasedFeatureStore(a)
-        feat_store_b = gb.TorchBasedFeatureStore(b)
+        feat_store_a = gb.TorchBasedFeature(a)
+        feat_store_b = gb.TorchBasedFeature(b)
 
         assert torch.equal(feat_store_a.read(), torch.tensor([1, 2, 3]))
         assert torch.equal(
@@ -71,7 +71,7 @@ def write_tensor_to_disk(dir, name, t, fmt="torch"):
 
 
 @pytest.mark.parametrize("in_memory", [True, False])
-def test_load_feature_stores(in_memory):
+def test_torch_based_feature_store(in_memory):
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([1, 2, 3])
         b = torch.tensor([2, 5, 3])
@@ -95,12 +95,12 @@ def test_load_feature_stores(in_memory):
                 in_memory=in_memory,
             ),
         ]
-        feat_stores = gb.load_feature_stores(feat_data)
+        feat_store = gb.TorchBasedFeatureStore(feat_data)
         assert torch.equal(
-            feat_stores[("node", "paper", "a")].read(), torch.tensor([1, 2, 3])
+            feat_store.read("node", "paper", "a"), torch.tensor([1, 2, 3])
         )
         assert torch.equal(
-            feat_stores[("edge", "paper-cites-paper", "b")].read(),
+            feat_store.read("edge", "paper-cites-paper", "b"),
             torch.tensor([2, 5, 3]),
         )
 
@@ -130,6 +130,8 @@ def test_load_feature_stores(in_memory):
                 in_memory=True,
             ),
         ]
-        feat_stores = gb.load_feature_stores(feat_data)
-        assert ("node", None, "a") in feat_stores
+        feat_store = gb.TorchBasedFeatureStore(feat_data)
+        assert torch.equal(
+            feat_store.read("node", None, "a"), torch.tensor([1, 2, 3])
+        )
         feat_stores = None
