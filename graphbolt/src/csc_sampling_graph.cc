@@ -614,22 +614,12 @@ inline torch::Tensor LaborPick(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::LABOR> args) {
-  // This part of code is used for calculating the picked number, which will
-  // soon be deleted as the picked number will be calculated in advance.
-  int64_t num_valid_neighbors =
-      NonUniform ? torch::count_nonzero(probs_or_mask.value().slice(
-                                            0, offset, offset + num_neighbors))
-                       .item<int64_t>()
-                 : num_neighbors;
-  if (num_valid_neighbors == 0) {
-    return torch::tensor({}, options);
-  }
-  if constexpr (Replace) {
-    fanout = fanout < 0 ? num_valid_neighbors : fanout;
-  } else {
-    fanout = fanout < 0 ? num_valid_neighbors
-                        : std::min(fanout, num_valid_neighbors);
-  }
+  // TODO: fix inconsistency with Neighbor sampler.
+  // 1. Replace = true, fanout = -1. Expected: sample all neighbors with
+  // non-zero probility once regardless of replacement.
+  // 2. Replace = true, fanout > num_neighbors. Expected: sample fanout many
+  // neighbors.
+  fanout = fanout < 0 ? num_neighbors : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
     return torch::arange(offset, offset + num_neighbors, options);
   }
