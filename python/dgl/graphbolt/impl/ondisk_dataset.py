@@ -60,6 +60,10 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     output_config_path : str
         The path to the output config file.
     """
+    # Convert the dataset_dir to absolute path if it is not.
+    if not os.path.isabs(dataset_dir):
+        dataset_dir = os.path.abspath(dataset_dir)
+
     # Check if the dataset path is valid.
     if not os.path.exists(dataset_dir):
         raise RuntimeError(f"Invalid dataset path: {dataset_dir}")
