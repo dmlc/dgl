@@ -1,20 +1,20 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file array/cpu/concurrent_id_hash_map.h
- * @brief Class about concurrent id hash map
+ * @file concurrent_id_hash_map.h
+ * @brief Class about concurrent id hash map.
  */
 
-#ifndef DGL_ARRAY_CPU_CONCURRENT_ID_HASH_MAP_H_
-#define DGL_ARRAY_CPU_CONCURRENT_ID_HASH_MAP_H_
+#ifndef GRAPHBOLT_CONCURRENT_ID_HASH_MAP_H_
+#define GRAPHBOLT_CONCURRENT_ID_HASH_MAP_H_
 
-#include <dgl/aten/types.h>
+#include <torch/torch.h>
 
 #include <functional>
 #include <memory>
 #include <vector>
 
-namespace dgl {
-namespace aten {
+namespace graphbolt {
+namespace sampling {
 
 /**
  * @brief A CPU targeted hashmap for mapping duplicate and non-consecutive ids
@@ -73,20 +73,6 @@ class ConcurrentIdHashMap {
 
  public:
   /**
-   * @brief An entry in the hashtable.
-   */
-  struct Mapping {
-    /**
-     * @brief The ID of the item inserted.
-     */
-    IdType key;
-    /**
-     * @brief The value of the item inserted.
-     */
-    IdType value;
-  };
-
-  /**
    * @brief Cross platform CAS operation.
    * It is an atomic operation that compares the contents of a memory
    * location with a given value and, only if they are the same, modifies
@@ -115,7 +101,7 @@ class ConcurrentIdHashMap {
    *
    * @return Unique ids from the input `ids`.
    */
-  IdArray Init(const IdArray& ids, size_t num_seeds);
+  torch::Tensor Init(const torch::Tensor& ids, size_t num_seeds);
 
   /**
    * @brief Find mappings of given keys.
@@ -124,7 +110,7 @@ class ConcurrentIdHashMap {
    *
    * @return Mapping results corresponding to `ids`.
    */
-  IdArray MapIds(const IdArray& ids) const;
+  torch::Tensor MapIds(const torch::Tensor& ids) const;
 
  private:
   /**
@@ -186,7 +172,7 @@ class ConcurrentIdHashMap {
   /**
    * @brief Hash maps which is used to store all elements.
    */
-  std::unique_ptr<Mapping[], std::function<void(Mapping*)>> hash_map_;
+  torch::Tensor hash_map_;
 
   /**
    * @brief Mask which is assisted to get the position in the table
@@ -195,10 +181,7 @@ class ConcurrentIdHashMap {
   IdType mask_;
 };
 
-template <typename IdType>
-bool BoolCompareAndSwap(IdType* ptr);
+}  // namespace sampling
+}  // namespace graphbolt
 
-}  // namespace aten
-}  // namespace dgl
-
-#endif  // DGL_ARRAY_CPU_CONCURRENT_ID_HASH_MAP_H_
+#endif  // GRAPHBOLT_CONCURRENT_ID_HASH_MAP_H_
