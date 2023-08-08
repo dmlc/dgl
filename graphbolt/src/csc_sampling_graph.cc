@@ -329,10 +329,10 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
  * >= 0 or -1.
- *  - When the value is -1, all neighbors with non-zero probability will be
- * sampled once regardless of replacement. It is equivalent to selecting all
- * neighbors with non-zero probability when the fanout is >= the number of
- * neighbors (and replacement is set to false).
+ *  - When the value is -1, all neighbors (with non-zero probability, if
+ * weighted) will be sampled once regardless of replacement. It is equivalent to
+ * selecting all neighbors with non-zero probability when the fanout is >= the
+ * number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
  * @param replace Boolean indicating whether the sample is performed with or
@@ -459,10 +459,10 @@ inline torch::Tensor UniformPick(
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
  * >= 0 or -1.
- *  - When the value is -1, all neighbors with non-zero probability will be
- * sampled once regardless of replacement. It is equivalent to selecting all
- * neighbors with non-zero probability when the fanout is >= the number of
- * neighbors (and replacement is set to false).
+ *  - When the value is -1, all neighbors (with non-zero probability, if
+ * weighted) will be sampled once regardless of replacement. It is equivalent to
+ * selecting all neighbors with non-zero probability when the fanout is >= the
+ * number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
  * @param replace Boolean indicating whether the sample is performed with or
@@ -594,10 +594,10 @@ inline void safe_divide(T& a, U b) {
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
  * >= 0 or -1.
- *  - When the value is -1, all neighbors with non-zero probability will be
- * sampled once regardless of replacement. It is equivalent to selecting all
- * neighbors with non-zero probability when the fanout is >= the number of
- * neighbors (and replacement is set to false).
+ *  - When the value is -1, all neighbors (with non-zero probability, if
+ * weighted) will be sampled once regardless of replacement. It is equivalent to
+ * selecting all neighbors with non-zero probability when the fanout is >= the
+ * number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
  * @param options Tensor options specifying the desired data type of the result.
