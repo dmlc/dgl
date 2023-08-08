@@ -1268,7 +1268,9 @@ def test_dotgat_conv_bi(g, idtype, out_dim, num_heads):
 def test_dense_cheb_conv(out_dim):
     for k in range(1, 4):
         ctx = F.ctx()
-        g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        g = dgl.from_scipy(
+            sp.sparse.random(100, 100, density=0.1), readonly=True
+        )
         g = g.to(F.ctx())
         adj = g.adj_external(transpose=True, ctx=ctx).to_dense()
         cheb = nn.ChebConv(5, out_dim, k, None)
