@@ -60,10 +60,6 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     output_config_path : str
         The path to the output config file.
     """
-    # Convert the dataset_dir to absolute path if it is not.
-    if not os.path.isabs(dataset_dir):
-        dataset_dir = os.path.abspath(dataset_dir)
-
     # Check if the dataset path is valid.
     if not os.path.exists(dataset_dir):
         raise RuntimeError(f"Invalid dataset path: {dataset_dir}")
@@ -80,7 +76,8 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         return os.path.join(dataset_dir, "preprocessed/metadata.yaml")
 
     print("Start to preprocess the on-disk dataset.")
-    processed_dir_prefix = os.path.join(dataset_dir, "preprocessed")
+    # processed_dir_prefix = os.path.join(dataset_dir, "preprocessed")
+    processed_dir_prefix = "preprocessed"
 
     # Check if the metadata.yaml exists.
     metadata_file_path = os.path.join(dataset_dir, "metadata.yaml")
@@ -92,7 +89,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         input_config = yaml.safe_load(f)
 
     # 1. Make `processed_dir_abs` directory if it does not exist.
-    os.makedirs(processed_dir_prefix, exist_ok=True)
+    os.makedirs(os.path.join(dataset_dir, processed_dir_prefix), exist_ok=True)
     output_config = deepcopy(input_config)
 
     # 2. Load the edge data and create a DGLGraph.
@@ -160,7 +157,11 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     )
 
     save_csc_sampling_graph(
-        csc_sampling_graph, output_config["graph_topology"]["path"]
+        csc_sampling_graph,
+        os.path.join(
+            dataset_dir,
+            output_config["graph_topology"]["path"],
+        ),
     )
     del output_config["graph"]
 
@@ -176,7 +177,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
             )
             _copy_or_convert_data(
                 os.path.join(dataset_dir, feature["path"]),
-                out_feature["path"],
+                os.path.join(dataset_dir, out_feature["path"]),
                 feature["format"],
                 out_feature["format"],
                 feature["in_memory"],
@@ -200,7 +201,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                 )
                 _copy_or_convert_data(
                     os.path.join(dataset_dir, input_data["path"]),
-                    output_data["path"],
+                    os.path.join(dataset_dir, output_data["path"]),
                     input_data["format"],
                     output_data["format"],
                 )
@@ -278,10 +279,12 @@ class OnDiskDataset(Dataset):
     def __init__(self, path: str) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
+        self.dataset_dir = path
         path = preprocess_ondisk_dataset(path)
         with open(path) as f:
-            yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
-            self._meta = OnDiskMetaData(**yaml_data)
+            self.yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
+        self._convert_yaml_path_to_absolute_path()
+        self._meta = OnDiskMetaData(**self.yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._num_classes = self._meta.num_classes
         self._num_labels = self._meta.num_labels
@@ -290,6 +293,24 @@ class OnDiskDataset(Dataset):
         self._train_set = self._init_tvt_set(self._meta.train_set)
         self._validation_set = self._init_tvt_set(self._meta.validation_set)
         self._test_set = self._init_tvt_set(self._meta.test_set)
+
+    def _convert_yaml_path_to_absolute_path(self):
+        """Convert the path in YAML file to absolute path."""
+        if "graph_topology" in self.yaml_data:
+            self.yaml_data["graph_topology"]["path"] = os.path.join(
+                self.dataset_dir, self.yaml_data["graph_topology"]["path"]
+            )
+        if "feature_data" in self.yaml_data:
+            for feature in self.yaml_data["feature_data"]:
+                feature["path"] = os.path.join(
+                    self.dataset_dir, feature["path"]
+                )
+        for set_name in ["train_set", "validation_set", "test_set"]:
+            if set_name not in self.yaml_data:
+                continue
+            for set_per_type in self.yaml_data[set_name]:
+                for data in set_per_type["data"]:
+                    data["path"] = os.path.join(self.dataset_dir, data["path"])
 
     @property
     def train_set(self) -> ItemSet or ItemSetDict:
