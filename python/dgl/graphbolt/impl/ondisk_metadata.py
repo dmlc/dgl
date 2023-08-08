@@ -15,6 +15,7 @@ __all__ = [
     "OnDiskMetaData",
     "OnDiskGraphTopologyType",
     "OnDiskGraphTopology",
+    "OnDiskTask",
 ]
 
 
@@ -71,6 +72,17 @@ class OnDiskGraphTopology(pydantic.BaseModel):
     path: str
 
 
+class OnDiskTask(pydantic.BaseModel):
+    """Task specification in YAML."""
+
+    name: Optional[str] = None
+    num_classes: Optional[int] = None
+    num_labels: Optional[int] = None
+    train_set: Optional[List[OnDiskTVTSet]] = []
+    validation_set: Optional[List[OnDiskTVTSet]] = []
+    test_set: Optional[List[OnDiskTVTSet]] = []
+
+
 class OnDiskMetaData(pydantic.BaseModel):
     """Metadata specification in YAML.
 
@@ -83,6 +95,4 @@ class OnDiskMetaData(pydantic.BaseModel):
     num_labels: Optional[int] = None
     graph_topology: Optional[OnDiskGraphTopology] = None
     feature_data: Optional[List[OnDiskFeatureData]] = []
-    train_set: Optional[List[OnDiskTVTSet]] = []
-    validation_set: Optional[List[OnDiskTVTSet]] = []
-    test_set: Optional[List[OnDiskTVTSet]] = []
+    tasks: Optional[List[OnDiskTask]] = []

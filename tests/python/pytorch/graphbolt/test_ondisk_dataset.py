@@ -22,11 +22,12 @@ def test_OnDiskDataset_TVTSet_exceptions():
 
         # Case 1: ``format`` is invalid.
         yaml_content = """
-        train_set:
-          - type: paper
-            data:
-              - format: torch_invalid
-                path: set/paper-train.pt
+        tasks:
+          - train_set:
+              - type: paper
+                data:
+                  - format: torch_invalid
+                    path: set/paper-train.pt
         """
         yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -37,15 +38,16 @@ def test_OnDiskDataset_TVTSet_exceptions():
         # Case 2: ``type`` is not specified while multiple TVT sets are
         # specified.
         yaml_content = """
-            train_set:
-              - type: null
-                data:
-                  - format: numpy
-                    path: set/train.npy
-              - type: null
-                data:
-                  - format: numpy
-                    path: set/train.npy
+            tasks:
+              - train_set:
+                - type: null
+                  data:
+                    - format: numpy
+                      path: set/train.npy
+                - type: null
+                  data:
+                    - format: numpy
+                      path: set/train.npy
         """
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
@@ -85,32 +87,36 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         #   ``type`` is not specified or specified as ``null``.
         #   ``in_memory`` could be ``true`` and ``false``.
         yaml_content = f"""
-            train_set:
-              - type: null
-                data:
-                  - format: numpy
-                    in_memory: true
-                    path: {train_ids_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {train_labels_path}
-            validation_set:
-              - data:
-                  - format: numpy
-                    in_memory: true
-                    path: {validation_ids_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {validation_labels_path}
-            test_set:
-              - type: null
-                data:
-                  - format: numpy
-                    in_memory: true
-                    path: {test_ids_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {test_labels_path}
+            tasks:
+              - name: node_classification
+                num_classes: 10
+                num_labels: 10
+                train_set:
+                  - type: null
+                    data:
+                      - format: numpy
+                        in_memory: true
+                        path: {train_ids_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {train_labels_path}
+                validation_set:
+                  - data:
+                      - format: numpy
+                        in_memory: true
+                        path: {validation_ids_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {validation_labels_path}
+                test_set:
+                  - type: null
+                    data:
+                      - format: numpy
+                        in_memory: true
+                        path: {test_ids_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {test_labels_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
         yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
@@ -119,8 +125,14 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
 
         dataset = gb.OnDiskDataset(test_dir)
 
+        # Verify tasks.
+        assert len(dataset.tasks) == 1
+        assert dataset.tasks[0].name == "node_classification"
+        assert dataset.tasks[0].num_classes == 10
+        assert dataset.tasks[0].num_labels == 10
+
         # Verify train set.
-        train_set = dataset.train_set
+        train_set = dataset.tasks[0].train_set
         assert len(train_set) == 1000
         assert isinstance(train_set, gb.ItemSet)
         for i, (id, label) in enumerate(train_set):
@@ -129,7 +141,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         train_set = None
 
         # Verify validation set.
-        validation_set = dataset.validation_set
+        validation_set = dataset.tasks[0].validation_set
         assert len(validation_set) == 1000
         assert isinstance(validation_set, gb.ItemSet)
         for i, (id, label) in enumerate(validation_set):
@@ -138,7 +150,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         validation_set = None
 
         # Verify test set.
-        test_set = dataset.test_set
+        test_set = dataset.tasks[0].test_set
         assert len(test_set) == 1000
         assert isinstance(test_set, gb.ItemSet)
         for i, (id, label) in enumerate(test_set):
@@ -149,20 +161,21 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
 
         # Case 2: Some TVT sets are None.
         yaml_content = f"""
-            train_set:
-              - type: null
-                data:
-                  - format: numpy
-                    path: {train_ids_path}
+            tasks:
+              - train_set:
+                  - type: null
+                    data:
+                      - format: numpy
+                        path: {train_ids_path}
         """
         yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
         dataset = gb.OnDiskDataset(test_dir)
-        assert dataset.train_set is not None
-        assert dataset.validation_set is None
-        assert dataset.test_set is None
+        assert dataset.tasks[0].train_set is not None
+        assert dataset.tasks[0].validation_set is None
+        assert dataset.tasks[0].test_set is None
         dataset = None
 
 
@@ -200,41 +213,42 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
         np.save(test_labels_path, test_labels)
 
         yaml_content = f"""
-            train_set:
-              - type: null
-                data:
-                  - format: numpy
-                    in_memory: true
-                    path: {train_src_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {train_dst_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {train_labels_path}
-            validation_set:
-              - data:
-                  - format: numpy
-                    in_memory: true
-                    path: {validation_src_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {validation_dst_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {validation_labels_path}
-            test_set:
-              - type: null
-                data:
-                  - format: numpy
-                    in_memory: true
-                    path: {test_src_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {test_dst_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {test_labels_path}
+            tasks:
+              - train_set:
+                  - type: null
+                    data:
+                      - format: numpy
+                        in_memory: true
+                        path: {train_src_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {train_dst_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {train_labels_path}
+                validation_set:
+                  - data:
+                      - format: numpy
+                        in_memory: true
+                        path: {validation_src_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {validation_dst_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {validation_labels_path}
+                test_set:
+                  - type: null
+                    data:
+                      - format: numpy
+                        in_memory: true
+                        path: {test_src_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {test_dst_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {test_labels_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
         yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
@@ -244,7 +258,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
         dataset = gb.OnDiskDataset(test_dir)
 
         # Verify train set.
-        train_set = dataset.train_set
+        train_set = dataset.tasks[0].train_set
         assert len(train_set) == 1000
         assert isinstance(train_set, gb.ItemSet)
         for i, (src, dst, label) in enumerate(train_set):
@@ -254,7 +268,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
         train_set = None
 
         # Verify validation set.
-        validation_set = dataset.validation_set
+        validation_set = dataset.tasks[0].validation_set
         assert len(validation_set) == 1000
         assert isinstance(validation_set, gb.ItemSet)
         for i, (src, dst, label) in enumerate(validation_set):
@@ -264,7 +278,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
         validation_set = None
 
         # Verify test set.
-        test_set = dataset.test_set
+        test_set = dataset.tasks[0].test_set
         assert len(test_set) == 1000
         assert isinstance(test_set, gb.ItemSet)
         for i, (src, dst, label) in enumerate(test_set):
@@ -313,41 +327,42 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_negs():
         np.save(test_neg_dst_path, test_neg_dst)
 
         yaml_content = f"""
-            train_set:
-              - type: null
-                data:
-                  - format: numpy
-                    in_memory: true
-                    path: {train_src_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {train_dst_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {train_neg_dst_path}
-            validation_set:
-              - data:
-                  - format: numpy
-                    in_memory: true
-                    path: {validation_src_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {validation_dst_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {validation_neg_dst_path}
-            test_set:
-              - type: null
-                data:
-                  - format: numpy
-                    in_memory: true
-                    path: {test_src_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {test_dst_path}
-                  - format: numpy
-                    in_memory: true
-                    path: {test_neg_dst_path}
+            tasks:
+              - train_set:
+                  - type: null
+                    data:
+                      - format: numpy
+                        in_memory: true
+                        path: {train_src_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {train_dst_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {train_neg_dst_path}
+                validation_set:
+                  - data:
+                      - format: numpy
+                        in_memory: true
+                        path: {validation_src_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {validation_dst_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {validation_neg_dst_path}
+                test_set:
+                  - type: null
+                    data:
+                      - format: numpy
+                        in_memory: true
+                        path: {test_src_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {test_dst_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {test_neg_dst_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
         yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
@@ -357,7 +372,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_negs():
         dataset = gb.OnDiskDataset(test_dir)
 
         # Verify train set.
-        train_set = dataset.train_set
+        train_set = dataset.tasks[0].train_set
         assert len(train_set) == 1000
         assert isinstance(train_set, gb.ItemSet)
         for i, (src, dst, negs) in enumerate(train_set):
@@ -367,7 +382,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_negs():
         train_set = None
 
         # Verify validation set.
-        validation_set = dataset.validation_set
+        validation_set = dataset.tasks[0].validation_set
         assert len(validation_set) == 1000
         assert isinstance(validation_set, gb.ItemSet)
         for i, (src, dst, negs) in enumerate(validation_set):
@@ -377,7 +392,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_negs():
         validation_set = None
 
         # Verify test set.
-        test_set = dataset.test_set
+        test_set = dataset.tasks[0].test_set
         assert len(test_set) == 1000
         assert isinstance(test_set, gb.ItemSet)
         for i, (src, dst, negs) in enumerate(test_set):
@@ -410,35 +425,36 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         np.save(test_path, test_data)
 
         yaml_content = f"""
-            train_set:
-              - type: paper
-                data:
-                  - format: numpy
-                    in_memory: true
-                    path: {train_path}
-              - type: author
-                data:
-                  - format: numpy
-                    path: {train_path}
-            validation_set:
-              - type: paper
-                data:
-                  - format: numpy
-                    path: {validation_path}
-              - type: author
-                data:
-                  - format: numpy
-                    path: {validation_path}
-            test_set:
-              - type: paper
-                data:
-                  - format: numpy
-                    in_memory: false
-                    path: {test_path}
-              - type: author
-                data:
-                  - format: numpy
-                    path: {test_path}
+            tasks:
+              - train_set:
+                  - type: paper
+                    data:
+                      - format: numpy
+                        in_memory: true
+                        path: {train_path}
+                  - type: author
+                    data:
+                      - format: numpy
+                        path: {train_path}
+                validation_set:
+                  - type: paper
+                    data:
+                      - format: numpy
+                        path: {validation_path}
+                  - type: author
+                    data:
+                      - format: numpy
+                        path: {validation_path}
+                test_set:
+                  - type: paper
+                    data:
+                      - format: numpy
+                        in_memory: false
+                        path: {test_path}
+                  - type: author
+                    data:
+                      - format: numpy
+                        path: {test_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
         yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
@@ -448,7 +464,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         dataset = gb.OnDiskDataset(test_dir)
 
         # Verify train set.
-        train_set = dataset.train_set
+        train_set = dataset.tasks[0].train_set
         assert len(train_set) == 2000
         assert isinstance(train_set, gb.ItemSetDict)
         for i, item in enumerate(train_set):
@@ -462,7 +478,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         train_set = None
 
         # Verify validation set.
-        validation_set = dataset.validation_set
+        validation_set = dataset.tasks[0].validation_set
         assert len(validation_set) == 2000
         assert isinstance(validation_set, gb.ItemSetDict)
         for i, item in enumerate(validation_set):
@@ -476,7 +492,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
         validation_set = None
 
         # Verify test set.
-        test_set = dataset.test_set
+        test_set = dataset.tasks[0].test_set
         assert len(test_set) == 2000
         assert isinstance(test_set, gb.ItemSetDict)
         for i, item in enumerate(test_set):
@@ -513,35 +529,36 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
         np.save(test_path, test_data)
 
         yaml_content = f"""
-            train_set:
-              - type: paper
-                data:
-                  - format: numpy
-                    in_memory: true
-                    path: {train_path}
-              - type: author
-                data:
-                  - format: numpy
-                    path: {train_path}
-            validation_set:
-              - type: paper
-                data:
-                  - format: numpy
-                    path: {validation_path}
-              - type: author
-                data:
-                  - format: numpy
-                    path: {validation_path}
-            test_set:
-              - type: paper
-                data:
-                  - format: numpy
-                    in_memory: false
-                    path: {test_path}
-              - type: author
-                data:
-                  - format: numpy
-                    path: {test_path}
+            tasks:
+              - train_set:
+                  - type: paper
+                    data:
+                      - format: numpy
+                        in_memory: true
+                        path: {train_path}
+                  - type: author
+                    data:
+                      - format: numpy
+                        path: {train_path}
+                validation_set:
+                  - type: paper
+                    data:
+                      - format: numpy
+                        path: {validation_path}
+                  - type: author
+                    data:
+                      - format: numpy
+                        path: {validation_path}
+                test_set:
+                  - type: paper
+                    data:
+                      - format: numpy
+                        in_memory: false
+                        path: {test_path}
+                  - type: author
+                    data:
+                      - format: numpy
+                        path: {test_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
         yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
@@ -551,7 +568,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
         dataset = gb.OnDiskDataset(test_dir)
 
         # Verify train set.
-        train_set = dataset.train_set
+        train_set = dataset.tasks[0].train_set
         assert len(train_set) == 2000
         assert isinstance(train_set, gb.ItemSetDict)
         for i, item in enumerate(train_set):
@@ -566,7 +583,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
         train_set = None
 
         # Verify validation set.
-        validation_set = dataset.validation_set
+        validation_set = dataset.tasks[0].validation_set
         assert len(validation_set) == 2000
         assert isinstance(validation_set, gb.ItemSetDict)
         for i, item in enumerate(validation_set):
@@ -581,7 +598,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
         validation_set = None
 
         # Verify test set.
-        test_set = dataset.test_set
+        test_set = dataset.tasks[0].test_set
         assert len(test_set) == 2000
         assert isinstance(test_set, gb.ItemSetDict)
         for i, item in enumerate(test_set):
@@ -860,12 +877,8 @@ def test_OnDiskDataset_Metadata():
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
         dataset_name = "graphbolt_test"
-        num_classes = 10
-        num_labels = 9
         yaml_content = f"""
             dataset_name: {dataset_name}
-            num_classes: {num_classes}
-            num_labels: {num_labels}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
         yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
@@ -874,8 +887,6 @@ def test_OnDiskDataset_Metadata():
 
         dataset = gb.OnDiskDataset(test_dir)
         assert dataset.dataset_name == dataset_name
-        assert dataset.num_classes == num_classes
-        assert dataset.num_labels == num_labels
 
         # Only dataset_name is specified.
         yaml_content = f"""
@@ -887,8 +898,6 @@ def test_OnDiskDataset_Metadata():
 
         dataset = gb.OnDiskDataset(test_dir)
         assert dataset.dataset_name == dataset_name
-        assert dataset.num_classes is None
-        assert dataset.num_labels is None
 
 
 def test_OnDiskDataset_preprocess_homogeneous():
@@ -945,8 +954,6 @@ def test_OnDiskDataset_preprocess_homogeneous():
 
         yaml_content = f"""
             dataset_name: {dataset_name}
-            num_classes: {num_classes}
-            num_labels: {num_labels}
             graph: # graph structure and required attributes.
                 nodes:
                     - num: {num_nodes}
@@ -967,21 +974,24 @@ def test_OnDiskDataset_preprocess_homogeneous():
                   format: numpy
                   in_memory: false
                   path: data/node-feat.npy
-            train_set:
-                - type_name: null
-                  data:
-                    - format: numpy
-                      path: set/train.npy
-            validation_set:
-                - type_name: null
-                  data:
-                    - format: numpy
-                      path: set/validation.npy
-            test_set:
-                - type_name: null
-                  data:
-                    - format: numpy
-                      path: set/test.npy
+            tasks:
+              - num_classes: {num_classes}
+                num_labels: {num_labels}
+                train_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: set/train.npy
+                validation_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: set/validation.npy
+                test_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: set/test.npy
         """
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
@@ -992,8 +1002,8 @@ def test_OnDiskDataset_preprocess_homogeneous():
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
 
         assert processed_dataset["dataset_name"] == dataset_name
-        assert processed_dataset["num_classes"] == num_classes
-        assert processed_dataset["num_labels"] == num_labels
+        assert processed_dataset["tasks"][0]["num_classes"] == num_classes
+        assert processed_dataset["tasks"][0]["num_labels"] == num_labels
         assert "graph" not in processed_dataset
         assert "graph_topology" in processed_dataset
 
@@ -1022,8 +1032,6 @@ def test_OnDiskDataset_preprocess_path():
 
         yaml_content = f"""
             dataset_name: {dataset_name}
-            num_classes: {num_classes}
-            num_labels: {num_labels}
         """
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
