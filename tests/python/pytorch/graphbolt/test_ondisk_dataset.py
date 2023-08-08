@@ -14,6 +14,62 @@ import yaml
 from dgl import graphbolt as gb
 
 
+def test_OnDiskDataset_Tasks():
+    """Test tasks."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+
+        # Case 1: classification tasks.
+        for task_type in [
+            "node_classification",
+            "edge_classification",
+            "graph_classification",
+        ]:
+            yaml_content = f"""
+          tasks:
+            - task_type: {task_type}
+              num_classes: 2
+              num_labels: 3
+          """
+            yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+            with open(yaml_file, "w") as f:
+                f.write(yaml_content)
+            dataset = gb.OnDiskDataset(test_dir)
+            assert dataset.tasks[0].metadata.task_type == task_type
+            assert dataset.tasks[0].metadata.num_classes == 2
+            assert dataset.tasks[0].metadata.num_labels == 3
+            dataset = None
+
+        # Case 2: regression/prediction tasks.
+        for task_type in [
+            "node_regression",
+            "edge_regression",
+            "link_prediction",
+        ]:
+            yaml_content = f"""
+          tasks:
+            - task_type: {task_type}
+          """
+            yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+            with open(yaml_file, "w") as f:
+                f.write(yaml_content)
+            dataset = gb.OnDiskDataset(test_dir)
+            assert dataset.tasks[0].metadata.task_type == task_type
+            dataset = None
+
+        # Case 3: invalid task type.
+        yaml_content = """
+        tasks:
+          - task_type: invalid
+        """
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+        with pytest.raises(pydantic.ValidationError):
+            _ = gb.OnDiskDataset(test_dir)
+
+
 def test_OnDiskDataset_TVTSet_exceptions():
     """Test excpetions thrown when parsing TVTSet."""
     with tempfile.TemporaryDirectory() as test_dir:
@@ -23,7 +79,8 @@ def test_OnDiskDataset_TVTSet_exceptions():
         # Case 1: ``format`` is invalid.
         yaml_content = """
         tasks:
-          - train_set:
+          - task_type: node_classification
+            train_set:
               - type: paper
                 data:
                   - format: torch_invalid
@@ -39,7 +96,8 @@ def test_OnDiskDataset_TVTSet_exceptions():
         # specified.
         yaml_content = """
             tasks:
-              - train_set:
+              - task_type: node_classification
+                train_set:
                 - type: null
                   data:
                     - format: numpy
@@ -88,7 +146,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         #   ``in_memory`` could be ``true`` and ``false``.
         yaml_content = f"""
             tasks:
-              - name: node_classification
+              - task_type: node_classification
                 num_classes: 10
                 num_labels: 10
                 train_set:
@@ -127,9 +185,9 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
 
         # Verify tasks.
         assert len(dataset.tasks) == 1
-        assert dataset.tasks[0].name == "node_classification"
-        assert dataset.tasks[0].num_classes == 10
-        assert dataset.tasks[0].num_labels == 10
+        assert dataset.tasks[0].metadata.task_type == "node_classification"
+        assert dataset.tasks[0].metadata.num_classes == 10
+        assert dataset.tasks[0].metadata.num_labels == 10
 
         # Verify train set.
         train_set = dataset.tasks[0].train_set
@@ -162,7 +220,8 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         # Case 2: Some TVT sets are None.
         yaml_content = f"""
             tasks:
-              - train_set:
+              - task_type: node_classification
+                train_set:
                   - type: null
                     data:
                       - format: numpy
@@ -214,7 +273,8 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
 
         yaml_content = f"""
             tasks:
-              - train_set:
+              - task_type: link_prediction
+                train_set:
                   - type: null
                     data:
                       - format: numpy
@@ -328,7 +388,8 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_negs():
 
         yaml_content = f"""
             tasks:
-              - train_set:
+              - task_type: link_prediction
+                train_set:
                   - type: null
                     data:
                       - format: numpy
@@ -426,7 +487,8 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
 
         yaml_content = f"""
             tasks:
-              - train_set:
+              - task_type: node_classification
+                train_set:
                   - type: paper
                     data:
                       - format: numpy
@@ -530,7 +592,8 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pair_label():
 
         yaml_content = f"""
             tasks:
-              - train_set:
+              - task_type: edge_classification
+                train_set:
                   - type: paper
                     data:
                       - format: numpy
@@ -975,7 +1038,8 @@ def test_OnDiskDataset_preprocess_homogeneous():
                   in_memory: false
                   path: data/node-feat.npy
             tasks:
-              - num_classes: {num_classes}
+              - task_type: node_classification
+                num_classes: {num_classes}
                 num_labels: {num_labels}
                 train_set:
                   - type_name: null

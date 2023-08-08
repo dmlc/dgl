@@ -12,7 +12,12 @@ import yaml
 
 import dgl
 
-from ..dataset import Dataset, Task
+from ..dataset import (
+    ClassificationTaskMetadata,
+    Dataset,
+    Task,
+    TaskMetadata,
+)
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, save_data
 
@@ -251,7 +256,7 @@ class OnDiskDataset(Dataset):
             in_memory: false
             path: edge_data/author-writes-paper-feat.npy
         tasks:
-          - name: "link prediction"
+          - task_type: "link_prediction"
             num_classes: 10
             num_labels: 10
             train_set:
@@ -320,17 +325,24 @@ class OnDiskDataset(Dataset):
         if tasks is None:
             return ret
         for task in tasks:
-            ret.append(
-                Task(
-                    task.name,
-                    task.num_classes,
-                    task.num_labels,
-                    self._init_tvt_set(task.train_set),
-                    self._init_tvt_set(task.validation_set),
-                    self._init_tvt_set(task.test_set),
-                )
-            )
+            ret.append(self._init_task(task))
         return ret
+
+    def _init_task(self, task: OnDiskTask) -> Task:
+        """Initialize the task."""
+        if "classification" in task.task_type:
+            task_meta = ClassificationTaskMetadata(
+                task.task_type, task.num_classes, task.num_labels
+            )
+        else:
+            task_meta = TaskMetadata(task.task_type)
+
+        return Task(
+            task_meta,
+            self._init_tvt_set(task.train_set),
+            self._init_tvt_set(task.validation_set),
+            self._init_tvt_set(task.test_set),
+        )
 
     def _load_graph(
         self, graph_topology: OnDiskGraphTopology

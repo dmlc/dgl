@@ -5,6 +5,7 @@ from typing import List, Optional
 
 import pydantic
 
+from ..dataset import GNNTaskTypes
 
 __all__ = [
     "OnDiskFeatureDataFormat",
@@ -75,7 +76,7 @@ class OnDiskGraphTopology(pydantic.BaseModel):
 class OnDiskTask(pydantic.BaseModel):
     """Task specification in YAML."""
 
-    name: Optional[str] = None
+    task_type: GNNTaskTypes
     num_classes: Optional[int] = None
     num_labels: Optional[int] = None
     train_set: Optional[List[OnDiskTVTSet]] = []
@@ -91,8 +92,6 @@ class OnDiskMetaData(pydantic.BaseModel):
     """
 
     dataset_name: Optional[str] = None
-    num_classes: Optional[int] = None
-    num_labels: Optional[int] = None
     graph_topology: Optional[OnDiskGraphTopology] = None
     feature_data: Optional[List[OnDiskFeatureData]] = []
     tasks: Optional[List[OnDiskTask]] = []
