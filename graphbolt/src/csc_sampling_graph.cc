@@ -135,7 +135,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
  * @brief Get a lambda function which contains the sampling process.
  *
  * @param fanouts The number of edges to be sampled for each node with or
- * without considering edge types.
+ * without considering edge types. Fanout cannot be -1 when replace is True.
  * @param replace Boolean indicating whether the sample is performed with or
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
@@ -248,6 +248,12 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
+  // Sampling with replace == true and fanout == -1 is undefined.
+  TORCH_CHECK(
+      !replace ||
+          std::find(fanouts.begin(), fanouts.end(), -1) == fanouts.end(),
+      "Fanout needs to be specified when replace is true.");
+
   torch::optional<torch::Tensor> probs_or_mask = torch::nullopt;
   if (probs_name.has_value() && !probs_name.value().empty()) {
     probs_or_mask = edge_attributes_.value().at(probs_name.value());
@@ -336,7 +342,8 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
  * threshold for selecting neighbors.
  * @param replace Boolean indicating whether the sample is performed with or
  * without replacement. If True, a value can be selected multiple times.
- * Otherwise, each value can be selected only once.
+ * Otherwise, each value can be selected only once. Fanout cannot be -1 when
+ * replace is True.
  * @param options Tensor options specifying the desired data type of the result.
  *
  * @return A tensor containing the picked neighbors.
@@ -465,7 +472,8 @@ inline torch::Tensor UniformPick(
  * threshold for selecting neighbors.
  * @param replace Boolean indicating whether the sample is performed with or
  * without replacement. If True, a value can be selected multiple times.
- * Otherwise, each value can be selected only once.
+ * Otherwise, each value can be selected only once. Fanout cannot be -1 when
+ * replace is True.
  * @param options Tensor options specifying the desired data type of the result.
  * @param probs_or_mask Optional tensor containing the (unnormalized)
  * probabilities associated with each neighboring edge of a node in the original
