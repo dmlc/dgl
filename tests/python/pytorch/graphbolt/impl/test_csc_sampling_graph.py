@@ -924,3 +924,23 @@ def test_sample_neighbors_pick_number(fanouts, replace, labor, probs_name):
         replace=replace,
         probs_name=probs_name if probs_name != "none" else None,
     )
+    sampled_num = subgraph.node_pairs[0].size(0)
+
+    if probs_name == "mask":
+        if fanouts[0] == -1:
+            assert sampled_num == 3
+        else:
+            if replace:
+                assert sampled_num == fanouts[0]
+            else:
+                assert sampled_num == min(fanouts[0], 3)
+    elif probs_name == "zero":
+        assert sampled_num == 0
+    else:
+        if fanouts[0] == -1:
+            assert sampled_num == 6
+        else:
+            if replace:
+                assert sampled_num == fanouts[0]
+            else:
+                assert sampled_num == min(fanouts[0], 6)
