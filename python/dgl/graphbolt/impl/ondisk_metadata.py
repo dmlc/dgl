@@ -80,6 +80,7 @@ class OnDiskTaskData(pydantic.BaseModel, extra="allow"):
     extra_fields: Optional[Dict[str, Any]] = {}
 
     @pydantic.model_validator(mode="before")
+    @classmethod
     def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Build extra fields."""
         for key in list(values.keys()):
