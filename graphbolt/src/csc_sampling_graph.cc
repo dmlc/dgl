@@ -612,10 +612,8 @@ inline void NonUniformPick(
     picked_tensor.slice(0, picked_offset, picked_offset + picked_count) =
         torch::index_select(temp_neighbors, 0, positive_probs_indices);
   } else {
-    if (!replace) fanout = std::min(fanout, num_positive_probs);
-    TORCH_CHECK(fanout == picked_count, "Picked count doesn't match.");
     picked_tensor.slice(0, picked_offset, picked_offset + picked_count) =
-        torch::multinomial(local_probs, fanout, replace) + offset;
+        torch::multinomial(local_probs, picked_count, replace) + offset;
   }
 }
 
