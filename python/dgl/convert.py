@@ -1,4 +1,4 @@
-"""Module for converting graph from/to other object."""
+    """Module for converting graph from/to other object."""
 from collections import defaultdict
 from collections.abc import Mapping
 
