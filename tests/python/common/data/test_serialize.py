@@ -187,10 +187,8 @@ def test_serialize_empty_dict():
 
 def load_old_files(files):
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=UserWarning) #with DGLWarning
-        return dgl.load_graphs(
-            os.path.join(os.path.dirname(__file__), files)
-        )
+        warnings.simplefilter("ignore", category=UserWarning)
+        return dgl.load_graphs(os.path.join(os.path.dirname(__file__), files))
 
 
 def test_load_old_files1():
