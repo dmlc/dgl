@@ -671,6 +671,10 @@ torch::Tensor Pick<SamplerType::LABOR>(
     SamplerArgs<SamplerType::LABOR> args) {
   if (fanout == 0) return torch::tensor({}, options);
   if (probs_or_mask.has_value()) {
+    if (fanout < 0) {
+      return NonUniformPick(
+          offset, num_neighbors, fanout, replace, options, probs_or_mask);
+    }
     torch::Tensor picked_neighbors;
     AT_DISPATCH_FLOATING_TYPES(
         probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
@@ -683,6 +687,8 @@ torch::Tensor Pick<SamplerType::LABOR>(
           }
         }));
     return picked_neighbors;
+  } else if (fanout < 0) {
+    return UniformPick(offset, num_neighbors, fanout, replace, options);
   } else if (replace) {
     return LaborPick<false, true>(
         offset, num_neighbors, fanout, options,
@@ -729,12 +735,7 @@ inline torch::Tensor LaborPick(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::LABOR> args) {
-  // TODO: fix inconsistency with Neighbor sampler.
-  // 1. Replace = true, fanout = -1. Expected: sample all neighbors with
-  // non-zero probility once regardless of replacement.
-  // 2. Replace = true, fanout > num_neighbors. Expected: sample fanout many
-  // neighbors.
-  fanout = fanout < 0 ? num_neighbors : std::min(fanout, num_neighbors);
+  fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
     return torch::arange(offset, offset + num_neighbors, options);
   }
