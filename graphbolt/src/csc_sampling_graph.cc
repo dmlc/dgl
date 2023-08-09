@@ -556,9 +556,10 @@ torch::Tensor Pick<SamplerType::LABOR>(
     SamplerArgs<SamplerType::LABOR> args) {
   if (fanout == 0) return torch::tensor({}, options);
   if (probs_or_mask.has_value()) {
-    if (fanout < 0)
+    if (fanout < 0) {
       return NonUniformPick(
           offset, num_neighbors, fanout, replace, options, probs_or_mask);
+    }
     torch::Tensor picked_neighbors;
     AT_DISPATCH_FLOATING_TYPES(
         probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
