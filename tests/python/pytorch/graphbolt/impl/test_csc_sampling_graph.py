@@ -917,7 +917,7 @@ def test_sample_neighbors_pick_number(fanouts, replace, labor, probs_name):
 
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
 
-    # Make sure the check inside are all passed.
+    # Make sure no exception will be thrown.
     subgraph = sampler(
         nodes,
         fanouts=torch.LongTensor(fanouts),
