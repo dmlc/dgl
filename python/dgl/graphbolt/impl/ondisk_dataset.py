@@ -4,7 +4,7 @@ import os
 import shutil
 
 from copy import deepcopy
-from typing import List
+from typing import Dict, List
 
 import pandas as pd
 import torch
@@ -12,7 +12,7 @@ import yaml
 
 import dgl
 
-from ..dataset import ClassificationTaskMetadata, Dataset, Task, TaskMetadata
+from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, save_data
 
@@ -25,7 +25,7 @@ from .csc_sampling_graph import (
 from .ondisk_metadata import (
     OnDiskGraphTopology,
     OnDiskMetaData,
-    OnDiskTask,
+    OnDiskTaskData,
     OnDiskTVTSet,
 )
 from .torch_based_feature_store import TorchBasedFeatureStore
@@ -220,6 +220,59 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     return output_config_path
 
 
+class OnDiskTask:
+    """An on-disk task.
+
+    An on-disk task is for ``OnDiskDataset``. It contains the metadata and the
+    train/val/test sets.
+    """
+
+    def __init__(
+        self,
+        metadata: Dict,
+        train_set: ItemSet or ItemSetDict,
+        validation_set: ItemSet or ItemSetDict,
+        test_set: ItemSet or ItemSetDict,
+    ):
+        """Initialize a task.
+
+        Parameters
+        ----------
+        metadata : Dict
+            Metadata.
+        train_set : ItemSet or ItemSetDict
+            Training set.
+        validation_set : ItemSet or ItemSetDict
+            Validation set.
+        test_set : ItemSet or ItemSetDict
+            Test set.
+        """
+        self._metadata = metadata
+        self._train_set = train_set
+        self._validation_set = validation_set
+        self._test_set = test_set
+
+    @property
+    def metadata(self) -> Dict:
+        """Return the task metadata."""
+        return self._metadata
+
+    @property
+    def train_set(self) -> ItemSet or ItemSetDict:
+        """Return the training set."""
+        return self._train_set
+
+    @property
+    def validation_set(self) -> ItemSet or ItemSetDict:
+        """Return the validation set."""
+        return self._validation_set
+
+    @property
+    def test_set(self) -> ItemSet or ItemSetDict:
+        """Return the test set."""
+        return self._test_set
+
+
 class OnDiskDataset(Dataset):
     """An on-disk dataset.
 
@@ -251,9 +304,8 @@ class OnDiskDataset(Dataset):
             in_memory: false
             path: edge_data/author-writes-paper-feat.npy
         tasks:
-          - task_type: "link_prediction"
+          - name: "edge_classification"
             num_classes: 10
-            num_labels: 10
             train_set:
               - type: paper # could be null for homogeneous graph.
                 data: # multiple data sources could be specified.
@@ -314,7 +366,7 @@ class OnDiskDataset(Dataset):
         """Return the dataset name."""
         return self._dataset_name
 
-    def _init_tasks(self, tasks: List[OnDiskTask]) -> List[Task]:
+    def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
         """Initialize the tasks."""
         ret = []
         if tasks is None:
@@ -323,17 +375,10 @@ class OnDiskDataset(Dataset):
             ret.append(self._init_task(task))
         return ret
 
-    def _init_task(self, task: OnDiskTask) -> Task:
+    def _init_task(self, task: OnDiskTaskData) -> OnDiskTask:
         """Initialize the task."""
-        if "classification" in task.task_type:
-            task_meta = ClassificationTaskMetadata(
-                task.task_type, task.num_classes, task.num_labels
-            )
-        else:
-            task_meta = TaskMetadata(task.task_type)
-
-        return Task(
-            task_meta,
+        return OnDiskTask(
+            task.extra_fields,
             self._init_tvt_set(task.train_set),
             self._init_tvt_set(task.validation_set),
             self._init_tvt_set(task.test_set),

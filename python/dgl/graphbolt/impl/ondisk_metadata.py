@@ -1,11 +1,9 @@
 """Ondisk metadata of GraphBolt."""
 
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import pydantic
-
-from ..dataset import GNNTaskTypes
 
 __all__ = [
     "OnDiskFeatureDataFormat",
@@ -16,7 +14,7 @@ __all__ = [
     "OnDiskMetaData",
     "OnDiskGraphTopologyType",
     "OnDiskGraphTopology",
-    "OnDiskTask",
+    "OnDiskTaskData",
 ]
 
 
@@ -73,15 +71,22 @@ class OnDiskGraphTopology(pydantic.BaseModel):
     path: str
 
 
-class OnDiskTask(pydantic.BaseModel):
+class OnDiskTaskData(pydantic.BaseModel, extra="allow"):
     """Task specification in YAML."""
 
-    task_type: GNNTaskTypes
-    num_classes: Optional[int] = None
-    num_labels: Optional[int] = None
     train_set: Optional[List[OnDiskTVTSet]] = []
     validation_set: Optional[List[OnDiskTVTSet]] = []
     test_set: Optional[List[OnDiskTVTSet]] = []
+    extra_fields: Optional[Dict[str, Any]] = {}
+
+    @pydantic.model_validator(mode="before")
+    def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Build extra fields."""
+        for key in list(values.keys()):
+            if key not in cls.model_fields:
+                values["extra_fields"] = values.get("extra_fields", {})
+                values["extra_fields"][key] = values.pop(key)
+        return values
 
 
 class OnDiskMetaData(pydantic.BaseModel):
@@ -94,4 +99,4 @@ class OnDiskMetaData(pydantic.BaseModel):
     dataset_name: Optional[str] = None
     graph_topology: Optional[OnDiskGraphTopology] = None
     feature_data: Optional[List[OnDiskFeatureData]] = []
-    tasks: Optional[List[OnDiskTask]] = []
+    tasks: Optional[List[OnDiskTaskData]] = []

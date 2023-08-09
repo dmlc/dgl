@@ -1,88 +1,23 @@
 """GraphBolt Dataset."""
-from enum import Enum
-from typing import List, Optional
+from typing import Dict, List
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
 
 __all__ = [
-    "GNNTaskTypes",
-    "TaskMetadata",
-    "ClassificationTaskMetadata",
     "Task",
     "Dataset",
 ]
 
 
-class GNNTaskTypes(str, Enum):
-    """Enum of task names."""
-
-    NODE_CLASSIFICATION = "node_classification"
-    NODE_REGRESSION = "node_regression"
-    EDGE_CLASSIFICATION = "edge_classification"
-    EDGE_REGRESSION = "edge_regression"
-    LINK_PREDICTION = "link_prediction"
-    GRAPH_CLASSIFICATION = "graph_classification"
-
-
-class TaskMetadata:
-    """Task metadata."""
-
-    def __init__(self, task_type: str):
-        """Initialize a task metadata.
-
-        Parameters
-        ----------
-        task_type : GNNTaskTypes
-            Task type.
-        """
-        self._task_type = task_type
-
-    @property
-    def task_type(self) -> str:
-        """Return the task type."""
-        return self._task_type.value
-
-
-class ClassificationTaskMetadata(TaskMetadata):
-    """Classification task metadata."""
-
-    def __init__(
-        self,
-        task_type: GNNTaskTypes,
-        num_classes: Optional[int] = None,
-        num_labels: Optional[int] = None,
-    ):
-        """Initialize a classification task metadata.
-
-        Parameters
-        ----------
-        task_type : GNNTaskTypes
-            Task type.
-        num_classes : int
-            Number of classes.
-        num_labels : int
-            Number of labels.
-        """
-        super().__init__(task_type)
-        self._num_classes = num_classes
-        self._num_labels = num_labels
-
-    @property
-    def num_classes(self) -> int:
-        """Return the number of classes."""
-        return self._num_classes
-
-    @property
-    def num_labels(self) -> int:
-        """Return the number of labels."""
-        return self._num_labels
-
-
 class Task:
-    """An task.
+    """An abstract task.
 
-    Task consists of several meta information and the *Train-Validation-Test Set*.
+    Task consists of several meta information and *Train-Validation-Test Set*.
+
+    *meta information*:
+    The meta information of a task includes any kinds of data that are defined
+    by the user in YAML when instantiating the task.
 
     *Train-Validation-Test Set*:
     The training-validation-testing (TVT) set which is used to train the neural
@@ -91,50 +26,25 @@ class Task:
     neural network parameters.
     """
 
-    def __init__(
-        self,
-        metadata: TaskMetadata,
-        train_set: ItemSet or ItemSetDict,
-        validation_set: ItemSet or ItemSetDict,
-        test_set: ItemSet or ItemSetDict,
-    ):
-        """Initialize a task.
-
-        Parameters
-        ----------
-        metadata : TaskMetadata
-            Metadata.
-        train_set : ItemSet or ItemSetDict
-            Training set.
-        validation_set : ItemSet or ItemSetDict
-            Validation set.
-        test_set : ItemSet or ItemSetDict
-            Test set.
-        """
-        self._metadata = metadata
-        self._train_set = train_set
-        self._validation_set = validation_set
-        self._test_set = test_set
-
     @property
-    def metadata(self) -> TaskMetadata:
+    def metadata(self) -> Dict:
         """Return the task metadata."""
-        return self._metadata
+        raise NotImplementedError
 
     @property
     def train_set(self) -> ItemSet or ItemSetDict:
         """Return the training set."""
-        return self._train_set
+        raise NotImplementedError
 
     @property
     def validation_set(self) -> ItemSet or ItemSetDict:
         """Return the validation set."""
-        return self._validation_set
+        raise NotImplementedError
 
     @property
     def test_set(self) -> ItemSet or ItemSetDict:
         """Return the test set."""
-        return self._test_set
+        raise NotImplementedError
 
 
 class Dataset:
