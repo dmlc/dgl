@@ -161,8 +161,8 @@ int64_t NumPick(
   int64_t num_valid_neighbors =
       probs_or_mask.has_value()
           ? *torch::count_nonzero(
-                probs_or_mask.value().slice(0, offset, offset + num_neighbors))
-                .data_ptr<int64_t>()
+                 probs_or_mask.value().slice(0, offset, offset + num_neighbors))
+                 .data_ptr<int64_t>()
           : num_neighbors;
   if (num_valid_neighbors == 0 || fanout == -1) return num_valid_neighbors;
   return replace ? fanout : std::min(fanout, num_valid_neighbors);
