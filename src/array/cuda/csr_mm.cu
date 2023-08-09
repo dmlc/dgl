@@ -66,7 +66,7 @@ std::pair<CSRMatrix, NDArray> CusparseSpgemm(
       const_cast<DType*>(B_weights),
       idtype, idtype, CUSPARSE_INDEX_BASE_ZERO, dtype));
   CUSPARSE_CALL(cusparseCreateCsr(
-      &matC, A.num_rows, B.num_cols, 0, nullptr, nullptr, nullptr, idtype,
+      &matC, A.num_rows, B.num_cols, 0, dC_csrOffsets_data, nullptr, nullptr, idtype,
       idtype, CUSPARSE_INDEX_BASE_ZERO, dtype));
   // SpGEMM Computation
   cusparseSpGEMMDescr_t spgemmDesc;
