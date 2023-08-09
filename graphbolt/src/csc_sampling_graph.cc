@@ -619,7 +619,7 @@ inline torch::Tensor LaborPick(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::LABOR> args) {
-  fanout = replace ? fanout : std::min(fanout, num_neighbors);
+  fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
     return torch::arange(offset, offset + num_neighbors, options);
   }
