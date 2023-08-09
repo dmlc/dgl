@@ -17,10 +17,9 @@ namespace sampling {
  * source and destination tensors.
  *
  * The function performs two main operations:
- *   1. Unique Operation: Concatenates 'unique_dst_ids' and 'src_ids' tensors
- * and extracts unique elements, ensuring no duplicates. The resulting tensor
- * represents all unique elements in both 'src_ids' and 'dst_ids', and the
- * indices correspond to the compacted IDs of the corresponding elements.
+ *   1. Unique Operation: unique(concat(unique_dst_ids, src_ids)), in which the
+ * unique operator will guarantee the unique_dst_ids are at the head of the
+ * result tensor.
  *   2. Compact Operation: Utilizes the reverse mapping derived from the unique
  * operation to transform 'src_ids' and 'dst_ids' into condensed IDs, mapping
  * entries corresponding to the inverse IDs.
