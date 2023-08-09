@@ -372,17 +372,15 @@ class OnDiskDataset(Dataset):
         if tasks is None:
             return ret
         for task in tasks:
-            ret.append(self._init_task(task))
+            ret.append(
+                OnDiskTask(
+                    task.extra_fields,
+                    self._init_tvt_set(task.train_set),
+                    self._init_tvt_set(task.validation_set),
+                    self._init_tvt_set(task.test_set),
+                )
+            )
         return ret
-
-    def _init_task(self, task: OnDiskTaskData) -> OnDiskTask:
-        """Initialize the task."""
-        return OnDiskTask(
-            task.extra_fields,
-            self._init_tvt_set(task.train_set),
-            self._init_tvt_set(task.validation_set),
-            self._init_tvt_set(task.test_set),
-        )
 
     def _load_graph(
         self, graph_topology: OnDiskGraphTopology
