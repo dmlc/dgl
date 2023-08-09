@@ -132,73 +132,6 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
 }
 
 /**
- * @brief Calculate the number of the neighbors to be picked for the given node.
- *
- * @param fanout The number of edges to be sampled for each node. It should be
- * >= 0 or -1.
- *  - When the value is -1, all neighbors will be chosen for sampling. It is
- * equivalent to selecting all neighbors with non-zero probability when the
- * fanout is >= the number of neighbors (and replacement is set to false).
- *  - When the value is a non-negative integer, it serves as a minimum
- * threshold for selecting neighbors.
- * @param replace Boolean indicating whether the sample is performed with or
- * without replacement. If True, a value can be selected multiple times.
- * Otherwise, each value can be selected only once.
- * @param probs_or_mask Optional tensor containing the (unnormalized)
- * probabilities associated with each neighboring edge of a node in the original
- * graph. It must be a 1D floating-point tensor with the number of elements
- * equal to the number of edges in the graph.
- * @param offset The starting edge ID for the connected neighbors of the given
- * node.
- * @param num_neighbors The number of neighbors of this node.
- *
- * @return The pick number of the given node.
- */
-int64_t NumPick(
-    int64_t fanout, bool replace,
-    const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors) {
-  int64_t num_valid_neighbors =
-      probs_or_mask.has_value()
-          ? *torch::count_nonzero(
-                 probs_or_mask.value().slice(0, offset, offset + num_neighbors))
-                 .data_ptr<int64_t>()
-          : num_neighbors;
-  if (num_valid_neighbors == 0 || fanout == -1) return num_valid_neighbors;
-  return replace ? fanout : std::min(fanout, num_valid_neighbors);
-}
-
-int64_t NumPickByEtype(
-    const std::vector<int64_t>& fanouts, bool replace,
-    const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
-    int64_t num_neighbors) {
-  int64_t etype_begin = offset;
-  const int64_t end = offset + num_neighbors;
-  int64_t total_count = 0;
-  AT_DISPATCH_INTEGRAL_TYPES(
-      type_per_edge.scalar_type(), "NumPickFnByEtype", ([&] {
-        const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
-        while (etype_begin < end) {
-          scalar_t etype = type_per_edge_data[etype_begin];
-          TORCH_CHECK(
-              etype >= 0 && etype < (int64_t)fanouts.size(),
-              "Etype values exceed the number of fanouts.");
-          auto etype_end_it = std::upper_bound(
-              type_per_edge_data + etype_begin, type_per_edge_data + end,
-              etype);
-          int64_t etype_end = etype_end_it - type_per_edge_data;
-          // Do sampling for one etype.
-          total_count += NumPick(
-              fanouts[etype], replace, probs_or_mask, etype_begin,
-              etype_end - etype_begin);
-          etype_begin = etype_end;
-        }
-      }));
-  return total_count;
-}
-
-/**
  * @brief Get a lambda function which counts the number of the neighbors to be
  * sampled.
  *
@@ -435,6 +368,50 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
   auto shared_memory_tensors = LoadTensorsFromSharedMemory(
       shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
   return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
+}
+
+int64_t NumPick(
+    int64_t fanout, bool replace,
+    const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
+    int64_t num_neighbors) {
+  int64_t num_valid_neighbors =
+      probs_or_mask.has_value()
+          ? *torch::count_nonzero(
+                 probs_or_mask.value().slice(0, offset, offset + num_neighbors))
+                 .data_ptr<int64_t>()
+          : num_neighbors;
+  if (num_valid_neighbors == 0 || fanout == -1) return num_valid_neighbors;
+  return replace ? fanout : std::min(fanout, num_valid_neighbors);
+}
+
+int64_t NumPickByEtype(
+    const std::vector<int64_t>& fanouts, bool replace,
+    const torch::Tensor& type_per_edge,
+    const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
+    int64_t num_neighbors) {
+  int64_t etype_begin = offset;
+  const int64_t end = offset + num_neighbors;
+  int64_t total_count = 0;
+  AT_DISPATCH_INTEGRAL_TYPES(
+      type_per_edge.scalar_type(), "NumPickFnByEtype", ([&] {
+        const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
+        while (etype_begin < end) {
+          scalar_t etype = type_per_edge_data[etype_begin];
+          TORCH_CHECK(
+              etype >= 0 && etype < (int64_t)fanouts.size(),
+              "Etype values exceed the number of fanouts.");
+          auto etype_end_it = std::upper_bound(
+              type_per_edge_data + etype_begin, type_per_edge_data + end,
+              etype);
+          int64_t etype_end = etype_end_it - type_per_edge_data;
+          // Do sampling for one etype.
+          total_count += NumPick(
+              fanouts[etype], replace, probs_or_mask, etype_begin,
+              etype_end - etype_begin);
+          etype_begin = etype_end;
+        }
+      }));
+  return total_count;
 }
 
 /**

@@ -946,6 +946,7 @@ def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
             else:
                 assert sampled_num == min(fanouts[0], 6)
 
+
 @unittest.skipIf(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
@@ -964,16 +965,13 @@ def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
         ([2, -1, 4], "none"),
     ],
 )
-def test_sample_neighbors_hetero_pick_number(fanouts, replace, labor, probs_name):
+def test_sample_neighbors_hetero_pick_number(
+    fanouts, replace, labor, probs_name
+):
     # Initialize data.
     num_nodes = 10
     num_edges = 9
-    ntypes = {
-        "N0": 0,
-        "N1": 1,
-        "N2": 2,
-        "N3": 3
-    }
+    ntypes = {"N0": 0, "N1": 1, "N2": 2, "N3": 3}
     etypes = {
         ("N0", "R0", "N1"): 0,
         ("N0", "R1", "N2"): 1,
@@ -1029,7 +1027,7 @@ def test_sample_neighbors_hetero_pick_number(fanouts, replace, labor, probs_name
                 else:
                     assert pairs[0].size(0) == min(fanout, 3)
     else:
-        fanout = fanouts[0] # Here fanout is the same for all etypes.
+        fanout = fanouts[0]  # Here fanout is the same for all etypes.
         for etype, pairs in subgraph.node_pairs.items():
             if etypes[etype] == 0:
                 # Etype 0: 2 valid neighbors.
