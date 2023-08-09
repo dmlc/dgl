@@ -306,8 +306,9 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
               std::vector<torch::Tensor> picked_neighbors_cur_thread(
                   local_grain_size);
 
+              const auto nodes_data_ptr = nodes.data_ptr<int64_t>();
               for (scalar_t i = begin; i < end; ++i) {
-                const auto nid = *nodes[i].data_ptr<int64_t>();
+                const auto nid = nodes_data_ptr[i];
                 TORCH_CHECK(
                     nid >= 0 && nid < NumNodes(),
                     "The seed nodes' IDs should fall within the range of the "
