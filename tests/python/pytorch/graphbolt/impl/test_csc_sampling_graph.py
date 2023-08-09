@@ -867,7 +867,7 @@ def test_from_dglgraph_heterogeneous():
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-@pytest.mark.parametrize("replace", [True, False])
+@pytest.mark.parametrize("replace", [False, True])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize(
     "fanouts, probs_name",
@@ -886,7 +886,7 @@ def test_from_dglgraph_heterogeneous():
         ([-1], "none"),
     ],
 )
-def test_sample_neighbors_pick_number(fanouts, replace, labor, probs_name):
+def test_sample_neighbors_homo_pick_number(fanouts, replace, labor, probs_name):
     """Original graph in COO:
     1   1   1   1   1   1
     0   0   0   0   0   0
@@ -926,6 +926,7 @@ def test_sample_neighbors_pick_number(fanouts, replace, labor, probs_name):
     )
     sampled_num = subgraph.node_pairs[0].size(0)
 
+    # Verify in subgraph.
     if probs_name == "mask":
         if fanouts[0] == -1:
             assert sampled_num == 3
@@ -944,3 +945,110 @@ def test_sample_neighbors_pick_number(fanouts, replace, labor, probs_name):
                 assert sampled_num == fanouts[0]
             else:
                 assert sampled_num == min(fanouts[0], 6)
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize("replace", [False, True])
+@pytest.mark.parametrize("labor", [False, True])
+@pytest.mark.parametrize(
+    "fanouts, probs_name",
+    [
+        ([-1, -1, -1], "mask"),
+        ([1, 1, 1], "mask"),
+        ([2, 2, 2], "mask"),
+        ([3, 3, 3], "mask"),
+        ([4, 4, 4], "mask"),
+        ([-1, 1, 3], "none"),
+        ([2, -1, 4], "none"),
+    ],
+)
+def test_sample_neighbors_hetero_pick_number(fanouts, replace, labor, probs_name):
+    # Initialize data.
+    num_nodes = 10
+    num_edges = 9
+    ntypes = {
+        "N0": 0,
+        "N1": 1,
+        "N2": 2,
+        "N3": 3
+    }
+    etypes = {
+        ("N0", "R0", "N1"): 0,
+        ("N0", "R1", "N2"): 1,
+        ("N0", "R2", "N3"): 2,
+    }
+    metadata = gb.GraphMetadata(ntypes, etypes)
+    indptr = torch.LongTensor([0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9])
+    indices = torch.LongTensor([1, 2, 3, 4, 5, 6, 7, 8, 9])
+    node_type_offset = torch.LongTensor([0, 1, 4, 7, 10])
+    type_per_edge = torch.LongTensor([0, 0, 0, 1, 1, 1, 2, 2, 2])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+    assert node_type_offset[-1] == num_nodes
+    assert all(type_per_edge < len(etypes))
+
+    edge_attributes = {
+        "mask": torch.BoolTensor([1, 1, 0, 1, 1, 1, 0, 0, 0]),
+        "all": torch.BoolTensor([1, 1, 1, 1, 1, 1, 1, 1, 1]),
+        "zero": torch.BoolTensor([0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    }
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(
+        indptr,
+        indices,
+        edge_attributes=edge_attributes,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        metadata=metadata,
+    )
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([0, 1])
+
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+
+    # Make sure no exception will be thrown.
+    subgraph = sampler(
+        nodes,
+        fanouts=torch.LongTensor(fanouts),
+        replace=replace,
+        probs_name=probs_name if probs_name != "none" else None,
+    )
+
+    if probs_name == "none":
+        for etype, pairs in subgraph.node_pairs.items():
+            fanout = fanouts[etypes[etype]]
+            if fanout == -1:
+                assert pairs[0].size(0) == 3
+            else:
+                if replace:
+                    assert pairs[0].size(0) == fanout
+                else:
+                    assert pairs[0].size(0) == min(fanout, 3)
+    else:
+        fanout = fanouts[0] # Here fanout is the same for all etypes.
+        for etype, pairs in subgraph.node_pairs.items():
+            if etypes[etype] == 0:
+                # Etype 0: 2 valid neighbors.
+                if fanout == -1:
+                    assert pairs[0].size(0) == 2
+                else:
+                    if replace:
+                        assert pairs[0].size(0) == fanout
+                    else:
+                        assert pairs[0].size(0) == min(fanout, 2)
+            elif etypes[etype] == 1:
+                # Etype 1: 3 valid neighbors.
+                if fanout == -1:
+                    assert pairs[0].size(0) == 3
+                else:
+                    if replace:
+                        assert pairs[0].size(0) == fanout
+                    else:
+                        assert pairs[0].size(0) == min(fanout, 3)
+            else:
+                # Etype 2: 0 valid neighbors.
+                assert pairs[0].size(0) == 0
