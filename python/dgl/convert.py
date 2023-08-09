@@ -1,4 +1,4 @@
-    """Module for converting graph from/to other object."""
+"""Module for converting graph from/to other object."""
 from collections import defaultdict
 from collections.abc import Mapping
 
@@ -1238,7 +1238,7 @@ def _batcher(lst):
     if type(lst[0]) is np.ndarray:
         return F.tensor(np.array(lst))
 
-     return F.tensor(lst)
+    return F.tensor(lst)
 
 
 def from_networkx(
