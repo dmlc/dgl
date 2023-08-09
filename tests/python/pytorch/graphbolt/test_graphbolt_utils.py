@@ -61,3 +61,6 @@ def test_unique_and_compact_node_pairs_homo():
     assert torch.equal(u, expected_u)
     assert torch.equal(v, expected_v)
     assert torch.equal(unique_nodes[: unique_v.size(0)], unique_v)
+
+
+test_unique_and_compact_node_pairs_hetero()

@@ -58,33 +58,30 @@ def unique_and_compact_node_pairs(
     if is_homogeneous:
         node_pairs = {("_N", "_E", "_N"): node_pairs}
 
-    # Find all destination nodes.
+    # Collect all source and destination nodes.
+    src_nodes = defaultdict(list)
     dst_nodes = defaultdict(list)
     for etype, (src_node, dst_node) in node_pairs.items():
+        src_nodes[etype[0]].append(src_node)
         dst_nodes[etype[2]].append(dst_node)
-
+    src_nodes = {ntype: torch.cat(nodes) for ntype, nodes in src_nodes.items()}
+    dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
     # Compute unique destination nodes if not provided.
     if unique_dst_nodes is None:
         unique_dst_nodes = {
-            ntype: torch.unique(torch.cat(nodes))
-            for ntype, nodes in dst_nodes.items()
+            ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
         }
 
-    # Collect all source nodes.
-    src_nodes = defaultdict(list)
-    for etype, (src_node, dst_node) in node_pairs.items():
-        src_nodes[etype[0]].append(src_node)
-
     ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
-
     unique_nodes = {}
-    compacted_src = defaultdict(list)
-    compacted_dst = defaultdict(list)
+    compacted_src = {}
+    compacted_dst = {}
+    dtype = list(src_nodes.values())[0].dtype
+    default_tensor = torch.tensor([], dtype=dtype)
     for ntype in ntypes:
-        src, dst = src_nodes[ntype], dst_nodes[ntype]
-        # When 'unique_dst_nodes' is empty, 'dst' must also be empty and 'src' must have value.
-        dtype = src[0].dtype if src else dst[0].dtype
-        unique_dst = unique_dst_nodes.get(ntype, torch.tensor([], dtype=dtype))
+        src = src_nodes.get(ntype, default_tensor)
+        unique_dst = unique_dst_nodes.get(ntype, default_tensor)
+        dst = dst_nodes.get(ntype, default_tensor)
         (
             unique_nodes[ntype],
             compacted_src[ntype],
@@ -93,10 +90,14 @@ def unique_and_compact_node_pairs(
 
     compacted_node_pairs = {}
     # Map back with the same order.
-    for etype, _ in node_pairs.items():
-        u_type, _, v_type = etype
-        u, v = compacted_src[u_type].pop(0), compacted_dst[v_type].pop(0)
-        compacted_node_pairs[etype] = (u, v)
+    for etype, pair in node_pairs.items():
+        len = pair[0].size(0)
+        src_type, _, dst_type = etype
+        src = compacted_src[src_type][:len]
+        dst = compacted_dst[dst_type][:len]
+        compacted_node_pairs[etype] = (src, dst)
+        compacted_src[src_type] = compacted_src[src_type][len:]
+        compacted_dst[dst_type] = compacted_dst[dst_type][len:]
 
     # Return singleton for a homogeneous graph.
     if is_homogeneous:

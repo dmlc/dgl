@@ -13,28 +13,20 @@
 
 namespace graphbolt {
 namespace sampling {
-std::tuple<torch::Tensor, TensorList, TensorList> Unique_and_compact(
-    const TensorList& src_ids, const TensorList& dst_ids,
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Unique_and_compact(
+    const torch::Tensor& src_ids, const torch::Tensor& dst_ids,
     const torch::Tensor unique_dst_ids) {
-  TensorList compacted_src_ids;
-  TensorList compacted_dst_ids;
+  torch::Tensor compacted_src_ids;
+  torch::Tensor compacted_dst_ids;
   torch::Tensor unique_ids;
   auto num_dst = unique_dst_ids.size(0);
-  std::vector<torch::Tensor> tensors_to_concat = {unique_dst_ids};
-  tensors_to_concat.insert(
-      tensors_to_concat.end(), src_ids.begin(), src_ids.end());
-  torch::Tensor ids = torch::cat(tensors_to_concat);
-  AT_DISPATCH_INTEGRAL_TYPES(
-      ids.scalar_type(), "unique_and_compact", ([&] {
-        ConcurrentIdHashMap<scalar_t> id_map;
-        unique_ids = id_map.Init(ids, num_dst);
-        for (auto id : src_ids) {
-          compacted_src_ids.emplace_back(id_map.MapIds(id));
-        }
-        for (auto id : dst_ids) {
-          compacted_dst_ids.emplace_back(id_map.MapIds(id));
-        }
-      }));
+  torch::Tensor ids = torch::cat({unique_dst_ids, src_ids});
+  AT_DISPATCH_INTEGRAL_TYPES(ids.scalar_type(), "unique_and_compact", ([&] {
+                               ConcurrentIdHashMap<scalar_t> id_map;
+                               unique_ids = id_map.Init(ids, num_dst);
+                               compacted_src_ids = id_map.MapIds(src_ids);
+                               compacted_dst_ids = id_map.MapIds(dst_ids);
+                             }));
   return std::tuple(unique_ids, compacted_src_ids, compacted_dst_ids);
 }
 }  // namespace sampling
