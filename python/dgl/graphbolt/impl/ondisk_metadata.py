@@ -23,6 +23,7 @@ class OnDiskFeatureDataFormat(str, Enum):
 
     TORCH = "torch"
     NUMPY = "numpy"
+    DGLGRAPH = "DGLGraph"
 
 
 class OnDiskTVTSetData(pydantic.BaseModel):

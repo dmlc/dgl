@@ -5,6 +5,8 @@ import os
 import numpy as np
 import torch
 
+from ...data.graph_serialize import load_graphs
+
 
 def _read_torch_data(path):
     return torch.load(path)
@@ -22,6 +24,8 @@ def read_data(path, fmt, in_memory=True):
         return _read_torch_data(path)
     elif fmt == "numpy":
         return _read_numpy_data(path, in_memory=in_memory)
+    elif fmt == "DGLGraph":
+        return load_graphs(path)[0]
     else:
         raise RuntimeError(f"Unsupported format: {fmt}")
 

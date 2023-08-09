@@ -2,6 +2,8 @@ import os
 import re
 import tempfile
 
+import dgl
+
 import gb_test_utils as gbt
 
 import numpy as np
@@ -402,6 +404,107 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_negs():
             assert src == test_src[i]
             assert dst == test_dst[i]
             assert torch.equal(negs, torch.from_numpy(test_neg_dst[i]))
+        test_set = None
+        dataset = None
+
+
+def test_OnDiskDataset_TVTSet_ItemSet_graph_label():
+    """Test TVTSet which returns ItemSet with graphs and labels."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        num_graphs = 1000
+        train_graphs = [dgl.rand_graph(100, 1000) for _ in range(num_graphs)]
+        train_graphs_path = os.path.join(test_dir, "train_graphs.bin")
+        dgl.save_graphs(train_graphs_path, train_graphs)
+        train_labels = np.random.randint(0, 10, size=num_graphs)
+        train_labels_path = os.path.join(test_dir, "train_labels.npy")
+        np.save(train_labels_path, train_labels)
+
+        validation_graphs = [
+            dgl.rand_graph(100, 1000) for _ in range(num_graphs)
+        ]
+        validation_graphs_path = os.path.join(test_dir, "validation_graphs.bin")
+        dgl.save_graphs(validation_graphs_path, validation_graphs)
+        validation_labels = np.random.randint(0, 10, size=num_graphs)
+        validation_labels_path = os.path.join(test_dir, "validation_labels.npy")
+        np.save(validation_labels_path, validation_labels)
+
+        test_graphs = [dgl.rand_graph(100, 1000) for _ in range(num_graphs)]
+        test_graphs_path = os.path.join(test_dir, "test_graphs.bin")
+        dgl.save_graphs(test_graphs_path, test_graphs)
+        test_labels = np.random.randint(0, 10, size=num_graphs)
+        test_labels_path = os.path.join(test_dir, "test_labels.npy")
+        np.save(test_labels_path, test_labels)
+
+        yaml_content = f"""
+            tasks:
+              - name: graph_classification
+                num_classes: 10
+                train_set:
+                  - data:
+                      - format: DGLGraph
+                        path: {train_graphs_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {train_labels_path}
+                validation_set:
+                  - data:
+                      - format: DGLGraph
+                        path: {validation_graphs_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {validation_labels_path}
+                test_set:
+                  - type: null
+                    data:
+                      - format: DGLGraph
+                        path: {test_graphs_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {test_labels_path}
+        """
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir)
+
+        # Verify tasks.
+        assert len(dataset.tasks) == 1
+        assert dataset.tasks[0].metadata["name"] == "graph_classification"
+        assert dataset.tasks[0].metadata["num_classes"] == 10
+
+        # Verify train set.
+        train_set = dataset.tasks[0].train_set
+        assert len(train_set) == num_graphs
+        assert isinstance(train_set, gb.ItemSet)
+        for i, (g, label) in enumerate(train_set):
+            assert isinstance(g, dgl.DGLGraph)
+            assert torch.equal(g.edges()[0], train_graphs[i].edges()[0])
+            assert torch.equal(g.edges()[1], train_graphs[i].edges()[1])
+            assert label == train_labels[i]
+        train_set = None
+
+        # Verify validation set.
+        validation_set = dataset.tasks[0].validation_set
+        assert len(validation_set) == num_graphs
+        assert isinstance(validation_set, gb.ItemSet)
+        for i, (g, label) in enumerate(validation_set):
+            assert isinstance(g, dgl.DGLGraph)
+            assert torch.equal(g.edges()[0], validation_graphs[i].edges()[0])
+            assert torch.equal(g.edges()[1], validation_graphs[i].edges()[1])
+            assert label == validation_labels[i]
+        validation_set = None
+
+        # Verify test set.
+        test_set = dataset.tasks[0].test_set
+        assert len(test_set) == num_graphs
+        assert isinstance(test_set, gb.ItemSet)
+        for i, (g, label) in enumerate(test_set):
+            assert isinstance(g, dgl.DGLGraph)
+            assert torch.equal(g.edges()[0], test_graphs[i].edges()[0])
+            assert torch.equal(g.edges()[1], test_graphs[i].edges()[1])
+            assert label == test_labels[i]
         test_set = None
         dataset = None
 
