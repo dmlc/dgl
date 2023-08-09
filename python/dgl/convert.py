@@ -1235,7 +1235,10 @@ def _batcher(lst):
     if F.is_tensor(lst[0]):
         return F.cat([F.unsqueeze(x, 0) for x in lst], dim=0)
 
-    return F.tensor(np.array(lst)) if type(lst[0]) is np.ndarray else F.tensor(lst)
+    if type(lst[0]) is np.ndarray:
+        return F.tensor(np.array(lst))
+
+     return F.tensor(lst)
 
 
 def from_networkx(
