@@ -131,16 +131,53 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
           : torch::nullopt);
 }
 
+/**
+ * @brief Get a lambda function which contains the sampling process.
+ *
+ * @param fanouts The number of edges to be sampled for each node with or
+ * without considering edge types.
+ * @param replace Boolean indicating whether the sample is performed with or
+ * without replacement. If True, a value can be selected multiple times.
+ * Otherwise, each value can be selected only once.
+ * @param options Tensor options specifying the desired data type of the result.
+ * @param type_per_edge A tensor representing the type of each edge, if
+ * present.
+ * @param probs_or_mask Optional tensor containing the (unnormalized)
+ * probabilities associated with each neighboring edge of a node in the original
+ * graph. It must be a 1D floating-point tensor with the number of elements
+ * equal to the number of edges in the graph.
+ * @param args Contains sampling algorithm specific arguments.
+ *
+ * @return A lambda function: (int64_t offset, int64_t num_neighbors) ->
+ * torch::Tensor, which takes offset and num_neighbors as params and returns a
+ * tensor of picked neighbors.
+ */
 template <SamplerType S>
+auto GetPickFn(
+    const std::vector<int64_t>& fanouts, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
+  return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
+             int64_t offset, int64_t num_neighbors) {
+    // If fanouts.size() > 1, perform sampling for each edge type of each node;
+    // otherwise just sample once for each node with no regard of edge types.
+    if (fanouts.size() > 1) {
+      return PickByEtype(
+          offset, num_neighbors, fanouts, replace, options,
+          type_per_edge.value(), probs_or_mask, args);
+    } else {
+      return Pick(
+          offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
+          args);
+    }
+  };
+}
+
+template <typename PickFn>
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
-    const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-    bool replace, bool return_eids,
-    const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<S> args) const {
+    const torch::Tensor& nodes, bool return_eids, PickFn pick_fn) const {
   const int64_t num_nodes = nodes.size(0);
-  // If true, perform sampling for each edge type of each node, otherwise just
-  // sample once for each node with no regard of edge types.
-  bool consider_etype = (fanouts.size() > 1);
   const int64_t num_threads = torch::get_num_threads();
   std::vector<torch::Tensor> picked_neighbors_per_thread(num_threads);
   torch::Tensor num_picked_neighbors_per_node =
@@ -178,15 +215,10 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                   continue;
                 }
 
-                if (consider_etype) {
-                  picked_neighbors_cur_thread[i - begin] = PickByEtype(
-                      offset, num_neighbors, fanouts, replace, indptr_options,
-                      type_per_edge_.value(), probs_or_mask, args);
-                } else {
-                  picked_neighbors_cur_thread[i - begin] = Pick(
-                      offset, num_neighbors, fanouts[0], replace,
-                      indptr_options, probs_or_mask, args);
-                }
+                picked_neighbors_cur_thread[i - begin] =
+                    pick_fn(offset, num_neighbors);
+
+                // This number should be the same as the result of num_pick_fn.
                 num_picked_neighbors_per_node[i + 1] =
                     picked_neighbors_cur_thread[i - begin].size(0);
               }
@@ -227,16 +259,23 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
       probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
     }
   }
+
   if (layer) {
     const int64_t random_seed = RandomEngine::ThreadLocal()->RandInt(
         static_cast<int64_t>(0), std::numeric_limits<int64_t>::max());
     SamplerArgs<SamplerType::LABOR> args{indices_, random_seed, NumNodes()};
     return SampleNeighborsImpl(
-        nodes, fanouts, replace, return_eids, probs_or_mask, args);
+        nodes, return_eids,
+        GetPickFn(
+            fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
+            args));
   } else {
     SamplerArgs<SamplerType::NEIGHBOR> args;
     return SampleNeighborsImpl(
-        nodes, fanouts, replace, return_eids, probs_or_mask, args);
+        nodes, return_eids,
+        GetPickFn(
+            fanouts, replace, indptr_.options(), type_per_edge_, probs_or_mask,
+            args));
   }
 }
 
@@ -290,9 +329,9 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
  * >= 0 or -1.
- *  - When the value is -1, all neighbors will be chosen for sampling. It is
- * equivalent to selecting all neighbors with non-zero probability when the
- * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is -1, all neighbors will be sampled once regardless of
+ * replacement. It is equivalent to selecting all neighbors when the fanout is
+ * >= the number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
  * @param replace Boolean indicating whether the sample is performed with or
@@ -419,9 +458,10 @@ inline torch::Tensor UniformPick(
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
  * >= 0 or -1.
- *  - When the value is -1, all neighbors will be chosen for sampling. It is
- * equivalent to selecting all neighbors with non-zero probability when the
- * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is -1, all neighbors with non-zero probability will be
+ * sampled once regardless of replacement. It is equivalent to selecting all
+ * neighbors with non-zero probability when the fanout is >= the number of
+ * neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
  * @param replace Boolean indicating whether the sample is performed with or
@@ -516,6 +556,10 @@ torch::Tensor Pick<SamplerType::LABOR>(
     SamplerArgs<SamplerType::LABOR> args) {
   if (fanout == 0) return torch::tensor({}, options);
   if (probs_or_mask.has_value()) {
+    if (fanout < 0) {
+      return NonUniformPick(
+          offset, num_neighbors, fanout, replace, options, probs_or_mask);
+    }
     torch::Tensor picked_neighbors;
     AT_DISPATCH_FLOATING_TYPES(
         probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
@@ -528,6 +572,8 @@ torch::Tensor Pick<SamplerType::LABOR>(
           }
         }));
     return picked_neighbors;
+  } else if (fanout < 0) {
+    return UniformPick(offset, num_neighbors, fanout, replace, options);
   } else if (replace) {
     return LaborPick<false, true>(
         offset, num_neighbors, fanout, options,
@@ -553,9 +599,10 @@ inline void safe_divide(T& a, U b) {
  * @param num_neighbors The number of neighbors to pick.
  * @param fanout The number of edges to be sampled for each node. It should be
  * >= 0 or -1.
- *  - When the value is -1, all neighbors will be chosen for sampling. It is
- * equivalent to selecting all neighbors with non-zero probability when the
- * fanout is >= the number of neighbors (and replacement is set to false).
+ *  - When the value is -1, all neighbors (with non-zero probability, if
+ * weighted) will be sampled once regardless of replacement. It is equivalent to
+ * selecting all neighbors with non-zero probability when the fanout is >= the
+ * number of neighbors (and replacement is set to false).
  *  - When the value is a non-negative integer, it serves as a minimum
  * threshold for selecting neighbors.
  * @param options Tensor options specifying the desired data type of the result.
@@ -573,7 +620,7 @@ inline torch::Tensor LaborPick(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::LABOR> args) {
-  fanout = fanout < 0 ? num_neighbors : std::min(fanout, num_neighbors);
+  fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
     return torch::arange(offset, offset + num_neighbors, options);
   }

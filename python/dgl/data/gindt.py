@@ -358,12 +358,6 @@ class GINDataset(DGLBuiltinDataset):
             )
 
     def save(self):
-        graph_path = os.path.join(
-            self.save_path, "gin_{}_{}.bin".format(self.name, self.hash)
-        )
-        info_path = os.path.join(
-            self.save_path, "gin_{}_{}.pkl".format(self.name, self.hash)
-        )
         label_dict = {"labels": self.labels}
         info_dict = {
             "N": self.N,
@@ -380,18 +374,12 @@ class GINDataset(DGLBuiltinDataset):
             "elabel_dict": self.elabel_dict,
             "ndegree_dict": self.ndegree_dict,
         }
-        save_graphs(str(graph_path), self.graphs, label_dict)
-        save_info(str(info_path), info_dict)
+        save_graphs(str(self.graph_path), self.graphs, label_dict)
+        save_info(str(self.info_path), info_dict)
 
     def load(self):
-        graph_path = os.path.join(
-            self.save_path, "gin_{}_{}.bin".format(self.name, self.hash)
-        )
-        info_path = os.path.join(
-            self.save_path, "gin_{}_{}.pkl".format(self.name, self.hash)
-        )
-        graphs, label_dict = load_graphs(str(graph_path))
-        info_dict = load_info(str(info_path))
+        graphs, label_dict = load_graphs(str(self.graph_path))
+        info_dict = load_info(str(self.info_path))
 
         self.graphs = graphs
         self.labels = label_dict["labels"]
@@ -410,14 +398,20 @@ class GINDataset(DGLBuiltinDataset):
         self.ndegree_dict = info_dict["ndegree_dict"]
         self.degree_as_nlabel = info_dict["degree_as_nlabel"]
 
-    def has_cache(self):
-        graph_path = os.path.join(
+    @property
+    def graph_path(self):
+        return os.path.join(
             self.save_path, "gin_{}_{}.bin".format(self.name, self.hash)
         )
-        info_path = os.path.join(
+
+    @property
+    def info_path(self):
+        return os.path.join(
             self.save_path, "gin_{}_{}.pkl".format(self.name, self.hash)
         )
-        if os.path.exists(graph_path) and os.path.exists(info_path):
+
+    def has_cache(self):
+        if os.path.exists(self.graph_path) and os.path.exists(self.info_path):
             return True
         return False
 
