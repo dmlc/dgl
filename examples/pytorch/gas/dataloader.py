@@ -68,21 +68,21 @@ class GASDataset(DGLBuiltinDataset):
 
         self.graph = hg
 
+    @property
+    def graph_path(self):
+        return os.path.join(self.save_path, self.name + "_dgl_graph.bin")
+
     def save(self):
         """save the graph list and the labels"""
-        graph_path = os.path.join(self.save_path, self.name + "_dgl_graph.bin")
-        save_graphs(str(graph_path), self.graph)
+        save_graphs(str(self.graph_path), self.graph)
 
     def has_cache(self):
         """check whether there are processed data in `self.save_path`"""
-        graph_path = os.path.join(self.save_path, self.name + "_dgl_graph.bin")
-        return os.path.exists(graph_path)
+        return os.path.exists(self.graph_path)
 
     def load(self):
         """load processed data from directory `self.save_path`"""
-        graph_path = os.path.join(self.save_path, self.name + "_dgl_graph.bin")
-
-        graph, _ = load_graphs(str(graph_path))
+        graph, _ = load_graphs(str(self.graph_path))
         self.graph = graph[0]
 
     @property

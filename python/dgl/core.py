@@ -211,9 +211,10 @@ def data_dict_to_list(graph, data_dict, func, target):
     -------------
     graph :  DGLGraph
         The input graph.
-    data_dict : dict[str, Tensor] or dict[(str, str, str), Tensor]]
+    data_dict : dict[str, Tensor] or dict[(str, str, str), Tensor]] or Tensor
         Node or edge data stored in DGLGraph. The key of the dictionary
-        is the node type name or edge type name.
+        is the node type name or edge type name. If there is only single source
+        node type, data_dict is the value of feature(a Tensor) not a dict.
     func : dgl.function.BaseMessageFunction
         Built-in message function.
     target : 'u', 'v' or 'e'
@@ -228,13 +229,22 @@ def data_dict_to_list(graph, data_dict, func, target):
     if isinstance(func, fn.BinaryMessageFunction):
         if target in ["u", "v"]:
             output_list = [None] * graph._graph.number_of_ntypes()
-            for srctype, _, dsttype in graph.canonical_etypes:
+            # If there is only single source node type, data_dict should be the value of
+            # feature, namely, a tensor.
+            if not isinstance(data_dict, dict):
+                src_id, dst_id = graph._graph.metagraph.find_edge(0)
                 if target == "u":
-                    src_id = graph.get_ntype_id(srctype)
-                    output_list[src_id] = data_dict[srctype]
+                    output_list[src_id] = data_dict
                 else:
-                    dst_id = graph.get_ntype_id(dsttype)
-                    output_list[dst_id] = data_dict[dsttype]
+                    output_list[dst_id] = data_dict
+            else:
+                for srctype, _, dsttype in graph.canonical_etypes:
+                    if target == "u":
+                        src_id = graph.get_ntype_id(srctype)
+                        output_list[src_id] = data_dict[srctype]
+                    else:
+                        dst_id = graph.get_ntype_id(dsttype)
+                        output_list[dst_id] = data_dict[dsttype]
         else:  # target == 'e'
             output_list = [None] * graph._graph.number_of_etypes()
             for rel in graph.canonical_etypes:

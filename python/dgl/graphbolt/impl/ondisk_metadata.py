@@ -1,19 +1,20 @@
 """Ondisk metadata of GraphBolt."""
 
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import pydantic
 
-
 __all__ = [
     "OnDiskFeatureDataFormat",
+    "OnDiskTVTSetData",
     "OnDiskTVTSet",
     "OnDiskFeatureDataDomain",
     "OnDiskFeatureData",
     "OnDiskMetaData",
     "OnDiskGraphTopologyType",
     "OnDiskGraphTopology",
+    "OnDiskTaskData",
 ]
 
 
@@ -24,13 +25,19 @@ class OnDiskFeatureDataFormat(str, Enum):
     NUMPY = "numpy"
 
 
+class OnDiskTVTSetData(pydantic.BaseModel):
+    """Train-Validation-Test set data."""
+
+    format: OnDiskFeatureDataFormat
+    in_memory: Optional[bool] = True
+    path: str
+
+
 class OnDiskTVTSet(pydantic.BaseModel):
     """Train-Validation-Test set."""
 
     type: Optional[str] = None
-    format: OnDiskFeatureDataFormat
-    in_memory: Optional[bool] = True
-    path: str
+    data: List[OnDiskTVTSetData]
 
 
 class OnDiskFeatureDataDomain(str, Enum):
@@ -64,6 +71,25 @@ class OnDiskGraphTopology(pydantic.BaseModel):
     path: str
 
 
+class OnDiskTaskData(pydantic.BaseModel, extra="allow"):
+    """Task specification in YAML."""
+
+    train_set: Optional[List[OnDiskTVTSet]] = []
+    validation_set: Optional[List[OnDiskTVTSet]] = []
+    test_set: Optional[List[OnDiskTVTSet]] = []
+    extra_fields: Optional[Dict[str, Any]] = {}
+
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Build extra fields."""
+        for key in list(values.keys()):
+            if key not in cls.model_fields:
+                values["extra_fields"] = values.get("extra_fields", {})
+                values["extra_fields"][key] = values.pop(key)
+        return values
+
+
 class OnDiskMetaData(pydantic.BaseModel):
     """Metadata specification in YAML.
 
@@ -72,10 +98,6 @@ class OnDiskMetaData(pydantic.BaseModel):
     """
 
     dataset_name: Optional[str] = None
-    num_classes: Optional[int] = None
-    num_labels: Optional[int] = None
     graph_topology: Optional[OnDiskGraphTopology] = None
     feature_data: Optional[List[OnDiskFeatureData]] = []
-    train_sets: Optional[List[List[OnDiskTVTSet]]] = []
-    validation_sets: Optional[List[List[OnDiskTVTSet]]] = []
-    test_sets: Optional[List[List[OnDiskTVTSet]]] = []
+    tasks: Optional[List[OnDiskTaskData]] = []
