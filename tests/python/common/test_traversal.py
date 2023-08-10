@@ -95,7 +95,7 @@ DFS_LABEL_NAMES = ["forward", "reverse", "nontree"]
 
 @parametrize_idtype
 def test_dfs_labeled_edges(idtype, example=False):
-    dgl_g = dgl.DGLGraph().astype(idtype)
+    dgl_g = dgl.graph([]).astype(idtype)
     dgl_g.add_nodes(6)
     dgl_g.add_edges([0, 1, 0, 3, 3], [1, 2, 2, 4, 5])
     dgl_edges, dgl_labels = dgl.dfs_labeled_edges_generator(

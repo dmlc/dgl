@@ -60,6 +60,7 @@ class GatedGraphConv(nn.Module):
 
     def __init__(self, in_feats, out_feats, n_steps, n_etypes, bias=True):
         super(GatedGraphConv, self).__init__()
+        assert in_feats <= out_feats, "out_feats must be not less than in_feats"
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._n_steps = n_steps
