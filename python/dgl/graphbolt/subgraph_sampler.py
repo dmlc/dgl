@@ -60,18 +60,20 @@ class SubgraphSampler(Mapper):
     def _sample(self, data):
         adjs = []
         num_layers = len(self.fanouts)
+        seeds = data
         for hop in range(num_layers):
-            seeds, subgraph = self._sample_sub_graph(
+            subgraph = self._sample_sub_graph(
                 seeds, hop,
             )
-            adjs.insert(0, subgraph)
+            seeds, compacted_subgraph = unique_and_compact_node_pairs(subgraph.node_pairs, seeds)
+            adjs.insert(0, compacted_subgraph)
         return seeds, adjs
-
+                     
     def _sample_sub_graph(self, seeds, hop):
         raise NotImplemented
 
 
-class LinkSubgraphSampler(SubgraphSampler):
+class LinkSampler(SubgraphSampler):
     def __init__(
         self,
         datapipe,
@@ -117,7 +119,12 @@ class LinkSubgraphSampler(SubgraphSampler):
                 neg_u, neg_v = data[2:4]
                 u = torch.cat((u, neg_u.view(-1)))
                 v = torch.cat((v, neg_v.view(-1)))
-                
+            elif self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
+                neg_u = data[2]
+                u = torch.cat((u, neg_u.view(-1)))        
+            elif self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
+                neg_v = data[2]
+                v = torch.cat((v, neg_v.view(-1)))
             seeds, compacted_pairs = unique_and_compact_node_pairs((u, v))
             return seeds, compacted_pairs
         
