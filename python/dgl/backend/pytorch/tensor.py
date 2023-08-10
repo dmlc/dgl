@@ -509,6 +509,7 @@ def backward(x, head_gradient=None):
 
 
 def grad(x):
+    x.retain_grad()
     return x.grad
 
 
