@@ -34,7 +34,8 @@ def unique_and_compact_node_pairs(
         Unique nodes of all destination nodes in the node pairs.
         - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
         - If `node_pairs` is a dictionary: The keys are node type and the
-        values are corresponding nodes. And IDs inside are heterogeneous ids.    
+        values are corresponding nodes. And IDs inside are heterogeneous ids.
+
     Returns
     -------
     Tuple[node_pairs, unique_nodes]
