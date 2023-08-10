@@ -62,9 +62,13 @@ def unique_and_compact_node_pairs(
     ('n2', 'e2', 'n1'): (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
     is_homogeneous = not isinstance(node_pairs, dict)
-
     if is_homogeneous:
         node_pairs = {("_N", "_E", "_N"): node_pairs}
+        if unique_dst_nodes is not None:
+            assert isinstance(
+                unique_dst_nodes, torch.Tensor
+            ), "Edge type not supported in homogeneous graph."
+            unique_dst_nodes = {"_N": unique_dst_nodes}
 
     # Collect all source and destination nodes for each node type.
     src_nodes = defaultdict(list)
