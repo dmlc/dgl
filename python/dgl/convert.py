@@ -1235,7 +1235,7 @@ def _batcher(lst):
     if F.is_tensor(lst[0]):
         return F.cat([F.unsqueeze(x, 0) for x in lst], dim=0)
 
-    if type(lst[0]) is np.ndarray:
+    if isinstance(lst[0], np.ndarray):
         return F.tensor(np.array(lst))
 
     return F.tensor(lst)
