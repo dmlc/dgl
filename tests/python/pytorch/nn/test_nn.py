@@ -49,8 +49,8 @@ def graph_with_nodes(num_nodes, ctx=None):
 
 @pytest.mark.parametrize("out_dim", [1, 2])
 def test_graph_conv0(out_dim):
-    g = graph_with_nodes(3)
     ctx = F.ctx()
+    g = graph_with_nodes(3, ctx)
     adj = g.adj_external(transpose=True, ctx=ctx)
 
     conv = nn.GraphConv(5, out_dim, norm="none", bias=True)
@@ -1268,9 +1268,7 @@ def test_dotgat_conv_bi(g, idtype, out_dim, num_heads):
 def test_dense_cheb_conv(out_dim):
     for k in range(1, 4):
         ctx = F.ctx()
-        g = dgl.from_scipy(
-            sp.sparse.random(100, 100, density=0.1), readonly=True
-        )
+        g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.1))
         g = g.to(F.ctx())
         adj = g.adj_external(transpose=True, ctx=ctx).to_dense()
         cheb = nn.ChebConv(5, out_dim, k, None)
@@ -2088,16 +2086,9 @@ def test_hgt(idtype, in_size, num_heads):
     train_idx = th.randperm(100, dtype=idtype)[:10]
     sampler = dgl.dataloading.NeighborSampler([-1])
     train_loader = dgl.dataloading.DataLoader(
-        g,
-        train_idx.to(dev),
-        sampler,
-        batch_size=8,
-        device=dev,
-        num_workers=1,
-        shuffle=True,
+        g, train_idx.to(dev), sampler, batch_size=8, device=dev, shuffle=True
     )
-    with train_loader.enable_cpu_affinity():
-        (input_nodes, output_nodes, block) = next(iter(train_loader))
+    (input_nodes, output_nodes, block) = next(iter(train_loader))
     block = block[0]
     x = x[input_nodes.to(th.long)]
     ntype = ntype[input_nodes.to(th.long)]
