@@ -360,17 +360,18 @@ int64_t NumPickByEtype(
 // torch::Tensor Pick(
 //     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
 //     const torch::TensorOptions& options,
-//     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args, PickedType* picked_data_ptr);
+//     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+//     PickedType* picked_data_ptr);
 
 template <typename PickedType>
-torch::Tensor Pick(
+void Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr);
 
 template <typename PickedType>
-torch::Tensor Pick(
+void Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
@@ -404,14 +405,16 @@ torch::Tensor Pick(
  * @return A tensor containing the picked neighbors.
  */
 template <SamplerType S, typename PickedType>
-torch::Tensor PickByEtype(
+void PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args, PickedType* picked_data_ptr);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr);
 
-template <bool NonUniform, bool Replace, typename T = float, typename PickedType>
-torch::Tensor LaborPick(
+template <
+    bool NonUniform, bool Replace, typename T = float, typename PickedType>
+void LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,

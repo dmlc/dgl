@@ -198,20 +198,23 @@ auto GetPickFn(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
-  return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args]<typename PickedType>(
-             int64_t offset, int64_t num_neighbors, PickedType* picked_data_ptr) {
-    // If fanouts.size() > 1, perform sampling for each edge type of each node;
-    // otherwise just sample once for each node with no regard of edge types.
-    if (fanouts.size() > 1) {
-      return PickByEtype(
-          offset, num_neighbors, fanouts, replace, options,
-          type_per_edge.value(), probs_or_mask, args, picked_data_ptr);
-    } else {
-      return Pick(
-          offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
-          args, picked_data_ptr);
-    }
-  };
+  return
+      [&fanouts, replace, &options, &type_per_edge, &probs_or_mask,
+       args]<typename PickedType>(
+          int64_t offset, int64_t num_neighbors, PickedType* picked_data_ptr) {
+        // If fanouts.size() > 1, perform sampling for each edge type of each
+        // node; otherwise just sample once for each node with no regard of edge
+        // types.
+        if (fanouts.size() > 1) {
+          return PickByEtype(
+              offset, num_neighbors, fanouts, replace, options,
+              type_per_edge.value(), probs_or_mask, args, picked_data_ptr);
+        } else {
+          return Pick(
+              offset, num_neighbors, fanouts[0], replace, options,
+              probs_or_mask, args, picked_data_ptr);
+        }
+      };
 }
 
 template <typename NumPickFn, typename PickFn>
@@ -262,15 +265,18 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                 int64_t allocate_size = num_pick_fn(offset, num_neighbors);
                 picked_neighbors_cur_thread[i - begin] =
                     torch::empty({allocate_size}, indptr_options);
-                torch::Tensor& picked_tensor = picked_neighbors_cur_thread[i - begin];
+                torch::Tensor& picked_tensor =
+                    picked_neighbors_cur_thread[i - begin];
                 // pick_fn(
                 //     offset, num_neighbors,
-                //     picked_neighbors_cur_thread[i - begin], 0, allocate_size);
+                //     picked_neighbors_cur_thread[i - begin], 0,
+                //     allocate_size);
                 AT_DISPATCH_INTEGRAL_TYPES(
-                  picked_tensor.scalar_type(), "CallPick", ([&] {
-                    pick_fn(offset, num_neighbors, picked_tensor.data_ptr());
-                  })
-                );
+                    picked_tensor.scalar_type(), "CallPick", ([&] {
+                      pick_fn(
+                          offset, num_neighbors,
+                          picked_tensor.data_ptr<scalar_t>());
+                    }));
 
                 // This number should be the same as the result of num_pick_fn.
                 num_picked_neighbors_per_node[i + 1] =
@@ -446,104 +452,100 @@ int64_t NumPickByEtype(
  *
  * @return A tensor containing the picked neighbors.
  */
-template<typename PickedType>
-inline torch::Tensor UniformPick(
+template <typename PickedType>
+inline void UniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options, PickedType* picked_data_ptr) {
-  torch::Tensor picked_neighbors;
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
-    picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
+    for (int64_t i = 0; i < num_neighbors; ++i) {
+      picked_data_ptr[i] = offset + i;
+    }
   } else if (replace) {
-    picked_neighbors =
-        torch::randint(offset, offset + num_neighbors, {fanout}, options);
+    memcpy(
+        picked_data_ptr,
+        torch::randint(offset, offset + num_neighbors, {fanout}, options)
+            .data_ptr<PickedType>(),
+        fanout * sizeof(PickedType));
   } else {
-    picked_neighbors = torch::empty({fanout}, options);
-    AT_DISPATCH_INTEGRAL_TYPES(
-        picked_neighbors.scalar_type(), "UniformPick", ([&] {
-          scalar_t* picked_neighbors_data =
-              picked_neighbors.data_ptr<scalar_t>();
-          // We use different sampling strategies for different sampling case.
-          if (fanout >= num_neighbors / 10) {
-            // [Algorithm]
-            // This algorithm is conceptually related to the Fisher-Yates
-            // shuffle.
-            //
-            // [Complexity Analysis]
-            // This algorithm's memory complexity is O(num_neighbors), but
-            // it generates fewer random numbers (O(fanout)).
-            //
-            // (Compare) Reservoir algorithm is one of the most classical
-            // sampling algorithms. Both the reservoir algorithm and our
-            // algorithm offer distinct advantages, we need to compare to
-            // illustrate our trade-offs.
-            // The reservoir algorithm is memory-efficient (O(fanout)) but
-            // creates many random numbers (O(num_neighbors)), which is
-            // costly.
-            //
-            // [Practical Consideration]
-            // Use this algorithm when `fanout >= num_neighbors / 10` to
-            // reduce computation.
-            // In this scenarios above, memory complexity is not a concern due
-            // to the small size of both `fanout` and `num_neighbors`. And it
-            // is efficient to allocate a small amount of memory. So the
-            // algorithm performence is great in this case.
-            std::vector<scalar_t> seq(num_neighbors);
-            // Assign the seq with [offset, offset + num_neighbors].
-            std::iota(seq.begin(), seq.end(), offset);
-            for (int64_t i = 0; i < fanout; ++i) {
-              auto j = RandomEngine::ThreadLocal()->RandInt(i, num_neighbors);
-              std::swap(seq[i], seq[j]);
-            }
-            // Save the randomly sampled fanout elements to the output tensor.
-            std::copy(seq.begin(), seq.begin() + fanout, picked_neighbors_data);
-          } else if (fanout < 64) {
-            // [Algorithm]
-            // Use linear search to verify uniqueness.
-            //
-            // [Complexity Analysis]
-            // Since the set of numbers is small (up to 64), so it is more
-            // cost-effective for the CPU to use this algorithm.
-            auto begin = picked_neighbors_data;
-            auto end = picked_neighbors_data + fanout;
+    // We use different sampling strategies for different sampling case.
+    if (fanout >= num_neighbors / 10) {
+      // [Algorithm]
+      // This algorithm is conceptually related to the Fisher-Yates
+      // shuffle.
+      //
+      // [Complexity Analysis]
+      // This algorithm's memory complexity is O(num_neighbors), but
+      // it generates fewer random numbers (O(fanout)).
+      //
+      // (Compare) Reservoir algorithm is one of the most classical
+      // sampling algorithms. Both the reservoir algorithm and our
+      // algorithm offer distinct advantages, we need to compare to
+      // illustrate our trade-offs.
+      // The reservoir algorithm is memory-efficient (O(fanout)) but
+      // creates many random numbers (O(num_neighbors)), which is
+      // costly.
+      //
+      // [Practical Consideration]
+      // Use this algorithm when `fanout >= num_neighbors / 10` to
+      // reduce computation.
+      // In this scenarios above, memory complexity is not a concern due
+      // to the small size of both `fanout` and `num_neighbors`. And it
+      // is efficient to allocate a small amount of memory. So the
+      // algorithm performence is great in this case.
+      std::vector<PickedType> seq(num_neighbors);
+      // Assign the seq with [offset, offset + num_neighbors].
+      std::iota(seq.begin(), seq.end(), offset);
+      for (int64_t i = 0; i < fanout; ++i) {
+        auto j = RandomEngine::ThreadLocal()->RandInt(i, num_neighbors);
+        std::swap(seq[i], seq[j]);
+      }
+      // Save the randomly sampled fanout elements to the output tensor.
+      std::copy(seq.begin(), seq.begin() + fanout, picked_data_ptr);
+    } else if (fanout < 64) {
+      // [Algorithm]
+      // Use linear search to verify uniqueness.
+      //
+      // [Complexity Analysis]
+      // Since the set of numbers is small (up to 64), so it is more
+      // cost-effective for the CPU to use this algorithm.
+      auto begin = picked_data_ptr;
+      auto end = picked_data_ptr + fanout;
 
-            while (begin != end) {
-              // Put the new random number in the last position.
-              *begin = RandomEngine::ThreadLocal()->RandInt(
-                  offset, offset + num_neighbors);
-              // Check if a new value doesn't exist in current
-              // range(picked_neighbors_data, begin). Otherwise get a new
-              // value until we haven't unique range of elements.
-              auto it = std::find(picked_neighbors_data, begin, *begin);
-              if (it == begin) ++begin;
-            }
-          } else {
-            // [Algorithm]
-            // Use hash-set to verify uniqueness. In the best scenario, the
-            // time complexity is O(fanout), assuming no conflicts occur.
-            //
-            // [Complexity Analysis]
-            // Let K = (fanout / num_neighbors), the expected number of extra
-            // sampling steps is roughly K^2 / (1-K) * num_neighbors, which
-            // means in the worst case scenario, the time complexity is
-            // O(num_neighbors^2).
-            //
-            // [Practical Consideration]
-            // In practice, we set the threshold K to 1/10. This trade-off is
-            // due to the slower performance of std::unordered_set, which
-            // would otherwise increase the sampling cost. By doing so, we
-            // achieve a balance between theoretical efficiency and practical
-            // performance.
-            std::unordered_set<scalar_t> picked_set;
-            while (static_cast<int64_t>(picked_set.size()) < fanout) {
-              picked_set.insert(RandomEngine::ThreadLocal()->RandInt(
-                  offset, offset + num_neighbors));
-            }
-            std::copy(
-                picked_set.begin(), picked_set.end(), picked_neighbors_data);
-          }
-        }));
+      while (begin != end) {
+        // Put the new random number in the last position.
+        *begin = RandomEngine::ThreadLocal()->RandInt(
+            offset, offset + num_neighbors);
+        // Check if a new value doesn't exist in current
+        // range(picked_data_ptr, begin). Otherwise get a new
+        // value until we haven't unique range of elements.
+        auto it = std::find(picked_data_ptr, begin, *begin);
+        if (it == begin) ++begin;
+      }
+    } else {
+      // [Algorithm]
+      // Use hash-set to verify uniqueness. In the best scenario, the
+      // time complexity is O(fanout), assuming no conflicts occur.
+      //
+      // [Complexity Analysis]
+      // Let K = (fanout / num_neighbors), the expected number of extra
+      // sampling steps is roughly K^2 / (1-K) * num_neighbors, which
+      // means in the worst case scenario, the time complexity is
+      // O(num_neighbors^2).
+      //
+      // [Practical Consideration]
+      // In practice, we set the threshold K to 1/10. This trade-off is
+      // due to the slower performance of std::unordered_set, which
+      // would otherwise increase the sampling cost. By doing so, we
+      // achieve a balance between theoretical efficiency and practical
+      // performance.
+      std::unordered_set<PickedType> picked_set;
+      while (static_cast<int64_t>(picked_set.size()) < fanout) {
+        picked_set.insert(RandomEngine::ThreadLocal()->RandInt(
+            offset, offset + num_neighbors));
+      }
+      std::copy(picked_set.begin(), picked_set.end(), picked_data_ptr);
+    }
   }
-  return picked_neighbors;
 }
 
 /**
@@ -582,56 +584,61 @@ inline torch::Tensor UniformPick(
  * @return A tensor containing the picked neighbors.
  */
 template <typename PickedType>
-inline torch::Tensor NonUniformPick(
+inline void NonUniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask, PickedType* picked_data_ptr) {
-  torch::Tensor picked_neighbors;
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    PickedType* picked_data_ptr) {
   auto local_probs =
       probs_or_mask.value().slice(0, offset, offset + num_neighbors);
   auto positive_probs_indices = local_probs.nonzero().squeeze(1);
   auto num_positive_probs = positive_probs_indices.size(0);
-  if (num_positive_probs == 0) return torch::tensor({}, options);
+  if (num_positive_probs == 0) return;
   if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
-    picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
-    picked_neighbors =
-        torch::index_select(picked_neighbors, 0, positive_probs_indices);
+    memcpy(
+        picked_data_ptr,
+        (positive_probs_indices + offset).data_ptr<PickedType>(),
+        num_positive_probs * sizeof(PickedType));
   } else {
     if (!replace) fanout = std::min(fanout, num_positive_probs);
-    picked_neighbors =
-        torch::multinomial(local_probs, fanout, replace) + offset;
+    memcpy(
+        picked_data_ptr,
+        (torch::multinomial(local_probs, fanout, replace) + offset)
+            .data_ptr<PickedType>(),
+        fanout * sizeof(PickedType));
   }
-  return picked_neighbors;
 }
 
 template <typename PickedType>
-torch::Tensor Pick(
+void Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr) {
   if (probs_or_mask.has_value()) {
-    return NonUniformPick(
-        offset, num_neighbors, fanout, replace, options, probs_or_mask, picked_data_ptr);
+    NonUniformPick(
+        offset, num_neighbors, fanout, replace, options, probs_or_mask,
+        picked_data_ptr);
   } else {
-    return UniformPick(offset, num_neighbors, fanout, replace, options, picked_data_ptr);
+    UniformPick(
+        offset, num_neighbors, fanout, replace, options, picked_data_ptr);
   }
 }
 
 template <SamplerType S, typename PickedType>
-torch::Tensor PickByEtype(
+void PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args, PickedType* picked_data_ptr) {
-  std::vector<torch::Tensor> picked_neighbors(
-      fanouts.size(), torch::tensor({}, options));
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr) {
   int64_t etype_begin = offset;
   int64_t etype_end = offset;
   AT_DISPATCH_INTEGRAL_TYPES(
       type_per_edge.scalar_type(), "PickByEtype", ([&] {
         const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
         const auto end = offset + num_neighbors;
+        int64_t pick_offset = 0;
         while (etype_begin < end) {
           scalar_t etype = type_per_edge_data[etype_begin];
           TORCH_CHECK(
@@ -642,51 +649,56 @@ torch::Tensor PickByEtype(
               type_per_edge_data + etype_begin, type_per_edge_data + end,
               etype);
           etype_end = etype_end_it - type_per_edge_data;
+          int64_t picked_count = NumPick(
+              fanout, replace, probs_or_mask, etype_begin,
+              etype_end - etype_begin);
           // Do sampling for one etype.
           if (fanout != 0) {
-            picked_neighbors[etype] = Pick(
+            Pick(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
-                probs_or_mask, args, picked_data_ptr);
+                probs_or_mask, args, picked_data_ptr + pick_offset);
+            pick_offset += picked_count;
           }
           etype_begin = etype_end;
         }
       }));
-
-  return torch::cat(picked_neighbors, 0);
 }
 
 template <typename PickedType>
-torch::Tensor Pick(
+void Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
-  if (fanout == 0) return torch::tensor({}, options);
+  if (fanout == 0) return;
   if (probs_or_mask.has_value()) {
     if (fanout < 0) {
-      return NonUniformPick(
-          offset, num_neighbors, fanout, replace, options, probs_or_mask, picked_data_ptr);
+      NonUniformPick(
+          offset, num_neighbors, fanout, replace, options, probs_or_mask,
+          picked_data_ptr);
+    } else {
+      AT_DISPATCH_FLOATING_TYPES(
+          probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
+            if (replace) {
+              LaborPick<true, true, scalar_t>(
+                  offset, num_neighbors, fanout, options, probs_or_mask, args,
+                  picked_data_ptr);
+            } else {
+              LaborPick<true, false, scalar_t>(
+                  offset, num_neighbors, fanout, options, probs_or_mask, args,
+                  picked_data_ptr);
+            }
+          }));
     }
-    torch::Tensor picked_neighbors;
-    AT_DISPATCH_FLOATING_TYPES(
-        probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
-          if (replace) {
-            picked_neighbors = LaborPick<true, true, scalar_t>(
-                offset, num_neighbors, fanout, options, probs_or_mask, args, picked_data_ptr);
-          } else {
-            picked_neighbors = LaborPick<true, false, scalar_t>(
-                offset, num_neighbors, fanout, options, probs_or_mask, args, picked_data_ptr);
-          }
-        }));
-    return picked_neighbors;
   } else if (fanout < 0) {
-    return UniformPick(offset, num_neighbors, fanout, replace, options, picked_data_ptr);
+    UniformPick(
+        offset, num_neighbors, fanout, replace, options, picked_data_ptr);
   } else if (replace) {
-    return LaborPick<false, true>(
+    LaborPick<false, true>(
         offset, num_neighbors, fanout, options,
         /* probs_or_mask= */ torch::nullopt, args, picked_data_ptr);
   } else {  // replace = false
-    return LaborPick<false, false>(
+    LaborPick<false, false>(
         offset, num_neighbors, fanout, options,
         /* probs_or_mask= */ torch::nullopt, args, picked_data_ptr);
   }
@@ -721,22 +733,27 @@ inline void safe_divide(T& a, U b) {
  *
  * @return A tensor containing the picked neighbors.
  */
-template <bool NonUniform, bool Replace, typename ProbsType, typename PickedType>
-inline torch::Tensor LaborPick(
+template <
+    bool NonUniform, bool Replace, typename ProbsType, typename PickedType>
+inline void LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
   fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
-    return torch::arange(offset, offset + num_neighbors, options);
+    for (int64_t i = 0; i < num_neighbors; ++i) {
+      picked_data_ptr[i] = offset + i;
+    }
+    return;
   }
   torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
   // Assuming max_degree of a vertex is <= 4 billion.
   auto heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
       heap_tensor.data_ptr<int32_t>());
   const ProbsType* local_probs_data =
-      NonUniform ? probs_or_mask.value().data_ptr<ProbsType>() + offset : nullptr;
+      NonUniform ? probs_or_mask.value().data_ptr<ProbsType>() + offset
+                 : nullptr;
   AT_DISPATCH_INTEGRAL_TYPES(
       args.indices.scalar_type(), "LaborPickMain", ([&] {
         const scalar_t* local_indices_data =
@@ -849,21 +866,15 @@ inline torch::Tensor LaborPick(
         }
       }));
   int64_t num_sampled = 0;
-  torch::Tensor picked_neighbors = torch::empty({fanout}, options);
-  AT_DISPATCH_INTEGRAL_TYPES(
-      picked_neighbors.scalar_type(), "LaborPickOutput", ([&] {
-        scalar_t* picked_neighbors_data = picked_neighbors.data_ptr<scalar_t>();
-        for (int64_t i = 0; i < fanout; ++i) {
-          const auto [rnd, j] = heap_data[i];
-          if (!NonUniform || rnd < std::numeric_limits<float>::infinity()) {
-            picked_neighbors_data[num_sampled++] = offset + j;
-          }
-        }
-      }));
+  for (int64_t i = 0; i < fanout; ++i) {
+    const auto [rnd, j] = heap_data[i];
+    if (!NonUniform || rnd < std::numeric_limits<float>::infinity()) {
+      picked_data_ptr[num_sampled++] = offset + j;
+    }
+  }
   TORCH_CHECK(
       !Replace || num_sampled == fanout || num_sampled == 0,
       "Sampling with replacement should sample exactly fanout neighbors or 0!");
-  return picked_neighbors.narrow(0, 0, num_sampled);
 }
 
 }  // namespace sampling
