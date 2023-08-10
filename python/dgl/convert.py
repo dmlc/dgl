@@ -1231,6 +1231,16 @@ def bipartite_from_scipy(
     return g.to(device)
 
 
+def _batcher(lst):
+    if F.is_tensor(lst[0]):
+        return F.cat([F.unsqueeze(x, 0) for x in lst], dim=0)
+
+    if isinstance(lst[0], np.ndarray):
+        return F.tensor(np.array(lst))
+
+    return F.tensor(lst)
+
+
 def from_networkx(
     nx_graph,
     node_attrs=None,
@@ -1367,12 +1377,6 @@ def from_networkx(
 
     # handle features
     # copy attributes
-    def _batcher(lst):
-        if F.is_tensor(lst[0]):
-            return F.cat([F.unsqueeze(x, 0) for x in lst], dim=0)
-        else:
-            return F.tensor(lst)
-
     if node_attrs is not None:
         # mapping from feature name to a list of tensors to be concatenated
         attr_dict = defaultdict(list)
@@ -1592,12 +1596,6 @@ def bipartite_from_networkx(
 
     # handle features
     # copy attributes
-    def _batcher(lst):
-        if F.is_tensor(lst[0]):
-            return F.cat([F.unsqueeze(x, 0) for x in lst], dim=0)
-        else:
-            return F.tensor(lst)
-
     if u_attrs is not None:
         # mapping from feature name to a list of tensors to be concatenated
         src_attr_dict = defaultdict(list)
