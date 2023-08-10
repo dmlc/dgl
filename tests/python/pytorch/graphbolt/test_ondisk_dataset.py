@@ -1199,7 +1199,7 @@ def test_OnDiskDataset_preprocess_yaml_content():
             )
             assert yaml_data["tasks"][0][set_name][0]["data"][0][
                 "path"
-            ] == os.path.join("preprocessed", "set/{file_name}.npy")
+            ] == os.path.join("preprocessed", f"set/{file_name}.npy")
             assert os.path.exists(
                 os.path.join(test_dir, f"preprocessed/set/{file_name}.npy")
             )
