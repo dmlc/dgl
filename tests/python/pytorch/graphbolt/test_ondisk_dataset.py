@@ -1166,9 +1166,8 @@ def test_OnDiskDataset_preprocess_yaml_content():
         assert yaml_data["dataset_name"] == dataset_name
 
         assert "graph_topology" in yaml_data
-        assert (
-            yaml_data["graph_topology"]["path"]
-            == "preprocessed/csc_sampling_graph.tar"
+        assert yaml_data["graph_topology"]["path"] == os.path.join(
+            "preprocessed", "csc_sampling_graph.tar"
         )
         assert yaml_data["graph_topology"]["type"] == "CSCSamplingGraph"
         assert os.path.exists(
@@ -1180,9 +1179,8 @@ def test_OnDiskDataset_preprocess_yaml_content():
         assert yaml_data["feature_data"][0]["type"] is None
         assert yaml_data["feature_data"][0]["name"] == "feat"
         assert yaml_data["feature_data"][0]["format"] == "numpy"
-        assert (
-            yaml_data["feature_data"][0]["path"]
-            == "preprocessed/data/node-feat.npy"
+        assert yaml_data["feature_data"][0]["path"] == os.path.join(
+            "preprocessed", "data", "node-feat.npy"
         )
         assert os.path.exists(
             os.path.join(test_dir, "preprocessed/data/node-feat.npy")
@@ -1199,10 +1197,9 @@ def test_OnDiskDataset_preprocess_yaml_content():
                 yaml_data["tasks"][0][set_name][0]["data"][0]["format"]
                 == "numpy"
             )
-            assert (
-                yaml_data["tasks"][0][set_name][0]["data"][0]["path"]
-                == f"preprocessed/set/{file_name}.npy"
-            )
+            assert yaml_data["tasks"][0][set_name][0]["data"][0][
+                "path"
+            ] == os.path.join("preprocessed", "set", f"{file_name}.npy")
             assert os.path.exists(
                 os.path.join(test_dir, f"preprocessed/set/{file_name}.npy")
             )
