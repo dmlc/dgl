@@ -129,7 +129,7 @@ def create_test_heterograph5(idtype):
 
 def test_line_graph1():
     N = 5
-    G = dgl.DGLGraph(nx.star_graph(N)).to(F.ctx())
+    G = dgl.from_networkx(nx.star_graph(N)).to(F.ctx())
     G.edata["h"] = F.randn((2 * N, D))
     L = G.line_graph(shared=True)
     assert L.num_nodes() == 2 * N
@@ -185,7 +185,7 @@ def test_line_graph2(idtype):
 
 def test_no_backtracking():
     N = 5
-    G = dgl.DGLGraph(nx.star_graph(N))
+    G = dgl.from_networkx(nx.star_graph(N))
     L = G.line_graph(backtracking=False)
     assert L.num_nodes() == 2 * N
     for i in range(1, N):
@@ -198,7 +198,7 @@ def test_no_backtracking():
 # reverse graph related
 @parametrize_idtype
 def test_reverse(idtype):
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(5)
     # The graph need not to be completely connected.
@@ -360,14 +360,14 @@ def test_reverse(idtype):
 
 @parametrize_idtype
 def test_reverse_shared_frames(idtype):
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(3)
     g.add_edges([0, 1, 2], [1, 2, 1])
     g.ndata["h"] = F.tensor([[0.0], [1.0], [2.0]])
     g.edata["h"] = F.tensor([[3.0], [4.0], [5.0]])
 
-    rg = g.reverse(share_ndata=True, share_edata=True)
+    rg = g.reverse(copy_ndata=True, copy_edata=True)
     assert F.allclose(g.ndata["h"], rg.ndata["h"])
     assert F.allclose(g.edata["h"], rg.edata["h"])
     assert F.allclose(
@@ -588,9 +588,9 @@ def test_add_reverse_edges():
 @unittest.skipIf(F._default_context_str == "gpu", reason="GPU not implemented")
 def test_simple_graph():
     elist = [(0, 1), (0, 2), (1, 2), (0, 1)]
-    g = dgl.DGLGraph(elist, readonly=True)
+    g = dgl.graph(elist)
     assert g.is_multigraph
-    sg = dgl.to_simple_graph(g)
+    sg = dgl.to_simple(g)
     assert not sg.is_multigraph
     assert sg.num_edges() == 3
     src, dst = sg.edges()
@@ -603,7 +603,7 @@ def _test_bidirected_graph():
     def _test(in_readonly, out_readonly):
         elist = [(0, 0), (0, 1), (1, 0), (1, 1), (2, 1), (2, 2)]
         num_edges = 7
-        g = dgl.DGLGraph(elist, readonly=in_readonly)
+        g = dgl.graph(elist)
         elist.append((1, 2))
         elist = set(elist)
         big = dgl.to_bidirected_stale(g, out_readonly)
@@ -638,10 +638,10 @@ def test_khop_graph():
             assert F.allclose(h_0, h_1, rtol=1e-3, atol=1e-3)
 
     # Test for random undirected graphs
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
+    g = dgl.from_networkx(nx.erdos_renyi_graph(N, 0.3))
     _test(g)
     # Test for random directed graphs
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3, directed=True))
+    g = dgl.from_networkx(nx.erdos_renyi_graph(N, 0.3, directed=True))
     _test(g)
 
 
@@ -649,7 +649,7 @@ def test_khop_graph():
 def test_khop_adj():
     N = 20
     feat = F.randn((N, 5))
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3, directed=True))
+    g = dgl.from_networkx(nx.erdos_renyi_graph(N, 0.3, directed=True))
     for k in range(3):
         adj = F.tensor(F.swapaxes(dgl.khop_adj(g, k), 0, 1))
         # use original graph to do message passing for k times.
@@ -667,14 +667,14 @@ def test_laplacian_lambda_max():
     N = 20
     eps = 1e-6
     # test DGLGraph
-    g = dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
+    g = dgl.from_networkx(nx.erdos_renyi_graph(N, 0.3))
     l_max = dgl.laplacian_lambda_max(g)
     assert l_max[0] < 2 + eps
     # test batched DGLGraph
     """
     N_arr = [20, 30, 10, 12]
     bg = dgl.batch([
-        dgl.DGLGraph(nx.erdos_renyi_graph(N, 0.3))
+        dgl.from_networkx(nx.erdos_renyi_graph(N, 0.3))
         for N in N_arr
     ])
     l_max_arr = dgl.laplacian_lambda_max(bg)
