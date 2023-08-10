@@ -198,18 +198,18 @@ auto GetPickFn(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
-  return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
-             int64_t offset, int64_t num_neighbors) {
+  return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args]<typename PickedType>(
+             int64_t offset, int64_t num_neighbors, PickedType* picked_data_ptr) {
     // If fanouts.size() > 1, perform sampling for each edge type of each node;
     // otherwise just sample once for each node with no regard of edge types.
     if (fanouts.size() > 1) {
       return PickByEtype(
           offset, num_neighbors, fanouts, replace, options,
-          type_per_edge.value(), probs_or_mask, args);
+          type_per_edge.value(), probs_or_mask, args, picked_data_ptr);
     } else {
       return Pick(
           offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
-          args);
+          args, picked_data_ptr);
     }
   };
 }
@@ -257,8 +257,20 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                   continue;
                 }
 
+                // Pre-allocate tensors for each node. This is temporary as the
+                // main process hasn't been rewritten.
+                int64_t allocate_size = num_pick_fn(offset, num_neighbors);
                 picked_neighbors_cur_thread[i - begin] =
-                    pick_fn(offset, num_neighbors);
+                    torch::empty({allocate_size}, indptr_options);
+                torch::Tensor& picked_tensor = picked_neighbors_cur_thread[i - begin];
+                // pick_fn(
+                //     offset, num_neighbors,
+                //     picked_neighbors_cur_thread[i - begin], 0, allocate_size);
+                AT_DISPATCH_INTEGRAL_TYPES(
+                  picked_tensor.scalar_type(), "CallPick", ([&] {
+                    pick_fn(offset, num_neighbors, picked_tensor.data_ptr());
+                  })
+                );
 
                 // This number should be the same as the result of num_pick_fn.
                 num_picked_neighbors_per_node[i + 1] =
@@ -434,9 +446,10 @@ int64_t NumPickByEtype(
  *
  * @return A tensor containing the picked neighbors.
  */
+template<typename PickedType>
 inline torch::Tensor UniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
-    const torch::TensorOptions& options) {
+    const torch::TensorOptions& options, PickedType* picked_data_ptr) {
   torch::Tensor picked_neighbors;
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
     picked_neighbors = torch::arange(offset, offset + num_neighbors, options);
@@ -568,10 +581,11 @@ inline torch::Tensor UniformPick(
  *
  * @return A tensor containing the picked neighbors.
  */
+template <typename PickedType>
 inline torch::Tensor NonUniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask) {
+    const torch::optional<torch::Tensor>& probs_or_mask, PickedType* picked_data_ptr) {
   torch::Tensor picked_neighbors;
   auto local_probs =
       probs_or_mask.value().slice(0, offset, offset + num_neighbors);
@@ -590,26 +604,26 @@ inline torch::Tensor NonUniformPick(
   return picked_neighbors;
 }
 
-template <>
-torch::Tensor Pick<SamplerType::NEIGHBOR>(
+template <typename PickedType>
+torch::Tensor Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::NEIGHBOR> args) {
+    SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr) {
   if (probs_or_mask.has_value()) {
     return NonUniformPick(
-        offset, num_neighbors, fanout, replace, options, probs_or_mask);
+        offset, num_neighbors, fanout, replace, options, probs_or_mask, picked_data_ptr);
   } else {
-    return UniformPick(offset, num_neighbors, fanout, replace, options);
+    return UniformPick(offset, num_neighbors, fanout, replace, options, picked_data_ptr);
   }
 }
 
-template <SamplerType S>
+template <SamplerType S, typename PickedType>
 torch::Tensor PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args, PickedType* picked_data_ptr) {
   std::vector<torch::Tensor> picked_neighbors(
       fanouts.size(), torch::tensor({}, options));
   int64_t etype_begin = offset;
@@ -630,9 +644,9 @@ torch::Tensor PickByEtype(
           etype_end = etype_end_it - type_per_edge_data;
           // Do sampling for one etype.
           if (fanout != 0) {
-            picked_neighbors[etype] = Pick<S>(
+            picked_neighbors[etype] = Pick(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
-                probs_or_mask, args);
+                probs_or_mask, args, picked_data_ptr);
           }
           etype_begin = etype_end;
         }
@@ -641,40 +655,40 @@ torch::Tensor PickByEtype(
   return torch::cat(picked_neighbors, 0);
 }
 
-template <>
-torch::Tensor Pick<SamplerType::LABOR>(
+template <typename PickedType>
+torch::Tensor Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args) {
+    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
   if (fanout == 0) return torch::tensor({}, options);
   if (probs_or_mask.has_value()) {
     if (fanout < 0) {
       return NonUniformPick(
-          offset, num_neighbors, fanout, replace, options, probs_or_mask);
+          offset, num_neighbors, fanout, replace, options, probs_or_mask, picked_data_ptr);
     }
     torch::Tensor picked_neighbors;
     AT_DISPATCH_FLOATING_TYPES(
         probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
           if (replace) {
             picked_neighbors = LaborPick<true, true, scalar_t>(
-                offset, num_neighbors, fanout, options, probs_or_mask, args);
+                offset, num_neighbors, fanout, options, probs_or_mask, args, picked_data_ptr);
           } else {
             picked_neighbors = LaborPick<true, false, scalar_t>(
-                offset, num_neighbors, fanout, options, probs_or_mask, args);
+                offset, num_neighbors, fanout, options, probs_or_mask, args, picked_data_ptr);
           }
         }));
     return picked_neighbors;
   } else if (fanout < 0) {
-    return UniformPick(offset, num_neighbors, fanout, replace, options);
+    return UniformPick(offset, num_neighbors, fanout, replace, options, picked_data_ptr);
   } else if (replace) {
     return LaborPick<false, true>(
         offset, num_neighbors, fanout, options,
-        /* probs_or_mask= */ torch::nullopt, args);
+        /* probs_or_mask= */ torch::nullopt, args, picked_data_ptr);
   } else {  // replace = false
     return LaborPick<false, false>(
         offset, num_neighbors, fanout, options,
-        /* probs_or_mask= */ torch::nullopt, args);
+        /* probs_or_mask= */ torch::nullopt, args, picked_data_ptr);
   }
 }
 
@@ -707,12 +721,12 @@ inline void safe_divide(T& a, U b) {
  *
  * @return A tensor containing the picked neighbors.
  */
-template <bool NonUniform, bool Replace, typename T>
+template <bool NonUniform, bool Replace, typename ProbsType, typename PickedType>
 inline torch::Tensor LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
-    SamplerArgs<SamplerType::LABOR> args) {
+    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
   fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
     return torch::arange(offset, offset + num_neighbors, options);
@@ -721,8 +735,8 @@ inline torch::Tensor LaborPick(
   // Assuming max_degree of a vertex is <= 4 billion.
   auto heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
       heap_tensor.data_ptr<int32_t>());
-  const T* local_probs_data =
-      NonUniform ? probs_or_mask.value().data_ptr<T>() + offset : nullptr;
+  const ProbsType* local_probs_data =
+      NonUniform ? probs_or_mask.value().data_ptr<ProbsType>() + offset : nullptr;
   AT_DISPATCH_INTEGRAL_TYPES(
       args.indices.scalar_type(), "LaborPickMain", ([&] {
         const scalar_t* local_indices_data =
