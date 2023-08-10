@@ -611,10 +611,11 @@ inline void NonUniformPick(
     return;
   }
   if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
-    torch::Tensor temp_neighbors =
-        torch::arange(offset, offset + num_neighbors, options);
+    TORCH_CHECK(
+        picked_count == num_positive_probs,
+        "Picked count doesn't match the actual picked number.");
     picked_tensor.slice(0, picked_offset, picked_offset + picked_count) =
-        torch::index_select(temp_neighbors, 0, positive_probs_indices);
+        positive_probs_indices.add(offset);
   } else {
     picked_tensor.slice(0, picked_offset, picked_offset + picked_count) =
         torch::multinomial(local_probs, picked_count, replace) + offset;
@@ -719,12 +720,14 @@ void Pick<SamplerType::LABOR>(
         picked_offset, picked_count);
   } else if (replace) {
     LaborPick<false, true>(
-        offset, num_neighbors, fanout, options, torch::nullopt, args,
-        picked_tensor, picked_offset, picked_count);
+        offset, num_neighbors, fanout, options,
+        /* probs_or_mask= */ torch::nullopt, args, picked_tensor, picked_offset,
+        picked_count);
   } else {  // replace = false
     LaborPick<false, false>(
-        offset, num_neighbors, fanout, options, torch::nullopt, args,
-        picked_tensor, picked_offset, picked_count);
+        offset, num_neighbors, fanout, options,
+        /* probs_or_mask= */ torch::nullopt, args, picked_tensor, picked_offset,
+        picked_count);
   }
 }
 
