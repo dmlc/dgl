@@ -356,13 +356,6 @@ int64_t NumPickByEtype(
  *
  * @return A tensor containing the picked neighbors.
  */
-// template <SamplerType S, typename PickedType>
-// torch::Tensor Pick(
-//     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
-//     const torch::TensorOptions& options,
-//     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
-//     PickedType* picked_data_ptr);
-
 template <typename PickedType>
 void Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,

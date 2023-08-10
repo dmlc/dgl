@@ -267,10 +267,6 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                     torch::empty({allocate_size}, indptr_options);
                 torch::Tensor& picked_tensor =
                     picked_neighbors_cur_thread[i - begin];
-                // pick_fn(
-                //     offset, num_neighbors,
-                //     picked_neighbors_cur_thread[i - begin], 0,
-                //     allocate_size);
                 AT_DISPATCH_INTEGRAL_TYPES(
                     picked_tensor.scalar_type(), "CallPick", ([&] {
                       pick_fn(
