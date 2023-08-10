@@ -91,13 +91,13 @@ def unique_and_compact_node_pairs(
     compacted_node_pairs = {}
     # Map back with the same order.
     for etype, pair in node_pairs.items():
-        len = pair[0].size(0)
+        num_elem = pair[0].size(0)
         src_type, _, dst_type = etype
-        src = compacted_src[src_type][:len]
-        dst = compacted_dst[dst_type][:len]
+        src = compacted_src[src_type][:num_elem]
+        dst = compacted_dst[dst_type][:num_elem]
         compacted_node_pairs[etype] = (src, dst)
-        compacted_src[src_type] = compacted_src[src_type][len:]
-        compacted_dst[dst_type] = compacted_dst[dst_type][len:]
+        compacted_src[src_type] = compacted_src[src_type][num_elem:]
+        compacted_dst[dst_type] = compacted_dst[dst_type][num_elem:]
 
     # Return singleton for a homogeneous graph.
     if is_homogeneous:
