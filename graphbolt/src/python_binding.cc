@@ -4,9 +4,9 @@
  * @brief Graph bolt library Python binding.
  */
 
-#include <graphbolt  //unique_and_compact.h>
 #include <graphbolt/csc_sampling_graph.h>
 #include <graphbolt/serialize.h>
+#include <graphbolt/unique_and_compact.h>
 
 namespace graphbolt {
 namespace sampling {
