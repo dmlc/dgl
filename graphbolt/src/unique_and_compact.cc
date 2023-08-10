@@ -5,7 +5,7 @@
  * @brief Unique and compact op.
  */
 
-#include "./unique_and_compact.h"
+#include <graphbolt/unique_and_compact.h>
 
 #include "./concurrent_id_hash_map.h"
 

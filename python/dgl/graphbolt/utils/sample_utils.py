@@ -11,7 +11,10 @@ def unique_and_compact_node_pairs(
         Tuple[torch.Tensor, torch.Tensor],
         Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
     ],
-    unique_dst_nodes=None,
+    unique_dst_nodes: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None,
 ):
     """
     Compact node pairs and return unique nodes (per type).
@@ -27,7 +30,12 @@ def unique_and_compact_node_pairs(
         - If `node_pairs` is a dictionary: The keys should be edge type and
         the values should be corresponding node pairs. And IDs inside are
         heterogeneous ids.
-
+    unique_dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
+        Unique nodes of all destination nodes in the node pairs.
+        - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
+        - If `node_pairs` is a dictionary: The keys are node type and the
+        values are corresponding nodes. And IDs inside are heterogeneous ids.
+    
     Returns
     -------
     Tuple[node_pairs, unique_nodes]
@@ -58,7 +66,7 @@ def unique_and_compact_node_pairs(
     if is_homogeneous:
         node_pairs = {("_N", "_E", "_N"): node_pairs}
 
-    # Collect all source and destination nodes.
+    # Collect all source and destination nodes for each node type.
     src_nodes = defaultdict(list)
     dst_nodes = defaultdict(list)
     for etype, (src_node, dst_node) in node_pairs.items():

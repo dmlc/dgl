@@ -26,7 +26,7 @@ namespace sampling {
  * @param src_ids         A tensor containing source IDs.
  * @param dst_ids         A tensor containing destination IDs.
  * @param unique_dst_ids  A tensor containing unique destination IDs, which is
- * exactly all the unique elements in 'dst_ids'.
+ *                        exactly all the unique elements in 'dst_ids'.
  *
  * @return
  * - A tensor representing all unique elements in 'src_ids' and 'dst_ids' after
@@ -41,7 +41,7 @@ namespace sampling {
  *   torch::Tensor src_ids = src
  *   torch::Tensor dst_ids = dst
  *   torch::Tensor unique_dst_ids = torch::unique(dst);
- *   auto result = Unique_and_compact(src_ids, dst_ids, unique_dst_ids);
+ *   auto result = UniqueAndCompact(src_ids, dst_ids, unique_dst_ids);
  *   torch::Tensor unique_ids = std::get<0>(result);
  *   torch::Tensor compacted_src_ids = std::get<1>(result);
  *   torch::Tensor compacted_dst_ids = std::get<2>(result);
