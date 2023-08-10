@@ -442,29 +442,33 @@ int64_t NumPickByEtype(
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
- * @param picked_tensor The tensor storing the picked neighbors.
- * @param picked_offset The starting position offset for results in the
+ * @param picked_tensor The target tensor where the picked neighbors are put.
+ * @param picked_offset The starting position of picked neighbors in the
  * picked_tensor.
- * @param picked_count The length of the tensor reserved for results. Hence, the
- * picked neighbors should be placed in picked_tensor[picked_offset :
- * picked_offset + picked_count].
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_count The length of reserved place in picked_tensor, which is
+ * the same as the count of picked neighbors. Hence, the result should be put in
+ * picked_tensor[picked_offset : picked_offset + picked_count].
  */
 inline void UniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options, torch::Tensor& picked_tensor,
     int64_t picked_offset, int64_t picked_count) {
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
-    TORCH_CHECK(picked_count == num_neighbors, "Picked count doesn't match.");
+    TORCH_CHECK(
+        picked_count == num_neighbors,
+        "Picked count doesn't match the actual picked number.");
     picked_tensor.slice(0, picked_offset, picked_offset + picked_count) =
         torch::arange(offset, offset + num_neighbors, options);
   } else if (replace) {
-    TORCH_CHECK(picked_count == fanout, "Picked count doesn't match.");
+    TORCH_CHECK(
+        picked_count == fanout,
+        "Picked count doesn't match the actual picked number.");
     picked_tensor.slice(0, picked_offset, picked_offset + picked_count) =
         torch::randint(offset, offset + num_neighbors, {fanout}, options);
   } else {
-    TORCH_CHECK(picked_count == fanout, "Picked count doesn't match.");
+    TORCH_CHECK(
+        picked_count == fanout,
+        "Picked count doesn't match the actual picked number.");
     AT_DISPATCH_INTEGRAL_TYPES(
         picked_tensor.scalar_type(), "UniformPick", ([&] {
           scalar_t* picked_neighbors_data =
@@ -584,14 +588,12 @@ inline void UniformPick(
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
- * @param picked_tensor The tensor storing the picked neighbors.
- * @param picked_offset The starting position offset for results in the
+ * @param picked_tensor The target tensor where the picked neighbors are put.
+ * @param picked_offset The starting position of picked neighbors in the
  * picked_tensor.
- * @param picked_count The length of the tensor reserved for results. Hence, the
- * picked neighbors should be placed in picked_tensor[picked_offset :
- * picked_offset + picked_count].
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_count The length of reserved place in picked_tensor, which is
+ * the same as the count of picked neighbors. Hence, the result should be put in
+ * picked_tensor[picked_offset : picked_offset + picked_count].
  */
 inline void NonUniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
@@ -603,7 +605,9 @@ inline void NonUniformPick(
   auto positive_probs_indices = local_probs.nonzero().squeeze(1);
   auto num_positive_probs = positive_probs_indices.size(0);
   if (num_positive_probs == 0) {
-    TORCH_CHECK(picked_count == 0, "Picked count doesn't match.");
+    TORCH_CHECK(
+        picked_count == 0,
+        "Picked count doesn't match the actual picked number.");
     return;
   }
   if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
@@ -666,7 +670,7 @@ void PickByEtype(
           if (fanout != 0) {
             TORCH_CHECK(
                 pick_begin + etype_count <= picked_offset + picked_count,
-                "Picked count doesn't match");
+                "Picked count doesn't match the actual picked number.");
             Pick<S>(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
                 probs_or_mask, args, picked_tensor, pick_begin, etype_count);
@@ -685,7 +689,9 @@ void Pick<SamplerType::LABOR>(
     SamplerArgs<SamplerType::LABOR> args, torch::Tensor& picked_tensor,
     int64_t picked_offset, int64_t picked_count) {
   if (fanout == 0) {
-    TORCH_CHECK(picked_count == 0, "Picked count doesn't match.");
+    TORCH_CHECK(
+        picked_count == 0,
+        "Picked count doesn't match the actual picked number.");
     return;
   }
   if (probs_or_mask.has_value()) {
@@ -748,14 +754,12 @@ inline void safe_divide(T& a, U b) {
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
  * @param args Contains labor specific arguments.
- * @param picked_tensor The tensor storing the picked neighbors.
- * @param picked_offset The starting position offset for results in the
+ * @param picked_tensor The target tensor where the picked neighbors are put.
+ * @param picked_offset The starting position of picked neighbors in the
  * picked_tensor.
- * @param picked_count The length of the tensor reserved for results. Hence, the
- * picked neighbors should be placed in picked_tensor[picked_offset :
- * picked_offset + picked_count].
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_count The length of reserved place in picked_tensor, which is
+ * the same as the count of picked neighbors. Hence, the result should be put in
+ * picked_tensor[picked_offset : picked_offset + picked_count].
  */
 template <bool NonUniform, bool Replace, typename T>
 inline void LaborPick(
@@ -766,7 +770,9 @@ inline void LaborPick(
     int64_t picked_offset, int64_t picked_count) {
   fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
-    TORCH_CHECK(num_neighbors == picked_count, "Picked count doesn't match.");
+    TORCH_CHECK(
+        num_neighbors == picked_count,
+        "Picked count doesn't match the actual picked number.");
     picked_tensor.slice(0, picked_offset, picked_offset + picked_count) =
         torch::arange(offset, offset + num_neighbors, options);
     return;

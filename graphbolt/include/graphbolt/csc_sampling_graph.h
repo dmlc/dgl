@@ -353,8 +353,12 @@ int64_t NumPickByEtype(
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_tensor The target tensor where the picked neighbors are put.
+ * @param picked_offset The starting position of picked neighbors in the
+ * picked_tensor.
+ * @param picked_count The length of reserved place in picked_tensor, which is
+ * the same as the count of picked neighbors. Hence, the result should be put in
+ * picked_tensor[picked_offset : picked_offset + picked_count].
  */
 template <SamplerType S>
 void Pick(
@@ -403,8 +407,12 @@ void Pick<SamplerType::LABOR>(
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_tensor The target tensor where the picked neighbors are put.
+ * @param picked_offset The starting position of picked neighbors in the
+ * picked_tensor.
+ * @param picked_count The length of reserved place in picked_tensor, which is
+ * the same as the count of picked neighbors. Hence, the result should be put in
+ * picked_tensor[picked_offset : picked_offset + picked_count].
  */
 template <SamplerType S>
 void PickByEtype(
