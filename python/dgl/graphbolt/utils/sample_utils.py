@@ -11,7 +11,10 @@ def unique_and_compact_node_pairs(
         Tuple[torch.Tensor, torch.Tensor],
         Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
     ],
-    unique_dst_nodes=None,
+    unique_dst_nodes: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None,
 ):
     """
     Compact node pairs and return unique nodes (per type).
@@ -27,7 +30,12 @@ def unique_and_compact_node_pairs(
         - If `node_pairs` is a dictionary: The keys should be edge type and
         the values should be corresponding node pairs. And IDs inside are
         heterogeneous ids.
-
+    unique_dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
+        Unique nodes of all destination nodes in the node pairs.
+        - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
+        - If `node_pairs` is a dictionary: The keys are node type and the
+        values are corresponding nodes. And IDs inside are heterogeneous ids.
+    
     Returns
     -------
     Tuple[node_pairs, unique_nodes]
@@ -54,11 +62,15 @@ def unique_and_compact_node_pairs(
     ('n2', 'e2', 'n1'): (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
     is_homogeneous = not isinstance(node_pairs, dict)
-
     if is_homogeneous:
         node_pairs = {("_N", "_E", "_N"): node_pairs}
+        if unique_dst_nodes is not None:
+            assert isinstance(
+                unique_dst_nodes, torch.Tensor
+            ), "Edge type not supported in homogeneous graph."
+            unique_dst_nodes = {"_N": unique_dst_nodes}
 
-    # Collect all source and destination nodes.
+    # Collect all source and destination nodes for each node type.
     src_nodes = defaultdict(list)
     dst_nodes = defaultdict(list)
     for etype, (src_node, dst_node) in node_pairs.items():
@@ -91,13 +103,13 @@ def unique_and_compact_node_pairs(
     compacted_node_pairs = {}
     # Map back with the same order.
     for etype, pair in node_pairs.items():
-        len = pair[0].size(0)
+        num_elem = pair[0].size(0)
         src_type, _, dst_type = etype
-        src = compacted_src[src_type][:len]
-        dst = compacted_dst[dst_type][:len]
+        src = compacted_src[src_type][:num_elem]
+        dst = compacted_dst[dst_type][:num_elem]
         compacted_node_pairs[etype] = (src, dst)
-        compacted_src[src_type] = compacted_src[src_type][len:]
-        compacted_dst[dst_type] = compacted_dst[dst_type][len:]
+        compacted_src[src_type] = compacted_src[src_type][num_elem:]
+        compacted_dst[dst_type] = compacted_dst[dst_type][num_elem:]
 
     # Return singleton for a homogeneous graph.
     if is_homogeneous:

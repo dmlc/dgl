@@ -4,16 +4,14 @@
  * @file unique_and_compact.cc
  * @brief Unique and compact op.
  */
-#ifndef GRAPHBOLT_UNIQUE_AND_COMPACT_H_
-#define GRAPHBOLT_UNIQUE_AND_COMPACT_H_
 
-#include "./unique_and_compact.h"
+#include <graphbolt/unique_and_compact.h>
 
 #include "./concurrent_id_hash_map.h"
 
 namespace graphbolt {
 namespace sampling {
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Unique_and_compact(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> UniqueAndCompact(
     const torch::Tensor& src_ids, const torch::Tensor& dst_ids,
     const torch::Tensor unique_dst_ids) {
   torch::Tensor compacted_src_ids;
@@ -31,4 +29,3 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> Unique_and_compact(
 }
 }  // namespace sampling
 }  // namespace graphbolt
-#endif  // GRAPHBOLT_UNIQUE_AND_COMPACT_H_

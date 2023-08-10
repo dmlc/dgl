@@ -33,20 +33,12 @@ import torch.nn.functional as F
 from ladies_sampler import LadiesSampler, normalized_edata, PoissonLadiesSampler
 
 from load_graph import load_dataset
-from model import GATv2, RGAT, SAGE
+from model import SAGE
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from torchmetrics.classification import MulticlassF1Score, MultilabelF1Score
-
-
-def cuda_index_tensor(tensor, idx):
-    assert idx.device != th.device("cpu")
-    if tensor.is_pinned():
-        return dgl.utils.gather_pinned_tensor_rows(tensor, idx)
-    else:
-        return tensor[idx.long()]
 
 
 class SAGELightning(LightningModule):
@@ -56,7 +48,6 @@ class SAGELightning(LightningModule):
         n_hidden,
         n_classes,
         n_layers,
-        model,
         activation,
         dropout,
         lr,
@@ -64,54 +55,15 @@ class SAGELightning(LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-        if model in ["sage"]:
-            self.module = (
-                SAGE(
-                    in_feats, n_hidden, n_classes, n_layers, activation, dropout
-                )
-                if in_feats != 768
-                else RGAT(
-                    in_feats,
-                    n_classes,
-                    n_hidden,
-                    5,
-                    n_layers,
-                    4,
-                    args.dropout,
-                    "paper",
-                )
-            )
-        else:
-            heads = ([8] * n_layers) + [1]
-            self.module = GATv2(
-                n_layers,
-                in_feats,
-                n_hidden,
-                n_classes,
-                heads,
-                activation,
-                dropout,
-                dropout,
-                0.2,
-                True,
-            )
+        self.module = SAGE(
+            in_feats, n_hidden, n_classes, n_layers, activation, dropout
+        )
         self.lr = lr
-        f1score_class = (
+        self.f1score_class = lambda: (
             MulticlassF1Score if not multilabel else MultilabelF1Score
-        )
-        self.train_acc = f1score_class(n_classes, average="micro")
-        self.val_acc = nn.ModuleList(
-            [
-                f1score_class(n_classes, average="micro"),
-                f1score_class(n_classes, average="micro"),
-            ]
-        )
-        self.test_acc = nn.ModuleList(
-            [
-                f1score_class(n_classes, average="micro"),
-                f1score_class(n_classes, average="micro"),
-            ]
-        )
+        )(n_classes, average="micro")
+        self.train_acc = self.f1score_class()
+        self.val_acc = self.f1score_class()
         self.num_steps = 0
         self.cum_sampled_nodes = [0 for _ in range(n_layers + 1)]
         self.cum_sampled_edges = [0 for _ in range(n_layers)]
@@ -225,10 +177,10 @@ class SAGELightning(LightningModule):
         batch_labels = mfgs[-1].dstdata["labels"]
         batch_pred = self.module(mfgs, batch_inputs)
         loss = self.loss_fn(batch_pred, batch_labels)
-        self.val_acc[dataloader_idx](batch_pred, batch_labels.int())
+        self.val_acc(batch_pred, batch_labels.int())
         self.log(
             "val_acc",
-            self.val_acc[dataloader_idx],
+            self.val_acc,
             prog_bar=True,
             on_step=False,
             on_epoch=True,
@@ -237,32 +189,6 @@ class SAGELightning(LightningModule):
         )
         self.log(
             "val_loss",
-            loss,
-            on_step=False,
-            on_epoch=True,
-            sync_dist=True,
-            batch_size=batch_labels.shape[0],
-        )
-
-    def test_step(self, batch, batch_idx, dataloader_idx=0):
-        input_nodes, output_nodes, mfgs = batch
-        mfgs = [mfg.int().to(device) for mfg in mfgs]
-        batch_inputs = mfgs[0].srcdata["features"]
-        batch_labels = mfgs[-1].dstdata["labels"]
-        batch_pred = self.module(mfgs, batch_inputs)
-        loss = self.loss_fn(batch_pred, batch_labels)
-        self.test_acc[dataloader_idx](batch_pred, batch_labels.int())
-        self.log(
-            "test_acc",
-            self.test_acc[dataloader_idx],
-            prog_bar=True,
-            on_step=False,
-            on_epoch=True,
-            sync_dist=True,
-            batch_size=batch_labels.shape[0],
-        )
-        self.log(
-            "test_loss",
             loss,
             on_step=False,
             on_epoch=True,
@@ -331,13 +257,6 @@ class DataModule(LightningDataModule):
                 prefetch_edge_feats=["etype"] if "etype" in g.edata else [],
                 prefetch_labels=["labels"],
             )
-        full_sampler = dgl.dataloading.MultiLayerFullNeighborSampler(
-            len(fanouts),
-            prefetch_node_feats=["features"],
-            prefetch_edge_feats=["etype"] if "etype" in g.edata else [],
-            prefetch_labels=["labels"],
-        )
-        unbiased_sampler = sampler
 
         dataloader_device = th.device("cpu")
         g = g.formats(["csc"])
@@ -363,8 +282,6 @@ class DataModule(LightningDataModule):
                 test_nid,
             )
         self.sampler = sampler
-        self.unbiased_sampler = unbiased_sampler
-        self.full_sampler = full_sampler
         self.device = dataloader_device
         self.use_uva = use_uva
         self.batch_size = batch_size
@@ -389,38 +306,18 @@ class DataModule(LightningDataModule):
         )
 
     def val_dataloader(self):
-        return [
-            dgl.dataloading.DataLoader(
-                self.g,
-                self.val_nid,
-                sampler,
-                device=self.device,
-                use_uva=self.use_uva,
-                batch_size=self.batch_size,
-                shuffle=False,
-                drop_last=False,
-                num_workers=self.num_workers,
-                gpu_cache=self.gpu_cache_arg,
-            )
-            for sampler in [self.unbiased_sampler]
-        ]
-
-    def test_dataloader(self):
-        return [
-            dgl.dataloading.DataLoader(
-                self.g,
-                self.test_nid,
-                sampler,
-                device=self.device,
-                use_uva=self.use_uva,
-                batch_size=self.batch_size,
-                shuffle=False,
-                drop_last=False,
-                num_workers=self.num_workers,
-                gpu_cache=self.gpu_cache_arg,
-            )
-            for sampler in [self.full_sampler]
-        ]
+        return dgl.dataloading.DataLoader(
+            self.g,
+            self.val_nid,
+            self.sampler,
+            device=self.device,
+            use_uva=self.use_uva,
+            batch_size=self.batch_size,
+            shuffle=False,
+            drop_last=False,
+            num_workers=self.num_workers,
+            gpu_cache=self.gpu_cache_arg,
+        )
 
 
 class BatchSizeCallback(Callback):
@@ -476,8 +373,10 @@ class BatchSizeCallback(Callback):
             trainer.datamodule.batch_size = int(
                 trainer.datamodule.batch_size * self.limit / self.m
             )
-            trainer.reset_train_dataloader()
-            trainer.reset_val_dataloader()
+            loop = trainer._active_loop
+            assert loop is not None
+            loop._combined_loader = None
+            loop.setup_data()
             self.clear()
 
 
@@ -500,7 +399,6 @@ if __name__ == "__main__":
     argparser.add_argument("--batch-size", type=int, default=1024)
     argparser.add_argument("--lr", type=float, default=0.001)
     argparser.add_argument("--dropout", type=float, default=0.5)
-    argparser.add_argument("--independent-batches", type=int, default=1)
     argparser.add_argument(
         "--num-workers",
         type=int,
@@ -515,8 +413,12 @@ if __name__ == "__main__":
         "be undesired if they cannot fit in GPU memory at once. "
         "This flag disables that.",
     )
-    argparser.add_argument("--model", type=str, default="sage")
-    argparser.add_argument("--sampler", type=str, default="labor")
+    argparser.add_argument(
+        "--sampler",
+        type=str,
+        default="labor",
+        choices=["neighbor", "labor", "ladies", "poisson-ladies"],
+    )
     argparser.add_argument("--importance-sampling", type=int, default=0)
     argparser.add_argument("--layer-dependency", action="store_true")
     argparser.add_argument("--batch-dependency", type=int, default=1)
@@ -547,7 +449,7 @@ if __name__ == "__main__":
         [int(_) for _ in args.fan_out.split(",")],
         [int(_) for _ in args.lad_out.split(",")],
         device,
-        args.batch_size // args.independent_batches,
+        args.batch_size,
         args.num_workers,
         args.sampler,
         args.importance_sampling,
@@ -560,7 +462,6 @@ if __name__ == "__main__":
         args.num_hidden,
         datamodule.n_classes,
         args.num_layers,
-        args.model,
         F.relu,
         args.dropout,
         args.lr,
@@ -570,12 +471,10 @@ if __name__ == "__main__":
     # Train
     callbacks = []
     if not args.disable_checkpoint:
-        # callbacks.append(ModelCheckpoint(monitor='val_acc/dataloader_idx_0', save_top_k=1, mode='max'))
         callbacks.append(
             ModelCheckpoint(monitor="val_acc", save_top_k=1, mode="max")
         )
     callbacks.append(BatchSizeCallback(args.vertex_limit))
-    # callbacks.append(EarlyStopping(monitor='val_acc/dataloader_idx_0', stopping_threshold=args.val_acc_target, mode='max', patience=args.early_stopping_patience))
     callbacks.append(
         EarlyStopping(
             monitor="val_acc",
@@ -584,19 +483,17 @@ if __name__ == "__main__":
             patience=args.early_stopping_patience,
         )
     )
-    subdir = "{}_{}_{}_{}_{}_{}".format(
+    subdir = "{}_{}_{}_{}_{}".format(
         args.dataset,
         args.sampler,
         args.importance_sampling,
         args.layer_dependency,
         args.batch_dependency,
-        args.independent_batches,
     )
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(
         accelerator="gpu" if args.gpu != -1 else "cpu",
         devices=[args.gpu],
-        accumulate_grad_batches=args.independent_batches,
         max_epochs=args.num_epochs,
         max_steps=args.num_steps,
         min_steps=args.min_steps,
@@ -618,5 +515,21 @@ if __name__ == "__main__":
             checkpoint_path=ckpt,
             hparams_file=os.path.join(logdir, "hparams.yaml"),
         ).to(device)
-    test_acc = trainer.test(model, datamodule=datamodule)
-    print("Test accuracy:", test_acc)
+    with th.no_grad():
+        graph = datamodule.g
+        pred = model.module.inference(
+            graph,
+            f"cuda:{args.gpu}" if args.gpu != -1 else "cpu",
+            4096,
+            args.num_workers,
+            graph.device,
+        )
+        for nid, split_name in zip(
+            [datamodule.train_nid, datamodule.val_nid, datamodule.test_nid],
+            ["Train", "Validation", "Test"],
+        ):
+            pred_nid = pred[nid]
+            label = graph.ndata["labels"][nid]
+            f1score = model.f1score_class().to(pred.device)
+            acc = f1score(pred_nid, label)
+            print(f"{split_name} accuracy:", acc.item())

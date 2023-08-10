@@ -160,6 +160,9 @@ inline IdType ConcurrentIdHashMap<IdType>::MapId(IdType id) const {
     Next(&pos, &delta);
     key = hash_map_data[getKeyIndex(pos)];
   }
+  if (key == empty_key) {
+    throw std::out_of_range("Id not found: " + std::to_string(id));
+  }
   return hash_map_data[getValueIndex(pos)];
 }
 

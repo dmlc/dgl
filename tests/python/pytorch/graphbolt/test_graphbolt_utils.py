@@ -1,4 +1,5 @@
 import dgl.graphbolt as gb
+import pytest
 import torch
 
 
@@ -63,4 +64,8 @@ def test_unique_and_compact_node_pairs_homo():
     assert torch.equal(unique_nodes[: unique_v.size(0)], unique_v)
 
 
-test_unique_and_compact_node_pairs_hetero()
+def test_incomplete_unique_dst_nodes_():
+    node_pairs = (torch.randint(0, 50, (50,)), torch.randint(100, 150, (50,)))
+    unique_dst_nodes = torch.arange(150, 200)
+    with pytest.raises(IndexError):
+        gb.unique_and_compact_node_pairs(node_pairs, unique_dst_nodes)
