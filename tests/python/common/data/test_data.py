@@ -778,13 +778,14 @@ def _test_construct_graphs_multiple():
 
 def _get_data_table(data_frame):
     from dgl.data.csv_dataset_base import DefaultDataParser
+
     with tempfile.TemporaryDirectory() as test_dir:
         csv_path = os.path.join(test_dir, "nodes.csv")
-    
+
         data_frame.to_csv(csv_path, index=False)
         dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
-    
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         return dp(df)
@@ -810,7 +811,7 @@ def _test_DefaultDataParser():
     assert np.array_equal(node_id, dt["node_id"])
     assert np.array_equal(label, dt["label"])
     assert np.array_equal(feat, dt["feat"])
-    
+
     # string consists of non-numeric values
     df = pd.DataFrame({"label": ["a", "b", "c"]})
     expect_except = False
@@ -819,7 +820,7 @@ def _test_DefaultDataParser():
     except:
         expect_except = True
     assert expect_except
-    
+
     # csv has index column which is ignored as it's unnamed
     df = pd.DataFrame({"label": [1, 2, 3]})
     dt = _get_data_table(df)
