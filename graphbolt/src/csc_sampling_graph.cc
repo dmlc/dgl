@@ -453,7 +453,7 @@ inline void UniformPick(
       picked_data_ptr[i] = offset + i;
     }
   } else if (replace) {
-    memcpy(
+    std::memcpy(
         picked_data_ptr,
         torch::randint(offset, offset + num_neighbors, {fanout}, options)
             .data_ptr<PickedType>(),
@@ -587,13 +587,13 @@ inline void NonUniformPick(
   auto num_positive_probs = positive_probs_indices.size(0);
   if (num_positive_probs == 0) return;
   if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
-    memcpy(
+    std::memcpy(
         picked_data_ptr,
         (positive_probs_indices + offset).data_ptr<PickedType>(),
         num_positive_probs * sizeof(PickedType));
   } else {
     if (!replace) fanout = std::min(fanout, num_positive_probs);
-    memcpy(
+    std::memcpy(
         picked_data_ptr,
         (torch::multinomial(local_probs, fanout, replace) + offset)
             .data_ptr<PickedType>(),
