@@ -232,7 +232,9 @@ constexpr int CACHE_LINE_SIZE = 128;
 
 template <typename IdType>
 struct AlignmentFunc {
-  static_assert(CACHE_LINE_SIZE % sizeof(IdType) == 0);
+  static_assert(
+      CACHE_LINE_SIZE % sizeof(IdType) == 0,
+      "Alignment requirement is not met.");
   const IdType* in_deg;
   const int64_t* perm;
   IdType num_rows;
