@@ -199,23 +199,21 @@ auto GetPickFn(
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
-  return
-      [&fanouts, replace, &options, &type_per_edge, &probs_or_mask,
-       args]<typename PickedType>(
-          int64_t offset, int64_t num_neighbors, PickedType* picked_data_ptr) {
-        // If fanouts.size() > 1, perform sampling for each edge type of each
-        // node; otherwise just sample once for each node with no regard of edge
-        // types.
-        if (fanouts.size() > 1) {
-          return PickByEtype(
-              offset, num_neighbors, fanouts, replace, options,
-              type_per_edge.value(), probs_or_mask, args, picked_data_ptr);
-        } else {
-          return Pick(
-              offset, num_neighbors, fanouts[0], replace, options,
-              probs_or_mask, args, picked_data_ptr);
-        }
-      };
+  return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
+             int64_t offset, int64_t num_neighbors, auto* picked_data_ptr) {
+    // If fanouts.size() > 1, perform sampling for each edge type of each
+    // node; otherwise just sample once for each node with no regard of edge
+    // types.
+    if (fanouts.size() > 1) {
+      return PickByEtype(
+          offset, num_neighbors, fanouts, replace, options,
+          type_per_edge.value(), probs_or_mask, args, picked_data_ptr);
+    } else {
+      return Pick(
+          offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
+          args, picked_data_ptr);
+    }
+  };
 }
 
 template <typename NumPickFn, typename PickFn>
