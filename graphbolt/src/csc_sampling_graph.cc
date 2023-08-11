@@ -187,10 +187,11 @@ auto GetNumPickFn(
  * equal to the number of edges in the graph.
  * @param args Contains sampling algorithm specific arguments.
  *
- * @return A lambda function: (int64_t offset, int64_t num_neighbors) ->
- * torch::Tensor, which takes offset (the starting edge ID of the given node)
- * and num_neighbors (number of neighbors) as params and returns a tensor of
- * picked neighbors.
+ * @return A lambda function: (int64_t offset, int64_t num_neighbors,
+ * PickedType* picked_data_ptr) -> torch::Tensor, which takes offset (the
+ * starting edge ID of the given node) and num_neighbors (number of neighbors)
+ * as params and puts the picked neighbors at the address specified by
+ * picked_data_ptr.
  */
 template <SamplerType S>
 auto GetPickFn(
@@ -260,8 +261,10 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                   continue;
                 }
 
-                // Pre-allocate tensors for each node. This is temporary as the
-                // main process hasn't been rewritten.
+                // Pre-allocate tensors for each node. Because the pick
+                // functions are modified, this part of code needed refactoring
+                // to adapt to the change of APIs. It's temporary since the
+                // whole process will be rewritten soon.
                 int64_t allocate_size = num_pick_fn(offset, num_neighbors);
                 picked_neighbors_cur_thread[i - begin] =
                     torch::empty({allocate_size}, indptr_options);
@@ -274,14 +277,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                           picked_tensor.data_ptr<scalar_t>());
                     }));
 
-                // This number should be the same as the result of num_pick_fn.
-                num_picked_neighbors_per_node[i + 1] =
-                    picked_neighbors_cur_thread[i - begin].size(0);
-                TORCH_CHECK(
-                    *num_picked_neighbors_per_node[i + 1].data_ptr<int64_t>() ==
-                        num_pick_fn(offset, num_neighbors),
-                    "Return value of num_pick_fn doesn't match the actual "
-                    "picked number.");
+                num_picked_neighbors_per_node[i + 1] = allocate_size;
               }
               picked_neighbors_per_thread[thread_id] =
                   torch::cat(picked_neighbors_cur_thread);
@@ -445,8 +441,8 @@ int64_t NumPickByEtype(
  * without replacement. If True, a value can be selected multiple times.
  * Otherwise, each value can be selected only once.
  * @param options Tensor options specifying the desired data type of the result.
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_data_ptr The destination address where the picked neighbors
+ * should be put. Enough memory space should be allocated in advance.
  */
 template <typename PickedType>
 inline void UniformPick(
@@ -576,8 +572,8 @@ inline void UniformPick(
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_data_ptr The destination address where the picked neighbors
+ * should be put. Enough memory space should be allocated in advance.
  */
 template <typename PickedType>
 inline void NonUniformPick(
@@ -726,8 +722,8 @@ inline void safe_divide(T& a, U b) {
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
  * @param args Contains labor specific arguments.
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_data_ptr The destination address where the picked neighbors
+ * should be put. Enough memory space should be allocated in advance.
  */
 template <
     bool NonUniform, bool Replace, typename ProbsType, typename PickedType>
