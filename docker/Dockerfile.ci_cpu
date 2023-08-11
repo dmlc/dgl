@@ -13,6 +13,10 @@ RUN bash /install/ubuntu_install_core.sh
 COPY install/ubuntu_install_build.sh /install/ubuntu_install_build.sh
 RUN bash /install/ubuntu_install_build.sh
 
+# tcmalloc
+RUN apt-get install -y libgoogle-perftools4
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4:$LD_PRELOAD
+
 # python
 COPY install/ubuntu_install_conda.sh /install/ubuntu_install_conda.sh
 RUN bash /install/ubuntu_install_conda.sh

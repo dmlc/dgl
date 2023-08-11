@@ -40,7 +40,7 @@ It is convenient to train models using DGL on large-scale graphs across **multip
 
 ## Get Started
 
-Users can install DGL from [pip and conda](https://www.dgl.ai/pages/start.html). Advanced users can follow the [instructions](https://docs.dgl.ai/install/index.html#install-from-source) to install from source.
+Users can install DGL from [pip and conda](https://www.dgl.ai/pages/start.html). You can also download GPU enabled DGL docker [containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/dgl) (backended by PyTorch) from NVIDIA NGC for both x86 and ARM based linux systems. Advanced users can follow the [instructions](https://docs.dgl.ai/install/index.html#install-from-source) to install from source.
 
 For absolute beginners, start with [the Blitz Introduction to DGL](https://docs.dgl.ai/tutorials/blitz/index.html). It covers the basic concepts of common graph machine learning tasks and a step-by-step on building Graph Neural Networks (GNNs) to solve them.
 
