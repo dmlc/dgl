@@ -1,3 +1,4 @@
+import warnings
 from collections import defaultdict as ddict
 
 import backend as F
@@ -5,7 +6,6 @@ import backend as F
 import dgl
 import networkx as nx
 import numpy as np
-import warnings
 from utils import parametrize_idtype
 
 D = 5
@@ -421,7 +421,9 @@ def test_update_all_0deg(idtype):
     # function does not contain valid edges
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
-        g.update_all(_message, _reduce, lambda nodes: {"h": nodes.data["h"] * 2})
+        g.update_all(
+            _message, _reduce, lambda nodes: {"h": nodes.data["h"] * 2}
+        )
 
     new_repr = g.ndata["h"]
     # should fallback to apply
