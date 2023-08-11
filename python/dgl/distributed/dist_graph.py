@@ -7,7 +7,7 @@ from collections import namedtuple
 from collections.abc import MutableMapping
 
 import numpy as np
-from dgl.graphbolt import load_from_shared_memory
+from dgl.graphbolt import load_from_shared_memory, load_dist_from_shared_memory
 
 from .. import backend as F, heterograph_index
 from .._ffi.ndarray import empty_shared_mem
@@ -611,7 +611,7 @@ class DistGraph:
         assert (
             self._client is not None
         ), "Distributed module is not initialized. Please call dgl.distributed.initialize."
-        self._g = load_from_shared_memory("sh_mem_name")
+        self._g = load_dist_from_shared_memory("sh_mem_name")
         self._gpb = get_shared_mem_partition_book(self.graph_name)
         if self._gpb is None:
             self._gpb = gpb

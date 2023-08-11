@@ -329,8 +329,11 @@ def load_partition_graphbolt(part_config, part_id, load_feats=True):
         partition_path,
         os.path.getsize(partition_path),
     )
-    graph_gb = gb.load_csc_sampling_graph(os.path.join(
-            os.path.dirname(partition_path), "csc_sampling_graph.tar"))
+    # TODO (IN): temporary fix to fetch nid
+    graph = load_graphs(partition_path)[0][0]
+    graph_gb = gb.load_dist_csc_sampling_graph(os.path.join(
+            os.path.dirname(partition_path), "csc_sampling_graph.tar"),
+            graph.ndata[NID])
     logging.info("Finished loading partition.")
 
     gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id)
