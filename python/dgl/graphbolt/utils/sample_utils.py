@@ -69,7 +69,6 @@ def unique_and_compact_node_pairs(
                 unique_dst_nodes, torch.Tensor
             ), "Edge type not supported in homogeneous graph."
             unique_dst_nodes = {"_N": unique_dst_nodes}
-<<<<<<< HEAD
 
     # Collect all source and destination nodes for each node type.
     src_nodes = defaultdict(list)
@@ -85,23 +84,6 @@ def unique_and_compact_node_pairs(
             ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
         }
 
-=======
-
-    # Collect all source and destination nodes for each node type.
-    src_nodes = defaultdict(list)
-    dst_nodes = defaultdict(list)
-    for etype, (src_node, dst_node) in node_pairs.items():
-        src_nodes[etype[0]].append(src_node)
-        dst_nodes[etype[2]].append(dst_node)
-    src_nodes = {ntype: torch.cat(nodes) for ntype, nodes in src_nodes.items()}
-    dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
-    # Compute unique destination nodes if not provided.
-    if unique_dst_nodes is None:
-        unique_dst_nodes = {
-            ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
-        }
-
->>>>>>> master
     ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
     unique_nodes = {}
     compacted_src = {}
