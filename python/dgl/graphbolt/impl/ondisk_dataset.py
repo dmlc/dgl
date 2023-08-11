@@ -346,12 +346,6 @@ class OnDiskDataset(Dataset):
         path = preprocess_ondisk_dataset(path)
         with open(path) as f:
             self.yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
-        self._convert_yaml_path_to_absolute_path()
-        self._meta = OnDiskMetaData(**self.yaml_data)
-        self._dataset_name = self._meta.dataset_name
-        self._graph = self._load_graph(self._meta.graph_topology)
-        self._feature = TorchBasedFeatureStore(self._meta.feature_data)
-        self._tasks = self._init_tasks(self._meta.tasks)
 
     def _convert_yaml_path_to_absolute_path(self):
         """Convert the path in YAML file to absolute path."""
@@ -374,6 +368,16 @@ class OnDiskDataset(Dataset):
                             data["path"] = os.path.join(
                                 self.dataset_dir, data["path"]
                             )
+
+    def load(self):
+        """Load the dataset."""
+        self._convert_yaml_path_to_absolute_path()
+        self._meta = OnDiskMetaData(**self.yaml_data)
+        self._dataset_name = self._meta.dataset_name
+        self._graph = self._load_graph(self._meta.graph_topology)
+        self._feature = TorchBasedFeatureStore(self._meta.feature_data)
+        self._tasks = self._init_tasks(self._meta.tasks)
+        return self
 
     @property
     def tasks(self) -> List[Task]:
