@@ -8,7 +8,7 @@ to get the best performance during training and inference on the CPU.
 Intel
 `````````````````````````````
 
-Hyper-treading
+Hyper-threading
 ---------------------------
 
 For specific workloads as GNN’s domain, suggested default setting for having best performance
