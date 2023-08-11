@@ -1,6 +1,7 @@
 import os
 import re
 import tempfile
+import unittest
 
 import gb_test_utils as gbt
 
@@ -1064,7 +1065,8 @@ def test_OnDiskDataset_preprocess_path():
             _ = gb.OnDiskDataset(fake_dir)
 
 
-def test_OnDiskDataset_preprocess_yaml_content():
+@unittest.skipIf(os.name == "nt", "Skip on Windows")
+def test_OnDiskDataset_preprocess_yaml_content_unix():
     """Test if the preprocessed metadata.yaml is correct."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1163,43 +1165,209 @@ def test_OnDiskDataset_preprocess_yaml_content():
         preprocessed_metadata_path = gb.preprocess_ondisk_dataset(test_dir)
         with open(preprocessed_metadata_path, "r") as f:
             yaml_data = yaml.safe_load(f)
-        assert yaml_data["dataset_name"] == dataset_name
 
-        assert "graph_topology" in yaml_data
-        assert yaml_data["graph_topology"]["path"] == os.path.join(
-            "preprocessed", "csc_sampling_graph.tar"
-        )
-        assert yaml_data["graph_topology"]["type"] == "CSCSamplingGraph"
+        target_yaml_content = f"""
+            dataset_name: {dataset_name}
+            graph_topology:
+              type: CSCSamplingGraph
+              path: preprocessed/csc_sampling_graph.tar
+            feature_data:
+              - domain: node
+                type: null
+                name: feat
+                format: numpy
+                in_memory: false
+                path: preprocessed/data/node-feat.npy
+            tasks:
+              - name: node_classification
+                num_classes: {num_classes}
+                train_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: preprocessed/set/train.npy
+                validation_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: preprocessed/set/validation.npy
+                test_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: preprocessed/set/test.npy
+        """
+        target_yaml_data = yaml.safe_load(target_yaml_content)
+        # Check yaml content.
+        assert (
+            yaml_data == target_yaml_data
+        ), "The preprocessed metadata.yaml is not correct."
+
+        # Check file existence.
         assert os.path.exists(
-            os.path.join(test_dir, "preprocessed/csc_sampling_graph.tar")
-        )
-
-        assert "feature_data" in yaml_data
-        assert yaml_data["feature_data"][0]["domain"] == "node"
-        assert yaml_data["feature_data"][0]["type"] is None
-        assert yaml_data["feature_data"][0]["name"] == "feat"
-        assert yaml_data["feature_data"][0]["format"] == "numpy"
-        assert yaml_data["feature_data"][0]["path"] == os.path.join(
-            "preprocessed", "data/node-feat.npy"
+            os.path.join(test_dir, yaml_data["graph_topology"]["path"])
         )
         assert os.path.exists(
-            os.path.join(test_dir, "preprocessed/data/node-feat.npy")
+            os.path.join(test_dir, yaml_data["feature_data"][0]["path"])
         )
-
-        assert "tasks" in yaml_data
-        assert yaml_data["tasks"][0]["name"] == "node_classification"
-        assert yaml_data["tasks"][0]["num_classes"] == num_classes
         for set_name in ["train_set", "validation_set", "test_set"]:
-            file_name = set_name.split("_")[0]
-            assert set_name in yaml_data["tasks"][0]
-            assert yaml_data["tasks"][0][set_name][0]["type_name"] is None
-            assert (
-                yaml_data["tasks"][0][set_name][0]["data"][0]["format"]
-                == "numpy"
-            )
-            assert yaml_data["tasks"][0][set_name][0]["data"][0][
-                "path"
-            ] == os.path.join("preprocessed", f"set/{file_name}.npy")
             assert os.path.exists(
-                os.path.join(test_dir, f"preprocessed/set/{file_name}.npy")
+                os.path.join(
+                    test_dir,
+                    yaml_data["tasks"][0][set_name][0]["data"][0]["path"],
+                )
+            )
+
+
+@unittest.skipIf(os.name != "nt", "Skip on Unix")
+def test_OnDiskDataset_preprocess_yaml_content_windows():
+    """Test if the preprocessed metadata.yaml is correct."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random edges.
+        nodes = np.repeat(np.arange(num_nodes), 5)
+        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
+        edges = np.stack([nodes, neighbors], axis=1)
+        # Wrtie into edges/edge.csv
+        os.makedirs(os.path.join(test_dir, "edges\\"), exist_ok=True)
+        edges = pd.DataFrame(edges, columns=["src", "dst"])
+        edges.to_csv(
+            os.path.join(test_dir, "edges\\edge.csv"),
+            index=False,
+            header=False,
+        )
+
+        # Generate random graph edge-feats.
+        edge_feats = np.random.rand(num_edges, 5)
+        os.makedirs(os.path.join(test_dir, "data\\"), exist_ok=True)
+        np.save(os.path.join(test_dir, "data\\edge-feat.npy"), edge_feats)
+
+        # Generate random node-feats.
+        node_feats = np.random.rand(num_nodes, 10)
+        np.save(os.path.join(test_dir, "data\\node-feat.npy"), node_feats)
+
+        # Generate train/test/valid set.
+        os.makedirs(os.path.join(test_dir, "set\\"), exist_ok=True)
+        train_pairs = (np.arange(1000), np.arange(1000, 2000))
+        train_labels = np.random.randint(0, 10, size=1000)
+        train_data = np.vstack([train_pairs, train_labels]).T
+        train_path = os.path.join(test_dir, "set\\train.npy")
+        np.save(train_path, train_data)
+
+        validation_pairs = (np.arange(1000, 2000), np.arange(2000, 3000))
+        validation_labels = np.random.randint(0, 10, size=1000)
+        validation_data = np.vstack([validation_pairs, validation_labels]).T
+        validation_path = os.path.join(test_dir, "set\\validation.npy")
+        np.save(validation_path, validation_data)
+
+        test_pairs = (np.arange(2000, 3000), np.arange(3000, 4000))
+        test_labels = np.random.randint(0, 10, size=1000)
+        test_data = np.vstack([test_pairs, test_labels]).T
+        test_path = os.path.join(test_dir, "set\\test.npy")
+        np.save(test_path, test_data)
+
+        yaml_content = f"""
+            dataset_name: {dataset_name}
+            graph: # graph structure and required attributes.
+                nodes:
+                    - num: {num_nodes}
+                edges:
+                    - format: csv
+                      path: edges\\edge.csv
+                feature_data:
+                    - domain: edge
+                      type: null
+                      name: feat
+                      format: numpy
+                      in_memory: true
+                      path: data\\edge-feat.npy
+            feature_data:
+                - domain: node
+                  type: null
+                  name: feat
+                  format: numpy
+                  in_memory: false
+                  path: data\\node-feat.npy
+            tasks:
+              - name: node_classification
+                num_classes: {num_classes}
+                train_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: set\\train.npy
+                validation_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: set\\validation.npy
+                test_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: set\\test.npy
+        """
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        preprocessed_metadata_path = gb.preprocess_ondisk_dataset(test_dir)
+        with open(preprocessed_metadata_path, "r") as f:
+            yaml_data = yaml.safe_load(f)
+
+        target_yaml_content = f"""
+            dataset_name: {dataset_name}
+            graph_topology:
+              type: CSCSamplingGraph
+              path: preprocessed\\csc_sampling_graph.tar
+            feature_data:
+              - domain: node
+                type: null
+                name: feat
+                format: numpy
+                in_memory: false
+                path: preprocessed\\data\\node-feat.npy
+            tasks:
+              - name: node_classification
+                num_classes: {num_classes}
+                train_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: preprocessed\\set\\train.npy
+                validation_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: preprocessed\\set\\validation.npy
+                test_set:
+                  - type_name: null
+                    data:
+                      - format: numpy
+                        path: preprocessed\\set\\test.npy
+        """
+        target_yaml_data = yaml.safe_load(target_yaml_content)
+        # Check yaml content.
+        assert (
+            yaml_data == target_yaml_data
+        ), "The preprocessed metadata.yaml is not correct."
+
+        # Check file existence.
+        assert os.path.exists(
+            os.path.join(test_dir, yaml_data["graph_topology"]["path"])
+        )
+        assert os.path.exists(
+            os.path.join(test_dir, yaml_data["feature_data"][0]["path"])
+        )
+        for set_name in ["train_set", "validation_set", "test_set"]:
+            assert os.path.exists(
+                os.path.join(
+                    test_dir,
+                    yaml_data["tasks"][0][set_name][0]["data"][0]["path"],
+                )
             )
