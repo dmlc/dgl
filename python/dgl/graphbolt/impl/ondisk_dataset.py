@@ -76,9 +76,10 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         )
 
     # 0. Check if the dataset is already preprocessed.
-    if os.path.exists(os.path.join(dataset_dir, "preprocessed/metadata.yaml")):
+    preprocess_metadata_path = os.path.join("preprocessed", "metadata.yaml")
+    if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
         print("The dataset is already preprocessed.")
-        return os.path.join(dataset_dir, "preprocessed/metadata.yaml")
+        return os.path.join(dataset_dir, preprocess_metadata_path)
 
     print("Start to preprocess the on-disk dataset.")
     processed_dir_prefix = "preprocessed"
@@ -215,7 +216,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                         )
 
     # 8. Save the output_config.
-    output_config_path = os.path.join(dataset_dir, "preprocessed/metadata.yaml")
+    output_config_path = os.path.join(dataset_dir, preprocess_metadata_path)
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
