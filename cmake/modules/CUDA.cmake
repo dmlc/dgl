@@ -248,7 +248,7 @@ macro(dgl_config_cuda out_variable)
   list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS_ARCH})
 
   # 2. flags in third_party/moderngpu
-  list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda;-Wno-deprecated-declarations;-std=c++14")
+  list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda;-Wno-deprecated-declarations;-std=c++17")
 
   message(STATUS "CUDA_NVCC_FLAGS: ${CUDA_NVCC_FLAGS}")
 
