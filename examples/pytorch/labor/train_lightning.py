@@ -521,15 +521,16 @@ if __name__ == "__main__":
             graph,
             f"cuda:{args.gpu}" if args.gpu != -1 else "cpu",
             4096,
+            args.use_uva,
             args.num_workers,
-            graph.device,
         )
         for nid, split_name in zip(
             [datamodule.train_nid, datamodule.val_nid, datamodule.test_nid],
             ["Train", "Validation", "Test"],
         ):
+            nid = nid.to(pred.device).long()
             pred_nid = pred[nid]
             label = graph.ndata["labels"][nid]
             f1score = model.f1score_class().to(pred.device)
             acc = f1score(pred_nid, label)
-            print(f"{split_name} accuracy:", acc.item())
+            print(f"{split_name} accuracy: {acc.item()}")

@@ -47,13 +47,14 @@ class SAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-    def inference(self, g, device, batch_size, num_workers, buffer_device=None):
+    def inference(self, g, device, batch_size, use_uva, num_workers):
         # The difference between this inference function and the one in the official
         # example is that the intermediate results can also benefit from prefetching.
         g.ndata["h"] = g.ndata["features"]
         sampler = dgl.dataloading.MultiLayerFullNeighborSampler(
             1, prefetch_node_feats=["h"]
         )
+        pin_memory = g.device != device and use_uva
         dataloader = dgl.dataloading.DataLoader(
             g,
             th.arange(g.num_nodes(), dtype=g.idtype, device=g.device),
@@ -62,26 +63,27 @@ class SAGE(nn.Module):
             batch_size=batch_size,
             shuffle=False,
             drop_last=False,
+            use_uva=use_uva,
             num_workers=num_workers,
             persistent_workers=(num_workers > 0),
         )
-        if buffer_device is None:
-            buffer_device = device
 
-        self.train(False)
+        self.eval()
 
         for l, layer in enumerate(self.layers):
-            y = th.zeros(
+            y = th.empty(
                 g.num_nodes(),
                 self.n_hidden if l != len(self.layers) - 1 else self.n_classes,
-                device=buffer_device,
+                dtype=g.ndata["h"].dtype,
+                device=g.device,
+                pin_memory=pin_memory,
             )
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 x = blocks[0].srcdata["h"]
                 h = layer(blocks[0], x)
-                if l != len(self.layers) - 1:
+                if l < len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
-                y[output_nodes] = h.to(buffer_device)
+                y[output_nodes.to(g.device).long()] = h.to(g.device)
             g.ndata["h"] = y
         return y
