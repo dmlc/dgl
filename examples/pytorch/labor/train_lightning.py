@@ -376,7 +376,7 @@ if __name__ == "__main__":
     argparser.add_argument(
         "--gpu",
         type=int,
-        default=0,
+        default=0 if th.cuda.is_available() else -1,
         help="GPU device ID. Use -1 for CPU training",
     )
     argparser.add_argument("--dataset", type=str, default="reddit")
@@ -484,7 +484,7 @@ if __name__ == "__main__":
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(
         accelerator="gpu" if args.gpu != -1 else "cpu",
-        devices=[args.gpu],
+        devices=[args.gpu] if args.gpu != -1 else "auto",
         max_epochs=args.num_epochs,
         max_steps=args.num_steps,
         min_steps=args.min_steps,

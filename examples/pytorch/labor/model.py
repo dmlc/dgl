@@ -84,6 +84,7 @@ class SAGE(nn.Module):
                 if l < len(self.layers) - 1:
                     h = self.activation(h)
                     h = self.dropout(h)
-                y[output_nodes.to(g.device).long()] = h.to(g.device)
+                # by design, our output nodes are contiguous
+                y[output_nodes[0] : output_nodes[-1] + 1] = h.to(y.device)
             g.ndata["h"] = y
         return y
