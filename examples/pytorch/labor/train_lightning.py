@@ -269,18 +269,9 @@ class DataModule(LightningDataModule):
             dataloader_device = device
 
         self.g = g
-        if cast_to_int:
-            self.train_nid, self.val_nid, self.test_nid = (
-                train_nid.int(),
-                val_nid.int(),
-                test_nid.int(),
-            )
-        else:
-            self.train_nid, self.val_nid, self.test_nid = (
-                train_nid,
-                val_nid,
-                test_nid,
-            )
+        self.train_nid = train_nid.to(g.idtype)
+        self.val_nid = val_nid.to(g.idtype)
+        self.test_nid = test_nid.to(g.idtype)
         self.sampler = sampler
         self.device = dataloader_device
         self.use_uva = use_uva
