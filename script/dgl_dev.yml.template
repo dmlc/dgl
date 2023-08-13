@@ -18,7 +18,7 @@ dependencies:
     - pandas
     - psutil
     - pyarrow
-    - pydantic
+    - pydantic>=2.0
     - pytest
     - pyyaml
     - rdflib
@@ -40,5 +40,6 @@ dependencies:
     - pillow
     - seaborn
     - jupyter_http_over_ws
+    - ufmt
 variables:
   DGL_HOME: __DGL_HOME__

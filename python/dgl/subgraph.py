@@ -161,8 +161,10 @@ def node_subgraph(
         nodes.get(ntype, F.copy_to(F.tensor([], graph.idtype), device))
         for ntype in graph.ntypes
     ]
-    sgi = graph._graph.node_subgraph(induced_nodes, relabel_nodes)
+    sgi = graph._graph.node_subgraph(induced_nodes)
     induced_edges = sgi.induced_edges
+    if not relabel_nodes:
+        sgi = graph._graph.edge_subgraph(induced_edges, True)
     # (BarclayII) should not write induced_nodes = sgi.induced_nodes due to the same
     # bug in #1453.
     induced_nodes_or_device = induced_nodes if relabel_nodes else device

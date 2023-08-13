@@ -1263,7 +1263,7 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         # Sanity check.
         assert len(type_per_edge) == graph.num_edges()
         csc_graph = graphbolt.from_csc(
-            indptr, indices, None, type_per_edge, metadata
+            indptr, indices, None, type_per_edge, metadata=metadata
         )
         orig_graph_path = os.path.join(
             os.path.dirname(part_config),

@@ -31,16 +31,19 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <numeric>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "../../random/continuous_seed.h"
+
 namespace dgl {
 namespace aten {
 namespace impl {
+
+using dgl::random::continuous_seed;
 
 constexpr double eps = 0.0001;
 
@@ -124,7 +127,10 @@ auto compute_importance_sampling_probabilities(
         var_1 = 0;
         if (weighted) {
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
-            var_1 += A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]]);
+            // The check for zero is necessary for numerical stability
+            var_1 += A[j] > 0
+                         ? A[j] * A[j] / std::min(ONE, c * ps[j - indptr[rid]])
+                         : 0;
         } else {
           for (auto j = indptr[rid]; j < indptr[rid + 1]; j++)
             var_1 += ONE / std::min(ONE, c * ps[j - indptr[rid]]);
@@ -153,7 +159,8 @@ auto compute_importance_sampling_probabilities(
 template <typename IdxType, typename FloatType>
 std::pair<COOMatrix, FloatArray> CSRLaborPick(
     CSRMatrix mat, IdArray rows, int64_t num_picks, FloatArray prob,
-    int importance_sampling, IdArray random_seed_arr, IdArray NIDs) {
+    int importance_sampling, IdArray random_seed_arr, float seed2_contribution,
+    IdArray NIDs) {
   using namespace aten;
   const IdxType* indptr = mat.indptr.Ptr<IdxType>();
   const IdxType* indices = mat.indices.Ptr<IdxType>();
@@ -208,17 +215,18 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
   IdArray picked_row = NDArray::Empty({hop_size}, vidtype, ctx);
   IdArray picked_col = NDArray::Empty({hop_size}, vidtype, ctx);
   IdArray picked_idx = NDArray::Empty({hop_size}, vidtype, ctx);
-  FloatArray picked_imp =
-      NDArray::Empty({importance_sampling ? hop_size : 0}, dtype, ctx);
+  FloatArray picked_imp = importance_sampling
+                              ? NDArray::Empty({hop_size}, dtype, ctx)
+                              : NullArray();
   IdxType* picked_rdata = picked_row.Ptr<IdxType>();
   IdxType* picked_cdata = picked_col.Ptr<IdxType>();
   IdxType* picked_idata = picked_idx.Ptr<IdxType>();
   FloatType* picked_imp_data = picked_imp.Ptr<FloatType>();
 
-  const uint64_t random_seed =
+  const continuous_seed random_seed =
       IsNullArray(random_seed_arr)
-          ? RandomEngine::ThreadLocal()->RandInt(1000000000)
-          : random_seed_arr.Ptr<int64_t>()[0];
+          ? continuous_seed(RandomEngine::ThreadLocal()->RandInt(1000000000))
+          : continuous_seed(random_seed_arr, seed2_contribution);
 
   // compute number of edges first and do sampling
   IdxType num_edges = 0;
@@ -230,11 +238,9 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
     const auto off = num_edges;
     for (auto j = indptr[rid]; j < indptr[rid + 1]; j++) {
       const auto v = indices[j];
-      const auto t = nids ? nids[v] : v;  // t in the paper
-      pcg32 ng(random_seed, t);
-      std::uniform_real_distribution<FloatType> uni;
+      const uint64_t t = nids ? nids[v] : v;  // t in the paper
       // rolled random number r_t is a function of the random_seed and t
-      const auto rnd = uni(ng);
+      const auto rnd = random_seed.uniform(t);
       const auto w = (weighted ? A[j] : 1);
       // if hop_map is initialized, get ps from there, otherwise get it from the
       // alternative.
@@ -278,13 +284,15 @@ std::pair<COOMatrix, FloatArray> CSRLaborPick(
 template <typename IdxType, typename FloatType>
 std::pair<COOMatrix, FloatArray> COOLaborPick(
     COOMatrix mat, IdArray rows, int64_t num_picks, FloatArray prob,
-    int importance_sampling, IdArray random_seed, IdArray NIDs) {
+    int importance_sampling, IdArray random_seed, float seed2_contribution,
+    IdArray NIDs) {
   using namespace aten;
   const auto& csr = COOToCSR(COOSliceRows(mat, rows));
   const IdArray new_rows =
       Range(0, rows->shape[0], rows->dtype.bits, rows->ctx);
   const auto&& picked_importances = CSRLaborPick<IdxType, FloatType>(
-      csr, new_rows, num_picks, prob, importance_sampling, random_seed, NIDs);
+      csr, new_rows, num_picks, prob, importance_sampling, random_seed,
+      seed2_contribution, NIDs);
   const auto& picked = picked_importances.first;
   const auto& importances = picked_importances.second;
   return std::make_pair(

@@ -37,6 +37,7 @@ def sample_labors(
     prob=None,
     importance_sampling=0,
     random_seed=None,
+    seed2_contribution=0,
     copy_ndata=True,
     copy_edata=True,
     exclude_edges=None,
@@ -109,6 +110,10 @@ def sample_labors(
         If this function is called without a ``random_seed``, we get the random seed by getting a
         random number from DGL. Use this argument with identical random_seed if multiple calls to
         this function are used to sample as part of a single batch.
+    seed2_contribution : float, optional
+        A float value between [0, 1) that determines the contribution
+        of the second random seed to generate the random variates for the
+        LABOR sampling algorithm.
     copy_ndata: bool, optional
         If True, the node features of the new graph are copied from
         the original graph. If False, the new graph will not have any
@@ -206,6 +211,7 @@ def sample_labors(
             prob=prob,
             importance_sampling=importance_sampling,
             random_seed=random_seed,
+            seed2_contribution=seed2_contribution,
             copy_ndata=copy_ndata,
             copy_edata=copy_edata,
             exclude_edges=exclude_edges,
@@ -219,6 +225,7 @@ def sample_labors(
             prob=prob,
             importance_sampling=importance_sampling,
             random_seed=random_seed,
+            seed2_contribution=seed2_contribution,
             copy_ndata=copy_ndata,
             copy_edata=copy_edata,
         )
@@ -242,6 +249,7 @@ def _sample_labors(
     prob=None,
     importance_sampling=0,
     random_seed=None,
+    seed2_contribution=0,
     copy_ndata=True,
     copy_edata=True,
     exclude_edges=None,
@@ -329,6 +337,7 @@ def _sample_labors(
         excluded_edges_all_t,
         importance_sampling,
         random_seed,
+        seed2_contribution,
         nids_all_types,
     )
     subgidx = ret_val[0]

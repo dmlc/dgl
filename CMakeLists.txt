@@ -10,31 +10,106 @@ include(cmake/util/Util.cmake)
 include(cmake/util/MshadowUtil.cmake)
 include(cmake/util/FindCUDA.cmake)
 
-if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
-  include(${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
+# TODO(#5475): Clean up the old flags after CI and regression framework adopt to the new setup.
+if (NOT DEFINED BUILD_TYPE)
+  dgl_option(USE_CUDA "Build with CUDA" OFF)
+  dgl_option(USE_OPENMP "Build with OpenMP" ON)
+  dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
+  dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
+  dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
+  dgl_option(USE_S3 "Build with S3 support" OFF)
+  dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
+  dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
+  dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
+  dgl_option(BUILD_TORCH "Build the PyTorch plugin" OFF)
+  dgl_option(BUILD_SPARSE "Build DGL sparse library" ON)
+  dgl_option(BUILD_GRAPHBOLT "Build Graphbolt library" OFF)
+  dgl_option(TORCH_PYTHON_INTERPS "Python interpreter used to build tensoradapter and DGL sparse library" python3)
 else()
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
-  endif()
-endif()
+  # Options for building DGL.
+  # NOTE: do not modify this file to change option values.
+  # Use bash script/build_dgl.sh -e '-DOPTION=VALUE' through command-line.
+  dgl_option(
+      BUILD_TYPE
+      "Type of the build: dev, test or release"
+      "dev"
+  )
+  message(STATUS "Build for ${BUILD_TYPE}")
 
-# NOTE: do not modify this file to change option values.
-# You can create a config.cmake at build folder
-# and add set(OPTION VALUE) to override these build options.
-# Alernatively, use cmake -DOPTION=VALUE through command-line.
-dgl_option(USE_CUDA "Build with CUDA" OFF)
-dgl_option(USE_OPENMP "Build with OpenMP" ON)
-dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
-dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
-dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
-dgl_option(USE_S3 "Build with S3 support" OFF)
-dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
-dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
-dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
-dgl_option(BUILD_TORCH "Build the PyTorch plugin" OFF)
-dgl_option(BUILD_SPARSE "Build DGL sparse library" ON)
-dgl_option(BUILD_GRAPHBOLT "Build Graphbolt library" OFF)
-dgl_option(TORCH_PYTHON_INTERPS "Python interpreter used to build tensoradapter and DGL sparse library" python3)
+  dgl_option(
+      USE_CUDA
+      "Build with CUDA"
+      OFF
+  )
+  dgl_option(
+      TORCH_PYTHON_INTERPS
+      "Python interpreter used to build tensoradapter and DGL sparse library"
+      python3
+  )
+
+  # Options for building DGL features, supported: "none", "dev", "test", "release", "all".
+  # NOTE: do not modify this file to change option values.
+  # Use bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' through command-line.
+  dgl_feature_option(
+      BUILD_SPARSE
+      "Build DGL sparse library"
+      "all"
+  )
+  dgl_feature_option(
+      BUILD_TORCH
+      "Build the PyTorch plugin"
+      "all"
+  )
+  dgl_feature_option(
+      USE_EPOLL
+      "Build with epoll for socket communicator"
+      "all"
+  )
+  dgl_feature_option(
+      USE_LIBXSMM
+      "Build with LIBXSMM library optimization"
+      "all"
+  )
+  dgl_feature_option(
+      USE_OPENMP
+      "Build with OpenMP"
+      "all"
+  )
+
+  dgl_feature_option(
+      BUILD_GRAPHBOLT
+      "Build Graphbolt library"
+      "dev" "test"
+  )
+
+  dgl_feature_option(
+      LIBCXX_ENABLE_PARALLEL_ALGORITHMS
+      "Enable the parallel algorithms library. This requires the PSTL to be available."
+      "none"
+  )
+  dgl_feature_option(
+      REBUILD_LIBXSMM
+      "Clean LIBXSMM build cache at every build"
+      "none"
+  )
+  dgl_feature_option(
+      USE_HDFS
+      "Build with HDFS support"
+      "none"
+  ) # Set env HADOOP_HDFS_HOME if needed
+  dgl_feature_option(
+      USE_S3
+      "Build with S3 support"
+      "none"
+  )
+
+  # Build cpp test only in test build.
+  dgl_feature_option(
+      BUILD_CPP_TEST
+      "Build cpp unittest executables"
+      "test"
+  )
+endif()
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
 if (NOT MSVC)
@@ -50,6 +125,7 @@ if(USE_CUDA)
   message(STATUS "Use external CUB/Thrust library for a consistent API and performance.")
   cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust")
   cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/cub")
+  cuda_include_directories(BEFORE "${CMAKE_SOURCE_DIR}/third_party/thrust/dependencies/libcudacxx/include")
 endif(USE_CUDA)
 
 # initial variables
@@ -85,7 +161,7 @@ if(MSVC)
 else(MSVC)
   include(CheckCXXCompilerFlag)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
   if(NOT APPLE)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
   endif(NOT APPLE)
@@ -225,6 +301,21 @@ if((NOT MSVC) AND (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--exclude-libs,ALL")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--exclude-libs,ALL")
 endif()
+
+# Compile gpu_cache
+if(USE_CUDA)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_GPU_CACHE")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_GPU_CACHE")
+  # Manually build gpu_cache because CMake always builds it as shared
+  file(GLOB gpu_cache_src
+    third_party/HugeCTR/gpu_cache/src/nv_gpu_cache.cu
+  )
+  cuda_add_library(gpu_cache STATIC ${gpu_cache_src})
+  target_include_directories(gpu_cache PRIVATE "third_party/HugeCTR/gpu_cache/include")
+  target_include_directories(dgl PRIVATE "third_party/HugeCTR/gpu_cache/include")
+  list(APPEND DGL_LINKER_LIBS gpu_cache)
+  message(STATUS "Build with HugeCTR GPU embedding cache.")
+endif(USE_CUDA)
 
 # support PARALLEL_ALGORITHMS
 if (LIBCXX_ENABLE_PARALLEL_ALGORITHMS)

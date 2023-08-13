@@ -54,15 +54,11 @@ def scipy_csr_input():
 
 
 def gen_by_mutation():
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     src, dst = edge_pair_input()
     g.add_nodes(10)
     g.add_edges(src, dst)
     return g
-
-
-def gen_from_data(data, readonly, sort):
-    return dgl.DGLGraph(data, readonly=readonly, sort_csr=True)
 
 
 def test_query():
@@ -275,19 +271,14 @@ def test_query():
         eid = g.edge_ids(0, 4)
 
     _test(gen_by_mutation())
-    _test(gen_from_data(elist_input(), False, False))
-    _test(gen_from_data(elist_input(), True, False))
-    _test(gen_from_data(elist_input(), True, True))
-    _test(gen_from_data(scipy_coo_input(), False, False))
-    _test(gen_from_data(scipy_coo_input(), True, False))
-
-    _test_csr(gen_from_data(scipy_csr_input(), False, False))
-    _test_csr(gen_from_data(scipy_csr_input(), True, False))
+    _test(dgl.graph(elist_input()))
+    _test(dgl.from_scipy(scipy_coo_input()))
+    _test_csr(dgl.from_scipy(scipy_csr_input()))
     _test_edge_ids()
 
 
 def test_mutation():
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g = g.to(F.ctx())
     # test add nodes with data
     g.add_nodes(5)
@@ -304,7 +295,7 @@ def test_mutation():
 
 
 def test_scipy_adjmat():
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g.add_nodes(10)
     g.add_edges(range(9), range(1, 10))
 
@@ -318,7 +309,7 @@ def test_scipy_adjmat():
 
 
 def test_incmat():
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g.add_nodes(4)
     g.add_edges(0, 1)  # 0
     g.add_edges(0, 2)  # 1
@@ -367,7 +358,7 @@ def test_incmat():
 
 
 def test_find_edges():
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g.add_nodes(10)
     g.add_edges(range(9), range(1, 10))
     e = g.find_edges([1, 3, 2, 4])
@@ -394,7 +385,7 @@ def test_find_edges():
 
 
 def test_ismultigraph():
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g.add_nodes(10)
     assert g.is_multigraph == False
     g.add_edges([0], [0])
@@ -406,7 +397,7 @@ def test_ismultigraph():
 
 
 def test_hypersparse_query():
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g = g.to(F.ctx())
     g.add_nodes(1000001)
     g.add_edges([0], [1])
@@ -425,7 +416,7 @@ def test_hypersparse_query():
 
 
 def test_empty_data_initialized():
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g = g.to(F.ctx())
     g.ndata["ha"] = F.tensor([])
     g.add_nodes(1, {"hb": F.tensor([1])})
@@ -460,7 +451,7 @@ def test_is_sorted():
 
 
 def test_default_types():
-    dg = dgl.DGLGraph()
+    dg = dgl.graph([])
     g = dgl.graph(([], []))
     assert dg.ntypes == g.ntypes
     assert dg.etypes == g.etypes

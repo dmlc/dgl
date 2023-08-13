@@ -190,6 +190,12 @@ class UnitGraph : public BaseHeteroGraph {
       int64_t num_vtypes, const aten::CSRMatrix& mat,
       dgl_format_code_t formats = ALL_CODE);
 
+  /** @brief Create a graph from (out) CSR and COO arrays, both representing the
+   * same graph */
+  static HeteroGraphPtr CreateFromCSRAndCOO(
+      int64_t num_vtypes, const aten::CSRMatrix& csr,
+      const aten::COOMatrix& coo, dgl_format_code_t formats = ALL_CODE);
+
   /** @brief Create a graph from (in) CSC arrays */
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, int64_t num_src, int64_t num_dst, IdArray indptr,
@@ -198,6 +204,12 @@ class UnitGraph : public BaseHeteroGraph {
   static HeteroGraphPtr CreateFromCSC(
       int64_t num_vtypes, const aten::CSRMatrix& mat,
       dgl_format_code_t formats = ALL_CODE);
+
+  /** @brief Create a graph from (in) CSC and COO arrays, both representing the
+   * same graph */
+  static HeteroGraphPtr CreateFromCSCAndCOO(
+      int64_t num_vtypes, const aten::CSRMatrix& csc,
+      const aten::COOMatrix& coo, dgl_format_code_t formats = ALL_CODE);
 
   /** @brief Convert the graph to use the given number of bits for storage */
   static HeteroGraphPtr AsNumBits(HeteroGraphPtr g, uint8_t bits);

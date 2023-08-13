@@ -89,7 +89,7 @@ def main(args):
     val_mask = g.ndata["val_mask"]
     test_mask = g.ndata["test_mask"]
     num_feats = features.shape[1]
-    n_classes = data.num_labels
+    n_classes = data.num_classes
     n_edges = g.num_edges()
     print(
         """----Data statistics------'
@@ -138,7 +138,7 @@ def main(args):
     )
 
     # initialize graph
-    dur = []
+    mean = 0
     for epoch in range(args.epochs):
         model.train()
         if epoch >= 3:
@@ -152,29 +152,29 @@ def main(args):
         optimizer.step()
 
         if epoch >= 3:
-            dur.append(time.time() - t0)
+            mean = (mean * (epoch - 3) + (time.time() - t0)) / (epoch - 2)
 
-        train_acc = accuracy(logits[train_mask], labels[train_mask])
+            train_acc = accuracy(logits[train_mask], labels[train_mask])
 
-        if args.fastmode:
-            val_acc = accuracy(logits[val_mask], labels[val_mask])
-        else:
-            val_acc = evaluate(g, model, features, labels, val_mask)
-            if args.early_stop:
-                if stopper.step(val_acc, model):
-                    break
+            if args.fastmode:
+                val_acc = accuracy(logits[val_mask], labels[val_mask])
+            else:
+                val_acc = evaluate(g, model, features, labels, val_mask)
+                if args.early_stop:
+                    if stopper.step(val_acc, model):
+                        break
 
-        print(
-            "Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | TrainAcc {:.4f} |"
-            " ValAcc {:.4f} | ETputs(KTEPS) {:.2f}".format(
-                epoch,
-                np.mean(dur),
-                loss.item(),
-                train_acc,
-                val_acc,
-                n_edges / np.mean(dur) / 1000,
+            print(
+                "Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | TrainAcc {:.4f} |"
+                " ValAcc {:.4f} | ETputs(KTEPS) {:.2f}".format(
+                    epoch,
+                    mean,
+                    loss.item(),
+                    train_acc,
+                    val_acc,
+                    n_edges / mean / 1000,
+                )
             )
-        )
 
     print()
     if args.early_stop:

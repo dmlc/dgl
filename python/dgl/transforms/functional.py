@@ -22,6 +22,7 @@ from collections.abc import Iterable, Mapping
 import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
+from packaging.version import Version
 
 try:
     import torch as th
@@ -85,6 +86,7 @@ __all__ = [
     "random_walk_pe",
     "laplacian_pe",
     "lap_pe",
+    "to_bfloat16",
     "to_half",
     "to_float",
     "to_double",
@@ -3589,14 +3591,20 @@ def random_walk_pe(g, k, eweight_name=None):
             shape=(N, N),
         )
         A = A.multiply(W)
-    RW = np.array(A / (A.sum(1) + 1e-30))  # 1-step transition probability
+    # 1-step transition probability
+    if Version(scipy.__version__) < Version("1.11.0"):
+        RW = np.array(A / (A.sum(1) + 1e-30))
+    else:
+        # Sparse matrix divided by a dense array returns a sparse matrix in
+        # scipy since 1.11.0.
+        RW = (A / (A.sum(1) + 1e-30)).toarray()
 
     # Iterate for k steps
-    PE = [F.astype(F.tensor(RW.diagonal()), F.float32)]
+    PE = [F.astype(F.tensor(np.array(RW.diagonal())), F.float32)]
     RW_power = RW
     for _ in range(k - 1):
         RW_power = RW_power @ RW
-        PE.append(F.astype(F.tensor(RW_power.diagonal()), F.float32))
+        PE.append(F.astype(F.tensor(np.array(RW_power.diagonal())), F.float32))
     PE = F.stack(PE, dim=-1)
 
     return PE
@@ -3702,6 +3710,24 @@ def laplacian_pe(g, k, padding=False, return_eigval=False):
     r"""Alias of `dgl.lap_pe`."""
     dgl_warning("dgl.laplacian_pe will be deprecated. Use dgl.lap_pe please.")
     return lap_pe(g, k, padding, return_eigval)
+
+
+def to_bfloat16(g):
+    r"""Cast this graph to use bfloat16 for any
+    floating-point edge and node feature data.
+
+    A shallow copy is returned so that the original graph is not modified.
+    Feature tensors that are not floating-point will not be modified.
+
+    Returns
+    -------
+    DGLGraph
+        Clone of graph with the feature data converted to float16.
+    """
+    ret = copy.copy(g)
+    ret._edge_frames = [frame.bfloat16() for frame in ret._edge_frames]
+    ret._node_frames = [frame.bfloat16() for frame in ret._node_frames]
+    return ret
 
 
 def to_half(g):
