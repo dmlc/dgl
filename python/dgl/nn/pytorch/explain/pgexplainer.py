@@ -208,7 +208,7 @@ class PGExplainer(nn.Module):
         return gate_inputs
 
     def train_step(self, graph, feat, tmp, **kwargs):
-        r"""Compute the loss of the explanation network
+        r"""Compute the loss of the explanation network for graph classification
 
         Parameters
         ----------
@@ -245,7 +245,7 @@ class PGExplainer(nn.Module):
         return loss
 
     def train_step_node(self, nodes, graph, feat, tmp, **kwargs):
-        r"""Compute the loss of the explanation network
+        r"""Compute the loss of the explanation network for node classification
 
         Parameters
         ----------
@@ -427,9 +427,8 @@ class PGExplainer(nn.Module):
         self, nodes, graph, feat, tmp=1.0, training=False, **kwargs
     ):
         r"""Learn and return an edge mask that plays a crucial role to
-        explain the prediction made by the GNN for node :attr:`node_id`.
-        Also, return the prediction made with the edges chosen based on
-        the edge mask.
+        explain the prediction made by the GNN for provided set of node IDs.
+        Also, return the prediction made with the graph and edge mask.
 
         Parameters
         ----------
@@ -451,8 +450,8 @@ class PGExplainer(nn.Module):
         -------
         Tensor
             Classification probabilities given the masked graph. It is a tensor of
-            shape :math:`(B, L)`, where :math:`L` is the different types of label
-            in the dataset, and :math:`B` is the batch size.
+            shape :math:`(B, N)`, where :math:`L` is the different types of node
+            labels in the dataset, and :math:`N` is the number of nodes in the graph.
         Tensor
             Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
             is the number of edges in the graph. A higher weight suggests a larger
@@ -629,7 +628,7 @@ class HeteroPGExplainer(PGExplainer):
     """
 
     def train_step(self, graph, feat, tmp, **kwargs):
-        r"""Compute the loss of the explanation network
+        r"""Compute the loss of the explanation network for graph classification
 
         Parameters
         ----------
@@ -653,7 +652,7 @@ class HeteroPGExplainer(PGExplainer):
         return super().train_step(graph, feat, tmp=tmp, **kwargs)
 
     def train_step_node(self, nodes, graph, feat, tmp, **kwargs):
-        r"""Compute the loss of the explanation network
+        r"""Compute the loss of the explanation network for node classification
 
         Parameters
         ----------
@@ -857,9 +856,8 @@ class HeteroPGExplainer(PGExplainer):
         self, nodes, graph, feat, tmp=1.0, training=False, **kwargs
     ):
         r"""Learn and return an edge mask that plays a crucial role to
-        explain the prediction made by the GNN for node :attr:`node_id`.
-        Also, return the prediction made with the edges chosen based on
-        the edge mask.
+        explain the prediction made by the GNN for provided set of node IDs.
+        Also, return the prediction made with the batched graph and edge mask.
 
         Parameters
         ----------
@@ -881,19 +879,21 @@ class HeteroPGExplainer(PGExplainer):
 
         Returns
         -------
-        Tensor
-            Classification probabilities given the masked graph. It is a tensor of
-            shape :math:`(B, L)`, where :math:`L` is the different types of label
-            in the dataset, and :math:`B` is the batch size.
-        Tensor
-            Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
-            is the number of edges in the graph. A higher weight suggests a larger
-            contribution of the edge.
+        dict[str, Tensor]
+            A dict mapping node types (keys) to classification probabilities
+            for node labels (values). The values are tensors of shape :math:`(N_t, L)`,
+            where :math:`L` is the different types of node labels in the dataset,
+            and :math:`N_t` is the number of nodes in the graph for node type :math:`t`.
+        dict[str, Tensor]
+            A dict mapping edge types (keys) to edge tensors (values) of shape :math:`(E_t)`,
+            where :math:`E_t` is the number of edges in the graph for edge type :math:`t`.
+            A higher weight suggests a larger contribution of the edge.
         DGLGraph
             The batched set of subgraphs induced on the k-hop in-neighborhood
             of the input center nodes.
-        Tensor
-            The new IDs of the subgraph center nodes.
+        dict[str, Tensor]
+            A dict mapping node types (keys) to a tensor of node IDs (values) which
+            correspond to the subgraph center nodes.
 
         Examples
         --------
