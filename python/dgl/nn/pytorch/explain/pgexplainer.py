@@ -58,6 +58,7 @@ class PGExplainer(nn.Module):
 
         self.model = model
         self.graph_explanation = explain_graph
+        # node explanation requires additional self-embedding data
         self.num_features = num_features * (2 if self.graph_explanation else 3)
         self.num_hops = num_hops
 
@@ -278,19 +279,16 @@ class PGExplainer(nn.Module):
         if isinstance(nodes, int):
             nodes = [nodes]
 
-        prob, _ = self.explain_node(
+        prob, _, batched_graph, inverse_indices = self.explain_node(
             nodes, graph, feat, tmp=tmp, training=True, **kwargs
         )
 
         pred = self.model(
-            self.batched_graph, self.batched_feats, embed=False, **kwargs
+            batched_graph, self.batched_feats, embed=False, **kwargs
         )
         pred = pred.argmax(-1).data
 
-        loss = self.loss(
-            prob[self.batched_inverse_indices],
-            pred[self.batched_inverse_indices],
-        )
+        loss = self.loss(prob[inverse_indices], pred[inverse_indices])
         return loss
 
     def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
@@ -520,7 +518,9 @@ class PGExplainer(nn.Module):
         ...     optimizer_exp.step()
 
         >>> # Explain the prediction for graph 0
-        >>> probs, edge_weight = explainer.explain_node(0, g, features)
+        >>> probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        ...     0, g, features
+        ... )
         """
         assert (
             not self.graph_explanation
@@ -581,17 +581,22 @@ class PGExplainer(nn.Module):
         )
         probs = F.softmax(logits, dim=-1)
 
+        batched_inverse_indices = (
+            batched_graph.ndata["train"].nonzero().squeeze(1)
+        )
+
         if training:
-            probs = probs.data
             self.batched_feats = batched_feats
-            self.batched_graph = batched_graph
-            self.batched_inverse_indices = (
-                batched_graph.ndata["train"].nonzero().squeeze(1)
-            )
+            probs = probs.data
         else:
             self.clear_masks()
 
-        return (probs, edge_mask)
+        return (
+            probs,
+            edge_mask,
+            batched_graph,
+            batched_inverse_indices,
+        )
 
 
 class HeteroPGExplainer(PGExplainer):
@@ -652,12 +657,15 @@ class HeteroPGExplainer(PGExplainer):
 
         Parameters
         ----------
-        nodes : dict
-            TODO
+        nodes : dict[str, interable[int]]
+            A dict mapping node types (keys) to an iterable set of node ids (values).
         graph : DGLGraph
             Input heterogeneous graph.
-        feat : Tensor
-            TODO
+        feat : dict[str, Tensor]
+            A dict mapping node types (keys) to feature tensors (values).
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
+            number of nodes for node type :math:`t`, and :math:`D_t` is the feature
+            size for node type :math:`t`
         tmp : float
             The temperature parameter fed to the sampling procedure.
         kwargs : dict
@@ -675,27 +683,21 @@ class HeteroPGExplainer(PGExplainer):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        prob, _ = self.explain_node(
+        prob, _, batched_graph, inverse_indices = self.explain_node(
             nodes, graph, feat, tmp=tmp, training=True, **kwargs
         )
 
         pred = self.model(
-            self.batched_graph, self.batched_feats, embed=False, **kwargs
+            batched_graph, self.batched_feats, embed=False, **kwargs
         )
         pred = {ntype: pred[ntype].argmax(-1).data for ntype in pred.keys()}
 
         loss = self.loss(
             torch.cat(
-                [
-                    prob[ntype][nid]
-                    for ntype, nid in self.batched_inverse_indices.items()
-                ]
+                [prob[ntype][nid] for ntype, nid in inverse_indices.items()]
             ),
             torch.cat(
-                [
-                    pred[ntype][nid]
-                    for ntype, nid in self.batched_inverse_indices.items()
-                ]
+                [pred[ntype][nid] for ntype, nid in inverse_indices.items()]
             ),
         )
         return loss
@@ -834,7 +836,7 @@ class HeteroPGExplainer(PGExplainer):
         self.set_masks(homo_graph, edge_mask)
 
         # convert the edge mask back into heterogeneous format
-        hetero_edge_mask = self._mask_to_hetero(
+        hetero_edge_mask = self._edge_mask_to_heterogeneous(
             edge_mask=edge_mask,
             homograph=homo_graph,
             heterograph=graph,
@@ -861,12 +863,15 @@ class HeteroPGExplainer(PGExplainer):
 
         Parameters
         ----------
-        nodes : dict
-            TODO
+        nodes : dict[str, interable[int]]
+            A dict mapping node types (keys) to an iterable set of node ids (values).
         graph : DGLGraph
             A heterogeneous graph.
-        feat : Tensor
-            TODO
+        feat : dict[str, Tensor]
+            A dict mapping node types (keys) to feature tensors (values).
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
+            number of nodes for node type :math:`t`, and :math:`D_t` is the feature
+            size for node type :math:`t`
         tmp : float
             The temperature parameter fed to the sampling procedure.
         training : bool
@@ -962,7 +967,9 @@ class HeteroPGExplainer(PGExplainer):
 
         >>> # Explain the graph
         >>> feat = g.ndata.pop("h")
-        >>> probs, edge_mask = explainer.explain_node({ "user": [0] }, g, feat)
+        >>> probs, edge_mask, bg, inverse_indices = explainer.explain_node(
+        ...     { "user": [0] }, g, feat
+        ... )
         """
         assert (
             not self.graph_explanation
@@ -974,22 +981,9 @@ class HeteroPGExplainer(PGExplainer):
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
-        # summary of batched node explanation:
-        # 1. extract a khop-subgraph for each target node.
-        #    these will be heterogeneous subgraphs, which will be converted to
-        #    homogeneous graphs in order to reuse logic from the existing impls.
-        # 2. batch these into a single graph to make evaluation more efficient.
-        #    embeddings and features must also be batched together to perform
-        #    model evaluation.
-        #    we need to track both these homogenous and heterogenous aspects of the
-        #    graph in order to jump between hetero-model evaluation and the flattenned
-        #    embedding space.
-        # 3. use the inverse indices mappings to get the correct node in the batched graph
-        #    to collect classifications results from when computing loss.
-
+        batched_embed = []
         batched_homo_graph = []
         batched_hetero_graph = []
-        batched_embed = []
         for target_ntype, target_nids in nodes.items():
             for target_nid in target_nids:
                 sg, inverse_indices = khop_in_subgraph(
@@ -1042,7 +1036,7 @@ class HeteroPGExplainer(PGExplainer):
         self.set_masks(batched_homo_graph, edge_mask)
 
         # convert the edge mask back into heterogeneous format
-        hetero_edge_mask = self._mask_to_hetero(
+        hetero_edge_mask = self._edge_mask_to_heterogeneous(
             edge_mask=edge_mask,
             homograph=batched_homo_graph,
             heterograph=batched_hetero_graph,
@@ -1053,6 +1047,17 @@ class HeteroPGExplainer(PGExplainer):
             for ntype in batched_hetero_graph.ntypes
         }
         # the model prediction with the updated edge mask
+
+        # print("____")
+        # for ntype in batched_hetero_graph.ntypes:
+        #     print(ntype, batched_hetero_graph.nodes(ntype))
+        # for ntype in batched_feats.keys():
+        #     print(ntype, batched_feats[ntype])
+        # for etype in batched_hetero_graph.canonical_etypes:
+        #     print(etype, batched_hetero_graph.edges(etype=etype))
+        # for etype in hetero_edge_mask.keys():
+        #     print(etype, hetero_edge_mask[etype])
+
         logits = self.model(
             batched_hetero_graph,
             batched_feats,
@@ -1063,23 +1068,49 @@ class HeteroPGExplainer(PGExplainer):
             ntype: F.softmax(logits[ntype], dim=-1) for ntype in logits.keys()
         }
 
+        batched_inverse_indices = {
+            ntype: batched_hetero_graph.nodes[ntype]
+            .data["train"]
+            .nonzero()
+            .squeeze(1)
+            for ntype in batched_hetero_graph.ntypes
+        }
+
         if training:
-            probs = {ntype: probs[ntype].data for ntype in probs.keys()}
             self.batched_feats = batched_feats
-            self.batched_graph = batched_hetero_graph
-            self.batched_inverse_indices = {
-                ntype: batched_hetero_graph.nodes[ntype]
-                .data["train"]
-                .nonzero()
-                .squeeze(1)
-                for ntype in batched_hetero_graph.ntypes
-            }
+            probs = {ntype: probs[ntype].data for ntype in probs.keys()}
         else:
             self.clear_masks()
 
-        return (probs, hetero_edge_mask)
+        return (
+            probs,
+            hetero_edge_mask,
+            batched_hetero_graph,
+            batched_inverse_indices,
+        )
 
-    def _mask_to_hetero(self, edge_mask, homograph, heterograph):
+    def _edge_mask_to_heterogeneous(self, edge_mask, homograph, heterograph):
+        r"""Convert an edge mask from homogeneous mappings built through
+        embeddings into heterogenous format by leveraging the context from
+        the source DGLGraphs in homogenous and heterogeneous form.
+
+        The `edge_mask` needs to have been built using the embedding of the
+        homogenous graph format for the mappings to work correctly.
+
+        Parameters
+        ----------
+        edge_mask : dict[str, Tensor]
+            A dict mapping node types (keys) to a tensor of edge weights (values).
+        homograph : DGLGraph
+            The homogeneous form of the source graph.
+        heterograph : DGLGraph
+            The heterogeneous form of the source graph.
+
+        Returns
+        -------
+        dict[str, Tensor]
+            A dict mapping node types (keys) to tensors of node ids (values)
+        """
         return {
             etype: edge_mask[
                 (homograph.edata[ETYPE] == heterograph.get_etype_id(etype))

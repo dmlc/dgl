@@ -1863,10 +1863,16 @@ def test_pgexplainer(g, idtype, n_classes):
     explainer.train_step_node(th.tensor(0), g, g.ndata["attr"], 5.0)
     explainer.train_step_node(th.tensor([0, 1]), g, g.ndata["attr"], 5.0)
 
-    probs, edge_weight = explainer.explain_node(0, g, feat)
-    probs, edge_weight = explainer.explain_node([0, 1], g, feat)
-    probs, edge_weight = explainer.explain_node(th.tensor(0), g, feat)
-    probs, edge_weight = explainer.explain_node(th.tensor([0, 1]), g, feat)
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(0, g, feat)
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        [0, 1], g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        th.tensor(0), g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        th.tensor([0, 1]), g, feat
+    )
 
 
 @pytest.mark.parametrize("g", get_cases(["hetero"]))
@@ -1943,8 +1949,10 @@ def test_heteropgexplainer(g, idtype, input_dim, n_classes):
     explainer.train_step_node({g.ntypes[0]: [0]}, g, feat, 5.0)
     explainer.train_step_node({g.ntypes[0]: th.tensor([0, 1])}, g, feat, 5.0)
 
-    probs, edge_weight = explainer.explain_node({g.ntypes[0]: [0]}, g, feat)
-    probs, edge_weight = explainer.explain_node(
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        {g.ntypes[0]: [0]}, g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
         {g.ntypes[0]: th.tensor([0, 1])}, g, feat
     )
 
