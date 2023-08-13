@@ -311,7 +311,9 @@ class DistSparseGradOptimizer(abc.ABC):
                         if trainers_per_server <= 1:
                             idx_split_size.append(
                                 th.tensor(
-                                    [idx_i.shape[0]], dtype=th.int64, device=device
+                                    [idx_i.shape[0]],
+                                    dtype=th.int64,
+                                    device=device
                                 )
                             )
                             idics_list.append(idx_i)
@@ -349,7 +351,7 @@ class DistSparseGradOptimizer(abc.ABC):
                     if th.distributed.get_backend() == "nccl":
                         idx_split_size = [
                             tensor.to(th.device(device))
-                                for tensor in idx_split_size
+                            for tensor in idx_split_size
                         ]
                         th.distributed.all_to_all(gather_list, idx_split_size)
                     else:
@@ -361,13 +363,16 @@ class DistSparseGradOptimizer(abc.ABC):
                         )
                     # use cpu until we have GPU alltoallv
                     idx_gather_list = [
-                        th.empty((int(num_emb),), dtype=idics.dtype, device=device)
+                        th.empty(
+                            (int(num_emb),), dtype=idics.dtype, device=device
+                        )
                         for num_emb in gather_list
                     ]
 
                     if th.distributed.get_backend() == "nccl":
                         idics_list = [
-                            tensor.to(th.device(device)) for tensor in idics_list
+                            tensor.to(th.device(device))
+                            for tensor in idics_list
                         ]
                         th.distributed.all_to_all(idx_gather_list, idics_list)
                     else:
