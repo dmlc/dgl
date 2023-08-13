@@ -313,7 +313,7 @@ class DistSparseGradOptimizer(abc.ABC):
                                 th.tensor(
                                     [idx_i.shape[0]],
                                     dtype=th.int64,
-                                    device=device
+                                    device=device,
                                 )
                             )
                             idics_list.append(idx_i)
