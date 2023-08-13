@@ -1046,18 +1046,8 @@ class HeteroPGExplainer(PGExplainer):
             ntype: batched_hetero_graph.nodes[ntype].data["feat"]
             for ntype in batched_hetero_graph.ntypes
         }
+
         # the model prediction with the updated edge mask
-
-        # print("____")
-        # for ntype in batched_hetero_graph.ntypes:
-        #     print(ntype, batched_hetero_graph.nodes(ntype))
-        # for ntype in batched_feats.keys():
-        #     print(ntype, batched_feats[ntype])
-        # for etype in batched_hetero_graph.canonical_etypes:
-        #     print(etype, batched_hetero_graph.edges(etype=etype))
-        # for etype in hetero_edge_mask.keys():
-        #     print(etype, hetero_edge_mask[etype])
-
         logits = self.model(
             batched_hetero_graph,
             batched_feats,
