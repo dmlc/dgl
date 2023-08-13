@@ -1406,9 +1406,9 @@ def test_OnDiskDataset_load_feature():
             original_feature_data.read("node", None, "feat"),
             modify_feature_data.read("node", None, "feat"),
         )
-        dataset = None
         original_feature_data = None
         modify_feature_data = None
+        dataset = None
 
 
 def test_OnDiskDataset_load_graph():
@@ -1465,9 +1465,9 @@ def test_OnDiskDataset_load_graph():
             original_graph.csc_indptr,
             modify_graph.csc_indptr,
         )
-        dataset = None
         original_graph = None
         modify_graph = None
+        dataset = None
 
 
 def test_OnDiskDataset_load_tasks():
@@ -1555,6 +1555,6 @@ def test_OnDiskDataset_load_tasks():
             original_train_set[0],
             modify_train_set[0],
         )
-        datset = None
         original_train_set = None
         modify_train_set = None
+        dataset = None
