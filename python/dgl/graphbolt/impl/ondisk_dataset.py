@@ -76,12 +76,13 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         )
 
     # 0. Check if the dataset is already preprocessed.
-    if os.path.exists(os.path.join(dataset_dir, "preprocessed/metadata.yaml")):
+    preprocess_metadata_path = os.path.join("preprocessed", "metadata.yaml")
+    if os.path.exists(os.path.join(dataset_dir, preprocess_metadata_path)):
         print("The dataset is already preprocessed.")
-        return os.path.join(dataset_dir, "preprocessed/metadata.yaml")
+        return os.path.join(dataset_dir, preprocess_metadata_path)
 
     print("Start to preprocess the on-disk dataset.")
-    processed_dir_prefix = os.path.join(dataset_dir, "preprocessed")
+    processed_dir_prefix = "preprocessed"
 
     # Check if the metadata.yaml exists.
     metadata_file_path = os.path.join(dataset_dir, "metadata.yaml")
@@ -93,7 +94,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
         input_config = yaml.safe_load(f)
 
     # 1. Make `processed_dir_abs` directory if it does not exist.
-    os.makedirs(processed_dir_prefix, exist_ok=True)
+    os.makedirs(os.path.join(dataset_dir, processed_dir_prefix), exist_ok=True)
     output_config = deepcopy(input_config)
 
     # 2. Load the edge data and create a DGLGraph.
@@ -161,7 +162,11 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
     )
 
     save_csc_sampling_graph(
-        csc_sampling_graph, output_config["graph_topology"]["path"]
+        csc_sampling_graph,
+        os.path.join(
+            dataset_dir,
+            output_config["graph_topology"]["path"],
+        ),
     )
     del output_config["graph"]
 
@@ -177,16 +182,16 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
             )
             _copy_or_convert_data(
                 os.path.join(dataset_dir, feature["path"]),
-                out_feature["path"],
+                os.path.join(dataset_dir, out_feature["path"]),
                 feature["format"],
                 out_feature["format"],
                 feature["in_memory"],
             )
 
     # 7. Save tasks and train/val/test split according to the output_config.
-    if input_config.get("task", None):
+    if input_config.get("tasks", None):
         for input_task, output_task in zip(
-            input_config["task"], output_config["task"]
+            input_config["tasks"], output_config["tasks"]
         ):
             for set_name in ["train_set", "validation_set", "test_set"]:
                 if set_name not in input_task:
@@ -205,13 +210,13 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                         )
                         _copy_or_convert_data(
                             os.path.join(dataset_dir, input_data["path"]),
-                            output_data["path"],
+                            os.path.join(dataset_dir, output_data["path"]),
                             input_data["format"],
                             output_data["format"],
                         )
 
     # 8. Save the output_config.
-    output_config_path = os.path.join(dataset_dir, "preprocessed/metadata.yaml")
+    output_config_path = os.path.join(dataset_dir, preprocess_metadata_path)
     with open(output_config_path, "w") as f:
         yaml.dump(output_config, f)
     print("Finish preprocessing the on-disk dataset.")
@@ -337,14 +342,47 @@ class OnDiskDataset(Dataset):
     def __init__(self, path: str) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
-        path = preprocess_ondisk_dataset(path)
-        with open(path) as f:
-            yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
-            self._meta = OnDiskMetaData(**yaml_data)
+        self._dataset_dir = path
+        yaml_path = preprocess_ondisk_dataset(path)
+        with open(yaml_path) as f:
+            self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
+
+    def _convert_yaml_path_to_absolute_path(self):
+        """Convert the path in YAML file to absolute path."""
+        if "graph_topology" in self._yaml_data:
+            self._yaml_data["graph_topology"]["path"] = os.path.join(
+                self._dataset_dir, self._yaml_data["graph_topology"]["path"]
+            )
+        if "feature_data" in self._yaml_data:
+            for feature in self._yaml_data["feature_data"]:
+                feature["path"] = os.path.join(
+                    self._dataset_dir, feature["path"]
+                )
+        if "tasks" in self._yaml_data:
+            for task in self._yaml_data["tasks"]:
+                for set_name in ["train_set", "validation_set", "test_set"]:
+                    if set_name not in task:
+                        continue
+                    for set_per_type in task[set_name]:
+                        for data in set_per_type["data"]:
+                            data["path"] = os.path.join(
+                                self._dataset_dir, data["path"]
+                            )
+
+    def load(self):
+        """Load the dataset."""
+        self._convert_yaml_path_to_absolute_path()
+        self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks)
+        return self
+
+    @property
+    def yaml_data(self) -> Dict:
+        """Return the YAML data."""
+        return self._yaml_data
 
     @property
     def tasks(self) -> List[Task]:

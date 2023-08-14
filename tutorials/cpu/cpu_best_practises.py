@@ -8,13 +8,23 @@ to get the best performance during training and inference on the CPU.
 Intel
 `````````````````````````````
 
-Hyper-treading
+Hyper-threading
 ---------------------------
 
 For specific workloads as GNN’s domain, suggested default setting for having best performance
 is to turn off hyperthreading.
 Turning off the hyper threading feature can be done at BIOS [#f1]_ or operating system level [#f2]_ [#f3]_ .
 
+Alternative memory allocators
+---------------------------
+
+Alternative memory allocators, such as *tcmalloc*, might provide significant performance improvements by more efficient memory usage, reducing overhead on unnecessary memory allocations or deallocations. *tcmalloc* uses thread-local caches to reduce overhead on thread synchronization, locks contention by using spinlocks and per-thread arenas respectively and categorizes memory allocations by sizes to reduce overhead on memory fragmentation.
+
+To take advantage of optimizations *tcmalloc* provides, install it on your system (on Ubuntu *tcmalloc* is included in libgoogle-perftools4 package) and add shared library to the LD_PRELOAD environment variable:
+
+.. code-block:: shell
+
+  export LD_PRELOAD=/lib/x86_64-linux-gnu/libtcmalloc.so.4:$LD_PRELOAD
 
 OpenMP settings
 ---------------------------
