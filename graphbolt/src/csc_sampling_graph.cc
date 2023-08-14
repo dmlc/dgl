@@ -229,6 +229,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
   // Calculate GrainSize for parallel_for.
   // Set the default grain size to 64.
   const int64_t grain_size = 64;
+
+  // Step 1. Calculate pick number of each node.
   AT_DISPATCH_INTEGRAL_TYPES(
       num_picked_neighbors_per_node.scalar_type(), "GetPickNumber", ([&] {
         torch::parallel_for(
@@ -253,8 +255,12 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
             });
       }));
 
+  // Step 2. Calculate prefix sum to get total length and offsets of each node.
+  // It's also the indptr of the generated subgraph.
   torch::Tensor subgraph_indptr =
       torch::cumsum(num_picked_neighbors_per_node, 0);
+
+  // Step 3. Allocate the tensor for picked neighbors.
   torch::Tensor picked_eids;
   AT_DISPATCH_INTEGRAL_TYPES(
       subgraph_indptr.scalar_type(), "GetTotalLength", ([&] {
@@ -263,6 +269,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
         picked_eids = torch::empty({total_length}, indptr_options);
       }));
 
+  // Step 4. Pick neighbors for each node.
   AT_DISPATCH_INTEGRAL_TYPES(
       picked_eids.scalar_type(), "GetPickedNeighbors", ([&] {
         torch::parallel_for(
@@ -290,6 +297,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
             });
       }));
 
+  // Step 5. Calculate other attributes and return the subgraph.
   torch::Tensor subgraph_indices =
       torch::index_select(indices_, 0, picked_eids);
   torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
