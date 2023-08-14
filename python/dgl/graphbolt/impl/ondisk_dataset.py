@@ -342,42 +342,47 @@ class OnDiskDataset(Dataset):
     def __init__(self, path: str) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
-        self.dataset_dir = path
-        path = preprocess_ondisk_dataset(path)
-        with open(path) as f:
-            self.yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
+        self._dataset_dir = path
+        yaml_path = preprocess_ondisk_dataset(path)
+        with open(yaml_path) as f:
+            self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
 
     def _convert_yaml_path_to_absolute_path(self):
         """Convert the path in YAML file to absolute path."""
-        if "graph_topology" in self.yaml_data:
-            self.yaml_data["graph_topology"]["path"] = os.path.join(
-                self.dataset_dir, self.yaml_data["graph_topology"]["path"]
+        if "graph_topology" in self._yaml_data:
+            self._yaml_data["graph_topology"]["path"] = os.path.join(
+                self._dataset_dir, self._yaml_data["graph_topology"]["path"]
             )
-        if "feature_data" in self.yaml_data:
-            for feature in self.yaml_data["feature_data"]:
+        if "feature_data" in self._yaml_data:
+            for feature in self._yaml_data["feature_data"]:
                 feature["path"] = os.path.join(
-                    self.dataset_dir, feature["path"]
+                    self._dataset_dir, feature["path"]
                 )
-        if "tasks" in self.yaml_data:
-            for task in self.yaml_data["tasks"]:
+        if "tasks" in self._yaml_data:
+            for task in self._yaml_data["tasks"]:
                 for set_name in ["train_set", "validation_set", "test_set"]:
                     if set_name not in task:
                         continue
                     for set_per_type in task[set_name]:
                         for data in set_per_type["data"]:
                             data["path"] = os.path.join(
-                                self.dataset_dir, data["path"]
+                                self._dataset_dir, data["path"]
                             )
 
     def load(self):
         """Load the dataset."""
         self._convert_yaml_path_to_absolute_path()
-        self._meta = OnDiskMetaData(**self.yaml_data)
+        self._meta = OnDiskMetaData(**self._yaml_data)
         self._dataset_name = self._meta.dataset_name
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks)
         return self
+
+    @property
+    def yaml_data(self) -> Dict:
+        """Return the YAML data."""
+        return self._yaml_data
 
     @property
     def tasks(self) -> List[Task]:
