@@ -5,6 +5,27 @@ macro(__dgl_option variable description value)
 endmacro()
 
 #######################################################
+# An option to specify the build type for a feature.
+# Usage:
+#   dgl_feature_option(<option_variable> "doc string" "dev" "release")
+macro(dgl_feature_option variable description)
+  set(__value "")
+  foreach(arg ${ARGN})
+    if(arg STREQUAL "all")
+      __dgl_option(${variable} "${description}" ON)
+    elseif(arg STREQUAL "dev" OR arg STREQUAL "test" OR arg STREQUAL "release")
+      list(APPEND __value ${arg})
+    endif()
+  endforeach()
+
+  if(${BUILD_TYPE} IN_LIST __value)
+    __dgl_option(${variable} "${description}" ON)
+  else()
+    __dgl_option(${variable} "${description}" OFF)
+  endif()
+endmacro()
+
+#######################################################
 # An option that the user can select. Can accept condition to control when option is available for user.
 # Usage:
 #   dgl_option(<option_variable> "doc string" <initial value or boolean expression> [IF <condition>])
