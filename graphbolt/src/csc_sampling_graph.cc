@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <tuple>
 #include <vector>
 
@@ -200,7 +201,7 @@ auto GetPickFn(
     const torch::optional<torch::Tensor>& type_per_edge,
     const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args) {
   return [&fanouts, replace, &options, &type_per_edge, &probs_or_mask, args](
-             int64_t offset, int64_t num_neighbors, auto* picked_data_ptr) {
+             int64_t offset, int64_t num_neighbors, auto picked_data_ptr) {
     // If fanouts.size() > 1, perform sampling for each edge type of each
     // node; otherwise just sample once for each node with no regard of edge
     // types.
@@ -451,9 +452,7 @@ inline void UniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options, PickedType* picked_data_ptr) {
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
-    for (int64_t i = 0; i < num_neighbors; ++i) {
-      picked_data_ptr[i] = offset + i;
-    }
+    std::iota(picked_data_ptr, picked_data_ptr + num_neighbors, offset);
   } else if (replace) {
     std::memcpy(
         picked_data_ptr,
@@ -736,9 +735,7 @@ inline void LaborPick(
     SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
   fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
-    for (int64_t i = 0; i < num_neighbors; ++i) {
-      picked_data_ptr[i] = offset + i;
-    }
+    std::iota(picked_data_ptr, picked_data_ptr + num_neighbors, offset);
     return;
   }
   torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
