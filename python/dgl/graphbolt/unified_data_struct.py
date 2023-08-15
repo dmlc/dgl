@@ -18,6 +18,13 @@ class UnifiedDataStruct:
     representation of input and output data across different stages, ensuring
     consistency and ease of use throughout the loading process."""
 
+    seed_node: Union[torch.Tensor, Dict[str, torch.Tensor]]
+    """
+    Representation of seed nodes used for sampling in the graph.
+    - If `seed_node` is a tensor: It indicates the graph is homogeneous.
+    - If `seed_node` is a dictionary: The keys should be node type and the
+      value should be corresponding heterogeneous node ids.
+    """
     sampled_subgraph: SampledSubgraph
     """
     An instance of the 'SampledSubgraph' class, representing a subset of a
