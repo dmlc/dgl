@@ -34,16 +34,20 @@ dgl_option(
     python3
 )
 
-# Options for building DGL features: "none," "dev," "dogfood," "release," and "all."
-#    "none"  - The feature is OFF for all build types. This is used when disabling a feature.
-#    "dev"   - The feature is ON for dev build. The default build from source and the build for unit
-#            - tests are using this build type.
-#  "dogfood" - The major function of this feature is done. The regression and benchmark framework
-#              are using this build type.
+# Options for building DGL features: "none," "dev," "dogfood," "release," and
+# "all."
+#    "none"  - The feature is OFF for all build types. This is used when
+#              disabling a feature.
+#    "dev"   - The feature is ON for dev build. The default build from source
+#              and the build for unit tests are using this build type.
+#  "dogfood" - The major function of this feature is done. The regression and
+#              benchmark framework are using this build type.
 #  "release" - The feature will be build for release.
-#    "all"   - The feature is ON for all build types. Equivalent to set ["dev" "dogfood" "release"].
-# NOTE: Please avoid editing this file to change feature options for a local build. Instead, using
-# bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' to overwrite the value.
+#    "all"   - The feature is ON for all build types. Equivalent to set ["dev"
+#              "dogfood" "release"].
+# NOTE: Please avoid editing this file to change feature options for a local
+# build. Instead, using bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' to
+# overwrite the value.
 dgl_feature_option(
     BUILD_SPARSE
     "Build DGL sparse library"
