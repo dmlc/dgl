@@ -1,4 +1,5 @@
-"""Unified data structure for input and ouput of all the stages in loading process, especially for edge level task."""
+"""Unified data structure for input and ouput of all the stages in loading
+process, especially for edge level task."""
 
 from dataclasses import dataclass
 from typing import Dict, Tuple, Union
