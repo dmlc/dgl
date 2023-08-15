@@ -6,7 +6,6 @@ from typing import Dict, Tuple, Union
 
 import torch
 
-from .data_format import LinkPredictionEdgeFormat
 from .unified_data_struct import UnifiedDataStruct
 
 
