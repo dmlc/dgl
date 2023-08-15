@@ -27,11 +27,17 @@ class UnifiedDataStruct:
     """A representation of node feature.
     - If `node_feature` is a tensor: It indicates the graph is homogeneous.
     - If `node_feature` is a dictionary: The keys should be node type and the
-      value should be corresponding node feature.
+      value should be corresponding node feature or embedding.
     """
     edge_feature: Union[torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]]
     """A representation of edge feature.
     - If `edge_feature` is a tensor: It indicates the graph is homogeneous.
     - If `edge_feature` is a dictionary: The keys should be edge type and the
-      value should be corresponding edge feature.
+      value should be corresponding edge feature or embedding.
+    """
+    input_nodes: Union[torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]]
+    """A representation of input nodes in the outermost layer.
+    - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
+    - If `input_nodes` is a dictionary: The keys should be node type and the
+      value should be corresponding heterogeneous node id.
     """
