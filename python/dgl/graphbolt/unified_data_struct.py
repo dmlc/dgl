@@ -25,10 +25,10 @@ class UnifiedDataStruct:
     - If `seed_node` is a dictionary: The keys should be node type and the
       value should be corresponding heterogeneous node ids.
     """
-    sampled_subgraph: SampledSubgraph
+    sampled_subgraphs: list[SampledSubgraph]
     """
-    An instance of the 'SampledSubgraph' class, representing a subset of a
-    larger graph structure.
+    A list of 'SampledSubgraph's, each one corresponding to one layer,
+    representing a subset of a larger graph structure.
     """
     node_feature: Union[torch.Tensor, Dict[str, torch.Tensor]]
     """A representation of node feature.
