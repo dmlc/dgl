@@ -20,7 +20,7 @@ OPTIONS:
   -e           Extra arguments of cmake.
   -g           Restart CUDA build.
   -r           Remove all intermediate output.
-  -t           Type of the build: dev, test or release (default: dev).
+  -t           Type of the build: dev, dogfood or release (default: dev).
 EOF
 }
 
