@@ -1,9 +1,9 @@
 """Uniform negative sampler for GraphBolt."""
 
-from ..subgraph_sampler import LinkSampler
+from ..subgraph_sampler import SubgraphSampler
 import torch
 
-class LinkNeighborSampler(LinkSampler):
+class NeighborSampler(SubgraphSampler):
     def __init__(
     self,
     datapipe,
@@ -61,7 +61,7 @@ class LinkNeighborSampler(LinkSampler):
         (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([1, 0, 0]))
         (tensor([1, 1, 1]), tensor([2, 1, 2]), tensor([1, 0, 0]))
         """
-        super().__init__(datapipe, input_format, fanouts, replace, prob_name)
+        super().__init__(datapipe, fanouts, replace, prob_name)
         self.graph = graph
 
     def _sample_sub_graph(self, seeds, hop):                
