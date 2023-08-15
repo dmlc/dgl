@@ -35,8 +35,9 @@ dgl_option(
 )
 
 # Options for building DGL features, supported: "none", "dev", "test", "release", "all".
+# "none" means OFF for all build types, and "all" means ON for all build types.
 # NOTE: do not modify this file to change option values.
-# Use bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' through command-line.
+# Use bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' through command-line will override the value.
 dgl_feature_option(
     BUILD_SPARSE
     "Build DGL sparse library"
