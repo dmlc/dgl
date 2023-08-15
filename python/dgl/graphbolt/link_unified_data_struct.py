@@ -20,7 +20,10 @@ class LinkUnifiedDataStruct(UnifiedDataStruct):
         Dict[Tuple(str, str, str), Tuple[torch.Tensor, torch.Tensor]],
     ]
     """
-    Representation of node pairs in the graph that require link prediction.
+    Representation of seed node pairs utilized in link prediction tasks. Please
+    note that after the subgraph sampling process, the IDs contained within
+    could be compressed. Additionally, the head and tail sizes may differ when
+    the 'data_format' is set to either HEAD_CONDITIONED or TAIL_CONDITIONED.
     - If `node_pair` is a tuple: It indicates a homogeneous graph where each
       tuple contains two tensors representing source-destination node pairs.
     - If `node_pair` is a dictionary: The keys should be edge type, and the
