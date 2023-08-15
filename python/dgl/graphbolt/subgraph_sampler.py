@@ -3,7 +3,8 @@
 import torch
 from torchdata.datapipes.iter import Mapper
 
-from .data_format import LinkPredictionEdgeFormat
+from .impl import SampledSubgraphImpl
+
 from .link_unified_data_struct import LinkUnifiedDataStruct
 from .node_unified_data_struct import NodeUnifiedDataStruct
 from .utils import unique_and_compact_node_pairs
@@ -61,7 +62,7 @@ class SubgraphSampler(Mapper):
         self.prob_name = prob_name
 
     def _sample(self, data):
-        adjs = []
+        subgraphs = []
         num_layers = len(self.fanouts)
         data = self._preprocess(data)
         seeds = data.seed_node
@@ -70,12 +71,17 @@ class SubgraphSampler(Mapper):
                 seeds,
                 hop,
             )
-            seeds, compacted_subgraph = unique_and_compact_node_pairs(
+            seeds, compacted_node_pairs = unique_and_compact_node_pairs(
                 subgraph.node_pairs, seeds
             )
-            adjs.insert(0, compacted_subgraph)
+            subgraph = SampledSubgraphImpl(
+                node_pairs=compacted_node_pairs,
+                reverse_column_node_ids=seeds,
+                reverse_row_node_ids=seeds,
+            )
+            subgraphs.insert(0, subgraph)
         data.input_nodes = seeds
-        data.sampled_subgraphs = adjs
+        data.sampled_subgraphs = subgraphs
         return data
 
     def _preprocess(self, data):
