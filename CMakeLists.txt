@@ -14,11 +14,11 @@ include(cmake/util/MshadowUtil.cmake)
 include(cmake/util/FindCUDA.cmake)
 
 # Options for building DGL.
-# NOTE: do not modify this file to change option values.
-# Use bash script/build_dgl.sh -e '-DOPTION=VALUE' through command-line.
+# NOTE: Please avoid editing this file to change build type. Instead, using
+# bash script/build_dgl.sh -e -t release to overwrite the value.
 dgl_option(
     BUILD_TYPE
-    "Type of the build: dev, test or release"
+    "Type of the build: dev, dogfood or release"
     "dev"
 )
 message(STATUS "Build for ${BUILD_TYPE}")
@@ -34,10 +34,16 @@ dgl_option(
     python3
 )
 
-# Options for building DGL features, supported: "none", "dev", "test", "release", "all".
-# "none" means OFF for all build types, and "all" means ON for all build types.
-# NOTE: do not modify this file to change option values.
-# Use bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' through command-line will override the value.
+# Options for building DGL features: "none," "dev," "dogfood," "release," and "all."
+#    "none"  - The feature is OFF for all build types. This is used when disabling a feature. 
+#    "dev"   - The feature is ON for dev build. The default build from source and the build for unit
+#            - tests are using this build type.
+#  "dogfood" - The major function of this feature is done. The regression and benchmark framework
+#              are using this build type.
+#  "release" - The feature will be build for release.
+#    "all"   - The feature is ON for all build types. Equivalent to set ["dev" "dogfood" "release"].
+# NOTE: Please avoid editing this file to change feature options for a local build. Instead, using
+# bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' to overwrite the value.
 dgl_feature_option(
     BUILD_SPARSE
     "Build DGL sparse library"
@@ -67,7 +73,7 @@ dgl_feature_option(
 dgl_feature_option(
     BUILD_GRAPHBOLT
     "Build Graphbolt library"
-    "dev" "test"
+    "dev" "dogfood"
 )
 
 dgl_feature_option(
@@ -91,11 +97,11 @@ dgl_feature_option(
     "none"
 )
 
-# Build cpp test only in test build.
+# Only build C++ tests for unit testing purposes in dev build.
 dgl_feature_option(
     BUILD_CPP_TEST
     "Build cpp unittest executables"
-    "test"
+    "dev"
 )
 
 # Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
