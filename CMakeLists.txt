@@ -35,7 +35,7 @@ dgl_option(
 )
 
 # Options for building DGL features: "none," "dev," "dogfood," "release," and "all."
-#    "none"  - The feature is OFF for all build types. This is used when disabling a feature. 
+#    "none"  - The feature is OFF for all build types. This is used when disabling a feature.
 #    "dev"   - The feature is ON for dev build. The default build from source and the build for unit
 #            - tests are using this build type.
 #  "dogfood" - The major function of this feature is done. The regression and benchmark framework
