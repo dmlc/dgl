@@ -42,7 +42,7 @@ class SAGE(nn.Module):
         hidden_x = x
         for layer_idx, layer in enumerate(self.layers):
             hidden_x = layer(graph, hidden_x)
-            is_last_layer = (layer_idx == len(self.layers) - 1)
+            is_last_layer = layer_idx == len(self.layers) - 1
             if not is_last_layer:
                 hidden_x = F.relu(hidden_x)
                 hidden_x = self.dropout(hidden_x)
