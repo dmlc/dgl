@@ -137,7 +137,7 @@ class SAGE(nn.Module):
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
                 x = feat[input_nodes]
                 hidden_x = layer(blocks[0], x)  # len(blocks) = 1
-                if layer_idx != len(self.layers) - 1:
+                if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
                 # By design, our output nodes are contiguous.
