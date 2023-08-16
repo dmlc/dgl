@@ -30,6 +30,12 @@ def unique_and_compact_node_pairs(
         - If `node_pairs` is a dictionary: The keys should be edge type and
         the values should be corresponding node pairs. And IDs inside are
         heterogeneous ids.
+        Note: These two tensors may have different shapes in some cases. For
+        instance, when the data format is 'HEAD_CONDITIONED', the 'src' tensor
+        is longer as it contains both positive and negative nodes, whereas
+        the 'dst' tensor only contains positive nodes. Similarly, for
+        'TAIL_CONDITIONED' data, the 'dst' tensor is longer.
+
     unique_dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
         Unique nodes of all destination nodes in the node pairs.
         - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
@@ -103,13 +109,14 @@ def unique_and_compact_node_pairs(
     compacted_node_pairs = {}
     # Map back with the same order.
     for etype, pair in node_pairs.items():
-        num_elem = pair[0].size(0)
+        num_src_elem = pair[0].size(0)
+        num_dst_elem = pair[1].size(0)
         src_type, _, dst_type = etype
-        src = compacted_src[src_type][:num_elem]
-        dst = compacted_dst[dst_type][:num_elem]
+        src = compacted_src[src_type][:num_src_elem]
+        dst = compacted_dst[dst_type][:num_dst_elem]
         compacted_node_pairs[etype] = (src, dst)
-        compacted_src[src_type] = compacted_src[src_type][num_elem:]
-        compacted_dst[dst_type] = compacted_dst[dst_type][num_elem:]
+        compacted_src[src_type] = compacted_src[src_type][num_src_elem:]
+        compacted_dst[dst_type] = compacted_dst[dst_type][num_dst_elem:]
 
     # Return singleton for a homogeneous graph.
     if is_homogeneous:
