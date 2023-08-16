@@ -16,8 +16,8 @@ class LinkPredictionBlock(DataBlock):
 
     node_pair: Union[
         Tuple[torch.Tensor, torch.Tensor],
-        Dict[Tuple(str, str, str), Tuple[torch.Tensor, torch.Tensor]],
-    ]
+        Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
+    ] = None
     """
     Representation of seed node pairs utilized in link prediction tasks.
     - If `node_pair` is a tuple: It indicates a homogeneous graph where each
@@ -37,7 +37,7 @@ class LinkPredictionBlock(DataBlock):
     """
 
     negative_head: Union[
-        torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]
+        torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]
     ] = None
     """
     Representation of negative samples for the head nodes in the link
@@ -49,7 +49,7 @@ class LinkPredictionBlock(DataBlock):
     """
 
     negative_tail: Union[
-        torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]
+        torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]
     ] = None
     """
     Representation of negative samples for the tail nodes in the link
@@ -62,15 +62,15 @@ class LinkPredictionBlock(DataBlock):
 
     compacted_node_pair: Union[
         Tuple[torch.Tensor, torch.Tensor],
-        Dict[Tuple(str, str, str), Tuple[torch.Tensor, torch.Tensor]],
-    ]
+        Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
+    ] = None
     """
     Representation of compacted node pairs corresponding to 'node_pair', where
     all node ids inside are compacted.
     """
 
     compacted_negative_head: Union[
-        torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]
+        torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]
     ] = None
     """
     Representation of compacted nodes corresponding to 'negative_head', where
@@ -78,7 +78,7 @@ class LinkPredictionBlock(DataBlock):
     """
 
     compacted_negative_tail: Union[
-        torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]
+        torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]
     ] = None
     """
     Representation of compacted nodes corresponding to 'negative_tail', where
