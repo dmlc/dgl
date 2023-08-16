@@ -6,11 +6,11 @@ from typing import Dict, Union
 
 import torch
 
-from .unified_data_struct import UnifiedDataStruct
+from .data_block import DataBlock
 
 
 @dataclass
-class NodeUnifiedDataStruct(UnifiedDataStruct):
+class NodeClassificationBlock(DataBlock):
     r"""A subclass of 'UnifiedDataStruct', specialized for handling node level
     tasks."""
 
