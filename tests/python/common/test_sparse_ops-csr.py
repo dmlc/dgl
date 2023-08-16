@@ -112,7 +112,8 @@ def test_csrmm_backward(idtype, dtype, num_vtypes):
 
 @parametrize_idtype
 @pytest.mark.parametrize("dtype", [F.float32, F.float64])
-def test_csrsum(idtype, dtype):
+@pytest.mark.parametrize("return_edge_ids", [True, False])
+def test_csrsum(idtype, dtype, return_edge_ids):
     a, A = _random_simple_graph(
         idtype, dtype, F.ctx(), 500, 600, 9000, "A", "B", "AB"
     )
@@ -122,7 +123,7 @@ def test_csrsum(idtype, dtype):
     C, C_weights = dgl._sparse_ops._csrsum(
         [A._graph, B._graph], [A.edata["w"], B.edata["w"]]
     )
-    C_adj = C.adjacency_matrix_scipy(0, False, "csr")
+    C_adj = C.adjacency_matrix_scipy(0, False, "csr", return_edge_ids)
     C_adj.data = F.asnumpy(C_weights)
     C_adj = F.tensor(C_adj.todense(), dtype=dtype)
     c = F.tensor((a + b).todense(), dtype=dtype)
