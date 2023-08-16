@@ -5,27 +5,29 @@ Reference Code: https://github.com/tkipf/relational-gcn
 import argparse
 import time
 
-import numpy as np
-import torch as th
-import torch.nn as nn
-import torch.nn.functional as F
-
-from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
-
 import dgl
 import dgl.sparse as dglsp
+
+import numpy as np
 
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
 
+from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
+
 
 class RelGraphEmbed(nn.Module):
     r"""Embedding layer for featureless heterograph."""
 
     def __init__(
-        self, ntype_num, embed_size, embed_name="embed", activation=None, dropout=0.0
+        self,
+        ntype_num,
+        embed_size,
+        embed_name="embed",
+        activation=None,
+        dropout=0.0,
     ):
         super(RelGraphEmbed, self).__init__()
         self.embed_size = embed_size
@@ -45,7 +47,7 @@ class RelGraphEmbed(nn.Module):
 
 
 class HeteroRelationalGraphConv(nn.Module):
-    r"""Relational graph convolution layer. 
+    r"""Relational graph convolution layer.
 
     Parameters
     ----------
@@ -69,10 +71,7 @@ class HeteroRelationalGraphConv(nn.Module):
         self.relation_names = relation_names
 
         self.conv = nn.ModuleDict(
-            {
-                str(rel): nn.Linear(in_size, out_size)
-                for rel in relation_names
-            }
+            {str(rel): nn.Linear(in_size, out_size) for rel in relation_names}
         )
 
         self.dropout = nn.Dropout(0.0)
@@ -82,7 +81,7 @@ class HeteroRelationalGraphConv(nn.Module):
 
         Parameters
         ----------
-        A : Hetero Sparse Matrix 
+        A : Hetero Sparse Matrix
             Input graph.
         inputs : dict[str, torch.Tensor]
             Node feature for each node type.
@@ -97,9 +96,11 @@ class HeteroRelationalGraphConv(nn.Module):
             src_type, edge_type, dst_type = rel
             if dst_type not in hs:
                 hs[dst_type] = th.zeros(
-                    inputs[dst_type].shape[0], self.out_size)
-            hs[dst_type] = hs[dst_type] + \
-                (A[rel].T @ self.conv[str(edge_type)](inputs[src_type]))
+                    inputs[dst_type].shape[0], self.out_size
+                )
+            hs[dst_type] = hs[dst_type] + (
+                A[rel].T @ self.conv[str(edge_type)](inputs[src_type])
+            )
             hs[dst_type] = F.relu(hs[dst_type])
 
         return hs
@@ -251,9 +252,10 @@ def main(args):
     A = {}
     for stype, etype, dtype in g.canonical_etypes:
         eg = g[stype, etype, dtype]
-        indices = th.stack(eg.edges('uv'))
+        indices = th.stack(eg.edges("uv"))
         A[(stype, etype, dtype)] = dglsp.spmatrix(
-            indices, shape=(g.num_nodes(stype), g.num_nodes(dtype)))
+            indices, shape=(g.num_nodes(stype), g.num_nodes(dtype))
+        )
 
     # Training loop.
     print("start training...")
@@ -312,7 +314,7 @@ if __name__ == "__main__":
         "-e",
         "--n-epochs",
         type=int,
-        default=10,
+        default=50,
         help="number of training epochs",
     )
     parser.add_argument(
