@@ -21,6 +21,6 @@ The code organization goes as follows:
 Compile with unittest by executing the command below
 ```
 # Assume current directory is the root directory of dgl, and googletest submodule is initialized
-bash script/build_dgl.sh -c -r -e '-DBUILD_TYPE=test'
+bash script/build_dgl.sh -c -r
 ./runUnitTests
 ```

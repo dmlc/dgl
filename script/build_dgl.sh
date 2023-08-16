@@ -20,11 +20,12 @@ OPTIONS:
   -e           Extra arguments of cmake.
   -g           Restart CUDA build.
   -r           Remove all intermediate output.
+  -t           Type of the build: dev, dogfood or release (default: dev).
 EOF
 }
 
 # Parse flags.
-while getopts "ce:ghr" flag; do
+while getopts "ce:ghrt:" flag; do
   if [[ ${flag} == "c" ]]; then
     cuda="OFF"
   elif [[ ${flag} == "e" ]]; then
@@ -33,6 +34,8 @@ while getopts "ce:ghr" flag; do
     cuda="ON"
   elif [[ ${flag} == "r" ]]; then
     remove="YES"
+  elif [[ ${flag} == "t" ]]; then
+    build_type=${OPTARG}
   elif [[ ${flag} == "h" ]]; then
     usage
     exit 0
@@ -58,6 +61,10 @@ if [[ ${remove} == "YES" ]]; then
   rm -rf build
 fi
 
+if [[ -z ${build_type} ]]; then
+  build_type="dev"
+fi
+
 if [[ -z ${cuda} ]]; then
   if [[ -d build ]]; then
     cd build
@@ -69,7 +76,7 @@ if [[ -z ${cuda} ]]; then
 else
   mkdir -p build
   cd build
-  cmake -DBUILD_TYPE=dev -DUSE_CUDA=${cuda} ${extra_args} ..
+  cmake -DBUILD_TYPE=${build_type} -DUSE_CUDA=${cuda} ${extra_args} ..
 fi
 
 if [[ ${PWD} == "${DGL_HOME}/build" ]]; then
