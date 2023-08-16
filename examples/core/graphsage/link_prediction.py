@@ -98,10 +98,10 @@ class SAGE(nn.Module):
             nn.Linear(hidden_size, 1),
         )
 
-    def forward(self, pair_graph, neg_pair_graph, blocks, x):
+    def forward(self, pair_graph, neg_pair_graph, g, x):
         hidden_x = x
-        for layer_idx, (layer, block) in enumerate(zip(self.layers, blocks)):
-            hidden_x = layer(block, hidden_x)
+        for layer_idx, layer in enumerate(self.layers):
+            hidden_x = layer(g, hidden_x)
             is_last_layer = layer_idx == len(self.layers) - 1
             if not is_last_layer:
                 hidden_x = F.relu(hidden_x)
@@ -194,11 +194,11 @@ def construct_negative_graph(graph, k):
 def train(device, g, model):
     opt = torch.optim.Adam(model.parameters(), lr=0.005)
 
-    negative_g = construct_negative_graph(g, 1)
-    for epoch in range(10):
+    for epoch in range(50):
         model.train()
+        negative_g = construct_negative_graph(g, 1)
         x = g.ndata["feat"].to(device)
-        pos_score, neg_score = model(g, negative_g, [g, g, g], x)
+        pos_score, neg_score = model(g, negative_g, g, x)
         score = torch.cat([pos_score, neg_score])
         pos_label = torch.ones_like(pos_score).to(device)
         neg_label = torch.zeros_like(neg_score).to(device)
