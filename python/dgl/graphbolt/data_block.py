@@ -23,12 +23,14 @@ class DataBlock:
     A list of 'SampledSubgraph's, each one corresponding to one layer,
     representing a subset of a larger graph structure.
     """
+    
     node_feature: Union[torch.Tensor, Dict[str, torch.Tensor]]
     """A representation of node feature.
     - If `node_feature` is a tensor: It indicates the graph is homogeneous.
     - If `node_feature` is a dictionary: The keys should be node type and the
       value should be corresponding node feature or embedding.
     """
+    
     edge_feature: list[
         Union[torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]]
     ]
@@ -37,6 +39,7 @@ class DataBlock:
     - If `edge_feature` is a dictionary: The keys should be edge type and the
       value should be corresponding edge feature or embedding.
     """
+    
     input_nodes: Union[torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]]
     """A representation of input nodes in the outermost layer. Conatins all nodes
        in the 'sampled_subgraphs'.
