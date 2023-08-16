@@ -55,7 +55,7 @@ class NegativeSampler(Mapper):
             An instance of 'LinkPredictionBlock' encompasses both positive and
             negative samples.
         """
-        
+
         data = LinkPredictionBlock(node_pair=node_pairs)
         if isinstance(node_pairs, Mapping):
             for etype, pos_pairs in node_pairs.items():
