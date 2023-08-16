@@ -6,6 +6,7 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 from .data_format import LinkPredictionEdgeFormat
+from .link_prediction_block import LinkPredictionBlock
 
 
 class NegativeSampler(Mapper):
@@ -37,17 +38,16 @@ class NegativeSampler(Mapper):
         self.negative_ratio = negative_ratio
         self.output_format = output_format
 
-    def _sample(self, data):
+    def _sample(self, node_pairs):
         """
         Generate a mix of positive and negative samples.
 
-        Parameters
+        node_pair
         ----------
-        LinkPredictionBlock : Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
-            An instance of 'LinkPredictionBlock' which should only contain the
-            'node_pair' field. If either 'negative_head' or 'negative_tail'
-            exists, meaning that negative samples are already available, this
-            process will do nothing.
+        node_pairs : Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
+            A tuple of tensors or a dictionary represents source-destination
+            node pairs of positive edges, where positive means the edge must
+            exist in the graph.
 
         Returns
         -------
@@ -55,15 +55,15 @@ class NegativeSampler(Mapper):
             An instance of 'LinkPredictionBlock' encompasses both positive and
             negative samples.
         """
-        if data.negative_head is None and data.negative_tail is None:
-            node_pairs = data.node_pair
-            if isinstance(node_pairs, Mapping):
-                for etype, pos_pairs in node_pairs.items():
-                    self._collate(
-                        data, self._sample_with_etype(pos_pairs, etype), etype
-                    )
-            else:
-                self._collate(data, self._sample_with_etype(node_pairs))
+        
+        data = LinkPredictionBlock(node_pair=node_pairs)
+        if isinstance(node_pairs, Mapping):
+            for etype, pos_pairs in node_pairs.items():
+                self._collate(
+                    data, self._sample_with_etype(pos_pairs, etype), etype
+                )
+        else:
+            self._collate(data, self._sample_with_etype(node_pairs))
         return data
 
     def _sample_with_etype(self, node_pairs, etype=None):
