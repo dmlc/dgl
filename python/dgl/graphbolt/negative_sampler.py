@@ -125,7 +125,7 @@ class NegativeSampler(Mapper):
                 neg_src = neg_src.view(-1, self.negative_ratio)
                 neg_dst = None
             elif (
-                self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED
+                self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED
             ):
                 neg_dst = neg_dst.view(-1, self.negative_ratio)
                 neg_src = None
