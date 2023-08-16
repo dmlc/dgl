@@ -27,7 +27,7 @@ class LinkPredictionBlock(DataBlock):
       type.
     """
 
-    label: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    label: Union[torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]] = None
     """
     Labels associated with the link prediction task.
     - If `label` is a tensor: It indicates a homogeneous graph. The value are

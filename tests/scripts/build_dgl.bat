@@ -13,7 +13,7 @@ SET TEMP=%WORKSPACE%\tmp
 SET TMPDIR=%WORKSPACE%\tmp
 
 PUSHD build
-cmake -DBUILD_TYPE=test -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -Dgtest_force_shared_crt=ON -DDMLC_FORCE_SHARED_CRT=ON -DCMAKE_CONFIGURATION_TYPES="Release" -DTORCH_PYTHON_INTERPS=python .. -G "Visual Studio 16 2019" || EXIT /B 1
+cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -Dgtest_force_shared_crt=ON -DDMLC_FORCE_SHARED_CRT=ON -DCMAKE_CONFIGURATION_TYPES="Release" -DTORCH_PYTHON_INTERPS=python .. -G "Visual Studio 16 2019" || EXIT /B 1
 msbuild dgl.sln /m /nr:false || EXIT /B 1
 COPY /Y Release\runUnitTests.exe .
 POPD
