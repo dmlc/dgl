@@ -406,7 +406,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v230810"
                   alwaysPull true
                 }
               }

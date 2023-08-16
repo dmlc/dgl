@@ -3600,11 +3600,11 @@ def random_walk_pe(g, k, eweight_name=None):
         RW = (A / (A.sum(1) + 1e-30)).toarray()
 
     # Iterate for k steps
-    PE = [F.astype(F.tensor(RW.diagonal()), F.float32)]
+    PE = [F.astype(F.tensor(np.array(RW.diagonal())), F.float32)]
     RW_power = RW
     for _ in range(k - 1):
         RW_power = RW_power @ RW
-        PE.append(F.astype(F.tensor(RW_power.diagonal()), F.float32))
+        PE.append(F.astype(F.tensor(np.array(RW_power.diagonal())), F.float32))
     PE = F.stack(PE, dim=-1)
 
     return PE
