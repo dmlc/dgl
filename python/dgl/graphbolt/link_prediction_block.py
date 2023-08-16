@@ -6,11 +6,11 @@ from typing import Dict, Tuple, Union
 
 import torch
 
-from .unified_data_struct import UnifiedDataStruct
+from .data_block import DataBlock
 
 
 @dataclass
-class LinkUnifiedDataStruct(UnifiedDataStruct):
+class LinkPredictionBlock(DataBlock):
     r"""A subclass of 'UnifiedDataStruct', specialized for handling edge level
     tasks."""
 
@@ -68,6 +68,22 @@ class LinkUnifiedDataStruct(UnifiedDataStruct):
         Dict[Tuple(str, str, str), Tuple[torch.Tensor, torch.Tensor]],
     ]
     """
-    Representation of compacted node pairs corresponding to node_pair, where
+    Representation of compacted node pairs corresponding to 'node_pair', where
+    all node ids inside are compacted.
+    """
+
+    compacted_negative_head: Union[
+        torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]
+    ] = None
+    """
+    Representation of compacted nodes corresponding to 'negative_head', where
+    all node ids inside are compacted.
+    """
+
+    compacted_negative_tail: Union[
+        torch.Tensor, Dict[Tuple(str, str, str), torch.Tensor]
+    ] = None
+    """
+    Representation of compacted nodes corresponding to 'negative_tail', where
     all node ids inside are compacted.
     """

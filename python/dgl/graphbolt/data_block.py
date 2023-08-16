@@ -7,11 +7,11 @@ import torch
 
 from .sampled_subgraph import SampledSubgraph
 
-__all__ = ["UnifiedDataStruct"]
+__all__ = ["DataBlock"]
 
 
 @dataclass
-class UnifiedDataStruct:
+class DataBlock:
     r"""A composite data class for data structure in the graphbolt. It is
     designed to facilitate the exchange of data among different components
     involved in processing data. The purpose of this class is to unify the
