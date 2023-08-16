@@ -1,6 +1,26 @@
-"""Modeling Relational Data with Graph Convolutional Networks
+"""
+Modeling Relational Data with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1703.06103
 Reference Code: https://github.com/tkipf/relational-gcn
+
+This script trains and tests a Hetero Relational Graph Convolutional Networks (Hetero-RGCN) model 
+based on the information of a full graph.
+
+This flowchart describes the main functional sequence of the provided example.
+main
+│
+├───> Load and preprocess full dataset
+│
+├───> Instantiate Hetero-RGCN model
+│
+├───> train
+│     │
+│     └───> Training loop
+│           │
+│           └───> Hetero-RGCN.forward
+└───> test
+      │
+      └───> Evaluate the model
 """
 import argparse
 import time
@@ -13,7 +33,6 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
-import tqdm
 
 from dgl.data.rdf import AIFBDataset, AMDataset, BGSDataset, MUTAGDataset
 
@@ -47,7 +66,7 @@ class RelGraphEmbed(nn.Module):
 
 
 class HeteroRelationalGraphConv(nn.Module):
-    r"""Relational graph convolution layer.
+    r"""HeteroRelational graph convolution layer.
 
     Parameters
     ----------
@@ -70,7 +89,12 @@ class HeteroRelationalGraphConv(nn.Module):
         self.out_size = out_size
         self.relation_names = relation_names
 
-        self.conv = nn.ModuleDict(
+        ########################################################################
+        # (HIGHLIGHT) HeteroGraphConv is a graph convolution operator over
+        # heterogeneous graphs. A dictionary is passed where the key is the
+        # relation name and the value is the insatnce of conv layer.
+        ########################################################################
+        self.W = nn.ModuleDict(
             {str(rel): nn.Linear(in_size, out_size) for rel in relation_names}
         )
 
@@ -98,8 +122,15 @@ class HeteroRelationalGraphConv(nn.Module):
                 hs[dst_type] = th.zeros(
                     inputs[dst_type].shape[0], self.out_size
                 )
+            ##############################################################################
+            # (HIGHLIGHT) Sparse library use hetero sparse matrix to present heterogeneous
+            # graphs. A dictionary is passed where the key is the tuple of (source node
+            # type, edge type, destination node type) and the value is the sparse matrix
+            # contructed by the key from global graph. The convolution operation is
+            # implemented by sparse matrix mutiply the result of conv layer.
+            ##############################################################################
             hs[dst_type] = hs[dst_type] + (
-                A[rel].T @ self.conv[str(edge_type)](inputs[src_type])
+                A[rel].T @ self.W[str(edge_type)](inputs[src_type])
             )
             hs[dst_type] = F.relu(hs[dst_type])
 
@@ -111,7 +142,6 @@ class EntityClassify(nn.Module):
         self,
         in_size,
         out_dim,
-        ntype_num,
         relation_names,
     ):
         super(EntityClassify, self).__init__()
@@ -120,7 +150,6 @@ class EntityClassify(nn.Module):
         self.relation_names = relation_names
         self.relation_names.sort()
 
-        self.embed_layer = RelGraphEmbed(ntype_num, self.in_size)
         self.layers = nn.ModuleList()
         # Input to hidden.
         self.layers.append(
@@ -139,58 +168,10 @@ class EntityClassify(nn.Module):
             )
         )
 
-    def forward(self, A):
-        h = self.embed_layer()
+    def forward(self, h, A):
         for layer in self.layers:
             h = layer(A, h)
         return h
-
-    def inference(self, g, batch_size, device, num_workers, x=None):
-        """Minibatch inference of final representation over all node types.
-
-        ***NOTE***
-        For node classification, the model is trained to predict on only one node type's
-        label.  Therefore, only that type's final representation is meaningful.
-        """
-
-        if x is None:
-            x = self.embed_layer()
-
-        for l, layer in enumerate(self.layers):
-            y = {
-                k: th.zeros(
-                    g.num_nodes(k),
-                    self.h_dim if l != len(self.layers) - 1 else self.out_dim,
-                )
-                for k in g.ntypes
-            }
-
-            sampler = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-            dataloader = dgl.dataloading.DataLoader(
-                g,
-                {k: th.arange(g.num_nodes(k)) for k in g.ntypes},
-                sampler,
-                batch_size=batch_size,
-                shuffle=True,
-                drop_last=False,
-                num_workers=num_workers,
-            )
-
-            with dataloader.enable_cpu_affinity():
-                for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
-                    block = blocks[0].to(device)
-
-                    h = {
-                        k: x[k][input_nodes[k]].to(device)
-                        for k in input_nodes.keys()
-                    }
-                    h = layer(block, h)
-
-                    for k in output_nodes.keys():
-                        y[k][output_nodes[k]] = h[k].cpu()
-
-            x = y
-        return y
 
 
 def main(args):
@@ -235,9 +216,11 @@ def main(args):
     model = EntityClassify(
         args.n_hidden,
         num_classes,
-        {ntype: g.num_nodes(ntype) for ntype in g.ntypes},
         list(set(g.etypes)),
     )
+
+    embed_layer = RelGraphEmbed({ntype: g.num_nodes(ntype)
+                                for ntype in g.ntypes}, args.n_hidden)
 
     if use_cuda:
         model.cuda()
@@ -247,8 +230,7 @@ def main(args):
         model.parameters(), lr=args.lr, weight_decay=args.l2norm
     )
 
-    # Construct sparse metrix.
-    g = g.local_var()
+    # Construct hetero sparse matrix.
     A = {}
     for stype, etype, dtype in g.canonical_etypes:
         eg = g[stype, etype, dtype]
@@ -265,7 +247,7 @@ def main(args):
         optimizer.zero_grad()
         if epoch > 5:
             t0 = time.time()
-        logits = model(A)[category]
+        logits = model(embed_layer(), A)[category]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         loss.backward()
         optimizer.step()
@@ -290,7 +272,7 @@ def main(args):
         th.save(model.state_dict(), args.model_path)
 
     model.eval()
-    logits = model.forward(A)[category]
+    logits = model.forward(embed_layer(), A)[category]
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = th.sum(
         logits[test_idx].argmax(dim=1) == labels[test_idx]
@@ -314,7 +296,7 @@ if __name__ == "__main__":
         "-e",
         "--n-epochs",
         type=int,
-        default=50,
+        default=5,
         help="number of training epochs",
     )
     parser.add_argument(
@@ -325,7 +307,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--l2norm", type=float, default=0, help="l2 norm coef")
 
-    # Only one of modes in this group is valid.
+    # Select one mode.
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument("--validation", dest="validation", action="store_true")
     fp.add_argument("--testing", dest="validation", action="store_false")
