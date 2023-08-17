@@ -42,7 +42,7 @@ class NegativeSampler(Mapper):
         """
         Generate a mix of positive and negative samples.
 
-        node_pair
+        Parameters
         ----------
         node_pairs : Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
             A tuple of tensors or a dictionary represents source-destination
