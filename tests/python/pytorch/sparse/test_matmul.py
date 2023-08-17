@@ -1,4 +1,4 @@
-import sys
+import warnings
 
 import backend as F
 import pytest
@@ -98,7 +98,9 @@ def test_spspmm(create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2):
 
     torch_A1 = sparse_matrix_to_torch_sparse(A1)
     torch_A2 = sparse_matrix_to_torch_sparse(A2)
-    torch_A3 = torch.sparse.mm(torch_A1, torch_A2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        torch_A3 = torch.sparse.mm(torch_A1, torch_A2)
     torch_A3_grad = sparse_matrix_to_torch_sparse(A3, grad)
     torch_A3.backward(torch_A3_grad)
 
