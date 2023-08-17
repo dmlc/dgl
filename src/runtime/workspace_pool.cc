@@ -128,6 +128,8 @@ WorkspacePool::~WorkspacePool() {
    * Comment out the destruct of WorkspacePool, due to Segmentation fault with
    * MXNet Since this will be only called at the termination of process, not
    * manually wiping out should not cause problems.
+   * Note, this will cause memory leak without the following code, so, maybe
+   * we need to solve the problem.
    */
   // for (size_t i = 0; i < array_.size(); ++i) {
   //   if (array_[i] != nullptr) {

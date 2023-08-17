@@ -44,20 +44,20 @@ static void start_server(int id);
 
 TEST(SocketCommunicatorTest, SendAndRecv) {
   // start 10 client
-  std::vector<std::thread*> client_thread;
+  std::vector<std::thread> client_thread(kNumSender);
   for (int i = 0; i < kNumSender; ++i) {
-    client_thread.push_back(new std::thread(start_client));
+    client_thread[i] = std::thread(start_client);
   }
   // start 10 server
-  std::vector<std::thread*> server_thread;
+  std::vector<std::thread> server_thread(kNumReceiver);
   for (int i = 0; i < kNumReceiver; ++i) {
-    server_thread.push_back(new std::thread(start_server, i));
+    server_thread[i] = std::thread(start_server, i);
   }
   for (int i = 0; i < kNumSender; ++i) {
-    client_thread[i]->join();
+    client_thread[i].join();
   }
   for (int i = 0; i < kNumReceiver; ++i) {
-    server_thread[i]->join();
+    server_thread[i].join();
   }
 }
 
