@@ -286,7 +286,7 @@ pipeline {
             stage('CPU Build') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
                   args "-u root"
                   alwaysPull true
@@ -304,7 +304,7 @@ pipeline {
             stage('GPU Build') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-gpu:cu116_v230711"
                   args "-u root"
                   alwaysPull true
@@ -323,7 +323,7 @@ pipeline {
             stage('PyTorch Cugraph GPU Build') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "rapidsai/cugraph_stable_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
                   args "-u root"
                   alwaysPull true
@@ -359,7 +359,7 @@ pipeline {
             stage('C++ CPU') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
                   alwaysPull true
                 }
@@ -405,7 +405,7 @@ pipeline {
             stage('Tensorflow CPU') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230810"
                   alwaysPull true
                 }
@@ -450,7 +450,7 @@ pipeline {
             stage('Torch CPU') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
                   args "--shm-size=4gb"
                   alwaysPull true
@@ -530,7 +530,7 @@ pipeline {
             stage('Distributed') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
                   args "--shm-size=4gb"
                   alwaysPull true
@@ -576,7 +576,7 @@ pipeline {
             stage('DGL-Go') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
                   alwaysPull true
                 }
