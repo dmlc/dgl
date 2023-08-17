@@ -418,7 +418,7 @@ def test_update_all_0deg(idtype):
     g = dgl.graph(([], []), num_nodes=5, idtype=idtype, device=F.ctx())
     g.ndata["h"] = old_repr
     # Intercepting the warning: The input graph for the user-defined edge
-    # function does not contain valid edges
+    # function does not contain valid edges.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         g.update_all(
