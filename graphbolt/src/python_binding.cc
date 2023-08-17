@@ -6,6 +6,7 @@
 
 #include <graphbolt/csc_sampling_graph.h>
 #include <graphbolt/serialize.h>
+#include <graphbolt/unique_and_compact.h>
 
 namespace graphbolt {
 namespace sampling {
@@ -39,6 +40,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("load_csc_sampling_graph", &LoadCSCSamplingGraph);
   m.def("save_csc_sampling_graph", &SaveCSCSamplingGraph);
   m.def("load_from_shared_memory", &CSCSamplingGraph::LoadFromSharedMemory);
+  m.def("unique_and_compact", &UniqueAndCompact);
 }
 
 }  // namespace sampling

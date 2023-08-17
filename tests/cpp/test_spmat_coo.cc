@@ -63,7 +63,9 @@ aten::COOMatrix COO1(DGLContext ctx = CTX) {
       aten::VecToIdArray(
           std::vector<IDX>({0, 2, 0, 1, 2}), sizeof(IDX) * 8, ctx),
       aten::VecToIdArray(
-          std::vector<IDX>({1, 2, 2, 0, 3}), sizeof(IDX) * 8, ctx));
+          std::vector<IDX>({1, 2, 2, 0, 3}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 3, 1, 2, 4}), sizeof(IDX) * 8, ctx));
 }
 
 template <typename IDX>
@@ -81,7 +83,9 @@ aten::COOMatrix COO2(DGLContext ctx = CTX) {
       aten::VecToIdArray(
           std::vector<IDX>({0, 2, 0, 1, 2, 0}), sizeof(IDX) * 8, ctx),
       aten::VecToIdArray(
-          std::vector<IDX>({1, 2, 2, 0, 3, 2}), sizeof(IDX) * 8, ctx));
+          std::vector<IDX>({1, 2, 2, 0, 3, 2}), sizeof(IDX) * 8, ctx),
+      aten::VecToIdArray(
+          std::vector<IDX>({0, 1, 2, 3, 4, 5}), sizeof(IDX) * 8, ctx));
 }
 
 template <typename IDX>
@@ -335,10 +339,10 @@ TEST(SpmatTest, COOToCSR) {
 
 template <typename IDX>
 void _TestCOOHasDuplicate() {
-  auto csr = COO1<IDX>();
-  ASSERT_FALSE(aten::COOHasDuplicate(csr));
-  csr = COO2<IDX>();
-  ASSERT_TRUE(aten::COOHasDuplicate(csr));
+  auto coo = COO1<IDX>();
+  ASSERT_FALSE(aten::COOHasDuplicate(coo));
+  coo = COO2<IDX>();
+  ASSERT_TRUE(aten::COOHasDuplicate(coo));
 }
 
 TEST(SpmatTest, TestCOOHasDuplicate) {
@@ -483,12 +487,12 @@ TEST(SpmatTest, COOGetData) {
 
 template <typename IDX>
 void _TestCOOGetDataAndIndices() {
-  auto csr = COO2<IDX>();
+  auto coo = COO2<IDX>();
   auto r =
       aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX) * 8, CTX);
   auto c =
       aten::VecToIdArray(std::vector<IDX>({0, 1, 2}), sizeof(IDX) * 8, CTX);
-  auto x = aten::COOGetDataAndIndices(csr, r, c);
+  auto x = aten::COOGetDataAndIndices(coo, r, c);
   auto tr =
       aten::VecToIdArray(std::vector<IDX>({0, 0, 0}), sizeof(IDX) * 8, CTX);
   auto tc =

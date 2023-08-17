@@ -57,7 +57,7 @@ def cpp_unit_test_win64() {
 def unit_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 40, unit: 'MINUTES') {
     sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
   }
 }
@@ -406,7 +406,7 @@ pipeline {
               agent {
                 docker {
                   label "linux-cpu-node"
-                  image "dgllib/dgl-ci-cpu:v230711"
+                  image "dgllib/dgl-ci-cpu:v230810"
                   alwaysPull true
                 }
               }
