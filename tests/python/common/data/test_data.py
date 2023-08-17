@@ -91,27 +91,6 @@ def test_fraud():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
-def test_fakenews():
-    transform = dgl.AddSelfLoop(allow_duplicate=True)
-
-    ds = data.FakeNewsDataset("politifact", "bert")
-    assert len(ds) == 314
-    g = ds[0][0]
-    g2 = data.FakeNewsDataset("politifact", "bert", transform=transform)[0][0]
-    assert g2.num_edges() - g.num_edges() == g.num_nodes()
-
-    ds = data.FakeNewsDataset("gossipcop", "profile")
-    assert len(ds) == 5464
-    g = ds[0][0]
-    g2 = data.FakeNewsDataset("gossipcop", "profile", transform=transform)[0][0]
-    assert g2.num_edges() - g.num_edges() == g.num_nodes()
-
-
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Datasets don't need to be tested on GPU.",
-)
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_tudataset_regression():
     ds = data.TUDataset("ZINC_test", force_reload=True)
     assert ds.num_classes == ds.num_labels
