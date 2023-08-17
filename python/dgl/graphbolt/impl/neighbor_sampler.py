@@ -1,17 +1,18 @@
 """Uniform negative sampler for GraphBolt."""
 
-from ..subgraph_sampler import SubgraphSampler
 import torch
+
+from ..subgraph_sampler import SubgraphSampler
+
 
 class NeighborSampler(SubgraphSampler):
     def __init__(
-    self,
-    datapipe,
-    input_format,
-    graph,
-    fanouts,
-    replace=False,
-    prob_name=None,
+        self,
+        datapipe,
+        graph,
+        fanouts,
+        replace=False,
+        prob_name=None,
     ):
         """
         Initlization for a link neighbor subgraph sampler.
@@ -20,8 +21,6 @@ class NeighborSampler(SubgraphSampler):
         ----------
         datapipe : DataPipe
             The datapipe.
-        input_format : LinkPredictionEdgeFormat
-            Determines the format of the input data.
         graph : CSCSamplingGraph
             The graph on which to perform subgraph sampling.
         fanouts: list[list[int]]
@@ -53,8 +52,8 @@ class NeighborSampler(SubgraphSampler):
         >>> neg_sampler = gb.UniformNegativeSampler(
             ...minibatch_sampler, 2, data_format, graph)
         >>> fanouts = [[5], [10], [15]]
-        >>> subgraph_sampler = gb.LinkNeighborSampler(
-            ...neg_sampler, data_format, fanouts)
+        >>> subgraph_sampler = gb.NeighborSampler(
+            ...neg_sampler, graph, fanouts)
         >>> for data in subgraph_sampler:
             ...  print(data)
             ...
@@ -64,7 +63,7 @@ class NeighborSampler(SubgraphSampler):
         super().__init__(datapipe, fanouts, replace, prob_name)
         self.graph = graph
 
-    def _sample_sub_graph(self, seeds, hop):                
+    def _sample_sub_graph(self, seeds, hop):
         return self.graph.sample_neighbors(
             seeds,
             torch.LongTensor(self.fanouts[hop]),

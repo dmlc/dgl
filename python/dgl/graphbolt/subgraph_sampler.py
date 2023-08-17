@@ -1,5 +1,8 @@
 """Subgraph samplers"""
 
+from collections import defaultdict
+from typing import Dict
+
 import torch
 from torchdata.datapipes.iter import Mapper
 
@@ -67,14 +70,10 @@ class SubgraphSampler(Mapper):
         if isinstance(data, LinkPredictionBlock):
             (
                 seeds,
-                compacted_pairs,
-                compacted_negative_head,
-                compacted_negative_tail,
+                data.compacted_node_pair,
+                data.compacted_negative_head,
+                data.compacted_negative_tail,
             ) = self._link_prediction_preprocess(data)
-            data.seed_node = seeds
-            data.compacted_node_pair = compacted_pairs
-            data.compacted_negative_head = compacted_negative_head
-            data.compacted_negative_tail = compacted_negative_tail
         elif isinstance(data, NodeClassificationBlock):
             seeds = data.seed_node
         else:
@@ -98,69 +97,72 @@ class SubgraphSampler(Mapper):
         return data
 
     def _link_prediction_preprocess(self, data):
-        src, dst = data.node_pair
+        node_pair = data.node_pair
         neg_src, neg_dst = data.negative_head, data.negative_tail
+        is_heterogeneous = isinstance(node_pair, Dict)
+        has_neg_src = neg_src is not None
+        has_neg_dst = neg_dst is not None
 
-        is_homogeneous = isinstance(src, torch.Tensor)
+        def merge_node_pairs(src, dst, neg_src, neg_dst):
+            if has_neg_src:
+                src = torch.cat([src, neg_src.view(-1)])
+            if has_neg_dst:
+                dst = torch.cat([dst, neg_dst.view(-1)])
+            return (src, dst)
 
-        def combine_pos_and_neg(pos, neg):
-            if is_homogeneous:
-                return torch.cat((pos, neg.view(-1)))
-            else:
-                return {
-                    etype: torch.cat((nodes, neg[etype].view(-1)))
-                    for etype, nodes in pos.items()
-                }
-
-        src = combine_pos_and_neg(src, neg_src) if neg_src is not None else src
-        dst = combine_pos_and_neg(dst, neg_dst) if neg_dst is not None else dst
-        seeds, compacted_node_pair = unique_and_compact_node_pairs((src, dst))
-
-        def split_pos_and_neg(nodes, num_pos, neg_shape):
-            return nodes[:num_pos], nodes[num_pos:].reshape(neg_shape)
-
-        compacted_negative_head = {} if neg_src is not None else None
-        compacted_negative_tail = {} if neg_dst is not None else None
-
-        if is_homogeneous:
-            if neg_src is not None:
-                num_pos = src.size(0)
-                (
-                    compacted_node_pair[0],
-                    compacted_negative_head,
-                ) = split_pos_and_neg(
-                    compacted_node_pair[0], num_pos, neg_src.shape
-                )
-            if neg_dst is not None:
-                num_pos = dst.size(0)
-                (
-                    compacted_node_pair[1],
-                    compacted_negative_tail,
-                ) = split_pos_and_neg(
-                    compacted_node_pair[1], num_pos, neg_dst.shape
+        # Merge postive graph and negative node pairs.
+        if is_heterogeneous:
+            merged_node_pair = {}
+            for etype, pair in node_pair.items():
+                neg_src_etype = neg_src[etype] if has_neg_src else None
+                neg_dst_etype = neg_dst[etype] if has_neg_dst else None
+                merged_node_pair[etype] = merge_node_pairs(
+                    pair[0], pair[1], neg_src_etype, neg_dst_etype
                 )
         else:
-            for etype, (src, dst) in compacted_node_pair.items():
-                num_pos = src.size(0)
+            merged_node_pair = merge_node_pairs(
+                node_pair[0], node_pair[1], neg_src, neg_dst
+            )
 
-                if neg_src is not None:
-                    shape = neg_src[etype].shape
-                    (
-                        compacted_node_pair[etype][0],
-                        compacted_negative_head[etype],
-                    ) = split_pos_and_neg(src, num_pos, shape)
+        # Compacct merged and get seed nodes for sampling.
+        seeds, compacted_merged_node_pair = unique_and_compact_node_pairs(
+            merged_node_pair
+        )
 
-                if neg_dst is not None:
-                    shape = neg_dst[etype].shape
-                    (
-                        compacted_node_pair[etype][1],
-                        compacted_negative_tail[etype],
-                    ) = split_pos_and_neg(dst, num_pos, shape)
+        def split_node_pairs(src, dst, num_pos_src, num_pos_dst):
+            pos_src, neg_src = src[:num_pos_src], src[num_pos_dst:]
+            pos_dst, neg_dst = dst[:num_pos_dst], dst[num_pos_dst:]
+            return (pos_src, pos_dst), neg_src, neg_dst
+
+        compacted_node_pair = {}
+        compacted_negative_head = {}
+        compacted_negative_tail = {}
+
+        # Split positive and negative node pairs.
+        if is_heterogeneous:
+            for etype, (src, dst) in compacted_merged_node_pair.items():
+                num_pos_src = node_pair[etype][0].size(0)
+                num_pos_dst = node_pair[etype][1].size(0)
+                (
+                    compacted_node_pair[etype],
+                    compacted_negative_head[etype],
+                    compacted_negative_tail[etype],
+                ) = split_node_pairs(src, dst, num_pos_src, num_pos_dst)
+        else:
+            src, dst = compacted_merged_node_pair
+            num_pos_src = node_pair[0].size(0)
+            num_pos_dst = node_pair[1].size(0)
+            (
+                compacted_node_pair,
+                compacted_negative_head,
+                compacted_negative_tail,
+            ) = split_node_pairs(src, dst, num_pos_src, num_pos_dst)
+
         return (
             seeds,
             compacted_node_pair,
-            compacted_negative_head,
-            compacted_negative_tail,
+            compacted_negative_head if has_neg_src else None,
+            compacted_negative_tail if has_neg_dst else None,
         )
 
     def _sample_sub_graph(self, seeds, hop):
