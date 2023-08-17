@@ -288,7 +288,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
-                  args "-u root"
+                  args "-u ubuntu"
                   alwaysPull true
                 }
               }
@@ -306,7 +306,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-gpu:cu116_v230711"
-                  args "-u root"
+                  args "-u ubuntu"
                   alwaysPull true
                 }
               }
@@ -325,7 +325,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "rapidsai/cugraph_stable_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
-                  args "-u root"
+                  args "-u ubuntu"
                   alwaysPull true
                 }
               }
