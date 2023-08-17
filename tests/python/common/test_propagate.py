@@ -102,7 +102,7 @@ def test_prop_nodes_topo(idtype):
     # set all leaf nodes to be ones
     tree.nodes[[1, 3, 4]].data["x"] = F.ones((3, 2))
     # Intercepting the warning: The input graph for the user-defined edge
-    # function does not contain valid edges
+    # function does not contain valid edges.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         dgl.prop_nodes_topo(
