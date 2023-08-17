@@ -786,6 +786,7 @@ def _get_data_table(data_frame):
         dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
 
+    # Intercepting the warning: "Unamed column is found. Ignored...".
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         return dp(df)
