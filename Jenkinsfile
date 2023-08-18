@@ -6,7 +6,7 @@ dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\
 
 def init_git() {
   sh 'rm -rf *'
-  git config --global --add safe.directory '*'
+  sh "git config --global --add safe.directory '*'"
   checkout scm
   sh 'git submodule update --recursive --init'
 }
