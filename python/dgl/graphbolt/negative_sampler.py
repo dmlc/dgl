@@ -38,16 +38,17 @@ class NegativeSampler(Mapper):
         self.negative_ratio = negative_ratio
         self.output_format = output_format
 
-    def _sample(self, node_pairs):
+    def _sample(self, data):
         """
         Generate a mix of positive and negative samples.
 
         Parameters
         ----------
-        node_pairs : Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
-            A tuple of tensors or a dictionary represents source-destination
-            node pairs of positive edges, where positive means the edge must
-            exist in the graph.
+        LinkPredictionBlock : Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
+            An instance of 'LinkPredictionBlock', where 'node_pair' is required
+            while 'negative_head' and 'negative_tail' should be None. If either
+            of them has value, it inidcates there have already negative samples
+            , thus the function will do nothing.
 
         Returns
         -------
@@ -55,15 +56,15 @@ class NegativeSampler(Mapper):
             An instance of 'LinkPredictionBlock' encompasses both positive and
             negative samples.
         """
-
-        data = LinkPredictionBlock(node_pair=node_pairs)
-        if isinstance(node_pairs, Mapping):
-            for etype, pos_pairs in node_pairs.items():
-                self._collate(
-                    data, self._sample_with_etype(pos_pairs, etype), etype
-                )
-        else:
-            self._collate(data, self._sample_with_etype(node_pairs))
+        if data.negative_head is None and data.negative_tail is None:
+            node_pairs = data.node_pair
+            if isinstance(node_pairs, Mapping):
+                for etype, pos_pairs in node_pairs.items():
+                    self._collate(
+                        data, self._sample_with_etype(pos_pairs, etype), etype
+                    )
+            else:
+                self._collate(data, self._sample_with_etype(node_pairs))
         return data
 
     def _sample_with_etype(self, node_pairs, etype=None):

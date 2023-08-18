@@ -2,6 +2,11 @@ import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
 import torch
+from torchdata.datapipes.iter import Mapper
+
+
+def to_data_block(data):
+    return gb.LinkPredictionBlock(node_pair=data)
 
 
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
@@ -17,9 +22,10 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
     )
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
+    data_block_converter = Mapper(minibatch_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
-        minibatch_sampler,
+        data_block_converter,
         negative_ratio,
         gb.LinkPredictionEdgeFormat.INDEPENDENT,
         graph,
@@ -49,9 +55,10 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
     )
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
+    data_block_converter = Mapper(minibatch_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
-        minibatch_sampler,
+        data_block_converter,
         negative_ratio,
         gb.LinkPredictionEdgeFormat.CONDITIONED,
         graph,
@@ -84,9 +91,10 @@ def test_NegativeSampler_Head_Conditioned_Format(negative_ratio):
     )
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
+    data_block_converter = Mapper(minibatch_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
-        minibatch_sampler,
+        data_block_converter,
         negative_ratio,
         gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED,
         graph,
@@ -117,9 +125,10 @@ def test_NegativeSampler_Tail_Conditioned_Format(negative_ratio):
     )
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
+    data_block_converter = Mapper(minibatch_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
-        minibatch_sampler,
+        data_block_converter,
         negative_ratio,
         gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
         graph,
