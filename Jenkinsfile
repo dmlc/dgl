@@ -5,6 +5,7 @@ dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll, build\\dgl_sparse\\*.dll, build\\graphbolt\\*.dll"
 
 def init_git() {
+  sh "chmod -R 777 ." // Fix permission issue
   sh 'rm -rf *'
   sh "git config --global --add safe.directory '*'"
   checkout scm
