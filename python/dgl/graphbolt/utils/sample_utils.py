@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple, Union
 import torch
 
 
-def unique_and_compact_nodes_list(
+def unique_and_compact(
     nodes: Union[
         List[torch.Tensor],
         Dict[str, List[torch.Tensor]],
@@ -19,10 +19,12 @@ def unique_and_compact_nodes_list(
     ----------
     nodes : List[torch.Tensor] or Dict[str, List[torch.Tensor]]
         List of nodes for compacting.
-        - If `nodes` is a list of tensor: It means the graph is homogeneous.
+        the unique_and_compact will be done per type
+        - If `nodes` is a list of tensor: It means the graph is homogeneous,
+        all the tensors will do unique_and_compact together.
         - If `nodes` is a list of dictionary: The keys should be node type and
-        the values should be corresponding nodes. And IDs inside are
-        heterogeneous ids.
+        the values should be corresponding nodes, and the IDs inside are
+        heterogeneous ids. And the unique_and_compact will be done per type.
 
     Returns
     -------
@@ -30,7 +32,7 @@ def unique_and_compact_nodes_list(
     """
     is_heterogeneous = isinstance(nodes, dict)
 
-    def unique_and_compact_nodes_homo(nodes):
+    def unique_and_compact_per_type(nodes):
         nums = [node.size(0) for node in nodes]
         nodes = torch.cat(nodes)
         empty_tensor = nodes.new_empty(0)
@@ -43,12 +45,12 @@ def unique_and_compact_nodes_list(
     if is_heterogeneous:
         unique, compacted = {}, {}
         for ntype, nodes_of_type in nodes.items():
-            unique[ntype], compacted[ntype] = unique_and_compact_nodes_homo(
+            unique[ntype], compacted[ntype] = unique_and_compact_per_type(
                 nodes_of_type
             )
         return unique, compacted
     else:
-        return unique_and_compact_nodes_homo(nodes)
+        return unique_and_compact_per_type(nodes)
 
 
 def unique_and_compact_node_pairs(
