@@ -28,13 +28,13 @@ def unique_and_compact_nodes_list(
     -------
     List[torch.Tensor] or Dict[str, List[torch.Tensor]]
     """
-    is_heterogeneous = not isinstance(nodes, dict)
+    is_heterogeneous = isinstance(nodes, dict)
 
     def unique_and_compact_nodes_homo(nodes):
         nums = [node.size(0) for node in nodes]
         nodes = torch.cat(nodes)
         empty_tensor = nodes.new_empty(0)
-        unique, compacted = torch.ops.graphbolt.unique_and_compact(
+        unique, compacted, _ = torch.ops.graphbolt.unique_and_compact(
             nodes, empty_tensor, empty_tensor
         )
         compacted = compacted.split(nums)
