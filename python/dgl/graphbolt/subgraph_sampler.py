@@ -10,7 +10,7 @@ from .impl import SampledSubgraphImpl
 
 from .link_prediction_block import LinkPredictionBlock
 from .node_classification_block import NodeClassificationBlock
-from .utils import unique_and_compact_node_pairs
+from .utils import unique_and_compact_node_pairs, unique_and_compact_nodes_list
 
 
 class SubgraphSampler(Mapper):
@@ -99,65 +99,56 @@ class SubgraphSampler(Mapper):
     def _link_prediction_preprocess(self, data):
         node_pair = data.node_pair
         neg_src, neg_dst = data.negative_head, data.negative_tail
-        is_heterogeneous = isinstance(node_pair, Dict)
         has_neg_src = neg_src is not None
         has_neg_dst = neg_dst is not None
-
-        def merge_node_pairs(src, dst, neg_src, neg_dst):
+        is_heterogeneous = isinstance(node_pair, Dict)
+        if is_heterogeneous:
+            # Collect all type of data
+            nodes = defaultdict(list)
+            for (src_type, _, dst_type), (src, dst) in node_pair.items():
+                nodes[src_type].append(src)
+                nodes[dst_type].append(dst)
             if has_neg_src:
-                src = torch.cat([src, neg_src.view(-1)])
+                for (src_type, _, _), src in neg_src.items():
+                    nodes[src_type].append(src)
             if has_neg_dst:
-                dst = torch.cat([dst, neg_dst.view(-1)])
-            return (src, dst)
-
-        # Merge postive graph and negative node pairs.
-        if is_heterogeneous:
-            merged_node_pair = {}
-            for etype, pair in node_pair.items():
-                neg_src_etype = neg_src[etype] if has_neg_src else None
-                neg_dst_etype = neg_dst[etype] if has_neg_dst else None
-                merged_node_pair[etype] = merge_node_pairs(
-                    pair[0], pair[1], neg_src_etype, neg_dst_etype
-                )
-        else:
-            merged_node_pair = merge_node_pairs(
-                node_pair[0], node_pair[1], neg_src, neg_dst
-            )
-
-        # Compacct merged and get seed nodes for sampling.
-        seeds, compacted_merged_node_pair = unique_and_compact_node_pairs(
-            merged_node_pair
-        )
-
-        def split_node_pairs(src, dst, num_pos_src, num_pos_dst):
-            pos_src, neg_src = src[:num_pos_src], src[num_pos_dst:]
-            pos_dst, neg_dst = dst[:num_pos_dst], dst[num_pos_dst:]
-            return (pos_src, pos_dst), neg_src, neg_dst
-
-        compacted_node_pair = {}
-        compacted_negative_head = {}
-        compacted_negative_tail = {}
-
-        # Split positive and negative node pairs.
-        if is_heterogeneous:
-            for etype, (src, dst) in compacted_merged_node_pair.items():
-                num_pos_src = node_pair[etype][0].size(0)
-                num_pos_dst = node_pair[etype][1].size(0)
-                (
-                    compacted_node_pair[etype],
-                    compacted_negative_head[etype],
-                    compacted_negative_tail[etype],
-                ) = split_node_pairs(src, dst, num_pos_src, num_pos_dst)
-        else:
-            src, dst = compacted_merged_node_pair
-            num_pos_src = node_pair[0].size(0)
-            num_pos_dst = node_pair[1].size(0)
+                for (_, _, dst_type), dst in neg_dst.items():
+                    nodes[dst_type].append(dst)
+            # Unique and compact
+            seeds, compacted = unique_and_compact_nodes_list(nodes)
             (
                 compacted_node_pair,
                 compacted_negative_head,
                 compacted_negative_tail,
-            ) = split_node_pairs(src, dst, num_pos_src, num_pos_dst)
-
+            ) = ({}, {}, {})
+            # Map back in same order as collect.
+            for etype, _ in node_pair.items():
+                src_type, _, dst_type = etype
+                src = compacted[src_type].pop(0)
+                dst = compacted[dst_type].pop(0)
+                compacted_node_pair[etype] = (src, dst)
+            if has_neg_src:
+                for etype, _ in neg_src.items():
+                    compacted_negative_head[etype] = compacted[etype[0]].pop(0)
+            if has_neg_dst:
+                for etype, _ in neg_dst.items():
+                    compacted_negative_tail[etype] = compacted[etype[2]].pop(0)
+        else:
+            # Collect all nodes
+            nodes = list(node_pair)
+            if has_neg_src:
+                nodes.append(neg_src)
+            if has_neg_dst:
+                nodes.append(neg_dst)
+            # Unique and compact
+            seeds, compacted = unique_and_compact_nodes_list(nodes)
+            # Map back in same order as collect.
+            compacted_node_pair = tuple(compacted[:2])
+            compacted = compacted[2:]
+            if has_neg_src:
+                compacted_negative_head = compacted.pop(0)
+            if has_neg_dst:
+                compacted_negative_tail = compacted.pop(0)
         return (
             seeds,
             compacted_node_pair,
