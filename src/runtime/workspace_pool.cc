@@ -125,21 +125,19 @@ WorkspacePool::WorkspacePool(
 
 WorkspacePool::~WorkspacePool() {
   /**
-   * Comment out the destruct of WorkspacePool, due to Segmentation fault with
-   * MXNet Since this will be only called at the termination of process, not
-   * manually wiping out should not cause problems.
-   * Note, this will cause memory leak without the following code, so, maybe
-   * we need to solve the problem.
+   * Note that the following code will cause Segmentation fault with MXNet.
+   * Since we're phasing out MXNet, it's acceptable to keep it as it is.
+   * Commenting out the following code will cause memory leak.
    */
-  // for (size_t i = 0; i < array_.size(); ++i) {
-  //   if (array_[i] != nullptr) {
-  //     DGLContext ctx;
-  //     ctx.device_type = device_type_;
-  //     ctx.device_id = static_cast<int>(i);
-  //     array_[i]->Release(ctx, device_.get());
-  //     delete array_[i];
-  //   }
-  // }
+  for (size_t i = 0; i < array_.size(); ++i) {
+    if (array_[i] != nullptr) {
+      DGLContext ctx;
+      ctx.device_type = device_type_;
+      ctx.device_id = static_cast<int>(i);
+      array_[i]->Release(ctx, device_.get());
+      delete array_[i];
+    }
+  }
 }
 
 void* WorkspacePool::AllocWorkspace(DGLContext ctx, size_t size) {
