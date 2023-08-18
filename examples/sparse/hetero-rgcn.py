@@ -3,8 +3,8 @@ Modeling Relational Data with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1703.06103
 Reference Code: https://github.com/tkipf/relational-gcn
 
-This script trains and tests a Hetero Relational Graph Convolutional Networks (Hetero-RGCN) model 
-based on the information of a full graph.
+This script trains and tests a Hetero Relational Graph Convolutional Networks 
+(Hetero-RGCN) model based on the information of a full graph.
 
 This flowchart describes the main functional sequence of the provided example.
 main
@@ -122,13 +122,14 @@ class HeteroRelationalGraphConv(nn.Module):
                 hs[dst_type] = th.zeros(
                     inputs[dst_type].shape[0], self.out_size
                 )
-            ##############################################################################
-            # (HIGHLIGHT) Sparse library use hetero sparse matrix to present heterogeneous
-            # graphs. A dictionary is passed where the key is the tuple of (source node
-            # type, edge type, destination node type) and the value is the sparse matrix
-            # contructed by the key from global graph. The convolution operation is
-            # implemented by sparse matrix mutiply the result of conv layer.
-            ##############################################################################
+            ####################################################################
+            # (HIGHLIGHT) Sparse library use hetero sparse matrix to present
+            # heterogeneous graphs. A dictionary is passed where the key is
+            # the tuple of (source node type, edge type, destination node type)
+            # and the value is the sparse matrix contructed from the key on
+            # global graph. The convolution operation is the multiplication of
+            # sparse matrix and convolutional layer.
+            ####################################################################
             hs[dst_type] = hs[dst_type] + (
                 A[rel].T @ self.W[str(edge_type)](inputs[src_type])
             )
@@ -219,8 +220,9 @@ def main(args):
         list(set(g.etypes)),
     )
 
-    embed_layer = RelGraphEmbed({ntype: g.num_nodes(ntype)
-                                for ntype in g.ntypes}, args.n_hidden)
+    embed_layer = RelGraphEmbed(
+        {ntype: g.num_nodes(ntype) for ntype in g.ntypes}, args.n_hidden
+    )
 
     if use_cuda:
         model.cuda()
@@ -296,7 +298,7 @@ if __name__ == "__main__":
         "-e",
         "--n-epochs",
         type=int,
-        default=5,
+        default=50,
         help="number of training epochs",
     )
     parser.add_argument(
