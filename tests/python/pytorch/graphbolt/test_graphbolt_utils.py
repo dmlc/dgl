@@ -3,6 +3,50 @@ import pytest
 import torch
 
 
+def test_unique_and_compact_node_list_hetero():
+    N1 = torch.randint(0, 50, (30,))
+    N2 = torch.randint(0, 50, (20,))
+    N3 = torch.randint(0, 50, (10,))
+    unique_N1 = torch.unique(N1)
+    unique_N2 = torch.unique(N2)
+    unique_N3 = torch.unique(N3)
+    expected_unique = {
+        "n1": unique_N1,
+        "n2": unique_N2,
+        "n3": unique_N3,
+    }
+    nodes_dict = {
+        "n1": N1.split(5),
+        "n2": N2.split(4),
+        "n3": N3.split(2),
+    }
+
+    unique, compacted = gb.unique_and_compact_nodes_list(nodes_dict)
+    for ntype, nodes in unique.items():
+        expected_nodes = expected_unique[ntype]
+        assert torch.equal(torch.sort(nodes)[0], expected_nodes)
+
+    for ntype, nodes in compacted.items():
+        expected_nodes = nodes_dict[ntype]
+        for expected_node, node in zip(expected_nodes, nodes):
+            node = unique[ntype][node]
+            assert torch.equal(expected_node, node)
+
+
+def test_unique_and_compact_node_list_homo():
+    N = torch.randint(0, 50, (200,))
+    expected_unique_N = torch.unique(N)
+    nodes_list = N.split(5)
+
+    unique, compacted = gb.unique_and_compact_nodes_list(nodes_list)
+
+    assert torch.equal(torch.sort(unique)[0], expected_unique_N)
+
+    for expected_node, node in zip(nodes_list, compacted):
+        node = unique[node]
+        assert torch.equal(expected_node, node)
+
+
 def test_unique_and_compact_node_pairs_hetero():
     N1 = torch.randint(0, 50, (30,))
     N2 = torch.randint(0, 50, (20,))
