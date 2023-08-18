@@ -382,9 +382,9 @@ pipeline {
             stage('C++ GPU') {
               agent {
                 docker {
-                  label "linux-gpu-node"
+                  label "dgl-ci-linux-gpu"
                   image "dgllib/dgl-ci-gpu:cu116_v230711"
-                  args "--runtime nvidia"
+                  args "-u root --runtime nvidia"
                   alwaysPull true
                 }
               }
@@ -414,6 +414,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230810"
+                  args "-u root"
                   alwaysPull true
                 }
               }
@@ -434,9 +435,9 @@ pipeline {
             stage('Tensorflow GPU') {
               agent {
                 docker {
-                  label "linux-gpu-node"
+                  label "dgl-ci-linux-gpu"
                   image "dgllib/dgl-ci-gpu:cu116_v230711"
-                  args "--runtime nvidia"
+                  args "-u root --runtime nvidia"
                   alwaysPull true
                 }
               }
@@ -461,7 +462,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
-                  args "--shm-size=4gb"
+                  args "-u root --shm-size=4gb"
                   alwaysPull true
                 }
               }
@@ -512,9 +513,9 @@ pipeline {
             stage('Torch GPU') {
               agent {
                 docker {
-                  label "linux-gpu-node"
+                  label "dgl-ci-linux-gpu"
                   image "dgllib/dgl-ci-gpu:cu116_v230711"
-                  args "--runtime nvidia --shm-size=8gb"
+                  args "-u root --runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
               }
@@ -543,7 +544,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
-                  args "--shm-size=4gb"
+                  args "-u root --shm-size=4gb"
                   alwaysPull true
                 }
               }
@@ -565,9 +566,9 @@ pipeline {
             stage('PyTorch Cugraph GPU') {
               agent {
                 docker {
-                  label "linux-gpu-node"
+                  label "dgl-ci-linux-gpu"
                   image "rapidsai/cugraph_stable_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
-                  args "--runtime nvidia --shm-size=8gb"
+                  args "-u root --runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
               }
@@ -591,6 +592,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
+                  args "-u root"
                   alwaysPull true
                 }
               }
