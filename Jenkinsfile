@@ -365,6 +365,7 @@ pipeline {
                 docker {
                   label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
+                  args "-u root"
                   alwaysPull true
                 }
               }
@@ -404,7 +405,6 @@ pipeline {
               }
               post {
                 always {
-                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
