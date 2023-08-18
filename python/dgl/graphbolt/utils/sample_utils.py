@@ -1,9 +1,54 @@
 """Utility functions for sampling."""
 
 from collections import defaultdict
-from typing import Dict, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import torch
+
+
+def unique_and_compact_nodes_list(
+    nodes: Union[
+        List[torch.Tensor],
+        Dict[str, List[torch.Tensor]],
+    ],
+):
+    """
+    Compact a list of nodes tensor.
+
+    Parameters
+    ----------
+    nodes : List[torch.Tensor] or Dict[str, List[torch.Tensor]]
+        List of nodes for compacting.
+        - If `nodes` is a list of tensor: It means the graph is homogeneous.
+        - If `nodes` is a list of dictionary: The keys should be node type and
+        the values should be corresponding nodes. And IDs inside are
+        heterogeneous ids.
+
+    Returns
+    -------
+    List[torch.Tensor] or Dict[str, List[torch.Tensor]]
+    """
+    is_heterogeneous = not isinstance(nodes, dict)
+
+    def unique_and_compact_nodes_homo(nodes):
+        nums = [node.size(0) for node in nodes]
+        nodes = torch.cat(nodes)
+        empty_tensor = nodes.new_empty(0)
+        unique, compacted = torch.ops.graphbolt.unique_and_compact(
+            nodes, empty_tensor, empty_tensor
+        )
+        compacted = compacted.split(nums)
+        return unique, compacted
+
+    if is_heterogeneous:
+        unique, compacted = {}, {}
+        for ntype, nodes_of_type in nodes.items():
+            unique[ntype], compacted[ntype] = unique_and_compact_nodes_homo(
+                nodes_of_type
+            )
+        return unique, compacted
+    else:
+        return unique_and_compact_nodes_homo(nodes)
 
 
 def unique_and_compact_node_pairs(
