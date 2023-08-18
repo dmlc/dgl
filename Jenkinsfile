@@ -33,7 +33,6 @@ def build_dgl_linux(dev) {
   sh "bash tests/scripts/build_dgl.sh ${dev}"
   sh 'ls -lh /usr/lib/x86_64-linux-gnu/'
   pack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  sh "git clean -fdx"
 }
 
 def build_dgl_win64(dev) {
@@ -299,6 +298,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
