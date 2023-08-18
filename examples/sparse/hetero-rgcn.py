@@ -200,7 +200,7 @@ def main(args):
     # Split dataset into train, validate, test.
     if args.validation:
         val_idx = train_idx[: len(train_idx) // 5]
-        train_idx = train_idx[len(train_idx) // 5:]
+        train_idx = train_idx[len(train_idx) // 5 :]
     else:
         val_idx = train_idx
 
