@@ -9,6 +9,7 @@ def init_git() {
   sh "git config --global --add safe.directory '*'"
   checkout scm
   sh 'git submodule update --recursive --init'
+  sh "chmod -R 777 ." // Fix permission issue
 }
 
 def init_git_win64() {
