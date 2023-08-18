@@ -200,7 +200,7 @@ def main(args):
     # Split dataset into train, validate, test.
     if args.validation:
         val_idx = train_idx[: len(train_idx) // 5]
-        train_idx = train_idx[len(train_idx) // 5:]
+        train_idx = train_idx[len(train_idx) // 5 :]
     else:
         val_idx = train_idx
 
@@ -243,20 +243,14 @@ def main(args):
 
     # Training loop.
     print("start training...")
-    dur = []
     model.train()
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
-        if epoch > 5:
-            t0 = time.time()
         logits = model(embed_layer(), A)[category]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         loss.backward()
         optimizer.step()
-        t1 = time.time()
 
-        if epoch > 5:
-            dur.append(t1 - t0)
         train_acc = th.sum(
             logits[train_idx].argmax(dim=1) == labels[train_idx]
         ).item() / len(train_idx)
@@ -267,7 +261,7 @@ def main(args):
         print(
             f"Epoch {epoch:05d} | Train Acc: {train_acc:.4f} | "
             f"Train Loss: {loss.item():.4f} | Valid Acc: {val_acc:.4f} | "
-            f"Valid loss: {val_loss.item():.4f} | Time: {np.average(dur):.4f}"
+            f"Valid loss: {val_loss.item():.4f} "
         )
     print()
     if args.model_path is not None:
@@ -298,7 +292,7 @@ if __name__ == "__main__":
         "-e",
         "--n-epochs",
         type=int,
-        default=50,
+        default=20,
         help="number of training epochs",
     )
     parser.add_argument(
