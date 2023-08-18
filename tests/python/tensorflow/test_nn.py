@@ -477,10 +477,7 @@ def test_edge_conv_bi(g, idtype, out_dim):
 
 
 def myagg(alist, dsttype):
-    rst = alist[0]
-    for i in range(1, len(alist)):
-        rst = rst + (i + 1) * alist[i]
-    return rst
+    return alist[0] + np.dot([i + 1 for i in range(1, len(alist))],alist[1:])
 
 
 @parametrize_idtype
