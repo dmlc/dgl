@@ -318,6 +318,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -336,6 +337,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -371,6 +373,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -389,6 +392,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -400,6 +404,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -421,6 +426,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -445,6 +451,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -477,6 +484,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -525,6 +533,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -548,6 +557,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -571,6 +581,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -592,6 +603,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
