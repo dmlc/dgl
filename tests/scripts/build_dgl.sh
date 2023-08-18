@@ -7,9 +7,6 @@ if [ $# -ne 1 ]; then
     exit -1
 fi
 
-# Build for testing.
-CMAKE_VARS="-DBUILD_TYPE=test"
-
 if [[ $1 != "cpu" ]]; then
     CMAKE_VARS="$CMAKE_VARS -DUSE_CUDA=ON"
 fi

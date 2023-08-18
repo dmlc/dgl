@@ -1,5 +1,5 @@
 import unittest
-from collections import defaultdict
+import warnings
 
 import backend as F
 
@@ -1774,6 +1774,7 @@ def test_sample_neighbors_exclude_edges_homoG(dtype, fused):
 
 @pytest.mark.parametrize("dtype", ["int32", "int64"])
 def test_global_uniform_negative_sampling(dtype):
+    warnings.simplefilter("ignore", np.ComplexWarning)
     g = dgl.graph(([], []), num_nodes=1000).to(F.ctx())
     src, dst = dgl.sampling.global_uniform_negative_sampling(
         g, 2000, False, True

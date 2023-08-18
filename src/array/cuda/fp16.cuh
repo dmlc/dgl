@@ -45,6 +45,8 @@ static __device__ __forceinline__ half min(half a, half b) {
 // Arithmetic FP16 operations for architecture >= 5.3 are already defined in
 // cuda_fp16.h
 #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 530)
+// CUDA 12.2 adds "emulated" support for older architectures.
+#if defined(CUDART_VERSION) && (CUDART_VERSION < 12020)
 __device__ __forceinline__ __half
 operator+(const __half& lh, const __half& rh) {
   return __half(float(lh) + float(rh));  // NOLINT
@@ -125,7 +127,8 @@ __device__ __forceinline__ bool operator>=(const __half& lh, const __half& rh) {
 __device__ __forceinline__ bool operator<=(const __half& lh, const __half& rh) {
   return float(lh) <= float(rh);  // NOLINT
 }
-#endif  // __CUDA_ARCH__ < 530
+#endif  // defined(CUDART_VERSION) && (CUDART_VERSION < 12020)
+#endif  // defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 530)
 #endif  // __CUDACC__
 
 #endif  // DGL_ARRAY_CUDA_FP16_CUH_
