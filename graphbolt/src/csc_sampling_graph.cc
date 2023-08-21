@@ -231,17 +231,19 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
   const int64_t grain_size = 64;
   torch::Tensor picked_eids;
   torch::Tensor subgraph_indptr;
+  torch::Tensor subgraph_indices;
+  torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
 
   AT_DISPATCH_INTEGRAL_TYPES(
       indptr_.scalar_type(), "SampleNeighborsImpl", ([&] {
+        const scalar_t* indptr_data = indptr_.data_ptr<scalar_t>();
+        auto num_picked_neighbors_data_ptr =
+            num_picked_neighbors_per_node.data_ptr<scalar_t>();
+        const auto nodes_data_ptr = nodes.data_ptr<int64_t>();
+
         // Step 1. Calculate pick number of each node.
         torch::parallel_for(
             0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
-              const scalar_t* indptr_data = indptr_.data_ptr<scalar_t>();
-              auto num_picked_neighbors_data_ptr =
-                  num_picked_neighbors_per_node.data_ptr<scalar_t>();
-
-              const auto nodes_data_ptr = nodes.data_ptr<int64_t>();
               for (int64_t i = begin; i < end; ++i) {
                 const auto nid = nodes_data_ptr[i];
                 TORCH_CHECK(
@@ -264,18 +266,17 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
         const auto total_length =
             subgraph_indptr.data_ptr<scalar_t>()[num_nodes];
         picked_eids = torch::empty({total_length}, indptr_options);
+        subgraph_indices = torch::empty({total_length}, indices_.options());
+        if (type_per_edge_.has_value()) {
+          subgraph_type_per_edge =
+              torch::empty({total_length}, type_per_edge_.value().options());
+        }
 
         // Step 4. Pick neighbors for each node.
+        auto picked_eids_data_ptr = picked_eids.data_ptr<scalar_t>();
+        auto subgraph_indptr_data_ptr = subgraph_indptr.data_ptr<scalar_t>();
         torch::parallel_for(
             0, num_nodes, grain_size, [&](int64_t begin, int64_t end) {
-              const scalar_t* indptr_data = indptr_.data_ptr<scalar_t>();
-              auto picked_eids_data_ptr = picked_eids.data_ptr<scalar_t>();
-              auto num_picked_neighbors_data_ptr =
-                  num_picked_neighbors_per_node.data_ptr<scalar_t>();
-              auto subgraph_indptr_data_ptr =
-                  subgraph_indptr.data_ptr<scalar_t>();
-
-              const auto nodes_data_ptr = nodes.data_ptr<int64_t>();
               for (int64_t i = begin; i < end; ++i) {
                 const auto nid = nodes_data_ptr[i];
                 const auto offset = indptr_data[nid];
@@ -290,21 +291,44 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                       actual_picked_count == picked_number,
                       "Actual picked count doesn't match the calculated pick "
                       "number.");
+
+                  // Step 5. Calculate other attributes and return the subgraph.
+                  AT_DISPATCH_INTEGRAL_TYPES(
+                      subgraph_indices.scalar_type(),
+                      "IndexSelectSubgraphIndices", ([&] {
+                        auto subgraph_indices_data_ptr =
+                            subgraph_indices.data_ptr<scalar_t>();
+                        auto indices_data_ptr = indices_.data_ptr<scalar_t>();
+                        for (auto i = picked_offset;
+                             i < picked_offset + picked_number; ++i) {
+                          subgraph_indices_data_ptr[i] =
+                              indices_data_ptr[picked_eids_data_ptr[i]];
+                        }
+                      }));
+                  if (type_per_edge_.has_value()) {
+                    AT_DISPATCH_INTEGRAL_TYPES(
+                        subgraph_type_per_edge.value().scalar_type(),
+                        "IndexSelectTypePerEdge", ([&] {
+                          auto subgraph_type_per_edge_data_ptr =
+                              subgraph_type_per_edge.value()
+                                  .data_ptr<scalar_t>();
+                          auto type_per_edge_data_ptr =
+                              type_per_edge_.value().data_ptr<scalar_t>();
+                          for (auto i = picked_offset;
+                               i < picked_offset + picked_number; ++i) {
+                            subgraph_type_per_edge_data_ptr[i] =
+                                type_per_edge_data_ptr[picked_eids_data_ptr[i]];
+                          }
+                        }));
+                  }
                 }
               }
             });
       }));
 
-  // Step 5. Calculate other attributes and return the subgraph.
-  torch::Tensor subgraph_indices =
-      torch::index_select(indices_, 0, picked_eids);
-  torch::optional<torch::Tensor> subgraph_type_per_edge = torch::nullopt;
-  if (type_per_edge_.has_value()) {
-    subgraph_type_per_edge =
-        torch::index_select(type_per_edge_.value(), 0, picked_eids);
-  }
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
+
   return c10::make_intrusive<SampledSubgraph>(
       subgraph_indptr, subgraph_indices, nodes, torch::nullopt,
       subgraph_reverse_edge_ids, subgraph_type_per_edge);
@@ -395,9 +419,17 @@ int64_t NumPick(
     int64_t num_neighbors) {
   int64_t num_valid_neighbors =
       probs_or_mask.has_value()
-          ? *torch::count_nonzero(
-                 probs_or_mask.value().slice(0, offset, offset + num_neighbors))
-                 .data_ptr<int64_t>()
+          ? [&] {
+            int64_t nonzero_count = 0;
+            AT_DISPATCH_ALL_TYPES(
+                probs_or_mask.value().scalar_type(), "NumPick", ([&] {
+                  scalar_t* probs_data_ptr = probs_or_mask.value().data_ptr<scalar_t>() + offset;
+                  for (auto i = offset; i < offset + num_neighbors; ++ i, ++ probs_data_ptr) {
+                    nonzero_count += (*probs_data_ptr != 0);
+                  }
+                }));
+            return nonzero_count;
+          }()
           : num_neighbors;
   if (num_valid_neighbors == 0 || fanout == -1) return num_valid_neighbors;
   return replace ? fanout : std::min(fanout, num_valid_neighbors);
