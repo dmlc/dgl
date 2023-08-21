@@ -41,7 +41,7 @@ class NegativeSampler(Mapper):
         """
         Generate a mix of positive and negative samples.
 
-        node_pair
+        Parameters
         ----------
         data : LinkPredictionBlock
             An instance of 'LinkPredictionBlock' class requires the 'node_pair'
