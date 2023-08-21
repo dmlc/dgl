@@ -20,15 +20,20 @@ def unique_and_compact(
     nodes : List[torch.Tensor] or Dict[str, List[torch.Tensor]]
         List of nodes for compacting.
         the unique_and_compact will be done per type
-        - If `nodes` is a list of tensor: It means the graph is homogeneous,
-        all the tensors will do unique_and_compact together.
+        - If `nodes` is a list of tensor: All the tensors will do unique and
+        compact together, usually it is used for homogeneous graph.
         - If `nodes` is a list of dictionary: The keys should be node type and
-        the values should be corresponding nodes, and the IDs inside are
-        heterogeneous ids. And the unique_and_compact will be done per type.
+        the values should be corresponding nodes, the unique and compact will
+        be done per type, usually it is used for heterogeneous graph.
 
     Returns
     -------
-    List[torch.Tensor] or Dict[str, List[torch.Tensor]]
+    Tuple[unique_nodes, compacted_node_list]
+    The Unique nodes (per type) of all nodes in the input. And the compacted
+    nodes list, where IDs inside are replaced with compacted node IDs.
+    "Compacted node list" indicates that the node IDs in the input node
+    list are replaced with mapped node IDs, where each type of node is
+    mapped to a contiguous space of IDs ranging from 0 to N.
     """
     is_heterogeneous = isinstance(nodes, dict)
 
