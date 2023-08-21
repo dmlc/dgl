@@ -13,111 +13,119 @@ include(cmake/util/Util.cmake)
 include(cmake/util/MshadowUtil.cmake)
 include(cmake/util/FindCUDA.cmake)
 
-# TODO(#5475): Clean up the old flags after CI and regression framework adopt to the new setup.
-if (NOT DEFINED BUILD_TYPE)
-  dgl_option(USE_CUDA "Build with CUDA" OFF)
-  dgl_option(USE_OPENMP "Build with OpenMP" ON)
-  dgl_option(USE_LIBXSMM "Build with LIBXSMM library optimization" ON)
-  dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
-  dgl_option(LIBCXX_ENABLE_PARALLEL_ALGORITHMS "Enable the parallel algorithms library. This requires the PSTL to be available." OFF)
-  dgl_option(USE_S3 "Build with S3 support" OFF)
-  dgl_option(USE_HDFS "Build with HDFS support" OFF) # Set env HADOOP_HDFS_HOME if needed
-  dgl_option(REBUILD_LIBXSMM "Clean LIBXSMM build cache at every build" OFF) # Set env HADOOP_HDFS_HOME if needed
-  dgl_option(USE_EPOLL "Build with epoll for socket communicator" ON)
-  dgl_option(BUILD_TORCH "Build the PyTorch plugin" OFF)
-  dgl_option(BUILD_SPARSE "Build DGL sparse library" ON)
-  dgl_option(BUILD_GRAPHBOLT "Build Graphbolt library" OFF)
-  dgl_option(TORCH_PYTHON_INTERPS "Python interpreter used to build tensoradapter and DGL sparse library" python3)
+# Options for building DGL.
+# NOTE: Please avoid editing this file to change build type. Instead, using
+# bash script/build_dgl.sh -e -t release to overwrite the value.
+dgl_option(
+    BUILD_TYPE
+    "Type of the build: dev, dogfood or release"
+    "dev"
+)
+message(STATUS "Build for ${BUILD_TYPE}")
+
+dgl_option(
+    USE_CUDA
+    "Build with CUDA"
+    OFF
+)
+dgl_option(
+    TORCH_PYTHON_INTERPS
+    "Python interpreter used to build tensoradapter and DGL sparse library"
+    python3
+)
+
+# Options for building DGL features: "none," "dev," "dogfood," "release," and
+# "all."
+#    "none"  - The feature is OFF for all build types. This is used when
+#              disabling a feature.
+#    "dev"   - The feature is ON for dev build. The default build from source
+#              and the build for unit tests are using this build type.
+#  "dogfood" - The major function of this feature is done. The regression and
+#              benchmark framework are using this build type.
+#  "release" - The feature will be build for release.
+#    "all"   - The feature is ON for all build types. Equivalent to set ["dev"
+#              "dogfood" "release"].
+# NOTE: Please avoid editing this file to change feature options for a local
+# build. Instead, using bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' to
+# overwrite the value.
+dgl_feature_option(
+    BUILD_SPARSE
+    "Build DGL sparse library"
+    "all"
+)
+dgl_feature_option(
+    BUILD_TORCH
+    "Build the PyTorch plugin"
+    "all"
+)
+dgl_feature_option(
+    USE_EPOLL
+    "Build with epoll for socket communicator"
+    "all"
+)
+dgl_feature_option(
+    USE_LIBXSMM
+    "Build with LIBXSMM library optimization"
+    "all"
+)
+dgl_feature_option(
+    USE_OPENMP
+    "Build with OpenMP"
+    "all"
+)
+
+dgl_feature_option(
+    BUILD_GRAPHBOLT
+    "Build Graphbolt library"
+    "dev" "dogfood"
+)
+
+dgl_feature_option(
+    LIBCXX_ENABLE_PARALLEL_ALGORITHMS
+    "Enable the parallel algorithms library. This requires the PSTL to be available."
+    "none"
+)
+dgl_feature_option(
+    REBUILD_LIBXSMM
+    "Clean LIBXSMM build cache at every build"
+    "none"
+)
+dgl_feature_option(
+    USE_HDFS
+    "Build with HDFS support"
+    "none"
+) # Set env HADOOP_HDFS_HOME if needed
+dgl_feature_option(
+    USE_S3
+    "Build with S3 support"
+    "none"
+)
+
+# Only build C++ tests for unit testing purposes in dev build.
+dgl_feature_option(
+    BUILD_CPP_TEST
+    "Build cpp unittest executables"
+    "dev"
+)
+
+# Set optimization options for different build types.
+if (${BUILD_TYPE} STREQUAL "dev")
+  if (MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Od")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Od")
+  else()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g3 -ggdb")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3 -ggdb")
+  endif()
 else()
-  # Options for building DGL.
-  # NOTE: do not modify this file to change option values.
-  # Use bash script/build_dgl.sh -e '-DOPTION=VALUE' through command-line.
-  dgl_option(
-      BUILD_TYPE
-      "Type of the build: dev, test or release"
-      "dev"
-  )
-  message(STATUS "Build for ${BUILD_TYPE}")
-
-  dgl_option(
-      USE_CUDA
-      "Build with CUDA"
-      OFF
-  )
-  dgl_option(
-      TORCH_PYTHON_INTERPS
-      "Python interpreter used to build tensoradapter and DGL sparse library"
-      python3
-  )
-
-  # Options for building DGL features, supported: "none", "dev", "test", "release", "all".
-  # NOTE: do not modify this file to change option values.
-  # Use bash script/build_dgl.sh -e '-DFEATURE_NAME=ON/OFF' through command-line.
-  dgl_feature_option(
-      BUILD_SPARSE
-      "Build DGL sparse library"
-      "all"
-  )
-  dgl_feature_option(
-      BUILD_TORCH
-      "Build the PyTorch plugin"
-      "all"
-  )
-  dgl_feature_option(
-      USE_EPOLL
-      "Build with epoll for socket communicator"
-      "all"
-  )
-  dgl_feature_option(
-      USE_LIBXSMM
-      "Build with LIBXSMM library optimization"
-      "all"
-  )
-  dgl_feature_option(
-      USE_OPENMP
-      "Build with OpenMP"
-      "all"
-  )
-
-  dgl_feature_option(
-      BUILD_GRAPHBOLT
-      "Build Graphbolt library"
-      "dev" "test"
-  )
-
-  dgl_feature_option(
-      LIBCXX_ENABLE_PARALLEL_ALGORITHMS
-      "Enable the parallel algorithms library. This requires the PSTL to be available."
-      "none"
-  )
-  dgl_feature_option(
-      REBUILD_LIBXSMM
-      "Clean LIBXSMM build cache at every build"
-      "none"
-  )
-  dgl_feature_option(
-      USE_HDFS
-      "Build with HDFS support"
-      "none"
-  ) # Set env HADOOP_HDFS_HOME if needed
-  dgl_feature_option(
-      USE_S3
-      "Build with S3 support"
-      "none"
-  )
-
-  # Build cpp test only in test build.
-  dgl_feature_option(
-      BUILD_CPP_TEST
-      "Build cpp unittest executables"
-      "test"
-  )
+  if (MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2")
+  else()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+  endif()
 endif()
-
-# Set debug compile option for gdb, only happens when -DCMAKE_BUILD_TYPE=DEBUG
-if (NOT MSVC)
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -O0 -g3 -ggdb")
-endif(NOT MSVC)
 
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
@@ -163,8 +171,8 @@ if(MSVC)
   endif()
 else(MSVC)
   include(CheckCXXCompilerFlag)
-  set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_C_FLAGS "-Wall -fPIC ${CMAKE_C_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-Wall -fPIC ${CMAKE_CXX_FLAGS}")
   if(NOT APPLE)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-common ${CMAKE_SHARED_LINKER_FLAGS}")
   endif(NOT APPLE)

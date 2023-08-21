@@ -1,11 +1,41 @@
 #!/usr/bin/env groovy
 
+// CI tests are executed within Docker containers as the 'root' user. However,
+// communications between Jenkins nodes are done with the 'ubuntu' user(login
+// via root is disallowed on AWS EC2 instances). Therefore, we need to change
+// the file permission to allow 'ubuntu' user to access the files created by
+// the 'root' user. This is achieved by running 'chmod -R 777 .'.
+
+// Summary of Jenkins nodes:
+// - linux-benchmark-node: Linux CPU node for authentication and lint check.
+//      number of nodes: 1
+//      instance type: m5.2xlarge(8 vCPUs, 32 GB memory)
+//      number of executors per node: 6
+//      number of jobs running on this node per CI run: 3
+// - linux-cpu-node: Linux CPU node for building and testing.
+//      number of nodes: 4
+//      instance type: m6i.24xlarge(96 vCPUs, 384 GB memory)
+//      number of executors per node: 6
+//      number of jobs running on this node per CI run: 8
+// - linux-gpu-node: Linux GPU node for building and testing.
+//      number of nodes: 4
+//      instance type: g4dn.4xlarge(16 vCPUs, 64 GB memory, 1 GPU)
+//      number of executors per node: 1
+//      number of jobs running on this node per CI run: 4
+// - windows-node: Windows CPU node for building and testing.
+//      number of nodes: 1
+//      instance type: m5.8xlarge(32 vCPUs, 128 GB memory)
+//      number of executors per node: 2
+//      number of jobs running on this node per CI run: 3
+
 dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so, build/dgl_sparse/*.so, build/graphbolt/*.so'
 // Currently DGL on Windows is not working with Cython yet
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll, build\\dgl_sparse\\*.dll, build\\graphbolt\\*.dll"
 
 def init_git() {
+  sh "chmod -R 777 ." // Fix permission issue
   sh 'rm -rf *'
+  sh "git config --global --add safe.directory '*'"
   checkout scm
   sh 'git submodule update --recursive --init'
 }
@@ -57,7 +87,7 @@ def cpp_unit_test_win64() {
 def unit_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 30, unit: 'MINUTES') {
+  timeout(time: 40, unit: 'MINUTES') {
     sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
   }
 }
@@ -286,7 +316,7 @@ pipeline {
             stage('CPU Build') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
                   args "-u root"
                   alwaysPull true
@@ -297,6 +327,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -304,7 +335,7 @@ pipeline {
             stage('GPU Build') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-gpu:cu116_v230711"
                   args "-u root"
                   alwaysPull true
@@ -316,6 +347,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -323,7 +355,7 @@ pipeline {
             stage('PyTorch Cugraph GPU Build') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "rapidsai/cugraph_stable_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
                   args "-u root"
                   alwaysPull true
@@ -334,6 +366,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -359,8 +392,9 @@ pipeline {
             stage('C++ CPU') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
+                  args "-u root"
                   alwaysPull true
                 }
               }
@@ -369,6 +403,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -376,9 +411,9 @@ pipeline {
             stage('C++ GPU') {
               agent {
                 docker {
-                  label "linux-gpu-node"
+                  label "dgl-ci-linux-gpu"
                   image "dgllib/dgl-ci-gpu:cu116_v230711"
-                  args "--runtime nvidia"
+                  args "-u root --runtime nvidia"
                   alwaysPull true
                 }
               }
@@ -387,6 +422,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -405,8 +441,9 @@ pipeline {
             stage('Tensorflow CPU') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230810"
+                  args "-u root"
                   alwaysPull true
                 }
               }
@@ -419,6 +456,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -426,9 +464,9 @@ pipeline {
             stage('Tensorflow GPU') {
               agent {
                 docker {
-                  label "linux-gpu-node"
+                  label "dgl-ci-linux-gpu"
                   image "dgllib/dgl-ci-gpu:cu116_v230711"
-                  args "--runtime nvidia"
+                  args "-u root --runtime nvidia"
                   alwaysPull true
                 }
               }
@@ -443,6 +481,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -450,9 +489,9 @@ pipeline {
             stage('Torch CPU') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
-                  args "--shm-size=4gb"
+                  args "-u root --shm-size=4gb"
                   alwaysPull true
                 }
               }
@@ -475,6 +514,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -502,9 +542,9 @@ pipeline {
             stage('Torch GPU') {
               agent {
                 docker {
-                  label "linux-gpu-node"
+                  label "dgl-ci-linux-gpu"
                   image "dgllib/dgl-ci-gpu:cu116_v230711"
-                  args "--runtime nvidia --shm-size=8gb"
+                  args "-u root --runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
               }
@@ -523,6 +563,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -530,9 +571,9 @@ pipeline {
             stage('Distributed') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
-                  args "--shm-size=4gb"
+                  args "-u root --shm-size=4gb"
                   alwaysPull true
                 }
               }
@@ -546,6 +587,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -553,9 +595,9 @@ pipeline {
             stage('PyTorch Cugraph GPU') {
               agent {
                 docker {
-                  label "linux-gpu-node"
+                  label "dgl-ci-linux-gpu"
                   image "rapidsai/cugraph_stable_torch-cuda:11.8-base-ubuntu20.04-py3.10-pytorch2.0.0-rapids23.04"
-                  args "--runtime nvidia --shm-size=8gb"
+                  args "-u root --runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
               }
@@ -569,6 +611,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
@@ -576,8 +619,9 @@ pipeline {
             stage('DGL-Go') {
               agent {
                 docker {
-                  label "linux-cpu-node"
+                  label "dgl-ci-linux-cpu"
                   image "dgllib/dgl-ci-cpu:v230711"
+                  args "-u root"
                   alwaysPull true
                 }
               }
@@ -590,6 +634,7 @@ pipeline {
               }
               post {
                 always {
+                  sh "chmod -R 777 ." // Fix permission issue
                   cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
               }
