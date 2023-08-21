@@ -26,7 +26,8 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        src, dst, label = data
+        src, dst = data.node_pair
+        label = data.label
         # Assertation
         assert len(src) == batch_size * (negative_ratio + 1)
         assert len(dst) == batch_size * (negative_ratio + 1)
@@ -57,7 +58,8 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        pos_src, pos_dst, neg_src, neg_dst = data
+        pos_src, pos_dst = data.node_pair
+        neg_src, neg_dst = data.negative_head, data.negative_tail
         # Assertation
         assert len(pos_src) == batch_size
         assert len(pos_dst) == batch_size
@@ -91,7 +93,8 @@ def test_NegativeSampler_Head_Conditioned_Format(negative_ratio):
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        pos_src, pos_dst, neg_src = data
+        pos_src, pos_dst = data.node_pair
+        neg_src = data.negative_head
         # Assertation
         assert len(pos_src) == batch_size
         assert len(pos_dst) == batch_size
@@ -123,7 +126,8 @@ def test_NegativeSampler_Tail_Conditioned_Format(negative_ratio):
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        pos_src, pos_dst, neg_dst = data
+        pos_src, pos_dst = data.node_pair
+        neg_dst = data.negative_tail
         # Assertation
         assert len(pos_src) == batch_size
         assert len(pos_dst) == batch_size
