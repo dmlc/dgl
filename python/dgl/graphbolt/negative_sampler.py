@@ -43,11 +43,12 @@ class NegativeSampler(Mapper):
 
         Parameters
         ----------
-        LinkPredictionBlock : Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
-            An instance of 'LinkPredictionBlock', where 'node_pair' is required
-            while 'negative_head' and 'negative_tail' should be None. If either
-            of them has value, it inidcates there have already negative samples
-            , thus the function will do nothing.
+        LinkPredictionBlock : LinkPredictionBlock
+            An instance of 'LinkPredictionBlock' class requires the 'node_pair'
+            field. This function is responsible for generating negative edges
+            corresponding to the positive edges defined by the 'node_pair'. In
+            cases where negative edges already exist, this function will
+            overwrite them.
 
         Returns
         -------
@@ -55,15 +56,14 @@ class NegativeSampler(Mapper):
             An instance of 'LinkPredictionBlock' encompasses both positive and
             negative samples.
         """
-        if data.negative_head is None and data.negative_tail is None:
-            node_pairs = data.node_pair
-            if isinstance(node_pairs, Mapping):
-                for etype, pos_pairs in node_pairs.items():
-                    self._collate(
-                        data, self._sample_with_etype(pos_pairs, etype), etype
-                    )
-            else:
-                self._collate(data, self._sample_with_etype(node_pairs))
+        node_pairs = data.node_pair
+        if isinstance(node_pairs, Mapping):
+            for etype, pos_pairs in node_pairs.items():
+                self._collate(
+                    data, self._sample_with_etype(pos_pairs, etype), etype
+                )
+        else:
+            self._collate(data, self._sample_with_etype(node_pairs))
         return data
 
     def _sample_with_etype(self, node_pairs, etype=None):
