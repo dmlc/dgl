@@ -3679,7 +3679,9 @@ def lap_pe(g, k, padding=False, return_eigval=False):
             L, k=k + 1, which="SR", tol=1e-2
         )
         topk_indices = EigVal.argsort()[1:]
-        topk_eigvals = EigVal[topk_indices].real  # scipy may give complex
+        # Since scipy may return complex value, to avoid crashing in NN code,
+        # convert them to real number.
+        topk_eigvals = EigVal[topk_indices].real
         topk_EigVec = EigVec[:, topk_indices].real
     else:
         # Fallback to numpy since scipy.sparse do not support this case.
