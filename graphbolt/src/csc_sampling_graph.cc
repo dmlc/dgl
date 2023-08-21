@@ -283,9 +283,13 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
                 const auto picked_number = num_picked_neighbors_data_ptr[i + 1];
                 const auto picked_offset = subgraph_indptr_data_ptr[i];
                 if (picked_number > 0) {
-                  pick_fn(
+                  auto actual_picked_count = pick_fn(
                       offset, num_neighbors,
                       picked_eids_data_ptr + picked_offset);
+                  TORCH_CHECK(
+                      actual_picked_count == picked_number,
+                      "Actual picked count doesn't match the calculated pick "
+                      "number.");
                 }
               }
             });
@@ -450,17 +454,19 @@ int64_t NumPickByEtype(
  * should be put. Enough memory space should be allocated in advance.
  */
 template <typename PickedType>
-inline void UniformPick(
+inline int64_t UniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options, PickedType* picked_data_ptr) {
   if ((fanout == -1) || (num_neighbors <= fanout && !replace)) {
     std::iota(picked_data_ptr, picked_data_ptr + num_neighbors, offset);
+    return num_neighbors;
   } else if (replace) {
     std::memcpy(
         picked_data_ptr,
         torch::randint(offset, offset + num_neighbors, {fanout}, options)
             .data_ptr<PickedType>(),
         fanout * sizeof(PickedType));
+    return fanout;
   } else {
     // We use different sampling strategies for different sampling case.
     if (fanout >= num_neighbors / 10) {
@@ -496,6 +502,7 @@ inline void UniformPick(
       }
       // Save the randomly sampled fanout elements to the output tensor.
       std::copy(seq.begin(), seq.begin() + fanout, picked_data_ptr);
+      return fanout;
     } else if (fanout < 64) {
       // [Algorithm]
       // Use linear search to verify uniqueness.
@@ -516,6 +523,7 @@ inline void UniformPick(
         auto it = std::find(picked_data_ptr, begin, *begin);
         if (it == begin) ++begin;
       }
+      return fanout;
     } else {
       // [Algorithm]
       // Use hash-set to verify uniqueness. In the best scenario, the
@@ -539,6 +547,7 @@ inline void UniformPick(
             offset, offset + num_neighbors));
       }
       std::copy(picked_set.begin(), picked_set.end(), picked_data_ptr);
+      return picked_set.size();
     }
   }
 }
@@ -579,7 +588,7 @@ inline void UniformPick(
  * should be put. Enough memory space should be allocated in advance.
  */
 template <typename PickedType>
-inline void NonUniformPick(
+inline int64_t NonUniformPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
@@ -588,12 +597,13 @@ inline void NonUniformPick(
       probs_or_mask.value().slice(0, offset, offset + num_neighbors);
   auto positive_probs_indices = local_probs.nonzero().squeeze(1);
   auto num_positive_probs = positive_probs_indices.size(0);
-  if (num_positive_probs == 0) return;
+  if (num_positive_probs == 0) return 0;
   if ((fanout == -1) || (num_positive_probs <= fanout && !replace)) {
     std::memcpy(
         picked_data_ptr,
         (positive_probs_indices + offset).data_ptr<PickedType>(),
         num_positive_probs * sizeof(PickedType));
+    return num_positive_probs;
   } else {
     if (!replace) fanout = std::min(fanout, num_positive_probs);
     std::memcpy(
@@ -601,27 +611,28 @@ inline void NonUniformPick(
         (torch::multinomial(local_probs, fanout, replace) + offset)
             .data_ptr<PickedType>(),
         fanout * sizeof(PickedType));
+    return fanout;
   }
 }
 
 template <typename PickedType>
-void Pick(
+int64_t Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr) {
   if (probs_or_mask.has_value()) {
-    NonUniformPick(
+    return NonUniformPick(
         offset, num_neighbors, fanout, replace, options, probs_or_mask,
         picked_data_ptr);
   } else {
-    UniformPick(
+    return UniformPick(
         offset, num_neighbors, fanout, replace, options, picked_data_ptr);
   }
 }
 
 template <SamplerType S, typename PickedType>
-void PickByEtype(
+int64_t PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
@@ -629,11 +640,11 @@ void PickByEtype(
     PickedType* picked_data_ptr) {
   int64_t etype_begin = offset;
   int64_t etype_end = offset;
+  int64_t pick_offset = 0;
   AT_DISPATCH_INTEGRAL_TYPES(
       type_per_edge.scalar_type(), "PickByEtype", ([&] {
         const scalar_t* type_per_edge_data = type_per_edge.data_ptr<scalar_t>();
         const auto end = offset + num_neighbors;
-        int64_t pick_offset = 0;
         while (etype_begin < end) {
           scalar_t etype = type_per_edge_data[etype_begin];
           TORCH_CHECK(
@@ -644,12 +655,9 @@ void PickByEtype(
               type_per_edge_data + etype_begin, type_per_edge_data + end,
               etype);
           etype_end = etype_end_it - type_per_edge_data;
-          int64_t picked_count = NumPick(
-              fanout, replace, probs_or_mask, etype_begin,
-              etype_end - etype_begin);
           // Do sampling for one etype.
           if (fanout != 0) {
-            Pick(
+            int64_t picked_count = Pick(
                 etype_begin, etype_end - etype_begin, fanout, replace, options,
                 probs_or_mask, args, picked_data_ptr + pick_offset);
             pick_offset += picked_count;
@@ -657,43 +665,46 @@ void PickByEtype(
           etype_begin = etype_end;
         }
       }));
+  return pick_offset;
 }
 
 template <typename PickedType>
-void Pick(
+int64_t Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr) {
-  if (fanout == 0) return;
+  if (fanout == 0) return 0;
   if (probs_or_mask.has_value()) {
     if (fanout < 0) {
-      NonUniformPick(
+      return NonUniformPick(
           offset, num_neighbors, fanout, replace, options, probs_or_mask,
           picked_data_ptr);
     } else {
+      int64_t picked_count;
       AT_DISPATCH_FLOATING_TYPES(
           probs_or_mask.value().scalar_type(), "LaborPickFloatType", ([&] {
             if (replace) {
-              LaborPick<true, true, scalar_t>(
+              picked_count = LaborPick<true, true, scalar_t>(
                   offset, num_neighbors, fanout, options, probs_or_mask, args,
                   picked_data_ptr);
             } else {
-              LaborPick<true, false, scalar_t>(
+              picked_count = LaborPick<true, false, scalar_t>(
                   offset, num_neighbors, fanout, options, probs_or_mask, args,
                   picked_data_ptr);
             }
           }));
+      return picked_count;
     }
   } else if (fanout < 0) {
-    UniformPick(
+    return UniformPick(
         offset, num_neighbors, fanout, replace, options, picked_data_ptr);
   } else if (replace) {
-    LaborPick<false, true>(
+    return LaborPick<false, true>(
         offset, num_neighbors, fanout, options,
         /* probs_or_mask= */ torch::nullopt, args, picked_data_ptr);
   } else {  // replace = false
-    LaborPick<false, false>(
+    return LaborPick<false, false>(
         offset, num_neighbors, fanout, options,
         /* probs_or_mask= */ torch::nullopt, args, picked_data_ptr);
   }
@@ -730,7 +741,7 @@ inline void safe_divide(T& a, U b) {
  */
 template <
     bool NonUniform, bool Replace, typename ProbsType, typename PickedType>
-inline void LaborPick(
+inline int64_t LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
@@ -738,7 +749,7 @@ inline void LaborPick(
   fanout = Replace ? fanout : std::min(fanout, num_neighbors);
   if (!NonUniform && !Replace && fanout >= num_neighbors) {
     std::iota(picked_data_ptr, picked_data_ptr + num_neighbors, offset);
-    return;
+    return num_neighbors;
   }
   torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
   // Assuming max_degree of a vertex is <= 4 billion.
@@ -868,6 +879,7 @@ inline void LaborPick(
   TORCH_CHECK(
       !Replace || num_sampled == fanout || num_sampled == 0,
       "Sampling with replacement should sample exactly fanout neighbors or 0!");
+  return num_sampled;
 }
 
 }  // namespace sampling
