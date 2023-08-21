@@ -23,9 +23,10 @@ class NeighborSampler(SubgraphSampler):
             The datapipe.
         graph : CSCSamplingGraph
             The graph on which to perform subgraph sampling.
-        fanouts: list[list[int]]
+        fanouts: list[torch.Tensor]
             The number of edges to be sampled for each node with or without
-            considering edge types.
+            considering edge types. The length of this parameter implicitly
+            signifies the layer of sampling being conducted.
         replace: bool
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
@@ -38,10 +39,16 @@ class NeighborSampler(SubgraphSampler):
             equalling the total number of edges.
 
         Examples
-        --------
+        -------
+        >>> import dgl.graphbolt as gb
+        >>> from torchdata.datapipes.iter import Mapper
+        >>> def to_link_block(data):
+            ... block = gb.LinkPredictionBlock(node_pair=data)
+            ... return block
+            ...
         >>> from dgl import graphbolt as gb
-        >>> indptr = torch.LongTensor([0, 2, 4, 5])
-        >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
+        >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
+        >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
         >>> graph = gb.from_csc(indptr, indices)
         >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
@@ -49,16 +56,20 @@ class NeighborSampler(SubgraphSampler):
         >>> minibatch_sampler = gb.MinibatchSampler(
             ...item_set, batch_size=1,
             ...)
+        >>> data_block_converter = Mapper(minibatch_sampler, to_link_block)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...minibatch_sampler, 2, data_format, graph)
-        >>> fanouts = [[5], [10], [15]]
+            ...data_block_converter, 2, data_format, graph)
+        >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
+            ...torch.LongTensor([15])]
         >>> subgraph_sampler = gb.NeighborSampler(
             ...neg_sampler, graph, fanouts)
         >>> for data in subgraph_sampler:
-            ...  print(data)
-            ...
-        (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([1, 0, 0]))
-        (tensor([1, 1, 1]), tensor([2, 1, 2]), tensor([1, 0, 0]))
+            ... print(data.compacted_node_pair)
+            ... print(len(data.sampled_subgraphs))
+        (tensor([0, 0, 0]), tensor([1, 0, 2]))
+        3
+        (tensor([0, 0, 0]), tensor([1, 1, 1]))
+        3
         """
         super().__init__(datapipe, fanouts, replace, prob_name)
         self.graph = graph
