@@ -66,7 +66,7 @@ class NeighborSampler(SubgraphSampler):
     def _sample_sub_graph(self, seeds, hop):
         return self.graph.sample_neighbors(
             seeds,
-            torch.LongTensor(self.fanouts[hop]),
+            self.fanouts[hop],
             self.replace,
             self.prob_name,
         )

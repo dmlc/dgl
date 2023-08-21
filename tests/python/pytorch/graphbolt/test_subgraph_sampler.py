@@ -1,54 +1,48 @@
-import dgl
-import dgl.graphbolt
+import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
 import torch
 import torchdata.datapipes as dp
+from torchdata.datapipes.iter import Mapper
 
 
-def get_graphbolt_sampler_func():
+def to_node_block(data):
+    block = gb.NodeClassificationBlock(seed_node=data)
+    return block
+
+
+def test_SubgraphSampler():
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
-
-    def sampler_func(data):
-        adjs = []
-        seeds = data
-
-        for hop in range(2):
-            sg = graph.sample_neighbors(seeds, torch.LongTensor([2]))
-            seeds = sg.node_pairs[0]
-            adjs.insert(0, sg)
-        return seeds, data, adjs
-
-    return sampler_func
-
-
-def get_dgl_sampler_func():
-    graph = dgl.add_reverse_edges(dgl.rand_graph(20, 60))
-    sampler = dgl.dataloading.NeighborSampler([2, 2])
-
-    def sampler_func(data):
-        return sampler.sample(graph, data)
-
-    return sampler_func
-
-
-def get_graphbolt_minibatch_dp():
-    itemset = dgl.graphbolt.ItemSet(torch.arange(10))
-    return dgl.graphbolt.MinibatchSampler(itemset, batch_size=2)
-
-
-def get_torchdata_minibatch_dp():
-    minibatch_dp = dp.map.SequenceWrapper(torch.arange(10)).batch(2)
-    minibatch_dp = minibatch_dp.to_iter_datapipe().collate()
-    return minibatch_dp
-
-
-@pytest.mark.parametrize(
-    "sampler_func", [get_graphbolt_sampler_func(), get_dgl_sampler_func()]
-)
-@pytest.mark.parametrize(
-    "minibatch_dp", [get_graphbolt_minibatch_dp(), get_torchdata_minibatch_dp()]
-)
-def test_SubgraphSampler(minibatch_dp, sampler_func):
-    sampler_dp = dgl.graphbolt.SubgraphSampler(minibatch_dp, sampler_func)
+    itemset = gb.ItemSet(torch.arange(10))
+    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    data_block_converter = Mapper(minibatch_dp, to_node_block)
+    sampler_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
     assert len(list(sampler_dp)) == 5
+
+
+def to_link_block(data):
+    block = gb.LinkPredictionBlock(node_pair=data)
+    return block
+
+@pytest.mark.parametrize(
+    "format", [gb.LinkPredictionEdgeFormat.INDEPENDENT, gb.LinkPredictionEdgeFormat.CONDITIONED, gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED, gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED]
+)
+def test_SubgraphSampler_with_Negative(format):
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    itemset = gb.ItemSet(
+        (
+            torch.arange(0, 10),
+            torch.arange(10, 20),
+        )
+    )
+    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    data_block_converter = Mapper(minibatch_dp, to_link_block)
+    negative_dp = gb.UniformNegativeSampler(data_block_converter, 1, format, graph)
+    neighbor_dp = gb.NeighborSampler(negative_dp, graph, fanouts)
+    assert len(list(neighbor_dp)) == 5
+
+test_SubgraphSampler_with_Negative(gb.LinkPredictionEdgeFormat.CONDITIONED)

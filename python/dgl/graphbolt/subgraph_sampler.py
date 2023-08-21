@@ -3,33 +3,18 @@
 from collections import defaultdict
 from typing import Dict
 
-import torch
 from torchdata.datapipes.iter import Mapper
 
 from .impl import SampledSubgraphImpl
 
 from .link_prediction_block import LinkPredictionBlock
 from .node_classification_block import NodeClassificationBlock
-from .utils import unique_and_compact_node_pairs, unique_and_compact_nodes_list
+from .utils import unique_and_compact, unique_and_compact_node_pairs
 
 
 class SubgraphSampler(Mapper):
-    """A subgraph sampler.
-
-    It is an iterator equivalent to the following:
-
-    .. code:: python
-
-       for data in datapipe:
-           yield _sample(data)
-
-    Parameters
-    ----------
-    datapipe : DataPipe
-        The datapipe.
-    fn : callable
-        The subgraph sampling function.
-    """
+    """A subgraph sampler used to sample a subgraph from a given set of nodes
+    from a larger graph."""
 
     def __init__(
         self,
@@ -45,19 +30,20 @@ class SubgraphSampler(Mapper):
         ----------
         datapipe : DataPipe
             The datapipe.
-        fanouts: list[list[int]]
+        fanouts: list[torch.Tensor]
             The number of edges to be sampled for each node with or without
-            considering edge types.
+            considering edge types. The length of this parameter implicitly
+            signifies the layer of sampling being conducted.
         replace: bool
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
         prob_name: str, optional
-            The name of an edge attribute used a. This
-            attribute tensor should contain (unnormalized) probabilities
-            corresponding to each neighboring edge of a node. It must be a 1D
-            floating-point or boolean tensor, with the number of elements
-            equalling the total number of edges.
+            The name of an edge attribute used as the weights of sampling for
+            each node. This attribute tensor should contain (unnormalized)
+            probabilities corresponding to each neighboring edge of a node.
+            It must be a 1D floating-point or boolean tensor, with the number
+            of elements equalling the total number of edges.
         """
         super().__init__(datapipe, self._sample)
         self.fanouts = fanouts
@@ -77,19 +63,20 @@ class SubgraphSampler(Mapper):
         elif isinstance(data, NodeClassificationBlock):
             seeds = data.seed_node
         else:
-            raise TypeError(f"Unsupported data {data}.")
+            raise TypeError(f"Unsupported type of data {data}.")
         for hop in range(num_layers):
             subgraph = self._sample_sub_graph(
                 seeds,
                 hop,
             )
+            reverse_row_node_ids = seeds
             seeds, compacted_node_pairs = unique_and_compact_node_pairs(
                 subgraph.node_pairs, seeds
             )
             subgraph = SampledSubgraphImpl(
                 node_pairs=compacted_node_pairs,
                 reverse_column_node_ids=seeds,
-                reverse_row_node_ids=seeds,
+                reverse_row_node_ids=reverse_row_node_ids,
             )
             subgraphs.insert(0, subgraph)
         data.input_nodes = seeds
@@ -110,12 +97,12 @@ class SubgraphSampler(Mapper):
                 nodes[dst_type].append(dst)
             if has_neg_src:
                 for (src_type, _, _), src in neg_src.items():
-                    nodes[src_type].append(src)
+                    nodes[src_type].append(src.view(-1))
             if has_neg_dst:
                 for (_, _, dst_type), dst in neg_dst.items():
-                    nodes[dst_type].append(dst)
+                    nodes[dst_type].append(dst.view(-1))
             # Unique and compact
-            seeds, compacted = unique_and_compact_nodes_list(nodes)
+            seeds, compacted = unique_and_compact(nodes)
             (
                 compacted_node_pair,
                 compacted_negative_head,
@@ -137,11 +124,11 @@ class SubgraphSampler(Mapper):
             # Collect all nodes
             nodes = list(node_pair)
             if has_neg_src:
-                nodes.append(neg_src)
+                nodes.append(neg_src.view(-1))
             if has_neg_dst:
-                nodes.append(neg_dst)
+                nodes.append(neg_dst.view(-1))
             # Unique and compact
-            seeds, compacted = unique_and_compact_nodes_list(nodes)
+            seeds, compacted = unique_and_compact(nodes)
             # Map back in same order as collect.
             compacted_node_pair = tuple(compacted[:2])
             compacted = compacted[2:]
