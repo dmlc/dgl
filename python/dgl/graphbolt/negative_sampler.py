@@ -6,7 +6,6 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 from .data_format import LinkPredictionEdgeFormat
-from .link_prediction_block import LinkPredictionBlock
 
 
 class NegativeSampler(Mapper):
