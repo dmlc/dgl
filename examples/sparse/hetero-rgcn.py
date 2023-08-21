@@ -83,11 +83,13 @@ class HeteroRelationalGraphConv(nn.Module):
         in_size,
         out_size,
         relation_names,
+        activation=None,
     ):
         super(HeteroRelationalGraphConv, self).__init__()
         self.in_size = in_size
         self.out_size = out_size
         self.relation_names = relation_names
+        self.activation = activation
 
         ########################################################################
         # (HIGHLIGHT) HeteroGraphConv is a graph convolution operator over
@@ -133,7 +135,9 @@ class HeteroRelationalGraphConv(nn.Module):
             hs[dst_type] = hs[dst_type] + (
                 A[rel].T @ self.W[str(edge_type)](inputs[src_type])
             )
-            hs[dst_type] = F.relu(hs[dst_type])
+            if self.activation:
+                hs[dst_type] = self.activation(hs[dst_type])
+            hs[dst_type] = self.dropout(hs[dst_type])
 
         return hs
 
@@ -142,12 +146,12 @@ class EntityClassify(nn.Module):
     def __init__(
         self,
         in_size,
-        out_dim,
+        out_size,
         relation_names,
     ):
         super(EntityClassify, self).__init__()
         self.in_size = in_size
-        self.out_dim = out_dim
+        self.out_size = out_size
         self.relation_names = relation_names
         self.relation_names.sort()
 
@@ -158,13 +162,14 @@ class EntityClassify(nn.Module):
                 self.in_size,
                 self.in_size,
                 self.relation_names,
+                activation=F.relu,
             )
         )
         # Hidden to output.
         self.layers.append(
             HeteroRelationalGraphConv(
                 self.in_size,
-                self.out_dim,
+                self.out_size,
                 self.relation_names,
             )
         )
@@ -241,6 +246,10 @@ def main(args):
             indices, shape=(g.num_nodes(stype), g.num_nodes(dtype))
         )
 
+        D1_hat = dglsp.diag(A[(stype, etype, dtype)].sum(1)) ** -0.5
+        D2_hat = dglsp.diag(A[(stype, etype, dtype)].sum(0)) ** -0.5
+        A[(stype, etype, dtype)] = D1_hat @ A[(stype, etype, dtype)] @ D2_hat
+
     # Training loop.
     print("start training...")
     model.train()
@@ -292,7 +301,7 @@ if __name__ == "__main__":
         "-e",
         "--n-epochs",
         type=int,
-        default=20,
+        default=50,
         help="number of training epochs",
     )
     parser.add_argument(
