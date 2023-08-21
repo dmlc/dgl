@@ -44,15 +44,10 @@ class RelGraphEmbed(nn.Module):
         self,
         ntype_num,
         embed_size,
-        embed_name="embed",
-        activation=None,
-        dropout=0.0,
     ):
         super(RelGraphEmbed, self).__init__()
         self.embed_size = embed_size
-        self.embed_name = embed_name
-        self.activation = activation
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(0.0)
 
         # Create weight embeddings for each node for each relation.
         self.embeds = nn.ParameterDict()
@@ -205,7 +200,7 @@ def main(args):
     # Split dataset into train, validate, test.
     if args.validation:
         val_idx = train_idx[: len(train_idx) // 5]
-        train_idx = train_idx[len(train_idx) // 5 :]
+        train_idx = train_idx[len(train_idx) // 5:]
     else:
         val_idx = train_idx
 
