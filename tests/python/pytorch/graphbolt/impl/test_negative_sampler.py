@@ -142,3 +142,66 @@ def test_NegativeSampler_Tail_Conditioned_Format(negative_ratio):
         assert len(pos_dst) == batch_size
         assert len(neg_dst) == batch_size
         assert neg_dst.numel() == batch_size * negative_ratio
+
+
+def get_hetero_graph():
+    # COO graph:
+    # [0, 0, 1, 1, 2, 2, 3, 3, 4, 4]
+    # [2, 4, 2, 3, 0, 1, 1, 0, 0, 1]
+    # [1, 1, 1, 1, 0, 0, 0, 0, 0] - > edge type.
+    # num_nodes = 5, num_n1 = 2, num_n2 = 3
+    ntypes = {"n1": 0, "n2": 1}
+    etypes = {("n1", "e1", "n2"): 0, ("n2", "e2", "n1"): 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
+    indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
+    indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
+    type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+    node_type_offset = torch.LongTensor([0, 2, 5])
+    return gb.from_csc(
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        metadata=metadata,
+    )
+
+
+def to_link_block(data):
+    block = gb.LinkPredictionBlock(node_pair=data)
+    return block
+
+
+@pytest.mark.parametrize(
+    "format",
+    [
+        gb.LinkPredictionEdgeFormat.INDEPENDENT,
+        gb.LinkPredictionEdgeFormat.CONDITIONED,
+        gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED,
+        gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
+    ],
+)
+def test_NegativeSampler_Hetero_Data(format):
+    graph = get_hetero_graph()
+    itemset = gb.ItemSetDict(
+        {
+            ("n1", "e1", "n2"): gb.ItemSet(
+                (
+                    torch.LongTensor([0, 0, 1, 1]),
+                    torch.LongTensor([0, 2, 0, 1]),
+                )
+            ),
+            ("n2", "e2", "n1"): gb.ItemSet(
+                (
+                    torch.LongTensor([0, 0, 1, 1, 2, 2]),
+                    torch.LongTensor([0, 1, 1, 0, 0, 1]),
+                )
+            ),
+        }
+    )
+
+    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    data_block_converter = Mapper(minibatch_dp, to_link_block)
+    negative_dp = gb.UniformNegativeSampler(
+        data_block_converter, 1, format, graph
+    )
+    assert len(list(negative_dp)) == 5

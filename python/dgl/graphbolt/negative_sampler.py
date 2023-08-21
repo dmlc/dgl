@@ -58,10 +58,18 @@ class NegativeSampler(Mapper):
         """
         node_pairs = data.node_pair
         if isinstance(node_pairs, Mapping):
+            if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
+                data.label = {}
+            else:
+                data.negative_head, data.negative_tail = {}, {}
             for etype, pos_pairs in node_pairs.items():
                 self._collate(
                     data, self._sample_with_etype(pos_pairs, etype), etype
                 )
+            if self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
+                data.negative_tail = None
+            if self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
+                data.negative_head = None
         else:
             self._collate(data, self._sample_with_etype(node_pairs))
         return data
@@ -101,7 +109,7 @@ class NegativeSampler(Mapper):
         etype : (str, str, str)
             Canonical edge type.
         """
-        pos_src, pos_dst = data.node_pair
+        pos_src, pos_dst = data.node_pair[etype] if etype else data.node_pair
         neg_src, neg_dst = neg_pairs
         if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
             pos_label = torch.ones_like(pos_src)

@@ -11,7 +11,7 @@ def to_node_block(data):
     return block
 
 
-def test_SubgraphSampler():
+def test_SubgraphSampler_Node():
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(torch.arange(10))
     minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
@@ -27,7 +27,7 @@ def to_link_block(data):
     return block
 
 
-def test_SubgraphSampler_link():
+def test_SubgraphSampler_Link():
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(
         (
@@ -52,7 +52,7 @@ def test_SubgraphSampler_link():
         gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
     ],
 )
-def test_SubgraphSampler_link_with_Negative(format):
+def test_SubgraphSampler_Link_With_Negative(format):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(
         (
@@ -71,6 +71,55 @@ def test_SubgraphSampler_link_with_Negative(format):
     assert len(list(neighbor_dp)) == 5
 
 
+def get_hetero_graph():
+    # COO graph:
+    # [0, 0, 1, 1, 2, 2, 3, 3, 4, 4]
+    # [2, 4, 2, 3, 0, 1, 1, 0, 0, 1]
+    # [1, 1, 1, 1, 0, 0, 0, 0, 0] - > edge type.
+    # num_nodes = 5, num_n1 = 2, num_n2 = 3
+    ntypes = {"n1": 0, "n2": 1}
+    etypes = {("n1", "e1", "n2"): 0, ("n2", "e2", "n1"): 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
+    indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
+    indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
+    type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+    node_type_offset = torch.LongTensor([0, 2, 5])
+    return gb.from_csc(
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        metadata=metadata,
+    )
+
+
+def test_SubgraphSampler_Link_Hetero():
+    graph = get_hetero_graph()
+    itemset = gb.ItemSetDict(
+        {
+            ("n1", "e1", "n2"): gb.ItemSet(
+                (
+                    torch.LongTensor([0, 0, 1, 1]),
+                    torch.LongTensor([0, 2, 0, 1]),
+                )
+            ),
+            ("n2", "e2", "n1"): gb.ItemSet(
+                (
+                    torch.LongTensor([0, 0, 1, 1, 2, 2]),
+                    torch.LongTensor([0, 1, 1, 0, 0, 1]),
+                )
+            ),
+        }
+    )
+
+    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    data_block_converter = Mapper(minibatch_dp, to_link_block)
+    neighbor_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
+    assert len(list(neighbor_dp)) == 5
+
+
 @pytest.mark.parametrize(
     "format",
     [
@@ -80,29 +129,25 @@ def test_SubgraphSampler_link_with_Negative(format):
         gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
     ],
 )
-def test_SubgraphSampler_link_hetero(format):
-    ntypes = {"n1": 0, "n2": 1}
-    etypes = {("n1", "e1", "n2"): 0, ("n2", "e2", "n1"): 1}
-    metadata = gb.GraphMetadata(ntypes, etypes)
-    indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
-    indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
-    type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
-    node_type_offset = torch.LongTensor([0, 2, 5])
+def test_SubgraphSampler_Link_Hetero_With_Negative(format):
+    graph = get_hetero_graph()
+    itemset = gb.ItemSetDict(
+        {
+            ("n1", "e1", "n2"): gb.ItemSet(
+                (
+                    torch.LongTensor([0, 0, 1, 1]),
+                    torch.LongTensor([0, 2, 0, 1]),
+                )
+            ),
+            ("n2", "e2", "n1"): gb.ItemSet(
+                (
+                    torch.LongTensor([0, 0, 1, 1, 2, 2]),
+                    torch.LongTensor([0, 1, 1, 0, 0, 1]),
+                )
+            ),
+        }
+    )
 
-    # Construct CSCSamplingGraph.
-    graph = gb.from_csc(
-        indptr,
-        indices,
-        node_type_offset=node_type_offset,
-        type_per_edge=type_per_edge,
-        metadata=metadata,
-    )
-    itemset = gb.ItemSet(
-        (
-            torch.arange(0, 10),
-            torch.arange(10, 20),
-        )
-    )
     minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
