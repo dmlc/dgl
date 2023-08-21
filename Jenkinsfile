@@ -1,5 +1,33 @@
 #!/usr/bin/env groovy
 
+// CI tests are executed within Docker containers as the 'root' user. However,
+// communications between Jenkins nodes are done with the 'ubuntu' user(login
+// via root is disallowed on AWS EC2 instances). Therefore, we need to change
+// the file permission to allow 'ubuntu' user to access the files created by
+// the 'root' user. This is achieved by running 'chmod -R 777 .'.
+
+// Summary of Jenkins nodes:
+// - linux-benchmark-node: Linux CPU node for authentication and lint check.
+//      number of nodes: 1
+//      instance type: m5.2xlarge(8 vCPUs, 32 GB memory)
+//      number of executors per node: 6
+//      number of jobs running on this node per CI run: 3
+// - linux-cpu-node: Linux CPU node for building and testing.
+//      number of nodes: 4
+//      instance type: m6i.24xlarge(96 vCPUs, 384 GB memory)
+//      number of executors per node: 6
+//      number of jobs running on this node per CI run: 8
+// - linux-gpu-node: Linux GPU node for building and testing.
+//      number of nodes: 4
+//      instance type: g4dn.4xlarge(16 vCPUs, 64 GB memory, 1 GPU)
+//      number of executors per node: 1
+//      number of jobs running on this node per CI run: 4
+// - windows-node: Windows CPU node for building and testing.
+//      number of nodes: 1
+//      instance type: m5.8xlarge(32 vCPUs, 128 GB memory)
+//      number of executors per node: 2
+//      number of jobs running on this node per CI run: 3
+
 dgl_linux_libs = 'build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-*-x86_64-linux-gnu.so, build/tensoradapter/pytorch/*.so, build/dgl_sparse/*.so, build/graphbolt/*.so'
 // Currently DGL on Windows is not working with Cython yet
 dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe, build\\tensoradapter\\pytorch\\*.dll, build\\dgl_sparse\\*.dll, build\\graphbolt\\*.dll"
