@@ -239,6 +239,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
         const scalar_t* indptr_data = indptr_.data_ptr<scalar_t>();
         auto num_picked_neighbors_data_ptr =
             num_picked_neighbors_per_node.data_ptr<scalar_t>();
+        num_picked_neighbors_data_ptr[0] = 0;
         const auto nodes_data_ptr = nodes.data_ptr<int64_t>();
 
         // Step 1. Calculate pick number of each node.
