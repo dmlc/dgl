@@ -45,7 +45,7 @@ def unique_and_compact(
             nodes, empty_tensor, empty_tensor
         )
         compacted = compacted.split(nums)
-        return unique, compacted
+        return unique, list(compacted)
 
     if is_heterogeneous:
         unique, compacted = {}, {}
