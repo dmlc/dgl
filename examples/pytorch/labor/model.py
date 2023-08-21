@@ -85,6 +85,8 @@ class SAGE(nn.Module):
                     h = self.activation(h)
                     h = self.dropout(h)
                 # by design, our output nodes are contiguous
-                y[output_nodes[0].item() : output_nodes[-1].item() + 1] = h.to(y.device)
+                y[output_nodes[0].item() : output_nodes[-1].item() + 1] = h.to(
+                    y.device
+                )
             g.ndata["h"] = y
         return y
