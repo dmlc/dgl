@@ -21,7 +21,7 @@ def test_unique_and_compact_hetero():
         "n3": N3.split(2),
     }
 
-    unique, compacted = gb.unique_and_compact_nodes_list(nodes_dict)
+    unique, compacted = gb.unique_and_compact(nodes_dict)
     for ntype, nodes in unique.items():
         expected_nodes = expected_unique[ntype]
         assert torch.equal(torch.sort(nodes)[0], expected_nodes)
@@ -38,7 +38,7 @@ def test_unique_and_compact_homo():
     expected_unique_N = torch.unique(N)
     nodes_list = N.split(5)
 
-    unique, compacted = gb.unique_and_compact_nodes_list(nodes_list)
+    unique, compacted = gb.unique_and_compact(nodes_list)
 
     assert torch.equal(torch.sort(unique)[0], expected_unique_N)
 
