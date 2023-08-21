@@ -3672,7 +3672,6 @@ def lap_pe(g, k, padding=False, return_eigval=False):
     L = sparse.eye(g.num_nodes()) - N * A * N
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
-
     if k + 1 < n - 1:
         # Use scipy if k + 1 < n - 1 for memory efficiency.
         EigVal, EigVec = scipy.sparse.linalg.eigs(
