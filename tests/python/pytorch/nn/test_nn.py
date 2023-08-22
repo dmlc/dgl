@@ -2086,9 +2086,16 @@ def test_hgt(idtype, in_size, num_heads):
     train_idx = th.randperm(100, dtype=idtype)[:10]
     sampler = dgl.dataloading.NeighborSampler([-1])
     train_loader = dgl.dataloading.DataLoader(
-        g, train_idx.to(dev), sampler, batch_size=8, device=dev, shuffle=True
+        g,
+        train_idx.to(dev),
+        sampler,
+        batch_size=8,
+        num_workers=1,
+        device=dev,
+        shuffle=True
     )
-    (input_nodes, output_nodes, block) = next(iter(train_loader))
+    with train_loader.enable_cpu_affinity():
+        (input_nodes, output_nodes, block) = next(iter(train_loader))
     block = block[0]
     x = x[input_nodes.to(th.long)]
     ntype = ntype[input_nodes.to(th.long)]
