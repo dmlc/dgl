@@ -376,7 +376,7 @@ class DefaultDataParser:
         data = {}
         for header in df:
             if "Unnamed" in header:
-                dgl_warning("Unamed column is found. Ignored...")
+                dgl_warning("Unnamed column is found. Ignored...")
                 continue
             dt = df[header].to_numpy().squeeze()
             if len(dt) > 0 and isinstance(dt[0], str):
