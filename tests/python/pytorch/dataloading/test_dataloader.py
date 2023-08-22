@@ -1,6 +1,9 @@
 import os
 import unittest
+
+import warnings
 from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from functools import partial
 
 import backend as F
@@ -12,9 +15,6 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from utils import parametrize_idtype
-
-import warnings
-from contextlib import contextmanager
 
 
 @contextmanager
@@ -78,11 +78,15 @@ def test_shadow(num_workers):
     with cpu_affinity_context(dataloader, num_workers):
         for i, (input_nodes, output_nodes, subgraph) in enumerate(dataloader):
             assert torch.equal(input_nodes, subgraph.ndata[dgl.NID])
-            assert torch.equal(input_nodes[: output_nodes.shape[0]], output_nodes)
+            assert torch.equal(
+                input_nodes[: output_nodes.shape[0]], output_nodes
+            )
             assert torch.equal(
                 subgraph.ndata["label"], g.ndata["label"][input_nodes]
             )
-            assert torch.equal(subgraph.ndata["feat"], g.ndata["feat"][input_nodes])
+            assert torch.equal(
+                subgraph.ndata["feat"], g.ndata["feat"][input_nodes]
+            )
             if i == 5:
                 break
 
