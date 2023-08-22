@@ -418,20 +418,17 @@ int64_t NumPick(
     int64_t fanout, bool replace,
     const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
     int64_t num_neighbors) {
-  int64_t num_valid_neighbors =
-      probs_or_mask.has_value()
-          ? [&] {
-            int64_t nonzero_count = 0;
-            AT_DISPATCH_ALL_TYPES(
-                probs_or_mask.value().scalar_type(), "NumPick", ([&] {
-                  scalar_t* probs_data_ptr = probs_or_mask.value().data_ptr<scalar_t>() + offset;
-                  for (auto i = offset; i < offset + num_neighbors; ++ i, ++ probs_data_ptr) {
-                    nonzero_count += (*probs_data_ptr != 0);
-                  }
-                }));
-            return nonzero_count;
-          }()
-          : num_neighbors;
+  int64_t num_valid_neighbors = num_neighbors;
+  if (probs_or_mask.has_value()) {
+    // Subtract the count of zeros in probs_or_mask.
+    AT_DISPATCH_ALL_TYPES(
+        probs_or_mask.value().scalar_type(), "CountZero", ([&] {
+          scalar_t* probs_data_ptr = probs_or_mask.value().data_ptr<scalar_t>();
+          num_valid_neighbors -= std::count(
+              probs_data_ptr + offset, probs_data_ptr + offset + num_neighbors,
+              0);
+        }));
+  }
   if (num_valid_neighbors == 0 || fanout == -1) return num_valid_neighbors;
   return replace ? fanout : std::min(fanout, num_valid_neighbors);
 }
