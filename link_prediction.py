@@ -50,33 +50,6 @@ class LinkNeighborSampler(LinkSampler):
         return self.graph.sample_neighbors(seeds, fanout)
 
 
-############## Negative sampler function ##################
-class NegativeSampler:
-    def __init__(self, graph, negative_ratio):
-        self.graph = graph
-        self.negative_ratio = negative_ratio
-
-    def __call__(self, data):
-        node_pairs = data
-        neg_pairs = self._generate(node_pairs)
-        num_sample = neg_pairs[0].shape[0] // self.negative_ratio
-        neg_dst = list(neg_pairs[1].split(num_sample))
-        data = list(data) + neg_dst
-        return data
-
-    def _generate(self, node_pairs, edge_type=None):
-        raise NotImplementedError
-
-
-class PerSourceUniformSampler(NegativeSampler):
-    def _generate(self, node_pairs, edge_type=None):
-        return self.graph.sample_negative_edges_uniform(
-            edge_type=edge_type,
-            node_pairs=node_pairs,
-            negative_ratio=self.negative_ratio,
-        )
-
-
 class SAGE(nn.Module):
     def __init__(self, in_size, hidden_size):
         super().__init__()
@@ -117,13 +90,14 @@ def create_fetch_func(features):
 
 def get_dataloader(args, graph, features, current_set):
     """Get a graphbolt-version dataloader."""
-    #! Why we need so many steps to get a dataloader?
     minibatch_sampler = gb.MinibatchSampler(
         current_set, batch_size=args.batch_size, shuffle=True
     )
-    negative_sampler = gb.SubgraphSampler(
+    negative_sampler = gb.UniformNegativeSampler(
         minibatch_sampler,
-        PerSourceUniformSampler(graph, args.neg_ratio),
+        args.neg_ratio,
+        gb.LinkPredictionEdgeFormat.INDEPENDENT,
+        graph,
     )
     subgraph_sampler = gb.SubgraphSampler(
         negative_sampler,
@@ -203,7 +177,7 @@ def train(args, graph, features, train_set, valid_set, model):
             print(
                 f"Epoch {epoch:05d} | "
                 f"Step {step:05d} | "
-                f"Loss {loss.item():.4f}",
+                f"Loss {(total_loss) / (step + 1):.4f}",
                 end="\r",
             )
 
