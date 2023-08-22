@@ -14,7 +14,7 @@ class NeighborSampler(SubgraphSampler):
     positive and negative node pairs, and employs these nodes as the seed nodes
     for subsequent steps.
     """
-    
+
     def __init__(
         self,
         datapipe,
