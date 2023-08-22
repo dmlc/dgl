@@ -28,6 +28,7 @@ def test_unique_and_compact_hetero():
 
     for ntype, nodes in compacted.items():
         expected_nodes = nodes_dict[ntype]
+        assert isinstance(nodes, list)
         for expected_node, node in zip(expected_nodes, nodes):
             node = unique[ntype][node]
             assert torch.equal(expected_node, node)
@@ -42,6 +43,7 @@ def test_unique_and_compact_homo():
 
     assert torch.equal(torch.sort(unique)[0], expected_unique_N)
 
+    assert isinstance(compacted, list)
     for expected_node, node in zip(nodes_list, compacted):
         node = unique[node]
         assert torch.equal(expected_node, node)

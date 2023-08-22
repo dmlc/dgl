@@ -60,7 +60,7 @@ class NeighborSampler(SubgraphSampler):
         >>> neg_sampler = gb.UniformNegativeSampler(
             ...data_block_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
-            ...torch.LongTensor([15])]
+            ...torch.LongTensor([15])cd ]
         >>> subgraph_sampler = gb.NeighborSampler(
             ...neg_sampler, graph, fanouts)
         >>> for data in subgraph_sampler:

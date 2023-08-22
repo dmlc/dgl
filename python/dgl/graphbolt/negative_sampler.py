@@ -41,9 +41,9 @@ class NegativeSampler(Mapper):
         """
         Generate a mix of positive and negative samples.
 
-        node_pair
+        Parameters
         ----------
-        LinkPredictionBlock : LinkPredictionBlock
+        data : LinkPredictionBlock
             An instance of 'LinkPredictionBlock' class requires the 'node_pair'
             field. This function is responsible for generating negative edges
             corresponding to the positive edges defined by the 'node_pair'. In
