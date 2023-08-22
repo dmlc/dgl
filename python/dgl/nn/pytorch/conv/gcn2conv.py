@@ -276,7 +276,7 @@ class GCN2Conv(nn.Module):
         which will come into effect when printing the model.
         """
         summary = "in={_in_feats}"
-        summary += ", share_weight={_share_weights}, alpha={alpha}, beta={beta}"
+        summary += ", alpha={alpha}, beta={beta}"
         if "self._bias" in self.__dict__:
             summary += ", bias={bias}"
         if "self._activation" in self.__dict__:
