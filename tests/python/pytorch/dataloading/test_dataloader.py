@@ -20,6 +20,10 @@ from utils import parametrize_idtype
 @contextmanager
 def cpu_affinity_context(dataloader, num_workers):
     if num_workers == 0:
+        # Suppressing warning:
+        # "DGLWarning: Dataloader CPU affinity opt is not enabled, ... "
+        # when it is impossible to use enable_cpu_affinity() to avoid
+        # its appearance.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
             yield
