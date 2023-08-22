@@ -12,19 +12,19 @@
 //      instance type: m5.2xlarge(8 vCPUs, 32 GB memory)
 //      number of executors per node: 6
 //      number of jobs running on this node per CI run: 3
-// - linux-cpu-node: Linux CPU node for building and testing.
+// - dgl-ci-linux-cpu: Linux CPU node for building and testing.
 //      number of nodes: 4
 //      instance type: m6i.24xlarge(96 vCPUs, 384 GB memory)
 //      number of executors per node: 6
 //      number of jobs running on this node per CI run: 8
-// - linux-gpu-node: Linux GPU node for building and testing.
+// - dgl-ci-linux-gpu: Linux GPU node for building and testing.
 //      number of nodes: 4
 //      instance type: g4dn.4xlarge(16 vCPUs, 64 GB memory, 1 GPU)
 //      number of executors per node: 1
 //      number of jobs running on this node per CI run: 4
-// - windows-node: Windows CPU node for building and testing.
-//      number of nodes: 1
-//      instance type: m5.8xlarge(32 vCPUs, 128 GB memory)
+// - dgl-ci-windows-cpu: Windows CPU node for building and testing.
+//      number of nodes: 4
+//      instance type: m6i.8xlarge(32 vCPUs, 128 GB memory)
 //      number of executors per node: 2
 //      number of jobs running on this node per CI run: 3
 
@@ -372,9 +372,7 @@ pipeline {
               }
             }
             stage('CPU Build (Win64)') {
-              // Windows build machines are manually added to Jenkins master with
-              // "windows" label as permanent agents.
-              agent { label 'windows' }
+              agent { label 'dgl-ci-windows-cpu' }
               steps {
                 build_dgl_win64('cpu')
               }
@@ -428,7 +426,7 @@ pipeline {
               }
             }
             stage('C++ CPU (Win64)') {
-              agent { label 'windows' }
+              agent { label 'dgl-ci-windows-cpu' }
               steps {
                 cpp_unit_test_win64()
               }
@@ -520,7 +518,7 @@ pipeline {
               }
             }
             stage('Torch CPU (Win64)') {
-              agent { label 'windows' }
+              agent { label 'dgl-ci-windows-cpu' }
               stages {
                 stage('Torch CPU (Win64) Unit test') {
                   steps {
@@ -668,7 +666,7 @@ pipeline {
             }
           }
         }
-        node('windows') {
+        node('dgl-ci-windows-cpu') {
             bat(script: "rmvirtualenv ${BUILD_TAG}", returnStatus: true)
         }
       }
