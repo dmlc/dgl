@@ -52,7 +52,7 @@ class SubgraphSampler(Mapper):
         has_neg_dst = neg_dst is not None
         is_heterogeneous = isinstance(node_pair, Dict)
         if is_heterogeneous:
-            # Collect all type of data
+            # Collect nodes from all types of input.
             nodes = defaultdict(list)
             for (src_type, _, dst_type), (src, dst) in node_pair.items():
                 nodes[src_type].append(src)
@@ -63,7 +63,7 @@ class SubgraphSampler(Mapper):
             if has_neg_dst:
                 for (_, _, dst_type), dst in neg_dst.items():
                     nodes[dst_type].append(dst.view(-1))
-            # Unique and compact
+            # Unique and compact the collected nodes.
             seeds, compacted = unique_and_compact(nodes)
             (
                 compacted_node_pair,
@@ -83,13 +83,13 @@ class SubgraphSampler(Mapper):
                 for etype, _ in neg_dst.items():
                     compacted_negative_tail[etype] = compacted[etype[2]].pop(0)
         else:
-            # Collect all nodes
+            # Collect nodes from all types of input.
             nodes = list(node_pair)
             if has_neg_src:
                 nodes.append(neg_src.view(-1))
             if has_neg_dst:
                 nodes.append(neg_dst.view(-1))
-            # Unique and compact
+            # Unique and compact the collected nodes.
             seeds, compacted = unique_and_compact(nodes)
             # Map back in same order as collect.
             compacted_node_pair = tuple(compacted[:2])
