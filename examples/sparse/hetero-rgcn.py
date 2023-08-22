@@ -143,12 +143,14 @@ class EntityClassify(nn.Module):
         in_size,
         out_size,
         relation_names,
+        embed_layer,
     ):
         super(EntityClassify, self).__init__()
         self.in_size = in_size
         self.out_size = out_size
         self.relation_names = relation_names
         self.relation_names.sort()
+        self.embed_layer = embed_layer
 
         self.layers = nn.ModuleList()
         # Input to hidden.
@@ -169,7 +171,8 @@ class EntityClassify(nn.Module):
             )
         )
 
-    def forward(self, h, A):
+    def forward(self, A):
+        h = self.embed_layer()
         for layer in self.layers:
             h = layer(A, h)
         return h
@@ -198,39 +201,23 @@ def main(args):
     labels = g.nodes[category].data.pop("labels")
 
     # Split dataset into train, validate, test.
-    if args.validation:
-        val_idx = train_idx[: len(train_idx) // 5]
-        train_idx = train_idx[len(train_idx) // 5:]
-    else:
-        val_idx = train_idx
+    val_idx = train_idx[: len(train_idx) // 5]
+    train_idx = train_idx[len(train_idx) // 5 :]
 
-    # Check cuda.
-    use_cuda = args.gpu >= 0 and th.cuda.is_available()
-    if use_cuda:
-        th.cuda.set_device(args.gpu)
-        g = g.to("cuda:%d" % args.gpu)
-        labels = labels.cuda()
-        train_idx = train_idx.cuda()
-        test_idx = test_idx.cuda()
+    embed_layer = RelGraphEmbed(
+        {ntype: g.num_nodes(ntype) for ntype in g.ntypes}, 16
+    )
 
     # Create model.
     model = EntityClassify(
-        args.n_hidden,
+        16,
         num_classes,
         list(set(g.etypes)),
+        embed_layer,
     )
-
-    embed_layer = RelGraphEmbed(
-        {ntype: g.num_nodes(ntype) for ntype in g.ntypes}, args.n_hidden
-    )
-
-    if use_cuda:
-        model.cuda()
 
     # Optimizer.
-    optimizer = th.optim.Adam(
-        model.parameters(), lr=args.lr, weight_decay=args.l2norm
-    )
+    optimizer = th.optim.Adam(model.parameters(), lr=1e-2, weight_decay=0)
 
     # Construct hetero sparse matrix.
     A = {}
@@ -240,7 +227,10 @@ def main(args):
         A[(stype, etype, dtype)] = dglsp.spmatrix(
             indices, shape=(g.num_nodes(stype), g.num_nodes(dtype))
         )
-
+        ###########################################################
+        # (HIGHLIGHT) Compute the normalized adjacency matrix with
+        # Sparse Matrix API
+        ###########################################################
         D1_hat = dglsp.diag(A[(stype, etype, dtype)].sum(1)) ** -0.5
         D2_hat = dglsp.diag(A[(stype, etype, dtype)].sum(0)) ** -0.5
         A[(stype, etype, dtype)] = D1_hat @ A[(stype, etype, dtype)] @ D2_hat
@@ -248,9 +238,9 @@ def main(args):
     # Training loop.
     print("start training...")
     model.train()
-    for epoch in range(args.n_epochs):
+    for epoch in range(20):
         optimizer.zero_grad()
-        logits = model(embed_layer(), A)[category]
+        logits = model(A)[category]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         loss.backward()
         optimizer.step()
@@ -268,11 +258,9 @@ def main(args):
             f"Valid loss: {val_loss.item():.4f} "
         )
     print()
-    if args.model_path is not None:
-        th.save(model.state_dict(), args.model_path)
 
     model.eval()
-    logits = model.forward(embed_layer(), A)[category]
+    logits = model.forward(A)[category]
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = th.sum(
         logits[test_idx].argmax(dim=1) == labels[test_idx]
@@ -288,30 +276,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RGCN")
     parser.add_argument(
-        "--n-hidden", type=int, default=16, help="number of hidden units"
-    )
-    parser.add_argument("--gpu", type=int, default=-1, help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
-    parser.add_argument(
-        "-e",
-        "--n-epochs",
-        type=int,
-        default=50,
-        help="number of training epochs",
-    )
-    parser.add_argument(
         "-d", "--dataset", type=str, required=True, help="dataset to use"
     )
-    parser.add_argument(
-        "--model_path", type=str, default=None, help="path for save the model"
-    )
-    parser.add_argument("--l2norm", type=float, default=0, help="l2 norm coef")
-
-    # Select one mode.
-    fp = parser.add_mutually_exclusive_group(required=False)
-    fp.add_argument("--validation", dest="validation", action="store_true")
-    fp.add_argument("--testing", dest="validation", action="store_false")
-    parser.set_defaults(validation=True)
 
     args = parser.parse_args()
     print(args)
