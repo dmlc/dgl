@@ -5,11 +5,9 @@ from typing import Dict
 
 from torchdata.datapipes.iter import Mapper
 
-from .impl import SampledSubgraphImpl
-
 from .link_prediction_block import LinkPredictionBlock
 from .node_classification_block import NodeClassificationBlock
-from .utils import unique_and_compact, unique_and_compact_node_pairs
+from .utils import unique_and_compact
 
 
 class SubgraphSampler(Mapper):
@@ -19,9 +17,6 @@ class SubgraphSampler(Mapper):
     def __init__(
         self,
         datapipe,
-        fanouts,
-        replace=False,
-        prob_name=None,
     ):
         """
         Initlization for a subgraph sampler.
@@ -30,29 +25,10 @@ class SubgraphSampler(Mapper):
         ----------
         datapipe : DataPipe
             The datapipe.
-        fanouts: list[torch.Tensor]
-            The number of edges to be sampled for each node with or without
-            considering edge types. The length of this parameter implicitly
-            signifies the layer of sampling being conducted.
-        replace: bool
-            Boolean indicating whether the sample is preformed with or
-            without replacement. If True, a value can be selected multiple
-            times. Otherwise, each value can be selected only once.
-        prob_name: str, optional
-            The name of an edge attribute used as the weights of sampling for
-            each node. This attribute tensor should contain (unnormalized)
-            probabilities corresponding to each neighboring edge of a node.
-            It must be a 1D floating-point or boolean tensor, with the number
-            of elements equalling the total number of edges.
         """
         super().__init__(datapipe, self._sample)
-        self.fanouts = fanouts
-        self.replace = replace
-        self.prob_name = prob_name
 
     def _sample(self, data):
-        subgraphs = []
-        num_layers = len(self.fanouts)
         if isinstance(data, LinkPredictionBlock):
             (
                 seeds,
@@ -64,23 +40,9 @@ class SubgraphSampler(Mapper):
             seeds = data.seed_node
         else:
             raise TypeError(f"Unsupported type of data {data}.")
-        for hop in range(num_layers):
-            subgraph = self._sample_sub_graph(
-                seeds,
-                hop,
-            )
-            reverse_row_node_ids = seeds
-            seeds, compacted_node_pairs = unique_and_compact_node_pairs(
-                subgraph.node_pairs, seeds
-            )
-            subgraph = SampledSubgraphImpl(
-                node_pairs=compacted_node_pairs,
-                reverse_column_node_ids=seeds,
-                reverse_row_node_ids=reverse_row_node_ids,
-            )
-            subgraphs.insert(0, subgraph)
-        data.input_nodes = seeds
-        data.sampled_subgraphs = subgraphs
+        data.input_nodes, data.sampled_subgraphs = self._sample_sub_graphs(
+            seeds
+        )
         return data
 
     def _link_prediction_preprocess(self, data):
@@ -143,5 +105,5 @@ class SubgraphSampler(Mapper):
             compacted_negative_tail if has_neg_dst else None,
         )
 
-    def _sample_sub_graph(self, seeds, hop):
+    def _sample_sub_graphs(self, seeds):
         raise NotImplementedError

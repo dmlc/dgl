@@ -1,6 +1,8 @@
 """Neighbor subgraph sampler for GraphBolt."""
 
 from ..subgraph_sampler import SubgraphSampler
+from ..utils import unique_and_compact_node_pairs
+from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
 class NeighborSampler(SubgraphSampler):
@@ -80,13 +82,30 @@ class NeighborSampler(SubgraphSampler):
         (tensor([0, 0, 0]), tensor([1, 1, 1]))
         3
         """
-        super().__init__(datapipe, fanouts, replace, prob_name)
+        super().__init__(datapipe)
+        self.fanouts = fanouts
+        self.replace = replace
+        self.prob_name = prob_name
         self.graph = graph
 
-    def _sample_sub_graph(self, seeds, hop):
-        return self.graph.sample_neighbors(
-            seeds,
-            self.fanouts[hop],
-            self.replace,
-            self.prob_name,
-        )
+    def _sample_sub_graphs(self, seeds):
+        subgraphs = []
+        num_layers = len(self.fanouts)
+        for hop in range(num_layers):
+            subgraph = self.graph.sample_neighbors(
+                seeds,
+                self.fanouts[hop],
+                self.replace,
+                self.prob_name,
+            )
+            reverse_row_node_ids = seeds
+            seeds, compacted_node_pairs = unique_and_compact_node_pairs(
+                subgraph.node_pairs, seeds
+            )
+            subgraph = SampledSubgraphImpl(
+                node_pairs=compacted_node_pairs,
+                reverse_column_node_ids=seeds,
+                reverse_row_node_ids=reverse_row_node_ids,
+            )
+            subgraphs.insert(0, subgraph)
+        return seeds, subgraphs
