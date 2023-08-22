@@ -1,11 +1,20 @@
-"""Uniform negative sampler for GraphBolt."""
-
-import torch
+"""Neighbor subgraph sampler for GraphBolt."""
 
 from ..subgraph_sampler import SubgraphSampler
 
 
 class NeighborSampler(SubgraphSampler):
+    """
+    Neighbor sampler is responsible for sampling a subgraph from given data. It
+    returns an induced subgraph along with compacted information. In the
+    context of a node classification task, the neighbor sampler directly
+    utilizes the nodes provided as seed nodes. However, in scenarios involving
+    link prediction, the process needs another pre-peocess operation. That is,
+    gathering unique nodes from the given node pairs, encompassing both
+    positive and negative node pairs, and employs these nodes as the seed nodes
+    for subsequent steps.
+    """
+    
     def __init__(
         self,
         datapipe,

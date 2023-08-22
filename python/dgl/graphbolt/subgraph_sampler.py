@@ -144,4 +144,5 @@ class SubgraphSampler(Mapper):
         )
 
     def _sample_sub_graph(self, seeds, hop):
-        raise NotImplemented
+        raise NotImplementedError
+
