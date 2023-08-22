@@ -6,13 +6,26 @@ from functools import partial
 import backend as F
 
 import dgl
-import dgl.ops as OPS
 import numpy as np
 import pytest
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from utils import parametrize_idtype
+
+import warnings
+from contextlib import contextmanager
+
+
+@contextmanager
+def cpu_affinity_context(dataloader, num_workers):
+    if num_workers == 0:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+            yield
+    else:
+        with dataloader.enable_cpu_affinity():
+            yield
 
 
 @pytest.mark.parametrize("batch_size", [None, 16])
@@ -44,8 +57,9 @@ def test_cluster_gcn(num_workers):
         g, torch.arange(100), sampler, batch_size=4, num_workers=num_workers
     )
     assert len(dataloader) == 25
-    for i, sg in enumerate(dataloader):
-        pass
+    with cpu_affinity_context(dataloader, num_workers):
+        for _, _ in enumerate(dataloader):
+            pass
 
 
 @pytest.mark.parametrize("num_workers", [0, 4])
@@ -61,15 +75,16 @@ def test_shadow(num_workers):
         drop_last=False,
         num_workers=num_workers,
     )
-    for i, (input_nodes, output_nodes, subgraph) in enumerate(dataloader):
-        assert torch.equal(input_nodes, subgraph.ndata[dgl.NID])
-        assert torch.equal(input_nodes[: output_nodes.shape[0]], output_nodes)
-        assert torch.equal(
-            subgraph.ndata["label"], g.ndata["label"][input_nodes]
-        )
-        assert torch.equal(subgraph.ndata["feat"], g.ndata["feat"][input_nodes])
-        if i == 5:
-            break
+    with cpu_affinity_context(dataloader, num_workers):
+        for i, (input_nodes, output_nodes, subgraph) in enumerate(dataloader):
+            assert torch.equal(input_nodes, subgraph.ndata[dgl.NID])
+            assert torch.equal(input_nodes[: output_nodes.shape[0]], output_nodes)
+            assert torch.equal(
+                subgraph.ndata["label"], g.ndata["label"][input_nodes]
+            )
+            assert torch.equal(subgraph.ndata["feat"], g.ndata["feat"][input_nodes])
+            if i == 5:
+                break
 
 
 @pytest.mark.parametrize("num_workers", [0, 4])
@@ -89,8 +104,9 @@ def test_saint(num_workers, mode):
         g, torch.arange(100), sampler, num_workers=num_workers
     )
     assert len(dataloader) == 100
-    for sg in dataloader:
-        pass
+    with cpu_affinity_context(dataloader, num_workers):
+        for sg in dataloader:
+            pass
 
 
 @parametrize_idtype
@@ -145,13 +161,14 @@ def test_neighbor_nonuniform(idtype, mode, use_ddp, use_mask):
             use_uva=use_uva,
             use_ddp=use_ddp,
         )
-        for input_nodes, output_nodes, blocks in dataloader:
-            seed = output_nodes.item()
-            neighbors = set(input_nodes[1:].cpu().numpy())
-            if seed == 1:
-                assert neighbors == {5, 6}
-            elif seed == 0:
-                assert neighbors == {1, 2}
+        with cpu_affinity_context(dataloader, num_workers):
+            for input_nodes, output_nodes, blocks in dataloader:
+                seed = output_nodes.item()
+                neighbors = set(input_nodes[1:].cpu().numpy())
+                if seed == 1:
+                    assert neighbors == {5, 6}
+                elif seed == 0:
+                    assert neighbors == {1, 2}
 
     g = dgl.heterograph(
         {
@@ -182,20 +199,21 @@ def test_neighbor_nonuniform(idtype, mode, use_ddp, use_mask):
             use_uva=use_uva,
             use_ddp=use_ddp,
         )
-        for input_nodes, output_nodes, blocks in dataloader:
-            seed = output_nodes["A"].item()
-            # Seed and neighbors are of different node types so slicing is not necessary here.
-            neighbors = set(input_nodes["B"].cpu().numpy())
-            if seed == 1:
-                assert neighbors == {5, 6}
-            elif seed == 0:
-                assert neighbors == {1, 2}
+        with cpu_affinity_context(dataloader, num_workers):
+            for input_nodes, output_nodes, blocks in dataloader:
+                seed = output_nodes["A"].item()
+                # Seed and neighbors are of different node types so slicing is not necessary here.
+                neighbors = set(input_nodes["B"].cpu().numpy())
+                if seed == 1:
+                    assert neighbors == {5, 6}
+                elif seed == 0:
+                    assert neighbors == {1, 2}
 
-            neighbors = set(input_nodes["C"].cpu().numpy())
-            if seed == 1:
-                assert neighbors == {7, 8}
-            elif seed == 0:
-                assert neighbors == {3, 4}
+                neighbors = set(input_nodes["C"].cpu().numpy())
+                if seed == 1:
+                    assert neighbors == {7, 8}
+                elif seed == 0:
+                    assert neighbors == {3, 4}
 
     if use_ddp:
         dist.destroy_process_group()
@@ -368,13 +386,14 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
             use_uva=use_uva,
             use_ddp=use_ddp,
         )
-        for input_nodes, output_nodes, blocks in dataloader:
-            _check_device(input_nodes)
-            _check_device(output_nodes)
-            _check_device(blocks)
-            _check_dtype(input_nodes, idtype, "dtype")
-            _check_dtype(output_nodes, idtype, "dtype")
-            _check_dtype(blocks, idtype, "idtype")
+        with cpu_affinity_context(dataloader, num_workers):
+            for input_nodes, output_nodes, blocks in dataloader:
+                _check_device(input_nodes)
+                _check_device(output_nodes)
+                _check_device(blocks)
+                _check_dtype(input_nodes, idtype, "dtype")
+                _check_dtype(output_nodes, idtype, "dtype")
+                _check_dtype(blocks, idtype, "idtype")
 
     g2 = dgl.heterograph(
         {
@@ -421,14 +440,15 @@ def test_node_dataloader(idtype, sampler_name, mode, use_ddp):
             use_uva=use_uva,
             use_ddp=use_ddp,
         )
-        assert isinstance(iter(dataloader), Iterator)
-        for input_nodes, output_nodes, blocks in dataloader:
-            _check_device(input_nodes)
-            _check_device(output_nodes)
-            _check_device(blocks)
-            _check_dtype(input_nodes, idtype, "dtype")
-            _check_dtype(output_nodes, idtype, "dtype")
-            _check_dtype(blocks, idtype, "idtype")
+        with cpu_affinity_context(dataloader, num_workers):
+            assert isinstance(iter(dataloader), Iterator)
+            for input_nodes, output_nodes, blocks in dataloader:
+                _check_device(input_nodes)
+                _check_device(output_nodes)
+                _check_device(blocks)
+                _check_dtype(input_nodes, idtype, "dtype")
+                _check_dtype(output_nodes, idtype, "dtype")
+                _check_dtype(blocks, idtype, "idtype")
 
     if use_ddp:
         dist.destroy_process_group()
@@ -483,10 +503,11 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, mode, use_ddp):
         use_uva=(mode == "uva"),
         use_ddp=use_ddp,
     )
-    for input_nodes, pos_pair_graph, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(pos_pair_graph)
-        _check_device(blocks)
+    with cpu_affinity_context(dataloader, 0):
+        for input_nodes, pos_pair_graph, blocks in dataloader:
+            _check_device(input_nodes)
+            _check_device(pos_pair_graph)
+            _check_device(blocks)
 
     # negative sampler
     edge_sampler = dgl.dataloading.as_edge_prediction_sampler(
@@ -501,11 +522,12 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, mode, use_ddp):
         use_uva=(mode == "uva"),
         use_ddp=use_ddp,
     )
-    for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(pos_pair_graph)
-        _check_device(neg_pair_graph)
-        _check_device(blocks)
+    with cpu_affinity_context(dataloader, 0):
+        for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
+            _check_device(input_nodes)
+            _check_device(pos_pair_graph)
+            _check_device(neg_pair_graph)
+            _check_device(blocks)
 
     g2 = dgl.heterograph(
         {
@@ -547,10 +569,11 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, mode, use_ddp):
         use_uva=(mode == "uva"),
         use_ddp=use_ddp,
     )
-    for input_nodes, pos_pair_graph, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(pos_pair_graph)
-        _check_device(blocks)
+    with cpu_affinity_context(dataloader, 0):
+        for input_nodes, pos_pair_graph, blocks in dataloader:
+            _check_device(input_nodes)
+            _check_device(pos_pair_graph)
+            _check_device(blocks)
 
     # negative sampler
     edge_sampler = dgl.dataloading.as_edge_prediction_sampler(
@@ -566,12 +589,13 @@ def test_edge_dataloader(idtype, sampler_name, neg_sampler, mode, use_ddp):
         use_ddp=use_ddp,
     )
 
-    assert isinstance(iter(dataloader), Iterator)
-    for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
-        _check_device(input_nodes)
-        _check_device(pos_pair_graph)
-        _check_device(neg_pair_graph)
-        _check_device(blocks)
+    with cpu_affinity_context(dataloader, 0):
+        assert isinstance(iter(dataloader), Iterator)
+        for input_nodes, pos_pair_graph, neg_pair_graph, blocks in dataloader:
+            _check_device(input_nodes)
+            _check_device(pos_pair_graph)
+            _check_device(neg_pair_graph)
+            _check_device(blocks)
 
     if use_ddp:
         dist.destroy_process_group()
@@ -667,8 +691,9 @@ def _find_edges_to_exclude(g, exclude, always_exclude, pair_eids):
     ],
 )
 @pytest.mark.parametrize("batch_size", [1, 50])
+@pytest.mark.parametrize("num_workers", [0, 4])
 def test_edge_dataloader_excludes(
-    exclude, always_exclude_flag, batch_size, sampler
+    exclude, always_exclude_flag, batch_size, num_workers, sampler
 ):
     if exclude == "reverse_types":
         g, reverse_etypes, always_exclude, seed_edges = _create_heterogeneous()
@@ -697,35 +722,37 @@ def test_edge_dataloader_excludes(
         batch_size=batch_size,
         device=F.ctx(),
         use_prefetch_thread=False,
+        num_workers=num_workers,
     )
-    for i, (input_nodes, pair_graph, blocks) in enumerate(dataloader):
-        if isinstance(blocks, list):
-            subg = blocks[0]
-        else:
-            subg = blocks
-        pair_eids = pair_graph.edata[dgl.EID]
-        block_eids = subg.edata[dgl.EID]
+    with cpu_affinity_context(dataloader, num_workers):
+        for i, (input_nodes, pair_graph, blocks) in enumerate(dataloader):
+            if isinstance(blocks, list):
+                subg = blocks[0]
+            else:
+                subg = blocks
+            pair_eids = pair_graph.edata[dgl.EID]
+            block_eids = subg.edata[dgl.EID]
 
-        edges_to_exclude = _find_edges_to_exclude(
-            g, exclude, always_exclude, pair_eids
-        )
-        if edges_to_exclude is None:
-            continue
-        edges_to_exclude = dgl.utils.recursive_apply(
-            edges_to_exclude, lambda x: x.cpu().numpy()
-        )
-        block_eids = dgl.utils.recursive_apply(
-            block_eids, lambda x: x.cpu().numpy()
-        )
+            edges_to_exclude = _find_edges_to_exclude(
+                g, exclude, always_exclude, pair_eids
+            )
+            if edges_to_exclude is None:
+                continue
+            edges_to_exclude = dgl.utils.recursive_apply(
+                edges_to_exclude, lambda x: x.cpu().numpy()
+            )
+            block_eids = dgl.utils.recursive_apply(
+                block_eids, lambda x: x.cpu().numpy()
+            )
 
-        if isinstance(edges_to_exclude, Mapping):
-            for k in edges_to_exclude.keys():
-                assert not np.isin(edges_to_exclude[k], block_eids[k]).any()
-        else:
-            assert not np.isin(edges_to_exclude, block_eids).any()
+            if isinstance(edges_to_exclude, Mapping):
+                for k in edges_to_exclude.keys():
+                    assert not np.isin(edges_to_exclude[k], block_eids[k]).any()
+            else:
+                assert not np.isin(edges_to_exclude, block_eids).any()
 
-        if i == 10:
-            break
+            if i == 10:
+                break
 
 
 def test_edge_dataloader_exclusion_with_reverse_seed_nodes():
@@ -752,19 +779,20 @@ def test_edge_dataloader_exclusion_with_reverse_seed_nodes():
         shuffle=True,
         drop_last=False,
     )
-    for _, pos_graph, mfgs in dataloader:
-        s, d = pos_graph["AB"].edges()
-        AB_pos = list(zip(s.tolist(), d.tolist()))
-        s, d = pos_graph["BA"].edges()
-        BA_pos = list(zip(s.tolist(), d.tolist()))
+    with cpu_affinity_context(dataloader, 0):
+        for _, pos_graph, mfgs in dataloader:
+            s, d = pos_graph["AB"].edges()
+            AB_pos = list(zip(s.tolist(), d.tolist()))
+            s, d = pos_graph["BA"].edges()
+            BA_pos = list(zip(s.tolist(), d.tolist()))
 
-        s, d = mfgs[-1]["AB"].edges()
-        AB_mfg = list(zip(s.tolist(), d.tolist()))
-        s, d = mfgs[-1]["BA"].edges()
-        BA_mfg = list(zip(s.tolist(), d.tolist()))
+            s, d = mfgs[-1]["AB"].edges()
+            AB_mfg = list(zip(s.tolist(), d.tolist()))
+            s, d = mfgs[-1]["BA"].edges()
+            BA_mfg = list(zip(s.tolist(), d.tolist()))
 
-        assert all(edge not in AB_mfg for edge in AB_pos)
-        assert all(edge not in BA_mfg for edge in BA_pos)
+            assert all(edge not in AB_mfg for edge in AB_pos)
+            assert all(edge not in BA_mfg for edge in BA_pos)
 
 
 def test_edge_dataloader_exclusion_without_all_reverses():
@@ -783,6 +811,7 @@ def test_edge_dataloader_exclusion_without_all_reverses():
         exclude="reverse_types",
         reverse_etypes={"AB": "BA"},
     )
+    num_workers = 0
     d = dgl.dataloading.DataLoader(
         graph=g,
         indices={
@@ -793,12 +822,12 @@ def test_edge_dataloader_exclusion_without_all_reverses():
         batch_size=2,
         shuffle=True,
         drop_last=False,
-        num_workers=0,
+        num_workers=num_workers,
         device=F.ctx(),
         use_ddp=False,
     )
-
-    next(iter(d))
+    with cpu_affinity_context(d, num_workers):
+        next(iter(d))
 
 
 def dummy_worker_init_fn(worker_id):
@@ -809,16 +838,18 @@ def test_dataloader_worker_init_fn():
     dataset = dgl.data.CoraFullDataset()
     g = dataset[0]
     sampler = dgl.dataloading.MultiLayerNeighborSampler([2])
+    num_workers = 4
     dataloader = dgl.dataloading.DataLoader(
         g,
         torch.arange(100),
         sampler,
         batch_size=4,
-        num_workers=4,
+        num_workers=num_workers,
         worker_init_fn=dummy_worker_init_fn,
     )
-    for _ in dataloader:
-        pass
+    with cpu_affinity_context(dataloader, num_workers):
+        for _ in dataloader:
+            pass
 
 
 if __name__ == "__main__":
