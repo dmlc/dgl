@@ -32,11 +32,11 @@ class NeighborSampler(SubgraphSampler):
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
         prob_name: str, optional
-            The name of an edge attribute used a. This
-            attribute tensor should contain (unnormalized) probabilities
-            corresponding to each neighboring edge of a node. It must be a 1D
-            floating-point or boolean tensor, with the number of elements
-            equalling the total number of edges.
+            The name of an edge attribute used as the weights of sampling for
+            each node. This attribute tensor should contain (unnormalized)
+            probabilities corresponding to each neighboring edge of a node.
+            It must be a 1D floating-point or boolean tensor, with the number
+            of elements equalling the total number of edges.
 
         Examples
         -------
@@ -60,7 +60,7 @@ class NeighborSampler(SubgraphSampler):
         >>> neg_sampler = gb.UniformNegativeSampler(
             ...data_block_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
-            ...torch.LongTensor([15])cd ]
+            ...torch.LongTensor([15])]
         >>> subgraph_sampler = gb.NeighborSampler(
             ...neg_sampler, graph, fanouts)
         >>> for data in subgraph_sampler:
