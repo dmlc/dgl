@@ -1,6 +1,7 @@
 import io
 import pickle
 import random
+import re
 from copy import deepcopy
 
 import backend as F
@@ -923,6 +924,9 @@ def test_gcn2conv_e_weight(g, idtype, bias):
     res = feat
     h = gcn2conv(g, res, feat, edge_weight=eweight)
     assert h.shape[-1] == 5
+    assert re.match(
+        re.compile(".*GCN2Conv.*in=.*, alpha=.*, beta=.*"), str(gcn2conv)
+    )
 
 
 @parametrize_idtype
