@@ -2092,7 +2092,7 @@ def test_hgt(idtype, in_size, num_heads):
         batch_size=8,
         num_workers=1,
         device=dev,
-        shuffle=True
+        shuffle=True,
     )
     with train_loader.enable_cpu_affinity():
         (input_nodes, output_nodes, block) = next(iter(train_loader))
