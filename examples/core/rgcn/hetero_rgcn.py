@@ -282,11 +282,11 @@ class RelGraphConvLayer(nn.Module):
 
 
 class EntityClassify(nn.Module):
-    def __init__(self, g, in_size, out_dim):
+    def __init__(self, g, in_size, out_size):
         super(EntityClassify, self).__init__()
         self.in_size = in_size
         self.hidden_size = 64
-        self.out_dim = out_dim
+        self.out_size = out_size
 
         # Generate and sort a list of unique edge types from the input graph.
         # eg. ['writes', 'cites']
@@ -314,7 +314,7 @@ class EntityClassify(nn.Module):
         self.layers.append(
             RelGraphConvLayer(
                 self.hidden_size,
-                self.out_dim,
+                self.out_size,
                 g.ntypes,
                 self.relation_names,
                 activation=None,
