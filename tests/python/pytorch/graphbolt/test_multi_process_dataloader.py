@@ -1,3 +1,5 @@
+import os
+import unittest
 from functools import partial
 
 import backend as F
@@ -25,6 +27,8 @@ def fetch_func(features, labels, data):
     return input_features, output_labels, adjs
 
 
+@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
+# TODO (peizhou): Will enable windows test once CSCSamplingraph is pickleable.
 def test_DataLoader():
     N = 40
     B = 4
