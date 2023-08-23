@@ -130,6 +130,18 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   void Save(torch::serialize::OutputArchive& archive) const;
 
   /**
+   * @brief Pickle method for deserializing.
+   * @param state The state of serialized CSCSamplingGraph.
+   */
+  void SetState(std::vector<torch::Dict<std::string, torch::Tensor>>& state);
+
+  /**
+   * @brief Pickle method for serializing.
+   * @returns The state of this CSCSamplingGraph.
+   */
+  std::vector<torch::Dict<std::string, torch::Tensor>> GetState() const;
+
+  /**
    * @brief Return the subgraph induced on the inbound edges of the given nodes.
    * @param nodes Type agnostic node IDs to form the subgraph.
    *

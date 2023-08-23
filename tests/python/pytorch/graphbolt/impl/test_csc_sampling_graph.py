@@ -1,4 +1,6 @@
 import os
+
+import pickle
 import tempfile
 import unittest
 
@@ -250,6 +252,77 @@ def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
     assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
     assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
+)
+def test_pickle_homo_graph(num_nodes, num_edges):
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
+    graph = gb.from_csc(csc_indptr, indices)
+
+    serialized = pickle.dumps(graph)
+    graph2 = pickle.loads(serialized)
+
+    assert graph.num_nodes == graph2.num_nodes
+    assert graph.num_edges == graph2.num_edges
+
+    assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
+    assert torch.equal(graph.indices, graph2.indices)
+
+    assert graph.metadata is None and graph2.metadata is None
+    assert graph.node_type_offset is None and graph2.node_type_offset is None
+    assert graph.type_per_edge is None and graph2.type_per_edge is None
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
+)
+@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+def test_pickle_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    edge_attributes = {
+        "a": torch.randn((num_edges,)),
+        "b": torch.randint(1, 10, (num_edges,)),
+    }
+    graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
+    )
+
+    serialized = pickle.dumps(graph)
+    graph2 = pickle.loads(serialized)
+
+    assert graph.num_nodes == graph2.num_nodes
+    assert graph.num_edges == graph2.num_edges
+
+    assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
+    assert torch.equal(graph.indices, graph2.indices)
+    assert torch.equal(graph.node_type_offset, graph2.node_type_offset)
+    assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
+    assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
+    assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+    assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
+    for i in graph.edge_attributes.keys():
+        assert torch.equal(graph.edge_attributes[i], graph2.edge_attributes[i])
 
 
 @unittest.skipIf(

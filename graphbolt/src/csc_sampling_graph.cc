@@ -95,6 +95,39 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
   }
 }
 
+void CSCSamplingGraph::SetState(
+    std::vector<torch::Dict<std::string, torch::Tensor>>& state) {
+  TORCH_CHECK(state.size() >= 1 && state.size() <= 2, "Wrong length of state.");
+  indptr_ = state[0].at("indptr");
+  indices_ = state[0].at("indices");
+  if (state[0].find("node_type_offset") != state[0].end()) {
+    node_type_offset_ = state[0].at("node_type_offset");
+  }
+  if (state[0].find("type_per_edge") != state[0].end()) {
+    type_per_edge_ = state[0].at("type_per_edge");
+  }
+  if (state.size() > 1) {
+    edge_attributes_ = state[1];
+  }
+}
+
+std::vector<torch::Dict<std::string, torch::Tensor>>
+CSCSamplingGraph::GetState() const {
+  std::vector<torch::Dict<std::string, torch::Tensor>> state(1);
+  state[0].insert_or_assign("indptr", indptr_);
+  state[0].insert_or_assign("indices", indices_);
+  if (node_type_offset_.has_value()) {
+    state[0].insert_or_assign("node_type_offset", node_type_offset_.value());
+  }
+  if (type_per_edge_.has_value()) {
+    state[0].insert_or_assign("type_per_edge", type_per_edge_.value());
+  }
+  if (edge_attributes_.has_value()) {
+    state.push_back(edge_attributes_.value());
+  }
+  return state;
+}
+
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
     const torch::Tensor& nodes) const {
   using namespace torch::indexing;
