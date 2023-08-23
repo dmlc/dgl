@@ -6,7 +6,6 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 from .data_format import LinkPredictionEdgeFormat
-from .link_prediction_block import LinkPredictionBlock
 
 
 class NegativeSampler(Mapper):
@@ -38,16 +37,18 @@ class NegativeSampler(Mapper):
         self.negative_ratio = negative_ratio
         self.output_format = output_format
 
-    def _sample(self, node_pairs):
+    def _sample(self, data):
         """
         Generate a mix of positive and negative samples.
 
         Parameters
         ----------
-        node_pairs : Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
-            A tuple of tensors or a dictionary represents source-destination
-            node pairs of positive edges, where positive means the edge must
-            exist in the graph.
+        data : LinkPredictionBlock
+            An instance of 'LinkPredictionBlock' class requires the 'node_pair'
+            field. This function is responsible for generating negative edges
+            corresponding to the positive edges defined by the 'node_pair'. In
+            cases where negative edges already exist, this function will
+            overwrite them.
 
         Returns
         -------
@@ -55,13 +56,20 @@ class NegativeSampler(Mapper):
             An instance of 'LinkPredictionBlock' encompasses both positive and
             negative samples.
         """
-
-        data = LinkPredictionBlock(node_pair=node_pairs)
+        node_pairs = data.node_pair
         if isinstance(node_pairs, Mapping):
+            if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
+                data.label = {}
+            else:
+                data.negative_head, data.negative_tail = {}, {}
             for etype, pos_pairs in node_pairs.items():
                 self._collate(
                     data, self._sample_with_etype(pos_pairs, etype), etype
                 )
+            if self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
+                data.negative_tail = None
+            if self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
+                data.negative_head = None
         else:
             self._collate(data, self._sample_with_etype(node_pairs))
         return data
@@ -101,7 +109,7 @@ class NegativeSampler(Mapper):
         etype : (str, str, str)
             Canonical edge type.
         """
-        pos_src, pos_dst = data.node_pair
+        pos_src, pos_dst = data.node_pair[etype] if etype else data.node_pair
         neg_src, neg_dst = neg_pairs
         if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
             pos_label = torch.ones_like(pos_src)

@@ -1,9 +1,61 @@
 """Utility functions for sampling."""
 
 from collections import defaultdict
-from typing import Dict, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import torch
+
+
+def unique_and_compact(
+    nodes: Union[
+        List[torch.Tensor],
+        Dict[str, List[torch.Tensor]],
+    ],
+):
+    """
+    Compact a list of nodes tensor.
+
+    Parameters
+    ----------
+    nodes : List[torch.Tensor] or Dict[str, List[torch.Tensor]]
+        List of nodes for compacting.
+        the unique_and_compact will be done per type
+        - If `nodes` is a list of tensor: All the tensors will do unique and
+        compact together, usually it is used for homogeneous graph.
+        - If `nodes` is a list of dictionary: The keys should be node type and
+        the values should be corresponding nodes, the unique and compact will
+        be done per type, usually it is used for heterogeneous graph.
+
+    Returns
+    -------
+    Tuple[unique_nodes, compacted_node_list]
+    The Unique nodes (per type) of all nodes in the input. And the compacted
+    nodes list, where IDs inside are replaced with compacted node IDs.
+    "Compacted node list" indicates that the node IDs in the input node
+    list are replaced with mapped node IDs, where each type of node is
+    mapped to a contiguous space of IDs ranging from 0 to N.
+    """
+    is_heterogeneous = isinstance(nodes, dict)
+
+    def unique_and_compact_per_type(nodes):
+        nums = [node.size(0) for node in nodes]
+        nodes = torch.cat(nodes)
+        empty_tensor = nodes.new_empty(0)
+        unique, compacted, _ = torch.ops.graphbolt.unique_and_compact(
+            nodes, empty_tensor, empty_tensor
+        )
+        compacted = compacted.split(nums)
+        return unique, list(compacted)
+
+    if is_heterogeneous:
+        unique, compacted = {}, {}
+        for ntype, nodes_of_type in nodes.items():
+            unique[ntype], compacted[ntype] = unique_and_compact_per_type(
+                nodes_of_type
+            )
+        return unique, compacted
+    else:
+        return unique_and_compact_per_type(nodes)
 
 
 def unique_and_compact_node_pairs(

@@ -20,7 +20,7 @@ from .negative_sampler import *
 from .data_block import *
 from .node_classification_block import *
 from .link_prediction_block import *
-from .utils import unique_and_compact_node_pairs
+from .utils import unique_and_compact, unique_and_compact_node_pairs
 
 
 def load_graphbolt():
