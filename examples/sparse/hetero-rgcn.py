@@ -182,12 +182,8 @@ def main(args):
     # Load graph data.
     if args.dataset == "aifb":
         dataset = AIFBDataset()
-    elif args.dataset == "mutag":
-        dataset = MUTAGDataset()
     elif args.dataset == "bgs":
         dataset = BGSDataset()
-    elif args.dataset == "am":
-        dataset = AMDataset()
     else:
         raise ValueError()
 
@@ -202,7 +198,7 @@ def main(args):
 
     # Split dataset into train, validate, test.
     val_idx = train_idx[: len(train_idx) // 5]
-    train_idx = train_idx[len(train_idx) // 5 :]
+    train_idx = train_idx[len(train_idx) // 5:]
 
     embed_layer = RelGraphEmbed(
         {ntype: g.num_nodes(ntype) for ntype in g.ntypes}, 16
@@ -238,7 +234,7 @@ def main(args):
     # Training loop.
     print("start training...")
     model.train()
-    for epoch in range(20):
+    for epoch in range(10):
         optimizer.zero_grad()
         logits = model(A)[category]
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
