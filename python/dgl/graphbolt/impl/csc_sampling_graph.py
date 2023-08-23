@@ -712,7 +712,7 @@ def save_csc_sampling_graph(graph, filename):
     print(f"CSCSamplingGraph has been saved to {filename}.")
 
 
-def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
+def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
     """Convert a DGLGraph to CSCSamplingGraph."""
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
     # Initialize metadata.
@@ -726,7 +726,11 @@ def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
     indptr, indices, _ = homo_g.adj_tensors("csc")
     ntype_count.insert(0, 0)
     node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
-    type_per_edge = homo_g.edata[ETYPE]
+
+    if not is_homogeneous:
+        type_per_edge = homo_g.edata[ETYPE]
+    else:
+        type_per_edge = None
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(

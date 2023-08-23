@@ -152,7 +152,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                 g.edata[graph_feature["name"]] = edge_data
 
     # 4. Convert the DGLGraph to a CSCSamplingGraph.
-    csc_sampling_graph = from_dglgraph(g)
+    csc_sampling_graph = from_dglgraph(g, is_homogeneous)
 
     # 5. Save the CSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
