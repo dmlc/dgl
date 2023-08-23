@@ -8,46 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
 from ogb.linkproppred import Evaluator
-
-
-############## Subgraph sampler function ##################
-class LinkSampler:
-    def __init__(self, graph, num_layers, fanout, neg_ratio=1000):
-        assert num_layers == len(fanout)
-        self.graph = graph
-        self.num_layers = num_layers
-        self.fanout = fanout
-        self.neg_ratio = neg_ratio
-
-    def __call__(self, data):
-        adjs = []
-        # Data format is (u, v, neg_v...).
-        u = data[0]
-        u = torch.cat([u.repeat_interleave(self.neg_ratio), u])
-        v = [t.view(1, -1) for t in data[2:]]
-        v = torch.cat(v, dim=1).view(-1)
-        # Cat pos and neg v.
-        v = torch.cat([data[1], v])
-        node_pairs = (u, v)
-
-        seeds, compacted_pairs = gb.unique_and_compact_node_pairs(node_pairs)
-        for hop in range(self.num_layers):
-            sg = self._generate(seeds, torch.LongTensor(self.fanout[hop]))
-            sg = dgl.graph(sg.node_pairs[("_N", "_E", "_N")])
-            block = dgl.to_block(sg, seeds)
-            seeds = block.srcdata[dgl.NID]
-            adjs.insert(0, block)
-
-        input_nodes = seeds
-        return input_nodes, compacted_pairs, adjs
-
-    def _generate(self, seeds, fanout):
-        raise NotImplementedError
-
-
-class LinkNeighborSampler(LinkSampler):
-    def _generate(self, seeds, fanout):
-        return self.graph.sample_neighbors(seeds, fanout)
+from functools import partial
+from torchdata.datapipes.iter import Mapper
 
 
 class SAGE(nn.Module):
@@ -76,34 +38,33 @@ class SAGE(nn.Module):
         return hidden_x
 
 
-def create_fetch_func(features):
-    """Create a fetch function."""
+def _fetch_func(data, features):
+    """Fetch data from disk."""
+    input_nodes, compacted_pairs, adjs = data
+    input_features = features.read("node", None, "feat", input_nodes)
+    return input_features.float(), compacted_pairs, adjs
 
-    def fetch_func(data):
-        """Fetch data from disk."""
-        input_nodes, compacted_pairs, adjs = data
-        input_features = features.read("node", None, "feat", input_nodes)
-        return input_features.float(), compacted_pairs, adjs
+def to_link_block(data):
+    block = gb.LinkPredictionBlock(node_pair=data)
+    return block
 
-    return fetch_func
-
-
-def get_dataloader(args, graph, features, current_set):
+def get_dataloader(args, graph, features, current_set, shuffle=True):
     """Get a graphbolt-version dataloader."""
+    import pdb; pdb.set_trace()
     minibatch_sampler = gb.MinibatchSampler(
-        current_set, batch_size=args.batch_size, shuffle=True
+        current_set, batch_size=args.batch_size, shuffle=shuffle
     )
+    data_block_converter = Mapper(minibatch_sampler, to_link_block)
     negative_sampler = gb.UniformNegativeSampler(
-        minibatch_sampler,
+        data_block_converter,
         args.neg_ratio,
         gb.LinkPredictionEdgeFormat.INDEPENDENT,
         graph,
     )
-    subgraph_sampler = gb.SubgraphSampler(
-        negative_sampler,
-        LinkNeighborSampler(graph, args.num_layers, args.fanout),
+    subgraph_sampler = gb.NeighborSampler(
+        negative_sampler, graph, args.fanout
     )
-    fetch_func = create_fetch_func(features)
+    fetch_func = partial(_fetch_func, features=features)
     feature_fetcher = gb.FeatureFetcher(subgraph_sampler, fetch_func)
     device_transfer = gb.CopyTo(feature_fetcher, torch.device("cpu"))
     dataloader = gb.MultiProcessDataLoader(
@@ -118,8 +79,7 @@ def evaluate(args, graph, features, current_set, model):
 
     # Since we need to evaluate the model, we need to set the number
     # of layers to 1 and the fanout to -1.
-    args.num_layers = 1
-    args.fanout = [[-1]]
+    args.fanout = [torch.LongTensor([-1])]
     dataloader = get_dataloader(args, graph, features, current_set)
     pos_pred = []
     neg_pred = []
@@ -226,7 +186,7 @@ def main(args):
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     # CSCSamplingGraph can't be used in GPU mode.
-    args.fanout = [[int(fanout)] for fanout in args.fanout.split(",")]
+    args.fanout = [torch.LongTensor([int(fanout)]) for fanout in args.fanout.split(",")]
 
     in_size = 128
     hidden_channels = 256
