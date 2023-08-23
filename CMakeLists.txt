@@ -127,6 +127,11 @@ else()
   endif()
 endif()
 
+if((NOT MSVC) AND (NOT USE_CUDA))
+  message(STATUS "Turn on Asan")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fsanitize=leak -fsanitize-recover=all")
+endif()
+
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX)
