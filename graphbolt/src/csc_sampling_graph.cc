@@ -782,7 +782,7 @@ inline int64_t LaborPick(
     std::iota(picked_data_ptr, picked_data_ptr + num_neighbors, offset);
     return num_neighbors;
   }
-  #define STACK_SIZE_LABOR 1024
+#define STACK_SIZE_LABOR 1024
   // Assuming max_degree of a vertex is <= 4 billion.
   std::array<std::pair<float, uint32_t>, STACK_SIZE_LABOR> heap_stack;
   auto heap_data = heap_stack.data();
