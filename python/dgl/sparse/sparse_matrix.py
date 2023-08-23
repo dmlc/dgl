@@ -507,7 +507,7 @@ class SparseMatrix:
                      values=tensor([0, 1, 2, 5]),
                      shape=(3, 6), nnz=4)
         """
-        return self.c_sparse_matrix.rowwise_select(ids)
+        raise NotImplementedError
 
     def columnwise_select(self, ids: torch.Tensor):
         """Returns a column-wise sub-matrix selected by ids.
@@ -537,7 +537,7 @@ class SparseMatrix:
                      values=tensor([0, 2, 4, 6]),
                      shape=(5, 3), nnz=4)
         """
-        return self.c_sparse_matrix.columnwise_select(ids)
+        raise NotImplementedError
 
     def rowwise_select(self, start: int, end: int):
         """Returns a row-wise sub-matrix selected by range [start, end).
@@ -567,7 +567,7 @@ class SparseMatrix:
                      values=tensor([1, 2, 3]),
                      shape=(2, 6), nnz=3)
         """
-        return self.c_sparse_matrix.rowwise_select(start, end)
+        raise NotImplementedError
 
     def columnwise_select(self, start: int, end: int):
         """Returns a column-wise sub-matrix selected by range [start, end).
@@ -597,7 +597,7 @@ class SparseMatrix:
                      values=tensor([2, 3, 4]),
                      shape=(5, 3), nnz=3)
         """
-        return self.c_sparse_matrix.columnwise_select(start, end)
+        raise NotImplementedError
 
 
 def spmatrix(
