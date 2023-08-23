@@ -737,17 +737,19 @@ def _test_construct_graphs_multiple():
     assert expect_except
 
 
-def _get_data_table(data_frame):
+def _get_data_table(data_frame, save_index=False):
     from dgl.data.csv_dataset_base import DefaultDataParser
 
     with tempfile.TemporaryDirectory() as test_dir:
         csv_path = os.path.join(test_dir, "nodes.csv")
 
-        data_frame.to_csv(csv_path, index=False)
+        data_frame.to_csv(csv_path, index=save_index)
         dp = DefaultDataParser()
         df = pd.read_csv(csv_path)
 
-    # Intercepting the warning: "Unamed column is found. Ignored...".
+    # Warning suppression : "Untitled column found. Ignored...",
+    # which appears when a CSV file is saved with an index:
+    #    data_frame.to_csv(csv_path, index=True).
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         return dp(df)
@@ -785,7 +787,7 @@ def _test_DefaultDataParser():
 
     # csv has index column which is ignored as it's unnamed
     df = pd.DataFrame({"label": [1, 2, 3]})
-    dt = _get_data_table(df)
+    dt = _get_data_table(df, True)
     assert len(dt) == 1
 
 
