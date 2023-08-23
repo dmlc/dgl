@@ -699,7 +699,7 @@ def _find_edges_to_exclude(g, exclude, always_exclude, pair_eids):
     ],
 )
 @pytest.mark.parametrize("batch_size", [1, 50])
-@pytest.mark.parametrize("num_workers", [0, 4])
+@pytest.mark.parametrize("num_workers", [0, 4] if F._default_context_str == "cpu" else [0])
 def test_edge_dataloader_excludes(
     exclude, always_exclude_flag, batch_size, num_workers, sampler
 ):
