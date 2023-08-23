@@ -727,10 +727,10 @@ def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
     ntype_count.insert(0, 0)
     node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
 
-    if not is_homogeneous:
-        type_per_edge = homo_g.edata[ETYPE]
-    else:
+    if is_homogeneous:
         type_per_edge = None
+    else:
+        type_per_edge = homo_g.edata[ETYPE]
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
