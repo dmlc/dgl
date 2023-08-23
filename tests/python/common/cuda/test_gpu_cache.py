@@ -25,7 +25,7 @@ D = 5
 
 
 def generate_graph(idtype, grad=False, add_data=True):
-    g = dgl.DGLGraph().to(F.ctx(), dtype=idtype)
+    g = dgl.graph([]).to(F.ctx(), dtype=idtype)
     g.add_nodes(10)
     u, v = [], []
     # create a graph where 0 is the source and 9 is the sink
