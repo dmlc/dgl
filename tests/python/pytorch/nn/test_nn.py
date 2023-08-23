@@ -1,8 +1,8 @@
 import io
 
 import random
-from copy import deepcopy
 from contextlib import contextmanager
+from copy import deepcopy
 
 import backend as F
 
@@ -2095,7 +2095,7 @@ def test_hgt(idtype, in_size, num_heads):
     # mini-batch
     train_idx = th.randperm(100, dtype=idtype)[:10]
     sampler = dgl.dataloading.NeighborSampler([-1])
-    num_workers =  1 if F._default_context_str == "cpu" else 0
+    num_workers = 1 if F._default_context_str == "cpu" else 0
     train_loader = dgl.dataloading.DataLoader(
         g,
         train_idx.to(dev),
