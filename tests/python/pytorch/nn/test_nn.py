@@ -1,8 +1,8 @@
 import io
 
 import random
-from contextlib import contextmanager
 import re
+from contextlib import contextmanager
 from copy import deepcopy
 
 import backend as F
