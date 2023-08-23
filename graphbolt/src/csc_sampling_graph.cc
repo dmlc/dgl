@@ -781,10 +781,16 @@ inline int64_t LaborPick(
     std::iota(picked_data_ptr, picked_data_ptr + num_neighbors, offset);
     return num_neighbors;
   }
-  torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
+  constexpr int stack_size = 1024;
   // Assuming max_degree of a vertex is <= 4 billion.
-  auto heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
-      heap_tensor.data_ptr<int32_t>());
+  std::pair<float, uint32_t> heap_stack[stack_size];
+  std::pair<float, uint32_t>* heap_data = &heap_stack[0];
+  torch::Tensor heap_tensor;
+  if (fanout > stack_size) {
+    heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
+    heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
+        heap_tensor.data_ptr<int32_t>());
+  }
   const ProbsType* local_probs_data =
       NonUniform ? probs_or_mask.value().data_ptr<ProbsType>() + offset
                  : nullptr;
@@ -814,9 +820,14 @@ inline int64_t LaborPick(
           // is O((fanout + num_neighbors) log(fanout)). It is possible to
           // decrease the logarithmic factor down to
           // O(log(min(fanout, num_neighbors))).
-          torch::Tensor remaining =
-              torch::ones({num_neighbors}, torch::kFloat32);
-          float* rem_data = remaining.data_ptr<float>();
+          float remaining_stack[stack_size];
+          float* rem_data = &remaining_stack[0];
+          torch::Tensor remaining;
+          if (num_neighbors > stack_size) {
+            remaining = torch::empty({num_neighbors}, torch::kFloat32);
+            rem_data = remaining.data_ptr<float>();
+          }
+          std::fill(rem_data, rem_data + num_neighbors, 1.f);
           auto heap_end = heap_data;
           const auto init_count = (num_neighbors + fanout - 1) / num_neighbors;
           auto sample_neighbor_i_with_index_t_jth_time =
