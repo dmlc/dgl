@@ -8,6 +8,7 @@
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
 
+#include <array>
 #include <cmath>
 #include <limits>
 #include <numeric>
@@ -783,8 +784,8 @@ inline int64_t LaborPick(
   }
   constexpr int stack_size = 1024;
   // Assuming max_degree of a vertex is <= 4 billion.
-  std::pair<float, uint32_t> heap_stack[stack_size];
-  std::pair<float, uint32_t>* heap_data = &heap_stack[0];
+  std::array<std::pair<float, uint32_t>, stack_size> heap_stack;
+  auto heap_data = heap_stack.data();
   torch::Tensor heap_tensor;
   if (fanout > stack_size) {
     heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
@@ -820,8 +821,8 @@ inline int64_t LaborPick(
           // is O((fanout + num_neighbors) log(fanout)). It is possible to
           // decrease the logarithmic factor down to
           // O(log(min(fanout, num_neighbors))).
-          float remaining_stack[stack_size];
-          float* rem_data = &remaining_stack[0];
+          std::array<float, stack_size> remaining_stack;
+          auto rem_data = remaining_stack.data();
           torch::Tensor remaining;
           if (num_neighbors > stack_size) {
             remaining = torch::empty({num_neighbors}, torch::kFloat32);
