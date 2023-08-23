@@ -6,10 +6,8 @@ import torch
 
 def get_graphbolt_fetch_func():
     feature_store = {
-        "feature": dgl.graphbolt.TorchBasedFeatureStore(torch.randn(200, 4)),
-        "label": dgl.graphbolt.TorchBasedFeatureStore(
-            torch.randint(0, 10, (200,))
-        ),
+        "feature": dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4)),
+        "label": dgl.graphbolt.TorchBasedFeature(torch.randint(0, 10, (200,))),
     }
 
     def fetch_func(data):

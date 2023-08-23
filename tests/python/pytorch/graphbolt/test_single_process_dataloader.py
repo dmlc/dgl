@@ -10,8 +10,8 @@ def test_DataLoader():
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N))
     graph = gb_test_utils.rand_csc_graph(200, 0.15)
-    features = dgl.graphbolt.TorchBasedFeatureStore(torch.randn(200, 4))
-    labels = dgl.graphbolt.TorchBasedFeatureStore(torch.randint(0, 10, (200,)))
+    features = dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4))
+    labels = dgl.graphbolt.TorchBasedFeature(torch.randint(0, 10, (200,)))
 
     def sampler_func(data):
         adjs = []

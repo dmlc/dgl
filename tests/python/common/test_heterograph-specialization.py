@@ -10,7 +10,7 @@ D = 5
 
 
 def generate_graph(idtype):
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(10)
     # create a graph where 0 is the source and 9 is the sink
@@ -183,7 +183,7 @@ def test_v2v_pull(idtype):
 @parametrize_idtype
 def test_update_all_multi_fallback(idtype):
     # create a graph with zero in degree nodes
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(10)
     for i in range(1, 9):
@@ -237,7 +237,7 @@ def test_update_all_multi_fallback(idtype):
 @parametrize_idtype
 def test_pull_multi_fallback(idtype):
     # create a graph with zero in degree nodes
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g = g.astype(idtype).to(F.ctx())
     g.add_nodes(10)
     for i in range(1, 9):
@@ -317,7 +317,7 @@ def test_spmv_3d_feat(idtype):
     n = 100
     p = 0.1
     a = sp.random(n, n, p, data_rvs=lambda n: np.ones(n))
-    g = dgl.DGLGraph(a)
+    g = dgl.from_scipy(a)
     g = g.astype(idtype).to(F.ctx())
     m = g.num_edges()
 

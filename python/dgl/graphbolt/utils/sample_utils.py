@@ -1,16 +1,72 @@
 """Utility functions for sampling."""
 
 from collections import defaultdict
-from typing import Dict, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import torch
+
+
+def unique_and_compact(
+    nodes: Union[
+        List[torch.Tensor],
+        Dict[str, List[torch.Tensor]],
+    ],
+):
+    """
+    Compact a list of nodes tensor.
+
+    Parameters
+    ----------
+    nodes : List[torch.Tensor] or Dict[str, List[torch.Tensor]]
+        List of nodes for compacting.
+        the unique_and_compact will be done per type
+        - If `nodes` is a list of tensor: All the tensors will do unique and
+        compact together, usually it is used for homogeneous graph.
+        - If `nodes` is a list of dictionary: The keys should be node type and
+        the values should be corresponding nodes, the unique and compact will
+        be done per type, usually it is used for heterogeneous graph.
+
+    Returns
+    -------
+    Tuple[unique_nodes, compacted_node_list]
+    The Unique nodes (per type) of all nodes in the input. And the compacted
+    nodes list, where IDs inside are replaced with compacted node IDs.
+    "Compacted node list" indicates that the node IDs in the input node
+    list are replaced with mapped node IDs, where each type of node is
+    mapped to a contiguous space of IDs ranging from 0 to N.
+    """
+    is_heterogeneous = isinstance(nodes, dict)
+
+    def unique_and_compact_per_type(nodes):
+        nums = [node.size(0) for node in nodes]
+        nodes = torch.cat(nodes)
+        empty_tensor = nodes.new_empty(0)
+        unique, compacted, _ = torch.ops.graphbolt.unique_and_compact(
+            nodes, empty_tensor, empty_tensor
+        )
+        compacted = compacted.split(nums)
+        return unique, list(compacted)
+
+    if is_heterogeneous:
+        unique, compacted = {}, {}
+        for ntype, nodes_of_type in nodes.items():
+            unique[ntype], compacted[ntype] = unique_and_compact_per_type(
+                nodes_of_type
+            )
+        return unique, compacted
+    else:
+        return unique_and_compact_per_type(nodes)
 
 
 def unique_and_compact_node_pairs(
     node_pairs: Union[
         Tuple[torch.Tensor, torch.Tensor],
         Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
-    ]
+    ],
+    unique_dst_nodes: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ] = None,
 ):
     """
     Compact node pairs and return unique nodes (per type).
@@ -26,6 +82,11 @@ def unique_and_compact_node_pairs(
         - If `node_pairs` is a dictionary: The keys should be edge type and
         the values should be corresponding node pairs. And IDs inside are
         heterogeneous ids.
+    unique_dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
+        Unique nodes of all destination nodes in the node pairs.
+        - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
+        - If `node_pairs` is a dictionary: The keys are node type and the
+        values are corresponding nodes. And IDs inside are heterogeneous ids.
 
     Returns
     -------
@@ -52,44 +113,59 @@ def unique_and_compact_node_pairs(
     {('n1', 'e1', 'n2'): (tensor([0, 1, 1]), tensor([0, 1, 0])),
     ('n2', 'e2', 'n1'): (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
-    is_homogeneous = not isinstance(node_pairs, Dict)
+    is_homogeneous = not isinstance(node_pairs, dict)
     if is_homogeneous:
         node_pairs = {("_N", "_E", "_N"): node_pairs}
-    nodes_dict = defaultdict(list)
-    # Collect nodes for each node type.
-    for etype, node_pair in node_pairs.items():
-        u_type, _, v_type = etype
-        u, v = node_pair
-        nodes_dict[u_type].append(u)
-        nodes_dict[v_type].append(v)
+        if unique_dst_nodes is not None:
+            assert isinstance(
+                unique_dst_nodes, torch.Tensor
+            ), "Edge type not supported in homogeneous graph."
+            unique_dst_nodes = {"_N": unique_dst_nodes}
 
-    unique_nodes_dict = {}
-    inverse_indices_dict = {}
-    for ntype, nodes in nodes_dict.items():
-        collected_nodes = torch.cat(nodes)
-        # Compact and find unique nodes.
-        unique_nodes, inverse_indices = torch.unique(
-            collected_nodes,
-            return_inverse=True,
-        )
-        unique_nodes_dict[ntype] = unique_nodes
-        inverse_indices_dict[ntype] = inverse_indices
+    # Collect all source and destination nodes for each node type.
+    src_nodes = defaultdict(list)
+    dst_nodes = defaultdict(list)
+    for etype, (src_node, dst_node) in node_pairs.items():
+        src_nodes[etype[0]].append(src_node)
+        dst_nodes[etype[2]].append(dst_node)
+    src_nodes = {ntype: torch.cat(nodes) for ntype, nodes in src_nodes.items()}
+    dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
+    # Compute unique destination nodes if not provided.
+    if unique_dst_nodes is None:
+        unique_dst_nodes = {
+            ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
+        }
 
-    # Map back in same order as collect.
+    ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
+    unique_nodes = {}
+    compacted_src = {}
+    compacted_dst = {}
+    dtype = list(src_nodes.values())[0].dtype
+    default_tensor = torch.tensor([], dtype=dtype)
+    for ntype in ntypes:
+        src = src_nodes.get(ntype, default_tensor)
+        unique_dst = unique_dst_nodes.get(ntype, default_tensor)
+        dst = dst_nodes.get(ntype, default_tensor)
+        (
+            unique_nodes[ntype],
+            compacted_src[ntype],
+            compacted_dst[ntype],
+        ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
+
     compacted_node_pairs = {}
-    unique_nodes = unique_nodes_dict
-    for etype, node_pair in node_pairs.items():
-        u_type, _, v_type = etype
-        u, v = node_pair
-        u_size, v_size = u.numel(), v.numel()
-        u = inverse_indices_dict[u_type][:u_size]
-        inverse_indices_dict[u_type] = inverse_indices_dict[u_type][u_size:]
-        v = inverse_indices_dict[v_type][:v_size]
-        inverse_indices_dict[v_type] = inverse_indices_dict[v_type][v_size:]
-        compacted_node_pairs[etype] = (u, v)
+    # Map back with the same order.
+    for etype, pair in node_pairs.items():
+        num_elem = pair[0].size(0)
+        src_type, _, dst_type = etype
+        src = compacted_src[src_type][:num_elem]
+        dst = compacted_dst[dst_type][:num_elem]
+        compacted_node_pairs[etype] = (src, dst)
+        compacted_src[src_type] = compacted_src[src_type][num_elem:]
+        compacted_dst[dst_type] = compacted_dst[dst_type][num_elem:]
 
-    # Return singleton for homogeneous graph.
+    # Return singleton for a homogeneous graph.
     if is_homogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
-        unique_nodes = list(unique_nodes_dict.values())[0]
+        unique_nodes = list(unique_nodes.values())[0]
+
     return unique_nodes, compacted_node_pairs

@@ -5263,12 +5263,12 @@ class DGLGraph(object):
             out = reduce_dict_data(frames, cross_reducer, merge_order[dtid])
             # Replace infinity with zero for isolated nodes when reducer is min/max
             if core.is_builtin(rfunc) and rfunc.name in ["min", "max"]:
-                key = list(out.keys())[0]
-                out[key] = (
-                    F.replace_inf_with_zero(out[key])
-                    if out[key] is not None
-                    else None
-                )
+                for key in out.keys():
+                    out[key] = (
+                        F.replace_inf_with_zero(out[key])
+                        if out[key] is not None
+                        else None
+                    )
             self._node_frames[dtid].update(out)
             # apply
             if apply_node_func is not None:

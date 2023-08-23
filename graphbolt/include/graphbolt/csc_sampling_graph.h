@@ -16,6 +16,21 @@
 namespace graphbolt {
 namespace sampling {
 
+enum SamplerType { NEIGHBOR, LABOR };
+
+template <SamplerType S>
+struct SamplerArgs;
+
+template <>
+struct SamplerArgs<SamplerType::NEIGHBOR> {};
+
+template <>
+struct SamplerArgs<SamplerType::LABOR> {
+  const torch::Tensor& indices;
+  int64_t random_seed;
+  int64_t num_nodes;
+};
+
 /**
  * @brief A sampling oriented csc format graph.
  *
@@ -143,6 +158,9 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param replace Boolean indicating whether the sample is preformed with or
    * without replacement. If True, a value can be selected multiple times.
    * Otherwise, each value can be selected only once.
+   * @param layer Boolean indicating whether neighbors should be sampled in a
+   * layer sampling fashion. Uses the LABOR-0 algorithm to increase overlap of
+   * sampled edges, see arXiv:2210.13339.
    * @param return_eids Boolean indicating whether edge IDs need to be returned,
    * typically used when edge features are required.
    * @param probs_name An optional string specifying the name of an edge
@@ -156,7 +174,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    */
   c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
-      bool replace, bool return_eids,
+      bool replace, bool layer, bool return_eids,
       torch::optional<std::string> probs_name) const;
 
   /**
@@ -204,6 +222,11 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const std::string& shared_memory_name);
 
  private:
+  template <typename NumPickFn, typename PickFn>
+  c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
+      const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
+      PickFn pick_fn) const;
+
   /**
    * @brief Build a CSCSamplingGraph from shared memory tensors.
    *
@@ -265,6 +288,41 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
 };
 
 /**
+ * @brief Calculate the number of the neighbors to be picked for the given node.
+ *
+ * @param fanout The number of edges to be sampled for each node. It should be
+ * >= 0 or -1.
+ *  - When the value is -1, all neighbors (with non-zero probability, if
+ * weighted) will be chosen for sampling. It is equivalent to selecting all
+ * neighbors with non-zero probability when the fanout is >= the number of
+ * neighbors (and replacement is set to false).
+ *  - When the value is a non-negative integer, it serves as a minimum
+ * threshold for selecting neighbors.
+ * @param replace Boolean indicating whether the sample is performed with or
+ * without replacement. If True, a value can be selected multiple times.
+ * Otherwise, each value can be selected only once.
+ * @param probs_or_mask Optional tensor containing the (unnormalized)
+ * probabilities associated with each neighboring edge of a node in the original
+ * graph. It must be a 1D floating-point tensor with the number of elements
+ * equal to the number of edges in the graph.
+ * @param offset The starting edge ID for the connected neighbors of the given
+ * node.
+ * @param num_neighbors The number of neighbors of this node.
+ *
+ * @return The pick number of the given node.
+ */
+int64_t NumPick(
+    int64_t fanout, bool replace,
+    const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
+    int64_t num_neighbors);
+
+int64_t NumPickByEtype(
+    const std::vector<int64_t>& fanouts, bool replace,
+    const torch::Tensor& type_per_edge,
+    const torch::optional<torch::Tensor>& probs_or_mask, int64_t offset,
+    int64_t num_neighbors);
+
+/**
  * @brief Picks a specified number of neighbors for a node, starting from the
  * given offset and having the specified number of neighbors.
  *
@@ -295,13 +353,22 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_data_ptr The destination address where the picked neighbors
+ * should be put. Enough memory space should be allocated in advance.
  */
-torch::Tensor Pick(
+template <typename PickedType>
+void Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
-    const torch::optional<torch::Tensor>& probs_or_mask);
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr);
+
+template <typename PickedType>
+void Pick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr);
 
 /**
  * @brief Picks a specified number of neighbors for a node per edge type,
@@ -327,14 +394,25 @@ torch::Tensor Pick(
  * probabilities associated with each neighboring edge of a node in the original
  * graph. It must be a 1D floating-point tensor with the number of elements
  * equal to the number of edges in the graph.
- *
- * @return A tensor containing the picked neighbors.
+ * @param picked_data_ptr The destination address where the picked neighbors
+ * should be put. Enough memory space should be allocated in advance.
  */
-torch::Tensor PickByEtype(
+template <SamplerType S, typename PickedType>
+void PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
-    const torch::optional<torch::Tensor>& probs_or_mask);
+    const torch::optional<torch::Tensor>& probs_or_mask, SamplerArgs<S> args,
+    PickedType* picked_data_ptr);
+
+template <
+    bool NonUniform, bool Replace, typename ProbsType = float,
+    typename PickedType>
+void LaborPick(
+    int64_t offset, int64_t num_neighbors, int64_t fanout,
+    const torch::TensorOptions& options,
+    const torch::optional<torch::Tensor>& probs_or_mask,
+    SamplerArgs<SamplerType::LABOR> args, PickedType* picked_data_ptr);
 
 }  // namespace sampling
 }  // namespace graphbolt

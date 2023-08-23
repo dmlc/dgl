@@ -21,9 +21,6 @@ The code organization goes as follows:
 Compile with unittest by executing the command below
 ```
 # Assume current directory is the root directory of dgl, and googletest submodule is initialized
-mkdir build
-cd build
-cmake .. -DBUILD_CPP_TEST=1
-make -j${nproc}
+bash script/build_dgl.sh -c -r
 ./runUnitTests
 ```

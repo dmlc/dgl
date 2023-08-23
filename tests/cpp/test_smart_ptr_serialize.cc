@@ -59,8 +59,6 @@ TYPED_TEST(SmartPtrTest, Vector_Test1) {
   dmlc::MemoryStringStream fs(&blob);
   using SmartPtr = typename TestFixture::SmartPtr;
   typedef std::pair<std::string, SmartPtr> Pair;
-  auto my1 = SmartPtr(new MyClass("@A@"));
-  auto my2 = SmartPtr(new MyClass("2222"));
 
   std::vector<Pair> myclasses;
   myclasses.emplace_back("a", SmartPtr(new MyClass("@A@B")));
@@ -83,8 +81,6 @@ TYPED_TEST(SmartPtrTest, Vector_Test2) {
   std::string blob;
   dmlc::MemoryStringStream fs(&blob);
   using SmartPtr = typename TestFixture::SmartPtr;
-  auto my1 = SmartPtr(new MyClass("@A@"));
-  auto my2 = SmartPtr(new MyClass("2222"));
 
   std::vector<SmartPtr> myclasses;
   myclasses.emplace_back(new MyClass("@A@"));

@@ -89,7 +89,7 @@ def test_prop_nodes_topo(idtype):
     assert check_fail(dgl.prop_nodes_topo, g)  # has loop
 
     # tree
-    tree = dgl.DGLGraph()
+    tree = dgl.graph([])
     tree.add_nodes(5)
     tree.add_edges(1, 0)
     tree.add_edges(2, 0)

@@ -9,7 +9,7 @@ from utils import parametrize_idtype
 
 
 def test_graph_filter():
-    g = dgl.DGLGraph().to(F.ctx())
+    g = dgl.graph([]).to(F.ctx())
     g.add_nodes(4)
     g.add_edges([0, 1, 2, 3], [1, 2, 3, 0])
 

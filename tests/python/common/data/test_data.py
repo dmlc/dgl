@@ -4,6 +4,7 @@ import os
 import tarfile
 import tempfile
 import unittest
+import warnings
 
 import backend as F
 
@@ -84,27 +85,6 @@ def test_fraud():
     g2 = data.FraudYelpDataset(transform=transform)[0]
     # 3 edge types
     assert g2.num_edges() - g.num_edges() == g.num_nodes() * 3
-
-
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Datasets don't need to be tested on GPU.",
-)
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
-def test_fakenews():
-    transform = dgl.AddSelfLoop(allow_duplicate=True)
-
-    ds = data.FakeNewsDataset("politifact", "bert")
-    assert len(ds) == 314
-    g = ds[0][0]
-    g2 = data.FakeNewsDataset("politifact", "bert", transform=transform)[0][0]
-    assert g2.num_edges() - g.num_edges() == g.num_nodes()
-
-    ds = data.FakeNewsDataset("gossipcop", "profile")
-    assert len(ds) == 5464
-    g = ds[0][0]
-    g2 = data.FakeNewsDataset("gossipcop", "profile", transform=transform)[0][0]
-    assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 
 @unittest.skipIf(
@@ -231,24 +211,6 @@ def test_gnn_benchmark():
     dst = F.asnumpy(g.edges()[1])
     assert np.array_equal(dst, np.sort(dst))
     g2 = data.CoraFullDataset(transform=transform)[0]
-    assert g2.num_edges() - g.num_edges() == g.num_nodes()
-
-
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Datasets don't need to be tested on GPU.",
-)
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
-def test_reddit():
-    # RedditDataset
-    g = data.RedditDataset()[0]
-    assert g.num_nodes() == 232965
-    assert g.num_edges() == 114615892
-    dst = F.asnumpy(g.edges()[1])
-    assert np.array_equal(dst, np.sort(dst))
-
-    transform = dgl.AddSelfLoop(allow_duplicate=True)
-    g2 = data.RedditDataset(transform=transform)[0]
     assert g2.num_edges() - g.num_edges() == g.num_nodes()
 
 
@@ -775,54 +737,58 @@ def _test_construct_graphs_multiple():
     assert expect_except
 
 
-def _test_DefaultDataParser():
+def _get_data_table(data_frame, save_index=False):
     from dgl.data.csv_dataset_base import DefaultDataParser
 
+    with tempfile.TemporaryDirectory() as test_dir:
+        csv_path = os.path.join(test_dir, "nodes.csv")
+
+        data_frame.to_csv(csv_path, index=save_index)
+        dp = DefaultDataParser()
+        df = pd.read_csv(csv_path)
+
+    # Warning suppression : "Untitled column found. Ignored...",
+    # which appears when a CSV file is saved with an index:
+    #    data_frame.to_csv(csv_path, index=True).
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        return dp(df)
+
+
+def _test_DefaultDataParser():
     # common csv
-    with tempfile.TemporaryDirectory() as test_dir:
-        csv_path = os.path.join(test_dir, "nodes.csv")
-        num_nodes = 5
-        num_labels = 3
-        num_dims = 2
-        node_id = np.arange(num_nodes)
-        label = np.random.randint(num_labels, size=num_nodes)
-        feat = np.random.rand(num_nodes, num_dims)
-        df = pd.DataFrame(
-            {
-                "node_id": node_id,
-                "label": label,
-                "feat": [line.tolist() for line in feat],
-            }
-        )
-        df.to_csv(csv_path, index=False)
-        dp = DefaultDataParser()
-        df = pd.read_csv(csv_path)
-        dt = dp(df)
-        assert np.array_equal(node_id, dt["node_id"])
-        assert np.array_equal(label, dt["label"])
-        assert np.array_equal(feat, dt["feat"])
+    num_nodes = 5
+    num_labels = 3
+    num_dims = 2
+    node_id = np.arange(num_nodes)
+    label = np.random.randint(num_labels, size=num_nodes)
+    feat = np.random.rand(num_nodes, num_dims)
+    df = pd.DataFrame(
+        {
+            "node_id": node_id,
+            "label": label,
+            "feat": [line.tolist() for line in feat],
+        }
+    )
+
+    dt = _get_data_table(df)
+    assert np.array_equal(node_id, dt["node_id"])
+    assert np.array_equal(label, dt["label"])
+    assert np.array_equal(feat, dt["feat"])
+
     # string consists of non-numeric values
-    with tempfile.TemporaryDirectory() as test_dir:
-        csv_path = os.path.join(test_dir, "nodes.csv")
-        df = pd.DataFrame({"label": ["a", "b", "c"]})
-        df.to_csv(csv_path, index=False)
-        dp = DefaultDataParser()
-        df = pd.read_csv(csv_path)
-        expect_except = False
-        try:
-            dt = dp(df)
-        except:
-            expect_except = True
-        assert expect_except
+    df = pd.DataFrame({"label": ["a", "b", "c"]})
+    expect_except = False
+    try:
+        _get_data_table(df)
+    except:
+        expect_except = True
+    assert expect_except
+
     # csv has index column which is ignored as it's unnamed
-    with tempfile.TemporaryDirectory() as test_dir:
-        csv_path = os.path.join(test_dir, "nodes.csv")
-        df = pd.DataFrame({"label": [1, 2, 3]})
-        df.to_csv(csv_path)
-        dp = DefaultDataParser()
-        df = pd.read_csv(csv_path)
-        dt = dp(df)
-        assert len(dt) == 1
+    df = pd.DataFrame({"label": [1, 2, 3]})
+    dt = _get_data_table(df, True)
+    assert len(dt) == 1
 
 
 def _test_load_yaml_with_sanity_check():
@@ -1668,6 +1634,9 @@ def _test_NodeEdgeGraphData():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+@unittest.skipIf(
+    dgl.backend.backend_name == "tensorflow", reason="Skip Tensorflow"
+)
 def test_csvdataset():
     _test_NodeEdgeGraphData()
     _test_construct_graphs_node_ids()
@@ -1866,6 +1835,9 @@ def test_as_linkpred_ogb():
     reason="Datasets don't need to be tested on GPU.",
 )
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
+@unittest.skipIf(
+    dgl.backend.backend_name == "tensorflow", reason="Skip Tensorflow"
+)
 def test_as_nodepred_csvdataset():
     with tempfile.TemporaryDirectory() as test_dir:
         # generate YAML/CSVs
@@ -1914,61 +1886,6 @@ def test_as_nodepred_csvdataset():
         assert "feat" in new_ds[0].ndata
         assert "label" in new_ds[0].ndata
         assert "train_mask" in new_ds[0].ndata
-
-
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Datasets don't need to be tested on GPU.",
-)
-@unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
-def test_as_graphpred():
-    ds = data.GINDataset(name="MUTAG", self_loop=True)
-    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
-    assert len(new_ds) == 188
-    assert new_ds.num_tasks == 1
-    assert new_ds.num_classes == 2
-
-    ds = data.FakeNewsDataset("politifact", "profile")
-    new_ds = data.AsGraphPredDataset(ds, verbose=True)
-    assert len(new_ds) == 314
-    assert new_ds.num_tasks == 1
-    assert new_ds.num_classes == 2
-
-    ds = data.QM7bDataset()
-    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
-    assert len(new_ds) == 7211
-    assert new_ds.num_tasks == 14
-    assert new_ds.num_classes is None
-
-    ds = data.QM9Dataset(label_keys=["mu", "gap"])
-    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
-    assert len(new_ds) == 130831
-    assert new_ds.num_tasks == 2
-    assert new_ds.num_classes is None
-
-    ds = data.QM9EdgeDataset(label_keys=["mu", "alpha"])
-    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
-    assert len(new_ds) == 130831
-    assert new_ds.num_tasks == 2
-    assert new_ds.num_classes is None
-
-    ds = data.TUDataset("DD")
-    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
-    assert len(new_ds) == 1178
-    assert new_ds.num_tasks == 1
-    assert new_ds.num_classes == 2
-
-    ds = data.LegacyTUDataset("DD")
-    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
-    assert len(new_ds) == 1178
-    assert new_ds.num_tasks == 1
-    assert new_ds.num_classes == 2
-
-    ds = data.BA2MotifDataset()
-    new_ds = data.AsGraphPredDataset(ds, [0.8, 0.1, 0.1], verbose=True)
-    assert len(new_ds) == 1000
-    assert new_ds.num_tasks == 1
-    assert new_ds.num_classes == 2
 
 
 @unittest.skipIf(

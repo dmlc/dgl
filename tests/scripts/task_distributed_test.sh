@@ -23,7 +23,7 @@ export DGLBACKEND=$1
 export DGLTESTDEV=$2
 export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
-export DGL_DOWNLOAD_DIR=${PWD}
+export DGL_DOWNLOAD_DIR=${PWD}/_download
 unset TORCH_ALLOW_TF32_CUBLAS_OVERRIDE
 
 export CUDA_VISIBLE_DEVICES=-1
@@ -33,9 +33,6 @@ conda activate ${DGLBACKEND}-ci
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1
 export DMLC_LOG_DEBUG=1
-
-# Install required dependencies
-python3 -m pip install pydantic-yaml
 
 python3 -m pytest -v --capture=tee-sys --junitxml=pytest_distributed.xml --durations=100 tests/distributed/*.py || fail "distributed"
 
