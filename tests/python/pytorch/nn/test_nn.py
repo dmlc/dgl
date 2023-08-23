@@ -1,7 +1,8 @@
 import io
-import pickle
+
 import random
 from copy import deepcopy
+from contextlib import contextmanager
 
 import backend as F
 
@@ -2038,6 +2039,15 @@ def test_typed_linear(feat_size, regularizer, num_bases):
     assert th.allclose(y, y_sorted[rev_idx], atol=1e-4, rtol=1e-4)
 
 
+@contextmanager
+def use_affinity_context(dataloader, num_workers):
+    if num_workers == 0:
+        yield
+    else:
+        with dataloader.enable_cpu_affinity():
+            yield
+
+
 @parametrize_idtype
 @pytest.mark.parametrize("in_size", [4])
 @pytest.mark.parametrize("num_heads", [1])
@@ -2085,16 +2095,18 @@ def test_hgt(idtype, in_size, num_heads):
     # mini-batch
     train_idx = th.randperm(100, dtype=idtype)[:10]
     sampler = dgl.dataloading.NeighborSampler([-1])
+    num_workers =  1 if F._default_context_str == "cpu" else 0
     train_loader = dgl.dataloading.DataLoader(
         g,
         train_idx.to(dev),
         sampler,
         batch_size=8,
-        num_workers=1,
+        num_workers=num_workers,
         device=dev,
         shuffle=True,
     )
-    with train_loader.enable_cpu_affinity():
+
+    with use_affinity_context(train_loader, num_workers):
         (input_nodes, output_nodes, block) = next(iter(train_loader))
     block = block[0]
     x = x[input_nodes.to(th.long)]
