@@ -27,7 +27,6 @@ def fetch_func(features, labels, data):
     return input_features, output_labels, adjs
 
 
-# TODO (peizhou): Will enable windows test once CSCSamplingraph is pickleable.
 def test_DataLoader():
     N = 40
     B = 4
