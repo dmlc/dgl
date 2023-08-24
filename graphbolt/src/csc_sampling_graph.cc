@@ -97,7 +97,12 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
 
 void CSCSamplingGraph::SetState(
     std::vector<torch::Dict<std::string, torch::Tensor>>& state) {
+  // The number of dicts are either 1 or 2, depending on the existence of
+  // edge_attributes.
   TORCH_CHECK(state.size() >= 1 && state.size() <= 2, "Wrong length of state.");
+  TORCH_CHECK(
+      state[0].at("magic_number").equal(torch::tensor({1})),
+      "Magic number mismatches when loading pickled CSCSamplingGraph.")
   indptr_ = state[0].at("indptr");
   indices_ = state[0].at("indices");
   if (state[0].find("node_type_offset") != state[0].end()) {
@@ -113,14 +118,18 @@ void CSCSamplingGraph::SetState(
 
 std::vector<torch::Dict<std::string, torch::Tensor>>
 CSCSamplingGraph::GetState() const {
+  // State is a vector of dicts. The first dict contains all the tensor
+  // attributes. If edge_attributes is not None, it will be stored as the second
+  // dict.
   std::vector<torch::Dict<std::string, torch::Tensor>> state(1);
-  state[0].insert_or_assign("indptr", indptr_);
-  state[0].insert_or_assign("indices", indices_);
+  state[0].insert("magic_number", torch::tensor({1}));  // Magic number.
+  state[0].insert("indptr", indptr_);
+  state[0].insert("indices", indices_);
   if (node_type_offset_.has_value()) {
-    state[0].insert_or_assign("node_type_offset", node_type_offset_.value());
+    state[0].insert("node_type_offset", node_type_offset_.value());
   }
   if (type_per_edge_.has_value()) {
-    state[0].insert_or_assign("type_per_edge", type_per_edge_.value());
+    state[0].insert("type_per_edge", type_per_edge_.value());
   }
   if (edge_attributes_.has_value()) {
     state.push_back(edge_attributes_.value());
