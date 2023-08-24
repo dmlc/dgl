@@ -48,6 +48,7 @@ class TorchBasedFeature(Feature):
         >>> feature_store.read(torch.tensor([0, 1, 2]))
         tensor([0, 1, 2])
         """
+        super(TorchBasedFeature, self).__init__()
         assert isinstance(torch_feature, torch.Tensor), (
             f"torch_feature in TorchBasedFeature must be torch.Tensor, "
             f"but got {type(torch_feature)}."
