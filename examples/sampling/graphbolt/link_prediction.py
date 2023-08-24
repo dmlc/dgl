@@ -83,7 +83,9 @@ def evaluate(args, graph, features, current_set, model):
     # Since we need to evaluate the model, we need to set the number
     # of layers to 1 and the fanout to -1.
     args.fanout = [torch.LongTensor([-1])]
-    dataloader = get_dataloader(args, graph, features, current_set)
+    dataloader = get_dataloader(
+        args, graph, features, current_set, shuffle=False
+    )
     pos_pred = []
     neg_pred = []
 
