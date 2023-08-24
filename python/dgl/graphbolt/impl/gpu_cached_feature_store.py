@@ -1,4 +1,4 @@
-"""Torch-based feature store for GraphBolt."""
+"""GPUcached feature store for GraphBolt."""
 import torch
 
 from dgl.cuda import GPUCache
@@ -44,6 +44,7 @@ class GPUCachedFeatureStore(FeatureStore):
             f"but got {type(fallback_store)}."
         )
         self._fallback_store = fallback_store
+        # we query the underlying feature store to learn the feature dimension
         self.cache_size = cache_size
         feat0 = fallback_store.read(torch.tensor([0]))
         self.item_shape = feat0.shape[1:]
