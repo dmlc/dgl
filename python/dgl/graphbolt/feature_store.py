@@ -2,7 +2,20 @@
 
 import torch
 
-__all__ = ["FeatureStore"]
+__all__ = ["Feature", "FeatureStore"]
+
+
+class Feature:
+    r"""Base class for feature."""
+
+    def __init__(self):
+        pass
+
+    def read(self, ids: torch.Tensor = None):
+        pass
+
+    def update(self, value: torch.Tensor, ids: torch.Tensor = None):
+        pass
 
 
 class FeatureStore:

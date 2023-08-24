@@ -4,13 +4,13 @@ from typing import List
 import numpy as np
 import torch
 
-from ..feature_store import FeatureStore
+from ..feature_store import Feature, FeatureStore
 from .ondisk_metadata import OnDiskFeatureData
 
 __all__ = ["TorchBasedFeature", "TorchBasedFeatureStore"]
 
 
-class TorchBasedFeature:
+class TorchBasedFeature(Feature):
     r"""Torch based feature."""
 
     def __init__(self, torch_feature: torch.Tensor):

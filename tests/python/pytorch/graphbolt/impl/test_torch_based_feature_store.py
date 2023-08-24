@@ -1,6 +1,8 @@
 import os
 import tempfile
 
+import backend as F
+
 import numpy as np
 import pydantic
 import pytest
@@ -108,7 +110,7 @@ def test_torch_based_feature_store(in_memory):
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
         a = b = None
-        feature_stores = None
+        feature_store = None
 
         # ``domain`` should be enum.
         with pytest.raises(pydantic.ValidationError):
@@ -135,4 +137,38 @@ def test_torch_based_feature_store(in_memory):
         assert torch.equal(
             feature_store.read("node", None, "a"), torch.tensor([1, 2, 3])
         )
-        feature_stores = None
+        feature_store = None
+
+
+@unittest.skipIf(
+    F._default_context_str != "gpu",
+    reason="GPUCachedFeature requires a GPU.",
+)
+def test_torch_based_feature():
+    a = torch.tensor([1, 2, 3])
+    b = torch.tensor([[1, 2, 3], [4, 5, 6]])
+
+    feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), 2)
+    feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), 1)
+
+    assert torch.equal(feat_store_a.read(), a)
+    assert torch.equal(feat_store_b.read(), b)
+    assert torch.equal(
+        feat_store_a.read(torch.tensor([0, 2])),
+        torch.tensor([1, 3]),
+    )
+    assert torch.equal(
+        feat_store_a.read(torch.tensor([1, 1])),
+        torch.tensor([2, 2]),
+    )
+    assert torch.equal(
+        feat_store_b.read(torch.tensor([1])),
+        torch.tensor([[4, 5, 6]]),
+    )
+    feat_store_a.update(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))
+    assert torch.equal(feat_store_a.read(), torch.tensor([0, 1, 2]))
+    feat_store_a.update(torch.tensor([2, 0]), torch.tensor([0, 2]))
+    assert torch.equal(feat_store_a.read(), torch.tensor([2, 1, 0]))
+
+    with pytest.raises(IndexError):
+        feat_store_a.read(torch.tensor([0, 1, 2, 3]))
