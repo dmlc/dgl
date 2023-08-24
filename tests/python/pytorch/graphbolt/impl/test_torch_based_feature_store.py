@@ -111,7 +111,7 @@ def test_torch_based_feature_store(in_memory):
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
         a = b = None
-        feature_store = None
+        feature_stores = None
 
         # ``domain`` should be enum.
         with pytest.raises(pydantic.ValidationError):
@@ -138,7 +138,7 @@ def test_torch_based_feature_store(in_memory):
         assert torch.equal(
             feature_store.read("node", None, "a"), torch.tensor([1, 2, 3])
         )
-        feature_store = None
+        feature_stores = None
 
 
 @unittest.skipIf(
