@@ -21,6 +21,6 @@ def test_basic_feature_store():
         torch.tensor([2, 5, 3]),
     )
     assert torch.equal(
-        feature_store.read("node", "paper", "a", torch.tensor([1, 2])),
+        feature_store.read("node", "paper", "a", torch.tensor([0, 1])),
         torch.tensor([3, 2]),
     )
