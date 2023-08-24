@@ -4,6 +4,7 @@ import torch
 
 __all__ = ["Feature", "FeatureStore"]
 
+
 class Feature:
     r"""Base class for feature."""
 
@@ -12,6 +13,7 @@ class Feature:
 
     def read(self, ids: torch.Tensor = None):
         """Read from the feature.
+
         Parameters
         ----------
         ids : torch.Tensor, optional
@@ -26,6 +28,7 @@ class Feature:
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
+
         Parameters
         ----------
         value : torch.Tensor
