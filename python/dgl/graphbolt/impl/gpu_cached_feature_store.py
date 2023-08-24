@@ -75,6 +75,7 @@ class GPUCachedFeature(Feature):
         values, missing_index, missing_keys = self._feature.query(keys)
         missing_values = self._fallback_feature.read(missing_keys).to("cuda")
         missing_values = missing_values.reshape(self.flat_shape)
+        values = values.to(missing_values.dtype)
         values[missing_index] = missing_values
         self._feature.replace(missing_keys, missing_values)
         return torch.reshape(values, self.item_shape)
