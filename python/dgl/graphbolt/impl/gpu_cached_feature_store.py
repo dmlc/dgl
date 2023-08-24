@@ -49,7 +49,6 @@ class GPUCachedFeature(Feature):
         feat0 = fallback_feature.read(torch.tensor([0]))
         self.item_shape = (-1,) + feat0.shape[1:]
         feat0 = torch.reshape(feat0, (1, -1))
-        print(feat0.shape)
         self.flat_shape = (-1, feat0.shape[1])
         self._feature = GPUCache(cache_size, feat0.shape[1])
 
