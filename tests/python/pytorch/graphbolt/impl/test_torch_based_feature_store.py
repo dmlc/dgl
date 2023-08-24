@@ -5,6 +5,7 @@ import numpy as np
 import pydantic
 import pytest
 import torch
+
 from dgl import graphbolt as gb
 
 
@@ -27,37 +28,37 @@ def test_torch_based_feature(in_memory):
             a = to_on_disk_tensor(test_dir, "a", a)
             b = to_on_disk_tensor(test_dir, "b", b)
 
-        feat_store_a = gb.TorchBasedFeature(a)
-        feat_store_b = gb.TorchBasedFeature(b)
+        feature_a = gb.TorchBasedFeature(a)
+        feature_b = gb.TorchBasedFeature(b)
 
-        assert torch.equal(feat_store_a.read(), torch.tensor([1, 2, 3]))
+        assert torch.equal(feature_a.read(), torch.tensor([1, 2, 3]))
         assert torch.equal(
-            feat_store_b.read(), torch.tensor([[1, 2, 3], [4, 5, 6]])
+            feature_b.read(), torch.tensor([[1, 2, 3], [4, 5, 6]])
         )
         assert torch.equal(
-            feat_store_a.read(torch.tensor([0, 2])),
+            feature_a.read(torch.tensor([0, 2])),
             torch.tensor([1, 3]),
         )
         assert torch.equal(
-            feat_store_a.read(torch.tensor([1, 1])),
+            feature_a.read(torch.tensor([1, 1])),
             torch.tensor([2, 2]),
         )
         assert torch.equal(
-            feat_store_b.read(torch.tensor([1])),
+            feature_b.read(torch.tensor([1])),
             torch.tensor([[4, 5, 6]]),
         )
-        feat_store_a.update(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))
-        assert torch.equal(feat_store_a.read(), torch.tensor([0, 1, 2]))
-        feat_store_a.update(torch.tensor([2, 0]), torch.tensor([0, 2]))
-        assert torch.equal(feat_store_a.read(), torch.tensor([2, 1, 0]))
+        feature_a.update(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))
+        assert torch.equal(feature_a.read(), torch.tensor([0, 1, 2]))
+        feature_a.update(torch.tensor([2, 0]), torch.tensor([0, 2]))
+        assert torch.equal(feature_a.read(), torch.tensor([2, 1, 0]))
 
         with pytest.raises(IndexError):
-            feat_store_a.read(torch.tensor([0, 1, 2, 3]))
+            feature_a.read(torch.tensor([0, 1, 2, 3]))
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
         a = b = None
-        feat_store_a = feat_store_b = None
+        feature_a = feature_b = None
 
 
 def write_tensor_to_disk(dir, name, t, fmt="torch"):
@@ -77,7 +78,7 @@ def test_torch_based_feature_store(in_memory):
         b = torch.tensor([2, 5, 3])
         write_tensor_to_disk(test_dir, "a", a, fmt="torch")
         write_tensor_to_disk(test_dir, "b", b, fmt="numpy")
-        feat_data = [
+        feature_data = [
             gb.OnDiskFeatureData(
                 domain="node",
                 type="paper",
@@ -95,19 +96,19 @@ def test_torch_based_feature_store(in_memory):
                 in_memory=in_memory,
             ),
         ]
-        feat_store = gb.TorchBasedFeatureStore(feat_data)
+        feature_store = gb.TorchBasedFeatureStore(feature_data)
         assert torch.equal(
-            feat_store.read("node", "paper", "a"), torch.tensor([1, 2, 3])
+            feature_store.read("node", "paper", "a"), torch.tensor([1, 2, 3])
         )
         assert torch.equal(
-            feat_store.read("edge", "paper-cites-paper", "b"),
+            feature_store.read("edge", "paper-cites-paper", "b"),
             torch.tensor([2, 5, 3]),
         )
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
         a = b = None
-        feat_stores = None
+        feature_stores = None
 
         # ``domain`` should be enum.
         with pytest.raises(pydantic.ValidationError):
@@ -121,7 +122,7 @@ def test_torch_based_feature_store(in_memory):
             )
 
         # ``type`` could be null.
-        feat_data = [
+        feature_data = [
             gb.OnDiskFeatureData(
                 domain="node",
                 name="a",
@@ -130,8 +131,8 @@ def test_torch_based_feature_store(in_memory):
                 in_memory=True,
             ),
         ]
-        feat_store = gb.TorchBasedFeatureStore(feat_data)
+        feature_store = gb.TorchBasedFeatureStore(feature_data)
         assert torch.equal(
-            feat_store.read("node", None, "a"), torch.tensor([1, 2, 3])
+            feature_store.read("node", None, "a"), torch.tensor([1, 2, 3])
         )
-        feat_stores = None
+        feature_stores = None
