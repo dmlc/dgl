@@ -1,18 +1,17 @@
 import os
-
 import pickle
 import re
 import tempfile
 import unittest
 
 import gb_test_utils as gbt
-
 import numpy as np
 import pandas as pd
 import pydantic
 import pytest
 import torch
 import yaml
+
 from dgl import graphbolt as gb
 
 
