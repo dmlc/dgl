@@ -4,13 +4,13 @@ from typing import List
 import numpy as np
 import torch
 
-from ..feature_store import Feature, FeatureStore
+from ..feature_store import FeatureStore
 from .ondisk_metadata import OnDiskFeatureData
 
 __all__ = ["TorchBasedFeature", "TorchBasedFeatureStore"]
 
 
-class TorchBasedFeature(Feature):
+class TorchBasedFeature:
     r"""Torch based feature."""
 
     def __init__(self, torch_feature: torch.Tensor):
@@ -48,7 +48,6 @@ class TorchBasedFeature(Feature):
         >>> feature_store.read(torch.tensor([0, 1, 2]))
         tensor([0, 1, 2])
         """
-        super(TorchBasedFeature, self).__init__()
         assert isinstance(torch_feature, torch.Tensor), (
             f"torch_feature in TorchBasedFeature must be torch.Tensor, "
             f"but got {type(torch_feature)}."
