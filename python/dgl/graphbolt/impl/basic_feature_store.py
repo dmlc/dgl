@@ -1,50 +1,31 @@
-"""Feature store for GraphBolt."""
+"""Basic feature store for GraphBolt."""
 
-import torch
+from typing import Dict, Tuple
 
-__all__ = ["Feature", "FeatureStore"]
+from ..feature_store import Feature, FeatureStore
 
-class Feature:
-    r"""Base class for feature."""
+__all__ = ["BasicFeatureStore"]
 
-    def __init__(self):
-        pass
 
-    def read(self, ids: torch.Tensor = None):
-        """Read from the feature.
+class BasicFeatureStore(FeatureStore):
+    r"""Basic feature store."""
+
+    def __init__(self, features: Dict[Tuple[str, str, str], Feature]):
+        r"""Initiate a basic feature store.
+
+
         Parameters
         ----------
-        ids : torch.Tensor, optional
-            The index of the feature. If specified, only the specified indices
-            of the feature are read. If None, the entire feature is returned.
+        features : Dict[Tuple[str, str, str], Feature]
+            The dict of features served by the feature store, in which the key
+            is tuple of (domain, type_name, feature_name).
+
         Returns
         -------
-        torch.Tensor
-            The read feature.
+        The feature stores.
         """
-        raise NotImplementedError
-
-    def update(self, value: torch.Tensor, ids: torch.Tensor = None):
-        """Update the feature.
-        Parameters
-        ----------
-        value : torch.Tensor
-            The updated value of the feature.
-        ids : torch.Tensor, optional
-            The indices of the feature to update. If specified, only the
-            specified indices of the feature will be updated. For the feature,
-            the `ids[i]` row is updated to `value[i]`. So the indices and value
-            must have the same length. If None, the entire feature will be
-            updated.
-        """
-        raise NotImplementedError
-
-
-class FeatureStore:
-    r"""Base class for feature store."""
-
-    def __init__(self):
-        pass
+        super().__init__()
+        self._features = features
 
     def read(
         self,
@@ -72,7 +53,7 @@ class FeatureStore:
         torch.Tensor
             The read feature.
         """
-        raise NotImplementedError
+        return self._features[(domain, type_name, feature_name)].read(ids)
 
     def update(
         self,
@@ -101,4 +82,8 @@ class FeatureStore:
             must have the same length. If None, the entire feature will be
             updated.
         """
-        raise NotImplementedError
+        self._features[(domain, type_name, feature_name)].update(value, ids)
+
+    def __len__(self):
+        """Return the number of features."""
+        return len(self._features)
