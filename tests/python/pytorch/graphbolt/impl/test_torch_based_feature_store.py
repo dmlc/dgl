@@ -156,24 +156,24 @@ def test_gpu_cached_feature():
     assert torch.equal(feat_store_b.read(), b)
     assert torch.equal(
         feat_store_a.read(torch.tensor([0, 2]).to("cuda")),
-        torch.tensor([1.0, 3.0]).to("cuda"),
+        torch.tensor([1., 3.]).to("cuda"),
     )
     assert torch.equal(
         feat_store_a.read(torch.tensor([1, 1]).to("cuda")),
-        torch.tensor([2.0, 2.0]).to("cuda"),
+        torch.tensor([2., 2.]).to("cuda"),
     )
     assert torch.equal(
         feat_store_b.read(torch.tensor([1]).to("cuda")),
-        torch.tensor([[4.0, 5.0, 6.0]]).to("cuda"),
+        torch.tensor([[4., 5., 6.]]).to("cuda"),
     )
     feat_store_a.update(
-        torch.tensor([0.0, 1.0, 2.0]).to("cuda"),
+        torch.tensor([0., 1., 2.]).to("cuda"),
         torch.tensor([0, 1, 2]).to("cuda"),
     )
     assert torch.equal(
-        feat_store_a.read(), torch.tensor([0.0, 1.0, 2.0]).to("cuda")
+        feat_store_a.read(), torch.tensor([0., 1., 2.]).to("cuda")
     )
     feat_store_a.update(
-        torch.tensor([2.0, 0.0]).to("cuda"), torch.tensor([0, 2]).to("cuda")
+        torch.tensor([2., 0.]).to("cuda"), torch.tensor([0, 2]).to("cuda")
     )
-    assert torch.equal(feat_store_a.read(), torch.tensor([2, 1, 0]).to("cuda"))
+    assert torch.equal(feat_store_a.read(), torch.tensor([2., 1., 0.]).to("cuda"))
