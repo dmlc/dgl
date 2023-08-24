@@ -25,7 +25,7 @@ class Feature:
         torch.Tensor
             The read feature.
         """
-        pass
+        raise NotImplementedError
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
@@ -41,7 +41,7 @@ class Feature:
             must have the same length. If None, the entire feature will be
             updated.
         """
-        pass
+        raise NotImplementedError
 
 
 class FeatureStore:
