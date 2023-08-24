@@ -5,6 +5,7 @@ import numpy as np
 import pydantic
 import pytest
 import torch
+
 from dgl import graphbolt as gb
 
 
