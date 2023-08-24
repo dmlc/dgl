@@ -357,14 +357,14 @@ int64_t NumPickByEtype(
  * should be put. Enough memory space should be allocated in advance.
  */
 template <typename PickedType>
-void Pick(
+int64_t Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr);
 
 template <typename PickedType>
-void Pick(
+int64_t Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
@@ -398,7 +398,7 @@ void Pick(
  * should be put. Enough memory space should be allocated in advance.
  */
 template <SamplerType S, typename PickedType>
-void PickByEtype(
+int64_t PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
@@ -408,7 +408,7 @@ void PickByEtype(
 template <
     bool NonUniform, bool Replace, typename ProbsType = float,
     typename PickedType>
-void LaborPick(
+int64_t LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
