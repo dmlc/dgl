@@ -98,7 +98,7 @@ class GPUCachedFeature(Feature):
             size = min(self.cache_size, value.shape[0])
             self._feature.replace(
                 torch.arange(0, size, device="cuda"),
-                value[:size].to("cuda"),
+                value[:size].to("cuda").reshape(self.flat_shape),
             )
         else:
             assert ids.shape[0] == value.shape[0], (
