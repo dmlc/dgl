@@ -2,6 +2,8 @@
 
 from typing import Dict, Tuple
 
+import torch
+
 from ..feature_store import Feature, FeatureStore
 
 __all__ = ["BasicFeatureStore"]
