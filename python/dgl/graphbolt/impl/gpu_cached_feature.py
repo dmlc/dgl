@@ -1,4 +1,4 @@
-"""GPUcached feature store for GraphBolt."""
+"""GPU cached feature for GraphBolt."""
 import torch
 
 from dgl.cuda import GPUCache
@@ -9,10 +9,10 @@ __all__ = ["GPUCachedFeature"]
 
 
 class GPUCachedFeature(Feature):
-    r"""GPU cached feature store wrapping a fallback feature store."""
+    r"""GPU cached feature wrapping a fallback feature."""
 
     def __init__(self, fallback_feature: Feature, cache_size: int):
-        """Initialize GPU cached feature store with a given fallback.
+        """Initialize GPU cached feature with a given fallback.
         Places the GPU cache to torch.cuda.current_device().
 
         Parameters
@@ -40,12 +40,12 @@ class GPUCachedFeature(Feature):
         """
         super(GPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
-            f"fallback_feature must be FeatureStore, "
-            f"but got {type(fallback_feature)}."
+            f"The fallback_feature must be an instance of Feature, but got "
+            f"{type(fallback_feature)}."
         )
         self._fallback_feature = fallback_feature
-        # we query the underlying feature store to learn the feature dimension
         self.cache_size = cache_size
+        # Fetching the feature dimension from the underlying feature.
         feat0 = fallback_feature.read(torch.tensor([0]))
         self.item_shape = (-1,) + feat0.shape[1:]
         feat0 = torch.reshape(feat0, (1, -1))
@@ -56,7 +56,7 @@ class GPUCachedFeature(Feature):
         """Read the feature by index.
 
         The returned tensor is always in GPU memory, no matter whether the
-        fallback feature store is in memory or on disk.
+        fallback feature is in memory or on disk.
 
         Parameters
         ----------
@@ -81,7 +81,7 @@ class GPUCachedFeature(Feature):
         return torch.reshape(values, self.item_shape)
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
-        """Update the feature store.
+        """Update the feature.
 
         Parameters
         ----------
