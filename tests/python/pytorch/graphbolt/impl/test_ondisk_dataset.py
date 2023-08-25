@@ -1,18 +1,17 @@
 import os
-
 import pickle
 import re
 import tempfile
 import unittest
 
 import gb_test_utils as gbt
-
 import numpy as np
 import pandas as pd
 import pydantic
 import pytest
 import torch
 import yaml
+
 from dgl import graphbolt as gb
 
 
@@ -949,7 +948,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             torch.arange(num_samples),
             torch.tensor([fanout]),
         )
-        assert len(list(subgraph.node_pairs.values())[0][0]) <= num_samples
+        assert len(subgraph.node_pairs[0]) <= num_samples
 
 
 def test_OnDiskDataset_preprocess_path():
