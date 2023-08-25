@@ -636,11 +636,104 @@ inline int64_t NonUniformPick(
     return num_positive_probs;
   } else {
     if (!replace) fanout = std::min(fanout, num_positive_probs);
-    std::memcpy(
-        picked_data_ptr,
-        (torch::multinomial(local_probs, fanout, replace) + offset)
-            .data_ptr<PickedType>(),
-        fanout * sizeof(PickedType));
+    if (fanout == 0) return 0;
+    TORCH_CHECK(
+        ((local_probs.max() < INFINITY) & (local_probs.min() >= 0))
+            .item()
+            .to<bool>(),
+        "Invalid probs_or_mask (contains either `inf`, `nan` or element < 0).");
+    TORCH_CHECK(
+        !(local_probs.sum() == 0).item().to<bool>(),
+        "Invalid probs_or_mask (sum of probabilities <= 0).");
+    AT_DISPATCH_ALL_TYPES(
+        local_probs.scalar_type(), "MultinomialSampling", ([&] {
+          auto local_probs_data_ptr = local_probs.data_ptr<scalar_t>();
+          auto positive_probs_indices_ptr =
+              positive_probs_indices.data_ptr<PickedType>();
+
+          std::random_device rd;
+          std::mt19937 gen(rd());
+          if (!replace) {
+            // The algorithm is from gumbel softmax.
+            // s = argmax( logp - log(-log(eps)) ) where eps ~ U(0, 1)
+            // Here we can apply exp to the formula which will not affect result
+            // of argmax or topk. Then we have s = argmax( p / (-log(eps)) )
+            // where eps ~ U(0, 1). We can also simplify the formula above by s
+            // = argmax( p / q ) where q ~ Exp(1)
+            std::exponential_distribution<> exp_distrib(1);
+            std::vector<std::pair<scalar_t, PickedType>> q(num_positive_probs);
+            for (auto i = 0; i < num_positive_probs; ++i) {
+              q[i].first = local_probs_data_ptr[positive_probs_indices_ptr[i]] /
+                           exp_distrib(gen);
+              q[i].second = positive_probs_indices_ptr[i];
+            }
+            if (fanout == 1) {
+              // Return argmax(p / q).
+              scalar_t max_prob = 0;
+              PickedType max_prob_index = -1;
+              for (auto i = 0; i < num_positive_probs; ++i) {
+                scalar_t cur_prob = q[i].first;
+                if (cur_prob > max_prob) {
+                  max_prob = cur_prob;
+                  max_prob_index = q[i].second;
+                }
+              }
+              *picked_data_ptr = max_prob_index + offset;
+            } else {
+              // Return topk(p / q).
+              if (fanout < num_positive_probs / 64) {
+                // Use partial_sort.
+                std::partial_sort(
+                    q.begin(), q.begin() + fanout, q.end(), std::greater{});
+                for (auto i = 0; i < fanout; ++i) {
+                  picked_data_ptr[i] = q[i].second + offset;
+                }
+              } else {
+                // Use nth_element.
+                std::nth_element(
+                    q.begin(), q.begin() + fanout - 1, q.end(), std::greater{});
+                for (auto i = 0; i < fanout; ++i) {
+                  picked_data_ptr[i] = q[i].second + offset;
+                }
+              }
+            }
+          } else {
+            // Calculate cumulative sum of probabilities.
+            std::vector<scalar_t> cum_probs(num_positive_probs);
+            scalar_t sum_probs = 0;
+            for (auto i = 0; i < num_positive_probs; ++i) {
+              sum_probs += local_probs_data_ptr[positive_probs_indices_ptr[i]];
+              cum_probs[i] = sum_probs;
+            }
+            // Normalize.
+            if ((sum_probs > 0) ||
+                ((sum_probs < 1.00001) && (sum_probs > 0.99999))) {
+              for (auto i = 0; i < num_positive_probs; ++i) {
+                cum_probs[i] /= sum_probs;
+              }
+            }
+            std::uniform_real_distribution<> uniform(0, 1);
+            for (auto i = 0; i < fanout; ++i) {
+              // Sample a probability mass from a uniform distribution.
+              double uniform_sample = uniform(gen);
+              // Use a binary search to find the index.
+              int left_pointer = 0;
+              int right_pointer = num_positive_probs;
+              int mid_pointer;
+              while (right_pointer - left_pointer > 0) {
+                mid_pointer = (left_pointer + right_pointer) / 2;
+                scalar_t cum_prob = cum_probs[mid_pointer];
+                if (cum_prob < uniform_sample) {
+                  left_pointer = mid_pointer + 1;
+                } else {
+                  right_pointer = mid_pointer;
+                }
+                picked_data_ptr[i] =
+                    positive_probs_indices_ptr[left_pointer] + offset;
+              }
+            }
+          }
+        }));
     return fanout;
   }
 }
