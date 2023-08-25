@@ -58,3 +58,22 @@ def test_basic_feature_store_hetero():
         feature_store.read("node", "paper", "a", torch.tensor([0, 1])),
         torch.tensor([3, 2]),
     )
+
+
+def test_basic_feature_store_errors():
+    a = torch.tensor([3, 2, 1])
+    b = torch.tensor([2, 5, 3])
+
+    features = {}
+    features[("node", "paper", "a")] = gb.TorchBasedFeature(a)
+    features[("node", "author", "b")] = gb.TorchBasedFeature(b)
+
+    feature_store = gb.BasicFeatureStore(features)
+
+    # Test error when key does not exist.
+    with pytest.raises(KeyError):
+        feature_store.read("node", "paper", "b")
+
+    # Test error when at least one id is out of bound.
+    with pytest.raises(IndexError):
+        feature_store.read("node", "paper", "a", torch.tensor([0, 3]))
