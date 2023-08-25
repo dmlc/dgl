@@ -46,24 +46,29 @@ class FeatureFetcher(Mapper):
         for key in self.feature_keys:
             domain, type_name, feature_name = key
             if domain == "node" and data.input_nodes is not None:
-                if type_name and type_name in data.input_nodes:
+                nodes = (
+                    data.input_nodes
+                    if not type_name
+                    else data.input_nodes[type_name]
+                )
+                if nodes is not None:
                     data.node_feature[
                         (type_name, feature_name)
                     ] = self.feature_store.read(
                         domain,
                         type_name,
                         feature_name,
-                        data.input_nodes[type_name],
+                        nodes,
                     )
             elif domain == "edge" and data.sampled_subgraphs is not None:
                 for i, subgraph in enumerate(data.sampled_subgraphs):
                     if subgraph.reverse_edge_ids is not None:
                         edges = (
                             subgraph.reverse_edge_ids
-                            if type_name
+                            if not type_name
                             # TODO(#6211): Clean up the edge type converter.
                             else subgraph.reverse_edge_ids.get(
-                                tuple(type_name.split("-")), None
+                                tuple(type_name.split(":")), None
                             )
                         )
                         if edges is not None:

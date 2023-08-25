@@ -27,6 +27,44 @@ def test_FeatureFetcher_homo():
     assert len(list(fetcher_dp)) == 5
 
 
+def test_FeatureFetcher_with_edges_homo():
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    a = torch.randint(0, 10, (graph.num_nodes,))
+    b = torch.randint(0, 10, (graph.num_edges,))
+
+    def add_node_and_edge_ids(seeds):
+        subgraphs = []
+        for _ in range(3):
+            subgraphs.append(
+                gb.SampledSubgraphImpl(
+                    node_pairs=(torch.tensor([]), torch.tensor([])),
+                    reverse_edge_ids=torch.randint(0, graph.num_edges, (10,)),
+                )
+            )
+        data = gb.NodeClassificationBlock(
+            input_nodes=seeds, sampled_subgraphs=subgraphs
+        )
+        return data
+
+    features = {}
+    keys = [("node", None, "a"), ("edge", None, "b")]
+    features[keys[0]] = gb.TorchBasedFeature(a)
+    features[keys[1]] = gb.TorchBasedFeature(b)
+    feature_store = gb.BasicFeatureStore(features)
+
+    itemset = gb.ItemSet(torch.arange(10))
+    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    converter_dp = Mapper(minibatch_dp, add_node_and_edge_ids)
+    fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, keys)
+
+    assert len(list(fetcher_dp)) == 5
+    for data in fetcher_dp:
+        assert data.node_feature[(None, "a")].size(0) == 2
+        assert len(data.edge_feature) == 3
+        for edge_feature in data.edge_feature:
+            assert edge_feature[(None, "b")].size(0) == 10
+
+
 def get_hetero_graph():
     # COO graph:
     # [0, 0, 1, 1, 2, 2, 3, 3, 4, 4]
@@ -74,3 +112,48 @@ def test_FeatureFetcher_hetero():
     fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, keys)
 
     assert len(list(fetcher_dp)) == 3
+
+
+def test_FeatureFetcher_with_edges_hetero():
+    a = torch.randint(0, 10, (20,))
+    b = torch.randint(0, 10, (50,))
+
+    def add_node_and_edge_ids(seeds):
+        subgraphs = []
+        reverse_edge_ids = {
+            ("n1", "e1", "n2"): torch.randint(0, 50, (10,)),
+            ("n2", "e2", "n1"): torch.randint(0, 50, (10,)),
+        }
+        for _ in range(3):
+            subgraphs.append(
+                gb.SampledSubgraphImpl(
+                    node_pairs=(torch.tensor([]), torch.tensor([])),
+                    reverse_edge_ids=reverse_edge_ids,
+                )
+            )
+        data = gb.NodeClassificationBlock(
+            input_nodes=seeds, sampled_subgraphs=subgraphs
+        )
+        return data
+
+    features = {}
+    keys = [("node", "n1", "a"), ("edge", "n1:e1:n2", "a")]
+    features[keys[0]] = gb.TorchBasedFeature(a)
+    features[keys[1]] = gb.TorchBasedFeature(b)
+    feature_store = gb.BasicFeatureStore(features)
+
+    itemset = gb.ItemSetDict(
+        {
+            "n1": gb.ItemSet(torch.randint(0, 20, (10,))),
+        }
+    )
+    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    converter_dp = Mapper(minibatch_dp, add_node_and_edge_ids)
+    fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, keys)
+
+    assert len(list(fetcher_dp)) == 5
+    for data in fetcher_dp:
+        assert data.node_feature[("n1", "a")].size(0) == 2
+        assert len(data.edge_feature) == 3
+        for edge_feature in data.edge_feature:
+            assert edge_feature[("n1:e1:n2", "a")].size(0) == 10
