@@ -46,7 +46,7 @@ def test_basic_feature_store_hetero():
         feature_store.read("node", "paper", "a"), torch.tensor([3, 2, 1])
     )
     assert torch.equal(
-        feature_store.read("node", "paper", "b"), torch.tensor([2, 5, 3])
+        feature_store.read("node", "author", "b"), torch.tensor([2, 5, 3])
     )
     assert torch.equal(
         feature_store.read("edge", "paper:cites:paper", "c"),
