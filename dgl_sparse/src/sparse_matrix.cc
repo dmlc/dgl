@@ -12,6 +12,8 @@
 #include <sparse/sparse_matrix.h>
 #include <torch/script.h>
 
+#include "./utils.h"
+
 namespace dgl {
 namespace sparse {
 
@@ -120,6 +122,22 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromDiag(
     torch::Tensor value, const std::vector<int64_t>& shape) {
   auto diag = std::make_shared<Diag>(Diag{shape[0], shape[1]});
   return SparseMatrix::FromDiagPointer(diag, value, shape);
+}
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::RowwiseSelect(torch::Tensor ids) {
+  auto id_array = TorchTensorToDGLArray(ids);
+  auto new_shape = std::vector<int64_t>{id_array.GetSize(), this->shape()[1]};
+  if (HasCSR() || !HasCOO()) {
+    auto dgl_csr = CSRToOldDGLCSR(this->CSRPtr());
+    auto slice_csr = dgl::aten::CSRSliceRows(dgl_csr, id_array);
+    auto slice_value = DGLArrayToTorchTensor(dgl::aten::IndexSelect(TorchTensorToDGLArray(this->value()), slice_csr.data));
+    return SparseMatrix::FromCSRPointer(CSRFromOldDGLCSR(slice_csr), slice_value, new_shape);
+  } else { // COO
+    auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
+    auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, id_array);
+    auto slice_value = DGLArrayToTorchTensor(dgl::aten::IndexSelect(TorchTensorToDGLArray(this->value()), slice_coo.data));
+    return SparseMatrix::FromCOOPointer(COOFromOldDGLCOO(slice_coo), slice_value, new_shape);
+  }
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(
