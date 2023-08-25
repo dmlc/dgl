@@ -75,12 +75,8 @@ def test_ItemSetDict_invalid_length():
     # Tuple of iterables.
     item_set = gb.ItemSetDict(
         {
-            "user:like:item": gb.ItemSet(
-                (InvalidLength(), InvalidLength())
-            ),
-            "user:follow:user": gb.ItemSet(
-                (InvalidLength(), InvalidLength())
-            ),
+            "user:like:item": gb.ItemSet((InvalidLength(), InvalidLength())),
+            "user:follow:user": gb.ItemSet((InvalidLength(), InvalidLength())),
         }
     )
     with pytest.raises(TypeError):
@@ -174,12 +170,8 @@ def test_ItemSetDict_node_pairs_labels():
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     labels = torch.randint(0, 3, (5,))
     node_pairs_dict = {
-        "user:like:item": gb.ItemSet(
-            (node_pairs[0], node_pairs[1], labels)
-        ),
-        "user:follow:user": gb.ItemSet(
-            (node_pairs[0], node_pairs[1], labels)
-        ),
+        "user:like:item": gb.ItemSet((node_pairs[0], node_pairs[1], labels)),
+        "user:follow:user": gb.ItemSet((node_pairs[0], node_pairs[1], labels)),
     }
     expected_data = []
     for key, value in node_pairs_dict.items():
