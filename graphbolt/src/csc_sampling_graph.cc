@@ -96,43 +96,43 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
 }
 
 void CSCSamplingGraph::SetState(
-    std::vector<torch::Dict<std::string, torch::Tensor>>& state) {
-  // The number of dicts are either 1 or 2, depending on the existence of
-  // edge_attributes.
-  TORCH_CHECK(state.size() >= 1 && state.size() <= 2, "Wrong length of state.");
+    torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>& state) {
+  auto&& regular_tensors = state.at("regular_tensors");
   TORCH_CHECK(
-      state[0].at("magic_number").equal(torch::tensor({1})),
+      regular_tensors.at("magic_number").equal(torch::tensor({1})),
       "Magic number mismatches when loading pickled CSCSamplingGraph.")
-  indptr_ = state[0].at("indptr");
-  indices_ = state[0].at("indices");
-  if (state[0].find("node_type_offset") != state[0].end()) {
-    node_type_offset_ = state[0].at("node_type_offset");
+  indptr_ = regular_tensors.at("indptr");
+  indices_ = regular_tensors.at("indices");
+  if (regular_tensors.find("node_type_offset") != regular_tensors.end()) {
+    node_type_offset_ = regular_tensors.at("node_type_offset");
   }
-  if (state[0].find("type_per_edge") != state[0].end()) {
-    type_per_edge_ = state[0].at("type_per_edge");
+  if (regular_tensors.find("type_per_edge") != regular_tensors.end()) {
+    type_per_edge_ = regular_tensors.at("type_per_edge");
   }
-  if (state.size() > 1) {
-    edge_attributes_ = state[1];
+  if (state.find("edge_attributes") != state.end()) {
+    edge_attributes_ = state.at("edge_attributes");
   }
 }
 
-std::vector<torch::Dict<std::string, torch::Tensor>>
+torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
 CSCSamplingGraph::GetState() const {
   // State is a vector of dicts. The first dict contains all the tensor
   // attributes. If edge_attributes is not None, it will be stored as the second
   // dict.
-  std::vector<torch::Dict<std::string, torch::Tensor>> state(1);
-  state[0].insert("magic_number", torch::tensor({1}));  // Magic number.
-  state[0].insert("indptr", indptr_);
-  state[0].insert("indices", indices_);
+  torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> state;
+  torch::Dict<std::string, torch::Tensor> regular_tensors;
+  regular_tensors.insert("magic_number", torch::tensor({1}));  // Magic number.
+  regular_tensors.insert("indptr", indptr_);
+  regular_tensors.insert("indices", indices_);
   if (node_type_offset_.has_value()) {
-    state[0].insert("node_type_offset", node_type_offset_.value());
+    regular_tensors.insert("node_type_offset", node_type_offset_.value());
   }
   if (type_per_edge_.has_value()) {
-    state[0].insert("type_per_edge", type_per_edge_.value());
+    regular_tensors.insert("type_per_edge", type_per_edge_.value());
   }
+  state.insert("regular_tensors", regular_tensors);
   if (edge_attributes_.has_value()) {
-    state.push_back(edge_attributes_.value());
+    state.insert("edge_attributes", edge_attributes_.value());
   }
   return state;
 }

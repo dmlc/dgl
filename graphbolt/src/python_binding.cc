@@ -39,12 +39,13 @@ TORCH_LIBRARY(graphbolt, m) {
       .def_pickle(
           // __getstate__
           [](const c10::intrusive_ptr<CSCSamplingGraph>& self)
-              -> std::vector<torch::Dict<std::string, torch::Tensor>> {
+              -> torch::Dict<
+                  std::string, torch::Dict<std::string, torch::Tensor>> {
             return self->GetState();
           },
           // __setstate__
-          [](std::vector<torch::Dict<std::string, torch::Tensor>> state)
-              -> c10::intrusive_ptr<CSCSamplingGraph> {
+          [](torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
+                 state) -> c10::intrusive_ptr<CSCSamplingGraph> {
             auto g = c10::make_intrusive<CSCSamplingGraph>();
             g->SetState(state);
             return g;
