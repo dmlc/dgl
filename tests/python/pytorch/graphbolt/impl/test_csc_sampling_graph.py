@@ -325,7 +325,7 @@ def test_pickle_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         assert torch.equal(graph.edge_attributes[i], graph2.edge_attributes[i])
 
 
-def process_csc_sampling_graph_spawn(graph):
+def process_csc_sampling_graph_mp(graph):
     return graph.num_nodes
 
 
@@ -333,7 +333,7 @@ def process_csc_sampling_graph_spawn(graph):
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
-def test_multiprocessing_spawn():
+def test_multiprocessing():
     num_nodes = 5
     num_edges = 10
     num_ntypes = 2
@@ -357,8 +357,7 @@ def test_multiprocessing_spawn():
         metadata,
     )
 
-    mp.set_start_method("spawn")
-    p = mp.Process(target=process_csc_sampling_graph_spawn, args=(2, graph))
+    p = mp.Process(target=process_csc_sampling_graph_mp, args=(graph,))
     p.start()
     p.join()
 
@@ -908,6 +907,75 @@ def test_hetero_graph_on_shared_memory(
     assert metadata.edge_type_to_id == graph1.metadata.edge_type_to_id
     assert metadata.node_type_to_id == graph2.metadata.node_type_to_id
     assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+
+
+def process_csc_sampling_graph_with_queue(graph, graph_queue, flag_queue):
+    # Put the graph into the queue.
+    graph_queue.put(graph)
+    # Wait for the main process to finish.
+    finished = flag_queue.get()
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_multiprocessing_with_shared_memory():
+    num_nodes = 5
+    num_edges = 10
+    num_ntypes = 2
+    num_etypes = 3
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    edge_attributes = {
+        "a": torch.randn((num_edges,)),
+    }
+    csc_indptr.share_memory_()
+    indices.share_memory_()
+    node_type_offset.share_memory_()
+    type_per_edge.share_memory_()
+
+    graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
+    )
+
+    graph_queue = mp.Queue()  # Used for sending graph.
+    flag_queue = mp.Queue()  # Used for sending finish signal.
+
+    p = mp.Process(
+        target=process_csc_sampling_graph_with_queue,
+        args=(graph, graph_queue, flag_queue),
+    )
+    p.start()
+
+    graph2 = graph_queue.get()
+    try:
+        check_tensors_on_the_same_shared_memory(
+            graph.csc_indptr, graph2.csc_indptr
+        )
+        check_tensors_on_the_same_shared_memory(graph.indices, graph2.indices)
+        check_tensors_on_the_same_shared_memory(
+            graph.node_type_offset, graph2.node_type_offset
+        )
+        check_tensors_on_the_same_shared_memory(
+            graph.type_per_edge, graph2.type_per_edge
+        )
+    except:
+        raise
+    finally:
+        # Send a finish signal to end sub-process.
+        flag_queue.put(True)
+    p.join()
 
 
 @unittest.skipIf(
