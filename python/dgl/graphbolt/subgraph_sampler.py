@@ -40,9 +40,7 @@ class SubgraphSampler(Mapper):
             seeds = data.seed_node
         else:
             raise TypeError(f"Unsupported type of data {data}.")
-        data.input_nodes, data.sampled_subgraphs = self._sample_sub_graphs(
-            seeds
-        )
+        data.input_nodes, data.sampled_subgraphs = self._sample_subgraphs(seeds)
         return data
 
     def _link_prediction_preprocess(self, data):
@@ -105,5 +103,5 @@ class SubgraphSampler(Mapper):
             compacted_negative_tail if has_neg_dst else None,
         )
 
-    def _sample_sub_graphs(self, seeds):
+    def _sample_subgraphs(self, seeds):
         raise NotImplementedError

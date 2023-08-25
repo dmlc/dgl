@@ -10,14 +10,14 @@ def test_basic_feature_store():
 
     features = {}
     features[("node", "paper", "a")] = gb.TorchBasedFeature(a)
-    features[("edge", "paper-cites-paper", "b")] = gb.TorchBasedFeature(b)
+    features[("edge", "paper:cites:paper", "b")] = gb.TorchBasedFeature(b)
 
     feature_store = gb.BasicFeatureStore(features)
     assert torch.equal(
         feature_store.read("node", "paper", "a"), torch.tensor([3, 2, 1])
     )
     assert torch.equal(
-        feature_store.read("edge", "paper-cites-paper", "b"),
+        feature_store.read("edge", "paper:cites:paper", "b"),
         torch.tensor([2, 5, 3]),
     )
     assert torch.equal(

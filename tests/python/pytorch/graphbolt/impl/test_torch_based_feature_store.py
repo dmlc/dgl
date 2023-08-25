@@ -89,7 +89,7 @@ def test_torch_based_feature_store(in_memory):
             ),
             gb.OnDiskFeatureData(
                 domain="edge",
-                type="paper-cites-paper",
+                type="paper:cites:paper",
                 name="b",
                 format="numpy",
                 path=os.path.join(test_dir, "b.npy"),
@@ -101,7 +101,7 @@ def test_torch_based_feature_store(in_memory):
             feature_store.read("node", "paper", "a"), torch.tensor([1, 2, 3])
         )
         assert torch.equal(
-            feature_store.read("edge", "paper-cites-paper", "b"),
+            feature_store.read("edge", "paper:cites:paper", "b"),
             torch.tensor([2, 5, 3]),
         )
 
