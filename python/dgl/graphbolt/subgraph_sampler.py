@@ -40,9 +40,7 @@ class SubgraphSampler(Mapper):
             seeds = data.seed_node
         else:
             raise TypeError(f"Unsupported type of data {data}.")
-        data.input_nodes, data.sampled_subgraphs = self._sample_subgraphs(
-            seeds
-        )
+        data.input_nodes, data.sampled_subgraphs = self._sample_subgraphs(seeds)
         return data
 
     def _link_prediction_preprocess(self, data):
