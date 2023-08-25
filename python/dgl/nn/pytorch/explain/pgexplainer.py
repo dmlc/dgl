@@ -544,7 +544,7 @@ class PGExplainer(nn.Module):
             )
             sg.ndata["feat"] = feat[sg.ndata[NID].long()]
             sg.ndata["train"] = torch.tensor(
-                [nid in inverse_indices for nid in sg.nodes()]
+                [nid in inverse_indices for nid in sg.nodes()], device=sg.device
             )
 
             embed = self.model(sg, sg.ndata["feat"], embed=True, **kwargs)
@@ -999,7 +999,9 @@ class HeteroPGExplainer(PGExplainer):
                     ]
 
                     sg.nodes[sg_ntype].data["feat"] = sg_feat
-                    sg.nodes[sg_ntype].data["train"] = torch.tensor(train_mask)
+                    sg.nodes[sg_ntype].data["train"] = torch.tensor(
+                        train_mask, device=sg.device
+                    )
 
                 embed = self.model(sg, sg.ndata["feat"], embed=True, **kwargs)
                 for ntype in embed.keys():
