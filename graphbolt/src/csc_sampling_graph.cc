@@ -789,8 +789,7 @@ inline int64_t LaborPick(
   torch::Tensor heap_tensor;
   if (fanout > StackSize) {
     constexpr int factor = sizeof(heap_data[0]) / sizeof(int32_t);
-    heap_tensor = torch::empty(
-        {fanout * factor}, torch::kInt32);
+    heap_tensor = torch::empty({fanout * factor}, torch::kInt32);
     heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
         heap_tensor.data_ptr<int32_t>());
   }
