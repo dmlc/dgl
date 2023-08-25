@@ -116,9 +116,9 @@ void CSCSamplingGraph::SetState(
 
 torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
 CSCSamplingGraph::GetState() const {
-  // State is a vector of dicts. The first dict contains all the tensor
-  // attributes. If edge_attributes is not None, it will be stored as the second
-  // dict.
+  // State is a dict of dicts. The tensor-type attributes are stored in the dict
+  // with key "regular_tensors". The dict-type attributes (edge_attributes) are
+  // stored directly with the their name as the key.
   torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> state;
   torch::Dict<std::string, torch::Tensor> regular_tensors;
   regular_tensors.insert("magic_number", torch::tensor({1}));  // Magic number.

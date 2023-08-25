@@ -11,6 +11,7 @@ import dgl.graphbolt as gb
 import gb_test_utils as gbt
 import pytest
 import torch
+import torch.multiprocessing as mp
 from scipy import sparse as spsp
 
 torch.manual_seed(3407)
@@ -322,6 +323,44 @@ def test_pickle_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
     for i in graph.edge_attributes.keys():
         assert torch.equal(graph.edge_attributes[i], graph2.edge_attributes[i])
+
+
+def process_csc_sampling_graph_spawn(graph):
+    return graph.num_nodes
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_multiprocessing_spawn():
+    num_nodes = 5
+    num_edges = 10
+    num_ntypes = 2
+    num_etypes = 3
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    edge_attributes = {
+        "a": torch.randn((num_edges,)),
+    }
+    graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
+    )
+
+    mp.set_start_method("spawn")
+    p = mp.Process(target=process_csc_sampling_graph_spawn, args=(2, graph))
+    p.start()
+    p.join()
 
 
 @unittest.skipIf(
