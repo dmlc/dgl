@@ -32,13 +32,12 @@ class DataBlock:
     no node types, 'node_type' should be None.
     """
 
-    edge_feature: List[
-        Dict[Tuple[Tuple[str, str, str], str], torch.Tensor]
-    ] = None
+    edge_feature: List[Dict[Tuple[str, str], torch.Tensor]] = None
     """Edge features associated with the 'sampled_subgraphs'.
     The keys are tuples in the format '(edge_type, feature_name)', and the
     values represent the corresponding features. In the case of a homogeneous
     graph where no edge types exist, 'edge_type' should be set to None.
+    Note 'edge_type' are of format 'str-str-str'.
     """
 
     input_nodes: Union[
