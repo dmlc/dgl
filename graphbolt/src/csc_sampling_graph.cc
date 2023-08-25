@@ -661,26 +661,30 @@ inline int64_t NonUniformPick(
             // where eps ~ U(0, 1). We can also simplify the formula above by s
             // = argmax( p / q ) where q ~ Exp(1)
             std::exponential_distribution<> exp_distrib(1);
-            std::vector<std::pair<scalar_t, PickedType>> q(num_positive_probs);
-            for (auto i = 0; i < num_positive_probs; ++i) {
-              q[i].first = local_probs_data_ptr[positive_probs_indices_ptr[i]] /
-                           exp_distrib(gen);
-              q[i].second = positive_probs_indices_ptr[i];
-            }
             if (fanout == 1) {
               // Return argmax(p / q).
               scalar_t max_prob = 0;
               PickedType max_prob_index = -1;
               for (auto i = 0; i < num_positive_probs; ++i) {
-                scalar_t cur_prob = q[i].first;
+                scalar_t cur_prob =
+                    local_probs_data_ptr[positive_probs_indices_ptr[i]] /
+                    exp_distrib(gen);
                 if (cur_prob > max_prob) {
                   max_prob = cur_prob;
-                  max_prob_index = q[i].second;
+                  max_prob_index = positive_probs_indices_ptr[i];
                 }
               }
               *picked_data_ptr = max_prob_index + offset;
             } else {
               // Return topk(p / q).
+              std::vector<std::pair<scalar_t, PickedType>> q(
+                  num_positive_probs);
+              for (auto i = 0; i < num_positive_probs; ++i) {
+                q[i].first =
+                    local_probs_data_ptr[positive_probs_indices_ptr[i]] /
+                    exp_distrib(gen);
+                q[i].second = positive_probs_indices_ptr[i];
+              }
               if (fanout < num_positive_probs / 64) {
                 // Use partial_sort.
                 std::partial_sort(
