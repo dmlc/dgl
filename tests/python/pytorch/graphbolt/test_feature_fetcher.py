@@ -74,6 +74,3 @@ def test_FeatureFetcher_hetero():
     fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, keys)
 
     assert len(list(fetcher_dp)) == 3
-
-
-test_FeatureFetcher_hetero()
