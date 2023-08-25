@@ -19,14 +19,12 @@ class DataBlock:
     consistency and ease of use throughout the loading process."""
 
     sampled_subgraphs: List[SampledSubgraph] = None
-    """
-    A list of 'SampledSubgraph's, each one corresponding to one layer,
+    """A list of 'SampledSubgraph's, each one corresponding to one layer,
     representing a subset of a larger graph structure.
     """
 
     node_feature: Dict[Tuple[str, str], torch.Tensor] = None
-    """
-    A representation of node features.
+    """A representation of node features.
     Keys are tuples of '(node_type, feature_name)' and the values are
     corresponding features. Note that for a homogeneous graph, where there are
     no node types, 'node_type' should be None.
