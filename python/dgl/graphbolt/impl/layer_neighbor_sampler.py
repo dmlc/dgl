@@ -1,13 +1,11 @@
-"""Neighbor subgraph sampler for GraphBolt."""
+"""Layer-Neighbor subgraph sampler for GraphBolt."""
 
-from ..subgraph_sampler import SubgraphSampler
-from ..utils import unique_and_compact_node_pairs
-from .sampled_subgraph_impl import SampledSubgraphImpl
+from .neighbor_sampler import NeighborSampler
 
 
-class NeighborSampler(SubgraphSampler):
+class LayerNeighborSampler(NeighborSampler):
     """
-    Neighbor sampler is responsible for sampling a subgraph from given data. It
+    Layer-Neighbor sampler is responsible for sampling a subgraph from given data. It
     returns an induced subgraph along with compacted information. In the
     context of a node classification task, the neighbor sampler directly
     utilizes the nodes provided as seed nodes. However, in scenarios involving
@@ -15,6 +13,9 @@ class NeighborSampler(SubgraphSampler):
     gathering unique nodes from the given node pairs, encompassing both
     positive and negative node pairs, and employs these nodes as the seed nodes
     for subsequent steps.
+
+    Implements the approach described in https://arxiv.org/abs/2210.13339,
+    Appendix A.3.
     """
 
     def __init__(
@@ -72,7 +73,7 @@ class NeighborSampler(SubgraphSampler):
             ...data_block_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
             ...torch.LongTensor([15])]
-        >>> subgraph_sampler = gb.NeighborSampler(
+        >>> subgraph_sampler = gb.LayerNeighborSampler(
             ...neg_sampler, graph, fanouts)
         >>> for data in subgraph_sampler:
             ... print(data.compacted_node_pair)
@@ -82,30 +83,5 @@ class NeighborSampler(SubgraphSampler):
         (tensor([0, 0, 0]), tensor([1, 1, 1]))
         3
         """
-        super().__init__(datapipe)
-        self.fanouts = fanouts
-        self.replace = replace
-        self.prob_name = prob_name
-        self.sampler = graph.sample_neighbors
-
-    def _sample_sub_graphs(self, seeds):
-        subgraphs = []
-        num_layers = len(self.fanouts)
-        for hop in range(num_layers):
-            subgraph = self.sampler(
-                seeds,
-                self.fanouts[hop],
-                self.replace,
-                self.prob_name,
-            )
-            reverse_row_node_ids = seeds
-            seeds, compacted_node_pairs = unique_and_compact_node_pairs(
-                subgraph.node_pairs, seeds
-            )
-            subgraph = SampledSubgraphImpl(
-                node_pairs=compacted_node_pairs,
-                reverse_column_node_ids=seeds,
-                reverse_row_node_ids=reverse_row_node_ids,
-            )
-            subgraphs.insert(0, subgraph)
-        return seeds, subgraphs
+        super().__init__(datapipe, graph, fanouts, replace, prob_name)
+        self.sampler = graph.sample_layer_neighbors
