@@ -842,7 +842,9 @@ inline int64_t LaborPick(
                 }  // r_t / \pi_t
                 if (heap_end < heap_data + fanout) {
                   heap_end[0] = std::make_pair(rnd, i);
-                  std::push_heap(heap_data, ++heap_end);
+                  if (++heap_end >= heap_data + fanout) {
+                    std::make_heap(heap_data, heap_data + fanout);
+                  }
                   return false;
                 } else if (rnd < heap_data[0].first) {
                   std::pop_heap(heap_data, heap_data + fanout);
