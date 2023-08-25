@@ -50,8 +50,8 @@ def test_ItemSetDict_valid_length():
     follow = (torch.arange(0, 5), torch.arange(5, 10))
     item_set = gb.ItemSetDict(
         {
-            ("user", "like", "item"): gb.ItemSet(like),
-            ("user", "follow", "user"): gb.ItemSet(follow),
+            "user:like:item": gb.ItemSet(like),
+            "user:follow:user": gb.ItemSet(follow),
         }
     )
     assert len(item_set) == len(like[0]) + len(follow[0])
@@ -75,10 +75,10 @@ def test_ItemSetDict_invalid_length():
     # Tuple of iterables.
     item_set = gb.ItemSetDict(
         {
-            ("user", "like", "item"): gb.ItemSet(
+            "user:like:item": gb.ItemSet(
                 (InvalidLength(), InvalidLength())
             ),
-            ("user", "follow", "user"): gb.ItemSet(
+            "user:follow:user": gb.ItemSet(
                 (InvalidLength(), InvalidLength())
             ),
         }
@@ -137,8 +137,8 @@ def test_ItemSet_head_tail_neg_tails():
 def test_ItemSetDict_node_edge_ids():
     # Node or edge IDs
     ids = {
-        ("user", "like", "item"): gb.ItemSet(torch.arange(0, 5)),
-        ("user", "follow", "user"): gb.ItemSet(torch.arange(0, 5)),
+        "user:like:item": gb.ItemSet(torch.arange(0, 5)),
+        "user:follow:user": gb.ItemSet(torch.arange(0, 5)),
     }
     chained_ids = []
     for key, value in ids.items():
@@ -155,8 +155,8 @@ def test_ItemSetDict_node_pairs():
     # Node pairs.
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     node_pairs_dict = {
-        ("user", "like", "item"): gb.ItemSet(node_pairs),
-        ("user", "follow", "user"): gb.ItemSet(node_pairs),
+        "user:like:item": gb.ItemSet(node_pairs),
+        "user:follow:user": gb.ItemSet(node_pairs),
     }
     expected_data = []
     for key, value in node_pairs_dict.items():
@@ -174,10 +174,10 @@ def test_ItemSetDict_node_pairs_labels():
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     labels = torch.randint(0, 3, (5,))
     node_pairs_dict = {
-        ("user", "like", "item"): gb.ItemSet(
+        "user:like:item": gb.ItemSet(
             (node_pairs[0], node_pairs[1], labels)
         ),
-        ("user", "follow", "user"): gb.ItemSet(
+        "user:follow:user": gb.ItemSet(
             (node_pairs[0], node_pairs[1], labels)
         ),
     }
@@ -199,8 +199,8 @@ def test_ItemSetDict_head_tail_neg_tails():
     neg_tails = torch.arange(10, 20).reshape(5, 2)
     item_set = gb.ItemSet((heads, tails, neg_tails))
     data_dict = {
-        ("user", "like", "item"): gb.ItemSet((heads, tails, neg_tails)),
-        ("user", "follow", "user"): gb.ItemSet((heads, tails, neg_tails)),
+        "user:like:item": gb.ItemSet((heads, tails, neg_tails)),
+        "user:follow:user": gb.ItemSet((heads, tails, neg_tails)),
     }
     expected_data = []
     for key, value in data_dict.items():
