@@ -831,14 +831,28 @@ inline int64_t LaborPick(
           }
           std::fill(remaining_data, remaining_data + num_neighbors, 1.f);
           auto heap_end = heap_data;
-          const auto init_count = (num_neighbors + fanout - 1) / num_neighbors;
+          auto pos_neighbors = num_neighbors;
+          if constexpr (NonUniform) {
+            pos_neighbors = std::count_if(
+                local_probs_data, local_probs_data + num_neighbors,
+                [](auto x) { return x > 0; });
+          }
+          const auto init_count = (pos_neighbors + fanout - 1) / pos_neighbors;
           auto sample_neighbor_i_with_index_t_jth_time =
               [&](scalar_t t, int64_t j, uint32_t i) {
+                ProbsType p;
+                if constexpr (NonUniform) {
+                  p = local_probs_data[i];
+                  if (!(p > 0)) {
+                    remaining_data[i] = -1;
+                    return true;
+                  }
+                }
                 auto rnd = labor::jth_sorted_uniform_random(
                     args.random_seed, t, args.num_nodes, j, remaining_data[i],
                     fanout - j);  // r_t
                 if constexpr (NonUniform) {
-                  safe_divide(rnd, local_probs_data[i]);
+                  rnd /= p;
                 }  // r_t / \pi_t
                 if (heap_end < heap_data + fanout) {
                   heap_end[0] = std::make_pair(rnd, i);
@@ -857,9 +871,9 @@ inline int64_t LaborPick(
                 }
               };
           for (uint32_t i = 0; i < num_neighbors; ++i) {
+            const auto t = local_indices_data[i];
             for (int64_t j = 0; j < init_count; j++) {
-              const auto t = local_indices_data[i];
-              sample_neighbor_i_with_index_t_jth_time(t, j, i);
+              if (sample_neighbor_i_with_index_t_jth_time(t, j, i)) break;
             }
           }
           for (uint32_t i = 0; i < num_neighbors; ++i) {
@@ -900,11 +914,16 @@ inline int64_t LaborPick(
             std::make_heap(heap_data, heap_data + fanout);
           }
           for (uint32_t i = fanout; i < num_neighbors; ++i) {
+            ProbsType p;
+            if constexpr (NonUniform) {
+              p = local_probs_data[i];
+              if (!(p > 0)) continue;
+            }
             const auto t = local_indices_data[i];
             auto rnd =
                 labor::uniform_random<float>(args.random_seed, t);  // r_t
             if constexpr (NonUniform) {
-              safe_divide(rnd, local_probs_data[i]);
+              rnd /= p;
             }  // r_t / \pi_t
             if (rnd < heap_data[0].first) {
               std::pop_heap(heap_data, heap_data + fanout);
