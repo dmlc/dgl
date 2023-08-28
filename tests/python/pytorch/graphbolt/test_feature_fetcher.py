@@ -21,7 +21,6 @@ def test_FeatureFetcher_homo():
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_node_block)
     sampler_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
-    keys.append(("node", None, "c"))
     fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, keys)
 
     assert len(list(fetcher_dp)) == 5
