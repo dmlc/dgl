@@ -124,7 +124,7 @@ class LayerNeighborSampler(NeighborSampler):
 
     Implements the approach described in https://arxiv.org/abs/2210.13339,
     Appendix A.3. Similar to dgl.dataloading.LaborSampler but this uses
-    sequential poisson sampling instead of poisson sampling to sample the count
+    sequential poisson sampling instead of poisson sampling to keep the count
     of sampled edges per vertex deterministic.
     """
 
