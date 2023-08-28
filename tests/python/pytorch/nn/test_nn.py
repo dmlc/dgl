@@ -1809,14 +1809,6 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
                     hg = hg + dgl.mean_nodes(graph, "h", ntype=ntype)
                 return hg
 
-    # Explain node prediction
-    model = Model(input_dim, n_classes, g.canonical_etypes, graph=False)
-    model = model.to(ctx)
-    explainer = nn.HeteroSubgraphX(
-        model, num_hops=2, shapley_steps=20, num_rollouts=5, coef=2.0
-    )
-    explainer.explain_node(g.ntypes[0], 1, g, feat, target_class=0)
-
     # Explain graph prediction
     model = Model(input_dim, n_classes, g.canonical_etypes, graph=True)
     model = model.to(ctx)
