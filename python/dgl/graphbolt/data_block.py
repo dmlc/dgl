@@ -50,59 +50,71 @@ class DataBlock:
       value should be corresponding heterogeneous node id.
     """
 
+    def to_dgl_block(self):
+        """Transforming a data block into DGL blocks necessitates constructing a
+        graphical structure and assigning features to the nodes and edges within
+        the blocks.
+        """
+        if not self.sampled_subgraphs:
+            return None
 
-def to_dgl_block(self):
-    """Transforming a data block into DGL blocks necessitates constructing a
-    graphical structure and assigning features to the nodes and edges within
-    the blocks.
-    """
-    if not self.sampled_subgraphs:
-        return None
+        blocks = [
+            dgl.create_block(
+                subgraph.node_pairs,
+            )
+            for subgraph in self.sampled_subgraphs
+        ]
 
-    blocks = [
-        dgl.create_block(
-            subgraph.node_pairs,
-        )
-        for subgraph in self.sampled_subgraphs
-    ]
+        if isinstance(self.sampled_subgraphs[0], Dict):
+            # Assign node features to the outermost layer's source nodes.
+            if self.node_feature:
+                for (
+                    node_type,
+                    feature_name,
+                ), feature in self.node_feature.items():
+                    blocks[0].srcnodes[node_type].data[feature_name] = feature
+            # Assign edge features.
+            if self.edge_feature:
+                for block, edge_feature in zip(blocks, self.edge_feature):
+                    for (
+                        edge_type,
+                        feature_name,
+                    ), feature in edge_feature.items():
+                        block.edges[edge_type].data[feature_name] = feature
+            # Assign reverse node ids to the outermost layer's source nodes.
+            reverse_row_node_ids = self.sampled_subgraphs[
+                0
+            ].reverse_row_node_ids
+            if reverse_row_node_ids:
+                for node_type, reverse_ids in reverse_row_node_ids.items():
+                    blocks[0].srcnodes[node_type].data[dgl.NID] = reverse_ids
+            # Assign reverse edges ids.
+            for block, subgraph in zip(blocks, self.sampled_subgraphs):
+                if subgraph.reverse_edge_ids:
+                    for (
+                        edge_type,
+                        reverse_ids,
+                    ) in subgraph.reverse_edge_ids.items():
+                        block.edges[edge_type].data[dgl.EID] = reverse_ids
+        else:
+            # Assign node features to the out most layer source nodes.
+            if self.node_feature:
+                for (_, feature_name), feature in self.node_feature.items():
+                    blocks[0].srcdata[feature_name] = feature
+            # Assign edge features.
+            if self.edge_feature:
+                for block, edge_feature in zip(blocks, self.edge_feature):
+                    for (_, feature_name), feature in edge_feature.items():
+                        block.edata[feature_name] = feature
+            # Assign reverse node ids.
+            reverse_row_node_ids = self.sampled_subgraphs[
+                0
+            ].reverse_row_node_ids
+            if reverse_row_node_ids:
+                blocks[0].srcdata[dgl.NID] = reverse_row_node_ids
+            # Assign reverse edges ids.
+            for block, subgraph in zip(blocks, self.sampled_subgraphs):
+                if subgraph.reverse_edge_ids:
+                    block.edata[dgl.EID] = subgraph.reverse_edge_ids
 
-    if isinstance(self.sampled_subgraphs[0], Dict):
-        # Assign node features to the outermost layer's source nodes.
-        if self.node_feature:
-            for (node_type, feature_name), feature in self.node_feature.items():
-                blocks[0].srcnodes[node_type].data[feature_name] = feature
-        # Assign edge features.
-        if self.edge_feature:
-            for block, edge_feature in zip(blocks, self.edge_feature):
-                for (edge_type, feature_name), feature in edge_feature.items():
-                    block.edges[edge_type].data[feature_name] = feature
-        # Assign reverse node ids to the outermost layer's source nodes.
-        reverse_row_node_ids = self.sampled_subgraphs[0].reverse_row_node_ids
-        if reverse_row_node_ids:
-            for node_type, reverse_ids in reverse_row_node_ids.items():
-                blocks[0].srcnodes[node_type].data[dgl.NID] = reverse_ids
-        # Assign reverse edges ids.
-        for block, subgraph in zip(blocks, self.sampled_subgraphs):
-            if subgraph.reverse_edge_ids:
-                for edge_type, reverse_ids in subgraph.reverse_edge_ids.items():
-                    block.edges[edge_type].data[dgl.EID] = reverse_ids
-    else:
-        # Assign node features to the out most layer source nodes.
-        if self.node_feature:
-            for (_, feature_name), feature in self.node_feature.items():
-                blocks[0].srcdata[feature_name] = feature
-        # Assign edge features.
-        if self.edge_feature:
-            for block, edge_feature in zip(blocks, self.edge_feature):
-                for (_, feature_name), feature in edge_feature.items():
-                    block.edata[feature_name] = feature
-        # Assign reverse node ids.
-        reverse_row_node_ids = self.sampled_subgraphs[0].reverse_row_node_ids
-        if reverse_row_node_ids:
-            blocks[0].srcdata[dgl.NID] = reverse_row_node_ids
-        # Assign reverse edges ids.
-        for block, subgraph in zip(blocks, self.sampled_subgraphs):
-            if subgraph.reverse_edge_ids:
-                block.edata[dgl.EID] = subgraph.reverse_edge_ids
-
-    return blocks
+        return blocks
