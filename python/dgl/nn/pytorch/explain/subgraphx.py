@@ -157,10 +157,8 @@ class SubgraphX(nn.Module):
             # TODO: per paper, "when computing the marginalized contributions,
             # the zero-padding strategy should exclude the target node v_i"
             if (
-                self.explanation_type is not None
-                and self.explanation_type == "node"
-                # and self.explanation_node_target in subgraph_nodes # TODO(detailed impl.)
-            ):
+                self.explanation_type == "node"
+            ):  # and self.explanation_node_target in subgraph_nodes # TODO(detailed impl.)
                 exclude_mask[self.node_explanation_target] = 1.0
 
             # Mask for set S_i and g_i
@@ -344,6 +342,7 @@ class SubgraphX(nn.Module):
         ), f"The number of nodes in the\
             graph {graph.num_nodes()} should be bigger than {self.node_min}."
 
+        self.explanation_type = "graph"
         self.graph = graph
         self.feat = feat
         self.target_class = target_class
