@@ -88,7 +88,7 @@ class NeighborSampler(SubgraphSampler):
         self.prob_name = prob_name
         self.sampler = graph.sample_neighbors
 
-    def _sample_sub_graphs(self, seeds):
+    def _sample_subgraphs(self, seeds):
         subgraphs = []
         num_layers = len(self.fanouts)
         for hop in range(num_layers):
