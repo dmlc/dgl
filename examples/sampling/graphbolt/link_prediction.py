@@ -89,7 +89,7 @@ def to_dgl_blocks(sampled_subgraphs):
             num_src_nodes=sampled_subgraph.reverse_column_node_ids.shape[0],
             num_dst_nodes=sampled_subgraph.reverse_row_node_ids.shape[0],
         )
-        for sampled_subgraph in range(sampled_subgraphs)
+        for sampled_subgraph in sampled_subgraphs
     ]
     return blocks
 
