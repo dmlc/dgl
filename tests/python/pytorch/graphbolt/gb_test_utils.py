@@ -1,10 +1,16 @@
 import os
 
 import dgl.graphbolt as gb
+
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 import torch
+
+
+def to_node_block(data):
+    block = gb.NodeClassificationBlock(seed_node=data)
+    return block
 
 
 def rand_csc_graph(N, density):
