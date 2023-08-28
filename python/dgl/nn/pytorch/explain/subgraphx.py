@@ -154,6 +154,15 @@ class SubgraphX(nn.Module):
             exclude_mask[local_region] = 0.0
             exclude_mask[selected_nodes] = 1.0
 
+            # TODO: per paper, "when computing the marginalized contributions,
+            # the zero-padding strategy should exclude the target node v_i"
+            if (
+                self.explanation_type is not None
+                and self.explanation_type == "node"
+                # and self.explanation_node_target in subgraph_nodes # TODO(detailed impl.)
+            ):
+                exclude_mask[self.node_explanation_target] = 1.0
+
             # Mask for set S_i and g_i
             include_mask = exclude_mask.clone()
             include_mask[subgraph_nodes] = 1.0
@@ -438,9 +447,12 @@ class SubgraphX(nn.Module):
         >>> g_nodes_explain = explainer.explain_node(0, graph, graph_feat, target_class=l)
         """
         # Extract node-centered k-hop subgraph and its associated node features.
-        sg, _ = khop_out_subgraph(graph, node_id, self.num_hops)
+        sg, inverse_indices = khop_out_subgraph(graph, node_id, self.num_hops)
         sg_nodes = sg.ndata[NID].long()
         sg_feat = feat[sg_nodes]
+
+        self.explanation_type = "node"
+        self.node_explanation_target = inverse_indices[0]
 
         eg_nodes = self.explain_graph(sg, sg_feat, target_class, **kwargs)
         original_nodes = sg_nodes[eg_nodes.long()]
@@ -885,110 +897,3 @@ class HeteroSubgraphX(nn.Module):
                 best_immediate_reward = best_leaf.immediate_reward
 
         return best_leaf.nodes
-
-    def explain_node(self, ntype, node_id, graph, feat, target_class, **kwargs):
-        r"""Find the most important subgraph from a k-hop neighborhood
-        rooted at a given node of the original graph for the model to
-        classify the graph into the target class.
-
-        Parameters
-        ----------
-        ntype : str
-            The type of the node to explain.
-        node_id : int
-            The ID of the node to explain.
-        graph : DGLGraph
-            A heterogeneous graph
-        feat : dict[str, Tensor]
-            The dictionary that associates input node features (values) with
-            the respective node types (keys) present in the graph.
-            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
-            number of nodes for node type :math:`t`, and :math:`D_t` is the feature size for
-            node type :math:`t`
-        target_class : int
-            The target class to explain
-        kwargs : dict
-            Additional arguments passed to the GNN model
-
-        Returns
-        -------
-        dict[str, Tensor]
-            The dictionary associating tensor node ids (values) to
-            node types (keys) that represents the most important subgraph
-
-        Examples
-        --------
-
-        >>> import dgl
-        >>> import dgl.function as fn
-        >>> import torch as th
-        >>> import torch.nn as nn
-        >>> import torch.nn.functional as F
-        >>> from dgl.nn import HeteroSubgraphX
-
-        >>> class Model(nn.Module):
-        ...     def __init__(self, in_dim, num_classes, canonical_etypes):
-        ...         super(Model, self).__init__()
-        ...         self.etype_weights = nn.ModuleDict(
-        ...             {
-        ...                 "_".join(c_etype): nn.Linear(in_dim, num_classes)
-        ...                 for c_etype in canonical_etypes
-        ...             }
-        ...         )
-        ...
-        ...     def forward(self, graph, feat):
-        ...         with graph.local_scope():
-        ...             c_etype_func_dict = {}
-        ...             for c_etype in graph.canonical_etypes:
-        ...                 src_type, etype, dst_type = c_etype
-        ...                 wh = self.etype_weights["_".join(c_etype)](feat[src_type])
-        ...                 graph.nodes[src_type].data[f"h_{c_etype}"] = wh
-        ...                 c_etype_func_dict[c_etype] = (
-        ...                     fn.copy_u(f"h_{c_etype}", "m"),
-        ...                     fn.mean("m", "h"),
-        ...                 )
-        ...             graph.multi_update_all(c_etype_func_dict, "sum")
-        ...             hg = 0
-        ...             for ntype in graph.ntypes:
-        ...                 if graph.num_nodes(ntype):
-        ...                     hg = hg + dgl.mean_nodes(graph, "h", ntype=ntype)
-        ...             return hg
-
-        >>> input_dim = 5
-        >>> num_classes = 2
-        >>> g = dgl.heterograph({("user", "plays", "game"): ([0, 1, 1, 2], [0, 0, 1, 1])})
-        >>> g.nodes["user"].data["h"] = th.randn(g.num_nodes("user"), input_dim)
-        >>> g.nodes["game"].data["h"] = th.randn(g.num_nodes("game"), input_dim)
-
-        >>> transform = dgl.transforms.AddReverse()
-        >>> g = transform(g)
-
-        >>> # define and train the model
-        >>> model = Model(input_dim, num_classes, g.canonical_etypes)
-        >>> feat = g.ndata["h"]
-        >>> optimizer = th.optim.Adam(model.parameters())
-        >>> for epoch in range(10):
-        ...     logits = model(g, feat)
-        ...     loss = F.cross_entropy(logits, th.tensor([1]))
-        ...     optimizer.zero_grad()
-        ...     loss.backward()
-        ...     optimizer.step()
-
-        >>> # Explain for node 0 of the first node type in the graph
-        >>> explainer = HeteroSubgraphX(model, num_hops=2)
-        >>> g_nodes_explain = explainer.explain_node(g.ntypes[0], 0, g, feat, target_class=1)
-        """
-        # Extract node-centered k-hop subgraph and its associated node features.
-        sg, _ = khop_out_subgraph(graph, {ntype: node_id}, self.num_hops)
-        sg_nodes = sg.ndata[NID]
-        sg_feat = {
-            ntype: feat[ntype][node_ids.long()]
-            for ntype, node_ids in sg_nodes.items()
-        }
-
-        eg_nodes = self.explain_graph(sg, sg_feat, target_class, **kwargs)
-        original_nodes = {
-            ntype: sg_nodes[ntype][eg_node_ids.long()]
-            for ntype, eg_node_ids in eg_nodes.items()
-        }
-        return original_nodes
