@@ -479,21 +479,24 @@ class SparseMatrix:
         """Returns whether the sparse matrix is a diagonal matrix."""
         return self.c_sparse_matrix.is_diag()
 
-    def rowwise_select(self, ids: torch.Tensor):
-        """Returns a row-wise sub-matrix selected by a list of row ids.
+    def select(self, dim: int, ids: torch.Tensor or slice):
+        """Returns a sub-matrix selected by a list of ids or by range.
 
         Parameters
         ----------
-        ids : tensor.Tensor
-            The row ids to select from matrix.
+        dim : int
+            The dim to select from matrix, should be 0 or 1.
+        ids : tensor.Tensor or slice
+            Tensor indicates the row ids to select from matrix.
             NOTE: The ids can include duplicate values.
+            Slice indicates sub-matrix selected by range [start, end).
 
         The function has not supported autograd.
 
         Returns
         -------
         SparseMatrix
-            The row-wise sub-matrix only contains the rows selected.
+            The sub-matrix only contains rows or columns selected.
 
         Examples
         --------
@@ -501,103 +504,36 @@ class SparseMatrix:
         >>> val = torch.tensor([0, 1, 2, 3, 4, 5])
         >>> A = dglsp.spmatrix(indices, val)
         >>> row_ids = torch.tensor([0, 1, 4])
-        >>> A.rowwise_select(row_ids)
+        >>> A.select(0, row_ids)
         SparseMatrix(indices=tensor([[0, 1, 1, 2],
                                      [0, 2, 4, 0]]),
                      values=tensor([0, 1, 2, 5]),
                      shape=(3, 6), nnz=4)
-        """
-        raise NotImplementedError
-
-    def columnwise_select(self, ids: torch.Tensor):
-        """Returns a column-wise sub-matrix selected by ids.
-
-        Parameters
-        ----------
-        ids : tensor.Tensor
-            The column ids to select from matrix.
-            NOTE: The ids can include duplicate values.
-
-        The function has not supported autograd.
-
-        Returns
-        -------
-        SparseMatrix
-            The column-wise sub-matrix only contains the columns selected.
-
-        Examples
-        --------
-        >>> indices = torch.tensor([0, 1, 1, 2, 3, 4], [0, 2, 4, 3, 5, 0]])
-        >>> val = torch.tensor([0, 1, 2, 3, 4, 5])
-        >>> A = dglsp.spmatrix(indices, val)
         >>> column_ids = torch.tensor([0, 4, 5])
-        >>> A.columnwise_select(column_ids)
+        >>> A.select(1, column_ids)
         SparseMatrix(indices=tensor([[0, 1, 3, 4],
                                      [0, 1, 2, 0]]),
-                     values=tensor([0, 2, 4, 6]),
+                     values=tensor([0, 2, 4, 5]),
                      shape=(5, 3), nnz=4)
-        """
-        raise NotImplementedError
-
-    def rowwise_select(self, start: int, end: int):
-        """Returns a row-wise sub-matrix selected by range [start, end).
-
-        Parameters
-        ----------
-        start : int
-            The start row to select from matrix.
-        end : int
-            The end row to select from matrix.
-
-        The function has not supported autograd.
-
-        Returns
-        -------
-        SparseMatrix
-            The row-wise sub-matrix between [start, end).
-
-        Examples
-        --------
-        >>> indices = torch.tensor([0, 1, 1, 2, 3, 4], [0, 2, 4, 3, 5, 0]])
-        >>> val = torch.tensor([0, 1, 2, 3, 4, 5])
-        >>> A = dglsp.spmatrix(indices, val)
-        >>> A.rowwise_select(1, 3)
+        >>> A.select(0, slice(1, 3))
         SparseMatrix(indices=tensor([[0, 0, 1],
                                      [2, 4, 3]]),
                      values=tensor([1, 2, 3]),
                      shape=(2, 6), nnz=3)
-        """
-        raise NotImplementedError
-
-    def columnwise_select(self, start: int, end: int):
-        """Returns a column-wise sub-matrix selected by range [start, end).
-
-        Parameters
-        ----------
-        start : int
-            The start column to select from matrix.
-        end : int
-            The end column to select from matrix.
-
-        The function has not supported autograd.
-
-        Returns
-        -------
-        SparseMatrix
-            The column-wise sub-matrix between [start, end).
-
-        Examples
-        --------
-        >>> indices = torch.tensor([0, 1, 1, 2, 3, 4], [0, 2, 4, 3, 5, 0]])
-        >>> val = torch.tensor([0, 1, 2, 3, 4, 5])
-        >>> A = dglsp.spmatrix(indices, val)
-        >>> A.columnwise_select(3, 6)
+        >>> A.select(1, slice(3, 6))
         SparseMatrix(indices=tensor([[1, 2, 3],
                                      [1, 0, 2]]),
                      values=tensor([2, 3, 4]),
                      shape=(5, 3), nnz=3)
         """
-        raise NotImplementedError
+        if type(ids) is torch.Tensor:
+            return SparseMatrix(self.c_sparse_matrix.index_select(dim, ids))
+        else:
+            start = 0 if ids.start is None else ids.start
+            end = ids.end
+            return SparseMatrix(
+                self.c_sparse_matrix.range_select(dim, start, end)
+            )
 
 
 def spmatrix(
