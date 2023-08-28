@@ -642,9 +642,6 @@ inline int64_t NonUniformPick(
             .item()
             .to<bool>(),
         "Invalid probs_or_mask (contains either `inf`, `nan` or element < 0).");
-    TORCH_CHECK(
-        !(local_probs.sum() == 0).item().to<bool>(),
-        "Invalid probs_or_mask (sum of probabilities <= 0).");
     AT_DISPATCH_ALL_TYPES(
         local_probs.scalar_type(), "MultinomialSampling", ([&] {
           auto local_probs_data_ptr = local_probs.data_ptr<scalar_t>();
@@ -665,7 +662,9 @@ inline int64_t NonUniformPick(
               // Return argmax(p / q).
               scalar_t max_prob = 0;
               PickedType max_prob_index = -1;
+              // We only care about the neighbors with non-zero probability.
               for (auto i = 0; i < num_positive_probs; ++i) {
+                // Calculate (p / q) for the current neighbor.
                 scalar_t cur_prob =
                     local_probs_data_ptr[positive_probs_indices_ptr[i]] /
                     exp_distrib(gen);
@@ -710,8 +709,7 @@ inline int64_t NonUniformPick(
               cum_probs[i] = sum_probs;
             }
             // Normalize.
-            if ((sum_probs > 0) ||
-                ((sum_probs < 1.00001) && (sum_probs > 0.99999))) {
+            if ((sum_probs < 1.00001) && (sum_probs > 0.99999)) {
               for (auto i = 0; i < num_positive_probs; ++i) {
                 cum_probs[i] /= sum_probs;
               }
