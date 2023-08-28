@@ -24,7 +24,7 @@ def test_FeatureFetcher_homo():
     fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, keys)
 
     assert len(list(fetcher_dp)) == 5
-test_FeatureFetcher_homo()
+
 
 def test_FeatureFetcher_with_edges_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
