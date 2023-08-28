@@ -985,6 +985,9 @@ class HeteroPGExplainer(PGExplainer):
         batched_homo_graph = []
         batched_hetero_graph = []
         for target_ntype, target_nids in nodes.items():
+            if isinstance(target_nids, torch.Tensor):
+                target_nids = target_nids.tolist()
+
             for target_nid in target_nids:
                 sg, inverse_indices = khop_in_subgraph(
                     graph, {target_ntype: target_nid}, self.num_hops
