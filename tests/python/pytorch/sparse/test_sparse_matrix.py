@@ -450,6 +450,44 @@ def test_has_duplicate():
     assert csc_A.has_duplicate()
 
 
+def test_rowwise_select():
+    ctx = F.ctx()
+
+    row = torch.tensor([0, 1, 1, 2, 3, 4]).to(ctx)
+    col = torch.tensor([0, 2, 4, 3, 5, 0]).to(ctx)
+    val = torch.arange(len(row)).to(ctx)
+    shape = (5, 6)
+    A = from_coo(row, col, val, shape)
+
+    ids = torch.tensor([0, 1, 4]).to(ctx)
+    A_select = A.rowwise_select(ids)
+
+    assert A_select.nnz == 4
+    assert A_select.shape == (3, 6)
+    assert list(A_select.row) == [0, 1, 1, 2]
+    assert list(A_select.col) == [0, 2, 4, 0]
+    assert list(A_select.val) == [0, 1, 2, 5]
+
+
+def test_columnwise_select():
+    ctx = F.ctx()
+
+    row = torch.tensor([0, 1, 1, 2, 3, 4]).to(ctx)
+    col = torch.tensor([0, 2, 4, 3, 5, 0]).to(ctx)
+    val = torch.arange(len(row)).to(ctx)
+    shape = (5, 6)
+    A = from_coo(row, col, val, shape)
+
+    ids = torch.tensor([0, 4, 5]).to(ctx)
+    A_select = A.columnwise_select(ids)
+
+    assert A_select.nnz == 4
+    assert A_select.shape == (5, 3)
+    assert list(A_select.row) == [0, 1, 3, 4]
+    assert list(A_select.col) == [0, 1, 2, 0]
+    assert list(A_select.val) == [0, 2, 4, 5]
+
+
 def test_print():
     ctx = F.ctx()
 
@@ -558,7 +596,8 @@ def test_torch_sparse_coo_conversion(row, col, nz_dim, shape):
         torch_sparse_shape += (nz_dim,)
         val_shape += (nz_dim,)
     val = torch.randn(val_shape).to(dev)
-    torch_sparse_coo = torch.sparse_coo_tensor(indices, val, torch_sparse_shape)
+    torch_sparse_coo = torch.sparse_coo_tensor(
+        indices, val, torch_sparse_shape)
     spmat = from_torch_sparse(torch_sparse_coo)
 
     def _assert_spmat_equal_to_torch_sparse_coo(spmat, torch_sparse_coo):

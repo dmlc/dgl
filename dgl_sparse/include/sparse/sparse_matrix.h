@@ -143,38 +143,35 @@ class SparseMatrix : public torch::CustomClassHolder {
    *
    * @return SparseMatrix
    */
-  c10::intrusive_ptr<SparseMatrix> RowwiseSelect(
-    torch::Tensor ids);
+  c10::intrusive_ptr<SparseMatrix> RowwiseSelect(torch::Tensor ids);
 
-//   /**
-//    * @brief Create a SparseMatrix by slicing columns.
-//    * @param ids Ids of the selected columns
-//    *
-//    * @return SparseMatrix
-//    */
-//   static c10::intrusive_ptr<SparseMatrix> ColumnwiseSelect(
-//       torch::Tensor ids);
+  //   /**
+  //    * @brief Create a SparseMatrix by slicing range rows.
+  //    * @param start Start id of the selected rows.
+  //    * @param end End id of the selected rows.
+  //    *
+  //    * @return SparseMatrix
+  //    */
+  //   c10::intrusive_ptr<SparseMatrix> RowwiseSelect(int64_t start, int64_t
+  //   end);
 
-//   /**
-//    * @brief Create a SparseMatrix by slicing range rows.
-//    * @param start Start id of the selected rows.
-//    * @param end End id of the selected rows.
-//    *
-//    * @return SparseMatrix
-//    */
-//   static c10::intrusive_ptr<SparseMatrix> RowwiseSelect(
-//       int64_t start, int64_t end);
+  /**
+   * @brief Create a SparseMatrix by slicing columns.
+   * @param ids Ids of the selected columns
+   *
+   * @return SparseMatrix
+   */
+  c10::intrusive_ptr<SparseMatrix> ColumnwiseSelect(torch::Tensor ids);
 
-//   /**
-//    * @brief Create a SparseMatrix by slicing columns.
-//    * @param start Start id of the selected columns.
-//    * @param end End id of the selected columns.
-//    *
-//    * @return SparseMatrix
-//    */
-//   static c10::intrusive_ptr<SparseMatrix> ColumnwiseSelect(
-//       int64_t start, int64_t end);
-
+  //   /**
+  //    * @brief Create a SparseMatrix by slicing columns.
+  //    * @param start Start id of the selected columns.
+  //    * @param end End id of the selected columns.
+  //    *
+  //    * @return SparseMatrix
+  //    */
+  //   c10::intrusive_ptr<SparseMatrix> ColumnwiseSelect(int64_t start, int64_t
+  //   end);
 
   /**
    * @brief Create a SparseMatrix from a SparseMatrix using new values.

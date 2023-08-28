@@ -124,21 +124,97 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromDiag(
   return SparseMatrix::FromDiagPointer(diag, value, shape);
 }
 
-c10::intrusive_ptr<SparseMatrix> SparseMatrix::RowwiseSelect(torch::Tensor ids) {
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::RowwiseSelect(
+    torch::Tensor ids) {
   auto id_array = TorchTensorToDGLArray(ids);
-  auto new_shape = std::vector<int64_t>{id_array.GetSize(), this->shape()[1]};
+  auto new_shape =
+      std::vector<int64_t>{id_array.NumElements(), this->shape()[1]};
   if (HasCSR() || !HasCOO()) {
     auto dgl_csr = CSRToOldDGLCSR(this->CSRPtr());
     auto slice_csr = dgl::aten::CSRSliceRows(dgl_csr, id_array);
-    auto slice_value = DGLArrayToTorchTensor(dgl::aten::IndexSelect(TorchTensorToDGLArray(this->value()), slice_csr.data));
-    return SparseMatrix::FromCSRPointer(CSRFromOldDGLCSR(slice_csr), slice_value, new_shape);
-  } else { // COO
+    auto slice_value =
+        this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+    return SparseMatrix::FromCSRPointer(
+        CSRFromOldDGLCSR(slice_csr), slice_value, new_shape);
+  } else {  // COO
     auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
     auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, id_array);
-    auto slice_value = DGLArrayToTorchTensor(dgl::aten::IndexSelect(TorchTensorToDGLArray(this->value()), slice_coo.data));
-    return SparseMatrix::FromCOOPointer(COOFromOldDGLCOO(slice_coo), slice_value, new_shape);
+    auto slice_value =
+        this->value().index_select(0, DGLArrayToTorchTensor(slice_coo.data));
+    slice_coo.data = dgl::aten::NullArray();
+    return SparseMatrix::FromCOOPointer(
+        COOFromOldDGLCOO(slice_coo), slice_value, new_shape);
   }
 }
+
+// c10::intrusive_ptr<SparseMatrix> SparseMatrix::RowwiseSelect(
+//     int64_t start, int64_t end) {
+//   auto new_shape = std::vector<int64_t>{end - start, this->shape()[1]};
+//   if (HasCSR() || !HasCOO()) {
+//     auto dgl_csr = CSRToOldDGLCSR(this->CSRPtr());
+//     auto slice_csr = dgl::aten::CSRSliceRows(dgl_csr, start, end);
+//     auto slice_value =
+//         this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+//     return SparseMatrix::FromCSRPointer(
+//         CSRFromOldDGLCSR(slice_csr), slice_value, new_shape);
+//   } else {  // COO
+//     auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
+//     auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, start, end);
+//     auto slice_value =
+//         this->value().index_select(0, DGLArrayToTorchTensor(slice_coo.data));
+//     slice_coo.data = dgl::aten::NullArray();
+//     return SparseMatrix::FromCOOPointer(
+//         COOFromOldDGLCOO(slice_coo), slice_value, new_shape);
+//   }
+// }
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::ColumnwiseSelect(
+    torch::Tensor ids) {
+  auto id_array = TorchTensorToDGLArray(ids);
+  auto new_shape =
+      std::vector<int64_t>{this->shape()[0], id_array.NumElements()};
+  if (HasCSC() || !HasCOO()) {
+    auto dgl_csc = CSRToOldDGLCSR(this->CSCPtr());
+    auto slice_csc = dgl::aten::CSRSliceRows(dgl_csc, id_array);
+    auto slice_value =
+        this->value().index_select(0, DGLArrayToTorchTensor(slice_csc.data));
+    return SparseMatrix::FromCSRPointer(
+        CSRFromOldDGLCSR(slice_csc), slice_value, new_shape);
+  } else {  // COO
+    auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
+    dgl_coo = aten::COOTranspose(dgl_coo);
+    auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, id_array);
+    auto slice_value =
+        this->value().index_select(0, DGLArrayToTorchTensor(slice_coo.data));
+    slice_coo.data = dgl::aten::NullArray();
+    slice_coo = aten::COOTranspose(slice_coo);
+    return SparseMatrix::FromCOOPointer(
+        COOFromOldDGLCOO(slice_coo), slice_value, new_shape);
+  }
+}
+
+// c10::intrusive_ptr<SparseMatrix> SparseMatrix::ColumnwiseSelect(
+//     int64_t start, int64_t end) {
+//   auto new_shape = std::vector<int64_t>{this->shape()[0], end - start};
+//   if (HasCSC() || !HasCOO()) {
+//     auto dgl_csc = CSRToOldDGLCSR(this->CSCPtr());
+//     auto slice_csc = dgl::aten::CSRSliceRows(dgl_csc, start, end);
+//     auto slice_value =
+//         this->value().index_select(0, DGLArrayToTorchTensor(slice_csc.data));
+//     return SparseMatrix::FromCSRPointer(
+//         CSRFromOldDGLCSR(slice_csc), slice_value, new_shape);
+//   } else {  // COO
+//     auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
+//     dgl_coo = aten::COOTranspose(dgl_coo);
+//     auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, start, end);
+//     auto slice_value =
+//         this->value().index_select(0, DGLArrayToTorchTensor(slice_coo.data));
+//     slice_coo.data = dgl::aten::NullArray();
+//     slice_coo = aten::COOTranspose(slice_coo);
+//     return SparseMatrix::FromCOOPointer(
+//         COOFromOldDGLCOO(slice_coo), slice_value, new_shape);
+//   }
+// }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(
     const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value) {

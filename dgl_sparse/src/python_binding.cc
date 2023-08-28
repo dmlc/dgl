@@ -34,8 +34,8 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("coalesce", &SparseMatrix::Coalesce)
       .def("has_duplicate", &SparseMatrix::HasDuplicate)
       .def("is_diag", &SparseMatrix::HasDiag)
-      .def("rowwise_select", &SparseMatrix::RowwiseSelect);
-      // .def("columnwise_select", &SparseMatrix::ColumnwiseSelect);
+      .def("rowwise_select", &SparseMatrix::RowwiseSelect)
+      .def("columnwise_select", &SparseMatrix::ColumnwiseSelect);
   m.def("from_coo", &SparseMatrix::FromCOO)
       .def("from_csr", &SparseMatrix::FromCSR)
       .def("from_csc", &SparseMatrix::FromCSC)
