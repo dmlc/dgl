@@ -148,19 +148,19 @@ def train(args, graph, features, train_set, valid_set, model):
         model.train()
         for step, data in enumerate(dataloader):
             # Unpack LinkPredictionBlock.
-            labels = data.label
+            labels = data.label.float()
             compacted_pairs = data.compacted_node_pair
             node_feature = data.node_feature[(None, "feat")].float()
             blocks = to_dgl_blocks(data.sampled_subgraphs)
 
             # Get the embeddings of the input nodes.
-            y = model(blocks, node_feature.float())
+            y = model(blocks, node_feature)
             logits = model.predictor(
                 y[compacted_pairs[0]] * y[compacted_pairs[1]]
             ).squeeze()
 
             # Compute loss.
-            loss = F.binary_cross_entropy_with_logits(logits, labels.float())
+            loss = F.binary_cross_entropy_with_logits(logits, labels)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
