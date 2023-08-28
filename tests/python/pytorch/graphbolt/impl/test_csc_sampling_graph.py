@@ -957,9 +957,8 @@ def test_multiprocessing_with_shared_memory():
         args=(graph, graph_queue, flag_queue),
     )
     p.start()
-
-    graph2 = graph_queue.get()
     try:
+        graph2 = graph_queue.get()
         check_tensors_on_the_same_shared_memory(
             graph.csc_indptr, graph2.csc_indptr
         )
