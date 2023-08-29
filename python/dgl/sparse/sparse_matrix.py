@@ -526,7 +526,7 @@ class SparseMatrix:
                      values=tensor([2, 3, 4]),
                      shape=(5, 3), nnz=3)
         """
-        if type(ids) is torch.Tensor:
+        if isinstance(ids, torch.Tensor):
             return SparseMatrix(self.c_sparse_matrix.index_select(dim, ids))
         else:
             start = 0 if ids.start is None else ids.start
