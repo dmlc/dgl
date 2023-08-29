@@ -495,7 +495,7 @@ class SparseMatrix:
               as a sequence along the given `dim`, and sliced according
               to the python slice definition.
 
-        The function has not supported autograd.
+        The function does not support autograd.
 
         Returns
         -------
@@ -543,8 +543,8 @@ class SparseMatrix:
                      values=tensor([2, 3, 4]),
                      shape=(5, 3), nnz=3)
         """
-        if dim != 0 and dim != 1:
-            raise ValueError(f"The selection dimension should be 0 or 1.")
+        if dim not in (0, 1):
+            raise ValueError("The selection dimension should be 0 or 1.")
         if isinstance(rule, torch.Tensor):
             raise NotImplementedError
         if isinstance(rule, slice):
