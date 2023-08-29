@@ -500,6 +500,9 @@ class SparseMatrix:
 
         Examples
         --------
+
+        Case1: Select several rows by index.
+
         >>> indices = torch.tensor([0, 1, 1, 2, 3, 4], [0, 2, 4, 3, 5, 0]])
         >>> val = torch.tensor([0, 1, 2, 3, 4, 5])
         >>> A = dglsp.spmatrix(indices, val)
@@ -509,17 +512,26 @@ class SparseMatrix:
                                      [0, 2, 4, 0]]),
                      values=tensor([0, 1, 2, 5]),
                      shape=(3, 6), nnz=4)
+
+        Case2: Select several columns by index.
+
         >>> column_ids = torch.tensor([0, 4, 5])
         >>> A.select(1, column_ids)
         SparseMatrix(indices=tensor([[0, 1, 3, 4],
                                      [0, 1, 2, 0]]),
                      values=tensor([0, 2, 4, 5]),
                      shape=(5, 3), nnz=4)
+
+        Case3: Select several rows by range.
+
         >>> A.select(0, slice(1, 3))
         SparseMatrix(indices=tensor([[0, 0, 1],
                                      [2, 4, 3]]),
                      values=tensor([1, 2, 3]),
                      shape=(2, 6), nnz=3)
+
+        Case4: Select several columns by range.
+
         >>> A.select(1, slice(3, 6))
         SparseMatrix(indices=tensor([[1, 2, 3],
                                      [1, 0, 2]]),
@@ -527,13 +539,13 @@ class SparseMatrix:
                      shape=(5, 3), nnz=3)
         """
         if isinstance(ids, torch.Tensor):
-            return SparseMatrix(self.c_sparse_matrix.index_select(dim, ids))
-        else:
+            raise NotImplementedError
+        elif isinstance(ids, slice):
             start = 0 if ids.start is None else ids.start
             end = ids.stop
-            return SparseMatrix(
-                self.c_sparse_matrix.range_select(dim, start, end)
-            )
+            raise NotImplementedError
+        else:
+            raise TypeError
 
 
 def spmatrix(
