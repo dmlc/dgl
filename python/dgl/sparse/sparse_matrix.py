@@ -479,21 +479,17 @@ class SparseMatrix:
         """Returns whether the sparse matrix is a diagonal matrix."""
         return self.c_sparse_matrix.is_diag()
 
-    def select(self, dim: int, rule: Union[tensor.Tensor, slice]):
-        """Returns a sub-matrix selected according to the given rule.
+    def index_select(self, dim: int, index: tensor.Tensor):
+        """Returns a sub-matrix selected according to the given index.
 
         Parameters
         ----------
         dim : int
             The dim to select from matrix, should be 0 or 1.
-        rule : Union[tensor.Tensor, slice]
-            The selection rule.
-            - if `rule` is a torch.Tensor, it indicates which IDs from
-              the `dim` should be chosen from the matrix.
-              Note that duplicated ids are allowed.
-            - if `rule` is a slice object, the matrix will be viewed
-              as a sequence along the given `dim`, and sliced according
-              to the python slice definition.
+        index : tensor.Tensor
+            The selection index indicates which IDs from the `dim` should
+            be chosen from the matrix.
+            Note that duplicated ids are allowed.
 
         The function does not support autograd.
 
@@ -526,8 +522,39 @@ class SparseMatrix:
                                      [0, 1, 2, 0]]),
                      values=tensor([0, 2, 4, 5]),
                      shape=(5, 3), nnz=4)
+        """
+        if dim not in (0, 1):
+            raise ValueError("The selection dimension should be 0 or 1.")
+        if isinstance(index, torch.Tensor):
+            raise NotImplementedError
+        raise TypeError(f"{type(index).__name__} is unsupported input type.")
 
-        Case 3: Select rows with given slice object.
+    def range_select(self, dim: int, range: slice):
+        """Returns a sub-matrix selected according to the given range.
+
+        Parameters
+        ----------
+        dim : int
+            The dim to select from matrix, should be 0 or 1.
+        range : slice
+            The selection slice indicates ID range from the `dim` should
+            be chosen from the matrix.
+
+        The function does not support autograd.
+
+        Returns
+        -------
+        SparseMatrix
+            The sub-matrix which contains selected rows or columns.
+
+        Examples
+        --------
+
+        >>> indices = torch.tensor([0, 1, 1, 2, 3, 4], [0, 2, 4, 3, 5, 0]])
+        >>> val = torch.tensor([0, 1, 2, 3, 4, 5])
+        >>> A = dglsp.spmatrix(indices, val)
+
+        Case 1: Select rows with given slice object.
 
         >>> A.select(0, slice(1, 3))
         SparseMatrix(indices=tensor([[0, 0, 1],
@@ -535,7 +562,7 @@ class SparseMatrix:
                      values=tensor([1, 2, 3]),
                      shape=(2, 6), nnz=3)
 
-        Case 4: Select columns with given slice object.
+        Case 2: Select columns with given slice object.
 
         >>> A.select(1, slice(3, 6))
         SparseMatrix(indices=tensor([[1, 2, 3],
@@ -545,11 +572,9 @@ class SparseMatrix:
         """
         if dim not in (0, 1):
             raise ValueError("The selection dimension should be 0 or 1.")
-        if isinstance(rule, torch.Tensor):
+        if isinstance(range, slice):
             raise NotImplementedError
-        if isinstance(rule, slice):
-            raise NotImplementedError
-        raise TypeError(f"{type(rule).__name__} is unsupported input type.")
+        raise TypeError(f"{type(range).__name__} is unsupported input type.")
 
 
 def spmatrix(
