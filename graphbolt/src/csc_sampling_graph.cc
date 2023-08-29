@@ -639,11 +639,6 @@ inline int64_t NonUniformPick(
   } else {
     if (!replace) fanout = std::min(fanout, num_positive_probs);
     if (fanout == 0) return 0;
-    TORCH_CHECK(
-        ((local_probs.max() < INFINITY) & (local_probs.min() >= 0))
-            .item()
-            .to<bool>(),
-        "Invalid probs_or_mask (contains either `inf`, `nan` or element < 0).");
     AT_DISPATCH_ALL_TYPES(
         local_probs.scalar_type(), "MultinomialSampling", ([&] {
           auto local_probs_data_ptr = local_probs.data_ptr<scalar_t>();
@@ -704,16 +699,16 @@ inline int64_t NonUniformPick(
             }
           } else {
             // Calculate cumulative sum of probabilities.
-            std::vector<scalar_t> cum_probs(num_positive_probs);
+            std::vector<scalar_t> prefix_sum_probs(num_positive_probs);
             scalar_t sum_probs = 0;
             for (auto i = 0; i < num_positive_probs; ++i) {
               sum_probs += local_probs_data_ptr[positive_probs_indices_ptr[i]];
-              cum_probs[i] = sum_probs;
+              prefix_sum_probs[i] = sum_probs;
             }
             // Normalize.
-            if ((sum_probs < 1.00001) && (sum_probs > 0.99999)) {
+            if ((sum_probs > 1.00001) || (sum_probs < 0.99999)) {
               for (auto i = 0; i < num_positive_probs; ++i) {
-                cum_probs[i] /= sum_probs;
+                prefix_sum_probs[i] /= sum_probs;
               }
             }
             std::uniform_real_distribution<> uniform(0, 1);
@@ -726,8 +721,8 @@ inline int64_t NonUniformPick(
               int mid_pointer;
               while (right_pointer - left_pointer > 0) {
                 mid_pointer = (left_pointer + right_pointer) / 2;
-                scalar_t cum_prob = cum_probs[mid_pointer];
-                if (cum_prob < uniform_sample) {
+                scalar_t prefix_sum_prob = prefix_sum_probs[mid_pointer];
+                if (prefix_sum_prob < uniform_sample) {
                   left_pointer = mid_pointer + 1;
                 } else {
                   right_pointer = mid_pointer;
