@@ -540,10 +540,9 @@ class SparseMatrix:
         """
         if isinstance(ids, torch.Tensor):
             raise NotImplementedError
-        elif isinstance(ids, slice):
+        if isinstance(ids, slice):
             raise NotImplementedError
-        else:
-            raise TypeError(f"{type(ids).__name__} is unsupported input type.")
+        raise TypeError(f"{type(ids).__name__} is unsupported input type.")
 
 
 def spmatrix(
