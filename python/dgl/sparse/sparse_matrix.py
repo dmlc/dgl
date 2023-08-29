@@ -479,33 +479,38 @@ class SparseMatrix:
         """Returns whether the sparse matrix is a diagonal matrix."""
         return self.c_sparse_matrix.is_diag()
 
-    def select(self, dim: int, ids: Union[tensor.Tensor, slice]):
-        """Returns a sub-matrix selected by a list of ids or by range.
+    def select(self, dim: int, rule: Union[tensor.Tensor, slice]):
+        """Returns a sub-matrix selected according to the given rule.
 
         Parameters
         ----------
         dim : int
             The dim to select from matrix, should be 0 or 1.
-        ids : Union[tensor.Tensor, slice]
-            Tensor indicates the row ids to select from matrix.
-            NOTE: The ids can include duplicate values.
-            Slice indicates sub-matrix selected by range [start, end).
+        rule : Union[tensor.Tensor, slice]
+            The selection rule.
+            - if `rule` is a torch.Tensor, it indicates which IDs from
+              the `dim` should be chosen from the matrix.
+              Note that duplicated ids are allowed.
+            - if `rule` is a slice object, the matrix will be viewed
+              as a sequence along the given `dim`, and sliced according
+              to the python slice definition.
 
         The function has not supported autograd.
 
         Returns
         -------
         SparseMatrix
-            The sub-matrix only contains rows or columns selected.
+            The sub-matrix which contains selected rows or columns.
 
         Examples
         --------
 
-        Case1: Select several rows by index.
-
         >>> indices = torch.tensor([0, 1, 1, 2, 3, 4], [0, 2, 4, 3, 5, 0]])
         >>> val = torch.tensor([0, 1, 2, 3, 4, 5])
         >>> A = dglsp.spmatrix(indices, val)
+
+        Case 1: Select rows by IDs.
+
         >>> row_ids = torch.tensor([0, 1, 4])
         >>> A.select(0, row_ids)
         SparseMatrix(indices=tensor([[0, 1, 1, 2],
@@ -513,7 +518,7 @@ class SparseMatrix:
                      values=tensor([0, 1, 2, 5]),
                      shape=(3, 6), nnz=4)
 
-        Case2: Select several columns by index.
+        Case 2: Select columns by IDs.
 
         >>> column_ids = torch.tensor([0, 4, 5])
         >>> A.select(1, column_ids)
@@ -522,7 +527,7 @@ class SparseMatrix:
                      values=tensor([0, 2, 4, 5]),
                      shape=(5, 3), nnz=4)
 
-        Case3: Select several rows by range.
+        Case 3: Select rows with given slice object.
 
         >>> A.select(0, slice(1, 3))
         SparseMatrix(indices=tensor([[0, 0, 1],
@@ -530,7 +535,7 @@ class SparseMatrix:
                      values=tensor([1, 2, 3]),
                      shape=(2, 6), nnz=3)
 
-        Case4: Select several columns by range.
+        Case 4: Select columns with given slice object.
 
         >>> A.select(1, slice(3, 6))
         SparseMatrix(indices=tensor([[1, 2, 3],
@@ -538,11 +543,13 @@ class SparseMatrix:
                      values=tensor([2, 3, 4]),
                      shape=(5, 3), nnz=3)
         """
-        if isinstance(ids, torch.Tensor):
+        if dim != 0 and dim != 1:
+            raise ValueError(f"The selection dimension should be 0 or 1.")
+        if isinstance(rule, torch.Tensor):
             raise NotImplementedError
-        if isinstance(ids, slice):
+        if isinstance(rule, slice):
             raise NotImplementedError
-        raise TypeError(f"{type(ids).__name__} is unsupported input type.")
+        raise TypeError(f"{type(rule).__name__} is unsupported input type.")
 
 
 def spmatrix(
