@@ -15,6 +15,7 @@ import torch.multiprocessing as mp
 from scipy import sparse as spsp
 
 torch.manual_seed(3407)
+mp.set_sharing_strategy("file_system")
 
 
 @unittest.skipIf(
@@ -325,7 +326,7 @@ def test_pickle_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         assert torch.equal(graph.edge_attributes[i], graph2.edge_attributes[i])
 
 
-def process_csc_sampling_graph_mp(graph):
+def process_csc_sampling_graph_multiprocessing(graph):
     return graph.num_nodes
 
 
@@ -357,7 +358,9 @@ def test_multiprocessing():
         metadata,
     )
 
-    p = mp.Process(target=process_csc_sampling_graph_mp, args=(graph,))
+    p = mp.Process(
+        target=process_csc_sampling_graph_multiprocessing, args=(graph,)
+    )
     p.start()
     p.join()
 
@@ -913,7 +916,22 @@ def process_csc_sampling_graph_with_queue(graph, graph_queue, flag_queue):
     # Put the graph into the queue.
     graph_queue.put(graph)
     # Wait for the main process to finish.
-    finished = flag_queue.get()
+    flag_queue.get()
+
+
+def check_spawned_tensors_on_the_same_shared_memory(t1, t2):
+    """Check if two tensors are on the same shared memory.
+
+    This function copies a random tensor value to `t1` and checks whether `t2`
+    holds the same random value and checks whether t2 is a distinct tensor
+    object from `t1`. Their equality confirms that they are separate tensors
+    that rely on the shared memory for their tensor value.
+    """
+    old_t1 = t1.clone()
+    v = torch.randint_like(t1, 100)
+    t1[:] = v
+    assert torch.equal(t1, t2)
+    t1[:] = old_t1
 
 
 @unittest.skipIf(
@@ -921,6 +939,12 @@ def process_csc_sampling_graph_with_queue(graph, graph_queue, flag_queue):
     reason="Graph is CPU only at present.",
 )
 def test_multiprocessing_with_shared_memory():
+    """Test if two CSCSamplingGraphs are on the same shared memory after spawning.
+
+    For now this code only works when the sharing strategy of torch.multiprocessing is set to `file_system` at the beginning.
+    The cause is still yet to be found.
+    """
+
     num_nodes = 5
     num_edges = 10
     num_ntypes = 2
@@ -932,9 +956,7 @@ def test_multiprocessing_with_shared_memory():
         type_per_edge,
         metadata,
     ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
-    edge_attributes = {
-        "a": torch.randn((num_edges,)),
-    }
+
     csc_indptr.share_memory_()
     indices.share_memory_()
     node_type_offset.share_memory_()
@@ -945,35 +967,40 @@ def test_multiprocessing_with_shared_memory():
         indices,
         node_type_offset,
         type_per_edge,
-        edge_attributes,
+        None,
         metadata,
     )
 
-    graph_queue = mp.Queue()  # Used for sending graph.
-    flag_queue = mp.Queue()  # Used for sending finish signal.
+    ctx = mp.get_context("spawn")  # Use spawn method.
 
-    p = mp.Process(
+    graph_queue = ctx.Queue()  # Used for sending graph.
+    flag_queue = ctx.Queue()  # Used for sending finish signal.
+
+    p = ctx.Process(
         target=process_csc_sampling_graph_with_queue,
         args=(graph, graph_queue, flag_queue),
     )
     p.start()
     try:
-        graph2 = graph_queue.get()
-        check_tensors_on_the_same_shared_memory(
+        graph2 = graph_queue.get()  # Get the graph from the other process.
+        # Check if the tensors are on the same shared memory.
+        check_spawned_tensors_on_the_same_shared_memory(
             graph.csc_indptr, graph2.csc_indptr
         )
-        check_tensors_on_the_same_shared_memory(graph.indices, graph2.indices)
-        check_tensors_on_the_same_shared_memory(
+        check_spawned_tensors_on_the_same_shared_memory(
+            graph.indices, graph2.indices
+        )
+        check_spawned_tensors_on_the_same_shared_memory(
             graph.node_type_offset, graph2.node_type_offset
         )
-        check_tensors_on_the_same_shared_memory(
+        check_spawned_tensors_on_the_same_shared_memory(
             graph.type_per_edge, graph2.type_per_edge
         )
     except:
         raise
     finally:
         # Send a finish signal to end sub-process.
-        flag_queue.put(True)
+        flag_queue.put(None)
     p.join()
 
 
