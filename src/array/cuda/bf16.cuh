@@ -46,6 +46,8 @@ min(__nv_bfloat16 a, __nv_bfloat16 b) {
 // Arithmetic BF16 operations for architecture >= 8.0 are already defined in
 // cuda_bf16.h
 #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 800)
+// CUDA 12.2 adds "emulated" support for older architectures.
+#if defined(CUDART_VERSION) && (CUDART_VERSION < 12020)
 __device__ __forceinline__ __nv_bfloat16
 operator+(const __nv_bfloat16& lh, const __nv_bfloat16& rh) {
   return __nv_bfloat16(float(lh) + float(rh));  // NOLINT
@@ -138,6 +140,7 @@ __device__ __forceinline__ bool operator<=(
     const __nv_bfloat16& lh, const __nv_bfloat16& rh) {
   return float(lh) <= float(rh);  // NOLINT
 }
+#endif  // defined(CUDART_VERSION) && (CUDART_VERSION < 12020)
 #endif  // defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 800)
 #endif  // __CUDACC__
 

@@ -1,4 +1,4 @@
-import sys
+import warnings
 
 import backend as F
 import pytest
@@ -17,6 +17,12 @@ from .utils import (
     sparse_matrix_to_dense,
     sparse_matrix_to_torch_sparse,
 )
+
+
+def _torch_sparse_mm(torch_A1, torch_A2):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        return torch.sparse.mm(torch_A1, torch_A2)
 
 
 @pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
@@ -98,7 +104,7 @@ def test_spspmm(create_func1, create_func2, shape_n_m, shape_k, nnz1, nnz2):
 
     torch_A1 = sparse_matrix_to_torch_sparse(A1)
     torch_A2 = sparse_matrix_to_torch_sparse(A2)
-    torch_A3 = torch.sparse.mm(torch_A1, torch_A2)
+    torch_A3 = _torch_sparse_mm(torch_A1, torch_A2)
     torch_A3_grad = sparse_matrix_to_torch_sparse(A3, grad)
     torch_A3.backward(torch_A3_grad)
 
@@ -161,7 +167,7 @@ def test_sparse_diag_mm(create_func, sparse_shape, nnz):
 
     torch_A = sparse_matrix_to_torch_sparse(A)
     torch_D = sparse_matrix_to_torch_sparse(D)
-    torch_B = torch.sparse.mm(torch_A, torch_D)
+    torch_B = _torch_sparse_mm(torch_A, torch_D)
     torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
     torch_B.backward(torch_B_grad)
 
@@ -194,7 +200,7 @@ def test_diag_sparse_mm(create_func, sparse_shape, nnz):
 
     torch_A = sparse_matrix_to_torch_sparse(A)
     torch_D = sparse_matrix_to_torch_sparse(D)
-    torch_B = torch.sparse.mm(torch_D, torch_A)
+    torch_B = _torch_sparse_mm(torch_D, torch_A)
     torch_B_grad = sparse_matrix_to_torch_sparse(B, grad)
     torch_B.backward(torch_B_grad)
 

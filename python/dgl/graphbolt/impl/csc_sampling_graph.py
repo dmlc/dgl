@@ -279,10 +279,11 @@ class CSCSamplingGraph:
                 types, and each fanout value corresponds to a specific edge
                 type of the nodes.
             The value of each fanout should be >= 0 or = -1.
-              - When the value is -1, all neighbors will be chosen for
-                sampling. It is equivalent to selecting all neighbors when
-                the fanout is >= the number of neighbors (and replace is set to
-                false).
+              - When the value is -1, all neighbors (with non-zero probability,
+                if weighted) will be sampled once regardless of replacement. It
+                is equivalent to selecting all neighbors with non-zero
+                probability when the fanout is >= the number of neighbors (and
+                replace is set to false).
               - When the value is a non-negative integer, it serves as a
                 minimum threshold for selecting neighbors.
         replace: bool
@@ -361,10 +362,11 @@ class CSCSamplingGraph:
                 types, and each fanout value corresponds to a specific edge
                 type of the nodes.
             The value of each fanout should be >= 0 or = -1.
-              - When the value is -1, all neighbors will be chosen for
-                sampling. It is equivalent to selecting all neighbors when
-                the fanout is >= the number of neighbors (and replace is set to
-                false).
+              - When the value is -1, all neighbors (with non-zero probability,
+                if weighted) will be sampled once regardless of replacement. It
+                is equivalent to selecting all neighbors with non-zero
+                probability when the fanout is >= the number of neighbors (and
+                replace is set to false).
               - When the value is a non-negative integer, it serves as a
                 minimum threshold for selecting neighbors.
         replace: bool
@@ -424,7 +426,70 @@ class CSCSamplingGraph:
                 torch.float64,
             ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, return_eids, probs_name
+            nodes, fanouts.tolist(), replace, False, return_eids, probs_name
+        )
+
+    def sample_layer_neighbors(
+        self,
+        nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        fanouts: torch.Tensor,
+        replace: bool = False,
+        probs_name: Optional[str] = None,
+    ) -> SampledSubgraphImpl:
+        """Sample neighboring edges of the given nodes and return the induced
+        subgraph via layer-neighbor sampling from arXiv:2210.13339:
+        "Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs"
+
+        Parameters
+        ----------
+        nodes: torch.Tensor or Dict[str, torch.Tensor]
+            IDs of the given seed nodes.
+            - If `nodes` is a tensor: It means the graph is homogeneous
+            graph, and ids inside are homogeneous ids.
+            - If `nodes` is a dictionary: The keys should be node type and
+            ids inside are heterogeneous ids.
+        fanouts: torch.Tensor
+            The number of edges to be sampled for each node with or without
+            considering edge types.
+              - When the length is 1, it indicates that the fanout applies to
+                all neighbors of the node as a collective, regardless of the
+                edge type.
+              - Otherwise, the length should equal to the number of edge
+                types, and each fanout value corresponds to a specific edge
+                type of the nodes.
+            The value of each fanout should be >= 0 or = -1.
+              - When the value is -1, all neighbors (with non-zero probability,
+                if weighted) will be sampled once regardless of replacement. It
+                is equivalent to selecting all neighbors with non-zero
+                probability when the fanout is >= the number of neighbors (and
+                replace is set to false).
+              - When the value is a non-negative integer, it serves as a
+                minimum threshold for selecting neighbors.
+        replace: bool
+            Boolean indicating whether the sample is preformed with or
+            without replacement. If True, a value can be selected multiple
+            times. Otherwise, each value can be selected only once.
+        probs_name: str, optional
+            An optional string specifying the name of an edge attribute. This
+            attribute tensor should contain (unnormalized) probabilities
+            corresponding to each neighboring edge of a node. It must be a 1D
+            floating-point or boolean tensor, with the number of elements
+            equalling the total number of edges.
+        Returns
+        -------
+        SampledSubgraphImpl
+            The sampled subgraph.
+
+        Examples
+        --------
+        TODO: Provide typical examples.
+        """
+        if isinstance(nodes, dict):
+            nodes = self._convert_to_homogeneous_nodes(nodes)
+
+        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
+            nodes, fanouts.tolist(), replace, True, False, probs_name
         )
 
     def sample_negative_edges_uniform(
@@ -715,7 +780,7 @@ def save_csc_sampling_graph(graph, filename):
     print(f"CSCSamplingGraph has been saved to {filename}.")
 
 
-def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
+def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
     """Convert a DGLGraph to CSCSamplingGraph."""
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
     # Initialize metadata.
@@ -729,7 +794,8 @@ def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
     indptr, indices, _ = homo_g.adj_tensors("csc")
     ntype_count.insert(0, 0)
     node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
-    type_per_edge = homo_g.edata[ETYPE]
+
+    type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE]
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(

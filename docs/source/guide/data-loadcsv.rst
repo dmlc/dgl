@@ -461,7 +461,7 @@ To parse the string type labels, one can define a ``DataParser`` class as follow
             parsed = {}
             for header in df:
                 if 'Unnamed' in header:  # Handle Unnamed column
-                    print("Unamed column is found. Ignored...")
+                    print("Unnamed column is found. Ignored...")
                     continue
                 dt = df[header].to_numpy().squeeze()
                 if header == 'label':

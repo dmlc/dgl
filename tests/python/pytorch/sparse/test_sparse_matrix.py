@@ -1,5 +1,5 @@
-import sys
 import unittest
+import warnings
 
 import backend as F
 import pytest
@@ -17,6 +17,12 @@ from dgl.sparse import (
     to_torch_sparse_csr,
     val_like,
 )
+
+
+def _torch_sparse_csr_tensor(indptr, indices, val, torch_sparse_shape):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        return torch.sparse_csr_tensor(indptr, indices, val, torch_sparse_shape)
 
 
 @pytest.mark.parametrize("dense_dim", [None, 4])
@@ -580,7 +586,7 @@ def test_torch_sparse_csr_conversion(indptr, indices, shape):
     torch_sparse_shape = shape
     val_shape = (indices.shape[0],)
     val = torch.randn(val_shape).to(dev)
-    torch_sparse_csr = torch.sparse_csr_tensor(
+    torch_sparse_csr = _torch_sparse_csr_tensor(
         indptr, indices, val, torch_sparse_shape
     )
     spmat = from_torch_sparse(torch_sparse_csr)

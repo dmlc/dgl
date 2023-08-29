@@ -1,6 +1,7 @@
 import io
 import pickle
 import random
+import re
 from copy import deepcopy
 
 import backend as F
@@ -42,10 +43,15 @@ def _AXWb(A, X, W, b):
     return Y + b
 
 
+def graph_with_nodes(num_nodes, ctx=None):
+    g = dgl.from_networkx(nx.path_graph(num_nodes))
+    return g.to(ctx) if ctx else g
+
+
 @pytest.mark.parametrize("out_dim", [1, 2])
 def test_graph_conv0(out_dim):
-    g = dgl.DGLGraph(nx.path_graph(3)).to(F.ctx())
     ctx = F.ctx()
+    g = graph_with_nodes(3, ctx)
     adj = g.adj_external(transpose=True, ctx=ctx)
 
     conv = nn.GraphConv(5, out_dim, norm="none", bias=True)
@@ -228,9 +234,8 @@ def _S2AXWb(A, N, X, W, b):
 
 @pytest.mark.parametrize("out_dim", [1, 2])
 def test_tagconv(out_dim):
-    g = dgl.DGLGraph(nx.path_graph(3))
-    g = g.to(F.ctx())
     ctx = F.ctx()
+    g = graph_with_nodes(3, ctx)
     adj = g.adj_external(transpose=True, ctx=ctx)
     norm = th.pow(g.in_degrees().float(), -0.5)
 
@@ -270,8 +275,7 @@ def test_tagconv(out_dim):
 
 def test_set2set():
     ctx = F.ctx()
-    g = dgl.DGLGraph(nx.path_graph(10))
-    g = g.to(F.ctx())
+    g = graph_with_nodes(10, ctx)
 
     s2s = nn.Set2Set(5, 3, 3)  # hidden size 5, 3 iters, 3 layers
     s2s = s2s.to(ctx)
@@ -283,8 +287,8 @@ def test_set2set():
     assert h1.shape[0] == 1 and h1.shape[1] == 10 and h1.dim() == 2
 
     # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(11)).to(F.ctx())
-    g2 = dgl.DGLGraph(nx.path_graph(5)).to(F.ctx())
+    g1 = graph_with_nodes(11, ctx)
+    g2 = graph_with_nodes(5, ctx)
     bg = dgl.batch([g, g1, g2])
     h0 = F.randn((bg.num_nodes(), 5))
     h1 = s2s(bg, h0)
@@ -293,8 +297,7 @@ def test_set2set():
 
 def test_glob_att_pool():
     ctx = F.ctx()
-    g = dgl.DGLGraph(nx.path_graph(10))
-    g = g.to(F.ctx())
+    g = graph_with_nodes(10, ctx)
 
     gap = nn.GlobalAttentionPooling(th.nn.Linear(5, 1), th.nn.Linear(5, 10))
     gap = gap.to(ctx)
@@ -317,8 +320,7 @@ def test_glob_att_pool():
 
 def test_simple_pool():
     ctx = F.ctx()
-    g = dgl.DGLGraph(nx.path_graph(15))
-    g = g.to(F.ctx())
+    g = graph_with_nodes(15, ctx)
 
     sum_pool = nn.SumPooling()
     avg_pool = nn.AvgPooling()
@@ -342,7 +344,7 @@ def test_simple_pool():
     assert h1.shape[0] == 1 and h1.shape[1] == 10 * 5 and h1.dim() == 2
 
     # test#2: batched graph
-    g_ = dgl.DGLGraph(nx.path_graph(5)).to(F.ctx())
+    g_ = graph_with_nodes(5, ctx)
     bg = dgl.batch([g, g_, g, g_, g])
     h0 = F.randn((bg.num_nodes(), 5))
     h1 = sum_pool(bg, h0)
@@ -390,7 +392,7 @@ def test_simple_pool():
 
 def test_set_trans():
     ctx = F.ctx()
-    g = dgl.DGLGraph(nx.path_graph(15))
+    g = graph_with_nodes(15)
 
     st_enc_0 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, "sab")
     st_enc_1 = nn.SetTransformerEncoder(50, 5, 10, 100, 2, "isab", 3)
@@ -410,8 +412,8 @@ def test_set_trans():
     assert h2.shape[0] == 1 and h2.shape[1] == 200 and h2.dim() == 2
 
     # test#2: batched graph
-    g1 = dgl.DGLGraph(nx.path_graph(5))
-    g2 = dgl.DGLGraph(nx.path_graph(10))
+    g1 = graph_with_nodes(5)
+    g2 = graph_with_nodes(10)
     bg = dgl.batch([g, g1, g2])
     h0 = F.randn((bg.num_nodes(), 50))
     h1 = st_enc_0(bg, h0)
@@ -922,6 +924,9 @@ def test_gcn2conv_e_weight(g, idtype, bias):
     res = feat
     h = gcn2conv(g, res, feat, edge_weight=eweight)
     assert h.shape[-1] == 5
+    assert re.match(
+        re.compile(".*GCN2Conv.*in=.*, alpha=.*, beta=.*"), str(gcn2conv)
+    )
 
 
 @parametrize_idtype
@@ -1267,7 +1272,7 @@ def test_dotgat_conv_bi(g, idtype, out_dim, num_heads):
 def test_dense_cheb_conv(out_dim):
     for k in range(1, 4):
         ctx = F.ctx()
-        g = dgl.DGLGraph(sp.sparse.random(100, 100, density=0.1), readonly=True)
+        g = dgl.from_scipy(sp.sparse.random(100, 100, density=0.1))
         g = g.to(F.ctx())
         adj = g.adj_external(transpose=True, ctx=ctx).to_dense()
         cheb = nn.ChebConv(5, out_dim, k, None)
@@ -1305,7 +1310,7 @@ def test_sequential():
             e_feat += graph.edata["e"]
             return n_feat, e_feat
 
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g.add_nodes(3)
     g.add_edges([0, 1, 2, 0, 1, 2, 0, 1, 2], [0, 0, 0, 1, 1, 1, 2, 2, 2])
     g = g.to(F.ctx())
@@ -1329,9 +1334,9 @@ def test_sequential():
             n_feat += graph.ndata["h"]
             return n_feat.view(graph.num_nodes() // 2, 2, -1).sum(1)
 
-    g1 = dgl.DGLGraph(nx.erdos_renyi_graph(32, 0.05)).to(F.ctx())
-    g2 = dgl.DGLGraph(nx.erdos_renyi_graph(16, 0.2)).to(F.ctx())
-    g3 = dgl.DGLGraph(nx.erdos_renyi_graph(8, 0.8)).to(F.ctx())
+    g1 = dgl.from_networkx(nx.erdos_renyi_graph(32, 0.05)).to(ctx)
+    g2 = dgl.from_networkx(nx.erdos_renyi_graph(16, 0.2)).to(ctx)
+    g3 = dgl.from_networkx(nx.erdos_renyi_graph(8, 0.8)).to(ctx)
     net = nn.Sequential(ExampleLayer(), ExampleLayer(), ExampleLayer())
     net = net.to(ctx)
     n_feat = F.randn((32, 4))
@@ -2363,7 +2368,7 @@ def test_dgn_conv(
     g = dgl.rand_graph(num_nodes, num_edges).to(dev)
     h = th.randn(num_nodes, in_size).to(dev)
     e = th.randn(num_edges, edge_feat_size).to(dev)
-    transform = dgl.LaplacianPE(k=3, feat_name="eig")
+    transform = dgl.LapPE(k=3, feat_name="eig")
     g = transform(g)
     eig = g.ndata["eig"]
     model = nn.DGNConv(
@@ -2480,7 +2485,7 @@ def test_MetaPath2Vec(idtype):
 @pytest.mark.parametrize("num_layer", [1, 4])
 @pytest.mark.parametrize("k", [3, 5])
 @pytest.mark.parametrize("lpe_dim", [4, 16])
-@pytest.mark.parametrize("n_head", [1, 4])
+@pytest.mark.parametrize("n_head", [2, 4])
 @pytest.mark.parametrize("batch_norm", [True, False])
 @pytest.mark.parametrize("num_post_layer", [0, 1, 2])
 def test_LapPosEncoder(

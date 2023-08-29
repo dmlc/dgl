@@ -13,7 +13,7 @@ D = 5
 
 
 def generate_graph(grad=False, add_data=True):
-    g = dgl.DGLGraph().to(F.ctx())
+    g = dgl.graph([]).to(F.ctx())
     g.add_nodes(10)
     # create a graph where 0 is the source and 9 is the sink
     for i in range(1, 9):
@@ -111,7 +111,7 @@ def test_subgraph_relabel_nodes(relabel_nodes):
 
 
 def _test_map_to_subgraph():
-    g = dgl.DGLGraph()
+    g = dgl.graph([])
     g.add_nodes(10)
     g.add_edges(F.arange(0, 9), F.arange(1, 10))
     h = g.subgraph([0, 1, 2, 5, 8])

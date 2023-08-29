@@ -3600,11 +3600,11 @@ def random_walk_pe(g, k, eweight_name=None):
         RW = (A / (A.sum(1) + 1e-30)).toarray()
 
     # Iterate for k steps
-    PE = [F.astype(F.tensor(RW.diagonal()), F.float32)]
+    PE = [F.astype(F.tensor(np.array(RW.diagonal())), F.float32)]
     RW_power = RW
     for _ in range(k - 1):
         RW_power = RW_power @ RW
-        PE.append(F.astype(F.tensor(RW_power.diagonal()), F.float32))
+        PE.append(F.astype(F.tensor(np.array(RW_power.diagonal())), F.float32))
     PE = F.stack(PE, dim=-1)
 
     return PE
@@ -3680,13 +3680,26 @@ def lap_pe(g, k, padding=False, return_eigval=False):
     L = sparse.eye(g.num_nodes()) - N * A * N
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
-    EigVal, EigVec = np.linalg.eig(L.toarray())
-    max_freqs = min(n - 1, k)
-    kpartition_indices = np.argpartition(EigVal, max_freqs)[: max_freqs + 1]
-    topk_eigvals = EigVal[kpartition_indices]
-    topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    topk_EigVec = EigVec[:, topk_indices]
-    eigvals = F.tensor(EigVal[topk_indices], dtype=F.float32)
+    if k + 1 < n - 1:
+        # Use scipy if k + 1 < n - 1 for memory efficiency.
+        EigVal, EigVec = scipy.sparse.linalg.eigs(
+            L, k=k + 1, which="SR", tol=1e-2
+        )
+        topk_indices = EigVal.argsort()[1:]
+        # Since scipy may return complex value, to avoid crashing in NN code,
+        # convert them to real number.
+        topk_eigvals = EigVal[topk_indices].real
+        topk_EigVec = EigVec[:, topk_indices].real
+    else:
+        # Fallback to numpy since scipy.sparse do not support this case.
+        EigVal, EigVec = np.linalg.eig(L.toarray())
+        max_freqs = min(n - 1, k)
+        kpartition_indices = np.argpartition(EigVal, max_freqs)[: max_freqs + 1]
+        topk_eigvals = EigVal[kpartition_indices]
+        topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
+        topk_EigVec = EigVec[:, topk_indices]
+        topk_EigVal = EigVal[topk_indices]
+    eigvals = F.tensor(topk_EigVal, dtype=F.float32)
 
     # get random flip signs
     rand_sign = 2 * (np.random.rand(max_freqs) > 0.5) - 1.0
