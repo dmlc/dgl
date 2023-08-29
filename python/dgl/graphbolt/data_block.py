@@ -37,9 +37,7 @@ class DataBlock:
     graph where no edge types exist, 'edge_type' should be set to None.
     """
 
-    input_nodes: Union[
-        torch.Tensor, Dict[str, torch.Tensor]
-    ] = None
+    input_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """A representation of input nodes in the outermost layer. Conatins all nodes
        in the 'sampled_subgraphs'.
     - If `input_nodes` is a tensor: It indicates the graph is homogeneous.

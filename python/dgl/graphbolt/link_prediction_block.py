@@ -36,9 +36,7 @@ class LinkPredictionBlock(DataBlock):
       should correspond to given 'node_pair'.
     """
 
-    negative_head: Union[
-        torch.Tensor, Dict[str, torch.Tensor]
-    ] = None
+    negative_head: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the head nodes in the link
     prediction task.
@@ -48,9 +46,7 @@ class LinkPredictionBlock(DataBlock):
       given type.
     """
 
-    negative_tail: Union[
-        torch.Tensor, Dict[str, torch.Tensor]
-    ] = None
+    negative_tail: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the tail nodes in the link
     prediction task.
@@ -69,17 +65,13 @@ class LinkPredictionBlock(DataBlock):
     all node ids inside are compacted.
     """
 
-    compacted_negative_head: Union[
-        torch.Tensor, Dict[str, torch.Tensor]
-    ] = None
+    compacted_negative_head: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of compacted nodes corresponding to 'negative_head', where
     all node ids inside are compacted.
     """
 
-    compacted_negative_tail: Union[
-        torch.Tensor, Dict[str, torch.Tensor]
-    ] = None
+    compacted_negative_tail: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of compacted nodes corresponding to 'negative_tail', where
     all node ids inside are compacted.
