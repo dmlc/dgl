@@ -16,7 +16,7 @@ class LinkPredictionBlock(DataBlock):
 
     node_pair: Union[
         Tuple[torch.Tensor, torch.Tensor],
-        Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
+        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ] = None
     """
     Representation of seed node pairs utilized in link prediction tasks.
@@ -27,7 +27,7 @@ class LinkPredictionBlock(DataBlock):
       type.
     """
 
-    label: Union[torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]] = None
+    label: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Labels associated with the link prediction task.
     - If `label` is a tensor: It indicates a homogeneous graph. The value are
@@ -37,7 +37,7 @@ class LinkPredictionBlock(DataBlock):
     """
 
     negative_head: Union[
-        torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]
+        torch.Tensor, Dict[str, torch.Tensor]
     ] = None
     """
     Representation of negative samples for the head nodes in the link
@@ -49,7 +49,7 @@ class LinkPredictionBlock(DataBlock):
     """
 
     negative_tail: Union[
-        torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]
+        torch.Tensor, Dict[str, torch.Tensor]
     ] = None
     """
     Representation of negative samples for the tail nodes in the link
@@ -62,7 +62,7 @@ class LinkPredictionBlock(DataBlock):
 
     compacted_node_pair: Union[
         Tuple[torch.Tensor, torch.Tensor],
-        Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
+        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ] = None
     """
     Representation of compacted node pairs corresponding to 'node_pair', where
@@ -70,7 +70,7 @@ class LinkPredictionBlock(DataBlock):
     """
 
     compacted_negative_head: Union[
-        torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]
+        torch.Tensor, Dict[str, torch.Tensor]
     ] = None
     """
     Representation of compacted nodes corresponding to 'negative_head', where
@@ -78,7 +78,7 @@ class LinkPredictionBlock(DataBlock):
     """
 
     compacted_negative_tail: Union[
-        torch.Tensor, Dict[Tuple[str, str, str], torch.Tensor]
+        torch.Tensor, Dict[str, torch.Tensor]
     ] = None
     """
     Representation of compacted nodes corresponding to 'negative_tail', where
