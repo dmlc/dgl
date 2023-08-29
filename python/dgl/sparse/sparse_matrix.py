@@ -529,15 +529,15 @@ class SparseMatrix:
             raise NotImplementedError
         raise TypeError(f"{type(index).__name__} is unsupported input type.")
 
-    def range_select(self, dim: int, range: slice):
-        """Returns a sub-matrix selected according to the given range.
+    def range_select(self, dim: int, index: slice):
+        """Returns a sub-matrix selected according to the given range index.
 
         Parameters
         ----------
         dim : int
             The dim to select from matrix, should be 0 or 1.
-        range : slice
-            The selection slice indicates ID range from the `dim` should
+        index : slice
+            The selection slice indicates ID index from the `dim` should
             be chosen from the matrix.
 
         The function does not support autograd.
@@ -572,9 +572,9 @@ class SparseMatrix:
         """
         if dim not in (0, 1):
             raise ValueError("The selection dimension should be 0 or 1.")
-        if isinstance(range, slice):
+        if isinstance(index, slice):
             raise NotImplementedError
-        raise TypeError(f"{type(range).__name__} is unsupported input type.")
+        raise TypeError(f"{type(index).__name__} is unsupported input type.")
 
 
 def spmatrix(
