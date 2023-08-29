@@ -59,6 +59,8 @@ fi
 
 if [[ ${remove} == "YES" ]]; then
   rm -rf build
+  rm -rf graphbolt/build
+  rm -rf dgl_sparse/build
 fi
 
 if [[ -z ${build_type} ]]; then
