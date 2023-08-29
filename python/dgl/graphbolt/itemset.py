@@ -100,14 +100,14 @@ class ItemSetDict:
     >>> node_pairs_like = (torch.arange(0, 2), torch.arange(0, 2))
     >>> node_pairs_follow = (torch.arange(0, 3), torch.arange(3, 6))
     >>> item_set = gb.ItemSetDict({
-    ...     ('user', 'like', 'item'): gb.ItemSet(node_pairs_like),
-    ...     ('user', 'follow', 'user'): gb.ItemSet(node_pairs_follow)})
+    ...     "user:like:item": gb.ItemSet(node_pairs_like),
+    ...     "user:follow:user": gb.ItemSet(node_pairs_follow)})
     >>> list(item_set)
-    [{('user', 'like', 'item'): (tensor(0), tensor(0))},
-     {('user', 'like', 'item'): (tensor(1), tensor(1))},
-     {('user', 'follow', 'user'): (tensor(0), tensor(3))},
-     {('user', 'follow', 'user'): (tensor(1), tensor(4))},
-     {('user', 'follow', 'user'): (tensor(2), tensor(5))}]
+    [{"user:like:item": (tensor(0), tensor(0))},
+     {"user:like:item": (tensor(1), tensor(1))},
+     {"user:follow:user": (tensor(0), tensor(3))},
+     {"user:follow:user": (tensor(1), tensor(4))},
+     {"user:follow:user": (tensor(2), tensor(5))}]
 
     3. Tuple of iterables with different shape.
     >>> like = (torch.arange(0, 2), torch.arange(0, 2),
@@ -115,14 +115,14 @@ class ItemSetDict:
     >>> follow = (torch.arange(0, 3), torch.arange(3, 6),
     ...     torch.arange(0, 6).reshape(-1, 2))
     >>> item_set = gb.ItemSetDict({
-    ...     ('user', 'like', 'item'): gb.ItemSet(like),
-    ...     ('user', 'follow', 'user'): gb.ItemSet(follow)})
+    ...     "user:like:item": gb.ItemSet(like),
+    ...     "user:follow:user": gb.ItemSet(follow)})
     >>> list(item_set)
-    [{('user', 'like', 'item'): (tensor(0), tensor(0), tensor([0, 1]))},
-     {('user', 'like', 'item'): (tensor(1), tensor(1), tensor([2, 3]))},
-     {('user', 'follow', 'user'): (tensor(0), tensor(3), tensor([0, 1]))},
-     {('user', 'follow', 'user'): (tensor(1), tensor(4), tensor([2, 3]))},
-     {('user', 'follow', 'user'): (tensor(2), tensor(5), tensor([4, 5]))}]
+    [{"user:like:item": (tensor(0), tensor(0), tensor([0, 1]))},
+     {"user:like:item": (tensor(1), tensor(1), tensor([2, 3]))},
+     {"user:follow:user": (tensor(0), tensor(3), tensor([0, 1]))},
+     {"user:follow:user": (tensor(1), tensor(4), tensor([2, 3]))},
+     {"user:follow:user": (tensor(2), tensor(5), tensor([4, 5]))}]
     """
 
     def __init__(self, itemsets: Dict[str, ItemSet]) -> None:

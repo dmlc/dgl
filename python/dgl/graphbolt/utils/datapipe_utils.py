@@ -1,5 +1,7 @@
 """DataPipe utilities"""
 
+__all__ = ["datapipe_graph_to_adjlist"]
+
 
 def _get_parents(result_dict, datapipe_graph):
     for k, (v, parents) in datapipe_graph.items():
