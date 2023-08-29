@@ -351,6 +351,12 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
         probs_or_mask.value().dtype() == torch::kFloat16) {
       probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
     }
+    TORCH_CHECK(
+        ((probs_or_mask.value().max() < INFINITY) &
+         (probs_or_mask.value().min() >= 0))
+            .item()
+            .to<bool>(),
+        "Invalid probs_or_mask (contains either `inf`, `nan` or element < 0).");
   }
 
   if (layer) {
