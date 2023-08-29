@@ -84,6 +84,7 @@ class DataBlock:
                         edge_type,
                         feature_name,
                     ), feature in edge_feature.items():
+                        edge_type = tuple(edge_type.split(":"))
                         graph.edges[edge_type].data[feature_name] = feature
             # Assign reverse node ids to the outermost layer's nodes.
             reverse_row_node_ids = self.sampled_subgraphs[
