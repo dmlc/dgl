@@ -29,7 +29,8 @@ def test_etype_tuple_to_str():
     with pytest.raises(
         AssertionError,
         match=re.escape(
-            "Passed-in canonical etype should be in format of (str, str, str). But got user:like:item."
+            "Passed-in canonical etype should be in format of (str, str, str). "
+            "But got user:like:item."
         ),
     ):
         _ = gb.etype_tuple_to_str(c_etype)
@@ -39,7 +40,8 @@ def test_etype_tuple_to_str():
     with pytest.raises(
         AssertionError,
         match=re.escape(
-            "Passed-in canonical etype should be in format of (str, str, str). But got ('user', 'like')."
+            "Passed-in canonical etype should be in format of (str, str, str). "
+            "But got ('user', 'like')."
         ),
     ):
         _ = gb.etype_tuple_to_str(c_etype)
@@ -57,7 +59,8 @@ def test_etype_str_to_tuple():
     with pytest.raises(
         AssertionError,
         match=re.escape(
-            "Passed-in canonical etype should be in format of 'str:str:str'. But got user:like."
+            "Passed-in canonical etype should be in format of 'str:str:str'. "
+            "But got user:like."
         ),
     ):
         _ = gb.etype_str_to_tuple(c_etype_str)
