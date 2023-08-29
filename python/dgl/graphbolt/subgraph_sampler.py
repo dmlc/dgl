@@ -5,6 +5,7 @@ from typing import Dict
 
 from torchdata.datapipes.iter import Mapper
 
+from .base import etype_str_to_tuple
 from .data_block import LinkPredictionBlock, NodeClassificationBlock
 from .utils import unique_and_compact
 
@@ -51,14 +52,17 @@ class SubgraphSampler(Mapper):
         if is_heterogeneous:
             # Collect nodes from all types of input.
             nodes = defaultdict(list)
-            for (src_type, _, dst_type), (src, dst) in node_pair.items():
+            for etype, (src, dst) in node_pair.items():
+                src_type, _, dst_type = etype_str_to_tuple(etype)
                 nodes[src_type].append(src)
                 nodes[dst_type].append(dst)
             if has_neg_src:
-                for (src_type, _, _), src in neg_src.items():
+                for etype, src in neg_src.items():
+                    src_type, _, _ = etype_str_to_tuple(etype)
                     nodes[src_type].append(src.view(-1))
             if has_neg_dst:
-                for (_, _, dst_type), dst in neg_dst.items():
+                for etype, dst in neg_dst.items():
+                    _, _, dst_type = etype_str_to_tuple(etype)
                     nodes[dst_type].append(dst.view(-1))
             # Unique and compact the collected nodes.
             seeds, compacted = unique_and_compact(nodes)
@@ -69,16 +73,18 @@ class SubgraphSampler(Mapper):
             ) = ({}, {}, {})
             # Map back in same order as collect.
             for etype, _ in node_pair.items():
-                src_type, _, dst_type = etype
+                src_type, _, dst_type = etype_str_to_tuple(etype)
                 src = compacted[src_type].pop(0)
                 dst = compacted[dst_type].pop(0)
                 compacted_node_pair[etype] = (src, dst)
             if has_neg_src:
                 for etype, _ in neg_src.items():
-                    compacted_negative_head[etype] = compacted[etype[0]].pop(0)
+                    src_type, _, _ = etype_str_to_tuple(etype)
+                    compacted_negative_head[etype] = compacted[src_type].pop(0)
             if has_neg_dst:
                 for etype, _ in neg_dst.items():
-                    compacted_negative_tail[etype] = compacted[etype[2]].pop(0)
+                    _, _, dst_type = etype_str_to_tuple(etype)
+                    compacted_negative_tail[etype] = compacted[dst_type].pop(0)
         else:
             # Collect nodes from all types of input.
             nodes = list(node_pair)
