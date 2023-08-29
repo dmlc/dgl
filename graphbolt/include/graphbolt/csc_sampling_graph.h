@@ -406,8 +406,8 @@ int64_t PickByEtype(
     PickedType* picked_data_ptr);
 
 template <
-    bool NonUniform, bool Replace, typename ProbsType = float,
-    typename PickedType>
+    bool NonUniform, bool Replace, typename ProbsType, typename PickedType,
+    int StackSize = 1024>
 int64_t LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
