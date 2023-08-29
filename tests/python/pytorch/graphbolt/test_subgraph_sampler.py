@@ -11,14 +11,16 @@ def to_node_block(data):
     return block
 
 
-def test_SubgraphSampler_Node():
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Node(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(torch.arange(10))
     minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     data_block_converter = Mapper(minibatch_dp, to_node_block)
-    sampler_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    sampler_dp = Sampler(data_block_converter, graph, fanouts)
     assert len(list(sampler_dp)) == 5
 
 
@@ -27,7 +29,8 @@ def to_link_block(data):
     return block
 
 
-def test_SubgraphSampler_Link():
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Link(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(
         (
@@ -39,7 +42,8 @@ def test_SubgraphSampler_Link():
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     data_block_converter = Mapper(minibatch_dp, to_link_block)
-    neighbor_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    neighbor_dp = Sampler(data_block_converter, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
 
 
@@ -52,7 +56,8 @@ def test_SubgraphSampler_Link():
         gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
     ],
 )
-def test_SubgraphSampler_Link_With_Negative(format):
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Link_With_Negative(format, labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(
         (
@@ -67,7 +72,8 @@ def test_SubgraphSampler_Link_With_Negative(format):
     negative_dp = gb.UniformNegativeSampler(
         data_block_converter, 1, format, graph
     )
-    neighbor_dp = gb.NeighborSampler(negative_dp, graph, fanouts)
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
 
 
@@ -93,7 +99,8 @@ def get_hetero_graph():
     )
 
 
-def test_SubgraphSampler_Link_Hetero():
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Link_Hetero(labor):
     graph = get_hetero_graph()
     itemset = gb.ItemSetDict(
         {
@@ -116,7 +123,8 @@ def test_SubgraphSampler_Link_Hetero():
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
     data_block_converter = Mapper(minibatch_dp, to_link_block)
-    neighbor_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    neighbor_dp = Sampler(data_block_converter, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
 
 
@@ -129,7 +137,8 @@ def test_SubgraphSampler_Link_Hetero():
         gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
     ],
 )
-def test_SubgraphSampler_Link_Hetero_With_Negative(format):
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Link_Hetero_With_Negative(format, labor):
     graph = get_hetero_graph()
     itemset = gb.ItemSetDict(
         {
@@ -155,5 +164,6 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(format):
     negative_dp = gb.UniformNegativeSampler(
         data_block_converter, 1, format, graph
     )
-    neighbor_dp = gb.NeighborSampler(negative_dp, graph, fanouts)
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
