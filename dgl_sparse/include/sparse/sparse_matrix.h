@@ -138,40 +138,24 @@ class SparseMatrix : public torch::CustomClassHolder {
       torch::Tensor value, const std::vector<int64_t>& shape);
 
   /**
-   * @brief Create a SparseMatrix by slicing rows.
+   * @brief Create a SparseMatrix by index slicing.
+   * @param dim Row-wise or column-wise select.
    * @param ids Ids of the selected rows
    *
    * @return SparseMatrix
    */
-  c10::intrusive_ptr<SparseMatrix> RowwiseSelect(torch::Tensor ids);
-
-  //   /**
-  //    * @brief Create a SparseMatrix by slicing range rows.
-  //    * @param start Start id of the selected rows.
-  //    * @param end End id of the selected rows.
-  //    *
-  //    * @return SparseMatrix
-  //    */
-  //   c10::intrusive_ptr<SparseMatrix> RowwiseSelect(int64_t start, int64_t
-  //   end);
+  c10::intrusive_ptr<SparseMatrix> IndexSelect(int64_t dim, torch::Tensor ids);
 
   /**
-   * @brief Create a SparseMatrix by slicing columns.
-   * @param ids Ids of the selected columns
+   * @brief Create a SparseMatrix by range slicing.
+   * @param dim Row-wise or column-wise select.
+   * @param start Start id of the selected columns.
+   * @param end End id of the selected columns.
    *
    * @return SparseMatrix
    */
-  c10::intrusive_ptr<SparseMatrix> ColumnwiseSelect(torch::Tensor ids);
-
-  //   /**
-  //    * @brief Create a SparseMatrix by slicing columns.
-  //    * @param start Start id of the selected columns.
-  //    * @param end End id of the selected columns.
-  //    *
-  //    * @return SparseMatrix
-  //    */
-  //   c10::intrusive_ptr<SparseMatrix> ColumnwiseSelect(int64_t start, int64_t
-  //   end);
+  c10::intrusive_ptr<SparseMatrix> RangeSelect(
+      int64_t dim, int64_t start, int64_t end);
 
   /**
    * @brief Create a SparseMatrix from a SparseMatrix using new values.

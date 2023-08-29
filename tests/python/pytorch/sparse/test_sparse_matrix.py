@@ -450,7 +450,7 @@ def test_has_duplicate():
     assert csc_A.has_duplicate()
 
 
-def test_rowwise_select():
+def test_select():
     ctx = F.ctx()
 
     row = torch.tensor([0, 1, 1, 2, 3, 4]).to(ctx)
@@ -459,33 +459,37 @@ def test_rowwise_select():
     shape = (5, 6)
     A = from_coo(row, col, val, shape)
 
-    ids = torch.tensor([0, 1, 4]).to(ctx)
-    A_select = A.rowwise_select(ids)
-
+    row_ids = torch.tensor([0, 1, 4]).to(ctx)
+    A_select = A.select(0, row_ids)
     assert A_select.nnz == 4
     assert A_select.shape == (3, 6)
     assert list(A_select.row) == [0, 1, 1, 2]
     assert list(A_select.col) == [0, 2, 4, 0]
     assert list(A_select.val) == [0, 1, 2, 5]
 
-
-def test_columnwise_select():
-    ctx = F.ctx()
-
-    row = torch.tensor([0, 1, 1, 2, 3, 4]).to(ctx)
-    col = torch.tensor([0, 2, 4, 3, 5, 0]).to(ctx)
-    val = torch.arange(len(row)).to(ctx)
-    shape = (5, 6)
-    A = from_coo(row, col, val, shape)
-
-    ids = torch.tensor([0, 4, 5]).to(ctx)
-    A_select = A.columnwise_select(ids)
-
+    column_ids = torch.tensor([0, 4, 5]).to(ctx)
+    A_select = A.select(1, column_ids)
     assert A_select.nnz == 4
     assert A_select.shape == (5, 3)
     assert list(A_select.row) == [0, 1, 3, 4]
     assert list(A_select.col) == [0, 1, 2, 0]
     assert list(A_select.val) == [0, 2, 4, 5]
+
+    row_slice = slice(1, 3)
+    A_select = A.select(0, row_slice)
+    assert A_select.nnz == 3
+    assert A_select.shape == (2, 6)
+    assert list(A_select.row) == [0, 0, 1]
+    assert list(A_select.col) == [2, 4, 3]
+    assert list(A_select.val) == [1, 2, 3]
+
+    column_slice = slice(3, 6)
+    A_select = A.select(1, column_slice)
+    assert A_select.nnz == 3
+    assert A_select.shape == (5, 3)
+    assert list(A_select.row) == [1, 2, 3]
+    assert list(A_select.col) == [1, 0, 2]
+    assert list(A_select.val) == [2, 3, 4]
 
 
 def test_print():
