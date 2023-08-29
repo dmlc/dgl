@@ -5,8 +5,7 @@ from typing import Dict
 
 from torchdata.datapipes.iter import Mapper
 
-from .link_prediction_block import LinkPredictionBlock
-from .node_classification_block import NodeClassificationBlock
+from .data_block import LinkPredictionBlock, NodeClassificationBlock
 from .utils import unique_and_compact
 
 
