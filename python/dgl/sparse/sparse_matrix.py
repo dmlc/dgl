@@ -486,7 +486,7 @@ class SparseMatrix:
         ----------
         dim : int
             The dim to select from matrix, should be 0 or 1.
-        ids : tensor.Tensor or slice
+        ids : Union[tensor.Tensor, slice]
             Tensor indicates the row ids to select from matrix.
             NOTE: The ids can include duplicate values.
             Slice indicates sub-matrix selected by range [start, end).
