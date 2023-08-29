@@ -5,7 +5,7 @@ import sys
 import torch
 
 from .._ffi import libinfo
-from .copy_to import *
+from .base import *
 from .data_block import *
 from .data_format import *
 from .dataloader import *

@@ -266,8 +266,8 @@ def test_ItemSetDict_node_pairs(batch_size, shuffle, drop_last):
         torch.arange(num_ids * 3, num_ids * 4),
     )
     node_pairs_dict = {
-        ("user", "like", "item"): gb.ItemSet(node_pairs_0),
-        ("user", "follow", "user"): gb.ItemSet(node_pairs_1),
+        "user:like:item": gb.ItemSet(node_pairs_0),
+        "user:follow:user": gb.ItemSet(node_pairs_1),
     }
     item_set = gb.ItemSetDict(node_pairs_dict)
     minibatch_sampler = gb.MinibatchSampler(
@@ -319,10 +319,10 @@ def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
     )
     labels = torch.arange(0, num_ids)
     node_pairs_dict = {
-        ("user", "like", "item"): gb.ItemSet(
+        "user:like:item": gb.ItemSet(
             (node_pairs_0[0], node_pairs_0[1], labels)
         ),
-        ("user", "follow", "user"): gb.ItemSet(
+        "user:follow:user": gb.ItemSet(
             (node_pairs_1[0], node_pairs_1[1], labels + num_ids * 2)
         ),
     }
@@ -380,8 +380,8 @@ def test_ItemSetDict_head_tail_neg_tails(batch_size, shuffle, drop_last):
     tails = torch.arange(num_ids, num_ids * 2)
     neg_tails = torch.stack((heads + 1, heads + 2), dim=-1)
     data_dict = {
-        ("user", "like", "item"): gb.ItemSet((heads, tails, neg_tails)),
-        ("user", "follow", "user"): gb.ItemSet((heads, tails, neg_tails)),
+        "user:like:item": gb.ItemSet((heads, tails, neg_tails)),
+        "user:follow:user": gb.ItemSet((heads, tails, neg_tails)),
     }
     item_set = gb.ItemSetDict(data_dict)
     minibatch_sampler = gb.MinibatchSampler(
