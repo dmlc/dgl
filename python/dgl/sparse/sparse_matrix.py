@@ -530,7 +530,7 @@ class SparseMatrix:
             return SparseMatrix(self.c_sparse_matrix.index_select(dim, ids))
         else:
             start = 0 if ids.start is None else ids.start
-            end = ids.end
+            end = ids.stop
             return SparseMatrix(
                 self.c_sparse_matrix.range_select(dim, start, end)
             )
