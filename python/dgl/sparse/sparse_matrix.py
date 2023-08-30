@@ -485,7 +485,8 @@ class SparseMatrix:
         Parameters
         ----------
         dim : int
-            The dim to select from matrix, should be 0 or 1.
+            The dim to select from matrix, should be 0 or 1. `dim = 0` for 
+            rowwise selection and `dim = 1` for columnwise selection.
         index : tensor.Tensor
             The selection index indicates which IDs from the `dim` should
             be chosen from the matrix.
@@ -535,7 +536,8 @@ class SparseMatrix:
         Parameters
         ----------
         dim : int
-            The dim to select from matrix, should be 0 or 1.
+            The dim to select from matrix, should be 0 or 1. `dim = 0` for 
+            rowwise selection and `dim = 1` for columnwise selection.
         index : slice
             The selection slice indicates ID index from the `dim` should
             be chosen from the matrix.
