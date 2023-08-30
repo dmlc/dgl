@@ -900,7 +900,7 @@ def test_hetero_graph_on_shared_memory(
     assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
 
 
-def process_csc_sampling_graph_with_queue(graph, data_queue, flag_queue):
+def process_csc_sampling_graph_on_shared_memory(graph, data_queue, flag_queue):
     # Backup the attributes.
     csc_indptr = graph.csc_indptr.clone()
     indices = graph.indices.clone()
@@ -979,13 +979,13 @@ def test_multiprocessing_with_shared_memory():
     flag_queue = ctx.Queue()  # Used for sending finish signal.
 
     p = ctx.Process(
-        target=process_csc_sampling_graph_with_queue,
+        target=process_csc_sampling_graph_on_shared_memory,
         args=(graph, data_queue, flag_queue),
     )
     p.start()
     try:
-        # Get data from the other process. Then check if the tensors are on the
-        # same shared memory by checking if the data here is also modified.
+        # Get data from the other process. Then check if the tensors here have
+        # the same data.
         csc_indptr2 = data_queue.get()
         assert torch.equal(graph.csc_indptr, csc_indptr2)
         indices2 = data_queue.get()
