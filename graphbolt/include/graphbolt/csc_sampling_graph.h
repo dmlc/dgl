@@ -134,7 +134,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param state The state of serialized CSCSamplingGraph.
    */
   void SetState(
-      const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>& state);
+      const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
+          state);
 
   /**
    * @brief Pickle method for serializing.
