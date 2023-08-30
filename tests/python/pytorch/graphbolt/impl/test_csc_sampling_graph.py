@@ -77,7 +77,7 @@ def test_hetero_empty_graph(num_nodes):
 )
 def test_metadata_with_ntype_exception(ntypes):
     with pytest.raises(Exception):
-        gb.GraphMetadata(ntypes, {("n1", "e1", "n2"): 1})
+        gb.GraphMetadata(ntypes, {"n1:e1:n2": 1})
 
 
 @unittest.skipIf(
@@ -91,9 +91,9 @@ def test_metadata_with_ntype_exception(ntypes):
         {"e1": 1},
         {("n1", "e1"): 1},
         {("n1", "e1", 10): 1},
-        {("n1", "e1", "n2"): 1, ("n1", "e2", "n3"): 1},
+        {"n1:e1:n2": 1, ("n1", "e2", "n3"): 1},
         {("n1", "e1", "n10"): 1},
-        {("n1", "e1", "n2"): 1.5},
+        {"n1:e1:n2": 1.5},
     ],
 )
 def test_metadata_with_etype_exception(etypes):
@@ -434,10 +434,10 @@ def test_in_subgraph_heterogeneous():
         "N1": 1,
     }
     etypes = {
-        ("N0", "R0", "N0"): 0,
-        ("N0", "R1", "N1"): 1,
-        ("N1", "R2", "N0"): 2,
-        ("N1", "R3", "N1"): 3,
+        "N0:R0:N0": 0,
+        "N0:R1:N1": 1,
+        "N1:R2:N0": 2,
+        "N1:R3:N1": 3,
     }
     indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
     indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
@@ -517,8 +517,8 @@ def test_sample_neighbors_homo():
 @pytest.mark.parametrize("labor", [False, True])
 def test_sample_neighbors_hetero(labor):
     """Original graph in COO:
-    ("n1", "e1", "n2"):[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
-    ("n2", "e2", "n1"):[0, 0, 1, 2], [0, 1, 1 ,0]
+    "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
+    "n2:e2:n1":[0, 0, 1, 2], [0, 1, 1 ,0]
     0   0   1   0   1
     0   0   1   1   1
     1   1   0   0   0
@@ -527,7 +527,7 @@ def test_sample_neighbors_hetero(labor):
     """
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
-    etypes = {("n1", "e1", "n2"): 0, ("n2", "e2", "n1"): 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
     metadata = gb.GraphMetadata(ntypes, etypes)
     num_nodes = 5
     num_edges = 9
@@ -555,11 +555,11 @@ def test_sample_neighbors_hetero(labor):
 
     # Verify in subgraph.
     expected_node_pairs = {
-        ("n1", "e1", "n2"): (
+        "n1:e1:n2": (
             torch.LongTensor([0, 1]),
             torch.LongTensor([0, 0]),
         ),
-        ("n2", "e2", "n1"): (
+        "n2:e2:n1": (
             torch.LongTensor([0, 2]),
             torch.LongTensor([0, 0]),
         ),
@@ -598,8 +598,8 @@ def test_sample_neighbors_fanouts(
     fanouts, expected_sampled_num1, expected_sampled_num2, labor
 ):
     """Original graph in COO:
-    ("n1", "e1", "n2"):[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
-    ("n2", "e2", "n1"):[0, 0, 1, 2], [0, 1, 1 ,0]
+    "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
+    "n2:e2:n1":[0, 0, 1, 2], [0, 1, 1 ,0]
     0   0   1   0   1
     0   0   1   1   1
     1   1   0   0   0
@@ -608,7 +608,7 @@ def test_sample_neighbors_fanouts(
     """
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
-    etypes = {("n1", "e1", "n2"): 0, ("n2", "e2", "n1"): 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
     metadata = gb.GraphMetadata(ntypes, etypes)
     num_nodes = 5
     num_edges = 9
@@ -634,14 +634,8 @@ def test_sample_neighbors_fanouts(
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
-    assert (
-        subgraph.node_pairs[("n1", "e1", "n2")][0].numel()
-        == expected_sampled_num1
-    )
-    assert (
-        subgraph.node_pairs[("n2", "e2", "n1")][0].numel()
-        == expected_sampled_num2
-    )
+    assert subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
+    assert subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
 
 
 @unittest.skipIf(
@@ -656,8 +650,8 @@ def test_sample_neighbors_replace(
     replace, expected_sampled_num1, expected_sampled_num2
 ):
     """Original graph in COO:
-    ("n1", "e1", "n2"):[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
-    ("n2", "e2", "n1"):[0, 0, 1, 2], [0, 1, 1 ,0]
+    "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
+    "n2:e2:n1":[0, 0, 1, 2], [0, 1, 1 ,0]
     0   0   1   0   1
     0   0   1   1   1
     1   1   0   0   0
@@ -666,7 +660,7 @@ def test_sample_neighbors_replace(
     """
     # Initialize data.
     ntypes = {"n1": 0, "n2": 1}
-    etypes = {("n1", "e1", "n2"): 0, ("n2", "e2", "n1"): 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
     metadata = gb.GraphMetadata(ntypes, etypes)
     num_nodes = 5
     num_edges = 9
@@ -692,14 +686,8 @@ def test_sample_neighbors_replace(
     )
 
     # Verify in subgraph.
-    assert (
-        subgraph.node_pairs[("n1", "e1", "n2")][0].numel()
-        == expected_sampled_num1
-    )
-    assert (
-        subgraph.node_pairs[("n2", "e2", "n1")][0].numel()
-        == expected_sampled_num2
-    )
+    assert subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
+    assert subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
 
 
 @unittest.skipIf(
@@ -1019,7 +1007,7 @@ def test_from_dglgraph_homogeneous():
     assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 1000]))
     assert torch.all(gb_g.type_per_edge == 0)
     assert gb_g.metadata.node_type_to_id == {"_N": 0}
-    assert gb_g.metadata.edge_type_to_id == {("_N", "_E", "_N"): 0}
+    assert gb_g.metadata.edge_type_to_id == {"_N:_E:_N": 0}
 
 
 @unittest.skipIf(
@@ -1063,10 +1051,10 @@ def test_from_dglgraph_heterogeneous():
         "n3": 2,
     }
     assert gb_g.metadata.edge_type_to_id == {
-        ("n1", "r12", "n2"): 0,
-        ("n1", "r13", "n3"): 1,
-        ("n2", "r21", "n1"): 2,
-        ("n2", "r23", "n3"): 3,
+        "n1:r12:n2": 0,
+        "n1:r13:n3": 1,
+        "n2:r21:n1": 2,
+        "n2:r23:n3": 3,
     }
 
 
@@ -1180,9 +1168,9 @@ def test_sample_neighbors_hetero_pick_number(
     num_edges = 9
     ntypes = {"N0": 0, "N1": 1, "N2": 2, "N3": 3}
     etypes = {
-        ("N0", "R0", "N1"): 0,
-        ("N0", "R1", "N2"): 1,
-        ("N0", "R2", "N3"): 2,
+        "N0:R0:N1": 0,
+        "N0:R1:N2": 1,
+        "N0:R2:N3": 2,
     }
     metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9])

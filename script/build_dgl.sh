@@ -61,6 +61,7 @@ if [[ ${remove} == "YES" ]]; then
   rm -rf build
   rm -rf graphbolt/build
   rm -rf dgl_sparse/build
+  rm -rf tensoradapter/pytorch/build
 fi
 
 if [[ -z ${build_type} ]]; then
