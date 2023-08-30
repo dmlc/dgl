@@ -151,7 +151,7 @@ def get_hetero_graph():
     # [1, 1, 1, 1, 0, 0, 0, 0, 0] - > edge type.
     # num_nodes = 5, num_n1 = 2, num_n2 = 3
     ntypes = {"n1": 0, "n2": 1}
-    etypes = {("n1", "e1", "n2"): 0, ("n2", "e2", "n1"): 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
     metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])

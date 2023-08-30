@@ -5,6 +5,8 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 
+from ..base import etype_str_to_tuple
+
 
 def unique_and_compact(
     nodes: Union[
@@ -61,7 +63,7 @@ def unique_and_compact(
 def unique_and_compact_node_pairs(
     node_pairs: Union[
         Tuple[torch.Tensor, torch.Tensor],
-        Dict[Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor]],
+        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ],
     unique_dst_nodes: Union[
         torch.Tensor,
@@ -73,8 +75,8 @@ def unique_and_compact_node_pairs(
 
     Parameters
     ----------
-    node_pairs : Tuple[torch.Tensor, torch.Tensor] or \
-        Dict(Tuple[str, str, str], Tuple[torch.Tensor, torch.Tensor])
+    node_pairs : Union[Tuple[torch.Tensor, torch.Tensor],
+                    Dict(str, Tuple[torch.Tensor, torch.Tensor])]
         Node pairs representing source-destination edges.
         - If `node_pairs` is a tuple: It means the graph is homogeneous.
         Also, it should be in the format ('u', 'v') representing source
@@ -102,20 +104,20 @@ def unique_and_compact_node_pairs(
     >>> import dgl.graphbolt as gb
     >>> N1 = torch.LongTensor([1, 2, 2])
     >>> N2 = torch.LongTensor([5, 6, 5])
-    >>> node_pairs = {("n1", "e1", "n2"): (N1, N2),
-    ...     ("n2", "e2", "n1"): (N2, N1)}
+    >>> node_pairs = {"n1:e1:n2": (N1, N2),
+    ...     "n2:e2:n1": (N2, N1)}
     >>> unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(
     ...     node_pairs
     ... )
     >>> print(unique_nodes)
     {'n1': tensor([1, 2]), 'n2': tensor([5, 6])}
     >>> print(compacted_node_pairs)
-    {('n1', 'e1', 'n2'): (tensor([0, 1, 1]), tensor([0, 1, 0])),
-    ('n2', 'e2', 'n1'): (tensor([0, 1, 0]), tensor([0, 1, 1]))}
+    {"n1:e1:n2": (tensor([0, 1, 1]), tensor([0, 1, 0])),
+    "n2:e2:n1": (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
     is_homogeneous = not isinstance(node_pairs, dict)
     if is_homogeneous:
-        node_pairs = {("_N", "_E", "_N"): node_pairs}
+        node_pairs = {"_N:_E:_N": node_pairs}
         if unique_dst_nodes is not None:
             assert isinstance(
                 unique_dst_nodes, torch.Tensor
@@ -126,8 +128,9 @@ def unique_and_compact_node_pairs(
     src_nodes = defaultdict(list)
     dst_nodes = defaultdict(list)
     for etype, (src_node, dst_node) in node_pairs.items():
-        src_nodes[etype[0]].append(src_node)
-        dst_nodes[etype[2]].append(dst_node)
+        src_type, _, dst_type = etype_str_to_tuple(etype)
+        src_nodes[src_type].append(src_node)
+        dst_nodes[dst_type].append(dst_node)
     src_nodes = {ntype: torch.cat(nodes) for ntype, nodes in src_nodes.items()}
     dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
     # Compute unique destination nodes if not provided.
@@ -156,7 +159,7 @@ def unique_and_compact_node_pairs(
     # Map back with the same order.
     for etype, pair in node_pairs.items():
         num_elem = pair[0].size(0)
-        src_type, _, dst_type = etype
+        src_type, _, dst_type = etype_str_to_tuple(etype)
         src = compacted_src[src_type][:num_elem]
         dst = compacted_dst[dst_type][:num_elem]
         compacted_node_pairs[etype] = (src, dst)
