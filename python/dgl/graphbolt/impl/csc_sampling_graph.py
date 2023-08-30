@@ -4,7 +4,7 @@ import os
 import tarfile
 import tempfile
 from collections import defaultdict
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Union
 
 import torch
 
