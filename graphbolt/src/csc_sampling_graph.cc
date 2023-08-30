@@ -651,8 +651,6 @@ inline int64_t NonUniformPick(
           auto positive_probs_indices_ptr =
               positive_probs_indices.data_ptr<PickedType>();
 
-          std::random_device rd;
-          std::mt19937 gen(rd());
           if (!replace) {
             // The algorithm is from gumbel softmax.
             // s = argmax( logp - log(-log(eps)) ) where eps ~ U(0, 1)
@@ -660,7 +658,6 @@ inline int64_t NonUniformPick(
             // of argmax or topk. Then we have s = argmax( p / (-log(eps)) )
             // where eps ~ U(0, 1). We can also simplify the formula above by s
             // = argmax( p / q ) where q ~ Exp(1)
-            std::exponential_distribution<> exp_distrib(1);
             if (fanout == 1) {
               // Return argmax(p / q).
               scalar_t max_prob = 0;
@@ -670,7 +667,7 @@ inline int64_t NonUniformPick(
                 // Calculate (p / q) for the current neighbor.
                 scalar_t cur_prob =
                     local_probs_data_ptr[positive_probs_indices_ptr[i]] /
-                    exp_distrib(gen);
+                    RandomEngine::ThreadLocal()->RandomExponential(1.);
                 if (cur_prob > max_prob) {
                   max_prob = cur_prob;
                   max_prob_index = positive_probs_indices_ptr[i];
@@ -684,7 +681,7 @@ inline int64_t NonUniformPick(
               for (auto i = 0; i < num_positive_probs; ++i) {
                 q[i].first =
                     local_probs_data_ptr[positive_probs_indices_ptr[i]] /
-                    exp_distrib(gen);
+                    RandomEngine::ThreadLocal()->RandomExponential(1.);
                 q[i].second = positive_probs_indices_ptr[i];
               }
               if (fanout < num_positive_probs / 64) {
@@ -717,10 +714,10 @@ inline int64_t NonUniformPick(
                 prefix_sum_probs[i] /= sum_probs;
               }
             }
-            std::uniform_real_distribution<> uniform(0, 1);
             for (auto i = 0; i < fanout; ++i) {
               // Sample a probability mass from a uniform distribution.
-              double uniform_sample = uniform(gen);
+              double uniform_sample =
+                  RandomEngine::ThreadLocal()->RandomUniform(0., 1.);
               // Use a binary search to find the index.
               int left_pointer = 0;
               int right_pointer = num_positive_probs;
