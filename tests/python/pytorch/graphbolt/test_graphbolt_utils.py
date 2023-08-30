@@ -62,15 +62,15 @@ def test_unique_and_compact_node_pairs_hetero():
         "n3": unique_N3,
     }
     node_pairs = {
-        ("n1", "e1", "n2"): (
+        "n1:e1:n2": (
             N1[:20],
             N2,
         ),
-        ("n1", "e2", "n3"): (
+        "n1:e2:n3": (
             N1[20:30],
             N3,
         ),
-        ("n2", "e3", "n3"): (
+        "n2:e3:n3": (
             N2[10:],
             N3,
         ),
@@ -84,7 +84,7 @@ def test_unique_and_compact_node_pairs_hetero():
         assert torch.equal(torch.sort(nodes)[0], expected_nodes)
     for etype, pair in compacted_node_pairs.items():
         u, v = pair
-        u_type, _, v_type = etype
+        u_type, _, v_type = gb.etype_str_to_tuple(etype)
         u, v = unique_nodes[u_type][u], unique_nodes[v_type][v]
         expected_u, expected_v = node_pairs[etype]
         assert torch.equal(u, expected_u)
