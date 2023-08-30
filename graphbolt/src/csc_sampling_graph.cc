@@ -100,7 +100,8 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
 }
 
 void CSCSamplingGraph::SetState(
-    torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>& state) {
+    const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
+        state) {
   // State is a dict of dicts. The tensor-type attributes are stored in the dict
   // with key "independent_tensors". The dict-type attributes (edge_attributes)
   // are stored directly with the their name as the key.

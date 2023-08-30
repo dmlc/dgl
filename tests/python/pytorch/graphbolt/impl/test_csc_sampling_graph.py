@@ -900,26 +900,38 @@ def test_hetero_graph_on_shared_memory(
     assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
 
 
-def process_csc_sampling_graph_with_queue(graph, graph_queue, flag_queue):
-    # Put the graph into the queue.
-    graph_queue.put(graph)
+def process_csc_sampling_graph_with_queue(graph, data_queue, flag_queue):
+    # Backup the attributes.
+    csc_indptr = graph.csc_indptr.clone()
+    indices = graph.indices.clone()
+    node_type_offset = graph.node_type_offset.clone()
+    type_per_edge = graph.type_per_edge.clone()
+
+    # Change the value to random integers. Send the new value to the main
+    # process.
+    v = torch.randint_like(graph.csc_indptr, 100)
+    graph.csc_indptr[:] = v
+    data_queue.put(v.clone())
+
+    v = torch.randint_like(graph.indices, 100)
+    graph.indices[:] = v
+    data_queue.put(v.clone())
+
+    v = torch.randint_like(graph.node_type_offset, 100)
+    graph.node_type_offset[:] = v
+    data_queue.put(v.clone())
+
+    v = torch.randint_like(graph.type_per_edge, 100)
+    graph.type_per_edge[:] = v
+    data_queue.put(v.clone())
+
     # Wait for the main process to finish.
     flag_queue.get()
 
-
-def check_spawned_tensors_on_the_same_shared_memory(t1, t2):
-    """Check if two tensors are on the same shared memory.
-
-    This function copies a random tensor value to `t1` and checks whether `t2`
-    holds the same random value and checks whether t2 is a distinct tensor
-    object from `t1`. Their equality confirms that they are separate tensors
-    that rely on the shared memory for their tensor value.
-    """
-    old_t1 = t1.clone()
-    v = torch.randint_like(t1, 100)
-    t1[:] = v
-    assert torch.equal(t1, t2)
-    t1[:] = old_t1
+    graph.csc_indptr[:] = csc_indptr
+    graph.indices[:] = indices
+    graph.node_type_offset[:] = node_type_offset
+    graph.type_per_edge[:] = type_per_edge
 
 
 @unittest.skipIf(
@@ -963,29 +975,25 @@ def test_multiprocessing_with_shared_memory():
 
     ctx = mp.get_context("spawn")  # Use spawn method.
 
-    graph_queue = ctx.Queue()  # Used for sending graph.
+    data_queue = ctx.Queue()  # Used for sending graph.
     flag_queue = ctx.Queue()  # Used for sending finish signal.
 
     p = ctx.Process(
         target=process_csc_sampling_graph_with_queue,
-        args=(graph, graph_queue, flag_queue),
+        args=(graph, data_queue, flag_queue),
     )
     p.start()
     try:
-        graph2 = graph_queue.get()  # Get the graph from the other process.
-        # Check if the tensors are on the same shared memory.
-        check_spawned_tensors_on_the_same_shared_memory(
-            graph.csc_indptr, graph2.csc_indptr
-        )
-        check_spawned_tensors_on_the_same_shared_memory(
-            graph.indices, graph2.indices
-        )
-        check_spawned_tensors_on_the_same_shared_memory(
-            graph.node_type_offset, graph2.node_type_offset
-        )
-        check_spawned_tensors_on_the_same_shared_memory(
-            graph.type_per_edge, graph2.type_per_edge
-        )
+        # Get data from the other process. Then check if the tensors are on the
+        # same shared memory by checking if the data here is also modified.
+        csc_indptr2 = data_queue.get()
+        assert torch.equal(graph.csc_indptr, csc_indptr2)
+        indices2 = data_queue.get()
+        assert torch.equal(graph.indices, indices2)
+        node_type_offset2 = data_queue.get()
+        assert torch.equal(graph.node_type_offset, node_type_offset2)
+        type_per_edge2 = data_queue.get()
+        assert torch.equal(graph.type_per_edge, type_per_edge2)
     except:
         raise
     finally:
