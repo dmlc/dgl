@@ -508,7 +508,7 @@ class SparseMatrix:
         Case 1: Select rows by IDs.
 
         >>> row_ids = torch.tensor([0, 1, 4])
-        >>> A.select(0, row_ids)
+        >>> A.index_select(0, row_ids)
         SparseMatrix(indices=tensor([[0, 1, 1, 2],
                                      [0, 2, 4, 0]]),
                      values=tensor([0, 1, 2, 5]),
@@ -517,10 +517,10 @@ class SparseMatrix:
         Case 2: Select columns by IDs.
 
         >>> column_ids = torch.tensor([0, 4, 5])
-        >>> A.select(1, column_ids)
-        SparseMatrix(indices=tensor([[0, 1, 3, 4],
-                                     [0, 1, 2, 0]]),
-                     values=tensor([0, 2, 4, 5]),
+        >>> A.index_select(1, column_ids)
+        SparseMatrix(indices=tensor([[0, 4, 1, 3],
+                                     [0, 0, 1, 2]]),
+                     values=tensor([0, 5, 2, 4]),
                      shape=(5, 3), nnz=4)
         """
         if dim not in (0, 1):
@@ -556,7 +556,7 @@ class SparseMatrix:
 
         Case 1: Select rows with given slice object.
 
-        >>> A.select(0, slice(1, 3))
+        >>> A.range_select(0, slice(1, 3))
         SparseMatrix(indices=tensor([[0, 0, 1],
                                      [2, 4, 3]]),
                      values=tensor([1, 2, 3]),
@@ -564,10 +564,10 @@ class SparseMatrix:
 
         Case 2: Select columns with given slice object.
 
-        >>> A.select(1, slice(3, 6))
-        SparseMatrix(indices=tensor([[1, 2, 3],
-                                     [1, 0, 2]]),
-                     values=tensor([2, 3, 4]),
+        >>> A.range_select(1, slice(3, 6))
+        SparseMatrix(indices=tensor([[2, 1, 3],
+                                     [0, 1, 2]]),
+                     values=tensor([3, 2, 4]),
                      shape=(5, 3), nnz=3)
         """
         if dim not in (0, 1):
