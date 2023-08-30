@@ -4,14 +4,14 @@ import os
 import tarfile
 import tempfile
 from collections import defaultdict
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Union
 
 import torch
 
 from ...base import ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
-from ..base import etype_str_to_tuple
+from ..base import etype_str_to_tuple, etype_tuple_to_str
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
@@ -21,7 +21,7 @@ class GraphMetadata:
     def __init__(
         self,
         node_type_to_id: Dict[str, int],
-        edge_type_to_id: Dict[Tuple[str, str, str], int],
+        edge_type_to_id: Dict[str, int],
     ):
         """Initialize the GraphMetadata object.
 
@@ -29,7 +29,7 @@ class GraphMetadata:
         ----------
         node_type_to_id : Dict[str, int]
             Dictionary from node types to node type IDs.
-        edge_type_to_id : Dict[Tuple[str, str, str], int]
+        edge_type_to_id : Dict[str, int]
             Dictionary from edge types to edge type IDs.
 
         Raises
@@ -55,7 +55,7 @@ class GraphMetadata:
         ), "Multiple node types shoud not be mapped to a same id."
         # Validate edge_type_to_id.
         for edge_type in edge_types:
-            src, edge, dst = edge_type
+            src, edge, dst = etype_str_to_tuple(edge_type)
             assert isinstance(edge, str), "Edge type name should be string."
             assert (
                 src in node_types
@@ -238,7 +238,7 @@ class CSCSamplingGraph:
             # converted to heterogeneous graphs.
             node_pairs = defaultdict(list)
             for etype, etype_id in self.metadata.edge_type_to_id.items():
-                src_ntype, _, dst_ntype = etype
+                src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
                 src_ntype_id = self.metadata.node_type_to_id[src_ntype]
                 dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
                 mask = type_per_edge == etype_id
@@ -719,7 +719,8 @@ def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
     # Initialize metadata.
     node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
     edge_type_to_id = {
-        etype: g.get_etype_id(etype) for etype in g.canonical_etypes
+        etype_tuple_to_str(etype): g.get_etype_id(etype)
+        for etype in g.canonical_etypes
     }
     metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
 
