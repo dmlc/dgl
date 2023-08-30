@@ -104,13 +104,13 @@ def test_SubgraphSampler_Link_Hetero(labor):
     graph = get_hetero_graph()
     itemset = gb.ItemSetDict(
         {
-            ("n1", "e1", "n2"): gb.ItemSet(
+            "n1:e1:n2": gb.ItemSet(
                 (
                     torch.LongTensor([0, 0, 1, 1]),
                     torch.LongTensor([0, 2, 0, 1]),
                 )
             ),
-            ("n2", "e2", "n1"): gb.ItemSet(
+            "n2:e2:n1": gb.ItemSet(
                 (
                     torch.LongTensor([0, 0, 1, 1, 2, 2]),
                     torch.LongTensor([0, 1, 1, 0, 0, 1]),
@@ -142,13 +142,13 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(format, labor):
     graph = get_hetero_graph()
     itemset = gb.ItemSetDict(
         {
-            ("n1", "e1", "n2"): gb.ItemSet(
+            "n1:e1:n2": gb.ItemSet(
                 (
                     torch.LongTensor([0, 0, 1, 1]),
                     torch.LongTensor([0, 2, 0, 1]),
                 )
             ),
-            ("n2", "e2", "n1"): gb.ItemSet(
+            "n2:e2:n1": gb.ItemSet(
                 (
                     torch.LongTensor([0, 0, 1, 1, 2, 2]),
                     torch.LongTensor([0, 1, 1, 0, 0, 1]),
