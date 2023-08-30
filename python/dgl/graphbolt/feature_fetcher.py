@@ -70,16 +70,17 @@ class FeatureFetcher(Mapper):
             if is_heterogeneous:
                 for type_name, feature_names in self.node_feature_keys.items():
                     nodes = data.input_nodes[type_name]
-                    if nodes is not None:
-                        for feature_name in feature_names:
-                            data.node_features[
-                                (type_name, feature_name)
-                            ] = self.feature_store.read(
-                                "node",
-                                type_name,
-                                feature_name,
-                                nodes,
-                            )
+                    if nodes is None:
+                        continue
+                    for feature_name in feature_names:
+                        data.node_features[
+                            (type_name, feature_name)
+                        ] = self.feature_store.read(
+                            "node",
+                            type_name,
+                            feature_name,
+                            nodes,
+                        )
             else:
                 for feature_name in self.node_feature_keys:
                     data.node_features[feature_name] = self.feature_store.read(
@@ -91,30 +92,29 @@ class FeatureFetcher(Mapper):
         # Read Edge features.
         if self.edge_feature_keys and data.sampled_subgraphs:
             for i, subgraph in enumerate(data.sampled_subgraphs):
-                if subgraph.reverse_edge_ids is not None:
-                    if is_heterogeneous:
-                        for (
-                            type_name,
-                            feature_names,
-                        ) in self.edge_feature_keys.items():
-                            edges = subgraph.reverse_edge_ids.get(
-                                type_name, None
-                            )
-                            if edges is not None:
-                                for feature_name in feature_names:
-                                    data.edge_features[i][
-                                        (type_name, feature_name)
-                                    ] = self.feature_store.read(
-                                        "edge", type_name, feature_name, edges
-                                    )
-                    else:
-                        for feature_name in self.edge_feature_keys:
-                            data.edge_features[i][
-                                feature_name
-                            ] = self.feature_store.read(
-                                "edge",
-                                None,
-                                feature_name,
-                                subgraph.reverse_edge_ids,
-                            )
+                if subgraph.reverse_edge_ids is None:
+                    continue
+                if is_heterogeneous:
+                    for (
+                        type_name,
+                        feature_names,
+                    ) in self.edge_feature_keys.items():
+                        edges = subgraph.reverse_edge_ids.get(type_name, None)
+                        if edges is not None:
+                            for feature_name in feature_names:
+                                data.edge_features[i][
+                                    (type_name, feature_name)
+                                ] = self.feature_store.read(
+                                    "edge", type_name, feature_name, edges
+                                )
+                else:
+                    for feature_name in self.edge_feature_keys:
+                        data.edge_features[i][
+                            feature_name
+                        ] = self.feature_store.read(
+                            "edge",
+                            None,
+                            feature_name,
+                            subgraph.reverse_edge_ids,
+                        )
         return data
