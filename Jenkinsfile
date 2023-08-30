@@ -157,7 +157,7 @@ def is_authorized(name) {
     'rudongyu', 'classicsong', 'HuXiangkun', 'hetong007', 'kylasa',
     'frozenbugs', 'peizhou001', 'zheng-da', 'czkkkkkk', 'thvasilo',
     // Intern:
-    'keli-wen', 'caojy1998', 'RamonZhou', 'xiangyuzhi', "Skeleton003",
+    'keli-wen', 'caojy1998', 'RamonZhou', 'xiangyuzhi', 'Skeleton003',
     // Friends:
     'nv-dlasalle', 'yaox12', 'chang-l', 'Kh4L', 'VibhuJawa', 'kkranen',
     'bgawrych', 'itaraban', 'daniil-sizov', 'anko-intel', 'Kacper-Pietkun',
