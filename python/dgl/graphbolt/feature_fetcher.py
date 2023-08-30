@@ -100,7 +100,7 @@ class FeatureFetcher(Mapper):
                         feature_names,
                     ) in self.edge_feature_keys.items():
                         edges = subgraph.reverse_edge_ids.get(type_name, None)
-                        if edges is not None:
+                        if edges is None:
                             continue
                         for feature_name in feature_names:
                             data.edge_features[i][
