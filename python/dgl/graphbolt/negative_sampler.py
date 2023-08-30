@@ -80,7 +80,7 @@ class NegativeSampler(Mapper):
 
         Parameters
         ----------
-        node_pairs : Tuple[Tensor, TEnsor]
+        node_pairs : Tuple[Tensor, Tensor]
             A tuple of tensors that represent source-destination node pairs of
             positive edges, where positive means the edge must exist in the
             graph.
