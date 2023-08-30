@@ -101,12 +101,13 @@ class FeatureFetcher(Mapper):
                     ) in self.edge_feature_keys.items():
                         edges = subgraph.reverse_edge_ids.get(type_name, None)
                         if edges is not None:
-                            for feature_name in feature_names:
-                                data.edge_features[i][
-                                    (type_name, feature_name)
-                                ] = self.feature_store.read(
-                                    "edge", type_name, feature_name, edges
-                                )
+                            continue
+                        for feature_name in feature_names:
+                            data.edge_features[i][
+                                (type_name, feature_name)
+                            ] = self.feature_store.read(
+                                "edge", type_name, feature_name, edges
+                            )
                 else:
                     for feature_name in self.edge_feature_keys:
                         data.edge_features[i][
