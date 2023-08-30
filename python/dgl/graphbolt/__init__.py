@@ -5,7 +5,7 @@ import sys
 import torch
 
 from .._ffi import libinfo
-from .copy_to import *
+from .base import *
 from .data_block import *
 from .data_format import *
 from .dataloader import *
@@ -14,10 +14,8 @@ from .feature_fetcher import *
 from .feature_store import *
 from .impl import *
 from .itemset import *
-from .link_prediction_block import *
 from .minibatch_sampler import *
 from .negative_sampler import *
-from .node_classification_block import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
 from .utils import unique_and_compact, unique_and_compact_node_pairs

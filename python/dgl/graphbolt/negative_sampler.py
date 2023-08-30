@@ -80,16 +80,16 @@ class NegativeSampler(Mapper):
 
         Parameters
         ----------
-        node_pairs : Tuple[Tensor]
-            A tuple of tensors or a dictionary represents source-destination
-            node pairs of positive edges, where positive means the edge must
-            exist in the graph.
-        etype : (str, str, str)
+        node_pairs : Tuple[Tensor, Tensor]
+            A tuple of tensors that represent source-destination node pairs of
+            positive edges, where positive means the edge must exist in the
+            graph.
+        etype : str
             Canonical edge type.
 
         Returns
         -------
-        Tuple[Tensor]
+        Tuple[Tensor, Tensor]
             A collection of negative node pairs.
         """
         raise NotImplementedError
@@ -102,14 +102,16 @@ class NegativeSampler(Mapper):
         data : LinkPredictionBlock
             The input data, which contains positive node pairs, will be filled
             with negative information in this function.
-        neg_pairs : Tuple[Tensor]
+        neg_pairs : Tuple[Tensor, Tensor]
             A tuple of tensors represents source-destination node pairs of
             negative edges, where negative means the edge may not exist in
             the graph.
-        etype : (str, str, str)
+        etype : str
             Canonical edge type.
         """
-        pos_src, pos_dst = data.node_pair[etype] if etype else data.node_pair
+        pos_src, pos_dst = (
+            data.node_pair[etype] if etype is not None else data.node_pair
+        )
         neg_src, neg_dst = neg_pairs
         if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
             pos_label = torch.ones_like(pos_src)
@@ -117,7 +119,7 @@ class NegativeSampler(Mapper):
             src = torch.cat([pos_src, neg_src])
             dst = torch.cat([pos_dst, neg_dst])
             label = torch.cat([pos_label, neg_label])
-            if etype:
+            if etype is not None:
                 data.node_pair[etype] = (src, dst)
                 data.label[etype] = label
             else:
@@ -141,7 +143,7 @@ class NegativeSampler(Mapper):
                 raise TypeError(
                     f"Unsupported output format {self.output_format}."
                 )
-            if etype:
+            if etype is not None:
                 data.negative_head[etype] = neg_src
                 data.negative_tail[etype] = neg_dst
             else:

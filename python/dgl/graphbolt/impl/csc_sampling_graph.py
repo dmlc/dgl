@@ -11,6 +11,7 @@ import torch
 from ...base import ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
+from ..base import etype_str_to_tuple
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
@@ -505,11 +506,11 @@ class CSCSamplingGraph:
 
         Parameters
         ----------
-        edge_type: Tuple[str]
+        edge_type: str
             The type of edges in the provided node_pairs. Any negative edges
             sampled will also have the same type. If set to None, it will be
             considered as a homogeneous graph.
-        node_pairs : Tuple[Tensor]
+        node_pairs : Tuple[Tensor, Tensor]
             A tuple of two 1D tensors that represent the source and destination
             of positive edges, with 'positive' indicating that these edges are
             present in the graph. It's important to note that within the
@@ -520,7 +521,7 @@ class CSCSamplingGraph:
 
         Returns
         -------
-        Tuple[Tensor]
+        Tuple[Tensor, Tensor]
             A tuple consisting of two 1D tensors represents the source and
             destination of negative edges. In the context of a heterogeneous
             graph, both the input nodes and the selected nodes are represented
@@ -528,12 +529,12 @@ class CSCSamplingGraph:
             `edge_type`. Note that negative refers to false negatives, which
             means the edge could be present or not present in the graph.
         """
-        if edge_type:
+        if edge_type is not None:
             assert (
                 self.node_type_offset is not None
             ), "The 'node_type_offset' array is necessary for performing \
                 negative sampling by edge type."
-            _, _, dst_node_type = edge_type
+            _, _, dst_node_type = etype_str_to_tuple(edge_type)
             dst_node_type_id = self.metadata.node_type_to_id[dst_node_type]
             max_node_id = (
                 self.node_type_offset[dst_node_type_id + 1]
