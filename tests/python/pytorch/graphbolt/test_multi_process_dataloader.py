@@ -34,7 +34,7 @@ def test_DataLoader():
     feature_fetcher = dgl.graphbolt.FeatureFetcher(
         subgraph_sampler,
         feature_store,
-        keys,
+        ["a", "b"],
     )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 
