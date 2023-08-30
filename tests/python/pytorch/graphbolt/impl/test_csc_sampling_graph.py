@@ -939,9 +939,11 @@ def check_spawned_tensors_on_the_same_shared_memory(t1, t2):
     reason="Graph is CPU only at present.",
 )
 def test_multiprocessing_with_shared_memory():
-    """Test if two CSCSamplingGraphs are on the same shared memory after spawning.
+    """Test if two CSCSamplingGraphs are on the same shared memory after
+    spawning.
 
-    For now this code only works when the sharing strategy of torch.multiprocessing is set to `file_system` at the beginning.
+    For now this code only works when the sharing strategy of
+    torch.multiprocessing is set to `file_system` at the beginning.
     The cause is still yet to be found.
     """
 
