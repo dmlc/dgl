@@ -457,10 +457,14 @@ def test_select():
     col = torch.tensor([0, 2, 4, 3, 5, 0]).to(ctx)
     val = torch.arange(len(row)).to(ctx)
     shape = (5, 6)
-    A = from_coo(row, col, val, shape)
+    coo_A = from_coo(row, col, val, shape)
+
+    # CSR
+    indptr, indices, _ = coo_A.csr()
+    A = from_csr(indptr, indices, val, shape)
 
     row_ids = torch.tensor([0, 1, 4]).to(ctx)
-    A_select = A.select(0, row_ids)
+    A_select = A.index_select(0, row_ids)
     assert A_select.nnz == 4
     assert A_select.shape == (3, 6)
     assert list(A_select.row) == [0, 1, 1, 2]
@@ -468,15 +472,15 @@ def test_select():
     assert list(A_select.val) == [0, 1, 2, 5]
 
     column_ids = torch.tensor([0, 4, 5]).to(ctx)
-    A_select = A.select(1, column_ids)
+    A_select = A.index_select(1, column_ids)
     assert A_select.nnz == 4
     assert A_select.shape == (5, 3)
-    assert list(A_select.row) == [0, 1, 3, 4]
-    assert list(A_select.col) == [0, 1, 2, 0]
-    assert list(A_select.val) == [0, 2, 4, 5]
+    assert list(A_select.row) == [0, 4, 1, 3]
+    assert list(A_select.col) == [0, 0, 1, 2]
+    assert list(A_select.val) == [0, 5, 2, 4]
 
     row_slice = slice(1, 3)
-    A_select = A.select(0, row_slice)
+    A_select = A.range_select(0, row_slice)
     assert A_select.nnz == 3
     assert A_select.shape == (2, 6)
     assert list(A_select.row) == [0, 0, 1]
@@ -484,12 +488,12 @@ def test_select():
     assert list(A_select.val) == [1, 2, 3]
 
     column_slice = slice(3, 6)
-    A_select = A.select(1, column_slice)
+    A_select = A.range_select(1, column_slice)
     assert A_select.nnz == 3
     assert A_select.shape == (5, 3)
-    assert list(A_select.row) == [1, 2, 3]
-    assert list(A_select.col) == [1, 0, 2]
-    assert list(A_select.val) == [2, 3, 4]
+    assert list(A_select.row) == [2, 1, 3]
+    assert list(A_select.col) == [0, 1, 2]
+    assert list(A_select.val) == [3, 2, 4]
 
 
 def test_print():
