@@ -1,6 +1,6 @@
 """Feature fetchers"""
 
-from typing import Dict, List
+from typing import Dict
 
 from torchdata.datapipes.iter import Mapper
 
@@ -9,7 +9,11 @@ class FeatureFetcher(Mapper):
     """A feature fetcher used to fetch features for node/edge in graphbolt."""
 
     def __init__(
-        self, datapipe, feature_store, node_feature_keys, edge_feature_keys
+        self,
+        datapipe,
+        feature_store,
+        node_feature_keys=None,
+        edge_feature_keys=None,
     ):
         """
         Initlization for a feature fetcher.
@@ -64,17 +68,18 @@ class FeatureFetcher(Mapper):
         # Read Node features.
         if self.node_feature_keys and data.input_nodes is not None:
             if is_heterogeneous:
-                for type_name, feature_name in self.node_feature_keys.items():
+                for type_name, feature_names in self.node_feature_keys.items():
                     nodes = data.input_nodes[type_name]
                     if nodes is not None:
-                        data.node_features[
-                            (type_name, feature_name)
-                        ] = self.feature_store.read(
-                            "node",
-                            type_name,
-                            feature_name,
-                            nodes,
-                        )
+                        for feature_name in feature_names:
+                            data.node_features[
+                                (type_name, feature_name)
+                            ] = self.feature_store.read(
+                                "node",
+                                type_name,
+                                feature_name,
+                                nodes,
+                            )
             else:
                 for feature_name in self.node_feature_keys:
                     data.node_features[feature_name] = self.feature_store.read(
@@ -90,17 +95,18 @@ class FeatureFetcher(Mapper):
                     if is_heterogeneous:
                         for (
                             type_name,
-                            feature_name,
+                            feature_names,
                         ) in self.edge_feature_keys.items():
                             edges = subgraph.reverse_edge_ids.get(
                                 type_name, None
                             )
                             if edges is not None:
-                                data.edge_features[i][
-                                    (type_name, feature_name)
-                                ] = self.feature_store.read(
-                                    "edge", type_name, feature_name, edges
-                                )
+                                for feature_name in feature_names:
+                                    data.edge_features[i][
+                                        (type_name, feature_name)
+                                    ] = self.feature_store.read(
+                                        "edge", type_name, feature_name, edges
+                                    )
                     else:
                         for feature_name in self.edge_feature_keys:
                             data.edge_features[i][
