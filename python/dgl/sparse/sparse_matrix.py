@@ -479,7 +479,7 @@ class SparseMatrix:
         """Returns whether the sparse matrix is a diagonal matrix."""
         return self.c_sparse_matrix.is_diag()
 
-    def index_select(self, dim: int, index: tensor.Tensor):
+    def index_select(self, dim: int, index: torch.Tensor):
         """Returns a sub-matrix selected according to the given index.
 
         Parameters
