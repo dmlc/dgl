@@ -66,10 +66,7 @@ class FeatureFetcher(Mapper):
                         edges = (
                             subgraph.reverse_edge_ids
                             if not type_name
-                            # TODO(#6211): Clean up the edge type converter.
-                            else subgraph.reverse_edge_ids.get(
-                                tuple(type_name.split(":")), None
-                            )
+                            else subgraph.reverse_edge_ids.get(type_name, None)
                         )
                         if edges is not None:
                             data.edge_feature[i][
