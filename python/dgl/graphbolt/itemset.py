@@ -84,6 +84,7 @@ class ItemSet:
 
     @property
     def names(self) -> Tuple[str]:
+        """Return the names of the items."""
         return self._names
 
 
