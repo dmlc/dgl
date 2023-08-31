@@ -147,6 +147,10 @@ class ItemSetDict:
 
     def __init__(self, itemsets: Dict[str, ItemSet]) -> None:
         self._itemsets = itemsets
+        self._names = itemsets[list(itemsets.keys())[0]].names
+        assert all(
+            self._names == itemset.names for itemset in itemsets.values()
+        ), "All itemsets must have the same names."
 
     def __iter__(self) -> Iterator:
         for key, itemset in self._itemsets.items():
@@ -155,3 +159,8 @@ class ItemSetDict:
 
     def __len__(self) -> int:
         return sum(len(itemset) for itemset in self._itemsets.values())
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
