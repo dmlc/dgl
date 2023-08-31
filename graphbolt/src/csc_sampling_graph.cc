@@ -705,11 +705,12 @@ inline int64_t NonUniformPick(
 
           if (!replace) {
             // The algorithm is from gumbel softmax.
-            // s = argmax( logp - log(-log(eps)) ) where eps ~ U(0, 1)
+            // s = argmax( logp - log(-log(eps)) ) where eps ~ U(0, 1).
             // Here we can apply exp to the formula which will not affect result
-            // of argmax or topk. Then we have s = argmax( p / (-log(eps)) )
-            // where eps ~ U(0, 1). We can also simplify the formula above by s
-            // = argmax( p / q ) where q ~ Exp(1)
+            // of argmax or topk. Then we have
+            // s = argmax( p / (-log(eps)) ) where eps ~ U(0, 1).
+            // We can also simplify the formula above by
+            // s = argmax( p / q ) where q ~ Exp(1).
             if (fanout == 1) {
               // Return argmax(p / q).
               scalar_t max_prob = 0;
@@ -717,11 +718,11 @@ inline int64_t NonUniformPick(
               // We only care about the neighbors with non-zero probability.
               for (auto i = 0; i < num_positive_probs; ++i) {
                 // Calculate (p / q) for the current neighbor.
-                scalar_t cur_prob =
+                scalar_t current_prob =
                     local_probs_data_ptr[positive_probs_indices_ptr[i]] /
                     RandomEngine::ThreadLocal()->Exponential(1.);
-                if (cur_prob > max_prob) {
-                  max_prob = cur_prob;
+                if (current_prob > max_prob) {
+                  max_prob = current_prob;
                   max_prob_index = positive_probs_indices_ptr[i];
                 }
               }
