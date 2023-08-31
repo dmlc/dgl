@@ -23,18 +23,25 @@ class DataBlock:
     representing a subset of a larger graph structure.
     """
 
-    node_feature: Dict[Tuple[str, str], torch.Tensor] = None
+    node_features: Union[
+        Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]
+    ] = None
     """A representation of node features.
-    Keys are tuples of '(node_type, feature_name)' and the values are
-    corresponding features. Note that for a homogeneous graph, where there are
-    no node types, 'node_type' should be None.
+      - If keys are single strings: It means the graph is homogeneous, and the
+      keys are feature names.
+      - If keys are tuples: It means the graph is heterogeneous, and the keys
+      are tuples of '(node_type, feature_name)'.
     """
 
-    edge_feature: List[Dict[Tuple[str, str], torch.Tensor]] = None
+    edge_features: List[
+        Union[Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]]
+    ] = None
     """Edge features associated with the 'sampled_subgraphs'.
-    The keys are tuples in the format '(edge_type, feature_name)', and the
-    values represent the corresponding features. In the case of a homogeneous
-    graph where no edge types exist, 'edge_type' should be set to None.
+      - If keys are single strings: It means the graph is homogeneous, and the
+      keys are feature names.
+      - If keys are tuples: It means the graph is heterogeneous, and the keys
+      are tuples of '(edge_type, feature_name)'. Note, edge type is single
+      string of format 'str:str:str'.
     """
 
     input_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
