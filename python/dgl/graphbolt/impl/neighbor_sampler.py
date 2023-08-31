@@ -54,7 +54,7 @@ class NeighborSampler(SubgraphSampler):
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
         >>> def to_link_block(data):
-            ... block = gb.LinkPredictionBlock(node_pair=data)
+            ... block = gb.MiniBatch(node_pair=data)
             ... return block
             ...
         >>> from dgl import graphbolt as gb
@@ -165,7 +165,7 @@ class LayerNeighborSampler(NeighborSampler):
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
         >>> def to_link_block(data):
-            ... block = gb.LinkPredictionBlock(node_pair=data)
+            ... block = gb.MiniBatch(node_pair=data)
             ... return block
             ...
         >>> from dgl import graphbolt as gb

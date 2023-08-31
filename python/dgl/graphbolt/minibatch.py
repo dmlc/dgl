@@ -7,11 +7,11 @@ import torch
 
 from .sampled_subgraph import SampledSubgraph
 
-__all__ = ["DataBlock", "NodeClassificationBlock", "LinkPredictionBlock"]
+__all__ = ["MiniBatch"]
 
 
 @dataclass
-class DataBlock:
+class MiniBatch:
     r"""A composite data class for data structure in the graphbolt. It is
     designed to facilitate the exchange of data among different components
     involved in processing data. The purpose of this class is to unify the
@@ -52,12 +52,6 @@ class DataBlock:
       value should be corresponding heterogeneous node id.
     """
 
-
-@dataclass
-class NodeClassificationBlock(DataBlock):
-    r"""A subclass of 'UnifiedDataStruct', specialized for handling node level
-    tasks."""
-
     seed_node: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of seed nodes used for sampling in the graph.
@@ -73,12 +67,6 @@ class NodeClassificationBlock(DataBlock):
     - If `label` is a dictionary: The keys should be node type and the
       value should be corresponding node labels to given 'seed_node'.
     """
-
-
-@dataclass
-class LinkPredictionBlock(DataBlock):
-    r"""A subclass of 'UnifiedDataStruct', specialized for handling edge level
-    tasks."""
 
     node_pair: Union[
         Tuple[torch.Tensor, torch.Tensor],

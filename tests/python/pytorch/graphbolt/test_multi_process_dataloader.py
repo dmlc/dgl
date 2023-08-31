@@ -1,6 +1,5 @@
 import os
 import unittest
-from functools import partial
 
 import backend as F
 
@@ -25,7 +24,7 @@ def test_DataLoader():
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
     minibatch_sampler = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
-    block_converter = Mapper(minibatch_sampler, gb_test_utils.to_node_block)
+    block_converter = Mapper(minibatch_sampler, gb_test_utils.to_node_minibatch)
     subgraph_sampler = dgl.graphbolt.NeighborSampler(
         block_converter,
         graph,
