@@ -6,7 +6,6 @@ from typing import Dict
 from torchdata.datapipes.iter import Mapper
 
 from .base import etype_str_to_tuple
-from .minibatch import MiniBatch
 from .utils import unique_and_compact
 
 
@@ -40,7 +39,8 @@ class SubgraphSampler(Mapper):
             seeds = minibatch.seed_node
         else:
             raise ValueError(
-                f"Invalid minibatch {minibatch}: Either 'node_pair' or 'seed_node' should have a value."
+                f"Invalid minibatch {minibatch}: Either 'node_pair' or \
+                'seed_node' should have a value."
             )
         (
             minibatch.input_nodes,
