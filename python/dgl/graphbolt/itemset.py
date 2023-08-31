@@ -61,9 +61,10 @@ class ItemSet:
                 self._names = names
             else:
                 self._names = (names,)
-            assert len(self._items) == len(
-                self._names
-            ), f"Number of items ({len(self._items)}) and names ({len(self._names)}) must match."
+            assert len(self._items) == len(self._names), (
+                f"Number of items ({len(self._items)}) and "
+                f"names ({len(self._names)}) must match."
+            )
         else:
             self._names = None
 
