@@ -64,10 +64,10 @@ class NeighborSampler(SubgraphSampler):
         >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
-        >>> minibatch_sampler = gb.ItemSampler(
+        >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(minibatch_sampler, to_link_block)
+        >>> data_block_converter = Mapper(item_sampler, to_link_block)
         >>> neg_sampler = gb.UniformNegativeSampler(
             ...data_block_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
@@ -175,10 +175,10 @@ class LayerNeighborSampler(NeighborSampler):
         >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
-        >>> minibatch_sampler = gb.ItemSampler(
+        >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(minibatch_sampler, to_link_block)
+        >>> data_block_converter = Mapper(item_sampler, to_link_block)
         >>> neg_sampler = gb.UniformNegativeSampler(
             ...data_block_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),

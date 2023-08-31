@@ -89,15 +89,15 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
         # TODO(BarclayII): Currently I'm using sharding_filter() as a
         # concept demonstration. Later on minibatch distribution should be
         # merged into ItemSampler to maximize efficiency.
-        minibatch_samplers = dp_utils.find_dps(
+        item_samplers = dp_utils.find_dps(
             datapipe_graph,
             ItemSampler,
         )
-        for minibatch_sampler in minibatch_samplers:
+        for item_sampler in item_samplers:
             datapipe_graph = dp_utils.replace_dp(
                 datapipe_graph,
-                minibatch_sampler,
-                minibatch_sampler.sharding_filter(),
+                item_sampler,
+                item_sampler.sharding_filter(),
             )
 
         # (2) Cut datapipe at FeatureFetcher and wrap.
