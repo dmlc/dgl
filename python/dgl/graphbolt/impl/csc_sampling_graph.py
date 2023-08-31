@@ -4,13 +4,14 @@ import os
 import tarfile
 import tempfile
 from collections import defaultdict
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Union
 
 import torch
 
 from ...base import ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
+from ..base import etype_str_to_tuple, etype_tuple_to_str
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
@@ -20,7 +21,7 @@ class GraphMetadata:
     def __init__(
         self,
         node_type_to_id: Dict[str, int],
-        edge_type_to_id: Dict[Tuple[str, str, str], int],
+        edge_type_to_id: Dict[str, int],
     ):
         """Initialize the GraphMetadata object.
 
@@ -28,7 +29,7 @@ class GraphMetadata:
         ----------
         node_type_to_id : Dict[str, int]
             Dictionary from node types to node type IDs.
-        edge_type_to_id : Dict[Tuple[str, str, str], int]
+        edge_type_to_id : Dict[str, int]
             Dictionary from edge types to edge type IDs.
 
         Raises
@@ -54,7 +55,7 @@ class GraphMetadata:
         ), "Multiple node types shoud not be mapped to a same id."
         # Validate edge_type_to_id.
         for edge_type in edge_types:
-            src, edge, dst = edge_type
+            src, edge, dst = etype_str_to_tuple(edge_type)
             assert isinstance(edge, str), "Edge type name should be string."
             assert (
                 src in node_types
@@ -237,7 +238,7 @@ class CSCSamplingGraph:
             # converted to heterogeneous graphs.
             node_pairs = defaultdict(list)
             for etype, etype_id in self.metadata.edge_type_to_id.items():
-                src_ntype, _, dst_ntype = etype
+                src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
                 src_ntype_id = self.metadata.node_type_to_id[src_ntype]
                 dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
                 mask = type_per_edge == etype_id
@@ -505,11 +506,11 @@ class CSCSamplingGraph:
 
         Parameters
         ----------
-        edge_type: Tuple[str]
+        edge_type: str
             The type of edges in the provided node_pairs. Any negative edges
             sampled will also have the same type. If set to None, it will be
             considered as a homogeneous graph.
-        node_pairs : Tuple[Tensor]
+        node_pairs : Tuple[Tensor, Tensor]
             A tuple of two 1D tensors that represent the source and destination
             of positive edges, with 'positive' indicating that these edges are
             present in the graph. It's important to note that within the
@@ -520,7 +521,7 @@ class CSCSamplingGraph:
 
         Returns
         -------
-        Tuple[Tensor]
+        Tuple[Tensor, Tensor]
             A tuple consisting of two 1D tensors represents the source and
             destination of negative edges. In the context of a heterogeneous
             graph, both the input nodes and the selected nodes are represented
@@ -528,12 +529,12 @@ class CSCSamplingGraph:
             `edge_type`. Note that negative refers to false negatives, which
             means the edge could be present or not present in the graph.
         """
-        if edge_type:
+        if edge_type is not None:
             assert (
                 self.node_type_offset is not None
             ), "The 'node_type_offset' array is necessary for performing \
                 negative sampling by edge type."
-            _, _, dst_node_type = edge_type
+            _, _, dst_node_type = etype_str_to_tuple(edge_type)
             dst_node_type_id = self.metadata.node_type_to_id[dst_node_type]
             max_node_id = (
                 self.node_type_offset[dst_node_type_id + 1]
@@ -712,13 +713,14 @@ def save_csc_sampling_graph(graph, filename):
     print(f"CSCSamplingGraph has been saved to {filename}.")
 
 
-def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
+def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
     """Convert a DGLGraph to CSCSamplingGraph."""
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
     # Initialize metadata.
     node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
     edge_type_to_id = {
-        etype: g.get_etype_id(etype) for etype in g.canonical_etypes
+        etype_tuple_to_str(etype): g.get_etype_id(etype)
+        for etype in g.canonical_etypes
     }
     metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
 
@@ -726,7 +728,8 @@ def from_dglgraph(g: DGLGraph) -> CSCSamplingGraph:
     indptr, indices, _ = homo_g.adj_tensors("csc")
     ntype_count.insert(0, 0)
     node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
-    type_per_edge = homo_g.edata[ETYPE]
+
+    type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE]
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(

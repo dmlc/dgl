@@ -117,15 +117,15 @@ class MinibatchSampler(IterDataPipe):
     >>> node_pairs_like = (torch.arange(0, 5), torch.arange(0, 5))
     >>> node_pairs_follow = (torch.arange(0, 6), torch.arange(6, 12))
     >>> item_set = gb.ItemSetDict({
-    ...     ("user", "like", "item"): gb.ItemSet(node_pairs_like),
-    ...     ("user", "follow", "user"): gb.ItemSet(node_pairs_follow),
+    ...     "user:like:item": gb.ItemSet(node_pairs_like),
+    ...     "user:follow:user": gb.ItemSet(node_pairs_follow),
     ... })
     >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
     >>> list(minibatch_sampler)
-    [{('user', 'like', 'item'): [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3])]},
-    {('user', 'like', 'item'): [tensor([4]), tensor([4])],
-     ('user', 'follow', 'user'): [tensor([0, 1, 2]), tensor([6, 7, 8])]},
-    {('user', 'follow', 'user'): [tensor([3, 4, 5]), tensor([ 9, 10, 11])]}]
+    [{"user:like:item": [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3])]},
+    {"user:like:item": [tensor([4]), tensor([4])],
+     "user:follow:user": [tensor([0, 1, 2]), tensor([6, 7, 8])]},
+    {"user:follow:user": [tensor([3, 4, 5]), tensor([ 9, 10, 11])]}]
 
     9. Heterogeneous node pairs and labels.
     >>> like = (
@@ -133,17 +133,17 @@ class MinibatchSampler(IterDataPipe):
     >>> follow = (
     ...     torch.arange(0, 6), torch.arange(6, 12), torch.arange(0, 6))
     >>> item_set = gb.ItemSetDict({
-    ...     ("user", "like", "item"): gb.ItemSet(like),
-    ...     ("user", "follow", "user"): gb.ItemSet(follow),
+    ...     "user:like:item": gb.ItemSet(like),
+    ...     "user:follow:user": gb.ItemSet(follow),
     ... })
     >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
     >>> list(minibatch_sampler)
-    [{('user', 'like', 'item'):
+    [{"user:like:item":
         [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3])]},
-     {('user', 'like', 'item'): [tensor([4]), tensor([4]), tensor([4])],
-      ('user', 'follow', 'user'):
+     {"user:like:item": [tensor([4]), tensor([4]), tensor([4])],
+      "user:follow:user":
         [tensor([0, 1, 2]), tensor([6, 7, 8]), tensor([0, 1, 2])]},
-     {('user', 'follow', 'user'):
+     {"user:follow:user":
         [tensor([3, 4, 5]), tensor([ 9, 10, 11]), tensor([3, 4, 5])]}]
 
     10. Heterogeneous head, tail and negative tails.
@@ -154,17 +154,17 @@ class MinibatchSampler(IterDataPipe):
     ...     torch.arange(0, 6), torch.arange(6, 12),
     ...     torch.arange(12, 24).reshape(-1, 2))
     >>> item_set = gb.ItemSetDict({
-    ...     ("user", "like", "item"): gb.ItemSet(like),
-    ...     ("user", "follow", "user"): gb.ItemSet(follow),
+    ...     "user:like:item": gb.ItemSet(like),
+    ...     "user:follow:user": gb.ItemSet(follow),
     ... })
     >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
     >>> list(minibatch_sampler)
-    [{('user', 'like', 'item'): [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3]),
+    [{"user:like:item": [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3]),
         tensor([[ 5,  6], [ 7,  8], [ 9, 10], [11, 12]])]},
-     {('user', 'like', 'item'): [tensor([4]), tensor([4]), tensor([[13, 14]])],
-      ('user', 'follow', 'user'): [tensor([0, 1, 2]), tensor([6, 7, 8]),
+     {"user:like:item": [tensor([4]), tensor([4]), tensor([[13, 14]])],
+      "user:follow:user": [tensor([0, 1, 2]), tensor([6, 7, 8]),
         tensor([[12, 13], [14, 15], [16, 17]])]},
-     {('user', 'follow', 'user'): [tensor([3, 4, 5]), tensor([ 9, 10, 11]),
+     {"user:follow:user": [tensor([3, 4, 5]), tensor([ 9, 10, 11]),
         tensor([[18, 19], [20, 21], [22, 23]])]}]
     """
 
