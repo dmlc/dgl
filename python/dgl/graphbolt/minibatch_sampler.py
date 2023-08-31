@@ -2,16 +2,122 @@
 
 from collections.abc import Mapping
 from functools import partial
-from typing import Iterator, Optional
+from typing import Iterator, Mapping, Optional
 
 from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
+from .data_block import LinkPredictionBlock, NodeClassificationBlock
 from .itemset import ItemSet, ItemSetDict
 
-__all__ = ["MinibatchSampler"]
+__all__ = [
+    "MinibatchSampler",
+    "node_classification_mapper",
+    "link_prediction_mapper",
+    "graph_classification_mapper",
+]
+
+
+def node_classification_mapper(minibatch):
+    """Map minibatch to NodeClassificationBlock."""
+    if isinstance(minibatch, list):
+        assert (
+            len(minibatch) == 2
+        ), "Minibatch should be a list of [seed_node, label]."
+        seed_node, label = minibatch
+        return NodeClassificationBlock(seed_node=seed_node, label=label)
+    if isinstance(minibatch, dict):
+        k, v = next(iter(minibatch.items()))
+        if isinstance(v, list):
+            assert (
+                len(v) == 2
+            ), "Minibatch should be a list of [seed_node, label]."
+            seed_node = {k: v[0] for k, v in minibatch.items()}
+            label = {k: v[1] for k, v in minibatch.items()}
+            return NodeClassificationBlock(seed_node=seed_node, label=label)
+    return NodeClassificationBlock(seed_node=minibatch)
+
+
+def link_prediction_mapper(minibatch):
+    """Map minibatch to LinkPredictionBlock."""
+    # assert isinstance(minibatch, list) and len(minibatch) >= 2, "Minibatch should be a list and contain node pairs at least."
+    if isinstance(minibatch, list):
+        if len(minibatch) == 2:
+            return LinkPredictionBlock(node_pair=minibatch)
+        elif len(minibatch) == 3:
+            node_pair, label = minibatch[:2], minibatch[2]
+            return LinkPredictionBlock(node_pair=node_pair, label=label)
+        elif len(minibatch) == 4:
+            node_pair, negative_tail, label = (
+                minibatch[:2],
+                minibatch[2],
+                minibatch[3],
+            )
+            return LinkPredictionBlock(
+                node_pair=node_pair, negative_tail=negative_tail, label=label
+            )
+        elif len(minibatch) == 5:
+            node_pair, negative_head, negative_tail, label = (
+                minibatch[:2],
+                minibatch[2],
+                minibatch[3],
+                minibatch[4],
+            )
+            return LinkPredictionBlock(
+                node_pair=node_pair,
+                negative_head=negative_head,
+                negative_tail=negative_tail,
+                label=label,
+            )
+        raise ValueError(
+            "Unknown minibatch format. Please instantiate LinkPredictionBlock on your own."
+        )
+    if isinstance(minibatch, dict):
+        k, v = next(iter(minibatch.items()))
+        if isinstance(v, list):
+            if len(v) == 2:
+                node_pair = {k: v for k, v in minibatch.items()}
+                return LinkPredictionBlock(node_pair=node_pair)
+            elif len(v) == 3:
+                node_pair = {k: v[:2] for k, v in minibatch.items()}
+                label = {k: v[2] for k, v in minibatch.items()}
+                return LinkPredictionBlock(node_pair=node_pair, label=label)
+            elif len(v) == 4:
+                node_pair = {k: v[:2] for k, v in minibatch.items()}
+                negative_tail = {k: v[2] for k, v in minibatch.items()}
+                label = {k: v[3] for k, v in minibatch.items()}
+                return LinkPredictionBlock(
+                    node_pair=node_pair,
+                    negative_tail=negative_tail,
+                    label=label,
+                )
+            elif len(v) == 5:
+                node_pair = {k: v[:2] for k, v in minibatch.items()}
+                negative_head = {k: v[2] for k, v in minibatch.items()}
+                negative_tail = {k: v[3] for k, v in minibatch.items()}
+                label = {k: v[4] for k, v in minibatch.items()}
+                return LinkPredictionBlock(
+                    node_pair=node_pair,
+                    negative_head=negative_head,
+                    negative_tail=negative_tail,
+                    label=label,
+                )
+            raise ValueError(
+                "Unknown minibatch format. Please instantiate LinkPredictionBlock on your own."
+            )
+    return None
+
+
+def graph_classification_mapper(minibatch):
+    """Map minibatch to GraphClassificationBlock."""
+    return minibatch
+
+
+def default_mapper(minibatch):
+    """Default mapper."""
+    return minibatch
 
 
 class MinibatchSampler(IterDataPipe):
@@ -32,6 +138,9 @@ class MinibatchSampler(IterDataPipe):
         Data to be sampled for mini-batches.
     batch_size : int
         The size of each batch.
+    data_block_mapper : callable
+        Mapper to map minibatch to `NodeClassificationBlock` or
+        `LinkPredictionBlock`.
     drop_last : bool
         Option to drop the last batch if it's not full.
     shuffle : bool
@@ -172,12 +281,14 @@ class MinibatchSampler(IterDataPipe):
         self,
         item_set: ItemSet or ItemSetDict,
         batch_size: int,
+        data_block_mapper: Optional[callable] = default_mapper,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
     ) -> None:
         super().__init__()
         self._item_set = item_set
         self._batch_size = batch_size
+        self._data_block_mapper = data_block_mapper
         self._drop_last = drop_last
         self._shuffle = shuffle
 
@@ -216,5 +327,8 @@ class MinibatchSampler(IterDataPipe):
             return default_collate(batch)
 
         data_pipe = data_pipe.collate(collate_fn=partial(_collate))
+
+        # Map to data block.
+        data_pipe = data_pipe.map(self._data_block_mapper)
 
         return iter(data_pipe)
