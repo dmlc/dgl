@@ -645,7 +645,7 @@ inline int64_t NonUniformPick(
   } else {
     if (!replace) fanout = std::min(fanout, num_positive_probs);
     if (fanout == 0) return 0;
-    AT_DISPATCH_ALL_TYPES(
+    AT_DISPATCH_FLOATING_TYPES(
         local_probs.scalar_type(), "MultinomialSampling", ([&] {
           auto local_probs_data_ptr = local_probs.data_ptr<scalar_t>();
           auto positive_probs_indices_ptr =
@@ -667,7 +667,7 @@ inline int64_t NonUniformPick(
                 // Calculate (p / q) for the current neighbor.
                 scalar_t cur_prob =
                     local_probs_data_ptr[positive_probs_indices_ptr[i]] /
-                    RandomEngine::ThreadLocal()->RandomExponential(1.);
+                    RandomEngine::ThreadLocal()->Exponential(1.);
                 if (cur_prob > max_prob) {
                   max_prob = cur_prob;
                   max_prob_index = positive_probs_indices_ptr[i];
@@ -681,7 +681,7 @@ inline int64_t NonUniformPick(
               for (auto i = 0; i < num_positive_probs; ++i) {
                 q[i].first =
                     local_probs_data_ptr[positive_probs_indices_ptr[i]] /
-                    RandomEngine::ThreadLocal()->RandomExponential(1.);
+                    RandomEngine::ThreadLocal()->Exponential(1.);
                 q[i].second = positive_probs_indices_ptr[i];
               }
               if (fanout < num_positive_probs / 64) {
@@ -717,7 +717,7 @@ inline int64_t NonUniformPick(
             for (auto i = 0; i < fanout; ++i) {
               // Sample a probability mass from a uniform distribution.
               double uniform_sample =
-                  RandomEngine::ThreadLocal()->RandomUniform(0., 1.);
+                  RandomEngine::ThreadLocal()->Uniform(0., 1.);
               // Use a binary search to find the index.
               int left_pointer = 0;
               int right_pointer = num_positive_probs;
