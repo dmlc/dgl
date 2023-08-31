@@ -32,7 +32,9 @@ def test_DataLoader():
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )
     feature_fetcher = dgl.graphbolt.FeatureFetcher(
-        subgraph_sampler, feature_store, keys
+        subgraph_sampler,
+        feature_store,
+        ["a"],
     )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 
