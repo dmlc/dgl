@@ -2,16 +2,67 @@
 
 from collections.abc import Mapping
 from functools import partial
-from typing import Iterator, Optional
+from typing import Callable, Iterator, Optional
 
 from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
+from .data_block import LinkPredictionBlock, NodeClassificationBlock
 from .itemset import ItemSet, ItemSetDict
 
-__all__ = ["MinibatchSampler"]
+__all__ = [
+    "MinibatchSampler",
+    "mapper_node_classification",
+    "mapper_node_classification_hetero",
+]
+
+
+def _mapper_default(batch):
+    """Default mapper.
+    [TODO] This is a temporary solution to be compatible with current cases.
+    It will be deprecated in the near future.
+    """
+    return batch
+
+
+def mapper_node_classification(batch):
+    """Map batch to NodeClassificationBlock for homogeneous graph.
+
+    Parameters
+    ----------
+    batch : tuple
+        A tuple of (seed_nodes, labels).
+
+    Returns
+    -------
+    NodeClassificationBlock
+        A node classification block.
+    """
+    seed_nodes, labels = batch
+    return NodeClassificationBlock(seed_node=seed_nodes, label=labels)
+
+
+def mapper_node_classification_hetero(batch):
+    """Map batch to NodeClassificationBlock for heterogeneous graph.
+
+    Parameters
+    ----------
+    batch : dict
+        A dict of (node_type, (seed_nodes, labels)).
+
+    Returns
+    -------
+    NodeClassificationBlock
+        A node classification block.
+    """
+    seed_nodes = {}
+    labels = {}
+    for node_type, (seed_node, label) in batch.items():
+        seed_nodes[node_type] = seed_node
+        labels[node_type] = label
+    return NodeClassificationBlock(seed_node=seed_nodes, label=labels)
 
 
 class MinibatchSampler(IterDataPipe):
@@ -32,6 +83,8 @@ class MinibatchSampler(IterDataPipe):
         Data to be sampled for mini-batches.
     batch_size : int
         The size of each batch.
+    mapper : callable, optional
+        Map batch to `DataBlock`. Default is `_mapper_default`.
     drop_last : bool
         Option to drop the last batch if it's not full.
     shuffle : bool
@@ -172,12 +225,14 @@ class MinibatchSampler(IterDataPipe):
         self,
         item_set: ItemSet or ItemSetDict,
         batch_size: int,
+        mapper: Optional[Callable] = _mapper_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
     ) -> None:
         super().__init__()
         self._item_set = item_set
         self._batch_size = batch_size
+        self._mapper = mapper
         self._drop_last = drop_last
         self._shuffle = shuffle
 
@@ -216,5 +271,8 @@ class MinibatchSampler(IterDataPipe):
             return default_collate(batch)
 
         data_pipe = data_pipe.collate(collate_fn=partial(_collate))
+
+        # Map to DataBlock.
+        data_pipe = data_pipe.map(self._mapper)
 
         return iter(data_pipe)

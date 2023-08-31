@@ -8,26 +8,39 @@ from torch.testing import assert_close
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSet_node_ids(batch_size, shuffle, drop_last):
+def test_ItemSet_node_ids_labels(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 103
-    item_set = gb.ItemSet(torch.arange(0, num_ids))
+    item_set = gb.ItemSet((torch.arange(0, num_ids), torch.arange(0, num_ids)))
     minibatch_sampler = gb.MinibatchSampler(
-        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+        item_set,
+        batch_size=batch_size,
+        mapper=gb.mapper_node_classification,
+        shuffle=shuffle,
+        drop_last=drop_last,
     )
     minibatch_ids = []
+    minibatch_labels = []
     for i, minibatch in enumerate(minibatch_sampler):
+        seed_node, label = minibatch.seed_node, minibatch.label
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
-            assert len(minibatch) == batch_size
+            assert len(seed_node) == batch_size
+            assert len(label) == batch_size
         else:
             if not drop_last:
-                assert len(minibatch) == num_ids % batch_size
+                assert len(seed_node) == num_ids % batch_size
+                assert len(label) == num_ids % batch_size
             else:
                 assert False
-        minibatch_ids.append(minibatch)
+        minibatch_ids.append(seed_node)
+        minibatch_labels.append(label)
     minibatch_ids = torch.cat(minibatch_ids)
+    minibatch_labels = torch.cat(minibatch_labels)
     assert torch.all(minibatch_ids[:-1] <= minibatch_ids[1:]) is not shuffle
+    assert (
+        torch.all(minibatch_labels[:-1] <= minibatch_labels[1:]) is not shuffle
+    )
 
 
 @pytest.mark.parametrize("batch_size", [1, 4])
@@ -215,22 +228,28 @@ def test_append_with_other_datapipes():
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_ItemSetDict_node_ids(batch_size, shuffle, drop_last):
+def test_ItemSetDict_node_ids_labels(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 205
     ids = {
-        "user": gb.ItemSet(torch.arange(0, 99)),
-        "item": gb.ItemSet(torch.arange(99, num_ids)),
+        "user": gb.ItemSet((torch.arange(0, 99), torch.arange(0, 99))),
+        "item": gb.ItemSet(
+            (torch.arange(99, num_ids), torch.arange(99, num_ids))
+        ),
     }
-    chained_ids = []
-    for key, value in ids.items():
-        chained_ids += [(key, v) for v in value]
     item_set = gb.ItemSetDict(ids)
     minibatch_sampler = gb.MinibatchSampler(
-        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+        item_set,
+        batch_size=batch_size,
+        mapper=gb.mapper_node_classification_hetero,
+        shuffle=shuffle,
+        drop_last=drop_last,
     )
     minibatch_ids = []
+    minibatch_labels = []
     for i, batch in enumerate(minibatch_sampler):
+        seed_node = batch.seed_node
+        label = batch.label
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -239,15 +258,26 @@ def test_ItemSetDict_node_ids(batch_size, shuffle, drop_last):
                 expected_batch_size = num_ids % batch_size
             else:
                 assert False
-        assert isinstance(batch, dict)
+        assert isinstance(seed_node, dict)
+        assert isinstance(label, dict)
         ids = []
-        for _, v in batch.items():
+        for _, v in seed_node.items():
             ids.append(v)
         ids = torch.cat(ids)
         assert len(ids) == expected_batch_size
         minibatch_ids.append(ids)
+        labels = []
+        for _, v in label.items():
+            labels.append(v)
+        labels = torch.cat(labels)
+        assert len(labels) == expected_batch_size
+        minibatch_labels.append(labels)
     minibatch_ids = torch.cat(minibatch_ids)
+    minibatch_labels = torch.cat(minibatch_labels)
     assert torch.all(minibatch_ids[:-1] <= minibatch_ids[1:]) is not shuffle
+    assert (
+        torch.all(minibatch_labels[:-1] <= minibatch_labels[1:]) is not shuffle
+    )
 
 
 @pytest.mark.parametrize("batch_size", [1, 4])
