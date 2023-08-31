@@ -1,8 +1,33 @@
+import re
+
 import dgl
 import pytest
 import torch
 from dgl import graphbolt as gb
 from torch.testing import assert_close
+
+
+def test_ItemSet_names():
+    # ItemSet with single name.
+    item_set = gb.ItemSet(torch.arange(0, 5), names="user")
+    assert item_set.names == ("user",)
+
+    # ItemSet with multiple names.
+    item_set = gb.ItemSet(
+        (torch.arange(0, 5), torch.arange(5, 10)), names=("user", "item")
+    )
+    assert item_set.names == ("user", "item")
+
+    # ItemSet with no name.
+    item_set = gb.ItemSet(torch.arange(0, 5))
+    assert item_set.names is None
+
+    # ItemSet with mismatched items and names.
+    with pytest.raises(
+        AssertionError,
+        match=re.escape("Number of items (1) and names (2) must match."),
+    ):
+        _ = gb.ItemSet(torch.arange(0, 5), names=("user", "item"))
 
 
 def test_ItemSet_valid_length():

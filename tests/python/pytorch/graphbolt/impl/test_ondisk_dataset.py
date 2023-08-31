@@ -61,6 +61,53 @@ def test_OnDiskDataset_TVTSet_exceptions():
             _ = gb.OnDiskDataset(test_dir).load()
 
 
+def test_OnDiskDataset_TVTSet_ItemSet_names():
+    """Test TVTSet which returns ItemSet with IDs, labels and corresponding names."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        train_ids = np.arange(1000)
+        train_ids_path = os.path.join(test_dir, "train_ids.npy")
+        np.save(train_ids_path, train_ids)
+        train_labels = np.random.randint(0, 10, size=1000)
+        train_labels_path = os.path.join(test_dir, "train_labels.npy")
+        np.save(train_labels_path, train_labels)
+
+        yaml_content = f"""
+            tasks:
+              - name: node_classification
+                num_classes: 10
+                train_set:
+                  - type: null
+                    data:
+                      - name: seed_node
+                        format: numpy
+                        in_memory: true
+                        path: {train_ids_path}
+                      - name: label
+                        format: numpy
+                        in_memory: true
+                        path: {train_labels_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {train_labels_path}
+        """
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+
+        # Verify train set.
+        train_set = dataset.tasks[0].train_set
+        assert len(train_set) == 1000
+        assert isinstance(train_set, gb.ItemSet)
+        for i, (id, label, _) in enumerate(train_set):
+            assert id == train_ids[i]
+            assert label == train_labels[i]
+        assert train_set.names == ("seed_node", "label", None)
+        train_set = None
+
+
 def test_OnDiskDataset_TVTSet_ItemSet_id_label():
     """Test TVTSet which returns ItemSet with IDs and labels."""
     with tempfile.TemporaryDirectory() as test_dir:

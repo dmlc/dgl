@@ -47,11 +47,25 @@ class ItemSet:
      (tensor(4), tensor(9), tensor([18, 19]))]
     """
 
-    def __init__(self, items: Iterable or Tuple[Iterable]) -> None:
+    def __init__(
+        self,
+        items: Iterable or Tuple[Iterable],
+        names: str or Tuple[str] = None,
+    ) -> None:
         if isinstance(items, tuple):
             self._items = items
         else:
             self._items = (items,)
+        if names is not None:
+            if isinstance(names, tuple):
+                self._names = names
+            else:
+                self._names = (names,)
+            assert len(self._items) == len(
+                self._names
+            ), f"Number of items ({len(self._items)}) and names ({len(self._names)}) must match."
+        else:
+            self._names = None
 
     def __iter__(self) -> Iterator:
         if len(self._items) == 1:
@@ -67,6 +81,10 @@ class ItemSet:
         raise TypeError(
             f"{type(self).__name__} instance doesn't have valid length."
         )
+
+    @property
+    def names(self) -> Tuple[str]:
+        return self._names
 
 
 class ItemSetDict:

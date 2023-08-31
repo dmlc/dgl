@@ -446,7 +446,8 @@ class OnDiskDataset(Dataset):
                 tuple(
                     read_data(data.path, data.format, data.in_memory)
                     for data in tvt_set[0].data
-                )
+                ),
+                names=tuple(data.name for data in tvt_set[0].data),
             )
         else:
             data = {}
@@ -455,7 +456,8 @@ class OnDiskDataset(Dataset):
                     tuple(
                         read_data(data.path, data.format, data.in_memory)
                         for data in tvt.data
-                    )
+                    ),
+                    names=tuple(data.name for data in tvt.data),
                 )
             ret = ItemSetDict(data)
         return ret
