@@ -22,6 +22,8 @@
 namespace graphbolt {
 namespace sampling {
 
+static const int kPickleVersion = 6199;
+
 CSCSamplingGraph::CSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
@@ -95,6 +97,56 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
   if (type_per_edge_) {
     archive.write("CSCSamplingGraph/type_per_edge", type_per_edge_.value());
   }
+}
+
+void CSCSamplingGraph::SetState(
+    const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
+        state) {
+  // State is a dict of dicts. The tensor-type attributes are stored in the dict
+  // with key "independent_tensors". The dict-type attributes (edge_attributes)
+  // are stored directly with the their name as the key.
+  const auto& independent_tensors = state.at("independent_tensors");
+  TORCH_CHECK(
+      independent_tensors.at("version_number")
+          .equal(torch::tensor({kPickleVersion})),
+      "Version number mismatches when loading pickled CSCSamplingGraph.")
+  indptr_ = independent_tensors.at("indptr");
+  indices_ = independent_tensors.at("indices");
+  if (independent_tensors.find("node_type_offset") !=
+      independent_tensors.end()) {
+    node_type_offset_ = independent_tensors.at("node_type_offset");
+  }
+  if (independent_tensors.find("type_per_edge") != independent_tensors.end()) {
+    type_per_edge_ = independent_tensors.at("type_per_edge");
+  }
+  if (state.find("edge_attributes") != state.end()) {
+    edge_attributes_ = state.at("edge_attributes");
+  }
+}
+
+torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
+CSCSamplingGraph::GetState() const {
+  // State is a dict of dicts. The tensor-type attributes are stored in the dict
+  // with key "independent_tensors". The dict-type attributes (edge_attributes)
+  // are stored directly with the their name as the key.
+  torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> state;
+  torch::Dict<std::string, torch::Tensor> independent_tensors;
+  // Serialization version number. It indicates the serialization method of the
+  // whole state.
+  independent_tensors.insert("version_number", torch::tensor({kPickleVersion}));
+  independent_tensors.insert("indptr", indptr_);
+  independent_tensors.insert("indices", indices_);
+  if (node_type_offset_.has_value()) {
+    independent_tensors.insert("node_type_offset", node_type_offset_.value());
+  }
+  if (type_per_edge_.has_value()) {
+    independent_tensors.insert("type_per_edge", type_per_edge_.value());
+  }
+  state.insert("independent_tensors", independent_tensors);
+  if (edge_attributes_.has_value()) {
+    state.insert("edge_attributes", edge_attributes_.value());
+  }
+  return state;
 }
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
