@@ -10,8 +10,6 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 
-@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-# TODO (peizhou): Will enable windows test once CSCSamplingraph is pickleable.
 def test_DataLoader():
     N = 40
     B = 4

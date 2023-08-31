@@ -35,7 +35,21 @@ TORCH_LIBRARY(graphbolt, m) {
       .def(
           "sample_negative_edges_uniform",
           &CSCSamplingGraph::SampleNegativeEdgesUniform)
-      .def("copy_to_shared_memory", &CSCSamplingGraph::CopyToSharedMemory);
+      .def("copy_to_shared_memory", &CSCSamplingGraph::CopyToSharedMemory)
+      .def_pickle(
+          // __getstate__
+          [](const c10::intrusive_ptr<CSCSamplingGraph>& self)
+              -> torch::Dict<
+                  std::string, torch::Dict<std::string, torch::Tensor>> {
+            return self->GetState();
+          },
+          // __setstate__
+          [](torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
+                 state) -> c10::intrusive_ptr<CSCSamplingGraph> {
+            auto g = c10::make_intrusive<CSCSamplingGraph>();
+            g->SetState(state);
+            return g;
+          });
   m.def("from_csc", &CSCSamplingGraph::FromCSC);
   m.def("load_csc_sampling_graph", &LoadCSCSamplingGraph);
   m.def("save_csc_sampling_graph", &SaveCSCSamplingGraph);
