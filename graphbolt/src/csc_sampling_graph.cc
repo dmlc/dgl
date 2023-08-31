@@ -771,20 +771,12 @@ inline int64_t NonUniformPick(
               double uniform_sample =
                   RandomEngine::ThreadLocal()->Uniform(0., 1.);
               // Use a binary search to find the index.
-              int left_pointer = 0;
-              int right_pointer = num_positive_probs;
-              int mid_pointer;
-              while (right_pointer - left_pointer > 0) {
-                mid_pointer = (left_pointer + right_pointer) / 2;
-                scalar_t prefix_sum_prob = prefix_sum_probs[mid_pointer];
-                if (prefix_sum_prob < uniform_sample) {
-                  left_pointer = mid_pointer + 1;
-                } else {
-                  right_pointer = mid_pointer;
-                }
-                picked_data_ptr[i] =
-                    positive_probs_indices_ptr[left_pointer] + offset;
-              }
+              int sampled_index = std::lower_bound(
+                                      prefix_sum_probs.begin(),
+                                      prefix_sum_probs.end(), uniform_sample) -
+                                  prefix_sum_probs.begin();
+              picked_data_ptr[i] =
+                  positive_probs_indices_ptr[sampled_index] + offset;
             }
           }
         }));
