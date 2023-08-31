@@ -64,7 +64,7 @@ class NeighborSampler(SubgraphSampler):
         >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
-        >>> minibatch_sampler = gb.MinibatchSampler(
+        >>> minibatch_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
         >>> data_block_converter = Mapper(minibatch_sampler, to_link_block)
@@ -175,7 +175,7 @@ class LayerNeighborSampler(NeighborSampler):
         >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
-        >>> minibatch_sampler = gb.MinibatchSampler(
+        >>> minibatch_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
         >>> data_block_converter = Mapper(minibatch_sampler, to_link_block)

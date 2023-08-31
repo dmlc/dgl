@@ -11,17 +11,17 @@ from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
 from .itemset import ItemSet, ItemSetDict
 
-__all__ = ["MinibatchSampler"]
+__all__ = ["ItemSampler"]
 
 
-class MinibatchSampler(IterDataPipe):
+class ItemSampler(IterDataPipe):
     """Minibatch Sampler.
 
     Creates mini-batches of data which could be node/edge IDs, node pairs with
     or without labels, head/tail/negative_tails, DGLGraphs and heterogeneous
     counterparts.
 
-    Note: This class `MinibatchSampler` is not decorated with
+    Note: This class `ItemSampler` is not decorated with
     `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
     does not support function-like call. But any iterable datapipes from
     `torchdata` can be further appended.
@@ -43,7 +43,7 @@ class MinibatchSampler(IterDataPipe):
     >>> import torch
     >>> from dgl import graphbolt as gb
     >>> item_set = gb.ItemSet(torch.arange(0, 10))
-    >>> minibatch_sampler = gb.MinibatchSampler(
+    >>> minibatch_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=True, drop_last=False
     ... )
     >>> list(minibatch_sampler)
@@ -51,7 +51,7 @@ class MinibatchSampler(IterDataPipe):
 
     2. Node pairs.
     >>> item_set = gb.ItemSet((torch.arange(0, 10), torch.arange(10, 20)))
-    >>> minibatch_sampler = gb.MinibatchSampler(
+    >>> minibatch_sampler = gb.ItemSampler(
     ...     item_set, batch_size=4, shuffle=True, drop_last=False
     ... )
     >>> list(minibatch_sampler)
@@ -62,7 +62,7 @@ class MinibatchSampler(IterDataPipe):
     >>> item_set = gb.ItemSet(
     ...     (torch.arange(0, 5), torch.arange(5, 10), torch.arange(10, 15))
     ... )
-    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 3)
+    >>> minibatch_sampler = gb.ItemSampler(item_set, 3)
     >>> list(minibatch_sampler)
     [[tensor([0, 1, 2]), tensor([5, 6, 7]), tensor([10, 11, 12])],
     [tensor([3, 4]), tensor([8, 9]), tensor([13, 14])]]
@@ -72,7 +72,7 @@ class MinibatchSampler(IterDataPipe):
     >>> tails = torch.arange(5, 10)
     >>> negative_tails = torch.stack((heads + 1, heads + 2), dim=-1)
     >>> item_set = gb.ItemSet((heads, tails, negative_tails))
-    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 3)
+    >>> minibatch_sampler = gb.ItemSampler(item_set, 3)
     >>> list(minibatch_sampler)
     [[tensor([0, 1, 2]), tensor([5, 6, 7]),
         tensor([[1, 2], [2, 3], [3, 4]])],
@@ -82,7 +82,7 @@ class MinibatchSampler(IterDataPipe):
     >>> import dgl
     >>> graphs = [ dgl.rand_graph(10, 20) for _ in range(5) ]
     >>> item_set = gb.ItemSet(graphs)
-    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 3)
+    >>> minibatch_sampler = gb.ItemSampler(item_set, 3)
     >>> list(minibatch_sampler)
     [Graph(num_nodes=30, num_edges=60,
       ndata_schemes={}
@@ -94,7 +94,7 @@ class MinibatchSampler(IterDataPipe):
     6. Further process batches with other datapipes such as
     `torchdata.datapipes.iter.Mapper`.
     >>> item_set = gb.ItemSet(torch.arange(0, 10))
-    >>> data_pipe = gb.MinibatchSampler(item_set, 4)
+    >>> data_pipe = gb.ItemSampler(item_set, 4)
     >>> def add_one(batch):
     ...     return batch + 1
     >>> data_pipe = data_pipe.map(add_one)
@@ -107,7 +107,7 @@ class MinibatchSampler(IterDataPipe):
     ...     "item": gb.ItemSet(torch.arange(0, 6)),
     ... }
     >>> item_set = gb.ItemSetDict(ids)
-    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
+    >>> minibatch_sampler = gb.ItemSampler(item_set, 4)
     >>> list(minibatch_sampler)
     [{'user': tensor([0, 1, 2, 3])},
     {'item': tensor([0, 1, 2]), 'user': tensor([4])},
@@ -120,7 +120,7 @@ class MinibatchSampler(IterDataPipe):
     ...     "user:like:item": gb.ItemSet(node_pairs_like),
     ...     "user:follow:user": gb.ItemSet(node_pairs_follow),
     ... })
-    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
+    >>> minibatch_sampler = gb.ItemSampler(item_set, 4)
     >>> list(minibatch_sampler)
     [{"user:like:item": [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3])]},
     {"user:like:item": [tensor([4]), tensor([4])],
@@ -136,7 +136,7 @@ class MinibatchSampler(IterDataPipe):
     ...     "user:like:item": gb.ItemSet(like),
     ...     "user:follow:user": gb.ItemSet(follow),
     ... })
-    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
+    >>> minibatch_sampler = gb.ItemSampler(item_set, 4)
     >>> list(minibatch_sampler)
     [{"user:like:item":
         [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3])]},
@@ -157,7 +157,7 @@ class MinibatchSampler(IterDataPipe):
     ...     "user:like:item": gb.ItemSet(like),
     ...     "user:follow:user": gb.ItemSet(follow),
     ... })
-    >>> minibatch_sampler = gb.MinibatchSampler(item_set, 4)
+    >>> minibatch_sampler = gb.ItemSampler(item_set, 4)
     >>> list(minibatch_sampler)
     [{"user:like:item": [tensor([0, 1, 2, 3]), tensor([0, 1, 2, 3]),
         tensor([[ 5,  6], [ 7,  8], [ 9, 10], [11, 12]])]},
