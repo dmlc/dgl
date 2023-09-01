@@ -44,11 +44,11 @@ class UniformNegativeSampler(NegativeSampler):
         >>> output_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
-        >>> minibatch_sampler = gb.MinibatchSampler(
+        >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...minibatch_sampler, 2, output_format, graph)
+            ...item_sampler, 2, output_format, graph)
         >>> for data in neg_sampler:
             ...  print(data)
             ...
@@ -62,11 +62,11 @@ class UniformNegativeSampler(NegativeSampler):
         >>> output_format = gb.LinkPredictionEdgeFormat.CONDITIONED
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
-        >>> minibatch_sampler = gb.MinibatchSampler(
+        >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...minibatch_sampler, 2, output_format, graph)
+            ...item_sampler, 2, output_format, graph)
         >>> for data in neg_sampler:
             ...  print(data)
             ...
