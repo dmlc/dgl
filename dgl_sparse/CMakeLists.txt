@@ -57,8 +57,19 @@ target_link_directories(${LIB_DGL_SPARSE_NAME} PRIVATE ${DGL_BUILD_DIR} "${DGL_B
 if(DEFINED MKL_LIBRARIES)
   target_link_directories(${LIB_DGL_SPARSE_NAME} PRIVATE ${MKL_ROOT}/lib/${MKL_ARCH})
 endif()
-
-target_link_libraries(${LIB_DGL_SPARSE_NAME} dmlc dgl)
+if (EXTERNAL_DMLC_LIB_PATH)
+   # external dmlc requires OpenMP link
+   include(FindOpenMP)
+   if(OPENMP_FOUND)
+        set(CMAKE_C_FLAGS "${OpenMP_C_FLAGS} ${CMAKE_C_FLAGS}")
+        set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
+   endif(OPENMP_FOUND)	
+   message(STATUS "looking for dmlc library in ${EXTERNAL_DMLC_LIB_PATH}")
+   find_package(dmlc REQUIRED HINTS ${EXTERNAL_DMLC_LIB_PATH})
+   target_link_libraries(${LIB_DGL_SPARSE_NAME} dmlc::dmlc dgl)
+else (EXTERNAL_DMLC_LIB_PATH)
+   target_link_libraries(${LIB_DGL_SPARSE_NAME} dmlc dgl)
+endif()
 set(GOOGLE_TEST 0) # Turn off dmlc-core test
 
 # Configure dgl_sparse library to use C++17 standard for compatibility with PyTorch
