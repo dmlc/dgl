@@ -10,7 +10,7 @@ import torch
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyTo():
-    dp = gb.MinibatchSampler(torch.randn(20), 4)
+    dp = gb.ItemSampler(torch.randn(20), 4)
     dp = gb.CopyTo(dp, "cuda")
 
     for data in dp:
