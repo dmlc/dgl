@@ -34,7 +34,7 @@ class SubgraphSampler(Mapper):
                 minibatch.compacted_node_pair,
                 minibatch.compacted_negative_head,
                 minibatch.compacted_negative_tail,
-            ) = self._link_prediction_preprocess(minibatch)
+            ) = self._node_pair_preprocess(minibatch)
         elif minibatch.seed_node is not None:
             seeds = minibatch.seed_node
         else:
@@ -48,7 +48,7 @@ class SubgraphSampler(Mapper):
         ) = self._sample_subgraphs(seeds)
         return minibatch
 
-    def _link_prediction_preprocess(self, minibatch):
+    def _node_pair_preprocess(self, minibatch):
         node_pair = minibatch.node_pair
         neg_src, neg_dst = minibatch.negative_head, minibatch.negative_tail
         has_neg_src = neg_src is not None

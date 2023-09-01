@@ -53,9 +53,9 @@ class NeighborSampler(SubgraphSampler):
         -------
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
-        >>> def to_link_block(data):
-            ... block = gb.MiniBatch(node_pair=data)
-            ... return block
+        >>> def minibatch_link_collator(data):
+            ... minibatch  = gb.MiniBatch(node_pair=data)
+            ... return minibatch
             ...
         >>> from dgl import graphbolt as gb
         >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
@@ -67,7 +67,8 @@ class NeighborSampler(SubgraphSampler):
         >>> minibatch_sampler = gb.MinibatchSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(minibatch_sampler, to_link_block)
+        >>> data_block_converter = Mapper(minibatch_sampler,
+            ...minibatch_link_collator)
         >>> neg_sampler = gb.UniformNegativeSampler(
             ...data_block_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
@@ -164,9 +165,9 @@ class LayerNeighborSampler(NeighborSampler):
         -------
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
-        >>> def to_link_block(data):
-            ... block = gb.MiniBatch(node_pair=data)
-            ... return block
+        >>> def minibatch_link_collator(data):
+            ... minibatch  = gb.MiniBatch(node_pair=data)
+            ... return minibatch
             ...
         >>> from dgl import graphbolt as gb
         >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
@@ -178,7 +179,8 @@ class LayerNeighborSampler(NeighborSampler):
         >>> minibatch_sampler = gb.MinibatchSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(minibatch_sampler, to_link_block)
+        >>> data_block_converter = Mapper(minibatch_sampler,
+            ...minibatch_link_collator)
         >>> neg_sampler = gb.UniformNegativeSampler(
             ...data_block_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),

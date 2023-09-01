@@ -20,7 +20,9 @@ def test_DataLoader():
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
     minibatch_sampler = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
-    block_converter = Mapper(minibatch_sampler, gb_test_utils.to_node_minibatch)
+    block_converter = Mapper(
+        minibatch_sampler, gb_test_utils.minibatch_node_collator
+    )
     subgraph_sampler = dgl.graphbolt.NeighborSampler(
         block_converter,
         graph,

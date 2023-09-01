@@ -8,12 +8,12 @@ import scipy.sparse as sp
 import torch
 
 
-def to_node_minibatch(data):
+def minibatch_node_collator(data):
     minibatch = gb.MiniBatch(seed_node=data)
     return minibatch
 
 
-def to_link_minibatch(data):
+def minibatch_link_collator(data):
     minibatch = gb.MiniBatch(node_pair=data)
     return minibatch
 

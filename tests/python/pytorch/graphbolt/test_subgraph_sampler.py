@@ -13,7 +13,9 @@ def test_SubgraphSampler_Node(labor):
     minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_node_minibatch)
+    data_block_converter = Mapper(
+        minibatch_dp, gb_test_utils.minibatch_node_collator
+    )
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     sampler_dp = Sampler(data_block_converter, graph, fanouts)
     assert len(list(sampler_dp)) == 5
@@ -36,7 +38,9 @@ def test_SubgraphSampler_Link(labor):
     minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_link_minibatch)
+    data_block_converter = Mapper(
+        minibatch_dp, gb_test_utils.minibatch_link_collator
+    )
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(data_block_converter, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
@@ -63,7 +67,9 @@ def test_SubgraphSampler_Link_With_Negative(format, labor):
     minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_link_minibatch)
+    data_block_converter = Mapper(
+        minibatch_dp, gb_test_utils.minibatch_link_collator
+    )
     negative_dp = gb.UniformNegativeSampler(
         data_block_converter, 1, format, graph
     )
@@ -117,7 +123,9 @@ def test_SubgraphSampler_Link_Hetero(labor):
     minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_link_minibatch)
+    data_block_converter = Mapper(
+        minibatch_dp, gb_test_utils.minibatch_link_collator
+    )
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(data_block_converter, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
@@ -155,7 +163,9 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(format, labor):
     minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_link_minibatch)
+    data_block_converter = Mapper(
+        minibatch_dp, gb_test_utils.minibatch_link_collator
+    )
     negative_dp = gb.UniformNegativeSampler(
         data_block_converter, 1, format, graph
     )
