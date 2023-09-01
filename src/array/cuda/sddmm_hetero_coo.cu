@@ -48,7 +48,6 @@ template void SDDMMCooHetero<kDGLCUDA, int64_t, __half>(
     const std::vector<NDArray>& rhs, std::vector<NDArray> out, int lhs_target,
     int rhs_target, const std::vector<dgl_type_t>& in_eid,
     const std::vector<dgl_type_t>& out_eid);
-#if BF16_ENABLED
 template void SDDMMCooHetero<kDGLCUDA, int32_t, __nv_bfloat16>(
     const std::string& op, const BcastOff& bcast,
     const std::vector<COOMatrix>& vec_coo, const std::vector<NDArray>& lhs,
@@ -61,7 +60,6 @@ template void SDDMMCooHetero<kDGLCUDA, int64_t, __nv_bfloat16>(
     const std::vector<NDArray>& rhs, std::vector<NDArray> out, int lhs_target,
     int rhs_target, const std::vector<dgl_type_t>& in_eid,
     const std::vector<dgl_type_t>& out_eid);
-#endif  // BF16_ENABLED
 template void SDDMMCooHetero<kDGLCUDA, int32_t, float>(
     const std::string& op, const BcastOff& bcast,
     const std::vector<COOMatrix>& vec_coo, const std::vector<NDArray>& lhs,

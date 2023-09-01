@@ -171,7 +171,6 @@ __global__ void _LinearSearchKernel(
   }
 }
 
-#if BF16_ENABLED
 /**
  * @brief Specialization for bf16 because conversion from long long to bfloat16
  * doesn't exist before SM80.
@@ -204,7 +203,6 @@ __global__ void _LinearSearchKernel(
     tx += stride_x;
   }
 }
-#endif  // BF16_ENABLED
 
 template <typename DType>
 inline DType GetCUDAScalar(

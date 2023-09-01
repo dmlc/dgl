@@ -28,169 +28,15 @@ namespace aten {
  */
 template <typename DType, typename IdType>
 inline bool cusparse_available(bool more_nnz_than_matrix_size) {
-#if CUDART_VERSION < 11000
-  if (std::is_same<IdType, int>::value &&
-      (std::is_same<DType, float>::value || std::is_same<DType, double>::value))
-    return true;
-  return false;
-#else
   if (std::is_same<DType, __half>::value ||
       std::is_same<DType, __nv_bfloat16>::value)
     return false;  // cusparse's SpMM on fp16 is slow, temporally disabled.
   // If the CSR matrix has more NNZ than matrix size, we should not use
   // cuSPARSE 11.1.
   return !more_nnz_than_matrix_size;
-#endif
 }
 
 namespace {
-
-/** @brief Call cuBLAS geam API for transpose operation for float and double. */
-template <typename DType>
-cublasStatus_t Xgeam(
-    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
-    int m, int n, const DType* alpha, const DType* A, int lda,
-    const DType* beta, const DType* B, int ldb, DType* C, int ldc) {
-  LOG(FATAL) << "Not supported dtype";
-  return CUBLAS_STATUS_EXECUTION_FAILED;
-}
-
-template <>
-cublasStatus_t Xgeam<__half>(
-    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
-    int m, int n, const __half* alpha, const __half* A, int lda,
-    const __half* beta, const __half* B, int ldb, __half* C, int ldc) {
-  // TODO(ndickson): There is no cublasHgeam, so a different
-  // implementation would be required.
-  LOG(FATAL) << "Xgeam does not support dtype half (FP16)";
-  return CUBLAS_STATUS_EXECUTION_FAILED;
-}
-
-#if BF16_ENABLED
-template <>
-cublasStatus_t Xgeam<__nv_bfloat16>(
-    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
-    int m, int n, const __nv_bfloat16* alpha, const __nv_bfloat16* A, int lda,
-    const __nv_bfloat16* beta, const __nv_bfloat16* B, int ldb,
-    __nv_bfloat16* C, int ldc) {
-  // TODO(ndickson): There is no cublasHgeam, so a different
-  // implementation would be required.
-  LOG(FATAL) << "Xgeam does not support dtype bfloat16 (BF16)";
-  return CUBLAS_STATUS_EXECUTION_FAILED;
-}
-#endif  // BF16_ENABLED
-
-template <>
-cublasStatus_t Xgeam<float>(
-    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
-    int m, int n, const float* alpha, const float* A, int lda,
-    const float* beta, const float* B, int ldb, float* C, int ldc) {
-  return cublasSgeam(
-      handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
-}
-
-template <>
-cublasStatus_t Xgeam<double>(
-    cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
-    int m, int n, const double* alpha, const double* A, int lda,
-    const double* beta, const double* B, int ldb, double* C, int ldc) {
-  return cublasDgeam(
-      handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
-}
-
-/**
- * @brief Transpose operator kernel implementation.
- * @note not efficient but it's not a bottleneck, used for float16 dtype.
- */
-template <typename DType>
-__global__ void _TransposeKernel(
-    const DType* __restrict__ in, DType* __restrict__ out, int n, int m) {
-  int i = blockIdx.x;
-  for (int j = threadIdx.x; j < m; j += blockDim.x)
-    out[i * m + j] = in[j * n + i];
-}
-
-/**
- * @brief Tranpose the input matrix.
- * @param row number of rows of input matrix.
- * @param col number of columns of input matrix.
- */
-template <typename DType>
-void _Transpose(const DType* in, DType* out, int row, int col) {
-  DType alpha = 1., beta = 0.;
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-  cudaStream_t stream = runtime::getCurrentCUDAStream();
-  if (!thr_entry->cublas_handle)
-    CUBLAS_CALL(cublasCreate(&(thr_entry->cublas_handle)));
-  CUBLAS_CALL(cublasSetStream(thr_entry->cublas_handle, stream));
-  CUBLAS_CALL(Xgeam<DType>(
-      thr_entry->cublas_handle, CUBLAS_OP_T, CUBLAS_OP_N, row, col, &alpha, in,
-      col, &beta, nullptr, row, out, row));
-}
-
-/**
- * @brief Tranpose the input matrix for data type half.
- * @note cuBLAS has no geam API for half data type, fallback to our kernel.
- */
-template <>
-void _Transpose<__half>(const __half* in, __half* out, int row, int col) {
-  cudaStream_t stream = runtime::getCurrentCUDAStream();
-  int nt = FindNumThreads(row);
-  int nb = col;
-  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, stream, in, out, col, row);
-}
-
-#if BF16_ENABLED
-/**
- * @brief Tranpose the input matrix for data type half.
- * @note cuBLAS has no geam API for bf16 data type, fallback to our kernel.
- */
-template <>
-void _Transpose<__nv_bfloat16>(
-    const __nv_bfloat16* in, __nv_bfloat16* out, int row, int col) {
-  cudaStream_t stream = runtime::getCurrentCUDAStream();
-  int nt = FindNumThreads(row);
-  int nb = col;
-  CUDA_KERNEL_CALL(_TransposeKernel, nb, nt, 0, stream, in, out, col, row);
-}
-#endif  // BF16_ENABLED
-
-#if CUDART_VERSION < 11000
-template <typename DType>
-cusparseStatus_t Xcsrmm2(
-    cusparseHandle_t handle, cusparseOperation_t transA,
-    cusparseOperation_t transB, int m, int n, int k, int nnz,
-    const DType* alpha, const cusparseMatDescr_t descrA, const DType* csrValA,
-    const int* csrRowPtrA, const int* csrColIndA, const DType* B, int ldb,
-    const DType* beta, DType* C, int ldc) {
-  LOG(INFO) << "Not supported dtype";
-  return CUSPARSE_STATUS_EXECUTION_FAILED;
-}
-
-template <>
-cusparseStatus_t Xcsrmm2<float>(
-    cusparseHandle_t handle, cusparseOperation_t transA,
-    cusparseOperation_t transB, int m, int n, int k, int nnz,
-    const float* alpha, const cusparseMatDescr_t descrA, const float* csrValA,
-    const int* csrRowPtrA, const int* csrColIndA, const float* B, int ldb,
-    const float* beta, float* C, int ldc) {
-  return cusparseScsrmm2(
-      handle, transA, transB, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA,
-      csrColIndA, B, ldb, beta, C, ldc);
-}
-
-template <>
-cusparseStatus_t Xcsrmm2<double>(
-    cusparseHandle_t handle, cusparseOperation_t transA,
-    cusparseOperation_t transB, int m, int n, int k, int nnz,
-    const double* alpha, const cusparseMatDescr_t descrA, const double* csrValA,
-    const int* csrRowPtrA, const int* csrColIndA, const double* B, int ldb,
-    const double* beta, double* C, int ldc) {
-  return cusparseDcsrmm2(
-      handle, transA, transB, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA,
-      csrColIndA, B, ldb, beta, C, ldc);
-}
-#endif
 
 /** Cusparse implementation of SpMM on Csr format. */
 template <typename DType, typename IdType>
@@ -226,7 +72,6 @@ void CusparseCsrmm2(
         static_cast<DType*>(device->AllocWorkspace(ctx, nnz * sizeof(DType)));
     _Fill(valptr, nnz, static_cast<DType>(1.));
   }
-#if CUDART_VERSION >= 11000
   cusparseSpMatDescr_t matA;
   cusparseDnMatDescr_t matB, matC;
   constexpr auto dtype = cuda_dtype<DType>::value;
@@ -256,26 +101,6 @@ void CusparseCsrmm2(
   CUSPARSE_CALL(cusparseDestroySpMat(matA));
   CUSPARSE_CALL(cusparseDestroyDnMat(matB));
   CUSPARSE_CALL(cusparseDestroyDnMat(matC));
-#else
-  // allocate matrix for temporary transposed output
-  DType* trans_out =
-      static_cast<DType*>(device->AllocWorkspace(ctx, m * n * sizeof(DType)));
-
-  cusparseMatDescr_t descr;
-  CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
-  CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
-  CUSPARSE_CALL(cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO));
-  CUSPARSE_CALL(Xcsrmm2<DType>(
-      thr_entry->cusparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-      CUSPARSE_OPERATION_TRANSPOSE, m, n, k, nnz, &alpha, descr,
-      (valptr) ? valptr : A_data, static_cast<int32_t*>(csr.indptr->data),
-      static_cast<int32_t*>(csr.indices->data), B_data, n, &beta, trans_out,
-      m));
-  CUSPARSE_CALL(cusparseDestroyMatDescr(descr));
-  // transpose the output matrix
-  _Transpose(trans_out, C_data, n, m);
-  device->FreeWorkspace(ctx, trans_out);
-#endif
   if (valptr) device->FreeWorkspace(ctx, valptr);
 }
 
@@ -317,7 +142,6 @@ void CusparseCsrmm2Hetero(
         static_cast<DType*>(device->AllocWorkspace(ctx, nnz * sizeof(DType)));
     _Fill(valptr, nnz, static_cast<DType>(1.));
   }
-#if CUDART_VERSION >= 11000
   cusparseSpMatDescr_t matA;
   cusparseDnMatDescr_t matB, matC;
   constexpr auto dtype = cuda_dtype<DType>::value;
@@ -347,19 +171,6 @@ void CusparseCsrmm2Hetero(
   CUSPARSE_CALL(cusparseDestroySpMat(matA));
   CUSPARSE_CALL(cusparseDestroyDnMat(matB));
   CUSPARSE_CALL(cusparseDestroyDnMat(matC));
-#else
-  cusparseMatDescr_t descr;
-  CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
-  CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
-  CUSPARSE_CALL(cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO));
-  CHECK_EQ(sizeof(IdType), sizeof(int32_t));
-  CUSPARSE_CALL(Xcsrmm2<DType>(
-      thr_entry->cusparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-      CUSPARSE_OPERATION_TRANSPOSE, m, n, k, nnz, &alpha, descr,
-      (valptr) ? valptr : A_data, static_cast<int32_t*>(csr.indptr->data),
-      static_cast<int32_t*>(csr.indices->data), B_data, n, &beta, C_data, m));
-  CUSPARSE_CALL(cusparseDestroyMatDescr(descr));
-#endif
   if (valptr) device->FreeWorkspace(ctx, valptr);
 }
 
@@ -562,8 +373,8 @@ __global__ void SpMMCmpCsrHeteroKernel(
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     while (tx < out_len) {
       using accum_type = typename accum_dtype<DType>::type;
-      accum_type local_accum = static_cast<accum_type>(
-          out[ty * out_len + tx]);  // ReduceOp::zero();
+      accum_type local_accum =
+          static_cast<accum_type>(out[ty * out_len + tx]);  // ReduceOp::zero();
       Idx local_argu = 0, local_arge = 0;
       const int lhs_add = UseBcast ? ubcast_off[tx] : tx;
       const int rhs_add = UseBcast ? ebcast_off[tx] : tx;
@@ -620,15 +431,11 @@ void SpMMCoo(
     NDArray out, NDArray argu, NDArray arge) {
   /**
    * TODO(Xin): Disable half precision for SpMMCoo due to the round-off error.
-   * We should use fp32 for the accumulation but it's hard to modify the 
+   * We should use fp32 for the accumulation but it's hard to modify the
    * current implementation.
    */
-#if BF16_ENABLED
   if (std::is_same<DType, __half>::value ||
       std::is_same<DType, __nv_bfloat16>::value)
-#else
-  if (std::is_same<DType, __half>::value)
-#endif  // BF16_ENABLED
     LOG(FATAL) << "SpMMCoo doesn't support half precision fow now. "
                << "Please use SpMMCsr instead by allowing the graph "
                << "materialize CSR/CSC formats.";

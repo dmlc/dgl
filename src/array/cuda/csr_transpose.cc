@@ -48,7 +48,6 @@ CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
   int32_t* t_indices_ptr = static_cast<int32_t*>(t_indices->data);
   void* t_data_ptr = t_data->data;
 
-#if CUDART_VERSION >= 10010
   auto device = runtime::DeviceAPI::Get(csr.indptr->ctx);
   // workspace
   size_t workspace_size;
@@ -66,13 +65,6 @@ CSRMatrix CSRTranspose<kDGLCUDA, int32_t>(CSRMatrix csr) {
       CUSPARSE_CSR2CSC_ALG1,  // see cusparse doc for reference
       workspace));
   device->FreeWorkspace(ctx, workspace);
-#else
-  CUSPARSE_CALL(cusparseScsr2csc(
-      thr_entry->cusparse_handle, csr.num_rows, csr.num_cols, nnz,
-      static_cast<const float*>(data_ptr), indptr_ptr, indices_ptr,
-      static_cast<float*>(t_data_ptr), t_indices_ptr, t_indptr_ptr,
-      CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO));
-#endif
 
   return CSRMatrix(
       csr.num_cols, csr.num_rows, t_indptr, t_indices, t_data, false);

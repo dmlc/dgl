@@ -47,14 +47,12 @@ template void SDDMMCsr<kDGLCUDA, int32_t, __half>(
 template void SDDMMCsr<kDGLCUDA, int64_t, __half>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);
-#if BF16_ENABLED
 template void SDDMMCsr<kDGLCUDA, int32_t, __nv_bfloat16>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);
 template void SDDMMCsr<kDGLCUDA, int64_t, __nv_bfloat16>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);
-#endif  // BF16_ENABLED
 template void SDDMMCsr<kDGLCUDA, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const CSRMatrix& csr,
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);
@@ -74,14 +72,12 @@ template void SDDMMCoo<kDGLCUDA, int32_t, __half>(
 template void SDDMMCoo<kDGLCUDA, int64_t, __half>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);
-#if BF16_ENABLED
 template void SDDMMCoo<kDGLCUDA, int32_t, __nv_bfloat16>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);
 template void SDDMMCoo<kDGLCUDA, int64_t, __nv_bfloat16>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);
-#endif  // BF16_ENABLED
 template void SDDMMCoo<kDGLCUDA, int32_t, float>(
     const std::string& op, const BcastOff& bcast, const COOMatrix& coo,
     NDArray lhs, NDArray rhs, NDArray out, int lhs_target, int rhs_target);

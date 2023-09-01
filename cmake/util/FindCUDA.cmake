@@ -27,6 +27,9 @@ macro(find_cuda use_cuda)
 
   # additional libraries
   if(CUDA_FOUND)
+    if(CUDA_VERSION_MAJOR LESS 11)
+      message(FATAL_ERROR "DGL requires at least CUDA 11.")
+    endif()
     if(MSVC)
       find_library(CUDA_CUDA_LIBRARY cuda
         ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64
