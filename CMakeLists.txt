@@ -125,9 +125,7 @@ if (EXTERNAL_DLPACK_PATH OR EXTERNAL_DMLC_PATH OR EXTERNAL_NANOFLANN_PATH OR EXT
   if (BUILD_CPP_TEST)
     message(FATAL_ERROR "Cannot build cpp unittests with external libraries")
   endif(BUILD_CPP_TEST)
-
 endif()
-
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
