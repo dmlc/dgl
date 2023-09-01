@@ -18,7 +18,7 @@
 namespace graphbolt {
 namespace sampling {
 
-static std::string GetSharedMemoryMetaName(const std::string& name) {
+static std::string GetSharedMemoryMetadataName(const std::string& name) {
   return name + "_meta";
 }
 
@@ -27,29 +27,30 @@ static std::string GetSharedMemoryDataName(const std::string& name) {
 }
 
 // To avoid unaligned memory access, we round the size of the binary buffer to
-// the nearest multiple of 256 bytes.
+// the nearest multiple of 8 bytes.
 inline static int64_t GetRoundedSize(int64_t size) {
   constexpr int64_t ALIGNED_SIZE = 8;
   return (size + ALIGNED_SIZE - 1) / ALIGNED_SIZE * ALIGNED_SIZE;
 }
 
 SharedMemoryHelper::SharedMemoryHelper(
-    const std::string& name, int64_t max_meta_memory_size, bool is_creator)
+    const std::string& name, bool is_creator, int64_t max_metadata_size)
     : name_(name),
-      max_meta_memory_size_(max_meta_memory_size),
       is_creator_(is_creator),
-      meta_shared_memory_(nullptr),
+      max_metadata_size_(max_metadata_size),
+      metadata_shared_memory_(nullptr),
       data_shared_memory_(nullptr),
-      meta_offset_(0),
+      metadata_offset_(0),
       data_offset_(0) {
   if (!is_creator) {
     // The reader process opens the shared memory objects created by the writer
     // process and reads data directly.
-    meta_shared_memory_ =
-        std::make_unique<SharedMemory>(GetSharedMemoryMetaName(name_));
-    meta_shared_memory_->Open(max_meta_memory_size_);
-    auto first_archive = this->ReadTorchArchive();
-    int64_t data_size = read_from_archive(first_archive, "data_size").toInt();
+    metadata_shared_memory_ =
+        std::make_unique<SharedMemory>(GetSharedMemoryMetadataName(name_));
+    metadata_shared_memory_->Open(max_metadata_size_);
+
+    auto archive = this->ReadTorchArchive();
+    int64_t data_size = read_from_archive(archive, "data_size").toInt();
     data_shared_memory_ =
         std::make_unique<SharedMemory>(GetSharedMemoryDataName(name_));
     data_shared_memory_->Open(data_size);
@@ -58,17 +59,17 @@ SharedMemoryHelper::SharedMemoryHelper(
 
 void SharedMemoryHelper::WriteTorchArchive(
     torch::serialize::OutputArchive&& archive) {
-  meta_to_write_.emplace_back(std::move(archive));
+  metadata_to_write_.emplace_back(std::move(archive));
 }
 
 torch::serialize::InputArchive SharedMemoryHelper::ReadTorchArchive() {
-  auto meta_ptr = this->GetCurrentMetaPtr();
-  int64_t meta_size = static_cast<int64_t*>(meta_ptr)[0];
+  auto metadata_ptr = this->GetCurrentMetadataPtr();
+  int64_t metadata_size = static_cast<int64_t*>(metadata_ptr)[0];
   torch::serialize::InputArchive archive;
   archive.load_from(
-      static_cast<const char*>(meta_ptr) + sizeof(int64_t), meta_size);
-  auto rounded_size = GetRoundedSize(meta_size);
-  this->MoveMetaPtr(sizeof(int64_t) + rounded_size);
+      static_cast<const char*>(metadata_ptr) + sizeof(int64_t), metadata_size);
+  auto rounded_size = GetRoundedSize(metadata_size);
+  this->MoveMetadataPtr(sizeof(int64_t) + rounded_size);
   return archive;
 }
 
@@ -145,13 +146,13 @@ void SharedMemoryHelper::WriteTorchArchiveInternal(
   std::stringstream serialized;
   archive.save_to(serialized);
   auto serialized_str = serialized.str();
-  auto meta_ptr = this->GetCurrentMetaPtr();
-  static_cast<int64_t*>(meta_ptr)[0] = serialized_str.size();
+  auto metadata_ptr = this->GetCurrentMetadataPtr();
+  static_cast<int64_t*>(metadata_ptr)[0] = serialized_str.size();
   memcpy(
-      static_cast<char*>(meta_ptr) + sizeof(int64_t), serialized_str.data(),
+      static_cast<char*>(metadata_ptr) + sizeof(int64_t), serialized_str.data(),
       serialized_str.size());
   int64_t rounded_size = GetRoundedSize(serialized_str.size());
-  this->MoveMetaPtr(sizeof(int64_t) + rounded_size);
+  this->MoveMetadataPtr(sizeof(int64_t) + rounded_size);
 }
 
 void SharedMemoryHelper::WriteTorchTensorInternal(
@@ -167,7 +168,7 @@ void SharedMemoryHelper::WriteTorchTensorInternal(
 
 void SharedMemoryHelper::Flush() {
   // The first archive records the size of the tensor data.
-  torch::serialize::OutputArchive first_archive;
+  torch::serialize::OutputArchive archive;
   size_t data_size = 0;
   for (auto tensor : tensors_to_write_) {
     if (tensor.has_value()) {
@@ -175,15 +176,16 @@ void SharedMemoryHelper::Flush() {
       data_size += GetRoundedSize(tensor_size);
     }
   }
-  first_archive.write("data_size", static_cast<int64_t>(data_size));
-  meta_shared_memory_ =
-      std::make_unique<SharedMemory>(GetSharedMemoryMetaName(name_));
-  meta_shared_memory_->Create(max_meta_memory_size_);
-  meta_offset_ = 0;
-  this->WriteTorchArchiveInternal(first_archive);
-  for (auto& archive : meta_to_write_) {
+  archive.write("data_size", static_cast<int64_t>(data_size));
+  metadata_shared_memory_ =
+      std::make_unique<SharedMemory>(GetSharedMemoryMetadataName(name_));
+  metadata_shared_memory_->Create(max_metadata_size_);
+  metadata_offset_ = 0;
+  this->WriteTorchArchiveInternal(archive);
+  for (auto& archive : metadata_to_write_) {
     this->WriteTorchArchiveInternal(archive);
   }
+
   data_shared_memory_ =
       std::make_unique<SharedMemory>(GetSharedMemoryDataName(name_));
   data_shared_memory_->Create(data_size);
@@ -191,10 +193,10 @@ void SharedMemoryHelper::Flush() {
   for (auto tensor : tensors_to_write_) {
     this->WriteTorchTensorInternal(tensor);
   }
-  meta_to_write_.clear();
+  metadata_to_write_.clear();
   tensors_to_write_.clear();
 
-  meta_offset_ = 0;
+  metadata_offset_ = 0;
   // Skip the first archive recording data size before read.
   this->ReadTorchArchive();
   data_offset_ = 0;
@@ -203,7 +205,7 @@ void SharedMemoryHelper::Flush() {
 std::pair<SharedMemoryPtr, SharedMemoryPtr>
 SharedMemoryHelper::ReleaseSharedMemory() {
   return std::make_pair(
-      std::move(meta_shared_memory_), std::move(data_shared_memory_));
+      std::move(metadata_shared_memory_), std::move(data_shared_memory_));
 }
 
 }  // namespace sampling
