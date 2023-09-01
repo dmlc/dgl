@@ -34,6 +34,7 @@ dgl_option(
     python3
 )
 
+# Conda build related options.
 dgl_option(EXTERNAL_DLPACK_PATH "Path to external dlpack" OFF)
 dgl_option(EXTERNAL_DMLC_PATH "Path to external dmlc-core" OFF)
 dgl_option(EXTERNAL_DMLC_LIB_PATH "Path to external dmlc-core library" OFF)
