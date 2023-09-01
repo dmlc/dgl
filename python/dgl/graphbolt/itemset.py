@@ -47,11 +47,26 @@ class ItemSet:
      (tensor(4), tensor(9), tensor([18, 19]))]
     """
 
-    def __init__(self, items: Iterable or Tuple[Iterable]) -> None:
+    def __init__(
+        self,
+        items: Iterable or Tuple[Iterable],
+        names: str or Tuple[str] = None,
+    ) -> None:
         if isinstance(items, tuple):
             self._items = items
         else:
             self._items = (items,)
+        if names is not None:
+            if isinstance(names, tuple):
+                self._names = names
+            else:
+                self._names = (names,)
+            assert len(self._items) == len(self._names), (
+                f"Number of items ({len(self._items)}) and "
+                f"names ({len(self._names)}) must match."
+            )
+        else:
+            self._names = None
 
     def __iter__(self) -> Iterator:
         if len(self._items) == 1:
@@ -67,6 +82,11 @@ class ItemSet:
         raise TypeError(
             f"{type(self).__name__} instance doesn't have valid length."
         )
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
 
 
 class ItemSetDict:
@@ -100,14 +120,14 @@ class ItemSetDict:
     >>> node_pairs_like = (torch.arange(0, 2), torch.arange(0, 2))
     >>> node_pairs_follow = (torch.arange(0, 3), torch.arange(3, 6))
     >>> item_set = gb.ItemSetDict({
-    ...     ('user', 'like', 'item'): gb.ItemSet(node_pairs_like),
-    ...     ('user', 'follow', 'user'): gb.ItemSet(node_pairs_follow)})
+    ...     "user:like:item": gb.ItemSet(node_pairs_like),
+    ...     "user:follow:user": gb.ItemSet(node_pairs_follow)})
     >>> list(item_set)
-    [{('user', 'like', 'item'): (tensor(0), tensor(0))},
-     {('user', 'like', 'item'): (tensor(1), tensor(1))},
-     {('user', 'follow', 'user'): (tensor(0), tensor(3))},
-     {('user', 'follow', 'user'): (tensor(1), tensor(4))},
-     {('user', 'follow', 'user'): (tensor(2), tensor(5))}]
+    [{"user:like:item": (tensor(0), tensor(0))},
+     {"user:like:item": (tensor(1), tensor(1))},
+     {"user:follow:user": (tensor(0), tensor(3))},
+     {"user:follow:user": (tensor(1), tensor(4))},
+     {"user:follow:user": (tensor(2), tensor(5))}]
 
     3. Tuple of iterables with different shape.
     >>> like = (torch.arange(0, 2), torch.arange(0, 2),
@@ -115,18 +135,22 @@ class ItemSetDict:
     >>> follow = (torch.arange(0, 3), torch.arange(3, 6),
     ...     torch.arange(0, 6).reshape(-1, 2))
     >>> item_set = gb.ItemSetDict({
-    ...     ('user', 'like', 'item'): gb.ItemSet(like),
-    ...     ('user', 'follow', 'user'): gb.ItemSet(follow)})
+    ...     "user:like:item": gb.ItemSet(like),
+    ...     "user:follow:user": gb.ItemSet(follow)})
     >>> list(item_set)
-    [{('user', 'like', 'item'): (tensor(0), tensor(0), tensor([0, 1]))},
-     {('user', 'like', 'item'): (tensor(1), tensor(1), tensor([2, 3]))},
-     {('user', 'follow', 'user'): (tensor(0), tensor(3), tensor([0, 1]))},
-     {('user', 'follow', 'user'): (tensor(1), tensor(4), tensor([2, 3]))},
-     {('user', 'follow', 'user'): (tensor(2), tensor(5), tensor([4, 5]))}]
+    [{"user:like:item": (tensor(0), tensor(0), tensor([0, 1]))},
+     {"user:like:item": (tensor(1), tensor(1), tensor([2, 3]))},
+     {"user:follow:user": (tensor(0), tensor(3), tensor([0, 1]))},
+     {"user:follow:user": (tensor(1), tensor(4), tensor([2, 3]))},
+     {"user:follow:user": (tensor(2), tensor(5), tensor([4, 5]))}]
     """
 
     def __init__(self, itemsets: Dict[str, ItemSet]) -> None:
         self._itemsets = itemsets
+        self._names = itemsets[list(itemsets.keys())[0]].names
+        assert all(
+            self._names == itemset.names for itemset in itemsets.values()
+        ), "All itemsets must have the same names."
 
     def __iter__(self) -> Iterator:
         for key, itemset in self._itemsets.items():
@@ -135,3 +159,8 @@ class ItemSetDict:
 
     def __len__(self) -> int:
         return sum(len(itemset) for itemset in self._itemsets.values())
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names

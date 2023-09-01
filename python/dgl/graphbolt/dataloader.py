@@ -4,10 +4,10 @@ import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
 
-from .datapipe_utils import datapipe_graph_to_adjlist
 from .feature_fetcher import FeatureFetcher
+from .item_sampler import ItemSampler
 
-from .minibatch_sampler import MinibatchSampler
+from .utils import datapipe_graph_to_adjlist
 
 
 class SingleProcessDataLoader(torch.utils.data.DataLoader):
@@ -26,7 +26,7 @@ class SingleProcessDataLoader(torch.utils.data.DataLoader):
     # dataloader as-is.
     #
     # The exception is that batch_size should be None, since we already
-    # have minibatch sampling and collating in MinibatchSampler.
+    # have minibatch sampling and collating in ItemSampler.
     def __init__(self, datapipe):
         super().__init__(datapipe, batch_size=None, num_workers=0)
 
@@ -77,7 +77,7 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
     def __init__(self, datapipe, num_workers=0):
         # Multiprocessing requires two modifications to the datapipe:
         #
-        # 1. Insert a stage after MinibatchSampler to distribute the
+        # 1. Insert a stage after ItemSampler to distribute the
         #    minibatches evenly across processes.
         # 2. Cut the datapipe at FeatureFetcher, and wrap the inner datapipe
         #    of the FeatureFetcher with a multiprocessing PyTorch DataLoader.
@@ -88,16 +88,16 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
         # (1) Insert minibatch distribution.
         # TODO(BarclayII): Currently I'm using sharding_filter() as a
         # concept demonstration. Later on minibatch distribution should be
-        # merged into MinibatchSampler to maximize efficiency.
-        minibatch_samplers = dp_utils.find_dps(
+        # merged into ItemSampler to maximize efficiency.
+        item_samplers = dp_utils.find_dps(
             datapipe_graph,
-            MinibatchSampler,
+            ItemSampler,
         )
-        for minibatch_sampler in minibatch_samplers:
+        for item_sampler in item_samplers:
             datapipe_graph = dp_utils.replace_dp(
                 datapipe_graph,
-                minibatch_sampler,
-                minibatch_sampler.sharding_filter(),
+                item_sampler,
+                item_sampler.sharding_filter(),
             )
 
         # (2) Cut datapipe at FeatureFetcher and wrap.

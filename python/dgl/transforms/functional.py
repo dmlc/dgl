@@ -22,7 +22,8 @@ from collections.abc import Iterable, Mapping
 import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
-from packaging.version import Version
+
+from ..utils import version
 
 try:
     import torch as th
@@ -3592,7 +3593,7 @@ def random_walk_pe(g, k, eweight_name=None):
         )
         A = A.multiply(W)
     # 1-step transition probability
-    if Version(scipy.__version__) < Version("1.11.0"):
+    if version.parse(scipy.__version__) < version.parse("1.11.0"):
         RW = np.array(A / (A.sum(1) + 1e-30))
     else:
         # Sparse matrix divided by a dense array returns a sparse matrix in
@@ -3680,13 +3681,26 @@ def lap_pe(g, k, padding=False, return_eigval=False):
     L = sparse.eye(g.num_nodes()) - N * A * N
 
     # select eigenvectors with smaller eigenvalues O(n + klogk)
-    EigVal, EigVec = np.linalg.eig(L.toarray())
-    max_freqs = min(n - 1, k)
-    kpartition_indices = np.argpartition(EigVal, max_freqs)[: max_freqs + 1]
-    topk_eigvals = EigVal[kpartition_indices]
-    topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    topk_EigVec = EigVec[:, topk_indices]
-    eigvals = F.tensor(EigVal[topk_indices], dtype=F.float32)
+    if k + 1 < n - 1:
+        # Use scipy if k + 1 < n - 1 for memory efficiency.
+        EigVal, EigVec = scipy.sparse.linalg.eigs(
+            L, k=k + 1, which="SR", tol=1e-2
+        )
+        topk_indices = EigVal.argsort()[1:]
+        # Since scipy may return complex value, to avoid crashing in NN code,
+        # convert them to real number.
+        topk_eigvals = EigVal[topk_indices].real
+        topk_EigVec = EigVec[:, topk_indices].real
+    else:
+        # Fallback to numpy since scipy.sparse do not support this case.
+        EigVal, EigVec = np.linalg.eig(L.toarray())
+        max_freqs = min(n - 1, k)
+        kpartition_indices = np.argpartition(EigVal, max_freqs)[: max_freqs + 1]
+        topk_eigvals = EigVal[kpartition_indices]
+        topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
+        topk_EigVec = EigVec[:, topk_indices]
+        topk_EigVal = EigVal[topk_indices]
+    eigvals = F.tensor(topk_EigVal, dtype=F.float32)
 
     # get random flip signs
     rand_sign = 2 * (np.random.rand(max_freqs) > 0.5) - 1.0

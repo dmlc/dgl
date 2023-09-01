@@ -37,34 +37,42 @@ class NegativeSampler(Mapper):
         self.negative_ratio = negative_ratio
         self.output_format = output_format
 
-    def _sample(self, node_pairs):
+    def _sample(self, data):
         """
         Generate a mix of positive and negative samples.
 
         Parameters
         ----------
-        node_pairs : Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
-            A tuple of tensors or a dictionary represents source-destination
-            node pairs of positive edges, where positive means the edge must
-            exist in the graph.
+        data : LinkPredictionBlock
+            An instance of 'LinkPredictionBlock' class requires the 'node_pair'
+            field. This function is responsible for generating negative edges
+            corresponding to the positive edges defined by the 'node_pair'. In
+            cases where negative edges already exist, this function will
+            overwrite them.
 
         Returns
         -------
-        Tuple[Tensor] or Dict[etype, Tuple[Tensor]]
-            A collection of edges or a dictionary that maps etypes to edges,
-            which includes both positive and negative samples.
+        LinkPredictionBlock
+            An instance of 'LinkPredictionBlock' encompasses both positive and
+            negative samples.
         """
+        node_pairs = data.node_pair
         if isinstance(node_pairs, Mapping):
-            return {
-                etype: self._collate(
-                    pos_pairs, self._sample_with_etype(pos_pairs, etype)
+            if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
+                data.label = {}
+            else:
+                data.negative_head, data.negative_tail = {}, {}
+            for etype, pos_pairs in node_pairs.items():
+                self._collate(
+                    data, self._sample_with_etype(pos_pairs, etype), etype
                 )
-                for etype, pos_pairs in node_pairs.items()
-            }
+            if self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
+                data.negative_tail = None
+            if self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
+                data.negative_head = None
         else:
-            return self._collate(
-                node_pairs, self._sample_with_etype(node_pairs, None)
-            )
+            self._collate(data, self._sample_with_etype(node_pairs))
+        return data
 
     def _sample_with_etype(self, node_pairs, etype=None):
         """Generate negative pairs for a given etype form positive pairs
@@ -72,63 +80,72 @@ class NegativeSampler(Mapper):
 
         Parameters
         ----------
-        node_pairs : Tuple[Tensor]
-            A tuple of tensors or a dictionary represents source-destination
-            node pairs of positive edges, where positive means the edge must
-            exist in the graph.
-        etype : (str, str, str)
+        node_pairs : Tuple[Tensor, Tensor]
+            A tuple of tensors that represent source-destination node pairs of
+            positive edges, where positive means the edge must exist in the
+            graph.
+        etype : str
             Canonical edge type.
 
         Returns
         -------
-        Tuple[Tensor]
+        Tuple[Tensor, Tensor]
             A collection of negative node pairs.
         """
         raise NotImplementedError
 
-    def _collate(self, pos_pairs, neg_pairs):
-        """Collates positive and negative samples.
+    def _collate(self, data, neg_pairs, etype=None):
+        """Collates positive and negative samples into data.
 
         Parameters
         ----------
-        pos_pairs : Tuple[Tensor]
-            A tuple of tensors represents source-destination node pairs of
-            positive edges, where positive means the edge must exist in
-            the graph.
-        neg_pairs : Tuple[Tensor]
+        data : LinkPredictionBlock
+            The input data, which contains positive node pairs, will be filled
+            with negative information in this function.
+        neg_pairs : Tuple[Tensor, Tensor]
             A tuple of tensors represents source-destination node pairs of
             negative edges, where negative means the edge may not exist in
             the graph.
-
-        Returns
-        -------
-        Tuple[Tensor]
-            A mixed collection of positive and negative node pairs.
+        etype : str
+            Canonical edge type.
         """
+        pos_src, pos_dst = (
+            data.node_pair[etype] if etype is not None else data.node_pair
+        )
+        neg_src, neg_dst = neg_pairs
         if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
-            pos_src, pos_dst = pos_pairs
-            neg_src, neg_dst = neg_pairs
             pos_label = torch.ones_like(pos_src)
             neg_label = torch.zeros_like(neg_src)
             src = torch.cat([pos_src, neg_src])
             dst = torch.cat([pos_dst, neg_dst])
             label = torch.cat([pos_label, neg_label])
-            return (src, dst, label)
-        elif self.output_format == LinkPredictionEdgeFormat.CONDITIONED:
-            pos_src, pos_dst = pos_pairs
-            neg_src, neg_dst = neg_pairs
-            neg_src = neg_src.view(-1, self.negative_ratio)
-            neg_dst = neg_dst.view(-1, self.negative_ratio)
-            return (pos_src, pos_dst, neg_src, neg_dst)
-        elif self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
-            pos_src, pos_dst = pos_pairs
-            neg_src, _ = neg_pairs
-            neg_src = neg_src.view(-1, self.negative_ratio)
-            return (pos_src, pos_dst, neg_src)
-        elif self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
-            pos_src, pos_dst = pos_pairs
-            _, neg_dst = neg_pairs
-            neg_dst = neg_dst.view(-1, self.negative_ratio)
-            return (pos_src, pos_dst, neg_dst)
+            if etype is not None:
+                data.node_pair[etype] = (src, dst)
+                data.label[etype] = label
+            else:
+                data.node_pair = (src, dst)
+                data.label = label
         else:
-            raise ValueError("Unsupported output format.")
+            if self.output_format == LinkPredictionEdgeFormat.CONDITIONED:
+                neg_src = neg_src.view(-1, self.negative_ratio)
+                neg_dst = neg_dst.view(-1, self.negative_ratio)
+            elif (
+                self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED
+            ):
+                neg_src = neg_src.view(-1, self.negative_ratio)
+                neg_dst = None
+            elif (
+                self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED
+            ):
+                neg_dst = neg_dst.view(-1, self.negative_ratio)
+                neg_src = None
+            else:
+                raise TypeError(
+                    f"Unsupported output format {self.output_format}."
+                )
+            if etype is not None:
+                data.negative_head[etype] = neg_src
+                data.negative_tail[etype] = neg_dst
+            else:
+                data.negative_head = neg_src
+                data.negative_tail = neg_dst
