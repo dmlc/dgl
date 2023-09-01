@@ -17,9 +17,9 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
     data_block_converter = Mapper(
-        minibatch_sampler, gb_test_utils.minibatch_link_collator
+        item_sampler, gb_test_utils.minibatch_link_collator
     )
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
@@ -52,9 +52,9 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
     data_block_converter = Mapper(
-        minibatch_sampler, gb_test_utils.minibatch_link_collator
+        item_sampler, gb_test_utils.minibatch_link_collator
     )
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
@@ -90,9 +90,9 @@ def test_NegativeSampler_Head_Conditioned_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
     data_block_converter = Mapper(
-        minibatch_sampler, gb_test_utils.minibatch_link_collator
+        item_sampler, gb_test_utils.minibatch_link_collator
     )
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
@@ -126,9 +126,9 @@ def test_NegativeSampler_Tail_Conditioned_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
     data_block_converter = Mapper(
-        minibatch_sampler, gb_test_utils.minibatch_link_collator
+        item_sampler, gb_test_utils.minibatch_link_collator
     )
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
@@ -203,8 +203,8 @@ def test_NegativeSampler_Hetero_Data(format):
         }
     )
 
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
-    data_block_converter = Mapper(minibatch_dp, to_link_block)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
+    data_block_converter = Mapper(item_sampler_dp, to_link_block)
     negative_dp = gb.UniformNegativeSampler(
         data_block_converter, 1, format, graph
     )

@@ -14,7 +14,7 @@ from .feature_fetcher import *
 from .feature_store import *
 from .impl import *
 from .itemset import *
-from .minibatch_sampler import *
+from .item_sampler import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
