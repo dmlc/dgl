@@ -1,8 +1,85 @@
+import re
+
 import dgl
 import pytest
 import torch
 from dgl import graphbolt as gb
 from torch.testing import assert_close
+
+
+def test_ItemSet_names():
+    # ItemSet with single name.
+    item_set = gb.ItemSet(torch.arange(0, 5), names="seed_node")
+    assert item_set.names == ("seed_node",)
+
+    # ItemSet with multiple names.
+    item_set = gb.ItemSet(
+        (torch.arange(0, 5), torch.arange(5, 10)), names=("seed_node", "label")
+    )
+    assert item_set.names == ("seed_node", "label")
+
+    # ItemSet with no name.
+    item_set = gb.ItemSet(torch.arange(0, 5))
+    assert item_set.names is None
+
+    # ItemSet with mismatched items and names.
+    with pytest.raises(
+        AssertionError,
+        match=re.escape("Number of items (1) and names (2) must match."),
+    ):
+        _ = gb.ItemSet(torch.arange(0, 5), names=("seed_node", "label"))
+
+
+def test_ItemSetDict_names():
+    # ItemSetDict with single name.
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(torch.arange(0, 5), names="seed_node"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seed_node"),
+        }
+    )
+    assert item_set.names == ("seed_node",)
+
+    # ItemSetDict with multiple names.
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(
+                (torch.arange(0, 5), torch.arange(5, 10)),
+                names=("seed_node", "label"),
+            ),
+            "item": gb.ItemSet(
+                (torch.arange(5, 10), torch.arange(10, 15)),
+                names=("seed_node", "label"),
+            ),
+        }
+    )
+    assert item_set.names == ("seed_node", "label")
+
+    # ItemSetDict with no name.
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(torch.arange(0, 5)),
+            "item": gb.ItemSet(torch.arange(5, 10)),
+        }
+    )
+    assert item_set.names is None
+
+    # ItemSetDict with mismatched items and names.
+    with pytest.raises(
+        AssertionError,
+        match=re.escape("All itemsets must have the same names."),
+    ):
+        _ = gb.ItemSetDict(
+            {
+                "user": gb.ItemSet(
+                    (torch.arange(0, 5), torch.arange(5, 10)),
+                    names=("seed_node", "label"),
+                ),
+                "item": gb.ItemSet(
+                    (torch.arange(5, 10),), names=("seed_node",)
+                ),
+            }
+        )
 
 
 def test_ItemSet_valid_length():

@@ -47,11 +47,26 @@ class ItemSet:
      (tensor(4), tensor(9), tensor([18, 19]))]
     """
 
-    def __init__(self, items: Iterable or Tuple[Iterable]) -> None:
+    def __init__(
+        self,
+        items: Iterable or Tuple[Iterable],
+        names: str or Tuple[str] = None,
+    ) -> None:
         if isinstance(items, tuple):
             self._items = items
         else:
             self._items = (items,)
+        if names is not None:
+            if isinstance(names, tuple):
+                self._names = names
+            else:
+                self._names = (names,)
+            assert len(self._items) == len(self._names), (
+                f"Number of items ({len(self._items)}) and "
+                f"names ({len(self._names)}) must match."
+            )
+        else:
+            self._names = None
 
     def __iter__(self) -> Iterator:
         if len(self._items) == 1:
@@ -67,6 +82,11 @@ class ItemSet:
         raise TypeError(
             f"{type(self).__name__} instance doesn't have valid length."
         )
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
 
 
 class ItemSetDict:
@@ -127,6 +147,10 @@ class ItemSetDict:
 
     def __init__(self, itemsets: Dict[str, ItemSet]) -> None:
         self._itemsets = itemsets
+        self._names = itemsets[list(itemsets.keys())[0]].names
+        assert all(
+            self._names == itemset.names for itemset in itemsets.values()
+        ), "All itemsets must have the same names."
 
     def __iter__(self) -> Iterator:
         for key, itemset in self._itemsets.items():
@@ -135,3 +159,8 @@ class ItemSetDict:
 
     def __len__(self) -> int:
         return sum(len(itemset) for itemset in self._itemsets.values())
+
+    @property
+    def names(self) -> Tuple[str]:
+        """Return the names of the items."""
+        return self._names
