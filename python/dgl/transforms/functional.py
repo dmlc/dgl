@@ -22,7 +22,7 @@ from collections.abc import Iterable, Mapping
 import numpy as np
 import scipy.sparse as sparse
 import scipy.sparse.linalg
-from packaging.version import Version
+from ..utils import version
 
 try:
     import torch as th
@@ -3592,7 +3592,7 @@ def random_walk_pe(g, k, eweight_name=None):
         )
         A = A.multiply(W)
     # 1-step transition probability
-    if Version(scipy.__version__) < Version("1.11.0"):
+    if version.parse(scipy.__version__) < version.parse("1.11.0"):
         RW = np.array(A / (A.sum(1) + 1e-30))
     else:
         # Sparse matrix divided by a dense array returns a sparse matrix in
