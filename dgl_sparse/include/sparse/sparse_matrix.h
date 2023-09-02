@@ -149,8 +149,8 @@ class SparseMatrix : public torch::CustomClassHolder {
   /**
    * @brief Create a SparseMatrix by range slicing.
    * @param dim Row-wise or column-wise select
-   * @param start Start id of the selected rows or columns
-   * @param end End id of the selected rows or columns
+   * @param start Inclusive start id of the selected rows or columns
+   * @param end Exclusive end id of the selected rows or columns
    *
    * @return SparseMatrix
    */
