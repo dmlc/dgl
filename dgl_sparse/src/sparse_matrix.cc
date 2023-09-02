@@ -155,46 +155,29 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::IndexSelect(
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::RangeSelect(
     int64_t dim, int64_t start, int64_t end) {
-  if (dim == 0) {  // row
-    auto new_shape = std::vector<int64_t>{end - start, this->shape()[1]};
-    if (HasCSR() || !HasCOO()) {
-      auto dgl_csr = CSRToOldDGLCSR(this->CSRPtr());
-      auto slice_csr = dgl::aten::CSRSliceRows(dgl_csr, start, end);
-      auto slice_value =
-          this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
-      slice_csr.data = dgl::aten::NullArray();
-      return SparseMatrix::FromCSRPointer(
-          CSRFromOldDGLCSR(slice_csr), slice_value, new_shape);
-    } else {  // COO
-      auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
-      auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, start, end);
-      auto slice_value =
-          this->value().index_select(0, DGLArrayToTorchTensor(slice_coo.data));
-      slice_coo.data = dgl::aten::NullArray();
-      return SparseMatrix::FromCOOPointer(
-          COOFromOldDGLCOO(slice_coo), slice_value, new_shape);
-    }
-  } else {  // column
-    auto new_shape = std::vector<int64_t>{this->shape()[0], end - start};
-    if (HasCSC() || !HasCOO()) {
-      auto dgl_csc = CSRToOldDGLCSR(this->CSCPtr());
-      auto slice_csc = dgl::aten::CSRSliceRows(dgl_csc, start, end);
-      auto slice_value =
-          this->value().index_select(0, DGLArrayToTorchTensor(slice_csc.data));
-      slice_csc.data = dgl::aten::NullArray();
-      return SparseMatrix::FromCSCPointer(
-          CSRFromOldDGLCSR(slice_csc), slice_value, new_shape);
-    } else {  // COO
-      auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
-      dgl_coo = aten::COOTranspose(dgl_coo);
-      auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, start, end);
-      auto slice_value =
-          this->value().index_select(0, DGLArrayToTorchTensor(slice_coo.data));
-      slice_coo.data = dgl::aten::NullArray();
-      slice_coo = aten::COOTranspose(slice_coo);
-      return SparseMatrix::FromCOOPointer(
-          COOFromOldDGLCOO(slice_coo), slice_value, new_shape);
-    }
+  if ((!dim && HasCSR()) || (dim && HasCSC()) || !HasCOO()) {
+    auto csr = dim == 0 ? this->CSRPtr() : this->CSCPtr();
+    auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), start, end);
+    auto slice_value =
+        this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+    slice_csr.data = dgl::aten::NullArray();
+    auto ret = CSRFromOldDGLCSR(slice_csr);
+    auto new_shape = dim == 0
+                         ? std::vector<int64_t>{ret->num_rows, ret->num_cols}
+                         : std::vector<int64_t>{ret->num_cols, ret->num_rows};
+    return dim == 0 ? SparseMatrix::FromCSRPointer(ret, slice_value, new_shape)
+                    : SparseMatrix::FromCSCPointer(ret, slice_value, new_shape);
+  } else {  // COO
+    auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
+    if (dim == 1) dgl_coo = aten::COOTranspose(dgl_coo);
+    auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, start, end);
+    auto slice_value =
+        this->value().index_select(0, DGLArrayToTorchTensor(slice_coo.data));
+    slice_coo.data = dgl::aten::NullArray();
+    if (dim == 1) slice_coo = aten::COOTranspose(slice_coo);
+    auto ret = COOFromOldDGLCOO(slice_coo);
+    auto new_shape = std::vector<int64_t>{ret->num_rows, ret->num_cols};
+    return SparseMatrix::FromCOOPointer(ret, slice_value, new_shape);
   }
 }
 
