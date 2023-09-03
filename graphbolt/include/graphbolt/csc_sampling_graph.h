@@ -130,6 +130,21 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   void Save(torch::serialize::OutputArchive& archive) const;
 
   /**
+   * @brief Pickle method for deserializing.
+   * @param state The state of serialized CSCSamplingGraph.
+   */
+  void SetState(
+      const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
+          state);
+
+  /**
+   * @brief Pickle method for serializing.
+   * @returns The state of this CSCSamplingGraph.
+   */
+  torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> GetState()
+      const;
+
+  /**
    * @brief Return the subgraph induced on the inbound edges of the given nodes.
    * @param nodes Type agnostic node IDs to form the subgraph.
    *
@@ -406,8 +421,8 @@ int64_t PickByEtype(
     PickedType* picked_data_ptr);
 
 template <
-    bool NonUniform, bool Replace, typename ProbsType = float,
-    typename PickedType>
+    bool NonUniform, bool Replace, typename ProbsType, typename PickedType,
+    int StackSize = 1024>
 int64_t LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,

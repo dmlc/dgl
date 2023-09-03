@@ -16,12 +16,12 @@ def test_FeatureFetcher_homo():
     feature_store = gb.BasicFeatureStore(features)
 
     itemset = gb.ItemSet(torch.arange(10))
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_node_block)
+    data_block_converter = Mapper(item_sampler_dp, gb_test_utils.to_node_block)
     sampler_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
-    fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, keys)
+    fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
 
@@ -52,16 +52,16 @@ def test_FeatureFetcher_with_edges_homo():
     feature_store = gb.BasicFeatureStore(features)
 
     itemset = gb.ItemSet(torch.arange(10))
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
-    converter_dp = Mapper(minibatch_dp, add_node_and_edge_ids)
-    fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, keys)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
+    converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
+    fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
     for data in fetcher_dp:
-        assert data.node_feature[(None, "a")].size(0) == 2
-        assert len(data.edge_feature) == 3
-        for edge_feature in data.edge_feature:
-            assert edge_feature[(None, "b")].size(0) == 10
+        assert data.node_features["a"].size(0) == 2
+        assert len(data.edge_features) == 3
+        for edge_feature in data.edge_features:
+            assert edge_feature["b"].size(0) == 10
 
 
 def get_hetero_graph():
@@ -71,7 +71,7 @@ def get_hetero_graph():
     # [1, 1, 1, 1, 0, 0, 0, 0, 0] - > edge type.
     # num_nodes = 5, num_n1 = 2, num_n2 = 3
     ntypes = {"n1": 0, "n2": 1}
-    etypes = {("n1", "e1", "n2"): 0, ("n2", "e2", "n1"): 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
     metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
@@ -103,12 +103,14 @@ def test_FeatureFetcher_hetero():
             "n2": gb.ItemSet(torch.LongTensor([0, 1, 2])),
         }
     )
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_node_block)
+    data_block_converter = Mapper(item_sampler_dp, gb_test_utils.to_node_block)
     sampler_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
-    fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, keys)
+    fetcher_dp = gb.FeatureFetcher(
+        sampler_dp, feature_store, {"n1": ["a"], "n2": ["a"]}
+    )
 
     assert len(list(fetcher_dp)) == 3
 
@@ -120,8 +122,8 @@ def test_FeatureFetcher_with_edges_hetero():
     def add_node_and_edge_ids(seeds):
         subgraphs = []
         reverse_edge_ids = {
-            ("n1", "e1", "n2"): torch.randint(0, 50, (10,)),
-            ("n2", "e2", "n1"): torch.randint(0, 50, (10,)),
+            "n1:e1:n2": torch.randint(0, 50, (10,)),
+            "n2:e2:n1": torch.randint(0, 50, (10,)),
         }
         for _ in range(3):
             subgraphs.append(
@@ -146,13 +148,15 @@ def test_FeatureFetcher_with_edges_hetero():
             "n1": gb.ItemSet(torch.randint(0, 20, (10,))),
         }
     )
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
-    converter_dp = Mapper(minibatch_dp, add_node_and_edge_ids)
-    fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, keys)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
+    converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
+    fetcher_dp = gb.FeatureFetcher(
+        converter_dp, feature_store, {"n1": ["a"]}, {"n1:e1:n2": ["a"]}
+    )
 
     assert len(list(fetcher_dp)) == 5
     for data in fetcher_dp:
-        assert data.node_feature[("n1", "a")].size(0) == 2
-        assert len(data.edge_feature) == 3
-        for edge_feature in data.edge_feature:
+        assert data.node_features[("n1", "a")].size(0) == 2
+        assert len(data.edge_features) == 3
+        for edge_feature in data.edge_features:
             assert edge_feature[("n1:e1:n2", "a")].size(0) == 10

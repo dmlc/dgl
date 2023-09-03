@@ -24,15 +24,17 @@ def test_DataLoader():
     features[keys[1]] = dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4))
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
-    minibatch_sampler = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
-    block_converter = Mapper(minibatch_sampler, to_node_block)
+    item_sampler = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
+    block_converter = Mapper(item_sampler, to_node_block)
     subgraph_sampler = dgl.graphbolt.NeighborSampler(
         block_converter,
         graph,
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )
     feature_fetcher = dgl.graphbolt.FeatureFetcher(
-        subgraph_sampler, feature_store, keys
+        subgraph_sampler,
+        feature_store,
+        ["a"],
     )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 

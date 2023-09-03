@@ -11,6 +11,7 @@ import yaml
 
 import dgl
 
+from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, save_data
@@ -126,7 +127,7 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
             )
             src = torch.tensor(edge_data["src"])
             dst = torch.tensor(edge_data["dst"])
-            data_dict[tuple(edge_info["type"].split(":"))] = (src, dst)
+            data_dict[etype_str_to_tuple(edge_info["type"])] = (src, dst)
         # Construct the heterograph.
         g = dgl.heterograph(data_dict, num_nodes_dict)
 
@@ -445,7 +446,8 @@ class OnDiskDataset(Dataset):
                 tuple(
                     read_data(data.path, data.format, data.in_memory)
                     for data in tvt_set[0].data
-                )
+                ),
+                names=tuple(data.name for data in tvt_set[0].data),
             )
         else:
             data = {}
@@ -454,7 +456,8 @@ class OnDiskDataset(Dataset):
                     tuple(
                         read_data(data.path, data.format, data.in_memory)
                         for data in tvt.data
-                    )
+                    ),
+                    names=tuple(data.name for data in tvt.data),
                 )
             ret = ItemSetDict(data)
         return ret

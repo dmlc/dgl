@@ -8,6 +8,8 @@
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <numeric>
@@ -19,6 +21,8 @@
 
 namespace graphbolt {
 namespace sampling {
+
+static const int kPickleVersion = 6199;
 
 CSCSamplingGraph::CSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
@@ -93,6 +97,56 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
   if (type_per_edge_) {
     archive.write("CSCSamplingGraph/type_per_edge", type_per_edge_.value());
   }
+}
+
+void CSCSamplingGraph::SetState(
+    const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
+        state) {
+  // State is a dict of dicts. The tensor-type attributes are stored in the dict
+  // with key "independent_tensors". The dict-type attributes (edge_attributes)
+  // are stored directly with the their name as the key.
+  const auto& independent_tensors = state.at("independent_tensors");
+  TORCH_CHECK(
+      independent_tensors.at("version_number")
+          .equal(torch::tensor({kPickleVersion})),
+      "Version number mismatches when loading pickled CSCSamplingGraph.")
+  indptr_ = independent_tensors.at("indptr");
+  indices_ = independent_tensors.at("indices");
+  if (independent_tensors.find("node_type_offset") !=
+      independent_tensors.end()) {
+    node_type_offset_ = independent_tensors.at("node_type_offset");
+  }
+  if (independent_tensors.find("type_per_edge") != independent_tensors.end()) {
+    type_per_edge_ = independent_tensors.at("type_per_edge");
+  }
+  if (state.find("edge_attributes") != state.end()) {
+    edge_attributes_ = state.at("edge_attributes");
+  }
+}
+
+torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
+CSCSamplingGraph::GetState() const {
+  // State is a dict of dicts. The tensor-type attributes are stored in the dict
+  // with key "independent_tensors". The dict-type attributes (edge_attributes)
+  // are stored directly with the their name as the key.
+  torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> state;
+  torch::Dict<std::string, torch::Tensor> independent_tensors;
+  // Serialization version number. It indicates the serialization method of the
+  // whole state.
+  independent_tensors.insert("version_number", torch::tensor({kPickleVersion}));
+  independent_tensors.insert("indptr", indptr_);
+  independent_tensors.insert("indices", indices_);
+  if (node_type_offset_.has_value()) {
+    independent_tensors.insert("node_type_offset", node_type_offset_.value());
+  }
+  if (type_per_edge_.has_value()) {
+    independent_tensors.insert("type_per_edge", type_per_edge_.value());
+  }
+  state.insert("independent_tensors", independent_tensors);
+  if (edge_attributes_.has_value()) {
+    state.insert("edge_attributes", edge_attributes_.value());
+  }
+  return state;
 }
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
@@ -636,11 +690,91 @@ inline int64_t NonUniformPick(
     return num_positive_probs;
   } else {
     if (!replace) fanout = std::min(fanout, num_positive_probs);
-    std::memcpy(
-        picked_data_ptr,
-        (torch::multinomial(local_probs, fanout, replace) + offset)
-            .data_ptr<PickedType>(),
-        fanout * sizeof(PickedType));
+    if (fanout == 0) return 0;
+    AT_DISPATCH_FLOATING_TYPES(
+        local_probs.scalar_type(), "MultinomialSampling", ([&] {
+          auto local_probs_data_ptr = local_probs.data_ptr<scalar_t>();
+          auto positive_probs_indices_ptr =
+              positive_probs_indices.data_ptr<PickedType>();
+
+          if (!replace) {
+            // The algorithm is from gumbel softmax.
+            // s = argmax( logp - log(-log(eps)) ) where eps ~ U(0, 1).
+            // Here we can apply exp to the formula which will not affect result
+            // of argmax or topk. Then we have
+            // s = argmax( p / (-log(eps)) ) where eps ~ U(0, 1).
+            // We can also simplify the formula above by
+            // s = argmax( p / q ) where q ~ Exp(1).
+            if (fanout == 1) {
+              // Return argmax(p / q).
+              scalar_t max_prob = 0;
+              PickedType max_prob_index = -1;
+              // We only care about the neighbors with non-zero probability.
+              for (auto i = 0; i < num_positive_probs; ++i) {
+                // Calculate (p / q) for the current neighbor.
+                scalar_t current_prob =
+                    local_probs_data_ptr[positive_probs_indices_ptr[i]] /
+                    RandomEngine::ThreadLocal()->Exponential(1.);
+                if (current_prob > max_prob) {
+                  max_prob = current_prob;
+                  max_prob_index = positive_probs_indices_ptr[i];
+                }
+              }
+              *picked_data_ptr = max_prob_index + offset;
+            } else {
+              // Return topk(p / q).
+              std::vector<std::pair<scalar_t, PickedType>> q(
+                  num_positive_probs);
+              for (auto i = 0; i < num_positive_probs; ++i) {
+                q[i].first =
+                    local_probs_data_ptr[positive_probs_indices_ptr[i]] /
+                    RandomEngine::ThreadLocal()->Exponential(1.);
+                q[i].second = positive_probs_indices_ptr[i];
+              }
+              if (fanout < num_positive_probs / 64) {
+                // Use partial_sort.
+                std::partial_sort(
+                    q.begin(), q.begin() + fanout, q.end(), std::greater{});
+                for (auto i = 0; i < fanout; ++i) {
+                  picked_data_ptr[i] = q[i].second + offset;
+                }
+              } else {
+                // Use nth_element.
+                std::nth_element(
+                    q.begin(), q.begin() + fanout - 1, q.end(), std::greater{});
+                for (auto i = 0; i < fanout; ++i) {
+                  picked_data_ptr[i] = q[i].second + offset;
+                }
+              }
+            }
+          } else {
+            // Calculate cumulative sum of probabilities.
+            std::vector<scalar_t> prefix_sum_probs(num_positive_probs);
+            scalar_t sum_probs = 0;
+            for (auto i = 0; i < num_positive_probs; ++i) {
+              sum_probs += local_probs_data_ptr[positive_probs_indices_ptr[i]];
+              prefix_sum_probs[i] = sum_probs;
+            }
+            // Normalize.
+            if ((sum_probs > 1.00001) || (sum_probs < 0.99999)) {
+              for (auto i = 0; i < num_positive_probs; ++i) {
+                prefix_sum_probs[i] /= sum_probs;
+              }
+            }
+            for (auto i = 0; i < fanout; ++i) {
+              // Sample a probability mass from a uniform distribution.
+              double uniform_sample =
+                  RandomEngine::ThreadLocal()->Uniform(0., 1.);
+              // Use a binary search to find the index.
+              int sampled_index = std::lower_bound(
+                                      prefix_sum_probs.begin(),
+                                      prefix_sum_probs.end(), uniform_sample) -
+                                  prefix_sum_probs.begin();
+              picked_data_ptr[i] =
+                  positive_probs_indices_ptr[sampled_index] + offset;
+            }
+          }
+        }));
     return fanout;
   }
 }
@@ -730,11 +864,11 @@ int64_t Pick(
     return UniformPick(
         offset, num_neighbors, fanout, replace, options, picked_data_ptr);
   } else if (replace) {
-    return LaborPick<false, true>(
+    return LaborPick<false, true, float>(
         offset, num_neighbors, fanout, options,
         /* probs_or_mask= */ torch::nullopt, args, picked_data_ptr);
   } else {  // replace = false
-    return LaborPick<false, false>(
+    return LaborPick<false, false, float>(
         offset, num_neighbors, fanout, options,
         /* probs_or_mask= */ torch::nullopt, args, picked_data_ptr);
   }
@@ -770,7 +904,8 @@ inline void safe_divide(T& a, U b) {
  * should be put. Enough memory space should be allocated in advance.
  */
 template <
-    bool NonUniform, bool Replace, typename ProbsType, typename PickedType>
+    bool NonUniform, bool Replace, typename ProbsType, typename PickedType,
+    int StackSize>
 inline int64_t LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
@@ -781,10 +916,16 @@ inline int64_t LaborPick(
     std::iota(picked_data_ptr, picked_data_ptr + num_neighbors, offset);
     return num_neighbors;
   }
-  torch::Tensor heap_tensor = torch::empty({fanout * 2}, torch::kInt32);
   // Assuming max_degree of a vertex is <= 4 billion.
-  auto heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
-      heap_tensor.data_ptr<int32_t>());
+  std::array<std::pair<float, uint32_t>, StackSize> heap;
+  auto heap_data = heap.data();
+  torch::Tensor heap_tensor;
+  if (fanout > StackSize) {
+    constexpr int factor = sizeof(heap_data[0]) / sizeof(int32_t);
+    heap_tensor = torch::empty({fanout * factor}, torch::kInt32);
+    heap_data = reinterpret_cast<std::pair<float, uint32_t>*>(
+        heap_tensor.data_ptr<int32_t>());
+  }
   const ProbsType* local_probs_data =
       NonUniform ? probs_or_mask.value().data_ptr<ProbsType>() + offset
                  : nullptr;
@@ -814,22 +955,29 @@ inline int64_t LaborPick(
           // is O((fanout + num_neighbors) log(fanout)). It is possible to
           // decrease the logarithmic factor down to
           // O(log(min(fanout, num_neighbors))).
-          torch::Tensor remaining =
-              torch::ones({num_neighbors}, torch::kFloat32);
-          float* rem_data = remaining.data_ptr<float>();
+          std::array<float, StackSize> remaining;
+          auto remaining_data = remaining.data();
+          torch::Tensor remaining_tensor;
+          if (num_neighbors > StackSize) {
+            remaining_tensor = torch::empty({num_neighbors}, torch::kFloat32);
+            remaining_data = remaining_tensor.data_ptr<float>();
+          }
+          std::fill_n(remaining_data, num_neighbors, 1.f);
           auto heap_end = heap_data;
           const auto init_count = (num_neighbors + fanout - 1) / num_neighbors;
           auto sample_neighbor_i_with_index_t_jth_time =
               [&](scalar_t t, int64_t j, uint32_t i) {
                 auto rnd = labor::jth_sorted_uniform_random(
-                    args.random_seed, t, args.num_nodes, j, rem_data[i],
+                    args.random_seed, t, args.num_nodes, j, remaining_data[i],
                     fanout - j);  // r_t
                 if constexpr (NonUniform) {
                   safe_divide(rnd, local_probs_data[i]);
                 }  // r_t / \pi_t
                 if (heap_end < heap_data + fanout) {
                   heap_end[0] = std::make_pair(rnd, i);
-                  std::push_heap(heap_data, ++heap_end);
+                  if (++heap_end >= heap_data + fanout) {
+                    std::make_heap(heap_data, heap_data + fanout);
+                  }
                   return false;
                 } else if (rnd < heap_data[0].first) {
                   std::pop_heap(heap_data, heap_data + fanout);
@@ -837,18 +985,18 @@ inline int64_t LaborPick(
                   std::push_heap(heap_data, heap_data + fanout);
                   return false;
                 } else {
-                  rem_data[i] = -1;
+                  remaining_data[i] = -1;
                   return true;
                 }
               };
           for (uint32_t i = 0; i < num_neighbors; ++i) {
+            const auto t = local_indices_data[i];
             for (int64_t j = 0; j < init_count; j++) {
-              const auto t = local_indices_data[i];
               sample_neighbor_i_with_index_t_jth_time(t, j, i);
             }
           }
           for (uint32_t i = 0; i < num_neighbors; ++i) {
-            if (rem_data[i] == -1) continue;
+            if (remaining_data[i] == -1) continue;
             const auto t = local_indices_data[i];
             for (int64_t j = init_count; j < fanout; ++j) {
               if (sample_neighbor_i_with_index_t_jth_time(t, j, i)) break;
@@ -906,9 +1054,6 @@ inline int64_t LaborPick(
       picked_data_ptr[num_sampled++] = offset + j;
     }
   }
-  TORCH_CHECK(
-      !Replace || num_sampled == fanout || num_sampled == 0,
-      "Sampling with replacement should sample exactly fanout neighbors or 0!");
   return num_sampled;
 }
 

@@ -1,8 +1,85 @@
+import re
+
 import dgl
 import pytest
 import torch
 from dgl import graphbolt as gb
 from torch.testing import assert_close
+
+
+def test_ItemSet_names():
+    # ItemSet with single name.
+    item_set = gb.ItemSet(torch.arange(0, 5), names="seed_node")
+    assert item_set.names == ("seed_node",)
+
+    # ItemSet with multiple names.
+    item_set = gb.ItemSet(
+        (torch.arange(0, 5), torch.arange(5, 10)), names=("seed_node", "label")
+    )
+    assert item_set.names == ("seed_node", "label")
+
+    # ItemSet with no name.
+    item_set = gb.ItemSet(torch.arange(0, 5))
+    assert item_set.names is None
+
+    # ItemSet with mismatched items and names.
+    with pytest.raises(
+        AssertionError,
+        match=re.escape("Number of items (1) and names (2) must match."),
+    ):
+        _ = gb.ItemSet(torch.arange(0, 5), names=("seed_node", "label"))
+
+
+def test_ItemSetDict_names():
+    # ItemSetDict with single name.
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(torch.arange(0, 5), names="seed_node"),
+            "item": gb.ItemSet(torch.arange(5, 10), names="seed_node"),
+        }
+    )
+    assert item_set.names == ("seed_node",)
+
+    # ItemSetDict with multiple names.
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(
+                (torch.arange(0, 5), torch.arange(5, 10)),
+                names=("seed_node", "label"),
+            ),
+            "item": gb.ItemSet(
+                (torch.arange(5, 10), torch.arange(10, 15)),
+                names=("seed_node", "label"),
+            ),
+        }
+    )
+    assert item_set.names == ("seed_node", "label")
+
+    # ItemSetDict with no name.
+    item_set = gb.ItemSetDict(
+        {
+            "user": gb.ItemSet(torch.arange(0, 5)),
+            "item": gb.ItemSet(torch.arange(5, 10)),
+        }
+    )
+    assert item_set.names is None
+
+    # ItemSetDict with mismatched items and names.
+    with pytest.raises(
+        AssertionError,
+        match=re.escape("All itemsets must have the same names."),
+    ):
+        _ = gb.ItemSetDict(
+            {
+                "user": gb.ItemSet(
+                    (torch.arange(0, 5), torch.arange(5, 10)),
+                    names=("seed_node", "label"),
+                ),
+                "item": gb.ItemSet(
+                    (torch.arange(5, 10),), names=("seed_node",)
+                ),
+            }
+        )
 
 
 def test_ItemSet_valid_length():
@@ -50,8 +127,8 @@ def test_ItemSetDict_valid_length():
     follow = (torch.arange(0, 5), torch.arange(5, 10))
     item_set = gb.ItemSetDict(
         {
-            ("user", "like", "item"): gb.ItemSet(like),
-            ("user", "follow", "user"): gb.ItemSet(follow),
+            "user:like:item": gb.ItemSet(like),
+            "user:follow:user": gb.ItemSet(follow),
         }
     )
     assert len(item_set) == len(like[0]) + len(follow[0])
@@ -75,12 +152,8 @@ def test_ItemSetDict_invalid_length():
     # Tuple of iterables.
     item_set = gb.ItemSetDict(
         {
-            ("user", "like", "item"): gb.ItemSet(
-                (InvalidLength(), InvalidLength())
-            ),
-            ("user", "follow", "user"): gb.ItemSet(
-                (InvalidLength(), InvalidLength())
-            ),
+            "user:like:item": gb.ItemSet((InvalidLength(), InvalidLength())),
+            "user:follow:user": gb.ItemSet((InvalidLength(), InvalidLength())),
         }
     )
     with pytest.raises(TypeError):
@@ -137,8 +210,8 @@ def test_ItemSet_head_tail_neg_tails():
 def test_ItemSetDict_node_edge_ids():
     # Node or edge IDs
     ids = {
-        ("user", "like", "item"): gb.ItemSet(torch.arange(0, 5)),
-        ("user", "follow", "user"): gb.ItemSet(torch.arange(0, 5)),
+        "user:like:item": gb.ItemSet(torch.arange(0, 5)),
+        "user:follow:user": gb.ItemSet(torch.arange(0, 5)),
     }
     chained_ids = []
     for key, value in ids.items():
@@ -155,8 +228,8 @@ def test_ItemSetDict_node_pairs():
     # Node pairs.
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     node_pairs_dict = {
-        ("user", "like", "item"): gb.ItemSet(node_pairs),
-        ("user", "follow", "user"): gb.ItemSet(node_pairs),
+        "user:like:item": gb.ItemSet(node_pairs),
+        "user:follow:user": gb.ItemSet(node_pairs),
     }
     expected_data = []
     for key, value in node_pairs_dict.items():
@@ -174,12 +247,8 @@ def test_ItemSetDict_node_pairs_labels():
     node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
     labels = torch.randint(0, 3, (5,))
     node_pairs_dict = {
-        ("user", "like", "item"): gb.ItemSet(
-            (node_pairs[0], node_pairs[1], labels)
-        ),
-        ("user", "follow", "user"): gb.ItemSet(
-            (node_pairs[0], node_pairs[1], labels)
-        ),
+        "user:like:item": gb.ItemSet((node_pairs[0], node_pairs[1], labels)),
+        "user:follow:user": gb.ItemSet((node_pairs[0], node_pairs[1], labels)),
     }
     expected_data = []
     for key, value in node_pairs_dict.items():
@@ -199,8 +268,8 @@ def test_ItemSetDict_head_tail_neg_tails():
     neg_tails = torch.arange(10, 20).reshape(5, 2)
     item_set = gb.ItemSet((heads, tails, neg_tails))
     data_dict = {
-        ("user", "like", "item"): gb.ItemSet((heads, tails, neg_tails)),
-        ("user", "follow", "user"): gb.ItemSet((heads, tails, neg_tails)),
+        "user:like:item": gb.ItemSet((heads, tails, neg_tails)),
+        "user:follow:user": gb.ItemSet((heads, tails, neg_tails)),
     }
     expected_data = []
     for key, value in data_dict.items():

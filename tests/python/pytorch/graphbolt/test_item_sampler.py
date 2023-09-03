@@ -12,11 +12,11 @@ def test_ItemSet_node_ids(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 103
     item_set = gb.ItemSet(torch.arange(0, num_ids))
-    minibatch_sampler = gb.MinibatchSampler(
+    item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
     minibatch_ids = []
-    for i, minibatch in enumerate(minibatch_sampler):
+    for i, minibatch in enumerate(item_sampler):
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
             assert len(minibatch) == batch_size
@@ -43,12 +43,12 @@ def test_ItemSet_graphs(batch_size, shuffle, drop_last):
         for i in range(num_graphs)
     ]
     item_set = gb.ItemSet(graphs)
-    minibatch_sampler = gb.MinibatchSampler(
+    item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
     minibatch_num_nodes = []
     minibatch_num_edges = []
-    for i, minibatch in enumerate(minibatch_sampler):
+    for i, minibatch in enumerate(item_sampler):
         is_last = (i + 1) * batch_size >= num_graphs
         if not is_last or num_graphs % batch_size == 0:
             assert minibatch.batch_size == batch_size
@@ -79,12 +79,12 @@ def test_ItemSet_node_pairs(batch_size, shuffle, drop_last):
     num_ids = 103
     node_pairs = (torch.arange(0, num_ids), torch.arange(num_ids, num_ids * 2))
     item_set = gb.ItemSet(node_pairs)
-    minibatch_sampler = gb.MinibatchSampler(
+    item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
     src_ids = []
     dst_ids = []
-    for i, (src, dst) in enumerate(minibatch_sampler):
+    for i, (src, dst) in enumerate(item_sampler):
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -115,13 +115,13 @@ def test_ItemSet_node_pairs_labels(batch_size, shuffle, drop_last):
     node_pairs = (torch.arange(0, num_ids), torch.arange(num_ids, num_ids * 2))
     labels = torch.arange(0, num_ids)
     item_set = gb.ItemSet((node_pairs[0], node_pairs[1], labels))
-    minibatch_sampler = gb.MinibatchSampler(
+    item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
     src_ids = []
     dst_ids = []
     labels = []
-    for i, (src, dst, label) in enumerate(minibatch_sampler):
+    for i, (src, dst, label) in enumerate(item_sampler):
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -163,13 +163,13 @@ def test_ItemSet_head_tail_neg_tails(batch_size, shuffle, drop_last):
         assert heads[i] == head
         assert tails[i] == tail
         assert torch.equal(neg_tails[i], negs)
-    minibatch_sampler = gb.MinibatchSampler(
+    item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
     head_ids = []
     tail_ids = []
     negs_ids = []
-    for i, (head, tail, negs) in enumerate(minibatch_sampler):
+    for i, (head, tail, negs) in enumerate(item_sampler):
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -204,7 +204,7 @@ def test_append_with_other_datapipes():
     num_ids = 100
     batch_size = 4
     item_set = gb.ItemSet(torch.arange(0, num_ids))
-    data_pipe = gb.MinibatchSampler(item_set, batch_size)
+    data_pipe = gb.ItemSampler(item_set, batch_size)
     # torchdata.datapipes.iter.Enumerator
     data_pipe = data_pipe.enumerate()
     for i, (idx, data) in enumerate(data_pipe):
@@ -226,11 +226,11 @@ def test_ItemSetDict_node_ids(batch_size, shuffle, drop_last):
     for key, value in ids.items():
         chained_ids += [(key, v) for v in value]
     item_set = gb.ItemSetDict(ids)
-    minibatch_sampler = gb.MinibatchSampler(
+    item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
     minibatch_ids = []
-    for i, batch in enumerate(minibatch_sampler):
+    for i, batch in enumerate(item_sampler):
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -266,16 +266,16 @@ def test_ItemSetDict_node_pairs(batch_size, shuffle, drop_last):
         torch.arange(num_ids * 3, num_ids * 4),
     )
     node_pairs_dict = {
-        ("user", "like", "item"): gb.ItemSet(node_pairs_0),
-        ("user", "follow", "user"): gb.ItemSet(node_pairs_1),
+        "user:like:item": gb.ItemSet(node_pairs_0),
+        "user:follow:user": gb.ItemSet(node_pairs_1),
     }
     item_set = gb.ItemSetDict(node_pairs_dict)
-    minibatch_sampler = gb.MinibatchSampler(
+    item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
     src_ids = []
     dst_ids = []
-    for i, batch in enumerate(minibatch_sampler):
+    for i, batch in enumerate(item_sampler):
         is_last = (i + 1) * batch_size >= total_ids
         if not is_last or total_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -319,21 +319,21 @@ def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
     )
     labels = torch.arange(0, num_ids)
     node_pairs_dict = {
-        ("user", "like", "item"): gb.ItemSet(
+        "user:like:item": gb.ItemSet(
             (node_pairs_0[0], node_pairs_0[1], labels)
         ),
-        ("user", "follow", "user"): gb.ItemSet(
+        "user:follow:user": gb.ItemSet(
             (node_pairs_1[0], node_pairs_1[1], labels + num_ids * 2)
         ),
     }
     item_set = gb.ItemSetDict(node_pairs_dict)
-    minibatch_sampler = gb.MinibatchSampler(
+    item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
     src_ids = []
     dst_ids = []
     labels = []
-    for i, batch in enumerate(minibatch_sampler):
+    for i, batch in enumerate(item_sampler):
         is_last = (i + 1) * batch_size >= total_ids
         if not is_last or total_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -380,17 +380,17 @@ def test_ItemSetDict_head_tail_neg_tails(batch_size, shuffle, drop_last):
     tails = torch.arange(num_ids, num_ids * 2)
     neg_tails = torch.stack((heads + 1, heads + 2), dim=-1)
     data_dict = {
-        ("user", "like", "item"): gb.ItemSet((heads, tails, neg_tails)),
-        ("user", "follow", "user"): gb.ItemSet((heads, tails, neg_tails)),
+        "user:like:item": gb.ItemSet((heads, tails, neg_tails)),
+        "user:follow:user": gb.ItemSet((heads, tails, neg_tails)),
     }
     item_set = gb.ItemSetDict(data_dict)
-    minibatch_sampler = gb.MinibatchSampler(
+    item_sampler = gb.ItemSampler(
         item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
     )
     head_ids = []
     tail_ids = []
     negs_ids = []
-    for i, batch in enumerate(minibatch_sampler):
+    for i, batch in enumerate(item_sampler):
         is_last = (i + 1) * batch_size >= total_ids
         if not is_last or total_ids % batch_size == 0:
             expected_batch_size = batch_size

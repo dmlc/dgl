@@ -21,8 +21,8 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    data_block_converter = Mapper(minibatch_sampler, to_data_block)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    data_block_converter = Mapper(item_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
         data_block_converter,
@@ -54,8 +54,8 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    data_block_converter = Mapper(minibatch_sampler, to_data_block)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    data_block_converter = Mapper(item_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
         data_block_converter,
@@ -90,8 +90,8 @@ def test_NegativeSampler_Head_Conditioned_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    data_block_converter = Mapper(minibatch_sampler, to_data_block)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    data_block_converter = Mapper(item_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
         data_block_converter,
@@ -124,8 +124,8 @@ def test_NegativeSampler_Tail_Conditioned_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    data_block_converter = Mapper(minibatch_sampler, to_data_block)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    data_block_converter = Mapper(item_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
         data_block_converter,
@@ -151,7 +151,7 @@ def get_hetero_graph():
     # [1, 1, 1, 1, 0, 0, 0, 0, 0] - > edge type.
     # num_nodes = 5, num_n1 = 2, num_n2 = 3
     ntypes = {"n1": 0, "n2": 1}
-    etypes = {("n1", "e1", "n2"): 0, ("n2", "e2", "n1"): 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
     metadata = gb.GraphMetadata(ntypes, etypes)
     indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
@@ -184,13 +184,13 @@ def test_NegativeSampler_Hetero_Data(format):
     graph = get_hetero_graph()
     itemset = gb.ItemSetDict(
         {
-            ("n1", "e1", "n2"): gb.ItemSet(
+            "n1:e1:n2": gb.ItemSet(
                 (
                     torch.LongTensor([0, 0, 1, 1]),
                     torch.LongTensor([0, 2, 0, 1]),
                 )
             ),
-            ("n2", "e2", "n1"): gb.ItemSet(
+            "n2:e2:n1": gb.ItemSet(
                 (
                     torch.LongTensor([0, 0, 1, 1, 2, 2]),
                     torch.LongTensor([0, 1, 1, 0, 0, 1]),
@@ -199,8 +199,8 @@ def test_NegativeSampler_Hetero_Data(format):
         }
     )
 
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
-    data_block_converter = Mapper(minibatch_dp, to_link_block)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
+    data_block_converter = Mapper(item_sampler_dp, to_link_block)
     negative_dp = gb.UniformNegativeSampler(
         data_block_converter, 1, format, graph
     )
