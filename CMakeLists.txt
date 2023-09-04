@@ -16,23 +16,11 @@ include(cmake/util/FindCUDA.cmake)
 # Options for building DGL.
 # NOTE: Please avoid editing this file to change build type. Instead, using
 # bash script/build_dgl.sh -e -t release to overwrite the value.
-dgl_option(
-    BUILD_TYPE
-    "Type of the build: dev, dogfood or release"
-    "dev"
-)
+dgl_option(BUILD_TYPE "Type of the build: dev, dogfood or release" "dev")
 message(STATUS "Build for ${BUILD_TYPE}")
 
-dgl_option(
-    USE_CUDA
-    "Build with CUDA"
-    OFF
-)
-dgl_option(
-    TORCH_PYTHON_INTERPS
-    "Python interpreter used to build tensoradapter and DGL sparse library"
-    python3
-)
+dgl_option(USE_CUDA "Build with CUDA" OFF)
+dgl_option(TORCH_PYTHON_INTERPS "Python interpreter for building sub-components" python3)
 
 # Conda build related options.
 dgl_option(EXTERNAL_DLPACK_PATH "Path to external dlpack" OFF)
