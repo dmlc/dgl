@@ -24,7 +24,7 @@ the example in the `examples/distributed/graphsage/`.
 This flowchart describes the main functional sequence of the provided example.
 main
 │
-├───> OnDiskDataset pre-processing.
+├───> OnDiskDataset pre-processing
 │
 ├───> Instantiate SAGE model
 │
@@ -312,7 +312,7 @@ def train(args, graph, features, train_set, valid_set, model):
                 f"Epoch {epoch:05d} | "
                 f"Step {step:05d} | "
                 f"Loss {(total_loss) / (step + 1):.4f}",
-                end="\r",
+                end="\n",
             )
             if step + 1 == 1000:
                 break
