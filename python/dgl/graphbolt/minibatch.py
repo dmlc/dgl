@@ -21,6 +21,56 @@ class MiniBatch:
     representation of input and output data across different stages, ensuring
     consistency and ease of use throughout the loading process."""
 
+    seed_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    """
+    Representation of seed nodes used for sampling in the graph.
+    - If `seed_nodes` is a tensor: It indicates the graph is homogeneous.
+    - If `seed_nodes` is a dictionary: The keys should be node type and the
+      value should be corresponding heterogeneous node ids.
+    """
+
+    node_pairs: Union[
+        Tuple[torch.Tensor, torch.Tensor],
+        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
+    ] = None
+    """
+    Representation of seed node pairs utilized in link prediction tasks.
+    - If `node_pairs` is a tuple: It indicates a homogeneous graph where each
+      tuple contains two tensors representing source-destination node pairs.
+    - If `node_pairs` is a dictionary: The keys should be edge type, and the
+      value should be a tuple of tensors representing node pairs of the given
+      type.
+    """
+
+    labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    """
+    labelss associated with seed nodes in the graph.
+    - If `labels` is a tensor: It indicates the graph is homogeneous. The value
+      should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
+    - If `labels` is a dictionary: The keys should be node or edge type and the
+      value should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
+    """
+
+    negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    """
+    Representation of negative samples for the head nodes in the link
+    prediction task.
+    - If `negative_srcs` is a tensor: It indicates a homogeneous graph.
+    - If `negative_srcs` is a dictionary: The key should be edge type, and the
+      value should correspond to the negative samples for head nodes of the
+      given type.
+    """
+
+    negative_dsts: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    """
+    Representation of negative samples for the tail nodes in the link
+    prediction task.
+    - If `negative_dsts` is a tensor: It indicates a homogeneous graph.
+    - If `negative_dsts` is a dictionary: The key should be edge type, and the
+      value should correspond to the negative samples for head nodes of the
+      given type.
+    """
+
     sampled_subgraphs: List[SampledSubgraph] = None
     """A list of 'SampledSubgraph's, each one corresponding to one layer,
     representing a subset of a larger graph structure.
@@ -53,56 +103,6 @@ class MiniBatch:
     - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
     - If `input_nodes` is a dictionary: The keys should be node type and the
       value should be corresponding heterogeneous node id.
-    """
-
-    seed_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Representation of seed nodes used for sampling in the graph.
-    - If `seed_nodes` is a tensor: It indicates the graph is homogeneous.
-    - If `seed_nodes` is a dictionary: The keys should be node type and the
-      value should be corresponding heterogeneous node ids.
-    """
-
-    labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    labelss associated with seed nodes in the graph.
-    - If `labels` is a tensor: It indicates the graph is homogeneous. The value
-      should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
-    - If `labels` is a dictionary: The keys should be node or edge type and the
-      value should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
-    """
-
-    node_pairs: Union[
-        Tuple[torch.Tensor, torch.Tensor],
-        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-    ] = None
-    """
-    Representation of seed node pairs utilized in link prediction tasks.
-    - If `node_pairs` is a tuple: It indicates a homogeneous graph where each
-      tuple contains two tensors representing source-destination node pairs.
-    - If `node_pairs` is a dictionary: The keys should be edge type, and the
-      value should be a tuple of tensors representing node pairs of the given
-      type.
-    """
-
-    negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Representation of negative samples for the head nodes in the link
-    prediction task.
-    - If `negative_srcs` is a tensor: It indicates a homogeneous graph.
-    - If `negative_srcs` is a dictionary: The key should be edge type, and the
-      value should correspond to the negative samples for head nodes of the
-      given type.
-    """
-
-    negative_dsts: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Representation of negative samples for the tail nodes in the link
-    prediction task.
-    - If `negative_dsts` is a tensor: It indicates a homogeneous graph.
-    - If `negative_dsts` is a dictionary: The key should be edge type, and the
-      value should correspond to the negative samples for head nodes of the
-      given type.
     """
 
     compacted_node_pairs: Union[
