@@ -47,6 +47,7 @@ namespace sampling {
  * shm_helper.Flush();
  * // After `Flush`, the data structures are written to the shared memory.
  * // Then the helper class can be used as a reader.
+ * shm_helper.InitializeRead();
  * auto archive = shm_helper.ReadTorchArchive();
  * auto tensor = shm_helper.ReadTorchTensor();
  * auto tensor_dict = shm_helper.ReadTorchTensorDict();
@@ -55,6 +56,7 @@ namespace sampling {
  * The usage of this class as a reader is as follows:
  * @code{.cpp}
  * SharedMemoryHelper shm_helper("shm_name", 1024, false);
+ * shm_helper.InitializeRead();
  * auto archive = shm_helper.ReadTorchArchive();
  * auto tensor = shm_helper.ReadTorchTensor();
  * auto tensor_dict = shm_helper.ReadTorchTensorDict();
@@ -67,11 +69,12 @@ class SharedMemoryHelper {
   /**
    * @brief Constructor of the shared memory helper.
    * @param name The name of the shared memory.
-   * @param is_creator Whether the helper is the creator of the shared memory.
    * @param max_metadata_size The maximum size of metadata.
    */
-  SharedMemoryHelper(
-      const std::string& name, bool is_creator, int64_t max_metadata_size);
+  SharedMemoryHelper(const std::string& name, int64_t max_metadata_size);
+
+  /** @brief Initialize this helper class before reading. */
+  void InitializeRead();
 
   void WriteTorchArchive(torch::serialize::OutputArchive&& archive);
   torch::serialize::InputArchive ReadTorchArchive();

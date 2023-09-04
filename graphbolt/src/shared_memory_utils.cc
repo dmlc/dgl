@@ -34,26 +34,31 @@ inline static int64_t GetRoundedSize(int64_t size) {
 }
 
 SharedMemoryHelper::SharedMemoryHelper(
-    const std::string& name, bool is_creator, int64_t max_metadata_size)
+    const std::string& name, int64_t max_metadata_size)
     : name_(name),
-      is_creator_(is_creator),
       max_metadata_size_(max_metadata_size),
       metadata_shared_memory_(nullptr),
       data_shared_memory_(nullptr),
       metadata_offset_(0),
-      data_offset_(0) {
-  if (!is_creator) {
-    // The reader process opens the shared memory objects created by the writer
-    // process and reads data directly.
+      data_offset_(0) {}
+
+void SharedMemoryHelper::InitializeRead() {
+  metadata_offset_ = 0;
+  data_offset_ = 0;
+  if (metadata_shared_memory_ == nullptr) {
+    // Reader process opens the shared memory.
     metadata_shared_memory_ =
         std::make_unique<SharedMemory>(GetSharedMemoryMetadataName(name_));
     metadata_shared_memory_->Open(max_metadata_size_);
-
     auto archive = this->ReadTorchArchive();
     int64_t data_size = read_from_archive(archive, "data_size").toInt();
     data_shared_memory_ =
         std::make_unique<SharedMemory>(GetSharedMemoryDataName(name_));
     data_shared_memory_->Open(data_size);
+  } else {
+    // Writer process already has the shared memory.
+    // Skip the first archive recording data size before read.
+    this->ReadTorchArchive();
   }
 }
 
@@ -195,11 +200,6 @@ void SharedMemoryHelper::Flush() {
   }
   metadata_to_write_.clear();
   tensors_to_write_.clear();
-
-  metadata_offset_ = 0;
-  // Skip the first archive recording data size before read.
-  this->ReadTorchArchive();
-  data_offset_ = 0;
 }
 
 std::pair<SharedMemoryPtr, SharedMemoryPtr>
