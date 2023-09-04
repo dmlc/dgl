@@ -1,3 +1,45 @@
+"""
+This script trains and tests a GraphSAGE model for link prediction on
+large graphs using graphbolt dataloader.
+
+Paper: [Inductive Representation Learning on Large Graphs]
+(https://arxiv.org/abs/1706.02216)
+
+Unlike previous dgl examples, we've utilized the newly defined dataloader
+from GraphBolt. This example will help you grasp how to build an end-to-end
+training pipeline using GraphBolt.
+
+While node classification predicts labels for nodes based on their
+local neighborhoods, link prediction assesses the likelihood of an edge
+existing between two nodes, necessitating different sampling strategies
+that account for pairs of nodes and their joint neighborhoods.
+
+Before reading this example, please familiar yourself with graphsage node
+classification by reading the example in the
+`examples/core/graphsage/link_prediction.py`
+
+If you want to train graphsage on a large graph in a distributed fashion, read
+the example in the `examples/distributed/graphsage/`.
+
+This flowchart describes the main functional sequence of the provided example.
+main
+│
+├───> OnDiskDataset pre-processing.
+│
+├───> Instantiate SAGE model
+│
+├───> train
+│     │
+│     ├───> Get graphbolt dataloader (HIGHLIGHT)
+│     │
+│     └───> Training loop
+│           │
+│           ├───> SAGE.forward
+│           │
+│           └───> Validation set evaluation
+│
+└───> Test set evaluation
+"""
 import argparse
 
 import dgl
@@ -45,7 +87,7 @@ def to_link_block_train(data):
 
 def to_link_block_eval(data):
     """Convert eval ItemSet to a LinkPredictionBlock."""
-    src, dst, neg_dst = data[0], data[1], data[2:]
+    src, dst, neg_dst = data[0], data[1], data[2]
     block = gb.LinkPredictionBlock(node_pair=(src, dst), negative_tail=neg_dst)
     return block
 
@@ -53,6 +95,7 @@ def to_link_block_eval(data):
 def get_dataloader(args, graph, features, current_set, is_train=True):
     """Get a GraphBolt version of a dataloader for link prediction tasks."""
 
+    ############################################################################
     # [Input]:
     # 'current_set' for the current dataset.
     # 'args.batch_size' to specify the number of samples to be processed
@@ -68,10 +111,12 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
     # An ItemSampler object for handling mini-batch sampling.
     # [Role]:
     # Initialize the ItemSampler to sample mini-batche from the dataset.
+    ############################################################################
     item_sampler = gb.ItemSampler(
         current_set, batch_size=args.batch_size, shuffle=is_train
     )
 
+    ############################################################################
     # [Input]:
     # The 'item_sampler' object and a block conversion function based
     # on the 'is_train'.
@@ -80,11 +125,13 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
     # [Role]:
     # Initialize a mapper to convert mini-batches into link blocks suitable
     # for training or evaluation.
+    ############################################################################
     data_block_converter = Mapper(
         item_sampler,
         to_link_block_train if is_train else to_link_block_eval,
     )
 
+    ############################################################################
     # [Input]:
     # 'is_train' to specify the training state.
     # [Output]:
@@ -93,12 +140,14 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
     # [Role]:
     # Decide the edge format for negative sampling based on whether we are
     # in training mode.
+    ############################################################################
     format = (
         gb.LinkPredictionEdgeFormat.INDEPENDENT
         if is_train
         else gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED
     )
 
+    ############################################################################
     # [Input]:
     # 'data_block_converter' to convert sampled data into the required
     # format.
@@ -113,6 +162,7 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
     # [Role]:
     # Initialize the UniformNegativeSampler for negative sampling in link
     # prediction.
+    ############################################################################
     negative_sampler = gb.UniformNegativeSampler(
         data_block_converter,
         args.neg_ratio,
@@ -120,6 +170,7 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
         graph,
     )
 
+    ############################################################################
     # [Input]:
     # The 'negative_sampler' or 'data_block_converter' depending
     # on 'is_train', the 'graph', and the fanout size ('args.fanout').
@@ -127,12 +178,14 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
     # A NeighborSampler object to sample neighbors.
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
+    ############################################################################
     subgraph_sampler = gb.NeighborSampler(
         negative_sampler if is_train else data_block_converter,
         graph,
         args.fanout,
     )
 
+    ############################################################################
     # [Input]:
     # The 'subgraph_sampler', 'features' to be fetched, and the
     # node feature key "feat".
@@ -141,8 +194,10 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
     # subgraphs.
+    ############################################################################
     feature_fetcher = gb.FeatureFetcher(subgraph_sampler, features, ["feat"])
 
+    ############################################################################
     # [Input]:
     # The 'feature_fetcher' and the number of worker processes
     # ('args.num_workers').
@@ -151,6 +206,7 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel and
     # copy it to the CPU.
+    ############################################################################
     dataloader = gb.MultiProcessDataLoader(
         gb.CopyTo(feature_fetcher, torch.device("cpu")),
         num_workers=args.num_workers,
@@ -190,7 +246,7 @@ def evaluate(args, graph, features, current_set, model):
     for step, data in tqdm.tqdm(enumerate(dataloader)):
         # Unpack LinkPredictionBlock.
         compacted_pairs = data.compacted_node_pair
-        node_feature = data.node_feature[(None, "feat")].float()
+        node_feature = data.node_features["feat"].float()
         blocks = to_dgl_blocks(data.sampled_subgraphs)
 
         # Get the embeddings of the input nodes.
@@ -200,9 +256,14 @@ def evaluate(args, graph, features, current_set, model):
             .squeeze()
             .detach()
         )
+        # Calculate the evaluation neg-ratio.
+        eval_neg_ratio = (
+            data.compacted_negative_tail.shape[0]
+            // data.compacted_node_pair[0].shape[0]
+        )
         # We need to repeat the negative source nodes to match the number of
         # negative destination nodes.
-        neg_src = compacted_pairs[0].repeat_interleave(args.neg_ratio, dim=0)
+        neg_src = compacted_pairs[0].repeat_interleave(eval_neg_ratio, dim=0)
         neg_score = (
             model.predictor(y[neg_src] * y[data.compacted_negative_tail])
             .squeeze()
@@ -211,7 +272,7 @@ def evaluate(args, graph, features, current_set, model):
         pos_pred.append(pos_score)
         neg_pred.append(neg_score)
     pos_pred = torch.cat(pos_pred, dim=0)
-    neg_pred = torch.cat(neg_pred, dim=0).view(-1, args.neg_ratio)
+    neg_pred = torch.cat(neg_pred, dim=0).view(-1, eval_neg_ratio)
 
     input_dict = {"y_pred_pos": pos_pred, "y_pred_neg": neg_pred}
     mrr = evaluator.eval(input_dict)["mrr_list"]
@@ -253,6 +314,8 @@ def train(args, graph, features, train_set, valid_set, model):
                 f"Loss {(total_loss) / (step + 1):.4f}",
                 end="\r",
             )
+            if step + 1 == 1000:
+                break
 
         # Evaluate the model.
         print("Validation")
