@@ -471,7 +471,8 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
-void CSCSamplingGraph::HoldSharedMemoryPtr(std::pair<SharedMemoryPtr, SharedMemoryPtr> ptr) {
+void CSCSamplingGraph::HoldSharedMemoryPtr(
+    std::pair<SharedMemoryPtr, SharedMemoryPtr> ptr) {
   std::tie(tensor_metadata_shm_, tensor_data_shm_) = ptr;
 }
 
