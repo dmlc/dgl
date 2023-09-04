@@ -18,12 +18,7 @@ from dgl.sparse import (
     val_like,
 )
 
-from .utils import (
-    rand_coo,
-    rand_csc,
-    rand_csr,
-    sparse_matrix_to_dense,
-)
+from .utils import rand_coo, rand_csc, rand_csr, sparse_matrix_to_dense
 
 
 def _torch_sparse_csr_tensor(indptr, indices, val, torch_sparse_shape):
@@ -607,8 +602,7 @@ def test_torch_sparse_coo_conversion(row, col, nz_dim, shape):
         torch_sparse_shape += (nz_dim,)
         val_shape += (nz_dim,)
     val = torch.randn(val_shape).to(dev)
-    torch_sparse_coo = torch.sparse_coo_tensor(
-        indices, val, torch_sparse_shape)
+    torch_sparse_coo = torch.sparse_coo_tensor(indices, val, torch_sparse_shape)
     spmat = from_torch_sparse(torch_sparse_coo)
 
     def _assert_spmat_equal_to_torch_sparse_coo(spmat, torch_sparse_coo):
