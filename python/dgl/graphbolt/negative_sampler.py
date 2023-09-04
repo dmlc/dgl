@@ -62,15 +62,15 @@ class NegativeSampler(Mapper):
             if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
                 minibatch.labels = {}
             else:
-                minibatch.negative_head, minibatch.negative_tail = {}, {}
+                minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
             for etype, pos_pairs in node_pairs.items():
                 self._collate(
                     minibatch, self._sample_with_etype(pos_pairs, etype), etype
                 )
             if self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
-                minibatch.negative_tail = None
+                minibatch.negative_dsts = None
             if self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
-                minibatch.negative_head = None
+                minibatch.negative_srcs = None
         else:
             self._collate(minibatch, self._sample_with_etype(node_pairs))
         return minibatch
@@ -147,8 +147,8 @@ class NegativeSampler(Mapper):
                     f"Unsupported output format {self.output_format}."
                 )
             if etype is not None:
-                minibatch.negative_head[etype] = neg_src
-                minibatch.negative_tail[etype] = neg_dst
+                minibatch.negative_srcs[etype] = neg_src
+                minibatch.negative_dsts[etype] = neg_dst
             else:
-                minibatch.negative_head = neg_src
-                minibatch.negative_tail = neg_dst
+                minibatch.negative_srcs = neg_src
+                minibatch.negative_dsts = neg_dst

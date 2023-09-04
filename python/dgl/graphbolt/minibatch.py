@@ -85,22 +85,22 @@ class MiniBatch:
       type.
     """
 
-    negative_head: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the head nodes in the link
     prediction task.
-    - If `negative_head` is a tensor: It indicates a homogeneous graph.
-    - If `negative_head` is a dictionary: The key should be edge type, and the
+    - If `negative_srcs` is a tensor: It indicates a homogeneous graph.
+    - If `negative_srcs` is a dictionary: The key should be edge type, and the
       value should correspond to the negative samples for head nodes of the
       given type.
     """
 
-    negative_tail: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    negative_dsts: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the tail nodes in the link
     prediction task.
-    - If `negative_tail` is a tensor: It indicates a homogeneous graph.
-    - If `negative_tail` is a dictionary: The key should be edge type, and the
+    - If `negative_dsts` is a tensor: It indicates a homogeneous graph.
+    - If `negative_dsts` is a dictionary: The key should be edge type, and the
       value should correspond to the negative samples for head nodes of the
       given type.
     """
@@ -114,15 +114,15 @@ class MiniBatch:
     all node ids inside are compacted.
     """
 
-    compacted_negative_head: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    compacted_negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    Representation of compacted nodes corresponding to 'negative_head', where
+    Representation of compacted nodes corresponding to 'negative_srcs', where
     all node ids inside are compacted.
     """
 
-    compacted_negative_tail: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    compacted_negative_dsts: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    Representation of compacted nodes corresponding to 'negative_tail', where
+    Representation of compacted nodes corresponding to 'negative_dsts', where
     all node ids inside are compacted.
     """
 
