@@ -67,20 +67,20 @@ class MiniBatch:
     """
     labelss associated with seed nodes in the graph.
     - If `labels` is a tensor: It indicates the graph is homogeneous. The value
-      should be corresponding labelss to given 'seed_nodes' or 'node_pair'.
+      should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
     - If `labels` is a dictionary: The keys should be node or edge type and the
-      value should be corresponding labelss to given 'seed_nodes' or 'node_pair'.
+      value should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
     """
 
-    node_pair: Union[
+    node_pairs: Union[
         Tuple[torch.Tensor, torch.Tensor],
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ] = None
     """
     Representation of seed node pairs utilized in link prediction tasks.
-    - If `node_pair` is a tuple: It indicates a homogeneous graph where each
+    - If `node_pairs` is a tuple: It indicates a homogeneous graph where each
       tuple contains two tensors representing source-destination node pairs.
-    - If `node_pair` is a dictionary: The keys should be edge type, and the
+    - If `node_pairs` is a dictionary: The keys should be edge type, and the
       value should be a tuple of tensors representing node pairs of the given
       type.
     """
@@ -105,12 +105,12 @@ class MiniBatch:
       given type.
     """
 
-    compacted_node_pair: Union[
+    compacted_node_pairs: Union[
         Tuple[torch.Tensor, torch.Tensor],
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ] = None
     """
-    Representation of compacted node pairs corresponding to 'node_pair', where
+    Representation of compacted node pairs corresponding to 'node_pairs', where
     all node ids inside are compacted.
     """
 

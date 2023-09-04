@@ -14,7 +14,7 @@ def minibatch_node_collator(data):
 
 
 def minibatch_link_collator(data):
-    minibatch = gb.MiniBatch(node_pair=data)
+    minibatch = gb.MiniBatch(node_pairs=data)
     return minibatch
 
 

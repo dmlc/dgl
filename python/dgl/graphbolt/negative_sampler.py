@@ -44,9 +44,9 @@ class NegativeSampler(Mapper):
         Parameters
         ----------
         minibatch : MiniBatch
-            An instance of 'MiniBatch' class requires the 'node_pair' field.
+            An instance of 'MiniBatch' class requires the 'node_pairs' field.
             This function is responsible for generating negative edges
-            corresponding to the positive edges defined by the 'node_pair'. In
+            corresponding to the positive edges defined by the 'node_pairs'. In
             cases where negative edges already exist, this function will
             overwrite them.
 
@@ -56,7 +56,7 @@ class NegativeSampler(Mapper):
             An instance of 'MiniBatch' encompasses both positive and negative
             samples.
         """
-        node_pairs = minibatch.node_pair
+        node_pairs = minibatch.node_pairs
         assert node_pairs is not None
         if isinstance(node_pairs, Mapping):
             if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
@@ -111,9 +111,9 @@ class NegativeSampler(Mapper):
             Canonical edge type.
         """
         pos_src, pos_dst = (
-            minibatch.node_pair[etype]
+            minibatch.node_pairs[etype]
             if etype is not None
-            else minibatch.node_pair
+            else minibatch.node_pairs
         )
         neg_src, neg_dst = neg_pairs
         if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
@@ -123,10 +123,10 @@ class NegativeSampler(Mapper):
             dst = torch.cat([pos_dst, neg_dst])
             labels = torch.cat([pos_labels, neg_labels])
             if etype is not None:
-                minibatch.node_pair[etype] = (src, dst)
+                minibatch.node_pairs[etype] = (src, dst)
                 minibatch.labels[etype] = labels
             else:
-                minibatch.node_pair = (src, dst)
+                minibatch.node_pairs = (src, dst)
                 minibatch.labels = labels
         else:
             if self.output_format == LinkPredictionEdgeFormat.CONDITIONED:

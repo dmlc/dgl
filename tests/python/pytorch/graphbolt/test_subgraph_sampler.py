@@ -22,7 +22,7 @@ def test_SubgraphSampler_Node(labor):
 
 
 def to_link_batch(data):
-    block = gb.MiniBatch(node_pair=data)
+    block = gb.MiniBatch(node_pairs=data)
     return block
 
 
