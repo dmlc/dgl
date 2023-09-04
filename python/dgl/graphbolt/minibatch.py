@@ -7,11 +7,11 @@ import torch
 
 from .sampled_subgraph import SampledSubgraph
 
-__all__ = ["DataBlock", "NodeClassificationBlock", "LinkPredictionBlock"]
+__all__ = ["MiniBatch"]
 
 
 @dataclass
-class DataBlock:
+class MiniBatch:
     r"""A composite data class for data structure in the graphbolt. It is
     designed to facilitate the exchange of data among different components
     involved in processing data. The purpose of this class is to unify the
@@ -52,12 +52,6 @@ class DataBlock:
       value should be corresponding heterogeneous node id.
     """
 
-
-@dataclass
-class NodeClassificationBlock(DataBlock):
-    r"""A subclass of 'UnifiedDataStruct', specialized for handling node level
-    tasks."""
-
     seed_node: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of seed nodes used for sampling in the graph.
@@ -69,16 +63,11 @@ class NodeClassificationBlock(DataBlock):
     label: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Labels associated with seed nodes in the graph.
-    - If `label` is a tensor: It indicates the graph is homogeneous.
-    - If `label` is a dictionary: The keys should be node type and the
-      value should be corresponding node labels to given 'seed_node'.
+    - If `label` is a tensor: It indicates the graph is homogeneous. The value
+      should be corresponding labels to given 'seed_node' or 'node_pair'.
+    - If `label` is a dictionary: The keys should be node or edge type and the
+      value should be corresponding labels to given 'seed_node' or 'node_pair'.
     """
-
-
-@dataclass
-class LinkPredictionBlock(DataBlock):
-    r"""A subclass of 'UnifiedDataStruct', specialized for handling edge level
-    tasks."""
 
     node_pair: Union[
         Tuple[torch.Tensor, torch.Tensor],
@@ -91,15 +80,6 @@ class LinkPredictionBlock(DataBlock):
     - If `node_pair` is a dictionary: The keys should be edge type, and the
       value should be a tuple of tensors representing node pairs of the given
       type.
-    """
-
-    label: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Labels associated with the link prediction task.
-    - If `label` is a tensor: It indicates a homogeneous graph. The value are
-      edge labels corresponding to given 'node_pair'.
-    - If `label` is a dictionary: The keys should be edge type, and the value
-      should correspond to given 'node_pair'.
     """
 
     negative_head: Union[torch.Tensor, Dict[str, torch.Tensor]] = None

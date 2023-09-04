@@ -7,11 +7,6 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 
-def to_node_block(data):
-    block = dgl.graphbolt.NodeClassificationBlock(seed_node=data)
-    return block
-
-
 def test_DataLoader():
     N = 32
     B = 4
@@ -25,9 +20,11 @@ def test_DataLoader():
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
     item_sampler = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
-    block_converter = Mapper(item_sampler, to_node_block)
+    minibatch_converter = Mapper(
+        item_sampler, gb_test_utils.minibatch_node_collator
+    )
     subgraph_sampler = dgl.graphbolt.NeighborSampler(
-        block_converter,
+        minibatch_converter,
         graph,
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )

@@ -53,9 +53,9 @@ class NeighborSampler(SubgraphSampler):
         -------
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
-        >>> def to_link_block(data):
-            ... block = gb.LinkPredictionBlock(node_pair=data)
-            ... return block
+        >>> def minibatch_link_collator(data):
+            ... minibatch  = gb.MiniBatch(node_pair=data)
+            ... return minibatch
             ...
         >>> from dgl import graphbolt as gb
         >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
@@ -67,9 +67,10 @@ class NeighborSampler(SubgraphSampler):
         >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(item_sampler, to_link_block)
+        >>> minibatch_converter = Mapper(item_sampler,
+            ...minibatch_link_collator)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...data_block_converter, 2, data_format, graph)
+            ...minibatch_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
             ...torch.LongTensor([15])]
         >>> subgraph_sampler = gb.NeighborSampler(
@@ -164,9 +165,9 @@ class LayerNeighborSampler(NeighborSampler):
         -------
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
-        >>> def to_link_block(data):
-            ... block = gb.LinkPredictionBlock(node_pair=data)
-            ... return block
+        >>> def minibatch_link_collator(data):
+            ... minibatch  = gb.MiniBatch(node_pair=data)
+            ... return minibatch
             ...
         >>> from dgl import graphbolt as gb
         >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
@@ -178,9 +179,10 @@ class LayerNeighborSampler(NeighborSampler):
         >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(item_sampler, to_link_block)
+        >>> minibatch_converter = Mapper(item_sampler,
+            ...minibatch_link_collator)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...data_block_converter, 2, data_format, graph)
+            ...minibatch_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
             ...torch.LongTensor([15])]
         >>> subgraph_sampler = gb.LayerNeighborSampler(

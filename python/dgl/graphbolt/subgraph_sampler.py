@@ -6,7 +6,6 @@ from typing import Dict
 from torchdata.datapipes.iter import Mapper
 
 from .base import etype_str_to_tuple
-from .data_block import LinkPredictionBlock, NodeClassificationBlock
 from .utils import unique_and_compact
 
 
@@ -28,24 +27,30 @@ class SubgraphSampler(Mapper):
         """
         super().__init__(datapipe, self._sample)
 
-    def _sample(self, data):
-        if isinstance(data, LinkPredictionBlock):
+    def _sample(self, minibatch):
+        if minibatch.node_pair is not None:
             (
                 seeds,
-                data.compacted_node_pair,
-                data.compacted_negative_head,
-                data.compacted_negative_tail,
-            ) = self._link_prediction_preprocess(data)
-        elif isinstance(data, NodeClassificationBlock):
-            seeds = data.seed_node
+                minibatch.compacted_node_pair,
+                minibatch.compacted_negative_head,
+                minibatch.compacted_negative_tail,
+            ) = self._node_pair_preprocess(minibatch)
+        elif minibatch.seed_node is not None:
+            seeds = minibatch.seed_node
         else:
-            raise TypeError(f"Unsupported type of data {data}.")
-        data.input_nodes, data.sampled_subgraphs = self._sample_subgraphs(seeds)
-        return data
+            raise ValueError(
+                f"Invalid minibatch {minibatch}: Either 'node_pair' or \
+                'seed_node' should have a value."
+            )
+        (
+            minibatch.input_nodes,
+            minibatch.sampled_subgraphs,
+        ) = self._sample_subgraphs(seeds)
+        return minibatch
 
-    def _link_prediction_preprocess(self, data):
-        node_pair = data.node_pair
-        neg_src, neg_dst = data.negative_head, data.negative_tail
+    def _node_pair_preprocess(self, minibatch):
+        node_pair = minibatch.node_pair
+        neg_src, neg_dst = minibatch.negative_head, minibatch.negative_tail
         has_neg_src = neg_src is not None
         has_neg_dst = neg_dst is not None
         is_heterogeneous = isinstance(node_pair, Dict)
