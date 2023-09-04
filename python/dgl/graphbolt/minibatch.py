@@ -76,6 +76,14 @@ class MiniBatch:
     representing a subset of a larger graph structure.
     """
 
+    input_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    """A representation of input nodes in the outermost layer. Conatins all nodes
+       in the 'sampled_subgraphs'.
+    - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
+    - If `input_nodes` is a dictionary: The keys should be node type and the
+      value should be corresponding heterogeneous node id.
+    """
+
     node_features: Union[
         Dict[str, torch.Tensor], Dict[Tuple[str, str], torch.Tensor]
     ] = None
@@ -95,14 +103,6 @@ class MiniBatch:
       - If keys are tuples: It means the graph is heterogeneous, and the keys
       are tuples of '(edge_type, feature_name)'. Note, edge type is single
       string of format 'str:str:str'.
-    """
-
-    input_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """A representation of input nodes in the outermost layer. Conatins all nodes
-       in the 'sampled_subgraphs'.
-    - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
-    - If `input_nodes` is a dictionary: The keys should be node type and the
-      value should be corresponding heterogeneous node id.
     """
 
     compacted_node_pairs: Union[
