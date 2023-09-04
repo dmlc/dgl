@@ -23,7 +23,7 @@ def test_to_dgl_graphs_hetero():
         reverse_row_node_ids=reverse_row_node_ids,
         reverse_edge_ids=reverse_edge_ids,
     )
-    g = gb.DataBlock(
+    g = gb.MiniBatch(
         sampled_subgraphs=[subgraph],
         node_features=node_features,
         edge_features=[edge_features],
@@ -55,7 +55,7 @@ def test_to_dgl_graphs_homo():
         reverse_row_node_ids=reverse_row_node_ids,
         reverse_edge_ids=reverse_edge_ids,
     )
-    g = gb.DataBlock(
+    g = gb.MiniBatch(
         sampled_subgraphs=[subgraph],
         node_features=node_features,
         edge_features=[edge_features],
