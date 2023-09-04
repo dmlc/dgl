@@ -12,7 +12,7 @@ that account for pairs of nodes and their joint neighborhoods.
 
 Before reading this example, please familiar yourself with graphsage node
 classification by reading the example in the
-`examples/core/graphsage/link_prediction.py`
+`examples/core/graphsage/node_classification.py`
 
 If you want to train graphsage on a large graph in a distributed fashion, read
 the example in the `examples/distributed/graphsage/`.
