@@ -5,10 +5,6 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 
-def to_data_block(data):
-    return gb.LinkPredictionBlock(node_pair=data)
-
-
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
 def test_NegativeSampler_Independent_Format(negative_ratio):
     # Construct CSCSamplingGraph.
@@ -21,8 +17,10 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    minibatch_converter = Mapper(minibatch_sampler, to_data_block)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    minibatch_converter = Mapper(
+        item_sampler, gb_test_utils.minibatch_link_collator
+    )
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
         minibatch_converter,
@@ -54,8 +52,10 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    minibatch_converter = Mapper(minibatch_sampler, to_data_block)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    minibatch_converter = Mapper(
+        item_sampler, gb_test_utils.minibatch_link_collator
+    )
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
         minibatch_converter,
@@ -90,8 +90,10 @@ def test_NegativeSampler_Head_Conditioned_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    minibatch_converter = Mapper(minibatch_sampler, to_data_block)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    minibatch_converter = Mapper(
+        item_sampler, gb_test_utils.minibatch_link_collator
+    )
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
         minibatch_converter,
@@ -124,8 +126,10 @@ def test_NegativeSampler_Tail_Conditioned_Format(negative_ratio):
         )
     )
     batch_size = 10
-    minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    minibatch_converter = Mapper(minibatch_sampler, to_data_block)
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    minibatch_converter = Mapper(
+        item_sampler, gb_test_utils.minibatch_link_collator
+    )
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
         minibatch_converter,
@@ -166,11 +170,6 @@ def get_hetero_graph():
     )
 
 
-def to_link_block(data):
-    block = gb.LinkPredictionBlock(node_pair=data)
-    return block
-
-
 @pytest.mark.parametrize(
     "format",
     [
@@ -199,8 +198,10 @@ def test_NegativeSampler_Hetero_Data(format):
         }
     )
 
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
-    minibatch_converter = Mapper(minibatch_dp, to_link_block)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
+    minibatch_converter = Mapper(
+        item_sampler_dp, gb_test_utils.minibatch_link_collator
+    )
     negative_dp = gb.UniformNegativeSampler(
         minibatch_converter, 1, format, graph
     )
