@@ -19,10 +19,10 @@ def test_FeatureFetcher_homo():
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(
+    minibatch_converter = Mapper(
         item_sampler_dp, gb_test_utils.minibatch_node_collator
     )
-    sampler_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
+    sampler_dp = gb.NeighborSampler(minibatch_converter, graph, fanouts)
     fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
@@ -106,10 +106,10 @@ def test_FeatureFetcher_hetero():
     item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(
+    minibatch_converter = Mapper(
         item_sampler_dp, gb_test_utils.minibatch_node_collator
     )
-    sampler_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
+    sampler_dp = gb.NeighborSampler(minibatch_converter, graph, fanouts)
     fetcher_dp = gb.FeatureFetcher(
         sampler_dp, feature_store, {"n1": ["a"], "n2": ["a"]}
     )

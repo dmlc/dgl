@@ -67,10 +67,10 @@ class NeighborSampler(SubgraphSampler):
         >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(item_sampler,
+        >>> minibatch_converter = Mapper(item_sampler,
             ...minibatch_link_collator)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...data_block_converter, 2, data_format, graph)
+            ...minibatch_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
             ...torch.LongTensor([15])]
         >>> subgraph_sampler = gb.NeighborSampler(
@@ -179,10 +179,10 @@ class LayerNeighborSampler(NeighborSampler):
         >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(item_sampler,
+        >>> minibatch_converter = Mapper(item_sampler,
             ...minibatch_link_collator)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...data_block_converter, 2, data_format, graph)
+            ...minibatch_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
             ...torch.LongTensor([15])]
         >>> subgraph_sampler = gb.LayerNeighborSampler(

@@ -57,6 +57,7 @@ class NegativeSampler(Mapper):
             samples.
         """
         node_pairs = data.node_pair
+        assert node_pairs is not None
         if isinstance(node_pairs, Mapping):
             if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
                 data.label = {}
