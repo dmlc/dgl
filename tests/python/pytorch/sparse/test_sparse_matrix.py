@@ -18,6 +18,13 @@ from dgl.sparse import (
     val_like,
 )
 
+from .utils import (
+    rand_coo,
+    rand_csc,
+    rand_csr,
+    sparse_matrix_to_dense,
+)
+
 
 def _torch_sparse_csr_tensor(indptr, indices, val, torch_sparse_shape):
     with warnings.catch_warnings():
@@ -450,144 +457,46 @@ def test_has_duplicate():
     assert csc_A.has_duplicate()
 
 
+@pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("shape", [(5, 5), (6, 4)])
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("row", [(0, 1, 1, 2, 3, 4), (0, 1, 2, 3, 4, 4)])
-@pytest.mark.parametrize("col", [(0, 2, 4, 3, 5, 0), (1, 2, 5, 3, 0, 1)])
-@pytest.mark.parametrize("dim", [0, 1])
-@pytest.mark.parametrize("index", [(0, 1, 4), (1, 1, 3)])
-def test_index_select(dense_dim, row, col, dim, index):
-    val_shape = (len(row),)
-    if dense_dim is not None:
-        val_shape += (dense_dim,)
+@pytest.mark.parametrize("select_dim", [0, 1])
+@pytest.mark.parametrize("index", [(0, 1, 3), (1, 2)])
+def test_index_select(create_func, shape, dense_dim, select_dim, index):
     ctx = F.ctx()
-
-    val = torch.randn(val_shape).to(ctx)
-    row = torch.tensor(row).to(ctx)
-    col = torch.tensor(col).to(ctx)
+    A = create_func(shape, 20, ctx, dense_dim)
     index = torch.tensor(index).to(ctx)
-    coo_A = from_coo(row, col, val, None)
+    A_select = A.index_select(select_dim, index)
 
-    # CSR
-    indptr, indices, _ = coo_A.csr()
-    A = from_csr(indptr, indices, val, None)
+    dense = sparse_matrix_to_dense(A)
+    dense_select = torch.index_select(dense, select_dim, index)
 
-    A_select = A.index_select(dim, index)
+    A_select_to_dense = sparse_matrix_to_dense(A_select)
 
-    # Transfer matrix to dense torch. `A_dense_map` is a 2-dim matrix at
-    # the same shape of sparse matrix. The non-zero element is the index of
-    # matrix value indicates there is a non-zero vector in the origin matrix.
-    A_dense_map = torch.zeros(A.shape)
-    for cnt in range(len(list(A.val))):
-        A_dense_map[list(row)[cnt], list(col)[cnt]] = torch.tensor(cnt + 1)
-    # Generate correct result by dense select.
-    A_dense_select = torch.index_select(A_dense_map, dim, index)
-    Index_verify = A_dense_select.nonzero()
-
-    # Sort format for check
-    A_select_row, A_select_col, A_select_val = (
-        list(A_select.row),
-        list(A_select.col),
-        list(A_select.val),
-    )
-    if dim == 0:  # CSR result sorted by (src, dst)
-        A_new = [
-            (A_select_row[i], A_select_col[i], A_select_val[i])
-            for i in range(len(A_select.row))
-        ]
-        A_new.sort(key=lambda x: (int(x[0]), int(x[1])))
-        for i in range(len(A_new)):
-            A_select_row[i], A_select_col[i], A_select_val[i] = A_new[i]
-    else:  # CSC verify data sorted by (dst, src)
-        idx_list = [tuple(idx) for idx in list(Index_verify)]
-        idx_list.sort(key=lambda x: (int(x[1]), int(x[0])))
-        Index_verify = torch.tensor(idx_list)
-
-    assert A.nnz == len(list(A.val))
-    assert A_select.nnz == Index_verify.shape[0]
-    assert A_select.shape == A_dense_select.shape
-    assert A_select_row == list(Index_verify.T[0])
-    assert A_select_col == list(Index_verify.T[1])
-    assert torch.allclose(
-        torch.stack(A_select_val),
-        torch.stack(
-            [
-                list(A.val)[int(A_dense_select[tuple(idx)]) - 1]
-                for idx in list(Index_verify)
-            ]
-        ),
-    )
+    assert A_select_to_dense.shape == dense_select.shape
+    assert torch.allclose(A_select_to_dense, dense_select)
 
 
+@pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("shape", [(5, 5), (6, 4)])
 @pytest.mark.parametrize("dense_dim", [None, 4])
-@pytest.mark.parametrize("row", [(0, 1, 1, 2, 3, 4), (0, 1, 2, 3, 4, 4)])
-@pytest.mark.parametrize("col", [(0, 2, 4, 3, 5, 0), (1, 2, 5, 3, 0, 1)])
-@pytest.mark.parametrize("dim", [0, 1])
-@pytest.mark.parametrize("rang", [slice(0, 3), slice(2, 4)])
-def test_range_select(dense_dim, row, col, dim, rang):
-    val_shape = (len(row),)
-    if dense_dim is not None:
-        val_shape += (dense_dim,)
+@pytest.mark.parametrize("select_dim", [0, 1])
+@pytest.mark.parametrize("rang", [slice(0, 2), slice(1, 3)])
+def test_range_select(create_func, shape, dense_dim, select_dim, rang):
     ctx = F.ctx()
+    A = create_func(shape, 20, ctx, dense_dim)
+    A_select = A.range_select(select_dim, rang)
 
-    val = torch.randn(val_shape).to(ctx)
-    row = torch.tensor(row).to(ctx)
-    col = torch.tensor(col).to(ctx)
-
-    coo_A = from_coo(row, col, val, None)
-
-    # CSR
-    indptr, indices, _ = coo_A.csr()
-    A = from_csr(indptr, indices, val, None)
-
-    A_select = A.range_select(dim, rang)
-
-    # Transfer matrix to dense torch. `A_dense_map` is a 2-dim matrix at
-    # the same shape of sparse matrix. The non-zero element is the index of
-    # matrix value indicates there is a non-zero vector in the origin matrix.
-    A_dense_map = torch.zeros(A.shape)
-    for cnt in range(len(list(A.val))):
-        A_dense_map[list(row)[cnt], list(col)[cnt]] = torch.tensor(cnt + 1)
-    # Generate correct result by dense select.
-    if dim == 0:
-        A_dense_select = A_dense_map[rang, :]
+    dense = sparse_matrix_to_dense(A)
+    if select_dim == 0:
+        dense_select = dense[rang, :]
     else:
-        A_dense_select = A_dense_map[:, rang]
+        dense_select = dense[:, rang]
 
-    Index_verify = A_dense_select.nonzero()
+    A_select_to_dense = sparse_matrix_to_dense(A_select)
 
-    # Sort format for check
-    A_select_row, A_select_col, A_select_val = (
-        list(A_select.row),
-        list(A_select.col),
-        list(A_select.val),
-    )
-    if dim == 0:  # CSR result sorted by (src, dst)
-        A_new = [
-            (A_select_row[i], A_select_col[i], A_select_val[i])
-            for i in range(len(A_select.row))
-        ]
-        A_new.sort(key=lambda x: (int(x[0]), int(x[1])))
-        for i in range(len(A_new)):
-            A_select_row[i], A_select_col[i], A_select_val[i] = A_new[i]
-    else:  # CSC verify data sorted by (dst, src)
-        idx_list = [tuple(idx) for idx in list(Index_verify)]
-        idx_list.sort(key=lambda x: (int(x[1]), int(x[0])))
-        Index_verify = torch.tensor(idx_list)
-
-    assert A.nnz == len(list(A.val))
-    assert A_select.nnz == Index_verify.shape[0]
-    assert A_select.shape == A_dense_select.shape
-    assert A_select_row == list(Index_verify.T[0])
-    assert A_select_col == list(Index_verify.T[1])
-    assert torch.allclose(
-        torch.stack(A_select_val),
-        torch.stack(
-            [
-                list(A.val)[int(A_dense_select[tuple(idx)]) - 1]
-                for idx in list(Index_verify)
-            ]
-        ),
-    )
+    assert A_select_to_dense.shape == dense_select.shape
+    assert torch.allclose(A_select_to_dense, dense_select)
 
 
 def test_print():
@@ -698,7 +607,8 @@ def test_torch_sparse_coo_conversion(row, col, nz_dim, shape):
         torch_sparse_shape += (nz_dim,)
         val_shape += (nz_dim,)
     val = torch.randn(val_shape).to(dev)
-    torch_sparse_coo = torch.sparse_coo_tensor(indices, val, torch_sparse_shape)
+    torch_sparse_coo = torch.sparse_coo_tensor(
+        indices, val, torch_sparse_shape)
     spmat = from_torch_sparse(torch_sparse_coo)
 
     def _assert_spmat_equal_to_torch_sparse_coo(spmat, torch_sparse_coo):
