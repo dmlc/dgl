@@ -31,6 +31,8 @@ struct SamplerArgs<SamplerType::LABOR> {
   int64_t num_nodes;
 };
 
+class SharedMemoryHelper;
+
 /**
  * @brief A sampling oriented csc format graph.
  *
@@ -243,18 +245,14 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       PickFn pick_fn) const;
 
   /**
-   * @brief Build a CSCSamplingGraph from shared memory tensors.
+   * @brief Build a CSCSamplingGraph from a shared memory helper. This function
+   * takes ownership of the shared memory objects in the helper.
    *
-   * @param shared_memory_tensors A tuple of two share memory objects holding
-   * tensor meta information and data respectively, and a vector of optional
-   * tensors on shared memory.
-   *
+   * @param shared_memory_helper The shared memory helper.
    * @return A new CSCSamplingGraph on shared memory.
    */
-  static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryTensors(
-      std::tuple<
-          SharedMemoryPtr, SharedMemoryPtr,
-          std::vector<torch::optional<torch::Tensor>>>&& shared_memory_tensors);
+  static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
+      SharedMemoryHelper&& shared_memory_helper);
 
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;

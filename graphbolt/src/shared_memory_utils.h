@@ -20,52 +20,122 @@ namespace graphbolt {
 namespace sampling {
 
 /**
- * @brief SharedMemoryTensors includes: (1) two share memory objects holding
- * tensor meta information and data respectively; (2) a vector of optional
- * tensors on shared memory.
+ * @brief SharedMemoryHelper is a helper class to write/read data structures
+ * to/from shared memory.
+ *
+ * In order to write data structure to shared memory, we need to serialize the
+ * data structure to a binary buffer and then write the buffer to the shared
+ * memory. However, the size of the binary buffer is not known in advance. To
+ * solve this problem, we use two shared memory objects: one for storing the
+ * metadata and the other for storing the binary buffer. The metadata includes
+ * the meta information of data structures such as size and shape. The size of
+ * the metadata is decided by the user via `max_metadata_size`. The size of
+ * the binary buffer is decided by the size of the data structures.
+ *
+ * To avoid repeated shared memory allocation, this helper class uses lazy data
+ * structure writing. The data structures are written to the shared memory only
+ * when `Flush` is called. The data structures are written in the order of
+ * calling `WriteTorchArchive`, `WriteTorchTensor` and `WriteTorchTensorDict`,
+ * and also read in the same order.
+ *
+ * The usage of this class as a writer is as follows:
+ * @code{.cpp}
+ * SharedMemoryHelper shm_helper("shm_name", 1024, true);
+ * shm_helper.WriteTorchArchive(archive);
+ * shm_helper.WriteTorchTensor(tensor);
+ * shm_helper.WriteTorchTensorDict(tensor_dict);
+ * shm_helper.Flush();
+ * // After `Flush`, the data structures are written to the shared memory.
+ * // Then the helper class can be used as a reader.
+ * shm_helper.InitializeRead();
+ * auto archive = shm_helper.ReadTorchArchive();
+ * auto tensor = shm_helper.ReadTorchTensor();
+ * auto tensor_dict = shm_helper.ReadTorchTensorDict();
+ * @endcode
+ *
+ * The usage of this class as a reader is as follows:
+ * @code{.cpp}
+ * SharedMemoryHelper shm_helper("shm_name", 1024, false);
+ * shm_helper.InitializeRead();
+ * auto archive = shm_helper.ReadTorchArchive();
+ * auto tensor = shm_helper.ReadTorchTensor();
+ * auto tensor_dict = shm_helper.ReadTorchTensorDict();
+ * @endcode
+ *
+ *
  */
-using SharedMemoryTensors = std::tuple<
-    SharedMemoryPtr, SharedMemoryPtr,
-    std::vector<torch::optional<torch::Tensor>>>;
+class SharedMemoryHelper {
+ public:
+  /**
+   * @brief Constructor of the shared memory helper.
+   * @param name The name of the shared memory.
+   * @param max_metadata_size The maximum size of metadata.
+   */
+  SharedMemoryHelper(const std::string& name, int64_t max_metadata_size);
 
-/**
- * @brief Copy torch tensors to shared memory.
- *
- * To simpilfy this interface, a regular tensor is also wrapped as an optional
- * one.
- *
- * The function has two steps:
- * 1. Copy meta info to shared memory `shared_memory_name + "_meta"`. This is to
- * make sure that other loading processes can get the meta info of tensors.
- * 2. Copy tensors to shared memory `shared_memory_name + "_data"`, which can be
- * loaded by other processes with meta info.
- *
- * The order of tensors loaded from `LoadTensorsFromSharedMemory` will be
- * exactly the same as the tensors copied from `CopyTensorsToSharedMemory`.
- *
- * @param name The name of shared memory.
- * @param tensors The tensors to copy.
- * @param max_meta_memory_size The maximum size of meta memory.
- *
- * @return A tuple of tensor meta shared memory, tensor data shared memory, and
- * shared optional tensors.
- */
-SharedMemoryTensors CopyTensorsToSharedMemory(
-    const std::string& name,
-    const std::vector<torch::optional<torch::Tensor>>& tensors,
-    int64_t max_meta_memory_size);
+  /** @brief Initialize this helper class before reading. */
+  void InitializeRead();
 
-/**
- * @brief Load torch tensors from shared memory.
- *
- * @param name The name of shared memory.
- * @param max_meta_memory_size The maximum size of meta memory.
- *
- * @return A tuple of tensor meta shared memory, tensor data shared memory,
- * and shared tensors.
- */
-SharedMemoryTensors LoadTensorsFromSharedMemory(
-    const std::string& name, int64_t max_meta_memory_size);
+  void WriteTorchArchive(torch::serialize::OutputArchive&& archive);
+  torch::serialize::InputArchive ReadTorchArchive();
+
+  void WriteTorchTensor(torch::optional<torch::Tensor> tensor);
+  torch::optional<torch::Tensor> ReadTorchTensor();
+
+  void WriteTorchTensorDict(
+      torch::optional<torch::Dict<std::string, torch::Tensor>> tensor_dict);
+  torch::optional<torch::Dict<std::string, torch::Tensor>>
+  ReadTorchTensorDict();
+
+  /** @brief Flush the data structures to the shared memory. */
+  void Flush();
+
+  /** @brief Release the shared memory and return their left values. */
+  std::pair<SharedMemoryPtr, SharedMemoryPtr> ReleaseSharedMemory();
+
+ private:
+  /**
+   * @brief Write the metadata to the shared memory. This function is
+   * called by `Flush`.
+   */
+  void WriteTorchArchiveInternal(torch::serialize::OutputArchive& archive);
+  /**
+   * @brief Write the tensor data to the shared memory. This function is
+   * called by `Flush`.
+   */
+  void WriteTorchTensorInternal(torch::optional<torch::Tensor> tensor);
+
+  inline void* GetCurrentMetadataPtr() const {
+    return static_cast<char*>(metadata_shared_memory_->GetMemory()) +
+           metadata_offset_;
+  }
+  inline void* GetCurrentDataPtr() const {
+    return static_cast<char*>(data_shared_memory_->GetMemory()) + data_offset_;
+  }
+  inline void MoveMetadataPtr(int64_t offset) {
+    TORCH_CHECK(
+        metadata_offset_ + offset <= max_metadata_size_,
+        "The size of metadata exceeds the maximum size of shared memory.");
+    metadata_offset_ += offset;
+  }
+  inline void MoveDataPtr(int64_t offset) { data_offset_ += offset; }
+
+  std::string name_;
+  bool is_creator_;
+
+  int64_t max_metadata_size_;
+
+  // The shared memory objects for storing metadata and tensor data.
+  SharedMemoryPtr metadata_shared_memory_, data_shared_memory_;
+
+  // The read/write offsets of the metadata and tensor data.
+  int64_t metadata_offset_, data_offset_;
+
+  // The data structures to write to the shared memory. They are written to the
+  // shared memory only when `Flush` is called.
+  std::vector<torch::serialize::OutputArchive> metadata_to_write_;
+  std::vector<torch::optional<torch::Tensor>> tensors_to_write_;
+};
 
 }  // namespace sampling
 }  // namespace graphbolt

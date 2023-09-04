@@ -439,33 +439,38 @@ CSCSamplingGraph::SampleNegativeEdgesUniform(
 }
 
 c10::intrusive_ptr<CSCSamplingGraph>
-CSCSamplingGraph::BuildGraphFromSharedMemoryTensors(
-    std::tuple<
-        SharedMemoryPtr, SharedMemoryPtr,
-        std::vector<torch::optional<torch::Tensor>>>&& shared_memory_tensors) {
-  auto& optional_tensors = std::get<2>(shared_memory_tensors);
+CSCSamplingGraph::BuildGraphFromSharedMemoryHelper(
+    SharedMemoryHelper&& helper) {
+  helper.InitializeRead();
+  auto indptr = helper.ReadTorchTensor();
+  auto indices = helper.ReadTorchTensor();
+  auto node_type_offset = helper.ReadTorchTensor();
+  auto type_per_edge = helper.ReadTorchTensor();
+  auto edge_attributes = helper.ReadTorchTensorDict();
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
-      optional_tensors[0].value(), optional_tensors[1].value(),
-      optional_tensors[2], optional_tensors[3], torch::nullopt);
-  graph->tensor_meta_shm_ = std::move(std::get<0>(shared_memory_tensors));
-  graph->tensor_data_shm_ = std::move(std::get<1>(shared_memory_tensors));
+      indptr.value(), indices.value(), node_type_offset, type_per_edge,
+      edge_attributes);
+  std::tie(graph->tensor_meta_shm_, graph->tensor_data_shm_) =
+      helper.ReleaseSharedMemory();
   return graph;
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
     const std::string& shared_memory_name) {
-  auto optional_tensors = std::vector<torch::optional<torch::Tensor>>{
-      indptr_, indices_, node_type_offset_, type_per_edge_};
-  auto shared_memory_tensors = CopyTensorsToSharedMemory(
-      shared_memory_name, optional_tensors, SERIALIZED_METAINFO_SIZE_MAX);
-  return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
+  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  helper.WriteTorchTensor(indptr_);
+  helper.WriteTorchTensor(indices_);
+  helper.WriteTorchTensor(node_type_offset_);
+  helper.WriteTorchTensor(type_per_edge_);
+  helper.WriteTorchTensorDict(edge_attributes_);
+  helper.Flush();
+  return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
     const std::string& shared_memory_name) {
-  auto shared_memory_tensors = LoadTensorsFromSharedMemory(
-      shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
-  return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
+  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
 int64_t NumPick(
