@@ -18,7 +18,7 @@ from dgl.sparse import (
     val_like,
 )
 
-from .utils import rand_coo, rand_csc, rand_csr, sparse_matrix_to_dense
+from .utils import rand_csc, rand_csr, rand_diag, sparse_matrix_to_dense
 
 
 def _torch_sparse_csr_tensor(indptr, indices, val, torch_sparse_shape):
@@ -452,7 +452,7 @@ def test_has_duplicate():
     assert csc_A.has_duplicate()
 
 
-@pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("create_func", [rand_diag, rand_csr, rand_csc])
 @pytest.mark.parametrize("shape", [(5, 5), (6, 4)])
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("select_dim", [0, 1])
@@ -472,7 +472,7 @@ def test_index_select(create_func, shape, dense_dim, select_dim, index):
     assert torch.allclose(A_select_to_dense, dense_select)
 
 
-@pytest.mark.parametrize("create_func", [rand_coo, rand_csr, rand_csc])
+@pytest.mark.parametrize("create_func", [rand_diag, rand_csr, rand_csc])
 @pytest.mark.parametrize("shape", [(5, 5), (6, 4)])
 @pytest.mark.parametrize("dense_dim", [None, 4])
 @pytest.mark.parametrize("select_dim", [0, 1])

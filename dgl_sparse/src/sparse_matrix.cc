@@ -128,11 +128,26 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::IndexSelect(
     int64_t dim, torch::Tensor ids) {
   auto id_array = TorchTensorToDGLArray(ids);
   bool rowwise = dim == 0;
-  if ((rowwise && HasCSR()) || (!rowwise && HasCSC()) || !HasCOO()) {
+  SparseFormat sparse_format;
+  if (rowwise) {
+    if (HasCSR() || !HasCOO())
+      sparse_format = SparseFormat::kCSR;
+    else
+      sparse_format = SparseFormat::kCOO;
+  } else {
+    if (HasCSC() || !HasCOO())
+      sparse_format = SparseFormat::kCSC;
+    else
+      sparse_format = SparseFormat::kCOO;
+  }
+
+  if (sparse_format == SparseFormat::kCSR ||
+      sparse_format == SparseFormat::kCSC) {
     auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
     auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), id_array);
     auto slice_value =
         this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+    // Drop the index array to prevent potential construct error of COO format.
     slice_csr.data = dgl::aten::NullArray();
     auto ret = CSRFromOldDGLCSR(slice_csr);
     if (rowwise) {
@@ -159,11 +174,26 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::IndexSelect(
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::RangeSelect(
     int64_t dim, int64_t start, int64_t end) {
   bool rowwise = dim == 0;
-  if ((rowwise && HasCSR()) || (!rowwise && HasCSC()) || !HasCOO()) {
+  SparseFormat sparse_format;
+  if (rowwise) {
+    if (HasCSR() || !HasCOO())
+      sparse_format = SparseFormat::kCSR;
+    else
+      sparse_format = SparseFormat::kCOO;
+  } else {
+    if (HasCSC() || !HasCOO())
+      sparse_format = SparseFormat::kCSC;
+    else
+      sparse_format = SparseFormat::kCOO;
+  }
+
+  if (sparse_format == SparseFormat::kCSR ||
+      sparse_format == SparseFormat::kCSC) {
     auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
     auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), start, end);
     auto slice_value =
         this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+    // Drop the index array to prevent potential construct error of COO format.
     slice_csr.data = dgl::aten::NullArray();
     auto ret = CSRFromOldDGLCSR(slice_csr);
     if (rowwise) {
