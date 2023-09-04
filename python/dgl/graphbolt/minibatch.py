@@ -55,21 +55,21 @@ class MiniBatch:
       value should be corresponding heterogeneous node id.
     """
 
-    seed_node: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    seed_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of seed nodes used for sampling in the graph.
-    - If `seed_node` is a tensor: It indicates the graph is homogeneous.
-    - If `seed_node` is a dictionary: The keys should be node type and the
+    - If `seed_nodes` is a tensor: It indicates the graph is homogeneous.
+    - If `seed_nodes` is a dictionary: The keys should be node type and the
       value should be corresponding heterogeneous node ids.
     """
 
-    label: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    Labels associated with seed nodes in the graph.
-    - If `label` is a tensor: It indicates the graph is homogeneous. The value
-      should be corresponding labels to given 'seed_node' or 'node_pair'.
-    - If `label` is a dictionary: The keys should be node or edge type and the
-      value should be corresponding labels to given 'seed_node' or 'node_pair'.
+    labelss associated with seed nodes in the graph.
+    - If `labels` is a tensor: It indicates the graph is homogeneous. The value
+      should be corresponding labelss to given 'seed_nodes' or 'node_pair'.
+    - If `labels` is a dictionary: The keys should be node or edge type and the
+      value should be corresponding labelss to given 'seed_nodes' or 'node_pair'.
     """
 
     node_pair: Union[

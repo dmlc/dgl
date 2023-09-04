@@ -35,12 +35,12 @@ class SubgraphSampler(Mapper):
                 minibatch.compacted_negative_head,
                 minibatch.compacted_negative_tail,
             ) = self._node_pair_preprocess(minibatch)
-        elif minibatch.seed_node is not None:
-            seeds = minibatch.seed_node
+        elif minibatch.seed_nodes is not None:
+            seeds = minibatch.seed_nodes
         else:
             raise ValueError(
                 f"Invalid minibatch {minibatch}: Either 'node_pair' or \
-                'seed_node' should have a value."
+                'seed_nodes' should have a value."
             )
         (
             minibatch.input_nodes,

@@ -60,7 +60,7 @@ class NegativeSampler(Mapper):
         assert node_pairs is not None
         if isinstance(node_pairs, Mapping):
             if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
-                minibatch.label = {}
+                minibatch.labels = {}
             else:
                 minibatch.negative_head, minibatch.negative_tail = {}, {}
             for etype, pos_pairs in node_pairs.items():
@@ -117,17 +117,17 @@ class NegativeSampler(Mapper):
         )
         neg_src, neg_dst = neg_pairs
         if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
-            pos_label = torch.ones_like(pos_src)
-            neg_label = torch.zeros_like(neg_src)
+            pos_labels = torch.ones_like(pos_src)
+            neg_labels = torch.zeros_like(neg_src)
             src = torch.cat([pos_src, neg_src])
             dst = torch.cat([pos_dst, neg_dst])
-            label = torch.cat([pos_label, neg_label])
+            labels = torch.cat([pos_labels, neg_labels])
             if etype is not None:
                 minibatch.node_pair[etype] = (src, dst)
-                minibatch.label[etype] = label
+                minibatch.labels[etype] = labels
             else:
                 minibatch.node_pair = (src, dst)
-                minibatch.label = label
+                minibatch.labels = labels
         else:
             if self.output_format == LinkPredictionEdgeFormat.CONDITIONED:
                 neg_src = neg_src.view(-1, self.negative_ratio)

@@ -31,13 +31,13 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
     # Perform Negative sampling.
     for data in negative_sampler:
         src, dst = data.node_pair
-        label = data.label
+        labels = data.labels
         # Assertation
         assert len(src) == batch_size * (negative_ratio + 1)
         assert len(dst) == batch_size * (negative_ratio + 1)
-        assert len(label) == batch_size * (negative_ratio + 1)
-        assert torch.all(torch.eq(label[:batch_size], 1))
-        assert torch.all(torch.eq(label[batch_size:], 0))
+        assert len(labels) == batch_size * (negative_ratio + 1)
+        assert torch.all(torch.eq(labels[:batch_size], 1))
+        assert torch.all(torch.eq(labels[batch_size:], 0))
 
 
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
