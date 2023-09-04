@@ -28,23 +28,23 @@ class ItemSet:
     [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4)]
 
     2. Tuple of iterables with same shape.
-    >>> node_pairs = (torch.arange(0, 5), torch.arange(5, 10))
-    >>> item_set = gb.ItemSet(node_pairs)
+    >>> node_ids = torch.arange(0, 5)
+    >>> labels = torch.arange(5, 10)
+    >>> item_set = gb.ItemSet((node_ids, labels))
     >>> list(item_set)
     [(tensor(0), tensor(5)), (tensor(1), tensor(6)), (tensor(2), tensor(7)),
      (tensor(3), tensor(8)), (tensor(4), tensor(9))]
 
     3. Tuple of iterables with different shape.
-    >>> heads = torch.arange(0, 5)
-    >>> tails = torch.arange(5, 10)
-    >>> neg_tails = torch.arange(10, 20).reshape(5, 2)
-    >>> item_set = gb.ItemSet((heads, tails, neg_tails))
+    >>> node_pairs = torch.arange(0, 10).reshape(-1, 2)
+    >>> neg_dsts = torch.arange(10, 25).reshape(-1, 3)
+    >>> item_set = gb.ItemSet((node_pairs, neg_dsts))
     >>> list(item_set)
-    [(tensor(0), tensor(5), tensor([10, 11])),
-     (tensor(1), tensor(6), tensor([12, 13])),
-     (tensor(2), tensor(7), tensor([14, 15])),
-     (tensor(3), tensor(8), tensor([16, 17])),
-     (tensor(4), tensor(9), tensor([18, 19]))]
+    [(tensor([0, 1]), tensor([10, 11, 12])),
+     (tensor([2, 3]), tensor([13, 14, 15])),
+     (tensor([4, 5]), tensor([16, 17, 18])),
+     (tensor([6, 7]), tensor([19, 20, 21])),
+     (tensor([8, 9]), tensor([22, 23, 24]))]
     """
 
     def __init__(
@@ -108,41 +108,41 @@ class ItemSetDict:
     >>> node_ids_user = torch.arange(0, 5)
     >>> node_ids_item = torch.arange(5, 10)
     >>> item_set = gb.ItemSetDict({
-    ...     'user': gb.ItemSet(node_ids_user),
-    ...     'item': gb.ItemSet(node_ids_item)})
+    ...     "user": gb.ItemSet(node_ids_user),
+    ...     "item": gb.ItemSet(node_ids_item)})
     >>> list(item_set)
-    [{'user': tensor(0)}, {'user': tensor(1)}, {'user': tensor(2)},
-     {'user': tensor(3)}, {'user': tensor(4)}, {'item': tensor(5)},
-     {'item': tensor(6)}, {'item': tensor(7)}, {'item': tensor(8)},
-     {'item': tensor(9)}]
+    [{"user": tensor(0)}, {"user": tensor(1)}, {"user": tensor(2)},
+     {"user": tensor(3)}, {"user": tensor(4)}, {"item": tensor(5)},
+     {"item": tensor(6)}, {"item": tensor(7)}, {"item": tensor(8)},
+     {"item": tensor(9)}}]
 
     2. Tuple of iterables with same shape.
-    >>> node_pairs_like = (torch.arange(0, 2), torch.arange(0, 2))
-    >>> node_pairs_follow = (torch.arange(0, 3), torch.arange(3, 6))
+    >>> node_ids_user = torch.arange(0, 2)
+    >>> labels_user = torch.arange(0, 2)
+    >>> node_ids_item = torch.arange(2, 5)
+    >>> labels_item = torch.arange(2, 5)
     >>> item_set = gb.ItemSetDict({
-    ...     "user:like:item": gb.ItemSet(node_pairs_like),
-    ...     "user:follow:user": gb.ItemSet(node_pairs_follow)})
+    ...     "user": gb.ItemSet((node_ids_user, labels_user)),
+    ...     "item": gb.ItemSet((node_ids_item, labels_item))})
     >>> list(item_set)
-    [{"user:like:item": (tensor(0), tensor(0))},
-     {"user:like:item": (tensor(1), tensor(1))},
-     {"user:follow:user": (tensor(0), tensor(3))},
-     {"user:follow:user": (tensor(1), tensor(4))},
-     {"user:follow:user": (tensor(2), tensor(5))}]
+    [{"user": (tensor(0), tensor(0))}, {"user": (tensor(1), tensor(1))},
+     {"item": (tensor(2), tensor(2))}, {"item": (tensor(3), tensor(3))},
+     {"item": (tensor(4), tensor(4))}}]
 
     3. Tuple of iterables with different shape.
-    >>> like = (torch.arange(0, 2), torch.arange(0, 2),
-    ...     torch.arange(0, 4).reshape(-1, 2))
-    >>> follow = (torch.arange(0, 3), torch.arange(3, 6),
-    ...     torch.arange(0, 6).reshape(-1, 2))
+    >>> node_pairs_like = torch.arange(0, 4).reshape(-1, 2)
+    >>> neg_dsts_like = torch.arange(4, 10).reshape(-1, 3)
+    >>> node_pairs_follow = torch.arange(0, 6).reshape(-1, 2)
+    >>> neg_dsts_follow = torch.arange(6, 15).reshape(-1, 3)
     >>> item_set = gb.ItemSetDict({
-    ...     "user:like:item": gb.ItemSet(like),
-    ...     "user:follow:user": gb.ItemSet(follow)})
+    ...     "user:like:item": gb.ItemSet((node_pairs_like, neg_dsts_like)),
+    ...     "user:follow:user": gb.ItemSet((node_pairs_follow, neg_dsts_follow))})
     >>> list(item_set)
-    [{"user:like:item": (tensor(0), tensor(0), tensor([0, 1]))},
-     {"user:like:item": (tensor(1), tensor(1), tensor([2, 3]))},
-     {"user:follow:user": (tensor(0), tensor(3), tensor([0, 1]))},
-     {"user:follow:user": (tensor(1), tensor(4), tensor([2, 3]))},
-     {"user:follow:user": (tensor(2), tensor(5), tensor([4, 5]))}]
+    [{"user:like:item": (tensor([0, 1]), tensor([4, 5, 6]))},
+     {"user:like:item": (tensor([2, 3]), tensor([7, 8, 9]))},
+     {"user:follow:user": (tensor([0, 1]), tensor([ 6,  7,  8,  9, 10, 11]))},
+     {"user:follow:user": (tensor([2, 3]), tensor([12, 13, 14, 15, 16, 17]))},
+     {"user:follow:user": (tensor([4, 5]), tensor([18, 19, 20, 21, 22, 23]))}]
     """
 
     def __init__(self, itemsets: Dict[str, ItemSet]) -> None:
