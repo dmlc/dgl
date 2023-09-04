@@ -44,11 +44,11 @@ class MiniBatch:
 
     labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    labels associated with seed nodes in the graph.
+    Labels associated with seed nodes / node pairs in the graph.
     - If `labels` is a tensor: It indicates the graph is homogeneous. The value
-      should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
+      should be corresponding labels to given 'seed_nodes' or 'node_pairs'.
     - If `labels` is a dictionary: The keys should be node or edge type and the
-      value should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
+      value should be corresponding labels to given 'seed_nodes' or 'node_pairs'.
     """
 
     negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
