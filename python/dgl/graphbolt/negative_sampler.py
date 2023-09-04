@@ -44,9 +44,9 @@ class NegativeSampler(Mapper):
         Parameters
         ----------
         minibatch : MiniBatch
-            An instance of 'MiniBatch' class requires the 'node_pair' field.
+            An instance of 'MiniBatch' class requires the 'node_pairs' field.
             This function is responsible for generating negative edges
-            corresponding to the positive edges defined by the 'node_pair'. In
+            corresponding to the positive edges defined by the 'node_pairs'. In
             cases where negative edges already exist, this function will
             overwrite them.
 
@@ -56,21 +56,21 @@ class NegativeSampler(Mapper):
             An instance of 'MiniBatch' encompasses both positive and negative
             samples.
         """
-        node_pairs = minibatch.node_pair
+        node_pairs = minibatch.node_pairs
         assert node_pairs is not None
         if isinstance(node_pairs, Mapping):
             if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
-                minibatch.label = {}
+                minibatch.labels = {}
             else:
-                minibatch.negative_head, minibatch.negative_tail = {}, {}
+                minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
             for etype, pos_pairs in node_pairs.items():
                 self._collate(
                     minibatch, self._sample_with_etype(pos_pairs, etype), etype
                 )
             if self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
-                minibatch.negative_tail = None
+                minibatch.negative_dsts = None
             if self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
-                minibatch.negative_head = None
+                minibatch.negative_srcs = None
         else:
             self._collate(minibatch, self._sample_with_etype(node_pairs))
         return minibatch
@@ -111,23 +111,23 @@ class NegativeSampler(Mapper):
             Canonical edge type.
         """
         pos_src, pos_dst = (
-            minibatch.node_pair[etype]
+            minibatch.node_pairs[etype]
             if etype is not None
-            else minibatch.node_pair
+            else minibatch.node_pairs
         )
         neg_src, neg_dst = neg_pairs
         if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
-            pos_label = torch.ones_like(pos_src)
-            neg_label = torch.zeros_like(neg_src)
+            pos_labels = torch.ones_like(pos_src)
+            neg_labels = torch.zeros_like(neg_src)
             src = torch.cat([pos_src, neg_src])
             dst = torch.cat([pos_dst, neg_dst])
-            label = torch.cat([pos_label, neg_label])
+            labels = torch.cat([pos_labels, neg_labels])
             if etype is not None:
-                minibatch.node_pair[etype] = (src, dst)
-                minibatch.label[etype] = label
+                minibatch.node_pairs[etype] = (src, dst)
+                minibatch.labels[etype] = labels
             else:
-                minibatch.node_pair = (src, dst)
-                minibatch.label = label
+                minibatch.node_pairs = (src, dst)
+                minibatch.labels = labels
         else:
             if self.output_format == LinkPredictionEdgeFormat.CONDITIONED:
                 neg_src = neg_src.view(-1, self.negative_ratio)
@@ -147,8 +147,8 @@ class NegativeSampler(Mapper):
                     f"Unsupported output format {self.output_format}."
                 )
             if etype is not None:
-                minibatch.negative_head[etype] = neg_src
-                minibatch.negative_tail[etype] = neg_dst
+                minibatch.negative_srcs[etype] = neg_src
+                minibatch.negative_dsts[etype] = neg_dst
             else:
-                minibatch.negative_head = neg_src
-                minibatch.negative_tail = neg_dst
+                minibatch.negative_srcs = neg_src
+                minibatch.negative_dsts = neg_dst

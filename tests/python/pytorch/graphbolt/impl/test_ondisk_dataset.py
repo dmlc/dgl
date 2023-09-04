@@ -78,11 +78,11 @@ def test_OnDiskDataset_TVTSet_ItemSet_names():
                 train_set:
                   - type: null
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         in_memory: true
                         path: {train_ids_path}
-                      - name: label
+                      - name: labels
                         format: numpy
                         in_memory: true
                         path: {train_labels_path}
@@ -104,7 +104,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_names():
         for i, (id, label, _) in enumerate(train_set):
             assert id == train_ids[i]
             assert label == train_labels[i]
-        assert train_set.names == ("seed_node", "label", None)
+        assert train_set.names == ("seed_nodes", "labels", None)
         train_set = None
 
 
@@ -125,11 +125,11 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_names():
                 train_set:
                   - type: "author:writes:paper"
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         in_memory: true
                         path: {train_ids_path}
-                      - name: label
+                      - name: labels
                         format: numpy
                         in_memory: true
                         path: {train_labels_path}
@@ -154,7 +154,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_names():
             id, label, _ = item["author:writes:paper"]
             assert id == train_ids[i]
             assert label == train_labels[i]
-        assert train_set.names == ("seed_node", "label", None)
+        assert train_set.names == ("seed_nodes", "labels", None)
         train_set = None
 
 
@@ -193,32 +193,32 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
                 train_set:
                   - type: null
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         in_memory: true
                         path: {train_ids_path}
-                      - name: label
+                      - name: labels
                         format: numpy
                         in_memory: true
                         path: {train_labels_path}
                 validation_set:
                   - data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         in_memory: true
                         path: {validation_ids_path}
-                      - name: label
+                      - name: labels
                         format: numpy
                         in_memory: true
                         path: {validation_labels_path}
                 test_set:
                   - type: null
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         in_memory: true
                         path: {test_ids_path}
-                      - name: label
+                      - name: labels
                         format: numpy
                         in_memory: true
                         path: {test_labels_path}
@@ -242,7 +242,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         for i, (id, label) in enumerate(train_set):
             assert id == train_ids[i]
             assert label == train_labels[i]
-        assert train_set.names == ("seed_node", "label")
+        assert train_set.names == ("seed_nodes", "labels")
         train_set = None
 
         # Verify validation set.
@@ -252,7 +252,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         for i, (id, label) in enumerate(validation_set):
             assert id == validation_ids[i]
             assert label == validation_labels[i]
-        assert validation_set.names == ("seed_node", "label")
+        assert validation_set.names == ("seed_nodes", "labels")
         validation_set = None
 
         # Verify test set.
@@ -262,7 +262,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_id_label():
         for i, (id, label) in enumerate(test_set):
             assert id == test_ids[i]
             assert label == test_labels[i]
-        assert test_set.names == ("seed_node", "label")
+        assert test_set.names == ("seed_nodes", "labels")
         test_set = None
         dataset = None
 
@@ -334,7 +334,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
                         format: numpy
                         in_memory: true
                         path: {train_dst_path}
-                      - name: label
+                      - name: labels
                         format: numpy
                         in_memory: true
                         path: {train_labels_path}
@@ -348,7 +348,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
                         format: numpy
                         in_memory: true
                         path: {validation_dst_path}
-                      - name: label
+                      - name: labels
                         format: numpy
                         in_memory: true
                         path: {validation_labels_path}
@@ -363,7 +363,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
                         format: numpy
                         in_memory: true
                         path: {test_dst_path}
-                      - name: label
+                      - name: labels
                         format: numpy
                         in_memory: true
                         path: {test_labels_path}
@@ -383,7 +383,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
             assert src == train_src[i]
             assert dst == train_dst[i]
             assert label == train_labels[i]
-        assert train_set.names == ("src", "dst", "label")
+        assert train_set.names == ("src", "dst", "labels")
         train_set = None
 
         # Verify validation set.
@@ -394,7 +394,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
             assert src == validation_src[i]
             assert dst == validation_dst[i]
             assert label == validation_labels[i]
-        assert validation_set.names == ("src", "dst", "label")
+        assert validation_set.names == ("src", "dst", "labels")
         validation_set = None
 
         # Verify test set.
@@ -405,7 +405,7 @@ def test_OnDiskDataset_TVTSet_ItemSet_node_pair_label():
             assert src == test_src[i]
             assert dst == test_dst[i]
             assert label == test_labels[i]
-        assert test_set.names == ("src", "dst", "label")
+        assert test_set.names == ("src", "dst", "labels")
         test_set = None
         dataset = None
 
@@ -564,36 +564,36 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
                 train_set:
                   - type: paper
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         in_memory: true
                         path: {train_path}
                   - type: author
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         path: {train_path}
                 validation_set:
                   - type: paper
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         path: {validation_path}
                   - type: author
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         path: {validation_path}
                 test_set:
                   - type: paper
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         in_memory: false
                         path: {test_path}
                   - type: author
                     data:
-                      - name: seed_node
+                      - name: seed_nodes
                         format: numpy
                         path: {test_path}
         """
@@ -616,7 +616,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
             id, label = item[key]
             assert id == train_ids[i % 1000]
             assert label == train_labels[i % 1000]
-        assert train_set.names == ("seed_node",)
+        assert train_set.names == ("seed_nodes",)
         train_set = None
 
         # Verify validation set.
@@ -631,7 +631,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
             id, label = item[key]
             assert id == validation_ids[i % 1000]
             assert label == validation_labels[i % 1000]
-        assert validation_set.names == ("seed_node",)
+        assert validation_set.names == ("seed_nodes",)
         validation_set = None
 
         # Verify test set.
@@ -646,7 +646,7 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_id_label():
             id, label = item[key]
             assert id == test_ids[i % 1000]
             assert label == test_labels[i % 1000]
-        assert test_set.names == ("seed_node",)
+        assert test_set.names == ("seed_nodes",)
         test_set = None
         dataset = None
 
@@ -798,7 +798,7 @@ def test_OnDiskDataset_Feature_heterograph():
                 path: {node_data_paper_path}
               - domain: node
                 type: paper
-                name: label
+                name: labels
                 format: numpy
                 in_memory: true
                 path: {node_data_label_path}
@@ -810,7 +810,7 @@ def test_OnDiskDataset_Feature_heterograph():
                 path: {edge_data_writes_path}
               - domain: edge
                 type: "author:writes:paper"
-                name: label
+                name: labels
                 format: numpy
                 in_memory: true
                 path: {edge_data_label_path}
@@ -832,7 +832,7 @@ def test_OnDiskDataset_Feature_heterograph():
             torch.tensor(node_data_paper),
         )
         assert torch.equal(
-            feature_data.read("node", "paper", "label"),
+            feature_data.read("node", "paper", "labels"),
             torch.tensor(node_data_label),
         )
 
@@ -842,7 +842,7 @@ def test_OnDiskDataset_Feature_heterograph():
             torch.tensor(edge_data_writes),
         )
         assert torch.equal(
-            feature_data.read("edge", "author:writes:paper", "label"),
+            feature_data.read("edge", "author:writes:paper", "labels"),
             torch.tensor(edge_data_label),
         )
 
@@ -879,7 +879,7 @@ def test_OnDiskDataset_Feature_homograph():
                 in_memory: false
                 path: {node_data_feat_path}
               - domain: node
-                name: label
+                name: labels
                 format: numpy
                 in_memory: true
                 path: {node_data_label_path}
@@ -889,7 +889,7 @@ def test_OnDiskDataset_Feature_homograph():
                 in_memory: false
                 path: {edge_data_feat_path}
               - domain: edge
-                name: label
+                name: labels
                 format: numpy
                 in_memory: true
                 path: {edge_data_label_path}
@@ -911,7 +911,7 @@ def test_OnDiskDataset_Feature_homograph():
             torch.tensor(node_data_feat),
         )
         assert torch.equal(
-            feature_data.read("node", None, "label"),
+            feature_data.read("node", None, "labels"),
             torch.tensor(node_data_label),
         )
 
@@ -921,7 +921,7 @@ def test_OnDiskDataset_Feature_homograph():
             torch.tensor(edge_data_feat),
         )
         assert torch.equal(
-            feature_data.read("edge", None, "label"),
+            feature_data.read("edge", None, "labels"),
             torch.tensor(edge_data_label),
         )
 

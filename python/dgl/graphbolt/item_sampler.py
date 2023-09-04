@@ -17,9 +17,9 @@ __all__ = ["ItemSampler"]
 class ItemSampler(IterDataPipe):
     """Item Sampler.
 
-    Creates item subset of data which could be node/edge IDs, node pairs with
-    or without labels, head/tail/negative_tails, DGLGraphs and heterogeneous
-    counterparts.
+    Creates item subset of data which could be node IDs, node pairs with or
+    without labels, node pairs with negative sources/destinations, DGLGraphs
+    and heterogeneous counterparts.
 
     Note: This class `ItemSampler` is not decorated with
     `torchdata.datapipes.functional_datapipe` on purpose. This indicates it

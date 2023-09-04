@@ -55,74 +55,74 @@ class MiniBatch:
       value should be corresponding heterogeneous node id.
     """
 
-    seed_node: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    seed_nodes: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of seed nodes used for sampling in the graph.
-    - If `seed_node` is a tensor: It indicates the graph is homogeneous.
-    - If `seed_node` is a dictionary: The keys should be node type and the
+    - If `seed_nodes` is a tensor: It indicates the graph is homogeneous.
+    - If `seed_nodes` is a dictionary: The keys should be node type and the
       value should be corresponding heterogeneous node ids.
     """
 
-    label: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    Labels associated with seed nodes in the graph.
-    - If `label` is a tensor: It indicates the graph is homogeneous. The value
-      should be corresponding labels to given 'seed_node' or 'node_pair'.
-    - If `label` is a dictionary: The keys should be node or edge type and the
-      value should be corresponding labels to given 'seed_node' or 'node_pair'.
+    labelss associated with seed nodes in the graph.
+    - If `labels` is a tensor: It indicates the graph is homogeneous. The value
+      should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
+    - If `labels` is a dictionary: The keys should be node or edge type and the
+      value should be corresponding labelss to given 'seed_nodes' or 'node_pairs'.
     """
 
-    node_pair: Union[
+    node_pairs: Union[
         Tuple[torch.Tensor, torch.Tensor],
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ] = None
     """
     Representation of seed node pairs utilized in link prediction tasks.
-    - If `node_pair` is a tuple: It indicates a homogeneous graph where each
+    - If `node_pairs` is a tuple: It indicates a homogeneous graph where each
       tuple contains two tensors representing source-destination node pairs.
-    - If `node_pair` is a dictionary: The keys should be edge type, and the
+    - If `node_pairs` is a dictionary: The keys should be edge type, and the
       value should be a tuple of tensors representing node pairs of the given
       type.
     """
 
-    negative_head: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the head nodes in the link
     prediction task.
-    - If `negative_head` is a tensor: It indicates a homogeneous graph.
-    - If `negative_head` is a dictionary: The key should be edge type, and the
+    - If `negative_srcs` is a tensor: It indicates a homogeneous graph.
+    - If `negative_srcs` is a dictionary: The key should be edge type, and the
       value should correspond to the negative samples for head nodes of the
       given type.
     """
 
-    negative_tail: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    negative_dsts: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
     Representation of negative samples for the tail nodes in the link
     prediction task.
-    - If `negative_tail` is a tensor: It indicates a homogeneous graph.
-    - If `negative_tail` is a dictionary: The key should be edge type, and the
+    - If `negative_dsts` is a tensor: It indicates a homogeneous graph.
+    - If `negative_dsts` is a dictionary: The key should be edge type, and the
       value should correspond to the negative samples for head nodes of the
       given type.
     """
 
-    compacted_node_pair: Union[
+    compacted_node_pairs: Union[
         Tuple[torch.Tensor, torch.Tensor],
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ] = None
     """
-    Representation of compacted node pairs corresponding to 'node_pair', where
+    Representation of compacted node pairs corresponding to 'node_pairs', where
     all node ids inside are compacted.
     """
 
-    compacted_negative_head: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    compacted_negative_srcs: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    Representation of compacted nodes corresponding to 'negative_head', where
+    Representation of compacted nodes corresponding to 'negative_srcs', where
     all node ids inside are compacted.
     """
 
-    compacted_negative_tail: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
+    compacted_negative_dsts: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
     """
-    Representation of compacted nodes corresponding to 'negative_tail', where
+    Representation of compacted nodes corresponding to 'negative_dsts', where
     all node ids inside are compacted.
     """
 

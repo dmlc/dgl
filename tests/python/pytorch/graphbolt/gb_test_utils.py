@@ -9,12 +9,12 @@ import torch
 
 
 def minibatch_node_collator(data):
-    minibatch = gb.MiniBatch(seed_node=data)
+    minibatch = gb.MiniBatch(seed_nodes=data)
     return minibatch
 
 
 def minibatch_link_collator(data):
-    minibatch = gb.MiniBatch(node_pair=data)
+    minibatch = gb.MiniBatch(node_pairs=data)
     return minibatch
 
 

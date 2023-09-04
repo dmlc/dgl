@@ -54,7 +54,7 @@ class NeighborSampler(SubgraphSampler):
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
         >>> def minibatch_link_collator(data):
-            ... minibatch  = gb.MiniBatch(node_pair=data)
+            ... minibatch  = gb.MiniBatch(node_pairs=data)
             ... return minibatch
             ...
         >>> from dgl import graphbolt as gb
@@ -76,7 +76,7 @@ class NeighborSampler(SubgraphSampler):
         >>> subgraph_sampler = gb.NeighborSampler(
             ...neg_sampler, graph, fanouts)
         >>> for data in subgraph_sampler:
-            ... print(data.compacted_node_pair)
+            ... print(data.compacted_node_pairs)
             ... print(len(data.sampled_subgraphs))
         (tensor([0, 0, 0]), tensor([1, 0, 2]))
         3
@@ -166,7 +166,7 @@ class LayerNeighborSampler(NeighborSampler):
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
         >>> def minibatch_link_collator(data):
-            ... minibatch  = gb.MiniBatch(node_pair=data)
+            ... minibatch  = gb.MiniBatch(node_pairs=data)
             ... return minibatch
             ...
         >>> from dgl import graphbolt as gb
@@ -188,7 +188,7 @@ class LayerNeighborSampler(NeighborSampler):
         >>> subgraph_sampler = gb.LayerNeighborSampler(
             ...neg_sampler, graph, fanouts)
         >>> for data in subgraph_sampler:
-            ... print(data.compacted_node_pair)
+            ... print(data.compacted_node_pairs)
             ... print(len(data.sampled_subgraphs))
         (tensor([0, 0, 0]), tensor([1, 0, 2]))
         3

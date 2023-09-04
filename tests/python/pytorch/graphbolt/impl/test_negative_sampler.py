@@ -30,14 +30,14 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        src, dst = data.node_pair
-        label = data.label
+        src, dst = data.node_pairs
+        labels = data.labels
         # Assertation
         assert len(src) == batch_size * (negative_ratio + 1)
         assert len(dst) == batch_size * (negative_ratio + 1)
-        assert len(label) == batch_size * (negative_ratio + 1)
-        assert torch.all(torch.eq(label[:batch_size], 1))
-        assert torch.all(torch.eq(label[batch_size:], 0))
+        assert len(labels) == batch_size * (negative_ratio + 1)
+        assert torch.all(torch.eq(labels[:batch_size], 1))
+        assert torch.all(torch.eq(labels[batch_size:], 0))
 
 
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
@@ -65,8 +65,8 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        pos_src, pos_dst = data.node_pair
-        neg_src, neg_dst = data.negative_head, data.negative_tail
+        pos_src, pos_dst = data.node_pairs
+        neg_src, neg_dst = data.negative_srcs, data.negative_dsts
         # Assertation
         assert len(pos_src) == batch_size
         assert len(pos_dst) == batch_size
@@ -103,8 +103,8 @@ def test_NegativeSampler_Head_Conditioned_Format(negative_ratio):
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        pos_src, pos_dst = data.node_pair
-        neg_src = data.negative_head
+        pos_src, pos_dst = data.node_pairs
+        neg_src = data.negative_srcs
         # Assertation
         assert len(pos_src) == batch_size
         assert len(pos_dst) == batch_size
@@ -139,8 +139,8 @@ def test_NegativeSampler_Tail_Conditioned_Format(negative_ratio):
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        pos_src, pos_dst = data.node_pair
-        neg_dst = data.negative_tail
+        pos_src, pos_dst = data.node_pairs
+        neg_dst = data.negative_dsts
         # Assertation
         assert len(pos_src) == batch_size
         assert len(pos_dst) == batch_size
