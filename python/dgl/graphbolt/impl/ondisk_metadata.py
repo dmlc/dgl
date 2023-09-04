@@ -28,6 +28,7 @@ class OnDiskFeatureDataFormat(str, Enum):
 class OnDiskTVTSetData(pydantic.BaseModel):
     """Train-Validation-Test set data."""
 
+    name: Optional[str] = None
     format: OnDiskFeatureDataFormat
     in_memory: Optional[bool] = True
     path: str

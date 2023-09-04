@@ -43,20 +43,21 @@ class NegativeSampler(Mapper):
 
         Parameters
         ----------
-        data : LinkPredictionBlock
-            An instance of 'LinkPredictionBlock' class requires the 'node_pair'
-            field. This function is responsible for generating negative edges
+        data : MiniBatch
+            An instance of 'MiniBatch' class requires the 'node_pair' field.
+            This function is responsible for generating negative edges
             corresponding to the positive edges defined by the 'node_pair'. In
             cases where negative edges already exist, this function will
             overwrite them.
 
         Returns
         -------
-        LinkPredictionBlock
-            An instance of 'LinkPredictionBlock' encompasses both positive and
-            negative samples.
+        MiniBatch
+            An instance of 'MiniBatch' encompasses both positive and negative
+            samples.
         """
         node_pairs = data.node_pair
+        assert node_pairs is not None
         if isinstance(node_pairs, Mapping):
             if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
                 data.label = {}
@@ -99,7 +100,7 @@ class NegativeSampler(Mapper):
 
         Parameters
         ----------
-        data : LinkPredictionBlock
+        data : MiniBatch
             The input data, which contains positive node pairs, will be filled
             with negative information in this function.
         neg_pairs : Tuple[Tensor, Tensor]

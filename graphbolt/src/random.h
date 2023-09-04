@@ -69,6 +69,25 @@ class RandomEngine {
     return dist(rng_);
   }
 
+  /**
+   * @brief Generate a uniform random real number in [low, high).
+   */
+  template <typename T>
+  T Uniform(T lower, T upper) {
+    std::uniform_real_distribution<T> dist(lower, upper);
+    return dist(rng_);
+  }
+
+  /**
+   * @brief Generate random non-negative floating-point values according to
+   * exponential distribution. Probability density function: P(x|λ) = λe^(-λx).
+   */
+  template <typename T>
+  T Exponential(T lambda) {
+    std::exponential_distribution<T> dist(lambda);
+    return dist(rng_);
+  }
+
  private:
   pcg32 rng_;
 };

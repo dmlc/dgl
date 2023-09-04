@@ -22,10 +22,10 @@ def test_NegativeSampler_Independent_Format(negative_ratio):
     )
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    data_block_converter = Mapper(minibatch_sampler, to_data_block)
+    minibatch_converter = Mapper(minibatch_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
-        data_block_converter,
+        minibatch_converter,
         negative_ratio,
         gb.LinkPredictionEdgeFormat.INDEPENDENT,
         graph,
@@ -55,10 +55,10 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
     )
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    data_block_converter = Mapper(minibatch_sampler, to_data_block)
+    minibatch_converter = Mapper(minibatch_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
-        data_block_converter,
+        minibatch_converter,
         negative_ratio,
         gb.LinkPredictionEdgeFormat.CONDITIONED,
         graph,
@@ -91,10 +91,10 @@ def test_NegativeSampler_Head_Conditioned_Format(negative_ratio):
     )
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    data_block_converter = Mapper(minibatch_sampler, to_data_block)
+    minibatch_converter = Mapper(minibatch_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
-        data_block_converter,
+        minibatch_converter,
         negative_ratio,
         gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED,
         graph,
@@ -125,10 +125,10 @@ def test_NegativeSampler_Tail_Conditioned_Format(negative_ratio):
     )
     batch_size = 10
     minibatch_sampler = gb.MinibatchSampler(item_set, batch_size=batch_size)
-    data_block_converter = Mapper(minibatch_sampler, to_data_block)
+    minibatch_converter = Mapper(minibatch_sampler, to_data_block)
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
-        data_block_converter,
+        minibatch_converter,
         negative_ratio,
         gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
         graph,
@@ -200,8 +200,8 @@ def test_NegativeSampler_Hetero_Data(format):
     )
 
     minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
-    data_block_converter = Mapper(minibatch_dp, to_link_block)
+    minibatch_converter = Mapper(minibatch_dp, to_link_block)
     negative_dp = gb.UniformNegativeSampler(
-        data_block_converter, 1, format, graph
+        minibatch_converter, 1, format, graph
     )
     assert len(list(negative_dp)) == 5
