@@ -450,7 +450,7 @@ CSCSamplingGraph::BuildGraphFromSharedMemoryHelper(
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
       edge_attributes);
-  std::tie(graph->tensor_meta_shm_, graph->tensor_data_shm_) =
+  std::tie(graph->tensor_metadata_shm_, graph->tensor_data_shm_) =
       helper.ReleaseSharedMemory();
   return graph;
 }

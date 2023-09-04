@@ -19,7 +19,7 @@ namespace graphbolt {
 namespace sampling {
 
 static std::string GetSharedMemoryMetadataName(const std::string& name) {
-  return name + "_meta";
+  return name + "_metadata";
 }
 
 static std::string GetSharedMemoryDataName(const std::string& name) {

@@ -292,12 +292,12 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   static constexpr int64_t SERIALIZED_METAINFO_SIZE_MAX = 32768;
 
   /**
-   * @brief Shared memory used to hold the tensor meta information and data of
-   * this class. By storing its shared memory objects, the graph controls the
+   * @brief Shared memory used to hold the tensor metadata and data of this
+   * class. By storing its shared memory objects, the graph controls the
    * resources of shared memory, which will be released automatically when the
    * graph is destroyed.
    */
-  SharedMemoryPtr tensor_meta_shm_, tensor_data_shm_;
+  SharedMemoryPtr tensor_metadata_shm_, tensor_data_shm_;
 };
 
 /**
