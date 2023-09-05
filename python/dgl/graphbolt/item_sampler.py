@@ -46,6 +46,8 @@ def minibatcher_default(batch, names):
         )
         return batch
     if len(names) == 1:
+        # Handle the case of single item: batch = tensor([0, 1, 2, 3]), names =
+        # ("seed_nodes",).
         init_data = {names[0]: batch}
     else:
         if isinstance(batch, Mapping):
