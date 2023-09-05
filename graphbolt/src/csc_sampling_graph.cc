@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "./random.h"
-#include "./shared_memory_utils.h"
+#include "./shared_memory_helper.h"
 
 namespace graphbolt {
 namespace sampling {

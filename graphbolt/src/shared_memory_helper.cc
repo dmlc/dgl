@@ -1,10 +1,10 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *
- * @file shared_memory_utils.cc
- * @brief Share memory utility function implementation.
+ * @file shared_memory_helper.cc
+ * @brief Share memory helper implementation.
  */
-#include "./shared_memory_utils.h"
+#include "./shared_memory_helper.h"
 
 #include <graphbolt/serialize.h>
 #include <graphbolt/shared_memory.h>

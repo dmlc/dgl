@@ -1,11 +1,11 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *
- * @file shared_memory_utils.h
- * @brief Share memory utilities.
+ * @file shared_memory_helper.h
+ * @brief Share memory helper.
  */
-#ifndef GRAPHBOLT_SHM_UTILS_H_
-#define GRAPHBOLT_SHM_UTILS_H_
+#ifndef GRAPHBOLT_SHARED_MEMORY_HELPER_H_
+#define GRAPHBOLT_SHARED_MEMORY_HELPER_H_
 
 #include <graphbolt/shared_memory.h>
 #include <torch/torch.h>
@@ -140,4 +140,4 @@ class SharedMemoryHelper {
 }  // namespace sampling
 }  // namespace graphbolt
 
-#endif  // GRAPHBOLT_SHM_UTILS_H_
+#endif  // GRAPHBOLT_SHARED_MEMORY_HELPER_H_
