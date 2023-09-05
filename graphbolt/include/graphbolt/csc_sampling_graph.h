@@ -237,11 +237,14 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const std::string& shared_memory_name);
 
   /**
-   * @brief Shared memory used to hold the tensor metadata and data of this
+   * @brief Hold the shared memory objects of the the tensor metadata and data.
+   * @note Shared memory used to hold the tensor metadata and data of this
    * class. By storing its shared memory objects, the graph controls the
    * resources of shared memory, which will be released automatically when the
-   * graph is destroyed.
-   * @param ptr The pointers to the shared memory objects.
+   * graph is destroyed. This function is for internal use by CopyToSharedMemory
+   * and LoadFromSharedMemory. Please contact the DGL team if you need to use it.
+   * @param tensor_metadata_shm The shared memory objects of tensor metadata.
+   * @param tensor_data_shm The shared memory objects of tensor data.
    */
   void HoldSharedMemoryPtr(
       SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm);
