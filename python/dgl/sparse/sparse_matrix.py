@@ -586,6 +586,74 @@ class SparseMatrix:
             )
         raise TypeError(f"{type(index).__name__} is unsupported input type.")
 
+    def sample(
+        self, dim: int, n_pick: int, replacement: Optional[bool] = False
+    ):
+        """Returns a sample matrix according to the given sample dim and number.
+
+        Parameters
+        ----------
+        dim : int
+            The dimension for sampling, should be 0 or 1. `dim = 0` for
+            rowwise selection and `dim = 1` for columnwise selection.
+        n_pick : int
+            The number of nodes to randomly sample on each row or column.
+        replacement : bool, optional
+            Whether to allow repeated sampling of the same neighbor.
+            `replacement = True` means allowing and `replacement = False`
+            means not.
+            NOTE: If `replacement = False` and there are fewer nodes
+            than n_pick, all nodes will be sampled.
+
+        The function does not support autograd.
+
+        Returns
+        -------
+        SparseMatrix
+            A submatrix with the same shape as the original matrix
+            containing the sampled nodes.
+
+        Examples
+        --------
+
+        >>> indices = torch.tensor([0, 0, 1, 1, 2, 2, 2], [0, 2, 0, 1, 0, 1, 2]])
+        >>> val = torch.tensor([0, 1, 2, 3, 4, 5, 6])
+        >>> A = dglsp.spmatrix(indices, val)
+
+        Case 1: Sample rows with the given number and disable repeated sampling.
+
+        >>> A.sample(0, 2)
+        SparseMatrix(indices=tensor([[0, 0, 1, 1, 2, 2],
+                                     [0, 2, 0, 1, 0, 2]]),
+                     values=tensor([0, 1, 2, 3, 4, 6]),
+                     shape=(3, 3), nnz=6)
+
+        Case 2: Sample cols with the given number and disable repeated sampling.
+
+        >>> A.sample(1, 2)
+        SparseMatrix(indices=tensor([[0, 1, 1, 2, 0, 2],
+                                     [0, 0, 1, 1, 2, 2]]),
+                     values=tensor([0, 2, 3, 5, 1, 6]),
+                     shape=(3, 3), nnz=4)
+
+        Case 3: Sample rows with the given number and enable repeated sampling.
+
+        >>> A.sample(0, 2, True)
+        SparseMatrix(indices=tensor([[0, 0, 1, 1, 2, 2],
+                                     [0, 2, 0, 0, 1, 2]]),
+                     values=tensor([0, 1, 2, 2, 5, 6]),
+                     shape=(3, 3), nnz=5)
+
+        Case 4: Sample cols with the given number and enable repeated sampling.
+
+        >>> A.sample(1, 2, True)
+        SparseMatrix(indices=tensor([[0, 1, 1, 1, 2, 2],
+                                     [0, 0, 1, 1, 2, 2]]),
+                     values=tensor([0, 2, 3, 3, 6, 6]),
+                     shape=(3, 3), nnz=4)
+        """
+        raise NotImplementedError
+
 
 def spmatrix(
     indices: torch.Tensor,
