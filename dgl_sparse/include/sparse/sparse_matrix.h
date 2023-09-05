@@ -138,21 +138,52 @@ class SparseMatrix : public torch::CustomClassHolder {
       torch::Tensor value, const std::vector<int64_t>& shape);
 
   /**
-   * @brief Create a SparseMatrix by index slicing.
-   * @param dim Row-wise or column-wise select
-   * @param ids Ids of the selected rows or columns
+   * @brief Create a SparseMatrix by selecting rows or columns based on provided
+   * indices.
    *
-   * @return SparseMatrix
+   * This function allows you to create a new SparseMatrix by selecting specific
+   * rows or columns from the original SparseMatrix based on the provided
+   * indices. The selection can be performed either row-wise or column-wise,
+   * determined by the 'dim' parameter.
+   *
+   * @param dim Select rows (dim=0) or columns (dim=1).
+   * @param ids A tensor containing the indices of the selected rows or columns.
+   *
+   * @return A new SparseMatrix containing the selected rows or columns.
+   *
+   * @note The 'dim' parameter should be either 0 (for row-wise selection) or 1
+   * (for column-wise selection).
+   * @note The 'ids' tensor should contain valid indices within the range of the
+   * original SparseMatrix's dimensions.
+   * @note The returned SparseMatrix may share data with the original matrix,
+   * depending on the implementation.
    */
   c10::intrusive_ptr<SparseMatrix> IndexSelect(int64_t dim, torch::Tensor ids);
 
   /**
-   * @brief Create a SparseMatrix by range slicing.
-   * @param dim Row-wise or column-wise select
-   * @param start Inclusive start id of the selected rows or columns
-   * @param end Exclusive end id of the selected rows or columns
+   * @brief Create a SparseMatrix by selecting a range of rows or columns based
+   * on provided indices.
    *
-   * @return SparseMatrix
+   * This function allows you to create a new SparseMatrix by selecting a range
+   * of specific rows or columns from the original SparseMatrix based on the
+   * provided indices. The selection can be performed either row-wise or
+   * column-wise, determined by the 'dim' parameter.
+   *
+   * @param dim Select rows (dim=0) or columns (dim=1).
+   * @param start The starting index of the range.
+   * @param end The ending index (exclusive) of the range.
+   *
+   * @return A new SparseMatrix containing the selected range of rows or
+   * columns.
+   *
+   * @note The 'dim' parameter should be either 0 (for row-wise selection) or 1
+   * (for column-wise selection).
+   * @note The 'start' and 'end' parameters define the inclusive-exclusive range
+   * of indices to select.
+   * @note The function ensures that the 'start' and 'end' indices are within
+   * the valid range of the original SparseMatrix's dimensions.
+   * @note The returned SparseMatrix may share data with the original matrix,
+   * depending on the implementation.
    */
   c10::intrusive_ptr<SparseMatrix> RangeSelect(
       int64_t dim, int64_t start, int64_t end);

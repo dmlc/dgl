@@ -130,44 +130,23 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::IndexSelect(
   bool rowwise = dim == 0;
   SparseFormat sparse_format;
   if (rowwise) {
-    if (HasCSR() || !HasCOO())
-      sparse_format = SparseFormat::kCSR;
-    else
-      sparse_format = SparseFormat::kCOO;
+    sparse_format = SparseFormat::kCSR;
   } else {
-    if (HasCSC() || !HasCOO())
-      sparse_format = SparseFormat::kCSC;
-    else
-      sparse_format = SparseFormat::kCOO;
+    sparse_format = SparseFormat::kCSC;
   }
-
-  if (sparse_format == SparseFormat::kCSR ||
-      sparse_format == SparseFormat::kCSC) {
-    auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
-    auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), id_array);
-    auto slice_value =
-        this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
-    // Drop the index array to prevent potential construct error of COO format.
-    slice_csr.data = dgl::aten::NullArray();
-    auto ret = CSRFromOldDGLCSR(slice_csr);
-    if (rowwise) {
-      return SparseMatrix::FromCSRPointer(
-          ret, slice_value, {ret->num_rows, ret->num_cols});
-    } else {
-      return SparseMatrix::FromCSCPointer(
-          ret, slice_value, {ret->num_cols, ret->num_rows});
-    }
-  } else {  // COO
-    auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
-    if (!rowwise) dgl_coo = aten::COOTranspose(dgl_coo);
-    auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, id_array);
-    auto slice_value =
-        this->value().index_select(0, DGLArrayToTorchTensor(slice_coo.data));
-    slice_coo.data = dgl::aten::NullArray();
-    if (!rowwise) slice_coo = aten::COOTranspose(slice_coo);
-    auto ret = COOFromOldDGLCOO(slice_coo);
-    auto new_shape = std::vector<int64_t>{ret->num_rows, ret->num_cols};
-    return SparseMatrix::FromCOOPointer(ret, slice_value, new_shape);
+  auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
+  auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), id_array);
+  auto slice_value =
+      this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+  // Drop the index array to prevent potential construct error of COO format.
+  slice_csr.data = dgl::aten::NullArray();
+  auto ret = CSRFromOldDGLCSR(slice_csr);
+  if (sparse_format == SparseFormat::kCSR) {
+    return SparseMatrix::FromCSRPointer(
+        ret, slice_value, {ret->num_rows, ret->num_cols});
+  } else {
+    return SparseMatrix::FromCSCPointer(
+        ret, slice_value, {ret->num_cols, ret->num_rows});
   }
 }
 
@@ -176,44 +155,23 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::RangeSelect(
   bool rowwise = dim == 0;
   SparseFormat sparse_format;
   if (rowwise) {
-    if (HasCSR() || !HasCOO())
-      sparse_format = SparseFormat::kCSR;
-    else
-      sparse_format = SparseFormat::kCOO;
+    sparse_format = SparseFormat::kCSR;
   } else {
-    if (HasCSC() || !HasCOO())
-      sparse_format = SparseFormat::kCSC;
-    else
-      sparse_format = SparseFormat::kCOO;
+    sparse_format = SparseFormat::kCSC;
   }
-
-  if (sparse_format == SparseFormat::kCSR ||
-      sparse_format == SparseFormat::kCSC) {
-    auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
-    auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), start, end);
-    auto slice_value =
-        this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
-    // Drop the index array to prevent potential construct error of COO format.
-    slice_csr.data = dgl::aten::NullArray();
-    auto ret = CSRFromOldDGLCSR(slice_csr);
-    if (rowwise) {
-      return SparseMatrix::FromCSRPointer(
-          ret, slice_value, {ret->num_rows, ret->num_cols});
-    } else {
-      return SparseMatrix::FromCSCPointer(
-          ret, slice_value, {ret->num_cols, ret->num_rows});
-    }
-  } else {  // COO
-    auto dgl_coo = COOToOldDGLCOO(this->COOPtr());
-    if (!rowwise) dgl_coo = aten::COOTranspose(dgl_coo);
-    auto slice_coo = dgl::aten::COOSliceRows(dgl_coo, start, end);
-    auto slice_value =
-        this->value().index_select(0, DGLArrayToTorchTensor(slice_coo.data));
-    slice_coo.data = dgl::aten::NullArray();
-    if (!rowwise) slice_coo = aten::COOTranspose(slice_coo);
-    auto ret = COOFromOldDGLCOO(slice_coo);
-    auto new_shape = std::vector<int64_t>{ret->num_rows, ret->num_cols};
-    return SparseMatrix::FromCOOPointer(ret, slice_value, new_shape);
+  auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
+  auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), start, end);
+  auto slice_value =
+      this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+  // Drop the index array to prevent potential construct error of COO format.
+  slice_csr.data = dgl::aten::NullArray();
+  auto ret = CSRFromOldDGLCSR(slice_csr);
+  if (sparse_format == SparseFormat::kCSR) {
+    return SparseMatrix::FromCSRPointer(
+        ret, slice_value, {ret->num_rows, ret->num_cols});
+  } else {
+    return SparseMatrix::FromCSCPointer(
+        ret, slice_value, {ret->num_cols, ret->num_rows});
   }
 }
 
