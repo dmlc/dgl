@@ -1,11 +1,11 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *
- * @file shared_memory_utils.h
- * @brief Share memory utilities.
+ * @file shared_memory_helper.h
+ * @brief Share memory helper.
  */
-#ifndef GRAPHBOLT_SHM_UTILS_H_
-#define GRAPHBOLT_SHM_UTILS_H_
+#ifndef GRAPHBOLT_SHARED_MEMORY_HELPER_H_
+#define GRAPHBOLT_SHARED_MEMORY_HELPER_H_
 
 #include <graphbolt/shared_memory.h>
 #include <torch/torch.h>
@@ -28,9 +28,9 @@ namespace sampling {
  * memory. However, the size of the binary buffer is not known in advance. To
  * solve this problem, we use two shared memory objects: one for storing the
  * metadata and the other for storing the binary buffer. The metadata includes
- * the meta information of data structures such as size and shape. The size of
- * the metadata is decided by the user via `max_metadata_size`. The size of
- * the binary buffer is decided by the size of the data structures.
+ * the metadata of data structures such as size and shape. The size of the
+ * metadata is decided by the user via `max_metadata_size`. The size of the
+ * binary buffer is decided by the size of the data structures.
  *
  * To avoid repeated shared memory allocation, this helper class uses lazy data
  * structure writing. The data structures are written to the shared memory only
@@ -140,4 +140,4 @@ class SharedMemoryHelper {
 }  // namespace sampling
 }  // namespace graphbolt
 
-#endif  // GRAPHBOLT_SHM_UTILS_H_
+#endif  // GRAPHBOLT_SHARED_MEMORY_HELPER_H_

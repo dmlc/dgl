@@ -487,7 +487,7 @@ class SparseMatrix:
         dim : int
             The dim to select from matrix, should be 0 or 1. `dim = 0` for
             rowwise selection and `dim = 1` for columnwise selection.
-        index : tensor.Tensor
+        index : torch.Tensor
             The selection index indicates which IDs from the `dim` should
             be chosen from the matrix.
             Note that duplicated ids are allowed.
@@ -527,7 +527,7 @@ class SparseMatrix:
         if dim not in (0, 1):
             raise ValueError("The selection dimension should be 0 or 1.")
         if isinstance(index, torch.Tensor):
-            raise NotImplementedError
+            return SparseMatrix(self.c_sparse_matrix.index_select(dim, index))
         raise TypeError(f"{type(index).__name__} is unsupported input type.")
 
     def range_select(self, dim: int, index: slice):
@@ -575,7 +575,15 @@ class SparseMatrix:
         if dim not in (0, 1):
             raise ValueError("The selection dimension should be 0 or 1.")
         if isinstance(index, slice):
-            raise NotImplementedError
+            if index.step not in (None, 1):
+                raise NotImplementedError(
+                    "Slice with step other than 1 are not supported yet."
+                )
+            start = 0 if index.start is None else index.start
+            end = index.stop
+            return SparseMatrix(
+                self.c_sparse_matrix.range_select(dim, start, end)
+            )
         raise TypeError(f"{type(index).__name__} is unsupported input type.")
 
 
