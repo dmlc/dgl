@@ -121,7 +121,7 @@ def _slice_subgraph(subgraph: SampledSubgraphImpl, index: torch.Tensor):
     )
 
 
-def _find_exclude_eids(edges, exclude_mode, reverse_etypes):
+def _find_exclude_edges(edges, exclude_mode, reverse_etypes):
     if exclude_mode is None:
         return edges
     elif callable(exclude_mode):
@@ -129,25 +129,21 @@ def _find_exclude_eids(edges, exclude_mode, reverse_etypes):
     elif exclude_mode == "reverse":
         if isinstance(edges, tuple):
             u, v = edges
-            edges_to_exclude = (torch.cat([u, v]), torch.cat([v, u]))
+            return (torch.cat([u, v]), torch.cat([v, u]))
         else:
-            reverse_edges = {}
-            # Find reverse edges to exclude.
             for etype, reverse_etype in reverse_etypes.items():
-                if etype not in edges:
-                    continue
-                u, v = edges[etype]
-                reverse_edges[reverse_etype] = (v, u)
-            # Merge with reverse edges.
-            edges_to_exclude = {}
-            for etype, (u, v) in edges.items():
-                if etype in reverse_edges:
-                    u = torch.cat([u, reverse_edges[etype][0]])
-                    v = torch.cat([v, reverse_edges[etype][1]])
-                    edges_to_exclude[etype] = (u, v)
-                else:
-                    edges_to_exclude[etype] = (u, v)
-            return edges_to_exclude
+                if etype in edges:
+                    if reverse_etype in edges:
+                        u, v = edges[reverse_etype]
+                        u = torch.cat([u, edges[etype][1]])
+                        v = torch.cat([v, edges[etype][0]])
+                        edges[reverse_etype] = (u, v)
+                    else:
+                        edges[reverse_etype] = (
+                            edges[etype][1],
+                            edges[etype][0],
+                        )
+            return edges
     else:
         raise ValueError("unsupported mode {}".format(exclude_mode))
 
@@ -225,11 +221,12 @@ def exclude_edges(
         "The sampled subgraph and the edges to exclude should be both "
         "homogeneous or both heterogeneous."
     )
+    # Get edges to exclude.
+    edges = _find_exclude_edges(edges, exclude_mode, reverse_etypes)
     # Three steps to exclude edges:
     # 1. Convert the node pairs to the original ids if they are compacted.
     # 2. Exclude the edges and get the index of the edges to keep.
     # 3. Slice the subgraph according to the index.
-    edges = _find_exclude_eids(edges, exclude_mode, reverse_etypes)
     if isinstance(subgraph.node_pairs, tuple):
         reverse_edges = _to_reverse_ids(
             subgraph.node_pairs,

@@ -135,3 +135,105 @@ def test_exclude_edges_hetero(reverse_row, reverse_column):
     )
     _assert_container_equal(result.reverse_row_node_ids, expected_row_node_ids)
     _assert_container_equal(result.reverse_edge_ids, expected_edge_ids)
+
+
+def test_exclude_edges_homo_with_reverse():
+    node_pairs = (torch.tensor([0, 2, 3, 4]), torch.tensor([1, 4, 2, 2]))
+    reverse_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
+    src_to_exclude = torch.tensor([11])
+    reverse_column_node_ids = torch.tensor([10, 15, 11, 24, 9])
+    dst_to_exclude = torch.tensor([9])
+    reverse_edge_ids = torch.Tensor([5, 9, 10])
+    subgraph = SampledSubgraphImpl(
+        node_pairs,
+        reverse_column_node_ids,
+        reverse_row_node_ids,
+        reverse_edge_ids,
+    )
+    edges_to_exclude = (src_to_exclude, dst_to_exclude)
+    result = exclude_edges(subgraph, edges_to_exclude, "reverse")
+    expected_node_pairs = (torch.tensor([0, 3]), torch.tensor([1, 2]))
+    expected_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
+    expected_column_node_ids = torch.tensor([10, 15, 11, 24, 9])
+    expected_edge_ids = torch.Tensor([5, 10])
+
+    _assert_container_equal(result.node_pairs, expected_node_pairs)
+    _assert_container_equal(
+        result.reverse_column_node_ids, expected_column_node_ids
+    )
+    _assert_container_equal(result.reverse_row_node_ids, expected_row_node_ids)
+    _assert_container_equal(result.reverse_edge_ids, expected_edge_ids)
+
+
+# [2, 0], [0, 2]
+def test_exclude_edges_hetero_with_reverse():
+    node_pairs = {
+        "A:relation:B": (
+            torch.tensor([0, 1, 2]),
+            torch.tensor([2, 1, 0]),
+        ),
+        "B:reverse:A": (
+            torch.tensor([2, 1, 0]),
+            torch.tensor([0, 1, 2]),
+        ),
+    }
+    reverse_row_node_ids = {
+        "A": torch.tensor([13, 14, 15]),
+        "B": torch.tensor([10, 11, 12]),
+    }
+    src_to_exclude = torch.tensor([15, 13])
+    reverse_column_node_ids = {
+        "B": torch.tensor([10, 11, 12]),
+        "A": torch.tensor([13, 14, 15]),
+    }
+    dst_to_exclude = torch.tensor([10, 12])
+    reverse_edge_ids = {
+        "A:relation:B": torch.tensor([19, 20, 21]),
+        "B:reverse:A": torch.tensor([10, 11, 12]),
+    }
+    subgraph = SampledSubgraphImpl(
+        node_pairs=node_pairs,
+        reverse_column_node_ids=reverse_column_node_ids,
+        reverse_row_node_ids=reverse_row_node_ids,
+        reverse_edge_ids=reverse_edge_ids,
+    )
+
+    edges_to_exclude = {
+        "A:relation:B": (
+            src_to_exclude,
+            dst_to_exclude,
+        ),
+    }
+    reverse_edge_types = {"A:relation:B": "B:reverse:A"}
+    result = exclude_edges(
+        subgraph, edges_to_exclude, "reverse", reverse_edge_types
+    )
+    expected_node_pairs = {
+        "A:relation:B": (
+            torch.tensor([1]),
+            torch.tensor([1]),
+        ),
+        "B:reverse:A": (
+            torch.tensor([1]),
+            torch.tensor([1]),
+        ),
+    }
+    expected_row_node_ids = {
+        "A": torch.tensor([13, 14, 15]),
+        "B": torch.tensor([10, 11, 12]),
+    }
+    expected_column_node_ids = {
+        "B": torch.tensor([10, 11, 12]),
+        "A": torch.tensor([13, 14, 15]),
+    }
+    expected_edge_ids = {
+        "A:relation:B": torch.tensor([20]),
+        "B:reverse:A": torch.tensor([11]),
+    }
+
+    _assert_container_equal(result.node_pairs, expected_node_pairs)
+    _assert_container_equal(
+        result.reverse_column_node_ids, expected_column_node_ids
+    )
+    _assert_container_equal(result.reverse_row_node_ids, expected_row_node_ids)
+    _assert_container_equal(result.reverse_edge_ids, expected_edge_ids)
