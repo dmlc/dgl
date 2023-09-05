@@ -1393,7 +1393,7 @@ def test_cf_conv(g, idtype, out_dim):
 
 
 def myagg(alist, dsttype):
-    return alist[0] + np.dot([i + 1 for range(1, len(alist))],alist[1:])
+    return np.dot(list(range(1, len(alist) + 1)), alist)
 
 
 @parametrize_idtype
