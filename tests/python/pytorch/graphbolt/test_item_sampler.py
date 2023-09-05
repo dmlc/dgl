@@ -15,23 +15,29 @@ def test_ItemSampler_minibatcher():
     with pytest.warns(
         UserWarning,
         match=re.escape(
-            "Failed to map item list to `MiniBatch` as the names of items are not provided. Please provide a customized `MiniBatcher`. The item list is returned as is."
+            "Failed to map item list to `MiniBatch` as the names of items are "
+            "not provided. Please provide a customized `MiniBatcher`. The "
+            "item list is returned as is."
         ),
     ):
         minibatch = next(iter(item_sampler))
         assert not isinstance(minibatch, gb.MiniBatch)
 
     # Default minibatcher is used if not specified.
-    # Exception is raised if unrecognized names are specified.
+    # Warning message is raised if unrecognized names are specified.
     item_set = gb.ItemSet(torch.arange(0, 10), names="unknown_name")
     item_sampler = gb.ItemSampler(item_set, batch_size=4)
-    with pytest.raises(
-        TypeError,
+    with pytest.warns(
+        UserWarning,
         match=re.escape(
-            "MiniBatch.__init__() got an unexpected keyword argument 'unknown_name'"
+            "Unknown item name 'unknown_name' is detected and added into "
+            "`MiniBatch`. You probably need to provide a customized "
+            "`MiniBatcher`."
         ),
     ):
         minibatch = next(iter(item_sampler))
+        assert isinstance(minibatch, gb.MiniBatch)
+        assert minibatch.unknown_name is not None
 
     # Default minibatcher is used if not specified.
     # `MiniBatch` is returned if expected names are specified.

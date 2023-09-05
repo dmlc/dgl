@@ -47,7 +47,8 @@ def minibatcher_default(batch, names):
         return batch
     if len(names) == 1:
         # Handle the case of single item: batch = tensor([0, 1, 2, 3]), names =
-        # ("seed_nodes",).
+        # ("seed_nodes",) as `zip(batch, names)` will iterate over the tensor
+        # instead of the batch.
         init_data = {names[0]: batch}
     else:
         if isinstance(batch, Mapping):
@@ -57,7 +58,15 @@ def minibatcher_default(batch, names):
             }
         else:
             init_data = {name: item for item, name in zip(batch, names)}
-    minibatch = MiniBatch(**init_data)
+    minibatch = MiniBatch()
+    for name, item in init_data.items():
+        if not hasattr(minibatch, name):
+            dgl_warning(
+                f"Unknown item name '{name}' is detected and added into "
+                "`MiniBatch`. You probably need to provide a customized "
+                "`MiniBatcher`."
+            )
+        setattr(minibatch, name, item)
     return minibatch
 
 
