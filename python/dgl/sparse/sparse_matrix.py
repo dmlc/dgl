@@ -587,89 +587,70 @@ class SparseMatrix:
         raise TypeError(f"{type(index).__name__} is unsupported input type.")
 
     def sample(
-        self,
-        dim: int,
-        fanout: int,
-        ids: Optional[torch.Tensor] = None,
-        replace: Optional[bool] = False,
-        bias: Optional[bool] = False,
+        self, dim: int, n_pick: int, replacement: Optional[bool] = False
     ):
-        """Returns a sampled matrix on the given dimension and sample arguments.
+        """Returns a sample matrix according to the given sample dim and number.
 
         Parameters
         ----------
         dim : int
             The dimension for sampling, should be 0 or 1. `dim = 0` for
             rowwise selection and `dim = 1` for columnwise selection.
-        fanout : int
-            The number of elements to randomly sample on each row or column.
-        ids : torch.Tensor, optional
-            An optional tensor containing row or column IDs from which to
-            sample elements.
-            NOTE: If `ids` is not provided (i.e., `ids = None`), the function
-            will sample from all rows or columns.
-        replace : bool, optional
-            Indicates whether repeated sampling of the same element is allowed.
-            When `replace = True`, repeated sampling is permitted; when
-            `replace = False`, it is not allowed.
-            NOTE: If `replace = False` and there are fewer elements than
-            `fanout`, all non-zero elements will be sampled.
-        bias : bool, optional
-            A boolean flag indicating whether to enable biasing during sampling.
-            When `bias = True`, the values of the sparse matrix will be used as
-            bias weights.
+        n_pick : int
+            The number of nodes to randomly sample on each row or column.
+        replacement : bool, optional
+            Whether to allow repeated sampling of the same neighbor.
+            `replacement = True` means allowing and `replacement = False`
+            means not.
+            NOTE: If `replacement = False` and there are fewer nodes
+            than n_pick, all nodes will be sampled.
 
         The function does not support autograd.
 
         Returns
         -------
         SparseMatrix
-            A submatrix with the same shape as the original matrix, containing
-            the randomly sampled non-zero elements.
+            A submatrix with the same shape as the original matrix
+            containing the sampled nodes.
 
         Examples
         --------
 
-        >>> indices = torch.tensor([[0, 0, 1, 1, 2, 2, 2],
-                                    [0, 2, 0, 1, 0, 1, 2]])
+        >>> indices = torch.tensor([0, 0, 1, 1, 2, 2, 2], [0, 2, 0, 1, 0, 1, 2]])
         >>> val = torch.tensor([0, 1, 2, 3, 4, 5, 6])
         >>> A = dglsp.spmatrix(indices, val)
 
         Case 1: Sample rows with the given number and disable repeated sampling.
 
-        >>> row_ids = torch.tensor([0, 2])
-        >>> A.sample(0, 2, row_ids)
-        SparseMatrix(indices=tensor([[0, 0, 1, 1],
-                                     [0, 2, 0, 2]]),
-                     values=tensor([0, 1, 4, 6]),
-                     shape=(2, 3), nnz=4)
+        >>> A.sample(0, 2)
+        SparseMatrix(indices=tensor([[0, 0, 1, 1, 2, 2],
+                                     [0, 2, 0, 1, 0, 2]]),
+                     values=tensor([0, 1, 2, 3, 4, 6]),
+                     shape=(3, 3), nnz=6)
 
         Case 2: Sample cols with the given number and disable repeated sampling.
 
-        >>> col_ids = torch.tensor([0, 2])
-        >>> A.sample(1, 2, col_ids)
-        SparseMatrix(indices=tensor([[0, 1, 0, 2],
-                                     [0, 0, 1, 1]]),
-                     values=tensor([0, 2, 1, 6]),
-                     shape=(3, 2), nnz=4)
+        >>> A.sample(1, 2)
+        SparseMatrix(indices=tensor([[0, 1, 1, 2, 0, 2],
+                                     [0, 0, 1, 1, 2, 2]]),
+                     values=tensor([0, 2, 3, 5, 1, 6]),
+                     shape=(3, 3), nnz=4)
 
         Case 3: Sample rows with the given number and enable repeated sampling.
 
-        >>> row_ids = torch.tensor([0, 1])
-        >>> A.sample(0, 2, row_ids, True)
-        SparseMatrix(indices=tensor([[0, 0, 1, 1],
-                                     [0, 2, 0, 0]]),
-                     values=tensor([0, 1, 2, 2]),
-                     shape=(2, 3), nnz=3)
+        >>> A.sample(0, 2, True)
+        SparseMatrix(indices=tensor([[0, 0, 1, 1, 2, 2],
+                                     [0, 2, 0, 0, 1, 2]]),
+                     values=tensor([0, 1, 2, 2, 5, 6]),
+                     shape=(3, 3), nnz=5)
 
         Case 4: Sample cols with the given number and enable repeated sampling.
 
-        >>> col_ids = torch.tensor([0, 1])
-        >>> A.sample(1, 2, col_ids, True)
-        SparseMatrix(indices=tensor([[0, 1, 1, 1],
-                                     [0, 0, 1, 1]]),
-                     values=tensor([0, 2, 3, 3]),
-                     shape=(3, 2), nnz=3)
+        >>> A.sample(1, 2, True)
+        SparseMatrix(indices=tensor([[0, 1, 1, 1, 2, 2],
+                                     [0, 0, 1, 1, 2, 2]]),
+                     values=tensor([0, 2, 3, 3, 6, 6]),
+                     shape=(3, 3), nnz=4)
         """
         raise NotImplementedError
 
