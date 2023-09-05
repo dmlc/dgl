@@ -449,10 +449,9 @@ static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
       edge_attributes);
-  SharedMemoryPtr tensor_metadata_shm, tensor_data_shm;
-  std::tie(tensor_metadata_shm, tensor_data_shm) = helper.ReleaseSharedMemory();
+  auto shared_memory = helper.ReleaseSharedMemory();
   graph->HoldSharedMemoryPtr(
-      std::move(tensor_metadata_shm), std::move(tensor_data_shm));
+      std::move(shared_memory.first), std::move(shared_memory.second));
   return graph;
 }
 
