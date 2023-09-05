@@ -31,7 +31,8 @@ def minibatcher_default(batch, names):
     batch : list
         List of items.
     names : Tuple[str] or None
-        Names of items in `batch`.
+        Names of items in `batch` with same length. The order should align
+        with `batch`.
 
     Returns
     -------
