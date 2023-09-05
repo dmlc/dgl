@@ -155,8 +155,6 @@ class SparseMatrix : public torch::CustomClassHolder {
    * (for column-wise selection).
    * @note The 'ids' tensor should contain valid indices within the range of the
    * original SparseMatrix's dimensions.
-   * @note The returned SparseMatrix may share data with the original matrix,
-   * depending on the implementation.
    */
   c10::intrusive_ptr<SparseMatrix> IndexSelect(int64_t dim, torch::Tensor ids);
 
@@ -170,7 +168,7 @@ class SparseMatrix : public torch::CustomClassHolder {
    * column-wise, determined by the 'dim' parameter.
    *
    * @param dim Select rows (dim=0) or columns (dim=1).
-   * @param start The starting index of the range.
+   * @param start The starting index (inclusive) of the range.
    * @param end The ending index (exclusive) of the range.
    *
    * @return A new SparseMatrix containing the selected range of rows or
@@ -178,12 +176,8 @@ class SparseMatrix : public torch::CustomClassHolder {
    *
    * @note The 'dim' parameter should be either 0 (for row-wise selection) or 1
    * (for column-wise selection).
-   * @note The 'start' and 'end' parameters define the inclusive-exclusive range
-   * of indices to select.
-   * @note The function ensures that the 'start' and 'end' indices are within
+   * @note The 'start' and 'end' indices should be valid indices within
    * the valid range of the original SparseMatrix's dimensions.
-   * @note The returned SparseMatrix may share data with the original matrix,
-   * depending on the implementation.
    */
   c10::intrusive_ptr<SparseMatrix> RangeSelect(
       int64_t dim, int64_t start, int64_t end);

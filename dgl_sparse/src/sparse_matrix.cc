@@ -128,20 +128,16 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::IndexSelect(
     int64_t dim, torch::Tensor ids) {
   auto id_array = TorchTensorToDGLArray(ids);
   bool rowwise = dim == 0;
-  SparseFormat sparse_format;
-  if (rowwise) {
-    sparse_format = SparseFormat::kCSR;
-  } else {
-    sparse_format = SparseFormat::kCSC;
-  }
   auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
   auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), id_array);
   auto slice_value =
       this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
-  // Drop the index array to prevent potential construct error of COO format.
+  // To prevent potential errors in future conversions to the COO format,
+  // where this array might be used as an initialization array for
+  // constructing COO representations, it is necessary to clear this array.
   slice_csr.data = dgl::aten::NullArray();
   auto ret = CSRFromOldDGLCSR(slice_csr);
-  if (sparse_format == SparseFormat::kCSR) {
+  if (rowwise) {
     return SparseMatrix::FromCSRPointer(
         ret, slice_value, {ret->num_rows, ret->num_cols});
   } else {
@@ -153,20 +149,16 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::IndexSelect(
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::RangeSelect(
     int64_t dim, int64_t start, int64_t end) {
   bool rowwise = dim == 0;
-  SparseFormat sparse_format;
-  if (rowwise) {
-    sparse_format = SparseFormat::kCSR;
-  } else {
-    sparse_format = SparseFormat::kCSC;
-  }
   auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
   auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), start, end);
   auto slice_value =
       this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
-  // Drop the index array to prevent potential construct error of COO format.
+  // To prevent potential errors in future conversions to the COO format,
+  // where this array might be used as an initialization array for
+  // constructing COO representations, it is necessary to clear this array.
   slice_csr.data = dgl::aten::NullArray();
   auto ret = CSRFromOldDGLCSR(slice_csr);
-  if (sparse_format == SparseFormat::kCSR) {
+  if (rowwise) {
     return SparseMatrix::FromCSRPointer(
         ret, slice_value, {ret->num_rows, ret->num_cols});
   } else {

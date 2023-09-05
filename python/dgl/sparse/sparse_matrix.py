@@ -575,6 +575,8 @@ class SparseMatrix:
         if dim not in (0, 1):
             raise ValueError("The selection dimension should be 0 or 1.")
         if isinstance(index, slice):
+            if index.step not in (None, 1):
+                raise NotImplementedError
             start = 0 if index.start is None else index.start
             end = index.stop
             return SparseMatrix(
