@@ -243,7 +243,8 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * graph is destroyed.
    * @param ptr The pointers to the shared memory objects.
    */
-  void HoldSharedMemoryPtr(std::pair<SharedMemoryPtr, SharedMemoryPtr> ptr);
+  void HoldSharedMemoryPtr(
+      SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm);
 
  private:
   template <typename NumPickFn, typename PickFn>
