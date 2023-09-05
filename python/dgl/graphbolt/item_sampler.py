@@ -2,16 +2,53 @@
 
 from collections.abc import Mapping
 from functools import partial
-from typing import Iterator, Optional
+from typing import Callable, Iterator, Optional
 
 from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
+from ..base import dgl_warning
+
 from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
 from .itemset import ItemSet, ItemSetDict
+from .minibatch import MiniBatch
 
-__all__ = ["ItemSampler"]
+__all__ = ["ItemSampler", "minibatcher_default"]
+
+
+def minibatcher_default(batch, names):
+    """Default minibatcher.
+
+    Parameters
+    ----------
+    batch : list
+        List of items.
+
+    Returns
+    -------
+    MiniBatch
+        A minibatch.
+    """
+    if names is None:
+        dgl_warning(
+            "Failed to map item list to `MiniBatch` as the names of items are "
+            "not provided. Please provide a customized `MiniBatcher`. "
+            "The item list is returned as is."
+        )
+        return batch
+    if len(names) == 1:
+        init_data = {names[0]: batch}
+    else:
+        if isinstance(batch, Mapping):
+            init_data = {
+                name: {k: v[i] for k, v in batch.items()}
+                for i, name in enumerate(names)
+            }
+        else:
+            init_data = {name: item for item, name in zip(batch, names)}
+    minibatch = MiniBatch(**init_data)
+    return minibatch
 
 
 class ItemSampler(IterDataPipe):
@@ -32,6 +69,8 @@ class ItemSampler(IterDataPipe):
         Data to be sampled.
     batch_size : int
         The size of each batch.
+    minibatcher : Optional[Callable]
+        A callable that takes in a list of items and returns a `MiniBatch`.
     drop_last : bool
         Option to drop the last batch if it's not full.
     shuffle : bool
@@ -172,12 +211,14 @@ class ItemSampler(IterDataPipe):
         self,
         item_set: ItemSet or ItemSetDict,
         batch_size: int,
+        minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
     ) -> None:
         super().__init__()
         self._item_set = item_set
         self._batch_size = batch_size
+        self._minibatcher = minibatcher
         self._drop_last = drop_last
         self._shuffle = shuffle
 
@@ -216,5 +257,10 @@ class ItemSampler(IterDataPipe):
             return default_collate(batch)
 
         data_pipe = data_pipe.collate(collate_fn=partial(_collate))
+
+        # Map to minibatch.
+        data_pipe = data_pipe.map(
+            partial(self._minibatcher, names=self._item_set.names)
+        )
 
         return iter(data_pipe)
