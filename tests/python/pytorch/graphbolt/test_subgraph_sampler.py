@@ -2,7 +2,6 @@ import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
 import torch
-import torchdata.datapipes as dp
 from torchdata.datapipes.iter import Mapper
 
 
@@ -46,17 +45,8 @@ def test_SubgraphSampler_Link(labor):
     assert len(list(neighbor_dp)) == 5
 
 
-@pytest.mark.parametrize(
-    "format",
-    [
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
-        gb.LinkPredictionEdgeFormat.CONDITIONED,
-        gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED,
-        gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
-    ],
-)
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Link_With_Negative(format, labor):
+def test_SubgraphSampler_Link_With_Negative(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(
         (
@@ -70,9 +60,7 @@ def test_SubgraphSampler_Link_With_Negative(format, labor):
     minibatch_converter = Mapper(
         item_sampler_dp, gb_test_utils.minibatch_link_collator
     )
-    negative_dp = gb.UniformNegativeSampler(
-        minibatch_converter, 1, format, graph
-    )
+    negative_dp = gb.UniformNegativeSampler(minibatch_converter, 1, graph)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
@@ -131,17 +119,8 @@ def test_SubgraphSampler_Link_Hetero(labor):
     assert len(list(neighbor_dp)) == 5
 
 
-@pytest.mark.parametrize(
-    "format",
-    [
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
-        gb.LinkPredictionEdgeFormat.CONDITIONED,
-        gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED,
-        gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
-    ],
-)
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Link_Hetero_With_Negative(format, labor):
+def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     graph = get_hetero_graph()
     itemset = gb.ItemSetDict(
         {
@@ -166,9 +145,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(format, labor):
     minibatch_converter = Mapper(
         item_sampler_dp, gb_test_utils.minibatch_link_collator
     )
-    negative_dp = gb.UniformNegativeSampler(
-        minibatch_converter, 1, format, graph
-    )
+    negative_dp = gb.UniformNegativeSampler(minibatch_converter, 1, graph)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5

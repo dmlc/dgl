@@ -2,10 +2,7 @@
 
 from _collections_abc import Mapping
 
-import torch
 from torchdata.datapipes.iter import Mapper
-
-from .data_format import LinkPredictionEdgeFormat
 
 
 class NegativeSampler(Mapper):
@@ -18,7 +15,6 @@ class NegativeSampler(Mapper):
         self,
         datapipe,
         negative_ratio,
-        output_format,
     ):
         """
         Initlization for a negative sampler.
@@ -29,13 +25,10 @@ class NegativeSampler(Mapper):
             The datapipe.
         negative_ratio : int
             The proportion of negative samples to positive samples.
-        output_format : LinkPredictionEdgeFormat
-            Determines the edge format of the output minibatch.
         """
         super().__init__(datapipe, self._sample)
         assert negative_ratio > 0, "Negative_ratio should be positive Integer."
         self.negative_ratio = negative_ratio
-        self.output_format = output_format
 
     def _sample(self, minibatch):
         """
@@ -59,18 +52,11 @@ class NegativeSampler(Mapper):
         node_pairs = minibatch.node_pairs
         assert node_pairs is not None
         if isinstance(node_pairs, Mapping):
-            if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
-                minibatch.labels = {}
-            else:
-                minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
+            minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
             for etype, pos_pairs in node_pairs.items():
                 self._collate(
                     minibatch, self._sample_with_etype(pos_pairs, etype), etype
                 )
-            if self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
-                minibatch.negative_dsts = None
-            if self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
-                minibatch.negative_srcs = None
         else:
             self._collate(minibatch, self._sample_with_etype(node_pairs))
         return minibatch
@@ -110,45 +96,14 @@ class NegativeSampler(Mapper):
         etype : str
             Canonical edge type.
         """
-        pos_src, pos_dst = (
-            minibatch.node_pairs[etype]
-            if etype is not None
-            else minibatch.node_pairs
-        )
         neg_src, neg_dst = neg_pairs
-        if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
-            pos_labels = torch.ones_like(pos_src)
-            neg_labels = torch.zeros_like(neg_src)
-            src = torch.cat([pos_src, neg_src])
-            dst = torch.cat([pos_dst, neg_dst])
-            labels = torch.cat([pos_labels, neg_labels])
-            if etype is not None:
-                minibatch.node_pairs[etype] = (src, dst)
-                minibatch.labels[etype] = labels
-            else:
-                minibatch.node_pairs = (src, dst)
-                minibatch.labels = labels
+        if neg_src is not None:
+            neg_src = neg_src.view(-1, self.negative_ratio)
+        if neg_dst is not None:
+            neg_dst = neg_dst.view(-1, self.negative_ratio)
+        if etype is not None:
+            minibatch.negative_srcs[etype] = neg_src
+            minibatch.negative_dsts[etype] = neg_dst
         else:
-            if self.output_format == LinkPredictionEdgeFormat.CONDITIONED:
-                neg_src = neg_src.view(-1, self.negative_ratio)
-                neg_dst = neg_dst.view(-1, self.negative_ratio)
-            elif (
-                self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED
-            ):
-                neg_src = neg_src.view(-1, self.negative_ratio)
-                neg_dst = None
-            elif (
-                self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED
-            ):
-                neg_dst = neg_dst.view(-1, self.negative_ratio)
-                neg_src = None
-            else:
-                raise TypeError(
-                    f"Unsupported output format {self.output_format}."
-                )
-            if etype is not None:
-                minibatch.negative_srcs[etype] = neg_src
-                minibatch.negative_dsts[etype] = neg_dst
-            else:
-                minibatch.negative_srcs = neg_src
-                minibatch.negative_dsts = neg_dst
+            minibatch.negative_srcs = neg_src
+            minibatch.negative_dsts = neg_dst

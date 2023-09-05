@@ -7,7 +7,6 @@ import torch
 from .._ffi import libinfo
 from .base import *
 from .minibatch import *
-from .data_format import *
 from .dataloader import *
 from .dataset import *
 from .feature_fetcher import *
