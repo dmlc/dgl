@@ -1,9 +1,9 @@
+import contextlib
 import io
 
 import random
 import re
 from contextlib import ContextDecorator
-import contextlib
 
 from copy import deepcopy
 
