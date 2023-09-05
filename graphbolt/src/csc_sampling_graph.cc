@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "./random.h"
-#include "./shared_memory_utils.h"
+#include "./shared_memory_helper.h"
 
 namespace graphbolt {
 namespace sampling {
@@ -438,8 +438,7 @@ CSCSamplingGraph::SampleNegativeEdgesUniform(
   return std::make_tuple(neg_src, neg_dst);
 }
 
-c10::intrusive_ptr<CSCSamplingGraph>
-CSCSamplingGraph::BuildGraphFromSharedMemoryHelper(
+static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
     SharedMemoryHelper&& helper) {
   helper.InitializeRead();
   auto indptr = helper.ReadTorchTensor();
@@ -450,8 +449,9 @@ CSCSamplingGraph::BuildGraphFromSharedMemoryHelper(
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
       edge_attributes);
-  std::tie(graph->tensor_meta_shm_, graph->tensor_data_shm_) =
-      helper.ReleaseSharedMemory();
+  auto shared_memory = helper.ReleaseSharedMemory();
+  graph->HoldSharedMemoryObject(
+      std::move(shared_memory.first), std::move(shared_memory.second));
   return graph;
 }
 
@@ -471,6 +471,12 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
     const std::string& shared_memory_name) {
   SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
+}
+
+void CSCSamplingGraph::HoldSharedMemoryObject(
+    SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm) {
+  tensor_metadata_shm_ = std::move(tensor_metadata_shm);
+  tensor_data_shm_ = std::move(tensor_data_shm);
 }
 
 int64_t NumPick(
