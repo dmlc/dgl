@@ -1,6 +1,6 @@
 """Graphbolt sampled subgraph."""
 # pylint: disable= invalid-name
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 import torch
 
@@ -14,7 +14,10 @@ class SampledSubgraph:
     @property
     def node_pairs(
         self,
-    ) -> Tuple[torch.Tensor] or Dict[(str, str, str), Tuple[torch.Tensor]]:
+    ) -> Union[
+        Tuple[torch.Tensor, torch.Tensor],
+        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
+    ]:
         """Returns the node pairs representing source-destination edges.
         - If `node_pairs` is a tuple: It should be in the format ('u', 'v')
             representing source and destination pairs.
@@ -26,7 +29,7 @@ class SampledSubgraph:
     @property
     def reverse_column_node_ids(
         self,
-    ) -> torch.Tensor or Dict[str, torch.Tensor]:
+    ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         """Returns corresponding reverse column node ids the original graph.
         Column's reverse node ids in the original graph. A graph structure
         can be treated as a coordinated row and column pair, and this is
@@ -42,7 +45,9 @@ class SampledSubgraph:
         return None
 
     @property
-    def reverse_row_node_ids(self) -> torch.Tensor or Dict[str, torch.Tensor]:
+    def reverse_row_node_ids(
+        self,
+    ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         """Returns corresponding reverse row node ids the original graph.
         Row's reverse node ids in the original graph. A graph structure
         can be treated as a coordinated row and column pair, and this is
@@ -57,7 +62,7 @@ class SampledSubgraph:
         return None
 
     @property
-    def reverse_edge_ids(self) -> torch.Tensor or Dict[str, torch.Tensor]:
+    def reverse_edge_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         """Returns corresponding reverse edge ids the original graph.
         Reverse edge ids in the original graph. This is useful when edge
             features are needed.

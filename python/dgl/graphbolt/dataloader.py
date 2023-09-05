@@ -4,10 +4,10 @@ import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
 
-from .datapipe_utils import datapipe_graph_to_adjlist
 from .feature_fetcher import FeatureFetcher
-
 from .minibatch_sampler import MinibatchSampler
+
+from .utils import datapipe_graph_to_adjlist
 
 
 class SingleProcessDataLoader(torch.utils.data.DataLoader):
