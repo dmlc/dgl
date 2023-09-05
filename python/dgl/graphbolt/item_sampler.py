@@ -20,6 +20,12 @@ __all__ = ["ItemSampler", "minibatcher_default"]
 def minibatcher_default(batch, names):
     """Default minibatcher.
 
+    The default minibatcher maps a list of items to a `MiniBatch` with the
+    same names as the items. The names of items are supposed to be provided
+    and align with the data attributes of `MiniBatch`. If any unknown item name
+    is provided, exception will be raised. If the names of items are not
+    provided, the item list is returned as is and a warning will be raised.
+
     Parameters
     ----------
     batch : list
