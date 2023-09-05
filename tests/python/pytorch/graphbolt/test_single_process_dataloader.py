@@ -1,8 +1,15 @@
 import backend as F
+
 import dgl
 import dgl.graphbolt
 import gb_test_utils
 import torch
+from torchdata.datapipes.iter import Mapper
+
+
+def to_node_block(data):
+    block = dgl.graphbolt.NodeClassificationBlock(seed_node=data)
+    return block
 
 
 def test_DataLoader():
@@ -10,34 +17,23 @@ def test_DataLoader():
     B = 4
     itemset = dgl.graphbolt.ItemSet(torch.arange(N))
     graph = gb_test_utils.rand_csc_graph(200, 0.15)
-    features = dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4))
-    labels = dgl.graphbolt.TorchBasedFeature(torch.randint(0, 10, (200,)))
 
-    def sampler_func(data):
-        adjs = []
-        seeds = data
-
-        for hop in range(2):
-            sg = graph.sample_neighbors(seeds, torch.LongTensor([2]))
-            seeds = sg.node_pairs[0]
-            adjs.insert(0, sg)
-
-        input_nodes = seeds
-        output_nodes = data
-        return input_nodes, output_nodes, adjs
-
-    def fetch_func(data):
-        input_nodes, output_nodes, adjs = data
-        input_features = features.read(input_nodes)
-        output_labels = labels.read(output_nodes)
-        return input_features, output_labels, adjs
+    features = {}
+    keys = [("node", None, "a"), ("node", None, "b")]
+    features[keys[0]] = dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4))
+    features[keys[1]] = dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4))
+    feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
     minibatch_sampler = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
-    subgraph_sampler = dgl.graphbolt.SubgraphSampler(
-        minibatch_sampler,
-        sampler_func,
+    block_converter = Mapper(minibatch_sampler, to_node_block)
+    subgraph_sampler = dgl.graphbolt.NeighborSampler(
+        block_converter,
+        graph,
+        fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )
-    feature_fetcher = dgl.graphbolt.FeatureFetcher(subgraph_sampler, fetch_func)
+    feature_fetcher = dgl.graphbolt.FeatureFetcher(
+        subgraph_sampler, feature_store, keys
+    )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 
     dataloader = dgl.graphbolt.SingleProcessDataLoader(device_transferrer)

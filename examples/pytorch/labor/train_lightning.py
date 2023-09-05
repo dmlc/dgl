@@ -269,18 +269,9 @@ class DataModule(LightningDataModule):
             dataloader_device = device
 
         self.g = g
-        if cast_to_int:
-            self.train_nid, self.val_nid, self.test_nid = (
-                train_nid.int(),
-                val_nid.int(),
-                test_nid.int(),
-            )
-        else:
-            self.train_nid, self.val_nid, self.test_nid = (
-                train_nid,
-                val_nid,
-                test_nid,
-            )
+        self.train_nid = train_nid.to(g.idtype)
+        self.val_nid = val_nid.to(g.idtype)
+        self.test_nid = test_nid.to(g.idtype)
         self.sampler = sampler
         self.device = dataloader_device
         self.use_uva = use_uva
@@ -385,7 +376,7 @@ if __name__ == "__main__":
     argparser.add_argument(
         "--gpu",
         type=int,
-        default=0,
+        default=0 if th.cuda.is_available() else -1,
         help="GPU device ID. Use -1 for CPU training",
     )
     argparser.add_argument("--dataset", type=str, default="reddit")
@@ -493,7 +484,7 @@ if __name__ == "__main__":
     logger = TensorBoardLogger(args.logdir, name=subdir)
     trainer = Trainer(
         accelerator="gpu" if args.gpu != -1 else "cpu",
-        devices=[args.gpu],
+        devices=[args.gpu] if args.gpu != -1 else "auto",
         max_epochs=args.num_epochs,
         max_steps=args.num_steps,
         min_steps=args.min_steps,
@@ -521,15 +512,16 @@ if __name__ == "__main__":
             graph,
             f"cuda:{args.gpu}" if args.gpu != -1 else "cpu",
             4096,
+            args.use_uva,
             args.num_workers,
-            graph.device,
         )
         for nid, split_name in zip(
             [datamodule.train_nid, datamodule.val_nid, datamodule.test_nid],
             ["Train", "Validation", "Test"],
         ):
+            nid = nid.to(pred.device).long()
             pred_nid = pred[nid]
             label = graph.ndata["labels"][nid]
             f1score = model.f1score_class().to(pred.device)
             acc = f1score(pred_nid, label)
-            print(f"{split_name} accuracy:", acc.item())
+            print(f"{split_name} accuracy: {acc.item()}")
