@@ -3,7 +3,7 @@ import unittest
 
 import warnings
 from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import ContextDecorator
 from functools import partial
 
 import backend as F
@@ -17,19 +17,25 @@ import torch.multiprocessing as mp
 from utils import parametrize_idtype
 
 
-@contextmanager
-def cpu_affinity_context(dataloader, num_workers):
-    if num_workers == 0:
+class mycontext(ContextDecorator):
+    def __init__(self, func):
+        pass
+
+    def __call__(self, dataloader, num_workers):
+        if num_workers:
+            return dataloader.enable_cpu_affinity()
+
         # Suppressing warning:
         # "DGLWarning: Dataloader CPU affinity opt is not enabled, ... "
         # when it is impossible to use enable_cpu_affinity() to avoid
         # its appearance.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=UserWarning)
-            yield
-    else:
-        with dataloader.enable_cpu_affinity():
-            yield
+        warnings.simplefilter("ignore", category=UserWarning)
+        return warnings.catch_warnings()
+
+
+@mycontext
+def cpu_affinity_context():
+    pass
 
 
 @pytest.mark.parametrize("batch_size", [None, 16])
