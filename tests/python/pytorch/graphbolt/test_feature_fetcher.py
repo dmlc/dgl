@@ -16,11 +16,13 @@ def test_FeatureFetcher_homo():
     feature_store = gb.BasicFeatureStore(features)
 
     itemset = gb.ItemSet(torch.arange(10))
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_node_block)
-    sampler_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
+    minibatch_converter = Mapper(
+        item_sampler_dp, gb_test_utils.minibatch_node_collator
+    )
+    sampler_dp = gb.NeighborSampler(minibatch_converter, graph, fanouts)
     fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
@@ -40,9 +42,7 @@ def test_FeatureFetcher_with_edges_homo():
                     reverse_edge_ids=torch.randint(0, graph.num_edges, (10,)),
                 )
             )
-        data = gb.NodeClassificationBlock(
-            input_nodes=seeds, sampled_subgraphs=subgraphs
-        )
+        data = gb.MiniBatch(input_nodes=seeds, sampled_subgraphs=subgraphs)
         return data
 
     features = {}
@@ -52,8 +52,8 @@ def test_FeatureFetcher_with_edges_homo():
     feature_store = gb.BasicFeatureStore(features)
 
     itemset = gb.ItemSet(torch.arange(10))
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
-    converter_dp = Mapper(minibatch_dp, add_node_and_edge_ids)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
+    converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
     fetcher_dp = gb.FeatureFetcher(converter_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
@@ -103,11 +103,13 @@ def test_FeatureFetcher_hetero():
             "n2": gb.ItemSet(torch.LongTensor([0, 1, 2])),
         }
     )
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    data_block_converter = Mapper(minibatch_dp, gb_test_utils.to_node_block)
-    sampler_dp = gb.NeighborSampler(data_block_converter, graph, fanouts)
+    minibatch_converter = Mapper(
+        item_sampler_dp, gb_test_utils.minibatch_node_collator
+    )
+    sampler_dp = gb.NeighborSampler(minibatch_converter, graph, fanouts)
     fetcher_dp = gb.FeatureFetcher(
         sampler_dp, feature_store, {"n1": ["a"], "n2": ["a"]}
     )
@@ -132,9 +134,7 @@ def test_FeatureFetcher_with_edges_hetero():
                     reverse_edge_ids=reverse_edge_ids,
                 )
             )
-        data = gb.NodeClassificationBlock(
-            input_nodes=seeds, sampled_subgraphs=subgraphs
-        )
+        data = gb.MiniBatch(input_nodes=seeds, sampled_subgraphs=subgraphs)
         return data
 
     features = {}
@@ -148,8 +148,8 @@ def test_FeatureFetcher_with_edges_hetero():
             "n1": gb.ItemSet(torch.randint(0, 20, (10,))),
         }
     )
-    minibatch_dp = gb.MinibatchSampler(itemset, batch_size=2)
-    converter_dp = Mapper(minibatch_dp, add_node_and_edge_ids)
+    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
+    converter_dp = Mapper(item_sampler_dp, add_node_and_edge_ids)
     fetcher_dp = gb.FeatureFetcher(
         converter_dp, feature_store, {"n1": ["a"]}, {"n1:e1:n2": ["a"]}
     )

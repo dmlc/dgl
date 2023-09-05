@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "./random.h"
-#include "./shared_memory_utils.h"
+#include "./shared_memory_helper.h"
 
 namespace graphbolt {
 namespace sampling {
@@ -403,12 +403,6 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
         probs_or_mask.value().dtype() == torch::kFloat16) {
       probs_or_mask = probs_or_mask.value().to(torch::kFloat32);
     }
-    TORCH_CHECK(
-        ((probs_or_mask.value().max() < INFINITY) &
-         (probs_or_mask.value().min() >= 0))
-            .item()
-            .to<bool>(),
-        "Invalid probs_or_mask (contains either `inf`, `nan` or element < 0).");
   }
 
   if (layer) {
@@ -444,34 +438,45 @@ CSCSamplingGraph::SampleNegativeEdgesUniform(
   return std::make_tuple(neg_src, neg_dst);
 }
 
-c10::intrusive_ptr<CSCSamplingGraph>
-CSCSamplingGraph::BuildGraphFromSharedMemoryTensors(
-    std::tuple<
-        SharedMemoryPtr, SharedMemoryPtr,
-        std::vector<torch::optional<torch::Tensor>>>&& shared_memory_tensors) {
-  auto& optional_tensors = std::get<2>(shared_memory_tensors);
+static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
+    SharedMemoryHelper&& helper) {
+  helper.InitializeRead();
+  auto indptr = helper.ReadTorchTensor();
+  auto indices = helper.ReadTorchTensor();
+  auto node_type_offset = helper.ReadTorchTensor();
+  auto type_per_edge = helper.ReadTorchTensor();
+  auto edge_attributes = helper.ReadTorchTensorDict();
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
-      optional_tensors[0].value(), optional_tensors[1].value(),
-      optional_tensors[2], optional_tensors[3], torch::nullopt);
-  graph->tensor_meta_shm_ = std::move(std::get<0>(shared_memory_tensors));
-  graph->tensor_data_shm_ = std::move(std::get<1>(shared_memory_tensors));
+      indptr.value(), indices.value(), node_type_offset, type_per_edge,
+      edge_attributes);
+  auto shared_memory = helper.ReleaseSharedMemory();
+  graph->HoldSharedMemoryObject(
+      std::move(shared_memory.first), std::move(shared_memory.second));
   return graph;
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
     const std::string& shared_memory_name) {
-  auto optional_tensors = std::vector<torch::optional<torch::Tensor>>{
-      indptr_, indices_, node_type_offset_, type_per_edge_};
-  auto shared_memory_tensors = CopyTensorsToSharedMemory(
-      shared_memory_name, optional_tensors, SERIALIZED_METAINFO_SIZE_MAX);
-  return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
+  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  helper.WriteTorchTensor(indptr_);
+  helper.WriteTorchTensor(indices_);
+  helper.WriteTorchTensor(node_type_offset_);
+  helper.WriteTorchTensor(type_per_edge_);
+  helper.WriteTorchTensorDict(edge_attributes_);
+  helper.Flush();
+  return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
     const std::string& shared_memory_name) {
-  auto shared_memory_tensors = LoadTensorsFromSharedMemory(
-      shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
-  return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
+  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  return BuildGraphFromSharedMemoryHelper(std::move(helper));
+}
+
+void CSCSamplingGraph::HoldSharedMemoryObject(
+    SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm) {
+  tensor_metadata_shm_ = std::move(tensor_metadata_shm);
+  tensor_data_shm_ = std::move(tensor_data_shm);
 }
 
 int64_t NumPick(

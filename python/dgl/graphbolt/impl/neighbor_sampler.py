@@ -53,9 +53,9 @@ class NeighborSampler(SubgraphSampler):
         -------
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
-        >>> def to_link_block(data):
-            ... block = gb.LinkPredictionBlock(node_pair=data)
-            ... return block
+        >>> def minibatch_link_collator(data):
+            ... minibatch  = gb.MiniBatch(node_pairs=data)
+            ... return minibatch
             ...
         >>> from dgl import graphbolt as gb
         >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
@@ -64,18 +64,19 @@ class NeighborSampler(SubgraphSampler):
         >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
-        >>> minibatch_sampler = gb.MinibatchSampler(
+        >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(minibatch_sampler, to_link_block)
+        >>> minibatch_converter = Mapper(item_sampler,
+            ...minibatch_link_collator)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...data_block_converter, 2, data_format, graph)
+            ...minibatch_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
             ...torch.LongTensor([15])]
         >>> subgraph_sampler = gb.NeighborSampler(
             ...neg_sampler, graph, fanouts)
         >>> for data in subgraph_sampler:
-            ... print(data.compacted_node_pair)
+            ... print(data.compacted_node_pairs)
             ... print(len(data.sampled_subgraphs))
         (tensor([0, 0, 0]), tensor([1, 0, 2]))
         3
@@ -164,9 +165,9 @@ class LayerNeighborSampler(NeighborSampler):
         -------
         >>> import dgl.graphbolt as gb
         >>> from torchdata.datapipes.iter import Mapper
-        >>> def to_link_block(data):
-            ... block = gb.LinkPredictionBlock(node_pair=data)
-            ... return block
+        >>> def minibatch_link_collator(data):
+            ... minibatch  = gb.MiniBatch(node_pairs=data)
+            ... return minibatch
             ...
         >>> from dgl import graphbolt as gb
         >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
@@ -175,18 +176,19 @@ class LayerNeighborSampler(NeighborSampler):
         >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
         >>> item_set = gb.ItemSet(node_pairs)
-        >>> minibatch_sampler = gb.MinibatchSampler(
+        >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
-        >>> data_block_converter = Mapper(minibatch_sampler, to_link_block)
+        >>> minibatch_converter = Mapper(item_sampler,
+            ...minibatch_link_collator)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...data_block_converter, 2, data_format, graph)
+            ...minibatch_converter, 2, data_format, graph)
         >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
             ...torch.LongTensor([15])]
         >>> subgraph_sampler = gb.LayerNeighborSampler(
             ...neg_sampler, graph, fanouts)
         >>> for data in subgraph_sampler:
-            ... print(data.compacted_node_pair)
+            ... print(data.compacted_node_pairs)
             ... print(len(data.sampled_subgraphs))
         (tensor([0, 0, 0]), tensor([1, 0, 2]))
         3
