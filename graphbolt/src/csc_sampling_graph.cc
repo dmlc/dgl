@@ -450,7 +450,7 @@ static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
       edge_attributes);
   auto shared_memory = helper.ReleaseSharedMemory();
-  graph->HoldSharedMemoryPtr(
+  graph->HoldSharedMemoryObject(
       std::move(shared_memory.first), std::move(shared_memory.second));
   return graph;
 }
@@ -473,7 +473,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
-void CSCSamplingGraph::HoldSharedMemoryPtr(
+void CSCSamplingGraph::HoldSharedMemoryObject(
     SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm) {
   tensor_metadata_shm_ = std::move(tensor_metadata_shm);
   tensor_data_shm_ = std::move(tensor_data_shm);

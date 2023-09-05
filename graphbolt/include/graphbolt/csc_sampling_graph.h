@@ -247,7 +247,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * @param tensor_metadata_shm The shared memory objects of tensor metadata.
    * @param tensor_data_shm The shared memory objects of tensor data.
    */
-  void HoldSharedMemoryPtr(
+  void HoldSharedMemoryObject(
       SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm);
 
  private:
