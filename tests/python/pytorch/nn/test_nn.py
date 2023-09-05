@@ -2,7 +2,9 @@ import io
 
 import random
 import re
-from contextlib import contextmanager
+from contextlib import ContextDecorator
+import contextlib
+
 from copy import deepcopy
 
 import backend as F
@@ -2043,13 +2045,20 @@ def test_typed_linear(feat_size, regularizer, num_bases):
     assert th.allclose(y, y_sorted[rev_idx], atol=1e-4, rtol=1e-4)
 
 
-@contextmanager
-def use_affinity_context(dataloader, num_workers):
-    if num_workers == 0:
-        yield
-    else:
-        with dataloader.enable_cpu_affinity():
-            yield
+class mycontext(ContextDecorator):
+    def __init__(self, func):
+        pass
+
+    def __call__(self, dataloader, num_workers):
+        if num_workers:
+            return dataloader.enable_cpu_affinity()
+        else:
+            return contextlib.nullcontext()
+
+
+@mycontext
+def use_affinity_context():
+    pass
 
 
 @parametrize_idtype
