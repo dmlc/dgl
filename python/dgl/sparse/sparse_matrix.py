@@ -600,9 +600,9 @@ class SparseMatrix:
             The number of elements to randomly sample on each row or column.
         replacement : bool, optional
             Indicates whether repeated sampling of the same element is allowed.
-            When `replacement = True`, repeated sampling is permitted; when 
-            `replacement = False`, it is not allowed. 
-            NOTE: If `replacement = False` and there are fewer elements than 
+            When `replacement = True`, repeated sampling is permitted; when
+            `replacement = False`, it is not allowed.
+            NOTE: If `replacement = False` and there are fewer elements than
             `n_pick`, all non-zero elements will be sampled.
 
         The function does not support autograd.
@@ -610,7 +610,7 @@ class SparseMatrix:
         Returns
         -------
         SparseMatrix
-            A submatrix with the same shape as the original matrix, containing 
+            A submatrix with the same shape as the original matrix, containing
             the randomly sampled non-zero elements.
 
         Examples
