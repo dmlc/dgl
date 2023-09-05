@@ -6,7 +6,7 @@ import torch
 
 from .._ffi import libinfo
 from .base import *
-from .data_block import *
+from .minibatch import *
 from .data_format import *
 from .dataloader import *
 from .dataset import *
@@ -14,7 +14,7 @@ from .feature_fetcher import *
 from .feature_store import *
 from .impl import *
 from .itemset import *
-from .minibatch_sampler import *
+from .item_sampler import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *

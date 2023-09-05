@@ -8,9 +8,14 @@ import scipy.sparse as sp
 import torch
 
 
-def to_node_block(data):
-    block = gb.NodeClassificationBlock(seed_node=data)
-    return block
+def minibatch_node_collator(data):
+    minibatch = gb.MiniBatch(seed_nodes=data)
+    return minibatch
+
+
+def minibatch_link_collator(data):
+    minibatch = gb.MiniBatch(node_pairs=data)
+    return minibatch
 
 
 def rand_csc_graph(N, density):

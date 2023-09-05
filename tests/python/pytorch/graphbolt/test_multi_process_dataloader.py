@@ -1,6 +1,5 @@
 import os
 import unittest
-from functools import partial
 
 import backend as F
 
@@ -11,8 +10,6 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 
-@unittest.skipIf(os.name == "nt", reason="Do not support windows yet")
-# TODO (peizhou): Will enable windows test once CSCSamplingraph is pickleable.
 def test_DataLoader():
     N = 40
     B = 4
@@ -24,17 +21,19 @@ def test_DataLoader():
     features[keys[1]] = dgl.graphbolt.TorchBasedFeature(torch.randn(200, 4))
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
-    minibatch_sampler = dgl.graphbolt.MinibatchSampler(itemset, batch_size=B)
-    block_converter = Mapper(minibatch_sampler, gb_test_utils.to_node_block)
+    item_sampler = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
+    minibatch_converter = Mapper(
+        item_sampler, gb_test_utils.minibatch_node_collator
+    )
     subgraph_sampler = dgl.graphbolt.NeighborSampler(
-        block_converter,
+        minibatch_converter,
         graph,
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )
     feature_fetcher = dgl.graphbolt.FeatureFetcher(
         subgraph_sampler,
         feature_store,
-        keys,
+        ["a", "b"],
     )
     device_transferrer = dgl.graphbolt.CopyTo(feature_fetcher, F.ctx())
 

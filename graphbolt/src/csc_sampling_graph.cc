@@ -17,10 +17,12 @@
 #include <vector>
 
 #include "./random.h"
-#include "./shared_memory_utils.h"
+#include "./shared_memory_helper.h"
 
 namespace graphbolt {
 namespace sampling {
+
+static const int kPickleVersion = 6199;
 
 CSCSamplingGraph::CSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
@@ -95,6 +97,56 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
   if (type_per_edge_) {
     archive.write("CSCSamplingGraph/type_per_edge", type_per_edge_.value());
   }
+}
+
+void CSCSamplingGraph::SetState(
+    const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
+        state) {
+  // State is a dict of dicts. The tensor-type attributes are stored in the dict
+  // with key "independent_tensors". The dict-type attributes (edge_attributes)
+  // are stored directly with the their name as the key.
+  const auto& independent_tensors = state.at("independent_tensors");
+  TORCH_CHECK(
+      independent_tensors.at("version_number")
+          .equal(torch::tensor({kPickleVersion})),
+      "Version number mismatches when loading pickled CSCSamplingGraph.")
+  indptr_ = independent_tensors.at("indptr");
+  indices_ = independent_tensors.at("indices");
+  if (independent_tensors.find("node_type_offset") !=
+      independent_tensors.end()) {
+    node_type_offset_ = independent_tensors.at("node_type_offset");
+  }
+  if (independent_tensors.find("type_per_edge") != independent_tensors.end()) {
+    type_per_edge_ = independent_tensors.at("type_per_edge");
+  }
+  if (state.find("edge_attributes") != state.end()) {
+    edge_attributes_ = state.at("edge_attributes");
+  }
+}
+
+torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
+CSCSamplingGraph::GetState() const {
+  // State is a dict of dicts. The tensor-type attributes are stored in the dict
+  // with key "independent_tensors". The dict-type attributes (edge_attributes)
+  // are stored directly with the their name as the key.
+  torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> state;
+  torch::Dict<std::string, torch::Tensor> independent_tensors;
+  // Serialization version number. It indicates the serialization method of the
+  // whole state.
+  independent_tensors.insert("version_number", torch::tensor({kPickleVersion}));
+  independent_tensors.insert("indptr", indptr_);
+  independent_tensors.insert("indices", indices_);
+  if (node_type_offset_.has_value()) {
+    independent_tensors.insert("node_type_offset", node_type_offset_.value());
+  }
+  if (type_per_edge_.has_value()) {
+    independent_tensors.insert("type_per_edge", type_per_edge_.value());
+  }
+  state.insert("independent_tensors", independent_tensors);
+  if (edge_attributes_.has_value()) {
+    state.insert("edge_attributes", edge_attributes_.value());
+  }
+  return state;
 }
 
 c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
@@ -386,34 +438,45 @@ CSCSamplingGraph::SampleNegativeEdgesUniform(
   return std::make_tuple(neg_src, neg_dst);
 }
 
-c10::intrusive_ptr<CSCSamplingGraph>
-CSCSamplingGraph::BuildGraphFromSharedMemoryTensors(
-    std::tuple<
-        SharedMemoryPtr, SharedMemoryPtr,
-        std::vector<torch::optional<torch::Tensor>>>&& shared_memory_tensors) {
-  auto& optional_tensors = std::get<2>(shared_memory_tensors);
+static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
+    SharedMemoryHelper&& helper) {
+  helper.InitializeRead();
+  auto indptr = helper.ReadTorchTensor();
+  auto indices = helper.ReadTorchTensor();
+  auto node_type_offset = helper.ReadTorchTensor();
+  auto type_per_edge = helper.ReadTorchTensor();
+  auto edge_attributes = helper.ReadTorchTensorDict();
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
-      optional_tensors[0].value(), optional_tensors[1].value(),
-      optional_tensors[2], optional_tensors[3], torch::nullopt);
-  graph->tensor_meta_shm_ = std::move(std::get<0>(shared_memory_tensors));
-  graph->tensor_data_shm_ = std::move(std::get<1>(shared_memory_tensors));
+      indptr.value(), indices.value(), node_type_offset, type_per_edge,
+      edge_attributes);
+  auto shared_memory = helper.ReleaseSharedMemory();
+  graph->HoldSharedMemoryObject(
+      std::move(shared_memory.first), std::move(shared_memory.second));
   return graph;
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
     const std::string& shared_memory_name) {
-  auto optional_tensors = std::vector<torch::optional<torch::Tensor>>{
-      indptr_, indices_, node_type_offset_, type_per_edge_};
-  auto shared_memory_tensors = CopyTensorsToSharedMemory(
-      shared_memory_name, optional_tensors, SERIALIZED_METAINFO_SIZE_MAX);
-  return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
+  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  helper.WriteTorchTensor(indptr_);
+  helper.WriteTorchTensor(indices_);
+  helper.WriteTorchTensor(node_type_offset_);
+  helper.WriteTorchTensor(type_per_edge_);
+  helper.WriteTorchTensorDict(edge_attributes_);
+  helper.Flush();
+  return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
 c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
     const std::string& shared_memory_name) {
-  auto shared_memory_tensors = LoadTensorsFromSharedMemory(
-      shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
-  return BuildGraphFromSharedMemoryTensors(std::move(shared_memory_tensors));
+  SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
+  return BuildGraphFromSharedMemoryHelper(std::move(helper));
+}
+
+void CSCSamplingGraph::HoldSharedMemoryObject(
+    SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm) {
+  tensor_metadata_shm_ = std::move(tensor_metadata_shm);
+  tensor_data_shm_ = std::move(tensor_data_shm);
 }
 
 int64_t NumPick(
@@ -638,11 +701,91 @@ inline int64_t NonUniformPick(
     return num_positive_probs;
   } else {
     if (!replace) fanout = std::min(fanout, num_positive_probs);
-    std::memcpy(
-        picked_data_ptr,
-        (torch::multinomial(local_probs, fanout, replace) + offset)
-            .data_ptr<PickedType>(),
-        fanout * sizeof(PickedType));
+    if (fanout == 0) return 0;
+    AT_DISPATCH_FLOATING_TYPES(
+        local_probs.scalar_type(), "MultinomialSampling", ([&] {
+          auto local_probs_data_ptr = local_probs.data_ptr<scalar_t>();
+          auto positive_probs_indices_ptr =
+              positive_probs_indices.data_ptr<PickedType>();
+
+          if (!replace) {
+            // The algorithm is from gumbel softmax.
+            // s = argmax( logp - log(-log(eps)) ) where eps ~ U(0, 1).
+            // Here we can apply exp to the formula which will not affect result
+            // of argmax or topk. Then we have
+            // s = argmax( p / (-log(eps)) ) where eps ~ U(0, 1).
+            // We can also simplify the formula above by
+            // s = argmax( p / q ) where q ~ Exp(1).
+            if (fanout == 1) {
+              // Return argmax(p / q).
+              scalar_t max_prob = 0;
+              PickedType max_prob_index = -1;
+              // We only care about the neighbors with non-zero probability.
+              for (auto i = 0; i < num_positive_probs; ++i) {
+                // Calculate (p / q) for the current neighbor.
+                scalar_t current_prob =
+                    local_probs_data_ptr[positive_probs_indices_ptr[i]] /
+                    RandomEngine::ThreadLocal()->Exponential(1.);
+                if (current_prob > max_prob) {
+                  max_prob = current_prob;
+                  max_prob_index = positive_probs_indices_ptr[i];
+                }
+              }
+              *picked_data_ptr = max_prob_index + offset;
+            } else {
+              // Return topk(p / q).
+              std::vector<std::pair<scalar_t, PickedType>> q(
+                  num_positive_probs);
+              for (auto i = 0; i < num_positive_probs; ++i) {
+                q[i].first =
+                    local_probs_data_ptr[positive_probs_indices_ptr[i]] /
+                    RandomEngine::ThreadLocal()->Exponential(1.);
+                q[i].second = positive_probs_indices_ptr[i];
+              }
+              if (fanout < num_positive_probs / 64) {
+                // Use partial_sort.
+                std::partial_sort(
+                    q.begin(), q.begin() + fanout, q.end(), std::greater{});
+                for (auto i = 0; i < fanout; ++i) {
+                  picked_data_ptr[i] = q[i].second + offset;
+                }
+              } else {
+                // Use nth_element.
+                std::nth_element(
+                    q.begin(), q.begin() + fanout - 1, q.end(), std::greater{});
+                for (auto i = 0; i < fanout; ++i) {
+                  picked_data_ptr[i] = q[i].second + offset;
+                }
+              }
+            }
+          } else {
+            // Calculate cumulative sum of probabilities.
+            std::vector<scalar_t> prefix_sum_probs(num_positive_probs);
+            scalar_t sum_probs = 0;
+            for (auto i = 0; i < num_positive_probs; ++i) {
+              sum_probs += local_probs_data_ptr[positive_probs_indices_ptr[i]];
+              prefix_sum_probs[i] = sum_probs;
+            }
+            // Normalize.
+            if ((sum_probs > 1.00001) || (sum_probs < 0.99999)) {
+              for (auto i = 0; i < num_positive_probs; ++i) {
+                prefix_sum_probs[i] /= sum_probs;
+              }
+            }
+            for (auto i = 0; i < fanout; ++i) {
+              // Sample a probability mass from a uniform distribution.
+              double uniform_sample =
+                  RandomEngine::ThreadLocal()->Uniform(0., 1.);
+              // Use a binary search to find the index.
+              int sampled_index = std::lower_bound(
+                                      prefix_sum_probs.begin(),
+                                      prefix_sum_probs.end(), uniform_sample) -
+                                  prefix_sum_probs.begin();
+              picked_data_ptr[i] =
+                  positive_probs_indices_ptr[sampled_index] + offset;
+            }
+          }
+        }));
     return fanout;
   }
 }

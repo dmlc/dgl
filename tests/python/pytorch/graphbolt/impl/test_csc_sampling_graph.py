@@ -1,4 +1,6 @@
 import os
+
+import pickle
 import tempfile
 import unittest
 
@@ -9,9 +11,11 @@ import dgl.graphbolt as gb
 import gb_test_utils as gbt
 import pytest
 import torch
+import torch.multiprocessing as mp
 from scipy import sparse as spsp
 
 torch.manual_seed(3407)
+mp.set_sharing_strategy("file_system")
 
 
 @unittest.skipIf(
@@ -249,6 +253,116 @@ def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
     assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
     assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
+)
+def test_pickle_homo_graph(num_nodes, num_edges):
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
+    graph = gb.from_csc(csc_indptr, indices)
+
+    serialized = pickle.dumps(graph)
+    graph2 = pickle.loads(serialized)
+
+    assert graph.num_nodes == graph2.num_nodes
+    assert graph.num_edges == graph2.num_edges
+
+    assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
+    assert torch.equal(graph.indices, graph2.indices)
+
+    assert graph.metadata is None and graph2.metadata is None
+    assert graph.node_type_offset is None and graph2.node_type_offset is None
+    assert graph.type_per_edge is None and graph2.type_per_edge is None
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
+)
+@pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+def test_pickle_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    edge_attributes = {
+        "a": torch.randn((num_edges,)),
+        "b": torch.randint(1, 10, (num_edges,)),
+    }
+    graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
+    )
+
+    serialized = pickle.dumps(graph)
+    graph2 = pickle.loads(serialized)
+
+    assert graph.num_nodes == graph2.num_nodes
+    assert graph.num_edges == graph2.num_edges
+
+    assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
+    assert torch.equal(graph.indices, graph2.indices)
+    assert torch.equal(graph.node_type_offset, graph2.node_type_offset)
+    assert torch.equal(graph.type_per_edge, graph2.type_per_edge)
+    assert graph.metadata.node_type_to_id == graph2.metadata.node_type_to_id
+    assert graph.metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+    assert graph.edge_attributes.keys() == graph2.edge_attributes.keys()
+    for i in graph.edge_attributes.keys():
+        assert torch.equal(graph.edge_attributes[i], graph2.edge_attributes[i])
+
+
+def process_csc_sampling_graph_multiprocessing(graph):
+    return graph.num_nodes
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_multiprocessing():
+    num_nodes = 5
+    num_edges = 10
+    num_ntypes = 2
+    num_etypes = 3
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    edge_attributes = {
+        "a": torch.randn((num_edges,)),
+    }
+    graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
+    )
+
+    p = mp.Process(
+        target=process_csc_sampling_graph_multiprocessing, args=(graph,)
+    )
+    p.start()
+    p.join()
 
 
 @unittest.skipIf(
@@ -693,9 +807,17 @@ def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
 @pytest.mark.parametrize(
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
-def test_homo_graph_on_shared_memory(num_nodes, num_edges):
+@pytest.mark.parametrize("test_edge_attrs", [True, False])
+def test_homo_graph_on_shared_memory(num_nodes, num_edges, test_edge_attrs):
     csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
-    graph = gb.from_csc(csc_indptr, indices)
+    if test_edge_attrs:
+        edge_attributes = {
+            "A1": torch.randn(num_edges),
+            "A2": torch.randn(num_edges),
+        }
+    else:
+        edge_attributes = None
+    graph = gb.from_csc(csc_indptr, indices, edge_attributes=edge_attributes)
 
     shm_name = "test_homo_g"
     graph1 = graph.copy_to_shared_memory(shm_name)
@@ -720,6 +842,15 @@ def test_homo_graph_on_shared_memory(num_nodes, num_edges):
     )
     check_tensors_on_the_same_shared_memory(graph1.indices, graph2.indices)
 
+    if test_edge_attrs:
+        for name, edge_attr in edge_attributes.items():
+            assert name in graph1.edge_attributes
+            assert name in graph2.edge_attributes
+            assert torch.equal(graph1.edge_attributes[name], edge_attr)
+            check_tensors_on_the_same_shared_memory(
+                graph1.edge_attributes[name], graph2.edge_attributes[name]
+            )
+
     assert graph1.metadata is None and graph2.metadata is None
     assert graph1.node_type_offset is None and graph2.node_type_offset is None
     assert graph1.type_per_edge is None and graph2.type_per_edge is None
@@ -733,8 +864,9 @@ def test_homo_graph_on_shared_memory(num_nodes, num_edges):
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
 @pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+@pytest.mark.parametrize("test_edge_attrs", [True, False])
 def test_hetero_graph_on_shared_memory(
-    num_nodes, num_edges, num_ntypes, num_etypes
+    num_nodes, num_edges, num_ntypes, num_etypes, test_edge_attrs
 ):
     (
         csc_indptr,
@@ -743,8 +875,21 @@ def test_hetero_graph_on_shared_memory(
         type_per_edge,
         metadata,
     ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+
+    if test_edge_attrs:
+        edge_attributes = {
+            "A1": torch.randn(num_edges),
+            "A2": torch.randn(num_edges),
+        }
+    else:
+        edge_attributes = None
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
     )
 
     shm_name = "test_hetero_g"
@@ -780,10 +925,121 @@ def test_hetero_graph_on_shared_memory(
         graph1.type_per_edge, graph2.type_per_edge
     )
 
+    if test_edge_attrs:
+        for name, edge_attr in edge_attributes.items():
+            assert name in graph1.edge_attributes
+            assert name in graph2.edge_attributes
+            assert torch.equal(graph1.edge_attributes[name], edge_attr)
+            check_tensors_on_the_same_shared_memory(
+                graph1.edge_attributes[name], graph2.edge_attributes[name]
+            )
+
     assert metadata.node_type_to_id == graph1.metadata.node_type_to_id
     assert metadata.edge_type_to_id == graph1.metadata.edge_type_to_id
     assert metadata.node_type_to_id == graph2.metadata.node_type_to_id
     assert metadata.edge_type_to_id == graph2.metadata.edge_type_to_id
+
+
+def process_csc_sampling_graph_on_shared_memory(graph, data_queue, flag_queue):
+    # Backup the attributes.
+    csc_indptr = graph.csc_indptr.clone()
+    indices = graph.indices.clone()
+    node_type_offset = graph.node_type_offset.clone()
+    type_per_edge = graph.type_per_edge.clone()
+
+    # Change the value to random integers. Send the new value to the main
+    # process.
+    v = torch.randint_like(graph.csc_indptr, 100)
+    graph.csc_indptr[:] = v
+    data_queue.put(v.clone())
+
+    v = torch.randint_like(graph.indices, 100)
+    graph.indices[:] = v
+    data_queue.put(v.clone())
+
+    v = torch.randint_like(graph.node_type_offset, 100)
+    graph.node_type_offset[:] = v
+    data_queue.put(v.clone())
+
+    v = torch.randint_like(graph.type_per_edge, 100)
+    graph.type_per_edge[:] = v
+    data_queue.put(v.clone())
+
+    # Wait for the main process to finish.
+    flag_queue.get()
+
+    graph.csc_indptr[:] = csc_indptr
+    graph.indices[:] = indices
+    graph.node_type_offset[:] = node_type_offset
+    graph.type_per_edge[:] = type_per_edge
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_multiprocessing_with_shared_memory():
+    """Test if two CSCSamplingGraphs are on the same shared memory after
+    spawning.
+
+    For now this code only works when the sharing strategy of
+    torch.multiprocessing is set to `file_system` at the beginning.
+    The cause is still yet to be found.
+    """
+
+    num_nodes = 5
+    num_edges = 10
+    num_ntypes = 2
+    num_etypes = 3
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+
+    csc_indptr.share_memory_()
+    indices.share_memory_()
+    node_type_offset.share_memory_()
+    type_per_edge.share_memory_()
+
+    graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        None,
+        metadata,
+    )
+
+    ctx = mp.get_context("spawn")  # Use spawn method.
+
+    data_queue = ctx.Queue()  # Used for sending graph.
+    flag_queue = ctx.Queue()  # Used for sending finish signal.
+
+    p = ctx.Process(
+        target=process_csc_sampling_graph_on_shared_memory,
+        args=(graph, data_queue, flag_queue),
+    )
+    p.start()
+    try:
+        # Get data from the other process. Then check if the tensors here have
+        # the same data.
+        csc_indptr2 = data_queue.get()
+        assert torch.equal(graph.csc_indptr, csc_indptr2)
+        indices2 = data_queue.get()
+        assert torch.equal(graph.indices, indices2)
+        node_type_offset2 = data_queue.get()
+        assert torch.equal(graph.node_type_offset, node_type_offset2)
+        type_per_edge2 = data_queue.get()
+        assert torch.equal(graph.type_per_edge, type_per_edge2)
+    except:
+        raise
+    finally:
+        # Send a finish signal to end sub-process.
+        flag_queue.put(None)
+    p.join()
 
 
 @unittest.skipIf(
