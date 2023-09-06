@@ -589,9 +589,9 @@ class SparseMatrix:
     def sample(
         self,
         dim: int,
-        n_pick: int,
+        fanout: int,
         ids: Optional[torch.Tensor] = None,
-        replacement: Optional[bool] = False,
+        replace: Optional[bool] = False,
         bias: Optional[bool] = False,
     ):
         """Returns a sampled matrix on the given dimension and sample arguments.
@@ -601,18 +601,18 @@ class SparseMatrix:
         dim : int
             The dimension for sampling, should be 0 or 1. `dim = 0` for
             rowwise selection and `dim = 1` for columnwise selection.
-        n_pick : int
+        fanout : int
             The number of elements to randomly sample on each row or column.
         ids : torch.Tensor, optional
             An optional tensor containing row or column IDs from which to
             sample elements.
             NOTE: If `ids` is not provided (i.e., `ids = None`), the function
             will sample from all rows or columns.
-        replacement : bool, optional
+        replace : bool, optional
             Indicates whether repeated sampling of the same element is allowed.
-            When `replacement = True`, repeated sampling is permitted; when
-            `replacement = False`, it is not allowed.
-            NOTE: If `replacement = False` and there are fewer elements than
+            When `replace = True`, repeated sampling is permitted; when
+            `replace = False`, it is not allowed.
+            NOTE: If `replace = False` and there are fewer elements than
             `n_pick`, all non-zero elements will be sampled.
         bias : bool, optional
             A boolean flag indicating whether to enable biasing during sampling.
