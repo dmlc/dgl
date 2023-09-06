@@ -167,6 +167,33 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::RangeSelect(
   }
 }
 
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::Sample(
+    int64_t dim, int64_t n_pick, bool replacement = false) {
+  bool rowwise = dim == 0;
+  auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
+  auto row_num = rowwise ? csr->num_cols : csr->num_rows;
+  std::vector<uint64_t> vec;
+
+  for (uint64_t i = 0; i < row_num; i++) vec.push_back(i);
+  auto sample_csr = dgl::aten::CSRRowWiseSampling(
+      CSRToOldDGLCSR(csr), dim, FromVector, n_pick, dgl::aten::NullArray(),
+      replacement);
+  auto sample_value =
+      this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+  // To prevent potential errors in future conversions to the COO format,
+  // where this array might be used as an initialization array for
+  // constructing COO representations, it is necessary to clear this array.
+  slice_csr.data = dgl::aten::NullArray();
+  auto ret = CSRFromOldDGLCSR(sample_csr);
+  if (rowwise) {
+    return SparseMatrix::FromCSRPointer(
+        ret, sample_value, {ret->num_rows, ret->num_cols});
+  } else {
+    return SparseMatrix::FromCSCPointer(
+        ret, sample_value, {ret->num_cols, ret->num_rows});
+  }
+}
+
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(
     const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value) {
   TORCH_CHECK(
