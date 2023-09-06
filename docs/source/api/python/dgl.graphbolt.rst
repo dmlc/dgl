@@ -18,3 +18,8 @@ APIs
     ItemSet
     ItemSetDict
     ItemSampler
+    NegativeSampler
+    SubgraphSampler
+    Feature
+    FeatureStore
+    FeatureFetcher
