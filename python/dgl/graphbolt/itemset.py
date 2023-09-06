@@ -15,8 +15,9 @@ class ItemSet:
     Parameters
     ----------
     items: Iterable or Tuple[Iterable]
-        The items to be iterated over. If it is a tuple, each item in the tuple
-        is an iterable of items.
+        The items to be iterated over. If it's multi-dimensional iterable such
+        as `torch.Tensor`, it will be iterated over the first dimension. If it
+        is a tuple, each item in the tuple is an iterable of items.
     names: str or Tuple[str], optional
         The names of the items. If it is a tuple, each name corresponds to an
         item in the tuple.

@@ -68,8 +68,8 @@ def minibatcher_default(batch, names):
                 "`MiniBatcher`."
             )
         if name == "node_pairs":
-            # `node_pairs` is passed as a tensor with shape (N, 2) and should
-            # be converted to a tuple of (src, dst).
+            # `node_pairs` is passed as a tensor in shape of `(N, 2)` and
+            # should be converted to a tuple of `(src, dst)`.
             if isinstance(item, Mapping):
                 item = {key: (item[key][:, 0], item[key][:, 1]) for key in item}
             else:
