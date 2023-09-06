@@ -86,9 +86,15 @@ class ItemSet:
             yield from self._items[0]
             return
 
-        items_len = self._items[0].shape[0]
-        for i in range(items_len):
-            yield tuple(item[i] for item in self._items)
+        if isinstance(self._items[0], Sized):
+            items_len = len(self._items[0])
+            for i in range(items_len):
+                yield tuple(item[i] for item in self._items)
+        else:
+            # If the items are not Sized, we use zip to iterate over them.
+            zip_items = zip(*self._items)
+            for item in zip_items:
+                yield tuple(item)
 
     def __len__(self) -> int:
         if isinstance(self._items[0], Sized):
