@@ -88,6 +88,13 @@ class ItemSet:
 
         if isinstance(self._items[0], Sized):
             items_len = len(self._items[0])
+            # Use for-loop to iterate over the items. Can avoid a long
+            # wait time when the items are torch tensors. Since torch
+            # tensors need to call self.unbind(0) to slice themselves.
+            # While for-loops are slower than zip, they prevent excessive
+            # wait times during the loading phase, and the impact on overall
+            # performance during the training/testing stage is minimal.
+            # For more details, see https://github.com/dmlc/dgl/pull/6293.
             for i in range(items_len):
                 yield tuple(item[i] for item in self._items)
         else:
