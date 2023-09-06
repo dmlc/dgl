@@ -13,19 +13,16 @@ import pytest
 import torch
 import torch.multiprocessing as mp
 from scipy import sparse as spsp
+from utils import parametrize_idtype
 
 torch.manual_seed(3407)
 mp.set_sharing_strategy("file_system")
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("num_nodes", [0, 1, 10, 100, 1000])
 def test_empty_graph(num_nodes):
-    csc_indptr = torch.zeros((num_nodes + 1,), dtype=int)
-    indices = torch.tensor([])
+    csc_indptr = torch.zeros((num_nodes + 1,), dtype=int, device=F.ctx())
+    indices = torch.tensor([], device=F.ctx())
     graph = gb.from_csc(csc_indptr, indices)
     assert graph.num_edges == 0
     assert graph.num_nodes == num_nodes
@@ -33,23 +30,19 @@ def test_empty_graph(num_nodes):
     assert torch.equal(graph.indices, indices)
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize("num_nodes", [0, 1, 10, 100, 1000])
 def test_hetero_empty_graph(num_nodes):
-    csc_indptr = torch.zeros((num_nodes + 1,), dtype=int)
-    indices = torch.tensor([])
+    csc_indptr = torch.zeros((num_nodes + 1,), dtype=int, device=F.ctx())
+    indices = torch.tensor([], device=F.ctx())
     metadata = gbt.get_metadata(num_ntypes=3, num_etypes=5)
     # Some node types have no nodes.
     if num_nodes == 0:
-        node_type_offset = torch.zeros((4,), dtype=int)
+        node_type_offset = torch.zeros((4,), dtype=int, device=F.ctx())
     else:
         node_type_offset = torch.sort(torch.randint(0, num_nodes, (4,)))[0]
         node_type_offset[0] = 0
         node_type_offset[-1] = num_nodes
-    type_per_edge = torch.tensor([])
+    type_per_edge = torch.tensor([], device=F.ctx())
     graph = gb.from_csc(
         csc_indptr,
         indices,
@@ -68,10 +61,6 @@ def test_hetero_empty_graph(num_nodes):
     assert torch.equal(graph.type_per_edge, type_per_edge)
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize(
     "ntypes", [{"n1": 1, "n2": 1}, {5: 1, "n2": 2}, {"n1": 1.5, "n2": 2.0}]
 )
@@ -80,10 +69,6 @@ def test_metadata_with_ntype_exception(ntypes):
         gb.GraphMetadata(ntypes, {"n1:e1:n2": 1})
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize(
     "etypes",
     [
@@ -101,15 +86,11 @@ def test_metadata_with_etype_exception(etypes):
         gb.GraphMetadata({"n1": 0, "n2": 1, "n3": 2}, etypes)
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize(
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
 def test_homo_graph(num_nodes, num_edges):
-    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges, device=F.ctx())
     edge_attributes = {
         "A1": torch.randn(num_edges),
         "A2": torch.randn(num_edges),
@@ -128,10 +109,6 @@ def test_homo_graph(num_nodes, num_edges):
     assert graph.type_per_edge is None
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize(
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
@@ -143,7 +120,12 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         node_type_offset,
         type_per_edge,
         metadata,
-    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    ) = gbt.random_hetero_graph(num_nodes,
+                                num_edges,
+                                num_ntypes,
+                                num_etypes,
+                                device=F.ctx(),
+    )
     edge_attributes = {
         "A1": torch.randn(num_edges),
         "A2": torch.randn(num_edges),
@@ -169,10 +151,6 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
     assert metadata.edge_type_to_id == graph.metadata.edge_type_to_id
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize(
     "node_type_offset",
     [
@@ -184,7 +162,7 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
 def test_node_type_offset_wrong_legnth(node_type_offset):
     num_ntypes = 3
     csc_indptr, indices, _, type_per_edge, metadata = gbt.random_hetero_graph(
-        10, 50, num_ntypes, 5
+        10, 50, num_ntypes, 5, device=F.ctx()
     )
     with pytest.raises(Exception):
         gb.from_csc(
@@ -192,15 +170,11 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
         )
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize(
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
 def test_load_save_homo_graph(num_nodes, num_edges):
-    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges, device=F.ctx())
     graph = gb.from_csc(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -219,10 +193,6 @@ def test_load_save_homo_graph(num_nodes, num_edges):
     assert graph.type_per_edge is None and graph2.type_per_edge is None
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 @pytest.mark.parametrize(
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
@@ -234,7 +204,11 @@ def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         node_type_offset,
         type_per_edge,
         metadata,
-    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    ) = gbt.random_hetero_graph(num_nodes,
+                                num_edges,
+                                num_ntypes,
+                                num_etypes,
+                                device=F.ctx())
     graph = gb.from_csc(
         csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
@@ -365,10 +339,10 @@ def test_multiprocessing():
     p.join()
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
+def _long_tensor_ctx(data):
+    return torch.LongTensor(data).to(F.ctx())
+
+
 def test_in_subgraph_homogeneous():
     """Original graph in COO:
     1   0   1   0   1
@@ -380,8 +354,8 @@ def test_in_subgraph_homogeneous():
     # Initialize data.
     num_nodes = 5
     num_edges = 12
-    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
-    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    indptr = _long_tensor_ctx([0, 3, 5, 7, 9, 12])
+    indices = _long_tensor_ctx([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
 
@@ -389,13 +363,13 @@ def test_in_subgraph_homogeneous():
     graph = gb.from_csc(indptr, indices)
 
     # Extract in subgraph.
-    nodes = torch.LongTensor([1, 3, 4])
+    nodes = _long_tensor_ctx([1, 3, 4])
     in_subgraph = graph.in_subgraph(nodes)
 
     # Verify in subgraph.
     assert torch.equal(in_subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
     assert torch.equal(
-        in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
+        in_subgraph.indices, _long_tensor_ctx([2, 3, 1, 2, 0, 3, 4])
     )
     assert torch.equal(in_subgraph.reverse_column_node_ids, nodes)
     assert torch.equal(
@@ -407,10 +381,6 @@ def test_in_subgraph_homogeneous():
     assert in_subgraph.type_per_edge is None
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph is CPU only at present.",
-)
 def test_in_subgraph_heterogeneous():
     """Original graph in COO:
     1   0   1   0   1
@@ -439,10 +409,10 @@ def test_in_subgraph_heterogeneous():
         "N1:R2:N0": 2,
         "N1:R3:N1": 3,
     }
-    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
-    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
-    node_type_offset = torch.LongTensor([0, 2, 5])
-    type_per_edge = torch.LongTensor([0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+    indptr = _long_tensor_ctx([0, 3, 5, 7, 9, 12])
+    indices = _long_tensor_ctx([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    node_type_offset = _long_tensor_ctx([0, 2, 5])
+    type_per_edge = _long_tensor_ctx([0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
     assert node_type_offset[-1] == num_nodes
@@ -455,13 +425,13 @@ def test_in_subgraph_heterogeneous():
     )
 
     # Extract in subgraph.
-    nodes = torch.LongTensor([1, 3, 4])
+    nodes = _long_tensor_ctx([1, 3, 4])
     in_subgraph = graph.in_subgraph(nodes)
 
     # Verify in subgraph.
     assert torch.equal(in_subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
     assert torch.equal(
-        in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
+        in_subgraph.indices, _long_tensor_ctx([2, 3, 1, 2, 0, 3, 4])
     )
     assert torch.equal(in_subgraph.reverse_column_node_ids, nodes)
     assert torch.equal(
@@ -471,7 +441,7 @@ def test_in_subgraph_heterogeneous():
         in_subgraph.reverse_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
     )
     assert torch.equal(
-        in_subgraph.type_per_edge, torch.LongTensor([2, 2, 1, 3, 1, 3, 3])
+        in_subgraph.type_per_edge, _long_tensor_ctx([2, 2, 1, 3, 1, 3, 3])
     )
 
 
@@ -809,7 +779,7 @@ def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
 )
 @pytest.mark.parametrize("test_edge_attrs", [True, False])
 def test_homo_graph_on_shared_memory(num_nodes, num_edges, test_edge_attrs):
-    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
+    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges, device=F.ctx())
     if test_edge_attrs:
         edge_attributes = {
             "A1": torch.randn(num_edges),
@@ -874,7 +844,7 @@ def test_hetero_graph_on_shared_memory(
         node_type_offset,
         type_per_edge,
         metadata,
-    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes, device=F.ctx())
 
     if test_edge_attrs:
         edge_attributes = {
@@ -1042,12 +1012,9 @@ def test_multiprocessing_with_shared_memory():
     p.join()
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph on GPU is not supported yet.",
-)
-def test_from_dglgraph_homogeneous():
-    dgl_g = dgl.rand_graph(1000, 10 * 1000)
+@parametrize_idtype
+def test_from_dglgraph_homogeneous(idtype):
+    dgl_g = dgl.rand_graph(1000, 10 * 1000, idtype=idtype, device=F.ctx())
     gb_g = gb.from_dglgraph(dgl_g)
 
     assert gb_g.num_nodes == dgl_g.num_nodes()
@@ -1058,12 +1025,9 @@ def test_from_dglgraph_homogeneous():
     assert gb_g.metadata.edge_type_to_id == {"_N:_E:_N": 0}
 
 
-@unittest.skipIf(
-    F._default_context_str == "gpu",
-    reason="Graph on GPU is not supported yet.",
-)
-def test_from_dglgraph_heterogeneous():
-    def create_random_hetero():
+@parametrize_idtype
+def test_from_dglgraph_heterogeneous(idtype):
+    def create_random_hetero(idtype):
         num_nodes = {"n1": 1000, "n2": 1010, "n3": 1020}
         etypes = [
             ("n1", "r12", "n2"),
@@ -1082,9 +1046,9 @@ def test_from_dglgraph_heterogeneous():
                 random_state=100,
             )
             edges[etype] = (arr.row, arr.col)
-        return dgl.heterograph(edges, num_nodes)
+        return dgl.heterograph(edges, num_nodes, idtype=idtype, device=F.ctx())
 
-    dgl_g = create_random_hetero()
+    dgl_g = create_random_hetero(idtype)
     gb_g = gb.from_dglgraph(dgl_g)
 
     assert gb_g.num_nodes == dgl_g.num_nodes()
@@ -1093,6 +1057,7 @@ def test_from_dglgraph_heterogeneous():
         gb_g.node_type_offset, torch.tensor([0, 1000, 2010, 3030])
     )
     assert torch.all(gb_g.type_per_edge[:-1] <= gb_g.type_per_edge[1:])
+
     assert gb_g.metadata.node_type_to_id == {
         "n1": 0,
         "n2": 1,

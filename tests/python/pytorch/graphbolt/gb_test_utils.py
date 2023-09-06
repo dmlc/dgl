@@ -25,18 +25,15 @@ def rand_csc_graph(N, density):
 
     indptr = torch.LongTensor(adj.indptr)
     indices = torch.LongTensor(adj.indices)
-
-    graph = gb.from_csc(indptr, indices)
-
-    return graph
+    return gb.from_csc(indptr, indices)
 
 
-def random_homo_graph(num_nodes, num_edges):
-    csc_indptr = torch.randint(0, num_edges, (num_nodes + 1,))
+def random_homo_graph(num_nodes, num_edges, device="cpu"):
+    csc_indptr = torch.randint(0, num_edges, (num_nodes + 1,), device=device)
     csc_indptr = torch.sort(csc_indptr)[0]
     csc_indptr[0] = 0
     csc_indptr[-1] = num_edges
-    indices = torch.randint(0, num_nodes, (num_edges,))
+    indices = torch.randint(0, num_nodes, (num_edges,), device=device)
     return csc_indptr, indices
 
 
@@ -53,8 +50,8 @@ def get_metadata(num_ntypes, num_etypes):
     return gb.GraphMetadata(ntypes, etypes)
 
 
-def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
-    csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
+def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes, device="cpu"):
+    csc_indptr, indices = random_homo_graph(num_nodes, num_edges, device=device)
     metadata = get_metadata(num_ntypes, num_etypes)
     # Randomly get node type split point.
     node_type_offset = torch.sort(
