@@ -785,7 +785,7 @@ def test_sequential():
 
 
 def myagg(alist, dsttype):
-    return alist[0] + np.dot([i+1 for i in range(1, len(alist))], alist[1:])
+    return np.dot(list(range(1, len(alist) + 1)), alist)
 
 
 @parametrize_idtype
