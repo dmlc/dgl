@@ -183,12 +183,12 @@ class SparseMatrix : public torch::CustomClassHolder {
       int64_t dim, int64_t start, int64_t end);
 
   /**
-   * @brief Create a SparseMatrix by sampling elements based on provided
-   * dimension and number.
+   * @brief Create a SparseMatrix by sampling elements based on the specified
+   * dimension and sample count.
    *
-   * This function allows you to create a new SparseMatrix by randomly sampling
-   * elements along a specified dimension (row-wise or column-wise) with the
-   * given number.
+   * This function enables the creation of a new SparseMatrix by randomly
+   * sampling elements along a specified dimension (row-wise or column-wise)
+   * with the specified sample count.
    *
    * @param dim Select rows (dim=0) or columns (dim=1) for sampling.
    * @param n_pick The number of elements to randomly sample from each row or
@@ -196,14 +196,22 @@ class SparseMatrix : public torch::CustomClassHolder {
    * @param replacement Indicates whether repeated sampling of the same element
    * is allowed. When 'replacement = true', repeated sampling is permitted; when
    * 'replacement = false', it is not allowed.
+   * @param ids An optional tensor containing row or column IDs from which to
+   * sample elements.
+   * @param bias An optional boolean flag indicating whether to enable biasing
+   * during sampling. When 'bias = true', the values of the sparse matrix will
+   * be used as bias weights.
    *
    * @return A new SparseMatrix with the same shape as the original matrix
    * containing the sampled elements.
    * @note If 'replacement = false' and there are fewer elements than 'n_pick',
    * all non-zero elements will be sampled.
+   * @note If 'ids' is not provided, the function will sample from
+   * all rows or columns.
    */
   c10::intrusive_ptr<SparseMatrix> Sample(
-      int64_t dim, int64_t n_pick, bool replacement = false);
+      int64_t dim, int64_t n_pick, bool replacement, torch::Tensor ids,
+      bool bias);
 
   /**
    * @brief Create a SparseMatrix from a SparseMatrix using new values.

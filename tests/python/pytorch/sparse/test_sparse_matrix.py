@@ -504,6 +504,21 @@ def test_range_select(create_func, shape, dense_dim, select_dim, rang):
     assert torch.allclose(A_select_to_dense, dense_select)
 
 
+@pytest.mark.parametrize(
+    "create_func", [rand_diag, rand_csr, rand_csc, rand_coo]
+)
+@pytest.mark.parametrize("shape", [(5, 5)])
+@pytest.mark.parametrize("dense_dim", [None, 4])
+@pytest.mark.parametrize("sample_dim", [0, 1])
+@pytest.mark.parametrize("index", [None, (0, 1, 3)])
+@pytest.mark.parametrize("inplace", [0, 1])
+@pytest.mark.parametrize("bias", [0, 1])
+def test_sample(create_func, shape, dense_dim, sample_dim, index, inplace, bias):
+    ctx = F.ctx()
+    A = create_func(shape, 20, ctx, dense_dim)
+    A_sample = A.sample(sample_dim, index, inplace, bias)
+
+
 def test_print():
     ctx = F.ctx()
 
@@ -612,7 +627,8 @@ def test_torch_sparse_coo_conversion(row, col, nz_dim, shape):
         torch_sparse_shape += (nz_dim,)
         val_shape += (nz_dim,)
     val = torch.randn(val_shape).to(dev)
-    torch_sparse_coo = torch.sparse_coo_tensor(indices, val, torch_sparse_shape)
+    torch_sparse_coo = torch.sparse_coo_tensor(
+        indices, val, torch_sparse_shape)
     spmat = from_torch_sparse(torch_sparse_coo)
 
     def _assert_spmat_equal_to_torch_sparse_coo(spmat, torch_sparse_coo):
