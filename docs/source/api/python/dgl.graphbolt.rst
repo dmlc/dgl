@@ -15,6 +15,8 @@ APIs
     :nosignatures:
     :template: classtemplate.rst
 
+    Dataset
+    Task
     ItemSet
     ItemSetDict
     ItemSampler
@@ -23,3 +25,15 @@ APIs
     Feature
     FeatureStore
     FeatureFetcher
+    CopyTo
+
+DataLoaders
+-----------
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    SingleProcessDataLoader
+    MultiProcessDataLoader
