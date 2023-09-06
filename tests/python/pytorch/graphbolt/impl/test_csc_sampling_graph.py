@@ -90,7 +90,9 @@ def test_metadata_with_etype_exception(etypes):
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
 def test_homo_graph(num_nodes, num_edges):
-    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges, device=F.ctx())
+    csc_indptr, indices = gbt.random_homo_graph(
+        num_nodes, num_edges, device=F.ctx()
+    )
     edge_attributes = {
         "A1": torch.randn(num_edges),
         "A2": torch.randn(num_edges),
@@ -120,11 +122,12 @@ def test_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         node_type_offset,
         type_per_edge,
         metadata,
-    ) = gbt.random_hetero_graph(num_nodes,
-                                num_edges,
-                                num_ntypes,
-                                num_etypes,
-                                device=F.ctx(),
+    ) = gbt.random_hetero_graph(
+        num_nodes,
+        num_edges,
+        num_ntypes,
+        num_etypes,
+        device=F.ctx(),
     )
     edge_attributes = {
         "A1": torch.randn(num_edges),
@@ -174,7 +177,9 @@ def test_node_type_offset_wrong_legnth(node_type_offset):
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
 def test_load_save_homo_graph(num_nodes, num_edges):
-    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges, device=F.ctx())
+    csc_indptr, indices = gbt.random_homo_graph(
+        num_nodes, num_edges, device=F.ctx()
+    )
     graph = gb.from_csc(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -204,11 +209,9 @@ def test_load_save_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
         node_type_offset,
         type_per_edge,
         metadata,
-    ) = gbt.random_hetero_graph(num_nodes,
-                                num_edges,
-                                num_ntypes,
-                                num_etypes,
-                                device=F.ctx())
+    ) = gbt.random_hetero_graph(
+        num_nodes, num_edges, num_ntypes, num_etypes, device=F.ctx()
+    )
     graph = gb.from_csc(
         csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
@@ -779,7 +782,9 @@ def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
 )
 @pytest.mark.parametrize("test_edge_attrs", [True, False])
 def test_homo_graph_on_shared_memory(num_nodes, num_edges, test_edge_attrs):
-    csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges, device=F.ctx())
+    csc_indptr, indices = gbt.random_homo_graph(
+        num_nodes, num_edges, device=F.ctx()
+    )
     if test_edge_attrs:
         edge_attributes = {
             "A1": torch.randn(num_edges),
@@ -844,7 +849,9 @@ def test_hetero_graph_on_shared_memory(
         node_type_offset,
         type_per_edge,
         metadata,
-    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes, device=F.ctx())
+    ) = gbt.random_hetero_graph(
+        num_nodes, num_edges, num_ntypes, num_etypes, device=F.ctx()
+    )
 
     if test_edge_attrs:
         edge_attributes = {

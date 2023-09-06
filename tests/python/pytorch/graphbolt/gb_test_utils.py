@@ -50,7 +50,9 @@ def get_metadata(num_ntypes, num_etypes):
     return gb.GraphMetadata(ntypes, etypes)
 
 
-def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes, device="cpu"):
+def random_hetero_graph(
+        num_nodes, num_edges, num_ntypes, num_etypes, device="cpu"
+):
     csc_indptr, indices = random_homo_graph(num_nodes, num_edges, device=device)
     metadata = get_metadata(num_ntypes, num_etypes)
     # Randomly get node type split point.
