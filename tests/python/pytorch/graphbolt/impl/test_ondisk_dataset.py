@@ -683,21 +683,21 @@ def test_OnDiskDataset_TVTSet_ItemSetDict_node_pairs_labels():
                     data:
                       - name: node_pairs
                         format: numpy
-                        in_memory: false
+                        in_memory: true
                         path: {test_node_pairs_path}
                       - name: labels
                         format: numpy
-                        in_memory: false
+                        in_memory: true
                         path: {test_labels_path}
                   - type: author:writes:paper
                     data:
                       - name: node_pairs
                         format: numpy
-                        in_memory: false
+                        in_memory: true
                         path: {test_node_pairs_path}
                       - name: labels
                         format: numpy
-                        in_memory: false
+                        in_memory: true
                         path: {test_labels_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
