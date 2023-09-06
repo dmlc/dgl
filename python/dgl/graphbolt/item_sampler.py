@@ -110,10 +110,10 @@ class ItemSampler(IterDataPipe):
     >>> from dgl import graphbolt as gb
     >>> item_set = gb.ItemSet(torch.arange(0, 10), names="seed_nodes")
     >>> item_sampler = gb.ItemSampler(
-    ...     item_set, batch_size=4, shuffle=True, drop_last=False
+    ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=tensor([9, 0, 7, 2]), node_pairs=None, labels=None,
+    MiniBatch(seed_nodes=tensor([0, 1, 2, 3]), node_pairs=None, labels=None,
         negative_srcs=None, negative_dsts=None, sampled_subgraphs=None,
         input_nodes=None, node_features=None, edge_features=None,
         compacted_node_pairs=None, compacted_negative_srcs=None,
@@ -123,30 +123,28 @@ class ItemSampler(IterDataPipe):
     >>> item_set = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2),
     ...     names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
-    ...     item_set, batch_size=4, shuffle=True, drop_last=False
+    ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None, node_pairs=tensor([[16, 17],
-        [ 4,  5],
-        [ 6,  7],
-        [10, 11]]), labels=None, negative_srcs=None, negative_dsts=None,
+    MiniBatch(seed_nodes=None,
+        node_pairs=(tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7])),
+        labels=None, negative_srcs=None, negative_dsts=None,
         sampled_subgraphs=None, input_nodes=None, node_features=None,
         edge_features=None, compacted_node_pairs=None,
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
     3. Node pairs and labels.
     >>> item_set = gb.ItemSet(
-    ...     (torch.arange(0, 20).reshape(-1, 2), torch.arange(10, 15)),
+    ...     (torch.arange(0, 20).reshape(-1, 2), torch.arange(10, 20)),
     ...     names=("node_pairs", "labels")
     ... )
     >>> item_sampler = gb.ItemSampler(
-    ...     item_set, batch_size=4, shuffle=True, drop_last=False
+    ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None, node_pairs=tensor([[8, 9],
-        [4, 5],
-        [0, 1],
-        [6, 7]]), labels=tensor([14, 12, 10, 13]), negative_srcs=None,
+    MiniBatch(seed_nodes=None,
+        node_pairs=(tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7])),
+        labels=tensor([10, 11, 12, 13]), negative_srcs=None,
         negative_dsts=None, sampled_subgraphs=None, input_nodes=None,
         node_features=None, edge_features=None, compacted_node_pairs=None,
         compacted_negative_srcs=None, compacted_negative_dsts=None)
@@ -157,17 +155,16 @@ class ItemSampler(IterDataPipe):
     >>> item_set = gb.ItemSet((node_pairs, negative_dsts), names=("node_pairs",
     ...     "negative_dsts"))
     >>> item_sampler = gb.ItemSampler(
-    ...     item_set, batch_size=4, shuffle=True, drop_last=False
+    ...     item_set, batch_size=4, shuffle=False, drop_last=False
     ... )
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None, node_pairs=tensor([[10, 11],
-        [ 6,  7],
-        [ 2,  3],
-        [ 8,  9]]), labels=None, negative_srcs=None,
-        negative_dsts=tensor([[20, 21],
-        [16, 17],
+    MiniBatch(seed_nodes=None,
+        node_pairs=(tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7])),
+        labels=None, negative_srcs=None,
+        negative_dsts=tensor([[10, 11],
         [12, 13],
-        [18, 19]]), sampled_subgraphs=None, input_nodes=None,
+        [14, 15],
+        [16, 17]]), sampled_subgraphs=None, input_nodes=None,
         node_features=None, edge_features=None, compacted_node_pairs=None,
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
@@ -219,10 +216,10 @@ class ItemSampler(IterDataPipe):
     ... })
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None, node_pairs={'user:like:item': tensor([[0, 1],
-        [2, 3],
-        [4, 5],
-        [6, 7]])}, labels=None, negative_srcs=None, negative_dsts=None,
+    MiniBatch(seed_nodes=None,
+        node_pairs={'user:like:item':
+            (tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7]))},
+        labels=None, negative_srcs=None, negative_dsts=None,
         sampled_subgraphs=None, input_nodes=None, node_features=None,
         edge_features=None, compacted_node_pairs=None,
         compacted_negative_srcs=None, compacted_negative_dsts=None)
@@ -240,10 +237,10 @@ class ItemSampler(IterDataPipe):
     ... })
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None, node_pairs={'user:like:item': tensor([[0, 1],
-        [2, 3],
-        [4, 5],
-        [6, 7]])}, labels={'user:like:item': tensor([0, 1, 2, 3])},
+    MiniBatch(seed_nodes=None,
+        node_pairs={'user:like:item':
+            (tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7]))},
+        labels={'user:like:item': tensor([0, 1, 2, 3])},
         negative_srcs=None, negative_dsts=None, sampled_subgraphs=None,
         input_nodes=None, node_features=None, edge_features=None,
         compacted_node_pairs=None, compacted_negative_srcs=None,
@@ -262,10 +259,10 @@ class ItemSampler(IterDataPipe):
     ... })
     >>> item_sampler = gb.ItemSampler(item_set, batch_size=4)
     >>> next(iter(item_sampler))
-    MiniBatch(seed_nodes=None, node_pairs={'user:like:item': tensor([[0, 1],
-        [2, 3],
-        [4, 5],
-        [6, 7]])}, labels=None, negative_srcs=None,
+    MiniBatch(seed_nodes=None,
+        node_pairs={'user:like:item':
+            (tensor([0, 2, 4, 6]), tensor([1, 3, 5, 7]))},
+        labels=None, negative_srcs=None,
         negative_dsts={'user:like:item': tensor([[10, 11],
         [12, 13],
         [14, 15],

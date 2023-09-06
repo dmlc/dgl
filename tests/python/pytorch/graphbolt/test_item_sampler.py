@@ -183,6 +183,7 @@ def test_ItemSet_node_pairs(batch_size, shuffle, drop_last):
     dst_ids = []
     for i, minibatch in enumerate(item_sampler):
         assert minibatch.node_pairs is not None
+        assert isinstance(minibatch.node_pairs, tuple)
         assert minibatch.labels is None
         src, dst = minibatch.node_pairs
         is_last = (i + 1) * batch_size >= num_ids
@@ -223,6 +224,7 @@ def test_ItemSet_node_pairs_labels(batch_size, shuffle, drop_last):
     labels = []
     for i, minibatch in enumerate(item_sampler):
         assert minibatch.node_pairs is not None
+        assert isinstance(minibatch.node_pairs, tuple)
         assert minibatch.labels is not None
         src, dst = minibatch.node_pairs
         label = minibatch.labels
@@ -276,6 +278,7 @@ def test_ItemSet_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
     negs_ids = []
     for i, minibatch in enumerate(item_sampler):
         assert minibatch.node_pairs is not None
+        assert isinstance(minibatch.node_pairs, tuple)
         assert minibatch.negative_dsts is not None
         src, dst = minibatch.node_pairs
         negs = minibatch.negative_dsts
@@ -449,7 +452,8 @@ def test_ItemSetDict_node_pairs(batch_size, shuffle, drop_last):
                 assert False
         src = []
         dst = []
-        for _, node_pairs in minibatch.node_pairs.items():
+        for _, (node_pairs) in minibatch.node_pairs.items():
+            assert isinstance(node_pairs, tuple)
             src.append(node_pairs[0])
             dst.append(node_pairs[1])
         src = torch.cat(src)
@@ -508,6 +512,7 @@ def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
         dst = []
         label = []
         for _, node_pairs in minibatch.node_pairs.items():
+            assert isinstance(node_pairs, tuple)
             src.append(node_pairs[0])
             dst.append(node_pairs[1])
         for _, v_label in minibatch.labels.items():
@@ -580,6 +585,7 @@ def test_ItemSetDict_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
         dst = []
         negs = []
         for _, node_pairs in minibatch.node_pairs.items():
+            assert isinstance(node_pairs, tuple)
             src.append(node_pairs[0])
             dst.append(node_pairs[1])
         for _, v_negs in minibatch.negative_dsts.items():
