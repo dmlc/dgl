@@ -67,6 +67,13 @@ def minibatcher_default(batch, names):
                 "`MiniBatch`. You probably need to provide a customized "
                 "`MiniBatcher`."
             )
+        if name == "node_pairs":
+            # `node_pairs` is passed as a tensor with shape (N, 2) and should
+            # be converted to a tuple of (src, dst).
+            if isinstance(item, Mapping):
+                item = {key: (item[key][:, 0], item[key][:, 1]) for key in item}
+            else:
+                item = (item[:, 0], item[:, 1])
         setattr(minibatch, name, item)
     return minibatch
 
