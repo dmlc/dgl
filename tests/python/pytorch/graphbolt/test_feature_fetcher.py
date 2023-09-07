@@ -4,6 +4,35 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 
+def test_FeatureFetcher_invoke():
+    # Prepare graph and required datapipes.
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    a = torch.randint(0, 10, (graph.num_nodes,))
+    b = torch.randint(0, 10, (graph.num_edges,))
+
+    features = {}
+    keys = [("node", None, "a"), ("edge", None, "b")]
+    features[keys[0]] = gb.TorchBasedFeature(a)
+    features[keys[1]] = gb.TorchBasedFeature(b)
+    feature_store = gb.BasicFeatureStore(features)
+
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    datapipe = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+
+    # Invoke FeatureFetcher via class constructor.
+    datapipe = gb.NeighborSampler(datapipe, graph, fanouts)
+    datapipe = gb.FeatureFetcher(datapipe, feature_store, ["a"], ["b"])
+    assert len(list(datapipe)) == 5
+
+    # Invoke FeatureFetcher via functional form.
+    datapipe = datapipe.sample_neighbor(graph, fanouts).fetch_feature(
+        feature_store, ["a"], ["b"]
+    )
+    assert len(list(datapipe)) == 5
+
+
 def test_FeatureFetcher_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     a = torch.randint(0, 10, (graph.num_nodes,))
@@ -15,14 +44,11 @@ def test_FeatureFetcher_homo():
     features[keys[1]] = gb.TorchBasedFeature(b)
     feature_store = gb.BasicFeatureStore(features)
 
-    itemset = gb.ItemSet(torch.arange(10))
-    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    minibatch_converter = Mapper(
-        item_sampler_dp, gb_test_utils.minibatch_node_collator
-    )
-    sampler_dp = gb.NeighborSampler(minibatch_converter, graph, fanouts)
+    sampler_dp = gb.NeighborSampler(item_sampler, graph, fanouts)
     fetcher_dp = gb.FeatureFetcher(sampler_dp, feature_store, ["a"], ["b"])
 
     assert len(list(fetcher_dp)) == 5
@@ -99,17 +125,14 @@ def test_FeatureFetcher_hetero():
 
     itemset = gb.ItemSetDict(
         {
-            "n1": gb.ItemSet(torch.LongTensor([0, 1])),
-            "n2": gb.ItemSet(torch.LongTensor([0, 1, 2])),
+            "n1": gb.ItemSet(torch.LongTensor([0, 1]), names="seed_nodes"),
+            "n2": gb.ItemSet(torch.LongTensor([0, 1, 2]), names="seed_nodes"),
         }
     )
-    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    minibatch_converter = Mapper(
-        item_sampler_dp, gb_test_utils.minibatch_node_collator
-    )
-    sampler_dp = gb.NeighborSampler(minibatch_converter, graph, fanouts)
+    sampler_dp = gb.NeighborSampler(item_sampler, graph, fanouts)
     fetcher_dp = gb.FeatureFetcher(
         sampler_dp, feature_store, {"n1": ["a"], "n2": ["a"]}
     )

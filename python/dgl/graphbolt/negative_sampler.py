@@ -3,11 +3,13 @@
 from _collections_abc import Mapping
 
 import torch
+from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import Mapper
 
 from .data_format import LinkPredictionEdgeFormat
 
 
+@functional_datapipe("sample_negative")
 class NegativeSampler(Mapper):
     """
     A negative sampler used to generate negative samples and return
