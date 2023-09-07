@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Callable, Iterator, Optional
 
-from torch.utils.data import default_collate
+from torch.utils.data import default_collate, functional_datapipe
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
 from ..base import dgl_warning
@@ -78,6 +78,7 @@ def minibatcher_default(batch, names):
     return minibatch
 
 
+@functional_datapipe("sample_item")
 class ItemSampler(IterDataPipe):
     """Item Sampler.
 
