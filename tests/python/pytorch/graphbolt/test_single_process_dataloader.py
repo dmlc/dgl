@@ -10,7 +10,7 @@ from torchdata.datapipes.iter import Mapper
 def test_DataLoader():
     N = 32
     B = 4
-    itemset = dgl.graphbolt.ItemSet(torch.arange(N))
+    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
     graph = gb_test_utils.rand_csc_graph(200, 0.15)
 
     features = {}
@@ -20,11 +20,8 @@ def test_DataLoader():
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
     item_sampler = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
-    minibatch_converter = Mapper(
-        item_sampler, gb_test_utils.minibatch_node_collator
-    )
     subgraph_sampler = dgl.graphbolt.NeighborSampler(
-        minibatch_converter,
+        item_sampler,
         graph,
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )

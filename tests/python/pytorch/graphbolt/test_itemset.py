@@ -101,9 +101,9 @@ def test_ItemSet_iteration_node_pairs_neg_dsts():
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
     neg_dsts = torch.arange(10, 25).reshape(-1, 3)
     item_set = gb.ItemSet(
-        (node_pairs, neg_dsts), names=("node_pairs", "neg_dsts")
+        (node_pairs, neg_dsts), names=("node_pairs", "negative_dsts")
     )
-    assert item_set.names == ("node_pairs", "neg_dsts")
+    assert item_set.names == ("node_pairs", "negative_dsts")
     for i, (node_pair, neg_dst) in enumerate(item_set):
         assert torch.equal(node_pairs[i], node_pair)
         assert torch.equal(neg_dsts[i], neg_dst)
@@ -319,17 +319,17 @@ def test_ItemSetDict_iteration_node_pairs_neg_dsts():
     neg_dsts = torch.arange(10, 25).reshape(-1, 3)
     node_pairs_neg_dsts = {
         "user:like:item": gb.ItemSet(
-            (node_pairs, neg_dsts), names=("node_pairs", "neg_dsts")
+            (node_pairs, neg_dsts), names=("node_pairs", "negative_dsts")
         ),
         "user:follow:user": gb.ItemSet(
-            (node_pairs, neg_dsts), names=("node_pairs", "neg_dsts")
+            (node_pairs, neg_dsts), names=("node_pairs", "negative_dsts")
         ),
     }
     expected_data = []
     for key, value in node_pairs_neg_dsts.items():
         expected_data += [(key, v) for v in value]
     item_set = gb.ItemSetDict(node_pairs_neg_dsts)
-    assert item_set.names == ("node_pairs", "neg_dsts")
+    assert item_set.names == ("node_pairs", "negative_dsts")
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
