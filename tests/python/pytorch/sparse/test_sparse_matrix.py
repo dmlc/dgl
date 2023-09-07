@@ -18,6 +18,14 @@ from dgl.sparse import (
     val_like,
 )
 
+from .utils import (
+    rand_coo,
+    rand_csc,
+    rand_csr,
+    rand_diag,
+    sparse_matrix_to_dense,
+)
+
 
 def _torch_sparse_csr_tensor(indptr, indices, val, torch_sparse_shape):
     with warnings.catch_warnings():
@@ -448,6 +456,52 @@ def test_has_duplicate():
     indptr, indices, _ = coo_A.csc()
     csc_A = from_csc(indptr, indices, val, shape)
     assert csc_A.has_duplicate()
+
+
+@pytest.mark.parametrize(
+    "create_func", [rand_diag, rand_csr, rand_csc, rand_coo]
+)
+@pytest.mark.parametrize("shape", [(5, 5), (6, 4)])
+@pytest.mark.parametrize("dense_dim", [None, 4])
+@pytest.mark.parametrize("select_dim", [0, 1])
+@pytest.mark.parametrize("index", [(0, 1, 3), (1, 2)])
+def test_index_select(create_func, shape, dense_dim, select_dim, index):
+    ctx = F.ctx()
+    A = create_func(shape, 20, ctx, dense_dim)
+    index = torch.tensor(index).to(ctx)
+    A_select = A.index_select(select_dim, index)
+
+    dense = sparse_matrix_to_dense(A)
+    dense_select = torch.index_select(dense, select_dim, index)
+
+    A_select_to_dense = sparse_matrix_to_dense(A_select)
+
+    assert A_select_to_dense.shape == dense_select.shape
+    assert torch.allclose(A_select_to_dense, dense_select)
+
+
+@pytest.mark.parametrize(
+    "create_func", [rand_diag, rand_csr, rand_csc, rand_coo]
+)
+@pytest.mark.parametrize("shape", [(5, 5), (6, 4)])
+@pytest.mark.parametrize("dense_dim", [None, 4])
+@pytest.mark.parametrize("select_dim", [0, 1])
+@pytest.mark.parametrize("rang", [slice(0, 2), slice(1, 3)])
+def test_range_select(create_func, shape, dense_dim, select_dim, rang):
+    ctx = F.ctx()
+    A = create_func(shape, 20, ctx, dense_dim)
+    A_select = A.range_select(select_dim, rang)
+
+    dense = sparse_matrix_to_dense(A)
+    if select_dim == 0:
+        dense_select = dense[rang, :]
+    else:
+        dense_select = dense[:, rang]
+
+    A_select_to_dense = sparse_matrix_to_dense(A_select)
+
+    assert A_select_to_dense.shape == dense_select.shape
+    assert torch.allclose(A_select_to_dense, dense_select)
 
 
 def test_print():

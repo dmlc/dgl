@@ -313,24 +313,36 @@ class OnDiskDataset(Dataset):
             train_set:
               - type: paper # could be null for homogeneous graph.
                 data: # multiple data sources could be specified.
-                  - format: numpy
+                  - name: node_pairs
+                    format: numpy
                     in_memory: true # If not specified, default to true.
-                    path: set/paper-train-src.npy
-                  - format: numpy
+                    path: set/paper-train-node_pairs.npy
+                  - name: labels
+                    format: numpy
                     in_memory: false
-                    path: set/paper-train-dst.npy
+                    path: set/paper-train-labels.npy
             validation_set:
               - type: paper
                 data:
-                  - format: numpy
+                  - name: node_pairs
+                    format: numpy
                     in_memory: true
-                    path: set/paper-validation.npy
+                    path: set/paper-validation-node_pairs.npy
+                  - name: labels
+                    format: numpy
+                    in_memory: true
+                    path: set/paper-validation-labels.npy
             test_set:
               - type: paper
                 data:
-                  - format: numpy
+                  - name: node_pairs
+                    format: numpy
                     in_memory: true
-                    path: set/paper-test.npy
+                    path: set/paper-test-node_pairs.npy
+                  - name: labels
+                    format: numpy
+                    in_memory: true
+                    path: set/paper-test-labels.npy
 
     Parameters
     ----------
@@ -446,7 +458,8 @@ class OnDiskDataset(Dataset):
                 tuple(
                     read_data(data.path, data.format, data.in_memory)
                     for data in tvt_set[0].data
-                )
+                ),
+                names=tuple(data.name for data in tvt_set[0].data),
             )
         else:
             data = {}
@@ -455,7 +468,8 @@ class OnDiskDataset(Dataset):
                     tuple(
                         read_data(data.path, data.format, data.in_memory)
                         for data in tvt.data
-                    )
+                    ),
+                    names=tuple(data.name for data in tvt.data),
                 )
             ret = ItemSetDict(data)
         return ret

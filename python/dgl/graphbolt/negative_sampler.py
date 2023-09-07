@@ -30,49 +30,50 @@ class NegativeSampler(Mapper):
         negative_ratio : int
             The proportion of negative samples to positive samples.
         output_format : LinkPredictionEdgeFormat
-            Determines the edge format of the output data.
+            Determines the edge format of the output minibatch.
         """
         super().__init__(datapipe, self._sample)
         assert negative_ratio > 0, "Negative_ratio should be positive Integer."
         self.negative_ratio = negative_ratio
         self.output_format = output_format
 
-    def _sample(self, data):
+    def _sample(self, minibatch):
         """
         Generate a mix of positive and negative samples.
 
         Parameters
         ----------
-        data : LinkPredictionBlock
-            An instance of 'LinkPredictionBlock' class requires the 'node_pair'
-            field. This function is responsible for generating negative edges
-            corresponding to the positive edges defined by the 'node_pair'. In
+        minibatch : MiniBatch
+            An instance of 'MiniBatch' class requires the 'node_pairs' field.
+            This function is responsible for generating negative edges
+            corresponding to the positive edges defined by the 'node_pairs'. In
             cases where negative edges already exist, this function will
             overwrite them.
 
         Returns
         -------
-        LinkPredictionBlock
-            An instance of 'LinkPredictionBlock' encompasses both positive and
-            negative samples.
+        MiniBatch
+            An instance of 'MiniBatch' encompasses both positive and negative
+            samples.
         """
-        node_pairs = data.node_pair
+        node_pairs = minibatch.node_pairs
+        assert node_pairs is not None
         if isinstance(node_pairs, Mapping):
             if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
-                data.label = {}
+                minibatch.labels = {}
             else:
-                data.negative_head, data.negative_tail = {}, {}
+                minibatch.negative_srcs, minibatch.negative_dsts = {}, {}
             for etype, pos_pairs in node_pairs.items():
                 self._collate(
-                    data, self._sample_with_etype(pos_pairs, etype), etype
+                    minibatch, self._sample_with_etype(pos_pairs, etype), etype
                 )
             if self.output_format == LinkPredictionEdgeFormat.HEAD_CONDITIONED:
-                data.negative_tail = None
+                minibatch.negative_dsts = None
             if self.output_format == LinkPredictionEdgeFormat.TAIL_CONDITIONED:
-                data.negative_head = None
+                minibatch.negative_srcs = None
         else:
-            self._collate(data, self._sample_with_etype(node_pairs))
-        return data
+            self._collate(minibatch, self._sample_with_etype(node_pairs))
+        return minibatch
 
     def _sample_with_etype(self, node_pairs, etype=None):
         """Generate negative pairs for a given etype form positive pairs
@@ -94,13 +95,13 @@ class NegativeSampler(Mapper):
         """
         raise NotImplementedError
 
-    def _collate(self, data, neg_pairs, etype=None):
-        """Collates positive and negative samples into data.
+    def _collate(self, minibatch, neg_pairs, etype=None):
+        """Collates positive and negative samples into minibatch.
 
         Parameters
         ----------
-        data : LinkPredictionBlock
-            The input data, which contains positive node pairs, will be filled
+        minibatch : MiniBatch
+            The input minibatch, which contains positive node pairs, will be filled
             with negative information in this function.
         neg_pairs : Tuple[Tensor, Tensor]
             A tuple of tensors represents source-destination node pairs of
@@ -110,21 +111,23 @@ class NegativeSampler(Mapper):
             Canonical edge type.
         """
         pos_src, pos_dst = (
-            data.node_pair[etype] if etype is not None else data.node_pair
+            minibatch.node_pairs[etype]
+            if etype is not None
+            else minibatch.node_pairs
         )
         neg_src, neg_dst = neg_pairs
         if self.output_format == LinkPredictionEdgeFormat.INDEPENDENT:
-            pos_label = torch.ones_like(pos_src)
-            neg_label = torch.zeros_like(neg_src)
+            pos_labels = torch.ones_like(pos_src)
+            neg_labels = torch.zeros_like(neg_src)
             src = torch.cat([pos_src, neg_src])
             dst = torch.cat([pos_dst, neg_dst])
-            label = torch.cat([pos_label, neg_label])
+            labels = torch.cat([pos_labels, neg_labels])
             if etype is not None:
-                data.node_pair[etype] = (src, dst)
-                data.label[etype] = label
+                minibatch.node_pairs[etype] = (src, dst)
+                minibatch.labels[etype] = labels
             else:
-                data.node_pair = (src, dst)
-                data.label = label
+                minibatch.node_pairs = (src, dst)
+                minibatch.labels = labels
         else:
             if self.output_format == LinkPredictionEdgeFormat.CONDITIONED:
                 neg_src = neg_src.view(-1, self.negative_ratio)
@@ -144,8 +147,8 @@ class NegativeSampler(Mapper):
                     f"Unsupported output format {self.output_format}."
                 )
             if etype is not None:
-                data.negative_head[etype] = neg_src
-                data.negative_tail[etype] = neg_dst
+                minibatch.negative_srcs[etype] = neg_src
+                minibatch.negative_dsts[etype] = neg_dst
             else:
-                data.negative_head = neg_src
-                data.negative_tail = neg_dst
+                minibatch.negative_srcs = neg_src
+                minibatch.negative_dsts = neg_dst
