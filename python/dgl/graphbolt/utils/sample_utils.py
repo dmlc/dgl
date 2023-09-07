@@ -19,7 +19,7 @@ def add_reverse_edges(
     This function finds the reverse edges of the given `edges` and returns the
     composition of them. In a homogeneous graph, reverse edges have inverted
     source and destination node IDs. While in a heterogeneous graph, reversing
-    also involves swapping node IDs and their types. This function is always
+    also involves swapping node IDs and their types. This function could be
     used before `exclude_edges` function to help find targeting edges.
     Note: The found reverse edges may not really exists in the original graph.
     And repeat edges could be added becasue reverse edges may already exists in
