@@ -241,6 +241,4 @@ def test_NegativeSampler_Hetero_Data(format):
 
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     negative_dp = gb.UniformNegativeSampler(item_sampler, 1, format, graph)
-    for neg in negative_dp:
-        print(neg)
     assert len(list(negative_dp)) == 5
