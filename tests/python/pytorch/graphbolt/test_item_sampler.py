@@ -183,9 +183,9 @@ def test_ItemSet_node_pairs(batch_size, shuffle, drop_last):
     dst_ids = []
     for i, minibatch in enumerate(item_sampler):
         assert minibatch.node_pairs is not None
+        assert isinstance(minibatch.node_pairs, tuple)
         assert minibatch.labels is None
-        src = minibatch.node_pairs[:, 0]
-        dst = minibatch.node_pairs[:, 1]
+        src, dst = minibatch.node_pairs
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -224,11 +224,12 @@ def test_ItemSet_node_pairs_labels(batch_size, shuffle, drop_last):
     labels = []
     for i, minibatch in enumerate(item_sampler):
         assert minibatch.node_pairs is not None
+        assert isinstance(minibatch.node_pairs, tuple)
         assert minibatch.labels is not None
-        assert len(minibatch.node_pairs) == len(minibatch.labels)
-        src = minibatch.node_pairs[:, 0]
-        dst = minibatch.node_pairs[:, 1]
+        src, dst = minibatch.node_pairs
         label = minibatch.labels
+        assert len(src) == len(dst)
+        assert len(src) == len(label)
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
             expected_batch_size = batch_size
@@ -277,9 +278,9 @@ def test_ItemSet_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
     negs_ids = []
     for i, minibatch in enumerate(item_sampler):
         assert minibatch.node_pairs is not None
+        assert isinstance(minibatch.node_pairs, tuple)
         assert minibatch.negative_dsts is not None
-        src = minibatch.node_pairs[:, 0]
-        dst = minibatch.node_pairs[:, 1]
+        src, dst = minibatch.node_pairs
         negs = minibatch.negative_dsts
         is_last = (i + 1) * batch_size >= num_ids
         if not is_last or num_ids % batch_size == 0:
@@ -451,9 +452,10 @@ def test_ItemSetDict_node_pairs(batch_size, shuffle, drop_last):
                 assert False
         src = []
         dst = []
-        for _, node_pairs in minibatch.node_pairs.items():
-            src.append(node_pairs[:, 0])
-            dst.append(node_pairs[:, 1])
+        for _, (node_pairs) in minibatch.node_pairs.items():
+            assert isinstance(node_pairs, tuple)
+            src.append(node_pairs[0])
+            dst.append(node_pairs[1])
         src = torch.cat(src)
         dst = torch.cat(dst)
         assert len(src) == expected_batch_size
@@ -510,8 +512,9 @@ def test_ItemSetDict_node_pairs_labels(batch_size, shuffle, drop_last):
         dst = []
         label = []
         for _, node_pairs in minibatch.node_pairs.items():
-            src.append(node_pairs[:, 0])
-            dst.append(node_pairs[:, 1])
+            assert isinstance(node_pairs, tuple)
+            src.append(node_pairs[0])
+            dst.append(node_pairs[1])
         for _, v_label in minibatch.labels.items():
             label.append(v_label)
         src = torch.cat(src)
@@ -582,8 +585,9 @@ def test_ItemSetDict_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
         dst = []
         negs = []
         for _, node_pairs in minibatch.node_pairs.items():
-            src.append(node_pairs[:, 0])
-            dst.append(node_pairs[:, 1])
+            assert isinstance(node_pairs, tuple)
+            src.append(node_pairs[0])
+            dst.append(node_pairs[1])
         for _, v_negs in minibatch.negative_dsts.items():
             negs.append(v_negs)
         src = torch.cat(src)
