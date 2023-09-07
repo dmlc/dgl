@@ -42,15 +42,15 @@ class UniformNegativeSampler(NegativeSampler):
         >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
         >>> graph = gb.from_csc(indptr, indices)
         >>> output_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
-        >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
-        >>> item_set = gb.ItemSet(node_pairs)
+        >>> node_pairs = torch.tensor([[0, 1], [1, 2]])
+        >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
         >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
         >>> neg_sampler = gb.UniformNegativeSampler(
             ...item_sampler, 2, output_format, graph)
         >>> for data in neg_sampler:
-            ...  print(data)
+            ...  print(data.node_pairs, data.negative_dsts)
             ...
         (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([1, 0, 0]))
         (tensor([1, 1, 1]), tensor([2, 1, 2]), tensor([1, 0, 0]))
@@ -60,18 +60,18 @@ class UniformNegativeSampler(NegativeSampler):
         >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
         >>> graph = gb.from_csc(indptr, indices)
         >>> output_format = gb.LinkPredictionEdgeFormat.CONDITIONED
-        >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
-        >>> item_set = gb.ItemSet(node_pairs)
+        >>> node_pairs = torch.tensor([[0, 1], [1, 2]])
+        >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
         >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
         >>> neg_sampler = gb.UniformNegativeSampler(
             ...item_sampler, 2, output_format, graph)
         >>> for data in neg_sampler:
-            ...  print(data)
+            ...  print(data.node_pairs, data.negative_dsts)
             ...
-        (tensor([0]), tensor([1]), tensor([[0, 0]]), tensor([[2, 1]]))
-        (tensor([1]), tensor([2]), tensor([[1, 1]]), tensor([[1, 2]]))
+        (tensor([0]), tensor([1]), tensor([[0, 0]]), tensor([[0, 1]]))
+        (tensor([1]), tensor([2]), tensor([[1, 1]]), tensor([[0, 1]]))
         """
         super().__init__(datapipe, negative_ratio, output_format)
         self.graph = graph
