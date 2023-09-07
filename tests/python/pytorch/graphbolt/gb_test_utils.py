@@ -8,16 +8,6 @@ import scipy.sparse as sp
 import torch
 
 
-def minibatch_node_collator(data):
-    minibatch = gb.MiniBatch(seed_nodes=data)
-    return minibatch
-
-
-def minibatch_link_collator(data):
-    minibatch = gb.MiniBatch(node_pairs=data)
-    return minibatch
-
-
 def rand_csc_graph(N, density):
     adj = sp.random(N, N, density)
     adj = adj + adj.T
