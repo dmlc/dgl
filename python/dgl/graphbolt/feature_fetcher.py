@@ -2,9 +2,12 @@
 
 from typing import Dict
 
+from torch.utils.data import functional_datapipe
+
 from torchdata.datapipes.iter import Mapper
 
 
+@functional_datapipe("fetch_feature")
 class FeatureFetcher(Mapper):
     """A feature fetcher used to fetch features for node/edge in graphbolt."""
 

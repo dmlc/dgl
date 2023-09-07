@@ -2,9 +2,11 @@
 
 from _collections_abc import Mapping
 
+from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import Mapper
 
 
+@functional_datapipe("sample_negative")
 class NegativeSampler(Mapper):
     """
     A negative sampler used to generate negative samples and return

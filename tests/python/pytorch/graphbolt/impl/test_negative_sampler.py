@@ -5,6 +5,75 @@ import torch
 from torchdata.datapipes.iter import Mapper
 
 
+def test_NegativeSampler_invoke():
+    # Instantiate graph and required datapipes.
+    num_seeds = 30
+    item_set = gb.ItemSet(
+        torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="node_pairs"
+    )
+    batch_size = 10
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    negative_ratio = 2
+
+    # Invoke NegativeSampler via class constructor.
+    negative_sampler = gb.NegativeSampler(
+        item_sampler,
+        negative_ratio,
+        gb.LinkPredictionEdgeFormat.INDEPENDENT,
+    )
+    with pytest.raises(NotImplementedError):
+        next(iter(negative_sampler))
+
+    # Invoke NegativeSampler via functional form.
+    negative_sampler = item_sampler.sample_negative(
+        negative_ratio,
+        gb.LinkPredictionEdgeFormat.INDEPENDENT,
+    )
+    with pytest.raises(NotImplementedError):
+        next(iter(negative_sampler))
+
+
+def test_UniformNegativeSampler_invoke():
+    # Instantiate graph and required datapipes.
+    graph = gb_test_utils.rand_csc_graph(100, 0.05)
+    num_seeds = 30
+    item_set = gb.ItemSet(
+        torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="node_pairs"
+    )
+    batch_size = 10
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    negative_ratio = 2
+
+    # Verify iteration over UniformNegativeSampler.
+    def _verify(negative_sampler):
+        for data in negative_sampler:
+            src, dst = data.node_pairs
+            labels = data.labels
+            # Assertation
+            assert len(src) == batch_size * (negative_ratio + 1)
+            assert len(dst) == batch_size * (negative_ratio + 1)
+            assert len(labels) == batch_size * (negative_ratio + 1)
+            assert torch.all(torch.eq(labels[:batch_size], 1))
+            assert torch.all(torch.eq(labels[batch_size:], 0))
+
+    # Invoke UniformNegativeSampler via class constructor.
+    negative_sampler = gb.UniformNegativeSampler(
+        item_sampler,
+        negative_ratio,
+        gb.LinkPredictionEdgeFormat.INDEPENDENT,
+        graph,
+    )
+    _verify(negative_sampler)
+
+    # Invoke UniformNegativeSampler via functional form.
+    negative_sampler = item_sampler.sample_uniform_negative(
+        negative_ratio,
+        gb.LinkPredictionEdgeFormat.INDEPENDENT,
+        graph,
+    )
+    _verify(negative_sampler)
+
+
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
 def test_Uniform_NegativeSampler(negative_ratio):
     # Construct CSCSamplingGraph.
