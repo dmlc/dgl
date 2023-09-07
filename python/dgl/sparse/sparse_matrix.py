@@ -613,7 +613,7 @@ class SparseMatrix:
             When `replace = True`, repeated sampling is permitted; when
             `replace = False`, it is not allowed.
             NOTE: If `replace = False` and there are fewer elements than
-            `n_pick`, all non-zero elements will be sampled.
+            `fanout`, all non-zero elements will be sampled.
         bias : bool, optional
             A boolean flag indicating whether to enable biasing during sampling.
             When `bias = True`, the values of the sparse matrix will be used as
