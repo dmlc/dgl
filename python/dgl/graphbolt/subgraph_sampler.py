@@ -3,12 +3,14 @@
 from collections import defaultdict
 from typing import Dict
 
+from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import Mapper
 
 from .base import etype_str_to_tuple
 from .utils import unique_and_compact
 
 
+@functional_datapipe("sample_subgraph")
 class SubgraphSampler(Mapper):
     """A subgraph sampler used to sample a subgraph from a given set of nodes
     from a larger graph."""

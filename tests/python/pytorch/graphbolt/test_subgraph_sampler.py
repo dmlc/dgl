@@ -6,6 +6,42 @@ import torchdata.datapipes as dp
 from torchdata.datapipes.iter import Mapper
 
 
+def test_SubgraphSampler_invoke():
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    datapipe = gb.ItemSampler(itemset, batch_size=2)
+
+    # Invoke via class constructor.
+    datapipe = gb.SubgraphSampler(datapipe)
+    with pytest.raises(NotImplementedError):
+        next(iter(datapipe))
+
+    # Invokde via functional form.
+    datapipe = datapipe.sample_subgraph()
+    with pytest.raises(NotImplementedError):
+        next(iter(datapipe))
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_NeighborSampler_invoke(labor):
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    datapipe = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+
+    # Invoke via class constructor.
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    datapipe = Sampler(datapipe, graph, fanouts)
+    assert len(list(datapipe)) == 5
+
+    # Invokde via functional form.
+    if labor:
+        datapipe = datapipe.sample_layer_neighbor(graph, fanouts)
+    else:
+        datapipe = datapipe.sample_neighbor(graph, fanouts)
+    assert len(list(datapipe)) == 5
+
+
 @pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Node(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
