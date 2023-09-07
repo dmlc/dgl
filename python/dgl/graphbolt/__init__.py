@@ -19,7 +19,7 @@ from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
 from .utils import (
-    add_reverse_edges,
+    find_reverse_edges,
     unique_and_compact,
     unique_and_compact_node_pairs,
 )
