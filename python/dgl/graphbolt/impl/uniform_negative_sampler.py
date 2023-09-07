@@ -1,8 +1,11 @@
 """Uniform negative sampler for GraphBolt."""
 
+from torch.utils.data import functional_datapipe
+
 from ..negative_sampler import NegativeSampler
 
 
+@functional_datapipe("sample_uniform_negative")
 class UniformNegativeSampler(NegativeSampler):
     """
     Negative samplers randomly select negative destination nodes for each

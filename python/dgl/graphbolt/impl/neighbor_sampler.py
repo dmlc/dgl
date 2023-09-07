@@ -1,10 +1,13 @@
 """Neighbor subgraph samplers for GraphBolt."""
 
+from torch.utils.data import functional_datapipe
+
 from ..subgraph_sampler import SubgraphSampler
 from ..utils import unique_and_compact_node_pairs
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
+@functional_datapipe("sample_neighbor")
 class NeighborSampler(SubgraphSampler):
     """
     Neighbor sampler is responsible for sampling a subgraph from given data. It
@@ -112,6 +115,7 @@ class NeighborSampler(SubgraphSampler):
         return seeds, subgraphs
 
 
+@functional_datapipe("sample_layer_neighbor")
 class LayerNeighborSampler(NeighborSampler):
     """
     Layer-Neighbor sampler is responsible for sampling a subgraph from given
