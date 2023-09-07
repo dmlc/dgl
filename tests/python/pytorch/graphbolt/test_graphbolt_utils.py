@@ -5,7 +5,7 @@ import torch
 
 def test_find_reverse_edges_homo():
     edges = (torch.tensor([1, 3, 5]), torch.tensor([2, 4, 5]))
-    edges = gb.find_reverse_edges(edges)
+    edges = gb.add_reverse_edges(edges)
     expected_edges = (
         torch.tensor([1, 3, 5, 2, 4, 5]),
         torch.tensor([2, 4, 5, 1, 3, 5]),
@@ -19,7 +19,7 @@ def test_find_reverse_edges_hetero():
         "A:r:B": (torch.tensor([1, 5]), torch.tensor([2, 5])),
         "B:rr:A": (torch.tensor([3]), torch.tensor([3])),
     }
-    edges = gb.find_reverse_edges(edges, {"A:r:B": "B:rr:A"})
+    edges = gb.add_reverse_edges(edges, {"A:r:B": "B:rr:A"})
     expected_edges = {
         "A:r:B": (torch.tensor([1, 5]), torch.tensor([2, 5])),
         "B:rr:A": (torch.tensor([3, 2, 5]), torch.tensor([3, 1, 5])),
@@ -35,7 +35,7 @@ def test_find_reverse_edges_bi_reverse_types():
         "A:r:B": (torch.tensor([1, 5]), torch.tensor([2, 5])),
         "B:rr:A": (torch.tensor([3]), torch.tensor([3])),
     }
-    edges = gb.find_reverse_edges(edges, {"A:r:B": "B:rr:A", "B:rr:A": "A:r:B"})
+    edges = gb.add_reverse_edges(edges, {"A:r:B": "B:rr:A", "B:rr:A": "A:r:B"})
     expected_edges = {
         "A:r:B": (torch.tensor([1, 5, 3]), torch.tensor([2, 5, 3])),
         "B:rr:A": (torch.tensor([3, 2, 5]), torch.tensor([3, 1, 5])),
@@ -52,7 +52,7 @@ def test_find_reverse_edges_circual_reverse_types():
         "B:r2:C": (torch.tensor([2]), torch.tensor([2])),
         "C:r3:A": (torch.tensor([3]), torch.tensor([3])),
     }
-    edges = gb.find_reverse_edges(
+    edges = gb.add_reverse_edges(
         edges, {"A:r1:B": "B:r2:C", "B:r2:C": "C:r3:A", "C:r3:A": "A:r1:B"}
     )
     expected_edges = {

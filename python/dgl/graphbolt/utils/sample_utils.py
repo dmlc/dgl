@@ -8,7 +8,7 @@ import torch
 from ..base import etype_str_to_tuple
 
 
-def find_reverse_edges(
+def add_reverse_edges(
     edges: Union[
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
         Tuple[torch.Tensor, torch.Tensor],
@@ -29,10 +29,10 @@ def find_reverse_edges(
     ----------
     edges : Union[Dict[str, Tuple[torch.Tensor, torch.Tensor]],
                 Tuple[torch.Tensor, torch.Tensor]]
-        Edges to exclude. If sampled subgraph is homogeneous, then `edges`
-        should be a pair of tensors representing the edges to exclude. If
-        sampled subgraph is heterogeneous, then `edges` should be a dictionary
-        of edge types and the corresponding edges to exclude.
+        - If sampled subgraph is homogeneous, then `edges` should be a pair of
+        of tensors.
+        - If sampled subgraph is heterogeneous, then `edges` should be a
+        dictionary of edge types and the corresponding edges to exclude.
     reverse_etypes : Dict[str, str], optional
         The mapping from the original edge types to their reverse edge types.
 
@@ -46,12 +46,12 @@ def find_reverse_edges(
     Examples
     --------
     >>> edges = {"A:r:B": (torch.tensor([0, 1]), torch.tensor([1, 2]))}
-    >>> print(gb.find_reverse_edges(edges, {"A:r:B": "B:rr:A"}))
+    >>> print(gb.add_reverse_edges(edges, {"A:r:B": "B:rr:A"}))
     {'A:r:B': (tensor([0, 1]), tensor([1, 2])),
     'B:rr:A': (tensor([1, 2]), tensor([0, 1]))}
 
     >>> edges = (torch.tensor([0, 1]), torch.tensor([2, 1]))
-    >>> print(gb.find_reverse_edges(edges))
+    >>> print(gb.add_reverse_edges(edges))
     (tensor([0, 1, 2, 1]), tensor([2, 1, 0, 1]))
     """
     if isinstance(edges, tuple):
