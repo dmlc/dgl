@@ -2045,20 +2045,11 @@ def test_typed_linear(feat_size, regularizer, num_bases):
     assert th.allclose(y, y_sorted[rev_idx], atol=1e-4, rtol=1e-4)
 
 
-class mycontext(ContextDecorator):
-    def __init__(self, func):
-        pass
-
-    def __call__(self, dataloader, num_workers):
-        if num_workers:
-            return dataloader.enable_cpu_affinity()
-        else:
-            return contextlib.nullcontext()
-
-
-@mycontext
-def use_affinity_context():
-    pass
+def use_affinity_context(dataloader, num_workers):
+    if num_workers:
+        return dataloader.enable_cpu_affinity()
+    else:
+        return contextlib.nullcontext()
 
 
 @parametrize_idtype
@@ -2121,6 +2112,7 @@ def test_hgt(idtype, in_size, num_heads):
 
     with use_affinity_context(train_loader, num_workers):
         (input_nodes, output_nodes, block) = next(iter(train_loader))
+
     block = block[0]
     x = x[input_nodes.to(th.long)]
     ntype = ntype[input_nodes.to(th.long)]
