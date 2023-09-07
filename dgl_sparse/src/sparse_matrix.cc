@@ -168,29 +168,25 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::RangeSelect(
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::Sample(
-    int64_t dim, int64_t n_pick, bool replacement, torch::Tensor ids,
-    bool bias) {
+    int64_t dim, int64_t fanout, torch::Tensor ids, bool replace, bool bias) {
   bool rowwise = dim == 0;
+  auto id_array = TorchTensorToDGLArray(ids);
   auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
-  if (ids.size(1) == 0) {
-    auto row_num = rowwise ? csr->num_cols : csr->num_rows;
-    std::vector<uint64_t> v(row_num);
-    iota(v.begin(), v.end(), row_num);
-    at::TensorOptions opts = at::TensorOptions().dtype(at::kInt);
-    ids = at::from_blob(v.data(), {row_num}, opts).clone();
-  }
-  auto sample_value = this->value().index_select(0, ids);
+
   auto prob_or_mask =
-      bias ? TorchTensorToDGLArray(sample_value) : dgl::aten::NullArray();
+      bias ? TorchTensorToDGLArray(this->value()) : dgl::aten::NullArray();
   auto sample_coo = dgl::aten::CSRRowWiseSampling(
-      CSRToOldDGLCSR(csr), TorchTensorToDGLArray(ids), n_pick, prob_or_mask,
-      replacement);
+      CSRToOldDGLCSR(csr), id_array, fanout, prob_or_mask, replace);
   auto sample_csr = COOToCSR(sample_coo);
+  auto sample_value =
+      this->value().index_select(0, DGLArrayToTorchTensor(sample_csr.data));
+  auto slice_csr = dgl::aten::CSRSliceRows(sample_csr, id_array);
   // To prevent potential errors in future conversions to the COO format,
   // where this array might be used as an initialization array for
   // constructing COO representations, it is necessary to clear this array.
-  sample_csr.data = dgl::aten::NullArray();
-  auto ret = CSRFromOldDGLCSR(sample_csr);
+  slice_csr.data = dgl::aten::NullArray();
+
+  auto ret = CSRFromOldDGLCSR(slice_csr);
   if (rowwise) {
     return SparseMatrix::FromCSRPointer(
         ret, sample_value, {ret->num_rows, ret->num_cols});

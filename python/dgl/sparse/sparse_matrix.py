@@ -613,7 +613,7 @@ class SparseMatrix:
             When `replace = True`, repeated sampling is permitted; when
             `replace = False`, it is not allowed.
             NOTE: If `replace = False` and there are fewer elements than
-            `n_pick`, all non-zero elements will be sampled.
+            `fanout`, all non-zero elements will be sampled.
         bias : bool, optional
             A boolean flag indicating whether to enable biasing during sampling.
             When `bias = True`, the values of the sparse matrix will be used as
@@ -671,7 +671,12 @@ class SparseMatrix:
                      values=tensor([0, 2, 3, 3]),
                      shape=(3, 2), nnz=3)
         """
-        raise NotImplementedError
+        if ids == None:
+            num = self.shape[0] if dim == 0 else self.shape[1]
+            ids = torch.tensor([id for id in range(num)])
+        return SparseMatrix(
+            self.c_sparse_matrix.sample(dim, fanout, ids, replace, bias)
+        )
 
 
 def spmatrix(
