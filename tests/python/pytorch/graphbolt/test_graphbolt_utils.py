@@ -3,6 +3,33 @@ import pytest
 import torch
 
 
+def test_add_reverse_edges_homo():
+    edges = (torch.tensor([1, 3, 5]), torch.tensor([2, 4, 5]))
+    edges = gb.add_reverse_edges(edges)
+    expected_edges = (
+        torch.tensor([1, 3, 5, 2, 4, 5]),
+        torch.tensor([2, 4, 5, 1, 3, 5]),
+    )
+    assert torch.equal(edges[0], expected_edges[0])
+    assert torch.equal(edges[1], expected_edges[1])
+
+
+def test_add_reverse_edges_hetero():
+    edges = {
+        "A:r:B": (torch.tensor([1, 5]), torch.tensor([2, 5])),
+        "B:rr:A": (torch.tensor([3]), torch.tensor([3])),
+    }
+    edges = gb.add_reverse_edges(edges, {"A:r:B": "B:rr:A"})
+    expected_edges = {
+        "A:r:B": (torch.tensor([1, 5]), torch.tensor([2, 5])),
+        "B:rr:A": (torch.tensor([3, 2, 5]), torch.tensor([3, 1, 5])),
+    }
+    assert torch.equal(edges["A:r:B"][0], expected_edges["A:r:B"][0])
+    assert torch.equal(edges["A:r:B"][1], expected_edges["A:r:B"][1])
+    assert torch.equal(edges["B:rr:A"][1], expected_edges["B:rr:A"][1])
+    assert torch.equal(edges["B:rr:A"][1], expected_edges["B:rr:A"][1])
+
+
 def test_unique_and_compact_hetero():
     N1 = torch.randint(0, 50, (30,))
     N2 = torch.randint(0, 50, (20,))

@@ -121,41 +121,12 @@ def _slice_subgraph(subgraph: SampledSubgraphImpl, index: torch.Tensor):
     )
 
 
-def _find_exclude_edges(edges, exclude_mode, reverse_etypes):
-    if exclude_mode is None:
-        return edges
-    elif callable(exclude_mode):
-        return exclude_mode(edges)
-    elif exclude_mode == "reverse":
-        if isinstance(edges, tuple):
-            u, v = edges
-            return (torch.cat([u, v]), torch.cat([v, u]))
-        else:
-            for etype, reverse_etype in reverse_etypes.items():
-                if etype in edges:
-                    if reverse_etype in edges:
-                        u, v = edges[reverse_etype]
-                        u = torch.cat([u, edges[etype][1]])
-                        v = torch.cat([v, edges[etype][0]])
-                        edges[reverse_etype] = (u, v)
-                    else:
-                        edges[reverse_etype] = (
-                            edges[etype][1],
-                            edges[etype][0],
-                        )
-            return edges
-    else:
-        raise ValueError("unsupported mode {}".format(exclude_mode))
-
-
 def exclude_edges(
     subgraph: SampledSubgraphImpl,
     edges: Union[
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
         Tuple[torch.Tensor, torch.Tensor],
     ],
-    exclude_mode=None,
-    reverse_etypes: Dict[str, str] = None,
 ) -> SampledSubgraphImpl:
     r"""Exclude edges from the sampled subgraph.
 
@@ -174,20 +145,7 @@ def exclude_edges(
         should be a pair of tensors representing the edges to exclude. If
         sampled subgraph is heterogeneous, then `edges` should be a dictionary
         of edge types and the corresponding edges to exclude.
-    exclude_mode : Union[str, callable], optional
-        Whether and how to exclude dependencies related to the provided edges
-        in the argument ``edges``. Possible values are
-        - If None, for excluding only provided ``edges``.
-        - If "reverse", for excluding not only the provided ``edges`` but aslo
-          their reverse edges. In the case of a homogeneous graph, reverse
-          edges refer to edges with inverted source and destination node IDs.
-          In heterogeneous graphs, this encompasses reversing both node IDs
-          and types, as specified by the ``reverse_types`` argument.
-        - If User-defined exclusion rule. It is a callable with edges in the
-          argument ``edges`` as a single argument and should return the edges
-          to be excluded.
-    reverse_etypes : Dict[str, str], optional
-        The mapping from the original edge types to their reverse edge types.
+
     Returns
     -------
     SampledSubgraphImpl
@@ -221,8 +179,6 @@ def exclude_edges(
         "The sampled subgraph and the edges to exclude should be both "
         "homogeneous or both heterogeneous."
     )
-    # Get edges to exclude.
-    edges = _find_exclude_edges(edges, exclude_mode, reverse_etypes)
     # Three steps to exclude edges:
     # 1. Convert the node pairs to the original ids if they are compacted.
     # 2. Exclude the edges and get the index of the edges to keep.

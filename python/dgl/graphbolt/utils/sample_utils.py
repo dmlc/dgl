@@ -8,6 +8,63 @@ import torch
 from ..base import etype_str_to_tuple
 
 
+def add_reverse_edges(edges, reverse_etypes=None):
+    r"""
+    This function finds the reverse edges of the given `edges` and returns the
+    composition of them. In a homogeneous graph, reverse edges have inverted
+    source and destination node IDs. While in a heterogeneous graph, reversing
+    also involves swapping node IDs and their types. This function is always
+    used before `exclude_edges` function to help find targeting edges.
+    Note: The found reverse edges may not really exists in the original graph.
+    And repeat edges could be added becasue reverse edges may already exists in
+    the `edges`.
+
+    Parameters
+    ----------
+    edges : Union[Dict[str, Tuple[torch.Tensor, torch.Tensor]],
+                Tuple[torch.Tensor, torch.Tensor]]
+        Edges to exclude. If sampled subgraph is homogeneous, then `edges`
+        should be a pair of tensors representing the edges to exclude. If
+        sampled subgraph is heterogeneous, then `edges` should be a dictionary
+        of edge types and the corresponding edges to exclude.
+    reverse_etypes : Dict[str, str], optional
+        The mapping from the original edge types to their reverse edge types.
+
+    Returns
+    -------
+    SampledSubgraphImpl
+        The sampled subgraph without the edges to exclude.
+
+    Examples
+    --------
+    >>> edges = {"A:r:B": (torch.tensor([0, 1]), torch.tensor([1, 2]))}
+    >>> print(gb.add_reverse_edges(edges, {"A:r:B": "B:rr:A"}))
+    {'A:r:B': (tensor([0, 1]), tensor([1, 2])),
+    'B:rr:A': (tensor([1, 2]), tensor([0, 1]))}
+
+    >>> edges = (torch.tensor([0, 1]), torch.tensor([2, 1]))
+    >>> print(gb.add_reverse_edges(edges))
+    (tensor([0, 1, 2, 1]), tensor([2, 1, 0, 1]))
+    """
+    if isinstance(edges, tuple):
+        u, v = edges
+        return (torch.cat([u, v]), torch.cat([v, u]))
+    else:
+        for etype, reverse_etype in reverse_etypes.items():
+            if etype in edges:
+                if reverse_etype in edges:
+                    u, v = edges[reverse_etype]
+                    u = torch.cat([u, edges[etype][1]])
+                    v = torch.cat([v, edges[etype][0]])
+                    edges[reverse_etype] = (u, v)
+                else:
+                    edges[reverse_etype] = (
+                        edges[etype][1],
+                        edges[etype][0],
+                    )
+        return edges
+
+
 def unique_and_compact(
     nodes: Union[
         List[torch.Tensor],
