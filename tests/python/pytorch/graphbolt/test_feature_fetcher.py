@@ -183,3 +183,32 @@ def test_FeatureFetcher_with_edges_hetero():
         assert len(data.edge_features) == 3
         for edge_feature in data.edge_features:
             assert edge_feature[("n1:e1:n2", "a")].size(0) == 10
+
+
+def exclude_seed_edges(minibatch):
+    edges_to_exclude = gb.add_reverse_edges(minibatch.node_pairs)
+    minibatch.sampled_subgraphs = [
+        gb.exclude_edges(subgraph, edges_to_exclude)
+        for subgraph in minibatch.sampled_subgraphs
+    ]
+    return minibatch
+
+
+def test_transform():
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    a = torch.randint(0, 10, (graph.num_nodes,))
+    b = torch.randint(0, 10, (graph.num_edges,))
+
+    features = {}
+    keys = [("node", None, "a"), ("edge", None, "b")]
+    features[keys[0]] = gb.TorchBasedFeature(a)
+    features[keys[1]] = gb.TorchBasedFeature(b)
+    feature_store = gb.BasicFeatureStore(features)
+
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    sampler_dp = gb.NeighborSampler(item_sampler, graph, fanouts)
+    transform_dp = Mapper(sampler_dp, exclude_seed_edges)
+    fetcher_dp = gb.FeatureFetcher(transform_dp, feature_store, ["a"], ["b"])
