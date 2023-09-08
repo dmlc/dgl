@@ -2,7 +2,6 @@ import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
 import torch
-from torchdata.datapipes.iter import Mapper
 
 
 def test_NegativeSampler_invoke():
@@ -19,7 +18,6 @@ def test_NegativeSampler_invoke():
     negative_sampler = gb.NegativeSampler(
         item_sampler,
         negative_ratio,
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
     )
     with pytest.raises(NotImplementedError):
         next(iter(negative_sampler))
@@ -27,7 +25,6 @@ def test_NegativeSampler_invoke():
     # Invoke NegativeSampler via functional form.
     negative_sampler = item_sampler.sample_negative(
         negative_ratio,
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
     )
     with pytest.raises(NotImplementedError):
         next(iter(negative_sampler))
@@ -47,20 +44,16 @@ def test_UniformNegativeSampler_invoke():
     # Verify iteration over UniformNegativeSampler.
     def _verify(negative_sampler):
         for data in negative_sampler:
-            src, dst = data.node_pairs
-            labels = data.labels
             # Assertation
-            assert len(src) == batch_size * (negative_ratio + 1)
-            assert len(dst) == batch_size * (negative_ratio + 1)
-            assert len(labels) == batch_size * (negative_ratio + 1)
-            assert torch.all(torch.eq(labels[:batch_size], 1))
-            assert torch.all(torch.eq(labels[batch_size:], 0))
+            assert data.negative_srcs.size(0) == batch_size
+            assert data.negative_srcs.size(1) == negative_ratio
+            assert data.negative_dsts.size(0) == batch_size
+            assert data.negative_dsts.size(1) == negative_ratio
 
     # Invoke UniformNegativeSampler via class constructor.
     negative_sampler = gb.UniformNegativeSampler(
         item_sampler,
         negative_ratio,
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
         graph,
     )
     _verify(negative_sampler)
@@ -68,7 +61,6 @@ def test_UniformNegativeSampler_invoke():
     # Invoke UniformNegativeSampler via functional form.
     negative_sampler = item_sampler.sample_uniform_negative(
         negative_ratio,
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
         graph,
     )
     _verify(negative_sampler)
@@ -144,6 +136,4 @@ def test_NegativeSampler_Hetero_Data():
 
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     negative_dp = gb.UniformNegativeSampler(item_sampler, 1, graph)
-    for neg in negative_dp:
-        print(neg)
     assert len(list(negative_dp)) == 5
