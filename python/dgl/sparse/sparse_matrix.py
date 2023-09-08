@@ -671,9 +671,9 @@ class SparseMatrix:
                      values=tensor([0, 2, 3, 3]),
                      shape=(3, 2), nnz=3)
         """
-        if ids == None:
+        if ids is None:
             num = self.shape[0] if dim == 0 else self.shape[1]
-            ids = torch.tensor([id for id in range(num)])
+            ids = torch.tensor(range(0, num))
         return SparseMatrix(
             self.c_sparse_matrix.sample(dim, fanout, ids, replace, bias)
         )
