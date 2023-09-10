@@ -172,28 +172,28 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Sample(
   bool rowwise = dim == 0;
   auto id_array = TorchTensorToDGLArray(ids);
   auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
-
-  auto prob_or_mask =
-      bias ? TorchTensorToDGLArray(this->value()) : dgl::aten::NullArray();
-  auto sample_coo = dgl::aten::CSRRowWiseSampling(
-      CSRToOldDGLCSR(csr), id_array, fanout, prob_or_mask, replace);
-  auto sample_csr = COOToCSR(sample_coo);
-  auto sample_value =
-      this->value().index_select(0, DGLArrayToTorchTensor(sample_csr.data));
-  auto slice_csr = dgl::aten::CSRSliceRows(sample_csr, id_array);
-  // To prevent potential errors in future conversions to the COO format,
-  // where this array might be used as an initialization array for
-  // constructing COO representations, it is necessary to clear this array.
+  // Slicing matrix.
+  auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), id_array);
+  auto slice_value =
+      this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+  // Reset value indices.
   slice_csr.data = dgl::aten::NullArray();
 
-  auto ret = CSRFromOldDGLCSR(slice_csr);
-  if (rowwise) {
-    return SparseMatrix::FromCSRPointer(
-        ret, sample_value, {ret->num_rows, ret->num_cols});
-  } else {
-    return SparseMatrix::FromCSCPointer(
-        ret, sample_value, {ret->num_cols, ret->num_rows});
-  }
+  auto prob =
+      bias ? TorchTensorToDGLArray(slice_value) : dgl::aten::NullArray();
+  std::vector<uint64_t> v(id_array.NumElements());
+  for (int i = 0; i < id_array.NumElements(); i++) v[i] = i;
+  auto slice_id = NDArray::FromVector<uint64_t>(v);
+  // Sampling all rows on sliced matrix.
+  auto sample_coo =
+      dgl::aten::CSRRowWiseSampling(slice_csr, slice_id, fanout, prob, replace);
+  auto sample_value =
+      slice_value.index_select(0, DGLArrayToTorchTensor(sample_coo.data));
+  sample_coo.data = dgl::aten::NullArray();
+  auto ret = COOFromOldDGLCOO(sample_coo);
+  if (!rowwise) ret = COOTranspose(ret);
+  return SparseMatrix::FromCOOPointer(
+      ret, sample_value, {ret->num_rows, ret->num_cols});
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(

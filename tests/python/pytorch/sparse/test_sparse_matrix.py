@@ -508,50 +508,65 @@ def test_range_select(create_func, shape, dense_dim, select_dim, rang):
     "create_func", [rand_diag, rand_csr, rand_csc, rand_coo]
 )
 @pytest.mark.parametrize("sample_dim", [0, 1])
-@pytest.mark.parametrize("index", [None, (0, 1, 3)])
-@pytest.mark.parametrize("replace", [0, 1])
-@pytest.mark.parametrize("bias", [0, 1])
+@pytest.mark.parametrize("index", [(0, 1, 2, 3, 4), (0, 1, 3), (1, 1, 2)])
+@pytest.mark.parametrize("replace", [False, True])
+@pytest.mark.parametrize("bias", [False, True])
 def test_sample(create_func, sample_dim, index, replace, bias):
     ctx = F.ctx()
     shape = (5, 5)
     sample_num = 3
-    A = create_func(shape, 6, ctx)
-    A_row = A.row
-    A_col = A.col
-    A_val = torch.abs(A.val)
+    A = create_func(shape, 10, ctx)
+    A_row, A_col, A_val = A.row, A.col, torch.abs(A.val)
     A = from_coo(A_row, A_col, A_val, shape)
 
-    if index is not None:
-        index = torch.tensor(index).to(ctx)
+    index = torch.tensor(index).to(ctx)
 
     A_sample = A.sample(sample_dim, sample_num, index, replace, bias)
     A_dense = sparse_matrix_to_dense(A)
     A_sample_to_dense = sparse_matrix_to_dense(A_sample)
 
-    if index == None:
-        ans_shape = shape
-        for row in range(shape[0]):
+    # Counting the edges in row and column, includes duplicate edges.
+    # row_cnt, col_cnt = {}, {}
+    # for i in range(len(list(A_sample.row))):
+    #     if (A_sample.row[i], A_sample.col[i]) not in dcnt:
+    #         dcnt[(A_sample.row[i], A_sample.col[i])] = 1
+    #     else:
+    #         dcnt[(A_sample.row[i], A_sample.col[i])] += 1
+
+    if sample_dim == 0:
+        ans_shape = (index.size(0), shape[1])
+        # Verify sample elements in origin rows
+        for i, row in enumerate(list(index)):
             ans_ele = list(A_dense[row, :].nonzero().reshape(-1))
-            ret_ele = list(A_sample_to_dense[row, :].nonzero().reshape(-1))
+            ret_ele = list(A_sample_to_dense[i, :].nonzero().reshape(-1))
             for e in ret_ele:
                 assert e in ans_ele
+            if replace:
+                # The number of sample elements in one row should be equal to
+                # 'sample_num' if the row is not empty otherwise should be
+                # equal to 0.
+                assert list(A_sample.row).count(torch.tensor(i)) == (
+                    sample_num if len(ans_ele) != 0 else 0
+                )
+            else:
+                assert len(ret_ele) == min(sample_num, len(ans_ele))
     else:
-        if sample_dim == 0:
-            ans_shape = (index.size(0), shape[1])
-            # Verify sample elements in origin rows
-            for i, row in enumerate(list(index)):
-                ans_ele = list(A_dense[row, :].nonzero().reshape(-1))
-                ret_ele = list(A_sample_to_dense[i, :].nonzero().reshape(-1))
-                for e in ret_ele:
-                    assert e in ans_ele
-        else:
-            ans_shape = (shape[0], index.size(0))
-            # Verify sample elements in origin columns
-            for i, col in enumerate(list(index)):
-                ans_ele = list(A_dense[:, col].nonzero().reshape(-1))
-                ret_ele = list(A_sample_to_dense[:, i].nonzero().reshape(-1))
-                for e in ret_ele:
-                    assert e in ans_ele
+        ans_shape = (shape[0], index.size(0))
+        # Verify sample elements in origin columns
+        for i, col in enumerate(list(index)):
+            ans_ele = list(A_dense[:, col].nonzero().reshape(-1))
+            ret_ele = list(A_sample_to_dense[:, i].nonzero().reshape(-1))
+            for e in ret_ele:
+                assert e in ans_ele
+            if replace:
+                # The number of sample elements in one column should be equal to
+                # 'sample_num' if the column is not empty otherwise should be
+                # equal to 0.
+                assert list(A_sample.col).count(torch.tensor(i)) == (
+                    sample_num if len(ans_ele) != 0 else 0
+                )
+            else:
+                assert len(ret_ele) == min(sample_num, len(ans_ele))
 
     assert A_sample.shape == ans_shape
     if not replace:
