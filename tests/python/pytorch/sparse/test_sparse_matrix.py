@@ -525,14 +525,6 @@ def test_sample(create_func, sample_dim, index, replace, bias):
     A_dense = sparse_matrix_to_dense(A)
     A_sample_to_dense = sparse_matrix_to_dense(A_sample)
 
-    # Counting the edges in row and column, includes duplicate edges.
-    # row_cnt, col_cnt = {}, {}
-    # for i in range(len(list(A_sample.row))):
-    #     if (A_sample.row[i], A_sample.col[i]) not in dcnt:
-    #         dcnt[(A_sample.row[i], A_sample.col[i])] = 1
-    #     else:
-    #         dcnt[(A_sample.row[i], A_sample.col[i])] += 1
-
     if sample_dim == 0:
         ans_shape = (index.size(0), shape[1])
         # Verify sample elements in origin rows
