@@ -6,7 +6,7 @@ Utilize the example provided in https://ogb.stanford.edu/docs/linkprop/ to downl
 import torch
 from ogb.linkproppred import LinkPropPredDataset
 
-dataset_names = "ogbl-citation2"
+dataset_name = "ogbl-citation2"
 # Set the download directory
 data_root = "./dataset" 
 
@@ -44,29 +44,33 @@ tasks:
     train_set:
       - type_name: null
         data:
-        - format: numpy
-          path: set/train_source_node.npy
+        # (n, 2)
+        - name: node_pairs
+          format: numpy
+          path: set/train_node_pairs.npy
           in_memory: true
-        - format: numpy
-          path: set/train_target_node.npy
     validation_set:
       - type_name: null
         data:
-        - format: numpy
-          path: set/valid_source_node.npy
-        - format: numpy
-          path: set/valid_target_node.npy
-        - format: numpy
-          path: set/valid_target_node_neg.npy
+        - name: node_pairs
+          format: numpy
+          path: set/valid_node_pairs.npy
+          in_memory: true
+        - name: negative_dsts
+          format: numpy
+          path: set/valid_negative_dsts.npy
+          in_memory: true
     test_set:
       - type_name: null
         data:
-        - format: numpy
-          path: set/test_source_node.npy
-        - format: numpy
-          path: set/test_target_node.npy
-        - format: numpy
-          path: set/test_target_node_neg.npy
+        - name: node_pairs
+          format: numpy
+          path: set/test_node_pairs.npy
+          in_memory: true
+        - name: negative_dsts
+          format: numpy
+          path: set/test_negative_dsts.npy
+          in_memory: true
 ```
 
 You'll need to convert the **raw dataset** into the corresponding structure and organize it into any folder of your choice. The final file structure should look like this:

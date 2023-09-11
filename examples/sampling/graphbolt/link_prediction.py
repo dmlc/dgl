@@ -79,31 +79,20 @@ class SAGE(nn.Module):
         return hidden_x
 
 
-def to_link_block_train(data):
-    """Convert train ItemSet to a LinkPredictionBlock."""
-    block = gb.LinkPredictionBlock(node_pair=data)
-    return block
-
-
-def to_link_block_eval(data):
-    """Convert eval ItemSet to a LinkPredictionBlock."""
-    src, dst, neg_dst = data[0], data[1], data[2]
-    block = gb.LinkPredictionBlock(node_pair=(src, dst), negative_tail=neg_dst)
-    return block
-
-
-def get_dataloader(args, graph, features, current_set, is_train=True):
-    """Get a GraphBolt version of a dataloader for link prediction tasks."""
+def current_dataloader(args, graph, features, itemset, is_train=True):
+    """Get a GraphBolt version of a dataloader for link prediction tasks. This
+    function is try to show the functional form datapipe in GraphBolt. You can
+    also generate a datapipe by using the class constructor.
+    """
 
     ############################################################################
     # [Input]:
-    # 'current_set' for the current dataset.
-    # 'args.batch_size' to specify the number of samples to be processed
-    # together, referred to as a 'mini-batch'. (The term 'mini-batch' is used
-    # here to indicate a subset of the entire dataset that is processed
-    # together. This is in contrast to processing the entire dataset, known
-    # as a 'full batch'.)
-    # 'is_train' to determine if data should be shuffled. (Shuffling is
+    # 'itemset': The current dataset.
+    # 'args.batch_size': Specify the number of samples to be processed together,
+    # referred to as a 'mini-batch'. (The term 'mini-batch' is used here to
+    # indicate a subset of the entire dataset that is processed together. This
+    # is in contrast to processing the entire dataset, known as a 'full batch'.)
+    # 'is_train': Determining if data should be shuffled. (Shuffling is
     # generally used only in training to improve model generalization. It's
     # not used in validation and testing as the focus there is to evaluate
     # performance rather than to learn from the data.)
@@ -112,103 +101,74 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
     # [Role]:
     # Initialize the ItemSampler to sample mini-batche from the dataset.
     ############################################################################
-    item_sampler = gb.ItemSampler(
-        current_set, batch_size=args.batch_size, shuffle=is_train
+    datapipe = gb.ItemSampler(
+        itemset, batch_size=args.batch_size, shuffle=is_train
     )
 
     ############################################################################
     # [Input]:
-    # The 'item_sampler' object and a block conversion function based
-    # on the 'is_train'.
-    # [Output]:
-    # A Mapper object that can convert sampled data blocks.
-    # [Role]:
-    # Initialize a mapper to convert mini-batches into link blocks suitable
-    # for training or evaluation.
-    ############################################################################
-    data_block_converter = Mapper(
-        item_sampler,
-        to_link_block_train if is_train else to_link_block_eval,
-    )
-
-    ############################################################################
-    # [Input]:
-    # 'is_train' to specify the training state.
-    # [Output]:
-    # The format to be used for negative sampling. (For more details, see
-    # the documentation for the LinkPredictionEdgeFormat enum class.)
-    # [Role]:
-    # Decide the edge format for negative sampling based on whether we are
-    # in training mode.
-    ############################################################################
-    format = (
-        gb.LinkPredictionEdgeFormat.INDEPENDENT
-        if is_train
-        else gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED
-    )
-
-    ############################################################################
-    # [Input]:
-    # 'data_block_converter' to convert sampled data into the required
-    # format.
-    # 'args.neg_ratio' to specify the ratio of negative to positive samples.
+    # 'args.neg_ratio': Specify the ratio of negative to positive samples.
     # (E.g., if neg_ratio is 1, for each positive sample there will be 1
     # negative sample.)
-    # 'format' to specify how negative sampling should be performed.
-    # 'graph' for the overall network topology where negative sampling occurs.
+    # 'graph': The overall network topology for negative sampling.
     # [Output]:
     # A UniformNegativeSampler object that will handle the generation of
     # negative samples for link prediction tasks.
     # [Role]:
     # Initialize the UniformNegativeSampler for negative sampling in link
     # prediction.
+    # [Note]:
+    # If 'is_train' is False, the UniformNegativeSampler will not be used.
+    # Since, in validation and testing, the itemset already contains the
+    # negative edges information.
     ############################################################################
-    negative_sampler = gb.UniformNegativeSampler(
-        data_block_converter,
-        args.neg_ratio,
-        format,
-        graph,
-    )
+    if is_train:
+        datapipe = datapipe.sample_uniform_negative(args.neg_ratio, graph)
 
     ############################################################################
     # [Input]:
-    # The 'negative_sampler' or 'data_block_converter' depending
-    # on 'is_train', the 'graph', and the fanout size ('args.fanout').
+    # 'datapipe' is either 'ItemSampler' or 'UniformNegativeSampler' depending
+    # on whether training is needed ('is_train'),
+    # 'graph': The network topology for sampling.
+    # 'args.fanout': Number of neighbors to sample per node.
     # [Output]:
     # A NeighborSampler object to sample neighbors.
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    subgraph_sampler = gb.NeighborSampler(
-        negative_sampler if is_train else data_block_converter,
-        graph,
-        args.fanout,
-    )
+    datapipe = datapipe.sample_neighbor(graph, args.fanout)
 
     ############################################################################
     # [Input]:
-    # The 'subgraph_sampler', 'features' to be fetched, and the
-    # node feature key "feat".
+    # 'features': The node features.
+    # 'node_feature_keys': The node feature keys (list) to be fetched.
     # [Output]:
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
     # subgraphs.
     ############################################################################
-    feature_fetcher = gb.FeatureFetcher(subgraph_sampler, features, ["feat"])
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
     # [Input]:
-    # The 'feature_fetcher' and the number of worker processes
-    # ('args.num_workers').
+    # 'device': The device to copy the data to.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device.
+    ############################################################################
+    datapipe = datapipe.copy_to(device=torch.device("cpu"))
+
+    ############################################################################
+    # [Input]:
+    # 'datapipe': The datapipe object to be used for data loading.
+    # 'args.num_workers': The number of processes to be used for data loading.
     # [Output]:
     # A MultiProcessDataLoader object to handle data loading.
     # [Role]:
-    # Initialize a multi-process dataloader to load the data in parallel and
-    # copy it to the CPU.
+    # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
     dataloader = gb.MultiProcessDataLoader(
-        gb.CopyTo(feature_fetcher, torch.device("cpu")),
+        datapipe,
         num_workers=args.num_workers,
     )
 
@@ -216,7 +176,31 @@ def get_dataloader(args, graph, features, current_set, is_train=True):
     return dataloader
 
 
-def to_dgl_blocks(sampled_subgraphs):
+# TODO[Keli]: Remove this helper function later.
+def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
+    """Convert the minibatch to a training pair and a label tensor."""
+    batch_size = data.compacted_node_pairs[0].shape[0]
+    neg_ratio = data.compacted_negative_dsts.shape[0] // batch_size
+
+    pos_src, pos_dst = data.compacted_node_pairs
+    if data.compacted_negative_srcs is None:
+        neg_src = pos_src.repeat_interleave(neg_ratio, dim=0)
+    else:
+        neg_src = data.compacted_negative_srcs
+    neg_dst = data.compacted_negative_dsts
+
+    node_pairs = (
+        torch.cat((pos_src, neg_src), dim=0),
+        torch.cat((pos_dst, neg_dst), dim=0),
+    )
+    pos_label = torch.ones_like(pos_src)
+    neg_label = torch.zeros_like(neg_src)
+    labels = torch.cat([pos_label, neg_label], dim=0)
+    return (node_pairs, labels.float())
+
+
+# TODO[Keli]: Remove this helper function later.
+def to_dgl_blocks(sampled_subgraphs: gb.SampledSubgraphImpl):
     """Convert sampled subgraphs to DGL blocks."""
     blocks = [
         dgl.create_block(
@@ -230,49 +214,39 @@ def to_dgl_blocks(sampled_subgraphs):
 
 
 @torch.no_grad()
-def evaluate(args, graph, features, current_set, model):
+def evaluate(args, graph, features, itemset, model):
     evaluator = Evaluator(name="ogbl-citation2")
 
     # Since we need to evaluate the model, we need to set the number
     # of layers to 1 and the fanout to -1.
     args.fanout = [torch.LongTensor([-1])]
-    dataloader = get_dataloader(
-        args, graph, features, current_set, is_train=False
+    dataloader = current_dataloader(
+        args, graph, features, itemset, is_train=False
     )
     pos_pred = []
     neg_pred = []
 
     model.eval()
     for step, data in tqdm.tqdm(enumerate(dataloader)):
-        # Unpack LinkPredictionBlock.
-        compacted_pairs = data.compacted_node_pair
+        # Unpack MiniBatch.
+        compacted_pairs, _ = to_binary_link_dgl_computing_pack(data)
         node_feature = data.node_features["feat"].float()
         blocks = to_dgl_blocks(data.sampled_subgraphs)
 
         # Get the embeddings of the input nodes.
         y = model(blocks, node_feature)
-        pos_score = (
-            (model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]]))
+        score = (
+            model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
             .squeeze()
             .detach()
         )
-        # Calculate the evaluation neg-ratio.
-        eval_neg_ratio = (
-            data.compacted_negative_tail.shape[0]
-            // data.compacted_node_pair[0].shape[0]
-        )
-        # We need to repeat the negative source nodes to match the number of
-        # negative destination nodes.
-        neg_src = compacted_pairs[0].repeat_interleave(eval_neg_ratio, dim=0)
-        neg_score = (
-            model.predictor(y[neg_src] * y[data.compacted_negative_tail])
-            .squeeze()
-            .detach()
-        )
+
+        pos_score = score[: data.compacted_node_pairs[0].shape[0]]
+        neg_score = score[data.compacted_node_pairs[0].shape[0] :]
         pos_pred.append(pos_score)
         neg_pred.append(neg_score)
     pos_pred = torch.cat(pos_pred, dim=0)
-    neg_pred = torch.cat(neg_pred, dim=0).view(-1, eval_neg_ratio)
+    neg_pred = torch.cat(neg_pred, dim=0).view(pos_pred.shape[0], -1)
 
     input_dict = {"y_pred_pos": pos_pred, "y_pred_neg": neg_pred}
     mrr = evaluator.eval(input_dict)["mrr_list"]
@@ -280,17 +254,15 @@ def evaluate(args, graph, features, current_set, model):
 
 
 def train(args, graph, features, train_set, valid_set, model):
-    total_loss = 0.0
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    dataloader = get_dataloader(args, graph, features, train_set)
+    dataloader = current_dataloader(args, graph, features, train_set)
 
     for epoch in tqdm.trange(args.epochs):
         model.train()
+        total_loss = 0
         for step, data in enumerate(dataloader):
-            # Unpack LinkPredictionBlock.
-            # data.label is computed during the NegativeSampler phase.
-            label = data.label.float()
-            compacted_pairs = data.compacted_node_pair
+            # Unpack MiniBatch.
+            compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
             node_feature = data.node_features["feat"].float()
             # Convert sampled subgraphs to DGL blocks.
             blocks = to_dgl_blocks(data.sampled_subgraphs)
@@ -302,25 +274,24 @@ def train(args, graph, features, train_set, valid_set, model):
             ).squeeze()
 
             # Compute loss.
-            loss = F.binary_cross_entropy_with_logits(logits, label)
+            loss = F.binary_cross_entropy_with_logits(logits, labels)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item()
-            print(
-                f"Epoch {epoch:05d} | "
-                f"Step {step:05d} | "
-                f"Loss {(total_loss) / (step + 1):.4f}",
-                end="\n",
-            )
-            if step + 1 == 1000:
-                break
+            if (step % 100 == 0) and (step != 0):
+                print(
+                    f"Epoch {epoch:05d} | "
+                    f"Step {step:05d} | "
+                    f"Loss {(total_loss) / (step + 1):.4f}",
+                    end="\n",
+                )
 
-        # Evaluate the model.
-        print("Validation")
-        valid_mrr = evaluate(args, graph, features, valid_set, model)
-        print(f"Valid MRR {valid_mrr.item():.4f}")
+    # Evaluate the model.
+    print("Validation")
+    valid_mrr = evaluate(args, graph, features, valid_set, model)
+    print(f"Valid MRR {valid_mrr.item():.4f}")
 
 
 def parse_args():
