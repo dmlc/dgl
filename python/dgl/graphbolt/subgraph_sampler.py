@@ -57,6 +57,12 @@ class SubgraphSampler(Mapper):
         has_neg_dst = neg_dst is not None
         is_heterogeneous = isinstance(node_pairs, Dict)
         if is_heterogeneous:
+            has_neg_src = has_neg_src and all(
+                item is not None for item in neg_src.values()
+            )
+            has_neg_dst = has_neg_dst and all(
+                item is not None for item in neg_dst.values()
+            )
             # Collect nodes from all types of input.
             nodes = defaultdict(list)
             for etype, (src, dst) in node_pairs.items():

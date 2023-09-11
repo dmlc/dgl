@@ -2,21 +2,20 @@ import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
 import torch
-import torchdata.datapipes as dp
 from torchdata.datapipes.iter import Mapper
 
 
 def test_SubgraphSampler_invoke():
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
-    datapipe = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
 
     # Invoke via class constructor.
-    datapipe = gb.SubgraphSampler(datapipe)
+    datapipe = gb.SubgraphSampler(item_sampler)
     with pytest.raises(NotImplementedError):
         next(iter(datapipe))
 
     # Invokde via functional form.
-    datapipe = datapipe.sample_subgraph()
+    datapipe = item_sampler.sample_subgraph()
     with pytest.raises(NotImplementedError):
         next(iter(datapipe))
 
@@ -25,20 +24,20 @@ def test_SubgraphSampler_invoke():
 def test_NeighborSampler_invoke(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
-    datapipe = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
     # Invoke via class constructor.
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    datapipe = Sampler(datapipe, graph, fanouts)
+    datapipe = Sampler(item_sampler, graph, fanouts)
     assert len(list(datapipe)) == 5
 
     # Invokde via functional form.
     if labor:
-        datapipe = datapipe.sample_layer_neighbor(graph, fanouts)
+        datapipe = item_sampler.sample_layer_neighbor(graph, fanouts)
     else:
-        datapipe = datapipe.sample_neighbor(graph, fanouts)
+        datapipe = item_sampler.sample_neighbor(graph, fanouts)
     assert len(list(datapipe)) == 5
 
 
@@ -71,23 +70,14 @@ def test_SubgraphSampler_Link(labor):
     assert len(list(neighbor_dp)) == 5
 
 
-@pytest.mark.parametrize(
-    "format",
-    [
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
-        gb.LinkPredictionEdgeFormat.CONDITIONED,
-        gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED,
-        gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
-    ],
-)
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Link_With_Negative(format, labor):
+def test_SubgraphSampler_Link_With_Negative(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    negative_dp = gb.UniformNegativeSampler(item_sampler, 1, format, graph)
+    negative_dp = gb.UniformNegativeSampler(item_sampler, 1, graph)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
@@ -139,17 +129,8 @@ def test_SubgraphSampler_Link_Hetero(labor):
     assert len(list(neighbor_dp)) == 5
 
 
-@pytest.mark.parametrize(
-    "format",
-    [
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
-        gb.LinkPredictionEdgeFormat.CONDITIONED,
-        gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED,
-        gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
-    ],
-)
 @pytest.mark.parametrize("labor", [False, True])
-def test_SubgraphSampler_Link_Hetero_With_Negative(format, labor):
+def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     graph = get_hetero_graph()
     itemset = gb.ItemSetDict(
         {
@@ -167,7 +148,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(format, labor):
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    negative_dp = gb.UniformNegativeSampler(item_sampler, 1, format, graph)
+    negative_dp = gb.UniformNegativeSampler(item_sampler, 1, graph)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
