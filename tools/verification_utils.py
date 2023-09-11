@@ -1,6 +1,8 @@
 import json
 import os
 
+import array_readwriter
+
 import constants
 
 import dgl
@@ -21,7 +23,7 @@ from dgl.distributed.partition import (
 from distpartitioning.utils import get_idranges
 
 
-def read_file(fname, ftype):
+def read_file(fname, ftype, delimiter=" "):
     """Read a file from disk
     Parameters:
     -----------
@@ -36,9 +38,9 @@ def read_file(fname, ftype):
         file contents are returned as numpy array
     """
     reader_fmt_meta = {"name": ftype}
-    array_readwriter.get_array_parser(**reader_fmt_meta).read(fname)
-
-    return data
+    if ftype == constants.STR_CSV:
+        reader_fmt_meta[constants.STR_FORMAT_DELIMITER] = delimiter
+    return array_readwriter.get_array_parser(**reader_fmt_meta).read(fname)
 
 
 def verify_partition_data_types(part_g):
@@ -163,9 +165,10 @@ def verify_metadata_counts(part_schema, part_g, graph_schema, g, partid):
         meta_ntype_count = ntype_data[partid][1] - ntype_data[partid][0]
         inner_node_mask = _get_inner_node_mask(part_g, g.get_ntype_id(ntype))
         graph_ntype_count = len(part_g.ndata[dgl.NID][inner_node_mask])
-        assert (
-            meta_ntype_count == graph_ntype_count
-        ), f"Metadata ntypecount = {meta_ntype_count} and graph_ntype_count = {graph_ntype_count}"
+        assert meta_ntype_count == graph_ntype_count, (
+            f"Metadata ntypecount = {meta_ntype_count} and "
+            f"graph_ntype_count = {graph_ntype_count}"
+        )
 
     for etype in part_schema[constants.STR_ETYPES]:
         etype_data = part_schema[constants.STR_EDGE_MAP][etype]
@@ -174,9 +177,10 @@ def verify_metadata_counts(part_schema, part_g, graph_schema, g, partid):
             part_g, g.get_etype_id(_etype_str_to_tuple(etype))
         )
         graph_etype_count = len(part_g.edata[dgl.EID][mask])
-        assert (
-            meta_etype_count == graph_etype_count
-        ), f"Metadata etypecount = {meta_etype_count} does not match part graph etypecount = {graph_etype_count}"
+        assert meta_etype_count == graph_etype_count, (
+            f"Metadata etypecount = {meta_etype_count} does not "
+            f"match part graph etypecount = {graph_etype_count}"
+        )
 
 
 def get_node_partids(partitions_dir, graph_schema):
@@ -204,7 +208,7 @@ def get_node_partids(partitions_dir, graph_schema):
         dict(
             zip(
                 graph_schema[constants.STR_NODE_TYPE],
-                graph_schema[constants.STR_NODE_TYPE_COUNTS],
+                graph_schema[constants.STR_NUM_NODES_PER_TYPE],
             )
         ),
     )
@@ -215,8 +219,13 @@ def get_node_partids(partitions_dir, graph_schema):
         )
         assert (
             len(node_partids[ntype])
-            == graph_schema[constants.STR_NODE_TYPE_COUNTS][ntype_id]
-        ), f"Node count for {ntype} = {len(node_partids[ntype])} in the partitions_dir while it should be {graph_schema[constants.STR_NTYPE_COUNTS][ntype_id]} (from graph schema)."
+            == graph_schema[constants.STR_NUM_NODES_PER_TYPE][ntype_id]
+        ), (
+            f"Node count for {ntype} = {len(node_partids[ntype])} in the "
+            f"partitions_dir while it should be "
+            f"{graph_schema[constants.STR_NUM_NODES_PER_TYPE][ntype_id]} "
+            f"(from graph schema)."
+        )
 
     return node_partids
 
@@ -242,7 +251,8 @@ def verify_node_partitionids(
         partition id of the partitioned graph, part_g
     """
     # read part graphs and verify the counts
-    # inner node masks, should give the node counts in each part-g and get the corresponding orig-ids to map to the original graph node-ids
+    # inner node masks, should give the node counts in each part-g and get the
+    # corresponding orig-ids to map to the original graph node-ids
     for ntype_id, ntype in enumerate(graph_schema[constants.STR_NODE_TYPE]):
         mask = _get_inner_node_mask(part_g, g.get_ntype_id(ntype))
 
@@ -258,9 +268,11 @@ def verify_node_partitionids(
         assert np.all(idxes >= 0)
 
         # get the partition-ids for these nodes.
-        assert np.all(
-            node_partids[ntype][idxes] == partition_id
-        ), f"All the nodes in the partition = {partid} does not their nodeid to partition-id maps are defined by the partitioning algorithm. Node-type = {ntype}"
+        assert np.all(node_partids[ntype][idxes] == partition_id), (
+            f"All the nodes in the partition = {partid} does not their "
+            f"nodeid to partition-id maps are defined by the "
+            f"partitioning algorithm. Node-type = {ntype}"
+        )
 
 
 def read_orig_ids(out_dir, fname, num_parts):
