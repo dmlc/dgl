@@ -50,7 +50,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
 from ogb.linkproppred import Evaluator
-from torchdata.datapipes.iter import Mapper
 
 
 class SAGE(nn.Module):
@@ -81,8 +80,9 @@ class SAGE(nn.Module):
 
 def current_dataloader(args, graph, features, itemset, is_train=True):
     """Get a GraphBolt version of a dataloader for link prediction tasks. This
-    function is try to show the functional form datapipe in GraphBolt. You can
-    also generate a datapipe by using the class constructor.
+    function demonstrates how to utilize functional forms of datapipes in
+    GraphBolt. Alternatively, you can create a datapipe using its class
+    constructor.
     """
 
     ############################################################################
