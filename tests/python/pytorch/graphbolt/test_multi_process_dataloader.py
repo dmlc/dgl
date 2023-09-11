@@ -1,6 +1,5 @@
 import os
 import unittest
-from functools import partial
 
 import backend as F
 
@@ -14,7 +13,7 @@ from torchdata.datapipes.iter import Mapper
 def test_DataLoader():
     N = 40
     B = 4
-    itemset = dgl.graphbolt.ItemSet(torch.arange(N))
+    itemset = dgl.graphbolt.ItemSet(torch.arange(N), names="seed_nodes")
     graph = gb_test_utils.rand_csc_graph(200, 0.15)
     features = {}
     keys = [("node", None, "a"), ("node", None, "b")]
@@ -23,9 +22,8 @@ def test_DataLoader():
     feature_store = dgl.graphbolt.BasicFeatureStore(features)
 
     item_sampler = dgl.graphbolt.ItemSampler(itemset, batch_size=B)
-    block_converter = Mapper(item_sampler, gb_test_utils.to_node_block)
     subgraph_sampler = dgl.graphbolt.NeighborSampler(
-        block_converter,
+        item_sampler,
         graph,
         fanouts=[torch.LongTensor([2]) for _ in range(2)],
     )

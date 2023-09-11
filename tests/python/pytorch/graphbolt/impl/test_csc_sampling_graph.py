@@ -807,9 +807,17 @@ def check_tensors_on_the_same_shared_memory(t1: torch.Tensor, t2: torch.Tensor):
 @pytest.mark.parametrize(
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
-def test_homo_graph_on_shared_memory(num_nodes, num_edges):
+@pytest.mark.parametrize("test_edge_attrs", [True, False])
+def test_homo_graph_on_shared_memory(num_nodes, num_edges, test_edge_attrs):
     csc_indptr, indices = gbt.random_homo_graph(num_nodes, num_edges)
-    graph = gb.from_csc(csc_indptr, indices)
+    if test_edge_attrs:
+        edge_attributes = {
+            "A1": torch.randn(num_edges),
+            "A2": torch.randn(num_edges),
+        }
+    else:
+        edge_attributes = None
+    graph = gb.from_csc(csc_indptr, indices, edge_attributes=edge_attributes)
 
     shm_name = "test_homo_g"
     graph1 = graph.copy_to_shared_memory(shm_name)
@@ -834,6 +842,15 @@ def test_homo_graph_on_shared_memory(num_nodes, num_edges):
     )
     check_tensors_on_the_same_shared_memory(graph1.indices, graph2.indices)
 
+    if test_edge_attrs:
+        for name, edge_attr in edge_attributes.items():
+            assert name in graph1.edge_attributes
+            assert name in graph2.edge_attributes
+            assert torch.equal(graph1.edge_attributes[name], edge_attr)
+            check_tensors_on_the_same_shared_memory(
+                graph1.edge_attributes[name], graph2.edge_attributes[name]
+            )
+
     assert graph1.metadata is None and graph2.metadata is None
     assert graph1.node_type_offset is None and graph2.node_type_offset is None
     assert graph1.type_per_edge is None and graph2.type_per_edge is None
@@ -847,8 +864,9 @@ def test_homo_graph_on_shared_memory(num_nodes, num_edges):
     "num_nodes, num_edges", [(1, 1), (100, 1), (10, 50), (1000, 50000)]
 )
 @pytest.mark.parametrize("num_ntypes, num_etypes", [(1, 1), (3, 5), (100, 1)])
+@pytest.mark.parametrize("test_edge_attrs", [True, False])
 def test_hetero_graph_on_shared_memory(
-    num_nodes, num_edges, num_ntypes, num_etypes
+    num_nodes, num_edges, num_ntypes, num_etypes, test_edge_attrs
 ):
     (
         csc_indptr,
@@ -857,8 +875,21 @@ def test_hetero_graph_on_shared_memory(
         type_per_edge,
         metadata,
     ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+
+    if test_edge_attrs:
+        edge_attributes = {
+            "A1": torch.randn(num_edges),
+            "A2": torch.randn(num_edges),
+        }
+    else:
+        edge_attributes = None
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
     )
 
     shm_name = "test_hetero_g"
@@ -893,6 +924,15 @@ def test_hetero_graph_on_shared_memory(
     check_tensors_on_the_same_shared_memory(
         graph1.type_per_edge, graph2.type_per_edge
     )
+
+    if test_edge_attrs:
+        for name, edge_attr in edge_attributes.items():
+            assert name in graph1.edge_attributes
+            assert name in graph2.edge_attributes
+            assert torch.equal(graph1.edge_attributes[name], edge_attr)
+            check_tensors_on_the_same_shared_memory(
+                graph1.edge_attributes[name], graph2.edge_attributes[name]
+            )
 
     assert metadata.node_type_to_id == graph1.metadata.node_type_to_id
     assert metadata.edge_type_to_id == graph1.metadata.edge_type_to_id

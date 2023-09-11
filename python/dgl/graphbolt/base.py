@@ -1,5 +1,6 @@
 """Base types and utilities for Graph Bolt."""
 
+from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
 from ..utils import recursive_apply
@@ -53,6 +54,7 @@ def _to(x, device):
     return x.to(device) if hasattr(x, "to") else x
 
 
+@functional_datapipe("copy_to")
 class CopyTo(IterDataPipe):
     """DataPipe that transfers each element yielded from the previous DataPipe
     to the given device.
