@@ -182,7 +182,7 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::Sample(
   auto prob =
       bias ? TorchTensorToDGLArray(slice_value) : dgl::aten::NullArray();
   std::vector<uint64_t> v(id_array.NumElements());
-  for (int i = 0; i < id_array.NumElements(); i++) v[i] = i;
+  iota(v.begin(), v.end(), 0);
   auto slice_id = NDArray::FromVector<uint64_t>(v);
   // Sampling all rows on sliced matrix.
   auto sample_coo =

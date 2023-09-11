@@ -516,8 +516,7 @@ def test_sample(create_func, sample_dim, index, replace, bias):
     shape = (5, 5)
     sample_num = 3
     A = create_func(shape, 10, ctx)
-    A_row, A_col, A_val = A.row, A.col, torch.abs(A.val)
-    A = from_coo(A_row, A_col, A_val, shape)
+    A = val_like(A, torch.abs(A.val))
 
     index = torch.tensor(index).to(ctx)
 

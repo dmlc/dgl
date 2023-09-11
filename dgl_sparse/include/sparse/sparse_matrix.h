@@ -186,9 +186,9 @@ class SparseMatrix : public torch::CustomClassHolder {
    * @brief Create a SparseMatrix by sampling elements based on the specified
    * dimension and sample count.
    *
-   * This function enables the creation of a new SparseMatrix by randomly
-   * sampling elements along a specified dimension (row-wise or column-wise)
-   * with the specified sample count.
+   * If `ids` is provided, this function samples elements from the specified
+   * set of row or column IDs, resulting in a sparse matrix containing only
+   * the sampled rows or columns.
    *
    * @param dim Select rows (dim=0) or columns (dim=1) for sampling.
    * @param fanout The number of elements to randomly sample from each row or
@@ -204,6 +204,7 @@ class SparseMatrix : public torch::CustomClassHolder {
    *
    * @return A new SparseMatrix with the same shape as the original matrix
    * containing the sampled elements.
+   *
    * @note If 'replace = false' and there are fewer elements than 'fanout',
    * all non-zero elements will be sampled.
    * @note If 'ids' is not provided, the function will sample from
