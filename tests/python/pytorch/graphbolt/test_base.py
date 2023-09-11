@@ -10,15 +10,15 @@ import torch
 
 @unittest.skipIf(F._default_context_str == "cpu", "CopyTo needs GPU to test")
 def test_CopyTo():
-    dp = gb.ItemSampler(gb.ItemSet(torch.randn(20)), 4)
+    item_sampler = gb.ItemSampler(gb.ItemSet(torch.randn(20)), 4)
 
     # Invoke CopyTo via class constructor.
-    dp = gb.CopyTo(dp, "cuda")
+    dp = gb.CopyTo(item_sampler, "cuda")
     for data in dp:
         assert data.device.type == "cuda"
 
     # Invoke CopyTo via functional form.
-    dp = dp.copy_to("cuda")
+    dp = item_sampler.copy_to("cuda")
     for data in dp:
         assert data.device.type == "cuda"
 

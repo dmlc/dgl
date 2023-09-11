@@ -17,17 +17,17 @@ def test_FeatureFetcher_invoke():
     feature_store = gb.BasicFeatureStore(features)
 
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
-    datapipe = gb.ItemSampler(itemset, batch_size=2)
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
     # Invoke FeatureFetcher via class constructor.
-    datapipe = gb.NeighborSampler(datapipe, graph, fanouts)
+    datapipe = gb.NeighborSampler(item_sampler, graph, fanouts)
     datapipe = gb.FeatureFetcher(datapipe, feature_store, ["a"], ["b"])
     assert len(list(datapipe)) == 5
 
     # Invoke FeatureFetcher via functional form.
-    datapipe = datapipe.sample_neighbor(graph, fanouts).fetch_feature(
+    datapipe = item_sampler.sample_neighbor(graph, fanouts).fetch_feature(
         feature_store, ["a"], ["b"]
     )
     assert len(list(datapipe)) == 5
