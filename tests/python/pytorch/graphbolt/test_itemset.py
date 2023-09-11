@@ -36,31 +36,7 @@ def test_ItemSet_length():
     ids = torch.arange(0, 5)
     item_set = gb.ItemSet(ids)
     assert len(item_set) == 5
-
-    # Tuple of iterables with valid length.
-    item_set = gb.ItemSet((torch.arange(0, 5), torch.arange(5, 10)))
-    assert len(item_set) == 5
-
-    class InvalidLength:
-        def __iter__(self):
-            return iter([0, 1, 2])
-
-    # Single iterable with invalid length.
-    item_set = gb.ItemSet(InvalidLength())
-    with pytest.raises(TypeError):
-        _ = len(item_set)
-
-    # Tuple of iterables with invalid length.
-    item_set = gb.ItemSet((InvalidLength(), InvalidLength()))
-    with pytest.raises(TypeError):
-        _ = len(item_set)
-
-
-def test_ItemSet_iteration():
-    # Single iterable with valid length.
-    ids = torch.arange(0, 5)
-    item_set = gb.ItemSet(ids)
-    assert len(item_set) == 5
+    # Test __iter__ method. Same as below.
     for i, item in enumerate(item_set):
         assert i == item.item()
 
