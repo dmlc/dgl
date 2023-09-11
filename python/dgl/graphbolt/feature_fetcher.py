@@ -52,15 +52,15 @@ class FeatureFetcher(Mapper):
 
         Parameters
         ----------
-        data : DataBlock
-            An instance of the 'DataBlock' class. Even if 'node_feature' or
+        data : MiniBatch
+            An instance of :class:`MiniBatch`. Even if 'node_feature' or
             'edge_feature' is already filled, it will be overwritten for
             overlapping features.
 
         Returns
         -------
-        DataBlock
-            An instance of 'DataBlock' filled with required features.
+        MiniBatch
+            An instance of :class:`MiniBatch` filled with required features.
         """
         data.node_features = {}
         num_layer = len(data.sampled_subgraphs) if data.sampled_subgraphs else 0
