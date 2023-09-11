@@ -11,6 +11,8 @@ from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
 from .itemset import ItemSet, ItemSetDict
 
+import torch.distributed as dist
+
 __all__ = ["ItemSampler"]
 
 
@@ -170,26 +172,42 @@ class ItemSampler(IterDataPipe):
 
     def __init__(
         self,
-        item_set: ItemSet or ItemSetDict,
+        item_set,
         batch_size: int,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
     ) -> None:
         super().__init__()
         self._item_set = item_set
+        # self._item_set = IterableWrapper(self._item_set).batch(batch_size=batch_size, drop_last=False).sharding_filter()
+        # num_replicas = dist.get_world_size()
+        # rank = dist.get_rank()
+        # num_batches = len(item_set) // batch_size
+        # remains = len(item_set) % batch_size
+        # assigned_batches = num_batches // num_replicas
+        # remaining_batches = num_batches % num_replicas
+        # start_pos = assigned_batches * rank + min(rank, remaining_batches)
+        # end_pos = start_pos + assigned_batches + (rank < remaining_batches)
+        # start_pos *= batch_size
+        # end_pos *= batch_size
+        # if len(item_set) - end_pos < batch_size:
+        #     end_pos = len(item_set)
+        # self._item_set = IterableWrapper(self._item_set[start_pos : end_pos])
+        self._item_set = IterableWrapper(self._item_set)
         self._batch_size = batch_size
         self._drop_last = drop_last
         self._shuffle = shuffle
 
     def __iter__(self) -> Iterator:
-        data_pipe = IterableWrapper(self._item_set)
+        data_pipe = self._item_set
+
         # Shuffle before batch.
         if self._shuffle:
             # `torchdata.datapipes.iter.Shuffler` works with stream too.
             # To ensure randomness, make sure the buffer size is at least 10
             # times the batch size.
             buffer_size = max(10000, 10 * self._batch_size)
-            data_pipe = data_pipe.shuffle(buffer_size=buffer_size)
+            data_pipe = data_pipe.shuffle(buffer_size=buffer_size, unbatch_level=-1)
 
         # Batch.
         data_pipe = data_pipe.batch(
