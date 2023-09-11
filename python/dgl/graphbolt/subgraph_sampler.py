@@ -3,12 +3,14 @@
 from collections import defaultdict
 from typing import Dict
 
+from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import Mapper
 
 from .base import etype_str_to_tuple
 from .utils import unique_and_compact
 
 
+@functional_datapipe("sample_subgraph")
 class SubgraphSampler(Mapper):
     """A subgraph sampler used to sample a subgraph from a given set of nodes
     from a larger graph."""
@@ -28,19 +30,19 @@ class SubgraphSampler(Mapper):
         super().__init__(datapipe, self._sample)
 
     def _sample(self, minibatch):
-        if minibatch.node_pair is not None:
+        if minibatch.node_pairs is not None:
             (
                 seeds,
-                minibatch.compacted_node_pair,
-                minibatch.compacted_negative_head,
-                minibatch.compacted_negative_tail,
-            ) = self._node_pair_preprocess(minibatch)
-        elif minibatch.seed_node is not None:
-            seeds = minibatch.seed_node
+                minibatch.compacted_node_pairs,
+                minibatch.compacted_negative_srcs,
+                minibatch.compacted_negative_dsts,
+            ) = self._node_pairs_preprocess(minibatch)
+        elif minibatch.seed_nodes is not None:
+            seeds = minibatch.seed_nodes
         else:
             raise ValueError(
-                f"Invalid minibatch {minibatch}: Either 'node_pair' or \
-                'seed_node' should have a value."
+                f"Invalid minibatch {minibatch}: Either 'node_pairs' or \
+                'seed_nodes' should have a value."
             )
         (
             minibatch.input_nodes,
@@ -48,16 +50,22 @@ class SubgraphSampler(Mapper):
         ) = self._sample_subgraphs(seeds)
         return minibatch
 
-    def _node_pair_preprocess(self, minibatch):
-        node_pair = minibatch.node_pair
-        neg_src, neg_dst = minibatch.negative_head, minibatch.negative_tail
+    def _node_pairs_preprocess(self, minibatch):
+        node_pairs = minibatch.node_pairs
+        neg_src, neg_dst = minibatch.negative_srcs, minibatch.negative_dsts
         has_neg_src = neg_src is not None
         has_neg_dst = neg_dst is not None
-        is_heterogeneous = isinstance(node_pair, Dict)
+        is_heterogeneous = isinstance(node_pairs, Dict)
         if is_heterogeneous:
+            has_neg_src = has_neg_src and all(
+                item is not None for item in neg_src.values()
+            )
+            has_neg_dst = has_neg_dst and all(
+                item is not None for item in neg_dst.values()
+            )
             # Collect nodes from all types of input.
             nodes = defaultdict(list)
-            for etype, (src, dst) in node_pair.items():
+            for etype, (src, dst) in node_pairs.items():
                 src_type, _, dst_type = etype_str_to_tuple(etype)
                 nodes[src_type].append(src)
                 nodes[dst_type].append(dst)
@@ -72,27 +80,27 @@ class SubgraphSampler(Mapper):
             # Unique and compact the collected nodes.
             seeds, compacted = unique_and_compact(nodes)
             (
-                compacted_node_pair,
-                compacted_negative_head,
-                compacted_negative_tail,
+                compacted_node_pairs,
+                compacted_negative_srcs,
+                compacted_negative_dsts,
             ) = ({}, {}, {})
             # Map back in same order as collect.
-            for etype, _ in node_pair.items():
+            for etype, _ in node_pairs.items():
                 src_type, _, dst_type = etype_str_to_tuple(etype)
                 src = compacted[src_type].pop(0)
                 dst = compacted[dst_type].pop(0)
-                compacted_node_pair[etype] = (src, dst)
+                compacted_node_pairs[etype] = (src, dst)
             if has_neg_src:
                 for etype, _ in neg_src.items():
                     src_type, _, _ = etype_str_to_tuple(etype)
-                    compacted_negative_head[etype] = compacted[src_type].pop(0)
+                    compacted_negative_srcs[etype] = compacted[src_type].pop(0)
             if has_neg_dst:
                 for etype, _ in neg_dst.items():
                     _, _, dst_type = etype_str_to_tuple(etype)
-                    compacted_negative_tail[etype] = compacted[dst_type].pop(0)
+                    compacted_negative_dsts[etype] = compacted[dst_type].pop(0)
         else:
             # Collect nodes from all types of input.
-            nodes = list(node_pair)
+            nodes = list(node_pairs)
             if has_neg_src:
                 nodes.append(neg_src.view(-1))
             if has_neg_dst:
@@ -100,17 +108,17 @@ class SubgraphSampler(Mapper):
             # Unique and compact the collected nodes.
             seeds, compacted = unique_and_compact(nodes)
             # Map back in same order as collect.
-            compacted_node_pair = tuple(compacted[:2])
+            compacted_node_pairs = tuple(compacted[:2])
             compacted = compacted[2:]
             if has_neg_src:
-                compacted_negative_head = compacted.pop(0)
+                compacted_negative_srcs = compacted.pop(0)
             if has_neg_dst:
-                compacted_negative_tail = compacted.pop(0)
+                compacted_negative_dsts = compacted.pop(0)
         return (
             seeds,
-            compacted_node_pair,
-            compacted_negative_head if has_neg_src else None,
-            compacted_negative_tail if has_neg_dst else None,
+            compacted_node_pairs,
+            compacted_negative_srcs if has_neg_src else None,
+            compacted_negative_dsts if has_neg_dst else None,
         )
 
     def _sample_subgraphs(self, seeds):

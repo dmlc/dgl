@@ -2,71 +2,90 @@ import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
 import torch
-from torchdata.datapipes.iter import Mapper
+
+
+def test_NegativeSampler_invoke():
+    # Instantiate graph and required datapipes.
+    num_seeds = 30
+    item_set = gb.ItemSet(
+        torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="node_pairs"
+    )
+    batch_size = 10
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    negative_ratio = 2
+
+    # Invoke NegativeSampler via class constructor.
+    negative_sampler = gb.NegativeSampler(
+        item_sampler,
+        negative_ratio,
+    )
+    with pytest.raises(NotImplementedError):
+        next(iter(negative_sampler))
+
+    # Invoke NegativeSampler via functional form.
+    negative_sampler = item_sampler.sample_negative(
+        negative_ratio,
+    )
+    with pytest.raises(NotImplementedError):
+        next(iter(negative_sampler))
+
+
+def test_UniformNegativeSampler_invoke():
+    # Instantiate graph and required datapipes.
+    graph = gb_test_utils.rand_csc_graph(100, 0.05)
+    num_seeds = 30
+    item_set = gb.ItemSet(
+        torch.arange(0, 2 * num_seeds).reshape(-1, 2), names="node_pairs"
+    )
+    batch_size = 10
+    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
+    negative_ratio = 2
+
+    # Verify iteration over UniformNegativeSampler.
+    def _verify(negative_sampler):
+        for data in negative_sampler:
+            # Assertation
+            assert data.negative_srcs.size(0) == batch_size
+            assert data.negative_srcs.size(1) == negative_ratio
+            assert data.negative_dsts.size(0) == batch_size
+            assert data.negative_dsts.size(1) == negative_ratio
+
+    # Invoke UniformNegativeSampler via class constructor.
+    negative_sampler = gb.UniformNegativeSampler(
+        item_sampler,
+        negative_ratio,
+        graph,
+    )
+    _verify(negative_sampler)
+
+    # Invoke UniformNegativeSampler via functional form.
+    negative_sampler = item_sampler.sample_uniform_negative(
+        negative_ratio,
+        graph,
+    )
+    _verify(negative_sampler)
 
 
 @pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
-def test_NegativeSampler_Independent_Format(negative_ratio):
+def test_Uniform_NegativeSampler(negative_ratio):
     # Construct CSCSamplingGraph.
     graph = gb_test_utils.rand_csc_graph(100, 0.05)
     num_seeds = 30
     item_set = gb.ItemSet(
-        (
-            torch.arange(0, num_seeds),
-            torch.arange(num_seeds, num_seeds * 2),
-        )
+        torch.arange(0, num_seeds * 2).reshape(-1, 2), names="node_pairs"
     )
     batch_size = 10
     item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
-    minibatch_converter = Mapper(
-        item_sampler, gb_test_utils.minibatch_link_collator
-    )
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
-        minibatch_converter,
+        item_sampler,
         negative_ratio,
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
         graph,
     )
     # Perform Negative sampling.
     for data in negative_sampler:
-        src, dst = data.node_pair
-        label = data.label
-        # Assertation
-        assert len(src) == batch_size * (negative_ratio + 1)
-        assert len(dst) == batch_size * (negative_ratio + 1)
-        assert len(label) == batch_size * (negative_ratio + 1)
-        assert torch.all(torch.eq(label[:batch_size], 1))
-        assert torch.all(torch.eq(label[batch_size:], 0))
-
-
-@pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
-def test_NegativeSampler_Conditioned_Format(negative_ratio):
-    # Construct CSCSamplingGraph.
-    graph = gb_test_utils.rand_csc_graph(100, 0.05)
-    num_seeds = 30
-    item_set = gb.ItemSet(
-        (
-            torch.arange(0, num_seeds),
-            torch.arange(num_seeds, num_seeds * 2),
-        )
-    )
-    batch_size = 10
-    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
-    minibatch_converter = Mapper(
-        item_sampler, gb_test_utils.minibatch_link_collator
-    )
-    # Construct NegativeSampler.
-    negative_sampler = gb.UniformNegativeSampler(
-        minibatch_converter,
-        negative_ratio,
-        gb.LinkPredictionEdgeFormat.CONDITIONED,
-        graph,
-    )
-    # Perform Negative sampling.
-    for data in negative_sampler:
-        pos_src, pos_dst = data.node_pair
-        neg_src, neg_dst = data.negative_head, data.negative_tail
+        pos_src, pos_dst = data.node_pairs
+        neg_src, neg_dst = data.negative_srcs, data.negative_dsts
         # Assertation
         assert len(pos_src) == batch_size
         assert len(pos_dst) == batch_size
@@ -76,76 +95,6 @@ def test_NegativeSampler_Conditioned_Format(negative_ratio):
         assert neg_dst.numel() == batch_size * negative_ratio
         expected_src = pos_src.repeat(negative_ratio).view(-1, negative_ratio)
         assert torch.equal(expected_src, neg_src)
-
-
-@pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
-def test_NegativeSampler_Head_Conditioned_Format(negative_ratio):
-    # Construct CSCSamplingGraph.
-    graph = gb_test_utils.rand_csc_graph(100, 0.05)
-    num_seeds = 30
-    item_set = gb.ItemSet(
-        (
-            torch.arange(0, num_seeds),
-            torch.arange(num_seeds, num_seeds * 2),
-        )
-    )
-    batch_size = 10
-    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
-    minibatch_converter = Mapper(
-        item_sampler, gb_test_utils.minibatch_link_collator
-    )
-    # Construct NegativeSampler.
-    negative_sampler = gb.UniformNegativeSampler(
-        minibatch_converter,
-        negative_ratio,
-        gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED,
-        graph,
-    )
-    # Perform Negative sampling.
-    for data in negative_sampler:
-        pos_src, pos_dst = data.node_pair
-        neg_src = data.negative_head
-        # Assertation
-        assert len(pos_src) == batch_size
-        assert len(pos_dst) == batch_size
-        assert len(neg_src) == batch_size
-        assert neg_src.numel() == batch_size * negative_ratio
-        expected_src = pos_src.repeat(negative_ratio).view(-1, negative_ratio)
-        assert torch.equal(expected_src, neg_src)
-
-
-@pytest.mark.parametrize("negative_ratio", [1, 5, 10, 20])
-def test_NegativeSampler_Tail_Conditioned_Format(negative_ratio):
-    # Construct CSCSamplingGraph.
-    graph = gb_test_utils.rand_csc_graph(100, 0.05)
-    num_seeds = 30
-    item_set = gb.ItemSet(
-        (
-            torch.arange(0, num_seeds),
-            torch.arange(num_seeds, num_seeds * 2),
-        )
-    )
-    batch_size = 10
-    item_sampler = gb.ItemSampler(item_set, batch_size=batch_size)
-    minibatch_converter = Mapper(
-        item_sampler, gb_test_utils.minibatch_link_collator
-    )
-    # Construct NegativeSampler.
-    negative_sampler = gb.UniformNegativeSampler(
-        minibatch_converter,
-        negative_ratio,
-        gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
-        graph,
-    )
-    # Perform Negative sampling.
-    for data in negative_sampler:
-        pos_src, pos_dst = data.node_pair
-        neg_dst = data.negative_tail
-        # Assertation
-        assert len(pos_src) == batch_size
-        assert len(pos_dst) == batch_size
-        assert len(neg_dst) == batch_size
-        assert neg_dst.numel() == batch_size * negative_ratio
 
 
 def get_hetero_graph():
@@ -170,39 +119,21 @@ def get_hetero_graph():
     )
 
 
-@pytest.mark.parametrize(
-    "format",
-    [
-        gb.LinkPredictionEdgeFormat.INDEPENDENT,
-        gb.LinkPredictionEdgeFormat.CONDITIONED,
-        gb.LinkPredictionEdgeFormat.HEAD_CONDITIONED,
-        gb.LinkPredictionEdgeFormat.TAIL_CONDITIONED,
-    ],
-)
-def test_NegativeSampler_Hetero_Data(format):
+def test_NegativeSampler_Hetero_Data():
     graph = get_hetero_graph()
     itemset = gb.ItemSetDict(
         {
             "n1:e1:n2": gb.ItemSet(
-                (
-                    torch.LongTensor([0, 0, 1, 1]),
-                    torch.LongTensor([0, 2, 0, 1]),
-                )
+                torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T,
+                names="node_pairs",
             ),
             "n2:e2:n1": gb.ItemSet(
-                (
-                    torch.LongTensor([0, 0, 1, 1, 2, 2]),
-                    torch.LongTensor([0, 1, 1, 0, 0, 1]),
-                )
+                torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T,
+                names="node_pairs",
             ),
         }
     )
 
-    item_sampler_dp = gb.ItemSampler(itemset, batch_size=2)
-    minibatch_converter = Mapper(
-        item_sampler_dp, gb_test_utils.minibatch_link_collator
-    )
-    negative_dp = gb.UniformNegativeSampler(
-        minibatch_converter, 1, format, graph
-    )
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    negative_dp = gb.UniformNegativeSampler(item_sampler, 1, graph)
     assert len(list(negative_dp)) == 5
