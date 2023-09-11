@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: partition-graph
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: asvuser
+      restartPolicy: Never
+      containers:
+        - args:
+            - "bash"
+            - "-c"
+            - |
+              # git clone --branch add_distributed_test https://github.com/vovallen/dgl.git
+              export NUM_PARTS=5
+              pip install --pre dgl -f https://data.dgl.ai/wheels-test/repo.html
+              cd /root
+              apt install -y wget
+              wget https://github.com/VoVAllen/dgl/raw/add_distributed_test/benchmarks/distributed/dist_sample/gen_partition.py
+              python gen_partition.py --num-parts $NUM_PARTS
+              mkdir -p /mnt/partition_data/${NUM_PARTS}parts/
+              cp -r ./partition_data/* /mnt/partition_data/${NUM_PARTS}parts/
+              ls /mnt/partition_data/${NUM_PARTS}parts/
+
+          image: public.ecr.aws/s1o7b3d9/benchmakrk_pyg_dgl:cu111_torch180_pyg170
+          imagePullPolicy: Always
+          name: benchmark
+          resources:
+            requests:
+              memory: "32G"
+              cpu: "16"
+            limits:
+              memory: "64G"
+              cpu: "32"
+          volumeMounts:
+          - name: ogbdata
+            mountPath: /root/dataset
+          - name: partition-efs
+            mountPath: /mnt/partition_data
+          - name: dshm
+            mountPath: /dev/shm
+      
+      volumes:
+      - name: partition-efs
+        persistentVolumeClaim:
+          claimName: efs-dgl-dist-claim
+      - name: ogbdata
+        persistentVolumeClaim:
+          claimName: efs-claim
+      - name: dshm
+        emptyDir:
+          medium: Memory
