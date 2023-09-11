@@ -22,8 +22,14 @@ APIs
     ItemSampler
     NegativeSampler
     SubgraphSampler
+    SampledSubgraph
+    exclude_edges
     Feature
+    Feature.read
+    Feature.update
     FeatureStore
+    FeatureStore.read
+    FeatureStore.update
     FeatureFetcher
     CopyTo
 
@@ -37,3 +43,24 @@ DataLoaders
 
     SingleProcessDataLoader
     MultiProcessDataLoader
+
+Standard Implementations
+-------------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+    :nosignatures:
+    :template: classtemplate.rst
+
+    OnDiskDataset
+    OnDiskTask
+    OnDiskMetaData
+    CSCSamplingGraph
+    UniformNegativeSampler
+    NeighborSampler
+    LayerNeighborSampler
+    SampledSubgraphImpl
+    BasicFeatureStore
+    TorchBasedFeature
+    TorchBasedFeatureStore
+    GPUCachedFeature
