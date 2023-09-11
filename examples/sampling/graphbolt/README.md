@@ -84,14 +84,11 @@ You'll need to convert the **raw dataset** into the corresponding structure and 
 │   └── cite.csv
 ├── metadata.yaml
 └── set
-    ├── test_source_node.npy
-    ├── test_target_node.npy
-    ├── test_target_node_neg.npy
-    ├── train_source_node.npy
-    ├── train_target_node.npy
-    ├── valid_source_node.npy
-    ├── valid_target_node.npy
-    └── valid_target_node_neg.npy
+    ├── test_negative_dsts.npy
+    ├── test_node_pairs.npy
+    ├── train_node_pairs.npy
+    ├── valid_negative_dsts.npy
+    └── valid_node_pairs.npy
 ```
 
 ## How to run the code?
