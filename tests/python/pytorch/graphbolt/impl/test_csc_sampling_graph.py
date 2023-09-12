@@ -1065,25 +1065,43 @@ def test_from_dglgraph_homogeneous():
 def test_from_dglgraph_heterogeneous():
     dgl_g = dgl.heterograph(
         {
-            ("author", "writes", "paper"): ([1, 2, 3, 4, 5], [1, 2, 3, 4, 5]),
-            ("paper", "cites", "paper"): ([2, 3, 4, 5, 6], [1, 2, 3, 4, 5]),
+            ("author", "writes", "paper"): (
+                [1, 2, 3, 4, 5, 2],
+                [1, 2, 3, 4, 5, 4],
+            ),
+            ("author", "affiliated_with", "institution"): (
+                [1, 2, 3, 4, 5],
+                [1, 2, 3, 4, 5],
+            ),
+            ("paper", "has_topic", "field"): ([1, 2, 3, 4, 5], [1, 2, 3, 4, 5]),
+            ("paper", "cites", "paper"): (
+                [2, 3, 4, 5, 6, 1],
+                [1, 2, 3, 4, 5, 4],
+            ),
         }
     )
     gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=False)
 
     assert gb_g.num_nodes == dgl_g.num_nodes()
     assert gb_g.num_edges == dgl_g.num_edges()
-    assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 6, 13]))
+    assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 6, 12, 18, 25]))
     assert torch.equal(
-        gb_g.type_per_edge, torch.tensor([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
+        gb_g.type_per_edge,
+        torch.tensor(
+            [3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2, 1, 1, 2, 2, 1, 2]
+        ),
     )
     assert gb_g.metadata.node_type_to_id == {
         "author": 0,
-        "paper": 1,
+        "field": 1,
+        "institution": 2,
+        "paper": 3,
     }
     assert gb_g.metadata.edge_type_to_id == {
-        "author:writes:paper": 0,
-        "paper:cites:paper": 1,
+        "author:affiliated_with:institution": 0,
+        "author:writes:paper": 1,
+        "paper:cites:paper": 2,
+        "paper:has_topic:field": 3,
     }
 
 
