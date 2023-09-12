@@ -79,7 +79,7 @@ class SAGE(nn.Module):
         return hidden_x
 
 
-def current_dataloader(args, graph, features, itemset, is_train=True):
+def create_dataloader(args, graph, features, itemset, is_train=True):
     """Get a GraphBolt version of a dataloader for link prediction tasks. This
     function demonstrates how to utilize functional forms of datapipes in
     GraphBolt. Alternatively, you can create a datapipe using its class
@@ -157,7 +157,7 @@ def current_dataloader(args, graph, features, itemset, is_train=True):
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=torch.device("cpu"))
+    datapipe = datapipe.copy_to(device=args.device)
 
     ############################################################################
     # [Input]:
@@ -221,7 +221,7 @@ def evaluate(args, graph, features, itemset, model):
     # Since we need to evaluate the model, we need to set the number
     # of layers to 1 and the fanout to -1.
     args.fanout = [torch.LongTensor([-1])]
-    dataloader = current_dataloader(
+    dataloader = create_dataloader(
         args, graph, features, itemset, is_train=False
     )
     pos_pred = []
@@ -260,7 +260,7 @@ def evaluate(args, graph, features, itemset, model):
 
 def train(args, graph, features, train_set, valid_set, model):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    dataloader = current_dataloader(args, graph, features, train_set)
+    dataloader = create_dataloader(args, graph, features, train_set)
 
     for epoch in tqdm.trange(args.epochs):
         model.train()
@@ -313,19 +313,18 @@ def parse_args():
         help="Fan-out of neighbor sampling. Default: 15,10,5",
     )
     parser.add_argument(
-        "--mode",
+        "--device",
         default="cpu",
-        choices=["cpu", "mixed", "puregpu"],
-        help="Training mode. 'cpu' for CPU training, 'mixed' for CPU-GPU mixed "
-        "training, 'puregpu' for pure-GPU training.",
+        choices=["cpu", "cuda"],
+        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
     )
     return parser.parse_args()
 
 
 def main(args):
     if not torch.cuda.is_available():
-        args.mode = "cpu"
-    print(f"Training in {args.mode} mode.")
+        args.device = "cpu"
+    print(f"Training in {args.device} mode.")
 
     # Load and preprocess dataset.
     print("Loading data")
@@ -336,7 +335,6 @@ def main(args):
     features = dataset.feature
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
-    # CSCSamplingGraph can't be used in GPU mode.
     args.fanout = list(map(int, args.fanout.split(",")))
 
     in_size = 128
