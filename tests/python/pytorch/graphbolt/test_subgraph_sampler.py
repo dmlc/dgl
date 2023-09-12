@@ -42,6 +42,30 @@ def test_NeighborSampler_invoke(labor):
 
 
 @pytest.mark.parametrize("labor", [False, True])
+def test_NeighborSampler_fanouts(labor):
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+
+    # `fanouts` is a list of tensors.
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    if labor:
+        datapipe = item_sampler.sample_layer_neighbor(graph, fanouts)
+    else:
+        datapipe = item_sampler.sample_neighbor(graph, fanouts)
+    assert len(list(datapipe)) == 5
+
+    # `fanouts` is a list of integers.
+    fanouts = [2 for _ in range(num_layer)]
+    if labor:
+        datapipe = item_sampler.sample_layer_neighbor(graph, fanouts)
+    else:
+        datapipe = item_sampler.sample_neighbor(graph, fanouts)
+    assert len(list(datapipe)) == 5
+
+
+@pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Node(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
     itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")

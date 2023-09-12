@@ -1,5 +1,6 @@
 """Neighbor subgraph samplers for GraphBolt."""
 
+import torch
 from torch.utils.data import functional_datapipe
 
 from ..subgraph_sampler import SubgraphSampler
@@ -37,7 +38,7 @@ class NeighborSampler(SubgraphSampler):
             The datapipe.
         graph : CSCSamplingGraph
             The graph on which to perform subgraph sampling.
-        fanouts: list[torch.Tensor]
+        fanouts: list[torch.Tensor] or list[int]
             The number of edges to be sampled for each node with or without
             considering edge types. The length of this parameter implicitly
             signifies the layer of sampling being conducted.
@@ -81,7 +82,12 @@ class NeighborSampler(SubgraphSampler):
         3
         """
         super().__init__(datapipe)
-        self.fanouts = fanouts
+        # Convert fanouts to a list of tensors.
+        self.fanouts = []
+        for fanout in fanouts:
+            if not isinstance(fanout, torch.Tensor):
+                fanout = torch.LongTensor([int(fanout)])
+            self.fanouts.append(fanout)
         self.replace = replace
         self.prob_name = prob_name
         self.sampler = graph.sample_neighbors
