@@ -21,7 +21,7 @@ class TestWrapUdfInTorchDistLauncher(unittest.TestCase):
             master_port=1234,
         )
         expected = (
-            "python3.7 -m torch.distributed.launch "
+            "python3.7 -m torch.distributed.run "
             "--nproc_per_node=2 --nnodes=2 --node_rank=1 --master_addr=127.0.0.1 "
             "--master_port=1234 path/to/some/trainer.py arg1 arg2"
         )
@@ -41,7 +41,7 @@ class TestWrapUdfInTorchDistLauncher(unittest.TestCase):
             master_port=1234,
         )
         expected = (
-            "cd path/to && python3.7 -m torch.distributed.launch "
+            "cd path/to && python3.7 -m torch.distributed.run "
             "--nproc_per_node=2 --nnodes=2 --node_rank=1 --master_addr=127.0.0.1 "
             "--master_port=1234 path/to/some/trainer.py arg1 arg2"
         )
@@ -68,7 +68,7 @@ class TestWrapUdfInTorchDistLauncher(unittest.TestCase):
                 master_port=1234,
             )
             expected = (
-                "{python_bin} -m torch.distributed.launch ".format(
+                "{python_bin} -m torch.distributed.run ".format(
                     python_bin=py_bin
                 )
                 + "--nproc_per_node=2 --nnodes=2 --node_rank=1 --master_addr=127.0.0.1 "
@@ -221,7 +221,7 @@ def test_submit_jobs():
             assert "DGL_ROLE=client" in cmd
             assert "DGL_GROUP_ID=0" in cmd
             assert (
-                f"python3 -m torch.distributed.launch --nproc_per_node={args.num_trainers} --nnodes={num_machines}"
+                f"python3 -m torch.distributed.run --nproc_per_node={args.num_trainers} --nnodes={num_machines}"
                 in cmd
             )
             assert "--master_addr=127.0.0" in cmd
