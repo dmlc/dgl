@@ -5,9 +5,6 @@
  */
 #include "./matrix_ops_impl.h"
 
-#include <sparse/matrix_ops.h>
-#include <torch/script.h>
-
 namespace dgl {
 namespace sparse {}  // namespace sparse
 }  // namespace dgl

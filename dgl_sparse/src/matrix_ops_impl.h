@@ -6,10 +6,6 @@
 #ifndef DGL_SPARSE_MATRIX_OPS_IMPL_H_
 #define DGL_SPARSE_MATRIX_OPS_IMPL_H_
 
-#include <sparse/sparse_format.h>
-
-#include <tuple>
-
 namespace dgl {
 namespace sparse {}
 }  // namespace dgl
