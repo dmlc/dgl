@@ -14,8 +14,9 @@ local neighborhoods, link prediction assesses the likelihood of an edge
 existing between two nodes, necessitating different sampling strategies
 that account for pairs of nodes and their joint neighborhoods.
 
-Before reading this example, please familiar yourself with graphsage node
-classification by reading the example in the
+TODO: Add the link_prediction.py example to core/graphsage.
+Before reading this example, please familiar yourself with graphsage link
+prediction by reading the example in the
 `examples/core/graphsage/link_prediction.py`
 
 If you want to train graphsage on a large graph in a distributed fashion, read
@@ -205,8 +206,8 @@ def to_dgl_blocks(sampled_subgraphs: gb.SampledSubgraphImpl):
     blocks = [
         dgl.create_block(
             sampled_subgraph.node_pairs,
-            num_src_nodes=sampled_subgraph.reverse_column_node_ids.shape[0],
-            num_dst_nodes=sampled_subgraph.reverse_row_node_ids.shape[0],
+            num_src_nodes=sampled_subgraph.reverse_row_node_ids.shape[0],
+            num_dst_nodes=sampled_subgraph.reverse_column_node_ids.shape[0],
         )
         for sampled_subgraph in sampled_subgraphs
     ]
@@ -235,14 +236,18 @@ def evaluate(args, graph, features, itemset, model):
 
         # Get the embeddings of the input nodes.
         y = model(blocks, node_feature)
+        # Calculate the score for positive and negative edges.
         score = (
             model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
             .squeeze()
             .detach()
         )
 
+        # Split the score into positive and negative parts.
         pos_score = score[: data.compacted_node_pairs[0].shape[0]]
         neg_score = score[data.compacted_node_pairs[0].shape[0] :]
+
+        # Append the score to the list.
         pos_pred.append(pos_score)
         neg_pred.append(neg_score)
     pos_pred = torch.cat(pos_pred, dim=0)
@@ -332,9 +337,7 @@ def main(args):
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     # CSCSamplingGraph can't be used in GPU mode.
-    args.fanout = [
-        torch.LongTensor([int(fanout)]) for fanout in args.fanout.split(",")
-    ]
+    args.fanout = list(map(int, args.fanout.split(",")))
 
     in_size = 128
     hidden_channels = 256
