@@ -504,6 +504,90 @@ def test_range_select(create_func, shape, dense_dim, select_dim, rang):
     assert torch.allclose(A_select_to_dense, dense_select)
 
 
+@pytest.mark.parametrize(
+    "create_func", [rand_diag, rand_csr, rand_csc, rand_coo]
+)
+@pytest.mark.parametrize("index", [(0, 1, 2, 3, 4), (0, 1, 3), (1, 1, 2)])
+@pytest.mark.parametrize("replace", [False, True])
+@pytest.mark.parametrize("bias", [False, True])
+def test_sample_rowwise(create_func, index, replace, bias):
+    ctx = F.ctx()
+    shape = (5, 5)
+    sample_dim = 0
+    sample_num = 3
+    A = create_func(shape, 10, ctx)
+    A = val_like(A, torch.abs(A.val))
+
+    index = torch.tensor(index).to(ctx)
+
+    A_sample = A.sample(sample_dim, sample_num, index, replace, bias)
+    A_dense = sparse_matrix_to_dense(A)
+    A_sample_to_dense = sparse_matrix_to_dense(A_sample)
+
+    ans_shape = (index.size(0), shape[1])
+    # Verify sample elements in origin rows
+    for i, row in enumerate(list(index)):
+        ans_ele = list(A_dense[row, :].nonzero().reshape(-1))
+        ret_ele = list(A_sample_to_dense[i, :].nonzero().reshape(-1))
+        for e in ret_ele:
+            assert e in ans_ele
+        if replace:
+            # The number of sample elements in one row should be equal to
+            # 'sample_num' if the row is not empty otherwise should be
+            # equal to 0.
+            assert list(A_sample.row).count(torch.tensor(i)) == (
+                sample_num if len(ans_ele) != 0 else 0
+            )
+        else:
+            assert len(ret_ele) == min(sample_num, len(ans_ele))
+
+    assert A_sample.shape == ans_shape
+    if not replace:
+        assert not A_sample.has_duplicate()
+
+
+@pytest.mark.parametrize(
+    "create_func", [rand_diag, rand_csr, rand_csc, rand_coo]
+)
+@pytest.mark.parametrize("index", [(0, 1, 2, 3, 4), (0, 1, 3), (1, 1, 2)])
+@pytest.mark.parametrize("replace", [False, True])
+@pytest.mark.parametrize("bias", [False, True])
+def test_sample_columnwise(create_func, index, replace, bias):
+    ctx = F.ctx()
+    shape = (5, 5)
+    sample_dim = 1
+    sample_num = 3
+    A = create_func(shape, 10, ctx)
+    A = val_like(A, torch.abs(A.val))
+
+    index = torch.tensor(index).to(ctx)
+
+    A_sample = A.sample(sample_dim, sample_num, index, replace, bias)
+    A_dense = sparse_matrix_to_dense(A)
+    A_sample_to_dense = sparse_matrix_to_dense(A_sample)
+
+    ans_shape = (shape[0], index.size(0))
+    # Verify sample elements in origin columns
+    for i, col in enumerate(list(index)):
+        ans_ele = list(A_dense[:, col].nonzero().reshape(-1))
+        ret_ele = list(A_sample_to_dense[:, i].nonzero().reshape(-1))
+        for e in ret_ele:
+            assert e in ans_ele
+        if replace:
+            # The number of sample elements in one column should be equal to
+            # 'sample_num' if the column is not empty otherwise should be
+            # equal to 0.
+            assert list(A_sample.col).count(torch.tensor(i)) == (
+                sample_num if len(ans_ele) != 0 else 0
+            )
+        else:
+            assert len(ret_ele) == min(sample_num, len(ans_ele))
+
+    assert A_sample.shape == ans_shape
+    if not replace:
+        assert not A_sample.has_duplicate()
+
+
 def test_print():
     ctx = F.ctx()
 
