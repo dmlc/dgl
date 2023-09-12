@@ -96,14 +96,14 @@ class NeighborSampler(SubgraphSampler):
                 self.replace,
                 self.prob_name,
             )
-            reverse_row_node_ids = seeds
+            reverse_column_node_ids = seeds
             seeds, compacted_node_pairs = unique_and_compact_node_pairs(
                 subgraph.node_pairs, seeds
             )
             subgraph = SampledSubgraphImpl(
                 node_pairs=compacted_node_pairs,
-                reverse_column_node_ids=seeds,
-                reverse_row_node_ids=reverse_row_node_ids,
+                reverse_column_node_ids=reverse_column_node_ids,
+                reverse_row_node_ids=seeds,
             )
             subgraphs.insert(0, subgraph)
         return seeds, subgraphs
