@@ -230,7 +230,7 @@ class PGExplainer(nn.Module):
         """
         assert (
             self.graph_explanation
-        ), '"explain_graph" must be True in initializing the module.'
+        ), '"explain_graph" must be True when initializing the module.'
 
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
@@ -270,7 +270,7 @@ class PGExplainer(nn.Module):
         """
         assert (
             not self.graph_explanation
-        ), '"explain_graph" must be False in initializing the module.'
+        ), '"explain_graph" must be False when initializing the module.'
 
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
@@ -390,7 +390,7 @@ class PGExplainer(nn.Module):
         """
         assert (
             self.graph_explanation
-        ), '"explain_graph" must be True in initializing the module.'
+        ), '"explain_graph" must be True when initializing the module.'
 
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
@@ -525,10 +525,10 @@ class PGExplainer(nn.Module):
         """
         assert (
             not self.graph_explanation
-        ), '"explain_graph" must be False in initializing the module.'
+        ), '"explain_graph" must be False when initializing the module.'
         assert (
             self.num_hops is not None
-        ), '"num_hops" must be provided in initializing the module.'
+        ), '"num_hops" must be provided when initializing the module.'
 
         if isinstance(nodes, torch.Tensor):
             nodes = nodes.tolist()
@@ -814,6 +814,10 @@ class HeteroPGExplainer(PGExplainer):
         >>> feat = g.ndata.pop("h")
         >>> probs, edge_mask = explainer.explain_graph(g, feat)
         """
+        assert (
+            self.graph_explanation
+        ), '"explain_graph" must be True when initializing the module.'
+
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
 
