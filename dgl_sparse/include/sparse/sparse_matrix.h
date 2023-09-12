@@ -183,6 +183,39 @@ class SparseMatrix : public torch::CustomClassHolder {
       int64_t dim, int64_t start, int64_t end);
 
   /**
+   * @brief Create a SparseMatrix by sampling elements based on the specified
+   * dimension and sample count.
+   *
+   * If `ids` is provided, this function samples elements from the specified
+   * set of row or column IDs, resulting in a sparse matrix containing only
+   * the sampled rows or columns.
+   *
+   * @param dim Select rows (dim=0) or columns (dim=1) for sampling.
+   * @param fanout The number of elements to randomly sample from each row or
+   * column.
+   * @param ids An optional tensor containing row or column IDs from which to
+   * sample elements.
+   * @param replace Indicates whether repeated sampling of the same element
+   * is allowed. If True, repeated sampling is allowed; otherwise, it is not
+   * allowed.
+   * @param bias An optional boolean flag indicating whether to enable biasing
+   * during sampling. If True, the values of the sparse matrix will be used as
+   * bias weights, meaning that elements with higher values will be more likely
+   * to be sampled. Otherwise, all elements will be sampled uniformly,
+   * regardless of their value.
+   *
+   * @return A new SparseMatrix with the same shape as the original matrix
+   * containing the sampled elements.
+   *
+   * @note If 'replace = false' and there are fewer elements than 'fanout',
+   * all non-zero elements will be sampled.
+   * @note If 'ids' is not provided, the function will sample from
+   * all rows or columns.
+   */
+  c10::intrusive_ptr<SparseMatrix> Sample(
+      int64_t dim, int64_t fanout, torch::Tensor ids, bool replace, bool bias);
+
+  /**
    * @brief Create a SparseMatrix from a SparseMatrix using new values.
    * @param mat An existing sparse matrix
    * @param value New values of the sparse matrix
