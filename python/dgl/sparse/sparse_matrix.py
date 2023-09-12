@@ -695,7 +695,7 @@ class SparseMatrix:
             relabeling and `dim = 1` for columnwise relabeling.
         heading_indices : torch.Tensor, optional
             An optional tensor containing row or column ids that should be placed
-            at the beginning of the relabeled dimension. 
+            at the beginning of the relabeled dimension.
 
         Returns
         -------
