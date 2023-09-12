@@ -136,16 +136,14 @@ class MiniBatch:
 
         reverse_row_node_ids = self.sampled_subgraphs[0].reverse_row_node_ids
         assert (
-            reverse_row_node_ids is not None,
-            "Missing `reverse_row_node_ids` in sampled sub graph.",
-        )
+            reverse_row_node_ids is not None
+        ), "Missing `reverse_row_node_ids` in sampled subgraph."
         reverse_column_node_ids = self.sampled_subgraphs[
             0
         ].reverse_column_node_ids
         assert (
-            reverse_column_node_ids is not None,
-            "Missing `reverse_column_node_ids` in sampled sub graph.",
-        )
+            reverse_column_node_ids is not None
+        ), "Missing `reverse_column_node_ids` in sampled subgraph."
 
         is_heterogeneous = isinstance(
             self.sampled_subgraphs[0].node_pairs, Dict

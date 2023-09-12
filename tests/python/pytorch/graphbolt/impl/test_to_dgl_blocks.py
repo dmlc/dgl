@@ -41,7 +41,10 @@ def test_to_dgl_blocks_hetero():
 
 
 def test_to_dgl_blocks_homo():
-    node_pairs = (torch.tensor([0, 1, 2, 2, 5, 5]), torch.tensor([0, 1, 1, 2, 2, 2]))
+    node_pairs = (
+        torch.tensor([0, 1, 2, 2, 5, 5]),
+        torch.tensor([0, 1, 1, 2, 2, 2]),
+    )
     reverse_column_node_ids = torch.tensor([10, 11, 12])
     reverse_row_node_ids = torch.tensor([10, 11, 12, 13, 14, 16])
     reverse_edge_ids = torch.tensor([19, 20, 21, 22, 25, 30])
