@@ -1,10 +1,7 @@
 import pytest
 import torch
 
-from dgl.graphbolt.impl.sampled_subgraph_impl import (
-    exclude_edges,
-    SampledSubgraphImpl,
-)
+from dgl.graphbolt.impl.sampled_subgraph_impl import SampledSubgraphImpl
 
 
 def _assert_container_equal(lhs, rhs):
@@ -49,7 +46,7 @@ def test_exclude_edges_homo(reverse_row, reverse_column):
         reverse_edge_ids,
     )
     edges_to_exclude = (src_to_exclude, dst_to_exclude)
-    result = exclude_edges(subgraph, edges_to_exclude)
+    result = subgraph.exclude_edges(edges_to_exclude)
     expected_node_pairs = (torch.tensor([0, 3]), torch.tensor([1, 2]))
     if reverse_row:
         expected_row_node_ids = torch.tensor([10, 15, 11, 24, 9])
@@ -108,7 +105,7 @@ def test_exclude_edges_hetero(reverse_row, reverse_column):
             dst_to_exclude,
         )
     }
-    result = exclude_edges(subgraph, edges_to_exclude)
+    result = subgraph.exclude_edges(edges_to_exclude)
     expected_node_pairs = {
         "A:relation:B": (
             torch.tensor([1]),
