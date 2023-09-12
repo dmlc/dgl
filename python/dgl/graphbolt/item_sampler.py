@@ -296,7 +296,7 @@ class ItemSampler(IterDataPipe):
         # if len(item_set) - end_pos < batch_size:
         #     end_pos = len(item_set)
         # self._item_set = IterableWrapper(self._item_set[start_pos : end_pos])
-        self._item_set = IterableWrapper(self._item_set)
+        self._datapipe = IterableWrapper(self._item_set)
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
@@ -322,7 +322,7 @@ class ItemSampler(IterDataPipe):
         return default_collate(batch)
 
     def __iter__(self) -> Iterator:
-        data_pipe = self._item_set
+        data_pipe = self._datapipe
 
         # Shuffle before batch.
         if self._shuffle:
@@ -330,7 +330,7 @@ class ItemSampler(IterDataPipe):
             # To ensure randomness, make sure the buffer size is at least 10
             # times the batch size.
             buffer_size = max(10000, 10 * self._batch_size)
-            data_pipe = data_pipe.shuffle(buffer_size=buffer_size, unbatch_level=-1)
+            data_pipe = data_pipe.shuffle(buffer_size=buffer_size)
 
         # Batch.
         data_pipe = data_pipe.batch(
