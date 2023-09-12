@@ -103,15 +103,40 @@ class SampledSubgraph:
 
         Returns
         -------
-        Tuple[node_pairs, reverse_column_node_ids
-                reverse_row_node_ids, reverse_edge_ids]
-            The data tuple is employed for constructing an implemented sampled
-            subgraph.
+        SampledSubgraph
+           An instance of a class that inherits from `SampledSubgraph`.
+
+        Examples
+        --------
+        >>> node_pairs = {"A:relation:B": (torch.tensor([0, 1, 2]),
+        ...     torch.tensor([0, 1, 2]))}
+        >>> reverse_column_node_ids = {'B': torch.tensor([10, 11, 12])}
+        >>> reverse_row_node_ids = {'A': torch.tensor([13, 14, 15])}
+        >>> reverse_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
+        >>> subgraph = gb.SampledSubgraphImpl(
+        ...     node_pairs=node_pairs,
+        ...     reverse_column_node_ids=reverse_column_node_ids,
+        ...     reverse_row_node_ids=reverse_row_node_ids,
+        ...     reverse_edge_ids=reverse_edge_ids
+        ... )
+        >>> edges_to_exclude = (torch.tensor([14, 15]), torch.tensor([11, 12]))
+        >>> result = subgraph.exclude_edges(edges_to_exclude)
+        >>> print(result.node_pairs)
+        {"A:relation:B": (tensor([0]), tensor([0]))}
+        >>> print(result.reverse_column_node_ids)
+        {'B': tensor([10, 11, 12])}
+        >>> print(result.reverse_row_node_ids)
+        {'A': tensor([13, 14, 15])}
+        >>> print(result.reverse_edge_ids)
+        {"A:relation:B": tensor([19])}
         """
         assert isinstance(self.node_pairs, tuple) == isinstance(edges, tuple), (
             "The sampled subgraph and the edges to exclude should be both "
             "homogeneous or both heterogeneous."
         )
+        # Get type of calling class.
+        calling_class = type(self)
+
         # Three steps to exclude edges:
         # 1. Convert the node pairs to the original ids if they are compacted.
         # 2. Exclude the edges and get the index of the edges to keep.
@@ -123,7 +148,7 @@ class SampledSubgraph:
                 self.reverse_column_node_ids,
             )
             index = _exclude_homo_edges(reverse_edges, edges)
-            return _slice_subgraph(self, index)
+            return calling_class(*_slice_subgraph(self, index))
         else:
             index = {}
             for etype, pair in self.node_pairs.items():
@@ -146,7 +171,7 @@ class SampledSubgraph:
                 index[etype] = _exclude_homo_edges(
                     reverse_edges, edges.get(etype)
                 )
-            return _slice_subgraph(self, index)
+            return calling_class(*_slice_subgraph(self, index))
 
 
 def _to_reverse_ids(node_pair, reverse_row_node_ids, reverse_column_node_ids):
