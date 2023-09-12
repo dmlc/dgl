@@ -208,7 +208,7 @@ class PGExplainer(nn.Module):
 
         return gate_inputs
 
-    def train_step(self, graph, feat, tmp, **kwargs):
+    def train_step(self, graph, feat, temperature, **kwargs):
         r"""Compute the loss of the explanation network for graph classification
 
         Parameters
@@ -218,7 +218,7 @@ class PGExplainer(nn.Module):
         feat : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
-        tmp : float
+        temperature : float
             The temperature parameter fed to the sampling procedure.
         kwargs : dict
             Additional arguments passed to the GNN model.
@@ -239,13 +239,13 @@ class PGExplainer(nn.Module):
         pred = pred.argmax(-1).data
 
         prob, _ = self.explain_graph(
-            graph, feat, tmp=tmp, training=True, **kwargs
+            graph, feat, temperature, training=True, **kwargs
         )
 
         loss = self.loss(prob, pred)
         return loss
 
-    def train_step_node(self, nodes, graph, feat, tmp, **kwargs):
+    def train_step_node(self, nodes, graph, feat, temperature, **kwargs):
         r"""Compute the loss of the explanation network for node classification
 
         Parameters
@@ -258,7 +258,7 @@ class PGExplainer(nn.Module):
         feat : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
-        tmp : float
+        temperature : float
             The temperature parameter fed to the sampling procedure.
         kwargs : dict
             Additional arguments passed to the GNN model.
@@ -281,7 +281,7 @@ class PGExplainer(nn.Module):
             nodes = [nodes]
 
         prob, _, batched_graph, inverse_indices = self.explain_node(
-            nodes, graph, feat, tmp=tmp, training=True, **kwargs
+            nodes, graph, feat, temperature, training=True, **kwargs
         )
 
         pred = self.model(
@@ -292,7 +292,9 @@ class PGExplainer(nn.Module):
         loss = self.loss(prob[inverse_indices], pred[inverse_indices])
         return loss
 
-    def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
+    def explain_graph(
+        self, graph, feat, temperature=1.0, training=False, **kwargs
+    ):
         r"""Learn and return an edge mask that plays a crucial role to
         explain the prediction made by the GNN for a graph. Also, return
         the prediction made with the edges chosen based on the edge mask.
@@ -304,7 +306,7 @@ class PGExplainer(nn.Module):
         feat : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
-        tmp : float
+        temperature : float
             The temperature parameter fed to the sampling procedure.
         training : bool
             Training the explanation network.
@@ -405,7 +407,9 @@ class PGExplainer(nn.Module):
         emb = self.elayers(emb)
         values = emb.reshape(-1)
 
-        values = self.concrete_sample(values, beta=tmp, training=training)
+        values = self.concrete_sample(
+            values, beta=temperature, training=training
+        )
         self.sparse_mask_values = values
 
         reverse_eids = graph.edge_ids(row, col).long()
@@ -425,7 +429,7 @@ class PGExplainer(nn.Module):
         return (probs, edge_mask)
 
     def explain_node(
-        self, nodes, graph, feat, tmp=1.0, training=False, **kwargs
+        self, nodes, graph, feat, temperature=1.0, training=False, **kwargs
     ):
         r"""Learn and return an edge mask that plays a crucial role to
         explain the prediction made by the GNN for provided set of node IDs.
@@ -440,7 +444,7 @@ class PGExplainer(nn.Module):
         feat : Tensor
             The input feature of shape :math:`(N, D)`. :math:`N` is the
             number of nodes, and :math:`D` is the feature size.
-        tmp : float
+        temperature : float
             The temperature parameter fed to the sampling procedure.
         training : bool
             Training the explanation network.
@@ -451,9 +455,9 @@ class PGExplainer(nn.Module):
         -------
         Tensor
             Classification probabilities given the masked graph. It is a tensor
-            of shape :math:`(B, N)`, where :math:`L` is the different types of
-            node labels in the dataset, and :math:`N` is the number of nodes in
-            the graph.
+            of shape :math:`(N, L)`, where :math:`L` is the different types
+            of node labels in the dataset, and :math:`N` is the number of nodes
+            in the graph.
         Tensor
             Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
             is the number of edges in the graph. A higher weight suggests a
@@ -566,7 +570,9 @@ class PGExplainer(nn.Module):
         batched_embed = self.elayers(batched_embed)
         values = batched_embed.reshape(-1)
 
-        values = self.concrete_sample(values, beta=tmp, training=training)
+        values = self.concrete_sample(
+            values, beta=temperature, training=training
+        )
         self.sparse_mask_values = values
 
         col, row = batched_graph.edges()
@@ -630,7 +636,7 @@ class HeteroPGExplainer(PGExplainer):
         in a sample than others. Default: 0.0.
     """
 
-    def train_step(self, graph, feat, tmp, **kwargs):
+    def train_step(self, graph, feat, temperature, **kwargs):
         r"""Compute the loss of the explanation network for graph classification
 
         Parameters
@@ -642,7 +648,7 @@ class HeteroPGExplainer(PGExplainer):
             The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is
             the number of nodes for node type :math:`t`, and :math:`D_t` is the
             feature size for node type :math:`t`
-        tmp : float
+        temperature : float
             The temperature parameter fed to the sampling procedure.
         kwargs : dict
             Additional arguments passed to the GNN model.
@@ -652,7 +658,7 @@ class HeteroPGExplainer(PGExplainer):
         Tensor
             A scalar tensor representing the loss.
         """
-        return super().train_step(graph, feat, tmp=tmp, **kwargs)
+        return super().train_step(graph, feat, temperature, **kwargs)
 
     def train_step_node(self, nodes, graph, feat, temperature, **kwargs):
         r"""Compute the loss of the explanation network for node classification
@@ -686,7 +692,7 @@ class HeteroPGExplainer(PGExplainer):
         self.elayers = self.elayers.to(graph.device)
 
         prob, _, batched_graph, inverse_indices = self.explain_node(
-            nodes, graph, feat, tmp=tmp, training=True, **kwargs
+            nodes, graph, feat, temperature, training=True, **kwargs
         )
 
         pred = self.model(
@@ -704,7 +710,9 @@ class HeteroPGExplainer(PGExplainer):
         )
         return loss
 
-    def explain_graph(self, graph, feat, tmp=1.0, training=False, **kwargs):
+    def explain_graph(
+        self, graph, feat, temperature=1.0, training=False, **kwargs
+    ):
         r"""Learn and return an edge mask that plays a crucial role to
         explain the prediction made by the GNN for a graph. Also, return
         the prediction made with the edges chosen based on the edge mask.
@@ -718,7 +726,7 @@ class HeteroPGExplainer(PGExplainer):
             The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is
             the number of nodes for node type :math:`t`, and :math:`D_t` is the
             feature size for node type :math:`t`
-        tmp : float
+        temperature : float
             The temperature parameter fed to the sampling procedure.
         training : bool
             Training the explanation network.
@@ -834,7 +842,9 @@ class HeteroPGExplainer(PGExplainer):
         emb = self.elayers(emb)
         values = emb.reshape(-1)
 
-        values = self.concrete_sample(values, beta=tmp, training=training)
+        values = self.concrete_sample(
+            values, beta=temperature, training=training
+        )
         self.sparse_mask_values = values
 
         reverse_eids = homo_graph.edge_ids(row, col).long()
@@ -1041,7 +1051,9 @@ class HeteroPGExplainer(PGExplainer):
         batched_embed = self.elayers(batched_embed)
         values = batched_embed.reshape(-1)
 
-        values = self.concrete_sample(values, beta=tmp, training=training)
+        values = self.concrete_sample(
+            values, beta=temperature, training=training
+        )
         self.sparse_mask_values = values
 
         col, row = batched_homo_graph.edges()
