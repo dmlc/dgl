@@ -38,6 +38,7 @@ set(SPARSE_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 file(GLOB SPARSE_HEADERS ${SPARSE_INCLUDE})
 file(GLOB SPARSE_SRC
   ${SPARSE_DIR}/*.cc
+  ${SPARSE_DIR}/cpu/*.cc
 )
 add_library(${LIB_DGL_SPARSE_NAME} SHARED ${SPARSE_SRC} ${SPARSE_HEADERS})
 target_include_directories(
