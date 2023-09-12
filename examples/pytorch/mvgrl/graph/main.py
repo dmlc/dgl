@@ -130,8 +130,8 @@ if __name__ == "__main__":
 
         print("Epoch {}, Loss {:.4f}".format(epoch, loss_all))
 
-        if loss < best:
-            best = loss
+        if loss_all < best:
+            best = loss_all
             best_t = epoch
             cnt_wait = 0
             th.save(model.state_dict(), f"{args.dataname}.pkl")
