@@ -14,10 +14,11 @@ class PGExplainer(nn.Module):
     r"""PGExplainer from `Parameterized Explainer for Graph Neural Network
     <https://arxiv.org/pdf/2011.04573>`
 
-    PGExplainer adopts a deep neural network (explanation network) to parameterize the generation
-    process of explanations, which enables it to explain multiple instances
-    collectively. PGExplainer models the underlying structure as edge
-    distributions, from which the explanatory graph is sampled.
+    PGExplainer adopts a deep neural network (explanation network) to
+    parameterize the generation process of explanations, which enables it to
+    explain multiple instances collectively. PGExplainer models the underlying
+    structure as edge distributions, from which the explanatory graph is
+    sampled.
 
     Parameters
     ----------
@@ -250,8 +251,8 @@ class PGExplainer(nn.Module):
         Parameters
         ----------
         nodes : int, iterable[int], tensor
-            The nodes from the graph used to train the explanation network, which cannot
-            have any duplicate value.
+            The nodes from the graph used to train the explanation network,
+            which cannot have any duplicate value.
         graph : DGLGraph
             Input homogeneous graph.
         feat : Tensor
@@ -313,13 +314,13 @@ class PGExplainer(nn.Module):
         Returns
         -------
         Tensor
-            Classification probabilities given the masked graph. It is a tensor of
-            shape :math:`(B, L)`, where :math:`L` is the different types of label
-            in the dataset, and :math:`B` is the batch size.
+            Classification probabilities given the masked graph. It is a tensor
+            of shape :math:`(B, L)`, where :math:`L` is the different types of
+            label in the dataset, and :math:`B` is the batch size.
         Tensor
             Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
-            is the number of edges in the graph. A higher weight suggests a larger
-            contribution of the edge.
+            is the number of edges in the graph. A higher weight suggests a
+            larger contribution of the edge.
 
         Examples
         --------
@@ -449,13 +450,14 @@ class PGExplainer(nn.Module):
         Returns
         -------
         Tensor
-            Classification probabilities given the masked graph. It is a tensor of
-            shape :math:`(B, N)`, where :math:`L` is the different types of node
-            labels in the dataset, and :math:`N` is the number of nodes in the graph.
+            Classification probabilities given the masked graph. It is a tensor
+            of shape :math:`(B, N)`, where :math:`L` is the different types of
+            node labels in the dataset, and :math:`N` is the number of nodes in
+            the graph.
         Tensor
             Edge weights which is a tensor of shape :math:`(E)`, where :math:`E`
-            is the number of edges in the graph. A higher weight suggests a larger
-            contribution of the edge.
+            is the number of edges in the graph. A higher weight suggests a
+            larger contribution of the edge.
         DGLGraph
             The batched set of subgraphs induced on the k-hop in-neighborhood
             of the input center nodes.
@@ -602,10 +604,11 @@ class HeteroPGExplainer(PGExplainer):
     r"""PGExplainer from `Parameterized Explainer for Graph Neural Network
     <https://arxiv.org/pdf/2011.04573>`__, adapted for heterogeneous graphs
 
-    PGExplainer adopts a deep neural network (explanation network) to parameterize the generation
-    process of explanations, which enables it to explain multiple instances
-    collectively. PGExplainer models the underlying structure as edge
-    distributions, from which the explanatory graph is sampled.
+    PGExplainer adopts a deep neural network (explanation network) to
+    parameterize the generation process of explanations, which enables it to
+    explain multiple instances collectively. PGExplainer models the underlying
+    structure as edge distributions, from which the explanatory graph is
+    sampled.
 
     Parameters
     ----------
@@ -636,9 +639,9 @@ class HeteroPGExplainer(PGExplainer):
             Input batched heterogeneous graph.
         feat : dict[str, Tensor]
             A dict mapping node types (keys) to feature tensors (values).
-            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
-            number of nodes for node type :math:`t`, and :math:`D_t` is the feature
-            size for node type :math:`t`
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is
+            the number of nodes for node type :math:`t`, and :math:`D_t` is the
+            feature size for node type :math:`t`
         tmp : float
             The temperature parameter fed to the sampling procedure.
         kwargs : dict
@@ -662,9 +665,9 @@ class HeteroPGExplainer(PGExplainer):
             Input heterogeneous graph.
         feat : dict[str, Tensor]
             A dict mapping node types (keys) to feature tensors (values).
-            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
-            number of nodes for node type :math:`t`, and :math:`D_t` is the feature
-            size for node type :math:`t`
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is
+            the number of nodes for node type :math:`t`, and :math:`D_t` is the
+            feature size for node type :math:`t`
         temperature : float
             The temperature parameter fed to the sampling procedure.
         kwargs : dict
@@ -712,9 +715,9 @@ class HeteroPGExplainer(PGExplainer):
             A heterogeneous graph.
         feat : dict[str, Tensor]
             A dict mapping node types (keys) to feature tensors (values).
-            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
-            number of nodes for node type :math:`t`, and :math:`D_t` is the feature
-            size for node type :math:`t`
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is
+            the number of nodes for node type :math:`t`, and :math:`D_t` is the
+            feature size for node type :math:`t`
         tmp : float
             The temperature parameter fed to the sampling procedure.
         training : bool
@@ -725,13 +728,14 @@ class HeteroPGExplainer(PGExplainer):
         Returns
         -------
         Tensor
-            Classification probabilities given the masked graph. It is a tensor of
-            shape :math:`(B, L)`, where :math:`L` is the different types of label
-            in the dataset, and :math:`B` is the batch size.
+            Classification probabilities given the masked graph. It is a tensor
+            of shape :math:`(B, L)`, where :math:`L` is the different types of
+            label in the dataset, and :math:`B` is the batch size.
         dict[str, Tensor]
-            A dict mapping edge types (keys) to edge tensors (values) of shape :math:`(E_t)`,
-            where :math:`E_t` is the number of edges in the graph for edge type :math:`t`.
-            A higher weight suggests a larger contribution of the edge.
+            A dict mapping edge types (keys) to edge tensors (values) of shape
+            :math:`(E_t)`, where :math:`E_t` is the number of edges in the graph
+            for edge type :math:`t`.  A higher weight suggests a larger
+            contribution of the edge.
 
         Examples
         --------
@@ -867,9 +871,9 @@ class HeteroPGExplainer(PGExplainer):
             A heterogeneous graph.
         feat : dict[str, Tensor]
             A dict mapping node types (keys) to feature tensors (values).
-            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
-            number of nodes for node type :math:`t`, and :math:`D_t` is the feature
-            size for node type :math:`t`
+            The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is
+            the number of nodes for node type :math:`t`, and :math:`D_t` is the
+            feature size for node type :math:`t`
         temperature : float
             The temperature parameter fed to the sampling procedure.
         training : bool
@@ -881,19 +885,21 @@ class HeteroPGExplainer(PGExplainer):
         -------
         dict[str, Tensor]
             A dict mapping node types (keys) to classification probabilities
-            for node labels (values). The values are tensors of shape :math:`(N_t, L)`,
-            where :math:`L` is the different types of node labels in the dataset,
-            and :math:`N_t` is the number of nodes in the graph for node type :math:`t`.
+            for node labels (values). The values are tensors of shape
+            :math:`(N_t, L)`, where :math:`L` is the different types of node
+            labels in the dataset, and :math:`N_t` is the number of nodes in
+            the graph for node type :math:`t`.
         dict[str, Tensor]
-            A dict mapping edge types (keys) to edge tensors (values) of shape :math:`(E_t)`,
-            where :math:`E_t` is the number of edges in the graph for edge type :math:`t`.
-            A higher weight suggests a larger contribution of the edge.
+            A dict mapping edge types (keys) to edge tensors (values) of shape
+            :math:`(E_t)`, where :math:`E_t` is the number of edges in the graph
+            for edge type :math:`t`.  A higher weight suggests a larger
+            contribution of the edge.
         DGLGraph
             The batched set of subgraphs induced on the k-hop in-neighborhood
             of the input center nodes.
         dict[str, Tensor]
-            A dict mapping node types (keys) to a tensor of node IDs (values) which
-            correspond to the subgraph center nodes.
+            A dict mapping node types (keys) to a tensor of node IDs (values)
+            which correspond to the subgraph center nodes.
 
         Examples
         --------
