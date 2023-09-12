@@ -680,6 +680,55 @@ class SparseMatrix:
             self.c_sparse_matrix.sample(dim, fanout, ids, replace, bias)
         )
 
+    def relabel(
+        self,
+        dim: int,
+        heading_indices: Optional[torch.Tensor] = None,
+    ):
+        """Relabels ids of a dimension to remove rows or columns without non-zero
+        elements in the sparse matrix.
+
+        Parameters
+        ----------
+        dim : int
+            The dimension to relabel. Should be 0 or 1. Use `dim = 0` for rowwise
+            relabeling and `dim = 1` for columnwise relabeling.
+        heading_indices : torch.Tensor, optional
+            An optional tensor containing row or column ids that should be placed
+            at the beginning of the relabeled dimension. 
+
+        Returns
+        -------
+        Tuple[SparseMatrix, torch.Tensor]
+            A tuple containing the relabeled sparse matrix and the index mapping
+            of the relabeled dimension from the new index to the original index.
+
+        Examples
+        --------
+        >>> indices = torch.tensor([[0, 2],
+                                    [1, 2]])
+        >>> A = dglsp.spmatrix(indices)
+
+        Case 1: Relabel rows without indices.
+
+        >>> B, original_rows = A.relabel(dim=0, heading_indices=None)
+        >>> print(B)
+        SparseMatrix(indices=tensor([[0, 1], [1, 2]]),
+                     shape=(2, 3), nnz=2)
+        >>> print(original_rows)
+        torch.Tensor([0, 2])
+
+        Case 2: Relabel rows with indices.
+
+        >>> B, original_rows = A.relabel(dim=0, heading_indices=[1, 2])
+        >>> print(B)
+        SparseMatrix(indices=tensor([[1, 2], [2, 1]]),
+                     shape=(3, 3), nnz=2)
+        >>> print(original_rows)
+        torch.Tensor([1, 2, 0])
+        """
+        raise NotImplementedError
+
 
 def spmatrix(
     indices: torch.Tensor,
