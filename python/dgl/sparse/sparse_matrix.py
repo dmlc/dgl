@@ -683,11 +683,24 @@ class SparseMatrix:
     def relabel(
         self,
         dim: int,
-        heading_indices: Optional[torch.Tensor] = None,
+        leading_indices: Optional[torch.Tensor] = None,
     ):
-        """Relabels ids of a dimension to remove rows or columns without non-zero
+        """Relabels indices of a dimension and remove rows or columns without non-zero
         elements in the sparse matrix.
+    This function serves a dual purpose: it allows you to reorganize the indices
+    within a specific dimension (rows or columns) of the sparse matrix and, if
+    needed, place certain 'heading_indices' at the beginning of the relabeled dimension.
 
+    In the absence of 'heading_indices' (when it's set to `None`), the order of
+    relabeled indices remains the same as the original order, except that rows or
+    columns without non-zero elements are removed. When 'heading_indices' are provided,
+    they are positioned at the start of the relabeled dimension.
+
+    This function mimics 'dgl.to_block', a method used to compress a sampled
+    subgraph by eliminating redundant nodes. The 'heading_indices' parameter
+    replicates the behavior of 'include_dst_in_src' in 'dgl.to_block.' Setting
+    'heading_indices' to column IDs when relabeling the row dimension, for example,
+    achieves the same effect as including destination nodes in source nodes.
         Parameters
         ----------
         dim : int
