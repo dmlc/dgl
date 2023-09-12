@@ -126,89 +126,101 @@ class MiniBatch:
     all node ids inside are compacted.
     """
 
-    def to_dgl_graphs(self):
-        """Transforming a data graph into DGL graphs necessitates constructing a
+    def to_dgl_blocks(self):
+        """Transforming a `MiniBatch` into DGL blocks necessitates constructing a
         graphical structure and assigning features to the nodes and edges within
-        the graphs.
+        the blocks.
         """
         if not self.sampled_subgraphs:
             return None
+
+        reverse_row_node_ids = self.sampled_subgraphs[0].reverse_row_node_ids
+        assert (
+            reverse_row_node_ids is not None,
+            "Missing `reverse_row_node_ids` in sampled sub graph.",
+        )
+        reverse_column_node_ids = self.sampled_subgraphs[
+            0
+        ].reverse_column_node_ids
+        assert (
+            reverse_column_node_ids is not None,
+            "Missing `reverse_column_node_ids` in sampled sub graph.",
+        )
 
         is_heterogeneous = isinstance(
             self.sampled_subgraphs[0].node_pairs, Dict
         )
 
         if is_heterogeneous:
-            graphs = []
+            blocks = []
             for subgraph in self.sampled_subgraphs:
-                graphs.append(
-                    dgl.heterograph(
+                blocks.append(
+                    dgl.create_block(
                         {
                             etype_str_to_tuple(etype): v
                             for etype, v in subgraph.node_pairs.items()
-                        }
+                        },
+                        num_src_nodes={
+                            ntype: len(nodes)
+                            for ntype, nodes in reverse_row_node_ids.items()
+                        },
+                        num_dst_nodes={
+                            ntype: len(nodes)
+                            for ntype, nodes in reverse_column_node_ids.items()
+                        },
                     )
                 )
         else:
-            graphs = [
-                dgl.graph(subgraph.node_pairs)
+            blocks = [
+                dgl.create_block(subgraph.node_pairs)
                 for subgraph in self.sampled_subgraphs
             ]
 
         if is_heterogeneous:
-            # Assign node features to the outermost layer's nodes.
+            # Assign node features to the outermost layer's source nodes.
             if self.node_features:
                 for (
                     node_type,
                     feature_name,
                 ), feature in self.node_features.items():
-                    graphs[0].nodes[node_type].data[feature_name] = feature
+                    blocks[0].srcnodes[node_type].data[feature_name] = feature
             # Assign edge features.
             if self.edge_features:
-                for graph, edge_feature in zip(graphs, self.edge_features):
+                for block, edge_feature in zip(blocks, self.edge_features):
                     for (
                         edge_type,
                         feature_name,
                     ), feature in edge_feature.items():
-                        graph.edges[etype_str_to_tuple(edge_type)].data[
+                        block.edges[etype_str_to_tuple(edge_type)].data[
                             feature_name
                         ] = feature
-            # Assign reverse node ids to the outermost layer's nodes.
-            reverse_row_node_ids = self.sampled_subgraphs[
-                0
-            ].reverse_row_node_ids
-            if reverse_row_node_ids:
-                for node_type, reverse_ids in reverse_row_node_ids.items():
-                    graphs[0].nodes[node_type].data[dgl.NID] = reverse_ids
+            # Assign reverse node ids to the outermost layer's source nodes.
+            for node_type, reverse_ids in reverse_row_node_ids.items():
+                blocks[0].srcnodes[node_type].data[dgl.NID] = reverse_ids
             # Assign reverse edges ids.
-            for graph, subgraph in zip(graphs, self.sampled_subgraphs):
+            for block, subgraph in zip(blocks, self.sampled_subgraphs):
                 if subgraph.reverse_edge_ids:
                     for (
                         edge_type,
                         reverse_ids,
                     ) in subgraph.reverse_edge_ids.items():
-                        graph.edges[etype_str_to_tuple(edge_type)].data[
+                        block.edges[etype_str_to_tuple(edge_type)].data[
                             dgl.EID
                         ] = reverse_ids
         else:
-            # Assign node features to the outermost layer's nodes.
+            # Assign node features to the outermost layer's source nodes.
             if self.node_features:
                 for feature_name, feature in self.node_features.items():
-                    graphs[0].ndata[feature_name] = feature
+                    blocks[0].srcdata[feature_name] = feature
             # Assign edge features.
             if self.edge_features:
-                for graph, edge_feature in zip(graphs, self.edge_features):
+                for block, edge_feature in zip(blocks, self.edge_features):
                     for feature_name, feature in edge_feature.items():
-                        graph.edata[feature_name] = feature
-            # Assign reverse node ids.
-            reverse_row_node_ids = self.sampled_subgraphs[
-                0
-            ].reverse_row_node_ids
-            if reverse_row_node_ids is not None:
-                graphs[0].ndata[dgl.NID] = reverse_row_node_ids
+                        block.edata[feature_name] = feature
+            blocks[0].srcdata[dgl.NID] = reverse_row_node_ids
             # Assign reverse edges ids.
-            for graph, subgraph in zip(graphs, self.sampled_subgraphs):
+            for block, subgraph in zip(blocks, self.sampled_subgraphs):
                 if subgraph.reverse_edge_ids is not None:
-                    graph.edata[dgl.EID] = subgraph.reverse_edge_ids
+                    block.edata[dgl.EID] = subgraph.reverse_edge_ids
 
-        return graphs
+        return blocks
