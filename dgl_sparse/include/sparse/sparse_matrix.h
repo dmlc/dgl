@@ -196,11 +196,13 @@ class SparseMatrix : public torch::CustomClassHolder {
    * @param ids An optional tensor containing row or column IDs from which to
    * sample elements.
    * @param replace Indicates whether repeated sampling of the same element
-   * is allowed. When 'replace = true', repeated sampling is permitted; when
-   * 'replace = false', it is not allowed.
+   * is allowed. If True, repeated sampling is allowed; otherwise, it is not
+   * allowed.
    * @param bias An optional boolean flag indicating whether to enable biasing
-   * during sampling. When 'bias = true', the values of the sparse matrix will
-   * be used as bias weights.
+   * during sampling. If True, the values of the sparse matrix will be used as
+   * bias weights, meaning that elements with higher values will be more likely
+   * to be sampled. Otherwise, all elements will be sampled uniformly,
+   * regardless of their value.
    *
    * @return A new SparseMatrix with the same shape as the original matrix
    * containing the sampled elements.
