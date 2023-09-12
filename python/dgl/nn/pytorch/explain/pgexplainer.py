@@ -651,12 +651,12 @@ class HeteroPGExplainer(PGExplainer):
         """
         return super().train_step(graph, feat, tmp=tmp, **kwargs)
 
-    def train_step_node(self, nodes, graph, feat, tmp, **kwargs):
+    def train_step_node(self, nodes, graph, feat, temperature, **kwargs):
         r"""Compute the loss of the explanation network for node classification
 
         Parameters
         ----------
-        nodes : dict[str, interable[int]]
+        nodes : dict[str, Iterable[int]]
             A dict mapping node types (keys) to an iterable set of node ids (values).
         graph : DGLGraph
             Input heterogeneous graph.
@@ -665,7 +665,7 @@ class HeteroPGExplainer(PGExplainer):
             The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
             number of nodes for node type :math:`t`, and :math:`D_t` is the feature
             size for node type :math:`t`
-        tmp : float
+        temperature : float
             The temperature parameter fed to the sampling procedure.
         kwargs : dict
             Additional arguments passed to the GNN model.
@@ -677,7 +677,7 @@ class HeteroPGExplainer(PGExplainer):
         """
         assert (
             not self.graph_explanation
-        ), '"explain_graph" must be False in initializing the module.'
+        ), '"explain_graph" must be False when initializing the module.'
 
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
@@ -853,7 +853,7 @@ class HeteroPGExplainer(PGExplainer):
         return (probs, hetero_edge_mask)
 
     def explain_node(
-        self, nodes, graph, feat, tmp=1.0, training=False, **kwargs
+        self, nodes, graph, feat, temperature=1.0, training=False, **kwargs
     ):
         r"""Learn and return an edge mask that plays a crucial role to
         explain the prediction made by the GNN for provided set of node IDs.
@@ -861,7 +861,7 @@ class HeteroPGExplainer(PGExplainer):
 
         Parameters
         ----------
-        nodes : dict[str, interable[int]]
+        nodes : dict[str, Iterable[int]]
             A dict mapping node types (keys) to an iterable set of node ids (values).
         graph : DGLGraph
             A heterogeneous graph.
@@ -870,7 +870,7 @@ class HeteroPGExplainer(PGExplainer):
             The input features are of shape :math:`(N_t, D_t)`. :math:`N_t` is the
             number of nodes for node type :math:`t`, and :math:`D_t` is the feature
             size for node type :math:`t`
-        tmp : float
+        temperature : float
             The temperature parameter fed to the sampling procedure.
         training : bool
             Training the explanation network.
@@ -973,10 +973,10 @@ class HeteroPGExplainer(PGExplainer):
         """
         assert (
             not self.graph_explanation
-        ), '"explain_graph" must be False in initializing the module.'
+        ), '"explain_graph" must be False when initializing the module.'
         assert (
             self.num_hops is not None
-        ), '"num_hops" must be provided in initializing the module.'
+        ), '"num_hops" must be provided when initializing the module.'
 
         self.model = self.model.to(graph.device)
         self.elayers = self.elayers.to(graph.device)
@@ -1040,7 +1040,7 @@ class HeteroPGExplainer(PGExplainer):
 
         self.set_masks(batched_homo_graph, edge_mask)
 
-        # convert the edge mask back into heterogeneous format
+        # Convert the edge mask back into heterogeneous format.
         hetero_edge_mask = self._edge_mask_to_heterogeneous(
             edge_mask=edge_mask,
             homograph=batched_homo_graph,
@@ -1052,7 +1052,7 @@ class HeteroPGExplainer(PGExplainer):
             for ntype in batched_hetero_graph.ntypes
         }
 
-        # the model prediction with the updated edge mask
+        # The model prediction with the updated edge mask.
         logits = self.model(
             batched_hetero_graph,
             batched_feats,
