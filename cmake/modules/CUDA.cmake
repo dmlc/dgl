@@ -203,10 +203,10 @@ function(dgl_select_nvcc_arch_flags out_variable)
 endfunction()
 
 ################################################################################################
-# Config cuda compilation.
+# Config cuda compilation and append CUDA libraries to linker_libs
 # Usage:
-#   dgl_config_cuda(<dgl_cuda_src>)
-macro(dgl_config_cuda out_variable)
+#  dgl_config_cuda(linker_libs)
+macro(dgl_config_cuda linker_libs)
   if(NOT CUDA_FOUND)
     message(FATAL_ERROR "Cannot find CUDA.")
   endif()
@@ -215,21 +215,6 @@ macro(dgl_config_cuda out_variable)
 	include_directories(${CUDA_INCLUDE_DIRS})
 
   add_definitions(-DDGL_USE_CUDA)
-
-  file(GLOB_RECURSE DGL_CUDA_SRC
-    src/array/cuda/*.cc
-    src/array/cuda/*.cu
-    src/array/cuda/uvm/*.cc
-    src/array/cuda/uvm/*.cu
-    src/kernel/cuda/*.cc
-    src/kernel/cuda/*.cu
-    src/partition/cuda/*.cu
-    src/runtime/cuda/*.cc
-    src/runtime/cuda/*.cu
-    src/geometry/cuda/*.cu
-    src/graph/transform/cuda/*.cu
-    src/graph/sampling/randomwalks/*.cu
-  )
 
   # NVCC flags
   # Manually set everything
@@ -252,10 +237,8 @@ macro(dgl_config_cuda out_variable)
 
   message(STATUS "CUDA_NVCC_FLAGS: ${CUDA_NVCC_FLAGS}")
 
-  list(APPEND DGL_LINKER_LIBS
+  list(APPEND ${linker_libs} 
     ${CUDA_CUDART_LIBRARY}
     ${CUDA_CUBLAS_LIBRARIES}
     ${CUDA_cusparse_LIBRARY})
-
-  set(${out_variable} ${DGL_CUDA_SRC})
 endmacro()
