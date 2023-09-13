@@ -134,24 +134,21 @@ class MiniBatch:
         if not self.sampled_subgraphs:
             return None
 
-        reverse_row_node_ids = self.sampled_subgraphs[0].reverse_row_node_ids
-        assert (
-            reverse_row_node_ids is not None
-        ), "Missing `reverse_row_node_ids` in sampled subgraph."
-        reverse_column_node_ids = self.sampled_subgraphs[
-            0
-        ].reverse_column_node_ids
-        assert (
-            reverse_column_node_ids is not None
-        ), "Missing `reverse_column_node_ids` in sampled subgraph."
-
         is_heterogeneous = isinstance(
             self.sampled_subgraphs[0].node_pairs, Dict
         )
 
-        if is_heterogeneous:
-            blocks = []
-            for subgraph in self.sampled_subgraphs:
+        blocks = []
+        for subgraph in self.sampled_subgraphs:
+            reverse_row_node_ids = subgraph.reverse_row_node_ids
+            assert (
+                reverse_row_node_ids is not None
+            ), "Missing `reverse_row_node_ids` in sampled subgraph."
+            reverse_column_node_ids = subgraph.reverse_column_node_ids
+            assert (
+                reverse_column_node_ids is not None
+            ), "Missing `reverse_column_node_ids` in sampled subgraph."
+            if is_heterogeneous:
                 blocks.append(
                     dgl.create_block(
                         {
@@ -159,20 +156,23 @@ class MiniBatch:
                             for etype, v in subgraph.node_pairs.items()
                         },
                         num_src_nodes={
-                            ntype: len(nodes)
+                            ntype: nodes.size(0)
                             for ntype, nodes in reverse_row_node_ids.items()
                         },
                         num_dst_nodes={
-                            ntype: len(nodes)
+                            ntype: nodes.size(0)
                             for ntype, nodes in reverse_column_node_ids.items()
                         },
                     )
                 )
-        else:
-            blocks = [
-                dgl.create_block(subgraph.node_pairs)
-                for subgraph in self.sampled_subgraphs
-            ]
+            else:
+                blocks.append(
+                    dgl.create_block(
+                        subgraph.node_pairs,
+                        num_src_nodes=reverse_row_node_ids.size(0),
+                        num_dst_nodes=reverse_column_node_ids.size(0),
+                    )
+                )
 
         if is_heterogeneous:
             # Assign node features to the outermost layer's source nodes.
@@ -193,7 +193,9 @@ class MiniBatch:
                             feature_name
                         ] = feature
             # Assign reverse node ids to the outermost layer's source nodes.
-            for node_type, reverse_ids in reverse_row_node_ids.items():
+            for node_type, reverse_ids in self.sampled_subgraphs[
+                0
+            ].reverse_row_node_ids.items():
                 blocks[0].srcnodes[node_type].data[dgl.NID] = reverse_ids
             # Assign reverse edges ids.
             for block, subgraph in zip(blocks, self.sampled_subgraphs):
@@ -215,7 +217,9 @@ class MiniBatch:
                 for block, edge_feature in zip(blocks, self.edge_features):
                     for feature_name, feature in edge_feature.items():
                         block.edata[feature_name] = feature
-            blocks[0].srcdata[dgl.NID] = reverse_row_node_ids
+            blocks[0].srcdata[dgl.NID] = self.sampled_subgraphs[
+                0
+            ].reverse_row_node_ids
             # Assign reverse edges ids.
             for block, subgraph in zip(blocks, self.sampled_subgraphs):
                 if subgraph.reverse_edge_ids is not None:
