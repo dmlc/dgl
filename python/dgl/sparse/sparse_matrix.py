@@ -680,6 +680,74 @@ class SparseMatrix:
             self.c_sparse_matrix.sample(dim, fanout, ids, replace, bias)
         )
 
+    def relabel(
+        self,
+        dim: int,
+        leading_indices: Optional[torch.Tensor] = None,
+    ):
+        """Relabels indices of a dimension and remove rows or columns without
+        non-zero elements in the sparse matrix.
+
+        This function serves a dual purpose: it allows you to reorganize the
+        indices within a specific dimension (rows or columns) of the sparse
+        matrix and, if needed, place certain 'leading_indices' at the beginning
+        of the relabeled dimension.
+
+        In the absence of 'leading_indices' (when it's set to `None`), the order
+        of relabeled indices remains the same as the original order, except that
+        rows or columns without non-zero elements are removed. When
+        'leading_indices' are provided, they are positioned at the start of the
+        relabeled dimension.
+
+        This function mimics 'dgl.to_block', a method used to compress a sampled
+        subgraph by eliminating redundant nodes. The 'leading_indices' parameter
+        replicates the behavior of 'include_dst_in_src' in 'dgl.to_block',
+        adding destination node information for message passing.
+        Setting 'leading_indices' to column IDs when relabeling the row
+        dimension, for example, achieves the same effect as including destination
+        nodes in source nodes.
+
+        Parameters
+        ----------
+        dim : int
+            The dimension to relabel. Should be 0 or 1. Use `dim = 0` for rowwise
+            relabeling and `dim = 1` for columnwise relabeling.
+        leading_indices : torch.Tensor, optional
+            An optional tensor containing row or column ids that should be placed
+            at the beginning of the relabeled dimension.
+
+        Returns
+        -------
+        Tuple[SparseMatrix, torch.Tensor]
+            A tuple containing the relabeled sparse matrix and the index mapping
+            of the relabeled dimension from the new index to the original index.
+
+        Examples
+        --------
+        >>> indices = torch.tensor([[0, 2],
+                                    [1, 2]])
+        >>> A = dglsp.spmatrix(indices)
+
+        Case 1: Relabel rows without indices.
+
+        >>> B, original_rows = A.relabel(dim=0, leading_indices=None)
+        >>> print(B)
+        SparseMatrix(indices=tensor([[0, 1], [1, 2]]),
+                     shape=(2, 3), nnz=2)
+        >>> print(original_rows)
+        torch.Tensor([0, 2])
+
+        Case 2: Relabel rows with indices.
+
+        >>> B, original_rows = A.relabel(dim=0, leading_indices=[1, 2])
+        >>> print(B)
+        SparseMatrix(indices=tensor([[1, 2], [2, 1]]),
+                     shape=(3, 3), nnz=2)
+        >>> print(original_rows)
+        torch.Tensor([1, 2, 0])
+        """
+        raise NotImplementedError
+
 
 def spmatrix(
     indices: torch.Tensor,
