@@ -637,6 +637,7 @@ class HeteroPGExplainer(PGExplainer):
     """
 
     def train_step(self, graph, feat, temperature, **kwargs):
+        # pylint: disable=useless-super-delegation
         r"""Compute the loss of the explanation network for graph classification
 
         Parameters
