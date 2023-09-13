@@ -701,7 +701,8 @@ class SparseMatrix:
 
         This function mimics 'dgl.to_block', a method used to compress a sampled
         subgraph by eliminating redundant nodes. The 'leading_indices' parameter
-        replicates the behavior of 'include_dst_in_src' in 'dgl.to_block.'
+        replicates the behavior of 'include_dst_in_src' in 'dgl.to_block',
+        adding destination node information for message passing.
         Setting 'leading_indices' to column IDs when relabeling the row
         dimension, for example, achieves the same effect as including destination
         nodes in source nodes.
