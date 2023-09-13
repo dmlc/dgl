@@ -53,8 +53,8 @@ def test_UniformNegativeSampler_invoke():
     # Invoke UniformNegativeSampler via class constructor.
     negative_sampler = gb.UniformNegativeSampler(
         item_sampler,
-        negative_ratio,
         graph,
+        negative_ratio,
     )
     _verify(negative_sampler)
 
@@ -79,8 +79,8 @@ def test_Uniform_NegativeSampler(negative_ratio):
     # Construct NegativeSampler.
     negative_sampler = gb.UniformNegativeSampler(
         item_sampler,
-        negative_ratio,
         graph,
+        negative_ratio,
     )
     # Perform Negative sampling.
     for data in negative_sampler:
@@ -135,5 +135,5 @@ def test_NegativeSampler_Hetero_Data():
     )
 
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
-    negative_dp = gb.UniformNegativeSampler(item_sampler, 1, graph)
+    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
     assert len(list(negative_dp)) == 5

@@ -101,7 +101,7 @@ def test_SubgraphSampler_Link_With_Negative(labor):
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    negative_dp = gb.UniformNegativeSampler(item_sampler, 1, graph)
+    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
@@ -172,7 +172,7 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-    negative_dp = gb.UniformNegativeSampler(item_sampler, 1, graph)
+    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
