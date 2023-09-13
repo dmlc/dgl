@@ -59,7 +59,7 @@ class PGExplainer(nn.Module):
 
         self.model = model
         self.graph_explanation = explain_graph
-        # node explanation requires additional self-embedding data
+        # Node explanation requires additional self-embedding data.
         self.num_features = num_features * (2 if self.graph_explanation else 3)
         self.num_hops = num_hops
 
