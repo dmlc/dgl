@@ -124,7 +124,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # negative edges information.
     ############################################################################
     if is_train:
-        datapipe = datapipe.sample_uniform_negative(args.neg_ratio, graph)
+        datapipe = datapipe.sample_uniform_negative(graph, args.neg_ratio)
 
     ############################################################################
     # [Input]:
