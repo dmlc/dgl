@@ -134,16 +134,15 @@ class DataModule(LightningDataModule):
     def train_dataloader(self):
         return dgl.dataloading.DataLoader(
             self.g,
-            self.train_idx.to("cuda"),
+            self.train_idx,
             self.sampler,
-            device="cuda",
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=False,
             # For CPU sampling, set num_workers to nonzero and use_uva=False
             # Set use_ddp to False for single GPU.
             num_workers=0,
-            use_uva=True,
+            use_uva=False,
             use_ddp=True,
         )
 
@@ -184,10 +183,7 @@ if __name__ == "__main__":
     #                   callbacks=[checkpoint_callback])
     trainer = Trainer(
         accelerator="gpu",
-        devices=[0, 1, 2, 3],
-        max_epochs=10,
-        callbacks=[checkpoint_callback],
-        strategy="ddp_spawn",
+        devices=8,
     )
     trainer.fit(model, datamodule=datamodule)
 

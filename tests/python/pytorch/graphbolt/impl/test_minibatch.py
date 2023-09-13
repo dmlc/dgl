@@ -4,31 +4,38 @@ import torch
 
 
 def test_to_dgl_blocks_hetero():
-    relation = "A:relation:B"
+    relation = "A:r:B"
+    reverse_relation = "B:rr:A"
     node_pairs = [
-        {relation: (torch.tensor([0, 1, 2]), torch.tensor([0, 4, 5]))},
-        {relation: (torch.tensor([0, 1]), torch.tensor([3, 1]))},
+        {
+            relation: (torch.tensor([0, 1, 1]), torch.tensor([0, 1, 2])),
+            reverse_relation: (torch.tensor([1, 0]), torch.tensor([2, 3])),
+        },
+        {relation: (torch.tensor([0, 1]), torch.tensor([1, 0]))},
     ]
     reverse_column_node_ids = [
-        {"B": torch.tensor([10, 11, 12, 13, 14, 16])},
-        {"B": torch.tensor([10, 11, 12, 13])},
+        {"B": torch.tensor([10, 11, 12]), "A": torch.tensor([5, 7, 9, 11])},
+        {"B": torch.tensor([10, 11])},
     ]
     reverse_row_node_ids = [
         {
-            "A": torch.tensor([5, 9, 7]),
-            "B": torch.tensor([10, 11, 12, 13, 14, 16]),
+            "A": torch.tensor([5, 7, 9, 11]),
+            "B": torch.tensor([10, 11, 12]),
         },
         {
-            "A": torch.tensor([5, 9]),
-            "B": torch.tensor([10, 11, 12, 13]),
+            "A": torch.tensor([5, 7]),
+            "B": torch.tensor([10, 11]),
         },
     ]
     reverse_edge_ids = [
-        {relation: torch.tensor([19, 20, 21])},
+        {
+            relation: torch.tensor([19, 20, 21]),
+            reverse_relation: torch.tensor([23, 26]),
+        },
         {relation: torch.tensor([10, 12])},
     ]
     node_features = {
-        ("A", "x"): torch.randint(0, 10, (3,)),
+        ("A", "x"): torch.randint(0, 10, (4,)),
     }
     edge_features = [
         {(relation, "x"): torch.randint(0, 10, (3,))},
@@ -50,27 +57,40 @@ def test_to_dgl_blocks_hetero():
         edge_features=edge_features,
     ).to_dgl_blocks()
 
+    etype = gb.etype_str_to_tuple(relation)
     for i, block in enumerate(blocks):
-        assert torch.equal(block.edges()[0], node_pairs[i][relation][0])
-        assert torch.equal(block.edges()[1], node_pairs[i][relation][1])
-        assert torch.equal(block.edata[dgl.EID], reverse_edge_ids[i][relation])
+        edges = block.edges(etype=etype)
+        assert torch.equal(edges[0], node_pairs[i][relation][0])
+        assert torch.equal(edges[1], node_pairs[i][relation][1])
         assert torch.equal(
-            block.edges[gb.etype_str_to_tuple(relation)].data["x"],
+            block.edges[etype].data[dgl.EID], reverse_edge_ids[i][relation]
+        )
+        assert torch.equal(
+            block.edges[etype].data["x"],
             edge_features[i][(relation, "x")],
         )
+    edges = blocks[0].edges(etype=gb.etype_str_to_tuple(reverse_relation))
+    assert torch.equal(edges[0], node_pairs[0][reverse_relation][0])
+    assert torch.equal(edges[1], node_pairs[0][reverse_relation][1])
     assert torch.equal(
         blocks[0].srcdata[dgl.NID]["A"], reverse_row_node_ids[0]["A"]
+    )
+    assert torch.equal(
+        blocks[0].srcdata[dgl.NID]["B"], reverse_row_node_ids[0]["B"]
     )
     assert torch.equal(
         blocks[0].srcnodes["A"].data["x"], node_features[("A", "x")]
     )
 
 
+test_to_dgl_blocks_hetero()
+
+
 def test_to_dgl_blocks_homo():
     node_pairs = [
         (
             torch.tensor([0, 1, 2, 2, 2, 1]),
-            torch.tensor([0, 1, 1, 2, 5, 2]),
+            torch.tensor([0, 1, 1, 2, 3, 2]),
         ),
         (
             torch.tensor([0, 1, 2]),
@@ -78,18 +98,18 @@ def test_to_dgl_blocks_homo():
         ),
     ]
     reverse_column_node_ids = [
-        torch.tensor([10, 11, 12, 13, 14, 16]),
+        torch.tensor([10, 11, 12, 13]),
         torch.tensor([10, 11]),
     ]
     reverse_row_node_ids = [
-        torch.tensor([10, 11, 12, 13, 14, 16]),
+        torch.tensor([10, 11, 12, 13]),
         torch.tensor([10, 11, 12]),
     ]
     reverse_edge_ids = [
         torch.tensor([19, 20, 21, 22, 25, 30]),
         torch.tensor([10, 15, 17]),
     ]
-    node_features = {"x": torch.randint(0, 10, (6,))}
+    node_features = {"x": torch.randint(0, 10, (4,))}
     edge_features = [
         {"x": torch.randint(0, 10, (6,))},
         {"x": torch.randint(0, 10, (3,))},
