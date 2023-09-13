@@ -60,8 +60,8 @@ def test_UniformNegativeSampler_invoke():
 
     # Invoke UniformNegativeSampler via functional form.
     negative_sampler = item_sampler.sample_uniform_negative(
-        negative_ratio,
         graph,
+        negative_ratio,
     )
     _verify(negative_sampler)
 
