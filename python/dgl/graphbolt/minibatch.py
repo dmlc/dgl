@@ -149,30 +149,29 @@ class MiniBatch:
                 reverse_column_node_ids is not None
             ), "Missing `reverse_column_node_ids` in sampled subgraph."
             if is_heterogeneous:
-                blocks.append(
-                    dgl.create_block(
-                        {
-                            etype_str_to_tuple(etype): v
-                            for etype, v in subgraph.node_pairs.items()
-                        },
-                        num_src_nodes={
-                            ntype: nodes.size(0)
-                            for ntype, nodes in reverse_row_node_ids.items()
-                        },
-                        num_dst_nodes={
-                            ntype: nodes.size(0)
-                            for ntype, nodes in reverse_column_node_ids.items()
-                        },
-                    )
-                )
+                node_pairs = {
+                    etype_str_to_tuple(etype): v
+                    for etype, v in subgraph.node_pairs.items()
+                }
+                num_src_nodes = {
+                    ntype: nodes.size(0)
+                    for ntype, nodes in reverse_row_node_ids.items()
+                }
+                num_dst_nodes = {
+                    ntype: nodes.size(0)
+                    for ntype, nodes in reverse_column_node_ids.items()
+                }
             else:
-                blocks.append(
-                    dgl.create_block(
-                        subgraph.node_pairs,
-                        num_src_nodes=reverse_row_node_ids.size(0),
-                        num_dst_nodes=reverse_column_node_ids.size(0),
-                    )
+                node_pairs = subgraph.node_pairs
+                num_src_nodes = reverse_row_node_ids.size(0)
+                num_dst_nodes = reverse_column_node_ids.size(0)
+            blocks.append(
+                dgl.create_block(
+                    node_pairs,
+                    num_src_nodes=num_src_nodes,
+                    num_dst_nodes=num_dst_nodes,
                 )
+            )
 
         if is_heterogeneous:
             # Assign node features to the outermost layer's source nodes.

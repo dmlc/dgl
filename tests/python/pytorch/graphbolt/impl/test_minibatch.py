@@ -5,39 +5,61 @@ import torch
 
 def test_to_dgl_blocks_hetero():
     relation = "A:relation:B"
-    node_pairs = {relation: (torch.tensor([0, 1, 2]), torch.tensor([0, 4, 5]))}
-    reverse_column_node_ids = {"B": torch.tensor([10, 11, 12, 13, 14, 16])}
-    reverse_row_node_ids = {
-        "A": torch.tensor([5, 9, 7]),
-        "B": torch.tensor([10, 11, 12, 13, 14, 16]),
-    }
-    reverse_edge_ids = {relation: torch.tensor([19, 20, 21])}
+    node_pairs = [
+        {relation: (torch.tensor([0, 1, 2]), torch.tensor([0, 4, 5]))},
+        {relation: (torch.tensor([0, 1]), torch.tensor([3, 1]))},
+    ]
+    reverse_column_node_ids = [
+        {"B": torch.tensor([10, 11, 12, 13, 14, 16])},
+        {"B": torch.tensor([10, 11, 12, 13])},
+    ]
+    reverse_row_node_ids = [
+        {
+            "A": torch.tensor([5, 9, 7]),
+            "B": torch.tensor([10, 11, 12, 13, 14, 16]),
+        },
+        {
+            "A": torch.tensor([5, 9]),
+            "B": torch.tensor([10, 11, 12, 13]),
+        },
+    ]
+    reverse_edge_ids = [
+        {relation: torch.tensor([19, 20, 21])},
+        {relation: torch.tensor([10, 12])},
+    ]
     node_features = {
         ("A", "x"): torch.randint(0, 10, (3,)),
     }
-    edge_features = {(relation, "x"): torch.randint(0, 10, (3,))}
-    subgraph = gb.SampledSubgraphImpl(
-        node_pairs=node_pairs,
-        reverse_column_node_ids=reverse_column_node_ids,
-        reverse_row_node_ids=reverse_row_node_ids,
-        reverse_edge_ids=reverse_edge_ids,
-    )
+    edge_features = [
+        {(relation, "x"): torch.randint(0, 10, (3,))},
+        {(relation, "x"): torch.randint(0, 10, (2,))},
+    ]
+    subgraphs = []
+    for i in range(2):
+        subgraphs.append(
+            gb.SampledSubgraphImpl(
+                node_pairs=node_pairs[i],
+                reverse_column_node_ids=reverse_column_node_ids[i],
+                reverse_row_node_ids=reverse_row_node_ids[i],
+                reverse_edge_ids=reverse_edge_ids[i],
+            )
+        )
     blocks = gb.MiniBatch(
-        sampled_subgraphs=[subgraph, subgraph],
+        sampled_subgraphs=subgraphs,
         node_features=node_features,
-        edge_features=[edge_features, edge_features],
+        edge_features=edge_features,
     ).to_dgl_blocks()
 
-    for block in blocks:
-        assert torch.equal(block.edges()[0], node_pairs[relation][0])
-        assert torch.equal(block.edges()[1], node_pairs[relation][1])
-        assert torch.equal(block.edata[dgl.EID], reverse_edge_ids[relation])
+    for i, block in enumerate(blocks):
+        assert torch.equal(block.edges()[0], node_pairs[i][relation][0])
+        assert torch.equal(block.edges()[1], node_pairs[i][relation][1])
+        assert torch.equal(block.edata[dgl.EID], reverse_edge_ids[i][relation])
         assert torch.equal(
             block.edges[gb.etype_str_to_tuple(relation)].data["x"],
-            edge_features[(relation, "x")],
+            edge_features[i][(relation, "x")],
         )
     assert torch.equal(
-        blocks[0].srcdata[dgl.NID]["A"], reverse_row_node_ids["A"]
+        blocks[0].srcdata[dgl.NID]["A"], reverse_row_node_ids[0]["A"]
     )
     assert torch.equal(
         blocks[0].srcnodes["A"].data["x"], node_features[("A", "x")]
