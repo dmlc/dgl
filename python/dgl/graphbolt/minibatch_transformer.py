@@ -6,6 +6,7 @@ from torchdata.datapipes.iter import Mapper
 
 from .minibatch import MiniBatch
 
+
 @functional_datapipe("transform")
 class MiniBatchTransformer(Mapper):
     """A mini-batch transformer used to manipulate mini-batch"""
