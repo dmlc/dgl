@@ -20,11 +20,11 @@ class SubgraphTransformer(Mapper):
         ----------
         datapipe : DataPipe
             The datapipe.
-        fn: 
+        fn:
             The function applied to each minibatch which is responsible for
             converting subgraph structures, potentially utilizing other fields
             within the minibatch as arguments.
-        
+
         Examples
         --------
         >>> from dgl import graphbolt as gb
