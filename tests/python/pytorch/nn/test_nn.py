@@ -1803,6 +1803,164 @@ def test_heterosubgraphx(g, idtype, input_dim, n_classes):
     explainer.explain_graph(g, feat, target_class=0)
 
 
+@parametrize_idtype
+@pytest.mark.parametrize(
+    "g",
+    get_cases(
+        ["homo"],
+        exclude=[
+            "zero-degree",
+            "homo-zero-degree",
+            "has_feature",
+            "has_scalar_e_feature",
+            "row_sorted",
+            "col_sorted",
+        ],
+    ),
+)
+@pytest.mark.parametrize("n_classes", [2])
+def test_pgexplainer(g, idtype, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    feat = F.randn((g.num_nodes(), 5))
+    g.ndata["attr"] = feat
+
+    # add reverse edges
+    transform = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform(g)
+
+    class Model(th.nn.Module):
+        def __init__(self, in_feats, out_feats, graph=False):
+            super(Model, self).__init__()
+            self.graph = graph
+            self.conv = nn.GraphConv(in_feats, out_feats)
+            self.fc = th.nn.Linear(out_feats, out_feats)
+            th.nn.init.xavier_uniform_(self.fc.weight)
+
+        def forward(self, g, h, embed=False, edge_weight=None):
+            h = self.conv(g, h, edge_weight=edge_weight)
+
+            if not self.graph or embed:
+                return h
+
+            with g.local_scope():
+                g.ndata["h"] = h
+                hg = dgl.mean_nodes(g, "h")
+                return self.fc(hg)
+
+    # graph explainer
+    model = Model(feat.shape[1], n_classes, graph=True)
+    model = model.to(ctx)
+    explainer = nn.PGExplainer(model, n_classes)
+    explainer.train_step(g, g.ndata["attr"], 5.0)
+
+    probs, edge_weight = explainer.explain_graph(g, feat)
+
+    # node explainer
+    model = Model(feat.shape[1], n_classes, graph=False)
+    model = model.to(ctx)
+    explainer = nn.PGExplainer(
+        model, n_classes, num_hops=1, explain_graph=False
+    )
+    explainer.train_step_node(0, g, g.ndata["attr"], 5.0)
+    explainer.train_step_node([0, 1], g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(th.tensor(0), g, g.ndata["attr"], 5.0)
+    explainer.train_step_node(th.tensor([0, 1]), g, g.ndata["attr"], 5.0)
+
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(0, g, feat)
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        [0, 1], g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        th.tensor(0), g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        th.tensor([0, 1]), g, feat
+    )
+
+
+@pytest.mark.parametrize("g", get_cases(["hetero"]))
+@pytest.mark.parametrize("idtype", [F.int64])
+@pytest.mark.parametrize("input_dim", [5])
+@pytest.mark.parametrize("n_classes", [2])
+def test_heteropgexplainer(g, idtype, input_dim, n_classes):
+    ctx = F.ctx()
+    g = g.astype(idtype).to(ctx)
+    feat = {
+        ntype: F.randn((g.num_nodes(ntype), input_dim)) for ntype in g.ntypes
+    }
+
+    # add self-loop and reverse edges
+    transform1 = dgl.transforms.AddSelfLoop(new_etypes=True)
+    g = transform1(g)
+    transform2 = dgl.transforms.AddReverse(copy_edata=True)
+    g = transform2(g)
+
+    class Model(th.nn.Module):
+        def __init__(
+            self, in_feats, embed_dim, out_feats, canonical_etypes, graph=True
+        ):
+            super(Model, self).__init__()
+            self.graph = graph
+            self.conv = nn.HeteroGraphConv(
+                {
+                    c_etype: nn.GraphConv(in_feats, embed_dim)
+                    for c_etype in canonical_etypes
+                }
+            )
+            self.fc = th.nn.Linear(embed_dim, out_feats)
+
+        def forward(self, g, h, embed=False, edge_weight=None):
+            if edge_weight is not None:
+                mod_kwargs = {
+                    etype: {"edge_weight": mask}
+                    for etype, mask in edge_weight.items()
+                }
+                h = self.conv(g, h, mod_kwargs=mod_kwargs)
+            else:
+                h = self.conv(g, h)
+
+            if not self.graph or embed:
+                return h
+
+            with g.local_scope():
+                g.ndata["h"] = h
+                hg = 0
+                for ntype in g.ntypes:
+                    hg = hg + dgl.mean_nodes(g, "h", ntype=ntype)
+                return self.fc(hg)
+
+    embed_dim = input_dim
+
+    # graph explainer
+    model = Model(
+        input_dim, embed_dim, n_classes, g.canonical_etypes, graph=True
+    )
+    model = model.to(ctx)
+    explainer = nn.HeteroPGExplainer(model, embed_dim)
+    explainer.train_step(g, feat, 5.0)
+
+    probs, edge_weight = explainer.explain_graph(g, feat)
+
+    # node explainer
+    model = Model(
+        input_dim, embed_dim, n_classes, g.canonical_etypes, graph=False
+    )
+    model = model.to(ctx)
+    explainer = nn.HeteroPGExplainer(
+        model, embed_dim, num_hops=1, explain_graph=False
+    )
+    explainer.train_step_node({g.ntypes[0]: [0]}, g, feat, 5.0)
+    explainer.train_step_node({g.ntypes[0]: th.tensor([0, 1])}, g, feat, 5.0)
+
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        {g.ntypes[0]: [0]}, g, feat
+    )
+    probs, edge_weight, bg, inverse_indices = explainer.explain_node(
+        {g.ntypes[0]: th.tensor([0, 1])}, g, feat
+    )
+
+
 def test_jumping_knowledge():
     ctx = F.ctx()
     num_layers = 2
