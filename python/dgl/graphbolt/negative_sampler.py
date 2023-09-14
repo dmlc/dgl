@@ -3,11 +3,12 @@
 from _collections_abc import Mapping
 
 from torch.utils.data import functional_datapipe
-from torchdata.datapipes.iter import Mapper
+
+from .base import MiniBatchTransformer
 
 
 @functional_datapipe("sample_negative")
-class NegativeSampler(Mapper):
+class NegativeSampler(MiniBatchTransformer):
     """
     A negative sampler used to generate negative samples and return
     a mix of positive and negative samples.
