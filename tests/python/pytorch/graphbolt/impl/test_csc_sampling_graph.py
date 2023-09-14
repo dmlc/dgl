@@ -547,7 +547,7 @@ def test_sample_neighbors_hetero(labor):
         metadata=metadata,
     )
 
-    # Generate subgraph via sample neighbors.
+    # Sample on both node types.
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
@@ -565,6 +565,27 @@ def test_sample_neighbors_hetero(labor):
         ),
     }
     assert len(subgraph.node_pairs) == 2
+    for etype, pairs in expected_node_pairs.items():
+        assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
+        assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
+    assert subgraph.reverse_column_node_ids is None
+    assert subgraph.reverse_row_node_ids is None
+    assert subgraph.reverse_edge_ids is None
+
+    # Sample on single node type.
+    nodes = {"n1": torch.LongTensor([0])}
+    fanouts = torch.tensor([-1, -1])
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    subgraph = sampler(nodes, fanouts)
+
+    # Verify in subgraph.
+    expected_node_pairs = {
+        "n2:e2:n1": (
+            torch.LongTensor([0, 2]),
+            torch.LongTensor([0, 0]),
+        ),
+    }
+    assert len(subgraph.node_pairs) == 1
     for etype, pairs in expected_node_pairs.items():
         assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
         assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
@@ -634,8 +655,14 @@ def test_sample_neighbors_fanouts(
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
-    assert subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
-    assert subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
+    assert (
+        expected_sampled_num1 == 0
+        or subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
+    )
+    assert (
+        expected_sampled_num2 == 0
+        or subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
+    )
 
 
 @unittest.skipIf(
