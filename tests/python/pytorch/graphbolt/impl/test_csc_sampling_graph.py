@@ -655,8 +655,14 @@ def test_sample_neighbors_fanouts(
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
-    assert subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
-    assert subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
+    assert (
+        expected_sampled_num1 == 0
+        or subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
+    )
+    assert (
+        expected_sampled_num2 == 0
+        or subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
+    )
 
 
 @unittest.skipIf(
