@@ -4,7 +4,7 @@ from typing import Dict
 
 from torch.utils.data import functional_datapipe
 
-from .base import MiniBatchTransformer
+from .minibatch_transformer import MiniBatchTransformer
 
 
 @functional_datapipe("fetch_feature")

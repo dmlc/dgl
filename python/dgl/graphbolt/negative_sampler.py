@@ -4,7 +4,7 @@ from _collections_abc import Mapping
 
 from torch.utils.data import functional_datapipe
 
-from .base import MiniBatchTransformer
+from .minibatch_transformer import MiniBatchTransformer
 
 
 @functional_datapipe("sample_negative")
