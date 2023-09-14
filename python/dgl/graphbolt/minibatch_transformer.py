@@ -29,7 +29,7 @@ class MiniBatchTransformer(Mapper):
         self.transformer = transformer
 
     def _transformer(self, minibatch):
-        minibatch = transformer(minibatch)
+        minibatch = self.transformer(minibatch)
         assert isinstance(
             minibatch, MiniBatch
         ), "The transformer output should be a instance of MiniBatch"
