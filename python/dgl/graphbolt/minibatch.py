@@ -257,10 +257,19 @@ def exclude_seed_edges(minibatch: MiniBatch):
     return exclude_edges(minibatch, minibatch.node_pairs)
 
 
-def exclude_seed_edges_and_reverse(minibatch: MiniBatch):
+def exclude_seed_edges_and_reverse(
+    minibatch: MiniBatch, reverse_etypes: Dict[str, str] = None
+):
     """
     Exclude seed edges and their reverse edges from the sampled subgraphs in
     the minibatch.
+
+        Parameters
+    ----------
+    minibatch : MiniBatch
+        The minibatch.
+    reverse_etypes : Dict[str, str] = None
+        The mapping from the original edge types to their reverse edge types.
     """
-    edges_to_exclude = add_reverse_edges(minibatch.node_pairs)
+    edges_to_exclude = add_reverse_edges(minibatch.node_pairs, reverse_etypes)
     return exclude_edges(minibatch, edges_to_exclude)
