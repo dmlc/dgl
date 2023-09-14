@@ -102,10 +102,9 @@ class MiniBatchTransformer(Mapper):
         ----------
         datapipe : DataPipe
             The datapipe.
-        fn:
+        transformer:
             The function applied to each minibatch which is responsible for
-            converting subgraph structures, potentially utilizing other fields
-            within the minibatch as arguments.
+            transforming the minibatch.
         """
         super().__init__(datapipe, self._transformer)
         self.transformer = transformer
