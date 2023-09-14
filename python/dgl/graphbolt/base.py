@@ -5,8 +5,6 @@ from torchdata.datapipes.iter import IterDataPipe
 
 from ..utils import recursive_apply
 
-from .minibatch import MiniBatch
-
 __all__ = [
     "CANONICAL_ETYPE_DELIMITER",
     "etype_str_to_tuple",
