@@ -1694,3 +1694,26 @@ def test_OnDiskDataset_load_tasks():
         original_train_set = None
         modify_train_set = None
         dataset = None
+
+
+def test_BuiltinOnDiskDataset():
+    """Test BuiltinOnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # Case 1: download from DGL S3 storage.
+        dataset_name = "test-only"
+        dataset = gb.BuiltinOnDiskDataset(
+            name=dataset_name, root=test_dir
+        ).load()
+        assert dataset.graph is not None
+        assert dataset.feature is not None
+        assert dataset.tasks is not None
+        assert dataset.dataset_name == dataset_name
+
+        # Case 2: dataset is already downloaded.
+        dataset = gb.BuiltinOnDiskDataset(
+            name=dataset_name, root=test_dir
+        ).load()
+        assert dataset.graph is not None
+        assert dataset.feature is not None
+        assert dataset.tasks is not None
+        assert dataset.dataset_name == dataset_name
