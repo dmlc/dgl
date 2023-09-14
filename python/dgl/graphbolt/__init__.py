@@ -17,6 +17,7 @@ from .item_sampler import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
+from .subgraph_transformer import *
 from .utils import (
     add_reverse_edges,
     unique_and_compact,
