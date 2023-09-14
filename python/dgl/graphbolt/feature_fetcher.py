@@ -4,11 +4,11 @@ from typing import Dict
 
 from torch.utils.data import functional_datapipe
 
-from torchdata.datapipes.iter import Mapper
+from .minibatch_transformer import MiniBatchTransformer
 
 
 @functional_datapipe("fetch_feature")
-class FeatureFetcher(Mapper):
+class FeatureFetcher(MiniBatchTransformer):
     """A feature fetcher used to fetch features for node/edge in graphbolt."""
 
     def __init__(
