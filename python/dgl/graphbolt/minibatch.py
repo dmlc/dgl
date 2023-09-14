@@ -264,7 +264,7 @@ def exclude_seed_edges_and_reverse(
     Exclude seed edges and their reverse edges from the sampled subgraphs in
     the minibatch.
 
-        Parameters
+    Parameters
     ----------
     minibatch : MiniBatch
         The minibatch.
