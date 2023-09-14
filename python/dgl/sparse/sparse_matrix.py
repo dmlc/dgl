@@ -671,7 +671,14 @@ class SparseMatrix:
                      values=tensor([0, 2, 3, 3]),
                      shape=(3, 2), nnz=3)
         """
-        raise NotImplementedError
+        if ids is None:
+            dim_size = self.shape[0] if dim == 0 else self.shape[1]
+            ids = torch.range(
+                0, dim_size, dtype=torch.int64, device=self.device
+            )
+        return SparseMatrix(
+            self.c_sparse_matrix.sample(dim, fanout, ids, replace, bias)
+        )
 
 
 def spmatrix(

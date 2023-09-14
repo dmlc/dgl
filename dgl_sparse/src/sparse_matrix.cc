@@ -167,6 +167,34 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::RangeSelect(
   }
 }
 
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::Sample(
+    int64_t dim, int64_t fanout, torch::Tensor ids, bool replace, bool bias) {
+  bool rowwise = dim == 0;
+  auto id_array = TorchTensorToDGLArray(ids);
+  auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
+  // Slicing matrix.
+  auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), id_array);
+  auto slice_value =
+      this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+  // Reset value indices.
+  slice_csr.data = dgl::aten::NullArray();
+
+  auto prob =
+      bias ? TorchTensorToDGLArray(slice_value) : dgl::aten::NullArray();
+  auto slice_id =
+      dgl::aten::Range(0, id_array.NumElements(), 64, id_array->ctx);
+  // Sampling all rows on sliced matrix.
+  auto sample_coo =
+      dgl::aten::CSRRowWiseSampling(slice_csr, slice_id, fanout, prob, replace);
+  auto sample_value =
+      slice_value.index_select(0, DGLArrayToTorchTensor(sample_coo.data));
+  sample_coo.data = dgl::aten::NullArray();
+  auto ret = COOFromOldDGLCOO(sample_coo);
+  if (!rowwise) ret = COOTranspose(ret);
+  return SparseMatrix::FromCOOPointer(
+      ret, sample_value, {ret->num_rows, ret->num_cols});
+}
+
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(
     const c10::intrusive_ptr<SparseMatrix>& mat, torch::Tensor value) {
   TORCH_CHECK(
