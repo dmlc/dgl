@@ -30,7 +30,7 @@ from .ondisk_metadata import (
 )
 from .torch_based_feature_store import TorchBasedFeatureStore
 
-__all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinOnDiskDataset"]
+__all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 
 def _copy_or_convert_data(
@@ -476,7 +476,7 @@ class OnDiskDataset(Dataset):
         return ret
 
 
-class BuiltinOnDiskDataset(OnDiskDataset):
+class BuiltinDataset(OnDiskDataset):
     """GraphBolt builtin on-disk dataset.
 
     This class is used to help download datasets from DGL S3 storage and load
@@ -501,4 +501,4 @@ class BuiltinOnDiskDataset(OnDiskDataset):
             download(url, path=zip_file_path)
             extract_archive(zip_file_path, root, overwrite=True)
             os.remove(zip_file_path)
-        super(BuiltinOnDiskDataset, self).__init__(dataset_dir)
+        super().__init__(dataset_dir)
