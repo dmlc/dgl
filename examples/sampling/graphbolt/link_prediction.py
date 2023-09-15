@@ -328,9 +328,7 @@ def main(args):
 
     # Load and preprocess dataset.
     print("Loading data")
-    dataset = gb.OnDiskDataset(
-        "/home/ubuntu/wklwork/work#4/example_ogbl_citation2"
-    ).load()
+    dataset = gb.BuiltinDataset("ogbl-citation2").load()
     graph = dataset.graph
     features = dataset.feature
     train_set = dataset.tasks[0].train_set
