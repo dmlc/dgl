@@ -1,4 +1,3 @@
-import dgl
 import dgl.graphbolt as gb
 import dgl.nn.pytorch as dglnn
 
@@ -92,11 +91,11 @@ class DataModule(LightningDataModule):
             self.train_set,
             batch_size=self.batch_size,
             shuffle=True,
-            drop_last=False,
+            drop_last=True,
         )
         sampler_dp = gb.NeighborSampler(item_sampler, self.graph, self.fanouts)
         feature_dp = gb.FeatureFetcher(sampler_dp, self.feature_store, ["feat"])
-        dataloader = dgl.graphbolt.SingleProcessDataLoader(feature_dp)
+        dataloader = gb.MultiProcessDataLoader(feature_dp, num_workers=8)
         return dataloader
 
     def val_dataloader(self):
@@ -104,11 +103,11 @@ class DataModule(LightningDataModule):
             self.valid_set,
             batch_size=self.batch_size,
             shuffle=True,
-            drop_last=False,
+            drop_last=True,
         )
         sampler_dp = gb.NeighborSampler(item_sampler, self.graph, self.fanouts)
         feature_dp = gb.FeatureFetcher(sampler_dp, self.feature_store, ["feat"])
-        dataloader = dgl.graphbolt.SingleProcessDataLoader(feature_dp)
+        dataloader = gb.MultiProcessDataLoader(feature_dp, num_workers=8)
         return dataloader
 
 
@@ -124,6 +123,6 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator="gpu",
         max_epochs=10,
-        callbacks=[checkpoint_callback],
+        #  callbacks=[checkpoint_callback],
     )
     trainer.fit(model, datamodule=datamodule)
