@@ -9,6 +9,7 @@ from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torchmetrics import Accuracy
 
+
 class SAGE(LightningModule):
     def __init__(self, in_feats, n_hidden, n_classes):
         super().__init__()
@@ -33,9 +34,9 @@ class SAGE(LightningModule):
         return h
 
     def training_step(self, batch, batch_idx):
-        blocks = [block.to('cuda') for block in batch.to_dgl_blocks()]
+        blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
         x = blocks[0].srcdata["feat"]
-        y = batch.labels.to('cuda')
+        y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
         loss = F.cross_entropy(y_hat, y)
         self.train_acc(torch.argmax(y_hat, 1), y)
@@ -49,9 +50,9 @@ class SAGE(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        blocks = [block.to('cuda') for block in batch.to_dgl_blocks()]
+        blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
         x = blocks[0].srcdata["feat"]
-        y = batch.labels.to('cuda')
+        y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
         self.val_acc(torch.argmax(y_hat, 1), y)
         self.log(
@@ -69,13 +70,15 @@ class SAGE(LightningModule):
         )
         return optimizer
 
+
 class DataModule(LightningDataModule):
     def __init__(self, fanouts, batch_size):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
         dataset = gb.OnDiskDataset(
-            "/home/ubuntu/workspace/example_ogbn_products/")
+            "/home/ubuntu/workspace/example_ogbn_products/"
+        )
         dataset.load()
         self.feature_store = dataset.feature
         self.graph = dataset.graph
@@ -85,27 +88,29 @@ class DataModule(LightningDataModule):
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
 
     def train_dataloader(self):
-        item_sampler = gb.ItemSampler(self.train_set,
-                                      batch_size=self.batch_size,
-                                      shuffle=True,
-                                      drop_last=False)
+        item_sampler = gb.ItemSampler(
+            self.train_set,
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=False,
+        )
         sampler_dp = gb.NeighborSampler(item_sampler, self.graph, self.fanouts)
-        feature_dp = gb.FeatureFetcher(sampler_dp,
-                                       self.feature_store, ["feat"])
+        feature_dp = gb.FeatureFetcher(sampler_dp, self.feature_store, ["feat"])
         dataloader = dgl.graphbolt.SingleProcessDataLoader(feature_dp)
         return dataloader
 
     def val_dataloader(self):
-        item_sampler = gb.ItemSampler(self.valid_set,
-                                      batch_size=self.batch_size,
-                                      shuffle=True,
-                                      drop_last=False)
+        item_sampler = gb.ItemSampler(
+            self.valid_set,
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=False,
+        )
         sampler_dp = gb.NeighborSampler(item_sampler, self.graph, self.fanouts)
-        feature_dp = gb.FeatureFetcher(sampler_dp,
-                                       self.feature_store,
-                                       ["feat"])
+        feature_dp = gb.FeatureFetcher(sampler_dp, self.feature_store, ["feat"])
         dataloader = dgl.graphbolt.SingleProcessDataLoader(feature_dp)
         return dataloader
+
 
 if __name__ == "__main__":
     datamodule = DataModule([15, 10, 5], 1024)
