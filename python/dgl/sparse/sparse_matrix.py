@@ -680,13 +680,13 @@ class SparseMatrix:
             self.c_sparse_matrix.sample(dim, fanout, ids, replace, bias)
         )
 
-    def relabel(
+    def compact(
         self,
         dim: int,
         leading_indices: Optional[torch.Tensor] = None,
     ):
-        """Relabels indices of a dimension and remove rows or columns without
-        non-zero elements in the sparse matrix.
+        """Compact sparse matrix by removing rows or columns without non-zero
+        elements in the sparse matrix and relabeling indices of the dimension.
 
         This function serves a dual purpose: it allows you to reorganize the
         indices within a specific dimension (rows or columns) of the sparse
@@ -697,7 +697,10 @@ class SparseMatrix:
         of relabeled indices remains the same as the original order, except that
         rows or columns without non-zero elements are removed. When
         'leading_indices' are provided, they are positioned at the start of the
-        relabeled dimension.
+        relabeled dimension. To be precise, all rows selected by the specified
+        indices will be remapped from 0 to length(indices) - 1. Rows that are not
+        selected and contain any non-zero elements will be positioned after those
+        remapped rows while maintaining their original order.
 
         This function mimics 'dgl.to_block', a method used to compress a sampled
         subgraph by eliminating redundant nodes. The 'leading_indices' parameter
@@ -727,22 +730,27 @@ class SparseMatrix:
         >>> indices = torch.tensor([[0, 2],
                                     [1, 2]])
         >>> A = dglsp.spmatrix(indices)
+        >>> print(A.to_dense())
+        tensor([[0., 1., 0.],
+                [0., 0., 0.],
+                [0., 0., 1.]])
 
-        Case 1: Relabel rows without indices.
+        Case 1: Compact rows without indices.
 
-        >>> B, original_rows = A.relabel(dim=0, leading_indices=None)
-        >>> print(B)
-        SparseMatrix(indices=tensor([[0, 1], [1, 2]]),
-                     shape=(2, 3), nnz=2)
+        >>> B, original_rows = A.compact(dim=0, leading_indices=None)
+        >>> print(B.to_dense())
+        tensor([[0., 1., 0.],
+                [0., 0., 1.]])
         >>> print(original_rows)
         torch.Tensor([0, 2])
 
-        Case 2: Relabel rows with indices.
+        Case 2: Compact rows with indices.
 
-        >>> B, original_rows = A.relabel(dim=0, leading_indices=[1, 2])
-        >>> print(B)
-        SparseMatrix(indices=tensor([[1, 2], [2, 1]]),
-                     shape=(3, 3), nnz=2)
+        >>> B, original_rows = A.compact(dim=0, leading_indices=[1, 2])
+        >>> print(B.to_dense())
+        tensor([[0., 0., 0.],
+                [0., 0., 1.],
+                [0., 1., 0.],])
         >>> print(original_rows)
         torch.Tensor([1, 2, 0])
         """

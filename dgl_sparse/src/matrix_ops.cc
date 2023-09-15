@@ -59,8 +59,8 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
 }
 
 /**
- * @brief Relabels indices of a dimension and removes rows or columns without
- * non-zero elements in the sparse matrix.
+ * @brief Compact sparse matrix by removing rows or columns without non-zero
+ * elements in the sparse matrix and relabeling indices of the dimension.
  *
  * This function serves a dual purpose: it allows you to reorganize the
  * indices within a specific dimension (rows or columns) of the sparse matrix
@@ -76,11 +76,11 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
  * @return A tuple containing the relabeled sparse matrix and the index mapping
  *         of the relabeled dimension from the new index to the original index.
  */
-std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> Relabel(
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> Compact(
     const c10::intrusive_ptr<SparseMatrix>& mat, uint64_t dim,
     torch::Tensor leading_indices) {
-  DGL_SPARSE_COO_SWITCH(mat->COOPtr(), XPU, IdType, "Relabel", {
-    return RelabelImpl<XPU, IdType>(mat, dim, leading_indices);
+  DGL_SPARSE_COO_SWITCH(mat->COOPtr(), XPU, IdType, "Compact", {
+    return CompactImpl<XPU, IdType>(mat, dim, leading_indices);
   });
 }
 
