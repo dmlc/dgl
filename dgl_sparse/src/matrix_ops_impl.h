@@ -20,20 +20,20 @@ namespace sparse {
  * This function serves a dual purpose: it allows you to reorganize the
  * indices within a specific dimension (rows or columns) of the sparse matrix
  * and, if needed, place certain 'leading_indices' at the beginning of the
- * relabeled dimension.
+ * compact dimension.
  *
- * @param mat The sparse matrix to be relabeled.
- * @param dim The dimension to relabel. Should be 0 or 1. Use 0 for row-wise
- *        relabeling and 1 for column-wise relabeling.
+ * @param mat The sparse matrix to be compacted.
+ * @param dim The dimension to compact. Should be 0 or 1. Use 0 for row-wise
+ *        compaction and 1 for column-wise compaction.
  * @param leading_indices An optional tensor containing row or column ids that
- *        should be placed at the beginning of the relabeled dimension.
+ *        should be placed at the beginning of the compact dimension.
  *
- * @return A tuple containing the relabeled sparse matrix and the index mapping
- *         of the relabeled dimension from the new index to the original index.
+ * @return A tuple containing the compacted sparse matrix and the index mapping
+ *         of the compact dimension from the new index to the original index.
  */
 template <c10::DeviceType XPU, typename IdType>
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactImpl(
-    const c10::intrusive_ptr<SparseMatrix>& mat, uint64_t dim,
+    const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     torch::Tensor leading_indices) {
   // Place holder only.
   return {mat, leading_indices};

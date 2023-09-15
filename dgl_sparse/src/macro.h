@@ -10,7 +10,8 @@ namespace dgl {
 namespace sparse {
 
 /**
- * Dispatch according to device:
+ * Dispatch an operator to a templated implementation function
+ * according to its device:
  *
  * DGL_SPARSE_XPU_SWITCH(tensor.device().type(), XPU, {
  *   // Now XPU is a placeholder for tensor.device().type()
