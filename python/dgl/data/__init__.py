@@ -74,6 +74,7 @@ from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
 from .zinc import ZINCDataset
+from .lrgb import PeptidesStructuralDataset
 
 
 def register_data_args(parser):
