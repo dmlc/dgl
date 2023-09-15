@@ -123,6 +123,6 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator="gpu",
         max_epochs=10,
-        #  callbacks=[checkpoint_callback],
+        callbacks=[checkpoint_callback],
     )
     trainer.fit(model, datamodule=datamodule)
