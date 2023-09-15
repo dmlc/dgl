@@ -123,7 +123,6 @@ if __name__ == "__main__":
     #                   callbacks=[checkpoint_callback])
     trainer = Trainer(
         accelerator="gpu",
-        devices=8,
         max_epochs=10,
         callbacks=[checkpoint_callback],
     )
