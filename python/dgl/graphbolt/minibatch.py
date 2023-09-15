@@ -9,7 +9,6 @@ import dgl
 
 from .base import etype_str_to_tuple
 from .sampled_subgraph import SampledSubgraph
-from .utils import add_reverse_edges
 
 __all__ = ["MiniBatch"]
 
