@@ -34,7 +34,10 @@ namespace sparse {
 template <c10::DeviceType XPU, typename IdType>
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactImpl(
     const c10::intrusive_ptr<SparseMatrix>& mat, uint64_t dim,
-    torch::Tensor leading_indices) {}
+    torch::Tensor leading_indices) {
+  // Place holder only.
+  return {mat, leading_indices};
+}
 
 }  // namespace sparse
 }  // namespace dgl
