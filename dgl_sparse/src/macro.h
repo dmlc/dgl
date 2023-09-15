@@ -18,14 +18,14 @@ namespace sparse {
  *   DeviceSpecificImplementation<XPU>(...);
  * });
  */
-#define DGL_SPARSE_XPU_SWITCH(val, XPU, op, ...)                \
+#define DGL_SPARSE_XPU_SWITCH(device, XPU, op, ...)             \
   do {                                                          \
-    if ((val) == c10::DeviceType::CPU) {                        \
+    if ((device) == c10::DeviceType::CPU) {                     \
       constexpr auto XPU = c10::DeviceType::CPU;                \
       { __VA_ARGS__ }                                           \
     } else {                                                    \
       LOG(FATAL) << "Operator " << (op) << " does not support " \
-                 << c10::DeviceTypeName(val) << " device.";     \
+                 << c10::DeviceTypeName(device) << " device.";  \
     }                                                           \
   } while (0)
 
@@ -38,25 +38,50 @@ namespace sparse {
  *   IdType *data = static_cast<IdType *>(array.data_ptr());
  * });
  */
-#define DGL_SPARSE_ID_TYPE_SWITCH(val, IdType, op, ...)         \
+#define DGL_SPARSE_ID_TYPE_SWITCH(dtype, IdType, op, ...)       \
   do {                                                          \
-    if ((val) == torch::kInt32) {                               \
+    if ((dtype) == torch::kInt32) {                             \
       typedef int32_t IdType;                                   \
       { __VA_ARGS__ }                                           \
-    } else if ((val) == torch::kInt64) {                        \
+    } else if ((dtype) == torch::kInt64) {                      \
       typedef int64_t IdType;                                   \
       { __VA_ARGS__ }                                           \
     } else {                                                    \
       LOG(FATAL) << "Operator " << (op) << " does not support " \
-                 << (val).name() << " as ID dtype.";            \
+                 << (dtype).name() << " as ID dtype.";          \
+    }                                                           \
+  } while (0)
+
+/**
+ * Dispatch according to Value type (either float or long):
+ *
+ * DGL_SPARSE_VAL_TYPE_SWITCH(tensor.dtype(), ValType, {
+ *   // Now ValType is the type corresponding to data type of the tensor.
+ *   // For instance, one can do this for a CPU array:
+ *   ValType *data = static_cast<ValType *>(array.data_ptr());
+ * });
+ */
+#define DGL_SPARSE_VAL_TYPE_SWITCH(dtype, ValType, op, ...)     \
+  do {                                                          \
+    if ((dtype) == torch::kFloat) {                             \
+      typedef float ValType;                                    \
+      { __VA_ARGS__ }                                           \
+    } else if ((dtype) == torch::kInt64) {                      \
+      typedef int64_t ValType;                                  \
+      { __VA_ARGS__ }                                           \
+    } else {                                                    \
+      LOG(FATAL) << "Operator " << (op) << " does not support " \
+                 << (dtype).name() << " as Val dtype.";         \
     }                                                           \
   } while (0)
 
 // Macro to dispatch according to device and index type.
-#define DGL_SPARSE_COO_SWITCH(coo, XPU, IdType, op, ...)         \
-  DGL_SPARSE_XPU_SWITCH(coo->indices.device().type(), XPU, op, { \
-    DGL_SPARSE_ID_TYPE_SWITCH(                                   \
-        (coo)->indices.dtype(), IdType, op, {{__VA_ARGS__}});    \
+#define DGL_SPARSE_MAT_SWITCH(mat, XPU, IdType, ValType, op, ...)             \
+  DGL_SPARSE_XPU_SWITCH(mat->COOPtr()->indices.device().type(), XPU, op, {    \
+    DGL_SPARSE_ID_TYPE_SWITCH((mat->COOPtr())->indices.dtype(), IdType, op, { \
+      DGL_SPARSE_VAL_TYPE_SWITCH(                                             \
+          (mat)->value().dtype(), ValType, op, {{__VA_ARGS__}});              \
+    });                                                                       \
   });
 
 }  // namespace sparse
