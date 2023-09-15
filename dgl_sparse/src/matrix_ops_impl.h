@@ -3,8 +3,8 @@
  * @file matrix_ops_impl.h
  * @brief DGL C++ sparse matrix operator implementations.
  */
-#ifndef SPARSE_MATRIX_OPS_IMPL_H_
-#define SPARSE_MATRIX_OPS_IMPL_H_
+#ifndef DGL_SPARSE_MATRIX_OPS_IMPL_H_
+#define DGL_SPARSE_MATRIX_OPS_IMPL_H_
 
 #include <sparse/sparse_format.h>
 
@@ -42,4 +42,4 @@ std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactImpl(
 }  // namespace sparse
 }  // namespace dgl
 
-#endif  // SPARSE_MATRIX_OPS_IMPL_H_
+#endif  // DGL_SPARSE_MATRIX_OPS_IMPL_H_

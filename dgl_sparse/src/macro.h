@@ -3,8 +3,8 @@
  * @file macro.h
  * @brief DGL C++ sparse API macros.
  */
-#ifndef SPARSE_MACRO_H_
-#define SPARSE_MACRO_H_
+#ifndef DGL_SPARSE_MACRO_H_
+#define DGL_SPARSE_MACRO_H_
 
 namespace dgl {
 namespace sparse {
@@ -62,4 +62,4 @@ namespace sparse {
 }  // namespace sparse
 }  // namespace dgl
 
-#endif  // SPARSE_MACRO_H_
+#endif  // DGL_SPARSE_MACRO_H_

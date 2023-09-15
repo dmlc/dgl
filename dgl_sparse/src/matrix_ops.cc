@@ -7,7 +7,7 @@
 #include <torch/script.h>
 
 #include "./macro.h"
-#include "sparse/matrix_ops_impl.h"
+#include "./matrix_ops_impl.h"
 
 namespace dgl {
 namespace sparse {
