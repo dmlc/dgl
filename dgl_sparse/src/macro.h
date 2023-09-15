@@ -18,14 +18,14 @@ namespace sparse {
  *   DeviceSpecificImplementation<XPU>(...);
  * });
  */
-#define DGL_SPARSE_XPU_SWITCH(val, XPU, op, ...)                \
+#define DGL_SPARSE_XPU_SWITCH(device, XPU, op, ...)             \
   do {                                                          \
-    if ((val) == c10::DeviceType::CPU) {                        \
+    if ((device) == c10::DeviceType::CPU) {                     \
       constexpr auto XPU = c10::DeviceType::CPU;                \
       { __VA_ARGS__ }                                           \
     } else {                                                    \
       LOG(FATAL) << "Operator " << (op) << " does not support " \
-                 << c10::DeviceTypeName(val) << " device.";     \
+                 << c10::DeviceTypeName(device) << " device.";  \
     }                                                           \
   } while (0)
 
@@ -38,17 +38,17 @@ namespace sparse {
  *   IdType *data = static_cast<IdType *>(array.data_ptr());
  * });
  */
-#define DGL_SPARSE_ID_TYPE_SWITCH(val, IdType, op, ...)         \
+#define DGL_SPARSE_ID_TYPE_SWITCH(dtype, IdType, op, ...)       \
   do {                                                          \
-    if ((val) == torch::kInt32) {                               \
+    if ((dtype) == torch::kInt32) {                             \
       typedef int32_t IdType;                                   \
       { __VA_ARGS__ }                                           \
-    } else if ((val) == torch::kInt64) {                        \
+    } else if ((dtype) == torch::kInt64) {                      \
       typedef int64_t IdType;                                   \
       { __VA_ARGS__ }                                           \
     } else {                                                    \
       LOG(FATAL) << "Operator " << (op) << " does not support " \
-                 << (val).name() << " as ID dtype.";            \
+                 << (dtype).name() << " as ID dtype.";          \
     }                                                           \
   } while (0)
 
