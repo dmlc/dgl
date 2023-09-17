@@ -275,27 +275,13 @@ class ItemSampler(IterDataPipe):
 
     def __init__(
         self,
-        item_set,
+        item_set: ItemSet or ItemSetDict,
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
     ) -> None:
         super().__init__()
-        # self._item_set = IterableWrapper(self._item_set).batch(batch_size=batch_size, drop_last=False).sharding_filter()
-        # num_replicas = dist.get_world_size()
-        # rank = dist.get_rank()
-        # num_batches = len(item_set) // batch_size
-        # remains = len(item_set) % batch_size
-        # assigned_batches = num_batches // num_replicas
-        # remaining_batches = num_batches % num_replicas
-        # start_pos = assigned_batches * rank + min(rank, remaining_batches)
-        # end_pos = start_pos + assigned_batches + (rank < remaining_batches)
-        # start_pos *= batch_size
-        # end_pos *= batch_size
-        # if len(item_set) - end_pos < batch_size:
-        #     end_pos = len(item_set)
-        # self._item_set = IterableWrapper(self._item_set[start_pos : end_pos])
         self._names = item_set.names
         self._item_set = IterableWrapper(item_set)
         self._batch_size = batch_size
@@ -384,7 +370,7 @@ class DistributedItemSampler(ItemSampler):
 
     def __init__(
         self,
-        item_set,
+        item_set: ItemSet or ItemSetDict,
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
