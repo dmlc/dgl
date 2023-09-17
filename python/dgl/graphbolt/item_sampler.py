@@ -361,13 +361,13 @@ class DistributedItemSampler(ItemSampler):
         Option to drop the last batch if it's not full.
     shuffle : bool
         Option to shuffle before sample.
+    num_replicas: int
+        Number of processes participating in distributed training. By default,
+        `world_size` is retrieved from the current distributed group.
     even_inputs : bool
         Option to make sure the numbers of batches for each replica are the
         same. This will be done by dropping the excessive batches of some
         replicas.
-    num_replicas: int
-        Number of processes participating in distributed training. By default,
-        `world_size` is retrieved from the current distributed group.
 
     Examples
     --------
