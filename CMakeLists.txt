@@ -259,8 +259,22 @@ list(APPEND DGL_SRC ${DGL_RPC_SRC})
 
 # Configure cuda
 if(USE_CUDA)
-  dgl_config_cuda(DGL_CUDA_SRC)
+  file(GLOB_RECURSE DGL_CUDA_SRC
+    src/array/cuda/*.cc
+    src/array/cuda/*.cu
+    src/array/cuda/uvm/*.cc
+    src/array/cuda/uvm/*.cu
+    src/kernel/cuda/*.cc
+    src/kernel/cuda/*.cu
+    src/partition/cuda/*.cu
+    src/runtime/cuda/*.cc
+    src/runtime/cuda/*.cu
+    src/geometry/cuda/*.cu
+    src/graph/transform/cuda/*.cu
+    src/graph/sampling/randomwalks/*.cu
+  )
   list(APPEND DGL_SRC ${DGL_CUDA_SRC})
+  dgl_config_cuda(DGL_LINKER_LIBS)
   cuda_add_library(dgl SHARED ${DGL_SRC})
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})

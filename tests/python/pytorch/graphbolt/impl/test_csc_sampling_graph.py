@@ -547,7 +547,7 @@ def test_sample_neighbors_hetero(labor):
         metadata=metadata,
     )
 
-    # Generate subgraph via sample neighbors.
+    # Sample on both node types.
     nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
     fanouts = torch.tensor([-1, -1])
     sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
@@ -565,6 +565,27 @@ def test_sample_neighbors_hetero(labor):
         ),
     }
     assert len(subgraph.node_pairs) == 2
+    for etype, pairs in expected_node_pairs.items():
+        assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
+        assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
+    assert subgraph.reverse_column_node_ids is None
+    assert subgraph.reverse_row_node_ids is None
+    assert subgraph.reverse_edge_ids is None
+
+    # Sample on single node type.
+    nodes = {"n1": torch.LongTensor([0])}
+    fanouts = torch.tensor([-1, -1])
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    subgraph = sampler(nodes, fanouts)
+
+    # Verify in subgraph.
+    expected_node_pairs = {
+        "n2:e2:n1": (
+            torch.LongTensor([0, 2]),
+            torch.LongTensor([0, 0]),
+        ),
+    }
+    assert len(subgraph.node_pairs) == 1
     for etype, pairs in expected_node_pairs.items():
         assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
         assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
@@ -634,8 +655,14 @@ def test_sample_neighbors_fanouts(
     subgraph = sampler(nodes, fanouts)
 
     # Verify in subgraph.
-    assert subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
-    assert subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
+    assert (
+        expected_sampled_num1 == 0
+        or subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
+    )
+    assert (
+        expected_sampled_num2 == 0
+        or subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
+    )
 
 
 @unittest.skipIf(
@@ -1048,12 +1075,12 @@ def test_multiprocessing_with_shared_memory():
 )
 def test_from_dglgraph_homogeneous():
     dgl_g = dgl.rand_graph(1000, 10 * 1000)
-    gb_g = gb.from_dglgraph(dgl_g)
+    gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=True)
 
     assert gb_g.num_nodes == dgl_g.num_nodes()
     assert gb_g.num_edges == dgl_g.num_edges()
     assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 1000]))
-    assert torch.all(gb_g.type_per_edge == 0)
+    assert gb_g.type_per_edge is None
     assert gb_g.metadata.node_type_to_id == {"_N": 0}
     assert gb_g.metadata.edge_type_to_id == {"_N:_E:_N": 0}
 
@@ -1063,46 +1090,45 @@ def test_from_dglgraph_homogeneous():
     reason="Graph on GPU is not supported yet.",
 )
 def test_from_dglgraph_heterogeneous():
-    def create_random_hetero():
-        num_nodes = {"n1": 1000, "n2": 1010, "n3": 1020}
-        etypes = [
-            ("n1", "r12", "n2"),
-            ("n2", "r21", "n1"),
-            ("n1", "r13", "n3"),
-            ("n2", "r23", "n3"),
-        ]
-        edges = {}
-        for etype in etypes:
-            src_ntype, _, dst_ntype = etype
-            arr = spsp.random(
-                num_nodes[src_ntype],
-                num_nodes[dst_ntype],
-                density=0.001,
-                format="coo",
-                random_state=100,
-            )
-            edges[etype] = (arr.row, arr.col)
-        return dgl.heterograph(edges, num_nodes)
-
-    dgl_g = create_random_hetero()
-    gb_g = gb.from_dglgraph(dgl_g)
+    dgl_g = dgl.heterograph(
+        {
+            ("author", "writes", "paper"): (
+                [1, 2, 3, 4, 5, 2],
+                [1, 2, 3, 4, 5, 4],
+            ),
+            ("author", "affiliated_with", "institution"): (
+                [1, 2, 3, 4, 5],
+                [1, 2, 3, 4, 5],
+            ),
+            ("paper", "has_topic", "field"): ([1, 2, 3, 4, 5], [1, 2, 3, 4, 5]),
+            ("paper", "cites", "paper"): (
+                [2, 3, 4, 5, 6, 1],
+                [1, 2, 3, 4, 5, 4],
+            ),
+        }
+    )
+    gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=False)
 
     assert gb_g.num_nodes == dgl_g.num_nodes()
     assert gb_g.num_edges == dgl_g.num_edges()
+    assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 6, 12, 18, 25]))
     assert torch.equal(
-        gb_g.node_type_offset, torch.tensor([0, 1000, 2010, 3030])
+        gb_g.type_per_edge,
+        torch.tensor(
+            [3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2, 1, 1, 2, 2, 1, 2]
+        ),
     )
-    assert torch.all(gb_g.type_per_edge[:-1] <= gb_g.type_per_edge[1:])
     assert gb_g.metadata.node_type_to_id == {
-        "n1": 0,
-        "n2": 1,
-        "n3": 2,
+        "author": 0,
+        "field": 1,
+        "institution": 2,
+        "paper": 3,
     }
     assert gb_g.metadata.edge_type_to_id == {
-        "n1:r12:n2": 0,
-        "n1:r13:n3": 1,
-        "n2:r21:n1": 2,
-        "n2:r23:n3": 3,
+        "author:affiliated_with:institution": 0,
+        "author:writes:paper": 1,
+        "paper:cites:paper": 2,
+        "paper:has_topic:field": 3,
     }
 
 

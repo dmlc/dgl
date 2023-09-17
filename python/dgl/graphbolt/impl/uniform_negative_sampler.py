@@ -20,8 +20,8 @@ class UniformNegativeSampler(NegativeSampler):
     def __init__(
         self,
         datapipe,
-        negative_ratio,
         graph,
+        negative_ratio,
     ):
         """
         Initlization for a uniform negative sampler.
@@ -30,10 +30,10 @@ class UniformNegativeSampler(NegativeSampler):
         ----------
         datapipe : DataPipe
             The datapipe.
-        negative_ratio : int
-            The proportion of negative samples to positive samples.
         graph : CSCSamplingGraph
             The graph on which to perform negative sampling.
+        negative_ratio : int
+            The proportion of negative samples to positive samples.
 
         Examples
         --------
@@ -47,7 +47,7 @@ class UniformNegativeSampler(NegativeSampler):
             ...item_set, batch_size=1,
             ...)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...item_sampler, 2, graph)
+            ...item_sampler, graph, 2)
         >>> for minibatch in neg_sampler:
             ...  print(minibatch.negative_srcs)
             ...  print(minibatch.negative_dsts)

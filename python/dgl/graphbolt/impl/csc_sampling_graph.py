@@ -242,6 +242,8 @@ class CSCSamplingGraph:
                 src_ntype_id = self.metadata.node_type_to_id[src_ntype]
                 dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
                 mask = type_per_edge == etype_id
+                if mask.count_nonzero() == 0:
+                    continue
                 hetero_row = row[mask] - self.node_type_offset[src_ntype_id]
                 hetero_column = (
                     column[mask] - self.node_type_offset[dst_ntype_id]
@@ -725,11 +727,12 @@ def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
     metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
 
     # Obtain CSC matrix.
-    indptr, indices, _ = homo_g.adj_tensors("csc")
+    indptr, indices, edge_ids = homo_g.adj_tensors("csc")
     ntype_count.insert(0, 0)
     node_type_offset = torch.cumsum(torch.LongTensor(ntype_count), 0)
 
-    type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE]
+    # Assign edge type according to the order of CSC matrix.
+    type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
