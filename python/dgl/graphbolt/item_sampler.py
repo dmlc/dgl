@@ -338,9 +338,11 @@ class ItemSampler(IterDataPipe):
 class DistributedItemSampler(ItemSampler):
     """Distributed Item Sampler.
 
-    This is useful with torch's DDP training. It will create distributed item subset of data which could be node IDs, node pairs with or
-    without labels, node pairs with negative sources/destinations, DGLGraphs
-    and heterogeneous counterparts. The items of the original item set will be sharded and form an exclusive subset for each replica (process).
+    This is useful with torch's DDP training. It will create distributed item
+    subset of data which could be node IDs, node pairs with or without labels,
+    node pairs with negative sources/destinations, DGLGraphs and heterogeneous
+    counterparts. The items of the original item set will be sharded and form
+    an exclusive subset for each replica (process).
 
     Note: This class `DistributedItemSampler` is not decorated with
     `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
@@ -360,9 +362,12 @@ class DistributedItemSampler(ItemSampler):
     shuffle : bool
         Option to shuffle before sample.
     even_inputs : bool
-        Option to make sure the numbers of batches for each replica are the same. This will be done by dropping the excessive batches of some replicas.
+        Option to make sure the numbers of batches for each replica are the
+        same. This will be done by dropping the excessive batches of some
+        replicas.
     num_replicas: int
-        Number of processes participating in distributed training. By default, `world_size` is retrieved from the current distributed group.
+        Number of processes participating in distributed training. By default,
+        `world_size` is retrieved from the current distributed group.
 
     Examples
     --------
@@ -413,7 +418,8 @@ class DistributedItemSampler(ItemSampler):
             drop_last=self._drop_last,
         )
 
-        # If even_inputs is True, drop the excessive inputs by limiting the length of the datapipe.
+        # If even_inputs is True, drop the excessive inputs by limiting the
+        # length of the datapipe.
         if self._even_inputs:
             data_pipe = data_pipe.header(self._num_batches)
 
