@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Callable, Iterator, Optional
 
+import torch.distributed as dist
 from torch.utils.data import default_collate, functional_datapipe
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
@@ -14,7 +15,7 @@ from ..heterograph import DGLGraph
 from .itemset import ItemSet, ItemSetDict
 from .minibatch import MiniBatch
 
-__all__ = ["ItemSampler", "minibatcher_default"]
+__all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
 
 
 def minibatcher_default(batch, names):
@@ -281,7 +282,6 @@ class ItemSampler(IterDataPipe):
         shuffle: Optional[bool] = False,
     ) -> None:
         super().__init__()
-        self._item_set = item_set
         # self._item_set = IterableWrapper(self._item_set).batch(batch_size=batch_size, drop_last=False).sharding_filter()
         # num_replicas = dist.get_world_size()
         # rank = dist.get_rank()
@@ -296,7 +296,8 @@ class ItemSampler(IterDataPipe):
         # if len(item_set) - end_pos < batch_size:
         #     end_pos = len(item_set)
         # self._item_set = IterableWrapper(self._item_set[start_pos : end_pos])
-        self._datapipe = IterableWrapper(self._item_set)
+        self._names = item_set.names
+        self._item_set = IterableWrapper(item_set)
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
@@ -322,7 +323,7 @@ class ItemSampler(IterDataPipe):
         return default_collate(batch)
 
     def __iter__(self) -> Iterator:
-        data_pipe = self._datapipe
+        data_pipe = self._item_set
 
         # Shuffle before batch.
         if self._shuffle:
@@ -342,8 +343,98 @@ class ItemSampler(IterDataPipe):
         data_pipe = data_pipe.collate(collate_fn=self._collate)
 
         # Map to minibatch.
-        data_pipe = data_pipe.map(
-            partial(self._minibatcher, names=self._item_set.names)
+        data_pipe = data_pipe.map(partial(self._minibatcher, names=self._names))
+
+        return iter(data_pipe)
+
+
+@functional_datapipe("distributed_sample_item")
+class DistributedItemSampler(ItemSampler):
+    """Distributed Item Sampler.
+
+    This is useful with torch's DDP training. It will create distributed item subset of data which could be node IDs, node pairs with or
+    without labels, node pairs with negative sources/destinations, DGLGraphs
+    and heterogeneous counterparts. The items of the original item set will be sharded and form an exclusive subset for each replica (process).
+
+    Note: This class `DistributedItemSampler` is not decorated with
+    `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
+    does not support function-like call. But any iterable datapipes from
+    `torchdata` can be further appended.
+
+    Parameters
+    ----------
+    item_set : ItemSet or ItemSetDict
+        Data to be sampled.
+    batch_size : int
+        The size of each batch.
+    minibatcher : Optional[Callable]
+        A callable that takes in a list of items and returns a `MiniBatch`.
+    drop_last : bool
+        Option to drop the last batch if it's not full.
+    shuffle : bool
+        Option to shuffle before sample.
+    even_inputs : bool
+        Option to make sure the numbers of batches for each replica are the same. This will be done by dropping the excessive batches of some replicas.
+    num_replicas: int
+        Number of processes participating in distributed training. By default, `world_size` is retrieved from the current distributed group.
+
+    Examples
+    --------
+    """
+
+    def __init__(
+        self,
+        item_set,
+        batch_size: int,
+        minibatcher: Optional[Callable] = minibatcher_default,
+        drop_last: Optional[bool] = False,
+        shuffle: Optional[bool] = False,
+        num_replicas: Optional[int] = None,
+        even_inputs: Optional[bool] = False,
+    ) -> None:
+        super().__init__(item_set, batch_size, minibatcher, drop_last, shuffle)
+        self._even_inputs = even_inputs
+        # Apply a sharding filter to distribute the items.
+        self._item_set = self._item_set.sharding_filter()
+        # Get world size.
+        if num_replicas == None:
+            if not dist.is_available():
+                raise RuntimeError(
+                    "Requires distributed package to be available"
+                )
+            num_replicas = dist.get_world_size()
+        total_len = len(item_set)
+        # Calculate the number of batches for each replica.
+        self._num_batches = total_len // (num_replicas * batch_size) + (
+            (not drop_last)
+            and (total_len % (num_replicas * batch_size) >= num_replicas)
         )
+
+    def __iter__(self) -> Iterator:
+        data_pipe = self._item_set
+
+        # Shuffle before batch.
+        if self._shuffle:
+            # `torchdata.datapipes.iter.Shuffler` works with stream too.
+            # To ensure randomness, make sure the buffer size is at least 10
+            # times the batch size.
+            buffer_size = max(10000, 10 * self._batch_size)
+            data_pipe = data_pipe.shuffle(buffer_size=buffer_size)
+
+        # Batch.
+        data_pipe = data_pipe.batch(
+            batch_size=self._batch_size,
+            drop_last=self._drop_last,
+        )
+
+        # If even_inputs is True, drop the excessive inputs by limiting the length of the datapipe.
+        if self._even_inputs:
+            data_pipe = data_pipe.header(self._num_batches)
+
+        # Collate.
+        data_pipe = data_pipe.collate(collate_fn=self._collate)
+
+        # Map to minibatch.
+        data_pipe = data_pipe.map(partial(self._minibatcher, names=self._names))
 
         return iter(data_pipe)

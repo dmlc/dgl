@@ -3,6 +3,8 @@ import re
 import dgl
 import pytest
 import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
 from dgl import graphbolt as gb
 from torch.testing import assert_close
 
@@ -610,3 +612,100 @@ def test_ItemSetDict_node_pairs_negative_dsts(batch_size, shuffle, drop_last):
     assert torch.all(src_ids[:-1] <= src_ids[1:]) is not shuffle
     assert torch.all(dst_ids[:-1] <= dst_ids[1:]) is not shuffle
     assert torch.all(negs_ids[:-1] <= negs_ids[1:]) is not shuffle
+
+
+def distributed_item_sampler_subprocess(
+    proc_id,
+    nprocs,
+    item_set,
+    num_ids,
+    batch_size,
+    shuffle,
+    drop_last,
+    even_inputs,
+):
+    dist.init_process_group(
+        backend="gloo",  # Use GLOO backend for CPU multiprocessing
+        init_method="tcp://127.0.0.1:12345",
+        world_size=nprocs,
+        rank=proc_id,
+    )
+
+    # Create a DistributedItemSampler.
+    item_sampler = gb.DistributedItemSampler(
+        item_set,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        drop_last=drop_last,
+        even_inputs=even_inputs,
+    )
+    data_loader = gb.SingleProcessDataLoader(item_sampler)
+
+    # Count the numbers of items and batches.
+    num_items = 0
+    sampled_count = torch.zeros(num_ids, dtype=torch.int32)
+    for i in data_loader:
+        # Count how many times each item is sampled.
+        sampled_count[i.seed_nodes] += 1
+        num_items += i.seed_nodes.size(0)
+    num_batches = len(list(item_sampler))
+
+    # Calculate expected numbers of items and batches.
+    expected_num_items = num_ids // nprocs + (num_ids % nprocs > proc_id)
+    if drop_last and expected_num_items % batch_size > 0:
+        expected_num_items -= expected_num_items % batch_size
+    expected_num_batches = expected_num_items // batch_size + (
+        (not drop_last) and (expected_num_items % batch_size > 0)
+    )
+    if even_inputs:
+        if (
+            (not drop_last)
+            and (num_ids % (nprocs * batch_size) < nprocs)
+            and (num_ids % (nprocs * batch_size) > proc_id)
+        ):
+            expected_num_batches -= 1
+            expected_num_items -= 1
+        elif (
+            drop_last
+            and (nprocs * batch_size - num_ids % (nprocs * batch_size) < nprocs)
+            and (num_ids % nprocs > proc_id)
+        ):
+            expected_num_batches -= 1
+            expected_num_items -= batch_size
+
+    # Check if the numbers are as expected.
+    assert num_items == expected_num_items
+    assert num_batches == expected_num_batches
+
+    # Add up results from all processes.
+    dist.reduce(sampled_count, 0)
+    dist.barrier()
+
+    # Make sure no item is sampled more than once.
+    assert sampled_count.max() <= 1
+
+    dist.destroy_process_group()
+
+
+@pytest.mark.parametrize("num_ids", [14, 16, 18, 20, 30, 32])
+@pytest.mark.parametrize("shuffle", [False, True])
+@pytest.mark.parametrize("drop_last", [False, True])
+@pytest.mark.parametrize("even_inputs", [False, True])
+def test_DistributedItemSampler(num_ids, shuffle, drop_last, even_inputs):
+    nprocs = 4
+    batch_size = 4
+    item_set = gb.ItemSet(torch.arange(0, num_ids), names="seed_nodes")
+    mp.spawn(
+        distributed_item_sampler_subprocess,
+        args=(
+            nprocs,
+            item_set,
+            num_ids,
+            batch_size,
+            shuffle,
+            drop_last,
+            even_inputs,
+        ),
+        nprocs=nprocs,
+        join=True,
+    )
