@@ -199,7 +199,7 @@ if __name__ == "__main__":
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", save_top_k=1)
     ########################################################################
     # (HIGHLIGHT) The `Trainer` is the key Class in lightning, which automates
-    # everything for you after defining `LightningDataModule` and
+    # everything after defining `LightningDataModule` and
     # `LightningDataModule`. More details can be found in
     # https://lightning.ai/docs/pytorch/stable/common/trainer.html.
     ########################################################################
