@@ -70,6 +70,7 @@ class SAGE(LightningModule):
         return h
 
     def training_step(self, batch, batch_idx):
+        # TODO: Move this to the data pipeline as a stage.
         blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
         x = blocks[0].srcdata["feat"]
         y = batch.labels.to("cuda")
@@ -113,6 +114,8 @@ class DataModule(LightningDataModule):
         self.fanouts = fanouts
         self.batch_size = batch_size
         self.num_workers = num_workers
+        # TODO: Update with a publicly accessible URL once the dataset has been
+        # uploaded.
         dataset = gb.OnDiskDataset(
             "/home/ubuntu/workspace/example_ogbn_products/"
         )
@@ -127,7 +130,7 @@ class DataModule(LightningDataModule):
     # (HIGHLIGHT) The 'train_dataloader' and 'val_dataloader' hooks are
     # essential components of the Lightning framework, defining how data is
     # loaded during training and validation. In this example, we utilize a
-    # specialized 'graphbolt dataloader', which are cconcatenated by a series
+    # specialized 'graphbolt dataloader', which are concatenated by a series
     # of datappipes, for these purposes.
     ########################################################################
     def train_dataloader(self):
@@ -192,13 +195,13 @@ if __name__ == "__main__":
     datamodule = DataModule([15, 10, 5], args.batch_size, args.num_workers)
     model = SAGE(100, 256, datamodule.num_classes).to(torch.double)
 
-    # Train
+    # Train.
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", save_top_k=1)
     ########################################################################
     # (HIGHLIGHT) The `Trainer` is the key Class in lightning, which automates
     # everything for you after defining `LightningDataModule` and
     # `LightningDataModule`. More details can be found in
-    # https://github.com/dmlc/dgl/pull/6335.
+    # https://lightning.ai/docs/pytorch/stable/common/trainer.html.
     ########################################################################
     trainer = Trainer(
         accelerator="gpu",
