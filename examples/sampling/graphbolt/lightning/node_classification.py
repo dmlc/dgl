@@ -31,7 +31,7 @@ main
             │
             ├───> SAGE.forward (RGCN model forward pass)
             │
-            └───> validate
+            └───> Validate
 """
 import argparse
 
