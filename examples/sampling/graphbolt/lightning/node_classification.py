@@ -1,3 +1,40 @@
+"""
+This flowchart describes the main functional sequence of the provided example.
+main
+│
+├───> initialize DataModule
+│     │
+│     └───> Load dataset
+│     │
+│     └───> Create train and valid dataloader[HIGHLIGHT]
+│           │
+│           └───> ItemSampler (Distribute data to minibatchs)
+│           │
+│           └───> NeighborSampler (Sample a subgraph for a minibatch)
+│           │
+│           └───> FeatureFetcher (Fetch features for the sampled subgraph)
+│
+├───> Instantiate GraphSAGE model
+│     │
+│     ├───> SAGEConvLayer (input to hidden)
+│     │
+│     └───> SAGEConvLayer (hidden to hidden)
+│     │
+│     └───> SAGEConvLayer (hidden to output)
+│     │
+│     └───> DropoutLayer
+│
+└───> run
+      │
+      │
+      └───> Training loop
+            │
+            ├───> SAGE.forward (RGCN model forward pass)
+            │
+            └───> validate
+"""
+import argparse
+
 import dgl.graphbolt as gb
 import dgl.nn.pytorch as dglnn
 
@@ -71,10 +108,11 @@ class SAGE(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, fanouts, batch_size):
+    def __init__(self, fanouts, batch_size, num_workers):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
+        self.num_workers = num_workers
         dataset = gb.OnDiskDataset(
             "/home/ubuntu/workspace/example_ogbn_products/"
         )
@@ -86,6 +124,13 @@ class DataModule(LightningDataModule):
         self.valid_set = dataset.tasks[0].validation_set
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
 
+    ########################################################################
+    # (HIGHLIGHT) The 'train_dataloader' and 'val_dataloader' hooks are
+    # essential components of the Lightning framework, defining how data is
+    # loaded during training and validation. In this example, we utilize a
+    # specialized 'graphbolt dataloader', which are cconcatenated by a series
+    # of datappipes, for these purposes.
+    ########################################################################
     def train_dataloader(self):
         item_sampler = gb.ItemSampler(
             self.train_set,
@@ -95,7 +140,9 @@ class DataModule(LightningDataModule):
         )
         sampler_dp = gb.NeighborSampler(item_sampler, self.graph, self.fanouts)
         feature_dp = gb.FeatureFetcher(sampler_dp, self.feature_store, ["feat"])
-        dataloader = gb.MultiProcessDataLoader(feature_dp, num_workers=8)
+        dataloader = gb.MultiProcessDataLoader(
+            feature_dp, num_workers=self.num_workers
+        )
         return dataloader
 
     def val_dataloader(self):
@@ -107,12 +154,37 @@ class DataModule(LightningDataModule):
         )
         sampler_dp = gb.NeighborSampler(item_sampler, self.graph, self.fanouts)
         feature_dp = gb.FeatureFetcher(sampler_dp, self.feature_store, ["feat"])
-        dataloader = gb.MultiProcessDataLoader(feature_dp, num_workers=8)
+        dataloader = gb.MultiProcessDataLoader(
+            feature_dp, num_workers=self.num_workers
+        )
         return dataloader
 
 
 if __name__ == "__main__":
-    datamodule = DataModule([15, 10, 5], 1024)
+    parser = argparse.ArgumentParser(
+        description="GNN baselines on ogbgmol* data with Pytorch Geometrics"
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=32,
+        help="input batch size for training (default: 32)",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=10,
+        help="number of epochs to train (default: 100)",
+    )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=0,
+        help="number of workers (default: 0)",
+    )
+    args = parser.parse_args()
+
+    datamodule = DataModule([15, 10, 5], args.batch_size, args.num_workers)
     model = SAGE(100, 256, datamodule.num_classes).to(torch.double)
 
     # Train
@@ -122,7 +194,7 @@ if __name__ == "__main__":
     #                   callbacks=[checkpoint_callback])
     trainer = Trainer(
         accelerator="gpu",
-        max_epochs=10,
+        max_epochs=args.epochs,
         callbacks=[checkpoint_callback],
     )
     trainer.fit(model, datamodule=datamodule)
