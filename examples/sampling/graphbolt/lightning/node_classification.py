@@ -10,9 +10,9 @@ main
 │           │
 │           └───> ItemSampler (Distribute data to minibatchs)
 │           │
-│           └───> NeighborSampler (Sample a subgraph for a minibatch)
+│           └───> sample_neighbor (Sample a subgraph for a minibatch)
 │           │
-│           └───> FeatureFetcher (Fetch features for the sampled subgraph)
+│           └───> fetch_feature (Fetch features for the sampled subgraph)
 │
 ├───> Instantiate GraphSAGE model
 │     │
@@ -27,7 +27,7 @@ main
 └───> run
       │
       │
-      └───> Training loop
+      └───> Trainer[HIGHLIGHT]
             │
             ├───> SAGE.forward (RGCN model forward pass)
             │
@@ -120,7 +120,6 @@ class DataModule(LightningDataModule):
         self.feature_store = dataset.feature
         self.graph = dataset.graph
         self.train_set = dataset.tasks[0].train_set
-        self.test_set = dataset.tasks[0].test_set
         self.valid_set = dataset.tasks[0].validation_set
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
 
@@ -132,30 +131,30 @@ class DataModule(LightningDataModule):
     # of datappipes, for these purposes.
     ########################################################################
     def train_dataloader(self):
-        item_sampler = gb.ItemSampler(
+        datapipe = gb.ItemSampler(
             self.train_set,
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=True,
         )
-        sampler_dp = gb.NeighborSampler(item_sampler, self.graph, self.fanouts)
-        feature_dp = gb.FeatureFetcher(sampler_dp, self.feature_store, ["feat"])
+        datapipe = datapipe.sample_neighbor(self.graph, self.fanouts)
+        datapipe = datapipe.fetch_feature(self.feature_store, ["feat"])
         dataloader = gb.MultiProcessDataLoader(
-            feature_dp, num_workers=self.num_workers
+            datapipe, num_workers=self.num_workers
         )
         return dataloader
 
     def val_dataloader(self):
-        item_sampler = gb.ItemSampler(
+        datapipe = gb.ItemSampler(
             self.valid_set,
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=True,
         )
-        sampler_dp = gb.NeighborSampler(item_sampler, self.graph, self.fanouts)
-        feature_dp = gb.FeatureFetcher(sampler_dp, self.feature_store, ["feat"])
+        datapipe = datapipe.sample_neighbor(self.graph, self.fanouts)
+        datapipe = datapipe.fetch_feature(self.feature_store, ["feat"])
         dataloader = gb.MultiProcessDataLoader(
-            feature_dp, num_workers=self.num_workers
+            datapipe, num_workers=self.num_workers
         )
         return dataloader
 
@@ -163,6 +162,12 @@ class DataModule(LightningDataModule):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="GNN baselines on ogbgmol* data with Pytorch Geometrics"
+    )
+    parser.add_argument(
+        "--num_gpus",
+        type=int,
+        default=4,
+        help="number of GPUs used for computing (default: 4)",
     )
     parser.add_argument(
         "--batch_size",
@@ -189,11 +194,15 @@ if __name__ == "__main__":
 
     # Train
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", save_top_k=1)
-    # Use this for single GPU
-    # trainer = Trainer(accelerator="gpu", devices=[0], max_epochs=10,
-    #                   callbacks=[checkpoint_callback])
+    ########################################################################
+    # (HIGHLIGHT) The `Trainer` is the key Class in lightning, which automates
+    # everything for you after defining `LightningDataModule` and
+    # `LightningDataModule`. More details can be found
+    # in https://github.com/dmlc/dgl/pull/6335.
+    ########################################################################
     trainer = Trainer(
         accelerator="gpu",
+        devices=args.num_gpus,
         max_epochs=args.epochs,
         callbacks=[checkpoint_callback],
     )
