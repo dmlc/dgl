@@ -197,8 +197,8 @@ if __name__ == "__main__":
     ########################################################################
     # (HIGHLIGHT) The `Trainer` is the key Class in lightning, which automates
     # everything for you after defining `LightningDataModule` and
-    # `LightningDataModule`. More details can be found
-    # in https://github.com/dmlc/dgl/pull/6335.
+    # `LightningDataModule`. More details can be found in
+    # https://github.com/dmlc/dgl/pull/6335.
     ########################################################################
     trainer = Trainer(
         accelerator="gpu",
