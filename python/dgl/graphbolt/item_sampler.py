@@ -388,7 +388,7 @@ class DistributedItemSampler(ItemSampler):
         # Apply a sharding filter to distribute the items.
         self._item_set = self._item_set.sharding_filter()
         # Get world size.
-        if num_replicas == None:
+        if num_replicas is None:
             if not dist.is_available():
                 raise RuntimeError(
                     "Requires distributed package to be available"
