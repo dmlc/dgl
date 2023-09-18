@@ -2,7 +2,7 @@
 This flowchart describes the main functional sequence of the provided example.
 main
 │
-├───> initialize DataModule
+├───> Instantiate DataModule
 │     │
 │     └───> Load dataset
 │     │
@@ -24,7 +24,7 @@ main
 │     │
 │     └───> DropoutLayer
 │
-└───> run
+└───> Run
       │
       │
       └───> Trainer[HIGHLIGHT]
