@@ -1,4 +1,4 @@
-'''
+"""
 This script trains and tests a GraphSAGE model for node classification
 on large graphs using GraphBolt dataloader.
 
@@ -11,7 +11,7 @@ training pipeline using GraphBolt.
 
 Before reading this example, please familiar yourself with graphsage node
 classification by reading the example in the
-`examples/core/graphsage/node_classification.py`. This introduction, 
+`examples/core/graphsage/node_classification.py`. This introduction,
 [A Blitz Introduction to Node Classification with DGL]
 (https://docs.dgl.ai/tutorials/blitz/1_introduction.html), might be helpful.
 
@@ -36,10 +36,9 @@ main
 │           └───> Validation set evaluation
 │
 └───> Test set evaluation
-'''
+"""
 import argparse
 
-import dgl
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch
@@ -72,12 +71,14 @@ class SAGE(nn.Module):
         return hidden_x
 
 
-'''HIGHLIGHT'''
+"""HIGHLIGHT"""
+
+
 def create_dataloader(args, graph, features, itemset, is_train=True):
     """
     Get a GraphBolt version of a dataloader for node classification tasks.
     This function demonstrates how to utilize functional forms of datapipes in
-    GraphBolt. 
+    GraphBolt.
     Alternatively, you can create a datapipe using its class constructor.
     """
 
@@ -99,20 +100,22 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize the ItemSampler to sample mini-batche from the dataset.
     ############################################################################
-    datapipe = gb.ItemSampler(itemset, batch_size=args.batch_size, shuffle=is_train)
+    datapipe = gb.ItemSampler(
+        itemset, batch_size=args.batch_size, shuffle=is_train
+    )
 
     ############################################################################
     # [Step-2]:
     # self.sample_uniform_negative()
     # [Note]:
     # some extra operations, such as initializing the UniformNegativeSampler for
-    # negative sampling, may be needed in other tasks when it is not training, 
+    # negative sampling, may be needed in other tasks when it is not training,
     # but not in node classification. Therefore we omit this step here.
     ############################################################################
     if is_train:
         # datapipe = datapipe.sample_uniform_negative(args.neg_ratio, graph)
         pass
-    
+
     ############################################################################
     # [Step-3]:
     # self.sample_neighbor()
@@ -163,7 +166,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=args.num_workers)
+    dataloader = gb.MultiProcessDataLoader(
+        datapipe, num_workers=args.num_workers
+    )
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -174,7 +179,9 @@ def evaluate(args, model, graph, features, itemset, num_classes):
     model.eval()
     ys = []
     y_hats = []
-    dataloader = create_dataloader(args, graph, features, itemset, is_train=False)
+    dataloader = create_dataloader(
+        args, graph, features, itemset, is_train=False
+    )
 
     for step, data in tqdm.tqdm(enumerate(dataloader)):
         blocks = data.to_dgl_blocks()
@@ -182,14 +189,22 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         x = data.node_features["feat"].float()
         ys.append(data.labels)
         y_hats.append(model(blocks, x))
-    
-    res = MF.accuracy(torch.cat(y_hats), torch.cat(ys), task="multiclass", num_classes=num_classes)
+
+    res = MF.accuracy(
+        torch.cat(y_hats),
+        torch.cat(ys),
+        task="multiclass",
+        num_classes=num_classes,
+    )
 
     return res
 
+
 def train(args, graph, features, train_set, valid_set, num_classes, model):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    dataloader = create_dataloader(args, graph, features, train_set, is_train=True)
+    dataloader = create_dataloader(
+        args, graph, features, train_set, is_train=True
+    )
 
     for epoch in tqdm.trange(args.epochs):
         # print(f"The beginning of epoch {epoch}")
@@ -223,7 +238,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             optimizer.step()
 
             total_loss += loss.item()
-        
+
         # Evaluate the model.
         print("Validating...")
         acc = evaluate(args, model, graph, features, valid_set, num_classes)
@@ -234,18 +249,34 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=
-        "A script trains and tests a GraphSAGE model for node classification using GraphBolt dataloader."
+    parser = argparse.ArgumentParser(
+        description="A script trains and tests a GraphSAGE model "
+        "for node classification using GraphBolt dataloader."
     )
-    parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs.")
-    parser.add_argument("--lr", type=float, default=0.0005, help="Learning rate for optimization.")
-    parser.add_argument("--batch-size", type=int, default=512, help="Batch size for training.")
-    parser.add_argument("--num-workers", type=int, default=4, help="Number of workers for data loading.")
+    parser.add_argument(
+        "--epochs", type=int, default=10, help="Number of training epochs."
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=0.0005,
+        help="Learning rate for optimization.",
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=512, help="Batch size for training."
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=4,
+        help="Number of workers for data loading.",
+    )
     parser.add_argument(
         "--fanout",
         type=str,
         default="15,10,5",
-        help="Fan-out of neighbor sampling. It is IMPORTANT to keep `len(fanout)` identical with the number of layers in your model. Default: 15,10,5",
+        help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
+        " identical with the number of layers in your model. Default: 15,10,5",
     )
     parser.add_argument(
         "--device",
@@ -255,6 +286,7 @@ def parse_args():
     )
     return parser.parse_args()
 
+
 def main(args):
     if not torch.cuda.is_available():
         args.device = "cpu"
@@ -262,8 +294,8 @@ def main(args):
 
     # Load and preprocess dataset.
     dataset = gb.OnDiskDataset(
-        "/home/ubuntu/example_ogbn_products" # Please edit it according to the path of your own dataset.
-    ).load()
+        "/home/ubuntu/example_ogbn_products"
+    ).load()  # Please edit it according to the path of your own dataset.
 
     graph = dataset.graph
     features = dataset.feature
@@ -271,11 +303,13 @@ def main(args):
     valid_set = dataset.tasks[0].validation_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
-    num_classes = dataset.tasks[0].metadata['num_classes']
+    num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    in_size = features.read('node', None, 'feat').shape[1] # Size of feature of a single node.
-    hidden_size = 128 # Customized by you.
-    out_size = num_classes # Number of classes.
+    in_size = features.read("node", None, "feat").shape[
+        1
+    ]  # Size of feature of a single node.
+    hidden_size = 128  # Customized by you.
+    out_size = num_classes  # Number of classes.
 
     model = SAGE(in_size, hidden_size, out_size)
 
@@ -283,12 +317,13 @@ def main(args):
     print("Training...")
     train(args, graph, features, train_set, valid_set, num_classes, model)
 
-     # Test the model.
+    # Test the model.
     print("Testing...")
     test_set = dataset.tasks[0].test_set
-    test_mrr = evaluate(args, model, graph, features, itemset=test_set, num_classes=num_classes)
+    test_mrr = evaluate(
+        args, model, graph, features, itemset=test_set, num_classes=num_classes
+    )
     print(f"Test MRR {test_mrr.item():.4f}")
-
 
 
 if __name__ == "__main__":
