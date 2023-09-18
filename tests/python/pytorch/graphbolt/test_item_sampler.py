@@ -673,21 +673,21 @@ def distributed_item_sampler_subprocess(
             expected_num_batches -= 1
             expected_num_items -= batch_size
 
-    # Check if the numbers are as expected.
-    assert num_items == expected_num_items
-    assert num_batches == expected_num_batches
-
     # Add up results from all processes.
     dist.reduce(sampled_count, 0)
-    dist.barrier()
 
-    # Make sure no item is sampled more than once.
-    assert sampled_count.max() <= 1
+    try:
+        # Check if the numbers are as expected.
+        assert num_items == expected_num_items
+        assert num_batches == expected_num_batches
 
-    dist.destroy_process_group()
+        # Make sure no item is sampled more than once.
+        assert sampled_count.max() <= 1
+    finally:
+        dist.destroy_process_group()
 
 
-@pytest.mark.parametrize("num_ids", [14, 16, 18, 20, 30, 32])
+@pytest.mark.parametrize("num_ids", [14, 30, 32, 34, 36])
 @pytest.mark.parametrize("shuffle", [False, True])
 @pytest.mark.parametrize("drop_last", [False, True])
 @pytest.mark.parametrize("even_inputs", [False, True])
