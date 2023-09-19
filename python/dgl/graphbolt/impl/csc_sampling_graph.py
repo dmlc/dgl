@@ -242,8 +242,6 @@ class CSCSamplingGraph:
                 src_ntype_id = self.metadata.node_type_to_id[src_ntype]
                 dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
                 mask = type_per_edge == etype_id
-                if mask.count_nonzero() == 0:
-                    continue
                 hetero_row = row[mask] - self.node_type_offset[src_ntype_id]
                 hetero_column = (
                     column[mask] - self.node_type_offset[dst_ntype_id]
