@@ -338,11 +338,12 @@ class ItemSampler(IterDataPipe):
 class DistributedItemSampler(ItemSampler):
     """Distributed Item Sampler.
 
-    This is useful with torch's DDP training. It will create distributed item
-    subset of data which could be node IDs, node pairs with or without labels,
-    node pairs with negative sources/destinations, DGLGraphs and heterogeneous
-    counterparts. The items of the original item set will be sharded and form
-    an exclusive subset for each replica (process).
+    This sampler creates a distributed subset of items from the given data set,
+    which can be used for training with PyTorch's Distributed Data Parallel
+    (DDP). The items can be node IDs, node pairs with or without labels, node
+    pairs with negative sources/destinations, DGLGraphs, or heterogeneous
+    counterparts. The original item set is sharded such that each replica
+    (process) receives an exclusive subset.
 
     Note: This class `DistributedItemSampler` is not decorated with
     `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
@@ -362,16 +363,22 @@ class DistributedItemSampler(ItemSampler):
     shuffle : bool
         Option to shuffle before sample.
     num_replicas: int
-        Number of processes participating in distributed training. By default,
-        `world_size` is retrieved from the current distributed group.
-    even_inputs : bool
+        The number of model replicas that will be created during Distributed
+        Data Parallel (DDP) training. By default, the world size is retrieved
+        from the current distributed group.
+    drop_uneven_inputs : bool
         Option to make sure the numbers of batches for each replica are the
-        same. If some of the processes have more batches than the others, the
-        redundant batches of those processes will be dropped. If drop_last and
-        even_inputs are both true, it will execute drop_last before even_inputs.
-        When using DDP training, using Join Context Manager provided by pytorch
-        is the recommended way to solve the uneven inputs problem. But if Join
-        is not helpful due to any reason, you could try this option.
+        same. If some of the replicas have more batches than the others, the
+        redundant batches of those replicas will be dropped. If the drop_last
+        parameter is also set to True, the last batch will be dropped before the
+        redundant batches are dropped.
+        Note: When using Distributed Data Parallel (DDP) training, the program
+        may hang or error if the a replica has fewer inputs. It is recommended
+        to use the Join Context Manager provided by PyTorch to solve this
+        problem. Please refer to
+        https://pytorch.org/tutorials/advanced/generic_join.html. However, this
+        option can be used if the Join Context Manager is not helpful for any
+        reason.
 
     Examples
     --------
@@ -385,18 +392,17 @@ class DistributedItemSampler(ItemSampler):
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
         num_replicas: Optional[int] = None,
-        even_inputs: Optional[bool] = False,
+        drop_uneven_inputs: Optional[bool] = False,
     ) -> None:
         super().__init__(item_set, batch_size, minibatcher, drop_last, shuffle)
-        self._even_inputs = even_inputs
+        self._drop_uneven_inputs = drop_uneven_inputs
         # Apply a sharding filter to distribute the items.
         self._item_set = self._item_set.sharding_filter()
         # Get world size.
         if num_replicas is None:
-            if not dist.is_available():
-                raise RuntimeError(
-                    "Requires distributed package to be available"
-                )
+            assert (
+                dist.is_available()
+            ), "Requires distributed package to be available"
             num_replicas = dist.get_world_size()
         total_len = len(item_set)
         # Calculate the number of batches for each replica.
@@ -422,9 +428,9 @@ class DistributedItemSampler(ItemSampler):
             drop_last=self._drop_last,
         )
 
-        # If even_inputs is True, drop the excessive inputs by limiting the
-        # length of the datapipe.
-        if self._even_inputs:
+        # If drop_uneven_inputs is True, drop the excessive inputs by limiting
+        # the length of the datapipe.
+        if self._drop_uneven_inputs:
             data_pipe = data_pipe.header(self._num_batches)
 
         # Collate.
