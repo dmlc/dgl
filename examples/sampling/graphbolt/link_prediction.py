@@ -124,7 +124,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # negative edges information.
     ############################################################################
     if is_train:
-        datapipe = datapipe.sample_uniform_negative(args.neg_ratio, graph)
+        datapipe = datapipe.sample_uniform_negative(graph, args.neg_ratio)
 
     ############################################################################
     # [Input]:
@@ -328,9 +328,7 @@ def main(args):
 
     # Load and preprocess dataset.
     print("Loading data")
-    dataset = gb.OnDiskDataset(
-        "/home/ubuntu/wklwork/work#4/example_ogbl_citation2"
-    ).load()
+    dataset = gb.BuiltinDataset("ogbl-citation2").load()
     graph = dataset.graph
     features = dataset.feature
     train_set = dataset.tasks[0].train_set

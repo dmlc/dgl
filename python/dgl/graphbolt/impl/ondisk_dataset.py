@@ -11,6 +11,7 @@ import yaml
 
 import dgl
 
+from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
@@ -29,7 +30,7 @@ from .ondisk_metadata import (
 )
 from .torch_based_feature_store import TorchBasedFeatureStore
 
-__all__ = ["OnDiskDataset", "preprocess_ondisk_dataset"]
+__all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 
 def _copy_or_convert_data(
@@ -473,3 +474,31 @@ class OnDiskDataset(Dataset):
                 )
             ret = ItemSetDict(data)
         return ret
+
+
+class BuiltinDataset(OnDiskDataset):
+    """GraphBolt builtin on-disk dataset.
+
+    This class is used to help download datasets from DGL S3 storage and load
+    them as ``OnDiskDataset``.
+
+    Parameters
+    ----------
+    name : str
+        The name of the builtin dataset.
+    root : str, optional
+        The root directory of the dataset. Default ot ``datasets``.
+    """
+
+    _base_url = "https://data.dgl.ai/dataset/graphbolt/"
+
+    def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
+        dataset_dir = os.path.join(root, name)
+        if not os.path.exists(dataset_dir):
+            url = self._base_url + name + ".zip"
+            os.makedirs(root, exist_ok=True)
+            zip_file_path = os.path.join(root, name + ".zip")
+            download(url, path=zip_file_path)
+            extract_archive(zip_file_path, root, overwrite=True)
+            os.remove(zip_file_path)
+        super().__init__(dataset_dir)

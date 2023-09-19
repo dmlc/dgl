@@ -56,23 +56,19 @@ class NeighborSampler(SubgraphSampler):
         Examples
         -------
         >>> import dgl.graphbolt as gb
-        >>> from torchdata.datapipes.iter import Mapper
         >>> from dgl import graphbolt as gb
         >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
         >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
         >>> graph = gb.from_csc(indptr, indices)
-        >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
         >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
         >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...item_sampler, 2, data_format, graph)
-        >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
-            ...torch.LongTensor([15])]
+            ...item_sampler, graph, 2)
         >>> subgraph_sampler = gb.NeighborSampler(
-            ...neg_sampler, graph, fanouts)
+            ...neg_sampler, graph, [5, 10, 15])
         >>> for data in subgraph_sampler:
             ... print(data.compacted_node_pairs)
             ... print(len(data.sampled_subgraphs))
@@ -82,6 +78,7 @@ class NeighborSampler(SubgraphSampler):
         3
         """
         super().__init__(datapipe)
+        self.graph = graph
         # Convert fanouts to a list of tensors.
         self.fanouts = []
         for fanout in fanouts:
@@ -95,6 +92,13 @@ class NeighborSampler(SubgraphSampler):
     def _sample_subgraphs(self, seeds):
         subgraphs = []
         num_layers = len(self.fanouts)
+        # Enrich seeds with all node types.
+        if isinstance(seeds, dict):
+            ntypes = list(self.graph.metadata.node_type_to_id.keys())
+            seeds = {
+                ntype: seeds.get(ntype, torch.LongTensor([]))
+                for ntype in ntypes
+            }
         for hop in range(num_layers):
             subgraph = self.sampler(
                 seeds,
@@ -168,7 +172,6 @@ class LayerNeighborSampler(NeighborSampler):
         Examples
         -------
         >>> import dgl.graphbolt as gb
-        >>> from torchdata.datapipes.iter import Mapper
         >>> from dgl import graphbolt as gb
         >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
         >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
