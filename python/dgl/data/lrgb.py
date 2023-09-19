@@ -6,8 +6,9 @@ import pandas as pd
 from ogb.utils import smiles2graph
 from tqdm import tqdm
 
-import dgl
 from .. import backend as F
+
+from ..convert import graph as dgl_graph
 from .dgl_dataset import DGLDataset
 from .utils import download, load_graphs, save_graphs, Subset
 
@@ -57,7 +58,7 @@ class PeptidesStructuralDataset(DGLDataset):
         Whether to print out progress information.
         Default: False.
     smiles2graph (callable):
-        A callable function that converts a SMILES string into a graph object. We use the OGB featurization.
+        A callable function that converts a SMILES string into a graph object.
         * The default smiles2graph requires rdkit to be installed *
 
     Examples
@@ -92,14 +93,19 @@ class PeptidesStructuralDataset(DGLDataset):
         smiles2graph=smiles2graph,
     ):
         self.smiles2graph = smiles2graph
-        self.version = "9786061a34298a0684150f2e4ff13f47"  # MD5 hash of the intended dataset file
-        self.url_stratified_split = "https://www.dropbox.com/s/9dfifzft1hqgow6/splits_random_stratified_peptide_structure.pickle?dl=1"
+        # MD5 hash of the dataset file.
+        self.version = "9786061a34298a0684150f2e4ff13f47"
+        self.url_stratified_split = """
+        https://www.dropbox.com/s/9dfifzft1hqgow6/splits_random_stratified_peptide_structure.pickle?dl=1
+        """
         self.md5sum_stratified_split = "5a0114bdadc80b94fc7ae974f13ef061"
 
         super(PeptidesStructuralDataset, self).__init__(
             name="Peptides-struc",
             raw_dir=raw_dir,
-            url="https://www.dropbox.com/s/464u3303eu2u4zp/peptide_structure_dataset.csv.gz?dl=1",
+            url="""
+            https://www.dropbox.com/s/464u3303eu2u4zp/peptide_structure_dataset.csv.gz?dl=1
+            """,
             force_reload=force_reload,
             verbose=verbose,
         )
@@ -147,13 +153,6 @@ class PeptidesStructuralDataset(DGLDataset):
         assert self._md5sum(path_split) == self.md5sum_stratified_split
 
     def process(self):
-        try:
-            import torch
-        except ImportError:
-            raise ModuleNotFoundError(
-                "This dataset requires PyTorch to be the backend."
-            )
-
         data_df = pd.read_csv(self.raw_data_path)
         smiles_list = data_df["smiles"]
         target_names = [
@@ -184,18 +183,18 @@ class PeptidesStructuralDataset(DGLDataset):
 
             assert len(graph["edge_feat"]) == graph["edge_index"].shape[1]
             assert len(graph["node_feat"]) == graph["num_nodes"]
-            dgl_graph = dgl.graph(
+            DGLgraph = dgl_graph(
                 (graph["edge_index"][0], graph["edge_index"][1]),
                 num_nodes=graph["num_nodes"],
             )
-            dgl_graph.edata["feat"] = F.zerocopy_from_numpy(
+            DGLgraph.edata["feat"] = F.zerocopy_from_numpy(
                 graph["edge_feat"]
             ).to(F.int64)
-            dgl_graph.ndata["feat"] = F.zerocopy_from_numpy(
+            DGLgraph.ndata["feat"] = F.zerocopy_from_numpy(
                 graph["node_feat"]
             ).to(F.int64)
 
-            self.graphs.append(dgl_graph)
+            self.graphs.append(DGLgraph)
             self.labels.append(y)
 
         self.labels = F.tensor(self.labels, dtype=F.float32)

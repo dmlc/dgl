@@ -70,11 +70,18 @@ from .heterophilous_graphs import (
     RomanEmpireDataset,
     TolokersDataset,
 )
+
+# RDKit is required for OGB-LSC PCQM4Mv2 and the datasets derived from it.
+# Exception handling was added to prevent crashes for users who are using other
+# datasets.
+try:
+    from .lrgb import PeptidesStructuralDataset
+except ImportError:
+    pass
 from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
 from .zinc import ZINCDataset
-from .lrgb import PeptidesStructuralDataset
 
 
 def register_data_args(parser):
