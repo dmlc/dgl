@@ -1,6 +1,53 @@
 import dgl.graphbolt as gb
+import gb_test_utils as gbt
 import pytest
 import torch
+
+
+def test_full_nodes_itemset_homo():
+    num_nodes = 5
+    num_edges = 10
+
+    homo_graph = gb.from_csc(*gbt.random_homo_graph(num_nodes, num_edges))
+    full_nodes_itemset = gb.full_nodes_itemset(homo_graph)
+
+    assert isinstance(full_nodes_itemset, gb.ItemSet)
+    assert full_nodes_itemset.names == ("full_seed_nodes",)
+    for i, item in enumerate(full_nodes_itemset):
+        assert i == item
+
+
+@pytest.mark.parametrize(
+    "num_nodes, num_edges", [(2, 1), (100, 1), (10, 50), (1000, 50000)]
+)
+@pytest.mark.parametrize("num_ntypes, num_etypes", [(2, 1), (3, 5), (100, 1)])
+def test_full_ndoes_itemset_hetero(
+    num_nodes, num_edges, num_ntypes, num_etypes
+):
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes)
+    edge_attributes = {
+        "A1": torch.randn(num_edges),
+        "A2": torch.randn(num_edges),
+    }
+    hetero_graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
+    )
+    full_nodes_itemset = gb.full_nodes_itemset(hetero_graph)
+
+    assert isinstance(full_nodes_itemset, gb.ItemSetDict)
+    assert full_nodes_itemset.names == ("full_seed_nodes",)
+    assert len(list(full_nodes_itemset)) == num_nodes
 
 
 def test_find_reverse_edges_homo():

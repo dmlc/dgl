@@ -6,7 +6,28 @@ from typing import Dict, List, Tuple, Union
 import torch
 
 from ..base import etype_str_to_tuple
+from ..itemset import ItemSet, ItemSetDict
 from ..minibatch import MiniBatch
+
+
+def full_nodes_itemset(
+    graph, name="full_seed_nodes"
+) -> Union[ItemSet, ItemSetDict]:
+    node_type_offset = graph.node_type_offset
+    if node_type_offset is None or len(node_type_offset) == 2:
+        # Homogeneous graph.
+        return ItemSet(torch.arange(graph.num_nodes), names=name)
+    else:
+        # Heterogeneous graph.
+        node_types = list(graph.metadata.node_type_to_id.keys())
+        node_dict = {
+            node_types[i]: ItemSet(
+                torch.arange(node_type_offset[i + 1] - node_type_offset[i]),
+                names=name,
+            )
+            for i in range(len(node_types))
+        }
+        return ItemSetDict(node_dict)
 
 
 def add_reverse_edges(

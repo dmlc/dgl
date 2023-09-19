@@ -19,6 +19,7 @@ from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
 from .utils import (
+    full_nodes_itemset,
     add_reverse_edges,
     exclude_seed_edges,
     unique_and_compact,
