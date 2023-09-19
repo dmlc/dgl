@@ -78,6 +78,7 @@ class NeighborSampler(SubgraphSampler):
         3
         """
         super().__init__(datapipe)
+        self.graph = graph
         # Convert fanouts to a list of tensors.
         self.fanouts = []
         for fanout in fanouts:
@@ -91,6 +92,13 @@ class NeighborSampler(SubgraphSampler):
     def _sample_subgraphs(self, seeds):
         subgraphs = []
         num_layers = len(self.fanouts)
+        # Enrich seeds with all node types.
+        if isinstance(seeds, dict):
+            ntypes = list(self.graph.metadata.node_type_to_id.keys())
+            seeds = {
+                ntype: seeds.get(ntype, torch.LongTensor([]))
+                for ntype in ntypes
+            }
         for hop in range(num_layers):
             subgraph = self.sampler(
                 seeds,
