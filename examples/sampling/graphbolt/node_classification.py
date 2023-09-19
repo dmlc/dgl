@@ -71,11 +71,9 @@ class SAGE(nn.Module):
         return hidden_x
 
 
-"""HIGHLIGHT"""
-
-
 def create_dataloader(args, graph, features, itemset, is_train=True):
     """
+    [HIGHLIGHT]
     Get a GraphBolt version of a dataloader for node classification tasks.
     This function demonstrates how to utilize functional forms of datapipes in
     GraphBolt.
@@ -106,18 +104,6 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Step-2]:
-    # self.sample_uniform_negative()
-    # [Note]:
-    # some extra operations, such as initializing the UniformNegativeSampler for
-    # negative sampling, may be needed in other tasks when it is not training,
-    # but not in node classification. Therefore we omit this step here.
-    ############################################################################
-    if is_train:
-        # datapipe = datapipe.sample_uniform_negative(args.neg_ratio, graph)
-        pass
-
-    ############################################################################
-    # [Step-3]:
     # self.sample_neighbor()
     # [Input]:
     # 'datapipe' is either 'ItemSampler' or 'UniformNegativeSampler' depending
@@ -132,7 +118,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     datapipe = datapipe.sample_neighbor(graph, args.fanout)
 
     ############################################################################
-    # [Step-4]:
+    # [Step-3]:
     # self.fetch_feature()
     # [Input]:
     # 'features': The node features.
@@ -146,17 +132,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
-    # [Step-5]:
-    # self.copy_to()
-    # [Input]:
-    # 'device': The device to copy the data to.
-    # [Output]:
-    # A CopyTo object to copy the data to the specified device.
-    ############################################################################
-    datapipe = datapipe.copy_to(device=args.device)
-
-    ############################################################################
-    # [Step-6]:
+    # [Step-4]:
     # gb.MultiProcessDataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
@@ -207,24 +183,15 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
     )
 
     for epoch in tqdm.trange(args.epochs):
-        # print(f"The beginning of epoch {epoch}")
         model.train()
         total_loss = 0
         for step, data in tqdm.tqdm(enumerate(dataloader)):
-            # print(f"epoch: {epoch}, step: {step}")
-
-            # blocks = data.to_dgl_blocks()
-
             # The input features from the source nodes in the first layer's
             # computation graph.
-            # x = blocks[0].srcdata["feat"]
             x = data.node_features["feat"].float()
-
-            # print(x)
 
             # The ground truth labels from the destination nodes
             # in the last layer's computation graph.
-            # y = blocks[-1].dstdata["label"]
             y = data.labels
 
             # The predicted labels.
@@ -263,7 +230,7 @@ def parse_args():
         help="Learning rate for optimization.",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=512, help="Batch size for training."
+        "--batch-size", type=int, default=256, help="Batch size for training."
     )
     parser.add_argument(
         "--num-workers",
@@ -293,9 +260,7 @@ def main(args):
     print(f"Training in {args.device} mode.")
 
     # Load and preprocess dataset.
-    dataset = gb.OnDiskDataset(
-        "/home/ubuntu/example_ogbn_products"
-    ).load()  # Please edit it according to the path of your own dataset.
+    dataset = gb.BuiltinDataset("ogbn-products").load()
 
     graph = dataset.graph
     features = dataset.feature
@@ -308,8 +273,8 @@ def main(args):
     in_size = features.read("node", None, "feat").shape[
         1
     ]  # Size of feature of a single node.
-    hidden_size = 128  # Customized by you.
-    out_size = num_classes  # Number of classes.
+    hidden_size = 128
+    out_size = num_classes
 
     model = SAGE(in_size, hidden_size, out_size)
 
@@ -320,10 +285,10 @@ def main(args):
     # Test the model.
     print("Testing...")
     test_set = dataset.tasks[0].test_set
-    test_mrr = evaluate(
+    test_acc = evaluate(
         args, model, graph, features, itemset=test_set, num_classes=num_classes
     )
-    print(f"Test MRR {test_mrr.item():.4f}")
+    print(f"Test Accuracy is {test_acc.item():.4f}")
 
 
 if __name__ == "__main__":
