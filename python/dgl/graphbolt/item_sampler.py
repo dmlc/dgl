@@ -366,8 +366,12 @@ class DistributedItemSampler(ItemSampler):
         `world_size` is retrieved from the current distributed group.
     even_inputs : bool
         Option to make sure the numbers of batches for each replica are the
-        same. This will be done by dropping the excessive batches of some
-        replicas.
+        same. If some of the processes have more batches than the others, the
+        redundant batches of those processes will be dropped. If drop_last and
+        even_inputs are both true, it will execute drop_last before even_inputs.
+        When using DDP training, using Join Context Manager provided by pytorch
+        is the recommended way to solve the uneven inputs problem. But if Join
+        is not helpful due to any reason, you could try this option.
 
     Examples
     --------
