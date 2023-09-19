@@ -202,13 +202,13 @@ if __name__ == "__main__":
         "--batch_size",
         type=int,
         default=1024,
-        help="input batch size for training (default: 32)",
+        help="input batch size for training (default: 1024)",
     )
     parser.add_argument(
         "--epochs",
         type=int,
         default=10,
-        help="number of epochs to train (default: 100)",
+        help="number of epochs to train (default: 10)",
     )
     parser.add_argument(
         "--num_workers",
