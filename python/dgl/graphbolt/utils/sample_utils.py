@@ -13,6 +13,7 @@ from ..minibatch import MiniBatch
 def full_nodes_itemset(
     graph, name="full_seed_nodes"
 ) -> Union[ItemSet, ItemSetDict]:
+    """To get the full seed nodes itemset of the graph."""
     node_type_offset = graph.node_type_offset
     if node_type_offset is None or len(node_type_offset) == 2:
         # Homogeneous graph.
