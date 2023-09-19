@@ -1,4 +1,5 @@
 import re
+from sys import platform
 
 import dgl
 import pytest
@@ -626,7 +627,9 @@ def distributed_item_sampler_subprocess(
 ):
     dist.init_process_group(
         backend="gloo",  # Use GLOO backend for CPU multiprocessing
-        init_method="tcp://127.0.0.1:12345",
+        init_method="file:///d:/tmp_distributed_item_sampler_subprocess"
+        if platform == "win32"
+        else "tcp://127.0.0.1:12345",
         world_size=nprocs,
         rank=proc_id,
     )
