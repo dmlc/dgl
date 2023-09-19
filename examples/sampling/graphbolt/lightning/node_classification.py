@@ -10,7 +10,8 @@ main
 │           │
 │           └───> ItemSampler (Distribute data to minibatchs)
 │           │
-│           └───> sample_neighbor (Sample a subgraph for a minibatch)
+│           └───> sample_neighbor or sample_layer_neighbor
+                  (Sample a subgraph for a minibatch)
 │           │
 │           └───> fetch_feature (Fetch features for the sampled subgraph)
 │
@@ -29,7 +30,7 @@ main
       │
       └───> Trainer[HIGHLIGHT]
             │
-            ├───> SAGE.forward (RGCN model forward pass)
+            ├───> SAGE.forward (GraphSAGE model forward pass)
             │
             └───> Validate
 """
@@ -69,6 +70,28 @@ class SAGE(LightningModule):
                 h = self.dropout(h)
         return h
 
+    def log_node_and_edge_counts(self, blocks):
+        node_counts = [block.num_src_nodes() for block in blocks] + [
+            blocks[-1].num_dst_nodes()
+        ]
+        edge_counts = [block.num_edges() for block in blocks]
+        for i, c in enumerate(node_counts):
+            self.log(
+                f"num_nodes/{i}",
+                float(c),
+                prog_bar=True,
+                on_step=True,
+                on_epoch=False,
+            )
+            if i < len(edge_counts):
+                self.log(
+                    f"num_edges/{i}",
+                    float(edge_counts[i]),
+                    prog_bar=True,
+                    on_step=True,
+                    on_epoch=False,
+                )
+
     def training_step(self, batch, batch_idx):
         # TODO: Move this to the data pipeline as a stage.
         blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
@@ -84,6 +107,7 @@ class SAGE(LightningModule):
             on_step=True,
             on_epoch=False,
         )
+        self.log_node_and_edge_counts(blocks)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -96,10 +120,11 @@ class SAGE(LightningModule):
             "val_acc",
             self.val_acc,
             prog_bar=True,
-            on_step=True,
+            on_step=False,
             on_epoch=True,
             sync_dist=True,
         )
+        self.log_node_and_edge_counts(blocks)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -109,22 +134,18 @@ class SAGE(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, fanouts, batch_size, num_workers):
+    def __init__(self, fanouts, batch_size, num_workers, labor):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
         self.num_workers = num_workers
-        # TODO: Update with a publicly accessible URL once the dataset has been
-        # uploaded.
-        dataset = gb.OnDiskDataset(
-            "/home/ubuntu/workspace/example_ogbn_products/"
-        )
-        dataset.load()
+        dataset = gb.BuiltinDataset("ogbn-products").load()
         self.feature_store = dataset.feature
         self.graph = dataset.graph
         self.train_set = dataset.tasks[0].train_set
         self.valid_set = dataset.tasks[0].validation_set
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
+        self.labor = labor
 
     ########################################################################
     # (HIGHLIGHT) The 'train_dataloader' and 'val_dataloader' hooks are
@@ -140,7 +161,12 @@ class DataModule(LightningDataModule):
             shuffle=True,
             drop_last=True,
         )
-        datapipe = datapipe.sample_neighbor(self.graph, self.fanouts)
+        sampler = (
+            datapipe.sample_layer_neighbor
+            if self.labor
+            else datapipe.sample_neighbor
+        )
+        datapipe = sampler(self.graph, self.fanouts)
         datapipe = datapipe.fetch_feature(self.feature_store, ["feat"])
         dataloader = gb.MultiProcessDataLoader(
             datapipe, num_workers=self.num_workers
@@ -169,8 +195,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_gpus",
         type=int,
-        default=4,
-        help="number of GPUs used for computing (default: 4)",
+        default=1,
+        help="number of GPUs used for computing (default: 1)",
     )
     parser.add_argument(
         "--batch_size",
@@ -190,10 +216,17 @@ if __name__ == "__main__":
         default=0,
         help="number of workers (default: 0)",
     )
+    parser.add_argument(
+        "--labor",
+        action="store_true",
+        help="Enables (La)yer-Neigh(bor) Sampler instead of Neighbor Sampler.",
+    )
     args = parser.parse_args()
 
-    datamodule = DataModule([15, 10, 5], args.batch_size, args.num_workers)
-    model = SAGE(100, 256, datamodule.num_classes).to(torch.double)
+    datamodule = DataModule(
+        [15, 10, 5], args.batch_size, args.num_workers, args.labor
+    )
+    model = SAGE(100, 256, datamodule.num_classes)
 
     # Train.
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", save_top_k=1)
