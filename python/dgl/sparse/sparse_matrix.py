@@ -754,7 +754,10 @@ class SparseMatrix:
         >>> print(original_rows)
         torch.Tensor([1, 2, 0])
         """
-        raise NotImplementedError
+        mat, idx = torch.ops.dgl_sparse.compact(
+            self.c_sparse_matrix, dim, leading_indices
+        )
+        return SparseMatrix(mat), idx
 
 
 def spmatrix(

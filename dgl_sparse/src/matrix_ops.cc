@@ -58,11 +58,12 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
   return {ret_coo, lhs_indices, rhs_indices};
 }
 
-std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> Compact(
-    const c10::intrusive_ptr<SparseMatrix>& mat, uint64_t dim,
-    torch::Tensor leading_indices) {
-  DGL_SPARSE_COO_SWITCH(mat->COOPtr(), XPU, IdType, "Compact", {
-    return CompactImpl<XPU, IdType>(mat, dim, leading_indices);
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
+Compact(
+    const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
+    torch::optional<torch::Tensor> leading_indices) {
+  DGL_SPARSE_MAT_SWITCH(mat, XPU, IdType, ValType, "Compact", {
+    return CompactImpl<XPU, IdType, ValType>(mat, dim, leading_indices);
   });
 }
 
