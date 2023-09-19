@@ -721,6 +721,109 @@ def test_sample_neighbors_replace(
     F._default_context_str == "gpu",
     reason="Graph is CPU only at present.",
 )
+@pytest.mark.parametrize("labor", [False, True])
+def test_sample_neighbors_return_eids_homo(labor):
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+    """
+    # Initialize data.
+    num_nodes = 5
+    num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Add edge id mapping from CSC graph -> original graph.
+    edge_attributes = {dgl.EID: torch.randperm(num_edges)}
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(indptr, indices, edge_attributes=edge_attributes)
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([1, 3, 4])
+    subgraph = graph.sample_neighbors(
+        nodes, fanouts=torch.LongTensor([-1]), return_eids=True
+    )
+
+    # Verify in subgraph.
+    expected_reverse_edge_ids = edge_attributes[dgl.EID][
+        torch.tensor([3, 4, 7, 8, 9, 10, 11])
+    ]
+    assert torch.equal(expected_reverse_edge_ids, subgraph.reverse_edge_ids)
+    assert subgraph.reverse_column_node_ids is None
+    assert subgraph.reverse_row_node_ids is None
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize("labor", [False, True])
+def test_sample_neighbors_return_eids_hetero(labor):
+    """
+    Original graph in COO:
+    "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
+    "n2:e2:n1":[0, 0, 1, 2], [0, 1, 1 ,0]
+    0   0   1   0   1
+    0   0   1   1   1
+    1   1   0   0   0
+    0   1   0   0   0
+    1   0   0   0   0
+    """
+    # Initialize data.
+    ntypes = {"n1": 0, "n2": 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
+    num_nodes = 5
+    num_edges = 9
+    indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
+    indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
+    type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
+    node_type_offset = torch.LongTensor([0, 2, 5])
+    edge_attributes = {
+        dgl.EID: torch.cat([torch.randperm(4), torch.randperm(5)])
+    }
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        edge_attributes=edge_attributes,
+        metadata=metadata,
+    )
+
+    # Sample on both node types.
+    nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
+    fanouts = torch.tensor([-1, -1])
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    subgraph = sampler(nodes, fanouts, return_eids=True)
+
+    # Verify in subgraph.
+    expected_reverse_edge_ids = {
+        "n2:e2:n1": edge_attributes[dgl.EID][torch.tensor([0, 1])],
+        "n1:e1:n2": edge_attributes[dgl.EID][torch.tensor([4, 5])],
+    }
+    assert subgraph.reverse_column_node_ids is None
+    assert subgraph.reverse_row_node_ids is None
+    for etype in etypes.keys():
+        assert torch.equal(
+            subgraph.reverse_edge_ids[etype], expected_reverse_edge_ids[etype]
+        )
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
 @pytest.mark.parametrize("replace", [True, False])
 @pytest.mark.parametrize("labor", [False, True])
 @pytest.mark.parametrize("probs_name", ["weight", "mask"])

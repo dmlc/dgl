@@ -8,7 +8,7 @@ from typing import Dict, Optional, Union
 
 import torch
 
-from ...base import ETYPE
+from ...base import EID, ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str
@@ -230,6 +230,10 @@ class CSCSamplingGraph:
         )
         row = C_sampled_subgraph.indices
         type_per_edge = C_sampled_subgraph.type_per_edge
+        reverse_edge_ids = C_sampled_subgraph.reverse_edge_ids
+        return_eids = reverse_edge_ids is not None
+        if return_eids:
+            reverse_edge_ids = self.edge_attributes[EID][reverse_edge_ids]
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
@@ -237,6 +241,7 @@ class CSCSamplingGraph:
             # The sampled graph is a fused homogenized graph, which need to be
             # converted to heterogeneous graphs.
             node_pairs = defaultdict(list)
+            reverse_hetero_edge_ids = {}
             for etype, etype_id in self.metadata.edge_type_to_id.items():
                 src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
                 src_ntype_id = self.metadata.node_type_to_id[src_ntype]
@@ -249,7 +254,13 @@ class CSCSamplingGraph:
                     column[mask] - self.node_type_offset[dst_ntype_id]
                 )
                 node_pairs[etype] = (hetero_row, hetero_column)
-        return SampledSubgraphImpl(node_pairs=node_pairs)
+                if return_eids:
+                    reverse_hetero_edge_ids[etype] = reverse_edge_ids[mask]
+            if return_eids:
+                reverse_edge_ids = reverse_hetero_edge_ids
+        return SampledSubgraphImpl(
+            node_pairs=node_pairs, reverse_edge_ids=reverse_edge_ids
+        )
 
     def _convert_to_homogeneous_nodes(self, nodes):
         homogeneous_nodes = []
@@ -264,6 +275,7 @@ class CSCSamplingGraph:
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        return_eids: bool = False,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -303,6 +315,15 @@ class CSCSamplingGraph:
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        return_eids: bool
+            Boolean indicating whether the edge IDs of sampled edges, should be
+            returned.
+            - If the graph is homogeneous, it will return a 1D tensor filled
+            with homogeneous ids.
+            - If the graph is heterogeneous, it will return a dict with the key
+            being edge type and the value being corresponding 1D tensor of
+            heterogeneous ids
+            This is typically used when edge features are required.
         Returns
         -------
         SampledSubgraphImpl
@@ -331,12 +352,12 @@ class CSCSamplingGraph:
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
         C_sampled_subgraph = self._sample_neighbors(
-            nodes, fanouts, replace, False, probs_name
+            nodes, fanouts, replace, probs_name, return_eids
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
-    def _check_sampler_arguments(self, nodes, fanouts, probs_name):
+    def _check_sampler_arguments(self, nodes, fanouts, probs_name, return_eids):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
         expected_fanout_len = 1
@@ -356,6 +377,18 @@ class CSCSamplingGraph:
             (fanouts >= 0) | (fanouts == -1)
         ), "Fanouts should consist of values that are either -1 or \
             greater than or equal to 0."
+        if return_eids:
+            assert (
+                EID in self.edge_attributes
+            ), f"The Edge attribute '{EID}' must be provided when the \
+                `return_eids` option is set."
+            assert (
+                self.edge_attributes[EID].dim() == 1
+            ), "`EID` attribute should be 1-D tensor."
+            assert (
+                self.edge_attributes[EID].size(0) == self.num_edges
+            ), "`EID` attribute should have the same number of elements as \
+                the number of edges."
         if probs_name:
             assert (
                 probs_name in self.edge_attributes
@@ -379,8 +412,8 @@ class CSCSamplingGraph:
         nodes: torch.Tensor,
         fanouts: torch.Tensor,
         replace: bool = False,
-        return_eids: bool = False,
         probs_name: Optional[str] = None,
+        return_eids: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -410,23 +443,23 @@ class CSCSamplingGraph:
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
-        return_eids: bool
-            Boolean indicating whether the edge IDs of sampled edges,
-            represented as a 1D tensor, should be returned. This is
-            typically used when edge features are required.
         probs_name: str, optional
             An optional string specifying the name of an edge attribute. This
             attribute tensor should contain (unnormalized) probabilities
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        return_eids: bool
+            Boolean indicating whether the edge IDs of sampled edges,
+            represented as a 1D tensor, should be returned. This is
+            typically used when edge features are required.
         Returns
         -------
         torch.classes.graphbolt.SampledSubgraph
             The sampled C subgraph.
         """
         # Ensure nodes is 1-D tensor.
-        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        self._check_sampler_arguments(nodes, fanouts, probs_name, return_eids)
         return self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, False, return_eids, probs_name
         )
@@ -436,6 +469,7 @@ class CSCSamplingGraph:
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
+        return_eids: bool = False,
         probs_name: Optional[str] = None,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
@@ -471,6 +505,15 @@ class CSCSamplingGraph:
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
+        return_eids: bool
+            Boolean indicating whether the edge IDs of sampled edges, should be
+            returned.
+            - If the graph is homogeneous, it will return a 1D tensor filled
+            with homogeneous ids.
+            - If the graph is heterogeneous, it will return a dict with the key
+            being edge type and the value being corresponding 1D tensor of
+            heterogeneous ids
+            This is typically used when edge features are required.
         probs_name: str, optional
             An optional string specifying the name of an edge attribute. This
             attribute tensor should contain (unnormalized) probabilities
@@ -489,9 +532,9 @@ class CSCSamplingGraph:
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
-        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        self._check_sampler_arguments(nodes, fanouts, probs_name, return_eids)
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, True, False, probs_name
+            nodes, fanouts.tolist(), replace, True, return_eids, probs_name
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
