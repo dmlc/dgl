@@ -130,6 +130,23 @@ def get_hetero_graph():
 
 
 @pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Node_Hetero(labor):
+    graph = get_hetero_graph()
+    itemset = gb.ItemSetDict(
+        {"n2": gb.ItemSet(torch.arange(3), names="seed_nodes")}
+    )
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    sampler_dp = Sampler(item_sampler, graph, fanouts)
+    assert len(list(sampler_dp)) == 2
+    for minibatch in sampler_dp:
+        blocks = minibatch.to_dgl_blocks()
+        assert len(blocks) == num_layer
+
+
+@pytest.mark.parametrize("labor", [False, True])
 def test_SubgraphSampler_Link_Hetero(labor):
     graph = get_hetero_graph()
     itemset = gb.ItemSetDict(
