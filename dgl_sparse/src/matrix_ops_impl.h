@@ -10,6 +10,7 @@
 #include <sparse/sparse_matrix.h>
 
 #include <tuple>
+#include <vector>
 
 #include "./utils.h"
 
@@ -73,19 +74,18 @@ CompactImpl(
       nnz.push_back(i);
     }
   }
-  long int nnz_size = nnz.size();
   if (dim == 0) {
     auto ret = SparseMatrix::FromCSR(
         VectorToTorchTensor(ret_ptr), VectorToTorchTensor(ret_idx),
         VectorToTorchTensor(ret_val),
-        std::vector<int64_t>{nnz_size, csr->num_cols});
+        std::vector<int64_t>{static_cast<int64_t>(nnz.size()), csr->num_cols});
     auto ret_idx = torch::optional<torch::Tensor>(VectorToTorchTensor(nnz));
     return {ret, ret_idx};
   } else {
     auto ret = SparseMatrix::FromCSC(
         VectorToTorchTensor(ret_ptr), VectorToTorchTensor(ret_idx),
         VectorToTorchTensor(ret_val),
-        std::vector<int64_t>{csr->num_cols, nnz_size});
+        std::vector<int64_t>{csr->num_cols, static_cast<int64_t>(nnz.size())});
     auto ret_idx = torch::optional<torch::Tensor>(VectorToTorchTensor(nnz));
     return {ret, ret_idx};
   }
