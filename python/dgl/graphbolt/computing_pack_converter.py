@@ -1,15 +1,15 @@
 """Computing pack converter"""
 
+from enum import Enum
+
 from torch.utils.data import functional_datapipe
 
 from torchdata.datapipes.iter import Mapper
 
 from .minibatch import MiniBatch
 
-from enum import Enum
-
 # Define an enumeration for days of the week
-class Computing_Lib(Enum):
+class ComputingLib(Enum):
     DGL = "dgl"
     # TO be added:
     # DGL_SPARSE = "dgl_sparse"
@@ -38,11 +38,10 @@ class ComputingPackConverter(Mapper):
         """
         super().__init__(datapipe, self._transformer)
         if isinstance(converter, str):
-            if converter == Computing_Lib:
+            if converter == ComputingLib.DGL:
                 self.converter = MiniBatch.to_dgl_blocks()
             else:
                 raise TypeError(f"Unsupported computing lib: {converter}")
         else:
             self.converter = converter
         super().__init__(datapipe, self.converter)
-
