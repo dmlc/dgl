@@ -1,3 +1,4 @@
+import os
 import re
 from sys import platform
 
@@ -627,7 +628,7 @@ def distributed_item_sampler_subprocess(
 ):
     dist.init_process_group(
         backend="gloo",  # Use GLOO backend for CPU multiprocessing
-        init_method="file:///d:/tmp_distributed_item_sampler_subprocess"
+        init_method=f"file:///{os.path.join(os.getcwd(), 'dis_tempfile')}"
         if platform == "win32"
         else "tcp://127.0.0.1:12345",
         world_size=nprocs,
@@ -698,6 +699,14 @@ def test_DistributedItemSampler(num_ids, shuffle, drop_last, even_inputs):
     nprocs = 4
     batch_size = 4
     item_set = gb.ItemSet(torch.arange(0, num_ids), names="seed_nodes")
+
+    # On Windows, if the process group initialization file already exists,
+    # the program may hang. So we need to delete it if it exists.
+    try:
+        os.remove(os.path.join(os.getcwd(), "dis_tempfile"))
+    except FileNotFoundError:
+        pass
+
     mp.spawn(
         distributed_item_sampler_subprocess,
         args=(
