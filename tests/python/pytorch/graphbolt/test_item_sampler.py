@@ -624,7 +624,7 @@ def distributed_item_sampler_subprocess(
     batch_size,
     shuffle,
     drop_last,
-    even_inputs,
+    drop_uneven_inputs,
 ):
     # On Windows, the init method can only be file.
     init_method = (
@@ -633,7 +633,7 @@ def distributed_item_sampler_subprocess(
         else "tcp://127.0.0.1:12345"
     )
     dist.init_process_group(
-        backend="gloo",  # Use GLOO backend for CPU multiprocessing
+        backend="gloo",  # Use Gloo backend for CPU multiprocessing
         init_method=init_method,
         world_size=nprocs,
         rank=proc_id,
@@ -645,7 +645,7 @@ def distributed_item_sampler_subprocess(
         batch_size=batch_size,
         shuffle=shuffle,
         drop_last=drop_last,
-        even_inputs=even_inputs,
+        drop_uneven_inputs=drop_uneven_inputs,
     )
     data_loader = gb.SingleProcessDataLoader(item_sampler)
 
@@ -665,7 +665,7 @@ def distributed_item_sampler_subprocess(
     expected_num_batches = expected_num_items // batch_size + (
         (not drop_last) and (expected_num_items % batch_size > 0)
     )
-    if even_inputs:
+    if drop_uneven_inputs:
         if (
             (not drop_last)
             and (num_ids % (nprocs * batch_size) < nprocs)
@@ -680,6 +680,10 @@ def distributed_item_sampler_subprocess(
         ):
             expected_num_batches -= 1
             expected_num_items -= batch_size
+        num_batches_tensor = torch.tensor(num_batches)
+        dist.broadcast(num_batches_tensor, 0)
+        # Test if the number of batches are the same for all processes.
+        assert num_batches_tensor == num_batches
 
     # Add up results from all processes.
     dist.reduce(sampled_count, 0)
@@ -698,8 +702,10 @@ def distributed_item_sampler_subprocess(
 @pytest.mark.parametrize("num_ids", [14, 30, 32, 34, 36])
 @pytest.mark.parametrize("shuffle", [False, True])
 @pytest.mark.parametrize("drop_last", [False, True])
-@pytest.mark.parametrize("even_inputs", [False, True])
-def test_DistributedItemSampler(num_ids, shuffle, drop_last, even_inputs):
+@pytest.mark.parametrize("drop_uneven_inputs", [False, True])
+def test_DistributedItemSampler(
+    num_ids, shuffle, drop_last, drop_uneven_inputs
+):
     nprocs = 4
     batch_size = 4
     item_set = gb.ItemSet(torch.arange(0, num_ids), names="seed_nodes")
@@ -721,7 +727,7 @@ def test_DistributedItemSampler(num_ids, shuffle, drop_last, even_inputs):
             batch_size,
             shuffle,
             drop_last,
-            even_inputs,
+            drop_uneven_inputs,
         ),
         nprocs=nprocs,
         join=True,
