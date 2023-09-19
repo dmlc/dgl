@@ -33,5 +33,5 @@ class MiniBatchTransformer(Mapper):
         minibatch = self.transformer(minibatch)
         assert isinstance(
             minibatch, MiniBatch
-        ), "The transformer output should be a instance of MiniBatch"
+        ), "The transformer output should be an instance of MiniBatch"
         return minibatch

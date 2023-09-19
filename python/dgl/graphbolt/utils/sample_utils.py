@@ -6,6 +6,7 @@ from typing import Dict, List, Tuple, Union
 import torch
 
 from ..base import etype_str_to_tuple
+from ..minibatch import MiniBatch
 
 
 def add_reverse_edges(
@@ -13,7 +14,7 @@ def add_reverse_edges(
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
         Tuple[torch.Tensor, torch.Tensor],
     ],
-    reverse_etypes: Dict[str, str] = None,
+    reverse_etypes_mapping: Dict[str, str] = None,
 ):
     r"""
     This function finds the reverse edges of the given `edges` and returns the
@@ -33,7 +34,7 @@ def add_reverse_edges(
         of tensors.
         - If sampled subgraph is heterogeneous, then `edges` should be a
         dictionary of edge types and the corresponding edges to exclude.
-    reverse_etypes : Dict[str, str], optional
+    reverse_etypes_mapping : Dict[str, str], optional
         The mapping from the original edge types to their reverse edge types.
 
     Returns
@@ -59,7 +60,7 @@ def add_reverse_edges(
         return (torch.cat([u, v]), torch.cat([v, u]))
     else:
         combined_edges = edges.copy()
-        for etype, reverse_etype in reverse_etypes.items():
+        for etype, reverse_etype in reverse_etypes_mapping.items():
             if etype in edges:
                 if reverse_etype in combined_edges:
                     u, v = combined_edges[reverse_etype]
@@ -72,6 +73,34 @@ def add_reverse_edges(
                         edges[etype][0],
                     )
         return combined_edges
+
+
+def exclude_seed_edges(
+    minibatch: MiniBatch,
+    include_reverse_edges: bool = False,
+    reverse_etypes_mapping: Dict[str, str] = None,
+):
+    """
+    Exclude seed edges with or without their reverse edges from the sampled
+    subgraphs in the minibatch.
+
+    Parameters
+    ----------
+    minibatch : MiniBatch
+        The minibatch.
+    reverse_etypes_mapping : Dict[str, str] = None
+        The mapping from the original edge types to their reverse edge types.
+    """
+    edges_to_exclude = minibatch.node_pairs
+    if include_reverse_edges:
+        edges_to_exclude = add_reverse_edges(
+            minibatch.node_pairs, reverse_etypes_mapping
+        )
+    minibatch.sampled_subgraphs = [
+        subgraph.exclude_edges(edges_to_exclude)
+        for subgraph in minibatch.sampled_subgraphs
+    ]
+    return minibatch
 
 
 def unique_and_compact(
