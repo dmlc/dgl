@@ -626,11 +626,15 @@ def distributed_item_sampler_subprocess(
     drop_last,
     even_inputs,
 ):
+    # On Windows, the init method can only be file.
+    init_method = (
+        f"file:///{os.path.join(os.getcwd(), 'dis_tempfile')}"
+        if platform == "win32"
+        else "tcp://127.0.0.1:12345"
+    )
     dist.init_process_group(
         backend="gloo",  # Use GLOO backend for CPU multiprocessing
-        init_method=f"file:///{os.path.join(os.getcwd(), 'dis_tempfile')}"
-        if platform == "win32"
-        else "tcp://127.0.0.1:12345",
+        init_method=init_method,
         world_size=nprocs,
         rank=proc_id,
     )
@@ -702,10 +706,11 @@ def test_DistributedItemSampler(num_ids, shuffle, drop_last, even_inputs):
 
     # On Windows, if the process group initialization file already exists,
     # the program may hang. So we need to delete it if it exists.
-    try:
-        os.remove(os.path.join(os.getcwd(), "dis_tempfile"))
-    except FileNotFoundError:
-        pass
+    if platform == "win32":
+        try:
+            os.remove(os.path.join(os.getcwd(), "dis_tempfile"))
+        except FileNotFoundError:
+            pass
 
     mp.spawn(
         distributed_item_sampler_subprocess,
