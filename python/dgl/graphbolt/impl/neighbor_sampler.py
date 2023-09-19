@@ -78,6 +78,7 @@ class NeighborSampler(SubgraphSampler):
         3
         """
         super().__init__(datapipe)
+        self.graph = graph
         # Convert fanouts to a list of tensors.
         self.fanouts = []
         for fanout in fanouts:
@@ -87,7 +88,6 @@ class NeighborSampler(SubgraphSampler):
         self.replace = replace
         self.prob_name = prob_name
         self.sampler = graph.sample_neighbors
-        self.graph = graph
 
     def _sample_subgraphs(self, seeds):
         subgraphs = []
