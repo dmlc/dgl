@@ -490,12 +490,13 @@ class BuiltinDataset(OnDiskDataset):
         .. note::
             Reverse edges are added to the original graph and duplicated
             edges are removed.
+
     **ogbl-citation2**
         The ogbl-citation2 dataset is a directed graph, representing the
         citation network between a subset of papers extracted from MAG. See
         more details in `ogbl-citation2
         <https://ogb.stanford.edu/docs/linkprop/#ogbl-citation2>`_.
-        
+
     **ogbn-products**
         The ogbn-products dataset is an undirected and unweighted graph,
         representing an Amazon product co-purchasing network. See more details
@@ -521,7 +522,7 @@ class BuiltinDataset(OnDiskDataset):
             if name not in self._datasets:
                 raise RuntimeError(
                     f"Dataset {name} is not available. Available datasets are "
-                    f"{self._datasets}"
+                    f"{self._datasets}."
                 )
             url = self._base_url + name + ".zip"
             os.makedirs(root, exist_ok=True)
