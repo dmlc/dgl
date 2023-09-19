@@ -487,11 +487,22 @@ class BuiltinDataset(OnDiskDataset):
         The ogbn-mag dataset is a heterogeneous network composed of a subset of
         the Microsoft Academic Graph (MAG). See more details in
         `ogbn-mag <https://ogb.stanford.edu/docs/nodeprop/#ogbn-mag>`_.
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
     **ogbl-citation2**
         The ogbl-citation2 dataset is a directed graph, representing the
         citation network between a subset of papers extracted from MAG. See
         more details in `ogbl-citation2
         <https://ogb.stanford.edu/docs/linkprop/#ogbl-citation2>`_.
+        
+    **ogbn-products**
+        The ogbn-products dataset is an undirected and unweighted graph,
+        representing an Amazon product co-purchasing network. See more details
+        in `ogbn-products
+        https://ogb.stanford.edu/docs/nodeprop/#ogbn-products>`_.
+        .. note::
+            Reverse edges are added to the original graph.
 
     Parameters
     ----------
@@ -509,7 +520,8 @@ class BuiltinDataset(OnDiskDataset):
         if not os.path.exists(dataset_dir):
             if name not in self._datasets:
                 raise RuntimeError(
-                    f"Dataset {name} is not available. Available datasets are {self._datasets}"
+                    f"Dataset {name} is not available. Available datasets are "
+                    f"{self._datasets}"
                 )
             url = self._base_url + name + ".zip"
             os.makedirs(root, exist_ok=True)
