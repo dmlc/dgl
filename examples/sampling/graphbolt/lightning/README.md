@@ -7,7 +7,12 @@
 python3 node_classification.py
 ```
 
+### Command
+```
+python3 node_classification.py --labor
+```
+
 ### Results
 ```
-Valid Accuracy: 0.877
+Valid Accuracy: 0.904
 ```
