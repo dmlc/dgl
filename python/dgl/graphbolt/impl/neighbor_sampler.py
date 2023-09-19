@@ -87,10 +87,18 @@ class NeighborSampler(SubgraphSampler):
         self.replace = replace
         self.prob_name = prob_name
         self.sampler = graph.sample_neighbors
+        self.graph = graph
 
     def _sample_subgraphs(self, seeds):
         subgraphs = []
         num_layers = len(self.fanouts)
+        # Enrich seeds with all node types.
+        if isinstance(seeds, dict):
+            ntypes = list(self.graph.metadata.node_type_to_id.keys())
+            seeds = {
+                ntype: seeds.get(ntype, torch.LongTensor([]))
+                for ntype in ntypes
+            }
         for hop in range(num_layers):
             subgraph = self.sampler(
                 seeds,
