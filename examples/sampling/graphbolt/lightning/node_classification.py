@@ -156,7 +156,7 @@ class DataModule(LightningDataModule):
         )
         sampler = (
             datapipe.sample_layer_neighbor
-            if self.labor
+            if self.labor and is_train
             else datapipe.sample_neighbor
         )
         datapipe = sampler(self.graph, self.fanouts)

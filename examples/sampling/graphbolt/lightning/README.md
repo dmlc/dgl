@@ -14,5 +14,5 @@ python3 node_classification.py --labor
 
 ### Results
 ```
-Valid Accuracy: 0.905
+Valid Accuracy: 0.907
 ```
