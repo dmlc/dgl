@@ -251,32 +251,45 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
 
         def _add_indent(_str, indent):
             lines = _str.split("\n")
-            lines = [lines[0]] + [" " * (indent + 10) + line for line in lines[1:]]
+            lines = [lines[0]] + [
+                " " * (indent + 10) + line for line in lines[1:]
+            ]
             return "\n".join(lines)
 
-        '''
+        """
         Let the variables in the list occupy one line each,
         and adjust the indentation on top of the original
         if the original data output has line feeds.
-        '''
+        """
         if type(val) is list:
             # Special handling SampledSubgraphImpl data. Line feeds variables within this type.
-            if type(val[0]) is dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl:
+            if (
+                type(val[0])
+                is dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl
+            ):
                 sampledsubgraph_strs = []
                 for sampledsubgraph in val:
                     SS_attributes = _get_attributes(sampledsubgraph)
                     sampledsubgraph_str = "SampledSubgraphImpl("
                     for SS_name in SS_attributes:
-                        sampledsubgraph_str = sampledsubgraph_str + f"{SS_name}={_add_indent(str(getattr(sampledsubgraph, SS_name)), len(SS_name)+1)},\n" + " " * 20
-                    sampledsubgraph_strs.append(sampledsubgraph_str[:-21] + ')')
-                val = '[' + ',\n'.join(sampledsubgraph_strs) + ']'
+                        sampledsubgraph_str = (
+                            sampledsubgraph_str
+                            + f"{SS_name}={_add_indent(str(getattr(sampledsubgraph, SS_name)), len(SS_name)+1)},\n"
+                            + " " * 20
+                        )
+                    sampledsubgraph_strs.append(sampledsubgraph_str[:-21] + ")")
+                val = "[" + ",\n".join(sampledsubgraph_strs) + "]"
             else:
                 val = [
-                        _add_indent(str(val_str), len(str(val_str).split("': ")[0]) - 6)
+                        _add_indent(
+                            str(val_str), len(str(val_str).split("': ")[0]) - 6
+                        )
                         for val_str in val
                     ]
-                val = '[' + ",\n".join(val) + ']'
+                val = "[" + ",\n".join(val) + "]"
         else:
             val = str(val)
-        final_str = final_str + f"{name}={_add_indent(val, len(name)+1)},\n" + " " * 10
+        final_str = (
+            final_str + f"{name}={_add_indent(val, len(name)+1)},\n" + " " * 10
+        )
     return "MiniBatch(" + final_str[:-3] + ")"
