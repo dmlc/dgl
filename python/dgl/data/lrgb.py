@@ -14,37 +14,36 @@ from .utils import download, load_graphs, save_graphs, Subset
 
 
 class PeptidesStructuralDataset(DGLDataset):
-    r"""Peptides structure dataset for the graph classification task.
+    r"""Peptides structure dataset for the graph regression task.
 
     DGL dataset of 15,535 small peptides represented as their molecular
     graph (SMILES) with 11 regression targets derived from the peptide's
     3D structure.
 
-    The original amino acid sequence representation is provided in
-    'peptide_seq' and the distance between atoms in 'self_dist_matrix' field
-    of the dataset file, but not used here as any part of the input.
-
-    The 11 regression targets were precomputed from molecule XYZ:
+    The 11 regression targets were precomputed from molecules' 3D structure:
         Inertia_mass_[a-c]: The principal component of the inertia of the
-            mass, with some normalizations. Sorted
+            mass, with some normalizations. (Sorted)
         Inertia_valence_[a-c]: The principal component of the inertia of the
             Hydrogen atoms. This is basically a measure of the 3D
-            distribution of hydrogens. Sorted
+            distribution of hydrogens. (Sorted)
         length_[a-c]: The length around the 3 main geometric axis of
-            the 3D objects (without considering atom types). Sorted
+            the 3D objects (without considering atom types). (Sorted)
         Spherocity: SpherocityIndex descriptor computed by
             rdkit.Chem.rdMolDescriptors.CalcSpherocityIndex
         Plane_best_fit: Plane of best fit (PBF) descriptor computed by
             rdkit.Chem.rdMolDescriptors.CalcPBF
 
+    Reference `<https://arxiv.org/abs/2206.08164.pdf>`_
+
     Statistics:
-    Train examples: 10,873
-    Valid examples: 2,331
-    Test examples: 2,331
-    Average number of nodes: 150.94
-    Average number of edges: 307.30
-    Number of atom types: 9
-    Number of bond types: 3
+
+    - Train examples: 10,873
+    - Valid examples: 2,331
+    - Test examples: 2,331
+    - Average number of nodes: 150.94
+    - Average number of edges: 307.30
+    - Number of atom types: 9
+    - Number of bond types: 3
 
     Parameters
     ----------
@@ -57,7 +56,11 @@ class PeptidesStructuralDataset(DGLDataset):
     verbose : bool
         Whether to print out progress information.
         Default: False.
-    smiles2graph (callable):
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
+    smiles2graph : callable
         A callable function that converts a SMILES string into a graph object.
         * The default smiles2graph requires rdkit to be installed *
 
@@ -90,11 +93,12 @@ class PeptidesStructuralDataset(DGLDataset):
         raw_dir=None,
         force_reload=None,
         verbose=None,
+        transform=None,
         smiles2graph=smiles2graph,
     ):
         self.smiles2graph = smiles2graph
         # MD5 hash of the dataset file.
-        self.version = "9786061a34298a0684150f2e4ff13f47"
+        self.md5sum_data = "9786061a34298a0684150f2e4ff13f47"
         self.url_stratified_split = """
         https://www.dropbox.com/s/9dfifzft1hqgow6/splits_random_stratified_peptide_structure.pickle?dl=1
         """
@@ -108,6 +112,7 @@ class PeptidesStructuralDataset(DGLDataset):
             """,
             force_reload=force_reload,
             verbose=verbose,
+            transform=transform,
         )
 
     @property
@@ -143,14 +148,16 @@ class PeptidesStructuralDataset(DGLDataset):
         path = download(self.url, path=self.raw_data_path)
         # Save to disk the MD5 hash of the downloaded file.
         hash = self._md5sum(path)
-        if hash != self.version:
+        if hash != self.md5sum_data:
             raise ValueError("Unexpected MD5 hash of the downloaded file")
         open(os.path.join(self.raw_path, hash), "w").close()
         # Download train/val/test splits.
         path_split = download(
             self.url_stratified_split, path=self.split_data_path
         )
-        assert self._md5sum(path_split) == self.md5sum_stratified_split
+        hash_split = self._md5sum(path_split)
+        if hash_split != self.md5sum_stratified_split:
+            raise ValueError("Unexpected MD5 hash of the split file")
 
     def process(self):
         data_df = pd.read_csv(self.raw_data_path)

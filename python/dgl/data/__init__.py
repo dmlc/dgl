@@ -71,7 +71,7 @@ from .heterophilous_graphs import (
     TolokersDataset,
 )
 
-# RDKit is required for OGB-LSC PCQM4Mv2 and the datasets derived from it.
+# RDKit is required for Peptides-Structural dataset.
 # Exception handling was added to prevent crashes for users who are using other
 # datasets.
 try:
