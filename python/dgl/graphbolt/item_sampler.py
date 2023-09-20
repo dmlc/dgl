@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Callable, Iterator, Optional
 
-from torch.utils.data import default_collate, functional_datapipe
+from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
 from ..base import dgl_warning
