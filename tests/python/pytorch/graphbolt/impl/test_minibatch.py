@@ -191,7 +191,7 @@ def test_minibatch_print():
     mb_w = gb.MiniBatch(
         node_pairs=node_pairs,
         sampled_subgraphs=subgraphs,
-        labels = labels,
+        labels=labels,
         node_features=node_features,
         edge_features=edge_features,
         negative_srcs=negative_srcs,
