@@ -483,10 +483,12 @@ class BuiltinDataset(OnDiskDataset):
     them as ``OnDiskDataset``.
 
     Available builtin datasets include:
+
     **ogbn-mag**
         The ogbn-mag dataset is a heterogeneous network composed of a subset of
         the Microsoft Academic Graph (MAG). See more details in
         `ogbn-mag <https://ogb.stanford.edu/docs/nodeprop/#ogbn-mag>`_.
+
         .. note::
             Reverse edges are added to the original graph and duplicated
             edges are removed.
@@ -502,6 +504,7 @@ class BuiltinDataset(OnDiskDataset):
         representing an Amazon product co-purchasing network. See more details
         in `ogbn-products
         https://ogb.stanford.edu/docs/nodeprop/#ogbn-products>`_.
+
         .. note::
             Reverse edges are added to the original graph.
 
