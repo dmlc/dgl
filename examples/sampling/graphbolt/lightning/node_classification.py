@@ -151,8 +151,8 @@ class DataModule(LightningDataModule):
         datapipe = gb.ItemSampler(
             node_set,
             batch_size=self.batch_size,
-            shuffle=is_train,
-            drop_last=is_train,
+            shuffle=True,
+            drop_last=True,
         )
         sampler = (
             datapipe.sample_layer_neighbor
