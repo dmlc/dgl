@@ -1,22 +1,16 @@
 """
-This script, `hetero_rgcn.py`, trains and tests a Relational Graph
-Convolutional Network (R-GCN) model for node classification on the
-Open Graph Benchmark (OGB) dataset "ogbn-mag". For more details on
-"ogbn-mag", please refer to the OGB website:
-(https://ogb.stanford.edu/docs/linkprop/)
+This script is a GraphBolt counterpart of
+``/examples/core/rgcn/hetero_rgcn.py``. It demonstrates how to use GraphBolt
+to train a R-GCN model for node classification on the Open Graph Benchmark
+(OGB) dataset "ogbn-mag". For more details on "ogbn-mag", please refer to
+the OGB website: (https://ogb.stanford.edu/docs/linkprop/).
 
 Paper [Modeling Relational Data with Graph Convolutional Networks]
 (https://arxiv.org/abs/1703.06103).
 
-Generation of graph embeddings is the main difference between homograph
-node classification and heterograph node classification:
-- Homograph: Since all nodes and edges are of the same type, embeddings
-  can be generated using a unified approach. Type-specific handling is
-  typically not required.
-- Heterograph: Due to the existence of multiple types of nodes and edges,
-  specific embeddings need to be generated for each type. This allows for
-  a more nuanced capture of the complex structure and semantic information
-  within the heterograph.
+This example highlights the user experience of GraphBolt while the model and
+training/evaluation procedures are almost identical to the original DGL
+implementation. Please refer to original DGL implementation for more details.
 
 This flowchart describes the main functional sequence of the provided example.
 main
@@ -66,6 +60,9 @@ from tqdm import tqdm
 def load_dataset(dataset_name):
     """Load the dataset and return the graph, features, train/valid/test sets
     and the number of classes.
+
+    Here, we use `BuiltInDataset` to load the dataset which returns graph,
+    features, train/valid/test sets and the number of classes.
     """
     dataset = gb.BuiltinDataset(dataset_name).load()
     print(f"Loaded dataset: {dataset.tasks[0].metadata['name']}")
@@ -85,18 +82,42 @@ def create_dataloader(
 ):
     """Create a GraphBolt dataloader for training, validation or testing."""
 
+    ###########################################################################
     # Initialize the ItemSampler to sample mini-batches from the dataset.
+    # `item_set`:
+    #   The set of items to sample from. This is typically the
+    #   training, validation or test set.
+    # `batch_size`:
+    #   The number of nodes to sample in each mini-batch.
+    # `shuffle`:
+    #   Whether to shuffle the items in the dataset before sampling.
     datapipe = gb.ItemSampler(item_set, batch_size=batch_size, shuffle=shuffle)
 
     # Sample neighbors for each seed node in the mini-batch.
+    # `graph`:
+    #   The graph(CSCSamplingGraph) from which to sample neighbors.
+    # `fanouts`:
+    #   The number of neighbors to sample for each node in each layer.
     datapipe = datapipe.sample_neighbor(graph, fanouts=fanouts)
 
     # Fetch the features for each node in the mini-batch.
-    datapipe = datapipe.fetch_feature(features, {"paper": ["feat", "year"]})
+    # `features`:
+    #   The feature store from which to fetch the features.
+    # `node_feature_keys`:
+    #   The node features to fetch. This is a dictionary where the keys are
+    #   node types and the values are lists of feature names.
+    datapipe = datapipe.fetch_feature(
+        features, node_feature_keys={"paper": ["feat", "year"]}
+    )
 
     # Move the mini-batch to the appropriate device.
+    # `device`:
+    #   The device to move the mini-batch to.
     datapipe = datapipe.copy_to(device)
 
+    # Create a DataLoader from the datapipe.
+    # `num_workers`:
+    #   The number of worker processes to use for data loading.
     return gb.MultiProcessDataLoader(datapipe, num_workers=num_workers)
 
 
@@ -387,12 +408,14 @@ class Logger(object):
 
 
 @th.no_grad()
-def evaluate(g, model, node_embed, device, item_set, features, num_workers):
+def evaluate(
+    name, g, model, node_embed, device, item_set, features, num_workers
+):
     # Switches the model to evaluation mode.
     model.eval()
     category = "paper"
-    # An evaluator for the dataset 'ogbn-mag'.
-    evaluator = Evaluator(name="ogbn-mag")
+    # An evaluator for the dataset.
+    evaluator = Evaluator(name=name)
 
     # Initialize a neighbor sampler that samples all neighbors. The model
     # has 2 GNN layers, so we create a sampler of 2 layers.
@@ -445,6 +468,7 @@ def evaluate(g, model, node_embed, device, item_set, features, num_workers):
 
 
 def run(
+    name,
     g,
     model,
     node_embed,
@@ -480,6 +504,7 @@ def run(
             num_workers=num_workers,
         )
         for data in tqdm(data_loader, desc=f"Training~Epoch {epoch:02d}"):
+            # Fetch the number of seed nodes in the batch.
             num_seeds = data.seed_nodes[category].shape[0]
             # Extract node embeddings for the input nodes.
             emb = extract_embed(node_embed, data.input_nodes)
@@ -504,19 +529,19 @@ def run(
         # Evaluate the model on the train/val/test set.
         print("Evaluating the model on the training set.")
         train_acc = evaluate(
-            g, model, node_embed, device, train_set, features, num_workers
+            name, g, model, node_embed, device, train_set, features, num_workers
         )
         print("Finish evaluating on training set.")
 
         print("Evaluating the model on the validation set.")
         valid_acc = evaluate(
-            g, model, node_embed, device, valid_set, features, num_workers
+            name, g, model, node_embed, device, valid_set, features, num_workers
         )
         print("Finish evaluating on validation set.")
 
         print("Evaluating the model on the test set.")
         test_acc = evaluate(
-            g, model, node_embed, device, test_set, features, num_workers
+            name, g, model, node_embed, device, test_set, features, num_workers
         )
         print("Finish evaluating on test set.")
 
@@ -564,19 +589,13 @@ def main(args):
     )
 
     for run_id in range(args.runs):
-        try:
-            embed_layer.reset_parameters()
-            model.reset_parameters()
-        except:
-            # Old pytorch version doesn't support reset_parameters() API.
-            ##################################################################
-            # [Why we need to reset the parameters?]
-            # If parameters are not reset, the model will start with the
-            # parameters learned from the last run, potentially resulting
-            # in biased outcomes or sub-optimal performance if the model was
-            # previously stuck in a poor local minimum.
-            ##################################################################
-            pass
+        # [Why we need to reset the parameters?]
+        # If parameters are not reset, the model will start with the
+        # parameters learned from the last run, potentially resulting
+        # in biased outcomes or sub-optimal performance if the model was
+        # previously stuck in a poor local minimum.
+        embed_layer.reset_parameters()
+        model.reset_parameters()
 
         # `itertools.chain()` is a function in Python's itertools module.
         # It is used to flatten a list of iterables, making them act as
@@ -602,6 +621,7 @@ def main(args):
                 file=sys.stderr,
             )
         logger = run(
+            args.dataset,
             g,
             model,
             embed_layer,
