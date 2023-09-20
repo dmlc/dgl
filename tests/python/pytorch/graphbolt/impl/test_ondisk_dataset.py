@@ -1701,6 +1701,8 @@ def test_BuiltinDataset():
     with tempfile.TemporaryDirectory() as test_dir:
         # Case 1: download from DGL S3 storage.
         dataset_name = "test-only"
+        # Add test-only dataset to the builtin dataset list for testing only.
+        gb.BuiltinDataset._datasets.append(dataset_name)
         dataset = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
         assert dataset.graph is not None
         assert dataset.feature is not None
@@ -1713,3 +1715,11 @@ def test_BuiltinDataset():
         assert dataset.feature is not None
         assert dataset.tasks is not None
         assert dataset.dataset_name == dataset_name
+
+        # Case 3: dataset is not available.
+        dataset_name = "fake_name"
+        with pytest.raises(
+            RuntimeError,
+            match=rf"Dataset {dataset_name} is not available.*",
+        ):
+            _ = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
