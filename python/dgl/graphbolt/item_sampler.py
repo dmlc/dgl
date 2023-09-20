@@ -78,7 +78,6 @@ def minibatcher_default(batch, names):
     return minibatch
 
 
-@functional_datapipe("sample_item")
 class ItemSampler(IterDataPipe):
     """Item Sampler.
 
