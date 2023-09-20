@@ -514,7 +514,7 @@ class BuiltinDataset(OnDiskDataset):
     """
 
     _base_url = "https://data.dgl.ai/dataset/graphbolt/"
-    _datasets = ["ogbn-mag", "ogbl-citation2"]
+    _datasets = ["ogbn-mag", "ogbl-citation2", "ogbn-products"]
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
         dataset_dir = os.path.join(root, name)
