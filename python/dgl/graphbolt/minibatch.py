@@ -225,16 +225,20 @@ class MiniBatch:
                     block.edata[dgl.EID] = subgraph.reverse_edge_ids
 
         return blocks
-    
+
     def __repr__(self) -> str:
         final_str = ""
         # get all attributes in the class except methods
-        attri = [a for a in dir(self) if not a.startswith('__') and not callable(getattr(self, a))]
+        attri = [
+            a
+            for a in dir(self)
+            if not a.startswith("__") and not callable(getattr(self, a))
+        ]
         attri.reverse()
         # insert key with its value into the string
         for name in attri:
             val = str(getattr(self, name))
-            if val != 'None':
-                val = val.replace('\n        ',' ')
+            if val != "None":
+                val = val.replace("\n        "," ")
             final_str = final_str + f"{name}={val},\n\t"
-        return "MiniBatch(" + final_str[:-3]+")"
+        return "MiniBatch(" + final_str[:-3] + ")"
