@@ -281,11 +281,11 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
                 val = "[" + ",\n".join(sampledsubgraph_strs) + "]"
             else:
                 val = [
-                        _add_indent(
-                            str(val_str), len(str(val_str).split("': ")[0]) - 6
-                        )
-                        for val_str in val
-                    ]
+                    _add_indent(
+                        str(val_str), len(str(val_str).split("': ")[0]) - 6
+                    )
+                    for val_str in val
+                ]
                 val = "[" + ",\n".join(val) + "]"
         else:
             val = str(val)
