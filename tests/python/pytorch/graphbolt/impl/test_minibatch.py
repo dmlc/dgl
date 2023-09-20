@@ -137,3 +137,68 @@ def test_to_dgl_blocks_homo():
         assert torch.equal(block.edata["x"], edge_features[i]["x"])
     assert torch.equal(blocks[0].srcdata[dgl.NID], reverse_row_node_ids[0])
     assert torch.equal(blocks[0].srcdata["x"], node_features["x"])
+
+
+def test_minibatch_print():
+    node_pairs = [
+        (
+            torch.tensor([0, 1, 2, 2, 2, 1]),
+            torch.tensor([0, 1, 1, 2, 3, 2]),
+        ),
+        (
+            torch.tensor([0, 1, 2]),
+            torch.tensor([1, 0, 0]),
+        ),
+    ]
+    reverse_column_node_ids = [
+        torch.tensor([10, 11, 12, 13]),
+        torch.tensor([10, 11]),
+    ]
+    reverse_row_node_ids = [
+        torch.tensor([10, 11, 12, 13]),
+        torch.tensor([10, 11, 12]),
+    ]
+    reverse_edge_ids = [
+        torch.tensor([19, 20, 21, 22, 25, 30]),
+        torch.tensor([10, 15, 17]),
+    ]
+    node_features = {"x": torch.randint(0, 10, (4,))}
+    edge_features = [
+        {"x": torch.randint(0, 10, (6,))},
+        {"x": torch.randint(0, 10, (3,))},
+    ]
+    subgraphs = []
+    for i in range(2):
+        subgraphs.append(
+            gb.SampledSubgraphImpl(
+                node_pairs=node_pairs[i],
+                reverse_column_node_ids=reverse_column_node_ids[i],
+                reverse_row_node_ids=reverse_row_node_ids[i],
+                reverse_edge_ids=reverse_edge_ids[i],
+            )
+        )
+    negative_srcs=torch.tensor([[8], [1], [6]])
+    negative_dsts=torch.tensor([[2], [8], [8]])
+    input_nodes=torch.tensor([8, 1, 6, 5, 9, 0, 2, 4])
+    compacted_node_pairs=(torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5]))
+    compacted_negative_srcs=torch.tensor([0, 1, 2])
+    compacted_negative_dsts=torch.tensor([6, 0, 0])
+    labels = torch.tensor([0. , 1. , 2.])
+    # minibatch without data
+    mb_wo = gb.MiniBatch()
+    print(mb_wo)
+    # minibatch with all attributes
+    mb_w = gb.MiniBatch(
+        node_pairs=node_pairs,
+        sampled_subgraphs=subgraphs,
+        labels = labels,
+        node_features=node_features,
+        edge_features=edge_features,
+        negative_srcs=negative_srcs,
+        negative_dsts=negative_dsts,
+        compacted_node_pairs=compacted_node_pairs,
+        input_nodes=input_nodes,
+        compacted_negative_srcs=compacted_negative_srcs,
+        compacted_negative_dsts=compacted_negative_dsts,
+    )
+    print(mb_w)
