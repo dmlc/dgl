@@ -1,5 +1,3 @@
-import io
-
 import dgl
 import dgl.graphbolt as gb
 import torch
@@ -190,22 +188,21 @@ def test_representation():
     minibatch = gb.MiniBatch()
     expect_result = str(
         """MiniBatch(seed_nodes=None,
-\tsampled_subgraphs=None,
-\tnode_pairs=None,
-\tnode_features=None,
-\tnegative_srcs=None,
-\tnegative_dsts=None,
-\tlabels=None,
-\tinput_nodes=None,
-\tedge_features=None,
-\tcompacted_node_pairs=None,
-\tcompacted_negative_srcs=None,
-\tcompacted_negative_dsts=None)\n"""
+          sampled_subgraphs=None,
+          node_pairs=None,
+          node_features=None,
+          negative_srcs=None,
+          negative_dsts=None,
+          labels=None,
+          input_nodes=None,
+          edge_features=None,
+          compacted_node_pairs=None,
+          compacted_negative_srcs=None,
+          compacted_negative_dsts=None,
+       )"""
     )
-    output = io.StringIO()
-    print(minibatch, file=output)
-    result = output.getvalue()
-    assert result == expect_result, print(expect_result, result)
+    result = str(minibatch)
+    assert result == expect_result, print(len(expect_result), len(result))
     # Test minibatch with all attributes.
     minibatch = gb.MiniBatch(
         node_pairs=node_pairs,
@@ -222,19 +219,35 @@ def test_representation():
     )
     expect_result = str(
         """MiniBatch(seed_nodes=None,
-\tsampled_subgraphs=[SampledSubgraphImpl(node_pairs=(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])), reverse_column_node_ids=tensor([10, 11, 12, 13]), reverse_row_node_ids=tensor([10, 11, 12, 13]), reverse_edge_ids=tensor([19, 20, 21, 22, 25, 30])), SampledSubgraphImpl(node_pairs=(tensor([0, 1, 2]), tensor([1, 0, 0])), reverse_column_node_ids=tensor([10, 11]), reverse_row_node_ids=tensor([10, 11, 12]), reverse_edge_ids=tensor([10, 15, 17]))],
-\tnode_pairs=[(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])), (tensor([0, 1, 2]), tensor([1, 0, 0]))],
-\tnode_features={'x': tensor([7, 6, 2, 2])},
-\tnegative_srcs=tensor([[8], [1], [6]]),
-\tnegative_dsts=tensor([[2], [8], [8]]),
-\tlabels=tensor([0., 1., 2.]),
-\tinput_nodes=tensor([8, 1, 6, 5, 9, 0, 2, 4]),
-\tedge_features=[{'x': tensor([[8], [1], [6]])}, {'x': tensor([[2], [8], [8]])}],
-\tcompacted_node_pairs=(tensor([0, 1, 2]), tensor([3, 4, 5])),
-\tcompacted_negative_srcs=tensor([0, 1, 2]),
-\tcompacted_negative_dsts=tensor([6, 0, 0]))\n"""
+          reverse_row_node_ids=[SampledSubgraphImpl(node_pairs=(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])),
+                                                   reverse_column_node_ids=tensor([10, 11, 12, 13]),
+                                                   reverse_edge_ids=tensor([19, 20, 21, 22, 25, 30]),
+                                                   reverse_row_node_ids=tensor([10, 11, 12, 13]),),
+                               SampledSubgraphImpl(node_pairs=(tensor([0, 1, 2]), tensor([1, 0, 0])),
+                                                   reverse_column_node_ids=tensor([10, 11]),
+                                                   reverse_edge_ids=tensor([10, 15, 17]),
+                                                   reverse_row_node_ids=tensor([10, 11, 12]),)],
+          node_pairs=[(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])),
+                     (tensor([0, 1, 2]), tensor([1, 0, 0]))],
+          node_features={'x': tensor([7, 6, 2, 2])},
+          negative_srcs=tensor([[8],
+                                [1],
+                                [6]]),
+          negative_dsts=tensor([[2],
+                                [8],
+                                [8]]),
+          labels=tensor([0., 1., 2.]),
+          input_nodes=tensor([8, 1, 6, 5, 9, 0, 2, 4]),
+          edge_features=[{'x': tensor([[8],
+                                       [1],
+                                       [6]])},
+                        {'x': tensor([[2],
+                                       [8],
+                                       [8]])}],
+          compacted_node_pairs=(tensor([0, 1, 2]), tensor([3, 4, 5])),
+          compacted_negative_srcs=tensor([0, 1, 2]),
+          compacted_negative_dsts=tensor([6, 0, 0]),
+       )"""
     )
-    output = io.StringIO()
-    print(minibatch, file=output)
-    result = output.getvalue()
+    result = str(minibatch)
     assert result == expect_result, print(expect_result, result)
