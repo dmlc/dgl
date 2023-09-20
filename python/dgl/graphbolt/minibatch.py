@@ -270,9 +270,10 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
                     ss_attributes = _get_attributes(sampledsubgraph)
                     sampledsubgraph_str = "SampledSubgraphImpl("
                     for ss_name in ss_attributes:
+                        ss_val = str(getattr(sampledsubgraph, ss_name))
                         sampledsubgraph_str = (
                             sampledsubgraph_str
-                            + f"{ss_name}={_add_indent(str(getattr(sampledsubgraph, ss_name)), len(ss_name)+1)},\n"
+                            + f"{ss_name}={_add_indent(ss_val, len(ss_name)+1)},\n"
                             + " " * 20
                         )
                     sampledsubgraph_strs.append(sampledsubgraph_str[:-21] + ")")
