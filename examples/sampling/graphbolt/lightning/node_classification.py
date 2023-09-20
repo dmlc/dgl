@@ -221,7 +221,9 @@ if __name__ == "__main__":
     model = SAGE(100, 256, datamodule.num_classes)
 
     # Train.
-    checkpoint_callback = ModelCheckpoint(monitor="val_acc", save_top_k=1)
+    checkpoint_callback = ModelCheckpoint(
+        monitor="val_acc", mode="max", save_top_k=1
+    )
     early_stopping_callback = EarlyStopping(monitor="val_acc", mode="max")
     ########################################################################
     # (HIGHLIGHT) The `Trainer` is the key Class in lightning, which automates
