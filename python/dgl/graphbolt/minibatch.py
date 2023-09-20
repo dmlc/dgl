@@ -228,15 +228,15 @@ class MiniBatch:
 
     def __repr__(self) -> str:
         final_str = ""
-        # get all attributes in the class except methods
-        attri = [
-            a
-            for a in dir(self)
-            if not a.startswith("__") and not callable(getattr(self, a))
+        # Get all attributes in the class except methods.
+        attributes = [
+            attribute
+            for attribute in dir(self)
+            if not attribute.startswith("__") and not callable(getattr(self, attribute))
         ]
-        attri.reverse()
-        # insert key with its value into the string
-        for name in attri:
+        attributes.reverse()
+        # Insert key with its value into the string.
+        for name in attributes:
             val = str(getattr(self, name))
             if val != "None":
                 val = val.replace("\n        ", " ")
