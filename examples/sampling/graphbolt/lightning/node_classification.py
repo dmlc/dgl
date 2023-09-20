@@ -43,7 +43,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from torchmetrics import Accuracy
 
 
@@ -147,19 +147,12 @@ class DataModule(LightningDataModule):
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
         self.labor = labor
 
-    ########################################################################
-    # (HIGHLIGHT) The 'train_dataloader' and 'val_dataloader' hooks are
-    # essential components of the Lightning framework, defining how data is
-    # loaded during training and validation. In this example, we utilize a
-    # specialized 'graphbolt dataloader', which are concatenated by a series
-    # of datappipes, for these purposes.
-    ########################################################################
-    def train_dataloader(self):
+    def create_dataloader(self, node_set, is_train):
         datapipe = gb.ItemSampler(
-            self.train_set,
+            node_set,
             batch_size=self.batch_size,
-            shuffle=True,
-            drop_last=True,
+            shuffle=is_train,
+            drop_last=is_train,
         )
         sampler = (
             datapipe.sample_layer_neighbor
@@ -172,20 +165,19 @@ class DataModule(LightningDataModule):
             datapipe, num_workers=self.num_workers
         )
         return dataloader
+    
+    ########################################################################
+    # (HIGHLIGHT) The 'train_dataloader' and 'val_dataloader' hooks are
+    # essential components of the Lightning framework, defining how data is
+    # loaded during training and validation. In this example, we utilize a
+    # specialized 'graphbolt dataloader', which are concatenated by a series
+    # of datapipes, for these purposes.
+    ########################################################################
+    def train_dataloader(self):
+        return self.create_dataloader(self.train_set, is_train=True)
 
     def val_dataloader(self):
-        datapipe = gb.ItemSampler(
-            self.valid_set,
-            batch_size=self.batch_size,
-            shuffle=True,
-            drop_last=True,
-        )
-        datapipe = datapipe.sample_neighbor(self.graph, self.fanouts)
-        datapipe = datapipe.fetch_feature(self.feature_store, ["feat"])
-        dataloader = gb.MultiProcessDataLoader(
-            datapipe, num_workers=self.num_workers
-        )
-        return dataloader
+        return self.create_dataloader(self.valid_set, is_train=False)
 
 
 if __name__ == "__main__":
@@ -207,8 +199,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--epochs",
         type=int,
-        default=10,
-        help="number of epochs to train (default: 10)",
+        default=40,
+        help="number of epochs to train (default: 40)",
     )
     parser.add_argument(
         "--num_workers",
@@ -230,6 +222,7 @@ if __name__ == "__main__":
 
     # Train.
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", save_top_k=1)
+    early_stopping_callback = EarlyStopping(monitor="val_acc", mode="max")
     ########################################################################
     # (HIGHLIGHT) The `Trainer` is the key Class in lightning, which automates
     # everything after defining `LightningDataModule` and
@@ -240,6 +233,6 @@ if __name__ == "__main__":
         accelerator="gpu",
         devices=args.num_gpus,
         max_epochs=args.epochs,
-        callbacks=[checkpoint_callback],
+        callbacks=[checkpoint_callback, early_stopping_callback],
     )
     trainer.fit(model, datamodule=datamodule)
