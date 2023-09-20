@@ -382,6 +382,12 @@ class DistributedItemSampler(ItemSampler):
 
     Examples
     --------
+    1. num_replica = 4, batch_size = 2, shuffle = False, drop_last = False,
+    drop_uneven_inputs = False, item_set = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    Replica#0 gets [[0, 4], [8,]]
+    Replica#1 gets [[1, 5], [9,]]
+    Replica#2 gets [[2, 6],]
+    Replica#3 gets [[3, 7],]
     """
 
     def __init__(

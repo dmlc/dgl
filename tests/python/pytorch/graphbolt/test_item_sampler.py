@@ -647,7 +647,12 @@ def distributed_item_sampler_subprocess(
         drop_last=drop_last,
         drop_uneven_inputs=drop_uneven_inputs,
     )
-    data_loader = gb.SingleProcessDataLoader(item_sampler)
+    feature_fetcher = gb.FeatureFetcher(
+        item_sampler,
+        gb.BasicFeatureStore({}),
+        [],
+    )
+    data_loader = gb.SingleProcessDataLoader(feature_fetcher)
 
     # Count the numbers of items and batches.
     num_items = 0
@@ -699,7 +704,7 @@ def distributed_item_sampler_subprocess(
         dist.destroy_process_group()
 
 
-@pytest.mark.parametrize("num_ids", [14, 30, 32, 34, 36])
+@pytest.mark.parametrize("num_ids", [24, 30, 32, 34, 36])
 @pytest.mark.parametrize("shuffle", [False, True])
 @pytest.mark.parametrize("drop_last", [False, True])
 @pytest.mark.parametrize("drop_uneven_inputs", [False, True])
