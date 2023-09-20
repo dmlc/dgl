@@ -233,7 +233,7 @@ class MiniBatch:
             attribute
             for attribute in dir(self)
             if not attribute.startswith("__")
-and not callable(getattr(self, attribute))
+            and not callable(getattr(self, attribute))
         ]
         attributes.reverse()
         # Insert key with its value into the string.
