@@ -95,7 +95,7 @@ class SAGE(LightningModule):
     def training_step(self, batch, batch_idx):
         # TODO: Move this to the data pipeline as a stage.
         blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
-        x = blocks[0].srcdata["feat"].float()
+        x = blocks[0].srcdata["feat"]
         y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
         loss = F.cross_entropy(y_hat, y)
@@ -112,7 +112,7 @@ class SAGE(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
-        x = blocks[0].srcdata["feat"].float()
+        x = blocks[0].srcdata["feat"]
         y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
         self.val_acc(torch.argmax(y_hat, 1), y)
@@ -134,7 +134,7 @@ class SAGE(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, fanouts, batch_size, num_workers, labor):
+    def __init__(self, fanouts, batch_size, num_workers):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
@@ -145,7 +145,6 @@ class DataModule(LightningDataModule):
         self.train_set = dataset.tasks[0].train_set
         self.valid_set = dataset.tasks[0].validation_set
         self.num_classes = dataset.tasks[0].metadata["num_classes"]
-        self.labor = labor
 
     def create_dataloader(self, node_set, is_train):
         datapipe = gb.ItemSampler(
@@ -156,7 +155,7 @@ class DataModule(LightningDataModule):
         )
         sampler = (
             datapipe.sample_layer_neighbor
-            if self.labor and is_train
+            if is_train
             else datapipe.sample_neighbor
         )
         datapipe = sampler(self.graph, self.fanouts)
@@ -182,7 +181,7 @@ class DataModule(LightningDataModule):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="GNN baselines on ogbgmol* data with Pytorch Geometrics"
+        description="GNN baselines on ogbn-products data with GraphBolt"
     )
     parser.add_argument(
         "--num_gpus",
@@ -208,17 +207,10 @@ if __name__ == "__main__":
         default=0,
         help="number of workers (default: 0)",
     )
-    parser.add_argument(
-        "--labor",
-        action="store_true",
-        help="Enables (La)yer-Neigh(bor) Sampler instead of Neighbor Sampler.",
-    )
     args = parser.parse_args()
 
-    datamodule = DataModule(
-        [15, 10, 5], args.batch_size, args.num_workers, args.labor
-    )
-    model = SAGE(100, 256, datamodule.num_classes)
+    datamodule = DataModule([15, 10, 5], args.batch_size, args.num_workers)
+    model = SAGE(100, 256, datamodule.num_classes).to(torch.double)
 
     # Train.
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", mode="max")
