@@ -584,8 +584,12 @@ def test_sample_neighbors_hetero(labor):
             torch.LongTensor([0, 2]),
             torch.LongTensor([0, 0]),
         ),
+        "n1:e1:n2": (
+            torch.LongTensor([]),
+            torch.LongTensor([]),
+        ),
     }
-    assert len(subgraph.node_pairs) == 1
+    assert len(subgraph.node_pairs) == 2
     for etype, pairs in expected_node_pairs.items():
         assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
         assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])

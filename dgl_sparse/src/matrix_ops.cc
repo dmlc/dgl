@@ -6,6 +6,9 @@
 #include <sparse/matrix_ops.h>
 #include <torch/script.h>
 
+#include "./macro.h"
+#include "./matrix_ops_impl.h"
+
 namespace dgl {
 namespace sparse {
 
@@ -53,6 +56,14 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
   auto ret_coo = std::make_shared<COO>(
       COO{lhs->num_rows, lhs->num_cols, ret_indices, false, false});
   return {ret_coo, lhs_indices, rhs_indices};
+}
+
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> Compact(
+    const c10::intrusive_ptr<SparseMatrix>& mat, uint64_t dim,
+    torch::Tensor leading_indices) {
+  DGL_SPARSE_COO_SWITCH(mat->COOPtr(), XPU, IdType, "Compact", {
+    return CompactImpl<XPU, IdType>(mat, dim, leading_indices);
+  });
 }
 
 }  // namespace sparse
