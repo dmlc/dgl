@@ -381,11 +381,47 @@ class DistributedItemSampler(ItemSampler):
     Examples
     --------
     1. num_replica = 4, batch_size = 2, shuffle = False, drop_last = False,
-    drop_uneven_inputs = False, item_set = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    Replica#0 gets [[0, 4], [8,]]
-    Replica#1 gets [[1, 5], [9,]]
-    Replica#2 gets [[2, 6],]
-    Replica#3 gets [[3, 7],]
+    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 7, 8, 9]
+    - Replica#0 gets [[0, 4], [8]]
+    - Replica#1 gets [[1, 5], [9]]
+    - Replica#2 gets [[2, 6]]
+    - Replica#3 gets [[3, 7]]
+
+    2. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
+    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 7, 8, 9].
+    - Replica#0 gets [[0, 4]]
+    - Replica#1 gets [[1, 5]]
+    - Replica#2 gets [[2, 6]]
+    - Replica#3 gets [[3, 7]]
+
+    3. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
+    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 11, 12, 13].
+    - Replica#0 gets [[0, 4], [8, 12]]
+    - Replica#1 gets [[1, 5], [9, 13]]
+    - Replica#2 gets [[2, 6]]
+    - Replica#3 gets [[3, 7]]
+
+    3. num_replica = 4, batch_size = 2, shuffle = False, drop_last = False,
+    drop_uneven_inputs = True, item_set = [0, 1, 2, ..., 11, 12, 13].
+    - Replica#0 gets [[0, 4], [8, 12]]
+    - Replica#1 gets [[1, 5], [9, 13]]
+    - Replica#2 gets [[2, 6], [10]]
+    - Replica#3 gets [[3, 7], [11]]
+
+    4. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
+    drop_uneven_inputs = True, item_set = [0, 1, 2, ..., 11, 12, 13].
+    - Replica#0 gets [[0, 4]]
+    - Replica#1 gets [[1, 5]]
+    - Replica#2 gets [[2, 6]]
+    - Replica#3 gets [[3, 7]]
+
+    5. num_replica = 4, batch_size = 2, shuffle = True, drop_last = True,
+    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 11, 12, 13].
+    One possible output:
+    - Replica#0 gets [[8, 0], [12, 4]]
+    - Replica#1 gets [[13, 1], [9, 5]]
+    - Replica#2 gets [[10, 2]]
+    - Replica#3 gets [[7, 11]]
     """
 
     def __init__(
