@@ -256,15 +256,13 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
             ]
             return "\n".join(lines)
 
-        """
-        Let the variables in the list occupy one line each,
-        and adjust the indentation on top of the original
-        if the original data output has line feeds.
-        """
-        if type(val) is list:
+        # Let the variables in the list occupy one line each,
+        # and adjust the indentation on top of the original
+        # if the original data output has line feeds.
+        if isinstance(val) is list:
             # Special handling SampledSubgraphImpl data. Line feeds variables within this type.
             if (
-                type(val[0])
+                isinstance(val[0])
                 is dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl
             ):
                 sampledsubgraph_strs = []
