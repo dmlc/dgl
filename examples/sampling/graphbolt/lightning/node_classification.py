@@ -95,7 +95,7 @@ class SAGE(LightningModule):
     def training_step(self, batch, batch_idx):
         # TODO: Move this to the data pipeline as a stage.
         blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
-        x = blocks[0].srcdata["feat"]
+        x = blocks[0].srcdata["feat"].float()
         y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
         loss = F.cross_entropy(y_hat, y)
@@ -112,7 +112,7 @@ class SAGE(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         blocks = [block.to("cuda") for block in batch.to_dgl_blocks()]
-        x = blocks[0].srcdata["feat"]
+        x = blocks[0].srcdata["feat"].float()
         y = batch.labels.to("cuda")
         y_hat = self(blocks, x)
         self.val_acc(torch.argmax(y_hat, 1), y)
