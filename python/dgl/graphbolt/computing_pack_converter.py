@@ -10,15 +10,17 @@ from .minibatch import MiniBatch
 
 # Define an enumeration for days of the week
 class ComputingLib(Enum):
+    """Enum denotes the supported computing libs."""
+
     DGL = "dgl"
-    # TO be added:
+    # TODO: Support below libs.
     # DGL_SPARSE = "dgl_sparse"
     # PYG = "pyg"
 
 
 @functional_datapipe("to_computing_pack")
 class ComputingPackConverter(Mapper):
-    """A converter used to convert a mini-batch to a computing pack"""
+    """A converter used to convert a mini-batch to a computing pack."""
 
     def __init__(
         self,
@@ -39,7 +41,7 @@ class ComputingPackConverter(Mapper):
         super().__init__(datapipe, self._transformer)
         if isinstance(converter, str):
             if converter == ComputingLib.DGL:
-                self.converter = MiniBatch.to_dgl_blocks()
+                self.converter = MiniBatch.to_dgl_blocks
             else:
                 raise TypeError(f"Unsupported computing lib: {converter}")
         else:
