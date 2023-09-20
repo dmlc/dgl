@@ -262,19 +262,19 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
         if the original data output has line feeds.
         """
         if type(val) is list:
-            # Special handling SampledSubgraphImpl data. Line feeds variables within this class.
+            # Special handling SampledSubgraphImpl data. Line feeds variables within this type.
             if (
                 type(val[0])
                 is dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl
             ):
                 sampledsubgraph_strs = []
                 for sampledsubgraph in val:
-                    SS_attributes = _get_attributes(sampledsubgraph)
+                    ss_attributes = _get_attributes(sampledsubgraph)
                     sampledsubgraph_str = "SampledSubgraphImpl("
-                    for SS_name in SS_attributes:
+                    for ss_name in ss_attributes:
                         sampledsubgraph_str = (
                             sampledsubgraph_str
-                            + f"{SS_name}={_add_indent(str(getattr(sampledsubgraph, SS_name)), len(SS_name)+1)},\n"
+                            + f"{ss_name}={_add_indent(str(getattr(sampledsubgraph, ss_name)), len(ss_name)+1)},\n"
                             + " " * 20
                         )
                     sampledsubgraph_strs.append(sampledsubgraph_str[:-21] + ")")
