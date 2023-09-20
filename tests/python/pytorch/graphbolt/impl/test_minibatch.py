@@ -1,7 +1,8 @@
+import io
+
 import dgl
 import dgl.graphbolt as gb
 import torch
-import io
 
 
 def test_to_dgl_blocks_hetero():
@@ -187,7 +188,8 @@ def test_representation():
     labels = torch.tensor([0.0, 1.0, 2.0])
     # Test minibatch without data.
     minibatch = gb.MiniBatch()
-    expect_result = str("""MiniBatch(seed_nodes=None,
+    expect_result = str(
+        """MiniBatch(seed_nodes=None,
 \tsampled_subgraphs=None,
 \tnode_pairs=None,
 \tnode_features=None,
@@ -198,11 +200,12 @@ def test_representation():
 \tedge_features=None,
 \tcompacted_node_pairs=None,
 \tcompacted_negative_srcs=None,
-\tcompacted_negative_dsts=None)\n""")
+\tcompacted_negative_dsts=None)\n"""
+    )
     output = io.StringIO()
     print(minibatch, file=output)
     result = output.getvalue()
-    assert result==expect_result, print(expect_result, result)
+    assert result == expect_result, print(expect_result, result)
     # Test minibatch with all attributes.
     minibatch = gb.MiniBatch(
         node_pairs=node_pairs,
@@ -217,7 +220,8 @@ def test_representation():
         compacted_negative_srcs=compacted_negative_srcs,
         compacted_negative_dsts=compacted_negative_dsts,
     )
-    expect_result = str("""MiniBatch(seed_nodes=None,
+    expect_result = str(
+        """MiniBatch(seed_nodes=None,
 \tsampled_subgraphs=[SampledSubgraphImpl(node_pairs=(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])), reverse_column_node_ids=tensor([10, 11, 12, 13]), reverse_row_node_ids=tensor([10, 11, 12, 13]), reverse_edge_ids=tensor([19, 20, 21, 22, 25, 30])), SampledSubgraphImpl(node_pairs=(tensor([0, 1, 2]), tensor([1, 0, 0])), reverse_column_node_ids=tensor([10, 11]), reverse_row_node_ids=tensor([10, 11, 12]), reverse_edge_ids=tensor([10, 15, 17]))],
 \tnode_pairs=[(tensor([0, 1, 2, 2, 2, 1]), tensor([0, 1, 1, 2, 3, 2])), (tensor([0, 1, 2]), tensor([1, 0, 0]))],
 \tnode_features={'x': tensor([7, 6, 2, 2])},
@@ -228,8 +232,9 @@ def test_representation():
 \tedge_features=[{'x': tensor([[8], [1], [6]])}, {'x': tensor([[2], [8], [8]])}],
 \tcompacted_node_pairs=(tensor([0, 1, 2]), tensor([3, 4, 5])),
 \tcompacted_negative_srcs=tensor([0, 1, 2]),
-\tcompacted_negative_dsts=tensor([6, 0, 0]))\n""")
+\tcompacted_negative_dsts=tensor([6, 0, 0]))\n"""
+    )
     output = io.StringIO()
     print(minibatch, file=output)
     result = output.getvalue()
-    assert result==expect_result, print(expect_result, result)
+    assert result == expect_result, print(expect_result, result)
