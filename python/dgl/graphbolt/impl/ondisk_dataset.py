@@ -482,6 +482,29 @@ class BuiltinDataset(OnDiskDataset):
     This class is used to help download datasets from DGL S3 storage and load
     them as ``OnDiskDataset``.
 
+    Available builtin datasets include:
+    **ogbn-mag**
+        The ogbn-mag dataset is a heterogeneous network composed of a subset of
+        the Microsoft Academic Graph (MAG). See more details in
+        `ogbn-mag <https://ogb.stanford.edu/docs/nodeprop/#ogbn-mag>`_.
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
+    **ogbl-citation2**
+        The ogbl-citation2 dataset is a directed graph, representing the
+        citation network between a subset of papers extracted from MAG. See
+        more details in `ogbl-citation2
+        <https://ogb.stanford.edu/docs/linkprop/#ogbl-citation2>`_.
+
+    **ogbn-products**
+        The ogbn-products dataset is an undirected and unweighted graph,
+        representing an Amazon product co-purchasing network. See more details
+        in `ogbn-products
+        https://ogb.stanford.edu/docs/nodeprop/#ogbn-products>`_.
+        .. note::
+            Reverse edges are added to the original graph.
+
     Parameters
     ----------
     name : str
@@ -491,10 +514,16 @@ class BuiltinDataset(OnDiskDataset):
     """
 
     _base_url = "https://data.dgl.ai/dataset/graphbolt/"
+    _datasets = ["ogbn-mag", "ogbl-citation2", "ogbn-products"]
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
         dataset_dir = os.path.join(root, name)
         if not os.path.exists(dataset_dir):
+            if name not in self._datasets:
+                raise RuntimeError(
+                    f"Dataset {name} is not available. Available datasets are "
+                    f"{self._datasets}."
+                )
             url = self._base_url + name + ".zip"
             os.makedirs(root, exist_ok=True)
             zip_file_path = os.path.join(root, name + ".zip")
