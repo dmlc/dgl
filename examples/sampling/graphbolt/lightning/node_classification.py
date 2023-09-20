@@ -43,7 +43,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torchmetrics import Accuracy
 
 
@@ -165,7 +165,7 @@ class DataModule(LightningDataModule):
             datapipe, num_workers=self.num_workers
         )
         return dataloader
-    
+
     ########################################################################
     # (HIGHLIGHT) The 'train_dataloader' and 'val_dataloader' hooks are
     # essential components of the Lightning framework, defining how data is
