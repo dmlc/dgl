@@ -239,6 +239,6 @@ class MiniBatch:
         for name in attri:
             val = str(getattr(self, name))
             if val != "None":
-                val = val.replace("\n        "," ")
+                val = val.replace("\n        ", " ")
             final_str = final_str + f"{name}={val},\n\t"
         return "MiniBatch(" + final_str[:-3] + ")"
