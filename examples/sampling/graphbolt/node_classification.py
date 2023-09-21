@@ -59,7 +59,7 @@ class SAGE(nn.Module):
         self.dropout = nn.Dropout(0.5)
         self.hidden_size = hidden_size
         self.out_size = out_size
-        # Set the dtype for the layers manually
+        # Set the dtype for the layers manually.
         self.set_layer_dtype(torch.float64)
 
     def set_layer_dtype(self, dtype):
@@ -129,7 +129,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # self.fetch_feature()
     # [Input]:
     # 'features': The node features.
-    # 'node_feature_keys': The node feature keys (list) to be fetched.
+    # 'node_feature_keys': The keys of the node features to be fetched.
     # [Output]:
     # A FeatureFetcher object to fetch node features.
     # [Role]:
@@ -201,6 +201,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             # in the last layer's computation graph.
             y = data.labels
 
+            # TODO[Mingbang]: Move the to_dgl_blocks() to a datapipe stage later
             # The predicted labels.
             y_hat = model(data.to_dgl_blocks(), x)
 
@@ -277,6 +278,7 @@ def main(args):
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
+    # TODO[Mingbang]: Replace this with a more elegant API.
     in_size = features.read("node", None, "feat").shape[
         1
     ]  # Size of feature of a single node.
