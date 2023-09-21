@@ -9,5 +9,5 @@ python3 node_classification.py
 
 ### Results
 ```
-Valid Accuracy: 0.877
+Valid Accuracy: 0.907
 ```
