@@ -261,11 +261,9 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
         # if the original data output has line feeds.
         if isinstance(val, list):
             # Special handling SampledSubgraphImpl data. Line feeds variables within this type.
-            if (
-                isinstance(
-                    val[0],
-                    dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl
-                )
+            if isinstance(
+                val[0],
+                dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl
             ):
                 sampledsubgraph_strs = []
                 for sampledsubgraph in val:
