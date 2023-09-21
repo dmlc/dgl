@@ -596,14 +596,50 @@ def test_print():
     col = torch.tensor([2, 1, 3]).to(ctx)
     val = torch.tensor([1.0, 1.0, 2.0]).to(ctx)
     A = from_coo(row, col, val)
-    print(A)
+    expected = (
+        str(
+            """SparseMatrix(indices=tensor([[1, 1, 3],
+                             [2, 1, 3]]),
+             values=tensor([1., 1., 2.]),
+             shape=(4, 4), nnz=3)"""
+        )
+        if str(ctx) == "cpu"
+        else str(
+            """SparseMatrix(indices=tensor([[1, 1, 3],
+                             [2, 1, 3]], device='cuda:0'),
+             values=tensor([1., 1., 2.], device='cuda:0'),
+             shape=(4, 4), nnz=3)"""
+        )
+    )
+    assert str(A) == expected, print(A, expected)
 
     # vector-shape non zero
     row = torch.tensor([1, 1, 3]).to(ctx)
     col = torch.tensor([2, 1, 3]).to(ctx)
-    val = torch.randn(3, 2).to(ctx)
+    val = torch.tensor(
+        [[1.3080, 1.5984], [-0.4126, 0.7250], [-0.5416, -0.7022]]
+    ).to(ctx)
     A = from_coo(row, col, val)
-    print(A)
+    expected = (
+        str(
+            """SparseMatrix(indices=tensor([[1, 1, 3],
+                             [2, 1, 3]]),
+             values=tensor([[ 1.3080,  1.5984],
+                            [-0.4126,  0.7250],
+                            [-0.5416, -0.7022]]),
+             shape=(4, 4), nnz=3, val_size=(2,))"""
+        )
+        if str(ctx) == "cpu"
+        else str(
+            """SparseMatrix(indices=tensor([[1, 1, 3],
+                             [2, 1, 3]], device='cuda:0'),
+             values=tensor([[ 1.3080,  1.5984],
+                            [-0.4126,  0.7250],
+                            [-0.5416, -0.7022]], device='cuda:0'),
+             shape=(4, 4), nnz=3, val_size=(2,))"""
+        )
+    )
+    assert str(A) == expected, print(A, expected)
 
 
 @unittest.skipIf(
