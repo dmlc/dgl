@@ -288,6 +288,23 @@ class ItemSampler(IterDataPipe):
         self._drop_last = drop_last
         self._shuffle = shuffle
 
+    def _organize_items(self, data_pipe) -> None:
+        # Shuffle before batch.
+        if self._shuffle:
+            # `torchdata.datapipes.iter.Shuffler` works with stream too.
+            # To ensure randomness, make sure the buffer size is at least 10
+            # times the batch size.
+            buffer_size = max(10000, 10 * self._batch_size)
+            data_pipe = data_pipe.shuffle(buffer_size=buffer_size)
+
+        # Batch.
+        data_pipe = data_pipe.batch(
+            batch_size=self._batch_size,
+            drop_last=self._drop_last,
+        )
+
+        return data_pipe
+
     @staticmethod
     def _collate(batch):
         """Collate items into a batch. For internal use only."""
@@ -308,21 +325,8 @@ class ItemSampler(IterDataPipe):
         return default_collate(batch)
 
     def __iter__(self) -> Iterator:
-        data_pipe = self._item_set
-
-        # Shuffle before batch.
-        if self._shuffle:
-            # `torchdata.datapipes.iter.Shuffler` works with stream too.
-            # To ensure randomness, make sure the buffer size is at least 10
-            # times the batch size.
-            buffer_size = max(10000, 10 * self._batch_size)
-            data_pipe = data_pipe.shuffle(buffer_size=buffer_size)
-
-        # Batch.
-        data_pipe = data_pipe.batch(
-            batch_size=self._batch_size,
-            drop_last=self._drop_last,
-        )
+        # Organize items.
+        data_pipe = self._organize_items(self._item_set)
 
         # Collate.
         data_pipe = data_pipe.collate(collate_fn=self._collate)
@@ -443,42 +447,25 @@ class DistributedItemSampler(ItemSampler):
         if num_replicas is None:
             assert (
                 dist.is_available()
-            ), "Requires distributed package to be available"
+            ), "Requires distributed package to be available."
             num_replicas = dist.get_world_size()
-        total_len = len(item_set)
-        # Calculate the number of batches after dropping uneven batches for each
-        # replica.
-        self._num_evened_batches = total_len // (num_replicas * batch_size) + (
-            (not drop_last)
-            and (total_len % (num_replicas * batch_size) >= num_replicas)
-        )
+        if self._drop_uneven_inputs:
+            total_len = len(item_set)
+            # Calculate the number of batches after dropping uneven batches for
+            # each replica.
+            self._num_evened_batches = total_len // (
+                num_replicas * batch_size
+            ) + (
+                (not drop_last)
+                and (total_len % (num_replicas * batch_size) >= num_replicas)
+            )
 
-    def __iter__(self) -> Iterator:
-        data_pipe = self._item_set
-
-        # Shuffle before batch.
-        if self._shuffle:
-            # `torchdata.datapipes.iter.Shuffler` works with stream too.
-            # To ensure randomness, make sure the buffer size is at least 10
-            # times the batch size.
-            buffer_size = max(10000, 10 * self._batch_size)
-            data_pipe = data_pipe.shuffle(buffer_size=buffer_size)
-
-        # Batch.
-        data_pipe = data_pipe.batch(
-            batch_size=self._batch_size,
-            drop_last=self._drop_last,
-        )
+    def _organize_items(self, data_pipe) -> None:
+        data_pipe = super()._organize_items(data_pipe)
 
         # If drop_uneven_inputs is True, drop the excessive inputs by limiting
         # the length of the datapipe.
         if self._drop_uneven_inputs:
             data_pipe = data_pipe.header(self._num_evened_batches)
 
-        # Collate.
-        data_pipe = data_pipe.collate(collate_fn=self._collate)
-
-        # Map to minibatch.
-        data_pipe = data_pipe.map(partial(self._minibatcher, names=self._names))
-
-        return iter(data_pipe)
+        return data_pipe
