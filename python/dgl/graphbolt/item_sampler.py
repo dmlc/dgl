@@ -446,8 +446,9 @@ class DistributedItemSampler(ItemSampler):
             ), "Requires distributed package to be available"
             num_replicas = dist.get_world_size()
         total_len = len(item_set)
-        # Calculate the number of batches for each replica.
-        self._num_batches = total_len // (num_replicas * batch_size) + (
+        # Calculate the number of batches after dropping uneven batches for each
+        # replica.
+        self._num_evened_batches = total_len // (num_replicas * batch_size) + (
             (not drop_last)
             and (total_len % (num_replicas * batch_size) >= num_replicas)
         )
@@ -472,7 +473,7 @@ class DistributedItemSampler(ItemSampler):
         # If drop_uneven_inputs is True, drop the excessive inputs by limiting
         # the length of the datapipe.
         if self._drop_uneven_inputs:
-            data_pipe = data_pipe.header(self._num_batches)
+            data_pipe = data_pipe.header(self._num_evened_batches)
 
         # Collate.
         data_pipe = data_pipe.collate(collate_fn=self._collate)
