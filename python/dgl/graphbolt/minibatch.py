@@ -260,7 +260,8 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
         # and adjust the indentation on top of the original
         # if the original data output has line feeds.
         if isinstance(val, list):
-            # Special handling SampledSubgraphImpl data. Line feeds variables within this type.
+            # Special handling SampledSubgraphImpl data.
+            # Line feeds variables within this type.
             if isinstance(
                 val[0],
                 dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl,
