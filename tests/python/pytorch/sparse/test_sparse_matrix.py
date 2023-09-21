@@ -607,9 +607,9 @@ def test_print():
     # vector-shape non zero
     row = torch.tensor([1, 1, 3]).to(ctx)
     col = torch.tensor([2, 1, 3]).to(ctx)
-    val = torch.tensor([[ 1.3080,  1.5984],
-                        [-0.4126,  0.7250],
-                        [-0.5416, -0.7022]]).to(ctx)
+    val = torch.tensor(
+        [[ 1.3080,  1.5984], [-0.4126,  0.7250], [-0.5416, -0.7022]]
+    ).to(ctx)
     A = from_coo(row, col, val)
     expect_res = str(
         """SparseMatrix(indices=tensor([[1, 1, 3],
