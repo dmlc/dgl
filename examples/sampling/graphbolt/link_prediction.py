@@ -200,27 +200,13 @@ def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
     return (node_pairs, labels.float())
 
 
-# TODO[Keli]: Remove this helper function later.
-def to_dgl_blocks(sampled_subgraphs: gb.SampledSubgraphImpl):
-    """Convert sampled subgraphs to DGL blocks."""
-    blocks = [
-        dgl.create_block(
-            sampled_subgraph.node_pairs,
-            num_src_nodes=sampled_subgraph.reverse_row_node_ids.shape[0],
-            num_dst_nodes=sampled_subgraph.reverse_column_node_ids.shape[0],
-        )
-        for sampled_subgraph in sampled_subgraphs
-    ]
-    return blocks
-
-
 @torch.no_grad()
 def evaluate(args, graph, features, itemset, model):
     evaluator = Evaluator(name="ogbl-citation2")
 
     # Since we need to evaluate the model, we need to set the number
-    # of layers to 1 and the fanout to -1.
-    args.fanout = [torch.LongTensor([-1])]
+    # of layers to 3 and the fanout to -1.
+    args.fanout = [-1] * 3
     dataloader = create_dataloader(
         args, graph, features, itemset, is_train=False
     )
@@ -232,7 +218,7 @@ def evaluate(args, graph, features, itemset, model):
         # Unpack MiniBatch.
         compacted_pairs, _ = to_binary_link_dgl_computing_pack(data)
         node_feature = data.node_features["feat"].float()
-        blocks = to_dgl_blocks(data.sampled_subgraphs)
+        blocks = data.to_dgl_blocks()
 
         # Get the embeddings of the input nodes.
         y = model(blocks, node_feature)
@@ -270,7 +256,7 @@ def train(args, graph, features, train_set, valid_set, model):
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
             node_feature = data.node_features["feat"].float()
             # Convert sampled subgraphs to DGL blocks.
-            blocks = to_dgl_blocks(data.sampled_subgraphs)
+            blocks = data.to_dgl_blocks()
 
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)
@@ -292,6 +278,8 @@ def train(args, graph, features, train_set, valid_set, model):
                     f"Loss {(total_loss) / (step + 1):.4f}",
                     end="\n",
                 )
+            if step + 1 == 1000:
+                break
 
     # Evaluate the model.
     print("Validation")
