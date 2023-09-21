@@ -604,10 +604,12 @@ def test_print():
              shape=(4, 4), nnz=3)"""
         )
         if str(ctx) == "cpu"
-        else """SparseMatrix(indices=tensor([[1, 1, 3],
-                             [2, 1, 3]]),
-             values=tensor([1., 1., 2.], device='cuda:0'),
-             shape=(4, 4), nnz=3)"""
+        else str(
+                """SparseMatrix(indices=tensor([[1, 1, 3],
+                                [2, 1, 3]]),
+                values=tensor([1., 1., 2.], device='cuda:0'),
+                shape=(4, 4), nnz=3)"""
+             )
     )
     assert str(A) == expected, print(A, expected)
 
@@ -628,12 +630,14 @@ def test_print():
              shape=(4, 4), nnz=3, val_size=(2,))"""
         )
         if str(ctx) == "cpu"
-        else """SparseMatrix(indices=tensor([[1, 1, 3],
-                             [2, 1, 3]]),
-             values=tensor([[ 1.3080,  1.5984],
-                            [-0.4126,  0.7250],
-                            [-0.5416, -0.7022]], device='cuda:0'),
-             shape=(4, 4), nnz=3, val_size=(2,))"""
+        else str(
+                """SparseMatrix(indices=tensor([[1, 1, 3],
+                                [2, 1, 3]]),
+                values=tensor([[ 1.3080,  1.5984],
+                                [-0.4126,  0.7250],
+                                [-0.5416, -0.7022]], device='cuda:0'),
+                shape=(4, 4), nnz=3, val_size=(2,))"""
+            )
     )
     assert str(A) == expected, print(A, expected)
 
