@@ -225,3 +225,89 @@ class MiniBatch:
                     block.edata[dgl.EID] = subgraph.reverse_edge_ids
 
         return blocks
+
+    def to_dgl_computing_pack(self):
+        blocks = self.to_dgl_blocks()
+        assert (
+            blocks is not None
+        ), "Subgraph sampling for computation is Missing."
+        pack = {"blocks": blocks}
+        # For node property tasks.
+        if self.compacted_node_pairs is None:
+            if self.labels is not None:
+                pack["labels"] = self.labels
+        # For link prediction tasks.
+        else:
+            assert (
+                self.compacted_node_pairs is not None
+            ), "Evaluate graph for Computation in link prediction task is Missing."
+            pack["positive_graph"] = self.compacted_node_pairs
+            # Build negative graph.
+            if (
+                self.compacted_negative_srcs is not None
+                and self.compacted_negative_dsts is not None
+            ):
+                # For homogeneous graph.
+                if isinstance(self.compacted_negative_srcs, torch.Tensor):
+                    pack["negative_graph"] = (
+                        self.compacted_negative_srcs.view(-1),
+                        self.compacted_negative_dsts.view(-1),
+                    )
+                # For heterogeneous graph.
+                else:
+                    pack["negative_graph"] = {
+                        (
+                            neg_src.view(-1),
+                            self.compacted_negative_dsts[etype].view(-1),
+                        )
+                        for etype, neg_src in self.compacted_negative_srcs.items()
+                    }
+            elif self.compacted_negative_srcs is not None:
+                # For homogeneous graph.
+                if isinstance(self.compacted_negative_srcs, torch.Tensor):
+                    negative_ratio = self.compacted_negative_srcs.size(1)
+                    pack["negative_graph"] = (
+                        self.compacted_negative_srcs.view(-1),
+                        self.compacted_node_pairs[1].repeat_interleave(
+                            negative_ratio
+                        ),
+                    )
+                # For heterogeneous graph.
+                else:
+                    negative_ratio = self.compacted_negative_srcs.values[
+                        0
+                    ].size(1)
+                    pack["negative_graph"] = {
+                        (
+                            neg_src.view(-1),
+                            self.compacted_node_pairs[etype][
+                                1
+                            ].repeat_interleave(negative_ratio),
+                        )
+                        for etype, neg_src in self.compacted_negative_srcs.items()
+                    }
+            elif self.compacted_negative_dsts is not None:
+                # For homogeneous graph.
+                if isinstance(self.compacted_negative_dsts, torch.Tensor):
+                    negative_ratio = self.compacted_negative_dsts.size(1)
+                    pack["negative_graph"] = (
+                        self.compacted_node_pairs[0].repeat_interleave(
+                            negative_ratio
+                        ),
+                        self.compacted_negative_dsts.view(-1),
+                    )
+                # For heterogeneous graph.
+                else:
+                    negative_ratio = self.compacted_negative_dsts.values[
+                        0
+                    ].size(1)
+                    pack["negative_graph"] = {
+                        (
+                            self.compacted_node_pairs[etype][
+                                0
+                            ].repeat_interleave(negative_ratio),
+                            neg_dst.view(-1),
+                        )
+                        for etype, neg_dst in self.compacted_negative_dsts.items()
+                    }
+        return pack
