@@ -225,3 +225,71 @@ class MiniBatch:
                     block.edata[dgl.EID] = subgraph.reverse_edge_ids
 
         return blocks
+
+    def __repr__(self) -> str:
+        return _minibatch_str(self)
+
+
+def _minibatch_str(minibatch: MiniBatch) -> str:
+    final_str = ""
+    # Get all attributes in the class except methods.
+
+    def _get_attributes(_obj) -> list:
+        attributes = [
+            attribute
+            for attribute in dir(_obj)
+            if not attribute.startswith("__")
+            and not callable(getattr(_obj, attribute))
+        ]
+        return attributes
+
+    attributes = _get_attributes(minibatch)
+    attributes.reverse()
+    # Insert key with its value into the string.
+    for name in attributes:
+        val = getattr(minibatch, name)
+
+        def _add_indent(_str, indent):
+            lines = _str.split("\n")
+            lines = [lines[0]] + [
+                " " * (indent + 10) + line for line in lines[1:]
+            ]
+            return "\n".join(lines)
+
+        # Let the variables in the list occupy one line each,
+        # and adjust the indentation on top of the original
+        # if the original data output has line feeds.
+        if isinstance(val, list):
+            # Special handling SampledSubgraphImpl data.
+            # Line feeds variables within this type.
+            if isinstance(
+                val[0],
+                dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl,
+            ):
+                sampledsubgraph_strs = []
+                for sampledsubgraph in val:
+                    ss_attributes = _get_attributes(sampledsubgraph)
+                    sampledsubgraph_str = "SampledSubgraphImpl("
+                    for ss_name in ss_attributes:
+                        ss_val = str(getattr(sampledsubgraph, ss_name))
+                        sampledsubgraph_str = (
+                            sampledsubgraph_str
+                            + f"{ss_name}={_add_indent(ss_val, len(ss_name)+1)},\n"
+                            + " " * 20
+                        )
+                    sampledsubgraph_strs.append(sampledsubgraph_str[:-21] + ")")
+                val = "[" + ",\n".join(sampledsubgraph_strs) + "]"
+            else:
+                val = [
+                    _add_indent(
+                        str(val_str), len(str(val_str).split("': ")[0]) - 6
+                    )
+                    for val_str in val
+                ]
+                val = "[" + ",\n".join(val) + "]"
+        else:
+            val = str(val)
+        final_str = (
+            final_str + f"{name}={_add_indent(val, len(name)+1)},\n" + " " * 10
+        )
+    return "MiniBatch(" + final_str[:-3] + ")"
