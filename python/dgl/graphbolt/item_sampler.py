@@ -362,8 +362,9 @@ class DistributedItemSampler(ItemSampler):
         Option to shuffle before sample.
     num_replicas: int
         The number of model replicas that will be created during Distributed
-        Data Parallel (DDP) training. By default, the world size is retrieved
-        from the current distributed group.
+        Data Parallel (DDP) training. It should be the same as the real world
+        size, otherwise it could cause errors. By default, it is retrieved from
+        the current distributed group.
     drop_uneven_inputs : bool
         Option to make sure the numbers of batches for each replica are the
         same. If some of the replicas have more batches than the others, the
