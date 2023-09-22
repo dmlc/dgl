@@ -6,5 +6,6 @@ python link_prediction.py
 
 Results (10 epochs):
 ```
-Test MRR 0.3745
+Valid MRR 0.7040
+Test MRR 0.7043
 ```

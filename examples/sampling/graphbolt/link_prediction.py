@@ -141,6 +141,22 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Input]:
+    # 'gb.exclude_seed_edges': Function to exclude seed edges, optionally
+    # including their reverse edges, from the sampled subgraphs in the
+    # minibatch.
+    # [Output]:
+    # A MiniBatchTransformer object with excluded seed edges.
+    # [Role]:
+    # During the training phase of link prediction, negative edges are
+    # sampled. It's essential to exclude the seed edges from the process
+    # to ensure that positive samples are not inadvertently included within
+    # the negative samples.
+    ############################################################################
+    if is_train:
+        datapipe = datapipe.transform(gb.exclude_seed_edges)
+
+    ############################################################################
+    # [Input]:
     # 'features': The node features.
     # 'node_feature_keys': The node feature keys (list) to be fetched.
     # [Output]:
