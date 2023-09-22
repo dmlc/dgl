@@ -347,6 +347,10 @@ class DistributedItemSampler(ItemSampler):
     counterparts. The original item set is sharded such that each replica
     (process) receives an exclusive subset.
 
+    Note: The items will be first sharded onto each replica, then get shuffled
+    (if needed) and batched. Therefore, each replica will always get a same set
+    of items.
+
     Note: This class `DistributedItemSampler` is not decorated with
     `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
     does not support function-like call. But any iterable datapipes from
@@ -450,6 +454,8 @@ class DistributedItemSampler(ItemSampler):
             ), "Requires distributed package to be available."
             num_replicas = dist.get_world_size()
         if self._drop_uneven_inputs:
+            # If the len() method of the item_set is not available, it will
+            # throw an exception.
             total_len = len(item_set)
             # Calculate the number of batches after dropping uneven batches for
             # each replica.
