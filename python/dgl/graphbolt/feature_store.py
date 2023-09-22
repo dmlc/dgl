@@ -70,6 +70,7 @@ class FeatureStore:
         domain: str,
         type_name: str,
         feature_name: str,
+        ids: torch.Tensor = None,
     ):
         """Read from the feature store.
 
@@ -97,7 +98,6 @@ class FeatureStore:
         domain: str,
         type_name: str,
         feature_name: str,
-        ids: torch.Tensor = None,
     ):
         """Get the size of the feature.
 

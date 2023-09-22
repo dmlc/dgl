@@ -62,7 +62,6 @@ class BasicFeatureStore(FeatureStore):
         domain: str = None,
         type_name: str = None,
         feature_name: str = None,
-        ids: torch.Tensor = None,
     ):
         """Get the size of the feature.
         Parameters
@@ -78,11 +77,7 @@ class BasicFeatureStore(FeatureStore):
         int
             The size of the feature.
         """
-        if (
-            domain is None
-            and type_name is None
-            and feature_name is None
-        ):
+        if domain is None and type_name is None and feature_name is None:
             for value in self._features.values():
                 return value.size()
         return self._features[(domain, type_name, feature_name)].size()
