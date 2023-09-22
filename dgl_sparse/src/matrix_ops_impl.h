@@ -17,10 +17,13 @@
 namespace dgl {
 namespace sparse {
 
+std::tuple<torch::Tensor, torch::Tensor> CompactId(
+    torch::Tensor &row, torch::optional<torch::Tensor> &leading_indices);
+
 template <c10::DeviceType XPU, typename IdType, typename ValType>
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
-CompactImpl(
-    const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
+CompactImplCOO(
+    const c10::intrusive_ptr<SparseMatrix> &mat, int64_t dim,
     torch::optional<torch::Tensor> leading_indices) {
   torch::Tensor row, col;
   auto coo = mat->COOTensors();
@@ -29,49 +32,68 @@ CompactImpl(
   else
     std::tie(col, row) = coo;
 
-  //// [ For debug and delete soon ]
-  // auto row_acc = row.accessor<IdType, 1>();
-  // auto col_acc = col.accessor<IdType, 1>();
-  // printf("COO format\n");
-  // for (int i = 0; i < row.size(-1); i++) printf("%ld ", row_acc[i]);
-  // printf("\n");
-  // for (int i = 0; i < col.size(-1); i++) printf("%ld ", col_acc[i]);
-  // printf("\n");
-
-  torch::Tensor sort_idx, rev_sort_idx;
-  std::tie(row, sort_idx) = row.sort(-1);
-  rev_sort_idx = std::get<1>(sort_idx.sort(-1));
-
-  torch::Tensor uniqued, uniq_idx;
-  int64_t n_leading_indices = 0;
-  if (leading_indices.has_value()) {
-    n_leading_indices = leading_indices.value().numel();
-    std::tie(uniqued, uniq_idx) =
-        torch::_unique(torch::cat({leading_indices.value(), row}), false, true);
-  } else {
-    std::tie(uniqued, uniq_idx) = torch::_unique(row, false, true);
-  }
-  auto n_uniqued = uniqued.numel();
-
-  auto new_row =
-      torch::arange(n_uniqued - 1, -1, -1)
-          .index_select(
-              0, uniq_idx.slice(
-                     0, n_leading_indices, n_leading_indices + row.size(-1)))
-          .index_select(0, rev_sort_idx);
+  torch::Tensor new_row, uniqued;
+  std::tie(new_row, uniqued) = CompactId(row, leading_indices);
 
   if (dim == 0) {
     auto ret = SparseMatrix::FromCOO(
         torch::stack({new_row, col}, 0), mat->value(),
-        std::vector<int64_t>{n_uniqued, mat->shape()[1]});
+        std::vector<int64_t>{uniqued.numel(), mat->shape()[1]});
     auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
     return {ret, ret_idx};
   } else {
     auto ret = SparseMatrix::FromCOO(
         torch::stack({col, new_row}, 0), mat->value(),
-        std::vector<int64_t>{mat->shape()[0], n_uniqued});
+        std::vector<int64_t>{mat->shape()[0], uniqued.numel()});
     auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
     return {ret, ret_idx};
+  }
+}
+
+template <c10::DeviceType XPU, typename IdType, typename ValType>
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
+CompactImplCSC(
+    const c10::intrusive_ptr<SparseMatrix> &mat, int64_t dim,
+    torch::optional<torch::Tensor> leading_indices) {
+  std::shared_ptr<dgl::sparse::CSR> csr;
+  if (dim == 0)
+    csr = mat->CSCPtr();
+  else
+    csr = mat->CSRPtr();
+
+  torch::Tensor new_indices, uniqued;
+  std::tie(new_indices, uniqued) = CompactId(csr->indices, leading_indices);
+
+  if (dim == 0) {
+    auto ret = SparseMatrix::FromCSC(
+        csr->indptr, new_indices, mat->value(),
+        std::vector<int64_t>{uniqued.numel(), mat->shape()[1]});
+    auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
+    return {ret, ret_idx};
+  } else {
+    auto ret = SparseMatrix::FromCSR(
+        csr->indptr, new_indices, mat->value(),
+        std::vector<int64_t>{mat->shape()[0], uniqued.numel()});
+    auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
+    return {ret, ret_idx};
+  }
+}
+
+template <c10::DeviceType XPU, typename IdType, typename ValType>
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
+CompactImpl(
+    const c10::intrusive_ptr<SparseMatrix> &mat, int64_t dim,
+    torch::optional<torch::Tensor> leading_indices) {
+  if (dim == 0) {
+    if (mat->HasCSC())
+      return CompactImplCSC<XPU, IdType, ValType>(mat, dim, leading_indices);
+    else
+      return CompactImplCOO<XPU, IdType, ValType>(mat, dim, leading_indices);
+  } else {
+    if (mat->HasCSR())
+      return CompactImplCSC<XPU, IdType, ValType>(mat, dim, leading_indices);
+    else
+      return CompactImplCOO<XPU, IdType, ValType>(mat, dim, leading_indices);
   }
 }
 
