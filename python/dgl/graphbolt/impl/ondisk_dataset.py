@@ -514,8 +514,7 @@ class BuiltinDataset(OnDiskDataset):
         `ogb-lsc-mag240m <https://ogb.stanford.edu/docs/lsc/mag240m/>`_.
 
         .. note::
-            Reverse edges are added to the original graph and duplicated
-            edges are removed.
+            Reverse edges are added to the original graph.
 
     Parameters
     ----------
