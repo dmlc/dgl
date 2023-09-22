@@ -437,8 +437,9 @@ class CSCSamplingGraph:
         probs_name: Optional[str] = None,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
-        subgraph via layer-neighbor sampling from arXiv:2210.13339:
-        "Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs"
+        subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
+        `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
+        <https://arxiv.org/abs/2210.13339>`__
 
         Parameters
         ----------
