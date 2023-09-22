@@ -17,10 +17,10 @@ python3 hetero_rgcn.py --dataset ogbn-mag --num_gups 1
 ### Resource usage and time cost
 Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 96 vCPUs(Cascade Lake P-8259L), 8 NVIDIA T4 GPUs.
 
-| Dataset Size | CPU RAM Usage | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
-| ------------ | ------------- | ----------| --------- | ---------------------------    |
-| ~1.1GB       | ~5GB          | 0GB       | ~4min5s   | ~2min7s + ~0min12s + ~0min8s   |
-| ~1.1GB       | ~4.3GB        | 4.7GB     | ~1min18s  | ~1min54s + ~0min12s + ~0min8s  |
+| Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
+| ------------ | ------------- | ----------- | ---------- | --------- | ---------------------------    |
+| ~1.1GB       | ~5GB          | 0           |  0GB       | ~4min5s   | ~2min7s + ~0min12s + ~0min8s   |
+| ~1.1GB       | ~4.3GB        | 1           |  4.7GB     | ~1min18s  | ~1min54s + ~0min12s + ~0min8s  |
 
 ### Accuracies
 ```

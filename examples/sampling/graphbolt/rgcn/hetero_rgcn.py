@@ -126,7 +126,7 @@ def create_dataloader(
     # Move the mini-batch to the appropriate device.
     # `device`:
     #   The device to move the mini-batch to.
-    # [TODO] GPU sampling is not supported yet.
+    # [TODO] Moving `MiniBatch` to GPU is not supported yet.
     device = th.device("cpu")
     datapipe = datapipe.copy_to(device)
 
