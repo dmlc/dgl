@@ -46,8 +46,8 @@ As we can see from above table, the time per epoch is quite close to the one in 
 ```
 Final performance: 
 All runs:
-Highest Train: 51.78 ± 0.86
-Highest Valid: 48.79 ± 0.44
-  Final Train: 51.78 ± 0.86
+Highest Train: 54.75 ± 0.29
+Highest Valid: 52.08 ± 0.09
+  Final Train: 54.75 ± 0.29
    Final Test: 0.00 ± 0.00
 ```
