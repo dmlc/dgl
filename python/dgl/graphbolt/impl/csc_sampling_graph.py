@@ -225,7 +225,7 @@ class CSCSamplingGraph:
         column_num = (
             C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
         )
-        column = C_sampled_subgraph.reverse_column_node_ids.repeat_interleave(
+        column = C_sampled_subgraph.original_column_node_ids.repeat_interleave(
             column_num
         )
         row = C_sampled_subgraph.indices

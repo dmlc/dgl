@@ -206,8 +206,8 @@ def to_dgl_blocks(sampled_subgraphs: gb.SampledSubgraphImpl):
     blocks = [
         dgl.create_block(
             sampled_subgraph.node_pairs,
-            num_src_nodes=sampled_subgraph.reverse_row_node_ids.shape[0],
-            num_dst_nodes=sampled_subgraph.reverse_column_node_ids.shape[0],
+            num_src_nodes=sampled_subgraph.original_row_node_ids.shape[0],
+            num_dst_nodes=sampled_subgraph.original_column_node_ids.shape[0],
         )
         for sampled_subgraph in sampled_subgraphs
     ]
