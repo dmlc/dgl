@@ -83,8 +83,10 @@ class BasicFeatureStore(FeatureStore):
             The size of the feature.
         """
         if (
-            domain is None and type_name is None and
-            feature_name is None and ids is None
+            domain is None
+            and type_name is None
+            and feature_name is None
+            and ids is None
         ):
             for value in self._features.values():
                 return value.size()
