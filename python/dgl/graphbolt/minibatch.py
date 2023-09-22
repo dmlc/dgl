@@ -62,8 +62,7 @@ class DGLMiniBatch:
     """
 
     labels: Union[torch.Tensor, Dict[str, torch.Tensor]] = None
-    """
-    Labels associated with seed nodes / node pairs in the graph.
+    """Labels associated with seed nodes / node pairs in the graph.
     - If `labels` is a tensor: It indicates the graph is homogeneous. The value
       are corresponding labels to given 'output_nodes' or 'node_pairs'.
     - If `labels` is a dictionary: The keys are node or edge type and the value
@@ -74,9 +73,8 @@ class DGLMiniBatch:
         Tuple[torch.Tensor, torch.Tensor],
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ] = None
-    """
-    Representation of positive graphs used for evaluating or computing loss in
-    link prediction tasks.
+    """Representation of positive graphs used for evaluating or computing loss
+    in link prediction tasks.
     - If `positive_node_pairs` is a tuple: It indicates a homogeneous graph
     containing two tensors representing source-destination node pairs.
     - If `positive_node_pairs` is a dictionary: The keys should be edge type,
@@ -88,8 +86,7 @@ class DGLMiniBatch:
         Tuple[torch.Tensor, torch.Tensor],
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ] = None
-    """
-    Representation of negative graphs used for evaluating or computing loss in
+    """Representation of negative graphs used for evaluating or computing loss in
     link prediction tasks.
     - If `negative_node_pairs` is a tuple: It indicates a homogeneous graph
     containing two tensors representing source-destination node pairs.
