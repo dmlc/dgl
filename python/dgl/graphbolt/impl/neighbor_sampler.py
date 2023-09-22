@@ -78,6 +78,7 @@ class NeighborSampler(SubgraphSampler):
         3
         """
         super().__init__(datapipe)
+        self.graph = graph
         # Convert fanouts to a list of tensors.
         self.fanouts = []
         for fanout in fanouts:
@@ -91,6 +92,13 @@ class NeighborSampler(SubgraphSampler):
     def _sample_subgraphs(self, seeds):
         subgraphs = []
         num_layers = len(self.fanouts)
+        # Enrich seeds with all node types.
+        if isinstance(seeds, dict):
+            ntypes = list(self.graph.metadata.node_type_to_id.keys())
+            seeds = {
+                ntype: seeds.get(ntype, torch.LongTensor([]))
+                for ntype in ntypes
+            }
         for hop in range(num_layers):
             subgraph = self.sampler(
                 seeds,
@@ -98,14 +106,14 @@ class NeighborSampler(SubgraphSampler):
                 self.replace,
                 self.prob_name,
             )
-            reverse_column_node_ids = seeds
+            original_column_node_ids = seeds
             seeds, compacted_node_pairs = unique_and_compact_node_pairs(
                 subgraph.node_pairs, seeds
             )
             subgraph = SampledSubgraphImpl(
                 node_pairs=compacted_node_pairs,
-                reverse_column_node_ids=reverse_column_node_ids,
-                reverse_row_node_ids=seeds,
+                original_column_node_ids=original_column_node_ids,
+                original_row_node_ids=seeds,
             )
             subgraphs.insert(0, subgraph)
         return seeds, subgraphs
@@ -114,6 +122,11 @@ class NeighborSampler(SubgraphSampler):
 @functional_datapipe("sample_layer_neighbor")
 class LayerNeighborSampler(NeighborSampler):
     """
+    Sampler that builds computational dependency of node representations via
+    labor sampling for multilayer GNN from the NeurIPS 2023 paper
+    `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
+    <https://arxiv.org/abs/2210.13339>`__
+
     Layer-Neighbor sampler is responsible for sampling a subgraph from given
     data. It returns an induced subgraph along with compacted information. In
     the context of a node classification task, the neighbor sampler directly
@@ -123,10 +136,13 @@ class LayerNeighborSampler(NeighborSampler):
     positive and negative node pairs, and employs these nodes as the seed nodes
     for subsequent steps.
 
-    Implements the approach described in https://arxiv.org/abs/2210.13339,
-    Appendix A.3. Similar to dgl.dataloading.LaborSampler but this uses
-    sequential poisson sampling instead of poisson sampling to keep the count
-    of sampled edges per vertex deterministic.
+    Implements the approach described in Appendix A.3 of the paper. Similar to
+    dgl.dataloading.LaborSampler but this uses sequential poisson sampling
+    instead of poisson sampling to keep the count of sampled edges per vertex
+    deterministic like NeighborSampler. Thus, it is a drop-in replacement for
+    NeighborSampler. However, unlike NeighborSampler, it samples fewer vertices
+    and edges for multilayer GNN scenario without harming convergence speed with
+    respect to training iterations.
     """
 
     def __init__(

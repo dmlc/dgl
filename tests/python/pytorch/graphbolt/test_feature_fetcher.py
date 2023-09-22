@@ -65,7 +65,7 @@ def test_FeatureFetcher_with_edges_homo():
             subgraphs.append(
                 gb.SampledSubgraphImpl(
                     node_pairs=(torch.tensor([]), torch.tensor([])),
-                    reverse_edge_ids=torch.randint(0, graph.num_edges, (10,)),
+                    original_edge_ids=torch.randint(0, graph.num_edges, (10,)),
                 )
             )
         data = gb.MiniBatch(input_nodes=seeds, sampled_subgraphs=subgraphs)
@@ -146,7 +146,7 @@ def test_FeatureFetcher_with_edges_hetero():
 
     def add_node_and_edge_ids(seeds):
         subgraphs = []
-        reverse_edge_ids = {
+        original_edge_ids = {
             "n1:e1:n2": torch.randint(0, 50, (10,)),
             "n2:e2:n1": torch.randint(0, 50, (10,)),
         }
@@ -154,7 +154,7 @@ def test_FeatureFetcher_with_edges_hetero():
             subgraphs.append(
                 gb.SampledSubgraphImpl(
                     node_pairs=(torch.tensor([]), torch.tensor([])),
-                    reverse_edge_ids=reverse_edge_ids,
+                    original_edge_ids=original_edge_ids,
                 )
             )
         data = gb.MiniBatch(input_nodes=seeds, sampled_subgraphs=subgraphs)

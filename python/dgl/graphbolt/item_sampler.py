@@ -4,7 +4,8 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Callable, Iterator, Optional
 
-from torch.utils.data import default_collate, functional_datapipe
+import torch.distributed as dist
+from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 
 from ..base import dgl_warning
@@ -14,7 +15,7 @@ from ..heterograph import DGLGraph
 from .itemset import ItemSet, ItemSetDict
 from .minibatch import MiniBatch
 
-__all__ = ["ItemSampler", "minibatcher_default"]
+__all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
 
 
 def minibatcher_default(batch, names):
@@ -78,7 +79,6 @@ def minibatcher_default(batch, names):
     return minibatch
 
 
-@functional_datapipe("sample_item")
 class ItemSampler(IterDataPipe):
     """Item Sampler.
 
@@ -281,11 +281,29 @@ class ItemSampler(IterDataPipe):
         shuffle: Optional[bool] = False,
     ) -> None:
         super().__init__()
-        self._item_set = item_set
+        self._names = item_set.names
+        self._item_set = IterableWrapper(item_set)
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
         self._shuffle = shuffle
+
+    def _organize_items(self, data_pipe) -> None:
+        # Shuffle before batch.
+        if self._shuffle:
+            # `torchdata.datapipes.iter.Shuffler` works with stream too.
+            # To ensure randomness, make sure the buffer size is at least 10
+            # times the batch size.
+            buffer_size = max(10000, 10 * self._batch_size)
+            data_pipe = data_pipe.shuffle(buffer_size=buffer_size)
+
+        # Batch.
+        data_pipe = data_pipe.batch(
+            batch_size=self._batch_size,
+            drop_last=self._drop_last,
+        )
+
+        return data_pipe
 
     @staticmethod
     def _collate(batch):
@@ -307,27 +325,153 @@ class ItemSampler(IterDataPipe):
         return default_collate(batch)
 
     def __iter__(self) -> Iterator:
-        data_pipe = IterableWrapper(self._item_set)
-        # Shuffle before batch.
-        if self._shuffle:
-            # `torchdata.datapipes.iter.Shuffler` works with stream too.
-            # To ensure randomness, make sure the buffer size is at least 10
-            # times the batch size.
-            buffer_size = max(10000, 10 * self._batch_size)
-            data_pipe = data_pipe.shuffle(buffer_size=buffer_size)
-
-        # Batch.
-        data_pipe = data_pipe.batch(
-            batch_size=self._batch_size,
-            drop_last=self._drop_last,
-        )
+        # Organize items.
+        data_pipe = self._organize_items(self._item_set)
 
         # Collate.
         data_pipe = data_pipe.collate(collate_fn=self._collate)
 
         # Map to minibatch.
-        data_pipe = data_pipe.map(
-            partial(self._minibatcher, names=self._item_set.names)
-        )
+        data_pipe = data_pipe.map(partial(self._minibatcher, names=self._names))
 
         return iter(data_pipe)
+
+
+class DistributedItemSampler(ItemSampler):
+    """Distributed Item Sampler.
+
+    This sampler creates a distributed subset of items from the given data set,
+    which can be used for training with PyTorch's Distributed Data Parallel
+    (DDP). The items can be node IDs, node pairs with or without labels, node
+    pairs with negative sources/destinations, DGLGraphs, or heterogeneous
+    counterparts. The original item set is sharded such that each replica
+    (process) receives an exclusive subset.
+
+    Note: The items will be first sharded onto each replica, then get shuffled
+    (if needed) and batched. Therefore, each replica will always get a same set
+    of items.
+
+    Note: This class `DistributedItemSampler` is not decorated with
+    `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
+    does not support function-like call. But any iterable datapipes from
+    `torchdata` can be further appended.
+
+    Parameters
+    ----------
+    item_set : ItemSet or ItemSetDict
+        Data to be sampled.
+    batch_size : int
+        The size of each batch.
+    minibatcher : Optional[Callable]
+        A callable that takes in a list of items and returns a `MiniBatch`.
+    drop_last : bool
+        Option to drop the last batch if it's not full.
+    shuffle : bool
+        Option to shuffle before sample.
+    num_replicas: int
+        The number of model replicas that will be created during Distributed
+        Data Parallel (DDP) training. It should be the same as the real world
+        size, otherwise it could cause errors. By default, it is retrieved from
+        the current distributed group.
+    drop_uneven_inputs : bool
+        Option to make sure the numbers of batches for each replica are the
+        same. If some of the replicas have more batches than the others, the
+        redundant batches of those replicas will be dropped. If the drop_last
+        parameter is also set to True, the last batch will be dropped before the
+        redundant batches are dropped.
+        Note: When using Distributed Data Parallel (DDP) training, the program
+        may hang or error if the a replica has fewer inputs. It is recommended
+        to use the Join Context Manager provided by PyTorch to solve this
+        problem. Please refer to
+        https://pytorch.org/tutorials/advanced/generic_join.html. However, this
+        option can be used if the Join Context Manager is not helpful for any
+        reason.
+
+    Examples
+    --------
+    1. num_replica = 4, batch_size = 2, shuffle = False, drop_last = False,
+    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 7, 8, 9]
+    - Replica#0 gets [[0, 4], [8]]
+    - Replica#1 gets [[1, 5], [9]]
+    - Replica#2 gets [[2, 6]]
+    - Replica#3 gets [[3, 7]]
+
+    2. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
+    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 7, 8, 9].
+    - Replica#0 gets [[0, 4]]
+    - Replica#1 gets [[1, 5]]
+    - Replica#2 gets [[2, 6]]
+    - Replica#3 gets [[3, 7]]
+
+    3. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
+    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 11, 12, 13].
+    - Replica#0 gets [[0, 4], [8, 12]]
+    - Replica#1 gets [[1, 5], [9, 13]]
+    - Replica#2 gets [[2, 6]]
+    - Replica#3 gets [[3, 7]]
+
+    3. num_replica = 4, batch_size = 2, shuffle = False, drop_last = False,
+    drop_uneven_inputs = True, item_set = [0, 1, 2, ..., 11, 12, 13].
+    - Replica#0 gets [[0, 4], [8, 12]]
+    - Replica#1 gets [[1, 5], [9, 13]]
+    - Replica#2 gets [[2, 6], [10]]
+    - Replica#3 gets [[3, 7], [11]]
+
+    4. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
+    drop_uneven_inputs = True, item_set = [0, 1, 2, ..., 11, 12, 13].
+    - Replica#0 gets [[0, 4]]
+    - Replica#1 gets [[1, 5]]
+    - Replica#2 gets [[2, 6]]
+    - Replica#3 gets [[3, 7]]
+
+    5. num_replica = 4, batch_size = 2, shuffle = True, drop_last = True,
+    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 11, 12, 13].
+    One possible output:
+    - Replica#0 gets [[8, 0], [12, 4]]
+    - Replica#1 gets [[13, 1], [9, 5]]
+    - Replica#2 gets [[10, 2]]
+    - Replica#3 gets [[7, 11]]
+    """
+
+    def __init__(
+        self,
+        item_set: ItemSet or ItemSetDict,
+        batch_size: int,
+        minibatcher: Optional[Callable] = minibatcher_default,
+        drop_last: Optional[bool] = False,
+        shuffle: Optional[bool] = False,
+        num_replicas: Optional[int] = None,
+        drop_uneven_inputs: Optional[bool] = False,
+    ) -> None:
+        super().__init__(item_set, batch_size, minibatcher, drop_last, shuffle)
+        self._drop_uneven_inputs = drop_uneven_inputs
+        # Apply a sharding filter to distribute the items.
+        self._item_set = self._item_set.sharding_filter()
+        # Get world size.
+        if num_replicas is None:
+            assert (
+                dist.is_available()
+            ), "Requires distributed package to be available."
+            num_replicas = dist.get_world_size()
+        if self._drop_uneven_inputs:
+            # If the len() method of the item_set is not available, it will
+            # throw an exception.
+            total_len = len(item_set)
+            # Calculate the number of batches after dropping uneven batches for
+            # each replica.
+            self._num_evened_batches = total_len // (
+                num_replicas * batch_size
+            ) + (
+                (not drop_last)
+                and (total_len % (num_replicas * batch_size) >= num_replicas)
+            )
+
+    def _organize_items(self, data_pipe) -> None:
+        data_pipe = super()._organize_items(data_pipe)
+
+        # If drop_uneven_inputs is True, drop the excessive inputs by limiting
+        # the length of the datapipe.
+        if self._drop_uneven_inputs:
+            data_pipe = data_pipe.header(self._num_evened_batches)
+
+        return data_pipe

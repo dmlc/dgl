@@ -53,6 +53,7 @@ Standard Implementations
     :template: classtemplate.rst
 
     OnDiskDataset
+    BuiltinDataset
     OnDiskTask
     OnDiskMetaData
     CSCSamplingGraph
