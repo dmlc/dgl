@@ -36,6 +36,14 @@ def test_gpu_cached_feature():
         torch.tensor([[4.0, 5.0, 6.0]]).to("cuda"),
     )
 
+    # Test get the size of the entire feature.
+    assert feat_store_a.size() == 3
+    assert feat_store_b.size() == 2
+
+    # Test get the size of the feature with ids.
+    assert feat_store_a.size(torch.tensor([0, 2]).to("cuda")) == 2
+    assert feat_store_b.read(torch.tensor([1]).to("cuda")) == 1
+
     # Test update the entire feature.
     feat_store_a.update(torch.tensor([0.0, 1.0, 2.0]).to("cuda"))
     assert torch.equal(

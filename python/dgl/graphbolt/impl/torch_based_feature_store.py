@@ -77,6 +77,23 @@ class TorchBasedFeature(Feature):
             return self._tensor
         return self._tensor[ids]
 
+    def size(self, ids: torch.Tensor = None):
+        """Get the size of the feature.
+        Parameters
+        ----------
+        ids : torch.Tensor, optional
+            The index of the feature. If specified, only the size of
+            the specified indices of the feature will calculate.
+            If None, the entire size of the feature is returned.
+        Returns
+        -------
+        int
+            The size of the feature.
+        """
+        if ids is None:
+            return len(self._tensor)
+        return len(self._tensor[ids])
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature store.
 

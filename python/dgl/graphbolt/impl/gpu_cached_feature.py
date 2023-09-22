@@ -80,6 +80,23 @@ class GPUCachedFeature(Feature):
         self._feature.replace(missing_keys, missing_values)
         return torch.reshape(values, self.item_shape)
 
+    def size(self, ids: torch.Tensor = None):
+        """Get the size of the feature.
+        Parameters
+        ----------
+        ids : torch.Tensor, optional
+            The index of the feature. If specified, only the size of
+            the specified indices of the feature will calculate.
+            If None, the entire size of the feature is returned.
+        Returns
+        -------
+        int
+            The size of the feature.
+        """
+        if ids is None:
+            return self._fallback_feature.size()
+        return self._fallback_feature[ids].size()
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
 

@@ -28,6 +28,15 @@ def test_basic_feature_store_homo():
         torch.tensor([3, 2]),
     )
 
+    # Test get the size of the entire feature.
+    assert feature_store.size("node", None, "a") == 3
+    assert feature_store.size("node", None, "b") == 3
+
+    # Test get the size of the feature with ids.
+    assert feature_store.size() == 3
+    assert feature_store.size("node", None, "b") == 3
+    assert feature_store.size("node", None, "b", torch.tensor([0, 1])) == 2
+
 
 def test_basic_feature_store_hetero():
     a = torch.tensor([3, 2, 1])
@@ -58,6 +67,15 @@ def test_basic_feature_store_hetero():
         feature_store.read("node", "paper", "a", torch.tensor([0, 1])),
         torch.tensor([3, 2]),
     )
+
+    # Test get the size of the entire feature.
+    assert feature_store.size() == 3
+    assert feature_store.size("node", "paper", "a") == 3
+    assert feature_store.size("node", "author", "b") == 3
+    assert feature_store.size("edge", "paper:cites:paper", "c") == 3
+
+    # Test get the size of the feature with ids.
+    assert feature_store.size("node", "paper", "a", torch.tensor([0, 1])) == 2
 
 
 def test_basic_feature_store_errors():

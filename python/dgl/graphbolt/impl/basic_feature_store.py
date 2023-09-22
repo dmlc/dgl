@@ -57,6 +57,39 @@ class BasicFeatureStore(FeatureStore):
         """
         return self._features[(domain, type_name, feature_name)].read(ids)
 
+    def size(
+        self,
+        domain: str = None,
+        type_name: str = None,
+        feature_name: str = None,
+        ids: torch.Tensor = None,
+    ):
+        """Get the size of the feature.
+        Parameters
+        ----------
+        domain : str
+            The domain of the feature such as "node", "edge" or "graph".
+        type_name : str
+            The node or edge type name.
+        feature_name : str
+            The feature name.
+        ids : torch.Tensor, optional
+            The index of the feature. If specified, only the size of
+            the specified indices of the feature will calculate.
+            If None, the entire size of the feature is returned.
+        Returns
+        -------
+        int
+            The size of the feature.
+        """
+        if (
+            domain is None and type_name is None and
+            feature_name is None and ids is None
+        ):
+            for value in self._features.values():
+                return value.size()
+        return self._features[(domain, type_name, feature_name)].size(ids)
+
     def update(
         self,
         domain: str,
