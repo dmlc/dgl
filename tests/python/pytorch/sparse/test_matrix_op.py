@@ -11,25 +11,21 @@ from .utils import (
 )
 
 
-@pytest.mark.skipif(F.ctx().type == "cuda", reason="GPU not support now")
 @pytest.mark.parametrize(
     "create_func", [rand_diag, rand_csr, rand_csc, rand_coo]
 )
 @pytest.mark.parametrize("dim", [0, 1])
-@pytest.mark.parametrize("index", [None, (1, 2), (0, 0, 2), (2, 0)])
+@pytest.mark.parametrize("index", [None, (1, 3), (4, 2), (0, 0, 2)])
 def test_compact(create_func, dim, index):
     ctx = F.ctx()
-    shape = (3, 3)
+    shape = (5, 5)
     ans_idx = []
     if index is not None:
-        ans_idx = list(index)
+        ans_idx = list(dict.fromkeys(index))
         index = torch.tensor(index).to(ctx)
+        index.unique()
 
-    A = create_func(shape, 6, ctx)
-
-    print(A)
-    print()
-    print(index)
+    A = create_func(shape, 8, ctx)
 
     A_compact, ret_id = A.compact(dim, index)
     A_compact_dense = sparse_matrix_to_dense(A_compact)
@@ -47,7 +43,7 @@ def test_compact(create_func, dim, index):
         ans_idx = torch.tensor(ans_idx).to(ctx)
     A_dense_select = sparse_matrix_to_dense(A.index_select(dim, ans_idx))
 
-    print(A_dense, index)
+    print(A_dense)
     print(A_dense_select)
     print(A_compact_dense)
 

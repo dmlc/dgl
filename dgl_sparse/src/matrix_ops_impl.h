@@ -22,71 +22,55 @@ std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
 CompactImpl(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     torch::optional<torch::Tensor> leading_indices) {
-  auto csr = dim == 0 ? mat->CSRPtr() : mat->CSCPtr();
-  auto ptr = csr->indptr;
-  auto idx = csr->indices;
-  auto val = mat->value();
-  if (csr->value_indices.has_value()) {
-    val = val.index_select(0, csr->value_indices.value());
-  }
-  auto ptr_acc = ptr.accessor<IdType, 1>();
-  auto idx_acc = idx.accessor<IdType, 1>();
-  auto val_acc = val.accessor<ValType, 1>();
+  torch::Tensor row, col;
+  auto coo = mat->COOTensors();
+  if (dim == 0)
+    std::tie(row, col) = coo;
+  else
+    std::tie(col, row) = coo;
 
-  IdType edg_len = 0;
-  std::vector<IdType> nnz, ret_ptr, ret_idx;
-  std::vector<ValType> ret_val;
-  // Bitmap indicates whether it has included in leading_indices
-  std::vector<bool> bitmap(ptr.size(-1));
-  ret_ptr.push_back(0);
-  /// [ Debug and delete soon ]
-  // printf("CSR format\n");
-  // for (int i = 0; i < ptr.size(-1); i++) printf("%ld ", ptr_acc[i]);
+  //// [ For debug and delete soon ]
+  // auto row_acc = row.accessor<IdType, 1>();
+  // auto col_acc = col.accessor<IdType, 1>();
+  // printf("COO format\n");
+  // for (int i = 0; i < row.size(-1); i++) printf("%ld ", row_acc[i]);
   // printf("\n");
-  // for (int i = 0; i < idx.size(-1); i++) printf("%ld ", idx_acc[i]);
+  // for (int i = 0; i < col.size(-1); i++) printf("%ld ", col_acc[i]);
   // printf("\n");
-  // for (int i = 0; i < val.size(-1); i++) printf("%.3f ", val_acc[i]);
-  // printf("\n-------- \n");
 
+  torch::Tensor sort_idx, rev_sort_idx;
+  std::tie(row, sort_idx) = row.sort(-1);
+  rev_sort_idx = std::get<1>(sort_idx.sort(-1));
+
+  torch::Tensor uniqued, uniq_idx;
+  int64_t n_leading_indices = 0;
   if (leading_indices.has_value()) {
-    torch::Tensor lead = leading_indices.value();
-    auto lead_acc = lead.accessor<IdType, 1>();
-    for (int i = 0; i < leading_indices->size(-1); i++) {
-      for (int j = ptr_acc[lead_acc[i]]; j < ptr_acc[lead_acc[i] + 1]; j++) {
-        ret_idx.push_back(idx_acc[j]);
-        ret_val.push_back(val_acc[j]);
-      }
-      edg_len += ptr_acc[lead_acc[i] + 1] - ptr_acc[lead_acc[i]];
-      ret_ptr.push_back(edg_len);
-      nnz.push_back(lead_acc[i]);
-      bitmap[lead_acc[i]] = true;
-    }
+    n_leading_indices = leading_indices.value().numel();
+    std::tie(uniqued, uniq_idx) =
+        torch::_unique(torch::cat({leading_indices.value(), row}), false, true);
+  } else {
+    std::tie(uniqued, uniq_idx) = torch::_unique(row, false, true);
   }
-  for (int i = 0; i < ptr.size(-1) - 1; i++) {
-    // If the row not in leading_indices and has non-zero elements.
-    if (!bitmap[i] && ptr_acc[i] != ptr_acc[i + 1]) {
-      for (int j = ptr_acc[i]; j < ptr_acc[i + 1]; j++) {
-        ret_idx.push_back(idx_acc[j]);
-        ret_val.push_back(val_acc[j]);
-      }
-      edg_len += ptr_acc[i + 1] - ptr_acc[i];
-      ret_ptr.push_back(edg_len);
-      nnz.push_back(i);
-    }
-  }
+  auto n_uniqued = uniqued.numel();
+
+  auto new_row =
+      torch::arange(n_uniqued - 1, -1, -1)
+          .index_select(
+              0, uniq_idx.slice(
+                     0, n_leading_indices, n_leading_indices + row.size(-1)))
+          .index_select(0, rev_sort_idx);
+
   if (dim == 0) {
-    auto ret = SparseMatrix::FromCSR(
-        VectorToTorchTensor(ret_ptr), VectorToTorchTensor(ret_idx),
-        VectorToTorchTensor(ret_val),
-        std::vector<int64_t>{static_cast<int64_t>(nnz.size()), csr->num_cols});
-    auto ret_idx = torch::optional<torch::Tensor>(VectorToTorchTensor(nnz));
+    auto ret = SparseMatrix::FromCOO(
+        torch::stack({new_row, col}, 0), mat->value(),
+        std::vector<int64_t>{n_uniqued, mat->shape()[1]});
+    auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
     return {ret, ret_idx};
   } else {
-    auto ret = SparseMatrix::FromCSC(
-        VectorToTorchTensor(ret_ptr), VectorToTorchTensor(ret_idx),
-        VectorToTorchTensor(ret_val),
-        std::vector<int64_t>{csr->num_cols, static_cast<int64_t>(nnz.size())});
-    auto ret_idx = torch::optional<torch::Tensor>(VectorToTorchTensor(nnz));
+    auto ret = SparseMatrix::FromCOO(
+        torch::stack({col, new_row}, 0), mat->value(),
+        std::vector<int64_t>{mat->shape()[0], n_uniqued});
+    auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
     return {ret, ret_idx};
   }
 }
