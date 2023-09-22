@@ -160,7 +160,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 @torch.no_grad()
 def evaluate(args, model, graph, features, itemset, num_classes):
     model.eval()
-    ys = []
+    y = []
     y_hats = []
     dataloader = create_dataloader(
         args, graph, features, itemset, is_train=False
@@ -170,12 +170,12 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         blocks = data.to_dgl_blocks()
 
         x = data.node_features["feat"]
-        ys.append(data.labels)
+        y.append(data.labels)
         y_hats.append(model(blocks, x))
 
     res = MF.accuracy(
         torch.cat(y_hats),
-        torch.cat(ys),
+        torch.cat(y),
         task="multiclass",
         num_classes=num_classes,
     )
