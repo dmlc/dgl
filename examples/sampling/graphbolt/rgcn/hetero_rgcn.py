@@ -76,6 +76,7 @@ def load_dataset(dataset_name):
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
     num_classes = dataset.tasks[0].metadata["num_classes"]
+    print(len(train_set), len(valid_set), len(test_set))
 
     return graph, features, train_set, valid_set, test_set, num_classes
 
@@ -642,7 +643,7 @@ def main(args):
     else:
         feat_size = 768
 
-    # As `ogb-lsc-mag240m` is a large dataset, feaatures of `author` and
+    # As `ogb-lsc-mag240m` is a large dataset, features of `author` and
     # `institution` are generated in advance and stored in the feature store.
     # For `ogbn-mag`, we generate the features on the fly.
     embed_layer = None

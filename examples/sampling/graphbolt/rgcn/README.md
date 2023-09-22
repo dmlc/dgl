@@ -37,10 +37,12 @@ Below results are run on AWS EC2 r6idn.metal, 1024GB RAM, 128 vCPUs(Ice Lake 837
 
 | Dataset Size | Peak CPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set) |
 | ------------ | ------------- | ------------------------ | ------------------------- |
-| ~443GB       | ~140GB        | ~2min45s                 | ~28min25s + ~4min21s + ~2min54s   |
+| ~404GB       | ~110GB        | ~2min45s                 | ~28min25s + ~4min21s + ~2min54s   |
 
 
 As labels are hidden for test set, test accuray is always **0.00**. Test submission is saved as `y_pred_mag240m_test-dev.npz` under current directory.
+
+As we can see from above table, the time per epoch is quite close to the one in `ogbn-mag`. This is due to no embedding layer is applied for `ogb-lsc-mag240m`. All required node features are generated in advance.
 ```
 Final performance: 
 All runs:
