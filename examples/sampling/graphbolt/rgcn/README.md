@@ -4,18 +4,25 @@ This example aims to demonstrate how to run node classification task on heteroge
 
 ## Run on `ogbn-mag` dataset
 
-### Command
+### Sample on CPU and train/infer on CPU
 ```
-python3 hetero_rgcn.py
+python3 hetero_rgcn.py --dataset ogbn-mag
 ```
 
-### Statistics of train/validation/test
-Below results are run on AWS EC2 r6idn.metal, 1024GB RAM, 128 vCPUs(Ice Lake 8375C), 0 GPUs.
+### Sample on CPU and train/infer on GPU
+```
+python3 hetero_rgcn.py --dataset ogbn-mag --num_gups 1
+```
 
-| Dataset Size | Peak CPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
-| ------------ | ------------- | ------------------------ | ---------------------------    |
-| ~1.1GB       | ~5GB          | ~3min                    | ~1min40s + ~0min9s + ~0min7s    |
+### Resource usage and time cost
+Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 96 vCPUs(Cascade Lake P-8259L), 8 NVIDIA T4 GPUs.
 
+| Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
+| ------------ | ------------- | ----------- | ---------- | --------- | ---------------------------    |
+| ~1.1GB       | ~5GB          | 0           |  0GB       | ~4min5s   | ~2min7s + ~0min12s + ~0min8s   |
+| ~1.1GB       | ~4.3GB        | 1           |  4.7GB     | ~1min18s  | ~1min54s + ~0min12s + ~0min8s  |
+
+### Accuracies
 ```
 Final performance: 
 All runs:
