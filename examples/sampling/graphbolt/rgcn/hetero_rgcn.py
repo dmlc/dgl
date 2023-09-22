@@ -420,6 +420,26 @@ class Logger(object):
             print(f"   Final Test: {r.mean():.2f} ± {r.std():.2f}")
 
 
+def extract_node_features(name, block, data, node_embed, device):
+    """Extract the node features from embedding layer or raw features."""
+    if name == "ogbn-mag":
+        # Extract node embeddings for the input nodes.
+        node_features = extract_embed(node_embed, data.input_nodes)
+        # Add the batch's raw "paper" features. Corresponds to the content
+        # in the function `rel_graph_embed` comment.
+        node_features.update({"paper": data.node_features[("paper", "feat")]})
+    else:
+        node_features = {
+            ntype: block.srcnodes[ntype].data["feat"]
+            for ntype in block.srctypes
+        }
+        # Original feature data are stored in float16 which is not supported
+        # on CPU. Let's convert to float32 explicitly.
+        if device == th.device("cpu"):
+            node_features = {k: v.float() for k, v in node_features.items()}
+    return node_features
+
+
 @th.no_grad()
 def evaluate(
     name,
@@ -471,23 +491,9 @@ def evaluate(
 
     for data in tqdm(data_loader, desc="Inference"):
         blocks = data.to_dgl_blocks()
-
-        if name == "ogbn-mag":
-            # Extract node embeddings for the input nodes.
-            node_features = extract_embed(node_embed, data.input_nodes)
-            # Add the batch's raw "paper" features. Corresponds to the content
-            # in the function `rel_graph_embed` comment.
-            node_features.update(
-                {category: data.node_features[(category, "feat")]}
-            )
-        else:
-            node_features = {
-                ntype: blocks[0].srcnodes[ntype].data["feat"]
-                for ntype in blocks[0].srctypes
-            }
-            # Original feature data are stored in float16 which is not supported on CPU. Let's convert to float32 explicitly.
-            if device == th.device("cpu"):
-                node_features = {k: v.float() for k, v in node_features.items()}
+        node_features = extract_node_features(
+            name, blocks[0], data, node_embed, device
+        )
 
         # Generate predictions.
         logits = model(node_features, blocks)[category]
@@ -554,26 +560,14 @@ def run(
             # Fetch the number of seed nodes in the batch.
             num_seeds = data.seed_nodes[category].shape[0]
 
+            # Convert MiniBatch to DGL Blocks.
             blocks = data.to_dgl_blocks()
 
-            if name == "ogbn-mag":
-                # Extract node embeddings for the input nodes.
-                node_features = extract_embed(node_embed, data.input_nodes)
-                # Add the batch's raw "paper" features. Corresponds to the content
-                # in the function `rel_graph_embed` comment.
-                node_features.update(
-                    {category: data.node_features[(category, "feat")]}
-                )
-            else:
-                node_features = {
-                    ntype: blocks[0].srcnodes[ntype].data["feat"]
-                    for ntype in blocks[0].srctypes
-                }
-                # Original feature data are stored in float16 which is not supported on CPU. Let's convert to float32 explicitly.
-                if device == th.device("cpu"):
-                    node_features = {
-                        k: v.float() for k, v in node_features.items()
-                    }
+            # Extract the node features from embedding layer or raw features.
+            node_features = extract_node_features(
+                name, blocks[0], data, node_embed, device
+            )
+
             # Reset gradients.
             optimizer.zero_grad()
             # Generate predictions.
