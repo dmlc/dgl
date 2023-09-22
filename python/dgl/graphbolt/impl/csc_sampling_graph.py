@@ -8,10 +8,10 @@ from typing import Dict, Optional, Union
 
 import torch
 
-from ...base import EID, ETYPE
+from ...base import ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
-from ..base import etype_str_to_tuple, etype_tuple_to_str
+from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
@@ -233,7 +233,9 @@ class CSCSamplingGraph:
         reverse_edge_ids = C_sampled_subgraph.reverse_edge_ids
         return_eids = reverse_edge_ids is not None
         if return_eids:
-            reverse_edge_ids = self.edge_attributes[EID][reverse_edge_ids]
+            reverse_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
+                reverse_edge_ids
+            ]
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
@@ -379,16 +381,16 @@ class CSCSamplingGraph:
             greater than or equal to 0."
         if return_eids:
             assert (
-                EID in self.edge_attributes
-            ), f"The Edge attribute '{EID}' must be provided when the \
-                `return_eids` option is set."
+                ORIGINAL_EDGE_ID in self.edge_attributes
+            ), f"The Edge attribute '{ORIGINAL_EDGE_ID}' must be provided \
+                when the `return_eids` option is set."
             assert (
-                self.edge_attributes[EID].dim() == 1
-            ), "`EID` attribute should be 1-D tensor."
+                self.edge_attributes[ORIGINAL_EDGE_ID].dim() == 1
+            ), "`ORIGINAL_EDGE_ID` attribute should be 1-D tensor."
             assert (
-                self.edge_attributes[EID].size(0) == self.num_edges
-            ), "`EID` attribute should have the same number of elements as \
-                the number of edges."
+                self.edge_attributes[ORIGINAL_EDGE_ID].size(0) == self.num_edges
+            ), "`ORIGINAL_EDGE_ID` attribute should have the same number of \
+                elements as the number of edges."
         if probs_name:
             assert (
                 probs_name in self.edge_attributes

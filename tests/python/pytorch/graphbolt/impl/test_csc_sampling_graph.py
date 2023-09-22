@@ -739,7 +739,7 @@ def test_sample_neighbors_return_eids_homo(labor):
     assert indptr[-1] == len(indices)
 
     # Add edge id mapping from CSC graph -> original graph.
-    edge_attributes = {dgl.EID: torch.randperm(num_edges)}
+    edge_attributes = {gb.ORIGINAL_EDGE_ID: torch.randperm(num_edges)}
 
     # Construct CSCSamplingGraph.
     graph = gb.from_csc(indptr, indices, edge_attributes=edge_attributes)
@@ -751,7 +751,7 @@ def test_sample_neighbors_return_eids_homo(labor):
     )
 
     # Verify in subgraph.
-    expected_reverse_edge_ids = edge_attributes[dgl.EID][
+    expected_reverse_edge_ids = edge_attributes[gb.ORIGINAL_EDGE_ID][
         torch.tensor([3, 4, 7, 8, 9, 10, 11])
     ]
     assert torch.equal(expected_reverse_edge_ids, subgraph.reverse_edge_ids)
@@ -786,7 +786,7 @@ def test_sample_neighbors_return_eids_hetero(labor):
     type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
     node_type_offset = torch.LongTensor([0, 2, 5])
     edge_attributes = {
-        dgl.EID: torch.cat([torch.randperm(4), torch.randperm(5)])
+        gb.ORIGINAL_EDGE_ID: torch.cat([torch.randperm(4), torch.randperm(5)])
     }
     assert indptr[-1] == num_edges
     assert indptr[-1] == len(indices)
@@ -809,8 +809,8 @@ def test_sample_neighbors_return_eids_hetero(labor):
 
     # Verify in subgraph.
     expected_reverse_edge_ids = {
-        "n2:e2:n1": edge_attributes[dgl.EID][torch.tensor([0, 1])],
-        "n1:e1:n2": edge_attributes[dgl.EID][torch.tensor([4, 5])],
+        "n2:e2:n1": edge_attributes[gb.ORIGINAL_EDGE_ID][torch.tensor([0, 1])],
+        "n1:e1:n2": edge_attributes[gb.ORIGINAL_EDGE_ID][torch.tensor([4, 5])],
     }
     assert subgraph.reverse_column_node_ids is None
     assert subgraph.reverse_row_node_ids is None
