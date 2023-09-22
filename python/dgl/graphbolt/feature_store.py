@@ -26,7 +26,7 @@ class Feature:
         """
         raise NotImplementedError
 
-    def size(self, ids: torch.Tensor = None):
+    def size(self):
         """Get the size of the feature.
 
         Parameters
@@ -70,7 +70,6 @@ class FeatureStore:
         domain: str,
         type_name: str,
         feature_name: str,
-        ids: torch.Tensor = None,
     ):
         """Read from the feature store.
 

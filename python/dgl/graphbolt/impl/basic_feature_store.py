@@ -73,10 +73,6 @@ class BasicFeatureStore(FeatureStore):
             The node or edge type name.
         feature_name : str
             The feature name.
-        ids : torch.Tensor, optional
-            The index of the feature. If specified, only the size of
-            the specified indices of the feature will calculate.
-            If None, the entire size of the feature is returned.
         Returns
         -------
         int
@@ -86,11 +82,10 @@ class BasicFeatureStore(FeatureStore):
             domain is None
             and type_name is None
             and feature_name is None
-            and ids is None
         ):
             for value in self._features.values():
                 return value.size()
-        return self._features[(domain, type_name, feature_name)].size(ids)
+        return self._features[(domain, type_name, feature_name)].size()
 
     def update(
         self,

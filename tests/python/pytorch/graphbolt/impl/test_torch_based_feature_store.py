@@ -55,10 +55,6 @@ def test_torch_based_feature(in_memory):
         assert feature_a.size() == 3
         assert feature_b.size() == 2
 
-        # Test get the size of the feature with ids.
-        assert feature_a.size(torch.tensor([0, 1])) == 2
-        assert feature_b.size(torch.tensor([0])) == 1
-
         # Test update the feature.
         feature_a.update(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))
         assert torch.equal(feature_a.read(), torch.tensor([0, 1, 2]))
@@ -121,11 +117,9 @@ def test_torch_based_feature_store(in_memory):
         )
 
         # Test get the size of the entire feature.
+        assert feature_store.size() == 3
         assert feature_store.size("node", "paper", "a") == 3
         assert feature_store.size("edge", "paper:cites:paper", "b") == 3
-
-        # Test get the size of the feature with ids.
-        assert feature_store.size("node", "paper", "a", torch.tensor([0])) == 1
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
@@ -160,8 +154,5 @@ def test_torch_based_feature_store(in_memory):
 
         # Test get the size of the entire feature.
         assert feature_store.size("node", None, "a") == 3
-
-        # Test get the size of the feature with ids.
-        assert feature_store.size("node", None, "a", torch.tensor([0])) == 1
 
         feature_store = None
