@@ -18,7 +18,8 @@ namespace dgl {
 namespace sparse {
 
 std::tuple<torch::Tensor, torch::Tensor> CompactId(
-    torch::Tensor &row, torch::optional<torch::Tensor> &leading_indices);
+    const torch::Tensor &row,
+    const torch::optional<torch::Tensor> &leading_indices);
 
 template <c10::DeviceType XPU, typename IdType, typename ValType>
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>

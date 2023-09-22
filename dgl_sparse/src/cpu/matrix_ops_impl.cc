@@ -9,9 +9,10 @@ namespace dgl {
 namespace sparse {
 
 std::tuple<torch::Tensor, torch::Tensor> CompactId(
-    torch::Tensor &row, torch::optional<torch::Tensor> &leading_indices) {
-  torch::Tensor sort_idx;
-  std::tie(row, sort_idx) = row.sort(-1);
+    const torch::Tensor &row,
+    const torch::optional<torch::Tensor> &leading_indices) {
+  torch::Tensor sort_row, sort_idx;
+  std::tie(sort_row, sort_idx) = row.sort(-1);
   torch::Tensor rev_sort_idx = torch::empty_like(sort_idx);
   rev_sort_idx.index_put_({sort_idx}, torch::arange(0, sort_idx.numel()));
 
@@ -19,10 +20,10 @@ std::tuple<torch::Tensor, torch::Tensor> CompactId(
   int64_t n_leading_indices = 0;
   if (leading_indices.has_value()) {
     n_leading_indices = leading_indices.value().numel();
-    std::tie(uniqued, uniq_idx) =
-        torch::_unique(torch::cat({leading_indices.value(), row}), false, true);
+    std::tie(uniqued, uniq_idx) = torch::_unique(
+        torch::cat({leading_indices.value(), sort_row}), false, true);
   } else {
-    std::tie(uniqued, uniq_idx) = torch::_unique(row, false, true);
+    std::tie(uniqued, uniq_idx) = torch::_unique(sort_row, false, true);
   }
 
   auto new_row =
