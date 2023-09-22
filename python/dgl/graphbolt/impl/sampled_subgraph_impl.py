@@ -17,31 +17,33 @@ class SampledSubgraphImpl(SampledSubgraph):
     --------
     >>> node_pairs = {"A:relation:B"): (torch.tensor([0, 1, 2]),
     ... torch.tensor([0, 1, 2]))}
-    >>> reverse_column_node_ids = {'B': torch.tensor([10, 11, 12])}
-    >>> reverse_row_node_ids = {'A': torch.tensor([13, 14, 15])}
-    >>> reverse_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
+    >>> original_column_node_ids = {'B': torch.tensor([10, 11, 12])}
+    >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
+    >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     >>> subgraph = gb.SampledSubgraphImpl(
     ... node_pairs=node_pairs,
-    ... reverse_column_node_ids=reverse_column_node_ids,
-    ... reverse_row_node_ids=reverse_row_node_ids,
-    ... reverse_edge_ids=reverse_edge_ids
+    ... original_column_node_ids=original_column_node_ids,
+    ... original_row_node_ids=original_row_node_ids,
+    ... original_edge_ids=original_edge_ids
     ... )
     >>> print(subgraph.node_pairs)
     {"A:relation:B": (tensor([0, 1, 2]), tensor([0, 1, 2]))}
-    >>> print(subgraph.reverse_column_node_ids)
+    >>> print(subgraph.original_column_node_ids)
     {'B': tensor([10, 11, 12])}
-    >>> print(subgraph.reverse_row_node_ids)
+    >>> print(subgraph.original_row_node_ids)
     {'A': tensor([13, 14, 15])}
-    >>> print(subgraph.reverse_edge_ids)
+    >>> print(subgraph.original_edge_ids)
     {"A:relation:B": tensor([19, 20, 21])}
     """
     node_pairs: Union[
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
         Tuple[torch.Tensor, torch.Tensor],
     ] = None
-    reverse_column_node_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
-    reverse_row_node_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
-    reverse_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
+    original_column_node_ids: Union[
+        Dict[str, torch.Tensor], torch.Tensor
+    ] = None
+    original_row_node_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
+    original_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
 
     def __post_init__(self):
         if isinstance(self.node_pairs, dict):

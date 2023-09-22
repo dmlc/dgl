@@ -225,7 +225,7 @@ class CSCSamplingGraph:
         column_num = (
             C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
         )
-        column = C_sampled_subgraph.reverse_column_node_ids.repeat_interleave(
+        column = C_sampled_subgraph.original_column_node_ids.repeat_interleave(
             column_num
         )
         row = C_sampled_subgraph.indices
@@ -437,8 +437,9 @@ class CSCSamplingGraph:
         probs_name: Optional[str] = None,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
-        subgraph via layer-neighbor sampling from arXiv:2210.13339:
-        "Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs"
+        subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
+        `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
+        <https://arxiv.org/abs/2210.13339>`__
 
         Parameters
         ----------

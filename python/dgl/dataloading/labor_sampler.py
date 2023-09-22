@@ -28,8 +28,8 @@ from .base import BlockSampler
 
 class LaborSampler(BlockSampler):
     """Sampler that builds computational dependency of node representations via
-    labor sampling for multilayer GNN from
-    `(LA)yer-neigh(BOR) Sampling: Defusing Neighborhood Explosion in GNNs
+    labor sampling for multilayer GNN from the NeurIPS 2023 paper
+    `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
     <https://arxiv.org/abs/2210.13339>`__
 
     This sampler will make every node gather messages from a fixed number of

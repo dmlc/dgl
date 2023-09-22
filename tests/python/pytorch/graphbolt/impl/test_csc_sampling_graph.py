@@ -397,12 +397,12 @@ def test_in_subgraph_homogeneous():
     assert torch.equal(
         in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
     )
-    assert torch.equal(in_subgraph.reverse_column_node_ids, nodes)
+    assert torch.equal(in_subgraph.original_column_node_ids, nodes)
     assert torch.equal(
-        in_subgraph.reverse_row_node_ids, torch.arange(0, num_nodes)
+        in_subgraph.original_row_node_ids, torch.arange(0, num_nodes)
     )
     assert torch.equal(
-        in_subgraph.reverse_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
+        in_subgraph.original_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
     )
     assert in_subgraph.type_per_edge is None
 
@@ -463,12 +463,12 @@ def test_in_subgraph_heterogeneous():
     assert torch.equal(
         in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
     )
-    assert torch.equal(in_subgraph.reverse_column_node_ids, nodes)
+    assert torch.equal(in_subgraph.original_column_node_ids, nodes)
     assert torch.equal(
-        in_subgraph.reverse_row_node_ids, torch.arange(0, num_nodes)
+        in_subgraph.original_row_node_ids, torch.arange(0, num_nodes)
     )
     assert torch.equal(
-        in_subgraph.reverse_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
+        in_subgraph.original_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
     )
     assert torch.equal(
         in_subgraph.type_per_edge, torch.LongTensor([2, 2, 1, 3, 1, 3, 3])
@@ -505,9 +505,9 @@ def test_sample_neighbors_homo():
     # Verify in subgraph.
     sampled_num = subgraph.node_pairs[0].size(0)
     assert sampled_num == 6
-    assert subgraph.reverse_column_node_ids is None
-    assert subgraph.reverse_row_node_ids is None
-    assert subgraph.reverse_edge_ids is None
+    assert subgraph.original_column_node_ids is None
+    assert subgraph.original_row_node_ids is None
+    assert subgraph.original_edge_ids is None
 
 
 @unittest.skipIf(
@@ -568,9 +568,9 @@ def test_sample_neighbors_hetero(labor):
     for etype, pairs in expected_node_pairs.items():
         assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
         assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
-    assert subgraph.reverse_column_node_ids is None
-    assert subgraph.reverse_row_node_ids is None
-    assert subgraph.reverse_edge_ids is None
+    assert subgraph.original_column_node_ids is None
+    assert subgraph.original_row_node_ids is None
+    assert subgraph.original_edge_ids is None
 
     # Sample on single node type.
     nodes = {"n1": torch.LongTensor([0])}
@@ -593,9 +593,9 @@ def test_sample_neighbors_hetero(labor):
     for etype, pairs in expected_node_pairs.items():
         assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
         assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
-    assert subgraph.reverse_column_node_ids is None
-    assert subgraph.reverse_row_node_ids is None
-    assert subgraph.reverse_edge_ids is None
+    assert subgraph.original_column_node_ids is None
+    assert subgraph.original_row_node_ids is None
+    assert subgraph.original_edge_ids is None
 
 
 @unittest.skipIf(

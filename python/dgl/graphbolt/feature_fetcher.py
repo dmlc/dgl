@@ -95,14 +95,14 @@ class FeatureFetcher(MiniBatchTransformer):
         # Read Edge features.
         if self.edge_feature_keys and data.sampled_subgraphs:
             for i, subgraph in enumerate(data.sampled_subgraphs):
-                if subgraph.reverse_edge_ids is None:
+                if subgraph.original_edge_ids is None:
                     continue
                 if is_heterogeneous:
                     for (
                         type_name,
                         feature_names,
                     ) in self.edge_feature_keys.items():
-                        edges = subgraph.reverse_edge_ids.get(type_name, None)
+                        edges = subgraph.original_edge_ids.get(type_name, None)
                         if edges is None:
                             continue
                         for feature_name in feature_names:
@@ -119,6 +119,6 @@ class FeatureFetcher(MiniBatchTransformer):
                             "edge",
                             None,
                             feature_name,
-                            subgraph.reverse_edge_ids,
+                            subgraph.original_edge_ids,
                         )
         return data
