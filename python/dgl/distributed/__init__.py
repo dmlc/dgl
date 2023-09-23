@@ -11,6 +11,7 @@ from .nn import *
 from .partition import (
     convert_dgl_partition_to_csc_sampling_graph,
     load_partition,
+    load_partition_graphbolt,
     load_partition_book,
     load_partition_feats,
     partition_graph,

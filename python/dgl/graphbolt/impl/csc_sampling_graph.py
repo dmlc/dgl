@@ -230,6 +230,9 @@ class CSCSamplingGraph:
         )
         row = C_sampled_subgraph.indices
         type_per_edge = C_sampled_subgraph.type_per_edge
+        # TODO (Israt): type_per_edge is not None for homogeneous
+        print("MUST FIX")
+        type_per_edge = None
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
@@ -248,13 +251,6 @@ class CSCSamplingGraph:
                 )
                 node_pairs[etype] = (hetero_row, hetero_column)
         return SampledSubgraphImpl(node_pairs=node_pairs)
-
-    def _convert_to_homogeneous_nodes(self, nodes):
-        homogeneous_nodes = []
-        for ntype, ids in nodes.items():
-            ntype_id = self.metadata.node_type_to_id[ntype]
-            homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
-        return torch.cat(homogeneous_nodes)
 
     def sample_neighbors(
         self,
@@ -325,52 +321,22 @@ class CSCSamplingGraph:
         defaultdict(<class 'list'>, {('n1', 'e1', 'n2'): (tensor([2]), \
         tensor([1])), ('n1', 'e2', 'n3'): (tensor([3]), tensor([2]))})
         """
+
+        def convert_to_homogeneous_nodes(nodes):
+            homogeneous_nodes = []
+            for ntype, ids in nodes.items():
+                ntype_id = self.metadata.node_type_to_id[ntype]
+                homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
+            return torch.cat(homogeneous_nodes)
+
         if isinstance(nodes, dict):
-            nodes = self._convert_to_homogeneous_nodes(nodes)
+            nodes = convert_to_homogeneous_nodes(nodes)
 
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, False, probs_name
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
-
-    def _check_sampler_arguments(self, nodes, fanouts, probs_name):
-        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
-        assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
-        expected_fanout_len = 1
-        if self.metadata and self.metadata.edge_type_to_id:
-            expected_fanout_len = len(self.metadata.edge_type_to_id)
-        assert len(fanouts) in [
-            expected_fanout_len,
-            1,
-        ], "Fanouts should have the same number of elements as etypes or \
-            should have a length of 1."
-        if fanouts.size(0) > 1:
-            assert (
-                self.type_per_edge is not None
-            ), "To perform sampling for each edge type (when the length of \
-                `fanouts` > 1), the graph must include edge type information."
-        assert torch.all(
-            (fanouts >= 0) | (fanouts == -1)
-        ), "Fanouts should consist of values that are either -1 or \
-            greater than or equal to 0."
-        if probs_name:
-            assert (
-                probs_name in self.edge_attributes
-            ), f"Unknown edge attribute '{probs_name}'."
-            probs_or_mask = self.edge_attributes[probs_name]
-            assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
-            assert (
-                probs_or_mask.size(0) == self.num_edges
-            ), "Probs should have the same number of elements as the number \
-                of edges."
-            assert probs_or_mask.dtype in [
-                torch.bool,
-                torch.float16,
-                torch.bfloat16,
-                torch.float32,
-                torch.float64,
-            ], "Probs should have a floating-point or boolean data type."
 
     def _sample_neighbors(
         self,
@@ -424,7 +390,42 @@ class CSCSamplingGraph:
             The sampled C subgraph.
         """
         # Ensure nodes is 1-D tensor.
-        self._check_sampler_arguments(nodes, fanouts, probs_name)
+        assert nodes.dim() == 1, "Nodes should be 1-D tensor."
+        assert fanouts.dim() == 1, "Fanouts should be 1-D tensor."
+        expected_fanout_len = 1
+        if self.metadata and self.metadata.edge_type_to_id:
+            expected_fanout_len = len(self.metadata.edge_type_to_id)
+        assert len(fanouts) in [
+            expected_fanout_len,
+            1,
+        ], "Fanouts should have the same number of elements as etypes or \
+            should have a length of 1."
+        if fanouts.size(0) > 1:
+            assert (
+                self.type_per_edge is not None
+            ), "To perform sampling for each edge type (when the length of \
+                `fanouts` > 1), the graph must include edge type information."
+        assert torch.all(
+            (fanouts >= 0) | (fanouts == -1)
+        ), "Fanouts should consist of values that are either -1 or \
+            greater than or equal to 0."
+        if probs_name:
+            assert (
+                probs_name in self.edge_attributes
+            ), f"Unknown edge attribute '{probs_name}'."
+            probs_or_mask = self.edge_attributes[probs_name]
+            assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
+            assert (
+                probs_or_mask.size(0) == self.num_edges
+            ), "Probs should have the same number of elements as the number \
+                of edges."
+            assert probs_or_mask.dtype in [
+                torch.bool,
+                torch.float16,
+                torch.bfloat16,
+                torch.float32,
+                torch.float64,
+            ], "Probs should have a floating-point or boolean data type."
         return self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, False, return_eids, probs_name
         )
@@ -492,8 +493,6 @@ class CSCSamplingGraph:
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
             nodes, fanouts.tolist(), replace, True, False, probs_name
         )
-
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
@@ -568,6 +567,36 @@ class CSCSamplingGraph:
         )
 
 
+class distCSCSamplingGraph(CSCSamplingGraph):
+    r"""Class for CSC sampling graph."""
+
+    def __init__(
+        self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata],
+        nid: torch.Tensor,
+    ):
+        super().__init__(c_csc_graph, metadata)
+        self._nid = nid
+
+    def copy_to_shared_memory(self, shared_memory_name: str):
+        """Copy the graph to shared memory.
+
+        Parameters
+        ----------
+        shared_memory_name : str
+            Name of the shared memory.
+
+        Returns
+        -------
+        CSCSamplingGraph
+            The copied CSCSamplingGraph object on shared memory.
+        """
+        return distCSCSamplingGraph(
+            self._c_csc_graph.copy_to_shared_memory(shared_memory_name),
+            self._metadata,
+            self._nid,
+        )
+
+
 def from_csc(
     csc_indptr: torch.Tensor,
     indices: torch.Tensor,
@@ -631,6 +660,31 @@ def from_csc(
     )
 
 
+def load_dist_from_shared_memory(
+    shared_memory_name: str,
+    metadata: Optional[GraphMetadata] = None,
+    nid = None,
+) -> CSCSamplingGraph:
+    """Load a CSCSamplingGraph object from shared memory.
+
+    Parameters
+    ----------
+    shared_memory_name : str
+        Name of the shared memory.
+
+    Returns
+    -------
+    CSCSamplingGraph
+        The loaded CSCSamplingGraph object on shared memory.
+    """
+    return distCSCSamplingGraph(
+        torch.ops.graphbolt.load_from_shared_memory(shared_memory_name),
+        metadata,
+        nid,
+        # torch.ops.graphbolt.load_from_shared_memory(shared_memory_name, nid),
+    )
+
+
 def load_from_shared_memory(
     shared_memory_name: str,
     metadata: Optional[GraphMetadata] = None,
@@ -680,6 +734,20 @@ def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
 
     final_str = prefix + _add_indent(final_str, len(prefix))
     return final_str
+
+
+def load_dist_csc_sampling_graph(filename, nid):
+    """Load CSCSamplingGraph from tar file."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with tarfile.open(filename, "r") as archive:
+            archive.extractall(temp_dir)
+        graph_filename = os.path.join(temp_dir, "csc_sampling_graph.pt")
+        metadata_filename = os.path.join(temp_dir, "metadata.pt")
+        return distCSCSamplingGraph(
+            torch.ops.graphbolt.load_csc_sampling_graph(graph_filename),
+            torch.load(metadata_filename),
+            nid=nid,
+        )
 
 
 def load_csc_sampling_graph(filename):

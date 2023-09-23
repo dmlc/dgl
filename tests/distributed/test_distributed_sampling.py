@@ -16,10 +16,12 @@ from dgl.distributed import (
     DistGraph,
     DistGraphServer,
     load_partition,
+    load_partition_graphbolt,
     load_partition_book,
     partition_graph,
     sample_etype_neighbors,
     sample_neighbors,
+    convert_dgl_partition_to_csc_sampling_graph,
 )
 from scipy import sparse as spsp
 from utils import generate_ip_config, reset_envs
@@ -1276,6 +1278,135 @@ def test_standalone_etype_sampling():
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.environ["DGL_DIST_MODE"] = "standalone"
         check_standalone_etype_sampling(Path(tmpdirname))
+
+
+def start_sample_client_graphbolt(rank, tmpdir, disable_shared_mem):
+    dgl.distributed.initialize("rpc_ip_config.txt")
+    dist_graph = DistGraph("test_num_nodes", part_config=tmpdir / "test_num_nodes.json")
+
+    assert isinstance(dist_graph._g, dgl.graphbolt.CSCSamplingGraph)
+
+    try:
+        sampled_graph = sample_neighbors(
+            dist_graph, [0, 10, 99, 66, 1024, 2008], 3
+        )
+    except Exception as e:
+        print(traceback.format_exc())
+        sampled_graph = None
+    dgl.distributed.exit_client()
+    return sampled_graph
+
+
+def start_hetero_sample_client_graphbolt(rank, tmpdir, disable_shared_mem, nodes):
+    dgl.distributed.initialize("rpc_ip_config.txt")
+    dist_graph = DistGraph("test_sampling", part_config=tmpdir / "test_sampling.json")
+
+    assert isinstance(dist_graph._g, dgl.graphbolt.CSCSamplingGraph)
+
+    gpb = None
+    if gpb is None:
+        gpb = dist_graph.get_partition_book()
+    try:
+        sampled_graph = sample_neighbors(dist_graph, nodes=nodes, fanout=3)
+        # block = dgl.to_block(sampled_graph, nodes)
+    except Exception as e:
+        print(traceback.format_exc())
+        sampled_graph = None
+    #     block = None
+    dgl.distributed.exit_client()
+    return sampled_graph, None #block, gpb
+
+
+def check_rpc_hetero_sampling_shuffle_graphbolt(tmpdir, num_server):
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
+    tmpdir = Path('/tmp/gb')
+    g = create_random_hetero()
+    num_parts = 1 #num_server
+    num_hops = 1
+
+    orig_nid_map, orig_eid_map = partition_graph(
+        g,
+        "test_sampling",
+        num_parts,
+        tmpdir,
+        num_hops=num_hops,
+        part_method="metis",
+        return_mapping=True,
+    )
+    # TODO (Israt): Directly save partitions in GraphBolt structure
+    convert_dgl_partition_to_csc_sampling_graph(tmpdir / "test_sampling.json")
+
+    pserver_list = []
+    ctx = mp.get_context("spawn")
+    for i in range(num_server):
+        p = ctx.Process(
+            target=start_server,
+            args=(i, tmpdir, num_server > 1, "test_sampling"),
+        )
+        p.start()
+        time.sleep(1)
+        pserver_list.append(p)
+
+    block, gpb = start_hetero_sample_client_graphbolt(
+        0, tmpdir, num_server > 1, nodes={"n3": [0, 10, 99, 66, 124, 208]}
+    )
+    print("Done sampling")
+    for p in pserver_list:
+        p.join()
+        assert p.exitcode == 0
+
+    # TODO (Israt): add checks from check_rpc_hetero_sampling_shuffle
+
+
+def check_rpc_sampling_GraphBolt(tmpdir, num_server):
+    generate_ip_config("rpc_ip_config.txt", num_server, num_server)
+    tmpdir = Path('/tmp/gb')
+    g = CitationGraphDataset("cora")[0]
+    print(g.idtype)
+    num_parts = num_server
+    num_hops = 1
+
+    partition_graph(
+        g,
+        "test_num_nodes",
+        num_parts,
+        tmpdir,
+        num_hops=num_hops,
+        part_method="metis",
+    )
+    # TODO (Israt): Directly save partitions in GraphBolt structure
+    convert_dgl_partition_to_csc_sampling_graph(tmpdir / "test_num_nodes.json")
+
+    pserver_list = []
+    ctx = mp.get_context("spawn")
+    for i in range(num_server):
+        p = ctx.Process(
+            target=start_server,
+            args=(i, tmpdir, num_server > 1, "test_num_nodes"),
+        )
+        p.start()
+        time.sleep(1)
+        pserver_list.append(p)
+
+    sampled_graph = start_sample_client_graphbolt(0, tmpdir, num_server > 1)
+
+    for p in pserver_list:
+        p.join()
+        assert p.exitcode == 0
+
+    src, dst = sampled_graph.edges()
+    assert sampled_graph.num_nodes() == g.num_nodes()
+    assert np.all(F.asnumpy(g.has_edges_between(src, dst)))
+
+@pytest.mark.parametrize("num_server", [1])  #[1, 4])
+def test_GraphBolt(num_server):
+    reset_envs()
+    import tempfile
+
+    os.environ["DGL_DIST_MODE"] = "distributed"
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        # check_rpc_sampling_GraphBolt(Path(tmpdirname), num_server)
+        check_rpc_hetero_sampling_shuffle_graphbolt(Path(tmpdirname), num_server)
 
 
 if __name__ == "__main__":
