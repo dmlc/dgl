@@ -204,7 +204,7 @@ def train(
             train_dataloader
         ):
             x = blocks[0].srcdata["feat"]
-            y = blocks[-1].dstdata["label"]
+            y = blocks[-1].dstdata["label"].to(torch.int64)
             y_hat = model(blocks, x)
             loss = F.cross_entropy(y_hat, y)
             opt.zero_grad()
