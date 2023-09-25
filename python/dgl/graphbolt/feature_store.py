@@ -106,7 +106,7 @@ class FeatureStore:
         Returns
         -------
         int
-            Get the size of the specified feature in the feature store.
+            The size of the specified feature in the feature store.
         """
         raise NotImplementedError
 
