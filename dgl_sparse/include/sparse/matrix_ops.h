@@ -44,8 +44,7 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
  * @return A tuple containing the compacted sparse matrix and the index mapping
  *         of the compact dimension from the new index to the original index.
  */
-std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
-Compact(
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> Compact(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     torch::optional<torch::Tensor> leading_indices);
 

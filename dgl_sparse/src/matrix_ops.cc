@@ -94,8 +94,7 @@ std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
   return {new_row, uniqued.index({RevertIndices(split_indices)})};
 }
 
-std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
-CompactCOO(
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCOO(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     torch::optional<torch::Tensor> leading_indices) {
   torch::Tensor row, col;
@@ -121,8 +120,7 @@ CompactCOO(
   }
 }
 
-std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
-CompactCSC(
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSC(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     torch::optional<torch::Tensor> leading_indices) {
   std::shared_ptr<dgl::sparse::CSR> csr;
@@ -150,8 +148,7 @@ CompactCSC(
   }
 }
 
-std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
-Compact(
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> Compact(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     torch::optional<torch::Tensor> leading_indices) {
   if (dim == 0) {
