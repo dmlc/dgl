@@ -12,6 +12,7 @@ from ...base import ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
+from ..sampling_graph import SamplingGraph
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
@@ -74,7 +75,7 @@ class GraphMetadata:
         self.edge_type_to_id = edge_type_to_id
 
 
-class CSCSamplingGraph:
+class CSCSamplingGraph(SamplingGraph):
     r"""Class for CSC sampling graph."""
 
     def __repr__(self):
@@ -87,15 +88,41 @@ class CSCSamplingGraph:
         self._metadata = metadata
 
     @property
-    def num_nodes(self) -> int:
-        """Returns the number of nodes in the graph.
-
+    def num_nodes(self):
+        """
+        >   For a homogenous graph, returns the number of nodes in it.
+        >   For a Heterogenous graph, returns a dictionary indicating
+            the numbers of all types of nodes in it.
         Returns
         -------
         int
-            The number of rows in the dense format.
+            The number of nodes in the entire graph (homogenous).
+        OR
+        Dict[str, int]
+            A dictionary indicating the numbers of all types of nodes
+            (heterogenous).
         """
-        return self._c_csc_graph.num_nodes()
+        offset = self.node_type_offset
+
+        # Homogenous.
+        if offset is None or self.metadata is None:
+            return self._c_csc_graph.num_nodes()
+
+        else:
+            # First, the graph is treated as heterogenous, then the return
+            # value type depends on the length of the dictionary.
+            num_nodes_per_type = {
+                _type: offset[_idx + 1] - offset[_idx]
+                for _type, _idx in self.metadata.node_type_to_id.items()
+            }
+
+            return (
+                num_nodes_per_type
+                if len(num_nodes_per_type) > 1  # True Heterogenous.
+                else next(  # Homogenous.
+                    iter(num_nodes_per_type.values()), None
+                )
+            )
 
     @property
     def num_edges(self) -> int:
@@ -312,8 +339,8 @@ class CSCSamplingGraph:
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
         probs_name: str, optional
-            An optional string specifying the name of an edge attribute used a. This
-            attribute tensor should contain (unnormalized) probabilities
+            An optional string specifying the name of an edge attribute used.
+            This attribute tensor should contain (unnormalized) probabilities
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
