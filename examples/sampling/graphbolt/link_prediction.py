@@ -294,7 +294,7 @@ def train(args, graph, features, train_set, valid_set, model):
                     f"Loss {(total_loss) / (step + 1):.4f}",
                     end="\n",
                 )
-            if step + 1 == 1000:
+            if step + 1 == args.early_stop:
                 break
 
     # Evaluate the model.
@@ -310,6 +310,12 @@ def parse_args():
     parser.add_argument("--neg-ratio", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument(
+        "--early-stop",
+        type=int,
+        default=0,
+        help="Early stop, 0 means no early stop",
+    )
     parser.add_argument(
         "--fanout",
         type=str,
