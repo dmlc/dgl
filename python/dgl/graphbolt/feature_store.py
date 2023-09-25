@@ -103,10 +103,6 @@ class FeatureStore:
             The node or edge type name.
         feature_name : str
             The feature name.
-        ids : torch.Tensor, optional
-            The index of the feature. If specified, only the size of
-            the specified indices of the feature will calculate.
-            If None, the entire size of the feature is returned.
         Returns
         -------
         int

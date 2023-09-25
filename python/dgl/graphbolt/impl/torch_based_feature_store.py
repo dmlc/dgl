@@ -79,13 +79,7 @@ class TorchBasedFeature(Feature):
 
     def size(self):
         """Get the size of the feature.
-        Parameters
-        ----------
-        ids : torch.Tensor, optional
-            The index of the feature. If specified, only the size of
-            the specified indices of the feature will calculate.
-            If None, the entire size of the feature is returned.
-        Returns
+
         -------
         int
             The size of the feature.
