@@ -11,7 +11,7 @@ import torch
 from ...base import ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
-from ..base import etype_str_to_tuple, etype_tuple_to_str
+from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
@@ -230,6 +230,15 @@ class CSCSamplingGraph:
         )
         row = C_sampled_subgraph.indices
         type_per_edge = C_sampled_subgraph.type_per_edge
+        original_edge_ids = C_sampled_subgraph.original_edge_ids
+        has_original_eids = (
+            self.edge_attributes is not None
+            and ORIGINAL_EDGE_ID in self.edge_attributes
+        )
+        if has_original_eids:
+            original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
+                original_edge_ids
+            ]
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
@@ -237,6 +246,7 @@ class CSCSamplingGraph:
             # The sampled graph is a fused homogenized graph, which need to be
             # converted to heterogeneous graphs.
             node_pairs = defaultdict(list)
+            original_hetero_edge_ids = {}
             for etype, etype_id in self.metadata.edge_type_to_id.items():
                 src_ntype, _, dst_ntype = etype_str_to_tuple(etype)
                 src_ntype_id = self.metadata.node_type_to_id[src_ntype]
@@ -247,7 +257,13 @@ class CSCSamplingGraph:
                     column[mask] - self.node_type_offset[dst_ntype_id]
                 )
                 node_pairs[etype] = (hetero_row, hetero_column)
-        return SampledSubgraphImpl(node_pairs=node_pairs)
+                if has_original_eids:
+                    original_hetero_edge_ids[etype] = original_edge_ids[mask]
+            if has_original_eids:
+                original_edge_ids = original_hetero_edge_ids
+        return SampledSubgraphImpl(
+            node_pairs=node_pairs, original_edge_ids=original_edge_ids
+        )
 
     def _convert_to_homogeneous_nodes(self, nodes):
         homogeneous_nodes = []
@@ -329,7 +345,7 @@ class CSCSamplingGraph:
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
         C_sampled_subgraph = self._sample_neighbors(
-            nodes, fanouts, replace, False, probs_name
+            nodes, fanouts, replace, probs_name
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
@@ -377,7 +393,6 @@ class CSCSamplingGraph:
         nodes: torch.Tensor,
         fanouts: torch.Tensor,
         replace: bool = False,
-        return_eids: bool = False,
         probs_name: Optional[str] = None,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
@@ -408,10 +423,6 @@ class CSCSamplingGraph:
             Boolean indicating whether the sample is preformed with or
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
-        return_eids: bool
-            Boolean indicating whether the edge IDs of sampled edges,
-            represented as a 1D tensor, should be returned. This is
-            typically used when edge features are required.
         probs_name: str, optional
             An optional string specifying the name of an edge attribute. This
             attribute tensor should contain (unnormalized) probabilities
@@ -425,8 +436,12 @@ class CSCSamplingGraph:
         """
         # Ensure nodes is 1-D tensor.
         self._check_sampler_arguments(nodes, fanouts, probs_name)
+        has_origin_eids = (
+            self.edge_attributes is not None
+            and ORIGINAL_EDGE_ID in self.edge_attributes
+        )
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, False, return_eids, probs_name
+            nodes, fanouts.tolist(), replace, False, has_origin_eids, probs_name
         )
 
     def sample_layer_neighbors(
@@ -489,8 +504,17 @@ class CSCSamplingGraph:
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
         self._check_sampler_arguments(nodes, fanouts, probs_name)
+        has_original_eids = (
+            self.edge_attributes is not None
+            and ORIGINAL_EDGE_ID in self.edge_attributes
+        )
         C_sampled_subgraph = self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, True, False, probs_name
+            nodes,
+            fanouts.tolist(),
+            replace,
+            True,
+            has_original_eids,
+            probs_name,
         )
 
         return self._convert_to_sampled_subgraph(C_sampled_subgraph)
