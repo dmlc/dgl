@@ -397,12 +397,12 @@ def test_in_subgraph_homogeneous():
     assert torch.equal(
         in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
     )
-    assert torch.equal(in_subgraph.reverse_column_node_ids, nodes)
+    assert torch.equal(in_subgraph.original_column_node_ids, nodes)
     assert torch.equal(
-        in_subgraph.reverse_row_node_ids, torch.arange(0, num_nodes)
+        in_subgraph.original_row_node_ids, torch.arange(0, num_nodes)
     )
     assert torch.equal(
-        in_subgraph.reverse_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
+        in_subgraph.original_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
     )
     assert in_subgraph.type_per_edge is None
 
@@ -463,12 +463,12 @@ def test_in_subgraph_heterogeneous():
     assert torch.equal(
         in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
     )
-    assert torch.equal(in_subgraph.reverse_column_node_ids, nodes)
+    assert torch.equal(in_subgraph.original_column_node_ids, nodes)
     assert torch.equal(
-        in_subgraph.reverse_row_node_ids, torch.arange(0, num_nodes)
+        in_subgraph.original_row_node_ids, torch.arange(0, num_nodes)
     )
     assert torch.equal(
-        in_subgraph.reverse_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
+        in_subgraph.original_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
     )
     assert torch.equal(
         in_subgraph.type_per_edge, torch.LongTensor([2, 2, 1, 3, 1, 3, 3])
@@ -505,9 +505,9 @@ def test_sample_neighbors_homo():
     # Verify in subgraph.
     sampled_num = subgraph.node_pairs[0].size(0)
     assert sampled_num == 6
-    assert subgraph.reverse_column_node_ids is None
-    assert subgraph.reverse_row_node_ids is None
-    assert subgraph.reverse_edge_ids is None
+    assert subgraph.original_column_node_ids is None
+    assert subgraph.original_row_node_ids is None
+    assert subgraph.original_edge_ids is None
 
 
 @unittest.skipIf(
@@ -568,9 +568,9 @@ def test_sample_neighbors_hetero(labor):
     for etype, pairs in expected_node_pairs.items():
         assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
         assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
-    assert subgraph.reverse_column_node_ids is None
-    assert subgraph.reverse_row_node_ids is None
-    assert subgraph.reverse_edge_ids is None
+    assert subgraph.original_column_node_ids is None
+    assert subgraph.original_row_node_ids is None
+    assert subgraph.original_edge_ids is None
 
     # Sample on single node type.
     nodes = {"n1": torch.LongTensor([0])}
@@ -593,9 +593,9 @@ def test_sample_neighbors_hetero(labor):
     for etype, pairs in expected_node_pairs.items():
         assert torch.equal(subgraph.node_pairs[etype][0], pairs[0])
         assert torch.equal(subgraph.node_pairs[etype][1], pairs[1])
-    assert subgraph.reverse_column_node_ids is None
-    assert subgraph.reverse_row_node_ids is None
-    assert subgraph.reverse_edge_ids is None
+    assert subgraph.original_column_node_ids is None
+    assert subgraph.original_row_node_ids is None
+    assert subgraph.original_edge_ids is None
 
 
 @unittest.skipIf(
@@ -719,6 +719,107 @@ def test_sample_neighbors_replace(
     # Verify in subgraph.
     assert subgraph.node_pairs["n1:e1:n2"][0].numel() == expected_sampled_num1
     assert subgraph.node_pairs["n2:e2:n1"][0].numel() == expected_sampled_num2
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize("labor", [False, True])
+def test_sample_neighbors_return_eids_homo(labor):
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+    """
+    # Initialize data.
+    num_nodes = 5
+    num_edges = 12
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Add edge id mapping from CSC graph -> original graph.
+    edge_attributes = {gb.ORIGINAL_EDGE_ID: torch.randperm(num_edges)}
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(indptr, indices, edge_attributes=edge_attributes)
+
+    # Generate subgraph via sample neighbors.
+    nodes = torch.LongTensor([1, 3, 4])
+    subgraph = graph.sample_neighbors(nodes, fanouts=torch.LongTensor([-1]))
+
+    # Verify in subgraph.
+    expected_reverse_edge_ids = edge_attributes[gb.ORIGINAL_EDGE_ID][
+        torch.tensor([3, 4, 7, 8, 9, 10, 11])
+    ]
+    assert torch.equal(expected_reverse_edge_ids, subgraph.original_edge_ids)
+    assert subgraph.original_column_node_ids is None
+    assert subgraph.original_row_node_ids is None
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize("labor", [False, True])
+def test_sample_neighbors_return_eids_hetero(labor):
+    """
+    Original graph in COO:
+    "n1:e1:n2":[0, 0, 1, 1, 1], [0, 2, 0, 1, 2]
+    "n2:e2:n1":[0, 0, 1, 2], [0, 1, 1 ,0]
+    0   0   1   0   1
+    0   0   1   1   1
+    1   1   0   0   0
+    0   1   0   0   0
+    1   0   0   0   0
+    """
+    # Initialize data.
+    ntypes = {"n1": 0, "n2": 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
+    num_nodes = 5
+    num_edges = 9
+    indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
+    indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
+    type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
+    node_type_offset = torch.LongTensor([0, 2, 5])
+    edge_attributes = {
+        gb.ORIGINAL_EDGE_ID: torch.cat([torch.randperm(4), torch.randperm(5)])
+    }
+    assert indptr[-1] == num_edges
+    assert indptr[-1] == len(indices)
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        edge_attributes=edge_attributes,
+        metadata=metadata,
+    )
+
+    # Sample on both node types.
+    nodes = {"n1": torch.LongTensor([0]), "n2": torch.LongTensor([0])}
+    fanouts = torch.tensor([-1, -1])
+    sampler = graph.sample_layer_neighbors if labor else graph.sample_neighbors
+    subgraph = sampler(nodes, fanouts)
+
+    # Verify in subgraph.
+    expected_reverse_edge_ids = {
+        "n2:e2:n1": edge_attributes[gb.ORIGINAL_EDGE_ID][torch.tensor([0, 1])],
+        "n1:e1:n2": edge_attributes[gb.ORIGINAL_EDGE_ID][torch.tensor([4, 5])],
+    }
+    assert subgraph.original_column_node_ids is None
+    assert subgraph.original_row_node_ids is None
+    for etype in etypes.keys():
+        assert torch.equal(
+            subgraph.original_edge_ids[etype], expected_reverse_edge_ids[etype]
+        )
 
 
 @unittest.skipIf(

@@ -508,6 +508,14 @@ class BuiltinDataset(OnDiskDataset):
         .. note::
             Reverse edges are added to the original graph.
 
+    **ogb-lsc-mag240m**
+        The ogb-lsc-mag240m dataset is a heterogeneous academic graph extracted
+        from the Microsoft Academic Graph (MAG). See more details in
+        `ogb-lsc-mag240m <https://ogb.stanford.edu/docs/lsc/mag240m/>`_.
+
+        .. note::
+            Reverse edges are added to the original graph.
+
     Parameters
     ----------
     name : str
@@ -517,7 +525,12 @@ class BuiltinDataset(OnDiskDataset):
     """
 
     _base_url = "https://data.dgl.ai/dataset/graphbolt/"
-    _datasets = ["ogbn-mag", "ogbl-citation2", "ogbn-products"]
+    _datasets = [
+        "ogbn-mag",
+        "ogbl-citation2",
+        "ogbn-products",
+        "ogb-lsc-mag240m",
+    ]
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
         dataset_dir = os.path.join(root, name)

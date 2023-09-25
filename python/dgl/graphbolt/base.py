@@ -7,12 +7,14 @@ from ..utils import recursive_apply
 
 __all__ = [
     "CANONICAL_ETYPE_DELIMITER",
+    "ORIGINAL_EDGE_ID",
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
 ]
 
 CANONICAL_ETYPE_DELIMITER = ":"
+ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
 
 
 def etype_tuple_to_str(c_etype):
