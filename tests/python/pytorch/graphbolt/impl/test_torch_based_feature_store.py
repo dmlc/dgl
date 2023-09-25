@@ -132,7 +132,9 @@ def test_torch_based_feature_store(in_memory):
 
         # Test get the size of the entire feature.
         assert feature_store.size("node", "paper", "a") == torch.Size([3])
-        assert feature_store.size("edge", "paper:cites:paper", "b") == torch.Size([3])
+        assert feature_store.size(
+            "edge", "paper:cites:paper", "b"
+        ) == torch.Size([3])
         assert feature_store.size("edge", "name:author", "c") == torch.Size([3])
 
         # For windows, the file is locked by the numpy.load. We need to delete
