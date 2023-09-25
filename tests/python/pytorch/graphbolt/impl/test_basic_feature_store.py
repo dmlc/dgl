@@ -29,7 +29,6 @@ def test_basic_feature_store_homo():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size() == 3
     assert feature_store.size("node", None, "a") == 3
     assert feature_store.size("node", None, "b") == 3
 
@@ -65,7 +64,6 @@ def test_basic_feature_store_hetero():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size() == 3
     assert feature_store.size("node", "paper", "a") == 3
     assert feature_store.size("node", "author", "b") == 3
     assert feature_store.size("edge", "paper:cites:paper", "c") == 3

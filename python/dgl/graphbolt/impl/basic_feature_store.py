@@ -59,9 +59,9 @@ class BasicFeatureStore(FeatureStore):
 
     def size(
         self,
-        domain: str = None,
-        type_name: str = None,
-        feature_name: str = None,
+        domain: str,
+        type_name: str,
+        feature_name: str,
     ):
         """Get the size of the feature.
         Parameters
@@ -77,9 +77,6 @@ class BasicFeatureStore(FeatureStore):
         int
             The size of the feature.
         """
-        if domain is None and type_name is None and feature_name is None:
-            for value in self._features.values():
-                return value.size()
         return self._features[(domain, type_name, feature_name)].size()
 
     def update(

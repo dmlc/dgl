@@ -117,7 +117,6 @@ def test_torch_based_feature_store(in_memory):
         )
 
         # Test get the size of the entire feature.
-        assert feature_store.size() == 3
         assert feature_store.size("node", "paper", "a") == 3
         assert feature_store.size("edge", "paper:cites:paper", "b") == 3
 
