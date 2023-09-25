@@ -137,13 +137,11 @@ std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSC(
     auto ret = SparseMatrix::FromCSC(
         csr->indptr, new_indices, mat->value(),
         std::vector<int64_t>{uniqued.numel(), mat->shape()[1]});
-    // auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
     return {ret, uniqued};
   } else {
     auto ret = SparseMatrix::FromCSR(
         csr->indptr, new_indices, mat->value(),
         std::vector<int64_t>{mat->shape()[0], uniqued.numel()});
-    // auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
     return {ret, uniqued};
   }
 }
