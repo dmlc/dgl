@@ -53,7 +53,7 @@ def test_torch_based_feature(in_memory):
 
         # Test get the size of the entire feature.
         assert feature_a.size() == 3
-        assert feature_b.size() == 2
+        assert feature_b.size() == 3
 
         # Test update the feature.
         feature_a.update(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))

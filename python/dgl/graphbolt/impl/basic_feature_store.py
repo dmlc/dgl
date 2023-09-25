@@ -63,7 +63,7 @@ class BasicFeatureStore(FeatureStore):
         type_name: str,
         feature_name: str,
     ):
-        """Get the size of the feature.
+        """Get the size of the specified feature in the feature store.
         Parameters
         ----------
         domain : str
@@ -75,7 +75,7 @@ class BasicFeatureStore(FeatureStore):
         Returns
         -------
         int
-            The size of the feature.
+            The size of the specified feature in the feature store.
         """
         return self._features[(domain, type_name, feature_name)].size()
 

@@ -93,7 +93,7 @@ class FeatureStore:
         type_name: str,
         feature_name: str,
     ):
-        """Get the size of the feature.
+        """Get the size of the specified feature in the feature store.
 
         Parameters
         ----------
@@ -106,7 +106,7 @@ class FeatureStore:
         Returns
         -------
         int
-            The size of the feature.
+            Get the size of the specified feature in the feature store.
         """
         raise NotImplementedError
 
