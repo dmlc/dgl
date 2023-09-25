@@ -116,7 +116,7 @@ def test_torch_based_feature_store(in_memory):
                 name="c",
                 format="torch",
                 path=os.path.join(test_dir, "c.pt"),
-                in_memory=in_memory,
+                in_memory=True,
             ),
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
@@ -139,7 +139,7 @@ def test_torch_based_feature_store(in_memory):
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
-        a = b = None
+        a = b = c = None
         feature_store = None
 
         # ``domain`` should be enum.
