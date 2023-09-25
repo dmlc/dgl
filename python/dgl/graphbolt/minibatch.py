@@ -285,7 +285,7 @@ class MiniBatch:
         return blocks
 
     def to_dgl(self):
-        """"Converting a `MiniBatch` into a DGL MiniBatch that contains
+        """ "Converting a `MiniBatch` into a DGL MiniBatch that contains
         everything necessary for computation."
         """
         minibatch = DGLMiniBatch(
