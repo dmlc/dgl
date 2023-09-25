@@ -31,7 +31,7 @@ class Feature:
 
         Returns
         -------
-        int
+        torch.Size
             The size of the feature.
         """
         raise NotImplementedError
@@ -105,7 +105,7 @@ class FeatureStore:
             The feature name.
         Returns
         -------
-        int
+        torch.Size
             The size of the specified feature in the feature store.
         """
         raise NotImplementedError

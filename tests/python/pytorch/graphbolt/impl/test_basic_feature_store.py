@@ -7,10 +7,12 @@ from dgl import graphbolt as gb
 def test_basic_feature_store_homo():
     a = torch.tensor([3, 2, 1])
     b = torch.tensor([2, 5, 3])
+    c = torch.tensor([[1, 2, 3], [4, 5, 6]])
 
     features = {}
     features[("node", None, "a")] = gb.TorchBasedFeature(a)
     features[("node", None, "b")] = gb.TorchBasedFeature(b)
+    features[("node", None, "c")] = gb.TorchBasedFeature(c)
 
     feature_store = gb.BasicFeatureStore(features)
 
@@ -29,19 +31,22 @@ def test_basic_feature_store_homo():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size("node", None, "a") == 3
-    assert feature_store.size("node", None, "b") == 3
+    assert feature_store.size("node", None, "a") == torch.Size([3])
+    assert feature_store.size("node", None, "b") == torch.Size([3])
+    assert feature_store.size("node", None, "c") == torch.Size([3])
 
 
 def test_basic_feature_store_hetero():
     a = torch.tensor([3, 2, 1])
     b = torch.tensor([2, 5, 3])
     c = torch.tensor([6, 8, 9])
+    d = torch.tensor([[1, 2], [4, 5]])
 
     features = {}
     features[("node", "paper", "a")] = gb.TorchBasedFeature(a)
     features[("node", "author", "b")] = gb.TorchBasedFeature(b)
     features[("edge", "paper:cites:paper", "c")] = gb.TorchBasedFeature(c)
+    features[("edge", "name:author", "d")] = gb.TorchBasedFeature(d)
 
     feature_store = gb.BasicFeatureStore(features)
 
@@ -64,9 +69,9 @@ def test_basic_feature_store_hetero():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size("node", "paper", "a") == 3
-    assert feature_store.size("node", "author", "b") == 3
-    assert feature_store.size("edge", "paper:cites:paper", "c") == 3
+    assert feature_store.size("node", "paper", "a") == torch.Size([3])
+    assert feature_store.size("node", "author", "b") == torch.Size([3])
+    assert feature_store.size("edge", "name:author", "d") == torch.Size([2])
 
 
 def test_basic_feature_store_errors():

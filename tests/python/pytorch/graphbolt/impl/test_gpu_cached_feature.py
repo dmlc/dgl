@@ -14,9 +14,11 @@ from dgl import graphbolt as gb
 def test_gpu_cached_feature():
     a = torch.tensor([1, 2, 3]).to("cuda").float()
     b = torch.tensor([[1, 2, 3], [4, 5, 6]]).to("cuda").float()
+    c = torch.tensor([[[1, 2], [2, 3]], [[4, 5], [5, 6]]]).to("cuda").float()
 
     feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), 2)
     feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), 1)
+    feat_store_c = gb.GPUCachedFeature(gb.TorchBasedFeature(c), 1)
 
     # Test read the entire feature.
     assert torch.equal(feat_store_a.read(), a)
@@ -37,8 +39,9 @@ def test_gpu_cached_feature():
     )
 
     # Test get the size of the entire feature.
-    assert feat_store_a.size() == 3
-    assert feat_store_b.size() == 3
+    assert feat_store_a.size() == torch.Size([3])
+    assert feat_store_b.size() == torch.Size([3])
+    assert feat_store_c.size() == torch.Size([2, 2])
 
     # Test update the entire feature.
     feat_store_a.update(torch.tensor([0.0, 1.0, 2.0]).to("cuda"))

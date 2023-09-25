@@ -85,7 +85,7 @@ class GPUCachedFeature(Feature):
 
         Returns
         -------
-        int
+        torch.Size
             The size of the feature.
         """
         return self._fallback_feature.size()

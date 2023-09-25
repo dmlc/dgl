@@ -24,12 +24,15 @@ def test_torch_based_feature(in_memory):
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([1, 2, 3])
         b = torch.tensor([[1, 2, 3], [4, 5, 6]])
+        c = torch.tensor([[[1, 2], [2, 3]], [[4, 5], [5, 6]]])
         if not in_memory:
             a = to_on_disk_tensor(test_dir, "a", a)
             b = to_on_disk_tensor(test_dir, "b", b)
+            c = to_on_disk_tensor(test_dir, "c", c)
 
         feature_a = gb.TorchBasedFeature(a)
         feature_b = gb.TorchBasedFeature(b)
+        feature_c = gb.TorchBasedFeature(c)
 
         # Test read the entire feature.
         assert torch.equal(feature_a.read(), torch.tensor([1, 2, 3]))
@@ -52,8 +55,9 @@ def test_torch_based_feature(in_memory):
         )
 
         # Test get the size of the entire feature.
-        assert feature_a.size() == 3
-        assert feature_b.size() == 3
+        assert feature_a.size() == torch.Size([3])
+        assert feature_b.size() == torch.Size([3])
+        assert feature_c.size() == torch.Size([2, 2])
 
         # Test update the feature.
         feature_a.update(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))
@@ -66,8 +70,8 @@ def test_torch_based_feature(in_memory):
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
-        a = b = None
-        feature_a = feature_b = None
+        a = b = c = None
+        feature_a = feature_b = feature_c = None
 
 
 def write_tensor_to_disk(dir, name, t, fmt="torch"):
@@ -85,8 +89,10 @@ def test_torch_based_feature_store(in_memory):
     with tempfile.TemporaryDirectory() as test_dir:
         a = torch.tensor([1, 2, 3])
         b = torch.tensor([2, 5, 3])
+        c = torch.tensor([[1, 2, 3], [4, 5, 6]])
         write_tensor_to_disk(test_dir, "a", a, fmt="torch")
         write_tensor_to_disk(test_dir, "b", b, fmt="numpy")
+        write_tensor_to_disk(test_dir, "c", c, fmt="torch")
         feature_data = [
             gb.OnDiskFeatureData(
                 domain="node",
@@ -104,6 +110,14 @@ def test_torch_based_feature_store(in_memory):
                 path=os.path.join(test_dir, "b.npy"),
                 in_memory=in_memory,
             ),
+            gb.OnDiskFeatureData(
+                domain="edge",
+                type="name:author",
+                name="c",
+                format="torch",
+                path=os.path.join(test_dir, "c.pt"),
+                in_memory=in_memory,
+            ),
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
 
@@ -117,8 +131,9 @@ def test_torch_based_feature_store(in_memory):
         )
 
         # Test get the size of the entire feature.
-        assert feature_store.size("node", "paper", "a") == 3
-        assert feature_store.size("edge", "paper:cites:paper", "b") == 3
+        assert feature_store.size("node", "paper", "a") == torch.Size([3])
+        assert feature_store.size("edge", "paper:cites:paper", "b") == torch.Size([3])
+        assert feature_store.size("edge", "name:author", "c") == torch.Size([3])
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
@@ -152,6 +167,6 @@ def test_torch_based_feature_store(in_memory):
         )
 
         # Test get the size of the entire feature.
-        assert feature_store.size("node", None, "a") == 3
+        assert feature_store.size("node", None, "a") == torch.Size([3])
 
         feature_store = None

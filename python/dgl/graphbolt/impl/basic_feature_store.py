@@ -74,7 +74,7 @@ class BasicFeatureStore(FeatureStore):
             The feature name.
         Returns
         -------
-        int
+        torch.Size
             The size of the specified feature in the feature store.
         """
         return self._features[(domain, type_name, feature_name)].size()
