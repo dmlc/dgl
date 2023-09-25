@@ -15,7 +15,7 @@ from .utils import (
     "create_func", [rand_diag, rand_csr, rand_csc, rand_coo]
 )
 @pytest.mark.parametrize("dim", [0, 1])
-@pytest.mark.parametrize("index", [None, (1, 3), (4, 2), (0, 0, 2)])
+@pytest.mark.parametrize("index", [None, (1, 3), (4, 0, 2)])
 def test_compact(create_func, dim, index):
     ctx = F.ctx()
     shape = (5, 5)

@@ -55,31 +55,43 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
   return {ret_coo, lhs_indices, rhs_indices};
 }
 
+torch::Tensor RevertIndices(const torch::Tensor& indices) {
+  auto rev_tensor = torch::empty_like(indices);
+  rev_tensor.index_put_({indices}, torch::arange(0, indices.numel()));
+  return rev_tensor;
+}
+
 std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
     const torch::Tensor& row,
     const torch::optional<torch::Tensor>& leading_indices) {
-  torch::Tensor sort_row, sort_idx;
-  std::tie(sort_row, sort_idx) = row.sort(-1);
-  torch::Tensor rev_sort_idx = torch::empty_like(sort_idx);
-  rev_sort_idx.index_put_({sort_idx}, torch::arange(0, sort_idx.numel()));
-
-  torch::Tensor uniqued, uniq_idx;
+  torch::Tensor sorted, sort_indices, uniqued, unique_reverse_indices, counts;
   int64_t n_leading_indices = 0;
   if (leading_indices.has_value()) {
     n_leading_indices = leading_indices.value().numel();
-    std::tie(uniqued, uniq_idx) = torch::_unique(
-        torch::cat({leading_indices.value(), sort_row}), false, true);
+    std::tie(sorted, sort_indices) =
+        torch::cat({leading_indices.value(), row}).sort();
   } else {
-    std::tie(uniqued, uniq_idx) = torch::_unique(sort_row, false, true);
+    std::tie(sorted, sort_indices) = row.sort();
   }
+  auto sort_rev_indices = RevertIndices(sort_indices);
+  std::tie(uniqued, unique_reverse_indices, counts) =
+      torch::unique_consecutive(sorted, true);
+  auto reverse_indices = unique_reverse_indices.index({sort_rev_indices});
+  auto n_uniqued = uniqued.numel();
 
-  auto new_row =
-      torch::arange(uniqued.numel() - 1, -1, -1)
-          .index_select(
-              0, uniq_idx.slice(
-                     0, n_leading_indices, n_leading_indices + row.size(-1)))
-          .index_select(0, rev_sort_idx);
-  return {new_row, uniqued};
+  auto split_indices = torch::full({n_uniqued}, -1);
+
+  split_indices.index_put_(
+      {reverse_indices.slice(0, 0, n_leading_indices)},
+      torch::arange(0, n_leading_indices, split_indices.options()));
+
+  split_indices.index_put_(
+      {(split_indices == -1).nonzero().view(-1)},
+      torch::arange(n_leading_indices, n_uniqued, split_indices.options()));
+
+  auto new_row = split_indices.index({reverse_indices.slice(
+      0, n_leading_indices, n_leading_indices + row.numel())});
+  return {new_row, uniqued.index({RevertIndices(split_indices)})};
 }
 
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::optional<torch::Tensor>>
@@ -100,14 +112,12 @@ CompactCOO(
     auto ret = SparseMatrix::FromCOO(
         torch::stack({new_row, col}, 0), mat->value(),
         std::vector<int64_t>{uniqued.numel(), mat->shape()[1]});
-    auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
-    return {ret, ret_idx};
+    return {ret, uniqued};
   } else {
     auto ret = SparseMatrix::FromCOO(
         torch::stack({col, new_row}, 0), mat->value(),
         std::vector<int64_t>{mat->shape()[0], uniqued.numel()});
-    auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
-    return {ret, ret_idx};
+    return {ret, uniqued};
   }
 }
 
@@ -129,14 +139,14 @@ CompactCSC(
     auto ret = SparseMatrix::FromCSC(
         csr->indptr, new_indices, mat->value(),
         std::vector<int64_t>{uniqued.numel(), mat->shape()[1]});
-    auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
-    return {ret, ret_idx};
+    // auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
+    return {ret, uniqued};
   } else {
     auto ret = SparseMatrix::FromCSR(
         csr->indptr, new_indices, mat->value(),
         std::vector<int64_t>{mat->shape()[0], uniqued.numel()});
-    auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
-    return {ret, ret_idx};
+    // auto ret_idx = torch::optional<torch::Tensor>(uniqued.flip(-1));
+    return {ret, uniqued};
   }
 }
 
