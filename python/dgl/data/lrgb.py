@@ -322,7 +322,7 @@ class PeptidesFunctionalDataset(DGLDataset):
     ):
         self.smiles2graph = smiles2graph
         # MD5 hash of the dataset file.
-        self.version = "701eb743e899f4d793f0e13c8fa5a1b4"
+        self.md5sum_data = "701eb743e899f4d793f0e13c8fa5a1b4"
         self.url_stratified_split = """
         https://www.dropbox.com/s/j4zcnx2eipuo0xz/splits_random_stratified_peptide.pickle?dl=1
         """
@@ -376,7 +376,7 @@ class PeptidesFunctionalDataset(DGLDataset):
         path = download(self.url, path=self.raw_data_path)
         # Save to disk the MD5 hash of the downloaded file.
         hash = self._md5sum(path)
-        if hash != self.version:
+        if hash != self.md5sum_data:
             raise ValueError("Unexpected MD5 hash of the downloaded file")
         open(os.path.join(self.raw_path, hash), "w").close()
         # Download train/val/test splits.
