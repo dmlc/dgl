@@ -85,8 +85,8 @@ class TorchBasedFeature(Feature):
             The size of the feature.
         """
         if len(self._tensor.shape) == 1:
-            return self._tensor.shape
-        return self._tensor.shape[1:]
+            return torch.Size([1])
+        return self._tensor[0].shape
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature store.

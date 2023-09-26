@@ -31,8 +31,8 @@ def test_basic_feature_store_homo():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size("node", None, "a") == torch.Size([3])
-    assert feature_store.size("node", None, "b") == torch.Size([3])
+    assert feature_store.size("node", None, "a") == torch.Size([1])
+    assert feature_store.size("node", None, "b") == torch.Size([1])
     assert feature_store.size("node", None, "c") == torch.Size([3])
 
 
@@ -69,8 +69,8 @@ def test_basic_feature_store_hetero():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size("node", "paper", "a") == torch.Size([3])
-    assert feature_store.size("node", "author", "b") == torch.Size([3])
+    assert feature_store.size("node", "paper", "a") == torch.Size([1])
+    assert feature_store.size("node", "author", "b") == torch.Size([1])
     assert feature_store.size("edge", "name:author", "d") == torch.Size([2])
 
 

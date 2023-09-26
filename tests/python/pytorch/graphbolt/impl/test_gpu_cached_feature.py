@@ -39,7 +39,7 @@ def test_gpu_cached_feature():
     )
 
     # Test get the size of the entire feature.
-    assert feat_store_a.size() == torch.Size([3])
+    assert feat_store_a.size() == torch.Size([1])
     assert feat_store_b.size() == torch.Size([3])
     assert feat_store_c.size() == torch.Size([2, 2])
 
