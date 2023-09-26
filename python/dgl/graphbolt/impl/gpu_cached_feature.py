@@ -18,7 +18,7 @@ class GPUCachedFeature(Feature):
         Parameters
         ----------
         fallback_feature : Feature
-            The fallback feature. 
+            The fallback feature.
             Note that its dimension should be greater than 1.
         cache_size : int
             The capacity of the GPU cache, the number of features to store.
