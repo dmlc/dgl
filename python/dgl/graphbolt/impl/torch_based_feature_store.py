@@ -23,36 +23,46 @@ class TorchBasedFeature(Feature):
         ----------
         torch_feature : torch.Tensor
             The torch feature.
+            Note that the dimension of the tensor should greater than 1.
 
         Examples
         --------
         >>> import torch
-        >>> torch_feat = torch.arange(0, 5)
+        >>> from dgl import graphbolt as gb
+        >>> torch_feat = torch.tensor([range(0, 5), range(0, 5)])
         >>> feature_store = TorchBasedFeature(torch_feat)
         >>> feature_store.read()
-        tensor([0, 1, 2, 3, 4])
-        >>> feature_store.read(torch.tensor([0, 1, 2]))
-        tensor([0, 1, 2])
-        >>> feature_store.update(torch.ones(3, dtype=torch.long),
-        ... torch.tensor([0, 1, 2]))
-        >>> feature_store.read(torch.tensor([0, 1, 2, 3]))
-        tensor([1, 1, 1, 3])
+        tensor([[0, 1, 2, 3, 4],
+                [0, 1, 2, 3, 4]])
+        >>> feature_store.read(torch.tensor([0]))
+        tensor([[0, 1, 2, 3, 4]])
+        >>> feature_store.update(torch.ones(5, dtype=torch.long),
+        ...                      torch.tensor([1]))
+        >>> feature_store.read(torch.tensor([0, 1]))
+        tensor([[0, 1, 2, 3, 4],
+                [1, 1, 1, 1, 1]])
 
         >>> import numpy as np
         >>> arr = np.arange(0, 5)
         >>> np.save("/tmp/arr.npy", arr)
         >>> torch_feat = torch.as_tensor(np.load("/tmp/arr.npy",
-        ...         mmap_mode="r+"))
-        >>> feature_store = TorchBasedFeature(torch_feat)
+        ...                                      mmap_mode="r+")
+        ...                              for _ in range(2)])
+        >>> feature_store = gb.TorchBasedFeature(torch_feat)
         >>> feature_store.read()
-        tensor([0, 1, 2, 3, 4])
-        >>> feature_store.read(torch.tensor([0, 1, 2]))
-        tensor([0, 1, 2])
+        tensor([[0, 1, 2, 3, 4],
+                [0, 1, 2, 3, 4]])
+        >>> feature_store.read(torch.tensor([0]))
+        tensor([[0, 1, 2, 3, 4]])
         """
         super().__init__()
         assert isinstance(torch_feature, torch.Tensor), (
             f"torch_feature in TorchBasedFeature must be torch.Tensor, "
             f"but got {type(torch_feature)}."
+        )
+        assert len(torch_feature.shape) > 1, (
+            f"dimension of torch_feature in TorchBasedFeature must greater than 1, "
+            f"bug got {len(torch_feature.shape)} dimension."
         )
         self._tensor = torch_feature
 
@@ -99,9 +109,9 @@ class TorchBasedFeature(Feature):
             )
             self._tensor[:] = value
         else:
-            assert ids.shape[0] == value.shape[0], (
-                f"ids and value must have the same length, "
-                f"but got {ids.shape[0]} and {value.shape[0]}."
+            assert self._tensor[ids].shape[1:] == value.shape, (
+                f"feature selected by ids and value must have the same length, "
+                f"but got {self._tensor[ids].shape} and {value.shape}."
             )
             self._tensor[ids] = value
 
@@ -136,7 +146,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
         >>> import torch
         >>> import numpy as np
         >>> from dgl import graphbolt as gb
-        >>> edge_label = torch.tensor([1, 2, 3])
+        >>> edge_label = torch.tensor([[1], [2], [3]])
         >>> node_feat = torch.tensor([[1, 2, 3], [4, 5, 6]])
         >>> torch.save(edge_label, "/tmp/edge_label.pt")
         >>> np.save("/tmp/node_feat.npy", node_feat.numpy())

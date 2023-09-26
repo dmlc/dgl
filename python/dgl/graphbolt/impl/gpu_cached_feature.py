@@ -18,25 +18,28 @@ class GPUCachedFeature(Feature):
         Parameters
         ----------
         fallback_feature : Feature
-            The fallback feature.
+            The fallback feature. 
+            Note that its dimension should be greater than 1.
         cache_size : int
             The capacity of the GPU cache, the number of features to store.
 
         Examples
         --------
         >>> import torch
-        >>> torch_feat = torch.arange(0, 8)
+        >>> torch_feat = torch.tensor([range(0, 5), range(0, 5)]).to("cuda")
         >>> cache_size = 5
-        >>> fallback_feature = TorchBasedFeature(torch_feat)
-        >>> feature = GPUCachedFeature(fallback_feature, cache_size)
+        >>> fallback_feature = gb.TorchBasedFeature(torch_feat)
+        >>> feature = gb.GPUCachedFeature(fallback_feature, cache_size)
         >>> feature.read()
-        tensor([0, 1, 2, 3, 4, 5, 6, 7])
-        >>> feature.read(torch.tensor([0, 1, 2]))
-        tensor([0, 1, 2])
-        >>> feature.update(torch.ones(3, dtype=torch.long),
-        ... torch.tensor([0, 1, 2]))
-        >>> feature.read(torch.tensor([0, 1, 2, 3]))
-        tensor([1, 1, 1, 3])
+        tensor([[0, 1, 2, 3, 4],
+            [0, 1, 2, 3, 4]], device='cuda:0')
+        >>> feature.read(torch.tensor([0]).to("cuda"))
+        tensor([[0, 1, 2, 3, 4]], device='cuda:0')
+        >>> feature.update(torch.ones(5, dtype=torch.long).to("cuda"),
+        ...                torch.tensor([1]).to("cuda"))
+        >>> feature.read(torch.tensor([0, 1]).to("cuda"))
+        tensor([[0, 1, 2, 3, 4],
+                [1, 1, 1, 1, 1]], device='cuda:0')
         """
         super(GPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
@@ -102,9 +105,10 @@ class GPUCachedFeature(Feature):
                 value[:size].to("cuda").reshape(self.flat_shape),
             )
         else:
-            assert ids.shape[0] == value.shape[0], (
-                f"ids and value must have the same length, "
-                f"but got {ids.shape[0]} and {value.shape[0]}."
+            assert self._fallback_feature.read(ids).shape[1:] == value.shape, (
+                f"feature selected by ids and value must have the same size, "
+                f"but got {self._fallback_feature.read(ids).shape[1:]} "
+                f"and {value.shape[0]}."
             )
             self._fallback_feature.update(value, ids)
             self._feature.replace(
