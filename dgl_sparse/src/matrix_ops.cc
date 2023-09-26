@@ -57,7 +57,8 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
 
 torch::Tensor RevertIndices(const torch::Tensor& indices) {
   auto rev_tensor = torch::empty_like(indices);
-  rev_tensor.index_put_({indices}, torch::arange(0, indices.numel()));
+  rev_tensor.index_put_(
+      {indices}, torch::arange(0, indices.numel(), rev_tensor.options()));
   return rev_tensor;
 }
 

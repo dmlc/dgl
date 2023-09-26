@@ -23,7 +23,6 @@ def test_compact(create_func, dim, index):
     if index is not None:
         ans_idx = list(dict.fromkeys(index))
         index = torch.tensor(index).to(ctx)
-        index.unique()
 
     A = create_func(shape, 8, ctx)
 
