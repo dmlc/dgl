@@ -36,7 +36,7 @@ class GPUCachedFeature(Feature):
             [0, 1, 2, 3, 4]], device='cuda:0')
         >>> feature.read(torch.tensor([0]).to("cuda"))
         tensor([[0, 1, 2, 3, 4]], device='cuda:0')
-        >>> feature.update(torch.ones(5, dtype=torch.long).to("cuda"),
+        >>> feature.update(torch.tensor([[1 for _ in range(5)]]).to("cuda"),
         ...                torch.tensor([1]).to("cuda"))
         >>> feature.read(torch.tensor([0, 1]).to("cuda"))
         tensor([[0, 1, 2, 3, 4],

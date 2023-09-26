@@ -47,8 +47,7 @@ def test_torch_based_feature(in_memory):
             feature_b.read(torch.tensor([1])),
             torch.tensor([[4, 5, 6]]),
         )
-        feature_a.update(torch.tensor([[0], [1], [2]]),
-                         torch.tensor([0, 1, 2]))
+        feature_a.update(torch.tensor([[0], [1], [2]]), torch.tensor([0, 1, 2]))
         assert torch.equal(feature_a.read(), torch.tensor([[0], [1], [2]]))
         feature_a.update(torch.tensor([[2], [0]]), torch.tensor([0, 2]))
         assert torch.equal(feature_a.read(), torch.tensor([[2], [1], [0]]))
@@ -100,7 +99,7 @@ def test_torch_based_feature_store(in_memory):
         feature_store = gb.TorchBasedFeatureStore(feature_data)
         assert torch.equal(
             feature_store.read("node", "paper", "a"),
-            torch.tensor([[1], [2], [3]])
+            torch.tensor([[1], [2], [3]]),
         )
         assert torch.equal(
             feature_store.read("edge", "paper:cites:paper", "b"),
@@ -135,7 +134,6 @@ def test_torch_based_feature_store(in_memory):
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
         assert torch.equal(
-            feature_store.read("node", None, "a"),
-            torch.tensor([[1], [2], [3]])
+            feature_store.read("node", None, "a"), torch.tensor([[1], [2], [3]])
         )
         feature_store = None

@@ -16,12 +16,11 @@ def test_basic_feature_store_homo():
 
     # Test read the entire feature.
     assert torch.equal(
-        feature_store.read("node", None, "a"),
-        torch.tensor([[3], [2], [1]])
+        feature_store.read("node", None, "a"), torch.tensor([[3], [2], [1]])
     )
     assert torch.equal(
         feature_store.read("node", None, "b"),
-        torch.tensor([[1, 2, 4], [2, 5, 3]])
+        torch.tensor([[1, 2, 4], [2, 5, 3]]),
     )
 
     # Test read with ids.
@@ -45,12 +44,11 @@ def test_basic_feature_store_hetero():
 
     # Test read the entire feature.
     assert torch.equal(
-        feature_store.read("node", "paper", "a"),
-        torch.tensor([[3], [2], [1]])
+        feature_store.read("node", "paper", "a"), torch.tensor([[3], [2], [1]])
     )
     assert torch.equal(
         feature_store.read("node", "author", "b"),
-        torch.tensor([[1, 2, 4], [2, 5, 3]])
+        torch.tensor([[1, 2, 4], [2, 5, 3]]),
     )
     assert torch.equal(
         feature_store.read("edge", "paper:cites:paper", "c"),
