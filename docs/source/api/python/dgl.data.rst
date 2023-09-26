@@ -70,6 +70,7 @@ Datasets for node classification/regression tasks
     MovieLensDataset
     PeptidesStructuralDataset
     PeptidesFunctionalDataset
+    VOCSuperpixelsDataset
 
 Edge Prediction Datasets
 ---------------------------------------

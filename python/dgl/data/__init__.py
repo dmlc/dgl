@@ -78,6 +78,7 @@ try:
     from .lrgb import PeptidesFunctionalDataset, PeptidesStructuralDataset
 except ImportError:
     pass
+from .lrgb import VOCSuperpixelsDataset
 from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
