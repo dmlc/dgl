@@ -23,7 +23,7 @@ class TorchBasedFeature(Feature):
         ----------
         torch_feature : torch.Tensor
             The torch feature.
-            Note that the dimension of the tensor should greater than 1.
+            Note that the dimension of the tensor should be greater than 1.
 
         Examples
         --------
@@ -61,8 +61,9 @@ class TorchBasedFeature(Feature):
             f"but got {type(torch_feature)}."
         )
         assert len(torch_feature.shape) > 1, (
-            f"dimension of torch_feature in TorchBasedFeature must greater than 1, "
-            f"bug got {len(torch_feature.shape)} dimension."
+            f"dimension of torch_feature in TorchBasedFeature"
+            f"must be greater than 1, "
+            f"but got {len(torch_feature.shape)} dimension."
         )
         self._tensor = torch_feature
 
