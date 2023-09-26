@@ -1218,8 +1218,8 @@ def test_from_dglgraph_homogeneous():
     dgl_g = dgl.rand_graph(1000, 10 * 1000)
     gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=True)
 
-    assert gb_g.total_num_nodes == dgl_g.total_num_nodes()
-    assert gb_g.total_num_edges == dgl_g.total_num_edges()
+    assert gb_g.total_num_nodes == dgl_g.num_nodes()
+    assert gb_g.total_num_edges == dgl_g.num_edges()
     assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 1000]))
     assert gb_g.type_per_edge is None
     assert gb_g.metadata.node_type_to_id == {"_N": 0}
@@ -1250,8 +1250,8 @@ def test_from_dglgraph_heterogeneous():
     )
     gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=False)
 
-    assert gb_g.total_num_nodes == dgl_g.total_num_nodes()
-    assert gb_g.total_num_edges == dgl_g.total_num_edges()
+    assert gb_g.total_num_nodes == dgl_g.num_nodes()
+    assert gb_g.total_num_edges == dgl_g.num_edges()
     assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 6, 12, 18, 25]))
     assert torch.equal(
         gb_g.type_per_edge,
