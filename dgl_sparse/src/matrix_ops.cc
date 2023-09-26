@@ -97,7 +97,7 @@ std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
 
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCOO(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
-    torch::optional<torch::Tensor> leading_indices) {
+    const torch::optional<torch::Tensor>& leading_indices) {
   torch::Tensor row, col;
   auto coo = mat->COOTensors();
   if (dim == 0)
@@ -123,7 +123,7 @@ std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCOO(
 
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSC(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
-    torch::optional<torch::Tensor> leading_indices) {
+    const torch::optional<torch::Tensor>& leading_indices) {
   std::shared_ptr<dgl::sparse::CSR> csr;
   if (dim == 0)
     csr = mat->CSCPtr();
@@ -149,7 +149,7 @@ std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSC(
 
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> Compact(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
-    torch::optional<torch::Tensor> leading_indices) {
+    const torch::optional<torch::Tensor>& leading_indices) {
   if (dim == 0) {
     if (mat->HasCSC())
       return CompactCSC(mat, dim, leading_indices);
