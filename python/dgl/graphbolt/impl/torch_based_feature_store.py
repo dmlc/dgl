@@ -30,13 +30,13 @@ class TorchBasedFeature(Feature):
         >>> import torch
         >>> from dgl import graphbolt as gb
         >>> torch_feat = torch.tensor([range(0, 5), range(0, 5)])
-        >>> feature_store = TorchBasedFeature(torch_feat)
+        >>> feature_store = gb.TorchBasedFeature(torch_feat)
         >>> feature_store.read()
         tensor([[0, 1, 2, 3, 4],
                 [0, 1, 2, 3, 4]])
         >>> feature_store.read(torch.tensor([0]))
         tensor([[0, 1, 2, 3, 4]])
-        >>> feature_store.update(torch.ones(5, dtype=torch.long),
+        >>> feature_store.update(torch.tensor([[1 for _ in range(5)]]),
         ...                      torch.tensor([1]))
         >>> feature_store.read(torch.tensor([0, 1]))
         tensor([[0, 1, 2, 3, 4],
@@ -110,7 +110,7 @@ class TorchBasedFeature(Feature):
             )
             self._tensor[:] = value
         else:
-            assert self._tensor[ids].shape[1:] == value.shape, (
+            assert self._tensor[ids].shape == value.shape, (
                 f"feature selected by ids and value must have the same size,"
                 f"but got {self._tensor[ids].shape} and {value.shape}."
             )

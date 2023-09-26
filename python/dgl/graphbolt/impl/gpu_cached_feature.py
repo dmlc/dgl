@@ -106,10 +106,10 @@ class GPUCachedFeature(Feature):
                 value[:size].to("cuda").reshape(self.flat_shape),
             )
         else:
-            assert self._fallback_feature.read(ids).shape[1:] == value.shape, (
+            assert self._fallback_feature.read(ids).shape == value.shape, (
                 f"feature selected by ids and value must have the same size,"
-                f"but got {self._fallback_feature.read(ids).shape[1:]} "
-                f"and {value.shape[0]}."
+                f"but got {self._fallback_feature.read(ids).shape} "
+                f"and {value.shape}."
             )
             self._fallback_feature.update(value, ids)
             self._feature.replace(
