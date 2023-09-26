@@ -68,6 +68,8 @@ Datasets for node classification/regression tasks
     TolokersDataset
     QuestionsDataset
     MovieLensDataset
+    PeptidesStructuralDataset
+    PeptidesFunctionalDataset
 
 Edge Prediction Datasets
 ---------------------------------------

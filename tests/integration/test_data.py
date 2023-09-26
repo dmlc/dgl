@@ -65,13 +65,29 @@ def test_fakenews():
 def test_peptides_structural():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
     dataset1 = data.PeptidesStructuralDataset()
-    g1, label = dataset1[0]
+    g1 = dataset1[0][0]
     dataset2 = data.PeptidesStructuralDataset(transform=transform)
+    g2 = dataset2[0][0]
+
+    assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="only supports pytorch"
+)
+def test_peptides_functional():
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    dataset1 = data.PeptidesFunctionalDataset()
+    g1, label = dataset1[0]
+    dataset2 = data.PeptidesFunctionalDataset(transform=transform)
     g2, _ = dataset2[0]
 
     assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
-    # return a scalar tensor
-    assert not label.shape
+    assert dataset1.num_classes == label.shape[0]
 
 
 @unittest.skipIf(
