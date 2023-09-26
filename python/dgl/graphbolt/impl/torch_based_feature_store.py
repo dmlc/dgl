@@ -110,7 +110,7 @@ class TorchBasedFeature(Feature):
             self._tensor[:] = value
         else:
             assert self._tensor[ids].shape[1:] == value.shape, (
-                f"feature selected by ids and value must have the same length, "
+                f"feature selected by ids and value must have the same size,"
                 f"but got {self._tensor[ids].shape} and {value.shape}."
             )
             self._tensor[ids] = value

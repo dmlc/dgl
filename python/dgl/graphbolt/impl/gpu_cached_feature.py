@@ -26,6 +26,7 @@ class GPUCachedFeature(Feature):
         Examples
         --------
         >>> import torch
+        >>> from dgl import graphbolt as gb
         >>> torch_feat = torch.tensor([range(0, 5), range(0, 5)]).to("cuda")
         >>> cache_size = 5
         >>> fallback_feature = gb.TorchBasedFeature(torch_feat)
@@ -106,7 +107,7 @@ class GPUCachedFeature(Feature):
             )
         else:
             assert self._fallback_feature.read(ids).shape[1:] == value.shape, (
-                f"feature selected by ids and value must have the same size, "
+                f"feature selected by ids and value must have the same size,"
                 f"but got {self._fallback_feature.read(ids).shape[1:]} "
                 f"and {value.shape[0]}."
             )
