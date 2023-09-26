@@ -80,7 +80,7 @@ std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
   auto reverse_indices = unique_reverse_indices.index({sort_rev_indices});
   auto n_uniqued = uniqued.numel();
 
-  auto split_indices = torch::full({n_uniqued}, -1);
+  auto split_indices = torch::full({n_uniqued}, -1, reverse_indices.options());
 
   split_indices.index_put_(
       {reverse_indices.slice(0, 0, n_leading_indices)},
