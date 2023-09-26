@@ -314,7 +314,7 @@ def parse_args():
         "--early-stop",
         type=int,
         default=0,
-        help="Early stop, 0 means no early stop",
+        help="0 means no early stop, otherwise stop at the input-th step",
     )
     parser.add_argument(
         "--fanout",
