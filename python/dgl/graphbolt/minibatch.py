@@ -285,7 +285,7 @@ class MiniBatch:
         return blocks
 
     def to_dgl(self):
-        """ "Converting a `MiniBatch` into a DGL MiniBatch that contains
+        """Converting a `MiniBatch` into a DGL MiniBatch that contains
         everything necessary for computation."
         """
         minibatch = DGLMiniBatch(
@@ -298,13 +298,10 @@ class MiniBatch:
         )
         assert (
             minibatch.blocks is not None
-        ), "Sampled subgraphs for computation are Missing."
+        ), "Sampled subgraphs for computation are missing."
 
         # For link prediction tasks.
         if self.compacted_node_pairs is not None:
-            assert (
-                self.compacted_node_pairs is not None
-            ), "Evaluate graph for Computation in link prediction task is Missing."
             minibatch.positive_node_pairs = self.compacted_node_pairs
             # Build negative graph.
             if (
