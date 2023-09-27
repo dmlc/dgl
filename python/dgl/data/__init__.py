@@ -75,10 +75,13 @@ from .heterophilous_graphs import (
 # Exception handling was added to prevent crashes for users who are using other
 # datasets.
 try:
-    from .lrgb import PeptidesFunctionalDataset, PeptidesStructuralDataset
+    from .lrgb import (
+        PeptidesFunctionalDataset,
+        PeptidesStructuralDataset,
+        VOCSuperpixelsDataset,
+    )
 except ImportError:
     pass
-from .lrgb import VOCSuperpixelsDataset
 from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset

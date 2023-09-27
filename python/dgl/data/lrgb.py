@@ -491,7 +491,8 @@ class VOCSuperpixelsDataset(DGLDataset):
         Default: "train".
     construct_format : str, optional
         Option to select the graph construction format.
-        Should be chosen from ["edge_wt_only_coord", "edge_wt_coord_feat", "edge_wt_region_boundary"]
+        Should be chosen from ["edge_wt_only_coord", "edge_wt_coord_feat",
+        "edge_wt_region_boundary"]
         "edge_wt_only_coord": the graphs are 8-nn graphs with the edge weights
         computed based on only spatial coordinates of superpixel nodes.
         "edge_wt_coord_feat": the graphs are 8-nn graphs with the edge weights
