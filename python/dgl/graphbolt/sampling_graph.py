@@ -11,10 +11,9 @@ class SamplingGraph:
 
     @property
     def num_nodes(self) -> Union[int, Dict[str, int]]:
-        """
-        >   For a homogenous graph, returns the number of nodes in it.
-        >   For a Heterogenous graph, returns a dictionary indicating
-            the numbers of all types of nodes in it.
+        """The number of nodes in the graph.
+        - If the graph is homogenous, returns an integer.
+        - If the graph is heterogenous, returns a dictionary.
 
         Returns
         -------
@@ -27,16 +26,15 @@ class SamplingGraph:
 
     @property
     def num_edges(self) -> Union[int, Dict[str, int]]:
-        """
-        >   For a homogenous graph, returns the number of edges in it.
-        >   For a Heterogenous graph, returns a dictionary indicating
-            the numbers of all types of edges in it.
+        """The number of edges in the graph.
+        - If the graph is homogenous, returns an integer.
+        - If the graph is heterogenous, returns a dictionary.
 
         Returns
         -------
         Union[int, Dict[str, int]]
-            The number of edges in the entire graph (homogenous), or
-            a dictionary indicating the numbers of all types of edges
-            in the graph (heterogenous).
+            The number of edges. Integer indicates the total edges number of a
+            homogenous graph; dict indicates edges number per edge types of a
+            heterogenous graph.
         """
         raise NotImplementedError
