@@ -169,7 +169,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Step-4]:
-    # gb.MultiProcessDataLoader()
+    # gb.to_dgl()
     # [Input]:
     # 'datapipe': The previous datapipe object.
     # [Output]:
@@ -205,19 +205,10 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     return dataloader
 
 
-# TODO[Keli]: Remove this helper function later.
 def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
     """Convert the minibatch to a training pair and a label tensor."""
-    batch_size = data.compacted_node_pairs[0].shape[0]
-    neg_ratio = data.compacted_negative_dsts.shape[0] // batch_size
-
-    pos_src, pos_dst = data.compacted_node_pairs
-    if data.compacted_negative_srcs is None:
-        neg_src = pos_src.repeat_interleave(neg_ratio, dim=0)
-    else:
-        neg_src = data.compacted_negative_srcs
-    neg_dst = data.compacted_negative_dsts
-
+    pos_src, pos_dst = data.positive_node_pairs
+    neg_src, neg_dst = data.negative_node_pairs
     node_pairs = (
         torch.cat((pos_src, neg_src), dim=0),
         torch.cat((pos_dst, neg_dst), dim=0),
