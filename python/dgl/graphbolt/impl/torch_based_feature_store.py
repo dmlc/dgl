@@ -59,7 +59,7 @@ class TorchBasedFeature(Feature):
             f"but got {type(torch_feature)}."
         )
         assert torch_feature.dim() > 1, (
-            f"dimension of torch_feature in TorchBasedFeature must be greater"
+            f"dimension of torch_feature in TorchBasedFeature must be greater "
             f"than 1, but got {torch_feature.dim()} dimension."
         )
         self._tensor = torch_feature
