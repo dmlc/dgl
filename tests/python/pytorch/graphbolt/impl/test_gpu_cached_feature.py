@@ -35,9 +35,9 @@ def test_gpu_cached_feature():
     )
 
     # Test update the entire feature.
-    feat_store_a.update(torch.tensor([[0.0, 1.0, 2.0], [3.0, 5.0, 2.0]]).to(
-        "cuda"
-    ))
+    feat_store_a.update(
+        torch.tensor([[0.0, 1.0, 2.0], [3.0, 5.0, 2.0]]).to("cuda")
+    )
     assert torch.equal(
         feat_store_a.read(),
         torch.tensor([[0.0, 1.0, 2.0], [3.0, 5.0, 2.0]]).to("cuda"),
