@@ -1702,7 +1702,7 @@ def test_BuiltinDataset():
         # Case 1: download from DGL S3 storage.
         dataset_name = "test-only"
         # Add test-only dataset to the builtin dataset list for testing only.
-        gb.BuiltinDataset._datasets.append(dataset_name)
+        gb.BuiltinDataset._all_datasets.append(dataset_name)
         dataset = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
         assert dataset.graph is not None
         assert dataset.feature is not None
