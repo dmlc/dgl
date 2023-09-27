@@ -1,11 +1,59 @@
 import dgl
 import dgl.graphbolt as gb
+import pytest
 import torch
 
 
-def test_to_dgl_blocks_hetero():
-    relation = "A:r:B"
-    reverse_relation = "B:rr:A"
+relation = "A:r:B"
+reverse_relation = "B:rr:A"
+
+
+def create_homo_minibatch():
+    node_pairs = [
+        (
+            torch.tensor([0, 1, 2, 2, 2, 1]),
+            torch.tensor([0, 1, 1, 2, 3, 2]),
+        ),
+        (
+            torch.tensor([0, 1, 2]),
+            torch.tensor([1, 0, 0]),
+        ),
+    ]
+    original_column_node_ids = [
+        torch.tensor([10, 11, 12, 13]),
+        torch.tensor([10, 11]),
+    ]
+    original_row_node_ids = [
+        torch.tensor([10, 11, 12, 13]),
+        torch.tensor([10, 11, 12]),
+    ]
+    original_edge_ids = [
+        torch.tensor([19, 20, 21, 22, 25, 30]),
+        torch.tensor([10, 15, 17]),
+    ]
+    node_features = {"x": torch.randint(0, 10, (4,))}
+    edge_features = [
+        {"x": torch.randint(0, 10, (6,))},
+        {"x": torch.randint(0, 10, (3,))},
+    ]
+    subgraphs = []
+    for i in range(2):
+        subgraphs.append(
+            gb.SampledSubgraphImpl(
+                node_pairs=node_pairs[i],
+                original_column_node_ids=original_column_node_ids[i],
+                original_row_node_ids=original_row_node_ids[i],
+                original_edge_ids=original_edge_ids[i],
+            )
+        )
+    return gb.MiniBatch(
+        sampled_subgraphs=subgraphs,
+        node_features=node_features,
+        edge_features=edge_features,
+    )
+
+
+def create_hetero_minibatch():
     node_pairs = [
         {
             relation: (torch.tensor([0, 1, 1]), torch.tensor([0, 1, 2])),
@@ -51,92 +99,11 @@ def test_to_dgl_blocks_hetero():
                 original_edge_ids=original_edge_ids[i],
             )
         )
-    blocks = gb.MiniBatch(
+    return gb.MiniBatch(
         sampled_subgraphs=subgraphs,
         node_features=node_features,
         edge_features=edge_features,
-    ).to_dgl_blocks()
-
-    etype = gb.etype_str_to_tuple(relation)
-    for i, block in enumerate(blocks):
-        edges = block.edges(etype=etype)
-        assert torch.equal(edges[0], node_pairs[i][relation][0])
-        assert torch.equal(edges[1], node_pairs[i][relation][1])
-        assert torch.equal(
-            block.edges[etype].data[dgl.EID], original_edge_ids[i][relation]
-        )
-        assert torch.equal(
-            block.edges[etype].data["x"],
-            edge_features[i][(relation, "x")],
-        )
-    edges = blocks[0].edges(etype=gb.etype_str_to_tuple(reverse_relation))
-    assert torch.equal(edges[0], node_pairs[0][reverse_relation][0])
-    assert torch.equal(edges[1], node_pairs[0][reverse_relation][1])
-    assert torch.equal(
-        blocks[0].srcdata[dgl.NID]["A"], original_row_node_ids[0]["A"]
     )
-    assert torch.equal(
-        blocks[0].srcdata[dgl.NID]["B"], original_row_node_ids[0]["B"]
-    )
-    assert torch.equal(
-        blocks[0].srcnodes["A"].data["x"], node_features[("A", "x")]
-    )
-
-
-test_to_dgl_blocks_hetero()
-
-
-def test_to_dgl_blocks_homo():
-    node_pairs = [
-        (
-            torch.tensor([0, 1, 2, 2, 2, 1]),
-            torch.tensor([0, 1, 1, 2, 3, 2]),
-        ),
-        (
-            torch.tensor([0, 1, 2]),
-            torch.tensor([1, 0, 0]),
-        ),
-    ]
-    original_column_node_ids = [
-        torch.tensor([10, 11, 12, 13]),
-        torch.tensor([10, 11]),
-    ]
-    original_row_node_ids = [
-        torch.tensor([10, 11, 12, 13]),
-        torch.tensor([10, 11, 12]),
-    ]
-    original_edge_ids = [
-        torch.tensor([19, 20, 21, 22, 25, 30]),
-        torch.tensor([10, 15, 17]),
-    ]
-    node_features = {"x": torch.randint(0, 10, (4,))}
-    edge_features = [
-        {"x": torch.randint(0, 10, (6,))},
-        {"x": torch.randint(0, 10, (3,))},
-    ]
-    subgraphs = []
-    for i in range(2):
-        subgraphs.append(
-            gb.SampledSubgraphImpl(
-                node_pairs=node_pairs[i],
-                original_column_node_ids=original_column_node_ids[i],
-                original_row_node_ids=original_row_node_ids[i],
-                original_edge_ids=original_edge_ids[i],
-            )
-        )
-    blocks = gb.MiniBatch(
-        sampled_subgraphs=subgraphs,
-        node_features=node_features,
-        edge_features=edge_features,
-    ).to_dgl_blocks()
-
-    for i, block in enumerate(blocks):
-        assert torch.equal(block.edges()[0], node_pairs[i][0])
-        assert torch.equal(block.edges()[1], node_pairs[i][1])
-        assert torch.equal(block.edata[dgl.EID], original_edge_ids[i])
-        assert torch.equal(block.edata["x"], edge_features[i]["x"])
-    assert torch.equal(blocks[0].srcdata[dgl.NID], original_row_node_ids[0])
-    assert torch.equal(blocks[0].srcdata["x"], node_features["x"])
 
 
 def test_representation():
@@ -251,3 +218,164 @@ def test_representation():
     )
     result = str(minibatch)
     assert result == expect_result, print(expect_result, result)
+
+
+def check_dgl_blocks_hetero(minibatch, blocks):
+    etype = gb.etype_str_to_tuple(relation)
+    node_pairs = [
+        subgraph.node_pairs for subgraph in minibatch.sampled_subgraphs
+    ]
+    original_edge_ids = [
+        subgraph.original_edge_ids for subgraph in minibatch.sampled_subgraphs
+    ]
+    original_row_node_ids = [
+        subgraph.original_row_node_ids
+        for subgraph in minibatch.sampled_subgraphs
+    ]
+
+    for i, block in enumerate(blocks):
+        edges = block.edges(etype=etype)
+        assert torch.equal(edges[0], node_pairs[i][relation][0])
+        assert torch.equal(edges[1], node_pairs[i][relation][1])
+        assert torch.equal(
+            block.edges[etype].data[dgl.EID], original_edge_ids[i][relation]
+        )
+    edges = blocks[0].edges(etype=gb.etype_str_to_tuple(reverse_relation))
+    assert torch.equal(edges[0], node_pairs[0][reverse_relation][0])
+    assert torch.equal(edges[1], node_pairs[0][reverse_relation][1])
+    assert torch.equal(
+        blocks[0].srcdata[dgl.NID]["A"], original_row_node_ids[0]["A"]
+    )
+    assert torch.equal(
+        blocks[0].srcdata[dgl.NID]["B"], original_row_node_ids[0]["B"]
+    )
+
+
+def check_dgl_blocks_homo(minibatch, blocks):
+    node_pairs = [
+        subgraph.node_pairs for subgraph in minibatch.sampled_subgraphs
+    ]
+    original_edge_ids = [
+        subgraph.original_edge_ids for subgraph in minibatch.sampled_subgraphs
+    ]
+    original_row_node_ids = [
+        subgraph.original_row_node_ids
+        for subgraph in minibatch.sampled_subgraphs
+    ]
+    for i, block in enumerate(blocks):
+        assert torch.equal(block.edges()[0], node_pairs[i][0])
+        assert torch.equal(block.edges()[1], node_pairs[i][1])
+        assert torch.equal(block.edata[dgl.EID], original_edge_ids[i])
+    assert torch.equal(blocks[0].srcdata[dgl.NID], original_row_node_ids[0])
+
+
+def test_to_dgl_node_classification_homo():
+    # Arrange
+    minibatch = create_homo_minibatch()
+    minibatch.seed_nodes = torch.tensor([10, 15])
+    minibatch.labels = torch.tensor([2, 5])
+    # Act
+    dgl_minibatch = minibatch.to_dgl()
+
+    # Assert
+    assert len(dgl_minibatch.blocks) == 2
+    assert minibatch.node_features is dgl_minibatch.node_features
+    assert minibatch.edge_features is dgl_minibatch.edge_features
+    assert minibatch.labels is dgl_minibatch.labels
+    assert minibatch.seed_nodes is dgl_minibatch.output_nodes
+    check_dgl_blocks_homo(minibatch, dgl_minibatch.blocks)
+
+
+def test_to_dgl_node_classification_hetero():
+    minibatch = create_hetero_minibatch()
+    minibatch.labels = {"B": torch.tensor([2, 5])}
+    minibatch.seed_nodes = {"B": torch.tensor([10, 15])}
+    dgl_minibatch = minibatch.to_dgl()
+
+    # Assert
+    assert len(dgl_minibatch.blocks) == 2
+    assert minibatch.node_features is dgl_minibatch.node_features
+    assert minibatch.edge_features is dgl_minibatch.edge_features
+    assert minibatch.labels is dgl_minibatch.labels
+    assert minibatch.seed_nodes is dgl_minibatch.output_nodes
+    check_dgl_blocks_hetero(minibatch, dgl_minibatch.blocks)
+
+
+@pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])
+def test_to_dgl_link_predication_homo(mode):
+    # Arrange
+    minibatch = create_homo_minibatch()
+    minibatch.compacted_node_pairs = (
+        torch.tensor([0, 1]),
+        torch.tensor([1, 0]),
+    )
+    if mode == "neg_graph" or mode == "neg_src":
+        minibatch.compacted_negative_srcs = torch.tensor([[0, 0], [1, 1]])
+    if mode == "neg_graph" or mode == "neg_dst":
+        minibatch.compacted_negative_dsts = torch.tensor([[1, 0], [0, 1]])
+    # Act
+    dgl_minibatch = minibatch.to_dgl()
+
+    # Assert
+    assert len(dgl_minibatch.blocks) == 2
+    assert minibatch.node_features is dgl_minibatch.node_features
+    assert minibatch.edge_features is dgl_minibatch.edge_features
+    assert minibatch.compacted_node_pairs is dgl_minibatch.positive_node_pairs
+    check_dgl_blocks_homo(minibatch, dgl_minibatch.blocks)
+    if mode == "neg_graph" or mode == "neg_src":
+        assert torch.equal(
+            dgl_minibatch.negative_node_pairs[0],
+            minibatch.compacted_negative_srcs.view(-1),
+        )
+    if mode == "neg_graph" or mode == "neg_dst":
+        assert torch.equal(
+            dgl_minibatch.negative_node_pairs[1],
+            minibatch.compacted_negative_dsts.view(-1),
+        )
+
+
+@pytest.mark.parametrize("mode", ["neg_graph", "neg_src", "neg_dst"])
+def test_to_dgl_link_predication_hetero(mode):
+    # Arrange
+    minibatch = create_hetero_minibatch()
+    minibatch.compacted_node_pairs = {
+        relation: (
+            torch.tensor([1, 1]),
+            torch.tensor([1, 0]),
+        ),
+        reverse_relation: (
+            torch.tensor([0, 1]),
+            torch.tensor([1, 0]),
+        ),
+    }
+    if mode == "neg_graph" or mode == "neg_src":
+        minibatch.compacted_negative_srcs = {
+            relation: torch.tensor([[2, 0], [1, 2]]),
+            reverse_relation: torch.tensor([[1, 2], [0, 2]]),
+        }
+    if mode == "neg_graph" or mode == "neg_dst":
+        minibatch.compacted_negative_dsts = {
+            relation: torch.tensor([[1, 3], [2, 1]]),
+            reverse_relation: torch.tensor([[2, 1], [3, 1]]),
+        }
+    # Act
+    dgl_minibatch = minibatch.to_dgl()
+
+    # Assert
+    assert len(dgl_minibatch.blocks) == 2
+    assert minibatch.node_features is dgl_minibatch.node_features
+    assert minibatch.edge_features is dgl_minibatch.edge_features
+    assert minibatch.compacted_node_pairs is dgl_minibatch.positive_node_pairs
+    check_dgl_blocks_hetero(minibatch, dgl_minibatch.blocks)
+    if mode == "neg_graph" or mode == "neg_src":
+        for etype, src in minibatch.compacted_negative_srcs.items():
+            assert torch.equal(
+                dgl_minibatch.negative_node_pairs[etype][0],
+                src.view(-1),
+            )
+    if mode == "neg_graph" or mode == "neg_dst":
+        for etype, dst in minibatch.compacted_negative_dsts.items():
+            assert torch.equal(
+                dgl_minibatch.negative_node_pairs[etype][1],
+                minibatch.compacted_negative_dsts[etype].view(-1),
+            )
