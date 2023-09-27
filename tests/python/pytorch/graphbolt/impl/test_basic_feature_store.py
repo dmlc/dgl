@@ -70,8 +70,8 @@ def test_basic_feature_store_errors():
     # Test error when dimension of the value is illegal.
     with pytest.raises(
         AssertionError,
-        match=r"dimension of torch_feature in TorchBasedFeature must be "
-            r"greater than 1, but got 1 dimension."
+        match=rf"dimension of torch_feature in TorchBasedFeature must be "
+            rf"greater than 1, but got {a.dim()} dimension.",
     ):
         features[("node", "paper", "a")] = gb.TorchBasedFeature(a)
     features[("node", "author", "b")] = gb.TorchBasedFeature(b)
