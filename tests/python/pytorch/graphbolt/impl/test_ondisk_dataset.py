@@ -961,8 +961,8 @@ def test_OnDiskDataset_Graph_homogeneous():
         dataset = gb.OnDiskDataset(test_dir).load()
         graph2 = dataset.graph
 
-        assert graph.num_nodes == graph2.num_nodes
-        assert graph.num_edges == graph2.num_edges
+        assert graph.total_num_nodes == graph2.total_num_nodes
+        assert graph.total_num_edges == graph2.total_num_edges
 
         assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
         assert torch.equal(graph.indices, graph2.indices)
@@ -1004,8 +1004,8 @@ def test_OnDiskDataset_Graph_heterogeneous():
         dataset = gb.OnDiskDataset(test_dir).load()
         graph2 = dataset.graph
 
-        assert graph.num_nodes == graph2.num_nodes
-        assert graph.num_edges == graph2.num_edges
+        assert graph.total_num_nodes == graph2.total_num_nodes
+        assert graph.total_num_edges == graph2.total_num_edges
 
         assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
         assert torch.equal(graph.indices, graph2.indices)
@@ -1076,8 +1076,8 @@ def test_OnDiskDataset_preprocess_homogeneous():
         csc_sampling_graph = gb.csc_sampling_graph.load_csc_sampling_graph(
             os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
         )
-        assert csc_sampling_graph.num_nodes == num_nodes
-        assert csc_sampling_graph.num_edges == num_edges
+        assert csc_sampling_graph.total_num_nodes == num_nodes
+        assert csc_sampling_graph.total_num_edges == num_edges
 
         num_samples = 100
         fanout = 1

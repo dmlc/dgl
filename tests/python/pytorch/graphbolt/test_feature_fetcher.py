@@ -7,8 +7,8 @@ from torchdata.datapipes.iter import Mapper
 def test_FeatureFetcher_invoke():
     # Prepare graph and required datapipes.
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
-    a = torch.randint(0, 10, (graph.num_nodes,))
-    b = torch.randint(0, 10, (graph.num_edges,))
+    a = torch.randint(0, 10, (graph.total_num_nodes,))
+    b = torch.randint(0, 10, (graph.total_num_edges,))
 
     features = {}
     keys = [("node", None, "a"), ("edge", None, "b")]
@@ -35,8 +35,8 @@ def test_FeatureFetcher_invoke():
 
 def test_FeatureFetcher_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
-    a = torch.randint(0, 10, (graph.num_nodes,))
-    b = torch.randint(0, 10, (graph.num_edges,))
+    a = torch.randint(0, 10, (graph.total_num_nodes,))
+    b = torch.randint(0, 10, (graph.total_num_edges,))
 
     features = {}
     keys = [("node", None, "a"), ("edge", None, "b")]
@@ -56,8 +56,8 @@ def test_FeatureFetcher_homo():
 
 def test_FeatureFetcher_with_edges_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
-    a = torch.randint(0, 10, (graph.num_nodes,))
-    b = torch.randint(0, 10, (graph.num_edges,))
+    a = torch.randint(0, 10, (graph.total_num_nodes,))
+    b = torch.randint(0, 10, (graph.total_num_edges,))
 
     def add_node_and_edge_ids(seeds):
         subgraphs = []
@@ -65,7 +65,9 @@ def test_FeatureFetcher_with_edges_homo():
             subgraphs.append(
                 gb.SampledSubgraphImpl(
                     node_pairs=(torch.tensor([]), torch.tensor([])),
-                    original_edge_ids=torch.randint(0, graph.num_edges, (10,)),
+                    original_edge_ids=torch.randint(
+                        0, graph.total_num_edges, (10,)
+                    ),
                 )
             )
         data = gb.MiniBatch(input_nodes=seeds, sampled_subgraphs=subgraphs)

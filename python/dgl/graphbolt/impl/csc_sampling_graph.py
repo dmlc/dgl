@@ -87,7 +87,7 @@ class CSCSamplingGraph:
         self._metadata = metadata
 
     @property
-    def num_nodes(self) -> int:
+    def total_num_nodes(self) -> int:
         """Returns the number of nodes in the graph.
 
         Returns
@@ -98,7 +98,7 @@ class CSCSamplingGraph:
         return self._c_csc_graph.num_nodes()
 
     @property
-    def num_edges(self) -> int:
+    def total_num_edges(self) -> int:
         """Returns the number of edges in the graph.
 
         Returns
@@ -116,7 +116,7 @@ class CSCSamplingGraph:
         -------
         torch.tensor
             The indices pointer in the CSC graph. An integer tensor with
-            shape `(num_nodes+1,)`.
+            shape `(total_num_nodes+1,)`.
         """
         return self._c_csc_graph.csc_indptr()
 
@@ -128,7 +128,7 @@ class CSCSamplingGraph:
         -------
         torch.tensor
             The indices in the CSC graph. An integer tensor with shape
-            `(num_edges,)`.
+            `(total_num_edges,)`.
 
         Notes
         -------
@@ -161,7 +161,7 @@ class CSCSamplingGraph:
         Returns
         -------
         torch.Tensor or None
-            If present, returns a 1D integer tensor of shape (num_edges,)
+            If present, returns a 1D integer tensor of shape (total_num_edges,)
             containing the type of each edge in the graph.
         """
         return self._c_csc_graph.type_per_edge()
@@ -377,7 +377,7 @@ class CSCSamplingGraph:
             probs_or_mask = self.edge_attributes[probs_name]
             assert probs_or_mask.dim() == 1, "Probs should be 1-D tensor."
             assert (
-                probs_or_mask.size(0) == self.num_edges
+                probs_or_mask.size(0) == self.total_num_edges
             ), "Probs should have the same number of elements as the number \
                 of edges."
             assert probs_or_mask.dtype in [
@@ -566,7 +566,7 @@ class CSCSamplingGraph:
                 - self.node_type_offset[dst_node_type_id]
             )
         else:
-            max_node_id = self.num_nodes
+            max_node_id = self.total_num_nodes
         return self._c_csc_graph.sample_negative_edges_uniform(
             node_pairs,
             negative_ratio,
@@ -606,10 +606,10 @@ def from_csc(
     ----------
     csc_indptr : torch.Tensor
         Pointer to the start of each row in the `indices`. An integer tensor
-        with shape `(num_nodes+1,)`.
+        with shape `(total_num_nodes+1,)`.
     indices : torch.Tensor
         Column indices of the non-zero elements in the CSC graph. An integer
-        tensor with shape `(num_edges,)`.
+        tensor with shape `(total_num_edges,)`.
     node_type_offset : Optional[torch.tensor], optional
         Offset of node types in the graph, by default None.
     type_per_edge : Optional[torch.tensor], optional
@@ -637,7 +637,7 @@ def from_csc(
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
-                     num_nodes=3, num_edges=7)
+                     total_num_nodes=3, total_num_edges=7)
     """
     if metadata and metadata.node_type_to_id and node_type_offset is not None:
         assert len(metadata.node_type_to_id) + 1 == node_type_offset.size(
@@ -683,7 +683,10 @@ def _csc_sampling_graph_str(graph: CSCSamplingGraph) -> str:
     """
     csc_indptr_str = str(graph.csc_indptr)
     indices_str = str(graph.indices)
-    meta_str = f"num_nodes={graph.num_nodes}, num_edges={graph.num_edges}"
+    meta_str = (
+        f"total_num_nodes={graph.total_num_nodes}, total_num_edges="
+        f"{graph.total_num_edges}"
+    )
     prefix = f"{type(graph).__name__}("
 
     def _add_indent(_str, indent):
