@@ -142,8 +142,7 @@ def test_SubgraphSampler_Node_Hetero(labor):
     sampler_dp = Sampler(item_sampler, graph, fanouts)
     assert len(list(sampler_dp)) == 2
     for minibatch in sampler_dp:
-        blocks = minibatch.to_dgl_blocks()
-        assert len(blocks) == num_layer
+        assert len(minibatch.sampled_subgraphs) == num_layer
 
 
 @pytest.mark.parametrize("labor", [False, True])
