@@ -123,6 +123,9 @@ def create_dataloader(
         node_feature_keys["institution"] = ["feat"]
     datapipe = datapipe.fetch_feature(features, node_feature_keys)
 
+    # Convert a mini-batch to dgl mini-batch for computing.
+    datapipe = datapipe.to_dgl_minibatch()
+
     # Move the mini-batch to the appropriate device.
     # `device`:
     #   The device to move the mini-batch to.
@@ -435,7 +438,7 @@ def extract_node_features(name, block, data, node_embed, device):
         )
     else:
         node_features = {
-            ntype: block.srcnodes[ntype].data["feat"]
+            ntype: data.node_features[(ntype, "feat")]
             for ntype in block.srctypes
         }
         # Original feature data are stored in float16 which is not supported
@@ -495,7 +498,7 @@ def evaluate(
     y_true = list()
 
     for data in tqdm(data_loader, desc="Inference"):
-        blocks = [block.to(device) for block in data.to_dgl_blocks()]
+        blocks = [block.to(device) for block in data.blocks]
         node_features = extract_node_features(
             name, blocks[0], data, node_embed, device
         )
@@ -563,10 +566,10 @@ def run(
         )
         for data in tqdm(data_loader, desc=f"Training~Epoch {epoch:02d}"):
             # Fetch the number of seed nodes in the batch.
-            num_seeds = data.seed_nodes[category].shape[0]
+            num_seeds = data.output_nodes[category].shape[0]
 
             # Convert MiniBatch to DGL Blocks.
-            blocks = [block.to(device) for block in data.to_dgl_blocks()]
+            blocks = [block.to(device) for block in data.blocks]
 
             # Extract the node features from embedding layer or raw features.
             node_features = extract_node_features(

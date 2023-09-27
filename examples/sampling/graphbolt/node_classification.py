@@ -140,7 +140,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Step-4]:
-    # gb.MultiProcessDataLoader()
+    # self.to_dgl_minibatch()
     # [Input]:
     # 'datapipe': The previous datapipe object.
     # [Output]:
@@ -148,7 +148,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Convert a mini-batch to dgl-minibatch.
     ############################################################################
-    datapipe = gb.DGLMiniBatchConverter(datapipe)
+    datapipe = datapipe.to_dgl_minibatch()
 
     ############################################################################
     # [Step-5]:

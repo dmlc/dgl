@@ -152,6 +152,18 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
+    # [Step-4]:
+    # gb.MultiProcessDataLoader()
+    # [Input]:
+    # 'datapipe': The previous datapipe object.
+    # [Output]:
+    # A DGLMiniBatch used for computing.
+    # [Role]:
+    # Convert a mini-batch to dgl-minibatch.
+    ############################################################################
+    datapipe = gb.to_dgl_minibatch()
+
+    ############################################################################
     # [Input]:
     # 'device': The device to copy the data to.
     # [Output]:
@@ -200,20 +212,6 @@ def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
     return (node_pairs, labels.float())
 
 
-# TODO[Keli]: Remove this helper function later.
-def to_dgl_blocks(sampled_subgraphs: gb.SampledSubgraphImpl):
-    """Convert sampled subgraphs to DGL blocks."""
-    blocks = [
-        dgl.create_block(
-            sampled_subgraph.node_pairs,
-            num_src_nodes=sampled_subgraph.original_row_node_ids.shape[0],
-            num_dst_nodes=sampled_subgraph.original_column_node_ids.shape[0],
-        )
-        for sampled_subgraph in sampled_subgraphs
-    ]
-    return blocks
-
-
 @torch.no_grad()
 def evaluate(args, graph, features, itemset, model):
     evaluator = Evaluator(name="ogbl-citation2")
@@ -232,7 +230,7 @@ def evaluate(args, graph, features, itemset, model):
         # Unpack MiniBatch.
         compacted_pairs, _ = to_binary_link_dgl_computing_pack(data)
         node_feature = data.node_features["feat"].float()
-        blocks = to_dgl_blocks(data.sampled_subgraphs)
+        blocks = data.blocks
 
         # Get the embeddings of the input nodes.
         y = model(blocks, node_feature)
@@ -270,7 +268,7 @@ def train(args, graph, features, train_set, valid_set, model):
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
             node_feature = data.node_features["feat"].float()
             # Convert sampled subgraphs to DGL blocks.
-            blocks = to_dgl_blocks(data.sampled_subgraphs)
+            blocks = data.blocks
 
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)

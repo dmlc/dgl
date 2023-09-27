@@ -31,4 +31,3 @@ def test_dgl_minibatch_converter():
     assert len(list(dataloader)) == N // B
     minibatch = next(iter(dataloader))
     assert isinstance(minibatch, gb.DGLMiniBatch)
-
