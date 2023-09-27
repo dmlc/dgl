@@ -29,14 +29,18 @@ def test_gpu_cached_feature():
     )
     assert torch.equal(
         feat_store_b.read(torch.tensor([1, 1]).to("cuda")),
-        torch.tensor([[[4.0, 5.0], [6.0, 7.0]], [[4.0, 5.0], [6.0, 7.0]]]).to("cuda"),
+        torch.tensor([[[4.0, 5.0], [6.0, 7.0]], [[4.0, 5.0], [6.0, 7.0]]]).to(
+            "cuda"
+        ),
     )
 
     # Test update the entire feature.
-    feat_store_a.update(torch.tensor([[0.0, 1.0, 2.0], [3.0, 5.0, 2.0]]).to("cuda"))
+    feat_store_a.update(torch.tensor([[0.0, 1.0, 2.0], [3.0, 5.0, 2.0]]).to(
+        "cuda"
+    ))
     assert torch.equal(
         feat_store_a.read(),
-        torch.tensor([[0.0, 1.0, 2.0], [3.0, 5.0, 2.0]]).to("cuda")
+        torch.tensor([[0.0, 1.0, 2.0], [3.0, 5.0, 2.0]]).to("cuda"),
     )
 
     # Test update with ids.
@@ -44,5 +48,6 @@ def test_gpu_cached_feature():
         torch.tensor([[2.0, 0.0, 1.0]]).to("cuda"), torch.tensor([0]).to("cuda")
     )
     assert torch.equal(
-        feat_store_a.read(), torch.tensor([[2.0, 0.0, 1.0], [3.0, 5.0, 2.0]]).to("cuda")
+        feat_store_a.read(),
+        torch.tensor([[2.0, 0.0, 1.0], [3.0, 5.0, 2.0]]).to("cuda"),
     )

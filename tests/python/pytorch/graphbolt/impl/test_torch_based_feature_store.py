@@ -36,12 +36,12 @@ def test_torch_based_feature(in_memory):
             feature_a.read(), torch.tensor([[1, 2, 3], [4, 5, 6]])
         )
         assert torch.equal(
-            feature_b.read(),
-            torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
+            feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
         )
         # Read the feature with ids.
         assert torch.equal(
-            feature_a.read(torch.tensor([0])), torch.tensor([[1, 2, 3]]),
+            feature_a.read(torch.tensor([0])),
+            torch.tensor([[1, 2, 3]]),
         )
         assert torch.equal(
             feature_b.read(torch.tensor([1])),
@@ -50,13 +50,11 @@ def test_torch_based_feature(in_memory):
         # Update the feature with ids.
         feature_a.update(torch.tensor([[0, 1, 2]]), torch.tensor([0]))
         assert torch.equal(
-            feature_a.read(),
-            torch.tensor([[0, 1, 2], [4, 5, 6]])
+            feature_a.read(), torch.tensor([[0, 1, 2], [4, 5, 6]])
         )
         feature_b.update(torch.tensor([[[1, 2], [3, 4]]]), torch.tensor([1]))
         assert torch.equal(
-            feature_b.read(),
-            torch.tensor([[[1, 2], [3, 4]], [[1, 2], [3, 4]]])
+            feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[1, 2], [3, 4]]])
         )
 
         with pytest.raises(IndexError):
@@ -142,6 +140,6 @@ def test_torch_based_feature_store(in_memory):
         feature_store = gb.TorchBasedFeatureStore(feature_data)
         assert torch.equal(
             feature_store.read("node", None, "a"),
-            torch.tensor([[1, 2, 4], [2, 5, 3]])
+            torch.tensor([[1, 2, 4], [2, 5, 3]]),
         )
         feature_store = None

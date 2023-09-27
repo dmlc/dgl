@@ -1,21 +1,20 @@
+import random
+
 import dgl.graphbolt as gb
 import gb_test_utils
 import torch
 from torchdata.datapipes.iter import Mapper
-import random
 
 
 def test_FeatureFetcher_invoke():
     # Prepare graph and required datapipes.
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
-    a = torch.tensor([
-        [random.randint(0, 10)]
-        for _ in range(graph.total_num_nodes)
-    ])
-    b = torch.tensor([
-        [random.randint(0, 10)]
-        for _ in range(graph.total_num_edges)
-    ])
+    a = torch.tensor(
+        [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
+    )
+    b = torch.tensor(
+        [[random.randint(0, 10)] for _ in range(graph.total_num_edges)]
+    )
 
     features = {}
     keys = [("node", None, "a"), ("edge", None, "b")]
@@ -42,14 +41,12 @@ def test_FeatureFetcher_invoke():
 
 def test_FeatureFetcher_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
-    a = torch.tensor([
-        [random.randint(0, 10)]
-        for _ in range(graph.total_num_nodes)
-    ])
-    b = torch.tensor([
-        [random.randint(0, 10)]
-        for _ in range(graph.total_num_edges)
-    ])
+    a = torch.tensor(
+        [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
+    )
+    b = torch.tensor(
+        [[random.randint(0, 10)] for _ in range(graph.total_num_edges)]
+    )
 
     features = {}
     keys = [("node", None, "a"), ("edge", None, "b")]
@@ -69,14 +66,12 @@ def test_FeatureFetcher_homo():
 
 def test_FeatureFetcher_with_edges_homo():
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
-    a = torch.tensor([
-        [random.randint(0, 10)]
-        for _ in range(graph.total_num_nodes)
-    ])
-    b = torch.tensor([
-        [random.randint(0, 10)]
-        for _ in range(graph.total_num_edges)
-    ])
+    a = torch.tensor(
+        [[random.randint(0, 10)] for _ in range(graph.total_num_nodes)]
+    )
+    b = torch.tensor(
+        [[random.randint(0, 10)] for _ in range(graph.total_num_edges)]
+    )
 
     def add_node_and_edge_ids(seeds):
         subgraphs = []

@@ -16,7 +16,8 @@ def test_basic_feature_store_homo():
 
     # Test read the entire feature.
     assert torch.equal(
-        feature_store.read("node", None, "a"), torch.tensor([[1, 2, 4], [2, 5, 3]])
+        feature_store.read("node", None, "a"),
+        torch.tensor([[1, 2, 4], [2, 5, 3]]),
     )
     assert torch.equal(
         feature_store.read("node", None, "b"),
@@ -30,7 +31,7 @@ def test_basic_feature_store_homo():
     )
     assert torch.equal(
         feature_store.read("node", None, "b", torch.tensor([0])),
-        torch.tensor([[[1, 2], [3, 4]]])
+        torch.tensor([[[1, 2], [3, 4]]]),
     )
 
 
