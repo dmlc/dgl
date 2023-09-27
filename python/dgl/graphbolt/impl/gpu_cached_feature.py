@@ -19,7 +19,6 @@ class GPUCachedFeature(Feature):
         ----------
         fallback_feature : Feature
             The fallback feature.
-            Note that its dimension should be greater than 1.
         cache_size : int
             The capacity of the GPU cache, the number of features to store.
 
@@ -27,13 +26,13 @@ class GPUCachedFeature(Feature):
         --------
         >>> import torch
         >>> from dgl import graphbolt as gb
-        >>> torch_feat = torch.tensor([range(0, 5), range(0, 5)]).to("cuda")
+        >>> torch_feat = torch.arange(10).reshape(2, -1).to("cuda")
         >>> cache_size = 5
         >>> fallback_feature = gb.TorchBasedFeature(torch_feat)
         >>> feature = gb.GPUCachedFeature(fallback_feature, cache_size)
         >>> feature.read()
         tensor([[0, 1, 2, 3, 4],
-            [0, 1, 2, 3, 4]], device='cuda:0')
+                [5, 6, 7, 8, 9]], device='cuda:0')
         >>> feature.read(torch.tensor([0]).to("cuda"))
         tensor([[0, 1, 2, 3, 4]], device='cuda:0')
         >>> feature.update(torch.tensor([[1 for _ in range(5)]]).to("cuda"),
@@ -106,11 +105,6 @@ class GPUCachedFeature(Feature):
                 value[:size].to("cuda").reshape(self.flat_shape),
             )
         else:
-            assert self._fallback_feature.read(ids).shape == value.shape, (
-                f"feature selected by ids and value must have the same size,"
-                f"but got {self._fallback_feature.read(ids).shape} "
-                f"and {value.shape}."
-            )
             self._fallback_feature.update(value, ids)
             self._feature.replace(
                 ids.to("cuda"), value.to("cuda").reshape(self.flat_shape)

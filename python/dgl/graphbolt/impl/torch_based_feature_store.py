@@ -29,11 +29,11 @@ class TorchBasedFeature(Feature):
         --------
         >>> import torch
         >>> from dgl import graphbolt as gb
-        >>> torch_feat = torch.tensor([range(0, 5), range(0, 5)])
+        >>> torch_feat = torch.arange(10).reshape(2, -1).to("cuda")
         >>> feature_store = gb.TorchBasedFeature(torch_feat)
         >>> feature_store.read()
         tensor([[0, 1, 2, 3, 4],
-                [0, 1, 2, 3, 4]])
+                [5, 6, 7, 8, 9]])
         >>> feature_store.read(torch.tensor([0]))
         tensor([[0, 1, 2, 3, 4]])
         >>> feature_store.update(torch.tensor([[1 for _ in range(5)]]),
@@ -45,13 +45,11 @@ class TorchBasedFeature(Feature):
         >>> import numpy as np
         >>> arr = np.arange(0, 5)
         >>> np.save("/tmp/arr.npy", arr)
-        >>> torch_feat = torch.as_tensor(np.load("/tmp/arr.npy",
-        ...                                      mmap_mode="r+")
-        ...                              for _ in range(2)])
+        >>> torch_feat = torch.as_tensor([np.load("/tmp/arr.npy",
+                                                  mmap_mode="r+")])
         >>> feature_store = gb.TorchBasedFeature(torch_feat)
         >>> feature_store.read()
-        tensor([[0, 1, 2, 3, 4],
-                [0, 1, 2, 3, 4]])
+        tensor([[0, 1, 2, 3, 4]])
         >>> feature_store.read(torch.tensor([0]))
         tensor([[0, 1, 2, 3, 4]])
         """
@@ -60,10 +58,9 @@ class TorchBasedFeature(Feature):
             f"torch_feature in TorchBasedFeature must be torch.Tensor, "
             f"but got {type(torch_feature)}."
         )
-        assert len(torch_feature.shape) > 1, (
-            f"dimension of torch_feature in TorchBasedFeature"
-            f"must be greater than 1, "
-            f"but got {len(torch_feature.shape)} dimension."
+        assert torch_feature.dim() > 1, (
+            f"dimension of torch_feature in TorchBasedFeature must be greater"
+            f"than 1, but got {len(torch_feature.shape)} dimension."
         )
         self._tensor = torch_feature
 
@@ -110,10 +107,11 @@ class TorchBasedFeature(Feature):
             )
             self._tensor[:] = value
         else:
-            assert self._tensor[ids].shape == value.shape, (
-                f"feature selected by ids and value must have the same size,"
-                f"but got {self._tensor[ids].shape} and {value.shape}."
+            assert ids.shape[0] == value.shape[0], (
+                f"ids and value must have the same length, "
+                f"but got {ids.shape[0]} and {value.shape[0]}."
             )
+            # [Todo] Check the value feature size matches tesnsor's one.
             self._tensor[ids] = value
 
 

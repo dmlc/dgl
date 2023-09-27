@@ -11,6 +11,7 @@ import pydantic
 import pytest
 import torch
 import yaml
+import random
 
 from dgl import graphbolt as gb
 
@@ -764,7 +765,10 @@ def test_OnDiskDataset_Feature_heterograph():
         node_data_paper = np.random.rand(1000, 10)
         node_data_paper_path = os.path.join(test_dir, "node_data_paper.npy")
         np.save(node_data_paper_path, node_data_paper)
-        node_data_label = np.random.randint(0, 10, size=1000)
+        node_data_label = torch.tensor([
+          [random.randint(0, 10)]
+          for _ in range(1000)
+        ])
         node_data_label_path = os.path.join(test_dir, "node_data_label.npy")
         np.save(node_data_label_path, node_data_label)
 
@@ -772,7 +776,10 @@ def test_OnDiskDataset_Feature_heterograph():
         edge_data_writes = np.random.rand(1000, 10)
         edge_data_writes_path = os.path.join(test_dir, "edge_writes_paper.npy")
         np.save(edge_data_writes_path, edge_data_writes)
-        edge_data_label = np.random.randint(0, 10, size=1000)
+        edge_data_label = torch.tensor([
+          [random.randint(0, 10)]
+          for _ in range(1000)
+        ])
         edge_data_label_path = os.path.join(test_dir, "edge_data_label.npy")
         np.save(edge_data_label_path, edge_data_label)
 
@@ -808,7 +815,7 @@ def test_OnDiskDataset_Feature_heterograph():
         yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
-
+        
         dataset = gb.OnDiskDataset(test_dir).load()
 
         # Verify feature data storage.
@@ -846,7 +853,10 @@ def test_OnDiskDataset_Feature_homograph():
         node_data_feat = np.random.rand(1000, 10)
         node_data_feat_path = os.path.join(test_dir, "node_data_feat.npy")
         np.save(node_data_feat_path, node_data_feat)
-        node_data_label = np.random.randint(0, 10, size=1000)
+        node_data_label = torch.tensor([
+          [random.randint(0, 10)]
+          for _ in range(1000)
+        ])
         node_data_label_path = os.path.join(test_dir, "node_data_label.npy")
         np.save(node_data_label_path, node_data_label)
 
@@ -854,7 +864,10 @@ def test_OnDiskDataset_Feature_homograph():
         edge_data_feat = np.random.rand(1000, 10)
         edge_data_feat_path = os.path.join(test_dir, "edge_data_feat.npy")
         np.save(edge_data_feat_path, edge_data_feat)
-        edge_data_label = np.random.randint(0, 10, size=1000)
+        edge_data_label = torch.tensor([
+          [random.randint(0, 10)]
+          for _ in range(1000)
+        ])
         edge_data_label_path = os.path.join(test_dir, "edge_data_label.npy")
         np.save(edge_data_label_path, edge_data_label)
 
@@ -1710,6 +1723,7 @@ def test_BuiltinDataset():
         assert dataset.dataset_name == dataset_name
 
         # Case 2: dataset is already downloaded.
+        
         dataset = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
         assert dataset.graph is not None
         assert dataset.feature is not None
