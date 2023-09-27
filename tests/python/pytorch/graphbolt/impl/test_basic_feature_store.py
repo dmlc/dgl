@@ -67,8 +67,11 @@ def test_basic_feature_store_errors():
     b = torch.tensor([[1, 2, 4], [2, 5, 3]])
 
     features = {}
-    # Test error when key does not exist.
-    with pytest.raises(AssertionError):
+    # Test error when dimension of the value is illegal.
+    with pytest.raises(
+        AssertionError,
+        match=rf"The dimension of the value is illegal."
+    ):
         features[("node", "paper", "a")] = gb.TorchBasedFeature(a)
     features[("node", "author", "b")] = gb.TorchBasedFeature(b)
 

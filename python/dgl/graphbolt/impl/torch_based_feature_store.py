@@ -43,13 +43,13 @@ class TorchBasedFeature(Feature):
                 [1, 1, 1, 1, 1]])
 
         >>> import numpy as np
-        >>> arr = np.arange(0, 5)
+        >>> arr = np.array([[1, 2], [3, 4]])
         >>> np.save("/tmp/arr.npy", arr)
-        >>> torch_feat = torch.as_tensor([np.load("/tmp/arr.npy",
-                                                  mmap_mode="r+")])
+        >>> torch_feat = torch.from_numpy(np.load("/tmp/arr.npy", mmap_mode="r+"))
         >>> feature_store = gb.TorchBasedFeature(torch_feat)
         >>> feature_store.read()
-        tensor([[0, 1, 2, 3, 4]])
+        tensor([[1, 2],
+                [3, 4]])
         >>> feature_store.read(torch.tensor([0]))
         tensor([[0, 1, 2, 3, 4]])
         """
@@ -60,7 +60,7 @@ class TorchBasedFeature(Feature):
         )
         assert torch_feature.dim() > 1, (
             f"dimension of torch_feature in TorchBasedFeature must be greater"
-            f"than 1, but got {len(torch_feature.shape)} dimension."
+            f"than 1, but got {torch_feature.dim()} dimension."
         )
         self._tensor = torch_feature
 
