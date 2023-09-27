@@ -141,6 +141,22 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Input]:
+    # 'gb.exclude_seed_edges': Function to exclude seed edges, optionally
+    # including their reverse edges, from the sampled subgraphs in the
+    # minibatch.
+    # [Output]:
+    # A MiniBatchTransformer object with excluded seed edges.
+    # [Role]:
+    # During the training phase of link prediction, negative edges are
+    # sampled. It's essential to exclude the seed edges from the process
+    # to ensure that positive samples are not inadvertently included within
+    # the negative samples.
+    ############################################################################
+    if is_train:
+        datapipe = datapipe.transform(gb.exclude_seed_edges)
+
+    ############################################################################
+    # [Input]:
     # 'features': The node features.
     # 'node_feature_keys': The node feature keys (list) to be fetched.
     # [Output]:
@@ -217,8 +233,8 @@ def evaluate(args, graph, features, itemset, model):
     evaluator = Evaluator(name="ogbl-citation2")
 
     # Since we need to evaluate the model, we need to set the number
-    # of layers to 1 and the fanout to -1.
-    args.fanout = [torch.LongTensor([-1])]
+    # of layers to 3 and the fanout to -1.
+    args.fanout = [-1] * 3
     dataloader = create_dataloader(
         args, graph, features, itemset, is_train=False
     )
@@ -290,6 +306,8 @@ def train(args, graph, features, train_set, valid_set, model):
                     f"Loss {(total_loss) / (step + 1):.4f}",
                     end="\n",
                 )
+            if step + 1 == args.early_stop:
+                break
 
     # Evaluate the model.
     print("Validation")
@@ -304,6 +322,12 @@ def parse_args():
     parser.add_argument("--neg-ratio", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument(
+        "--early-stop",
+        type=int,
+        default=0,
+        help="0 means no early stop, otherwise stop at the input-th step",
+    )
     parser.add_argument(
         "--fanout",
         type=str,

@@ -499,6 +499,10 @@ class BuiltinDataset(OnDiskDataset):
         more details in `ogbl-citation2
         <https://ogb.stanford.edu/docs/linkprop/#ogbl-citation2>`_.
 
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
     **ogbn-products**
         The ogbn-products dataset is an undirected and unweighted graph,
         representing an Amazon product co-purchasing network. See more details
