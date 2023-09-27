@@ -19,9 +19,9 @@ class SamplingGraph:
         Returns
         -------
         Union[int, Dict[str, int]]
-            The number of nodes in the entire graph (homogenous), or
-            a dictionary indicating the numbers of all types of nodes
-            in the graph (heterogenous).
+            The number of nodes. Integer indicates the total nodes number of a
+            homogenous graph; dict indicates nodes number per node types of a
+            heterogenous graph.
         """
         raise NotImplementedError
 
