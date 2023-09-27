@@ -71,7 +71,7 @@ def test_basic_feature_store_errors():
     with pytest.raises(
         AssertionError,
         match=rf"dimension of torch_feature in TorchBasedFeature must be "
-            rf"greater than 1, but got {a.dim()} dimension.",
+        rf"greater than 1, but got {a.dim()} dimension.",
     ):
         features[("node", "paper", "a")] = gb.TorchBasedFeature(a)
     features[("node", "author", "b")] = gb.TorchBasedFeature(b)
