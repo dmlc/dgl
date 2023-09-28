@@ -84,6 +84,7 @@ class CSCSamplingGraph(SamplingGraph):
     def __init__(
         self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
     ):
+        super.__init__()
         self._c_csc_graph = c_csc_graph
         self._metadata = metadata
 
@@ -145,7 +146,11 @@ class CSCSamplingGraph(SamplingGraph):
 
     @property
     def num_edges(self) -> Union[int, Dict[str, int]]:
-        """The number of edges in the graph.
+        """[NOT BEEN IMPLEMENTED YET]
+
+        TODO[Mingbang]: Discuss the implementation of this API.
+
+        The number of edges in the graph.
         - If the graph is homogenous, returns an integer.
         - If the graph is heterogenous, returns a dictionary.
 
