@@ -29,16 +29,16 @@ class TorchBasedFeature(Feature):
         --------
         >>> import torch
         >>> from dgl import graphbolt as gb
-        >>> torch_feat = torch.arange(10).reshape(2, -1).to("cuda")
-        >>> feature_store = gb.TorchBasedFeature(torch_feat)
-        >>> feature_store.read()
+        >>> torch_feat = torch.arange(10).reshape(2, -1)
+        >>> feature = gb.TorchBasedFeature(torch_feat)
+        >>> feature.read()
         tensor([[0, 1, 2, 3, 4],
                 [5, 6, 7, 8, 9]])
-        >>> feature_store.read(torch.tensor([0]))
+        >>> feature.read(torch.tensor([0]))
         tensor([[0, 1, 2, 3, 4]])
-        >>> feature_store.update(torch.tensor([[1 for _ in range(5)]]),
+        >>> feature.update(torch.tensor([[1 for _ in range(5)]]),
         ...                      torch.tensor([1]))
-        >>> feature_store.read(torch.tensor([0, 1]))
+        >>> feature.read(torch.tensor([0, 1]))
         tensor([[0, 1, 2, 3, 4],
                 [1, 1, 1, 1, 1]])
 
@@ -46,12 +46,12 @@ class TorchBasedFeature(Feature):
         >>> arr = np.array([[1, 2], [3, 4]])
         >>> np.save("/tmp/arr.npy", arr)
         >>> torch_feat = torch.from_numpy(np.load("/tmp/arr.npy", mmap_mode="r+"))
-        >>> feature_store = gb.TorchBasedFeature(torch_feat)
-        >>> feature_store.read()
+        >>> feature = gb.TorchBasedFeature(torch_feat)
+        >>> feature.read()
         tensor([[1, 2],
                 [3, 4]])
-        >>> feature_store.read(torch.tensor([0]))
-        tensor([[0, 1, 2, 3, 4]])
+        >>> feature.read(torch.tensor([0]))
+        tensor([[1, 2]])
         """
         super().__init__()
         assert isinstance(torch_feature, torch.Tensor), (
