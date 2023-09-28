@@ -45,6 +45,7 @@ Welcome to Deep Graph Library Tutorials and Documentation
    api/python/dgl.distributed
    api/python/dgl.function
    api/python/dgl.geometry
+   api/python/dgl.graphbolt
    api/python/nn-pytorch
    api/python/nn-tensorflow
    api/python/nn-mxnet

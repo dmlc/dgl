@@ -11,6 +11,7 @@ import yaml
 
 import dgl
 
+from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
@@ -29,7 +30,7 @@ from .ondisk_metadata import (
 )
 from .torch_based_feature_store import TorchBasedFeatureStore
 
-__all__ = ["OnDiskDataset", "preprocess_ondisk_dataset"]
+__all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
 
 
 def _copy_or_convert_data(
@@ -313,24 +314,36 @@ class OnDiskDataset(Dataset):
             train_set:
               - type: paper # could be null for homogeneous graph.
                 data: # multiple data sources could be specified.
-                  - format: numpy
+                  - name: node_pairs
+                    format: numpy
                     in_memory: true # If not specified, default to true.
-                    path: set/paper-train-src.npy
-                  - format: numpy
+                    path: set/paper-train-node_pairs.npy
+                  - name: labels
+                    format: numpy
                     in_memory: false
-                    path: set/paper-train-dst.npy
+                    path: set/paper-train-labels.npy
             validation_set:
               - type: paper
                 data:
-                  - format: numpy
+                  - name: node_pairs
+                    format: numpy
                     in_memory: true
-                    path: set/paper-validation.npy
+                    path: set/paper-validation-node_pairs.npy
+                  - name: labels
+                    format: numpy
+                    in_memory: true
+                    path: set/paper-validation-labels.npy
             test_set:
               - type: paper
                 data:
-                  - format: numpy
+                  - name: node_pairs
+                    format: numpy
                     in_memory: true
-                    path: set/paper-test.npy
+                    path: set/paper-test-node_pairs.npy
+                  - name: labels
+                    format: numpy
+                    in_memory: true
+                    path: set/paper-test-labels.npy
 
     Parameters
     ----------
@@ -461,3 +474,91 @@ class OnDiskDataset(Dataset):
                 )
             ret = ItemSetDict(data)
         return ret
+
+
+class BuiltinDataset(OnDiskDataset):
+    """GraphBolt builtin on-disk dataset.
+
+    This class is used to help download datasets from DGL S3 storage and load
+    them as ``OnDiskDataset``.
+
+    Available builtin datasets include:
+
+    **ogbn-mag**
+        The ogbn-mag dataset is a heterogeneous network composed of a subset of
+        the Microsoft Academic Graph (MAG). See more details in
+        `ogbn-mag <https://ogb.stanford.edu/docs/nodeprop/#ogbn-mag>`_.
+
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
+    **ogbl-citation2**
+        The ogbl-citation2 dataset is a directed graph, representing the
+        citation network between a subset of papers extracted from MAG. See
+        more details in `ogbl-citation2
+        <https://ogb.stanford.edu/docs/linkprop/#ogbl-citation2>`_.
+
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
+    **ogbn-products**
+        The ogbn-products dataset is an undirected and unweighted graph,
+        representing an Amazon product co-purchasing network. See more details
+        in `ogbn-products
+        https://ogb.stanford.edu/docs/nodeprop/#ogbn-products>`_.
+
+        .. note::
+            Reverse edges are added to the original graph.
+
+    **ogb-lsc-mag240m**
+        The ogb-lsc-mag240m dataset is a heterogeneous academic graph extracted
+        from the Microsoft Academic Graph (MAG). See more details in
+        `ogb-lsc-mag240m <https://ogb.stanford.edu/docs/lsc/mag240m/>`_.
+
+        .. note::
+            Reverse edges are added to the original graph.
+
+    Parameters
+    ----------
+    name : str
+        The name of the builtin dataset.
+    root : str, optional
+        The root directory of the dataset. Default ot ``datasets``.
+    """
+
+    # For dataset that is smaller than 30GB, we use the base url.
+    # Otherwise, we use the accelerated url.
+    _base_url = "https://data.dgl.ai/dataset/graphbolt/"
+    _accelerated_url = (
+        "https://dgl-data.s3-accelerate.amazonaws.com/dataset/graphbolt/"
+    )
+    _datasets = [
+        "ogbn-mag",
+        "ogbl-citation2",
+        "ogbn-products",
+    ]
+    _large_datasets = ["ogb-lsc-mag240m"]
+    _all_datasets = _datasets + _large_datasets
+
+    def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
+        dataset_dir = os.path.join(root, name)
+        if not os.path.exists(dataset_dir):
+            if name not in self._all_datasets:
+                raise RuntimeError(
+                    f"Dataset {name} is not available. Available datasets are "
+                    f"{self._all_datasets}."
+                )
+            url = (
+                self._accelerated_url
+                if name in self._large_datasets
+                else self._base_url
+            )
+            url += name + ".zip"
+            os.makedirs(root, exist_ok=True)
+            zip_file_path = os.path.join(root, name + ".zip")
+            download(url, path=zip_file_path)
+            extract_archive(zip_file_path, root, overwrite=True)
+            os.remove(zip_file_path)
+        super().__init__(dataset_dir)

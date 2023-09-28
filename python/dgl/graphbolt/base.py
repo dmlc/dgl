@@ -1,17 +1,20 @@
 """Base types and utilities for Graph Bolt."""
 
+from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
 from ..utils import recursive_apply
 
 __all__ = [
     "CANONICAL_ETYPE_DELIMITER",
+    "ORIGINAL_EDGE_ID",
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
 ]
 
 CANONICAL_ETYPE_DELIMITER = ":"
+ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
 
 
 def etype_tuple_to_str(c_etype):
@@ -53,6 +56,7 @@ def _to(x, device):
     return x.to(device) if hasattr(x, "to") else x
 
 
+@functional_datapipe("copy_to")
 class CopyTo(IterDataPipe):
     """DataPipe that transfers each element yielded from the previous DataPipe
     to the given device.

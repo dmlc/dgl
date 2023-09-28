@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project(dgl_sparse C CXX)
 
 # Find PyTorch cmake files and PyTorch versions with the python interpreter $PYTHON_INTERP
@@ -20,8 +20,11 @@ string(REPLACE "." ";" TORCH_VERSION_LIST ${TORCH_VER})
 list(GET TORCH_VERSION_LIST 0 TORCH_VERSION_MAJOR)
 list(GET TORCH_VERSION_LIST 1 TORCH_VERSION_MINOR)
 
+set(SPARSE_LINKER_LIBS "")
+
 if(USE_CUDA)
   add_definitions(-DDGL_USE_CUDA)
+  enable_language(CUDA)
 endif()
 
 set(Torch_DIR "${TORCH_PREFIX}/Torch")
@@ -32,17 +35,26 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3 -ggdb")
 
 set(LIB_DGL_SPARSE_NAME "dgl_sparse_pytorch_${TORCH_VER}")
+list(APPEND SPARSE_LINKER_LIBS ${TORCH_LIBRARIES})
 
 set(SPARSE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(SPARSE_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 file(GLOB SPARSE_HEADERS ${SPARSE_INCLUDE})
 file(GLOB SPARSE_SRC
   ${SPARSE_DIR}/*.cc
+  ${SPARSE_DIR}/cpu/*.cc
 )
+if(USE_CUDA)
+  file(GLOB SPARSE_CUDA_SRC
+    ${SPARSE_DIR}/cuda/*.cu
+  )
+  list(APPEND SPARSE_SRC ${SPARSE_CUDA_SRC})
+endif()
+
 add_library(${LIB_DGL_SPARSE_NAME} SHARED ${SPARSE_SRC} ${SPARSE_HEADERS})
 target_include_directories(
   ${LIB_DGL_SPARSE_NAME} PRIVATE ${SPARSE_DIR} ${SPARSE_HEADERS})
-target_link_libraries(${LIB_DGL_SPARSE_NAME} "${TORCH_LIBRARIES}")
+target_link_libraries(${LIB_DGL_SPARSE_NAME} ${SPARSE_LINKER_LIBS})
 target_compile_definitions(${LIB_DGL_SPARSE_NAME} PRIVATE TORCH_VERSION_MAJOR=${TORCH_VERSION_MAJOR})
 target_compile_definitions(${LIB_DGL_SPARSE_NAME} PRIVATE TORCH_VERSION_MINOR=${TORCH_VERSION_MINOR})
 

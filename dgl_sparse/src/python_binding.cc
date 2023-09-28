@@ -33,7 +33,10 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("transpose", &SparseMatrix::Transpose)
       .def("coalesce", &SparseMatrix::Coalesce)
       .def("has_duplicate", &SparseMatrix::HasDuplicate)
-      .def("is_diag", &SparseMatrix::HasDiag);
+      .def("is_diag", &SparseMatrix::HasDiag)
+      .def("index_select", &SparseMatrix::IndexSelect)
+      .def("range_select", &SparseMatrix::RangeSelect)
+      .def("sample", &SparseMatrix::Sample);
   m.def("from_coo", &SparseMatrix::FromCOO)
       .def("from_csr", &SparseMatrix::FromCSR)
       .def("from_csc", &SparseMatrix::FromCSC)

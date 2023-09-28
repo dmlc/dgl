@@ -236,25 +236,25 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   static c10::intrusive_ptr<CSCSamplingGraph> LoadFromSharedMemory(
       const std::string& shared_memory_name);
 
+  /**
+   * @brief Hold the shared memory objects of the the tensor metadata and data.
+   * @note Shared memory used to hold the tensor metadata and data of this
+   * class. By storing its shared memory objects, the graph controls the
+   * resources of shared memory, which will be released automatically when the
+   * graph is destroyed. This function is for internal use by CopyToSharedMemory
+   * and LoadFromSharedMemory. Please contact the DGL team if you need to use
+   * it.
+   * @param tensor_metadata_shm The shared memory objects of tensor metadata.
+   * @param tensor_data_shm The shared memory objects of tensor data.
+   */
+  void HoldSharedMemoryObject(
+      SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm);
+
  private:
   template <typename NumPickFn, typename PickFn>
   c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
       PickFn pick_fn) const;
-
-  /**
-   * @brief Build a CSCSamplingGraph from shared memory tensors.
-   *
-   * @param shared_memory_tensors A tuple of two share memory objects holding
-   * tensor meta information and data respectively, and a vector of optional
-   * tensors on shared memory.
-   *
-   * @return A new CSCSamplingGraph on shared memory.
-   */
-  static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryTensors(
-      std::tuple<
-          SharedMemoryPtr, SharedMemoryPtr,
-          std::vector<torch::optional<torch::Tensor>>>&& shared_memory_tensors);
 
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
@@ -294,12 +294,12 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   static constexpr int64_t SERIALIZED_METAINFO_SIZE_MAX = 32768;
 
   /**
-   * @brief Shared memory used to hold the tensor meta information and data of
-   * this class. By storing its shared memory objects, the graph controls the
+   * @brief Shared memory used to hold the tensor metadata and data of this
+   * class. By storing its shared memory objects, the graph controls the
    * resources of shared memory, which will be released automatically when the
    * graph is destroyed.
    */
-  SharedMemoryPtr tensor_meta_shm_, tensor_data_shm_;
+  SharedMemoryPtr tensor_metadata_shm_, tensor_data_shm_;
 };
 
 /**

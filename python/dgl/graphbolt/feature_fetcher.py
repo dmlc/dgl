@@ -2,10 +2,13 @@
 
 from typing import Dict
 
-from torchdata.datapipes.iter import Mapper
+from torch.utils.data import functional_datapipe
+
+from .minibatch_transformer import MiniBatchTransformer
 
 
-class FeatureFetcher(Mapper):
+@functional_datapipe("fetch_feature")
+class FeatureFetcher(MiniBatchTransformer):
     """A feature fetcher used to fetch features for node/edge in graphbolt."""
 
     def __init__(
@@ -49,15 +52,15 @@ class FeatureFetcher(Mapper):
 
         Parameters
         ----------
-        data : DataBlock
-            An instance of the 'DataBlock' class. Even if 'node_feature' or
+        data : MiniBatch
+            An instance of :class:`MiniBatch`. Even if 'node_feature' or
             'edge_feature' is already filled, it will be overwritten for
             overlapping features.
 
         Returns
         -------
-        DataBlock
-            An instance of 'DataBlock' filled with required features.
+        MiniBatch
+            An instance of :class:`MiniBatch` filled with required features.
         """
         data.node_features = {}
         num_layer = len(data.sampled_subgraphs) if data.sampled_subgraphs else 0
@@ -92,14 +95,14 @@ class FeatureFetcher(Mapper):
         # Read Edge features.
         if self.edge_feature_keys and data.sampled_subgraphs:
             for i, subgraph in enumerate(data.sampled_subgraphs):
-                if subgraph.reverse_edge_ids is None:
+                if subgraph.original_edge_ids is None:
                     continue
                 if is_heterogeneous:
                     for (
                         type_name,
                         feature_names,
                     ) in self.edge_feature_keys.items():
-                        edges = subgraph.reverse_edge_ids.get(type_name, None)
+                        edges = subgraph.original_edge_ids.get(type_name, None)
                         if edges is None:
                             continue
                         for feature_name in feature_names:
@@ -116,6 +119,6 @@ class FeatureFetcher(Mapper):
                             "edge",
                             None,
                             feature_name,
-                            subgraph.reverse_edge_ids,
+                            subgraph.original_edge_ids,
                         )
         return data

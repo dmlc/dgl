@@ -6,8 +6,7 @@ import torch
 
 from .._ffi import libinfo
 from .base import *
-from .data_block import *
-from .data_format import *
+from .minibatch import *
 from .dataloader import *
 from .dataset import *
 from .feature_fetcher import *
@@ -15,10 +14,16 @@ from .feature_store import *
 from .impl import *
 from .itemset import *
 from .item_sampler import *
+from .minibatch_transformer import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
-from .utils import unique_and_compact, unique_and_compact_node_pairs
+from .utils import (
+    add_reverse_edges,
+    exclude_seed_edges,
+    unique_and_compact,
+    unique_and_compact_node_pairs,
+)
 
 
 def load_graphbolt():

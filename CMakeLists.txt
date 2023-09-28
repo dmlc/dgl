@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
@@ -16,23 +16,11 @@ include(cmake/util/FindCUDA.cmake)
 # Options for building DGL.
 # NOTE: Please avoid editing this file to change build type. Instead, using
 # bash script/build_dgl.sh -e -t release to overwrite the value.
-dgl_option(
-    BUILD_TYPE
-    "Type of the build: dev, dogfood or release"
-    "dev"
-)
+dgl_option(BUILD_TYPE "Type of the build: dev, dogfood or release" "dev")
 message(STATUS "Build for ${BUILD_TYPE}")
 
-dgl_option(
-    USE_CUDA
-    "Build with CUDA"
-    OFF
-)
-dgl_option(
-    TORCH_PYTHON_INTERPS
-    "Python interpreter used to build tensoradapter and DGL sparse library"
-    python3
-)
+dgl_option(USE_CUDA "Build with CUDA" OFF)
+dgl_option(TORCH_PYTHON_INTERPS "Python interpreter for building sub-components" python3)
 
 # Conda build related options.
 dgl_option(EXTERNAL_DLPACK_PATH "Path to external dlpack" OFF)
@@ -271,8 +259,22 @@ list(APPEND DGL_SRC ${DGL_RPC_SRC})
 
 # Configure cuda
 if(USE_CUDA)
-  dgl_config_cuda(DGL_CUDA_SRC)
+  file(GLOB_RECURSE DGL_CUDA_SRC
+    src/array/cuda/*.cc
+    src/array/cuda/*.cu
+    src/array/cuda/uvm/*.cc
+    src/array/cuda/uvm/*.cu
+    src/kernel/cuda/*.cc
+    src/kernel/cuda/*.cu
+    src/partition/cuda/*.cu
+    src/runtime/cuda/*.cc
+    src/runtime/cuda/*.cu
+    src/geometry/cuda/*.cu
+    src/graph/transform/cuda/*.cu
+    src/graph/sampling/randomwalks/*.cu
+  )
   list(APPEND DGL_SRC ${DGL_CUDA_SRC})
+  dgl_config_cuda(DGL_LINKER_LIBS)
   cuda_add_library(dgl SHARED ${DGL_SRC})
 else(USE_CUDA)
   add_library(dgl SHARED ${DGL_SRC})
@@ -534,6 +536,8 @@ if(BUILD_GRAPHBOLT)
       ALL
       ${CMAKE_COMMAND} -E env
       CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
       BINDIR=${BINDIR}
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}
@@ -548,6 +552,8 @@ if(BUILD_GRAPHBOLT)
       ALL
       ${CMAKE_COMMAND} -E env
       CMAKE_COMMAND=${CMAKE_CMD}
+      CUDA_TOOLKIT_ROOT_DIR=${CUDA_TOOLKIT_ROOT_DIR}
+      USE_CUDA=${USE_CUDA}
       BINDIR=${CMAKE_CURRENT_BINARY_DIR}
       CFLAGS=${CMAKE_C_FLAGS}
       CXXFLAGS=${CMAKE_CXX_FLAGS}

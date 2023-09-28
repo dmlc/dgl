@@ -1,8 +1,11 @@
 """Uniform negative sampler for GraphBolt."""
 
+from torch.utils.data import functional_datapipe
+
 from ..negative_sampler import NegativeSampler
 
 
+@functional_datapipe("sample_uniform_negative")
 class UniformNegativeSampler(NegativeSampler):
     """
     Negative samplers randomly select negative destination nodes for each
@@ -17,9 +20,8 @@ class UniformNegativeSampler(NegativeSampler):
     def __init__(
         self,
         datapipe,
-        negative_ratio,
-        output_format,
         graph,
+        negative_ratio,
     ):
         """
         Initlization for a uniform negative sampler.
@@ -28,12 +30,10 @@ class UniformNegativeSampler(NegativeSampler):
         ----------
         datapipe : DataPipe
             The datapipe.
-        negative_ratio : int
-            The proportion of negative samples to positive samples.
-        output_format : LinkPredictionEdgeFormat
-            Determines the format of the output data.
         graph : CSCSamplingGraph
             The graph on which to perform negative sampling.
+        negative_ratio : int
+            The proportion of negative samples to positive samples.
 
         Examples
         --------
@@ -41,39 +41,21 @@ class UniformNegativeSampler(NegativeSampler):
         >>> indptr = torch.LongTensor([0, 2, 4, 5])
         >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
         >>> graph = gb.from_csc(indptr, indices)
-        >>> output_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
         >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
-        >>> item_set = gb.ItemSet(node_pairs)
+        >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
         >>> item_sampler = gb.ItemSampler(
             ...item_set, batch_size=1,
             ...)
         >>> neg_sampler = gb.UniformNegativeSampler(
-            ...item_sampler, 2, output_format, graph)
-        >>> for data in neg_sampler:
-            ...  print(data)
+            ...item_sampler, graph, 2)
+        >>> for minibatch in neg_sampler:
+            ...  print(minibatch.negative_srcs)
+            ...  print(minibatch.negative_dsts)
             ...
         (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([1, 0, 0]))
         (tensor([1, 1, 1]), tensor([2, 1, 2]), tensor([1, 0, 0]))
-
-        >>> from dgl import graphbolt as gb
-        >>> indptr = torch.LongTensor([0, 2, 4, 5])
-        >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
-        >>> graph = gb.from_csc(indptr, indices)
-        >>> output_format = gb.LinkPredictionEdgeFormat.CONDITIONED
-        >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
-        >>> item_set = gb.ItemSet(node_pairs)
-        >>> item_sampler = gb.ItemSampler(
-            ...item_set, batch_size=1,
-            ...)
-        >>> neg_sampler = gb.UniformNegativeSampler(
-            ...item_sampler, 2, output_format, graph)
-        >>> for data in neg_sampler:
-            ...  print(data)
-            ...
-        (tensor([0]), tensor([1]), tensor([[0, 0]]), tensor([[2, 1]]))
-        (tensor([1]), tensor([2]), tensor([[1, 1]]), tensor([[1, 2]]))
         """
-        super().__init__(datapipe, negative_ratio, output_format)
+        super().__init__(datapipe, negative_ratio)
         self.graph = graph
 
     def _sample_with_etype(self, node_pairs, etype=None):
