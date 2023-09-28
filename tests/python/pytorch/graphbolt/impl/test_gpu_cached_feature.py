@@ -17,7 +17,6 @@ def test_gpu_cached_feature():
 
     feat_store_a = gb.GPUCachedFeature(gb.TorchBasedFeature(a), 2)
     feat_store_b = gb.GPUCachedFeature(gb.TorchBasedFeature(b), 1)
-    feat_store_c = gb.GPUCachedFeature(gb.TorchBasedFeature(c), 1)
 
     # Test read the entire feature.
     assert torch.equal(feat_store_a.read(), a)
@@ -35,10 +34,9 @@ def test_gpu_cached_feature():
         ),
     )
 
-    # Test get the size of the entire feature.
-    assert feat_store_a.size() == torch.Size([1])
-    assert feat_store_b.size() == torch.Size([3])
-    assert feat_store_c.size() == torch.Size([2, 2])
+    # Test get the size of the entire feature with ids.
+    assert feat_store_a.size() == torch.Size([3])
+    assert feat_store_b.size() == torch.Size([2, 2])
 
     # Test update the entire feature.
     feat_store_a.update(

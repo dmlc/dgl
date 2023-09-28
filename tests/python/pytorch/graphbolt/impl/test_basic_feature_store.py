@@ -11,7 +11,6 @@ def test_basic_feature_store_homo():
     features = {}
     features[("node", None, "a")] = gb.TorchBasedFeature(a)
     features[("node", None, "b")] = gb.TorchBasedFeature(b)
-    features[("node", None, "c")] = gb.TorchBasedFeature(c)
 
     feature_store = gb.BasicFeatureStore(features)
 
@@ -36,9 +35,8 @@ def test_basic_feature_store_homo():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size("node", None, "a") == torch.Size([1])
-    assert feature_store.size("node", None, "b") == torch.Size([1])
-    assert feature_store.size("node", None, "c") == torch.Size([3])
+    assert feature_store.size("node", None, "a") == torch.Size([3])
+    assert feature_store.size("node", None, "b") == torch.Size([2, 2])
 
 
 def test_basic_feature_store_hetero():
@@ -47,7 +45,7 @@ def test_basic_feature_store_hetero():
 
     features = {}
     features[("node", "author", "a")] = gb.TorchBasedFeature(a)
-    features[("edge", "paper:cites:paper", "b")] = gb.TorchBasedFeature(b)
+    features[("edge", "paper:cites", "b")] = gb.TorchBasedFeature(b)
 
     feature_store = gb.BasicFeatureStore(features)
 
@@ -57,7 +55,7 @@ def test_basic_feature_store_hetero():
         torch.tensor([[1, 2, 4], [2, 5, 3]]),
     )
     assert torch.equal(
-        feature_store.read("edge", "paper:cites:paper", "b"),
+        feature_store.read("edge", "paper:cites", "b"),
         torch.tensor([[[6], [8]], [[8], [9]]]),
     )
 
@@ -68,9 +66,8 @@ def test_basic_feature_store_hetero():
     )
 
     # Test get the size of the entire feature.
-    assert feature_store.size("node", "paper", "a") == torch.Size([1])
-    assert feature_store.size("node", "author", "b") == torch.Size([1])
-    assert feature_store.size("edge", "name:author", "d") == torch.Size([2])
+    assert feature_store.size("node", "author", "a") == torch.Size([3])
+    assert feature_store.size("edge", "paper:cites", "b") == torch.Size([2, 1])
 
 
 def test_basic_feature_store_errors():

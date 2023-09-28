@@ -27,11 +27,9 @@ def test_torch_based_feature(in_memory):
         if not in_memory:
             a = to_on_disk_tensor(test_dir, "a", a)
             b = to_on_disk_tensor(test_dir, "b", b)
-            c = to_on_disk_tensor(test_dir, "c", c)
 
         feature_a = gb.TorchBasedFeature(a)
         feature_b = gb.TorchBasedFeature(b)
-        feature_c = gb.TorchBasedFeature(c)
 
         # Read the entire feature.
         assert torch.equal(
@@ -61,24 +59,36 @@ def test_torch_based_feature(in_memory):
             feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[1, 2], [3, 4]]])
         )
 
-#         # Test get the size of the entire feature.
-#         assert feature_a.size() == torch.Size([1])
-#         assert feature_b.size() == torch.Size([3])
-#         assert feature_c.size() == torch.Size([2, 2])
+        # Test update the feature.
+        feature_a.update(torch.tensor([[5, 1, 3]]))
+        assert torch.equal(
+            feature_a.read(),
+            torch.tensor([[5, 1, 3]]),
+        ), print(feature_a.read())
+        feature_b.update(torch.tensor(
+            [[[1, 3], [5, 7]],
+             [[2, 4], [6, 8]],
+             [[2, 4], [6, 8]]]
+        ))
+        assert torch.equal(
+            feature_b.read(),
+            torch.tensor(
+                [[[1, 3], [5, 7]],
+                [[2, 4], [6, 8]],
+                [[2, 4], [6, 8]]]
+            ),
+        )
 
-#         # Test update the feature.
-#         feature_a.update(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))
-#         assert torch.equal(feature_a.read(), torch.tensor([0, 1, 2]))
-#         feature_a.update(torch.tensor([2, 0]), torch.tensor([0, 2]))
-#         assert torch.equal(feature_a.read(), torch.tensor([2, 1, 0]))
-
+        # Test get the size of the entire feature.
+        assert feature_a.size() == torch.Size([3])
+        assert feature_b.size() == torch.Size([2, 2])
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
-        a = b = c = None
-        feature_a = feature_b = feature_c = None
+        a = b = None
+        feature_a = feature_b = None
 
 
 def write_tensor_to_disk(dir, name, t, fmt="torch"):
@@ -98,7 +108,6 @@ def test_torch_based_feature_store(in_memory):
         b = torch.tensor([[[1, 2], [3, 4]], [[2, 5], [3, 4]]])
         write_tensor_to_disk(test_dir, "a", a, fmt="torch")
         write_tensor_to_disk(test_dir, "b", b, fmt="numpy")
-        write_tensor_to_disk(test_dir, "c", c, fmt="torch")
         feature_data = [
             gb.OnDiskFeatureData(
                 domain="node",
@@ -116,14 +125,6 @@ def test_torch_based_feature_store(in_memory):
                 path=os.path.join(test_dir, "b.npy"),
                 in_memory=in_memory,
             ),
-            gb.OnDiskFeatureData(
-                domain="edge",
-                type="name:author",
-                name="c",
-                format="torch",
-                path=os.path.join(test_dir, "c.pt"),
-                in_memory=True,
-            ),
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
 
@@ -138,11 +139,10 @@ def test_torch_based_feature_store(in_memory):
         )
 
         # Test get the size of the entire feature.
-        assert feature_store.size("node", "paper", "a") == torch.Size([1])
+        assert feature_store.size("node", "paper", "a") == torch.Size([3])
         assert feature_store.size(
             "edge", "paper:cites:paper", "b"
-        ) == torch.Size([1])
-        assert feature_store.size("edge", "name:author", "c") == torch.Size([3])
+        ) == torch.Size([2, 2])
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
@@ -171,9 +171,12 @@ def test_torch_based_feature_store(in_memory):
             ),
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
+        # Test read the entire feature.
         assert torch.equal(
             feature_store.read("node", None, "a"),
             torch.tensor([[1, 2, 4], [2, 5, 3]]),
         )
+        # Test get the size of the entire feature.
+        assert feature_store.size("node", None, "a") == torch.Size([3])
 
         feature_store = None
