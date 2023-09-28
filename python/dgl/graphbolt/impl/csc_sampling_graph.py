@@ -142,7 +142,7 @@ class CSCSamplingGraph(SamplingGraph):
                 return num_nodes_per_type
             else:  # Homogenous.
                 return self._c_csc_graph.num_nodes()
-            
+
     @property
     def num_edges(self) -> Union[int, Dict[str, int]]:
         """The number of edges in the graph.
