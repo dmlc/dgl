@@ -142,6 +142,21 @@ class CSCSamplingGraph(SamplingGraph):
                 return num_nodes_per_type
             else:  # Homogenous.
                 return self._c_csc_graph.num_nodes()
+            
+    @property
+    def num_edges(self) -> Union[int, Dict[str, int]]:
+        """The number of edges in the graph.
+        - If the graph is homogenous, returns an integer.
+        - If the graph is heterogenous, returns a dictionary.
+
+        Returns
+        -------
+        Union[int, Dict[str, int]]
+            The number of edges. Integer indicates the total edges number of a
+            homogenous graph; dict indicates edges number per edge types of a
+            heterogenous graph.
+        """
+        raise self.total_num_edges
 
     @property
     def csc_indptr(self) -> torch.tensor:
