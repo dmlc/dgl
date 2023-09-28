@@ -443,9 +443,8 @@ def extract_node_features(name, block, data, node_embed, device):
         }
         # Original feature data are stored in float16 while model weights are
         # float32, so we need to convert the features to float32.
-        # [TODO] Enable mixed precision training on GPU.
         node_features = {
-            k: v.float().to(device) for k, v in node_features.items()
+            k: v.to(device).float() for k, v in node_features.items()
         }
     return node_features
 
