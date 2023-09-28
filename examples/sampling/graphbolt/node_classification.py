@@ -140,7 +140,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Step-4]:
-    # self.to_dgl_minibatch()
+    # self.to_dgl()
     # [Input]:
     # 'datapipe': The previous datapipe object.
     # [Output]:
@@ -148,7 +148,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Convert a mini-batch to dgl-minibatch.
     ############################################################################
-    datapipe = datapipe.to_dgl_minibatch()
+    datapipe = datapipe.to_dgl()
 
     ############################################################################
     # [Step-5]:

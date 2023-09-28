@@ -18,7 +18,6 @@ from .minibatch_transformer import *
 from .negative_sampler import *
 from .sampled_subgraph import *
 from .subgraph_sampler import *
-from .dgl_minibatch_converter import *
 from .utils import (
     add_reverse_edges,
     exclude_seed_edges,

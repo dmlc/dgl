@@ -124,7 +124,7 @@ def create_dataloader(
     datapipe = datapipe.fetch_feature(features, node_feature_keys)
 
     # Convert a mini-batch to dgl mini-batch for computing.
-    datapipe = datapipe.to_dgl_minibatch()
+    datapipe = datapipe.to_dgl()
 
     # Move the mini-batch to the appropriate device.
     # `device`:

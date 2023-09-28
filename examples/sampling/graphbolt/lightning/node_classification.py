@@ -159,7 +159,7 @@ class DataModule(LightningDataModule):
         )
         datapipe = sampler(self.graph, self.fanouts)
         datapipe = datapipe.fetch_feature(self.feature_store, ["feat"])
-        datapipe = datapipe.to_dgl_minibatch()
+        datapipe = datapipe.to_dgl()
         dataloader = gb.MultiProcessDataLoader(
             datapipe, num_workers=self.num_workers
         )
