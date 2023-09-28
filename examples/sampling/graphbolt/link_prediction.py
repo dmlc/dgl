@@ -177,7 +177,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Convert a mini-batch to dgl-minibatch.
     ############################################################################
-    datapipe = gb.to_dgl()
+    datapipe = datapipe.to_dgl()
 
     ############################################################################
     # [Input]:
