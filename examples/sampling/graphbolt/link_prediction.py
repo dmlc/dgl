@@ -168,6 +168,18 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
+    # [Step-4]:
+    # gb.to_dgl()
+    # [Input]:
+    # 'datapipe': The previous datapipe object.
+    # [Output]:
+    # A DGLMiniBatch used for computing.
+    # [Role]:
+    # Convert a mini-batch to dgl-minibatch.
+    ############################################################################
+    datapipe = gb.to_dgl()
+
+    ############################################################################
     # [Input]:
     # 'device': The device to copy the data to.
     # [Output]:
@@ -193,19 +205,10 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     return dataloader
 
 
-# TODO[Keli]: Remove this helper function later.
 def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
     """Convert the minibatch to a training pair and a label tensor."""
-    batch_size = data.compacted_node_pairs[0].shape[0]
-    neg_ratio = data.compacted_negative_dsts.shape[0] // batch_size
-
-    pos_src, pos_dst = data.compacted_node_pairs
-    if data.compacted_negative_srcs is None:
-        neg_src = pos_src.repeat_interleave(neg_ratio, dim=0)
-    else:
-        neg_src = data.compacted_negative_srcs
-    neg_dst = data.compacted_negative_dsts
-
+    pos_src, pos_dst = data.positive_node_pairs
+    neg_src, neg_dst = data.negative_node_pairs
     node_pairs = (
         torch.cat((pos_src, neg_src), dim=0),
         torch.cat((pos_dst, neg_dst), dim=0),
@@ -234,7 +237,7 @@ def evaluate(args, graph, features, itemset, model):
         # Unpack MiniBatch.
         compacted_pairs, _ = to_binary_link_dgl_computing_pack(data)
         node_feature = data.node_features["feat"].float()
-        blocks = data.to_dgl_blocks()
+        blocks = data.blocks
 
         # Get the embeddings of the input nodes.
         y = model(blocks, node_feature)
@@ -272,7 +275,7 @@ def train(args, graph, features, train_set, valid_set, model):
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
             node_feature = data.node_features["feat"].float()
             # Convert sampled subgraphs to DGL blocks.
-            blocks = data.to_dgl_blocks()
+            blocks = data.blocks
 
             # Get the embeddings of the input nodes.
             y = model(blocks, node_feature)
