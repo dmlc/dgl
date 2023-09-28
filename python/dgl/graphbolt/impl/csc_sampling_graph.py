@@ -123,8 +123,26 @@ class CSCSamplingGraph(SamplingGraph):
             homogenous graph; dict indicates nodes number per node types of a
             heterogenous graph.
 
-        TODO[Mingbang]: Add code examples to demonstrate the usage of num_nodes
+        Examples
+        --------
+        >>> import dgl.graphbolt as gb, torch
+        >>> total_num_nodes = 5
+        >>> total_num_edges = 12
+        >>> ntypes = {"N0": 0, "N1": 1}
+        >>> etypes = {"N0:R0:N0": 0, "N0:R1:N1": 1,
+        ... "N1:R2:N0": 2, "N1:R3:N1": 3}
+        >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+        >>> node_type_offset = torch.LongTensor([0, 2, 5])
+        >>> type_per_edge = torch.LongTensor(
+        ... [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+        >>> metadata = gb.GraphMetadata(ntypes, etypes)
+        >>> graph = gb.from_csc(indptr, indices, node_type_offset,
+        ... type_per_edge, None, metadata)
+        >>> print(graph.num_nodes)
+        {'N0': tensor(2), 'N1': tensor(3)}
         """
+
         offset = self.node_type_offset
 
         # Homogenous.
