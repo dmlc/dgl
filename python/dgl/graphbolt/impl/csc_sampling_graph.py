@@ -84,7 +84,7 @@ class CSCSamplingGraph(SamplingGraph):
     def __init__(
         self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
     ):
-        super.__init__()
+        super().__init__()
         self._c_csc_graph = c_csc_graph
         self._metadata = metadata
 
