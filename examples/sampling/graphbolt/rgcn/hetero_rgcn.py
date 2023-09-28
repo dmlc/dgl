@@ -444,7 +444,9 @@ def extract_node_features(name, block, data, node_embed, device):
         # Original feature data are stored in float16 while model weights are
         # float32, so we need to convert the features to float32.
         # [TODO] Enable mixed precision training on GPU.
-        node_features = {k: v.float() for k, v in node_features.items()}
+        node_features = {
+            k: v.float().to(device) for k, v in node_features.items()
+        }
     return node_features
 
 
@@ -469,18 +471,6 @@ def evaluate(
     else:
         evaluator = MAG240MEvaluator()
 
-    # Initialize a neighbor sampler that samples all neighbors. The model
-    # has 2 GNN layers, so we create a sampler of 2 layers.
-    ######################################################################
-    # [Why we need to sample all neighbors?]
-    # During the testing phase, we use a `MultiLayerFullNeighborSampler` to
-    # sample all neighbors for each node. This is done to achieve the most
-    # accurate evaluation of the model's performance, despite the increased
-    # computational cost. This contrasts with the training phase where we
-    # prefer a balance between computational efficiency and model accuracy,
-    # hence only a subset of neighbors is sampled.
-    ######################################################################
-
     data_loader = create_dataloader(
         name,
         g,
@@ -488,7 +478,7 @@ def evaluate(
         item_set,
         device,
         batch_size=4096,
-        fanouts=[-1, -1],
+        fanouts=[25, 10],
         shuffle=False,
         num_workers=num_workers,
     )
