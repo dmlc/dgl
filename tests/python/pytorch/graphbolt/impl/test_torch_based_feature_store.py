@@ -65,17 +65,13 @@ def test_torch_based_feature(in_memory):
             feature_a.read(),
             torch.tensor([[5, 1, 3]]),
         ), print(feature_a.read())
-        feature_b.update(torch.tensor(
-            [[[1, 3], [5, 7]],
-             [[2, 4], [6, 8]],
-             [[2, 4], [6, 8]]]
-        ))
+        feature_b.update(
+            torch.tensor([[[1, 3], [5, 7]], [[2, 4], [6, 8]], [[2, 4], [6, 8]]])
+        )
         assert torch.equal(
             feature_b.read(),
             torch.tensor(
-                [[[1, 3], [5, 7]],
-                [[2, 4], [6, 8]],
-                [[2, 4], [6, 8]]]
+                [[[1, 3], [5, 7]], [[2, 4], [6, 8]], [[2, 4], [6, 8]]]
             ),
         )
 
