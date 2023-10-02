@@ -15,7 +15,7 @@ python3 hetero_rgcn.py --dataset ogbn-mag --num_gups 1
 ```
 
 ### Resource usage and time cost
-Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 96 vCPUs(Cascade Lake P-8259L), 8 NVIDIA T4 GPUs.
+Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 96 vCPUs(Cascade Lake P-8259L), 8 NVIDIA T4 GPUs(16GB RAM). CPU RAM usage is the peak value of `used` and `buff/cache` field of `free` command which are a bit rough. Please refer to `RSS`/`USS`/`PSS` which are more accurate. GPU RAM usage is the peak value recorded by `nvidia-smi` command.
 
 | Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
 | ------------ | ------------- | ----------- | ---------- | --------- | ---------------------------    |
@@ -34,22 +34,30 @@ Highest Valid: 34.69 ± 0.49
 
 ## Run on `ogb-lsc-mag240m` dataset
 
-### Command
+### Sample on CPU and train/infer on CPU
 ```
-python3 hetero_rgcn.py --dataset ogb-lsc-mag240m --runs 2
+python3 hetero_rgcn.py --dataset ogb-lsc-mag240m
 ```
 
-### Statistics of train/validation/test
-Below results are run on AWS EC2 r6idn.metal, 1024GB RAM, 128 vCPUs(Ice Lake 8375C), 0 GPUs.
+### Sample on CPU and train/infer on GPU
+```
+python3 hetero_rgcn.py --dataset ogb-lsc-mag240m --num_gups 1
+```
 
-| Dataset Size | Peak CPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set) |
-| ------------ | ------------- | ------------------------ | ------------------------- |
-| ~404GB       | ~110GB        | ~2min45s                 | ~28min25s + ~4min21s + ~2min54s   |
+### Resource usage and time cost
+Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 96 vCPUs(Cascade Lake P-8259L), 8 NVIDIA T4 GPUs(16GB RAM). CPU RAM usage is the peak value of `used` and `buff/cache` field of `free` command which are a bit rough. Please refer to `RSS`/`USS`/`PSS` which are more accurate. GPU RAM usage is the peak value recorded by `nvidia-smi` command.
 
+Infer with full neighbors on GPU is out of memory on `T4(16GB RAM)``. GPUs with larger memory is required such as `A100(40GB RAM)`.
+```
+Tried to allocate 21.72 GiB (GPU 0; 14.75 GiB total capacity; 12.30 GiB already allocated; 2.02 GiB free; 12.60 GiB reserved in total by PyTorch)
+```
 
-As labels are hidden for test set, test accuray is always **0.00**. Test submission is saved as `y_pred_mag240m_test-dev.npz` under current directory.
+| Dataset Size | CPU RAM Usage(used + buff/cache) | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
+| ------------ | ------------- | ----------- | ---------- | --------- | ---------------------------    |
+| ~404GB       | ~110GB + ~250GB       | 0           |  0GB       | ~5min22s(1087it, 3.37it/s)   | ~35min29s(272it, 7.83s/it) + ~6min9s(34it, 10.87s/it) + ~3min32s(22it, 9.66s/it)   |
+| ~404GB       | ~110GB + ~250GB        | 1           |  2.7GB     | ~2min45s(1087it, 6.56it/s)  | ~OOM + ~OOM + ~OOM  |
 
-As we can see from above table, the time per epoch is quite close to the one in `ogbn-mag`. This is due to no embedding layer is applied for `ogb-lsc-mag240m`. All required node features are generated in advance.
+### Accuracies
 ```
 Final performance: 
 All runs:
