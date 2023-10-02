@@ -8,7 +8,7 @@ from typing import Dict, Optional, Union
 
 import torch
 
-from ...base import ETYPE, EID
+from ...base import EID, ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
@@ -761,7 +761,7 @@ def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
 
     # Assign edge attributes according to the original eids mapping.
-    edge_attributes = {ORIGINAL_EDGE_ID : homo_g.edata[EID][edge_ids]}
+    edge_attributes = {ORIGINAL_EDGE_ID: homo_g.edata[EID][edge_ids]}
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
