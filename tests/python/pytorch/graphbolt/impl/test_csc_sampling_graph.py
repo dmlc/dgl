@@ -1182,6 +1182,22 @@ def test_from_dglgraph_homogeneous():
     dgl_g = dgl.rand_graph(1000, 10 * 1000)
     gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=True)
 
+    # Get the COO representation of the CSCSamplingGraph.
+    gb_coo = [
+        # row -> col.
+        (gb_g.indices[row_idx], torch.tensor(col))
+        for col in range(gb_g.num_nodes)
+        for row_idx in range(gb_g.csc_indptr[col], gb_g.csc_indptr[col + 1])
+    ]
+
+    # Use ORIGINAL_EDGE_ID to check if the edge mapping is correct.
+    for edge_idx in range(gb_g.num_edges):
+        original_edge_id = gb_g.edge_attributes[gb.ORIGINAL_EDGE_ID][edge_idx]
+        assert (
+            dgl_g.edges()[0][original_edge_id],
+            dgl_g.edges()[1][original_edge_id],
+        ) == gb_coo[edge_idx]
+
     assert gb_g.num_nodes == dgl_g.num_nodes()
     assert gb_g.num_edges == dgl_g.num_edges()
     assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 1000]))
@@ -1213,6 +1229,46 @@ def test_from_dglgraph_heterogeneous():
         }
     )
     gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=False)
+
+    # `reverse_node_id` is used to map the node id in CSCSamplingGraph to the
+    # node id in Hetero-DGLGraph.
+    reverse_node_id = {}
+    num_ntypes = len(gb_g.node_type_offset) - 1
+    for i in range(0, num_ntypes):
+        for j in range(gb_g.node_type_offset[i], gb_g.node_type_offset[i + 1]):
+            reverse_node_id[j] = torch.tensor(j) - gb_g.node_type_offset[i]
+
+    # Get the COO representation of the CSCSamplingGraph.
+    gb_coo = [
+        # row -> col.
+        (reverse_node_id[gb_g.indices[row_idx].item()], reverse_node_id[col])
+        for col in range(gb_g.num_nodes)
+        for row_idx in range(gb_g.csc_indptr[col], gb_g.csc_indptr[col + 1])
+    ]
+
+    # Check the order of etypes in DGLGraph is the same as CSCSamplingGraph.
+    assert (
+        # Since the etypes in CSCSamplingGraph is "srctype:etype:dsttype",
+        # we need to split the string and get the middle part.
+        list(
+            map(
+                lambda ss: ss.split(":")[1],
+                gb_g.metadata.edge_type_to_id.keys(),
+            )
+        )
+        == dgl_g.etypes
+    )
+
+    # Use ORIGINAL_EDGE_ID to check if the edge mapping is correct.
+    for edge_idx in range(gb_g.num_edges):
+        hetero_graph_idx = gb_g.type_per_edge[edge_idx]
+        original_edge_id = gb_g.edge_attributes[gb.ORIGINAL_EDGE_ID][edge_idx]
+        edge_type = dgl_g.etypes[hetero_graph_idx]
+        dgl_edge_pairs = dgl_g.edges(etype=edge_type)
+        assert (
+            dgl_edge_pairs[0][original_edge_id],
+            dgl_edge_pairs[1][original_edge_id],
+        ) == gb_coo[edge_idx]
 
     assert gb_g.num_nodes == dgl_g.num_nodes()
     assert gb_g.num_edges == dgl_g.num_edges()
