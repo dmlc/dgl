@@ -840,3 +840,17 @@ def test_diag_matrix_transpose(val_shape, mat_shape):
     if mat_shape is None:
         mat_shape = (val_shape[0], val_shape[0])
     assert mat.shape == mat_shape[::-1]
+
+
+import dgl.sparse as dglsp
+
+
+def test_device():
+    indices = torch.tensor([[1, 1, 2], [2, 3, 3]])
+    val = torch.arange(1, 4).float()
+    A = dglsp.spmatrix(indices, val, (3, 4))
+    X1 = torch.arange(0, 3 * 5 * 2).view(3, 5, 2).float()
+    X2 = torch.arange(0, 5 * 4 * 2).view(5, 4, 2).float()
+    X1 = X1.to("cuda:0")
+    X2 = X2.to("cuda:0")
+    dglsp.bsddmm(A, X1, X2)  # A is still on the CPU
