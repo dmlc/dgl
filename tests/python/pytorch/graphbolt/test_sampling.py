@@ -1,7 +1,7 @@
-import torch
 import dgl
 import dgl.graphbolt as gb
 import dgl.sparse as dglsp
+import torch
 
 
 def test_sampling():
@@ -13,27 +13,35 @@ def test_sampling():
         dgl.random.seed(seed)
 
     setup_seed(926)
-    indptr = torch.tensor([0, 0, 1, 3, 6,  8, 10])
+    indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
     indices = torch.tensor([5, 3, 3, 3, 3, 4, 4, 0, 5, 4])
 
-    matrix_a= dglsp.from_csc(indptr, indices)
+    matrix_a = dglsp.from_csc(indptr, indices)
     node_pairs = torch.t(torch.stack(matrix_a.coo()))
-    node_feature_data = torch.tensor([[0.9634, 0.2294],
-                                    [0.6172, 0.7865],
-                                    [0.2109, 0.1089],
-                                    [0.8672, 0.2276],
-                                    [0.5503, 0.8223],
-                                    [0.5160, 0.2486]])
-    edge_feature_data = torch.tensor([[0.5123, 0.1709, 0.6150],
-                                    [0.1476, 0.1902, 0.1314],
-                                    [0.2582, 0.5203, 0.6228],
-                                    [0.3708, 0.7631, 0.2683],
-                                    [0.2126, 0.7878, 0.7225],
-                                    [0.7885, 0.3414, 0.5485],
-                                    [0.4088, 0.8200, 0.1851],
-                                    [0.0056, 0.9469, 0.4432],
-                                    [0.8972, 0.7511, 0.3617],
-                                    [0.5773, 0.2199, 0.3366]])
+    node_feature_data = torch.tensor(
+        [
+            [0.9634, 0.2294],
+            [0.6172, 0.7865],
+            [0.2109, 0.1089],
+            [0.8672, 0.2276],
+            [0.5503, 0.8223],
+            [0.5160, 0.2486]
+        ]
+    )
+    edge_feature_data = torch.tensor(
+        [
+            [0.5123, 0.1709, 0.6150],
+            [0.1476, 0.1902, 0.1314],
+            [0.2582, 0.5203, 0.6228],
+            [0.3708, 0.7631, 0.2683],
+            [0.2126, 0.7878, 0.7225],
+            [0.7885, 0.3414, 0.5485],
+            [0.4088, 0.8200, 0.1851],
+            [0.0056, 0.9469, 0.4432],
+            [0.8972, 0.7511, 0.3617],
+            [0.5773, 0.2199, 0.3366]
+        ]
+    )
 
     item_set = gb.ItemSet(node_pairs, names="node_pairs")
     graph = gb.from_csc(indptr, indices)
@@ -41,21 +49,23 @@ def test_sampling():
     node_feature = gb.TorchBasedFeature(node_feature_data)
     edge_feature = gb.TorchBasedFeature(edge_feature_data)
     features = {
-        ("node", None, "feat") : node_feature,
-        ("edge", None, "feat") : edge_feature,
+        ("node", None, "feat"): node_feature,
+        ("edge", None, "feat"): edge_feature,
     }
     feature_store = gb.BasicFeatureStore(features)
     datapipe = gb.ItemSampler(item_set, batch_size=4)
     datapipe = datapipe.sample_uniform_negative(graph, 1)
     fanouts = torch.LongTensor([1])
     datapipe = datapipe.sample_neighbor(graph, [fanouts, fanouts], replace=True)
-    datapipe = datapipe.fetch_feature(feature_store, node_feature_keys=["feat"],
-                                      edge_feature_keys=["feat"])
+    datapipe = datapipe.fetch_feature(
+        feature_store, node_feature_keys=["feat"], edge_feature_keys=["feat"]
+    )
     dataloader = gb.SingleProcessDataLoader(
         datapipe,
     )
-    expected = [str(
-        """MiniBatch(seed_nodes=None,
+    expected = [
+        str(
+            """MiniBatch(seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(node_pairs=(tensor([5, 1, 0, 1, 4]), tensor([0, 1, 2, 3, 5])),
                                                 original_column_node_ids=tensor([5, 3, 1, 2, 0, 4]),
                                                 original_edge_ids=None,
@@ -87,9 +97,9 @@ def test_sampling():
           compacted_negative_srcs=tensor([0, 1, 1, 1]),
           compacted_negative_dsts=tensor([0, 3, 4, 5]),
        )"""
-       ),
+        ),
         str(
-        """MiniBatch(seed_nodes=None,
+            """MiniBatch(seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(node_pairs=(tensor([0, 2, 3, 3]), tensor([0, 1, 3, 4])),
                                                 original_column_node_ids=tensor([3, 4, 0, 5, 1]),
                                                 original_edge_ids=None,
@@ -120,9 +130,9 @@ def test_sampling():
           compacted_negative_srcs=tensor([0, 1, 1, 2]),
           compacted_negative_dsts=tensor([1, 3, 4, 1]),
        )"""
-       ),
+        ),
         str(
-        """MiniBatch(seed_nodes=None,
+            """MiniBatch(seed_nodes=None,
           sampled_subgraphs=[SampledSubgraphImpl(node_pairs=(tensor([1, 1, 2]), tensor([0, 1, 2])),
                                                 original_column_node_ids=tensor([5, 4, 3, 0]),
                                                 original_edge_ids=None,
