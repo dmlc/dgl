@@ -41,6 +41,8 @@ class TorchBasedFeature(Feature):
         >>> feature.read(torch.tensor([0, 1]))
         tensor([[0, 1, 2, 3, 4],
                 [1, 1, 1, 1, 1]])
+        >>> feature.size()
+        torch.Size([5])
 
         >>> import numpy as np
         >>> arr = np.array([[1, 2], [3, 4]])
