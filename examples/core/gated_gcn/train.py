@@ -124,8 +124,8 @@ if __name__ == "__main__":
     print(f"Training with DGL built-in GATConv module.")
 
     # Load ogb dataset & evaluator.
-    dataset = DglGraphPropPredDataset(name="ogbg-molhiv")
-    evaluator = Evaluator(name="ogbg-molhiv")
+    dataset = DglGraphPropPredDataset(name=args.dataset)
+    evaluator = Evaluator(name=args.dataset)
 
     if args.num_gpus > 0 and torch.cuda.is_available():
         device = torch.device("cuda")
@@ -159,12 +159,11 @@ if __name__ == "__main__":
         loss = train(model, device, train_loader, opt, loss_fn)
         t1 = time.time()
         # Evaluate the prediction.
-        evaluate(model, device, valid_loader, evaluator)
-        acc = evaluate(model, device, test_loader, evaluator)
+        val_acc = evaluate(model, device, valid_loader, evaluator)
         print(
             "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} | Time {:.4f}".format(
-                epoch, loss, acc, t1 - t0
+                epoch, loss, val_acc, t1 - t0
             )
         )
-
+    acc = evaluate(model, device, test_loader, evaluator)
     print("Test accuracy {:.4f}".format(acc))
