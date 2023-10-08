@@ -99,7 +99,7 @@ static std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
   return {new_row, uniqued.index({RevertIndices(split_indices)})};
 }
 
-std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCOO(
+static std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCOO(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     const torch::optional<torch::Tensor>& leading_indices) {
   torch::Tensor row, col;
@@ -125,7 +125,7 @@ std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCOO(
   }
 }
 
-std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSR(
+static std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSR(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     const torch::optional<torch::Tensor>& leading_indices) {
   std::shared_ptr<CSR> csr;
