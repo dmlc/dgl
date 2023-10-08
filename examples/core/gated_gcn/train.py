@@ -1,9 +1,8 @@
-import time
-
 """
 Gated Graph Convolutional Network module for graph classification tasks
 """
 import argparse
+import time
 
 import torch
 import torch.nn as nn
