@@ -55,7 +55,7 @@ class PeptidesStructuralDataset(DGLDataset):
     Parameters
     ----------
     raw_dir : str
-        Raw file directory to download/contains the input data directory.
+        Directory to store all the downloaded raw datasets.
         Default: "~/.dgl/".
     force_reload : bool
         Whether to reload the dataset.
@@ -254,7 +254,21 @@ class PeptidesStructuralDataset(DGLDataset):
         return len(self.graphs)
 
     def __getitem__(self, idx):
-        """Get datapoint with index"""
+        """Get the idx-th sample.
+
+        Parameters
+        ---------
+        idx : int or tensor
+            The sample index, if idx is tensor will ignore transform.
+
+        Returns
+        -------
+        (:class:`dgl.DGLGraph`, Tensor)
+            Graph with node feature stored in ``feat`` field and its label.
+        or
+        :class:`dgl.data.utils.Subset`
+            Subset of the dataset at specified indices
+        """
         if F.is_tensor(idx) and idx.dim() == 1:
             return Subset(self, idx.cpu())
 
@@ -291,7 +305,7 @@ class PeptidesFunctionalDataset(DGLDataset):
     Parameters
     ----------
     raw_dir : str
-        Raw file directory to download/contains the input data directory.
+        Directory to store all the downloaded raw datasets.
         Default: "~/.dgl/".
     force_reload : bool
         Whether to reload the dataset.
@@ -474,7 +488,21 @@ class PeptidesFunctionalDataset(DGLDataset):
         return len(self.graphs)
 
     def __getitem__(self, idx):
-        """Get datapoint with index"""
+        """Get the idx-th sample.
+
+        Parameters
+        ---------
+        idx : int or tensor
+            The sample index, if idx is tensor will ignore transform.
+
+        Returns
+        -------
+        (:class:`dgl.DGLGraph`, Tensor)
+            Graph with node feature stored in ``feat`` field and its label.
+        or
+        :class:`dgl.data.utils.Subset`
+            Subset of the dataset at specified indices
+        """
         if F.is_tensor(idx) and idx.dim() == 1:
             return Subset(self, idx.cpu())
 
@@ -509,7 +537,7 @@ class VOCSuperpixelsDataset(DGLDataset):
     Parameters
     ----------
     raw_dir : str
-        Raw file directory to download/contains the input data directory.
+        Directory to store all the downloaded raw datasets.
         Default: "~/.dgl/".
     split : str
         Should be chosen from ["train", "val", "test"]
@@ -699,12 +727,12 @@ class VOCSuperpixelsDataset(DGLDataset):
         return os.path.exists(self.graph_path)
 
     def __getitem__(self, idx):
-        r"""Get the idx^th sample.
+        r"""Get the idx-th sample.
 
         Parameters
         ---------
-        idx : int
-            The sample index.
+        idx : int or tensor
+            The sample index, if idx is tensor will ignore transform.
 
         Returns
         -------
@@ -714,6 +742,9 @@ class VOCSuperpixelsDataset(DGLDataset):
             - ``ndata['feat']``: node features
             - ``ndata['label']``: node labels
             - ``edata['feat']``: edge features
+        or
+        :class:`dgl.data.utils.Subset`
+            Subset of the dataset at specified indices
         """
         if F.is_tensor(idx) and idx.dim() == 1:
             return Subset(self, idx.cpu())
