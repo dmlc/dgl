@@ -167,5 +167,5 @@ if __name__ == "__main__":
                 epoch, loss, acc, t1 - t0
             )
         )
-        
+
     print("Test accuracy {:.4f}".format(acc))
