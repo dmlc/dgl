@@ -41,6 +41,8 @@ class TorchBasedFeature(Feature):
         >>> feature.read(torch.tensor([0, 1]))
         tensor([[0, 1, 2, 3, 4],
                 [1, 1, 1, 1, 1]])
+        >>> feature.size()
+        torch.Size([5])
 
         >>> import numpy as np
         >>> arr = np.array([[1, 2], [3, 4]])
@@ -85,6 +87,15 @@ class TorchBasedFeature(Feature):
             return self._tensor
         return self._tensor[ids]
 
+    def size(self):
+        """Get the size of the feature.
+
+        -------
+        torch.Size
+            The size of the feature.
+        """
+        return self._tensor.size()[1:]
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature store.
 
@@ -100,18 +111,21 @@ class TorchBasedFeature(Feature):
             updated.
         """
         if ids is None:
-            assert self._tensor.shape == value.shape, (
+            assert self.size() == value.size()[1:], (
                 f"ids is None, so the entire feature will be updated. "
-                f"But the shape of the feature is {self._tensor.shape}, "
-                f"while the shape of the value is {value.shape}."
+                f"But the size of the feature is {self.size()}, "
+                f"while the size of the value is {value.size()[1:]}."
             )
-            self._tensor[:] = value
+            self._tensor = value
         else:
             assert ids.shape[0] == value.shape[0], (
                 f"ids and value must have the same length, "
                 f"but got {ids.shape[0]} and {value.shape[0]}."
             )
-            # [Todo] Check the value feature size matches tesnsor's one.
+            assert self.size() == value.size()[1:], (
+                f"The size of the feature is {self.size()}, "
+                f"while the size of the value is {value.size()[1:]}."
+            )
             self._tensor[ids] = value
 
 

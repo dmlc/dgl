@@ -35,6 +35,8 @@ def test_torch_based_feature(in_memory):
         assert torch.equal(
             feature_a.read(), torch.tensor([[1, 2, 3], [4, 5, 6]])
         )
+
+        # Test read the feature with ids.
         assert torch.equal(
             feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
         )
@@ -57,6 +59,25 @@ def test_torch_based_feature(in_memory):
             feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[1, 2], [3, 4]]])
         )
 
+        # Test update the feature.
+        feature_a.update(torch.tensor([[5, 1, 3]]))
+        assert torch.equal(
+            feature_a.read(),
+            torch.tensor([[5, 1, 3]]),
+        ), print(feature_a.read())
+        feature_b.update(
+            torch.tensor([[[1, 3], [5, 7]], [[2, 4], [6, 8]], [[2, 4], [6, 8]]])
+        )
+        assert torch.equal(
+            feature_b.read(),
+            torch.tensor(
+                [[[1, 3], [5, 7]], [[2, 4], [6, 8]], [[2, 4], [6, 8]]]
+            ),
+        )
+
+        # Test get the size of the entire feature.
+        assert feature_a.size() == torch.Size([3])
+        assert feature_b.size() == torch.Size([2, 2])
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
@@ -102,6 +123,8 @@ def test_torch_based_feature_store(in_memory):
             ),
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
+
+        # Test read the entire feature.
         assert torch.equal(
             feature_store.read("node", "paper", "a"),
             torch.tensor([[1, 2, 4], [2, 5, 3]]),
@@ -110,6 +133,12 @@ def test_torch_based_feature_store(in_memory):
             feature_store.read("edge", "paper:cites:paper", "b"),
             torch.tensor([[[1, 2], [3, 4]], [[2, 5], [3, 4]]]),
         )
+
+        # Test get the size of the entire feature.
+        assert feature_store.size("node", "paper", "a") == torch.Size([3])
+        assert feature_store.size(
+            "edge", "paper:cites:paper", "b"
+        ) == torch.Size([2, 2])
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
@@ -138,8 +167,12 @@ def test_torch_based_feature_store(in_memory):
             ),
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
+        # Test read the entire feature.
         assert torch.equal(
             feature_store.read("node", None, "a"),
             torch.tensor([[1, 2, 4], [2, 5, 3]]),
         )
+        # Test get the size of the entire feature.
+        assert feature_store.size("node", None, "a") == torch.Size([3])
+
         feature_store = None

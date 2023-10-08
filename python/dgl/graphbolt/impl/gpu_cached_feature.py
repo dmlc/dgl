@@ -40,6 +40,8 @@ class GPUCachedFeature(Feature):
         >>> feature.read(torch.tensor([0, 1]).to("cuda"))
         tensor([[0, 1, 2, 3, 4],
                 [1, 1, 1, 1, 1]], device='cuda:0')
+        >>> feature.size()
+        torch.Size([5])
         """
         super(GPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
@@ -82,6 +84,16 @@ class GPUCachedFeature(Feature):
         values[missing_index] = missing_values
         self._feature.replace(missing_keys, missing_values)
         return torch.reshape(values, self.item_shape)
+
+    def size(self):
+        """Get the size of the feature.
+
+        Returns
+        -------
+        torch.Size
+            The size of the feature.
+        """
+        return self._fallback_feature.size()
 
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
