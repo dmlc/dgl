@@ -100,7 +100,6 @@ def evaluate(model, device, data_loader, evaluator):
     return evaluator.eval({"y_true": y_true, "y_pred": y_pred})["rocauc"]
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
