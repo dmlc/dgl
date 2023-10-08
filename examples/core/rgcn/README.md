@@ -3,6 +3,7 @@
 This example aims to demonstrate how to run node classification task on heterogeneous graph with **DGL**. Models are not tuned to achieve the best accuracy yet.
 
 ## Run on `ogbn-mag` dataset
+In the preprocess stage, reverse edges are added and duplicate edges are removed. Feature data of `author` and `institution` node types are generated dynamically with embedding layer.
 
 ### Sample on CPU and train/infer on CPU
 ```
@@ -33,7 +34,7 @@ Highest Valid: 48.25 ± 0.20
 ```
 
 ## Run on `ogb-lsc-mag240m` dataset
-Since preprocessing of graph and feature data will usually take a long time, we also offer the above files for download:
+In the preprocess stage, reverse edges are added and duplicate edges are removed. What's more, feature data are generated in advance for `author` and `institution` node types via message passing. Since such preprocessing will usually take a long time, we also offer the above files for download:
 
 * [`paper-feat.npy`](https://dgl-data.s3-accelerate.amazonaws.com/dataset/OGB-LSC/paper-feat.npy)
 * [`author-feat.npy`](https://dgl-data.s3-accelerate.amazonaws.com/dataset/OGB-LSC/author-feat.npy)
