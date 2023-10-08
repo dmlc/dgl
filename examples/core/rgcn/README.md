@@ -11,7 +11,7 @@ python3 hetero_rgcn.py --dataset ogbn-mag
 
 ### Sample on CPU and train/infer on GPU
 ```
-python3 hetero_rgcn.py --dataset ogbn-mag --num_gups 1
+python3 hetero_rgcn.py --dataset ogbn-mag --num_gpus 1
 ```
 
 ### Resource usage and time cost
@@ -47,7 +47,7 @@ python3 hetero_rgcn.py --dataset ogb-lsc-mag240m
 
 ### Sample on CPU and train/infer on GPU
 ```
-python3 hetero_rgcn.py --dataset ogb-lsc-mag240m --num_gups 1
+python3 hetero_rgcn.py --dataset ogb-lsc-mag240m --num_gpus 1
 ```
 
 ### Resource usage and time cost
