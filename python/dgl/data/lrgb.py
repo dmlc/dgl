@@ -795,5 +795,283 @@ class VOCSuperpixelsDataset(DGLDataset):
 
         if self._transform is None:
             return self.graphs[idx]
+        else:
+            return self._transform(self.graphs[idx])
 
-        return self._transform(self.graphs[idx])
+
+class COCOSuperpixelsDataset(DGLDataset):
+    r"""COCO superpixel dataset for the node classification task.
+
+    DGL dataset of COCOSuperpixels which contains image superpixels
+    and a semantic segmentation label for each node superpixel.
+
+    Based on the COCO 2017 dataset. Original source `here<https://cocodataset.org>`_
+
+    COCO categories:
+    person bicycle car motorcycle airplane bus train truck boat traffic light fire hydrant stop
+    sign parking meter bench bird cat dog horse sheep cow elephant bear zebra giraffe backpack
+    umbrella handbag tie suitcase frisbee skis snowboard sports ball kite baseball bat baseball
+    glove skateboard surfboard tennis racket bottle wine glass cup fork knife spoon bowl banana
+    apple sandwich orange broccoli carrot hot dog pizza donut cake chair couch potted plant bed
+    dining table toilet tv laptop mouse remote keyboard cell phone microwave oven toaster sink
+    refrigerator book clock vase scissors teddy bear hair drier toothbrush
+
+    Reference `<https://arxiv.org/abs/2206.08164.pdf>`_
+
+    Statistics:
+
+    - Train examples: 113,286
+    - Valid examples: 5,000
+    - Test examples: 5,000
+    - Average number of nodes: 476.88
+    - Average number of edges: 2,710.48
+    - Number of node classes: 81
+
+    Parameters
+    ----------
+    raw_dir : str
+        Directory to store all the downloaded raw datasets.
+        Default: "~/.dgl/".
+    split : str
+        Should be chosen from ["train", "val", "test"]
+        Default: "train".
+    construct_format : str, optional
+        Option to select the graph construction format.
+        Should be chosen from the following formats:
+        "edge_wt_only_coord": the graphs are 8-nn graphs with the edge weights
+        computed based on only spatial coordinates of superpixel nodes.
+        "edge_wt_coord_feat": the graphs are 8-nn graphs with the edge weights
+        computed based on combination of spatial coordinates and feature
+        values of superpixel nodes.
+        "edge_wt_region_boundary": the graphs region boundary graphs where two
+        regions (i.e. superpixel nodes) have an edge between them if they share
+        a boundary in the original image.
+        Default: "edge_wt_region_boundary".
+    slic_compactness : int, optional
+        Option to select compactness of slic that was used for superpixels
+        Should be chosen from [10, 30]
+        Default: 30.
+    force_reload : bool
+        Whether to reload the dataset.
+        Default: False.
+    verbose : bool
+        Whether to print out progress information.
+        Default: False.
+    transform : callable, optional
+        A transform that takes in a :class:`~dgl.DGLGraph` object and returns
+        a transformed version. The :class:`~dgl.DGLGraph` object will be
+        transformed before every access.
+
+    Examples
+    ---------
+    >>> from dgl.data import COCOSuperpixelsDataset
+
+    >>> train_dataset = COCOSuperpixelsDataset(split="train")
+    >>> len(train_dataset)
+    113286
+    >>> train_dataset.num_classes
+    81
+    >>> graph = train_dataset[0]
+    >>> graph
+    Graph(num_nodes=488, num_edges=2766,
+        ndata_schemes={'feat': Scheme(shape=(14,), dtype=torch.float32), 'label': Scheme(shape=(), dtype=torch.uint8)}
+        edata_schemes={'feat': Scheme(shape=(2,), dtype=torch.float32)})
+
+    >>> # accept tensor to be index, but will ignore transform parameter
+    >>> import torch
+    >>> idx = torch.tensor([0, 1, 2])
+    >>> train_dataset_subset = train_dataset[idx]
+    >>> train_dataset_subset[0]
+    Graph(num_nodes=488, num_edges=2766,
+        ndata_schemes={'feat': Scheme(shape=(14,), dtype=torch.float32), 'label': Scheme(shape=(), dtype=torch.uint8)}
+        edata_schemes={'feat': Scheme(shape=(2,), dtype=torch.float32)})
+    """
+
+    urls = {
+        10: {
+            "edge_wt_only_coord": """
+            https://www.dropbox.com/s/prqizdep8gk0ndk/coco_superpixels_edge_wt_only_coord.zip?dl=1
+            """,
+            "edge_wt_coord_feat": """
+            https://www.dropbox.com/s/zftoyln1pkcshcg/coco_superpixels_edge_wt_coord_feat.zip?dl=1
+            """,
+            "edge_wt_region_boundary": """
+            https://www.dropbox.com/s/fhihfcyx2y978u8/coco_superpixels_edge_wt_region_boundary.zip?dl=1
+            """,
+        },
+        30: {
+            "edge_wt_only_coord": """
+            https://www.dropbox.com/s/hrbfkxmc5z9lsaz/coco_superpixels_edge_wt_only_coord.zip?dl=1
+            """,
+            "edge_wt_coord_feat": """
+            https://www.dropbox.com/s/4rfa2d5ij1gfu9b/coco_superpixels_edge_wt_coord_feat.zip?dl=1
+            """,
+            "edge_wt_region_boundary": """
+            https://www.dropbox.com/s/r6ihg1f4pmyjjy0/coco_superpixels_edge_wt_region_boundary.zip?dl=1
+            """,
+        },
+    }
+
+    def __init__(
+        self,
+        raw_dir=None,
+        split="train",
+        construct_format="edge_wt_region_boundary",
+        slic_compactness=30,
+        force_reload=None,
+        verbose=None,
+        transform=None,
+    ):
+        assert split in ["train", "val", "test"], "split not valid."
+        assert construct_format in [
+            "edge_wt_only_coord",
+            "edge_wt_coord_feat",
+            "edge_wt_region_boundary",
+        ], "construct_format not valid."
+        assert slic_compactness in [10, 30], "slic_compactness not valid."
+
+        self.construct_format = construct_format
+        self.slic_compactness = slic_compactness
+        self.split = split
+
+        super(COCOSuperpixelsDataset, self).__init__(
+            name="COCO-SP",
+            raw_dir=raw_dir,
+            url=self.urls[self.slic_compactness][self.construct_format],
+            force_reload=force_reload,
+            verbose=verbose,
+            transform=transform,
+        )
+
+    @property
+    def save_path(self):
+        return os.path.join(
+            self.raw_path,
+            "slic_compactness_" + str(self.slic_compactness),
+            self.construct_format,
+        )
+
+    @property
+    def raw_data_path(self):
+        return os.path.join(self.save_path, f"{self.split}.pickle")
+
+    @property
+    def graph_path(self):
+        return os.path.join(self.save_path, f"processed_{self.split}.pkl")
+
+    @property
+    def num_classes(self):
+        r"""Number of classes for each node."""
+        return 81
+
+    def __len__(self):
+        r"""The number of examples in the dataset."""
+        return len(self.graphs)
+
+    def download(self):
+        zip_file_path = os.path.join(
+            self.raw_path, "coco_superpixels_" + self.construct_format + ".zip"
+        )
+        path = download(self.url, path=zip_file_path, overwrite=True)
+        extract_archive(path, self.raw_path, overwrite=True)
+        makedirs(self.save_path)
+        os.rename(
+            os.path.join(
+                self.raw_path, "coco_superpixels_" + self.construct_format
+            ),
+            self.save_path,
+        )
+        os.unlink(path)
+
+    def label_remap(self):
+        # Util function to remap the labels as the original label idxs are not contiguous
+
+        original_label_idx = [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 
+                             11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                             23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36,
+                             37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48,
+                             49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 
+                             60, 61, 62, 63, 64, 65, 67, 70, 72, 73, 74,
+                             75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86,
+                             87, 88, 89, 90]
+        label_map = {}
+        for i, key in enumerate(original_label_idx):
+            label_map[key] = i
+
+        return label_map
+
+    def process(self):
+        with open(self.raw_data_path, "rb") as f:
+            graphs = pickle.load(f)
+
+        label_map = self.label_remap()
+        self.graphs = []
+
+        for idx in tqdm(
+            range(len(graphs)), desc=f"Processing {self.split} dataset"
+        ):
+            graph = graphs[idx]
+
+            """
+            Each `graph` is a tuple (x, edge_attr, edge_index, y)
+                Shape of x : [num_nodes, 14]
+                Shape of edge_attr : [num_edges, 1] or [num_edges, 2]
+                Shape of edge_index : [2, num_edges]
+                Shape of y : [num_nodes]
+            """
+
+            DGLgraph = dgl_graph(
+                (graph[2][0], graph[2][1]),
+                num_nodes=len(graph[3]),
+            )
+            DGLgraph.ndata["feat"] = graph[0].to(F.float32)
+            DGLgraph.edata["feat"] = graph[1].to(F.float32)
+
+            y = F.tensor(graph[3])
+
+            # Label remapping. See self.label_remap() func
+            for i, label in enumerate(y):
+                y[i] = label_map[label.item()]
+
+            DGLgraph.ndata["label"] = y
+            self.graphs.append(DGLgraph)
+
+    def load(self):
+        with open(self.graph_path, "rb") as f:
+            f = pickle.load(f)
+            self.graphs = f
+
+    def save(self):
+        with open(os.path.join(self.graph_path), "wb") as f:
+            pickle.dump(self.graphs, f)
+
+    def has_cache(self):
+        return os.path.exists(self.graph_path)
+
+    def __getitem__(self, idx):
+        r"""Get the idx-th sample.
+
+        Parameters
+        ---------
+        idx : int or tensor
+            The sample index, if idx is tensor will ignore transform.
+
+        Returns
+        -------
+        :class:`dgl.DGLGraph`
+            graph structure, node features, node labels and edge features.
+
+            - ``ndata['feat']``: node features
+            - ``ndata['label']``: node labels
+            - ``edata['feat']``: edge features
+        or
+        :class:`dgl.data.utils.Subset`
+            Subset of the dataset at specified indices
+        """
+        if F.is_tensor(idx) and idx.dim() == 1:
+            return Subset(self, idx.cpu())
+
+        if self._transform is None:
+            return self.graphs[idx]
+        else:
+            return self._transform(self.graphs[idx])
