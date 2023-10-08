@@ -55,13 +55,23 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
   return {ret_coo, lhs_indices, rhs_indices};
 }
 
-static torch::Tensor RevertIndices(const torch::Tensor& indices) {
-  auto rev_tensor = torch::empty_like(indices);
+/** @brief Return the reverted mapping of a permutation. */
+static torch::Tensor RevertPermutation(const torch::Tensor& perm) {
+  auto rev_tensor = torch::empty_like(perm);
   rev_tensor.index_put_(
-      {indices}, torch::arange(0, indices.numel(), rev_tensor.options()));
+      {perm}, torch::arange(0, perm.numel(), rev_tensor.options()));
   return rev_tensor;
 }
 
+/**
+ * @brief Compute the compact indices of row indices and leading indices. Return
+ * the compacted indices and the original row indices of compacted indices.
+ *
+ * @param row The row indices.
+ * @param leading_indices The leading indices.
+ *
+ * @return A tuple of compact indices, original indices.
+ */
 static std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
     const torch::Tensor& row,
     const torch::optional<torch::Tensor>& leading_indices) {
@@ -76,7 +86,7 @@ static std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
     std::tie(sorted, sort_indices) = row.sort();
   }
   // 2. Reverse sort indices.
-  auto sort_rev_indices = RevertIndices(sort_indices);
+  auto sort_rev_indices = RevertPermutation(sort_indices);
   // 3. Unique the sorted array.
   std::tie(uniqued, unique_reverse_indices, counts) =
       torch::unique_consecutive(sorted, true);
@@ -96,7 +106,7 @@ static std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
   // 5. Decode the indices to get the compact indices.
   auto new_row = split_indices.index({reverse_indices.slice(
       0, n_leading_indices, n_leading_indices + row.numel())});
-  return {new_row, uniqued.index({RevertIndices(split_indices)})};
+  return {new_row, uniqued.index({RevertPermutation(split_indices)})};
 }
 
 static std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCOO(
