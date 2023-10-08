@@ -15,8 +15,6 @@
 #include <torch/custom_class.h>
 #include <torch/script.h>
 
-#include <vector>
-
 namespace dgl {
 namespace sparse {
 

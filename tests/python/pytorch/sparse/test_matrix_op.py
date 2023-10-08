@@ -42,10 +42,6 @@ def test_compact(create_func, dim, index):
         ans_idx = torch.tensor(ans_idx).to(ctx)
     A_dense_select = sparse_matrix_to_dense(A.index_select(dim, ans_idx))
 
-    print(A_dense)
-    print(A_dense_select)
-    print(A_compact_dense)
-
     assert A_compact_dense.shape == A_dense_select.shape
     assert torch.allclose(A_compact_dense, A_dense_select)
     assert torch.allclose(ans_idx, ret_id)

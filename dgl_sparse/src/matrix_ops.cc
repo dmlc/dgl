@@ -55,17 +55,18 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
   return {ret_coo, lhs_indices, rhs_indices};
 }
 
-torch::Tensor RevertIndices(const torch::Tensor& indices) {
+static torch::Tensor RevertIndices(const torch::Tensor& indices) {
   auto rev_tensor = torch::empty_like(indices);
   rev_tensor.index_put_(
       {indices}, torch::arange(0, indices.numel(), rev_tensor.options()));
   return rev_tensor;
 }
 
-std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
+static std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
     const torch::Tensor& row,
     const torch::optional<torch::Tensor>& leading_indices) {
   torch::Tensor sorted, sort_indices, uniqued, unique_reverse_indices, counts;
+  // 1. Sort leading indices and row indices in ascending order.
   int64_t n_leading_indices = 0;
   if (leading_indices.has_value()) {
     n_leading_indices = leading_indices.value().numel();
@@ -74,12 +75,15 @@ std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
   } else {
     std::tie(sorted, sort_indices) = row.sort();
   }
+  // 2. Reverse sort indices.
   auto sort_rev_indices = RevertIndices(sort_indices);
+  // 3. Unique the sorted array.
   std::tie(uniqued, unique_reverse_indices, counts) =
       torch::unique_consecutive(sorted, true);
   auto reverse_indices = unique_reverse_indices.index({sort_rev_indices});
   auto n_uniqued = uniqued.numel();
 
+  // 4. Relabel the indices and map the inverse array to the original array.
   auto split_indices = torch::full({n_uniqued}, -1, reverse_indices.options());
 
   split_indices.index_put_(
@@ -89,7 +93,7 @@ std::tuple<torch::Tensor, torch::Tensor> CompactIndices(
   split_indices.index_put_(
       {(split_indices == -1).nonzero().view(-1)},
       torch::arange(n_leading_indices, n_uniqued, split_indices.options()));
-
+  // 5. Decode the indices to get the compact indices.
   auto new_row = split_indices.index({reverse_indices.slice(
       0, n_leading_indices, n_leading_indices + row.numel())});
   return {new_row, uniqued.index({RevertIndices(split_indices)})};
@@ -121,10 +125,10 @@ std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCOO(
   }
 }
 
-std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSC(
+std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSR(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     const torch::optional<torch::Tensor>& leading_indices) {
-  std::shared_ptr<dgl::sparse::CSR> csr;
+  std::shared_ptr<CSR> csr;
   if (dim == 0)
     csr = mat->CSCPtr();
   else
@@ -134,14 +138,17 @@ std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSC(
   std::tie(new_indices, uniqued) =
       CompactIndices(csr->indices, leading_indices);
 
+  auto ret_value = mat->value();
+  if (csr->value_indices.has_value())
+    ret_value = mat->value().index_select(0, csr->value_indices.value());
   if (dim == 0) {
     auto ret = SparseMatrix::FromCSC(
-        csr->indptr, new_indices, mat->value(),
+        csr->indptr, new_indices, ret_value,
         std::vector<int64_t>{uniqued.numel(), mat->shape()[1]});
     return {ret, uniqued};
   } else {
     auto ret = SparseMatrix::FromCSR(
-        csr->indptr, new_indices, mat->value(),
+        csr->indptr, new_indices, ret_value,
         std::vector<int64_t>{mat->shape()[0], uniqued.numel()});
     return {ret, uniqued};
   }
@@ -150,17 +157,10 @@ std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> CompactCSC(
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> Compact(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
     const torch::optional<torch::Tensor>& leading_indices) {
-  if (dim == 0) {
-    if (mat->HasCSC())
-      return CompactCSC(mat, dim, leading_indices);
-    else
-      return CompactCOO(mat, dim, leading_indices);
-  } else {
-    if (mat->HasCSR())
-      return CompactCSC(mat, dim, leading_indices);
-    else
-      return CompactCOO(mat, dim, leading_indices);
+  if (mat->HasCOO()) {
+    return CompactCOO(mat, dim, leading_indices);
   }
+  return CompactCSR(mat, dim, leading_indices);
 }
 
 }  // namespace sparse
