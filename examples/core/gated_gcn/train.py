@@ -1,8 +1,10 @@
 import time
+
 """
 Gated Graph Convolutional Network module for graph classification tasks
 """
 import argparse
+
 import torch
 import torch.nn as nn
 
@@ -13,7 +15,6 @@ from dgl.nn.pytorch import GatedGCNConv
 from dgl.nn.pytorch.glob import AvgPooling
 from ogb.graphproppred import DglGraphPropPredDataset, Evaluator
 from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
-from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 
 class GatedGCN(nn.Module):
