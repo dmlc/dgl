@@ -1,7 +1,8 @@
+import time
 """
 Gated Graph Convolutional Network module for graph classification tasks
 """
-
+import argparse
 import torch
 import torch.nn as nn
 
@@ -12,6 +13,7 @@ from dgl.nn.pytorch import GatedGCNConv
 from dgl.nn.pytorch.glob import AvgPooling
 from ogb.graphproppred import DglGraphPropPredDataset, Evaluator
 from ogb.graphproppred.mol_encoder import AtomEncoder, BondEncoder
+from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 
 
 class GatedGCN(nn.Module):
@@ -98,12 +100,38 @@ def evaluate(model, device, data_loader, evaluator):
     return evaluator.eval({"y_true": y_true, "y_pred": y_pred})["rocauc"]
 
 
-def main():
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="cora",
+        help="Dataset name ('cora', 'citeseer', 'pubmed').",
+    )
+    parser.add_argument(
+        "--num_epochs",
+        type=int,
+        default=200,
+        help="Number of epochs for train.",
+    )
+    parser.add_argument(
+        "--num_gpus",
+        type=int,
+        default=0,
+        help="Number of GPUs used for train and evaluation.",
+    )
+    args = parser.parse_args()
+    print(f"Training with DGL built-in GATConv module.")
 
     # Load ogb dataset & evaluator.
     dataset = DglGraphPropPredDataset(name="ogbg-molhiv")
     evaluator = Evaluator(name="ogbg-molhiv")
+
+    if args.num_gpus > 0 and torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
 
     n_classes = dataset.num_tasks
 
@@ -123,20 +151,21 @@ def main():
 
     opt = optim.Adam(model.parameters(), lr=0.01)
     loss_fn = nn.BCEWithLogitsLoss()
+    acc = evaluate(model, device, test_loader, evaluator)
 
     print("---------- Training ----------")
-    for epoch in range(50):
+    for epoch in range(args.num_epochs):
         # Kick off training.
+        t0 = time.time()
         loss = train(model, device, train_loader, opt, loss_fn)
-
+        t1 = time.time()
         # Evaluate the prediction.
-        valid_acc = evaluate(model, device, valid_loader, evaluator)
-        test_acc = evaluate(model, device, test_loader, evaluator)
+        evaluate(model, device, valid_loader, evaluator)
+        acc = evaluate(model, device, test_loader, evaluator)
         print(
-            f"In epoch {epoch}, loss: {loss:.3f}, val acc: {valid_acc:.3f}, test"
-            f" acc: {test_acc:.3f}"
+            "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} | Time {:.4f}".format(
+                epoch, loss, acc, t1 - t0
+            )
         )
-
-
-if __name__ == "__main__":
-    main()
+        
+    print("Test accuracy {:.4f}".format(acc))
