@@ -1219,20 +1219,13 @@ def test_from_dglgraph_homogeneous():
     gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=True)
 
     # Get the COO representation of the CSCSamplingGraph.
-    gb_coo = [
-        # row -> col.
-        (gb_g.indices[row_idx], torch.tensor(col))
-        for col in range(gb_g.total_num_nodes)
-        for row_idx in range(gb_g.csc_indptr[col], gb_g.csc_indptr[col + 1])
-    ]
+    num_columns = gb_g.csc_indptr[1:] - gb_g.csc_indptr[:-1]
+    rows = gb_g.indices
+    columns = torch.arange(gb_g.total_num_nodes).repeat_interleave(num_columns)
 
-    # Use ORIGINAL_EDGE_ID to check if the edge mapping is correct.
-    for edge_idx in range(gb_g.total_num_edges):
-        original_edge_id = gb_g.edge_attributes[gb.ORIGINAL_EDGE_ID][edge_idx]
-        assert (
-            dgl_g.edges()[0][original_edge_id],
-            dgl_g.edges()[1][original_edge_id],
-        ) == gb_coo[edge_idx]
+    original_edge_ids = gb_g.edge_attributes[gb.ORIGINAL_EDGE_ID]
+    assert torch.all(dgl_g.edges()[0][original_edge_ids] == rows)
+    assert torch.all(dgl_g.edges()[1][original_edge_ids] == columns)
 
     assert gb_g.total_num_nodes == dgl_g.num_nodes()
     assert gb_g.total_num_edges == dgl_g.num_edges()
@@ -1268,18 +1261,14 @@ def test_from_dglgraph_heterogeneous():
 
     # `reverse_node_id` is used to map the node id in CSCSamplingGraph to the
     # node id in Hetero-DGLGraph.
-    reverse_node_id = {}
-    num_ntypes = len(gb_g.node_type_offset) - 1
-    for i in range(0, num_ntypes):
-        for j in range(gb_g.node_type_offset[i], gb_g.node_type_offset[i + 1]):
-            reverse_node_id[j] = torch.tensor(j) - gb_g.node_type_offset[i]
+    num_ntypes = gb_g.node_type_offset[1:] - gb_g.node_type_offset[:-1]
+    reverse_node_id = torch.cat([torch.arange(num) for num in num_ntypes])
 
     # Get the COO representation of the CSCSamplingGraph.
-    gb_coo = [
-        # row -> col.
-        (reverse_node_id[gb_g.indices[row_idx].item()], reverse_node_id[col])
-        for col in range(gb_g.total_num_nodes)
-        for row_idx in range(gb_g.csc_indptr[col], gb_g.csc_indptr[col + 1])
+    num_columns = gb_g.csc_indptr[1:] - gb_g.csc_indptr[:-1]
+    rows = reverse_node_id[gb_g.indices]
+    columns = reverse_node_id[
+        torch.arange(gb_g.total_num_nodes).repeat_interleave(num_columns)
     ]
 
     # Check the order of etypes in DGLGraph is the same as CSCSamplingGraph.
@@ -1301,10 +1290,8 @@ def test_from_dglgraph_heterogeneous():
         original_edge_id = gb_g.edge_attributes[gb.ORIGINAL_EDGE_ID][edge_idx]
         edge_type = dgl_g.etypes[hetero_graph_idx]
         dgl_edge_pairs = dgl_g.edges(etype=edge_type)
-        assert (
-            dgl_edge_pairs[0][original_edge_id],
-            dgl_edge_pairs[1][original_edge_id],
-        ) == gb_coo[edge_idx]
+        assert dgl_edge_pairs[0][original_edge_id] == rows[edge_idx]
+        assert dgl_edge_pairs[1][original_edge_id] == columns[edge_idx]
 
     assert gb_g.total_num_nodes == dgl_g.num_nodes()
     assert gb_g.total_num_edges == dgl_g.num_edges()
