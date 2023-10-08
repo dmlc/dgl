@@ -150,7 +150,6 @@ if __name__ == "__main__":
 
     opt = optim.Adam(model.parameters(), lr=0.01)
     loss_fn = nn.BCEWithLogitsLoss()
-    acc = evaluate(model, device, test_loader, evaluator)
 
     print("---------- Training ----------")
     for epoch in range(args.num_epochs):
