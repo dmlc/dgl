@@ -160,7 +160,8 @@ if __name__ == "__main__":
         # Evaluate the prediction.
         val_acc = evaluate(model, device, valid_loader, evaluator)
         print(
-            f"Epoch {epoch:05d} | Loss {loss:.4f} | Accuracy {val_acc:.4f} | Time {t1 - t0:.4f}"
+            f"Epoch {epoch:05d} | Loss {loss:.4f} | Accuracy {val_acc:.4f} | "
+            f"Time {t1 - t0:.4f}"
         )
     acc = evaluate(model, device, test_loader, evaluator)
     print(f"Test accuracy {acc:.4f}")
