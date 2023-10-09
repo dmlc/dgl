@@ -22,8 +22,8 @@ def to_on_disk_tensor(test_dir, name, t):
 @pytest.mark.parametrize("in_memory", [True, False])
 def test_torch_based_feature(in_memory):
     with tempfile.TemporaryDirectory() as test_dir:
-        a = torch.tensor([1, 2, 3])
-        b = torch.tensor([[1, 2, 3], [4, 5, 6]])
+        a = torch.tensor([[1, 2, 3], [4, 5, 6]])
+        b = torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
         if not in_memory:
             a = to_on_disk_tensor(test_dir, "a", a)
             b = to_on_disk_tensor(test_dir, "b", b)
@@ -31,27 +31,53 @@ def test_torch_based_feature(in_memory):
         feature_a = gb.TorchBasedFeature(a)
         feature_b = gb.TorchBasedFeature(b)
 
-        assert torch.equal(feature_a.read(), torch.tensor([1, 2, 3]))
+        # Read the entire feature.
         assert torch.equal(
-            feature_b.read(), torch.tensor([[1, 2, 3], [4, 5, 6]])
+            feature_a.read(), torch.tensor([[1, 2, 3], [4, 5, 6]])
         )
+
+        # Test read the feature with ids.
         assert torch.equal(
-            feature_a.read(torch.tensor([0, 2])),
-            torch.tensor([1, 3]),
+            feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])
         )
+        # Read the feature with ids.
         assert torch.equal(
-            feature_a.read(torch.tensor([1, 1])),
-            torch.tensor([2, 2]),
+            feature_a.read(torch.tensor([0])),
+            torch.tensor([[1, 2, 3]]),
         )
         assert torch.equal(
             feature_b.read(torch.tensor([1])),
-            torch.tensor([[4, 5, 6]]),
+            torch.tensor([[[4, 5], [6, 7]]]),
         )
-        feature_a.update(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))
-        assert torch.equal(feature_a.read(), torch.tensor([0, 1, 2]))
-        feature_a.update(torch.tensor([2, 0]), torch.tensor([0, 2]))
-        assert torch.equal(feature_a.read(), torch.tensor([2, 1, 0]))
+        # Update the feature with ids.
+        feature_a.update(torch.tensor([[0, 1, 2]]), torch.tensor([0]))
+        assert torch.equal(
+            feature_a.read(), torch.tensor([[0, 1, 2], [4, 5, 6]])
+        )
+        feature_b.update(torch.tensor([[[1, 2], [3, 4]]]), torch.tensor([1]))
+        assert torch.equal(
+            feature_b.read(), torch.tensor([[[1, 2], [3, 4]], [[1, 2], [3, 4]]])
+        )
 
+        # Test update the feature.
+        feature_a.update(torch.tensor([[5, 1, 3]]))
+        assert torch.equal(
+            feature_a.read(),
+            torch.tensor([[5, 1, 3]]),
+        ), print(feature_a.read())
+        feature_b.update(
+            torch.tensor([[[1, 3], [5, 7]], [[2, 4], [6, 8]], [[2, 4], [6, 8]]])
+        )
+        assert torch.equal(
+            feature_b.read(),
+            torch.tensor(
+                [[[1, 3], [5, 7]], [[2, 4], [6, 8]], [[2, 4], [6, 8]]]
+            ),
+        )
+
+        # Test get the size of the entire feature.
+        assert feature_a.size() == torch.Size([3])
+        assert feature_b.size() == torch.Size([2, 2])
         with pytest.raises(IndexError):
             feature_a.read(torch.tensor([0, 1, 2, 3]))
 
@@ -74,8 +100,8 @@ def write_tensor_to_disk(dir, name, t, fmt="torch"):
 @pytest.mark.parametrize("in_memory", [True, False])
 def test_torch_based_feature_store(in_memory):
     with tempfile.TemporaryDirectory() as test_dir:
-        a = torch.tensor([1, 2, 3])
-        b = torch.tensor([2, 5, 3])
+        a = torch.tensor([[1, 2, 4], [2, 5, 3]])
+        b = torch.tensor([[[1, 2], [3, 4]], [[2, 5], [3, 4]]])
         write_tensor_to_disk(test_dir, "a", a, fmt="torch")
         write_tensor_to_disk(test_dir, "b", b, fmt="numpy")
         feature_data = [
@@ -97,18 +123,27 @@ def test_torch_based_feature_store(in_memory):
             ),
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
+
+        # Test read the entire feature.
         assert torch.equal(
-            feature_store.read("node", "paper", "a"), torch.tensor([1, 2, 3])
+            feature_store.read("node", "paper", "a"),
+            torch.tensor([[1, 2, 4], [2, 5, 3]]),
         )
         assert torch.equal(
             feature_store.read("edge", "paper:cites:paper", "b"),
-            torch.tensor([2, 5, 3]),
+            torch.tensor([[[1, 2], [3, 4]], [[2, 5], [3, 4]]]),
         )
+
+        # Test get the size of the entire feature.
+        assert feature_store.size("node", "paper", "a") == torch.Size([3])
+        assert feature_store.size(
+            "edge", "paper:cites:paper", "b"
+        ) == torch.Size([2, 2])
 
         # For windows, the file is locked by the numpy.load. We need to delete
         # it before closing the temporary directory.
         a = b = None
-        feature_stores = None
+        feature_store = None
 
         # ``domain`` should be enum.
         with pytest.raises(pydantic.ValidationError):
@@ -132,7 +167,12 @@ def test_torch_based_feature_store(in_memory):
             ),
         ]
         feature_store = gb.TorchBasedFeatureStore(feature_data)
+        # Test read the entire feature.
         assert torch.equal(
-            feature_store.read("node", None, "a"), torch.tensor([1, 2, 3])
+            feature_store.read("node", None, "a"),
+            torch.tensor([[1, 2, 4], [2, 5, 3]]),
         )
-        feature_stores = None
+        # Test get the size of the entire feature.
+        assert feature_store.size("node", None, "a") == torch.Size([3])
+
+        feature_store = None
