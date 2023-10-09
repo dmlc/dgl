@@ -105,8 +105,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        default="cora",
-        help="Dataset name ('cora', 'citeseer', 'pubmed').",
+        default="ogbg-molhiv",
+        help="Dataset name ('ogbg-molhiv', 'ogbg-molbace', 'ogbg-molmuv').",
     )
     parser.add_argument(
         "--num_epochs",
