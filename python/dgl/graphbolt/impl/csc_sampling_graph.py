@@ -149,18 +149,14 @@ class CSCSamplingGraph(SamplingGraph):
         if offset is None or self.metadata is None:
             return self._c_csc_graph.num_nodes()
 
+        # Heterogenous
         else:
-            # First, the graph is treated as heterogenous, then the return
-            # type depends on the length of the dictionary.
             num_nodes_per_type = {
                 _type: offset[_idx + 1] - offset[_idx]
                 for _type, _idx in self.metadata.node_type_to_id.items()
             }
 
-            if len(num_nodes_per_type) > 1:  # True Heterogenous.
-                return num_nodes_per_type
-            else:  # Homogenous.
-                return self._c_csc_graph.num_nodes()
+            return num_nodes_per_type
 
     @property
     def csc_indptr(self) -> torch.tensor:
