@@ -7,6 +7,7 @@ import torch
 
 import dgl
 from dgl.heterograph import DGLBlock
+from dgl.utils import recursive_apply
 
 from .base import etype_str_to_tuple
 from .sampled_subgraph import SampledSubgraph
@@ -94,6 +95,25 @@ class DGLMiniBatch:
     and the value should be a tuple of tensors representing node pairs of the
     given type.
     """
+
+    def to(self, device: torch.device) -> None:
+        # Copy `DGLMiniBatch` to the specified device using reflection.
+
+        def _to(x, device):
+            return x.to(device) if hasattr(x, "to") else x
+
+        for attr in dir(self):
+            # Only copy member variables.
+            if not callable(getattr(self, attr)) and not attr.startswith("__"):
+                setattr(
+                    self,
+                    attr,
+                    recursive_apply(
+                        getattr(self, attr), lambda x: _to(x, device)
+                    ),
+                )
+
+        return self
 
 
 @dataclass
@@ -372,6 +392,25 @@ class MiniBatch:
                         for etype, neg_dst in self.compacted_negative_dsts.items()
                     }
         return minibatch
+
+    def to(self, device: torch.device) -> None:
+        # Copy `MiniBatch` to the specified device using reflection.
+
+        def _to(x, device):
+            return x.to(device) if hasattr(x, "to") else x
+
+        for attr in dir(self):
+            # Only copy member variables.
+            if not callable(getattr(self, attr)) and not attr.startswith("__"):
+                setattr(
+                    self,
+                    attr,
+                    recursive_apply(
+                        getattr(self, attr), lambda x: _to(x, device)
+                    ),
+                )
+
+        return self
 
 
 def _minibatch_str(minibatch: MiniBatch) -> str:
