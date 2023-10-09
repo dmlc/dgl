@@ -28,14 +28,14 @@ from .utils import (
 
 def load_graphbolt():
     """Load Graphbolt C++ library"""
-    version = torch.__version__.split("+", maxsplit=1)[0]
+    vers = torch.__version__.split("+", maxsplit=1)[0]
 
     if sys.platform.startswith("linux"):
-        basename = f"libgraphbolt_pytorch_{version}.so"
+        basename = f"libgraphbolt_pytorch_{vers}.so"
     elif sys.platform.startswith("darwin"):
-        basename = f"libgraphbolt_pytorch_{version}.dylib"
+        basename = f"libgraphbolt_pytorch_{vers}.dylib"
     elif sys.platform.startswith("win"):
-        basename = f"graphbolt_pytorch_{version}.dll"
+        basename = f"graphbolt_pytorch_{vers}.dll"
     else:
         raise NotImplementedError("Unsupported system: %s" % sys.platform)
 
