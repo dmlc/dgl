@@ -169,7 +169,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     ############################################################################
     # [Step-4]:
-    # gb.to_dgl()
+    # datapipe.to_dgl()
     # [Input]:
     # 'datapipe': The previous datapipe object.
     # [Output]:
