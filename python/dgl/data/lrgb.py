@@ -795,8 +795,8 @@ class VOCSuperpixelsDataset(DGLDataset):
 
         if self._transform is None:
             return self.graphs[idx]
-        else:
-            return self._transform(self.graphs[idx])
+
+        return self._transform(self.graphs[idx])
 
 
 class COCOSuperpixelsDataset(DGLDataset):
@@ -876,7 +876,8 @@ class COCOSuperpixelsDataset(DGLDataset):
     >>> graph = train_dataset[0]
     >>> graph
     Graph(num_nodes=488, num_edges=2766,
-        ndata_schemes={'feat': Scheme(shape=(14,), dtype=torch.float32), 'label': Scheme(shape=(), dtype=torch.uint8)}
+        ndata_schemes={'feat': Scheme(shape=(14,), dtype=torch.float32),
+                        'label': Scheme(shape=(), dtype=torch.uint8)}
         edata_schemes={'feat': Scheme(shape=(2,), dtype=torch.float32)})
 
     >>> # support tensor to be index when transform is None
@@ -886,7 +887,8 @@ class COCOSuperpixelsDataset(DGLDataset):
     >>> train_dataset_subset = train_dataset[idx]
     >>> train_dataset_subset[0]
     Graph(num_nodes=488, num_edges=2766,
-        ndata_schemes={'feat': Scheme(shape=(14,), dtype=torch.float32), 'label': Scheme(shape=(), dtype=torch.uint8)}
+        ndata_schemes={'feat': Scheme(shape=(14,), dtype=torch.float32),
+                        'label': Scheme(shape=(), dtype=torch.uint8)}
         edata_schemes={'feat': Scheme(shape=(2,), dtype=torch.float32)})
     """
 
@@ -936,6 +938,7 @@ class COCOSuperpixelsDataset(DGLDataset):
         self.construct_format = construct_format
         self.slic_compactness = slic_compactness
         self.split = split
+        self.graphs = []
 
         super(COCOSuperpixelsDataset, self).__init__(
             name="COCO-SP",
@@ -948,6 +951,7 @@ class COCOSuperpixelsDataset(DGLDataset):
 
     @property
     def save_path(self):
+        r"""Directory to save the processed dataset."""
         return os.path.join(
             self.raw_path,
             "slic_compactness_" + str(self.slic_compactness),
@@ -956,10 +960,12 @@ class COCOSuperpixelsDataset(DGLDataset):
 
     @property
     def raw_data_path(self):
+        r"""Path to save the raw dataset file."""
         return os.path.join(self.save_path, f"{self.split}.pickle")
 
     @property
     def graph_path(self):
+        r"""Path to save the processed dataset file."""
         return os.path.join(self.save_path, f"processed_{self.split}.pkl")
 
     @property
@@ -1003,11 +1009,10 @@ class COCOSuperpixelsDataset(DGLDataset):
         return label_map
 
     def process(self):
-        with open(self.raw_data_path, "rb") as f:
-            graphs = pickle.load(f)
+        with open(self.raw_data_path, "rb") as file:
+            graphs = pickle.load(file)
 
         label_map = self.label_remap()
-        self.graphs = []
 
         for idx in tqdm(
             range(len(graphs)), desc=f"Processing {self.split} dataset"
@@ -1039,13 +1044,13 @@ class COCOSuperpixelsDataset(DGLDataset):
             self.graphs.append(DGLgraph)
 
     def load(self):
-        with open(self.graph_path, "rb") as f:
-            f = pickle.load(f)
-            self.graphs = f
+        with open(self.graph_path, "rb") as file:
+            graphs = pickle.load(file)
+            self.graphs = graphs
 
     def save(self):
-        with open(os.path.join(self.graph_path), "wb") as f:
-            pickle.dump(self.graphs, f)
+        with open(os.path.join(self.graph_path), "wb") as file:
+            pickle.dump(self.graphs, file)
 
     def has_cache(self):
         return os.path.exists(self.graph_path)
@@ -1073,14 +1078,13 @@ class COCOSuperpixelsDataset(DGLDataset):
         if F.is_tensor(idx) and idx.dim() == 1:
             if self._transform is None:
                 return Subset(self, idx.cpu())
-            else:
-                raise ValueError(
-                    """
+            raise ValueError(
+                """
                     Not support tensor idx when transform is not None
                     """
-                )
+            )
 
         if self._transform is None:
             return self.graphs[idx]
-        else:
-            return self._transform(self.graphs[idx])
+
+        return self._transform(self.graphs[idx])
