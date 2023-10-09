@@ -1582,7 +1582,8 @@ def test_OnDiskDataset_load_graph():
         dataset.yaml_data["graph_topology"]["type"] = "fake_type"
         with pytest.raises(
             pydantic.ValidationError,
-            match="Input should be 'CSCSamplingGraph'",
+            # As error message diffs in pydantic 1.x and 2.x, we just match keyword only.
+            match="'CSCSamplingGraph'",
         ):
             dataset.load()
 
