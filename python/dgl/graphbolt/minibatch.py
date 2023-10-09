@@ -94,7 +94,7 @@ class DGLMiniBatch:
     and the value should be a tuple of tensors representing node pairs of the
     given type.
     """
-    
+
     def __repr__(self) -> str:
         return _dgl_minibatch_str(self)
 
@@ -465,9 +465,7 @@ def _dgl_minibatch_str(dglminibatch: DGLMiniBatch) -> str:
 
         def _add_indent(_str, indent):
             lines = _str.split("\n")
-            lines = [lines[0]] + [
-                " " * indent + line for line in lines[1:]
-            ]
+            lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
             return "\n".join(lines)
 
         # Let the variables in the list occupy one line each,
@@ -482,7 +480,7 @@ def _dgl_minibatch_str(dglminibatch: DGLMiniBatch) -> str:
                 blocks_strs = []
                 for block in val:
                     block_str = str(block).replace(" ", "\n")
-                    block_str = _add_indent(block_str, len("Block")+1)
+                    block_str = _add_indent(block_str, len("Block") + 1)
                     blocks_strs.append(block_str)
                 val = "[" + ",\n".join(blocks_strs) + "]"
             else:
