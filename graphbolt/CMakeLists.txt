@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.5)
 project(graphbolt C CXX)
 set (CMAKE_CXX_STANDARD 17)
 
+if(USE_CUDA)
+  enable_language(CUDA)
+endif()
+
 # Find PyTorch cmake files and PyTorch versions with the python interpreter
 # $PYTHON_INTERP ("python3" or "python" if empty)
 if(NOT PYTHON_INTERP)
@@ -38,6 +42,12 @@ set(BOLT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(BOLT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 file(GLOB BOLT_HEADERS ${BOLT_INCLUDE})
 file(GLOB BOLT_SRC ${BOLT_DIR}/*.cc)
+if(USE_CUDA)
+  file(GLOB BOLT_CUDA_SRC
+    ${BOLT_DIR}/cuda/*.cu
+  )
+  list(APPEND BOLT_SRC ${BOLT_CUDA_SRC})
+endif()
 
 add_library(${LIB_GRAPHBOLT_NAME} SHARED ${BOLT_SRC} ${BOLT_HEADERS})
 target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}

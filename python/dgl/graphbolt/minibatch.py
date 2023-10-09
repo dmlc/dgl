@@ -209,10 +209,12 @@ class MiniBatch:
     all node ids inside are compacted.
     """
 
-    def to_dgl_blocks(self):
-        """Transforming a `MiniBatch` into DGL blocks necessitates constructing a
-        graphical structure and assigning features to the nodes and edges within
-        the blocks.
+    def __repr__(self) -> str:
+        return _minibatch_str(self)
+
+    def _to_dgl_blocks(self):
+        """Transforming a `MiniBatch` into DGL blocks necessitates constructing
+        a graphical structure and ID mappings.
         """
         if not self.sampled_subgraphs:
             return None
@@ -257,23 +259,6 @@ class MiniBatch:
             )
 
         if is_heterogeneous:
-            # Assign node features to the outermost layer's source nodes.
-            if self.node_features:
-                for (
-                    node_type,
-                    feature_name,
-                ), feature in self.node_features.items():
-                    blocks[0].srcnodes[node_type].data[feature_name] = feature
-            # Assign edge features.
-            if self.edge_features:
-                for block, edge_feature in zip(blocks, self.edge_features):
-                    for (
-                        edge_type,
-                        feature_name,
-                    ), feature in edge_feature.items():
-                        block.edges[etype_str_to_tuple(edge_type)].data[
-                            feature_name
-                        ] = feature
             # Assign reverse node ids to the outermost layer's source nodes.
             for node_type, reverse_ids in self.sampled_subgraphs[
                 0
@@ -290,15 +275,6 @@ class MiniBatch:
                             dgl.EID
                         ] = reverse_ids
         else:
-            # Assign node features to the outermost layer's source nodes.
-            if self.node_features:
-                for feature_name, feature in self.node_features.items():
-                    blocks[0].srcdata[feature_name] = feature
-            # Assign edge features.
-            if self.edge_features:
-                for block, edge_feature in zip(blocks, self.edge_features):
-                    for feature_name, feature in edge_feature.items():
-                        block.edata[feature_name] = feature
             blocks[0].srcdata[dgl.NID] = self.sampled_subgraphs[
                 0
             ].original_row_node_ids
@@ -306,11 +282,96 @@ class MiniBatch:
             for block, subgraph in zip(blocks, self.sampled_subgraphs):
                 if subgraph.original_edge_ids is not None:
                     block.edata[dgl.EID] = subgraph.original_edge_ids
-
         return blocks
 
-    def __repr__(self) -> str:
-        return _minibatch_str(self)
+    def to_dgl(self):
+        """Converting a `MiniBatch` into a DGL MiniBatch that contains
+        everything necessary for computation."
+        """
+        minibatch = DGLMiniBatch(
+            blocks=self._to_dgl_blocks(),
+            input_nodes=self.input_nodes,
+            output_nodes=self.seed_nodes,
+            node_features=self.node_features,
+            edge_features=self.edge_features,
+            labels=self.labels,
+        )
+        assert (
+            minibatch.blocks is not None
+        ), "Sampled subgraphs for computation are missing."
+
+        # For link prediction tasks.
+        if self.compacted_node_pairs is not None:
+            minibatch.positive_node_pairs = self.compacted_node_pairs
+            # Build negative graph.
+            if (
+                self.compacted_negative_srcs is not None
+                and self.compacted_negative_dsts is not None
+            ):
+                # For homogeneous graph.
+                if isinstance(self.compacted_negative_srcs, torch.Tensor):
+                    minibatch.negative_node_pairs = (
+                        self.compacted_negative_srcs.view(-1),
+                        self.compacted_negative_dsts.view(-1),
+                    )
+                # For heterogeneous graph.
+                else:
+                    minibatch.negative_node_pairs = {
+                        etype: (
+                            neg_src.view(-1),
+                            self.compacted_negative_dsts[etype].view(-1),
+                        )
+                        for etype, neg_src in self.compacted_negative_srcs.items()
+                    }
+            elif self.compacted_negative_srcs is not None:
+                # For homogeneous graph.
+                if isinstance(self.compacted_negative_srcs, torch.Tensor):
+                    negative_ratio = self.compacted_negative_srcs.size(1)
+                    minibatch.negative_node_pairs = (
+                        self.compacted_negative_srcs.view(-1),
+                        self.compacted_node_pairs[1].repeat_interleave(
+                            negative_ratio
+                        ),
+                    )
+                # For heterogeneous graph.
+                else:
+                    negative_ratio = list(
+                        self.compacted_negative_srcs.values()
+                    )[0].size(1)
+                    minibatch.negative_node_pairs = {
+                        etype: (
+                            neg_src.view(-1),
+                            self.compacted_node_pairs[etype][
+                                1
+                            ].repeat_interleave(negative_ratio),
+                        )
+                        for etype, neg_src in self.compacted_negative_srcs.items()
+                    }
+            elif self.compacted_negative_dsts is not None:
+                # For homogeneous graph.
+                if isinstance(self.compacted_negative_dsts, torch.Tensor):
+                    negative_ratio = self.compacted_negative_dsts.size(1)
+                    minibatch.negative_node_pairs = (
+                        self.compacted_node_pairs[0].repeat_interleave(
+                            negative_ratio
+                        ),
+                        self.compacted_negative_dsts.view(-1),
+                    )
+                # For heterogeneous graph.
+                else:
+                    negative_ratio = list(
+                        self.compacted_negative_dsts.values()
+                    )[0].size(1)
+                    minibatch.negative_node_pairs = {
+                        etype: (
+                            self.compacted_node_pairs[etype][
+                                0
+                            ].repeat_interleave(negative_ratio),
+                            neg_dst.view(-1),
+                        )
+                        for etype, neg_dst in self.compacted_negative_dsts.items()
+                    }
+        return minibatch
 
 
 def _minibatch_str(minibatch: MiniBatch) -> str:

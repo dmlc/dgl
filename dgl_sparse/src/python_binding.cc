@@ -8,6 +8,7 @@
 // clang-format on
 
 #include <sparse/elementwise_op.h>
+#include <sparse/matrix_ops.h>
 #include <sparse/reduction.h>
 #include <sparse/sddmm.h>
 #include <sparse/softmax.h>
@@ -54,7 +55,8 @@ TORCH_LIBRARY(dgl_sparse, m) {
       .def("spmm", &SpMM)
       .def("sddmm", &SDDMM)
       .def("softmax", &Softmax)
-      .def("spspmm", &SpSpMM);
+      .def("spspmm", &SpSpMM)
+      .def("compact", &Compact);
 }
 
 }  // namespace sparse

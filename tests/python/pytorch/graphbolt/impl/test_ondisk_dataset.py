@@ -1,5 +1,6 @@
 import os
 import pickle
+import random
 import re
 import tempfile
 import unittest
@@ -764,7 +765,9 @@ def test_OnDiskDataset_Feature_heterograph():
         node_data_paper = np.random.rand(1000, 10)
         node_data_paper_path = os.path.join(test_dir, "node_data_paper.npy")
         np.save(node_data_paper_path, node_data_paper)
-        node_data_label = np.random.randint(0, 10, size=1000)
+        node_data_label = torch.tensor(
+            [[random.randint(0, 10)] for _ in range(1000)]
+        )
         node_data_label_path = os.path.join(test_dir, "node_data_label.npy")
         np.save(node_data_label_path, node_data_label)
 
@@ -772,7 +775,9 @@ def test_OnDiskDataset_Feature_heterograph():
         edge_data_writes = np.random.rand(1000, 10)
         edge_data_writes_path = os.path.join(test_dir, "edge_writes_paper.npy")
         np.save(edge_data_writes_path, edge_data_writes)
-        edge_data_label = np.random.randint(0, 10, size=1000)
+        edge_data_label = torch.tensor(
+            [[random.randint(0, 10)] for _ in range(1000)]
+        )
         edge_data_label_path = os.path.join(test_dir, "edge_data_label.npy")
         np.save(edge_data_label_path, edge_data_label)
 
@@ -846,7 +851,9 @@ def test_OnDiskDataset_Feature_homograph():
         node_data_feat = np.random.rand(1000, 10)
         node_data_feat_path = os.path.join(test_dir, "node_data_feat.npy")
         np.save(node_data_feat_path, node_data_feat)
-        node_data_label = np.random.randint(0, 10, size=1000)
+        node_data_label = torch.tensor(
+            [[random.randint(0, 10)] for _ in range(1000)]
+        )
         node_data_label_path = os.path.join(test_dir, "node_data_label.npy")
         np.save(node_data_label_path, node_data_label)
 
@@ -854,7 +861,9 @@ def test_OnDiskDataset_Feature_homograph():
         edge_data_feat = np.random.rand(1000, 10)
         edge_data_feat_path = os.path.join(test_dir, "edge_data_feat.npy")
         np.save(edge_data_feat_path, edge_data_feat)
-        edge_data_label = np.random.randint(0, 10, size=1000)
+        edge_data_label = torch.tensor(
+            [[random.randint(0, 10)] for _ in range(1000)]
+        )
         edge_data_label_path = os.path.join(test_dir, "edge_data_label.npy")
         np.save(edge_data_label_path, edge_data_label)
 
@@ -961,8 +970,8 @@ def test_OnDiskDataset_Graph_homogeneous():
         dataset = gb.OnDiskDataset(test_dir).load()
         graph2 = dataset.graph
 
-        assert graph.num_nodes == graph2.num_nodes
-        assert graph.num_edges == graph2.num_edges
+        assert graph.total_num_nodes == graph2.total_num_nodes
+        assert graph.total_num_edges == graph2.total_num_edges
 
         assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
         assert torch.equal(graph.indices, graph2.indices)
@@ -1004,8 +1013,8 @@ def test_OnDiskDataset_Graph_heterogeneous():
         dataset = gb.OnDiskDataset(test_dir).load()
         graph2 = dataset.graph
 
-        assert graph.num_nodes == graph2.num_nodes
-        assert graph.num_edges == graph2.num_edges
+        assert graph.total_num_nodes == graph2.total_num_nodes
+        assert graph.total_num_edges == graph2.total_num_edges
 
         assert torch.equal(graph.csc_indptr, graph2.csc_indptr)
         assert torch.equal(graph.indices, graph2.indices)
@@ -1076,8 +1085,8 @@ def test_OnDiskDataset_preprocess_homogeneous():
         csc_sampling_graph = gb.csc_sampling_graph.load_csc_sampling_graph(
             os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
         )
-        assert csc_sampling_graph.num_nodes == num_nodes
-        assert csc_sampling_graph.num_edges == num_edges
+        assert csc_sampling_graph.total_num_nodes == num_nodes
+        assert csc_sampling_graph.total_num_edges == num_edges
 
         num_samples = 100
         fanout = 1
@@ -1702,7 +1711,7 @@ def test_BuiltinDataset():
         # Case 1: download from DGL S3 storage.
         dataset_name = "test-only"
         # Add test-only dataset to the builtin dataset list for testing only.
-        gb.BuiltinDataset._datasets.append(dataset_name)
+        gb.BuiltinDataset._all_datasets.append(dataset_name)
         dataset = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
         assert dataset.graph is not None
         assert dataset.feature is not None

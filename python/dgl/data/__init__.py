@@ -71,11 +71,15 @@ from .heterophilous_graphs import (
     TolokersDataset,
 )
 
-# RDKit is required for Peptides-Structural dataset.
+# RDKit is required for Peptides-Structural, Peptides-Functional dataset.
 # Exception handling was added to prevent crashes for users who are using other
 # datasets.
 try:
-    from .lrgb import PeptidesStructuralDataset
+    from .lrgb import (
+        PeptidesFunctionalDataset,
+        PeptidesStructuralDataset,
+        VOCSuperpixelsDataset,
+    )
 except ImportError:
     pass
 from .pattern import PATTERNDataset

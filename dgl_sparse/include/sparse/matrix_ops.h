@@ -6,7 +6,6 @@
 #ifndef SPARSE_MATRIX_OPS_H_
 #define SPARSE_MATRIX_OPS_H_
 
-#include <sparse/sparse_format.h>
 #include <sparse/sparse_matrix.h>
 
 #include <tuple>
@@ -47,7 +46,7 @@ std::tuple<std::shared_ptr<COO>, torch::Tensor, torch::Tensor> COOIntersection(
  */
 std::tuple<c10::intrusive_ptr<SparseMatrix>, torch::Tensor> Compact(
     const c10::intrusive_ptr<SparseMatrix>& mat, int64_t dim,
-    torch::Tensor leading_indices);
+    const torch::optional<torch::Tensor>& leading_indices);
 
 }  // namespace sparse
 }  // namespace dgl

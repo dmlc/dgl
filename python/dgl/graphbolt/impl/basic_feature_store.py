@@ -57,6 +57,28 @@ class BasicFeatureStore(FeatureStore):
         """
         return self._features[(domain, type_name, feature_name)].read(ids)
 
+    def size(
+        self,
+        domain: str,
+        type_name: str,
+        feature_name: str,
+    ):
+        """Get the size of the specified feature in the feature store.
+        Parameters
+        ----------
+        domain : str
+            The domain of the feature such as "node", "edge" or "graph".
+        type_name : str
+            The node or edge type name.
+        feature_name : str
+            The feature name.
+        Returns
+        -------
+        torch.Size
+            The size of the specified feature in the feature store.
+        """
+        return self._features[(domain, type_name, feature_name)].size()
+
     def update(
         self,
         domain: str,

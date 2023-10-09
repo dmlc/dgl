@@ -499,6 +499,10 @@ class BuiltinDataset(OnDiskDataset):
         more details in `ogbl-citation2
         <https://ogb.stanford.edu/docs/linkprop/#ogbl-citation2>`_.
 
+        .. note::
+            Reverse edges are added to the original graph and duplicated
+            edges are removed.
+
     **ogbn-products**
         The ogbn-products dataset is an undirected and unweighted graph,
         representing an Amazon product co-purchasing network. See more details
@@ -524,23 +528,34 @@ class BuiltinDataset(OnDiskDataset):
         The root directory of the dataset. Default ot ``datasets``.
     """
 
+    # For dataset that is smaller than 30GB, we use the base url.
+    # Otherwise, we use the accelerated url.
     _base_url = "https://data.dgl.ai/dataset/graphbolt/"
+    _accelerated_url = (
+        "https://dgl-data.s3-accelerate.amazonaws.com/dataset/graphbolt/"
+    )
     _datasets = [
         "ogbn-mag",
         "ogbl-citation2",
         "ogbn-products",
-        "ogb-lsc-mag240m",
     ]
+    _large_datasets = ["ogb-lsc-mag240m"]
+    _all_datasets = _datasets + _large_datasets
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
         dataset_dir = os.path.join(root, name)
         if not os.path.exists(dataset_dir):
-            if name not in self._datasets:
+            if name not in self._all_datasets:
                 raise RuntimeError(
                     f"Dataset {name} is not available. Available datasets are "
-                    f"{self._datasets}."
+                    f"{self._all_datasets}."
                 )
-            url = self._base_url + name + ".zip"
+            url = (
+                self._accelerated_url
+                if name in self._large_datasets
+                else self._base_url
+            )
+            url += name + ".zip"
             os.makedirs(root, exist_ok=True)
             zip_file_path = os.path.join(root, name + ".zip")
             download(url, path=zip_file_path)
