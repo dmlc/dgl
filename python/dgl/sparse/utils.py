@@ -10,5 +10,14 @@ def is_scalar(x):
     return isinstance(x, Number) or (torch.is_tensor(x) and x.dim() == 0)
 
 
+def device_check(mat, tensor):
+    for t in tensor:
+        if mat.device != t.device:
+            raise RuntimeError(
+                f"indices should be on the same device as the "
+                f"sparse matrix ({mat.device})"
+            )
+
+
 # Scalar type annotation
 Scalar = Union[Number, torch.Tensor]

@@ -2,6 +2,7 @@
 import torch
 
 from .sparse_matrix import SparseMatrix
+from .utils import device_check
 
 __all__ = ["sddmm", "bsddmm"]
 
@@ -50,13 +51,7 @@ def sddmm(A: SparseMatrix, X1: torch.Tensor, X2: torch.Tensor) -> SparseMatrix:
                  values=tensor([-1.6585, -3.9714, -0.5406]),
                  shape=(3, 4), nnz=3)
     """
-    if A.device != X1.device or A.device != X2.device:
-        raise RuntimeError(
-
-
-            
-            f"RuntimeError: indices should be either on cpu or on the same device as the sparse matrix ({A.device})"
-        )
+    device_check(A, [X1, X2])
     return SparseMatrix(torch.ops.dgl_sparse.sddmm(A.c_sparse_matrix, X1, X2))
 
 
