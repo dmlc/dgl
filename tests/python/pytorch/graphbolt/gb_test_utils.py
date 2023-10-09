@@ -1,5 +1,6 @@
 import os
 
+import dgl
 import dgl.graphbolt as gb
 
 import numpy as np
@@ -165,3 +166,11 @@ def random_homo_graphbolt_graph(
                     path: {test_path}
     """
     return yaml_content
+
+
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    dgl.seed(seed)
+    dgl.random.seed(seed)
