@@ -4,6 +4,7 @@ import dgl.sparse as dglsp
 import gb_test_utils
 import torch
 
+
 def test_integration_link_prediction():
     gb_test_utils.setup_seed(926)
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
