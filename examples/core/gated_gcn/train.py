@@ -121,7 +121,7 @@ if __name__ == "__main__":
         help="Number of GPUs used for train and evaluation.",
     )
     args = parser.parse_args()
-    print(f"Training with DGL built-in GATConv module.")
+    print("Training with DGL built-in GATConv module.")
 
     # Load ogb dataset & evaluator.
     dataset = DglGraphPropPredDataset(name=args.dataset)
