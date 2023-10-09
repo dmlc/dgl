@@ -12,6 +12,7 @@ from ...base import ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
+from ..sampling_graph import SamplingGraph
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
@@ -74,7 +75,7 @@ class GraphMetadata:
         self.edge_type_to_id = edge_type_to_id
 
 
-class CSCSamplingGraph:
+class CSCSamplingGraph(SamplingGraph):
     r"""Class for CSC sampling graph."""
 
     def __repr__(self):
@@ -83,6 +84,7 @@ class CSCSamplingGraph:
     def __init__(
         self, c_csc_graph: torch.ScriptObject, metadata: Optional[GraphMetadata]
     ):
+        super().__init__()
         self._c_csc_graph = c_csc_graph
         self._metadata = metadata
 
@@ -107,6 +109,54 @@ class CSCSamplingGraph:
             The number of edges in the graph.
         """
         return self._c_csc_graph.num_edges()
+
+    @property
+    def num_nodes(self) -> Union[int, Dict[str, int]]:
+        """The number of nodes in the graph.
+        - If the graph is homogenous, returns an integer.
+        - If the graph is heterogenous, returns a dictionary.
+
+        Returns
+        -------
+        Union[int, Dict[str, int]]
+            The number of nodes. Integer indicates the total nodes number of a
+            homogenous graph; dict indicates nodes number per node types of a
+            heterogenous graph.
+
+        Examples
+        --------
+        >>> import dgl.graphbolt as gb, torch
+        >>> total_num_nodes = 5
+        >>> total_num_edges = 12
+        >>> ntypes = {"N0": 0, "N1": 1}
+        >>> etypes = {"N0:R0:N0": 0, "N0:R1:N1": 1,
+        ... "N1:R2:N0": 2, "N1:R3:N1": 3}
+        >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+        >>> node_type_offset = torch.LongTensor([0, 2, 5])
+        >>> type_per_edge = torch.LongTensor(
+        ... [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+        >>> metadata = gb.GraphMetadata(ntypes, etypes)
+        >>> graph = gb.from_csc(indptr, indices, node_type_offset,
+        ... type_per_edge, None, metadata)
+        >>> print(graph.num_nodes)
+        {'N0': tensor(2), 'N1': tensor(3)}
+        """
+
+        offset = self.node_type_offset
+
+        # Homogenous.
+        if offset is None or self.metadata is None:
+            return self._c_csc_graph.num_nodes()
+
+        # Heterogenous
+        else:
+            num_nodes_per_type = {
+                _type: offset[_idx + 1] - offset[_idx]
+                for _type, _idx in self.metadata.node_type_to_id.items()
+            }
+
+            return num_nodes_per_type
 
     @property
     def csc_indptr(self) -> torch.tensor:
@@ -312,8 +362,8 @@ class CSCSamplingGraph:
             without replacement. If True, a value can be selected multiple
             times. Otherwise, each value can be selected only once.
         probs_name: str, optional
-            An optional string specifying the name of an edge attribute used a. This
-            attribute tensor should contain (unnormalized) probabilities
+            An optional string specifying the name of an edge attribute used.
+            This attribute tensor should contain (unnormalized) probabilities
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.

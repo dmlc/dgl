@@ -182,6 +182,84 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize(
+    "total_num_nodes, total_num_edges",
+    [(1, 1), (100, 1), (10, 50), (1000, 50000)],
+)
+def test_num_nodes_homo(total_num_nodes, total_num_edges):
+    csc_indptr, indices = gbt.random_homo_graph(
+        total_num_nodes, total_num_edges
+    )
+    edge_attributes = {
+        "A1": torch.randn(total_num_edges),
+        "A2": torch.randn(total_num_edges),
+    }
+    graph = gb.from_csc(csc_indptr, indices, edge_attributes=edge_attributes)
+
+    assert graph.num_nodes == total_num_nodes
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_num_nodes_hetero():
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+
+    node_type_0: [0, 1]
+    node_type_1: [2, 3, 4]
+    edge_type_0: node_type_0 -> node_type_0
+    edge_type_1: node_type_0 -> node_type_1
+    edge_type_2: node_type_1 -> node_type_0
+    edge_type_3: node_type_1 -> node_type_1
+    """
+    # Initialize data.
+    total_num_nodes = 5
+    total_num_edges = 12
+    ntypes = {
+        "N0": 0,
+        "N1": 1,
+    }
+    etypes = {
+        "N0:R0:N0": 0,
+        "N0:R1:N1": 1,
+        "N1:R2:N0": 2,
+        "N1:R3:N1": 3,
+    }
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    node_type_offset = torch.LongTensor([0, 2, 5])
+    type_per_edge = torch.LongTensor([0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+    assert indptr[-1] == total_num_edges
+    assert indptr[-1] == len(indices)
+    assert node_type_offset[-1] == total_num_nodes
+    assert all(type_per_edge < len(etypes))
+
+    # Construct CSCSamplingGraph.
+    metadata = gb.GraphMetadata(ntypes, etypes)
+    graph = gb.from_csc(
+        indptr, indices, node_type_offset, type_per_edge, None, metadata
+    )
+
+    # Verify nodes number per node types.
+    assert graph.num_nodes == {
+        "N0": 2,
+        "N1": 3,
+    }
+    assert graph.num_nodes["N0"] == 2
+    assert graph.num_nodes["N1"] == 3
+    assert "N2" not in graph.num_nodes
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
     "node_type_offset",
     [
         torch.tensor([0, 1]),
