@@ -11,6 +11,8 @@ def is_scalar(x):
 
 
 def device_check(mat, tensor):
+    """Check the input tensor device is the same as sparse matrix device.
+    If not, raise an error."""
     for t in tensor:
         if mat.device != t.device:
             raise RuntimeError(
