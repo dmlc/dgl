@@ -46,6 +46,11 @@ class Task:
         """Return the test set."""
         raise NotImplementedError
 
+    @property
+    def full_set(self) -> ItemSet or ItemSetDict:
+        """Return the entire undivided dataset."""
+        raise NotImplementedError
+
 
 class Dataset:
     """An abstract dataset.
