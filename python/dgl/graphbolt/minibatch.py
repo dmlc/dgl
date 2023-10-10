@@ -97,7 +97,7 @@ class DGLMiniBatch:
     """
 
     def to(self, device: torch.device) -> None:
-        # Copy `DGLMiniBatch` to the specified device using reflection.
+        """Copy `DGLMiniBatch` to the specified device using reflection."""
 
         def _to(x, device):
             return x.to(device) if hasattr(x, "to") else x
@@ -394,7 +394,7 @@ class MiniBatch:
         return minibatch
 
     def to(self, device: torch.device) -> None:
-        # Copy `MiniBatch` to the specified device using reflection.
+        """Copy `MiniBatch` to the specified device using reflection."""
 
         def _to(x, device):
             return x.to(device) if hasattr(x, "to") else x
