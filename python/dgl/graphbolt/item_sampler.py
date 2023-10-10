@@ -19,9 +19,7 @@ __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
 
 
 def minibatcher_default(batch, names):
-    """Default minibatcher.
-
-    The default minibatcher maps a list of items to a `MiniBatch` with the
+    """Default minibatcher which maps a list of items to a `MiniBatch` with the
     same names as the items. The names of items are supposed to be provided
     and align with the data attributes of `MiniBatch`. If any unknown item name
     is provided, exception will be raised. If the names of items are not
@@ -80,11 +78,11 @@ def minibatcher_default(batch, names):
 
 
 class ItemSampler(IterDataPipe):
-    """Item Sampler.
+    """A sampler to iterate over input items and create subsets.
 
-    Creates item subset of data which could be node IDs, node pairs with or
-    without labels, node pairs with negative sources/destinations, DGLGraphs
-    and heterogeneous counterparts.
+    Input items could be node IDs, node pairs with or without labels, node
+    pairs with negative sources/destinations, DGLGraphs and heterogeneous
+    counterparts.
 
     Note: This class `ItemSampler` is not decorated with
     `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
@@ -338,7 +336,7 @@ class ItemSampler(IterDataPipe):
 
 
 class DistributedItemSampler(ItemSampler):
-    """Distributed Item Sampler.
+    """A sampler to iterate over input items and create subsets distributedly.
 
     This sampler creates a distributed subset of items from the given data set,
     which can be used for training with PyTorch's Distributed Data Parallel
