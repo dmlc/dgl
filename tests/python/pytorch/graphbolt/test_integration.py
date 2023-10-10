@@ -1,7 +1,6 @@
 import dgl
 import dgl.graphbolt as gb
 import dgl.sparse as dglsp
-
 import torch
 
 
@@ -162,7 +161,6 @@ def test_integration_link_prediction():
 
 def test_integration_node_classification():
     torch.manual_seed(926)
-
 
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
     indices = torch.tensor([5, 3, 3, 3, 3, 4, 4, 0, 5, 4])
