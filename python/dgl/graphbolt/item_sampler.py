@@ -345,6 +345,10 @@ class DistributedItemSampler(ItemSampler):
     counterparts. The original item set is sharded such that each replica
     (process) receives an exclusive subset.
 
+    Note: DistributedItemSampler may not work as expected when it is the last
+    datapipe before the data is fetched. Please wrap a SingleProcessDataLoader
+    or another datapipe on it.
+
     Note: The items will be first sharded onto each replica, then get shuffled
     (if needed) and batched. Therefore, each replica will always get a same set
     of items.
