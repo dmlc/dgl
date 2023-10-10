@@ -4,14 +4,16 @@ from torch.utils.data import functional_datapipe
 
 from ..negative_sampler import NegativeSampler
 
+__all__ = ["UniformNegativeSampler"]
+
 
 @functional_datapipe("sample_uniform_negative")
 class UniformNegativeSampler(NegativeSampler):
-    """
-    Negative samplers randomly select negative destination nodes for each
-    source node based on a uniform distribution. It's important to note that
-    the term 'negative' refers to false negatives, indicating that the sampled
-    pairs are not ensured to be absent in the graph.
+    """Sample negative destination nodes for each source node based on a uniform
+    distribution.
+
+    It's important to note that the term 'negative' refers to false negatives,
+    indicating that the sampled pairs are not ensured to be absent in the graph.
     For each edge ``(u, v)``, it is supposed to generate `negative_ratio` pairs
     of negative edges ``(u, v')``, where ``v'`` is chosen uniformly from all
     the nodes in the graph.

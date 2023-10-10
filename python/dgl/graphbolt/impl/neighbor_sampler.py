@@ -8,9 +8,13 @@ from ..utils import unique_and_compact_node_pairs
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
+__all__ = ["NeighborSampler", "LayerNeighborSampler"]
+
+
 @functional_datapipe("sample_neighbor")
 class NeighborSampler(SubgraphSampler):
-    """
+    """Sample neighbor edges from a graph and return a subgraph.
+
     Neighbor sampler is responsible for sampling a subgraph from given data. It
     returns an induced subgraph along with compacted information. In the
     context of a node classification task, the neighbor sampler directly
@@ -121,7 +125,8 @@ class NeighborSampler(SubgraphSampler):
 
 @functional_datapipe("sample_layer_neighbor")
 class LayerNeighborSampler(NeighborSampler):
-    """
+    """Sample layer neighbor edges from a graph and return a subgraph.
+
     Sampler that builds computational dependency of node representations via
     labor sampling for multilayer GNN from the NeurIPS 2023 paper
     `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs

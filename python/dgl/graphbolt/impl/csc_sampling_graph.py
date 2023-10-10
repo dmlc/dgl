@@ -16,6 +16,17 @@ from ..sampling_graph import SamplingGraph
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
+__all__ = [
+    "GraphMetadata",
+    "CSCSamplingGraph",
+    "from_csc",
+    "load_from_shared_memory",
+    "load_csc_sampling_graph",
+    "save_csc_sampling_graph",
+    "from_dglgraph",
+]
+
+
 class GraphMetadata:
     r"""Class for metadata of csc sampling graph."""
 
@@ -76,7 +87,7 @@ class GraphMetadata:
 
 
 class CSCSamplingGraph(SamplingGraph):
-    r"""Class for CSC sampling graph."""
+    r"""A sampling graph in CSC format."""
 
     def __repr__(self):
         return _csc_sampling_graph_str(self)

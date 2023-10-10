@@ -12,7 +12,7 @@ __all__ = ["TorchBasedFeature", "TorchBasedFeatureStore"]
 
 
 class TorchBasedFeature(Feature):
-    r"""Torch based feature."""
+    r"""A wrapper of pytorch based feature."""
 
     def __init__(self, torch_feature: torch.Tensor):
         """Initialize a torch based feature store by a torch feature.
@@ -130,7 +130,7 @@ class TorchBasedFeature(Feature):
 
 
 class TorchBasedFeatureStore(BasicFeatureStore):
-    r"""Torch based feature store."""
+    r"""A store to manage multiple pytorch based feature for access."""
 
     def __init__(self, feat_data: List[OnDiskFeatureData]):
         r"""Load feature stores from disk.
