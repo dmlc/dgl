@@ -6,6 +6,11 @@ from torchdata.datapipes.iter import Mapper
 
 from .minibatch import MiniBatch
 
+__all__ = [
+    "MiniBatchTransformer",
+    "DGLMiniBatchConverter",
+]
+
 
 @functional_datapipe("transform")
 class MiniBatchTransformer(Mapper):
