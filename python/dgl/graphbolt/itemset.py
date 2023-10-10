@@ -6,7 +6,7 @@ __all__ = ["ItemSet", "ItemSetDict"]
 
 
 class ItemSet:
-    r"""An iterable itemset.
+    r"""A wrapper of iterable data or tuple of iterable data.
 
     All itemsets that represent an iterable of items should subclass it. Such
     form of itemset is particularly useful when items come from a stream. This
@@ -118,7 +118,7 @@ class ItemSet:
 
 
 class ItemSetDict:
-    r"""An iterable ItemsetDict.
+    r"""Dictionary wrapper of **ItemSet**.
 
     Each item is retrieved by iterating over each itemset and returned with
     corresponding key as a dict.
