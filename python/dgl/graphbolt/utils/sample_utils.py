@@ -259,7 +259,6 @@ def unique_and_compact_node_pairs(
             ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
         # [TODO]: add function that return nodes without deduplication and
         # compacted node pairs.
-            
 
     compacted_node_pairs = {}
     # Map back with the same order.
