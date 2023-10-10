@@ -57,6 +57,14 @@ class TorchBasedFeature(Feature):
             [3, 4]])
     >>> feature.read(torch.tensor([0]))
     tensor([[1, 2]])
+
+    3. Pinned CPU feature.
+    >>> torch_feat = torch.arange(10).reshape(2, -1).pin_memory()
+    >>> feature = gb.TorchBasedFeature(torch_feat)
+    >>> feature.read().device
+    device(type='cuda', index=0)
+    >>> feature.read(torch.tensor([0]).cuda()).device
+    device(type='cuda', index=0)
     """
 
     def __init__(self, torch_feature: torch.Tensor):
@@ -75,8 +83,9 @@ class TorchBasedFeature(Feature):
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.
 
-        The returned tensor is always in memory, no matter whether the feature
-        store is in memory or on disk.
+        If the feature is on pinned CPU memory and `ids` is on GPU or pinned CPU
+        memory, it will be read by GPU and the returned tensor will be on GPU.
+        Otherwise, the returned tensor will be on CPU.
 
         Parameters
         ----------
@@ -90,7 +99,11 @@ class TorchBasedFeature(Feature):
             The read feature.
         """
         if ids is None:
+            if self._tensor.is_pinned():
+                return self._tensor.cuda()
             return self._tensor
+        if self._tensor.is_pinned() and ids.is_cuda:
+            return torch.ops.graphbolt.uva_index_select(self._tensor, ids)
         return self._tensor[ids]
 
     def size(self):
@@ -133,6 +146,11 @@ class TorchBasedFeature(Feature):
                 f"The size of the feature is {self.size()}, "
                 f"while the size of the value is {value.size()[1:]}."
             )
+            if self._tensor.is_pinned() and value.is_cuda and ids.is_cuda:
+                raise NotImplementedError(
+                    "Update the feature on pinned CPU memory by GPU is not "
+                    "supported yet."
+                )
             self._tensor[ids] = value
 
 
