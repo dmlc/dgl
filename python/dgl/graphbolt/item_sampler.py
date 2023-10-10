@@ -387,48 +387,90 @@ class DistributedItemSampler(ItemSampler):
 
     Examples
     --------
-    1. num_replica = 4, batch_size = 2, shuffle = False, drop_last = False,
-    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 7, 8, 9]
-    - Replica#0 gets [[0, 4], [8]]
-    - Replica#1 gets [[1, 5], [9]]
-    - Replica#2 gets [[2, 6]]
-    - Replica#3 gets [[3, 7]]
+    0. Preparation: DistributedItemSampler needs multi-processing environment to
+    work. You need to spawn subprocesses and initialize processing group before
+    executing following examples. Due to randomness, the output is not always
+    the same as listed below.
+    >>> import torch
+    >>> from dgl import graphbolt as gb
+    >>> item_set = gb.ItemSet(torch.arange(0, 13))
+    >>> num_replicas = 4
+    >>> batch_size = 2
+    >>> mp.spawn(...)
 
-    2. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
-    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 7, 8, 9].
-    - Replica#0 gets [[0, 4]]
-    - Replica#1 gets [[1, 5]]
-    - Replica#2 gets [[2, 6]]
-    - Replica#3 gets [[3, 7]]
+    1. shuffle = False, drop_last = False, drop_uneven_inputs = False.
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=False, drop_last=False,
+    >>>     drop_uneven_inputs=False
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    Replica#0: [tensor([0, 4]), tensor([ 8, 12])]
+    Replica#1: [tensor([1, 5]), tensor([ 9, 13])]
+    Replica#2: [tensor([2, 6]), tensor([10])]
+    Replica#3: [tensor([3, 7]), tensor([11])]
 
-    3. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
-    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 11, 12, 13].
-    - Replica#0 gets [[0, 4], [8, 12]]
-    - Replica#1 gets [[1, 5], [9, 13]]
-    - Replica#2 gets [[2, 6]]
-    - Replica#3 gets [[3, 7]]
+    2. shuffle = False, drop_last = True, drop_uneven_inputs = False.
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=False, drop_last=True,
+    >>>     drop_uneven_inputs=False
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    Replica#0: [tensor([0, 4]), tensor([ 8, 12])]
+    Replica#1: [tensor([1, 5]), tensor([ 9, 13])]
+    Replica#2: [tensor([2, 6])]
+    Replica#3: [tensor([3, 7])]
 
-    3. num_replica = 4, batch_size = 2, shuffle = False, drop_last = False,
-    drop_uneven_inputs = True, item_set = [0, 1, 2, ..., 11, 12, 13].
-    - Replica#0 gets [[0, 4], [8, 12]]
-    - Replica#1 gets [[1, 5], [9, 13]]
-    - Replica#2 gets [[2, 6], [10]]
-    - Replica#3 gets [[3, 7], [11]]
+    3. shuffle = False, drop_last = False, drop_uneven_inputs = True.
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=False, drop_last=False,
+    >>>     drop_uneven_inputs=True
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    Replica#0: [tensor([0, 4]), tensor([ 8, 12])]
+    Replica#1: [tensor([1, 5]), tensor([ 9, 13])]
+    Replica#2: [tensor([2, 6]), tensor([10])]
+    Replica#3: [tensor([3, 7]), tensor([11])]
 
-    4. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
-    drop_uneven_inputs = True, item_set = [0, 1, 2, ..., 11, 12, 13].
-    - Replica#0 gets [[0, 4]]
-    - Replica#1 gets [[1, 5]]
-    - Replica#2 gets [[2, 6]]
-    - Replica#3 gets [[3, 7]]
+    4. shuffle = False, drop_last = True, drop_uneven_inputs = True.
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=False, drop_last=True,
+    >>>     drop_uneven_inputs=True
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    Replica#0: [tensor([0, 4])]
+    Replica#1: [tensor([1, 5])]
+    Replica#2: [tensor([2, 6])]
+    Replica#3: [tensor([3, 7])]
 
-    5. num_replica = 4, batch_size = 2, shuffle = True, drop_last = True,
-    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 11, 12, 13].
-    One possible output:
-    - Replica#0 gets [[8, 0], [12, 4]]
-    - Replica#1 gets [[13, 1], [9, 5]]
-    - Replica#2 gets [[10, 2]]
-    - Replica#3 gets [[7, 11]]
+    5. shuffle = True, drop_last = True, drop_uneven_inputs = False.
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=True, drop_last=True,
+    >>>     drop_uneven_inputs=False
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    (One possible output:)
+    Replica#0: [tensor([0, 8]), tensor([ 4, 12])]
+    Replica#1: [tensor([ 5, 13]), tensor([9, 1])]
+    Replica#2: [tensor([ 2, 10])]
+    Replica#3: [tensor([11,  7])]
+
+    6. shuffle = True, drop_last = True, drop_uneven_inputs = True.
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=True, drop_last=True,
+    >>>     drop_uneven_inputs=True
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    (One possible output:)
+    Replica#0: [tensor([8, 0])]
+    Replica#1: [tensor([ 1, 13])]
+    Replica#2: [tensor([10,  6])]
+    Replica#3: [tensor([ 3, 11])]
     """
 
     def __init__(
