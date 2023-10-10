@@ -403,14 +403,14 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
             ]
             return "\n".join(lines)
 
-        # Let the variables in the list occupy one line each,
-        # and adjust the indentation on top of the original
-        # if the original data output has line feeds.
+        # Let the variables in the list occupy one line each, and adjust the
+        # indentation on top of the original if the original data output has
+        # line feeds.
         if isinstance(val, list):
             if len(val) == 0:
                 val = "[]"
-            # Special handling SampledSubgraphImpl data.
-            # Line feeds variables within this type.
+            # Special handling of SampledSubgraphImpl data. Each element of
+            # the data occupies one row and is further structured.
             elif isinstance(
                 val[0],
                 dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl,
@@ -468,14 +468,14 @@ def _dgl_minibatch_str(dglminibatch: DGLMiniBatch) -> str:
             lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
             return "\n".join(lines)
 
-        # Let the variables in the list occupy one line each,
-        # and adjust the indentation on top of the original
-        # if the original data output has line feeds.
+        # Let the variables in the list occupy one line each, and adjust the
+        # indentation on top of the original if the original data output has
+        # line feeds.
         if isinstance(val, list):
             if len(val) == 0:
                 val = "[]"
-            # Special handling blocks data.
-            # Line feeds variables within this type.
+            # Special handling of blocks data. Each element of list occupies
+            # one row and is further structured.
             elif name == "blocks":
                 blocks_strs = []
                 for block in val:
