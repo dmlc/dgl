@@ -165,4 +165,3 @@ def random_homo_graphbolt_graph(
                     path: {test_path}
     """
     return yaml_content
-
