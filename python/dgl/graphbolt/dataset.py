@@ -11,9 +11,8 @@ __all__ = [
 
 
 class Task:
-    """An abstract task.
-
-    Task consists of several meta information and *Train-Validation-Test Set*.
+    """An abstract task which consists of meta information and
+    *Train-Validation-Test Set*.
 
     *meta information*:
     The meta information of a task includes any kinds of data that are defined
@@ -48,9 +47,9 @@ class Task:
 
 
 class Dataset:
-    """An abstract dataset.
+    """An abstract dataset which provides abstraction for accessing the data
+    required for training.
 
-    Dataset provides abstraction for accessing the data required for training.
     The data abstraction could be a native CPU memory block, a shared memory
     block, a file handle of an opened file on disk, a service that provides
     the API to access the data e.t.c. There are 3 primary components in the

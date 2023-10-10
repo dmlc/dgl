@@ -18,7 +18,7 @@ __all__ = ["DGLMiniBatch", "MiniBatch"]
 @dataclass
 class DGLMiniBatch:
     r"""A data class designed for the DGL library, encompassing all the
-    necessary fields for computation using the DGL library.."""
+    necessary fields for computation using the DGL library."""
 
     blocks: List[DGLBlock] = None
     """A list of 'DGLBlock's, each one corresponding to one layer, representing
@@ -118,8 +118,9 @@ class DGLMiniBatch:
 
 @dataclass
 class MiniBatch:
-    r"""A composite data class for data structure in the graphbolt. It is
-    designed to facilitate the exchange of data among different components
+    r"""A composite data class for data structure in the graphbolt.
+
+    It is designed to facilitate the exchange of data among different components
     involved in processing data. The purpose of this class is to unify the
     representation of input and output data across different stages, ensuring
     consistency and ease of use throughout the loading process."""

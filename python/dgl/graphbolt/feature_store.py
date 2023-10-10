@@ -6,7 +6,7 @@ __all__ = ["Feature", "FeatureStore"]
 
 
 class Feature:
-    r"""Base class for feature."""
+    r"""A wrapper of feature data for access."""
 
     def __init__(self):
         pass
@@ -54,7 +54,7 @@ class Feature:
 
 
 class FeatureStore:
-    r"""Base class for feature store."""
+    r"""A store to manage multiple features for access."""
 
     def __init__(self):
         pass

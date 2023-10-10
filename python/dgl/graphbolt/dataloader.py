@@ -10,6 +10,12 @@ from .item_sampler import ItemSampler
 from .utils import datapipe_graph_to_adjlist
 
 
+__all__ = [
+    "SingleProcessDataLoader",
+    "MultiProcessDataLoader",
+]
+
+
 class SingleProcessDataLoader(torch.utils.data.DataLoader):
     """Single process DataLoader.
 
