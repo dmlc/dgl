@@ -80,6 +80,21 @@ void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
     type_per_edge_ =
         read_from_archive(archive, "CSCSamplingGraph/type_per_edge").toTensor();
   }
+  if (read_from_archive(archive, "CSCSamplingGraph/has_edge_attributes")
+          .toBool()) {
+    c10::Dict<c10::IValue, c10::IValue> generic_dict =
+        read_from_archive(archive, "CSCSamplingGraph/edge_attributes")
+            .toGenericDict();
+    EdgeAttrMap target_dict;
+    for (const auto& pair : generic_dict) {
+      std::string key = pair.key().toStringRef();
+      torch::Tensor value = pair.value().toTensor();
+      // Use move to avoid copy.
+      target_dict.insert(std::move(key), std::move(value));
+    }
+    // Same as above.
+    edge_attributes_ = std::move(target_dict);
+  }
 }
 
 void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
@@ -96,6 +111,13 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
       "CSCSamplingGraph/has_type_per_edge", type_per_edge_.has_value());
   if (type_per_edge_) {
     archive.write("CSCSamplingGraph/type_per_edge", type_per_edge_.value());
+  }
+  archive.write(
+      "CSCSamplingGraph/has_edge_attributes", edge_attributes_.has_value());
+  if (edge_attributes_) {
+    std::cout << "Try to write\n";
+    archive.write("CSCSamplingGraph/edge_attributes", edge_attributes_.value());
+    std::cout << "Finish to write\n";
   }
 }
 
