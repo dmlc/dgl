@@ -115,9 +115,8 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
   archive.write(
       "CSCSamplingGraph/has_edge_attributes", edge_attributes_.has_value());
   if (edge_attributes_) {
-    std::cout << "Try to write\n";
-    archive.write("CSCSamplingGraph/edge_attributes", edge_attributes_.value());
-    std::cout << "Finish to write\n";
+    archive.write(
+        "CSCSamplingGraph/edge_attributes", edge_attributes_.value());
   }
 }
 
