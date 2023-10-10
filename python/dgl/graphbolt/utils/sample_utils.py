@@ -164,6 +164,7 @@ def unique_and_compact_node_pairs(
         torch.Tensor,
         Dict[str, torch.Tensor],
     ] = None,
+    deduplicate=True,
 ):
     """
     Compact node pairs and return unique nodes (per type).
@@ -184,12 +185,18 @@ def unique_and_compact_node_pairs(
         - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
         - If `node_pairs` is a dictionary: The keys are node type and the
         values are corresponding nodes. And IDs inside are heterogeneous ids.
+    deduplicate: bool
+        Boolean indicating whether seeds between hops will be deduplicate.
+        If True, the same elements in seeds will be deleted to only one.
+        Otherwise, the same elements will be remained.
 
     Returns
     -------
     Tuple[node_pairs, unique_nodes]
         The compacted node pairs, where node IDs are replaced with mapped node
-        IDs, and the unique nodes (per type).
+        IDs, and the certain nodes (per type). If deduplicate is True, the
+        certain nodes will be unique. Otherwise, the certain nodes will be
+        original seeds and new src_nodes.
         "Compacted node pairs" indicates that the node IDs in the input node
         pairs are replaced with mapped node IDs, where each type of node is
         mapped to a contiguous space of IDs ranging from 0 to N.
@@ -244,11 +251,15 @@ def unique_and_compact_node_pairs(
         src = src_nodes.get(ntype, default_tensor)
         unique_dst = unique_dst_nodes.get(ntype, default_tensor)
         dst = dst_nodes.get(ntype, default_tensor)
-        (
-            unique_nodes[ntype],
-            compacted_src[ntype],
-            compacted_dst[ntype],
-        ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
+        if deduplicate:
+            (
+                unique_nodes[ntype],
+                compacted_src[ntype],
+                compacted_dst[ntype],
+            ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
+        # [TODO]: add function that return nodes without deduplication and
+        # compacted node pairs.
+            
 
     compacted_node_pairs = {}
     # Map back with the same order.

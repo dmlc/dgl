@@ -28,6 +28,7 @@ class NeighborSampler(SubgraphSampler):
         fanouts,
         replace=False,
         prob_name=None,
+        deduplicate=True,
     ):
         """
         Initlization for a link neighbor subgraph sampler.
@@ -52,6 +53,10 @@ class NeighborSampler(SubgraphSampler):
             probabilities corresponding to each neighboring edge of a node.
             It must be a 1D floating-point or boolean tensor, with the number
             of elements equalling the total number of edges.
+        deduplicate: bool
+            Boolean indicating whether seeds between hops will be deduplicate.
+            If True, the same elements in seeds will be deleted to only one.
+            Otherwise, the same elements will be remained.
 
         Examples
         -------
@@ -87,6 +92,7 @@ class NeighborSampler(SubgraphSampler):
             self.fanouts.append(fanout)
         self.replace = replace
         self.prob_name = prob_name
+        self.deduplicate = deduplicate
         self.sampler = graph.sample_neighbors
 
     def _sample_subgraphs(self, seeds):
