@@ -123,6 +123,7 @@ def spspmm(A: SparseMatrix, B: SparseMatrix) -> SparseMatrix:
     assert isinstance(
         B, SparseMatrix
     ), f"Expect A2 to be a SparseMatrix object, got {type(B)}."
+
     return SparseMatrix(
         torch.ops.dgl_sparse.spspmm(A.c_sparse_matrix, B.c_sparse_matrix)
     )
