@@ -1577,6 +1577,10 @@ def test_OnDiskDataset_load_graph():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
+        # Check if the CSCSamplingGraph.edge_attributes loaded.
+        dataset = gb.OnDiskDataset(test_dir).load()
+        assert dataset.graph.edge_attributes is not None
+
         # Case1. Test modify the `type` field.
         dataset = gb.OnDiskDataset(test_dir)
         dataset.yaml_data["graph_topology"]["type"] = "fake_type"
