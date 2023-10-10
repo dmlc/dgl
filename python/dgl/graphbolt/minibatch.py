@@ -96,6 +96,7 @@ class DGLMiniBatch:
     given type.
     """
 
+    # pylint: disable-next=error-name
     def to(self, device: torch.device) -> None:
         """Copy `DGLMiniBatch` to the specified device using reflection."""
 
@@ -394,6 +395,7 @@ class MiniBatch:
                     }
         return minibatch
 
+    # pylint: disable-next=error-name
     def to(self, device: torch.device) -> None:
         """Copy `MiniBatch` to the specified device using reflection."""
 
