@@ -1,12 +1,12 @@
 import dgl
 import dgl.graphbolt as gb
 import dgl.sparse as dglsp
-import gb_test_utils
 import torch
 
 
 def test_integration_link_prediction():
-    gb_test_utils.setup_seed(926)
+    torch.manual_seed(926)
+    
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
     indices = torch.tensor([5, 3, 3, 3, 3, 4, 4, 0, 5, 4])
 
@@ -39,7 +39,7 @@ def test_integration_link_prediction():
 
     item_set = gb.ItemSet(node_pairs, names="node_pairs")
     graph = gb.from_csc(indptr, indices)
-    # print(graph)
+
     node_feature = gb.TorchBasedFeature(node_feature_data)
     edge_feature = gb.TorchBasedFeature(edge_feature_data)
     features = {
@@ -160,7 +160,8 @@ def test_integration_link_prediction():
 
 
 def test_integration_node_classification():
-    gb_test_utils.setup_seed(926)
+    torch.manual_seed(926)
+    
     indptr = torch.tensor([0, 0, 1, 3, 6, 8, 10])
     indices = torch.tensor([5, 3, 3, 3, 3, 4, 4, 0, 5, 4])
 
@@ -193,7 +194,7 @@ def test_integration_node_classification():
 
     item_set = gb.ItemSet(node_pairs, names="node_pairs")
     graph = gb.from_csc(indptr, indices)
-    # print(graph)
+
     node_feature = gb.TorchBasedFeature(node_feature_data)
     edge_feature = gb.TorchBasedFeature(edge_feature_data)
     features = {
