@@ -164,7 +164,6 @@ def unique_and_compact_node_pairs(
         torch.Tensor,
         Dict[str, torch.Tensor],
     ] = None,
-    deduplicate=True,
 ):
     """
     Compact node pairs and return unique nodes (per type).
@@ -185,10 +184,6 @@ def unique_and_compact_node_pairs(
         - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
         - If `node_pairs` is a dictionary: The keys are node type and the
         values are corresponding nodes. And IDs inside are heterogeneous ids.
-    deduplicate: bool
-        Boolean indicating whether seeds between hops will be deduplicate.
-        If True, the same elements in seeds will be deleted to only one.
-        Otherwise, the same elements will be remained.
 
     Returns
     -------
@@ -251,14 +246,11 @@ def unique_and_compact_node_pairs(
         src = src_nodes.get(ntype, default_tensor)
         unique_dst = unique_dst_nodes.get(ntype, default_tensor)
         dst = dst_nodes.get(ntype, default_tensor)
-        if deduplicate:
-            (
-                unique_nodes[ntype],
-                compacted_src[ntype],
-                compacted_dst[ntype],
-            ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
-        # [TODO]: add function that return nodes without deduplication and
-        # compacted node pairs.
+        (
+            unique_nodes[ntype],
+            compacted_src[ntype],
+            compacted_dst[ntype],
+        ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
 
     compacted_node_pairs = {}
     # Map back with the same order.

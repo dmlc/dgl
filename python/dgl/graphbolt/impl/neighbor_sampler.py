@@ -113,9 +113,12 @@ class NeighborSampler(SubgraphSampler):
                 self.prob_name,
             )
             original_column_node_ids = seeds
-            seeds, compacted_node_pairs = unique_and_compact_node_pairs(
-                subgraph.node_pairs, seeds
-            )
+            if self.deduplicate:
+                seeds, compacted_node_pairs = unique_and_compact_node_pairs(
+                    subgraph.node_pairs, seeds
+                )
+            # [TODO]: add function that return nodes without deduplication and
+            # compacted node pairs.
             subgraph = SampledSubgraphImpl(
                 node_pairs=compacted_node_pairs,
                 original_column_node_ids=original_column_node_ids,
