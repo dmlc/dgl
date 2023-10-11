@@ -64,6 +64,7 @@ class BasicFeatureStore(FeatureStore):
         feature_name: str,
     ):
         """Get the size of the specified feature in the feature store.
+
         Parameters
         ----------
         domain : str
@@ -72,6 +73,7 @@ class BasicFeatureStore(FeatureStore):
             The node or edge type name.
         feature_name : str
             The feature name.
+
         Returns
         -------
         torch.Size

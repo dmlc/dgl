@@ -13,7 +13,7 @@ APIs
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
-    :template: classtemplate.rst
+    :template: graphbolt_classtemplate.rst
 
     Dataset
     Task
@@ -41,7 +41,7 @@ DataLoaders
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
-    :template: classtemplate.rst
+    :template: graphbolt_classtemplate.rst
 
     SingleProcessDataLoader
     MultiProcessDataLoader
@@ -52,7 +52,7 @@ Standard Implementations
 .. autosummary::
     :toctree: ../../generated/
     :nosignatures:
-    :template: classtemplate.rst
+    :template: graphbolt_classtemplate.rst
 
     OnDiskDataset
     BuiltinDataset

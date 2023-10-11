@@ -478,7 +478,7 @@ class OnDiskDataset(Dataset):
 
 class BuiltinDataset(OnDiskDataset):
     """A utility class to download built-in dataset from AWS S3 and load it as
-    ``OnDiskDataset``.
+    :class:`OnDiskDataset`.
 
     Available built-in datasets include:
 
