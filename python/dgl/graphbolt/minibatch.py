@@ -7,6 +7,7 @@ import torch
 
 import dgl
 from dgl.heterograph import DGLBlock
+from dgl.utils import recursive_apply
 
 from .base import etype_str_to_tuple
 from .sampled_subgraph import SampledSubgraph
@@ -94,6 +95,28 @@ class DGLMiniBatch:
     and the value should be a tuple of tensors representing node pairs of the
     given type.
     """
+
+    def __repr__(self) -> str:
+        return _dgl_minibatch_str(self)
+
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy `DGLMiniBatch` to the specified device using reflection."""
+
+        def _to(x, device):
+            return x.to(device) if hasattr(x, "to") else x
+
+        for attr in dir(self):
+            # Only copy member variables.
+            if not callable(getattr(self, attr)) and not attr.startswith("__"):
+                setattr(
+                    self,
+                    attr,
+                    recursive_apply(
+                        getattr(self, attr), lambda x: _to(x, device)
+                    ),
+                )
+
+        return self
 
 
 @dataclass
@@ -374,6 +397,25 @@ class MiniBatch:
                     }
         return minibatch
 
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy `MiniBatch` to the specified device using reflection."""
+
+        def _to(x, device):
+            return x.to(device) if hasattr(x, "to") else x
+
+        for attr in dir(self):
+            # Only copy member variables.
+            if not callable(getattr(self, attr)) and not attr.startswith("__"):
+                setattr(
+                    self,
+                    attr,
+                    recursive_apply(
+                        getattr(self, attr), lambda x: _to(x, device)
+                    ),
+                )
+
+        return self
+
 
 def _minibatch_str(minibatch: MiniBatch) -> str:
     final_str = ""
@@ -401,13 +443,15 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
             ]
             return "\n".join(lines)
 
-        # Let the variables in the list occupy one line each,
-        # and adjust the indentation on top of the original
-        # if the original data output has line feeds.
+        # Let the variables in the list occupy one line each, and adjust the
+        # indentation on top of the original if the original data output has
+        # line feeds.
         if isinstance(val, list):
-            # Special handling SampledSubgraphImpl data.
-            # Line feeds variables within this type.
-            if isinstance(
+            if len(val) == 0:
+                val = "[]"
+            # Special handling of SampledSubgraphImpl data. Each element of
+            # the data occupies one row and is further structured.
+            elif isinstance(
                 val[0],
                 dgl.graphbolt.impl.sampled_subgraph_impl.SampledSubgraphImpl,
             ):
@@ -438,3 +482,58 @@ def _minibatch_str(minibatch: MiniBatch) -> str:
             final_str + f"{name}={_add_indent(val, len(name)+1)},\n" + " " * 10
         )
     return "MiniBatch(" + final_str[:-3] + ")"
+
+
+def _dgl_minibatch_str(dglminibatch: DGLMiniBatch) -> str:
+    final_str = ""
+    # Get all attributes in the class except methods.
+
+    def _get_attributes(_obj) -> list:
+        attributes = [
+            attribute
+            for attribute in dir(_obj)
+            if not attribute.startswith("__")
+            and not callable(getattr(_obj, attribute))
+        ]
+        return attributes
+
+    attributes = _get_attributes(dglminibatch)
+    attributes.reverse()
+    # Insert key with its value into the string.
+    for name in attributes:
+        val = getattr(dglminibatch, name)
+
+        def _add_indent(_str, indent):
+            lines = _str.split("\n")
+            lines = [lines[0]] + [" " * indent + line for line in lines[1:]]
+            return "\n".join(lines)
+
+        # Let the variables in the list occupy one line each, and adjust the
+        # indentation on top of the original if the original data output has
+        # line feeds.
+        if isinstance(val, list):
+            if len(val) == 0:
+                val = "[]"
+            # Special handling of blocks data. Each element of list occupies
+            # one row and is further structured.
+            elif name == "blocks":
+                blocks_strs = []
+                for block in val:
+                    block_str = str(block).replace(" ", "\n")
+                    block_str = _add_indent(block_str, len("Block") + 1)
+                    blocks_strs.append(block_str)
+                val = "[" + ",\n".join(blocks_strs) + "]"
+            else:
+                val = [
+                    _add_indent(
+                        str(val_str), len(str(val_str).split("': ")[0]) + 3
+                    )
+                    for val_str in val
+                ]
+                val = "[" + ",\n".join(val) + "]"
+        else:
+            val = str(val)
+        final_str = (
+            final_str + f"{name}={_add_indent(val, len(name)+15)},\n" + " " * 13
+        )
+    return "DGLMiniBatch(" + final_str[:-3] + ")"

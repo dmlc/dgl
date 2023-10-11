@@ -12,17 +12,17 @@ __all__ = [
 
 class Task:
     """An abstract task which consists of meta information and
-    *Train-Validation-Test Set*.
+    Train/Validation/Test Set.
 
-    *meta information*:
-    The meta information of a task includes any kinds of data that are defined
-    by the user in YAML when instantiating the task.
+    * meta information
+        The meta information of a task includes any kinds of data that are
+        defined by the user in YAML when instantiating the task.
 
-    *Train-Validation-Test Set*:
-    The training-validation-testing (TVT) set which is used to train the neural
-    networks. We calculate the embeddings based on their respective features
-    and the graph structure, and then utilize the embeddings to optimize the
-    neural network parameters.
+    * Train/Validation/Test Set
+        The train/validation/test (TVT) set which is used to train the neural
+        networks. We calculate the embeddings based on their respective features
+        and the graph structure, and then utilize the embeddings to optimize the
+        neural network parameters.
     """
 
     @property
@@ -53,18 +53,18 @@ class Dataset:
     The data abstraction could be a native CPU memory block, a shared memory
     block, a file handle of an opened file on disk, a service that provides
     the API to access the data e.t.c. There are 3 primary components in the
-    dataset: *Task*, *Feature Storage*, *Graph Topology*.
+    dataset:
 
-    *Task*:
-    A task consists of several meta information and the
-    *Train-Validation-Test Set*. A dataset could have multiple tasks.
+    * Task
+        A task consists of several meta information and the
+        Train/Validation/Test Set. A dataset could have multiple tasks.
 
-    *Feature Storage*:
-    A key-value store which stores node/edge/graph features.
+    * Feature Storage
+        A key-value store which stores node/edge/graph features.
 
-    *Graph Topology*:
-    Graph topology is used by the subgraph sampling algorithm to
-    generate a subgraph.
+    * Graph Topology
+        Graph topology is used by the subgraph sampling algorithm to generate
+        a subgraph.
     """
 
     @property

@@ -8,10 +8,12 @@ import torch
 from ..base import etype_str_to_tuple
 from ..sampled_subgraph import SampledSubgraph
 
+__all__ = ["SampledSubgraphImpl"]
+
 
 @dataclass
 class SampledSubgraphImpl(SampledSubgraph):
-    r"""Class for sampled subgraph specific for CSCSamplingGraph.
+    r"""Sampled subgraph of CSCSamplingGraph.
 
     Examples
     --------

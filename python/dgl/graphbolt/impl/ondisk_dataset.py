@@ -279,13 +279,13 @@ class OnDiskTask:
 
 
 class OnDiskDataset(Dataset):
-    """An on-disk dataset.
+    """An on-disk dataset which reads graph topology, feature data and
+    Train/Validation/Test set from disk.
 
-    An on-disk dataset is a dataset which reads graph topology, feature data
-    and TVT set from disk. Due to limited resources, the data which are too
-    large to fit into RAM will remain on disk while others reside in RAM once
-    ``OnDiskDataset`` is initialized. This behavior could be controled by user
-    via ``in_memory`` field in YAML file.
+    Due to limited resources, the data which are too large to fit into RAM will
+    remain on disk while others reside in RAM once ``OnDiskDataset`` is
+    initialized. This behavior could be controled by user via ``in_memory``
+    field in YAML file.
 
     A full example of YAML file is as follows:
 
@@ -477,12 +477,10 @@ class OnDiskDataset(Dataset):
 
 
 class BuiltinDataset(OnDiskDataset):
-    """GraphBolt builtin on-disk dataset.
+    """A utility class to download built-in dataset from AWS S3 and load it as
+    :class:`OnDiskDataset`.
 
-    This class is used to help download datasets from DGL S3 storage and load
-    them as ``OnDiskDataset``.
-
-    Available builtin datasets include:
+    Available built-in datasets include:
 
     **ogbn-mag**
         The ogbn-mag dataset is a heterogeneous network composed of a subset of

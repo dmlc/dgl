@@ -28,6 +28,7 @@ class ItemSet:
     >>> from dgl import graphbolt as gb
 
     1. Single iterable: seed nodes.
+
     >>> node_ids = torch.arange(0, 5)
     >>> item_set = gb.ItemSet(node_ids, names="seed_nodes")
     >>> list(item_set)
@@ -36,6 +37,7 @@ class ItemSet:
     ('seed_nodes',)
 
     2. Tuple of iterables with same shape: seed nodes and labels.
+
     >>> node_ids = torch.arange(0, 5)
     >>> labels = torch.arange(5, 10)
     >>> item_set = gb.ItemSet(
@@ -47,6 +49,7 @@ class ItemSet:
     ('seed_nodes', 'labels')
 
     3. Tuple of iterables with different shape: node pairs and negative dsts.
+
     >>> node_pairs = torch.arange(0, 10).reshape(-1, 2)
     >>> neg_dsts = torch.arange(10, 25).reshape(-1, 3)
     >>> item_set = gb.ItemSet(
@@ -133,6 +136,7 @@ class ItemSetDict:
     >>> from dgl import graphbolt as gb
 
     1. Single iterable: seed nodes.
+
     >>> node_ids_user = torch.arange(0, 5)
     >>> node_ids_item = torch.arange(5, 10)
     >>> item_set = gb.ItemSetDict({
@@ -147,6 +151,7 @@ class ItemSetDict:
     ('seed_nodes',)
 
     2. Tuple of iterables with same shape: seed nodes and labels.
+
     >>> node_ids_user = torch.arange(0, 2)
     >>> labels_user = torch.arange(0, 2)
     >>> node_ids_item = torch.arange(2, 5)
@@ -166,6 +171,7 @@ class ItemSetDict:
     ('seed_nodes', 'labels')
 
     3. Tuple of iterables with different shape: node pairs and negative dsts.
+
     >>> node_pairs_like = torch.arange(0, 4).reshape(-1, 2)
     >>> neg_dsts_like = torch.arange(4, 10).reshape(-1, 3)
     >>> node_pairs_follow = torch.arange(0, 6).reshape(-1, 2)
