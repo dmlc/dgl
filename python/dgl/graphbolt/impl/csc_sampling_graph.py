@@ -16,6 +16,17 @@ from ..sampling_graph import SamplingGraph
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
+__all__ = [
+    "GraphMetadata",
+    "CSCSamplingGraph",
+    "from_csc",
+    "load_from_shared_memory",
+    "load_csc_sampling_graph",
+    "save_csc_sampling_graph",
+    "from_dglgraph",
+]
+
+
 class GraphMetadata:
     r"""Class for metadata of csc sampling graph."""
 
@@ -76,7 +87,7 @@ class GraphMetadata:
 
 
 class CSCSamplingGraph(SamplingGraph):
-    r"""Class for CSC sampling graph."""
+    r"""A sampling graph in CSC format."""
 
     def __repr__(self):
         return _csc_sampling_graph_str(self)
@@ -336,10 +347,10 @@ class CSCSamplingGraph(SamplingGraph):
         ----------
         nodes: torch.Tensor or Dict[str, torch.Tensor]
             IDs of the given seed nodes.
-            - If `nodes` is a tensor: It means the graph is homogeneous
-            graph, and ids inside are homogeneous ids.
-            - If `nodes` is a dictionary: The keys should be node type and
-            ids inside are heterogeneous ids.
+              - If `nodes` is a tensor: It means the graph is homogeneous
+                graph, and ids inside are homogeneous ids.
+              - If `nodes` is a dictionary: The keys should be node type and
+                ids inside are heterogeneous ids.
         fanouts: torch.Tensor
             The number of edges to be sampled for each node with or without
             considering edge types.
@@ -375,21 +386,22 @@ class CSCSamplingGraph(SamplingGraph):
         Examples
         --------
         >>> import dgl.graphbolt as gb
-        >>> ntypes = {'n1': 0, 'n2': 1, 'n3': 2}
-        >>> etypes = {('n1', 'e1', 'n2'): 0, ('n1', 'e2', 'n3'): 1}
+        >>> import torch
+        >>> ntypes = {"n1": 0, "n2": 1}
+        >>> etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
         >>> metadata = gb.GraphMetadata(ntypes, etypes)
-        >>> indptr = torch.LongTensor([0, 3, 4, 5, 7])
-        >>> indices = torch.LongTensor([0, 1, 3, 2, 3, 0, 1])
-        >>> node_type_offset = torch.LongTensor([0, 2, 3, 4])
-        >>> type_per_edge = torch.LongTensor([0, 0, 1, 0, 1, 0, 1])
+        >>> indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
+        >>> indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
+        >>> node_type_offset = torch.LongTensor([0, 2, 5])
+        >>> type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
         >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge,
-        ... node_type_offset=node_type_offset, metadata=metadata)
-        >>> nodes = {'n1': torch.LongTensor([1]), 'n2': torch.LongTensor([0])}
+        ...     node_type_offset=node_type_offset, metadata=metadata)
+        >>> nodes = {'n1': torch.LongTensor([0]), 'n2': torch.LongTensor([0])}
         >>> fanouts = torch.tensor([1, 1])
         >>> subgraph = graph.sample_neighbors(nodes, fanouts)
         >>> print(subgraph.node_pairs)
-        defaultdict(<class 'list'>, {('n1', 'e1', 'n2'): (tensor([2]), \
-        tensor([1])), ('n1', 'e2', 'n3'): (tensor([3]), tensor([2]))})
+        defaultdict(<class 'list'>, {'n1:e1:n2': (tensor([0]),
+          tensor([0])), 'n2:e2:n1': (tensor([2]), tensor([0]))})
         """
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)
@@ -510,10 +522,10 @@ class CSCSamplingGraph(SamplingGraph):
         ----------
         nodes: torch.Tensor or Dict[str, torch.Tensor]
             IDs of the given seed nodes.
-            - If `nodes` is a tensor: It means the graph is homogeneous
-            graph, and ids inside are homogeneous ids.
-            - If `nodes` is a dictionary: The keys should be node type and
-            ids inside are heterogeneous ids.
+              - If `nodes` is a tensor: It means the graph is homogeneous
+                graph, and ids inside are homogeneous ids.
+              - If `nodes` is a dictionary: The keys should be node type and
+                ids inside are heterogeneous ids.
         fanouts: torch.Tensor
             The number of edges to be sampled for each node with or without
             considering edge types.
@@ -548,7 +560,23 @@ class CSCSamplingGraph(SamplingGraph):
 
         Examples
         --------
-        TODO: Provide typical examples.
+        >>> import dgl.graphbolt as gb
+        >>> import torch
+        >>> ntypes = {"n1": 0, "n2": 1}
+        >>> etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
+        >>> metadata = gb.GraphMetadata(ntypes, etypes)
+        >>> indptr = torch.LongTensor([0, 2, 4, 6, 7, 9])
+        >>> indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 1])
+        >>> node_type_offset = torch.LongTensor([0, 2, 5])
+        >>> type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0])
+        >>> graph = gb.from_csc(indptr, indices, type_per_edge=type_per_edge,
+        ...     node_type_offset=node_type_offset, metadata=metadata)
+        >>> nodes = {'n1': torch.LongTensor([0]), 'n2': torch.LongTensor([0])}
+        >>> fanouts = torch.tensor([1, 1])
+        >>> subgraph = graph.sample_layer_neighbors(nodes, fanouts)
+        >>> print(subgraph.node_pairs)
+        defaultdict(<class 'list'>, {'n1:e1:n2': (tensor([1]),
+          tensor([0])), 'n2:e2:n1': (tensor([2]), tensor([0]))})
         """
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)

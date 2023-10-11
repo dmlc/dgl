@@ -165,6 +165,7 @@ class ItemSetDict:
     >>> from dgl import graphbolt as gb
 
     1. Single iterable: seed nodes.
+
     >>> node_ids_user = torch.arange(0, 5)
     >>> node_ids_item = torch.arange(5, 10)
     >>> item_set = gb.ItemSetDict({
@@ -179,6 +180,7 @@ class ItemSetDict:
     ('seed_nodes',)
 
     2. Tuple of iterables with same shape: seed nodes and labels.
+
     >>> node_ids_user = torch.arange(0, 2)
     >>> labels_user = torch.arange(0, 2)
     >>> node_ids_item = torch.arange(2, 5)
@@ -198,6 +200,7 @@ class ItemSetDict:
     ('seed_nodes', 'labels')
 
     3. Tuple of iterables with different shape: node pairs and negative dsts.
+
     >>> node_pairs_like = torch.arange(0, 4).reshape(-1, 2)
     >>> neg_dsts_like = torch.arange(4, 10).reshape(-1, 3)
     >>> node_pairs_follow = torch.arange(0, 6).reshape(-1, 2)
