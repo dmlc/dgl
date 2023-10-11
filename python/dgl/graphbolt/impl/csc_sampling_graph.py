@@ -8,12 +8,23 @@ from typing import Dict, Optional, Union
 
 import torch
 
-from ...base import ETYPE
+from ...base import EID, ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
 from ..sampling_graph import SamplingGraph
 from .sampled_subgraph_impl import SampledSubgraphImpl
+
+
+__all__ = [
+    "GraphMetadata",
+    "CSCSamplingGraph",
+    "from_csc",
+    "load_from_shared_memory",
+    "load_csc_sampling_graph",
+    "save_csc_sampling_graph",
+    "from_dglgraph",
+]
 
 
 class GraphMetadata:
@@ -76,7 +87,7 @@ class GraphMetadata:
 
 
 class CSCSamplingGraph(SamplingGraph):
-    r"""Class for CSC sampling graph."""
+    r"""A sampling graph in CSC format."""
 
     def __repr__(self):
         return _csc_sampling_graph_str(self)
@@ -810,13 +821,16 @@ def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
     # Assign edge type according to the order of CSC matrix.
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
 
+    # Assign edge attributes according to the original eids mapping.
+    edge_attributes = {ORIGINAL_EDGE_ID: homo_g.edata[EID][edge_ids]}
+
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(
             indptr,
             indices,
             node_type_offset,
             type_per_edge,
-            None,
+            edge_attributes,
         ),
         metadata,
     )

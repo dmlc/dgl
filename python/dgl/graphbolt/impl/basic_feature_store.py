@@ -10,7 +10,7 @@ __all__ = ["BasicFeatureStore"]
 
 
 class BasicFeatureStore(FeatureStore):
-    r"""Basic feature store."""
+    r"""A basic feature store to manage multiple features for access."""
 
     def __init__(self, features: Dict[Tuple[str, str, str], Feature]):
         r"""Initiate a basic feature store.

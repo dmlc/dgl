@@ -3,6 +3,9 @@
 from typing import Dict, Union
 
 
+__all__ = ["SamplingGraph"]
+
+
 class SamplingGraph:
     r"""Class for sampling graph."""
 

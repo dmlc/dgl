@@ -7,6 +7,7 @@ import torch
 
 import dgl
 from dgl.heterograph import DGLBlock
+from dgl.utils import recursive_apply
 
 from .base import etype_str_to_tuple
 from .sampled_subgraph import SampledSubgraph
@@ -17,7 +18,7 @@ __all__ = ["DGLMiniBatch", "MiniBatch"]
 @dataclass
 class DGLMiniBatch:
     r"""A data class designed for the DGL library, encompassing all the
-    necessary fields for computation using the DGL library.."""
+    necessary fields for computation using the DGL library."""
 
     blocks: List[DGLBlock] = None
     """A list of 'DGLBlock's, each one corresponding to one layer, representing
@@ -98,11 +99,31 @@ class DGLMiniBatch:
     def __repr__(self) -> str:
         return _dgl_minibatch_str(self)
 
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy `DGLMiniBatch` to the specified device using reflection."""
+
+        def _to(x, device):
+            return x.to(device) if hasattr(x, "to") else x
+
+        for attr in dir(self):
+            # Only copy member variables.
+            if not callable(getattr(self, attr)) and not attr.startswith("__"):
+                setattr(
+                    self,
+                    attr,
+                    recursive_apply(
+                        getattr(self, attr), lambda x: _to(x, device)
+                    ),
+                )
+
+        return self
+
 
 @dataclass
 class MiniBatch:
-    r"""A composite data class for data structure in the graphbolt. It is
-    designed to facilitate the exchange of data among different components
+    r"""A composite data class for data structure in the graphbolt.
+
+    It is designed to facilitate the exchange of data among different components
     involved in processing data. The purpose of this class is to unify the
     representation of input and output data across different stages, ensuring
     consistency and ease of use throughout the loading process."""
@@ -375,6 +396,25 @@ class MiniBatch:
                         for etype, neg_dst in self.compacted_negative_dsts.items()
                     }
         return minibatch
+
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy `MiniBatch` to the specified device using reflection."""
+
+        def _to(x, device):
+            return x.to(device) if hasattr(x, "to") else x
+
+        for attr in dir(self):
+            # Only copy member variables.
+            if not callable(getattr(self, attr)) and not attr.startswith("__"):
+                setattr(
+                    self,
+                    attr,
+                    recursive_apply(
+                        getattr(self, attr), lambda x: _to(x, device)
+                    ),
+                )
+
+        return self
 
 
 def _minibatch_str(minibatch: MiniBatch) -> str:

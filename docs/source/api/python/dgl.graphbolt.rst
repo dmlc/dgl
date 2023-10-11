@@ -5,7 +5,7 @@
 
 .. currentmodule:: dgl.graphbolt
 
-`dgl.graphbolt` is a dataloading framework for GNN that provides well-defined APIs for each stage of the data pipeline and multiple standard implementations.
+**dgl.graphbolt** is a dataloading framework for GNN that provides well-defined APIs for each stage of the data pipeline and multiple standard implementations.
 
 APIs
 -------------------------
@@ -20,18 +20,20 @@ APIs
     ItemSet
     ItemSetDict
     ItemSampler
+    DistributedItemSampler
     NegativeSampler
     SubgraphSampler
     SampledSubgraph
-    exclude_edges
+    SamplingGraph
+    MiniBatch
+    MiniBatchTransformer
+    DGLMiniBatch
+    DGLMiniBatchConverter
     Feature
-    Feature.read
-    Feature.update
     FeatureStore
-    FeatureStore.read
-    FeatureStore.update
     FeatureFetcher
     CopyTo
+
 
 DataLoaders
 -----------
@@ -54,8 +56,6 @@ Standard Implementations
 
     OnDiskDataset
     BuiltinDataset
-    OnDiskTask
-    OnDiskMetaData
     CSCSamplingGraph
     UniformNegativeSampler
     NeighborSampler

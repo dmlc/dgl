@@ -9,6 +9,10 @@ from .base import etype_str_to_tuple
 from .minibatch_transformer import MiniBatchTransformer
 from .utils import unique_and_compact
 
+__all__ = [
+    "SubgraphSampler",
+]
+
 
 @functional_datapipe("sample_subgraph")
 class SubgraphSampler(MiniBatchTransformer):
