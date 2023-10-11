@@ -118,8 +118,8 @@ class NeighborSampler(SubgraphSampler):
                 seeds, compacted_node_pairs = unique_and_compact_node_pairs(
                     subgraph.node_pairs, seeds
                 )
-            # [TODO]: add function that return nodes without deduplication and
-            # compacted node pairs.
+            else:
+                raise RuntimeError("Not implemented yet.")
             subgraph = SampledSubgraphImpl(
                 node_pairs=compacted_node_pairs,
                 original_column_node_ids=original_column_node_ids,
