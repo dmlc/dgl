@@ -256,8 +256,11 @@ class DistSparseGradOptimizer(abc.ABC):
         of the embeddings involved in a mini-batch to DGL's servers and update the embeddings.
         """
         with th.no_grad():
-            device = th.device(f"cuda:{self._rank}") if th.distributed.get_backend() == "nccl" \
+            device = (
+                th.device(f"cuda:{self._rank}")
+                if th.distributed.get_backend() == "nccl"
                 else th.device("cpu")
+            )
             local_indics = {emb.name: [] for emb in self._params}
             local_grads = {emb.name: [] for emb in self._params}
             for emb in self._params:
@@ -349,24 +352,26 @@ class DistSparseGradOptimizer(abc.ABC):
                             [self._world_size], dtype=th.int64, device=device
                         ).chunk(self._world_size)
                     )
-                    alltoall(self._rank,
-                            self._world_size,
-                            gather_list,
-                            idx_split_size,
-                            device,
-                        )
+                    alltoall(
+                        self._rank,
+                        self._world_size,
+                        gather_list,
+                        idx_split_size,
+                        device,
+                    )
                     idx_gather_list = [
                         th.empty(
                             (int(num_emb),), dtype=idics.dtype, device=device
                         )
                         for num_emb in gather_list
                     ]
-                    alltoallv(self._rank,
-                            self._world_size,
-                            idx_gather_list,
-                            idics_list,
-                            device,
-                        )
+                    alltoallv(
+                        self._rank,
+                        self._world_size,
+                        idx_gather_list,
+                        idics_list,
+                        device,
+                    )
                     local_indics[name] = idx_gather_list
                     grad_gather_list = [
                         th.empty(
@@ -376,12 +381,13 @@ class DistSparseGradOptimizer(abc.ABC):
                         )
                         for num_emb in gather_list
                     ]
-                    alltoallv(self._rank,
-                            self._world_size,
-                            grad_gather_list,
-                            grad_list,
-                            device,
-                        )
+                    alltoallv(
+                        self._rank,
+                        self._world_size,
+                        grad_gather_list,
+                        grad_list,
+                        device,
+                    )
                     local_grads[name] = grad_gather_list
                 else:
                     local_indics[name] = [idics]

@@ -81,8 +81,7 @@ def alltoall(rank, world_size, output_tensor_list, input_tensor_list, device):
     """
     if th.distributed.get_backend() == "nccl":
         input_tensor_list = [
-            tensor.to(th.device(device))
-            for tensor in input_tensor_list
+            tensor.to(th.device(device)) for tensor in input_tensor_list
         ]
         th.distributed.all_to_all(output_tensor_list, input_tensor_list)
     else:
@@ -113,8 +112,7 @@ def alltoallv(rank, world_size, output_tensor_list, input_tensor_list, device):
     """
     if th.distributed.get_backend() == "nccl":
         input_tensor_list = [
-            tensor.to(th.device(device))
-            for tensor in input_tensor_list
+            tensor.to(th.device(device)) for tensor in input_tensor_list
         ]
         th.distributed.all_to_all(output_tensor_list, input_tensor_list)
     else:
