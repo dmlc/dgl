@@ -26,7 +26,9 @@ def test_ItemSet_names():
     # Integer-initiated ItemSet with excessive names.
     with pytest.raises(
         AssertionError,
-        match=re.escape("Number of names mustn't exceed 1 when item is an integer.")
+        match=re.escape(
+            "Number of names mustn't exceed 1 when item is an integer."
+        ),
     ):
         _ = gb.ItemSet(5, names=("seed_nodes", "labels"))
 
