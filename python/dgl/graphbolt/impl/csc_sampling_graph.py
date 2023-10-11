@@ -15,6 +15,10 @@ from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
+def my_isin(elements, test_elements):
+    return torch.ops.graphbolt.my_isin(elements, test_elements)
+
+
 class GraphMetadata:
     r"""Class for metadata of csc sampling graph."""
 
