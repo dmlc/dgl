@@ -190,7 +190,7 @@ def unique_and_compact_node_pairs(
     Tuple[node_pairs, unique_nodes]
         The compacted node pairs, where node IDs are replaced with mapped node
         IDs, and the unique nodes (per type).
-        "Compacted node pairs" indicates that the nvode IDs in the input node
+        "Compacted node pairs" indicates that the node IDs in the input node
         pairs are replaced with mapped node IDs, where each type of node is
         mapped to a contiguous space of IDs ranging from 0 to N.
 
