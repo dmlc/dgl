@@ -470,7 +470,7 @@ class DistributedItemSampler(ItemSampler):
     Replica#3: [tensor([11,  7])]
 
     6. shuffle = True, drop_last = True, drop_uneven_inputs = True.
-    
+
     >>> item_sampler = gb.DistributedItemSampler(
     >>>     item_set, batch_size=2, shuffle=True, drop_last=True,
     >>>     drop_uneven_inputs=True
