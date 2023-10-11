@@ -13,7 +13,7 @@ def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     rank : int
         The rank of current worker
     world_size : int
-        The size of the entire
+        The size of the entire communicator
     output_tensor_list : List of tensor
         The received tensors
     input_tensor_list : List of tensor
@@ -37,7 +37,7 @@ def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     rank : int
         The rank of current worker
     world_size : int
-        The size of the entire
+        The size of the entire communicator
     output_tensor_list : List of tensor
         The received tensors
     input_tensor_list : List of tensor
@@ -71,7 +71,7 @@ def alltoall(rank, world_size, output_tensor_list, input_tensor_list, device):
     rank : int
         The rank of current worker
     world_size : int
-        The size of the entire
+        The size of the entire communicator
     output_tensor_list : List of tensor
         The received tensors
     input_tensor_list : List of tensor
@@ -102,7 +102,7 @@ def alltoallv(rank, world_size, output_tensor_list, input_tensor_list, device):
     rank : int
         The rank of current worker
     world_size : int
-        The size of the entire
+        The size of the entire communicator
     output_tensor_list : List of tensor
         The received tensors
     input_tensor_list : List of tensor
