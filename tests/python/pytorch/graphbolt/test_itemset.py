@@ -23,6 +23,13 @@ def test_ItemSet_names():
     item_set = gb.ItemSet(torch.arange(0, 5))
     assert item_set.names is None
 
+    # Integer-initiated ItemSet with excessive names.
+    with pytest.raises(
+        AssertionError,
+        match=re.escape("Number of names mustn't exceed 1 when item is an integer.")
+    ):
+        _ = gb.ItemSet(5, names=("seed_nodes", "labels"))
+
     # ItemSet with mismatched items and names.
     with pytest.raises(
         AssertionError,
@@ -32,11 +39,18 @@ def test_ItemSet_names():
 
 
 def test_ItemSet_length():
+    # Integer with valid length
+    num = 10
+    item_set = gb.ItemSet(num)
+    assert len(item_set) == 10
+    # Test __iter__() method. Same as below.
+    for i, item in enumerate(item_set):
+        assert i == item
+
     # Single iterable with valid length.
     ids = torch.arange(0, 5)
     item_set = gb.ItemSet(ids)
     assert len(item_set) == 5
-    # Test __iter__ method. Same as below.
     for i, item in enumerate(item_set):
         assert i == item.item()
 
