@@ -209,4 +209,5 @@ class LayerNeighborSampler(NeighborSampler):
         prob_name=None,
         deduplicate=True,
     ):
+        super().__init__(datapipe, graph, fanouts, replace, prob_name)
         self.sampler = graph.sample_layer_neighbors
