@@ -9,40 +9,40 @@ __all__ = ["GPUCachedFeature"]
 
 
 class GPUCachedFeature(Feature):
-    r"""GPU cached feature wrapping a fallback feature."""
+    r"""GPU cached feature wrapping a fallback feature.
+
+    Places the GPU cache to torch.cuda.current_device().
+
+    Parameters
+    ----------
+    fallback_feature : Feature
+        The fallback feature.
+    cache_size : int
+        The capacity of the GPU cache, the number of features to store.
+
+    Examples
+    --------
+    >>> import torch
+    >>> from dgl import graphbolt as gb
+    >>> torch_feat = torch.arange(10).reshape(2, -1).to("cuda")
+    >>> cache_size = 5
+    >>> fallback_feature = gb.TorchBasedFeature(torch_feat)
+    >>> feature = gb.GPUCachedFeature(fallback_feature, cache_size)
+    >>> feature.read()
+    tensor([[0, 1, 2, 3, 4],
+            [5, 6, 7, 8, 9]], device='cuda:0')
+    >>> feature.read(torch.tensor([0]).to("cuda"))
+    tensor([[0, 1, 2, 3, 4]], device='cuda:0')
+    >>> feature.update(torch.tensor([[1 for _ in range(5)]]).to("cuda"),
+    ...                torch.tensor([1]).to("cuda"))
+    >>> feature.read(torch.tensor([0, 1]).to("cuda"))
+    tensor([[0, 1, 2, 3, 4],
+            [1, 1, 1, 1, 1]], device='cuda:0')
+    >>> feature.size()
+    torch.Size([5])
+    """
 
     def __init__(self, fallback_feature: Feature, cache_size: int):
-        """Initialize GPU cached feature with a given fallback.
-        Places the GPU cache to torch.cuda.current_device().
-
-        Parameters
-        ----------
-        fallback_feature : Feature
-            The fallback feature.
-        cache_size : int
-            The capacity of the GPU cache, the number of features to store.
-
-        Examples
-        --------
-        >>> import torch
-        >>> from dgl import graphbolt as gb
-        >>> torch_feat = torch.arange(10).reshape(2, -1).to("cuda")
-        >>> cache_size = 5
-        >>> fallback_feature = gb.TorchBasedFeature(torch_feat)
-        >>> feature = gb.GPUCachedFeature(fallback_feature, cache_size)
-        >>> feature.read()
-        tensor([[0, 1, 2, 3, 4],
-                [5, 6, 7, 8, 9]], device='cuda:0')
-        >>> feature.read(torch.tensor([0]).to("cuda"))
-        tensor([[0, 1, 2, 3, 4]], device='cuda:0')
-        >>> feature.update(torch.tensor([[1 for _ in range(5)]]).to("cuda"),
-        ...                torch.tensor([1]).to("cuda"))
-        >>> feature.read(torch.tensor([0, 1]).to("cuda"))
-        tensor([[0, 1, 2, 3, 4],
-                [1, 1, 1, 1, 1]], device='cuda:0')
-        >>> feature.size()
-        torch.Size([5])
-        """
         super(GPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
             f"The fallback_feature must be an instance of Feature, but got "

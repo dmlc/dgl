@@ -105,6 +105,7 @@ class ItemSampler(IterDataPipe):
     Examples
     --------
     1. Node IDs.
+
     >>> import torch
     >>> from dgl import graphbolt as gb
     >>> item_set = gb.ItemSet(torch.arange(0, 10), names="seed_nodes")
@@ -119,6 +120,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_dsts=None)
 
     2. Node pairs.
+
     >>> item_set = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2),
     ...     names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
@@ -133,6 +135,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
     3. Node pairs and labels.
+
     >>> item_set = gb.ItemSet(
     ...     (torch.arange(0, 20).reshape(-1, 2), torch.arange(10, 20)),
     ...     names=("node_pairs", "labels")
@@ -149,6 +152,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
     4. Node pairs and negative destinations.
+
     >>> node_pairs = torch.arange(0, 20).reshape(-1, 2)
     >>> negative_dsts = torch.arange(10, 30).reshape(-1, 2)
     >>> item_set = gb.ItemSet((node_pairs, negative_dsts), names=("node_pairs",
@@ -168,6 +172,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
     5. DGLGraphs.
+
     >>> import dgl
     >>> graphs = [ dgl.rand_graph(10, 20) for _ in range(5) ]
     >>> item_set = gb.ItemSet(graphs)
@@ -181,7 +186,8 @@ class ItemSampler(IterDataPipe):
       edata_schemes={})]
 
     6. Further process batches with other datapipes such as
-    `torchdata.datapipes.iter.Mapper`.
+    :class:`torchdata.datapipes.iter.Mapper`.
+
     >>> item_set = gb.ItemSet(torch.arange(0, 10))
     >>> data_pipe = gb.ItemSampler(item_set, 4)
     >>> def add_one(batch):
@@ -191,6 +197,7 @@ class ItemSampler(IterDataPipe):
     [tensor([1, 2, 3, 4]), tensor([5, 6, 7, 8]), tensor([ 9, 10])]
 
     7. Heterogeneous node IDs.
+
     >>> ids = {
     ...     "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
     ...     "item": gb.ItemSet(torch.arange(0, 6), names="seed_nodes"),
@@ -205,6 +212,7 @@ class ItemSampler(IterDataPipe):
     compacted_negative_dsts=None)
 
     8. Heterogeneous node pairs.
+
     >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
     >>> node_pairs_follow = torch.arange(10, 20).reshape(-1, 2)
     >>> item_set = gb.ItemSetDict({
@@ -224,6 +232,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
     9. Heterogeneous node pairs and labels.
+
     >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
     >>> labels_like = torch.arange(0, 10)
     >>> node_pairs_follow = torch.arange(10, 20).reshape(-1, 2)
@@ -246,6 +255,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_dsts=None)
 
     10. Heterogeneous node pairs and negative destinations.
+
     >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
     >>> negative_dsts_like = torch.arange(10, 20).reshape(-1, 2)
     >>> node_pairs_follow = torch.arange(20, 30).reshape(-1, 2)
