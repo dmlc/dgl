@@ -136,7 +136,7 @@ class ItemSet:
 
     def __len__(self) -> int:
         if isinstance(self._items, int):
-            return self._items  # TODO: discuss the return value here.
+            return self._items
         if isinstance(self._items[0], Sized):
             return len(self._items[0])
         raise TypeError(
