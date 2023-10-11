@@ -19,9 +19,7 @@ __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
 
 
 def minibatcher_default(batch, names):
-    """Default minibatcher.
-
-    The default minibatcher maps a list of items to a `MiniBatch` with the
+    """Default minibatcher which maps a list of items to a `MiniBatch` with the
     same names as the items. The names of items are supposed to be provided
     and align with the data attributes of `MiniBatch`. If any unknown item name
     is provided, exception will be raised. If the names of items are not
@@ -80,11 +78,11 @@ def minibatcher_default(batch, names):
 
 
 class ItemSampler(IterDataPipe):
-    """Item Sampler.
+    """A sampler to iterate over input items and create subsets.
 
-    Creates item subset of data which could be node IDs, node pairs with or
-    without labels, node pairs with negative sources/destinations, DGLGraphs
-    and heterogeneous counterparts.
+    Input items could be node IDs, node pairs with or without labels, node
+    pairs with negative sources/destinations, DGLGraphs and heterogeneous
+    counterparts.
 
     Note: This class `ItemSampler` is not decorated with
     `torchdata.datapipes.functional_datapipe` on purpose. This indicates it
@@ -107,6 +105,7 @@ class ItemSampler(IterDataPipe):
     Examples
     --------
     1. Node IDs.
+
     >>> import torch
     >>> from dgl import graphbolt as gb
     >>> item_set = gb.ItemSet(torch.arange(0, 10), names="seed_nodes")
@@ -121,6 +120,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_dsts=None)
 
     2. Node pairs.
+
     >>> item_set = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2),
     ...     names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
@@ -135,6 +135,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
     3. Node pairs and labels.
+
     >>> item_set = gb.ItemSet(
     ...     (torch.arange(0, 20).reshape(-1, 2), torch.arange(10, 20)),
     ...     names=("node_pairs", "labels")
@@ -151,6 +152,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
     4. Node pairs and negative destinations.
+
     >>> node_pairs = torch.arange(0, 20).reshape(-1, 2)
     >>> negative_dsts = torch.arange(10, 30).reshape(-1, 2)
     >>> item_set = gb.ItemSet((node_pairs, negative_dsts), names=("node_pairs",
@@ -170,6 +172,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
     5. DGLGraphs.
+
     >>> import dgl
     >>> graphs = [ dgl.rand_graph(10, 20) for _ in range(5) ]
     >>> item_set = gb.ItemSet(graphs)
@@ -183,7 +186,8 @@ class ItemSampler(IterDataPipe):
       edata_schemes={})]
 
     6. Further process batches with other datapipes such as
-    `torchdata.datapipes.iter.Mapper`.
+    :class:`torchdata.datapipes.iter.Mapper`.
+
     >>> item_set = gb.ItemSet(torch.arange(0, 10))
     >>> data_pipe = gb.ItemSampler(item_set, 4)
     >>> def add_one(batch):
@@ -193,6 +197,7 @@ class ItemSampler(IterDataPipe):
     [tensor([1, 2, 3, 4]), tensor([5, 6, 7, 8]), tensor([ 9, 10])]
 
     7. Heterogeneous node IDs.
+
     >>> ids = {
     ...     "user": gb.ItemSet(torch.arange(0, 5), names="seed_nodes"),
     ...     "item": gb.ItemSet(torch.arange(0, 6), names="seed_nodes"),
@@ -207,6 +212,7 @@ class ItemSampler(IterDataPipe):
     compacted_negative_dsts=None)
 
     8. Heterogeneous node pairs.
+
     >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
     >>> node_pairs_follow = torch.arange(10, 20).reshape(-1, 2)
     >>> item_set = gb.ItemSetDict({
@@ -226,6 +232,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_srcs=None, compacted_negative_dsts=None)
 
     9. Heterogeneous node pairs and labels.
+
     >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
     >>> labels_like = torch.arange(0, 10)
     >>> node_pairs_follow = torch.arange(10, 20).reshape(-1, 2)
@@ -248,6 +255,7 @@ class ItemSampler(IterDataPipe):
         compacted_negative_dsts=None)
 
     10. Heterogeneous node pairs and negative destinations.
+
     >>> node_pairs_like = torch.arange(0, 10).reshape(-1, 2)
     >>> negative_dsts_like = torch.arange(10, 20).reshape(-1, 2)
     >>> node_pairs_follow = torch.arange(20, 30).reshape(-1, 2)
@@ -338,7 +346,7 @@ class ItemSampler(IterDataPipe):
 
 
 class DistributedItemSampler(ItemSampler):
-    """Distributed Item Sampler.
+    """A sampler to iterate over input items and create subsets distributedly.
 
     This sampler creates a distributed subset of items from the given data set,
     which can be used for training with PyTorch's Distributed Data Parallel
@@ -346,6 +354,10 @@ class DistributedItemSampler(ItemSampler):
     pairs with negative sources/destinations, DGLGraphs, or heterogeneous
     counterparts. The original item set is sharded such that each replica
     (process) receives an exclusive subset.
+
+    Note: DistributedItemSampler may not work as expected when it is the last
+    datapipe before the data is fetched. Please wrap a SingleProcessDataLoader
+    or another datapipe on it.
 
     Note: The items will be first sharded onto each replica, then get shuffled
     (if needed) and batched. Therefore, each replica will always get a same set
@@ -389,48 +401,97 @@ class DistributedItemSampler(ItemSampler):
 
     Examples
     --------
-    1. num_replica = 4, batch_size = 2, shuffle = False, drop_last = False,
-    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 7, 8, 9]
-    - Replica#0 gets [[0, 4], [8]]
-    - Replica#1 gets [[1, 5], [9]]
-    - Replica#2 gets [[2, 6]]
-    - Replica#3 gets [[3, 7]]
+    0. Preparation: DistributedItemSampler needs multi-processing environment to
+    work. You need to spawn subprocesses and initialize processing group before
+    executing following examples. Due to randomness, the output is not always
+    the same as listed below.
 
-    2. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
-    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 7, 8, 9].
-    - Replica#0 gets [[0, 4]]
-    - Replica#1 gets [[1, 5]]
-    - Replica#2 gets [[2, 6]]
-    - Replica#3 gets [[3, 7]]
+    >>> import torch
+    >>> from dgl import graphbolt as gb
+    >>> item_set = gb.ItemSet(torch.arange(0, 13))
+    >>> num_replicas = 4
+    >>> batch_size = 2
+    >>> mp.spawn(...)
 
-    3. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
-    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 11, 12, 13].
-    - Replica#0 gets [[0, 4], [8, 12]]
-    - Replica#1 gets [[1, 5], [9, 13]]
-    - Replica#2 gets [[2, 6]]
-    - Replica#3 gets [[3, 7]]
+    1. shuffle = False, drop_last = False, drop_uneven_inputs = False.
 
-    3. num_replica = 4, batch_size = 2, shuffle = False, drop_last = False,
-    drop_uneven_inputs = True, item_set = [0, 1, 2, ..., 11, 12, 13].
-    - Replica#0 gets [[0, 4], [8, 12]]
-    - Replica#1 gets [[1, 5], [9, 13]]
-    - Replica#2 gets [[2, 6], [10]]
-    - Replica#3 gets [[3, 7], [11]]
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=False, drop_last=False,
+    >>>     drop_uneven_inputs=False
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    Replica#0: [tensor([0, 4]), tensor([ 8, 12])]
+    Replica#1: [tensor([1, 5]), tensor([ 9, 13])]
+    Replica#2: [tensor([2, 6]), tensor([10])]
+    Replica#3: [tensor([3, 7]), tensor([11])]
 
-    4. num_replica = 4, batch_size = 2, shuffle = False, drop_last = True,
-    drop_uneven_inputs = True, item_set = [0, 1, 2, ..., 11, 12, 13].
-    - Replica#0 gets [[0, 4]]
-    - Replica#1 gets [[1, 5]]
-    - Replica#2 gets [[2, 6]]
-    - Replica#3 gets [[3, 7]]
+    2. shuffle = False, drop_last = True, drop_uneven_inputs = False.
 
-    5. num_replica = 4, batch_size = 2, shuffle = True, drop_last = True,
-    drop_uneven_inputs = False, item_set = [0, 1, 2, ..., 11, 12, 13].
-    One possible output:
-    - Replica#0 gets [[8, 0], [12, 4]]
-    - Replica#1 gets [[13, 1], [9, 5]]
-    - Replica#2 gets [[10, 2]]
-    - Replica#3 gets [[7, 11]]
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=False, drop_last=True,
+    >>>     drop_uneven_inputs=False
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    Replica#0: [tensor([0, 4]), tensor([ 8, 12])]
+    Replica#1: [tensor([1, 5]), tensor([ 9, 13])]
+    Replica#2: [tensor([2, 6])]
+    Replica#3: [tensor([3, 7])]
+
+    3. shuffle = False, drop_last = False, drop_uneven_inputs = True.
+
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=False, drop_last=False,
+    >>>     drop_uneven_inputs=True
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    Replica#0: [tensor([0, 4]), tensor([ 8, 12])]
+    Replica#1: [tensor([1, 5]), tensor([ 9, 13])]
+    Replica#2: [tensor([2, 6]), tensor([10])]
+    Replica#3: [tensor([3, 7]), tensor([11])]
+
+    4. shuffle = False, drop_last = True, drop_uneven_inputs = True.
+
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=False, drop_last=True,
+    >>>     drop_uneven_inputs=True
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    Replica#0: [tensor([0, 4])]
+    Replica#1: [tensor([1, 5])]
+    Replica#2: [tensor([2, 6])]
+    Replica#3: [tensor([3, 7])]
+
+    5. shuffle = True, drop_last = True, drop_uneven_inputs = False.
+
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=True, drop_last=True,
+    >>>     drop_uneven_inputs=False
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    (One possible output:)
+    Replica#0: [tensor([0, 8]), tensor([ 4, 12])]
+    Replica#1: [tensor([ 5, 13]), tensor([9, 1])]
+    Replica#2: [tensor([ 2, 10])]
+    Replica#3: [tensor([11,  7])]
+
+    6. shuffle = True, drop_last = True, drop_uneven_inputs = True.
+
+    >>> item_sampler = gb.DistributedItemSampler(
+    >>>     item_set, batch_size=2, shuffle=True, drop_last=True,
+    >>>     drop_uneven_inputs=True
+    >>> )
+    >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
+    >>> print(f"Replica#{proc_id}: {list(data_loader)})
+    (One possible output:)
+    Replica#0: [tensor([8, 0])]
+    Replica#1: [tensor([ 1, 13])]
+    Replica#2: [tensor([10,  6])]
+    Replica#3: [tensor([ 3, 11])]
     """
 
     def __init__(

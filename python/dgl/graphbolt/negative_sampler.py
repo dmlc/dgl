@@ -6,6 +6,10 @@ from torch.utils.data import functional_datapipe
 
 from .minibatch_transformer import MiniBatchTransformer
 
+__all__ = [
+    "NegativeSampler",
+]
+
 
 @functional_datapipe("sample_negative")
 class NegativeSampler(MiniBatchTransformer):

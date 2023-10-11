@@ -7,6 +7,11 @@ from torch.utils.data import functional_datapipe
 from .minibatch_transformer import MiniBatchTransformer
 
 
+__all__ = [
+    "FeatureFetcher",
+]
+
+
 @functional_datapipe("fetch_feature")
 class FeatureFetcher(MiniBatchTransformer):
     """A feature fetcher used to fetch features for node/edge in graphbolt."""

@@ -36,6 +36,7 @@ Contributors
 * [Michal Szarmach](https://github.com/mszarma) from Intel
 * [Izabela Mazur](https://github.com/IzabelaMazur) from Intel
 * [Sanchit Misra](https://github.com/sanchit-misra) from Intel
+* [Andrzej Kotlowski](https://github.com/anko-intel) from Intel
 * [Sheng Zha](https://github.com/szha) from AWS
 * [Yifei Ma](https://github.com/yifeim) from  AWS
 * [Yizhi Liu](https://github.com/yzhliu) from AWS
