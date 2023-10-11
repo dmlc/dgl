@@ -7,6 +7,9 @@ import torch
 from .base import etype_str_to_tuple
 
 
+__all__ = ["SampledSubgraph"]
+
+
 class SampledSubgraph:
     r"""An abstract class for sampled subgraph. In the context of a
     heterogeneous graph, each field should be of `Dict` type. Otherwise,

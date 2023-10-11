@@ -182,6 +182,84 @@ def test_hetero_graph(total_num_nodes, total_num_edges, num_ntypes, num_etypes):
     reason="Graph is CPU only at present.",
 )
 @pytest.mark.parametrize(
+    "total_num_nodes, total_num_edges",
+    [(1, 1), (100, 1), (10, 50), (1000, 50000)],
+)
+def test_num_nodes_homo(total_num_nodes, total_num_edges):
+    csc_indptr, indices = gbt.random_homo_graph(
+        total_num_nodes, total_num_edges
+    )
+    edge_attributes = {
+        "A1": torch.randn(total_num_edges),
+        "A2": torch.randn(total_num_edges),
+    }
+    graph = gb.from_csc(csc_indptr, indices, edge_attributes=edge_attributes)
+
+    assert graph.num_nodes == total_num_nodes
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+def test_num_nodes_hetero():
+    """Original graph in COO:
+    1   0   1   0   1
+    1   0   1   1   0
+    0   1   0   1   0
+    0   1   0   0   1
+    1   0   0   0   1
+
+    node_type_0: [0, 1]
+    node_type_1: [2, 3, 4]
+    edge_type_0: node_type_0 -> node_type_0
+    edge_type_1: node_type_0 -> node_type_1
+    edge_type_2: node_type_1 -> node_type_0
+    edge_type_3: node_type_1 -> node_type_1
+    """
+    # Initialize data.
+    total_num_nodes = 5
+    total_num_edges = 12
+    ntypes = {
+        "N0": 0,
+        "N1": 1,
+    }
+    etypes = {
+        "N0:R0:N0": 0,
+        "N0:R1:N1": 1,
+        "N1:R2:N0": 2,
+        "N1:R3:N1": 3,
+    }
+    indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+    indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+    node_type_offset = torch.LongTensor([0, 2, 5])
+    type_per_edge = torch.LongTensor([0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+    assert indptr[-1] == total_num_edges
+    assert indptr[-1] == len(indices)
+    assert node_type_offset[-1] == total_num_nodes
+    assert all(type_per_edge < len(etypes))
+
+    # Construct CSCSamplingGraph.
+    metadata = gb.GraphMetadata(ntypes, etypes)
+    graph = gb.from_csc(
+        indptr, indices, node_type_offset, type_per_edge, None, metadata
+    )
+
+    # Verify nodes number per node types.
+    assert graph.num_nodes == {
+        "N0": 2,
+        "N1": 3,
+    }
+    assert graph.num_nodes["N0"] == 2
+    assert graph.num_nodes["N1"] == 3
+    assert "N2" not in graph.num_nodes
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Graph is CPU only at present.",
+)
+@pytest.mark.parametrize(
     "node_type_offset",
     [
         torch.tensor([0, 1]),
@@ -1218,6 +1296,15 @@ def test_from_dglgraph_homogeneous():
     dgl_g = dgl.rand_graph(1000, 10 * 1000)
     gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=True)
 
+    # Get the COO representation of the CSCSamplingGraph.
+    num_columns = gb_g.csc_indptr[1:] - gb_g.csc_indptr[:-1]
+    rows = gb_g.indices
+    columns = torch.arange(gb_g.total_num_nodes).repeat_interleave(num_columns)
+
+    original_edge_ids = gb_g.edge_attributes[gb.ORIGINAL_EDGE_ID]
+    assert torch.all(dgl_g.edges()[0][original_edge_ids] == rows)
+    assert torch.all(dgl_g.edges()[1][original_edge_ids] == columns)
+
     assert gb_g.total_num_nodes == dgl_g.num_nodes()
     assert gb_g.total_num_edges == dgl_g.num_edges()
     assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 1000]))
@@ -1249,6 +1336,40 @@ def test_from_dglgraph_heterogeneous():
         }
     )
     gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=False)
+
+    # `reverse_node_id` is used to map the node id in CSCSamplingGraph to the
+    # node id in Hetero-DGLGraph.
+    num_ntypes = gb_g.node_type_offset[1:] - gb_g.node_type_offset[:-1]
+    reverse_node_id = torch.cat([torch.arange(num) for num in num_ntypes])
+
+    # Get the COO representation of the CSCSamplingGraph.
+    num_columns = gb_g.csc_indptr[1:] - gb_g.csc_indptr[:-1]
+    rows = reverse_node_id[gb_g.indices]
+    columns = reverse_node_id[
+        torch.arange(gb_g.total_num_nodes).repeat_interleave(num_columns)
+    ]
+
+    # Check the order of etypes in DGLGraph is the same as CSCSamplingGraph.
+    assert (
+        # Since the etypes in CSCSamplingGraph is "srctype:etype:dsttype",
+        # we need to split the string and get the middle part.
+        list(
+            map(
+                lambda ss: ss.split(":")[1],
+                gb_g.metadata.edge_type_to_id.keys(),
+            )
+        )
+        == dgl_g.etypes
+    )
+
+    # Use ORIGINAL_EDGE_ID to check if the edge mapping is correct.
+    for edge_idx in range(gb_g.total_num_edges):
+        hetero_graph_idx = gb_g.type_per_edge[edge_idx]
+        original_edge_id = gb_g.edge_attributes[gb.ORIGINAL_EDGE_ID][edge_idx]
+        edge_type = dgl_g.etypes[hetero_graph_idx]
+        dgl_edge_pairs = dgl_g.edges(etype=edge_type)
+        assert dgl_edge_pairs[0][original_edge_id] == rows[edge_idx]
+        assert dgl_edge_pairs[1][original_edge_id] == columns[edge_idx]
 
     assert gb_g.total_num_nodes == dgl_g.num_nodes()
     assert gb_g.total_num_edges == dgl_g.num_edges()

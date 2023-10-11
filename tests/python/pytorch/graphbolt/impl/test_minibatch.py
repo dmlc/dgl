@@ -106,7 +106,7 @@ def create_hetero_minibatch():
     )
 
 
-def test_representation():
+def test_minibatch_representation():
     node_pairs = [
         (
             torch.tensor([0, 1, 2, 2, 2, 1]),
@@ -218,6 +218,91 @@ def test_representation():
     )
     result = str(minibatch)
     assert result == expect_result, print(expect_result, result)
+
+
+def test_dgl_minibatch_representation():
+    node_pairs = [
+        (
+            torch.tensor([0, 1, 2, 2, 2, 1]),
+            torch.tensor([0, 1, 1, 2, 3, 2]),
+        ),
+        (
+            torch.tensor([0, 1, 2]),
+            torch.tensor([1, 0, 0]),
+        ),
+    ]
+    original_column_node_ids = [
+        torch.tensor([10, 11, 12, 13]),
+        torch.tensor([10, 11]),
+    ]
+    original_row_node_ids = [
+        torch.tensor([10, 11, 12, 13]),
+        torch.tensor([10, 11, 12]),
+    ]
+    original_edge_ids = [
+        torch.tensor([19, 20, 21, 22, 25, 30]),
+        torch.tensor([10, 15, 17]),
+    ]
+    node_features = {"x": torch.tensor([7, 6, 2, 2])}
+    edge_features = [
+        {"x": torch.tensor([[8], [1], [6]])},
+        {"x": torch.tensor([[2], [8], [8]])},
+    ]
+    subgraphs = []
+    for i in range(2):
+        subgraphs.append(
+            gb.SampledSubgraphImpl(
+                node_pairs=node_pairs[i],
+                original_column_node_ids=original_column_node_ids[i],
+                original_row_node_ids=original_row_node_ids[i],
+                original_edge_ids=original_edge_ids[i],
+            )
+        )
+    negative_srcs = torch.tensor([[8], [1], [6]])
+    negative_dsts = torch.tensor([[2], [8], [8]])
+    input_nodes = torch.tensor([8, 1, 6, 5, 9, 0, 2, 4])
+    compacted_node_pairs = (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5]))
+    compacted_negative_srcs = torch.tensor([0, 1, 2])
+    compacted_negative_dsts = torch.tensor([6, 0, 0])
+    labels = torch.tensor([0.0, 1.0, 2.0])
+    # Test dglminibatch with all attributes.
+    minibatch = gb.MiniBatch(
+        node_pairs=node_pairs,
+        sampled_subgraphs=subgraphs,
+        labels=labels,
+        node_features=node_features,
+        edge_features=edge_features,
+        negative_srcs=negative_srcs,
+        negative_dsts=negative_dsts,
+        compacted_node_pairs=compacted_node_pairs,
+        input_nodes=input_nodes,
+        compacted_negative_srcs=compacted_negative_srcs,
+        compacted_negative_dsts=compacted_negative_dsts,
+    )
+    dgl_minibatch = minibatch.to_dgl()
+    expect_result = str(
+        """DGLMiniBatch(positive_node_pairs=(tensor([0, 1, 2]), tensor([3, 4, 5])),
+             output_nodes=None,
+             node_features={'x': tensor([7, 6, 2, 2])},
+             negative_node_pairs=(tensor([0, 1, 2]), tensor([6, 0, 0])),
+             labels=tensor([0., 1., 2.]),
+             input_nodes=tensor([8, 1, 6, 5, 9, 0, 2, 4]),
+             edge_features=[{'x': tensor([[8],
+                                          [1],
+                                          [6]])},
+                            {'x': tensor([[2],
+                                          [8],
+                                          [8]])}],
+             blocks=[Block(num_src_nodes=4,
+                           num_dst_nodes=4,
+                           num_edges=6),
+                     Block(num_src_nodes=3,
+                           num_dst_nodes=2,
+                           num_edges=3)],
+          )"""
+    )
+    result = str(dgl_minibatch)
+    assert result == expect_result, print(result)
 
 
 def check_dgl_blocks_hetero(minibatch, blocks):

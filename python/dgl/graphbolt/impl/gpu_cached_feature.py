@@ -9,35 +9,40 @@ __all__ = ["GPUCachedFeature"]
 
 
 class GPUCachedFeature(Feature):
-    r"""GPU cached feature wrapping a fallback feature."""
+    r"""GPU cached feature wrapping a fallback feature.
+
+    Places the GPU cache to torch.cuda.current_device().
+
+    Parameters
+    ----------
+    fallback_feature : Feature
+        The fallback feature.
+    cache_size : int
+        The capacity of the GPU cache, the number of features to store.
+
+    Examples
+    --------
+    >>> import torch
+    >>> from dgl import graphbolt as gb
+    >>> torch_feat = torch.arange(10).reshape(2, -1).to("cuda")
+    >>> cache_size = 5
+    >>> fallback_feature = gb.TorchBasedFeature(torch_feat)
+    >>> feature = gb.GPUCachedFeature(fallback_feature, cache_size)
+    >>> feature.read()
+    tensor([[0, 1, 2, 3, 4],
+            [5, 6, 7, 8, 9]], device='cuda:0')
+    >>> feature.read(torch.tensor([0]).to("cuda"))
+    tensor([[0, 1, 2, 3, 4]], device='cuda:0')
+    >>> feature.update(torch.tensor([[1 for _ in range(5)]]).to("cuda"),
+    ...                torch.tensor([1]).to("cuda"))
+    >>> feature.read(torch.tensor([0, 1]).to("cuda"))
+    tensor([[0, 1, 2, 3, 4],
+            [1, 1, 1, 1, 1]], device='cuda:0')
+    >>> feature.size()
+    torch.Size([5])
+    """
 
     def __init__(self, fallback_feature: Feature, cache_size: int):
-        """Initialize GPU cached feature with a given fallback.
-        Places the GPU cache to torch.cuda.current_device().
-
-        Parameters
-        ----------
-        fallback_feature : Feature
-            The fallback feature.
-        cache_size : int
-            The capacity of the GPU cache, the number of features to store.
-
-        Examples
-        --------
-        >>> import torch
-        >>> torch_feat = torch.arange(0, 8)
-        >>> cache_size = 5
-        >>> fallback_feature = TorchBasedFeature(torch_feat)
-        >>> feature = GPUCachedFeature(fallback_feature, cache_size)
-        >>> feature.read()
-        tensor([0, 1, 2, 3, 4, 5, 6, 7])
-        >>> feature.read(torch.tensor([0, 1, 2]))
-        tensor([0, 1, 2])
-        >>> feature.update(torch.ones(3, dtype=torch.long),
-        ... torch.tensor([0, 1, 2]))
-        >>> feature.read(torch.tensor([0, 1, 2, 3]))
-        tensor([1, 1, 1, 3])
-        """
         super(GPUCachedFeature, self).__init__()
         assert isinstance(fallback_feature, Feature), (
             f"The fallback_feature must be an instance of Feature, but got "
@@ -80,6 +85,16 @@ class GPUCachedFeature(Feature):
         self._feature.replace(missing_keys, missing_values)
         return torch.reshape(values, self.item_shape)
 
+    def size(self):
+        """Get the size of the feature.
+
+        Returns
+        -------
+        torch.Size
+            The size of the feature.
+        """
+        return self._fallback_feature.size()
+
     def update(self, value: torch.Tensor, ids: torch.Tensor = None):
         """Update the feature.
 
@@ -102,10 +117,6 @@ class GPUCachedFeature(Feature):
                 value[:size].to("cuda").reshape(self.flat_shape),
             )
         else:
-            assert ids.shape[0] == value.shape[0], (
-                f"ids and value must have the same length, "
-                f"but got {ids.shape[0]} and {value.shape[0]}."
-            )
             self._fallback_feature.update(value, ids)
             self._feature.replace(
                 ids.to("cuda"), value.to("cuda").reshape(self.flat_shape)

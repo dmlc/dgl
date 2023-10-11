@@ -279,13 +279,13 @@ class OnDiskTask:
 
 
 class OnDiskDataset(Dataset):
-    """An on-disk dataset.
+    """An on-disk dataset which reads graph topology, feature data and
+    Train/Validation/Test set from disk.
 
-    An on-disk dataset is a dataset which reads graph topology, feature data
-    and TVT set from disk. Due to limited resources, the data which are too
-    large to fit into RAM will remain on disk while others reside in RAM once
-    ``OnDiskDataset`` is initialized. This behavior could be controled by user
-    via ``in_memory`` field in YAML file.
+    Due to limited resources, the data which are too large to fit into RAM will
+    remain on disk while others reside in RAM once ``OnDiskDataset`` is
+    initialized. This behavior could be controled by user via ``in_memory``
+    field in YAML file.
 
     A full example of YAML file is as follows:
 
@@ -477,12 +477,10 @@ class OnDiskDataset(Dataset):
 
 
 class BuiltinDataset(OnDiskDataset):
-    """GraphBolt builtin on-disk dataset.
+    """A utility class to download built-in dataset from AWS S3 and load it as
+    :class:`OnDiskDataset`.
 
-    This class is used to help download datasets from DGL S3 storage and load
-    them as ``OnDiskDataset``.
-
-    Available builtin datasets include:
+    Available built-in datasets include:
 
     **ogbn-mag**
         The ogbn-mag dataset is a heterogeneous network composed of a subset of
@@ -528,23 +526,34 @@ class BuiltinDataset(OnDiskDataset):
         The root directory of the dataset. Default ot ``datasets``.
     """
 
+    # For dataset that is smaller than 30GB, we use the base url.
+    # Otherwise, we use the accelerated url.
     _base_url = "https://data.dgl.ai/dataset/graphbolt/"
+    _accelerated_url = (
+        "https://dgl-data.s3-accelerate.amazonaws.com/dataset/graphbolt/"
+    )
     _datasets = [
         "ogbn-mag",
         "ogbl-citation2",
         "ogbn-products",
-        "ogb-lsc-mag240m",
     ]
+    _large_datasets = ["ogb-lsc-mag240m"]
+    _all_datasets = _datasets + _large_datasets
 
     def __init__(self, name: str, root: str = "datasets") -> OnDiskDataset:
         dataset_dir = os.path.join(root, name)
         if not os.path.exists(dataset_dir):
-            if name not in self._datasets:
+            if name not in self._all_datasets:
                 raise RuntimeError(
                     f"Dataset {name} is not available. Available datasets are "
-                    f"{self._datasets}."
+                    f"{self._all_datasets}."
                 )
-            url = self._base_url + name + ".zip"
+            url = (
+                self._accelerated_url
+                if name in self._large_datasets
+                else self._base_url
+            )
+            url += name + ".zip"
             os.makedirs(root, exist_ok=True)
             zip_file_path = os.path.join(root, name + ".zip")
             download(url, path=zip_file_path)
