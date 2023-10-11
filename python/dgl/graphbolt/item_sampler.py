@@ -395,6 +395,7 @@ class DistributedItemSampler(ItemSampler):
     work. You need to spawn subprocesses and initialize processing group before
     executing following examples. Due to randomness, the output is not always
     the same as listed below.
+
     >>> import torch
     >>> from dgl import graphbolt as gb
     >>> item_set = gb.ItemSet(torch.arange(0, 13))
@@ -403,6 +404,7 @@ class DistributedItemSampler(ItemSampler):
     >>> mp.spawn(...)
 
     1. shuffle = False, drop_last = False, drop_uneven_inputs = False.
+
     >>> item_sampler = gb.DistributedItemSampler(
     >>>     item_set, batch_size=2, shuffle=False, drop_last=False,
     >>>     drop_uneven_inputs=False
@@ -415,6 +417,7 @@ class DistributedItemSampler(ItemSampler):
     Replica#3: [tensor([3, 7]), tensor([11])]
 
     2. shuffle = False, drop_last = True, drop_uneven_inputs = False.
+
     >>> item_sampler = gb.DistributedItemSampler(
     >>>     item_set, batch_size=2, shuffle=False, drop_last=True,
     >>>     drop_uneven_inputs=False
@@ -427,6 +430,7 @@ class DistributedItemSampler(ItemSampler):
     Replica#3: [tensor([3, 7])]
 
     3. shuffle = False, drop_last = False, drop_uneven_inputs = True.
+
     >>> item_sampler = gb.DistributedItemSampler(
     >>>     item_set, batch_size=2, shuffle=False, drop_last=False,
     >>>     drop_uneven_inputs=True
@@ -439,6 +443,7 @@ class DistributedItemSampler(ItemSampler):
     Replica#3: [tensor([3, 7]), tensor([11])]
 
     4. shuffle = False, drop_last = True, drop_uneven_inputs = True.
+
     >>> item_sampler = gb.DistributedItemSampler(
     >>>     item_set, batch_size=2, shuffle=False, drop_last=True,
     >>>     drop_uneven_inputs=True
@@ -451,6 +456,7 @@ class DistributedItemSampler(ItemSampler):
     Replica#3: [tensor([3, 7])]
 
     5. shuffle = True, drop_last = True, drop_uneven_inputs = False.
+
     >>> item_sampler = gb.DistributedItemSampler(
     >>>     item_set, batch_size=2, shuffle=True, drop_last=True,
     >>>     drop_uneven_inputs=False
@@ -464,6 +470,7 @@ class DistributedItemSampler(ItemSampler):
     Replica#3: [tensor([11,  7])]
 
     6. shuffle = True, drop_last = True, drop_uneven_inputs = True.
+    
     >>> item_sampler = gb.DistributedItemSampler(
     >>>     item_set, batch_size=2, shuffle=True, drop_last=True,
     >>>     drop_uneven_inputs=True
