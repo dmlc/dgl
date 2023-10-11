@@ -211,5 +211,7 @@ class LayerNeighborSampler(NeighborSampler):
         (tensor([0, 0, 0]), tensor([1, 1, 1]))
         3
         """
-        super().__init__(datapipe, graph, fanouts, replace, prob_name, deduplicate)
+        super().__init__(
+            datapipe, graph, fanouts, replace, prob_name, deduplicate
+        )
         self.sampler = graph.sample_layer_neighbors
