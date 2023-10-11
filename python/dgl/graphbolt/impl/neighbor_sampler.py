@@ -44,6 +44,10 @@ class NeighborSampler(SubgraphSampler):
         probabilities corresponding to each neighboring edge of a node.
         It must be a 1D floating-point or boolean tensor, with the number
         of elements equalling the total number of edges.
+    deduplicated: bool
+        Boolean indicating whether seeds between hops will be deduplicated.
+        If True, the same elements in seeds will be deleted to only one.
+        Otherwise, the same elements will be remained.
 
     Examples
     -------
@@ -171,6 +175,10 @@ class LayerNeighborSampler(NeighborSampler):
         probabilities corresponding to each neighboring edge of a node.
         It must be a 1D floating-point or boolean tensor, with the number
         of elements equalling the total number of edges.
+    deduplicated: bool
+            Boolean indicating whether seeds between hops will be deduplicated.
+            If True, the same elements in seeds will be deleted to only one.
+            Otherwise, the same elements will be remained.
 
     Examples
     -------
