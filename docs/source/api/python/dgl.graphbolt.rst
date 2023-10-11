@@ -56,8 +56,6 @@ Standard Implementations
 
     OnDiskDataset
     BuiltinDataset
-    OnDiskTask
-    OnDiskMetaData
     CSCSamplingGraph
     UniformNegativeSampler
     NeighborSampler
