@@ -20,8 +20,8 @@ Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 9
 
 | Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
 | ------------ | ------------- | ----------- | ---------- | --------- | ---------------------------    |
-| ~1.1GB       | ~5GB        | 0           |  0GB       | ~4min03s(615it, 2.53it/s)   | ~0min22s(154it, 6.86it/s) + ~0min2s(16it, 6.92it/s) + ~0min1s(11it, 7.34it/s)   |
-| ~1.1GB       | ~3GB          | 0           |  4.4GB     | ~1min20s(615it, 7.65it/s)   | ~0min14s(154it, 10.79it/s) + ~0min1s(16it, 10.07it/s) + ~0min1s(11it, 10.42it/s)   |
+| ~1.1GB       | ~5GB          | 0           |  0GB       | ~4min03s(615it, 2.53it/s)   | ~0min22s(154it, 6.86it/s) + ~0min2s(16it, 6.92it/s) + ~0min1s(11it, 7.34it/s)   |
+| ~1.1GB       | ~3GB          | 1           |  4.4GB     | ~1min20s(615it, 7.65it/s)   | ~0min14s(154it, 10.79it/s) + ~0min1s(16it, 10.07it/s) + ~0min1s(11it, 10.42it/s)   |
 
 ### Accuracies
 ```
