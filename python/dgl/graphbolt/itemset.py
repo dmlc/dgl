@@ -84,9 +84,9 @@ class ItemSet:
                     self._names = names
                 else:
                     self._names = (names,)
-                assert len(self._names) == 1, (
-                    "Number of names mustn't exceed 1 when item is an integer."
-                )
+                assert (
+                    len(self._names) == 1
+                ), "Number of names mustn't exceed 1 when item is an integer."
             else:
                 self._names = None
             return
