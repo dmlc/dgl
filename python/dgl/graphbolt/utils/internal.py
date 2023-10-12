@@ -35,10 +35,10 @@ def save_data(data, path, fmt):
         raise RuntimeError(f"Unsupported format: {fmt}")
 
     # Perform necessary conversion.
-    if fmt == "numpy" and isinstance(element, torch.Tensor):
-        element = element.cpu().numpy()
-    elif fmt == "torch" and isinstance(element, np.ndarray):
-        element = torch.from_numpy(element).cpu()
+    if fmt == "numpy" and isinstance(data, torch.Tensor):
+        data = data.cpu().numpy()
+    elif fmt == "torch" and isinstance(data, np.ndarray):
+        data = torch.from_numpy(data).cpu()
 
     # Save the data.
     if fmt == "numpy":

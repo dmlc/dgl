@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Dict, List
 
 import pandas as pd
+import numpy as np
 import torch
 import yaml
 
@@ -42,13 +43,12 @@ def _copy_or_convert_data(
 ):
     """Copy or convert the data from input_path to output_path."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    if input_format == "numpy":
-        # If the original format is numpy, just copy the file.
-        shutil.copyfile(input_path, output_path)
-    else:
-        # If the original format is not numpy, convert it to numpy.
-        data = read_data(input_path, input_format, in_memory)
-        save_data(data, output_path, output_format)
+    # Read data. If the original format is not numpy, convert it to numpy. If
+    # dim of the data is 1, reshape it to n * 1 and save it to output_path.
+    data = read_data(input_path, input_format, in_memory)
+    if data.dim() == 1:
+        data = data.reshape(-1, 1)
+    save_data(data, output_path, output_format)
 
 
 def preprocess_ondisk_dataset(dataset_dir: str) -> str:
