@@ -1,5 +1,5 @@
 """GraphBolt Dataset."""
-from typing import Dict, List
+from typing import Dict, List, Union
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
@@ -85,4 +85,9 @@ class Dataset:
     @property
     def dataset_name(self) -> str:
         """Return the dataset name."""
+        raise NotImplementedError
+
+    @property
+    def full_node_set(self) -> Union[ItemSet, ItemSetDict]:
+        """Return the full node itemset."""
         raise NotImplementedError

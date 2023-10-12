@@ -1711,6 +1711,35 @@ def test_OnDiskDataset_load_tasks():
         dataset = None
 
 
+def test_OnDiskDataset_load_full_node_set():
+    """Test preprocess of OnDiskDataset."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+
+        full_node_set = dataset.full_node_set
+
+        for i, item in enumerate(full_node_set):
+            assert i == item
+
+
 def test_BuiltinDataset():
     """Test BuiltinDataset."""
     with tempfile.TemporaryDirectory() as test_dir:

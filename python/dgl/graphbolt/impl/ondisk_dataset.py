@@ -3,7 +3,7 @@
 import os
 import shutil
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import pandas as pd
 import torch
@@ -235,9 +235,9 @@ class OnDiskTask:
     def __init__(
         self,
         metadata: Dict,
-        train_set: ItemSet or ItemSetDict,
-        validation_set: ItemSet or ItemSetDict,
-        test_set: ItemSet or ItemSetDict,
+        train_set: Union[ItemSet, ItemSetDict],
+        validation_set: Union[ItemSet, ItemSetDict],
+        test_set: Union[ItemSet, ItemSetDict],
     ):
         """Initialize a task.
 
@@ -245,11 +245,11 @@ class OnDiskTask:
         ----------
         metadata : Dict
             Metadata.
-        train_set : ItemSet or ItemSetDict
+        train_set : Union[ItemSet, ItemSetDict]
             Training set.
-        validation_set : ItemSet or ItemSetDict
+        validation_set : Union[ItemSet, ItemSetDict]
             Validation set.
-        test_set : ItemSet or ItemSetDict
+        test_set : Union[ItemSet, ItemSetDict]
             Test set.
         """
         self._metadata = metadata
@@ -263,17 +263,17 @@ class OnDiskTask:
         return self._metadata
 
     @property
-    def train_set(self) -> ItemSet or ItemSetDict:
+    def train_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the training set."""
         return self._train_set
 
     @property
-    def validation_set(self) -> ItemSet or ItemSetDict:
+    def validation_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the validation set."""
         return self._validation_set
 
     @property
-    def test_set(self) -> ItemSet or ItemSetDict:
+    def test_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the test set."""
         return self._test_set
 
@@ -389,6 +389,7 @@ class OnDiskDataset(Dataset):
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks)
+        self._full_node_set = self._init_full_node_set()
         return self
 
     @property
@@ -415,6 +416,11 @@ class OnDiskDataset(Dataset):
     def dataset_name(self) -> str:
         """Return the dataset name."""
         return self._dataset_name
+
+    @property
+    def full_node_set(self) -> Union[ItemSet, ItemSetDict]:
+        """Return the full node itemset."""
+        return self._full_node_set
 
     def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
         """Initialize the tasks."""
@@ -446,7 +452,7 @@ class OnDiskDataset(Dataset):
 
     def _init_tvt_set(
         self, tvt_set: List[OnDiskTVTSet]
-    ) -> ItemSet or ItemSetDict:
+    ) -> Union[ItemSet, ItemSetDict]:
         """Initialize the TVT set."""
         ret = None
         if (tvt_set is None) or (len(tvt_set) == 0):
@@ -474,6 +480,16 @@ class OnDiskDataset(Dataset):
                 )
             ret = ItemSetDict(data)
         return ret
+
+    def _init_full_node_set(self) -> Union[ItemSet, ItemSetDict]:
+        num_nodes = self._graph.num_nodes
+        if isinstance(num_nodes, int):
+            return ItemSet(num_nodes)
+        else:
+            dict = {}
+            for node_type, number in num_nodes.items():
+                dict[node_type] = ItemSet(number)
+            return ItemSetDict(dict)
 
 
 class BuiltinDataset(OnDiskDataset):
