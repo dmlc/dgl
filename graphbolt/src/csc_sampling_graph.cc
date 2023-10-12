@@ -76,7 +76,7 @@ torch::Tensor CSCSamplingGraph::MyIsIn(
         const scalar_t* E_ptr = E.data_ptr<scalar_t>();
         const scalar_t* sorted_S_ptr = sorted_S.data_ptr<scalar_t>();
         bool* res = result.data_ptr<bool>();
-        torch::parallel_for(0, num_E, 1024, [&](size_t start, size_t end) {
+        torch::parallel_for(0, num_E, 4096, [&](size_t start, size_t end) {
           for (auto i = start; i < end; i++) {
             res[i] = std::binary_search(
                 sorted_S_ptr, sorted_S_ptr + num_S, E_ptr[i]);
