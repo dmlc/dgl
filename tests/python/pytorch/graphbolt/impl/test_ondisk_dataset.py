@@ -1737,9 +1737,9 @@ def test_OnDiskDataset_load_1D_feature():
         np.save(os.path.join(test_dir, node_feat_path), node_feats)
 
         dataset = gb.OnDiskDataset(test_dir).load()
-        assert dataset.feature.size("node", None, "feat") == torch.Size([1]), (
-            print(dataset.feature.size("node", None, "feat"))
-        )
+        assert dataset.feature.size("node", None, "feat") == torch.Size(
+            [1]
+        ), print(dataset.feature.size("node", None, "feat"))
 
 
 def test_BuiltinDataset():
