@@ -4,6 +4,7 @@ set (CMAKE_CXX_STANDARD 17)
 
 if(USE_CUDA)
   enable_language(CUDA)
+  add_definitions(-DGRAPHBOLT_USE_CUDA)
 endif()
 
 # Find PyTorch cmake files and PyTorch versions with the python interpreter

@@ -34,8 +34,8 @@ __global__ void IndexSelectMultiKernel(
   }
 }
 
-template <c10::DeviceType XPU, typename DType, typename IdType>
-torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index) {
+template <typename DType, typename IdType>
+torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
   const int64_t input_len = input.size(0);
   const int64_t ret_len = index.size(0);
   const int64_t feat_size = std::accumulate(
@@ -65,29 +65,25 @@ torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index) {
   return ret;
 }
 
-template torch::Tensor
-UVAIndexSelectImpl<c10::DeviceType::CUDA, float, int32_t>(
-    torch::Tensor input, torch::Tensor index);
-template torch::Tensor
-UVAIndexSelectImpl<c10::DeviceType::CUDA, int32_t, int32_t>(
-    torch::Tensor input, torch::Tensor index);
-template torch::Tensor
-UVAIndexSelectImpl<c10::DeviceType::CUDA, double, int32_t>(
-    torch::Tensor input, torch::Tensor index);
-template torch::Tensor
-UVAIndexSelectImpl<c10::DeviceType::CUDA, int64_t, int32_t>(
-    torch::Tensor input, torch::Tensor index);
-template torch::Tensor
-UVAIndexSelectImpl<c10::DeviceType::CUDA, float, int64_t>(
-    torch::Tensor input, torch::Tensor index);
-template torch::Tensor
-UVAIndexSelectImpl<c10::DeviceType::CUDA, int32_t, int64_t>(
-    torch::Tensor input, torch::Tensor index);
-template torch::Tensor
-UVAIndexSelectImpl<c10::DeviceType::CUDA, double, int64_t>(
-    torch::Tensor input, torch::Tensor index);
-template torch::Tensor
-UVAIndexSelectImpl<c10::DeviceType::CUDA, int64_t, int64_t>(
+/**
+ * @brief Index select operator implementation on CUDA.
+ *
+ * The supporting input types are: float, double, int, int64_t.
+ * The supporting index types are: int, int64_t.
+ */
+template <c10::DeviceType XPU>
+torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index) {
+  return AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Int, at::ScalarType::Long, input.scalar_type(),
+      "UVAIndexSelectImpl", [&] {
+        return AT_DISPATCH_INDEX_TYPES(
+            index.scalar_type(), "UVAIndexSelectImpl", [&] {
+              return UVAIndexSelectImpl_<scalar_t, index_t>(input, index);
+            });
+      });
+}
+
+template torch::Tensor UVAIndexSelectImpl<c10::DeviceType::CUDA>(
     torch::Tensor input, torch::Tensor index);
 
 }  //  namespace ops

@@ -11,58 +11,19 @@
 
 namespace graphbolt {
 
-/**
- * Dispatch Pytorch data type to template functions. Available data types are
- * float32, float64, int32, and int64.
- *
- * GRAPHBOLT_DTYPE_SWITCH(tensor.scalar_type(), DType, {
- *   // Now DType is the type corresponding to data type in the tensor.
- *   // Then you can use DType to template your function.
- *   DType *data = tensor.data_ptr<DType>();
- * });
- */
-#define GRAPHBOLT_DTYPE_SWITCH(val, DType, val_name, ...)           \
-  do {                                                              \
-    if ((val) == torch::kFloat32) {                                 \
-      typedef float DType;                                          \
-      { __VA_ARGS__ }                                               \
-    } else if ((val) == torch::kFloat64) {                          \
-      typedef double DType;                                         \
-      { __VA_ARGS__ }                                               \
-    } else if ((val) == torch::kInt32) {                            \
-      typedef int32_t DType;                                        \
-      { __VA_ARGS__ }                                               \
-    } else if ((val) == torch::kInt64) {                            \
-      typedef int64_t DType;                                        \
-      { __VA_ARGS__ }                                               \
-    } else {                                                        \
-      TORCH_CHECK(false, (val_name), " must be float or int type"); \
-    }                                                               \
-  } while (0)
-
-/**
- * Dispatch Pytorch index type to template functions. Available index types are
- * int32 and int64.
- *
- * GRAPHBOLT_ID_TYPE_SWITCH(tensor.scalar_type(), IdType, {
- *  // Now IdType is the type corresponding to index type in the tensor.
- *  // Then you can use IdType to template your function.
- *  IdType *data = tensor.data_ptr<IdType>();
- * });
- */
-#define GRAPHBOLT_ID_TYPE_SWITCH(val, IdType, val_name, ...)          \
-  do {                                                                \
-    TORCH_CHECK(                                                      \
-        (val) == torch::kInt32 || (val) == torch::kInt64, (val_name), \
-        " must be int type");                                         \
-    if ((val) == torch::kInt32) {                                     \
-      typedef int32_t IdType;                                         \
-      { __VA_ARGS__ }                                                 \
-    } else {                                                          \
-      typedef int64_t IdType;                                         \
-      { __VA_ARGS__ }                                                 \
-    }                                                                 \
-  } while (0)
+// Dispatch operator implementation function to CUDA device only.
+#ifdef GRAPHBOLT_USE_CUDA
+#define GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(device_type, name, ...) \
+  if (device_type == c10::DeviceType::CUDA) {                       \
+    const auto XPU = c10::DeviceType::CUDA;                         \
+    return __VA_ARGS__();                                           \
+  } else {                                                          \
+    TORCH_CHECK(false, name, " is only available on CUDA device."); \
+  }
+#else
+#define GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(device_type, name, ...) \
+  TORCH_CHECK(false, name, " is only available on CUDA device.");
+#endif
 
 }  // namespace graphbolt
 

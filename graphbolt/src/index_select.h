@@ -13,9 +13,9 @@ namespace ops {
 
 /**
  * @brief Template implementation function to be instantiated with different
- * device types, data types and index types.
+ * device types.
  */
-template <c10::DeviceType XPU, typename DType, typename IdType>
+template <c10::DeviceType XPU>
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
 
 /**
