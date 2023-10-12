@@ -3,6 +3,7 @@ from .. import backend as F
 from ..base import EID, NID
 from ..heterograph import DGLGraph
 from ..transforms import to_block
+from ..utils import get_num_threads
 from .base import BlockSampler
 
 
@@ -150,8 +151,9 @@ class NeighborSampler(BlockSampler):
     def sample_blocks(self, g, seed_nodes, exclude_eids=None):
         output_nodes = seed_nodes
         blocks = []
-
-        if self.fused:
+        # sample_neighbors_fused function requires multithreading to be more efficient
+        # than sample_neighbors
+        if self.fused and get_num_threads() > 1:
             cpu = F.device_type(g.device) == "cpu"
             if isinstance(seed_nodes, dict):
                 for ntype in list(seed_nodes.keys()):
