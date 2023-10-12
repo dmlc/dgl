@@ -1,5 +1,6 @@
 """Base types and utilities for Graph Bolt."""
 
+import torch
 from torch.utils.data import functional_datapipe
 from torchdata.datapipes.iter import IterDataPipe
 
@@ -11,10 +12,15 @@ __all__ = [
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
+    "my_isin",
 ]
 
 CANONICAL_ETYPE_DELIMITER = ":"
 ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
+
+
+def my_isin(elements, test_elements):
+    return torch.ops.graphbolt.my_isin(elements, test_elements)
 
 
 def etype_tuple_to_str(c_etype):

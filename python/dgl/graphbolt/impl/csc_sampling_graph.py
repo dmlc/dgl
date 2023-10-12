@@ -24,12 +24,7 @@ __all__ = [
     "load_csc_sampling_graph",
     "save_csc_sampling_graph",
     "from_dglgraph",
-    "my_isin",
 ]
-
-
-def my_isin(elements, test_elements):
-    return torch.ops.graphbolt.my_isin(elements, test_elements)
 
 
 class GraphMetadata:
