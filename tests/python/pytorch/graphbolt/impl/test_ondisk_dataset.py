@@ -1731,7 +1731,7 @@ def test_OnDiskDataset_load_1D_feature():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        # Regenerate random 1D node-feats.
+        # Regenerate random 1-D node-feats.
         node_feats = np.random.rand(num_nodes, num_classes).reshape(1, -1)[0]
         node_feat_path = os.path.join("data", "node-feat.npy")
         np.save(os.path.join(test_dir, node_feat_path), node_feats)
