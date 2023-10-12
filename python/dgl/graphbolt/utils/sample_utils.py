@@ -358,11 +358,13 @@ def duplicated_and_compact_node_pairs(
         src = src_nodes.get(ntype, default_tensor)
         unique_dst = unique_dst_nodes.get(ntype, default_tensor)
         dst = dst_nodes.get(ntype, default_tensor)
-        (
-            unique_nodes[ntype],
-            compacted_src[ntype],
-            compacted_dst[ntype],
-        ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
+        unique_nodes[ntype] = torch.cat([unique_dst, src])
+        compacted_src[ntype] = torch.arange(
+            len(unique_dst), len(unique_dst) + len(src), dtype=int
+        )
+        compacted_dst[ntype] = not_deduplication_compact_dst(
+            dst, unique_dst
+        )
 
     compacted_node_pairs = {}
     # Map back with the same order.
