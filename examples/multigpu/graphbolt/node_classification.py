@@ -64,7 +64,7 @@ class SAGE(nn.Module):
         self.hidden_size = hidden_size
         self.out_size = out_size
         # Set the dtype for the layers manually.
-        self.set_layer_dtype(torch.float64)
+        self.set_layer_dtype(torch.float32)
 
     def set_layer_dtype(self, dtype):
         for layer in self.layers:
@@ -100,7 +100,7 @@ def create_dataloader(
     ############################################################################
 
     ############################################################################
-    # [Step-1]:
+    # [Note]:
     # gb.DistributedItemSampler()
     # [Input]:
     # 'item_set': The current dataset. (e.g. `train_set` or `valid_set`)
@@ -125,60 +125,21 @@ def create_dataloader(
         shuffle=shuffle,
         drop_uneven_inputs=drop_uneven_inputs,
     )
-
-    ############################################################################
-    # [Step-2]:
-    # datapipe.sample_neighbor()
-    # [Input]:
-    # 'datapipe' is either 'ItemSampler' or 'UniformNegativeSampler' depending
-    # on whether training is needed.
-    # 'graph': The network topology for sampling.
-    # 'fanouts': Number of neighbors to sample per node.
-    # [Output]:
-    # A sample_neighbor object to sample neighbors.
-    ############################################################################
     datapipe = datapipe.sample_neighbor(graph, args.fanout)
-
-    ############################################################################
-    # [Step-3]:
-    # datapipe.fetch_feature()
-    # [Input]:
-    # 'features': The node features.
-    # 'node_feature_keys': The keys of the node features to be fetched.
-    # [Output]:
-    # A FeatureFetcher object to fetch node features.
-    ############################################################################
     datapipe = datapipe.fetch_feature(
         features, node_feature_keys=["feat", "label"]
     )
-
-    ############################################################################
-    # [Step-4]:
-    # datapipe.to_dgl()
-    # [Output]:
-    # A DGLMiniBatchConverter object to convert each MiniBatch in the datapipe
-    # to DGLMiniBatch with generated blocks.
-    ############################################################################
     datapipe = datapipe.to_dgl()
 
     ############################################################################
-    # [Step-5]:
-    # datapipe.copy_to()
+    # [Note]:
+    # datapipe.copy_to() / gb.CopyTo()
     # [Input]:
     # 'device': The specified device that data should be copied to.
     # [Output]:
     # A CopyTo object copying data in the datapipe to a specified device.\
     ############################################################################
     datapipe = datapipe.copy_to(device)
-
-    ############################################################################
-    # [Step-6]:
-    # gb.SingleProcessDataLoader()
-    # [Input]:
-    # 'datapipe': The datapipe object to be used for data loading.
-    # [Output]:
-    # A SingleProcessDataLoader object to handle data loading.
-    ############################################################################
     dataloader = gb.SingleProcessDataLoader(datapipe)
 
     # Return the fully-initialized DataLoader object.
@@ -349,7 +310,7 @@ def run(proc_id, nprocs, args, devices, dataset):
     out_size = num_classes
 
     # Create GraphSAGE model. It should be copied onto a GPU as a replica.
-    model = SAGE(in_size, hidden_size, out_size).to(torch.float32).to(device)
+    model = SAGE(in_size, hidden_size, out_size).to(device)
     model = DDP(model)
 
     # Model training.
