@@ -1849,6 +1849,35 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         dataset = None
 
 
+def test_OnDiskDataset_load_1D_feature():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 1
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # Regenerate random 1D node-feats.
+        node_feats = np.random.rand(num_nodes, num_classes).reshape(1, -1)[0]
+        node_feat_path = os.path.join("data", "node-feat.npy")
+        np.save(os.path.join(test_dir, node_feat_path), node_feats)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+        assert dataset.feature.size("node", None, "feat") == torch.Size([1])
+
+
 def test_BuiltinDataset():
     """Test BuiltinDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
