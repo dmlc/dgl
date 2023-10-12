@@ -86,8 +86,8 @@ def alltoall(rank, world_size, output_tensor_list, input_tensor_list, device):
         th.distributed.all_to_all(output_tensor_list, input_tensor_list)
     else:
         alltoall_cpu(
-            self._rank,
-            self._world_size,
+            rank,
+            world_size,
             output_tensor_list,
             input_tensor_list,
         )
@@ -117,8 +117,8 @@ def alltoallv(rank, world_size, output_tensor_list, input_tensor_list, device):
         th.distributed.all_to_all(output_tensor_list, input_tensor_list)
     else:
         alltoallv_cpu(
-            self._rank,
-            self._world_size,
+            rank,
+            world_size,
             output_tensor_list,
             input_tensor_list,
         )
