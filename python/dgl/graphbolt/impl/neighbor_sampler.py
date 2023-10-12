@@ -123,7 +123,9 @@ class NeighborSampler(SubgraphSampler):
                     compacted_node_pairs,
                 ) = unique_and_compact_node_pairs(subgraph.node_pairs, seeds)
             else:
-                raise RuntimeError("Not implemented yet.")
+                seeds, compacted_node_pairs = duplicated_and_compact_node_pairs(
+                    subgraph.node_pairs, seeds
+                )
             subgraph = SampledSubgraphImpl(
                 node_pairs=compacted_node_pairs,
                 original_column_node_ids=seeds,
