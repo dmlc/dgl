@@ -75,6 +75,7 @@ from .heterophilous_graphs import (
 # datasets.
 try:
     from .lrgb import (
+        COCOSuperpixelsDataset,
         PeptidesFunctionalDataset,
         PeptidesStructuralDataset,
         VOCSuperpixelsDataset,
