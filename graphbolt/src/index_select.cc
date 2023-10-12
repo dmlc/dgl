@@ -21,9 +21,9 @@ torch::Tensor UVAIndexSelect(torch::Tensor input, torch::Tensor index) {
   TORCH_CHECK(
       input.is_contiguous() && index.is_contiguous(),
       "Input and index tensors must be contiguous in memory.");
-  GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(
-      c10::DeviceType::CUDA, "UVAIndexSelect",
-      [&]() { return UVAIndexSelectImpl<XPU>(input, index); });
+  GRAPHBOLT_DISPATCH_CUDA_ONLY_DEVICE(c10::DeviceType::CUDA, "UVAIndexSelect", {
+    return UVAIndexSelectImpl<XPU>(input, index);
+  });
 }
 
 }  // namespace ops

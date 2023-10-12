@@ -22,8 +22,9 @@ namespace graphbolt {
   {                                                                          \
     (kernel)<<<(nblks), (nthrs), (shmem), (stream)>>>(__VA_ARGS__);          \
     cudaError_t e = cudaGetLastError();                                      \
-    CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)                 \
-        << "CUDA kernel launch error: " << cudaGetErrorString(e);            \
+    TORCH_CHECK(                                                             \
+        e == cudaSuccess || e == cudaErrorCudartUnloading,                   \
+        "CUDA kernel launch error: ", cudaGetErrorString(e));                \
   }
 
 }  // namespace graphbolt

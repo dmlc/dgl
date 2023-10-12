@@ -58,7 +58,7 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
   GRAPHBOLT_CUDA_KERNEL_CALL(
       IndexSelectMultiKernel, grid, block, 0, stream, input_len, input_ptr,
       feat_size, index_ptr, ret_len, ret_ptr);
-  auto ret_shape = std::vector({ret_len});
+  auto ret_shape = std::vector<int64_t>({ret_len});
   ret_shape.insert(
       ret_shape.end(), input.sizes().begin() + 1, input.sizes().end());
   ret = ret.reshape(ret_shape);

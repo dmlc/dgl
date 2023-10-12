@@ -57,6 +57,11 @@ target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
                            "../third_party/pcg/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 
+# FIXME: our linux CI does not support CUDA standard 17
+if(USE_CUDA)
+  set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 14)
+endif()
+
 # The Torch CMake configuration only sets up the path for the MKL library when
 # using the conda distribution. The following is a workaround to address this
 # when using a standalone installation of MKL.
