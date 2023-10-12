@@ -80,9 +80,13 @@ void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
     type_per_edge_ =
         read_from_archive(archive, "CSCSamplingGraph/type_per_edge").toTensor();
   }
-  if (read_from_archive(archive, "CSCSamplingGraph/has_edge_attributes")
-          .toBool()) {
-    c10::Dict<c10::IValue, c10::IValue> generic_dict =
+
+  // Optional edge attributes.
+  torch::IValue has_edge_attributes;
+  if (archive.try_read(
+          "CSCSamplingGraph/has_edge_attributes", has_edge_attributes) &&
+      has_edge_attributes.toBool()) {
+    torch::Dict<torch::IValue, torch::IValue> generic_dict =
         read_from_archive(archive, "CSCSamplingGraph/edge_attributes")
             .toGenericDict();
     EdgeAttrMap target_dict;
