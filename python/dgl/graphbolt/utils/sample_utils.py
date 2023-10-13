@@ -383,7 +383,9 @@ def duplicated_and_compact_node_pairs(
     return duplicated_nodes, compacted_node_pairs
 
 
-def not_deduplication_compact_dst(dst: torch.Tensor, duplicated_dst: torch.Tensor):
+def not_deduplication_compact_dst(
+    dst: torch.Tensor, duplicated_dst: torch.Tensor
+):
     """
     Compact dst without deduplication.
 
