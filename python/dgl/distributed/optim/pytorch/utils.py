@@ -13,7 +13,7 @@ def alltoall_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     rank : int
         The rank of current worker
     world_size : int
-        The size of the entire
+        The size of the entire communicator
     output_tensor_list : List of tensor
         The received tensors
     input_tensor_list : List of tensor
@@ -37,7 +37,7 @@ def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
     rank : int
         The rank of current worker
     world_size : int
-        The size of the entire
+        The size of the entire communicator
     output_tensor_list : List of tensor
         The received tensors
     input_tensor_list : List of tensor
@@ -60,3 +60,65 @@ def alltoallv_cpu(rank, world_size, output_tensor_list, input_tensor_list):
             dist.recv(output_tensor_list[i], src=i)
 
     th.distributed.barrier()
+
+
+def alltoall(rank, world_size, output_tensor_list, input_tensor_list, device):
+    """Each process scatters list of input tensors to all processes in a cluster
+    and return gathered list of tensors in output list. The tensors should have the same shape.
+
+    Parameters
+    ----------
+    rank : int
+        The rank of current worker
+    world_size : int
+        The size of the entire communicator
+    output_tensor_list : List of tensor
+        The received tensors
+    input_tensor_list : List of tensor
+        The tensors to exchange
+    device: th.device
+        Device of the tensors
+    """
+    if th.distributed.get_backend() == "nccl":
+        input_tensor_list = [
+            tensor.to(th.device(device)) for tensor in input_tensor_list
+        ]
+        th.distributed.all_to_all(output_tensor_list, input_tensor_list)
+    else:
+        alltoall_cpu(
+            rank,
+            world_size,
+            output_tensor_list,
+            input_tensor_list,
+        )
+
+
+def alltoallv(rank, world_size, output_tensor_list, input_tensor_list, device):
+    """Each process scatters list of input tensors to all processes in a cluster
+    and return gathered list of tensors in output list.
+
+    Parameters
+    ----------
+    rank : int
+        The rank of current worker
+    world_size : int
+        The size of the entire communicator
+    output_tensor_list : List of tensor
+        The received tensors
+    input_tensor_list : List of tensor
+        The tensors to exchange
+    device: th.device
+        Device of the tensors
+    """
+    if th.distributed.get_backend() == "nccl":
+        input_tensor_list = [
+            tensor.to(th.device(device)) for tensor in input_tensor_list
+        ]
+        th.distributed.all_to_all(output_tensor_list, input_tensor_list)
+    else:
+        alltoallv_cpu(
+            rank,
+            world_size,
+            output_tensor_list,
+            input_tensor_list,
+        )
