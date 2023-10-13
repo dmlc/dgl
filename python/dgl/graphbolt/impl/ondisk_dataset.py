@@ -420,6 +420,8 @@ class OnDiskDataset(Dataset):
     @property
     def full_node_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the full node itemset."""
+        if self._full_node_set is None:
+            return self._init_full_node_set()
         return self._full_node_set
 
     def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
@@ -482,6 +484,8 @@ class OnDiskDataset(Dataset):
         return ret
 
     def _init_full_node_set(self) -> Union[ItemSet, ItemSetDict]:
+        if not isinstance(self._graph, CSCSamplingGraph):
+            return None
         num_nodes = self._graph.num_nodes
         if isinstance(num_nodes, int):
             return ItemSet(num_nodes)

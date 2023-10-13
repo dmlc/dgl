@@ -1736,8 +1736,15 @@ def test_OnDiskDataset_load_full_node_set():
 
         full_node_set = dataset.full_node_set
 
-        for i, item in enumerate(full_node_set):
-            assert i == item
+        # assert (False), f"{dataset.graph.num_nodes}, {(full_node_set)}"
+
+        if isinstance(full_node_set, gb.ItemSet):
+            for i, item in enumerate(full_node_set):
+                assert i == item
+        else:
+            for i, _dict in enumerate(full_node_set):
+                assert len(_dict) == 1
+                assert isinstance(_dict, dict)
 
 
 def test_BuiltinDataset():

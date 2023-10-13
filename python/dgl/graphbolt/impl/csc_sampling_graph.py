@@ -151,7 +151,7 @@ class CSCSamplingGraph(SamplingGraph):
         >>> graph = gb.from_csc(indptr, indices, node_type_offset,
         ... type_per_edge, None, metadata)
         >>> print(graph.num_nodes)
-        {'N0': tensor(2), 'N1': tensor(3)}
+        {'N0': 2, 'N1': 3}
         """
 
         offset = self.node_type_offset
@@ -163,7 +163,7 @@ class CSCSamplingGraph(SamplingGraph):
         # Heterogenous
         else:
             num_nodes_per_type = {
-                _type: offset[_idx + 1] - offset[_idx]
+                _type: int(offset[_idx + 1] - offset[_idx])
                 for _type, _idx in self.metadata.node_type_to_id.items()
             }
 
