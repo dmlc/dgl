@@ -35,7 +35,10 @@ class ItemSet:
     >>> num = 10
     >>> item_set = gb.ItemSet(num, names="seed_nodes")
     >>> list(item_set)
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4), tensor(5),
+     tensor(6), tensor(7), tensor(8), tensor(9)]
+    >>> item_set[:]
+    tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     >>> item_set.names
     ('seed_nodes',)
 
@@ -44,6 +47,8 @@ class ItemSet:
     >>> item_set = gb.ItemSet(node_ids, names="seed_nodes")
     >>> list(item_set)
     [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4)]
+    >>> item_set[:]
+    tensor([0, 1, 2, 3, 4])
     >>> item_set.names
     ('seed_nodes',)
 
@@ -55,6 +60,8 @@ class ItemSet:
     >>> list(item_set)
     [(tensor(0), tensor(5)), (tensor(1), tensor(6)), (tensor(2), tensor(7)),
      (tensor(3), tensor(8)), (tensor(4), tensor(9))]
+    >>> item_set[:]
+    (tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9]))
     >>> item_set.names
     ('seed_nodes', 'labels')
 
@@ -69,6 +76,10 @@ class ItemSet:
      (tensor([4, 5]), tensor([16, 17, 18])),
      (tensor([6, 7]), tensor([19, 20, 21])),
      (tensor([8, 9]), tensor([22, 23, 24]))]
+    >>> item_set[:]
+    (tensor([[0, 1], [2, 3], [4, 5], [6, 7],[8, 9]]),
+     tensor([[10, 11, 12], [13, 14, 15], [16, 17, 18], [19, 20, 21],
+        [22, 23, 24]]))
     >>> item_set.names
     ('node_pairs', 'negative_dsts')
     """
