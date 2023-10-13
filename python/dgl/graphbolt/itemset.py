@@ -2,6 +2,8 @@
 
 from typing import Dict, Iterable, Iterator, Sized, Tuple, Union
 
+import torch
+
 __all__ = ["ItemSet", "ItemSetDict"]
 
 
@@ -76,22 +78,8 @@ class ItemSet:
         items: Union[int, Iterable, Tuple[Iterable]],
         names: Union[str, Tuple[str]] = None,
     ) -> None:
-        # Initiated by an integer.
         if isinstance(items, int):
-            self._items = items
-            if names is not None:
-                if isinstance(names, tuple):
-                    self._names = names
-                else:
-                    self._names = (names,)
-                assert (
-                    len(self._names) == 1
-                ), "Number of names mustn't exceed 1 when item is an integer."
-            else:
-                self._names = None
-            return
-
-        # Otherwise.
+            items = torch.arange(items)
         if isinstance(items, tuple):
             self._items = items
         else:
@@ -109,10 +97,6 @@ class ItemSet:
             self._names = None
 
     def __iter__(self) -> Iterator:
-        if isinstance(self._items, int):
-            yield from range(self._items)
-            return
-
         if len(self._items) == 1:
             yield from self._items[0]
             return
@@ -135,13 +119,20 @@ class ItemSet:
                 yield tuple(item)
 
     def __len__(self) -> int:
-        if isinstance(self._items, int):
-            return self._items
         if isinstance(self._items[0], Sized):
             return len(self._items[0])
         raise TypeError(
             f"{type(self).__name__} instance doesn't have valid length."
         )
+
+    def __getitem__(self, idx: Union[int, Iterable]) -> Tuple:
+        if not isinstance(self._items[0], Sized):
+            raise TypeError(
+                f"{type(self).__name__} instance doesn't support indexing."
+            )
+        if len(self._items) == 1:
+            return self._items[0][idx]
+        return tuple(item[idx] for item in self._items)
 
     @property
     def names(self) -> Tuple[str]:
