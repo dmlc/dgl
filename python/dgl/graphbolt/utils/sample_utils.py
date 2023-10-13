@@ -315,14 +315,14 @@ def duplicated_and_compact_node_pairs(
     >>> N2 = torch.LongTensor([5, 6, 5])
     >>> node_pairs = {"n1:e1:n2": (N1, N2),
     ...     "n2:e2:n1": (N2, N1)}
-    >>> unique_nodes, compacted_node_pairs = gb.unique_and_compact_node_pairs(
+    >>> duplicated_nodes, compacted_node_pairs = gb.duplicated_and_compact_node_pairs(
     ...     node_pairs
     ... )
-    >>> print(unique_nodes)
-    {'n1': tensor([1, 2]), 'n2': tensor([5, 6])}
+    >>> print(duplicated_nodes)
+    {'n1': tensor([1, 2, 2]), 'n2': tensor([5, 6, 5])}
     >>> print(compacted_node_pairs)
-    {"n1:e1:n2": (tensor([0, 1, 1]), tensor([0, 1, 0])),
-    "n2:e2:n1": (tensor([0, 1, 0]), tensor([0, 1, 1]))}
+    {"n1:e1:n2": (tensor([0, 1, 2]), tensor([0, 1, 2])),
+    "n2:e2:n1": (tensor([0, 1, 2]), tensor([0, 1, 2]))}
     """
     is_homogeneous = not isinstance(node_pairs, dict)
     if is_homogeneous:
@@ -344,7 +344,7 @@ def duplicated_and_compact_node_pairs(
     dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
     # Compute unique destination nodes if not provided.
     if duplicated_dst_nodes is None:
-        raise ValueError("Seeds should not be None.")
+        duplicated_dst_nodes = dst_nodes
 
     ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
     duplicated_nodes = {}
