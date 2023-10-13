@@ -12,7 +12,7 @@ import yaml
 import dgl
 
 from ...data.utils import download, extract_archive
-from ..base import etype_str_to_tuple, ORIGINAL_EDGE_ID
+from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..utils import read_data, save_data
