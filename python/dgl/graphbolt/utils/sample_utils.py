@@ -295,8 +295,7 @@ def compact_node_pairs(
     if seeds is None:
         if deduplicate:
             seeds = {
-                ntype: torch.unique(nodes)
-                for ntype, nodes in dst_nodes.items()
+                ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
             }
         else:
             seeds = dst_nodes
