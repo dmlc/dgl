@@ -490,10 +490,10 @@ class OnDiskDataset(Dataset):
         if isinstance(num_nodes, int):
             return ItemSet(num_nodes)
         else:
-            dict = {}
+            data = {}
             for node_type, number in num_nodes.items():
-                dict[node_type] = ItemSet(number)
-            return ItemSetDict(dict)
+                data[node_type] = ItemSet(number)
+            return ItemSetDict(data)
 
 
 class BuiltinDataset(OnDiskDataset):
