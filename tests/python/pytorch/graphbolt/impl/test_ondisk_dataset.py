@@ -1736,8 +1736,6 @@ def test_OnDiskDataset_load_all_nodes_set():
 
         all_nodes_set = dataset.all_nodes_set
 
-        # assert (False), f"{dataset.graph.num_nodes}, {(all_nodes_set)}"
-
         if isinstance(all_nodes_set, gb.ItemSet):
             for i, item in enumerate(all_nodes_set):
                 assert i == item
