@@ -212,6 +212,16 @@ def test_test_SubgraphSampler_without_dedpulication(labor):
     datapipe = Sampler(item_sampler, graph, fanouts, deduplicate=False)
 
     length = [17, 7]
+    compacted_dst = [
+        torch.tensor([0, 1, 2, 2, 4, 4, 5, 5, 6, 6]), torch.tensor([0, 1, 2, 2])
+    ]
+    seeds = [torch.tensor([0, 3, 4, 5, 2, 2, 4]), torch.tensor([0, 3, 4])]
     for data in datapipe:
         for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
             assert len(sampled_subgraph.original_row_node_ids) == length[step]
+            assert torch.equal(
+                sampled_subgraph.node_pairs[1], compacted_dst[step]
+            )
+            assert torch.equal(
+                sampled_subgraph.original_column_node_ids, seeds[step]
+            )

@@ -210,7 +210,7 @@ def unique_and_compact_node_pairs(
     {"n1:e1:n2": (tensor([0, 1, 1]), tensor([0, 1, 0])),
     "n2:e2:n1": (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
-    return compact_node_pairs(node_pairs, unique_dst_nodes, deduplicate=True)
+    return compact_node_pairs(node_pairs, unique_dst_nodes, unique=True)
 
 
 def compact_node_pairs(
@@ -222,10 +222,11 @@ def compact_node_pairs(
         torch.Tensor,
         Dict[str, torch.Tensor],
     ] = None,
-    deduplicate=False,
+    unique=False,
 ):
     """
-    Compact node pairs and return duplicated nodes (per type).
+    Return compacted node pairs and seeds (per type). If unique is True,
+    seeds will be unique, otherwise there will have same nodes.
 
     Parameters
     ----------
@@ -243,16 +244,16 @@ def compact_node_pairs(
         - If `seeds` is a tensor: It means the graph is homogeneous.
         - If `node_pairs` is a dictionary: The keys are node type and the
         values are corresponding nodes. And IDs inside are heterogeneous ids.
-    deduplicate: bool
+    unique: bool
         Boolean indicating whether seeds between hops will be deduplicated.
         If True, the same elements in seeds will be deleted to only one.
         Otherwise, the same elements will be remained.
 
     Returns
     -------
-    Tuple[duplicated_nodes, node_pairs]
+    Tuple[seeds, node_pairs]
         The compacted node pairs, where node IDs are replaced with mapped node
-        IDs, and the duplicated nodes (per type).
+        IDs, and the seeds (per type).
         "Compacted node pairs" indicates that the node IDs in the input node
         pairs are replaced with mapped node IDs, where each type of node is
         mapped to a contiguous space of IDs ranging from 0 to N.
@@ -293,7 +294,7 @@ def compact_node_pairs(
     dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
     # Compute destination nodes if not provided.
     if seeds is None:
-        if deduplicate:
+        if unique:
             seeds = {
                 ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
             }
@@ -301,7 +302,7 @@ def compact_node_pairs(
             seeds = dst_nodes
 
     ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
-    cat_seeds = {}
+    new_seeds = {}
     compacted_src = {}
     compacted_dst = {}
     dtype = list(src_nodes.values())[0].dtype
@@ -310,18 +311,18 @@ def compact_node_pairs(
         src = src_nodes.get(ntype, default_tensor)
         original_seeds = seeds.get(ntype, default_tensor)
         dst = dst_nodes.get(ntype, default_tensor)
-        if deduplicate:
+        if unique:
             (
-                cat_seeds[ntype],
+                new_seeds[ntype],
                 compacted_src[ntype],
                 compacted_dst[ntype],
             ) = torch.ops.graphbolt.unique_and_compact(src, dst, original_seeds)
         else:
-            cat_seeds[ntype] = torch.cat([original_seeds, src])
+            new_seeds[ntype] = torch.cat([original_seeds, src])
             compacted_src[ntype] = torch.arange(
-                len(original_seeds), len(cat_seeds[ntype]), dtype=int
+                len(original_seeds), len(new_seeds[ntype]), dtype=int
             )
-            compacted_dst[ntype] = not_deduplication_compact_dst(
+            compacted_dst[ntype] = compact_dst_nodes(
                 dst, original_seeds
             )
 
@@ -339,14 +340,12 @@ def compact_node_pairs(
     # Return singleton for a homogeneous graph.
     if is_homogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
-        cat_seeds = list(cat_seeds.values())[0]
+        new_seeds = list(new_seeds.values())[0]
 
-    return cat_seeds, compacted_node_pairs
+    return new_seeds, compacted_node_pairs
 
 
-def not_deduplication_compact_dst(
-    dst: torch.Tensor, duplicated_dst: torch.Tensor
-):
+def compact_dst_nodes(dst: torch.Tensor, seeds: torch.Tensor):
     """
     Compact dst without deduplication.
 
@@ -354,37 +353,43 @@ def not_deduplication_compact_dst(
     ----------
     dst: torch.Tensor
         The original dst that need to be compacted.
-    duplicated_dst: torch.Tensor
-        Duplicated_dst record the nodes that generate dst in order. Its index
+    seeds: torch.Tensor
+        Seeds record the nodes that generate dst in order. Its index
         will be used to help generate the compacted dst.
 
     Returns
     -------
     torch.Tenor
         Compacted dst without deduplication.
+
+    Examples
+    --------
+    >>> dst = torch.tensor([0, 3, 4, 4, 2, 2, 2, 2, 4, 4])
+    >>> seeds = torch.tensor([0, 3, 4, 5, 2, 2, 4])
+    >>> compacted_dst = compact_dst_nodes(dst, seeds)
+    >>> print(compacted_dst)
+    torch.tensor([0, 1, 2, 2, 4, 4, 5, 5, 6, 6])
     """
-    # Record the number of consecutive identical values.
-    dst_constinuous = [1 for _ in duplicated_dst]
-    for i in range(1, len(duplicated_dst)):
-        dst_constinuous[i] = (
-            dst_constinuous[i - 1] + 1
-            if (duplicated_dst[i] == duplicated_dst[i - 1])
-            else 1
-        )
+    # Compute seeds_constinuous. Record the number of consecutive identical
+    # values.
+    seeds_constinuous = torch.ones_like(seeds)
+    seeds_constinuous[1:] = torch.where(
+        seeds[1:] == seeds[:-1], seeds_constinuous[:-1] + 1, 1
+    )
     # Initially, compatc_dst is processed as the corresponding
     # subscript in dst. In this case, consecutively identical values
     # are grouped into the same subscript.
     dst_compact = []
     dst_index = len(dst) - 1
-    duplicated_dst_index = len(duplicated_dst) - 1
+    seeds_index = len(seeds) - 1
     compacted_dst_num = {}
     while dst_index >= 0:
-        if dst[dst_index] != duplicated_dst[duplicated_dst_index]:
-            duplicated_dst_index -= 1
+        if dst[dst_index] != seeds[seeds_index]:
+            seeds_index -= 1
         else:
-            dst_compact.append(duplicated_dst_index)
-            compacted_dst_num[duplicated_dst_index] = (
-                compacted_dst_num.get(duplicated_dst_index, 0) + 1
+            dst_compact.append(seeds_index)
+            compacted_dst_num[seeds_index] = (
+                compacted_dst_num.get(seeds_index, 0) + 1
             )
             dst_index -= 1
     dst_compact.reverse()
@@ -397,7 +402,7 @@ def not_deduplication_compact_dst(
         if dst[dst_index] == dst[dst_index + 1]:
             matchtime += 1
             max_matchtime = int(
-                compacted_dst_num[index_nw] / dst_constinuous[index_nw]
+                compacted_dst_num[index_nw] / seeds_constinuous[index_nw]
             )
             if matchtime > max_matchtime:
                 dst_compact[dst_index] = (
