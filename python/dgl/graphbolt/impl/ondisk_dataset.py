@@ -488,9 +488,7 @@ class OnDiskDataset(Dataset):
         if isinstance(num_nodes, int):
             return ItemSet(num_nodes)
         else:
-            data = {}
-            for node_type, number in num_nodes.items():
-                data[node_type] = ItemSet(number)
+            data = {type: ItemSet(num_node) for type, num_node in num_nodes.items()}
             return ItemSetDict(data)
 
 
