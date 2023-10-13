@@ -1,6 +1,7 @@
 import os
 
 import dgl.graphbolt as gb
+
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -37,7 +38,7 @@ def get_metadata(num_ntypes, num_etypes):
         for n2 in range(n1, num_ntypes):
             if count >= num_etypes:
                 break
-            etypes.update({(f"n{n1}", f"e{count}", f"n{n2}"): count})
+            etypes.update({f"n{n1}:e{count}:n{n2}": count})
             count += 1
     return gb.GraphMetadata(ntypes, etypes)
 

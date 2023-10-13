@@ -18,7 +18,7 @@
 
 #if !defined(_WIN32)
 #ifdef USE_LIBXSMM
-#include <libxsmm.h>
+#include <libxsmm_source.h>
 #include <unistd.h>
 #ifdef DEBUG
 #include <x86intrin.h>

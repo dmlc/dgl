@@ -12,6 +12,8 @@
 #include <sparse/sparse_matrix.h>
 #include <torch/script.h>
 
+#include "./utils.h"
+
 namespace dgl {
 namespace sparse {
 
@@ -120,6 +122,77 @@ c10::intrusive_ptr<SparseMatrix> SparseMatrix::FromDiag(
     torch::Tensor value, const std::vector<int64_t>& shape) {
   auto diag = std::make_shared<Diag>(Diag{shape[0], shape[1]});
   return SparseMatrix::FromDiagPointer(diag, value, shape);
+}
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::IndexSelect(
+    int64_t dim, torch::Tensor ids) {
+  auto id_array = TorchTensorToDGLArray(ids);
+  bool rowwise = dim == 0;
+  auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
+  auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), id_array);
+  auto slice_value =
+      this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+  // To prevent potential errors in future conversions to the COO format,
+  // where this array might be used as an initialization array for
+  // constructing COO representations, it is necessary to clear this array.
+  slice_csr.data = dgl::aten::NullArray();
+  auto ret = CSRFromOldDGLCSR(slice_csr);
+  if (rowwise) {
+    return SparseMatrix::FromCSRPointer(
+        ret, slice_value, {ret->num_rows, ret->num_cols});
+  } else {
+    return SparseMatrix::FromCSCPointer(
+        ret, slice_value, {ret->num_cols, ret->num_rows});
+  }
+}
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::RangeSelect(
+    int64_t dim, int64_t start, int64_t end) {
+  bool rowwise = dim == 0;
+  auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
+  auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), start, end);
+  auto slice_value =
+      this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+  // To prevent potential errors in future conversions to the COO format,
+  // where this array might be used as an initialization array for
+  // constructing COO representations, it is necessary to clear this array.
+  slice_csr.data = dgl::aten::NullArray();
+  auto ret = CSRFromOldDGLCSR(slice_csr);
+  if (rowwise) {
+    return SparseMatrix::FromCSRPointer(
+        ret, slice_value, {ret->num_rows, ret->num_cols});
+  } else {
+    return SparseMatrix::FromCSCPointer(
+        ret, slice_value, {ret->num_cols, ret->num_rows});
+  }
+}
+
+c10::intrusive_ptr<SparseMatrix> SparseMatrix::Sample(
+    int64_t dim, int64_t fanout, torch::Tensor ids, bool replace, bool bias) {
+  bool rowwise = dim == 0;
+  auto id_array = TorchTensorToDGLArray(ids);
+  auto csr = rowwise ? this->CSRPtr() : this->CSCPtr();
+  // Slicing matrix.
+  auto slice_csr = dgl::aten::CSRSliceRows(CSRToOldDGLCSR(csr), id_array);
+  auto slice_value =
+      this->value().index_select(0, DGLArrayToTorchTensor(slice_csr.data));
+  // Reset value indices.
+  slice_csr.data = dgl::aten::NullArray();
+
+  auto prob =
+      bias ? TorchTensorToDGLArray(slice_value) : dgl::aten::NullArray();
+  auto slice_id =
+      dgl::aten::Range(0, id_array.NumElements(), 64, id_array->ctx);
+  // Sampling all rows on sliced matrix.
+  auto sample_coo =
+      dgl::aten::CSRRowWiseSampling(slice_csr, slice_id, fanout, prob, replace);
+  auto sample_value =
+      slice_value.index_select(0, DGLArrayToTorchTensor(sample_coo.data));
+  sample_coo.data = dgl::aten::NullArray();
+  auto ret = COOFromOldDGLCOO(sample_coo);
+  if (!rowwise) ret = COOTranspose(ret);
+  return SparseMatrix::FromCOOPointer(
+      ret, sample_value, {ret->num_rows, ret->num_cols});
 }
 
 c10::intrusive_ptr<SparseMatrix> SparseMatrix::ValLike(

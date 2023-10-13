@@ -70,6 +70,19 @@ from .heterophilous_graphs import (
     RomanEmpireDataset,
     TolokersDataset,
 )
+
+# RDKit is required for Peptides-Structural, Peptides-Functional dataset.
+# Exception handling was added to prevent crashes for users who are using other
+# datasets.
+try:
+    from .lrgb import (
+        COCOSuperpixelsDataset,
+        PeptidesFunctionalDataset,
+        PeptidesStructuralDataset,
+        VOCSuperpixelsDataset,
+    )
+except ImportError:
+    pass
 from .pattern import PATTERNDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset

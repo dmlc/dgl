@@ -17,10 +17,11 @@ TORCH_LIBRARY(graphbolt, m) {
       .def_readwrite("indptr", &SampledSubgraph::indptr)
       .def_readwrite("indices", &SampledSubgraph::indices)
       .def_readwrite(
-          "reverse_row_node_ids", &SampledSubgraph::reverse_row_node_ids)
+          "original_row_node_ids", &SampledSubgraph::original_row_node_ids)
       .def_readwrite(
-          "reverse_column_node_ids", &SampledSubgraph::reverse_column_node_ids)
-      .def_readwrite("reverse_edge_ids", &SampledSubgraph::reverse_edge_ids)
+          "original_column_node_ids",
+          &SampledSubgraph::original_column_node_ids)
+      .def_readwrite("original_edge_ids", &SampledSubgraph::original_edge_ids)
       .def_readwrite("type_per_edge", &SampledSubgraph::type_per_edge);
   m.class_<CSCSamplingGraph>("CSCSamplingGraph")
       .def("num_nodes", &CSCSamplingGraph::NumNodes)
@@ -35,7 +36,21 @@ TORCH_LIBRARY(graphbolt, m) {
       .def(
           "sample_negative_edges_uniform",
           &CSCSamplingGraph::SampleNegativeEdgesUniform)
-      .def("copy_to_shared_memory", &CSCSamplingGraph::CopyToSharedMemory);
+      .def("copy_to_shared_memory", &CSCSamplingGraph::CopyToSharedMemory)
+      .def_pickle(
+          // __getstate__
+          [](const c10::intrusive_ptr<CSCSamplingGraph>& self)
+              -> torch::Dict<
+                  std::string, torch::Dict<std::string, torch::Tensor>> {
+            return self->GetState();
+          },
+          // __setstate__
+          [](torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
+                 state) -> c10::intrusive_ptr<CSCSamplingGraph> {
+            auto g = c10::make_intrusive<CSCSamplingGraph>();
+            g->SetState(state);
+            return g;
+          });
   m.def("from_csc", &CSCSamplingGraph::FromCSC);
   m.def("load_csc_sampling_graph", &LoadCSCSamplingGraph);
   m.def("save_csc_sampling_graph", &SaveCSCSamplingGraph);

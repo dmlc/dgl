@@ -1,4 +1,5 @@
 import pytest
+
 from dgl import graphbolt as gb
 
 

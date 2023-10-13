@@ -130,6 +130,21 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   void Save(torch::serialize::OutputArchive& archive) const;
 
   /**
+   * @brief Pickle method for deserializing.
+   * @param state The state of serialized CSCSamplingGraph.
+   */
+  void SetState(
+      const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
+          state);
+
+  /**
+   * @brief Pickle method for serializing.
+   * @returns The state of this CSCSamplingGraph.
+   */
+  torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> GetState()
+      const;
+
+  /**
    * @brief Return the subgraph induced on the inbound edges of the given nodes.
    * @param nodes Type agnostic node IDs to form the subgraph.
    *
@@ -221,25 +236,25 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   static c10::intrusive_ptr<CSCSamplingGraph> LoadFromSharedMemory(
       const std::string& shared_memory_name);
 
+  /**
+   * @brief Hold the shared memory objects of the the tensor metadata and data.
+   * @note Shared memory used to hold the tensor metadata and data of this
+   * class. By storing its shared memory objects, the graph controls the
+   * resources of shared memory, which will be released automatically when the
+   * graph is destroyed. This function is for internal use by CopyToSharedMemory
+   * and LoadFromSharedMemory. Please contact the DGL team if you need to use
+   * it.
+   * @param tensor_metadata_shm The shared memory objects of tensor metadata.
+   * @param tensor_data_shm The shared memory objects of tensor data.
+   */
+  void HoldSharedMemoryObject(
+      SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm);
+
  private:
   template <typename NumPickFn, typename PickFn>
   c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
       PickFn pick_fn) const;
-
-  /**
-   * @brief Build a CSCSamplingGraph from shared memory tensors.
-   *
-   * @param shared_memory_tensors A tuple of two share memory objects holding
-   * tensor meta information and data respectively, and a vector of optional
-   * tensors on shared memory.
-   *
-   * @return A new CSCSamplingGraph on shared memory.
-   */
-  static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryTensors(
-      std::tuple<
-          SharedMemoryPtr, SharedMemoryPtr,
-          std::vector<torch::optional<torch::Tensor>>>&& shared_memory_tensors);
 
   /** @brief CSC format index pointer array. */
   torch::Tensor indptr_;
@@ -279,12 +294,12 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   static constexpr int64_t SERIALIZED_METAINFO_SIZE_MAX = 32768;
 
   /**
-   * @brief Shared memory used to hold the tensor meta information and data of
-   * this class. By storing its shared memory objects, the graph controls the
+   * @brief Shared memory used to hold the tensor metadata and data of this
+   * class. By storing its shared memory objects, the graph controls the
    * resources of shared memory, which will be released automatically when the
    * graph is destroyed.
    */
-  SharedMemoryPtr tensor_meta_shm_, tensor_data_shm_;
+  SharedMemoryPtr tensor_metadata_shm_, tensor_data_shm_;
 };
 
 /**
@@ -357,14 +372,14 @@ int64_t NumPickByEtype(
  * should be put. Enough memory space should be allocated in advance.
  */
 template <typename PickedType>
-void Pick(
+int64_t Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
     SamplerArgs<SamplerType::NEIGHBOR> args, PickedType* picked_data_ptr);
 
 template <typename PickedType>
-void Pick(
+int64_t Pick(
     int64_t offset, int64_t num_neighbors, int64_t fanout, bool replace,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,
@@ -398,7 +413,7 @@ void Pick(
  * should be put. Enough memory space should be allocated in advance.
  */
 template <SamplerType S, typename PickedType>
-void PickByEtype(
+int64_t PickByEtype(
     int64_t offset, int64_t num_neighbors, const std::vector<int64_t>& fanouts,
     bool replace, const torch::TensorOptions& options,
     const torch::Tensor& type_per_edge,
@@ -406,9 +421,9 @@ void PickByEtype(
     PickedType* picked_data_ptr);
 
 template <
-    bool NonUniform, bool Replace, typename ProbsType = float,
-    typename PickedType>
-void LaborPick(
+    bool NonUniform, bool Replace, typename ProbsType, typename PickedType,
+    int StackSize = 1024>
+int64_t LaborPick(
     int64_t offset, int64_t num_neighbors, int64_t fanout,
     const torch::TensorOptions& options,
     const torch::optional<torch::Tensor>& probs_or_mask,

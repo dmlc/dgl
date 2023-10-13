@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 
 import pydantic
 
+from ...utils import version
+
 __all__ = [
     "OnDiskFeatureDataFormat",
     "OnDiskTVTSetData",
@@ -28,6 +30,7 @@ class OnDiskFeatureDataFormat(str, Enum):
 class OnDiskTVTSetData(pydantic.BaseModel):
     """Train-Validation-Test set data."""
 
+    name: Optional[str] = None
     format: OnDiskFeatureDataFormat
     in_memory: Optional[bool] = True
     path: str
@@ -79,15 +82,32 @@ class OnDiskTaskData(pydantic.BaseModel, extra="allow"):
     test_set: Optional[List[OnDiskTVTSet]] = []
     extra_fields: Optional[Dict[str, Any]] = {}
 
-    @pydantic.model_validator(mode="before")
-    @classmethod
-    def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """Build extra fields."""
-        for key in list(values.keys()):
-            if key not in cls.model_fields:
-                values["extra_fields"] = values.get("extra_fields", {})
-                values["extra_fields"][key] = values.pop(key)
-        return values
+    # As pydantic 2.0 has changed the API of validators, we need to use
+    # different validators for different versions to be compatible with
+    # previous versions.
+    if version.parse(pydantic.__version__) >= version.parse("2.0"):
+
+        @pydantic.model_validator(mode="before")
+        @classmethod
+        def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+            """Build extra fields."""
+            for key in list(values.keys()):
+                if key not in cls.model_fields:
+                    values["extra_fields"] = values.get("extra_fields", {})
+                    values["extra_fields"][key] = values.pop(key)
+            return values
+
+    else:
+
+        @pydantic.root_validator(pre=True)
+        @classmethod
+        def build_extra(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+            """Build extra fields."""
+            for key in list(values.keys()):
+                if key not in ["train_set", "validation_set", "test_set"]:
+                    values["extra_fields"] = values.get("extra_fields", {})
+                    values["extra_fields"][key] = values.pop(key)
+            return values
 
 
 class OnDiskMetaData(pydantic.BaseModel):

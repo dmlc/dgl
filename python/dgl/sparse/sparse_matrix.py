@@ -479,6 +479,286 @@ class SparseMatrix:
         """Returns whether the sparse matrix is a diagonal matrix."""
         return self.c_sparse_matrix.is_diag()
 
+    def index_select(self, dim: int, index: torch.Tensor):
+        """Returns a sub-matrix selected according to the given index.
+
+        Parameters
+        ----------
+        dim : int
+            The dim to select from matrix, should be 0 or 1. `dim = 0` for
+            rowwise selection and `dim = 1` for columnwise selection.
+        index : torch.Tensor
+            The selection index indicates which IDs from the `dim` should
+            be chosen from the matrix.
+            Note that duplicated ids are allowed.
+
+        The function does not support autograd.
+
+        Returns
+        -------
+        SparseMatrix
+            The sub-matrix which contains selected rows or columns.
+
+        Examples
+        --------
+
+        >>> indices = torch.tensor([0, 1, 1, 2, 3, 4], [0, 2, 4, 3, 5, 0]])
+        >>> val = torch.tensor([0, 1, 2, 3, 4, 5])
+        >>> A = dglsp.spmatrix(indices, val)
+
+        Case 1: Select rows by IDs.
+
+        >>> row_ids = torch.tensor([0, 1, 4])
+        >>> A.index_select(0, row_ids)
+        SparseMatrix(indices=tensor([[0, 1, 1, 2],
+                                     [0, 2, 4, 0]]),
+                     values=tensor([0, 1, 2, 5]),
+                     shape=(3, 6), nnz=4)
+
+        Case 2: Select columns by IDs.
+
+        >>> column_ids = torch.tensor([0, 4, 5])
+        >>> A.index_select(1, column_ids)
+        SparseMatrix(indices=tensor([[0, 4, 1, 3],
+                                     [0, 0, 1, 2]]),
+                     values=tensor([0, 5, 2, 4]),
+                     shape=(5, 3), nnz=4)
+        """
+        if dim not in (0, 1):
+            raise ValueError("The selection dimension should be 0 or 1.")
+        if isinstance(index, torch.Tensor):
+            return SparseMatrix(self.c_sparse_matrix.index_select(dim, index))
+        raise TypeError(f"{type(index).__name__} is unsupported input type.")
+
+    def range_select(self, dim: int, index: slice):
+        """Returns a sub-matrix selected according to the given range index.
+
+        Parameters
+        ----------
+        dim : int
+            The dim to select from matrix, should be 0 or 1. `dim = 0` for
+            rowwise selection and `dim = 1` for columnwise selection.
+        index : slice
+            The selection slice indicates ID index from the `dim` should
+            be chosen from the matrix.
+
+        The function does not support autograd.
+
+        Returns
+        -------
+        SparseMatrix
+            The sub-matrix which contains selected rows or columns.
+
+        Examples
+        --------
+
+        >>> indices = torch.tensor([0, 1, 1, 2, 3, 4], [0, 2, 4, 3, 5, 0]])
+        >>> val = torch.tensor([0, 1, 2, 3, 4, 5])
+        >>> A = dglsp.spmatrix(indices, val)
+
+        Case 1: Select rows with given slice object.
+
+        >>> A.range_select(0, slice(1, 3))
+        SparseMatrix(indices=tensor([[0, 0, 1],
+                                     [2, 4, 3]]),
+                     values=tensor([1, 2, 3]),
+                     shape=(2, 6), nnz=3)
+
+        Case 2: Select columns with given slice object.
+
+        >>> A.range_select(1, slice(3, 6))
+        SparseMatrix(indices=tensor([[2, 1, 3],
+                                     [0, 1, 2]]),
+                     values=tensor([3, 2, 4]),
+                     shape=(5, 3), nnz=3)
+        """
+        if dim not in (0, 1):
+            raise ValueError("The selection dimension should be 0 or 1.")
+        if isinstance(index, slice):
+            if index.step not in (None, 1):
+                raise NotImplementedError(
+                    "Slice with step other than 1 are not supported yet."
+                )
+            start = 0 if index.start is None else index.start
+            end = index.stop
+            return SparseMatrix(
+                self.c_sparse_matrix.range_select(dim, start, end)
+            )
+        raise TypeError(f"{type(index).__name__} is unsupported input type.")
+
+    def sample(
+        self,
+        dim: int,
+        fanout: int,
+        ids: Optional[torch.Tensor] = None,
+        replace: Optional[bool] = False,
+        bias: Optional[bool] = False,
+    ):
+        """Returns a sampled matrix on the given dimension and sample arguments.
+
+        Parameters
+        ----------
+        dim : int
+            The dimension for sampling, should be 0 or 1. `dim = 0` for
+            rowwise selection and `dim = 1` for columnwise selection.
+        fanout : int
+            The number of elements to randomly sample on each row or column.
+        ids : torch.Tensor, optional
+            An optional tensor containing row or column IDs from which to
+            sample elements.
+            NOTE: If `ids` is not provided (i.e., `ids = None`), the function
+            will sample from all rows or columns.
+        replace : bool, optional
+            Indicates whether repeated sampling of the same element is allowed.
+            When `replace = True`, repeated sampling is permitted; when
+            `replace = False`, it is not allowed.
+            NOTE: If `replace = False` and there are fewer elements than
+            `fanout`, all non-zero elements will be sampled.
+        bias : bool, optional
+            A boolean flag indicating whether to enable biasing during sampling.
+            When `bias = True`, the values of the sparse matrix will be used as
+            bias weights.
+
+        The function does not support autograd.
+
+        Returns
+        -------
+        SparseMatrix
+            A submatrix with the same shape as the original matrix, containing
+            the randomly sampled non-zero elements.
+
+        Examples
+        --------
+
+        >>> indices = torch.tensor([[0, 0, 1, 1, 2, 2, 2],
+                                    [0, 2, 0, 1, 0, 1, 2]])
+        >>> val = torch.tensor([0, 1, 2, 3, 4, 5, 6])
+        >>> A = dglsp.spmatrix(indices, val)
+
+        Case 1: Sample rows with the given number and disable repeated sampling.
+
+        >>> row_ids = torch.tensor([0, 2])
+        >>> A.sample(0, 2, row_ids)
+        SparseMatrix(indices=tensor([[0, 0, 1, 1],
+                                     [0, 2, 0, 2]]),
+                     values=tensor([0, 1, 4, 6]),
+                     shape=(2, 3), nnz=4)
+
+        Case 2: Sample cols with the given number and disable repeated sampling.
+
+        >>> col_ids = torch.tensor([0, 2])
+        >>> A.sample(1, 2, col_ids)
+        SparseMatrix(indices=tensor([[0, 1, 0, 2],
+                                     [0, 0, 1, 1]]),
+                     values=tensor([0, 2, 1, 6]),
+                     shape=(3, 2), nnz=4)
+
+        Case 3: Sample rows with the given number and enable repeated sampling.
+
+        >>> row_ids = torch.tensor([0, 1])
+        >>> A.sample(0, 2, row_ids, True)
+        SparseMatrix(indices=tensor([[0, 0, 1, 1],
+                                     [0, 2, 0, 0]]),
+                     values=tensor([0, 1, 2, 2]),
+                     shape=(2, 3), nnz=3)
+
+        Case 4: Sample cols with the given number and enable repeated sampling.
+
+        >>> col_ids = torch.tensor([0, 1])
+        >>> A.sample(1, 2, col_ids, True)
+        SparseMatrix(indices=tensor([[0, 1, 1, 1],
+                                     [0, 0, 1, 1]]),
+                     values=tensor([0, 2, 3, 3]),
+                     shape=(3, 2), nnz=3)
+        """
+        if ids is None:
+            dim_size = self.shape[0] if dim == 0 else self.shape[1]
+            ids = torch.range(
+                0, dim_size, dtype=torch.int64, device=self.device
+            )
+        return SparseMatrix(
+            self.c_sparse_matrix.sample(dim, fanout, ids, replace, bias)
+        )
+
+    def compact(
+        self,
+        dim: int,
+        leading_indices: Optional[torch.Tensor] = None,
+    ):
+        """Compact sparse matrix by removing rows or columns without non-zero
+        elements in the sparse matrix and relabeling indices of the dimension.
+
+        This function serves a dual purpose: it allows you to reorganize the
+        indices within a specific dimension (rows or columns) of the sparse
+        matrix and, if needed, place certain 'leading_indices' at the beginning
+        of the relabeled dimension.
+
+        In the absence of 'leading_indices' (when it's set to `None`), the order
+        of relabeled indices remains the same as the original order, except that
+        rows or columns without non-zero elements are removed. When
+        'leading_indices' are provided, they are positioned at the start of the
+        relabeled dimension. To be precise, all rows selected by the specified
+        indices will be remapped from 0 to length(indices) - 1. Rows that are not
+        selected and contain any non-zero elements will be positioned after those
+        remapped rows while maintaining their original order.
+
+        This function mimics 'dgl.to_block', a method used to compress a sampled
+        subgraph by eliminating redundant nodes. The 'leading_indices' parameter
+        replicates the behavior of 'include_dst_in_src' in 'dgl.to_block',
+        adding destination node information for message passing.
+        Setting 'leading_indices' to column IDs when relabeling the row
+        dimension, for example, achieves the same effect as including destination
+        nodes in source nodes.
+
+        Parameters
+        ----------
+        dim : int
+            The dimension to relabel. Should be 0 or 1. Use `dim = 0` for rowwise
+            relabeling and `dim = 1` for columnwise relabeling.
+        leading_indices : torch.Tensor, optional
+            An optional tensor containing row or column ids that should be placed
+            at the beginning of the relabeled dimension.
+
+        Returns
+        -------
+        Tuple[SparseMatrix, torch.Tensor]
+            A tuple containing the relabeled sparse matrix and the index mapping
+            of the relabeled dimension from the new index to the original index.
+
+        Examples
+        --------
+        >>> indices = torch.tensor([[0, 2],
+                                    [1, 2]])
+        >>> A = dglsp.spmatrix(indices)
+        >>> print(A.to_dense())
+        tensor([[0., 1., 0.],
+                [0., 0., 0.],
+                [0., 0., 1.]])
+
+        Case 1: Compact rows without indices.
+
+        >>> B, original_rows = A.compact(dim=0, leading_indices=None)
+        >>> print(B.to_dense())
+        tensor([[0., 1., 0.],
+                [0., 0., 1.]])
+        >>> print(original_rows)
+        torch.Tensor([0, 2])
+
+        Case 2: Compact rows with indices.
+
+        >>> B, original_rows = A.compact(dim=0, leading_indices=[1, 2])
+        >>> print(B.to_dense())
+        tensor([[0., 0., 0.],
+                [0., 0., 1.],
+                [0., 1., 0.],])
+        >>> print(original_rows)
+        torch.Tensor([1, 2, 0])
+        """
+        mat, idx = torch.ops.dgl_sparse.compact(
+            self.c_sparse_matrix, dim, leading_indices
+        )
+        return SparseMatrix(mat), idx
+
 
 def spmatrix(
     indices: torch.Tensor,

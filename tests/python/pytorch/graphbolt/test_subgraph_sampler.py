@@ -1,54 +1,194 @@
-import dgl
-import dgl.graphbolt
+import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
 import torch
-import torchdata.datapipes as dp
+from torchdata.datapipes.iter import Mapper
 
 
-def get_graphbolt_sampler_func():
+def test_SubgraphSampler_invoke():
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+
+    # Invoke via class constructor.
+    datapipe = gb.SubgraphSampler(item_sampler)
+    with pytest.raises(NotImplementedError):
+        next(iter(datapipe))
+
+    # Invokde via functional form.
+    datapipe = item_sampler.sample_subgraph()
+    with pytest.raises(NotImplementedError):
+        next(iter(datapipe))
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_NeighborSampler_invoke(labor):
     graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
 
-    def sampler_func(data):
-        adjs = []
-        seeds = data
+    # Invoke via class constructor.
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    datapipe = Sampler(item_sampler, graph, fanouts)
+    assert len(list(datapipe)) == 5
 
-        for hop in range(2):
-            sg = graph.sample_neighbors(seeds, torch.LongTensor([2]))
-            seeds = sg.node_pairs[0]
-            adjs.insert(0, sg)
-        return seeds, data, adjs
-
-    return sampler_func
-
-
-def get_dgl_sampler_func():
-    graph = dgl.add_reverse_edges(dgl.rand_graph(20, 60))
-    sampler = dgl.dataloading.NeighborSampler([2, 2])
-
-    def sampler_func(data):
-        return sampler.sample(graph, data)
-
-    return sampler_func
+    # Invokde via functional form.
+    if labor:
+        datapipe = item_sampler.sample_layer_neighbor(graph, fanouts)
+    else:
+        datapipe = item_sampler.sample_neighbor(graph, fanouts)
+    assert len(list(datapipe)) == 5
 
 
-def get_graphbolt_minibatch_dp():
-    itemset = dgl.graphbolt.ItemSet(torch.arange(10))
-    return dgl.graphbolt.MinibatchSampler(itemset, batch_size=2)
+@pytest.mark.parametrize("labor", [False, True])
+def test_NeighborSampler_fanouts(labor):
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+
+    # `fanouts` is a list of tensors.
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    if labor:
+        datapipe = item_sampler.sample_layer_neighbor(graph, fanouts)
+    else:
+        datapipe = item_sampler.sample_neighbor(graph, fanouts)
+    assert len(list(datapipe)) == 5
+
+    # `fanouts` is a list of integers.
+    fanouts = [2 for _ in range(num_layer)]
+    if labor:
+        datapipe = item_sampler.sample_layer_neighbor(graph, fanouts)
+    else:
+        datapipe = item_sampler.sample_neighbor(graph, fanouts)
+    assert len(list(datapipe)) == 5
 
 
-def get_torchdata_minibatch_dp():
-    minibatch_dp = dp.map.SequenceWrapper(torch.arange(10)).batch(2)
-    minibatch_dp = minibatch_dp.to_iter_datapipe().collate()
-    return minibatch_dp
-
-
-@pytest.mark.parametrize(
-    "sampler_func", [get_graphbolt_sampler_func(), get_dgl_sampler_func()]
-)
-@pytest.mark.parametrize(
-    "minibatch_dp", [get_graphbolt_minibatch_dp(), get_torchdata_minibatch_dp()]
-)
-def test_SubgraphSampler(minibatch_dp, sampler_func):
-    sampler_dp = dgl.graphbolt.SubgraphSampler(minibatch_dp, sampler_func)
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Node(labor):
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    itemset = gb.ItemSet(torch.arange(10), names="seed_nodes")
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    sampler_dp = Sampler(item_sampler, graph, fanouts)
     assert len(list(sampler_dp)) == 5
+
+
+def to_link_batch(data):
+    block = gb.MiniBatch(node_pairs=data)
+    return block
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Link(labor):
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    neighbor_dp = Sampler(item_sampler, graph, fanouts)
+    assert len(list(neighbor_dp)) == 5
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Link_With_Negative(labor):
+    graph = gb_test_utils.rand_csc_graph(20, 0.15)
+    itemset = gb.ItemSet(torch.arange(0, 20).reshape(-1, 2), names="node_pairs")
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    neighbor_dp = Sampler(negative_dp, graph, fanouts)
+    assert len(list(neighbor_dp)) == 5
+
+
+def get_hetero_graph():
+    # COO graph:
+    # [0, 0, 1, 1, 2, 2, 3, 3, 4, 4]
+    # [2, 4, 2, 3, 0, 1, 1, 0, 0, 1]
+    # [1, 1, 1, 1, 0, 0, 0, 0, 0] - > edge type.
+    # num_nodes = 5, num_n1 = 2, num_n2 = 3
+    ntypes = {"n1": 0, "n2": 1}
+    etypes = {"n1:e1:n2": 0, "n2:e2:n1": 1}
+    metadata = gb.GraphMetadata(ntypes, etypes)
+    indptr = torch.LongTensor([0, 2, 4, 6, 8, 10])
+    indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
+    type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+    node_type_offset = torch.LongTensor([0, 2, 5])
+    return gb.from_csc(
+        indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        metadata=metadata,
+    )
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Node_Hetero(labor):
+    graph = get_hetero_graph()
+    itemset = gb.ItemSetDict(
+        {"n2": gb.ItemSet(torch.arange(3), names="seed_nodes")}
+    )
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    sampler_dp = Sampler(item_sampler, graph, fanouts)
+    assert len(list(sampler_dp)) == 2
+    for minibatch in sampler_dp:
+        assert len(minibatch.sampled_subgraphs) == num_layer
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Link_Hetero(labor):
+    graph = get_hetero_graph()
+    itemset = gb.ItemSetDict(
+        {
+            "n1:e1:n2": gb.ItemSet(
+                torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T,
+                names="node_pairs",
+            ),
+            "n2:e2:n1": gb.ItemSet(
+                torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T,
+                names="node_pairs",
+            ),
+        }
+    )
+
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    neighbor_dp = Sampler(item_sampler, graph, fanouts)
+    assert len(list(neighbor_dp)) == 5
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
+    graph = get_hetero_graph()
+    itemset = gb.ItemSetDict(
+        {
+            "n1:e1:n2": gb.ItemSet(
+                torch.LongTensor([[0, 0, 1, 1], [0, 2, 0, 1]]).T,
+                names="node_pairs",
+            ),
+            "n2:e2:n1": gb.ItemSet(
+                torch.LongTensor([[0, 0, 1, 1, 2, 2], [0, 1, 1, 0, 0, 1]]).T,
+                names="node_pairs",
+            ),
+        }
+    )
+
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    negative_dp = gb.UniformNegativeSampler(item_sampler, graph, 1)
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    neighbor_dp = Sampler(negative_dp, graph, fanouts)
+    assert len(list(neighbor_dp)) == 5

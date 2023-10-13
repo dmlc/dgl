@@ -5,31 +5,37 @@ import sys
 import torch
 
 from .._ffi import libinfo
-from .itemset import *
-from .minibatch_sampler import *
-from .feature_store import *
-from .feature_fetcher import *
-from .copy_to import *
-from .dataset import *
-from .impl import *
+from .base import *
+from .minibatch import *
 from .dataloader import *
-from .subgraph_sampler import *
-from .sampled_subgraph import *
-from .data_format import *
+from .dataset import *
+from .feature_fetcher import *
+from .feature_store import *
+from .impl import *
+from .itemset import *
+from .item_sampler import *
+from .minibatch_transformer import *
 from .negative_sampler import *
-from .utils import unique_and_compact_node_pairs
+from .sampled_subgraph import *
+from .subgraph_sampler import *
+from .utils import (
+    add_reverse_edges,
+    exclude_seed_edges,
+    unique_and_compact,
+    unique_and_compact_node_pairs,
+)
 
 
 def load_graphbolt():
     """Load Graphbolt C++ library"""
-    version = torch.__version__.split("+", maxsplit=1)[0]
+    vers = torch.__version__.split("+", maxsplit=1)[0]
 
     if sys.platform.startswith("linux"):
-        basename = f"libgraphbolt_pytorch_{version}.so"
+        basename = f"libgraphbolt_pytorch_{vers}.so"
     elif sys.platform.startswith("darwin"):
-        basename = f"libgraphbolt_pytorch_{version}.dylib"
+        basename = f"libgraphbolt_pytorch_{vers}.dylib"
     elif sys.platform.startswith("win"):
-        basename = f"graphbolt_pytorch_{version}.dll"
+        basename = f"graphbolt_pytorch_{vers}.dll"
     else:
         raise NotImplementedError("Unsupported system: %s" % sys.platform)
 

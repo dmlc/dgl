@@ -7,6 +7,7 @@ from __future__ import absolute_import
 
 import os, sys
 import pickle as pkl
+import warnings
 
 import networkx as nx
 
@@ -34,10 +35,12 @@ backend = os.environ.get("DGLBACKEND", "pytorch")
 
 
 def _pickle_load(pkl_file):
-    if sys.version_info > (3, 0):
-        return pkl.load(pkl_file, encoding="latin1")
-    else:
-        return pkl.load(pkl_file)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=DeprecationWarning)
+        if sys.version_info > (3, 0):
+            return pkl.load(pkl_file, encoding="latin1")
+        else:
+            return pkl.load(pkl_file)
 
 
 class CitationGraphDataset(DGLBuiltinDataset):

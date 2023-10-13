@@ -89,9 +89,9 @@ TEST(MessageQueueTest, MultiThread) {
   MessageQueue queue(100000, kNumOfProducer);
   EXPECT_EQ(queue.EmptyAndNoMoreAdd(), false);
   EXPECT_EQ(queue.Empty(), true);
-  std::vector<std::thread*> thread_pool;
+  std::vector<std::thread> thread_pool(kNumOfProducer);
   for (int i = 0; i < kNumOfProducer; ++i) {
-    thread_pool.push_back(new std::thread(start_add, &queue, i));
+    thread_pool[i] = std::thread(start_add, &queue, i);
   }
   for (int i = 0; i < kNumOfProducer * kNumOfMessage; ++i) {
     Message msg;
@@ -99,7 +99,7 @@ TEST(MessageQueueTest, MultiThread) {
     EXPECT_EQ(string(msg.data, msg.size), string("apple"));
   }
   for (int i = 0; i < kNumOfProducer; ++i) {
-    thread_pool[i]->join();
+    thread_pool[i].join();
   }
   EXPECT_EQ(queue.EmptyAndNoMoreAdd(), true);
 }
