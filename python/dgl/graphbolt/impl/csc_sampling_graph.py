@@ -163,7 +163,7 @@ class CSCSamplingGraph(SamplingGraph):
         # Heterogenous
         else:
             num_nodes_per_type = {
-                _type: int(offset[_idx + 1] - offset[_idx])
+                _type: (offset[_idx + 1] - offset[_idx]).item()
                 for _type, _idx in self.metadata.node_type_to_id.items()
             }
 

@@ -1711,7 +1711,7 @@ def test_OnDiskDataset_load_tasks():
         dataset = None
 
 
-def test_OnDiskDataset_load_full_node_set():
+def test_OnDiskDataset_load_all_nodes_set():
     """Test preprocess of OnDiskDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1734,15 +1734,15 @@ def test_OnDiskDataset_load_full_node_set():
 
         dataset = gb.OnDiskDataset(test_dir).load()
 
-        full_node_set = dataset.full_node_set
+        all_nodes_set = dataset.all_nodes_set
 
-        # assert (False), f"{dataset.graph.num_nodes}, {(full_node_set)}"
+        # assert (False), f"{dataset.graph.num_nodes}, {(all_nodes_set)}"
 
-        if isinstance(full_node_set, gb.ItemSet):
-            for i, item in enumerate(full_node_set):
+        if isinstance(all_nodes_set, gb.ItemSet):
+            for i, item in enumerate(all_nodes_set):
                 assert i == item
         else:
-            for i, _dict in enumerate(full_node_set):
+            for i, _dict in enumerate(all_nodes_set):
                 assert len(_dict) == 1
                 assert isinstance(_dict, dict)
 

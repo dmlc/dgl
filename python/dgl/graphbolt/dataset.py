@@ -88,6 +88,6 @@ class Dataset:
         raise NotImplementedError
 
     @property
-    def full_node_set(self) -> Union[ItemSet, ItemSetDict]:
-        """Return the full node itemset."""
+    def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
+        """Return the itemset containing all nodes."""
         raise NotImplementedError

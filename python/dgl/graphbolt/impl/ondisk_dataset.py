@@ -389,7 +389,7 @@ class OnDiskDataset(Dataset):
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks)
-        self._full_node_set = self._init_full_node_set()
+        self._all_nodes_set = self._init_all_nodes_set()
         return self
 
     @property
@@ -418,11 +418,9 @@ class OnDiskDataset(Dataset):
         return self._dataset_name
 
     @property
-    def full_node_set(self) -> Union[ItemSet, ItemSetDict]:
-        """Return the full node itemset."""
-        if self._full_node_set is None:
-            return self._init_full_node_set()
-        return self._full_node_set
+    def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
+        """Return the itemset containing all nodes."""
+        return self._all_nodes_set
 
     def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
         """Initialize the tasks."""
@@ -483,7 +481,7 @@ class OnDiskDataset(Dataset):
             ret = ItemSetDict(data)
         return ret
 
-    def _init_full_node_set(self) -> Union[ItemSet, ItemSetDict]:
+    def _init_all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
         if not isinstance(self._graph, CSCSamplingGraph):
             return None
         num_nodes = self._graph.num_nodes
