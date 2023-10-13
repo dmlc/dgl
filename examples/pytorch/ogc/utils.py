@@ -21,7 +21,7 @@ def symmetric_normalize_adjacency(graph):
     in_degs = graph.in_degrees().float()
     in_norm = torch.pow(in_degs, -0.5).unsqueeze(-1)
     degi = torch.diag(torch.squeeze(torch.t(in_norm)))
-    degi = sp.coo_matrix(degi).tocsr()
+    degi = sp.coo_matrix(degi.cpu()).tocsr()
     adj = sp.csr_matrix((adj.val.cpu(), (adj.row.cpu(), adj.col.cpu())), shape=adj.shape)
     adj = degi.dot(adj.dot(degi))
     return adj
