@@ -1869,16 +1869,11 @@ def test_OnDiskDataset_load_1D_feature():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        with open(yaml_file, "r") as f:
-            input_config = yaml.safe_load(f)
-
         # Regenerate random 1-D node-feats.
         node_feats = np.random.rand(num_nodes, num_classes).reshape(1, -1)[0]
-        node_feat_path = os.path.join("data", "node-feat1.npy")
+        node_feat_path = os.path.join("data", "node-feat.npy")
+        os.remove(os.path.join(test_dir, node_feat_path))
         np.save(os.path.join(test_dir, node_feat_path), node_feats)
-        input_config["feature_data"][0]["path"] = os.path.join(
-            test_dir, node_feat_path
-        )
 
         dataset = gb.OnDiskDataset(test_dir).load()
         assert dataset.feature.size("node", None, "feat") == torch.Size(
