@@ -1736,13 +1736,10 @@ def test_OnDiskDataset_load_all_nodes_set():
 
         all_nodes_set = dataset.all_nodes_set
 
-        if isinstance(all_nodes_set, gb.ItemSet):
-            for i, item in enumerate(all_nodes_set):
-                assert i == item
-        else:
-            for i, _dict in enumerate(all_nodes_set):
-                assert len(_dict) == 1
-                assert isinstance(_dict, dict)
+        for i, item in enumerate(all_nodes_set):
+            assert i == item
+
+        dataset = None
 
 
 def test_BuiltinDataset():
