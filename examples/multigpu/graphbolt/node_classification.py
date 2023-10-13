@@ -126,9 +126,7 @@ def create_dataloader(
         drop_uneven_inputs=drop_uneven_inputs,
     )
     datapipe = datapipe.sample_neighbor(graph, args.fanout)
-    datapipe = datapipe.fetch_feature(
-        features, node_feature_keys=["feat", "label"]
-    )
+    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
     datapipe = datapipe.to_dgl()
 
     ############################################################################
