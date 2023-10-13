@@ -4,7 +4,9 @@ import torch
 from torch.utils.data import functional_datapipe
 
 from ..subgraph_sampler import SubgraphSampler
-from ..utils import unique_and_compact_node_pairs
+from ..utils import (
+    unique_and_compact_node_pairs, duplicated_and_compact_node_pairs
+)
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 

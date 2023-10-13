@@ -274,13 +274,13 @@ def duplicated_and_compact_node_pairs(
         Tuple[torch.Tensor, torch.Tensor],
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ],
-    unique_dst_nodes: Union[
+    duplicated_dst_nodes: Union[
         torch.Tensor,
         Dict[str, torch.Tensor],
     ] = None,
 ):
     """
-    Compact node pairs and return unique nodes (per type).
+    Compact node pairs and return duplicated nodes (per type).
 
     Parameters
     ----------
@@ -293,17 +293,17 @@ def duplicated_and_compact_node_pairs(
         - If `node_pairs` is a dictionary: The keys should be edge type and
         the values should be corresponding node pairs. And IDs inside are
         heterogeneous ids.
-    unique_dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
-        Unique nodes of all destination nodes in the node pairs.
-        - If `unique_dst_nodes` is a tensor: It means the graph is homogeneous.
+    duplicated_dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
+        All destination nodes in the node pairs.
+        - If `duplicated_dst_nodes` is a tensor: It means the graph is homogeneous.
         - If `node_pairs` is a dictionary: The keys are node type and the
         values are corresponding nodes. And IDs inside are heterogeneous ids.
 
     Returns
     -------
-    Tuple[node_pairs, unique_nodes]
+    Tuple[duplicated_nodes, node_pairs]
         The compacted node pairs, where node IDs are replaced with mapped node
-        IDs, and the unique nodes (per type).
+        IDs, and the duplicated nodes (per type).
         "Compacted node pairs" indicates that the node IDs in the input node
         pairs are replaced with mapped node IDs, where each type of node is
         mapped to a contiguous space of IDs ranging from 0 to N.
@@ -327,11 +327,11 @@ def duplicated_and_compact_node_pairs(
     is_homogeneous = not isinstance(node_pairs, dict)
     if is_homogeneous:
         node_pairs = {"_N:_E:_N": node_pairs}
-        if unique_dst_nodes is not None:
+        if duplicated_dst_nodes is not None:
             assert isinstance(
-                unique_dst_nodes, torch.Tensor
+                duplicated_dst_nodes, torch.Tensor
             ), "Edge type not supported in homogeneous graph."
-            unique_dst_nodes = {"_N": unique_dst_nodes}
+            duplicated_dst_nodes = {"_N": duplicated_dst_nodes}
 
     # Collect all source and destination nodes for each node type.
     src_nodes = defaultdict(list)
@@ -343,27 +343,25 @@ def duplicated_and_compact_node_pairs(
     src_nodes = {ntype: torch.cat(nodes) for ntype, nodes in src_nodes.items()}
     dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
     # Compute unique destination nodes if not provided.
-    if unique_dst_nodes is None:
-        unique_dst_nodes = {
-            ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
-        }
+    if duplicated_dst_nodes is None:
+        raise ValueError("Seeds should not be None.")
 
     ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
-    unique_nodes = {}
+    duplicated_nodes = {}
     compacted_src = {}
     compacted_dst = {}
     dtype = list(src_nodes.values())[0].dtype
     default_tensor = torch.tensor([], dtype=dtype)
     for ntype in ntypes:
         src = src_nodes.get(ntype, default_tensor)
-        unique_dst = unique_dst_nodes.get(ntype, default_tensor)
+        duplicated_dst = duplicated_dst_nodes.get(ntype, default_tensor)
         dst = dst_nodes.get(ntype, default_tensor)
-        unique_nodes[ntype] = torch.cat([unique_dst, src])
+        duplicated_nodes[ntype] = torch.cat([duplicated_dst, src])
         compacted_src[ntype] = torch.arange(
-            len(unique_dst), len(unique_dst) + len(src), dtype=int
+            len(duplicated_dst), len(duplicated_dst) + len(src), dtype=int
         )
         compacted_dst[ntype] = not_deduplication_compact_dst(
-            dst, unique_dst
+            dst, duplicated_dst
         )
 
     compacted_node_pairs = {}
@@ -380,12 +378,12 @@ def duplicated_and_compact_node_pairs(
     # Return singleton for a homogeneous graph.
     if is_homogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
-        unique_nodes = list(unique_nodes.values())[0]
+        duplicated_nodes = list(duplicated_nodes.values())[0]
 
-    return unique_nodes, compacted_node_pairs
+    return duplicated_nodes, compacted_node_pairs
 
 
-def not_deduplication_compact_dst(dst: torch.Tensor, unique_dst: torch.Tensor):
+def not_deduplication_compact_dst(dst: torch.Tensor, duplicated_dst: torch.Tensor):
     """
     Compact dst without deduplication.
 
@@ -393,9 +391,9 @@ def not_deduplication_compact_dst(dst: torch.Tensor, unique_dst: torch.Tensor):
     ----------
     dst: torch.Tensor
         The original dst that need to be compacted.
-    unique_dst: torch.Tensor
-        Unique_dst record the nodes that generate dst in order. Its index will
-        be used to help generate the compacted dst.
+    duplicated_dst: torch.Tensor
+        Duplicated_dst record the nodes that generate dst in order. Its index
+        will be used to help generate the compacted dst.
 
     Returns
     -------
@@ -403,11 +401,11 @@ def not_deduplication_compact_dst(dst: torch.Tensor, unique_dst: torch.Tensor):
         Compacted dst without deduplication.
     """
     # Record the number of consecutive identical values.
-    dst_constinuous = [1 for _ in unique_dst]
-    for i in range(1, len(unique_dst)):
+    dst_constinuous = [1 for _ in duplicated_dst]
+    for i in range(1, len(duplicated_dst)):
         dst_constinuous[i] = (
             dst_constinuous[i - 1] + 1
-            if (unique_dst[i] == unique_dst[i - 1])
+            if (duplicated_dst[i] == duplicated_dst[i - 1])
             else 1
         )
     # Initially, compatc_dst is processed as the corresponding
@@ -415,15 +413,15 @@ def not_deduplication_compact_dst(dst: torch.Tensor, unique_dst: torch.Tensor):
     # are grouped into the same subscript.
     dst_compact = []
     dst_index = len(dst) - 1
-    unique_dst_index = len(unique_dst) - 1
+    duplicated_dst_index = len(duplicated_dst) - 1
     compacted_dst_num = {}
     while dst_index >= 0:
-        if dst[dst_index] != unique_dst[unique_dst_index]:
-            unique_dst_index -= 1
+        if dst[dst_index] != duplicated_dst[duplicated_dst_index]:
+            duplicated_dst_index -= 1
         else:
-            dst_compact.append(unique_dst_index)
-            compacted_dst_num[unique_dst_index] = (
-                compacted_dst_num.get(unique_dst_index, 0) + 1
+            dst_compact.append(duplicated_dst_index)
+            compacted_dst_num[duplicated_dst_index] = (
+                compacted_dst_num.get(duplicated_dst_index, 0) + 1
             )
             dst_index -= 1
     dst_compact.reverse()
