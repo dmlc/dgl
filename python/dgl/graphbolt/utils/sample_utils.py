@@ -322,9 +322,7 @@ def compact_node_pairs(
             compacted_src[ntype] = torch.arange(
                 len(original_seeds), len(new_seeds[ntype]), dtype=int
             )
-            compacted_dst[ntype] = compact_dst_nodes(
-                dst, original_seeds
-            )
+            compacted_dst[ntype] = compact_dst_nodes(dst, original_seeds)
 
     compacted_node_pairs = {}
     # Map back with the same order.
