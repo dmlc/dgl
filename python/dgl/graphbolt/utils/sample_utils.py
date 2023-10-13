@@ -342,7 +342,7 @@ def duplicated_and_compact_node_pairs(
         dst_nodes[dst_type].append(dst_node)
     src_nodes = {ntype: torch.cat(nodes) for ntype, nodes in src_nodes.items()}
     dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
-    # Compute unique destination nodes if not provided.
+    # Compute destination nodes if not provided.
     if duplicated_dst_nodes is None:
         duplicated_dst_nodes = dst_nodes
 
