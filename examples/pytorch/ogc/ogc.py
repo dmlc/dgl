@@ -84,7 +84,6 @@ if __name__ == "__main__":
     features = g.ndata["feat"]
 
     adj = symmetric_normalize_adjacency(g)
-    print(g.num_edges)
     I_N = sp.eye(features.shape[0])
     # lazy random walk (also known as lazy graph convolution)
     lazy_adj = (1 - beta) * I_N + beta * adj
