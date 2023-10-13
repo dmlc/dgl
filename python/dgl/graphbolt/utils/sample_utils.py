@@ -210,74 +210,19 @@ def unique_and_compact_node_pairs(
     {"n1:e1:n2": (tensor([0, 1, 1]), tensor([0, 1, 0])),
     "n2:e2:n1": (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
-    is_homogeneous = not isinstance(node_pairs, dict)
-    if is_homogeneous:
-        node_pairs = {"_N:_E:_N": node_pairs}
-        if unique_dst_nodes is not None:
-            assert isinstance(
-                unique_dst_nodes, torch.Tensor
-            ), "Edge type not supported in homogeneous graph."
-            unique_dst_nodes = {"_N": unique_dst_nodes}
-
-    # Collect all source and destination nodes for each node type.
-    src_nodes = defaultdict(list)
-    dst_nodes = defaultdict(list)
-    for etype, (src_node, dst_node) in node_pairs.items():
-        src_type, _, dst_type = etype_str_to_tuple(etype)
-        src_nodes[src_type].append(src_node)
-        dst_nodes[dst_type].append(dst_node)
-    src_nodes = {ntype: torch.cat(nodes) for ntype, nodes in src_nodes.items()}
-    dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
-    # Compute unique destination nodes if not provided.
-    if unique_dst_nodes is None:
-        unique_dst_nodes = {
-            ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
-        }
-
-    ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
-    unique_nodes = {}
-    compacted_src = {}
-    compacted_dst = {}
-    dtype = list(src_nodes.values())[0].dtype
-    default_tensor = torch.tensor([], dtype=dtype)
-    for ntype in ntypes:
-        src = src_nodes.get(ntype, default_tensor)
-        unique_dst = unique_dst_nodes.get(ntype, default_tensor)
-        dst = dst_nodes.get(ntype, default_tensor)
-        (
-            unique_nodes[ntype],
-            compacted_src[ntype],
-            compacted_dst[ntype],
-        ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
-
-    compacted_node_pairs = {}
-    # Map back with the same order.
-    for etype, pair in node_pairs.items():
-        num_elem = pair[0].size(0)
-        src_type, _, dst_type = etype_str_to_tuple(etype)
-        src = compacted_src[src_type][:num_elem]
-        dst = compacted_dst[dst_type][:num_elem]
-        compacted_node_pairs[etype] = (src, dst)
-        compacted_src[src_type] = compacted_src[src_type][num_elem:]
-        compacted_dst[dst_type] = compacted_dst[dst_type][num_elem:]
-
-    # Return singleton for a homogeneous graph.
-    if is_homogeneous:
-        compacted_node_pairs = list(compacted_node_pairs.values())[0]
-        unique_nodes = list(unique_nodes.values())[0]
-
-    return unique_nodes, compacted_node_pairs
+    return compact_node_pairs(node_pairs, unique_dst_nodes, deduplicate=True)
 
 
-def duplicated_and_compact_node_pairs(
+def compact_node_pairs(
     node_pairs: Union[
         Tuple[torch.Tensor, torch.Tensor],
         Dict[str, Tuple[torch.Tensor, torch.Tensor]],
     ],
-    duplicated_dst_nodes: Union[
+    seeds: Union[
         torch.Tensor,
         Dict[str, torch.Tensor],
     ] = None,
+    deduplicate=False,
 ):
     """
     Compact node pairs and return duplicated nodes (per type).
@@ -293,11 +238,15 @@ def duplicated_and_compact_node_pairs(
         - If `node_pairs` is a dictionary: The keys should be edge type and
         the values should be corresponding node pairs. And IDs inside are
         heterogeneous ids.
-    duplicated_dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
+    seeds: torch.Tensor or Dict[str, torch.Tensor]
         All destination nodes in the node pairs.
-        - If `duplicated_dst_nodes` is a tensor: It means the graph is homogeneous.
+        - If `seeds` is a tensor: It means the graph is homogeneous.
         - If `node_pairs` is a dictionary: The keys are node type and the
         values are corresponding nodes. And IDs inside are heterogeneous ids.
+    deduplicate: bool
+        Boolean indicating whether seeds between hops will be deduplicated.
+        If True, the same elements in seeds will be deleted to only one.
+        Otherwise, the same elements will be remained.
 
     Returns
     -------
@@ -327,11 +276,11 @@ def duplicated_and_compact_node_pairs(
     is_homogeneous = not isinstance(node_pairs, dict)
     if is_homogeneous:
         node_pairs = {"_N:_E:_N": node_pairs}
-        if duplicated_dst_nodes is not None:
+        if seeds is not None:
             assert isinstance(
-                duplicated_dst_nodes, torch.Tensor
+                seeds, torch.Tensor
             ), "Edge type not supported in homogeneous graph."
-            duplicated_dst_nodes = {"_N": duplicated_dst_nodes}
+            seeds = {"_N": seeds}
 
     # Collect all source and destination nodes for each node type.
     src_nodes = defaultdict(list)
@@ -343,26 +292,39 @@ def duplicated_and_compact_node_pairs(
     src_nodes = {ntype: torch.cat(nodes) for ntype, nodes in src_nodes.items()}
     dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
     # Compute destination nodes if not provided.
-    if duplicated_dst_nodes is None:
-        duplicated_dst_nodes = dst_nodes
+    if seeds is None:
+        if deduplicate:
+            seeds = {
+                ntype: torch.unique(nodes)
+                for ntype, nodes in dst_nodes.items()
+            }
+        else:
+            seeds = dst_nodes
 
     ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
-    duplicated_nodes = {}
+    cat_seeds = {}
     compacted_src = {}
     compacted_dst = {}
     dtype = list(src_nodes.values())[0].dtype
     default_tensor = torch.tensor([], dtype=dtype)
     for ntype in ntypes:
         src = src_nodes.get(ntype, default_tensor)
-        duplicated_dst = duplicated_dst_nodes.get(ntype, default_tensor)
+        original_seeds = seeds.get(ntype, default_tensor)
         dst = dst_nodes.get(ntype, default_tensor)
-        duplicated_nodes[ntype] = torch.cat([duplicated_dst, src])
-        compacted_src[ntype] = torch.arange(
-            len(duplicated_dst), len(duplicated_dst) + len(src), dtype=int
-        )
-        compacted_dst[ntype] = not_deduplication_compact_dst(
-            dst, duplicated_dst
-        )
+        if deduplicate:
+            (
+                cat_seeds[ntype],
+                compacted_src[ntype],
+                compacted_dst[ntype],
+            ) = torch.ops.graphbolt.unique_and_compact(src, dst, original_seeds)
+        else:
+            cat_seeds[ntype] = torch.cat([original_seeds, src])
+            compacted_src[ntype] = torch.arange(
+                len(original_seeds), len(cat_seeds[ntype]), dtype=int
+            )
+            compacted_dst[ntype] = not_deduplication_compact_dst(
+                dst, original_seeds
+            )
 
     compacted_node_pairs = {}
     # Map back with the same order.
@@ -378,9 +340,9 @@ def duplicated_and_compact_node_pairs(
     # Return singleton for a homogeneous graph.
     if is_homogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
-        duplicated_nodes = list(duplicated_nodes.values())[0]
+        cat_seeds = list(cat_seeds.values())[0]
 
-    return duplicated_nodes, compacted_node_pairs
+    return cat_seeds, compacted_node_pairs
 
 
 def not_deduplication_compact_dst(
