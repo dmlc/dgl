@@ -24,7 +24,9 @@ def benchmark_itemsampler(use_indexing, shuffle, num_ids, batch_size):
         f"batch_size={batch_size}`: {t_end - t_start:.4f}s"
     )
 
+
 batch_size = 1000
+
 for num_ids in [10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000]:
     for shuffle in [False, True]:
         for use_indexing in [False, True]:
