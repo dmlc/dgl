@@ -124,7 +124,7 @@ class NeighborSampler(SubgraphSampler):
                 node_pairs=compacted_node_pairs,
                 original_column_node_ids=original_column_node_ids,
                 original_row_node_ids=seeds,
-                original_edge_ids=subgraph.original_edge_ids
+                original_edge_ids=subgraph.original_edge_ids,
             )
             subgraphs.insert(0, subgraph)
         return seeds, subgraphs
