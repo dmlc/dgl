@@ -498,12 +498,17 @@ class CSCSamplingGraph(SamplingGraph):
         """
         # Ensure nodes is 1-D tensor.
         self._check_sampler_arguments(nodes, fanouts, probs_name)
-        has_origin_eids = (
+        has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, False, has_origin_eids, probs_name
+            nodes,
+            fanouts.tolist(),
+            replace,
+            False,
+            has_original_eids,
+            probs_name,
         )
 
     def sample_layer_neighbors(
