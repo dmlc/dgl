@@ -90,7 +90,7 @@ class NeighborSampler(SubgraphSampler):
         for fanout in fanouts:
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
-            self.fanouts.append(fanout)
+            self.fanouts.insert(0, fanout)
         self.replace = replace
         self.prob_name = prob_name
         self.deduplicate = deduplicate
