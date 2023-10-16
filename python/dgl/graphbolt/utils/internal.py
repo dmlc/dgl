@@ -60,6 +60,7 @@ def save_data(data, path, fmt):
 
 
 def get_npy_dim(npy_path):
+    """Get the dim of numpy file."""
     with open(npy_path, "rb") as f:
         # Read the magic string of the .npy file
         magic_str = f.read(6)
