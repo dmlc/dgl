@@ -2,6 +2,8 @@
 
 from typing import Dict, Iterable, Iterator, Sized, Tuple, Union
 
+import torch
+
 __all__ = ["ItemSet", "ItemSetDict"]
 
 
@@ -33,7 +35,10 @@ class ItemSet:
     >>> num = 10
     >>> item_set = gb.ItemSet(num, names="seed_nodes")
     >>> list(item_set)
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4), tensor(5),
+     tensor(6), tensor(7), tensor(8), tensor(9)]
+    >>> item_set[torch.arange(0, num)]
+    tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     >>> item_set.names
     ('seed_nodes',)
 
@@ -42,6 +47,8 @@ class ItemSet:
     >>> item_set = gb.ItemSet(node_ids, names="seed_nodes")
     >>> list(item_set)
     [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4)]
+    >>> item_set[:]
+    tensor([0, 1, 2, 3, 4])
     >>> item_set.names
     ('seed_nodes',)
 
@@ -53,6 +60,8 @@ class ItemSet:
     >>> list(item_set)
     [(tensor(0), tensor(5)), (tensor(1), tensor(6)), (tensor(2), tensor(7)),
      (tensor(3), tensor(8)), (tensor(4), tensor(9))]
+    >>> item_set[:]
+    (tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9]))
     >>> item_set.names
     ('seed_nodes', 'labels')
 
@@ -67,6 +76,10 @@ class ItemSet:
      (tensor([4, 5]), tensor([16, 17, 18])),
      (tensor([6, 7]), tensor([19, 20, 21])),
      (tensor([8, 9]), tensor([22, 23, 24]))]
+    >>> item_set[:]
+    (tensor([[0, 1], [2, 3], [4, 5], [6, 7],[8, 9]]),
+     tensor([[10, 11, 12], [13, 14, 15], [16, 17, 18], [19, 20, 21],
+        [22, 23, 24]]))
     >>> item_set.names
     ('node_pairs', 'negative_dsts')
     """
@@ -76,33 +89,20 @@ class ItemSet:
         items: Union[int, Iterable, Tuple[Iterable]],
         names: Union[str, Tuple[str]] = None,
     ) -> None:
-        # Initiated by an integer.
-        if isinstance(items, int):
-            self._items = items
-            if names is not None:
-                if isinstance(names, tuple):
-                    self._names = names
-                else:
-                    self._names = (names,)
-                assert (
-                    len(self._names) == 1
-                ), "Number of names mustn't exceed 1 when item is an integer."
-            else:
-                self._names = None
-            return
-
-        # Otherwise.
-        if isinstance(items, tuple):
+        if isinstance(items, (int, tuple)):
             self._items = items
         else:
             self._items = (items,)
         if names is not None:
+            num_items = (
+                len(self._items) if isinstance(self._items, tuple) else 1
+            )
             if isinstance(names, tuple):
                 self._names = names
             else:
                 self._names = (names,)
-            assert len(self._items) == len(self._names), (
-                f"Number of items ({len(self._items)}) and "
+            assert num_items == len(self._names), (
+                f"Number of items ({num_items}) and "
                 f"names ({len(self._names)}) must match."
             )
         else:
@@ -110,7 +110,7 @@ class ItemSet:
 
     def __iter__(self) -> Iterator:
         if isinstance(self._items, int):
-            yield from range(self._items)
+            yield from torch.arange(self._items)
             return
 
         if len(self._items) == 1:
@@ -142,6 +142,24 @@ class ItemSet:
         raise TypeError(
             f"{type(self).__name__} instance doesn't have valid length."
         )
+
+    def __getitem__(self, idx: Union[int, slice, Iterable]) -> Tuple:
+        try:
+            len(self)
+        except TypeError:
+            raise TypeError(
+                f"{type(self).__name__} instance doesn't support indexing."
+            )
+        if isinstance(self._items, int):
+            assert isinstance(idx, (int, torch.Tensor)), (
+                f"Indexing of integer-initialized {type(self).__name__} "
+                f"instance must be int or torch.Tensor."
+            )
+            # [Warning] Index range is not checked.
+            return idx
+        if len(self._items) == 1:
+            return self._items[0][idx]
+        return tuple(item[idx] for item in self._items)
 
     @property
     def names(self) -> Tuple[str]:
