@@ -48,12 +48,12 @@ def save_data(data, path, fmt):
 
 
 def get_npy_dim(npy_path):
-    with open(npy_path, 'rb') as f:
+    with open(npy_path, "rb") as f:
         # Read the magic string of the .npy file
         magic_str = f.read(6)
-        # Verify the magic string to confirm it's a .npy file
-        if magic_str != b'\x93NUMPY':
-            raise ValueError('Not a valid .npy file')
+        # Verify the magic string to confirm it"s a .npy file
+        if magic_str != b"\x93NUMPY":
+            raise ValueError("Not a valid .npy file")
 
         # Read the version number of the .npy file
         version_major, version_minor = np.frombuffer(f.read(2), dtype=np.uint8)
@@ -63,19 +63,21 @@ def get_npy_dim(npy_path):
         elif version_major == 2:
             header_len_size = 4  # version 2.x uses 4 bytes for header length
         else:
-            raise ValueError('Unsupported version of .npy file')
+            raise ValueError("Unsupported version of .npy file")
 
         # Read the header
-        header_len = int(np.frombuffer(f.read(header_len_size), dtype=np.uint16))
-        header = f.read(header_len).decode('latin1')
+        header_len = int(
+            np.frombuffer(f.read(header_len_size), dtype=np.uint16)
+        )
+        header = f.read(header_len).decode("latin1")
 
         # Extract shape information from the header
-        loc = header.find('(')
-        loc_end = header.find(')')
-        shape_str = header[loc + 1:loc_end].replace(' ', '').split(',')
+        loc = header.find("(")
+        loc_end = header.find(")")
+        shape_str = header[loc + 1:loc_end].replace(" ", "").split(",")
 
-        # If there's a trailing comma for one-dimensional arrays, remove it
-        if shape_str[-1] == '':
+        # If there"s a trailing comma for one-dimensional arrays, remove it
+        if shape_str[-1] == "":
             shape_str = shape_str[:-1]
 
         shape = tuple(map(int, shape_str))
