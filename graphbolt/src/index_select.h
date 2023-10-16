@@ -11,27 +11,24 @@
 namespace graphbolt {
 namespace ops {
 
-/**
- * @brief Template implementation function to be instantiated with different
- * device types.
- */
-template <c10::DeviceType XPU>
+/** @brief Implemented in the cuda directory. */
 torch::Tensor UVAIndexSelectImpl(torch::Tensor input, torch::Tensor index);
 
 /**
- * @brief Select rows from pinned memory tensor by GPU kernel.
+ * @brief Select rows from input tensor according to index tensor.
  *
  * NOTE:
  * 1. The shape of input tensor can be multi-dimensional, but the index tensor
  * must be 1-D.
- * 2. The input tensor must be pinned memory tensor and the index tensor
- * can be on GPU or pinned memory.
+ * 2. If input is on pinned memory and index is on pinned memory or GPU memory,
+ * then UVAIndexSelectImpl will be called. Otherwise, torch::index_select will
+ * be called.
  *
  * @param input Input tensor with shape (N, ...).
  * @param index Index tensor with shape (M,).
  * @return torch::Tensor Output tensor with shape (M, ...).
  */
-torch::Tensor UVAIndexSelect(torch::Tensor input, torch::Tensor index);
+torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index);
 
 }  // namespace ops
 }  // namespace graphbolt

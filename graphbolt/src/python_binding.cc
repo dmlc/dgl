@@ -65,7 +65,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("load_from_shared_memory", &CSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
   m.def("isin", &IsIn);
-  m.def("uva_index_select", &ops::UVAIndexSelect);
+  m.def("index_select", &ops::IndexSelect);
 }
 
 }  // namespace sampling

@@ -102,9 +102,7 @@ class TorchBasedFeature(Feature):
             if self._tensor.is_pinned():
                 return self._tensor.cuda()
             return self._tensor
-        if self._tensor.is_pinned() and ids.is_cuda:
-            return torch.ops.graphbolt.uva_index_select(self._tensor, ids)
-        return self._tensor[ids]
+        return torch.ops.graphbolt.index_select(self._tensor, ids)
 
     def size(self):
         """Get the size of the feature.
