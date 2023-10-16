@@ -48,36 +48,6 @@ import torchmetrics.functional as MF
 import tqdm
 
 
-class SAGE(nn.Module):
-    def __init__(self, in_size, hidden_size, out_size):
-        super().__init__()
-        self.layers = nn.ModuleList()
-        # Three-layer GraphSAGE-mean.
-        self.layers.append(dglnn.SAGEConv(in_size, hidden_size, "mean"))
-        self.layers.append(dglnn.SAGEConv(hidden_size, hidden_size, "mean"))
-        self.layers.append(dglnn.SAGEConv(hidden_size, out_size, "mean"))
-        self.dropout = nn.Dropout(0.5)
-        self.hidden_size = hidden_size
-        self.out_size = out_size
-        # Set the dtype for the layers manually.
-        self.set_layer_dtype(torch.float64)
-
-    def set_layer_dtype(self, dtype):
-        for layer in self.layers:
-            for param in layer.parameters():
-                param.data = param.data.to(dtype)
-
-    def forward(self, blocks, x):
-        hidden_x = x
-        for layer_idx, (layer, block) in enumerate(zip(self.layers, blocks)):
-            hidden_x = layer(block, hidden_x)
-            is_last_layer = layer_idx == len(self.layers) - 1
-            if not is_last_layer:
-                hidden_x = F.relu(hidden_x)
-                hidden_x = self.dropout(hidden_x)
-        return hidden_x
-
-
 def create_dataloader(args, graph, features, itemset, is_train=True):
     """
     [HIGHLIGHT]
@@ -113,8 +83,6 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Step-2]:
     # self.sample_neighbor()
     # [Input]:
-    # 'datapipe' is either 'ItemSampler' or 'UniformNegativeSampler' depending
-    # on whether training is needed ('is_train'),
     # 'graph': The network topology for sampling.
     # 'args.fanout': Number of neighbors to sample per node.
     # [Output]:
@@ -167,6 +135,79 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
 
     # Return the fully-initialized DataLoader object.
     return dataloader
+
+
+class SAGE(nn.Module):
+    def __init__(self, in_size, hidden_size, out_size):
+        super().__init__()
+        self.layers = nn.ModuleList()
+        # Three-layer GraphSAGE-mean.
+        self.layers.append(dglnn.SAGEConv(in_size, hidden_size, "mean"))
+        self.layers.append(dglnn.SAGEConv(hidden_size, hidden_size, "mean"))
+        self.layers.append(dglnn.SAGEConv(hidden_size, out_size, "mean"))
+        self.dropout = nn.Dropout(0.5)
+        self.hidden_size = hidden_size
+        self.out_size = out_size
+        # Set the dtype for the layers manually.
+        self.set_layer_dtype(torch.float64)
+
+    def set_layer_dtype(self, dtype):
+        for layer in self.layers:
+            for param in layer.parameters():
+                param.data = param.data.to(dtype)
+
+    def forward(self, blocks, x):
+        hidden_x = x
+        for layer_idx, (layer, block) in enumerate(zip(self.layers, blocks)):
+            hidden_x = layer(block, hidden_x)
+            is_last_layer = layer_idx == len(self.layers) - 1
+            if not is_last_layer:
+                hidden_x = F.relu(hidden_x)
+                hidden_x = self.dropout(hidden_x)
+        return hidden_x
+
+    def inference(self, args, graph, features, all_nodes_set):
+        """Conduct layer-wise inference to get all the node embeddings."""
+        dataloader = create_dataloader(
+            args, graph, features, all_nodes_set, is_train=False
+        )
+        buffer_device = torch.device("cpu")
+        pin_memory = buffer_device != args.device
+
+        for layer_idx, layer in enumerate(self.layers):
+            is_last_layer = layer_idx == len(self.layers) - 1
+            y = torch.empty(
+                graph.total_num_nodes,
+                self.out_size if is_last_layer else self.hidden_size,
+                device=buffer_device,
+                pin_memory=pin_memory,
+            )
+            print(f"y= {y}")
+            features = features.to(args.device)
+
+            for step, data in tqdm.tqdm(enumerate(dataloader)):
+                x = data.node_features["feat"]
+                hidden_x = layer(data.blocks[0], x)
+                if not is_last_layer:
+                    hidden_x = F.relu(hidden_x)
+                    hidden_x = self.dropout(hidden_x)
+                # By design, our output nodes are contiguous.
+                y[
+                    data.output_nodes[0] : data.output_nodes[-1] + 1
+                ] = hidden_x.to(buffer_device)
+            features = y
+        return y
+
+
+@torch.no_grad()
+def layerwise_infer(
+    args, graph, features, test_set, all_nodes_set, model, num_classes
+):
+    model.eval()
+    pred = model.inference(args, graph, features, all_nodes_set)
+    pred = pred[test_set._items[0]]
+    label = test_set._items[1].to(pred.device)
+    return MF.accuracy(pred, label, task="multiclass", num_classes=num_classes)
 
 
 @torch.no_grad()
@@ -282,6 +323,7 @@ def main(args):
     features = dataset.feature
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
+    test_set = dataset.tasks[0].test_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
@@ -294,15 +336,34 @@ def main(args):
 
     model = SAGE(in_size, hidden_size, out_size)
 
+    print("Debugging...")
+    test_acc = layerwise_infer(
+        args,
+        graph,
+        features,
+        test_set,
+        dataset.all_nodes_set,
+        model,
+        num_classes,
+    )
+
     # Model training.
     print("Training...")
     train(args, graph, features, train_set, valid_set, num_classes, model)
 
     # Test the model.
     print("Testing...")
-    test_set = dataset.tasks[0].test_set
-    test_acc = evaluate(
-        args, model, graph, features, itemset=test_set, num_classes=num_classes
+    # test_acc = evaluate(
+    #     args, model, graph, features, itemset=test_set, num_classes=num_classes
+    # )
+    test_acc = layerwise_infer(
+        args,
+        graph,
+        features,
+        test_set,
+        dataset.all_nodes_set,
+        model,
+        num_classes,
     )
     print(f"Test Accuracy is {test_acc.item():.4f}")
 
