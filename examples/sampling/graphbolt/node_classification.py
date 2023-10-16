@@ -182,8 +182,7 @@ class SAGE(nn.Module):
                 device=buffer_device,
                 pin_memory=pin_memory,
             )
-            print(f"y= {y}")
-            features = features.to(args.device)
+            # features = features.to(args.device)
 
             for step, data in tqdm.tqdm(enumerate(dataloader)):
                 x = data.node_features["feat"]
