@@ -86,7 +86,7 @@ def get_npy_dim(npy_path):
         # Extract shape information from the header
         loc = header.find("(")
         loc_end = header.find(")")
-        shape_str = header[loc + 1:loc_end].replace(" ", "").split(",")
+        shape_str = header[loc + 1 : loc_end].replace(" ", "").split(",")
 
         # If there"s a trailing comma for one-dimensional arrays, remove it
         if shape_str[-1] == "":
