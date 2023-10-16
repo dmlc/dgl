@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Callable, Iterator, Optional
 
+import numpy as np
+import torch
 import torch.distributed as dist
 from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
@@ -75,6 +77,41 @@ def minibatcher_default(batch, names):
                 item = (item[:, 0], item[:, 1])
         setattr(minibatch, name, item)
     return minibatch
+
+
+class ItemShufflerAndBatcher:
+    """A shuffler to shuffle items and create batches."""
+
+    def __init__(
+        self, item_set, shuffle, batch_size, drop_last, buffer_size=10 * 1000
+    ):
+        self._item_set = item_set
+        self._shuffle = shuffle
+        self._batch_size = batch_size
+        self._drop_last = drop_last
+        self._buffer_size = max(buffer_size, 20 * batch_size)
+
+    def __iter__(self):
+        buffer = None
+        num_items = len(self._item_set)
+        curr_idx = 0
+        while curr_idx < num_items:
+            start = curr_idx
+            end = min(curr_idx + self._buffer_size, num_items)
+            buffer = self._item_set[start:end]
+            curr_idx = end
+            indices = torch.arange(end - start)
+            # print(f"ItemShufflerAndBatcher.__iter__(): indices={indices}")
+            if self._shuffle:
+                np.random.shuffle(indices.numpy())
+            indices_splits = torch.split(indices, self._batch_size)
+            for indices_split in indices_splits:
+                if self._drop_last and len(indices_split) < self._batch_size:
+                    break
+                # print(f"ItemShufflerAndBatcher.__iter__(): indices_split={indices_split}")
+                # print(f"ItemShufflerAndBatcher.__iter__(): buffer={buffer}")
+                yield tuple(item[indices_split] for item in buffer)
+            buffer = None
 
 
 class ItemSampler(IterDataPipe):
@@ -287,14 +324,16 @@ class ItemSampler(IterDataPipe):
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
+        use_indexing: Optional[bool] = False,
     ) -> None:
         super().__init__()
         self._names = item_set.names
-        self._item_set = IterableWrapper(item_set)
+        self._item_set = item_set
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
         self._shuffle = shuffle
+        self._use_indexing = use_indexing
 
     def _organize_items(self, data_pipe) -> None:
         # Shuffle before batch.
@@ -333,8 +372,18 @@ class ItemSampler(IterDataPipe):
         return default_collate(batch)
 
     def __iter__(self) -> Iterator:
+        if self._use_indexing:
+            data_pipe = IterableWrapper(
+                ItemShufflerAndBatcher(
+                    self._item_set,
+                    self._shuffle,
+                    self._batch_size,
+                    self._drop_last,
+                )
+            )
+            return iter(data_pipe)
         # Organize items.
-        data_pipe = self._organize_items(self._item_set)
+        data_pipe = self._organize_items(IterableWrapper(self._item_set))
 
         # Collate.
         data_pipe = data_pipe.collate(collate_fn=self._collate)
@@ -507,7 +556,7 @@ class DistributedItemSampler(ItemSampler):
         super().__init__(item_set, batch_size, minibatcher, drop_last, shuffle)
         self._drop_uneven_inputs = drop_uneven_inputs
         # Apply a sharding filter to distribute the items.
-        self._item_set = self._item_set.sharding_filter()
+        self._item_set = IterableWrapper(self._item_set).sharding_filter()
         # Get world size.
         if num_replicas is None:
             assert (
