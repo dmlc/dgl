@@ -94,7 +94,7 @@ def test_ItemSet_length():
 
 
 def test_ItemSet_seed_nodes():
-    # Node IDs.
+    # Node IDs with tensor.
     item_set = gb.ItemSet(torch.arange(0, 5), names="seed_nodes")
     assert item_set.names == ("seed_nodes",)
     # Iterating over ItemSet and indexing one by one.
@@ -103,6 +103,20 @@ def test_ItemSet_seed_nodes():
         assert i == item_set[i]
     # Indexing with a slice.
     assert torch.equal(item_set[:], torch.arange(0, 5))
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
+
+    # Node IDs with single integer.
+    item_set = gb.ItemSet(5, names="seed_nodes")
+    assert item_set.names == ("seed_nodes",)
+    # Iterating over ItemSet and indexing one by one.
+    for i, item in enumerate(item_set):
+        assert i == item.item()
+        assert i == item_set[i]
+    # Indexing with a slice.
+    assert torch.equal(item_set[:], torch.arange(0, 5))
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
 
 
 def test_ItemSet_seed_nodes_labels():
@@ -120,6 +134,9 @@ def test_ItemSet_seed_nodes_labels():
     # Indexing with a slice.
     assert torch.equal(item_set[:][0], seed_nodes)
     assert torch.equal(item_set[:][1], labels)
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)][0], seed_nodes)
+    assert torch.equal(item_set[torch.arange(0, 5)][1], labels)
 
 
 def test_ItemSet_node_pairs():
@@ -135,6 +152,8 @@ def test_ItemSet_node_pairs():
         assert node_pairs[i][1] == item_set[i][1]
     # Indexing with a slice.
     assert torch.equal(item_set[:], node_pairs)
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)], node_pairs)
 
 
 def test_ItemSet_node_pairs_labels():
@@ -152,6 +171,9 @@ def test_ItemSet_node_pairs_labels():
     # Indexing with a slice.
     assert torch.equal(item_set[:][0], node_pairs)
     assert torch.equal(item_set[:][1], labels)
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)][0], node_pairs)
+    assert torch.equal(item_set[torch.arange(0, 5)][1], labels)
 
 
 def test_ItemSet_node_pairs_neg_dsts():
@@ -171,6 +193,9 @@ def test_ItemSet_node_pairs_neg_dsts():
     # Indexing with a slice.
     assert torch.equal(item_set[:][0], node_pairs)
     assert torch.equal(item_set[:][1], neg_dsts)
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)][0], node_pairs)
+    assert torch.equal(item_set[torch.arange(0, 5)][1], neg_dsts)
 
 
 def test_ItemSet_graphs():

@@ -90,24 +90,32 @@ class ItemSet:
         names: Union[str, Tuple[str]] = None,
     ) -> None:
         if isinstance(items, int):
-            items = torch.arange(items)
-        if isinstance(items, tuple):
+            self._items = items
+            self._internal_items = None  # For indexing.
+        elif isinstance(items, tuple):
             self._items = items
         else:
             self._items = (items,)
         if names is not None:
+            num_items = (
+                len(self._items) if isinstance(self._items, tuple) else 1
+            )
             if isinstance(names, tuple):
                 self._names = names
             else:
                 self._names = (names,)
-            assert len(self._items) == len(self._names), (
-                f"Number of items ({len(self._items)}) and "
+            assert num_items == len(self._names), (
+                f"Number of items ({num_items}) and "
                 f"names ({len(self._names)}) must match."
             )
         else:
             self._names = None
 
     def __iter__(self) -> Iterator:
+        if isinstance(self._items, int):
+            yield from torch.arange(self._items)
+            return
+
         if len(self._items) == 1:
             yield from self._items[0]
             return
@@ -130,17 +138,29 @@ class ItemSet:
                 yield tuple(item)
 
     def __len__(self) -> int:
+        if isinstance(self._items, int):
+            return self._items
         if isinstance(self._items[0], Sized):
             return len(self._items[0])
         raise TypeError(
             f"{type(self).__name__} instance doesn't have valid length."
         )
 
-    def __getitem__(self, idx: Union[int, Iterable]) -> Tuple:
-        if not isinstance(self._items[0], Sized):
+    def __getitem__(self, idx: Union[int, slice, Iterable]) -> Tuple:
+        try:
+            len(self)
+        except TypeError:
             raise TypeError(
                 f"{type(self).__name__} instance doesn't support indexing."
             )
+        if isinstance(self._items, int):
+            # [TODO][Rui] Indexing probably could be further optimized. For
+            # example, if the index is an integer or list, we can directly
+            # return the items without instantiating the whole range. This
+            # is the most common case in GraphBolt(``ItemSampler``).
+            if self._internal_items is None:
+                self._internal_items = torch.arange(self._items)
+            return self._internal_items[idx]
         if len(self._items) == 1:
             return self._items[0][idx]
         return tuple(item[idx] for item in self._items)
