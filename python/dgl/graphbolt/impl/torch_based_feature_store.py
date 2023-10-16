@@ -134,6 +134,9 @@ class TorchBasedFeature(Feature):
             )
             self._tensor[ids] = value
 
+    def pin_memory_(self):
+        self._tensor = self._tensor.pin_memory()
+
 
 class TorchBasedFeatureStore(BasicFeatureStore):
     r"""A store to manage multiple pytorch based feature for access.
@@ -188,3 +191,7 @@ class TorchBasedFeatureStore(BasicFeatureStore):
             else:
                 raise ValueError(f"Unknown feature format {spec.format}")
         super().__init__(features)
+
+    def pin_memory_(self):
+        for feature in self._features.values():
+            feature.pin_memory_()

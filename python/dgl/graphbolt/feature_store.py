@@ -52,6 +52,12 @@ class Feature:
         """
         raise NotImplementedError
 
+    def pin_memory_(self):
+        """In-place operation to copy the feature to pinned memory."""
+        raise NotImplementedError(
+            f"pin_memory_() is not implemented for {self.__class__.__name__}"
+        )
+
 
 class FeatureStore:
     r"""A store to manage multiple features for access."""
@@ -138,3 +144,9 @@ class FeatureStore:
             updated.
         """
         raise NotImplementedError
+
+    def pin_memory_(self):
+        """In-place operation to copy the feature store to pinned memory."""
+        raise NotImplementedError(
+            f"pin_memory_() is not implemented for {self.__class__.__name__}"
+        )
