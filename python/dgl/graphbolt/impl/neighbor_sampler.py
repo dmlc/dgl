@@ -34,6 +34,10 @@ class NeighborSampler(SubgraphSampler):
         The number of edges to be sampled for each node with or without
         considering edge types. The length of this parameter implicitly
         signifies the layer of sampling being conducted.
+        Note: The fanout order is from the outermost layer to innermost layer.
+        For example, the fanout '[15, 10, 5]' means that 15 to the outermost
+        layer, 10 to the intermediate layer and 5 corresponds to the innermost
+        layer.
     replace: bool
         Boolean indicating whether the sample is preformed with or
         without replacement. If True, a value can be selected multiple
@@ -90,7 +94,7 @@ class NeighborSampler(SubgraphSampler):
         for fanout in fanouts:
             if not isinstance(fanout, torch.Tensor):
                 fanout = torch.LongTensor([int(fanout)])
-            self.fanouts.append(fanout)
+            self.fanouts.insert(0, fanout)
         self.replace = replace
         self.prob_name = prob_name
         self.deduplicate = deduplicate

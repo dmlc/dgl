@@ -301,9 +301,9 @@ def train(args, graph, features, train_set, valid_set, model):
                 break
 
     # Evaluate the model.
-    print("Validation")
-    valid_mrr = evaluate(args, graph, features, valid_set, model)
-    print(f"Valid MRR {valid_mrr.item():.4f}")
+    # print("Validation")
+    # valid_mrr = evaluate(args, graph, features, valid_set, model)
+    # print(f"Valid MRR {valid_mrr.item():.4f}")
 
 
 def parse_args():
@@ -354,8 +354,11 @@ def main(args):
 
     # Model training.
     print("Training...")
-    train(args, graph, features, train_set, valid_set, model)
+    import time
 
+    s = time.perf_counter()
+    train(args, graph, features, train_set, valid_set, model)
+    print(f"{time.perf_counter() - s} seconds elpased. ")
     # Test the model.
     print("Testing...")
     test_set = dataset.tasks[0].test_set
