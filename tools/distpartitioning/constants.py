@@ -41,3 +41,7 @@ STR_NUM_NODES_PER_TYPE = "num_nodes_per_type"
 STR_NUM_EDGES_PER_TYPE = "num_edges_per_type"
 
 STR_NTYPES = "ntypes"
+STR_NODE_MAP = "node_map"
+STR_EDGE_MAP = "edge_map"
+STR_ETYPES = "etypes"
+STR_NTYPES = "ntypes"
