@@ -37,7 +37,7 @@ class ItemSet:
     >>> list(item_set)
     [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4), tensor(5),
      tensor(6), tensor(7), tensor(8), tensor(9)]
-    >>> item_set[:]
+    >>> item_set[torch.arange(0, num)]
     tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     >>> item_set.names
     ('seed_nodes',)
