@@ -15,6 +15,7 @@ from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
+from ..sampling_graph import SamplingGraph
 from ..utils import read_data, save_data
 from .csc_sampling_graph import (
     CSCSamplingGraph,
@@ -389,7 +390,7 @@ class OnDiskDataset(Dataset):
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks)
-        self._all_nodes_set = self._init_all_nodes_set()
+        self._all_nodes_set = self._init_all_nodes_set(self._graph)
         return self
 
     @property
@@ -403,7 +404,7 @@ class OnDiskDataset(Dataset):
         return self._tasks
 
     @property
-    def graph(self) -> object:
+    def graph(self) -> SamplingGraph:
         """Return the graph."""
         return self._graph
 
@@ -481,15 +482,16 @@ class OnDiskDataset(Dataset):
             ret = ItemSetDict(data)
         return ret
 
-    def _init_all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
-        if not isinstance(self._graph, CSCSamplingGraph):
+    def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
+        if graph is None:
             return None
-        num_nodes = self._graph.num_nodes
+        num_nodes = graph.num_nodes
         if isinstance(num_nodes, int):
             return ItemSet(num_nodes)
         else:
             data = {
-                type: ItemSet(num_node) for type, num_node in num_nodes.items()
+                node_type: ItemSet(num_node)
+                for node_type, num_node in num_nodes.items()
             }
             return ItemSetDict(data)
 

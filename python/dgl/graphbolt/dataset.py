@@ -3,6 +3,7 @@ from typing import Dict, List, Union
 
 from .feature_store import FeatureStore
 from .itemset import ItemSet, ItemSetDict
+from .sampling_graph import SamplingGraph
 
 __all__ = [
     "Task",
@@ -73,7 +74,7 @@ class Dataset:
         raise NotImplementedError
 
     @property
-    def graph(self) -> object:
+    def graph(self) -> SamplingGraph:
         """Return the graph."""
         raise NotImplementedError
 
