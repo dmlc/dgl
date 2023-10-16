@@ -1103,9 +1103,24 @@ def test_OnDiskDataset_preprocess_homogeneous():
         )
         assert len(subgraph.node_pairs[0]) <= num_samples
 
-        # Delete the preprocessed directory to re-preprocess.
-        shutil.rmtree(os.path.join(test_dir, "preprocessed"))
-        assert not os.path.exists(os.path.join(test_dir, "preprocessed"))
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
         # Test do not generate original_edge_id.
         output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
             test_dir, original_edge_id=False
@@ -1119,6 +1134,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             csc_sampling_graph.edge_attributes is not None
             and gb.ORIGINAL_EDGE_ID not in csc_sampling_graph.edge_attributes
         )
+        csc_sampling_graph = None
 
 
 def test_OnDiskDataset_preprocess_path():
@@ -1607,14 +1623,6 @@ def test_OnDiskDataset_load_graph():
             dataset.graph.edge_attributes is not None
             and gb.ORIGINAL_EDGE_ID in dataset.graph.edge_attributes
         )
-        # Delete the preprocessed directory to re-preprocess.
-        shutil.rmtree(os.path.join(test_dir, "preprocessed"))
-        assert not os.path.exists(os.path.join(test_dir, "preprocessed"))
-        dataset = gb.OnDiskDataset(test_dir, original_edge_id=False).load()
-        assert (
-            dataset.graph.edge_attributes is None
-            or gb.ORIGINAL_EDGE_ID not in dataset.graph.edge_attributes
-        )
 
         # Case1. Test modify the `type` field.
         dataset = gb.OnDiskDataset(test_dir)
@@ -1653,6 +1661,33 @@ def test_OnDiskDataset_load_graph():
         )
         original_graph = None
         modify_graph = None
+        dataset = None
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # Test do not generate original_edge_id.
+        dataset = gb.OnDiskDataset(test_dir, original_edge_id=False).load()
+        assert (
+            dataset.graph.edge_attributes is None
+            or gb.ORIGINAL_EDGE_ID not in dataset.graph.edge_attributes
+        )
         dataset = None
 
 
