@@ -68,7 +68,7 @@ def get_npy_dim(npy_path):
             raise ValueError("Not a valid .npy file")
 
         # Read the version number of the .npy file
-        version_major, version_minor = np.frombuffer(f.read(2), dtype=np.uint8)
+        version_major, _ = np.frombuffer(f.read(2), dtype=np.uint8)
         # Determine the length of the header
         if version_major == 1:
             header_len_size = 2  # version 1.x uses 2 bytes for header length
