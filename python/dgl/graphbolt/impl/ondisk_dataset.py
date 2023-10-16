@@ -3,7 +3,7 @@
 import os
 import shutil
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import pandas as pd
 import torch
@@ -235,9 +235,9 @@ class OnDiskTask:
     def __init__(
         self,
         metadata: Dict,
-        train_set: ItemSet or ItemSetDict,
-        validation_set: ItemSet or ItemSetDict,
-        test_set: ItemSet or ItemSetDict,
+        train_set: Union[ItemSet, ItemSetDict],
+        validation_set: Union[ItemSet, ItemSetDict],
+        test_set: Union[ItemSet, ItemSetDict],
     ):
         """Initialize a task.
 
@@ -245,11 +245,11 @@ class OnDiskTask:
         ----------
         metadata : Dict
             Metadata.
-        train_set : ItemSet or ItemSetDict
+        train_set : Union[ItemSet, ItemSetDict]
             Training set.
-        validation_set : ItemSet or ItemSetDict
+        validation_set : Union[ItemSet, ItemSetDict]
             Validation set.
-        test_set : ItemSet or ItemSetDict
+        test_set : Union[ItemSet, ItemSetDict]
             Test set.
         """
         self._metadata = metadata
@@ -263,17 +263,17 @@ class OnDiskTask:
         return self._metadata
 
     @property
-    def train_set(self) -> ItemSet or ItemSetDict:
+    def train_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the training set."""
         return self._train_set
 
     @property
-    def validation_set(self) -> ItemSet or ItemSetDict:
+    def validation_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the validation set."""
         return self._validation_set
 
     @property
-    def test_set(self) -> ItemSet or ItemSetDict:
+    def test_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the test set."""
         return self._test_set
 
@@ -446,7 +446,7 @@ class OnDiskDataset(Dataset):
 
     def _init_tvt_set(
         self, tvt_set: List[OnDiskTVTSet]
-    ) -> ItemSet or ItemSetDict:
+    ) -> Union[ItemSet, ItemSetDict]:
         """Initialize the TVT set."""
         ret = None
         if (tvt_set is None) or (len(tvt_set) == 0):
