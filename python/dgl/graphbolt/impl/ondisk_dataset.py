@@ -52,7 +52,9 @@ def _copy_or_convert_data(
         save_data(data, output_path, output_format)
 
 
-def preprocess_ondisk_dataset(dataset_dir: str) -> str:
+def preprocess_ondisk_dataset(
+    dataset_dir: str, include_original_edge_id: bool = False
+) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
 
@@ -153,7 +155,9 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                 g.edata[graph_feature["name"]] = edge_data
 
     # 4. Convert the DGLGraph to a CSCSamplingGraph.
-    csc_sampling_graph = from_dglgraph(g, is_homogeneous)
+    csc_sampling_graph = from_dglgraph(
+        g, is_homogeneous, include_original_edge_id
+    )
 
     # 5. Save the CSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
@@ -352,11 +356,13 @@ class OnDiskDataset(Dataset):
         The YAML file path.
     """
 
-    def __init__(self, path: str) -> None:
+    def __init__(
+        self, path: str, include_original_edge_id: bool = False
+    ) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         self._dataset_dir = path
-        yaml_path = preprocess_ondisk_dataset(path)
+        yaml_path = preprocess_ondisk_dataset(path, include_original_edge_id)
         with open(yaml_path) as f:
             self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
 
