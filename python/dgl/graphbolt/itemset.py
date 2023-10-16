@@ -89,10 +89,7 @@ class ItemSet:
         items: Union[int, Iterable, Tuple[Iterable]],
         names: Union[str, Tuple[str]] = None,
     ) -> None:
-        if isinstance(items, int):
-            self._items = items
-            self._internal_items = None  # For indexing.
-        elif isinstance(items, tuple):
+        if isinstance(items, int) or isinstance(items, tuple):
             self._items = items
         else:
             self._items = (items,)
@@ -154,13 +151,12 @@ class ItemSet:
                 f"{type(self).__name__} instance doesn't support indexing."
             )
         if isinstance(self._items, int):
-            # [TODO][Rui] Indexing probably could be further optimized. For
-            # example, if the index is an integer or list, we can directly
-            # return the items without instantiating the whole range. This
-            # is the most common case in GraphBolt(``ItemSampler``).
-            if self._internal_items is None:
-                self._internal_items = torch.arange(self._items)
-            return self._internal_items[idx]
+            assert isinstance(idx, int) or isinstance(idx, torch.Tensor), (
+                f"Indexing of integer-initialized {type(self).__name__} "
+                f"instance must be int or torch.Tensor."
+            )
+            # [Warning] Index range is not checked.
+            return idx
         if len(self._items) == 1:
             return self._items[0][idx]
         return tuple(item[idx] for item in self._items)
