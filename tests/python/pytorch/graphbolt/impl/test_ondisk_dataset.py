@@ -1711,6 +1711,71 @@ def test_OnDiskDataset_load_tasks():
         dataset = None
 
 
+def test_OnDiskDataset_all_nodes_set_homo():
+    """Test homograph's all nodes set of OnDiskDataset."""
+    csc_indptr, indices = gbt.random_homo_graph(1000, 10 * 1000)
+    graph = gb.from_csc(csc_indptr, indices)
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
+        gb.save_csc_sampling_graph(graph, graph_path)
+
+        yaml_content = f"""
+            graph_topology:
+              type: CSCSamplingGraph
+              path: {graph_path}
+        """
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+        all_nodes_set = dataset.all_nodes_set
+        assert isinstance(all_nodes_set, gb.ItemSet)
+        for i, item in enumerate(all_nodes_set):
+            assert i == item
+
+        dataset = None
+
+
+def test_OnDiskDataset_all_nodes_set_hetero():
+    """Test heterograph's all nodes set of OnDiskDataset."""
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
+    graph = gb.from_csc(
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+    )
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
+        gb.save_csc_sampling_graph(graph, graph_path)
+
+        yaml_content = f"""
+            graph_topology:
+              type: CSCSamplingGraph
+              path: {graph_path}
+        """
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+        all_nodes_set = dataset.all_nodes_set
+        assert isinstance(all_nodes_set, gb.ItemSetDict)
+        for i, item in enumerate(all_nodes_set):
+            assert len(item) == 1
+            assert isinstance(item, dict)
+
+        dataset = None
+
+
 def test_BuiltinDataset():
     """Test BuiltinDataset."""
     with tempfile.TemporaryDirectory() as test_dir:
