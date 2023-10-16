@@ -34,9 +34,10 @@ class NeighborSampler(SubgraphSampler):
         The number of edges to be sampled for each node with or without
         considering edge types. The length of this parameter implicitly
         signifies the layer of sampling being conducted.
-        Note: The order of the fanouts is opposite to the layer. For example,
-        `[15, 10, 5]` signifies that 5 corresponds to the 1st layer, 10 to the
-        2nd, and 15 to the final layer.
+        Note: The fanout order is from the outermost layer to innermost layer.
+        For example, the fanout '[15, 10, 5]' means that 15 to the outermost
+        layer, 10 to the intermediate layer and 5 corresponds to the innermost
+        layer.
     replace: bool
         Boolean indicating whether the sample is preformed with or
         without replacement. If True, a value can be selected multiple
