@@ -820,7 +820,9 @@ def save_csc_sampling_graph(graph, filename):
 
 
 def from_dglgraph(
-    g: DGLGraph, is_homogeneous: bool = False, original_edge_id: bool = False
+    g: DGLGraph,
+    is_homogeneous: bool = False,
+    include_original_edge_id: bool = False,
 ) -> CSCSamplingGraph:
     """Convert a DGLGraph to CSCSamplingGraph."""
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
@@ -841,7 +843,7 @@ def from_dglgraph(
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
 
     edge_attributes = {}
-    if original_edge_id:
+    if include_original_edge_id:
         # Assign edge attributes according to the original eids mapping.
         edge_attributes[ORIGINAL_EDGE_ID] = homo_g.edata[EID][edge_ids]
 

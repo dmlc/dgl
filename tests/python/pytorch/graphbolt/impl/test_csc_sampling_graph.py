@@ -1297,13 +1297,17 @@ def test_from_dglgraph_homogeneous():
 
     # Check if the original edge id exist in edge attributes when the
     # original_edge_id is set to False.
-    gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=False, original_edge_id=False)
+    gb_g = gb.from_dglgraph(
+        dgl_g, is_homogeneous=False, include_original_edge_id=False
+    )
     assert (
         gb_g.edge_attributes is None
         or gb.ORIGINAL_EDGE_ID not in gb_g.edge_attributes
     )
 
-    gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=True, original_edge_id=True)
+    gb_g = gb.from_dglgraph(
+        dgl_g, is_homogeneous=True, include_original_edge_id=True
+    )
     # Get the COO representation of the CSCSamplingGraph.
     num_columns = gb_g.csc_indptr[1:] - gb_g.csc_indptr[:-1]
     rows = gb_g.indices
@@ -1345,13 +1349,17 @@ def test_from_dglgraph_heterogeneous():
     )
     # Check if the original edge id exist in edge attributes when the
     # original_edge_id is set to False.
-    gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=False, original_edge_id=False)
+    gb_g = gb.from_dglgraph(
+        dgl_g, is_homogeneous=False, include_original_edge_id=False
+    )
     assert (
         gb_g.edge_attributes is None
         or gb.ORIGINAL_EDGE_ID not in gb_g.edge_attributes
     )
 
-    gb_g = gb.from_dglgraph(dgl_g, is_homogeneous=False, original_edge_id=True)
+    gb_g = gb.from_dglgraph(
+        dgl_g, is_homogeneous=False, include_original_edge_id=True
+    )
 
     # `reverse_node_id` is used to map the node id in CSCSamplingGraph to the
     # node id in Hetero-DGLGraph.

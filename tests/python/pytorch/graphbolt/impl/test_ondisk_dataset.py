@@ -2,7 +2,6 @@ import os
 import pickle
 import random
 import re
-import shutil
 import tempfile
 import unittest
 
@@ -1074,7 +1073,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
         output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, original_edge_id=False
+            test_dir, include_original_edge_id=False
         )
 
         with open(output_file, "rb") as f:
@@ -1123,7 +1122,7 @@ def test_OnDiskDataset_preprocess_homogeneous():
             f.write(yaml_content)
         # Test do not generate original_edge_id.
         output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
-            test_dir, original_edge_id=False
+            test_dir, include_original_edge_id=False
         )
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
@@ -1618,7 +1617,9 @@ def test_OnDiskDataset_load_graph():
             f.write(yaml_content)
 
         # Check the different original_edge_id option to load edge_attributes.
-        dataset = gb.OnDiskDataset(test_dir, original_edge_id=True).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
         assert (
             dataset.graph.edge_attributes is not None
             and gb.ORIGINAL_EDGE_ID in dataset.graph.edge_attributes
@@ -1683,7 +1684,9 @@ def test_OnDiskDataset_load_graph():
             f.write(yaml_content)
 
         # Test do not generate original_edge_id.
-        dataset = gb.OnDiskDataset(test_dir, original_edge_id=False).load()
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False
+        ).load()
         assert (
             dataset.graph.edge_attributes is None
             or gb.ORIGINAL_EDGE_ID not in dataset.graph.edge_attributes
