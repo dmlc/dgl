@@ -286,10 +286,7 @@ def main(args):
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
-    # TODO[Mingbang]: Replace this with a more elegant API.
-    in_size = features.read("node", None, "feat").shape[
-        1
-    ]  # Size of feature of a single node.
+    in_size = features.size("node", None, "feat")[0]
     hidden_size = 128
     out_size = num_classes
 

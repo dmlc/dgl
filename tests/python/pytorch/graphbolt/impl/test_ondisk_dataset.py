@@ -1072,7 +1072,9 @@ def test_OnDiskDataset_preprocess_homogeneous():
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
-        output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(test_dir)
+        output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
+            test_dir, include_original_edge_id=False
+        )
 
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
@@ -1087,6 +1089,10 @@ def test_OnDiskDataset_preprocess_homogeneous():
         )
         assert csc_sampling_graph.total_num_nodes == num_nodes
         assert csc_sampling_graph.total_num_edges == num_edges
+        assert (
+            csc_sampling_graph.edge_attributes is None
+            or gb.ORIGINAL_EDGE_ID not in csc_sampling_graph.edge_attributes
+        )
 
         num_samples = 100
         fanout = 1
@@ -1095,6 +1101,39 @@ def test_OnDiskDataset_preprocess_homogeneous():
             torch.tensor([fanout]),
         )
         assert len(subgraph.node_pairs[0]) <= num_samples
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+        # Test do not generate original_edge_id.
+        output_file = gb.ondisk_dataset.preprocess_ondisk_dataset(
+            test_dir, include_original_edge_id=False
+        )
+        with open(output_file, "rb") as f:
+            processed_dataset = yaml.load(f, Loader=yaml.Loader)
+        csc_sampling_graph = gb.csc_sampling_graph.load_csc_sampling_graph(
+            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
+        )
+        assert (
+            csc_sampling_graph.edge_attributes is not None
+            and gb.ORIGINAL_EDGE_ID not in csc_sampling_graph.edge_attributes
+        )
+        csc_sampling_graph = None
 
 
 def test_OnDiskDataset_preprocess_path():
@@ -1577,9 +1616,14 @@ def test_OnDiskDataset_load_graph():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        # Check if the CSCSamplingGraph.edge_attributes loaded.
-        dataset = gb.OnDiskDataset(test_dir).load()
-        assert dataset.graph.edge_attributes is not None
+        # Check the different original_edge_id option to load edge_attributes.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=True
+        ).load()
+        assert (
+            dataset.graph.edge_attributes is not None
+            and gb.ORIGINAL_EDGE_ID in dataset.graph.edge_attributes
+        )
 
         # Case1. Test modify the `type` field.
         dataset = gb.OnDiskDataset(test_dir)
@@ -1618,6 +1662,35 @@ def test_OnDiskDataset_load_graph():
         )
         original_graph = None
         modify_graph = None
+        dataset = None
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        # Test do not generate original_edge_id.
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=False
+        ).load()
+        assert (
+            dataset.graph.edge_attributes is None
+            or gb.ORIGINAL_EDGE_ID not in dataset.graph.edge_attributes
+        )
         dataset = None
 
 
@@ -1708,6 +1781,71 @@ def test_OnDiskDataset_load_tasks():
         )
         original_train_set = None
         modify_train_set = None
+        dataset = None
+
+
+def test_OnDiskDataset_all_nodes_set_homo():
+    """Test homograph's all nodes set of OnDiskDataset."""
+    csc_indptr, indices = gbt.random_homo_graph(1000, 10 * 1000)
+    graph = gb.from_csc(csc_indptr, indices)
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
+        gb.save_csc_sampling_graph(graph, graph_path)
+
+        yaml_content = f"""
+            graph_topology:
+              type: CSCSamplingGraph
+              path: {graph_path}
+        """
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+        all_nodes_set = dataset.all_nodes_set
+        assert isinstance(all_nodes_set, gb.ItemSet)
+        for i, item in enumerate(all_nodes_set):
+            assert i == item
+
+        dataset = None
+
+
+def test_OnDiskDataset_all_nodes_set_hetero():
+    """Test heterograph's all nodes set of OnDiskDataset."""
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
+    graph = gb.from_csc(
+        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+    )
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
+        gb.save_csc_sampling_graph(graph, graph_path)
+
+        yaml_content = f"""
+            graph_topology:
+              type: CSCSamplingGraph
+              path: {graph_path}
+        """
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+        all_nodes_set = dataset.all_nodes_set
+        assert isinstance(all_nodes_set, gb.ItemSetDict)
+        for i, item in enumerate(all_nodes_set):
+            assert len(item) == 1
+            assert isinstance(item, dict)
+
         dataset = None
 
 
