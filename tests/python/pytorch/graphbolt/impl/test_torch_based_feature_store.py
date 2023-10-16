@@ -86,6 +86,44 @@ def test_torch_based_feature(in_memory):
         a = b = None
         feature_a = feature_b = None
 
+        # Test loaded tensors' contiguity from C/Fortran contiguous ndarray.
+        C_contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="C")
+        Fortran_contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="F")
+        assert C_contiguous_numpy.flags["C_CONTIGUOUS"]
+        assert Fortran_contiguous_numpy.flags["F_CONTIGUOUS"]
+        np.save(
+            os.path.join(test_dir, "C_contiguous_numpy.npy"), C_contiguous_numpy
+        )
+        np.save(
+            os.path.join(test_dir, "Fortran_contiguous_numpy.npy"),
+            Fortran_contiguous_numpy,
+        )
+
+        cur_mmap_mode = None
+        if not in_memory:
+            cur_mmap_mode = "r+"
+        feature_a = gb.TorchBasedFeature(
+            torch.from_numpy(
+                np.load(
+                    os.path.join(test_dir, "C_contiguous_numpy.npy"),
+                    mmap_mode=cur_mmap_mode,
+                )
+            )
+        )
+        feature_b = gb.TorchBasedFeature(
+            torch.from_numpy(
+                np.load(
+                    os.path.join(test_dir, "Fortran_contiguous_numpy.npy"),
+                    mmap_mode=cur_mmap_mode,
+                )
+            )
+        )
+        assert feature_a._tensor.is_contiguous()
+        assert feature_b._tensor.is_contiguous()
+
+        C_contiguous_numpy = Fortran_contiguous_numpy = None
+        feature_a = feature_b = None
+
 
 def write_tensor_to_disk(dir, name, t, fmt="torch"):
     if fmt == "torch":
