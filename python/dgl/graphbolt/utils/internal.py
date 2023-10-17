@@ -3,8 +3,8 @@
 import os
 
 import numpy as np
-from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 import torch
+from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 
 
 def _read_torch_data(path):
@@ -52,9 +52,9 @@ def get_npy_dim(npy_path):
     """Get the dim of numpy file."""
     with open(npy_path, "rb") as f:
         magic_str = f.read(6)
-        if magic_str != b'\x93NUMPY':
+        if magic_str != b"\x93NUMPY":
             raise ValueError("Not a .npy file")
-        # Use the corresponding version of func to get header. 
+        # Use the corresponding version of func to get header.
         version = f.read(2)
         if version == b"\x01\x00":
             header, _, _ = read_array_header_1_0(f)
@@ -62,5 +62,5 @@ def get_npy_dim(npy_path):
             header, _, _ = read_array_header_2_0(f)
         else:
             raise ValueError(f"Unsupported .npy version")
-        
+
         return len(header)
