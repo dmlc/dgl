@@ -35,26 +35,25 @@ def save_data(data, path, fmt):
         raise RuntimeError(f"Unsupported format: {fmt}")
 
     # Perform necessary conversion.
-    if fmt == "numpy" and isinstance(element, torch.Tensor):
-        element = element.cpu()
-        if not element.is_contiguous():
+    if fmt == "numpy" and isinstance(data, torch.Tensor):
+        data = data.cpu().numpy()
+    elif fmt == "torch" and isinstance(data, np.ndarray):
+        data = torch.from_numpy(data).cpu()
+
+    # Save the data.
+    if fmt == "numpy":
+        if not data.flags["C_CONTIGUOUS"]:
             Warning(
                 "The ndarray saved to disk is not contiguous, "
                 "so it will be copied to contiguous memory."
             )
-            element = element.contiguous()
-        element = element.numpy()
-    elif fmt == "torch" and isinstance(element, np.ndarray):
-        element = torch.from_numpy(element).cpu()
-        if not element.is_contiguous():
+            data = np.ascontiguousarray(data)
+        np.save(path, data)
+    elif fmt == "torch":
+        if not data.is_contiguous():
             Warning(
                 "The tensor saved to disk is not contiguous, "
                 "so it will be copied to contiguous memory."
             )
-            element = element.contiguous()
-
-    # Save the data.
-    if fmt == "numpy":
-        np.save(path, data)
-    elif fmt == "torch":
+            data = data.contiguous()
         torch.save(data, path)
