@@ -73,6 +73,6 @@ def get_npy_dim(npy_path):
         elif version == b"\x02\x00":
             header, _, _ = read_array_header_2_0(f)
         else:
-            raise ValueError(f"Unsupported .npy version")
+            raise ValueError("Unsupported .npy version")
 
         return len(header)
