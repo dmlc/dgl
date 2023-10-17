@@ -37,7 +37,7 @@ class ItemSet:
     >>> list(item_set)
     [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4), tensor(5),
      tensor(6), tensor(7), tensor(8), tensor(9)]
-    >>> item_set[torch.arange(0, num)]
+    >>> item_set[:]
     tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     >>> item_set.names
     ('seed_nodes',)
@@ -151,11 +151,13 @@ class ItemSet:
                 f"{type(self).__name__} instance doesn't support indexing."
             )
         if isinstance(self._items, int):
-            assert isinstance(idx, (int, torch.Tensor)), (
-                f"Indexing of integer-initialized {type(self).__name__} "
-                f"instance must be int or torch.Tensor."
-            )
             # [Warning] Index range is not checked.
+            if isinstance(idx, slice):
+                return torch.arange(
+                    start=0 if idx.start is None else idx.start,
+                    end=self._items if idx.stop is None else idx.stop,
+                    step=1 if idx.step is None else idx.step,
+                )
             return idx
         if len(self._items) == 1:
             return self._items[0][idx]

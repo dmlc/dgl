@@ -114,14 +114,8 @@ def test_ItemSet_seed_nodes():
         assert i == item.item()
         assert i == item_set[i]
     # Indexing with a slice.
-    with pytest.raises(
-        AssertionError,
-        match=(
-            "Indexing of integer-initialized ItemSet instance must be int or "
-            "torch.Tensor."
-        ),
-    ):
-        _ = item_set[:]
+    assert torch.equal(item_set[:], torch.arange(0, 5))
+    assert torch.equal(item_set[0:5], torch.arange(0, 5))
     # Indexing with an Tensor.
     assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
 
