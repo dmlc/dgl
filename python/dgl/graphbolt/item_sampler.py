@@ -381,12 +381,12 @@ class ItemSampler(IterDataPipe):
                     self._drop_last,
                 )
             )
-            return iter(data_pipe)
-        # Organize items.
-        data_pipe = self._organize_items(IterableWrapper(self._item_set))
+        else:
+            # Organize items.
+            data_pipe = self._organize_items(IterableWrapper(self._item_set))
 
-        # Collate.
-        data_pipe = data_pipe.collate(collate_fn=self._collate)
+            # Collate.
+            data_pipe = data_pipe.collate(collate_fn=self._collate)
 
         # Map to minibatch.
         data_pipe = data_pipe.map(partial(self._minibatcher, names=self._names))
