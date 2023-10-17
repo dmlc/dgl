@@ -492,7 +492,8 @@ class OnDiskDataset(Dataset):
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
         if graph is None:
             warnings.warn(
-                "The dataset does not contain a SamplingGraph", Warning
+                "Initializing `all_nodes_set` with a graph whose type does "
+                "not belong to SamplingGraph", Warning
             )
             return None
         num_nodes = graph.num_nodes
