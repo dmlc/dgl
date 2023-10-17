@@ -1869,8 +1869,16 @@ def test_OnDiskDataset_load_1D_feature():
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
+        with open(yaml_file, "r") as f:
+            input_config = yaml.safe_load(f)
+        node_feat = np.load(
+            os.path.join(test_dir, input_config["feature_data"][0]["path"])
+        )
         dataset = gb.OnDiskDataset(test_dir).load()
-        dataset = None
+        assert torch.equal(
+            torch.from_numpy(node_feat.reshape(-1, 1)),
+            dataset.feature.read("node", None, "feat"),
+        )
 
 
 def test_BuiltinDataset():

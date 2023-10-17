@@ -3,6 +3,7 @@
 import os
 
 import numpy as np
+from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 import torch
 
 
@@ -50,37 +51,16 @@ def save_data(data, path, fmt):
 def get_npy_dim(npy_path):
     """Get the dim of numpy file."""
     with open(npy_path, "rb") as f:
-        # Read the magic string of the .npy file
         magic_str = f.read(6)
-        # Verify the magic string to confirm it"s a .npy file
-        if magic_str != b"\x93NUMPY":
-            raise ValueError("Not a valid .npy file")
-
-        # Read the version number of the .npy file
-        version_major, _ = np.frombuffer(f.read(2), dtype=np.uint8)
-        # Determine the length of the header
-        if version_major == 1:
-            header_len_size = 2  # version 1.x uses 2 bytes for header length
-        elif version_major == 2:
-            header_len_size = 4  # version 2.x uses 4 bytes for header length
+        if magic_str != b'\x93NUMPY':
+            raise ValueError("Not a .npy file")
+        # Use the corresponding version of func to get header. 
+        version = f.read(2)
+        if version == b"\x01\x00":
+            header, _, _ = read_array_header_1_0(f)
+        elif version == b"\x02\x00":
+            header, _, _ = read_array_header_2_0(f)
         else:
-            raise ValueError("Unsupported version of .npy file")
-
-        # Read the header
-        header_len = int(
-            np.frombuffer(f.read(header_len_size), dtype=np.uint16)
-        )
-        header = f.read(header_len).decode("latin1")
-
-        # Extract shape information from the header
-        loc = header.find("(")
-        loc_end = header.find(")")
-        shape_str = header[loc + 1 : loc_end].replace(" ", "").split(",")
-
-        # If there"s a trailing comma for one-dimensional arrays, remove it
-        if shape_str[-1] == "":
-            shape_str = shape_str[:-1]
-
-        shape = tuple(map(int, shape_str))
-
-        return len(shape)
+            raise ValueError(f"Unsupported .npy version")
+        
+        return len(header)
