@@ -348,7 +348,7 @@ def main(args):
     valid_set = dataset.tasks[0].validation_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
-    in_size = 128
+    in_size = features.size("node", None, "feat")[0]
     hidden_channels = 256
     model = SAGE(in_size, hidden_channels)
 
