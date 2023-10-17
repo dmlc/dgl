@@ -111,7 +111,7 @@ def create_dataloader(
     # 'drop_last': Determines whether the last non-full minibatch should be
     # dropped.
     # 'shuffle': Determines if the items should be shuffled.
-    # 'num_replicas: Specifies the number of replicas.
+    # 'num_replicas': Specifies the number of replicas.
     # 'drop_uneven_inputs': Determines whether the numbers of minibatches on all
     # ranks should be kept the same by dropping uneven minibatches.
     # [Output]:
@@ -146,7 +146,7 @@ def create_dataloader(
 
 @torch.no_grad()
 def evaluate(
-    proc_id, args, model, graph, features, itemset, num_classes, device
+    rank, args, model, graph, features, itemset, num_classes, device
 ):
     model.eval()
     y = []
@@ -164,7 +164,7 @@ def evaluate(
 
     for step, data in (
         tqdm.tqdm(enumerate(dataloader))
-        if proc_id == 0
+        if rank == 0
         else enumerate(dataloader)
     ):
         blocks = data.blocks
@@ -183,8 +183,8 @@ def evaluate(
 
 
 def train(
-    nprocs,
-    proc_id,
+    world_size,
+    rank,
     args,
     graph,
     features,
@@ -227,7 +227,7 @@ def train(
         with Join([model]):
             for step, data in (
                 tqdm.tqdm(enumerate(dataloader))
-                if proc_id == 0
+                if rank == 0
                 else enumerate(dataloader)
             ):
                 # The input features are from the source nodes in the first
@@ -252,11 +252,11 @@ def train(
                 total_loss += loss
 
         # Evaluate the model.
-        if proc_id == 0:
+        if rank == 0:
             print("Validating...")
         acc = (
             evaluate(
-                proc_id,
+                rank,
                 args,
                 model,
                 graph,
@@ -265,7 +265,7 @@ def train(
                 num_classes,
                 device,
             )
-            / nprocs
+            / world_size
         )
         ########################################################################
         # (HIGHLIGHT) Collect accuracy and loss values from sub-processes and
@@ -277,23 +277,23 @@ def train(
         dist.reduce(tensor=acc, dst=0)
         total_loss /= step + 1
         dist.reduce(tensor=total_loss, dst=0)
-        if proc_id == 0:
+        if rank == 0:
             print(
                 f"Epoch {epoch:05d} | "
-                f"Average Loss {total_loss.item() / nprocs:.4f} | "
+                f"Average Loss {total_loss.item() / world_size:.4f} | "
                 f"Accuracy {acc.item():.4f} "
             )
 
 
-def run(proc_id, nprocs, args, devices, dataset):
+def run(rank, world_size, args, devices, dataset):
     # Set up multiprocessing environment.
-    device = devices[proc_id]
+    device = devices[rank]
     torch.cuda.set_device(device)
     dist.init_process_group(
         backend="nccl",  # Use NCCL backend for distributed GPU training
         init_method="tcp://127.0.0.1:12345",
-        world_size=nprocs,
-        rank=proc_id,
+        world_size=world_size,
+        rank=rank,
     )
 
     graph = dataset.graph
@@ -312,11 +312,11 @@ def run(proc_id, nprocs, args, devices, dataset):
     model = DDP(model)
 
     # Model training.
-    if proc_id == 0:
+    if rank == 0:
         print("Training...")
     train(
-        nprocs,
-        proc_id,
+        world_size,
+        rank,
         args,
         graph,
         features,
@@ -328,12 +328,12 @@ def run(proc_id, nprocs, args, devices, dataset):
     )
 
     # Test the model.
-    if proc_id == 0:
+    if rank == 0:
         print("Testing...")
     test_set = dataset.tasks[0].test_set
     test_acc = (
         evaluate(
-            proc_id,
+            rank,
             args,
             model,
             graph,
@@ -342,10 +342,10 @@ def run(proc_id, nprocs, args, devices, dataset):
             num_classes=num_classes,
             device=device,
         )
-        / nprocs
+        / world_size
     )
     dist.reduce(tensor=test_acc, dst=0)
-    if proc_id == 0:
+    if rank == 0:
         print(f"Test Accuracy is {test_acc.item():.4f}")
 
 
@@ -390,14 +390,14 @@ if __name__ == "__main__":
         exit(0)
 
     devices = list(map(int, args.gpu.split(",")))
-    nprocs = len(devices)
+    world_size = len(devices)
 
-    print(f"Training with {nprocs} gpus.")
+    print(f"Training with {world_size} gpus.")
 
     # Load and preprocess dataset.
     dataset = gb.BuiltinDataset("ogbn-products").load()
 
     mp.set_sharing_strategy("file_system")
     mp.spawn(
-        run, args=(nprocs, args, devices, dataset), nprocs=nprocs, join=True
+        run, args=(world_size, args, devices, dataset), nprocs=world_size, join=True
     )
