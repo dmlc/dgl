@@ -338,7 +338,9 @@ class CSCSamplingGraph(SamplingGraph):
                 C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
             )
             column = torch.arange(len(column_num)).repeat_interleave(column_num)
-            row = torch.arange(len(C_sampled_subgraph.indices)) + len(column_num)
+            row = torch.arange(len(C_sampled_subgraph.indices)) + len(
+                column_num
+            )
             original_edge_ids = C_sampled_subgraph.original_edge_ids
             has_original_eids = (
                 self.edge_attributes is not None

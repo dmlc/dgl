@@ -116,7 +116,7 @@ class NeighborSampler(SubgraphSampler):
                 self.fanouts[hop],
                 self.replace,
                 self.prob_name,
-                self.deduplicate
+                self.deduplicate,
             )
             original_column_node_ids = seeds
             if self.deduplicate:
