@@ -145,9 +145,7 @@ def create_dataloader(
 
 
 @torch.no_grad()
-def evaluate(
-    rank, args, model, graph, features, itemset, num_classes, device
-):
+def evaluate(rank, args, model, graph, features, itemset, num_classes, device):
     model.eval()
     y = []
     y_hats = []
@@ -163,9 +161,7 @@ def evaluate(
     )
 
     for step, data in (
-        tqdm.tqdm(enumerate(dataloader))
-        if rank == 0
-        else enumerate(dataloader)
+        tqdm.tqdm(enumerate(dataloader)) if rank == 0 else enumerate(dataloader)
     ):
         blocks = data.blocks
         x = data.node_features["feat"].float()
@@ -399,5 +395,8 @@ if __name__ == "__main__":
 
     mp.set_sharing_strategy("file_system")
     mp.spawn(
-        run, args=(world_size, args, devices, dataset), nprocs=world_size, join=True
+        run,
+        args=(world_size, args, devices, dataset),
+        nprocs=world_size,
+        join=True,
     )
