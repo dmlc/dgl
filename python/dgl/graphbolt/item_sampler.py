@@ -364,6 +364,8 @@ class ItemSampler(IterDataPipe):
             item_set[0]
         except TypeError:
             use_indexing = False
+        # [TODO][Rui] For now, we disable indexing for ItemSetDict.
+        use_indexing = (not isinstance(item_set, ItemSetDict)) and use_indexing
         self._use_indexing = use_indexing
         self._item_set = (
             item_set if self._use_indexing else IterableWrapper(item_set)
