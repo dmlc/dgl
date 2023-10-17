@@ -194,6 +194,8 @@ class ItemSetDict:
      {"user": tensor(3)}, {"user": tensor(4)}, {"item": tensor(5)},
      {"item": tensor(6)}, {"item": tensor(7)}, {"item": tensor(8)},
      {"item": tensor(9)}}]
+    >>> item_set[:]
+    {"user": tensor([0, 1, 2, 3, 4]), "item": tensor([5, 6, 7, 8, 9])}
     >>> item_set.names
     ('seed_nodes',)
 
@@ -214,6 +216,9 @@ class ItemSetDict:
     [{"user": (tensor(0), tensor(0))}, {"user": (tensor(1), tensor(1))},
      {"item": (tensor(2), tensor(2))}, {"item": (tensor(3), tensor(3))},
      {"item": (tensor(4), tensor(4))}}]
+    >>> item_set[:]
+    {"user": (tensor([0, 1]), tensor([0, 1])),
+     "item": (tensor([2, 3, 4]), tensor([2, 3, 4]))}
     >>> item_set.names
     ('seed_nodes', 'labels')
 
@@ -236,6 +241,13 @@ class ItemSetDict:
      {"user:follow:user": (tensor([0, 1]), tensor([ 6,  7,  8,  9, 10, 11]))},
      {"user:follow:user": (tensor([2, 3]), tensor([12, 13, 14, 15, 16, 17]))},
      {"user:follow:user": (tensor([4, 5]), tensor([18, 19, 20, 21, 22, 23]))}]
+    >>> item_set[:]
+    {"user:like:item": (tensor([[0, 1], [2, 3]]),
+                        tensor([[4, 5, 6], [7, 8, 9]])),
+     "user:follow:user": (tensor([[0, 1], [2, 3], [4, 5]]),
+                          tensor([[ 6,  7,  8,  9, 10, 11],
+                                  [12, 13, 14, 15, 16, 17],
+                                  [18, 19, 20, 21, 22, 23]]))}
     >>> item_set.names
     ('node_pairs', 'negative_dsts')
     """
@@ -254,6 +266,38 @@ class ItemSetDict:
 
     def __len__(self) -> int:
         return sum(len(itemset) for itemset in self._itemsets.values())
+
+    def __getitem__(self, idx: Union[int, slice, Iterable]) -> Dict[str, Tuple]:
+        try:
+            len(self)
+        except TypeError:
+            raise TypeError(
+                f"{type(self).__name__} instance doesn't support indexing."
+            )
+        offsets = [len(itemset) for itemset in self._itemsets.values()]
+        total_num = sum(offsets)
+        if isinstance(idx, int):
+            if idx < 0:
+                idx += total_num
+            assert idx < total_num, (
+                f"Index {idx} out of range for {type(self).__name__} "
+                f"instance with length {total_num}."
+            )
+            for key, offset in zip(self._itemsets.keys(), offsets):
+                if idx < offset:
+                    return {key: self._itemsets[key][idx]}
+                idx -= offset
+        elif isinstance(idx, slice):
+            start, stop, step = idx.indices(total_num)
+            return {
+                key: self._itemsets[key][start:stop:step]
+                for key in self._itemsets.keys()
+            }
+
+        raise TypeError(
+            f"Indexing of {type(self).__name__} instance must be int or "
+            f"slice."
+        )
 
     @property
     def names(self) -> Tuple[str]:
