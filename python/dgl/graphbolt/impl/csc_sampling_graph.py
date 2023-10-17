@@ -325,7 +325,7 @@ class CSCSamplingGraph(SamplingGraph):
         return SampledSubgraphImpl(
             node_pairs=node_pairs, original_edge_ids=original_edge_ids
         )
-        
+
     def _convert_to_all_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
