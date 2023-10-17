@@ -2,9 +2,9 @@
 
 import os
 import shutil
+import warnings
 from copy import deepcopy
 from typing import Dict, List, Union
-import warnings
 
 import pandas as pd
 import torch
@@ -493,15 +493,16 @@ class OnDiskDataset(Dataset):
         if graph is None:
             warnings.warn(
                 "Initializing `all_nodes_set` with a graph whose type does "
-                "not belong to SamplingGraph", Warning
+                "not belong to SamplingGraph",
+                Warning,
             )
             return None
         num_nodes = graph.num_nodes
         if isinstance(num_nodes, int):
-            return ItemSet(num_nodes)
+            return ItemSet(num_nodes, names="seed_nodes")
         else:
             data = {
-                node_type: ItemSet(num_node)
+                node_type: ItemSet(num_node, names="seed_nodes")
                 for node_type, num_node in num_nodes.items()
             }
             return ItemSetDict(data)
