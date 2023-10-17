@@ -289,10 +289,16 @@ class ItemSetDict:
                 idx -= offset
         elif isinstance(idx, slice):
             start, stop, step = idx.indices(total_num)
-            return {
-                key: self._itemsets[key][start:stop:step]
-                for key in self._itemsets.keys()
-            }
+            data = {}
+            for key, offset in zip(self._itemsets.keys(), offsets):
+                if start < offset:
+                    data[key] = self._itemsets[key][start:stop:step]
+                start -= offset
+                start = max(start, 0)
+                stop -= offset
+                if stop <= 0:
+                    break
+            return data
 
         raise TypeError(
             f"Indexing of {type(self).__name__} instance must be int or "

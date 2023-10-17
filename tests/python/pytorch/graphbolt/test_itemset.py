@@ -355,9 +355,20 @@ def test_ItemSetDict_iteration_seed_nodes():
         assert item[chained_ids[i][0]] == chained_ids[i][1]
         assert item_set[i] == item
         assert item_set[i - len(item_set)] == item
-    # Indexing with a slice.
+    # Indexing all with a slice.
     assert torch.equal(item_set[:]["user"], user_ids)
     assert torch.equal(item_set[:]["item"], item_ids)
+    # Indexing partial with a slice.
+    partial_data = item_set[:3]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["user"], user_ids[:3])
+    partial_data = item_set[7:]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["item"], item_ids[2:])
+    partial_data = item_set[3:7]
+    assert len(list(partial_data.keys())) == 2
+    assert torch.equal(partial_data["user"], user_ids[3:5])
+    assert torch.equal(partial_data["item"], item_ids[:2])
 
     with pytest.raises(
         AssertionError,
