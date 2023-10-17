@@ -4,6 +4,7 @@ import os
 import shutil
 from copy import deepcopy
 from typing import Dict, List, Union
+import warnings
 
 import pandas as pd
 import torch
@@ -490,6 +491,9 @@ class OnDiskDataset(Dataset):
 
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
         if graph is None:
+            warnings.warn(
+                "The dataset does not contain a SamplingGraph", Warning
+            )
             return None
         num_nodes = graph.num_nodes
         if isinstance(num_nodes, int):
