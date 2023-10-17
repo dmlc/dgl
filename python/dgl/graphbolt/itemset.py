@@ -153,11 +153,8 @@ class ItemSet:
         if isinstance(self._items, int):
             # [Warning] Index range is not checked.
             if isinstance(idx, slice):
-                return torch.arange(
-                    start=0 if idx.start is None else idx.start,
-                    end=self._items if idx.stop is None else idx.stop,
-                    step=1 if idx.step is None else idx.step,
-                )
+                start, stop, step = idx.indices(self._items)
+                return torch.arange(start, stop, step)
             return idx
         if len(self._items) == 1:
             return self._items[0][idx]

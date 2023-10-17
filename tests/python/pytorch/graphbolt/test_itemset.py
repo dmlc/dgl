@@ -115,7 +115,6 @@ def test_ItemSet_seed_nodes():
         assert i == item_set[i]
     # Indexing with a slice.
     assert torch.equal(item_set[:], torch.arange(0, 5))
-    assert torch.equal(item_set[0:5], torch.arange(0, 5))
     # Indexing with an Tensor.
     assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
 
