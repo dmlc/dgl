@@ -325,6 +325,46 @@ class CSCSamplingGraph(SamplingGraph):
         return SampledSubgraphImpl(
             node_pairs=node_pairs, original_edge_ids=original_edge_ids
         )
+        
+    def _convert_to_all_sampled_subgraph(
+        self,
+        C_sampled_subgraph: torch.ScriptObject,
+    ):
+        """An internal function used to convert a fused homogeneous sampled
+        subgraph to general struct 'SampledSubgraphImpl'."""
+        type_per_edge = C_sampled_subgraph.type_per_edge
+        if type_per_edge is None:
+            column_num = (
+                C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
+            )
+            column = torch.arange(len(column_num)).repeat_interleave(column_num)
+            row = torch.arange(len(C_sampled_subgraph.indices)) + len(column_num)
+            original_edge_ids = C_sampled_subgraph.original_edge_ids
+            has_original_eids = (
+                self.edge_attributes is not None
+                and ORIGINAL_EDGE_ID in self.edge_attributes
+            )
+            if has_original_eids:
+                original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
+                    original_edge_ids
+                ]
+            # The sampled graph is already a homogeneous graph.
+            node_pairs = (row, column)
+            return SampledSubgraphImpl(
+                node_pairs=node_pairs,
+                original_edge_ids=original_edge_ids,
+                original_column_node_ids=(
+                    C_sampled_subgraph.original_column_node_ids
+                ),
+                original_row_node_ids=torch.cat(
+                    (
+                        C_sampled_subgraph.original_column_node_ids,
+                        C_sampled_subgraph.indices,
+                    )
+                ),
+            )
+        else:
+            raise RuntimeError("Not implemented yet.")
 
     def _convert_to_homogeneous_nodes(self, nodes):
         homogeneous_nodes = []
@@ -339,6 +379,7 @@ class CSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        deduplicate=True,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -378,6 +419,10 @@ class CSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        deduplicate: bool
+            Boolean indicating whether seeds between hops will be deduplicated.
+            If True, the same elements in seeds will be deleted to only one.
+            Otherwise, the same elements will be remained.
         Returns
         -------
         SampledSubgraphImpl
@@ -409,8 +454,10 @@ class CSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, probs_name
         )
-
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        if deduplicate:
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        else:
+            return self._convert_to_all_sampled_subgraph(C_sampled_subgraph)
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
@@ -512,6 +559,7 @@ class CSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        deduplicate=True,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
@@ -553,6 +601,10 @@ class CSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        deduplicate: bool
+            Boolean indicating whether seeds between hops will be deduplicated.
+            If True, the same elements in seeds will be deleted to only one.
+            Otherwise, the same elements will be remained.
         Returns
         -------
         SampledSubgraphImpl
@@ -594,8 +646,10 @@ class CSCSamplingGraph(SamplingGraph):
             has_original_eids,
             probs_name,
         )
-
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        if deduplicate:
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        else:
+            return self._convert_to_all_sampled_subgraph(C_sampled_subgraph)
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio

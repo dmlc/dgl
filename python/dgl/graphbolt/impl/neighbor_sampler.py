@@ -4,7 +4,8 @@ import torch
 from torch.utils.data import functional_datapipe
 
 from ..subgraph_sampler import SubgraphSampler
-from ..utils import compact_node_pairs, unique_and_compact_node_pairs
+from ..utils import unique_and_compact_node_pairs
+from ..base import etype_str_to_tuple
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
 
@@ -116,24 +117,21 @@ class NeighborSampler(SubgraphSampler):
                 self.fanouts[hop],
                 self.replace,
                 self.prob_name,
+                self.deduplicate
             )
+            original_column_node_ids = seeds
             if self.deduplicate:
-                (
-                    original_row_node_ids,
-                    compacted_node_pairs,
-                ) = unique_and_compact_node_pairs(subgraph.node_pairs, seeds)
-            else:
-                seeds, compacted_node_pairs = compact_node_pairs(
+                seeds, compacted_node_pairs = unique_and_compact_node_pairs(
                     subgraph.node_pairs, seeds
                 )
-            subgraph = SampledSubgraphImpl(
-                node_pairs=compacted_node_pairs,
-                original_column_node_ids=seeds,
-                original_row_node_ids=original_row_node_ids,
-                original_edge_ids=subgraph.original_edge_ids,
-            )
+                subgraph = SampledSubgraphImpl(
+                    node_pairs=compacted_node_pairs,
+                    original_column_node_ids=original_column_node_ids,
+                    original_row_node_ids=seeds,
+                )
+            else:
+                seeds = subgraph.original_row_node_ids
             subgraphs.insert(0, subgraph)
-            seeds = original_row_node_ids
         return seeds, subgraphs
 
 

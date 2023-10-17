@@ -210,78 +210,14 @@ def unique_and_compact_node_pairs(
     {"n1:e1:n2": (tensor([0, 1, 1]), tensor([0, 1, 0])),
     "n2:e2:n1": (tensor([0, 1, 0]), tensor([0, 1, 1]))}
     """
-    return compact_node_pairs(node_pairs, unique_dst_nodes, unique=True)
-
-
-def compact_node_pairs(
-    node_pairs: Union[
-        Tuple[torch.Tensor, torch.Tensor],
-        Dict[str, Tuple[torch.Tensor, torch.Tensor]],
-    ],
-    seeds: Union[
-        torch.Tensor,
-        Dict[str, torch.Tensor],
-    ] = None,
-    unique=False,
-):
-    """
-    Return compacted node pairs and seeds (per type). If unique is True,
-    seeds will be unique, otherwise there will have same nodes.
-
-    Parameters
-    ----------
-    node_pairs : Union[Tuple[torch.Tensor, torch.Tensor],
-                    Dict(str, Tuple[torch.Tensor, torch.Tensor])]
-        Node pairs representing source-destination edges.
-        - If `node_pairs` is a tuple: It means the graph is homogeneous.
-        Also, it should be in the format ('u', 'v') representing source
-        and destination pairs. And IDs inside are homogeneous ids.
-        - If `node_pairs` is a dictionary: The keys should be edge type and
-        the values should be corresponding node pairs. And IDs inside are
-        heterogeneous ids.
-    seeds: torch.Tensor or Dict[str, torch.Tensor]
-        All destination nodes in the node pairs.
-        - If `seeds` is a tensor: It means the graph is homogeneous.
-        - If `node_pairs` is a dictionary: The keys are node type and the
-        values are corresponding nodes. And IDs inside are heterogeneous ids.
-    unique: bool
-        Boolean indicating whether seeds between hops will be deduplicated.
-        If True, the same elements in seeds will be deleted to only one.
-        Otherwise, the same elements will be remained.
-
-    Returns
-    -------
-    Tuple[seeds, node_pairs]
-        The compacted node pairs, where node IDs are replaced with mapped node
-        IDs, and the seeds (per type).
-        "Compacted node pairs" indicates that the node IDs in the input node
-        pairs are replaced with mapped node IDs, where each type of node is
-        mapped to a contiguous space of IDs ranging from 0 to N.
-
-    Examples
-    --------
-    >>> import dgl.graphbolt as gb
-    >>> N1 = torch.LongTensor([1, 2, 2])
-    >>> N2 = torch.LongTensor([5, 6, 5])
-    >>> node_pairs = {"n1:e1:n2": (N1, N2),
-    ...     "n2:e2:n1": (N2, N1)}
-    >>> duplicated_nodes, compacted_node_pairs = gb.duplicated_and_compact_node_pairs(
-    ...     node_pairs
-    ... )
-    >>> print(duplicated_nodes)
-    {'n1': tensor([1, 2, 2]), 'n2': tensor([5, 6, 5])}
-    >>> print(compacted_node_pairs)
-    {"n1:e1:n2": (tensor([0, 1, 2]), tensor([0, 1, 2])),
-    "n2:e2:n1": (tensor([0, 1, 2]), tensor([0, 1, 2]))}
-    """
     is_homogeneous = not isinstance(node_pairs, dict)
     if is_homogeneous:
         node_pairs = {"_N:_E:_N": node_pairs}
-        if seeds is not None:
+        if unique_dst_nodes is not None:
             assert isinstance(
-                seeds, torch.Tensor
+                unique_dst_nodes, torch.Tensor
             ), "Edge type not supported in homogeneous graph."
-            seeds = {"_N": seeds}
+            unique_dst_nodes = {"_N": unique_dst_nodes}
 
     # Collect all source and destination nodes for each node type.
     src_nodes = defaultdict(list)
@@ -292,37 +228,27 @@ def compact_node_pairs(
         dst_nodes[dst_type].append(dst_node)
     src_nodes = {ntype: torch.cat(nodes) for ntype, nodes in src_nodes.items()}
     dst_nodes = {ntype: torch.cat(nodes) for ntype, nodes in dst_nodes.items()}
-    # Compute destination nodes if not provided.
-    if seeds is None:
-        if unique:
-            seeds = {
-                ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
-            }
-        else:
-            seeds = dst_nodes
+    # Compute unique destination nodes if not provided.
+    if unique_dst_nodes is None:
+        unique_dst_nodes = {
+            ntype: torch.unique(nodes) for ntype, nodes in dst_nodes.items()
+        }
 
     ntypes = set(dst_nodes.keys()) | set(src_nodes.keys())
-    new_seeds = {}
+    unique_nodes = {}
     compacted_src = {}
     compacted_dst = {}
     dtype = list(src_nodes.values())[0].dtype
     default_tensor = torch.tensor([], dtype=dtype)
     for ntype in ntypes:
         src = src_nodes.get(ntype, default_tensor)
-        original_seeds = seeds.get(ntype, default_tensor)
+        unique_dst = unique_dst_nodes.get(ntype, default_tensor)
         dst = dst_nodes.get(ntype, default_tensor)
-        if unique:
-            (
-                new_seeds[ntype],
-                compacted_src[ntype],
-                compacted_dst[ntype],
-            ) = torch.ops.graphbolt.unique_and_compact(src, dst, original_seeds)
-        else:
-            new_seeds[ntype] = torch.cat([original_seeds, src])
-            compacted_src[ntype] = torch.arange(
-                len(original_seeds), len(new_seeds[ntype]), dtype=int
-            )
-            compacted_dst[ntype] = compact_dst_nodes(dst, original_seeds)
+        (
+            unique_nodes[ntype],
+            compacted_src[ntype],
+            compacted_dst[ntype],
+        ) = torch.ops.graphbolt.unique_and_compact(src, dst, unique_dst)
 
     compacted_node_pairs = {}
     # Map back with the same order.
@@ -338,75 +264,6 @@ def compact_node_pairs(
     # Return singleton for a homogeneous graph.
     if is_homogeneous:
         compacted_node_pairs = list(compacted_node_pairs.values())[0]
-        new_seeds = list(new_seeds.values())[0]
+        unique_nodes = list(unique_nodes.values())[0]
 
-    return new_seeds, compacted_node_pairs
-
-
-def compact_dst_nodes(dst: torch.Tensor, seeds: torch.Tensor):
-    """
-    Compact dst without deduplication.
-
-    Parameters
-    ----------
-    dst: torch.Tensor
-        The original dst that need to be compacted.
-    seeds: torch.Tensor
-        Seeds record the nodes that generate dst in order. Its index
-        will be used to help generate the compacted dst.
-
-    Returns
-    -------
-    torch.Tenor
-        Compacted dst without deduplication.
-
-    Examples
-    --------
-    >>> dst = torch.tensor([0, 3, 4, 4, 2, 2, 2, 2, 4, 4])
-    >>> seeds = torch.tensor([0, 3, 4, 5, 2, 2, 4])
-    >>> compacted_dst = compact_dst_nodes(dst, seeds)
-    >>> print(compacted_dst)
-    torch.tensor([0, 1, 2, 2, 4, 4, 5, 5, 6, 6])
-    """
-    # Compute seeds_constinuous. Record the number of consecutive identical
-    # values.
-    seeds_constinuous = torch.ones_like(seeds)
-    seeds_constinuous[1:] = torch.where(
-        seeds[1:] == seeds[:-1], seeds_constinuous[:-1] + 1, 1
-    )
-    # Initially, compatc_dst is processed as the corresponding
-    # subscript in dst. In this case, consecutively identical values
-    # are grouped into the same subscript.
-    dst_compact = []
-    dst_index = len(dst) - 1
-    seeds_index = len(seeds) - 1
-    compacted_dst_num = {}
-    while dst_index >= 0:
-        if dst[dst_index] != seeds[seeds_index]:
-            seeds_index -= 1
-        else:
-            dst_compact.append(seeds_index)
-            compacted_dst_num[seeds_index] = (
-                compacted_dst_num.get(seeds_index, 0) + 1
-            )
-            dst_index -= 1
-    dst_compact.reverse()
-    # Renumber the same consecutive subscripts so that they correspond
-    # to the correct dst.
-    dst_index = len(dst) - 2
-    matchtime = 1
-    while dst_index >= 0:
-        index_nw = dst_compact[dst_index]
-        if dst[dst_index] == dst[dst_index + 1]:
-            matchtime += 1
-            max_matchtime = int(
-                compacted_dst_num[index_nw] / seeds_constinuous[index_nw]
-            )
-            if matchtime > max_matchtime:
-                dst_compact[dst_index] = (
-                    dst_compact[dst_index + max_matchtime] - 1
-                )
-        else:
-            matchtime = 1
-        dst_index -= 1
-    return torch.tensor(dst_compact, dtype=int)
+    return unique_nodes, compacted_node_pairs
