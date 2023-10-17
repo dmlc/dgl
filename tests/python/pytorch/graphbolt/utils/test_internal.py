@@ -14,6 +14,7 @@ def test_read_torch_data():
         torch.save(save_tensor, file_name)
         read_tensor = utils.internal._read_torch_data(file_name)
         assert torch.equal(save_tensor, read_tensor)
+        save_tensor = read_tensor = None
 
 
 @pytest.mark.parametrize("in_memory", [True, False])
@@ -24,6 +25,7 @@ def test_read_numpy_data(in_memory):
         np.save(file_name, save_numpy)
         read_tensor = utils.internal._read_numpy_data(file_name, in_memory)
         assert torch.equal(torch.from_numpy(save_numpy), read_tensor)
+        save_numpy = read_tensor = None
 
 
 @pytest.mark.parametrize("fmt", ["torch", "numpy"])
@@ -77,3 +79,5 @@ def test_save_data(data_fmt, save_fmt, contiguous):
             # Checks if the loaded data is C-contiguous.
             assert loaded_data.flags["C_CONTIGUOUS"]
             assert np.array_equal(tensor_data.numpy(), loaded_data)
+
+        data = tensor_data = loaded_data = None
