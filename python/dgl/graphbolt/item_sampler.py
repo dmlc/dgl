@@ -99,7 +99,7 @@ class ItemShufflerAndBatcher:
     drop_last : bool
         Option to drop the last batch if it's not full.
     buffer_size : int
-        The size of the buffer to store items slices from the :class:`ItemSet`.
+        The size of the buffer to store items sliced from the :class:`ItemSet`.
 
     """
 
@@ -109,38 +109,41 @@ class ItemShufflerAndBatcher:
         shuffle: bool,
         batch_size: int,
         drop_last: bool,
-        buffer_size: Optional[bool] = 10 * 1000,
+        buffer_size: Optional[int] = 10 * 1000,
     ):
         self._item_set = item_set
         self._shuffle = shuffle
         self._batch_size = batch_size
         self._drop_last = drop_last
         self._buffer_size = max(buffer_size, 20 * batch_size)
+        # Round up the buffer size to the nearest multiple of batch size.
+        self._buffer_size = (
+            (self._buffer_size + batch_size - 1) // batch_size * batch_size
+        )
 
     def __iter__(self):
         buffer = None
         num_items = len(self._item_set)
-        curr_idx = 0
-        while curr_idx < num_items:
-            start = curr_idx
-            end = min(curr_idx + self._buffer_size, num_items)
+        start = 0
+        while start < num_items:
+            end = min(start + self._buffer_size, num_items)
             buffer = self._item_set[start:end]
-            curr_idx = end
             indices = torch.arange(end - start)
             if self._shuffle:
                 np.random.shuffle(indices.numpy())
-            indices_splits = torch.split(indices, self._batch_size)
-            for indices_split in indices_splits:
-                if self._drop_last and len(indices_split) < self._batch_size:
+            for i in range(0, len(indices), self._batch_size):
+                if self._drop_last and i + self._batch_size > len(indices):
                     break
+                batch_indices = indices[i : i + self._batch_size]
                 if len(self._item_set._items) == 1:
                     if isinstance(buffer[0], DGLGraph):
-                        yield dgl_batch([buffer[idx] for idx in indices_split])
+                        yield dgl_batch([buffer[idx] for idx in batch_indices])
                     else:
-                        yield buffer[indices_split]
+                        yield buffer[batch_indices]
                 else:
-                    yield tuple(item[indices_split] for item in buffer)
+                    yield tuple(item[batch_indices] for item in buffer)
             buffer = None
+            start = end
 
 
 class ItemSampler(IterDataPipe):
