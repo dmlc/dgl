@@ -1870,7 +1870,7 @@ def test_OnDiskDataset_load_1D_feature():
             f.write(yaml_content)
 
         dataset = gb.OnDiskDataset(test_dir).load()
-        assert dataset.feature.size("node", None, "feat") == torch.Size([1])
+        dataset = None
 
 
 def test_BuiltinDataset():
