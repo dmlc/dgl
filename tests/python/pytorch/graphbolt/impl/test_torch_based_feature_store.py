@@ -87,16 +87,16 @@ def test_torch_based_feature(in_memory):
         feature_a = feature_b = None
 
         # Test loaded tensors' contiguity from C/Fortran contiguous ndarray.
-        C_contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="C")
-        Fortran_contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="F")
-        assert C_contiguous_numpy.flags["C_CONTIGUOUS"]
-        assert Fortran_contiguous_numpy.flags["F_CONTIGUOUS"]
+        contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="C")
+        non_contiguous_numpy = np.array([[1, 2, 3], [4, 5, 6]], order="F")
+        assert contiguous_numpy.flags["C_CONTIGUOUS"]
+        assert non_contiguous_numpy.flags["F_CONTIGUOUS"]
         np.save(
-            os.path.join(test_dir, "C_contiguous_numpy.npy"), C_contiguous_numpy
+            os.path.join(test_dir, "contiguous_numpy.npy"), contiguous_numpy
         )
         np.save(
-            os.path.join(test_dir, "Fortran_contiguous_numpy.npy"),
-            Fortran_contiguous_numpy,
+            os.path.join(test_dir, "non_contiguous_numpy.npy"),
+            non_contiguous_numpy,
         )
 
         cur_mmap_mode = None
@@ -105,7 +105,7 @@ def test_torch_based_feature(in_memory):
         feature_a = gb.TorchBasedFeature(
             torch.from_numpy(
                 np.load(
-                    os.path.join(test_dir, "C_contiguous_numpy.npy"),
+                    os.path.join(test_dir, "contiguous_numpy.npy"),
                     mmap_mode=cur_mmap_mode,
                 )
             )
@@ -113,7 +113,7 @@ def test_torch_based_feature(in_memory):
         feature_b = gb.TorchBasedFeature(
             torch.from_numpy(
                 np.load(
-                    os.path.join(test_dir, "Fortran_contiguous_numpy.npy"),
+                    os.path.join(test_dir, "non_contiguous_numpy.npy"),
                     mmap_mode=cur_mmap_mode,
                 )
             )
@@ -121,7 +121,7 @@ def test_torch_based_feature(in_memory):
         assert feature_a._tensor.is_contiguous()
         assert feature_b._tensor.is_contiguous()
 
-        C_contiguous_numpy = Fortran_contiguous_numpy = None
+        contiguous_numpy = non_contiguous_numpy = None
         feature_a = feature_b = None
 
 

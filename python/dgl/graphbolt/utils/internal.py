@@ -19,7 +19,14 @@ def _read_numpy_data(path, in_memory=True):
 def read_data(path, fmt, in_memory=True):
     """Read data from disk."""
     if fmt == "torch":
-        return _read_torch_data(path)
+        _tensor = _read_torch_data(path)
+        if not _tensor.is_contiguous():
+            Warning(
+                "The tensor read from disk is not contiguous, "
+                "so it will be copied to contiguous memory."
+            )
+            _tensor = _tensor.contiguous()
+        return _tensor
     elif fmt == "numpy":
         return _read_numpy_data(path, in_memory=in_memory)
     else:
@@ -36,9 +43,9 @@ def save_data(data, path, fmt):
 
     # Perform necessary conversion.
     if fmt == "numpy" and isinstance(element, torch.Tensor):
-        element = element.cpu().numpy()
+        element = element.cpu().contiguous().numpy()
     elif fmt == "torch" and isinstance(element, np.ndarray):
-        element = torch.from_numpy(element).cpu()
+        element = torch.from_numpy(element).cpu().contiguous()
 
     # Save the data.
     if fmt == "numpy":
