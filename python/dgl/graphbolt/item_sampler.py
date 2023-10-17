@@ -360,15 +360,10 @@ class ItemSampler(IterDataPipe):
         super().__init__()
         self._names = item_set.names
         # Check if the item set supports indexing.
-        if use_indexing:
-            try:
-                item_set[0]
-            except TypeError:
-                dgl_warning(
-                    f"Failed to use indexing as the item set doesn't support "
-                    f"indexing. Please set `use_indexing=False`."
-                )
-                use_indexing = False
+        try:
+            item_set[0]
+        except TypeError:
+            use_indexing = False
         self._use_indexing = use_indexing
         self._item_set = (
             item_set if self._use_indexing else IterableWrapper(item_set)
