@@ -1849,10 +1849,6 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         dataset = None
 
 
-@unittest.skipIf(
-    os.name == "nt",
-    reason="Tentatively skip due to unknown reason fails Windows test.",
-)
 def test_OnDiskDataset_load_1D_feature():
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
@@ -1884,6 +1880,7 @@ def test_OnDiskDataset_load_1D_feature():
 
         dataset = None
         node_feat = None
+        feature = None
 
 
 def test_BuiltinDataset():
