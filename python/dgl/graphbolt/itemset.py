@@ -279,10 +279,8 @@ class ItemSetDict:
         if isinstance(idx, int):
             if idx < 0:
                 idx += total_num
-            assert idx < total_num, (
-                f"Index {idx} out of range for {type(self).__name__} "
-                f"instance with length {total_num}."
-            )
+            if idx < 0 or idx >= total_num:
+                raise IndexError(f"{type(self).__name__} index out of range.")
             for key, offset in zip(self._itemsets.keys(), offsets):
                 if idx < offset:
                     return {key: self._itemsets[key][idx]}

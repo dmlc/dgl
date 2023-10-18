@@ -370,11 +370,10 @@ def test_ItemSetDict_iteration_seed_nodes():
     assert torch.equal(partial_data["user"], user_ids[3:5])
     assert torch.equal(partial_data["item"], item_ids[:2])
 
-    with pytest.raises(
-        AssertionError,
-        match="Index 20 out of range for ItemSetDict instance with length 10.",
-    ):
+    with pytest.raises(IndexError, match="ItemSetDict index out of range."):
         _ = item_set[20]
+    with pytest.raises(IndexError, match="ItemSetDict index out of range."):
+        _ = item_set[-20]
 
 
 def test_ItemSetDict_iteration_seed_nodes_labels():
