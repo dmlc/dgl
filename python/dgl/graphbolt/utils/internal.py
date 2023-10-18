@@ -63,7 +63,12 @@ def save_data(data, path, fmt):
 def get_npy_dim(npy_path):
     """Get the dim of numpy file."""
     with open(npy_path, "rb") as f:
-        f.seek(8, 1)
+        # For the read_array_header API provided by numpy will only read the
+        # length of the header, it will cause parsing failure and error if
+        # first 8 bytes which contains magin string and version are not read
+        # ahead of time. So, we need to make sure we have skipped these 8
+        # bytes.
+        f.seek(8, 0)
         try:
             shape, _, _ = read_array_header_1_0(f)
         except ValueError:

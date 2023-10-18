@@ -1878,6 +1878,8 @@ def test_OnDiskDataset_load_1D_feature():
         feature = dataset.feature.read("node", None, "feat")
         assert torch.equal(torch.from_numpy(node_feat.reshape(-1, 1)), feature)
 
+        dataset = None
+
 
 def test_BuiltinDataset():
     """Test BuiltinDataset."""
@@ -1898,6 +1900,8 @@ def test_BuiltinDataset():
         assert dataset.feature is not None
         assert dataset.tasks is not None
         assert dataset.dataset_name == dataset_name
+
+        dataset = None
 
         # Case 3: dataset is not available.
         dataset_name = "fake_name"
