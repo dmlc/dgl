@@ -1850,7 +1850,7 @@ def test_OnDiskDataset_all_nodes_set_hetero():
 
 @unittest.skipIf(
     os.name == "nt",
-    reason="Tentatively skip due to unknown reason fails Windows test."
+    reason="Tentatively skip due to unknown reason fails Windows test.",
 )
 def test_OnDiskDataset_load_1D_feature():
     with tempfile.TemporaryDirectory() as test_dir:
