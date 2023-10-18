@@ -151,7 +151,7 @@ class CSCSamplingGraph(SamplingGraph):
         >>> graph = gb.from_csc(indptr, indices, node_type_offset,
         ... type_per_edge, None, metadata)
         >>> print(graph.num_nodes)
-        {'N0': tensor(2), 'N1': tensor(3)}
+        {'N0': 2, 'N1': 3}
         """
 
         offset = self.node_type_offset
@@ -163,7 +163,7 @@ class CSCSamplingGraph(SamplingGraph):
         # Heterogenous
         else:
             num_nodes_per_type = {
-                _type: offset[_idx + 1] - offset[_idx]
+                _type: (offset[_idx + 1] - offset[_idx]).item()
                 for _type, _idx in self.metadata.node_type_to_id.items()
             }
 
@@ -819,7 +819,11 @@ def save_csc_sampling_graph(graph, filename):
     print(f"CSCSamplingGraph has been saved to {filename}.")
 
 
-def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
+def from_dglgraph(
+    g: DGLGraph,
+    is_homogeneous: bool = False,
+    include_original_edge_id: bool = False,
+) -> CSCSamplingGraph:
     """Convert a DGLGraph to CSCSamplingGraph."""
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
     # Initialize metadata.
@@ -838,8 +842,10 @@ def from_dglgraph(g: DGLGraph, is_homogeneous=False) -> CSCSamplingGraph:
     # Assign edge type according to the order of CSC matrix.
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
 
-    # Assign edge attributes according to the original eids mapping.
-    edge_attributes = {ORIGINAL_EDGE_ID: homo_g.edata[EID][edge_ids]}
+    edge_attributes = {}
+    if include_original_edge_id:
+        # Assign edge attributes according to the original eids mapping.
+        edge_attributes[ORIGINAL_EDGE_ID] = homo_g.edata[EID][edge_ids]
 
     return CSCSamplingGraph(
         torch.ops.graphbolt.from_csc(

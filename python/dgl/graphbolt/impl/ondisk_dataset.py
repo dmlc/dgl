@@ -3,7 +3,7 @@
 import os
 import shutil
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import pandas as pd
 import torch
@@ -15,6 +15,7 @@ from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
+from ..sampling_graph import SamplingGraph
 from ..utils import read_data, save_data
 from .csc_sampling_graph import (
     CSCSamplingGraph,
@@ -51,7 +52,9 @@ def _copy_or_convert_data(
         save_data(data, output_path, output_format)
 
 
-def preprocess_ondisk_dataset(dataset_dir: str) -> str:
+def preprocess_ondisk_dataset(
+    dataset_dir: str, include_original_edge_id: bool = False
+) -> str:
     """Preprocess the on-disk dataset. Parse the input config file,
     load the data, and save the data in the format that GraphBolt supports.
 
@@ -152,7 +155,9 @@ def preprocess_ondisk_dataset(dataset_dir: str) -> str:
                 g.edata[graph_feature["name"]] = edge_data
 
     # 4. Convert the DGLGraph to a CSCSamplingGraph.
-    csc_sampling_graph = from_dglgraph(g, is_homogeneous)
+    csc_sampling_graph = from_dglgraph(
+        g, is_homogeneous, include_original_edge_id
+    )
 
     # 5. Save the CSCSamplingGraph and modify the output_config.
     output_config["graph_topology"] = {}
@@ -235,9 +240,9 @@ class OnDiskTask:
     def __init__(
         self,
         metadata: Dict,
-        train_set: ItemSet or ItemSetDict,
-        validation_set: ItemSet or ItemSetDict,
-        test_set: ItemSet or ItemSetDict,
+        train_set: Union[ItemSet, ItemSetDict],
+        validation_set: Union[ItemSet, ItemSetDict],
+        test_set: Union[ItemSet, ItemSetDict],
     ):
         """Initialize a task.
 
@@ -245,11 +250,11 @@ class OnDiskTask:
         ----------
         metadata : Dict
             Metadata.
-        train_set : ItemSet or ItemSetDict
+        train_set : Union[ItemSet, ItemSetDict]
             Training set.
-        validation_set : ItemSet or ItemSetDict
+        validation_set : Union[ItemSet, ItemSetDict]
             Validation set.
-        test_set : ItemSet or ItemSetDict
+        test_set : Union[ItemSet, ItemSetDict]
             Test set.
         """
         self._metadata = metadata
@@ -263,17 +268,17 @@ class OnDiskTask:
         return self._metadata
 
     @property
-    def train_set(self) -> ItemSet or ItemSetDict:
+    def train_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the training set."""
         return self._train_set
 
     @property
-    def validation_set(self) -> ItemSet or ItemSetDict:
+    def validation_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the validation set."""
         return self._validation_set
 
     @property
-    def test_set(self) -> ItemSet or ItemSetDict:
+    def test_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the test set."""
         return self._test_set
 
@@ -351,11 +356,13 @@ class OnDiskDataset(Dataset):
         The YAML file path.
     """
 
-    def __init__(self, path: str) -> None:
+    def __init__(
+        self, path: str, include_original_edge_id: bool = False
+    ) -> None:
         # Always call the preprocess function first. If already preprocessed,
         # the function will return the original path directly.
         self._dataset_dir = path
-        yaml_path = preprocess_ondisk_dataset(path)
+        yaml_path = preprocess_ondisk_dataset(path, include_original_edge_id)
         with open(yaml_path) as f:
             self._yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
 
@@ -389,6 +396,7 @@ class OnDiskDataset(Dataset):
         self._graph = self._load_graph(self._meta.graph_topology)
         self._feature = TorchBasedFeatureStore(self._meta.feature_data)
         self._tasks = self._init_tasks(self._meta.tasks)
+        self._all_nodes_set = self._init_all_nodes_set(self._graph)
         return self
 
     @property
@@ -402,7 +410,7 @@ class OnDiskDataset(Dataset):
         return self._tasks
 
     @property
-    def graph(self) -> object:
+    def graph(self) -> SamplingGraph:
         """Return the graph."""
         return self._graph
 
@@ -415,6 +423,11 @@ class OnDiskDataset(Dataset):
     def dataset_name(self) -> str:
         """Return the dataset name."""
         return self._dataset_name
+
+    @property
+    def all_nodes_set(self) -> Union[ItemSet, ItemSetDict]:
+        """Return the itemset containing all nodes."""
+        return self._all_nodes_set
 
     def _init_tasks(self, tasks: List[OnDiskTaskData]) -> List[OnDiskTask]:
         """Initialize the tasks."""
@@ -446,7 +459,7 @@ class OnDiskDataset(Dataset):
 
     def _init_tvt_set(
         self, tvt_set: List[OnDiskTVTSet]
-    ) -> ItemSet or ItemSetDict:
+    ) -> Union[ItemSet, ItemSetDict]:
         """Initialize the TVT set."""
         ret = None
         if (tvt_set is None) or (len(tvt_set) == 0):
@@ -474,6 +487,19 @@ class OnDiskDataset(Dataset):
                 )
             ret = ItemSetDict(data)
         return ret
+
+    def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
+        if graph is None:
+            return None
+        num_nodes = graph.num_nodes
+        if isinstance(num_nodes, int):
+            return ItemSet(num_nodes)
+        else:
+            data = {
+                node_type: ItemSet(num_node)
+                for node_type, num_node in num_nodes.items()
+            }
+            return ItemSetDict(data)
 
 
 class BuiltinDataset(OnDiskDataset):

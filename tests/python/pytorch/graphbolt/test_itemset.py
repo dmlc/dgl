@@ -23,6 +23,13 @@ def test_ItemSet_names():
     item_set = gb.ItemSet(torch.arange(0, 5))
     assert item_set.names is None
 
+    # Integer-initiated ItemSet with excessive names.
+    with pytest.raises(
+        AssertionError,
+        match=re.escape("Number of items (1) and names (2) must match."),
+    ):
+        _ = gb.ItemSet(5, names=("seed_nodes", "labels"))
+
     # ItemSet with mismatched items and names.
     with pytest.raises(
         AssertionError,
@@ -32,11 +39,18 @@ def test_ItemSet_names():
 
 
 def test_ItemSet_length():
+    # Integer with valid length
+    num = 10
+    item_set = gb.ItemSet(num)
+    assert len(item_set) == 10
+    # Test __iter__() method. Same as below.
+    for i, item in enumerate(item_set):
+        assert i == item
+
     # Single iterable with valid length.
     ids = torch.arange(0, 5)
     item_set = gb.ItemSet(ids)
     assert len(item_set) == 5
-    # Test __iter__ method. Same as below.
     for i, item in enumerate(item_set):
         assert i == item.item()
 
@@ -53,61 +67,127 @@ def test_ItemSet_length():
 
     # Single iterable with invalid length.
     item_set = gb.ItemSet(InvalidLength())
-    with pytest.raises(TypeError):
+    with pytest.raises(
+        TypeError, match="ItemSet instance doesn't have valid length."
+    ):
         _ = len(item_set)
+    with pytest.raises(
+        TypeError, match="ItemSet instance doesn't support indexing."
+    ):
+        _ = item_set[0]
     for i, item in enumerate(item_set):
         assert i == item
 
     # Tuple of iterables with invalid length.
     item_set = gb.ItemSet((InvalidLength(), InvalidLength()))
-    with pytest.raises(TypeError):
+    with pytest.raises(
+        TypeError, match="ItemSet instance doesn't have valid length."
+    ):
         _ = len(item_set)
+    with pytest.raises(
+        TypeError, match="ItemSet instance doesn't support indexing."
+    ):
+        _ = item_set[0]
     for i, (item1, item2) in enumerate(item_set):
         assert i == item1
         assert i == item2
 
 
-def test_ItemSet_iteration_seed_nodes():
-    # Node IDs.
+def test_ItemSet_seed_nodes():
+    # Node IDs with tensor.
     item_set = gb.ItemSet(torch.arange(0, 5), names="seed_nodes")
     assert item_set.names == ("seed_nodes",)
+    # Iterating over ItemSet and indexing one by one.
     for i, item in enumerate(item_set):
         assert i == item.item()
+        assert i == item_set[i]
+    # Indexing with a slice.
+    assert torch.equal(item_set[:], torch.arange(0, 5))
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
+
+    # Node IDs with single integer.
+    item_set = gb.ItemSet(5, names="seed_nodes")
+    assert item_set.names == ("seed_nodes",)
+    # Iterating over ItemSet and indexing one by one.
+    for i, item in enumerate(item_set):
+        assert i == item.item()
+        assert i == item_set[i]
+    # Indexing with a slice.
+    assert torch.equal(item_set[:], torch.arange(0, 5))
+    # Indexing with an integer.
+    assert item_set[0] == 0
+    assert item_set[-1] == 4
+    # Indexing that is out of range.
+    with pytest.raises(IndexError, match="ItemSet index out of range."):
+        _ = item_set[5]
+    with pytest.raises(IndexError, match="ItemSet index out of range."):
+        _ = item_set[-10]
+    # Indexing with tensor.
+    with pytest.raises(
+        TypeError, match="ItemSet indices must be integer or slice."
+    ):
+        _ = item_set[torch.arange(3)]
 
 
-def test_ItemSet_iteration_seed_nodes_labels():
+def test_ItemSet_seed_nodes_labels():
     # Node IDs and labels.
     seed_nodes = torch.arange(0, 5)
     labels = torch.randint(0, 3, (5,))
     item_set = gb.ItemSet((seed_nodes, labels), names=("seed_nodes", "labels"))
     assert item_set.names == ("seed_nodes", "labels")
+    # Iterating over ItemSet and indexing one by one.
     for i, (seed_node, label) in enumerate(item_set):
         assert seed_node == seed_nodes[i]
         assert label == labels[i]
+        assert seed_node == item_set[i][0]
+        assert label == item_set[i][1]
+    # Indexing with a slice.
+    assert torch.equal(item_set[:][0], seed_nodes)
+    assert torch.equal(item_set[:][1], labels)
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)][0], seed_nodes)
+    assert torch.equal(item_set[torch.arange(0, 5)][1], labels)
 
 
-def test_ItemSet_iteration_node_pairs():
+def test_ItemSet_node_pairs():
     # Node pairs.
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
     item_set = gb.ItemSet(node_pairs, names="node_pairs")
     assert item_set.names == ("node_pairs",)
+    # Iterating over ItemSet and indexing one by one.
     for i, (src, dst) in enumerate(item_set):
         assert node_pairs[i][0] == src
         assert node_pairs[i][1] == dst
+        assert node_pairs[i][0] == item_set[i][0]
+        assert node_pairs[i][1] == item_set[i][1]
+    # Indexing with a slice.
+    assert torch.equal(item_set[:], node_pairs)
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)], node_pairs)
 
 
-def test_ItemSet_iteration_node_pairs_labels():
+def test_ItemSet_node_pairs_labels():
     # Node pairs and labels
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
     labels = torch.randint(0, 3, (5,))
     item_set = gb.ItemSet((node_pairs, labels), names=("node_pairs", "labels"))
     assert item_set.names == ("node_pairs", "labels")
+    # Iterating over ItemSet and indexing one by one.
     for i, (node_pair, label) in enumerate(item_set):
         assert torch.equal(node_pairs[i], node_pair)
         assert labels[i] == label
+        assert torch.equal(node_pairs[i], item_set[i][0])
+        assert labels[i] == item_set[i][1]
+    # Indexing with a slice.
+    assert torch.equal(item_set[:][0], node_pairs)
+    assert torch.equal(item_set[:][1], labels)
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)][0], node_pairs)
+    assert torch.equal(item_set[torch.arange(0, 5)][1], labels)
 
 
-def test_ItemSet_iteration_node_pairs_neg_dsts():
+def test_ItemSet_node_pairs_neg_dsts():
     # Node pairs and negative destinations.
     node_pairs = torch.arange(0, 10).reshape(-1, 2)
     neg_dsts = torch.arange(10, 25).reshape(-1, 3)
@@ -115,18 +195,31 @@ def test_ItemSet_iteration_node_pairs_neg_dsts():
         (node_pairs, neg_dsts), names=("node_pairs", "negative_dsts")
     )
     assert item_set.names == ("node_pairs", "negative_dsts")
+    # Iterating over ItemSet and indexing one by one.
     for i, (node_pair, neg_dst) in enumerate(item_set):
         assert torch.equal(node_pairs[i], node_pair)
         assert torch.equal(neg_dsts[i], neg_dst)
+        assert torch.equal(node_pairs[i], item_set[i][0])
+        assert torch.equal(neg_dsts[i], item_set[i][1])
+    # Indexing with a slice.
+    assert torch.equal(item_set[:][0], node_pairs)
+    assert torch.equal(item_set[:][1], neg_dsts)
+    # Indexing with an Iterable.
+    assert torch.equal(item_set[torch.arange(0, 5)][0], node_pairs)
+    assert torch.equal(item_set[torch.arange(0, 5)][1], neg_dsts)
 
 
-def test_ItemSet_iteration_graphs():
+def test_ItemSet_graphs():
     # Graphs.
     graphs = [dgl.rand_graph(10, 20) for _ in range(5)]
     item_set = gb.ItemSet(graphs)
     assert item_set.names is None
+    # Iterating over ItemSet and indexing one by one.
     for i, item in enumerate(item_set):
         assert graphs[i] == item
+        assert graphs[i] == item_set[i]
+    # Indexing with a slice.
+    assert item_set[:] == graphs
 
 
 def test_ItemSetDict_names():

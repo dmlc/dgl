@@ -1,6 +1,8 @@
 """GraphBolt Itemset."""
 
-from typing import Dict, Iterable, Iterator, Sized, Tuple
+from typing import Dict, Iterable, Iterator, Sized, Tuple, Union
+
+import torch
 
 __all__ = ["ItemSet", "ItemSetDict"]
 
@@ -14,11 +16,13 @@ class ItemSet:
 
     Parameters
     ----------
-    items: Iterable or Tuple[Iterable]
-        The items to be iterated over. If it's multi-dimensional iterable such
-        as `torch.Tensor`, it will be iterated over the first dimension. If it
-        is a tuple, each item in the tuple is an iterable of items.
-    names: str or Tuple[str], optional
+    items: Union[int, Iterable, Tuple[Iterable]]
+        The items to be iterated over. If it is a single integer, a `range()`
+        object will be created and iterated over. If it's multi-dimensional
+        iterable such as `torch.Tensor`, it will be iterated over the first
+        dimension. If it is a tuple, each item in the tuple is an iterable of
+        items.
+    names: Union[str, Tuple[str]], optional
         The names of the items. If it is a tuple, each name corresponds to an
         item in the tuple.
 
@@ -27,17 +31,28 @@ class ItemSet:
     >>> import torch
     >>> from dgl import graphbolt as gb
 
-    1. Single iterable: seed nodes.
+    1. Integer: number of nodes.
+    >>> num = 10
+    >>> item_set = gb.ItemSet(num, names="seed_nodes")
+    >>> list(item_set)
+    [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4), tensor(5),
+     tensor(6), tensor(7), tensor(8), tensor(9)]
+    >>> item_set[:]
+    tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    >>> item_set.names
+    ('seed_nodes',)
 
+    2. Single iterable: seed nodes.
     >>> node_ids = torch.arange(0, 5)
     >>> item_set = gb.ItemSet(node_ids, names="seed_nodes")
     >>> list(item_set)
     [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4)]
+    >>> item_set[:]
+    tensor([0, 1, 2, 3, 4])
     >>> item_set.names
     ('seed_nodes',)
 
-    2. Tuple of iterables with same shape: seed nodes and labels.
-
+    3. Tuple of iterables with same shape: seed nodes and labels.
     >>> node_ids = torch.arange(0, 5)
     >>> labels = torch.arange(5, 10)
     >>> item_set = gb.ItemSet(
@@ -45,11 +60,12 @@ class ItemSet:
     >>> list(item_set)
     [(tensor(0), tensor(5)), (tensor(1), tensor(6)), (tensor(2), tensor(7)),
      (tensor(3), tensor(8)), (tensor(4), tensor(9))]
+    >>> item_set[:]
+    (tensor([0, 1, 2, 3, 4]), tensor([5, 6, 7, 8, 9]))
     >>> item_set.names
     ('seed_nodes', 'labels')
 
-    3. Tuple of iterables with different shape: node pairs and negative dsts.
-
+    4. Tuple of iterables with different shape: node pairs and negative dsts.
     >>> node_pairs = torch.arange(0, 10).reshape(-1, 2)
     >>> neg_dsts = torch.arange(10, 25).reshape(-1, 3)
     >>> item_set = gb.ItemSet(
@@ -60,40 +76,51 @@ class ItemSet:
      (tensor([4, 5]), tensor([16, 17, 18])),
      (tensor([6, 7]), tensor([19, 20, 21])),
      (tensor([8, 9]), tensor([22, 23, 24]))]
+    >>> item_set[:]
+    (tensor([[0, 1], [2, 3], [4, 5], [6, 7],[8, 9]]),
+     tensor([[10, 11, 12], [13, 14, 15], [16, 17, 18], [19, 20, 21],
+        [22, 23, 24]]))
     >>> item_set.names
     ('node_pairs', 'negative_dsts')
     """
 
     def __init__(
         self,
-        items: Iterable or Tuple[Iterable],
-        names: str or Tuple[str] = None,
+        items: Union[int, Iterable, Tuple[Iterable]],
+        names: Union[str, Tuple[str]] = None,
     ) -> None:
-        if isinstance(items, tuple):
+        if isinstance(items, (int, tuple)):
             self._items = items
         else:
             self._items = (items,)
         if names is not None:
+            num_items = (
+                len(self._items) if isinstance(self._items, tuple) else 1
+            )
             if isinstance(names, tuple):
                 self._names = names
             else:
                 self._names = (names,)
-            assert len(self._items) == len(self._names), (
-                f"Number of items ({len(self._items)}) and "
+            assert num_items == len(self._names), (
+                f"Number of items ({num_items}) and "
                 f"names ({len(self._names)}) must match."
             )
         else:
             self._names = None
 
     def __iter__(self) -> Iterator:
+        if isinstance(self._items, int):
+            yield from torch.arange(self._items)
+            return
+
         if len(self._items) == 1:
             yield from self._items[0]
             return
 
         if isinstance(self._items[0], Sized):
             items_len = len(self._items[0])
-            # Use for-loop to iterate over the items. Can avoid a long
-            # wait time when the items are torch tensors. Since torch
+            # Use for-loop to iterate over the items. It can avoid a long
+            # waiting time when the items are torch tensors. Since torch
             # tensors need to call self.unbind(0) to slice themselves.
             # While for-loops are slower than zip, they prevent excessive
             # wait times during the loading phase, and the impact on overall
@@ -108,11 +135,39 @@ class ItemSet:
                 yield tuple(item)
 
     def __len__(self) -> int:
+        if isinstance(self._items, int):
+            return self._items
         if isinstance(self._items[0], Sized):
             return len(self._items[0])
         raise TypeError(
             f"{type(self).__name__} instance doesn't have valid length."
         )
+
+    def __getitem__(self, idx: Union[int, slice, Iterable]) -> Tuple:
+        try:
+            len(self)
+        except TypeError:
+            raise TypeError(
+                f"{type(self).__name__} instance doesn't support indexing."
+            )
+        if isinstance(self._items, int):
+            if isinstance(idx, slice):
+                start, stop, step = idx.indices(self._items)
+                return torch.arange(start, stop, step)
+            if isinstance(idx, int):
+                if idx < 0:
+                    idx += self._items
+                if idx < 0 or idx >= self._items:
+                    raise IndexError(
+                        f"{type(self).__name__} index out of range."
+                    )
+                return idx
+            raise TypeError(
+                f"{type(self).__name__} indices must be integer or slice."
+            )
+        if len(self._items) == 1:
+            return self._items[0][idx]
+        return tuple(item[idx] for item in self._items)
 
     @property
     def names(self) -> Tuple[str]:
