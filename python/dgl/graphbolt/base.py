@@ -20,6 +20,24 @@ ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
 
 
 def isin(elements, test_elements):
+    """Tests if each element of elements is in test_elements. Returns a boolean
+    tensor of the same shape as elements that is True for elements in
+    test_elements and False otherwise..
+
+    Parameters
+    ----------
+    elements : torch.Tensor
+        A 1D tensor represents the input elements.
+    test_elements : torch.Tensor
+        A 1D tensor represents the values to test against for each input.
+
+    Examples
+    --------
+    >>> isin(torch.tensor([1, 2, 3, 4]), torch.tensor([2, 3]))
+    tensor([[False,  True,  True,  False]])
+    """
+    assert elements.dim() == 1, "Elements should be 1D tensor."
+    assert test_elements.dim() == 1, "Test_elements should be 1D tensor."
     return torch.ops.graphbolt.isin(elements, test_elements)
 
 
