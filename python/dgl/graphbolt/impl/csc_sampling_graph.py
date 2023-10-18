@@ -701,7 +701,7 @@ class CSCSamplingGraph(SamplingGraph):
         )
 
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
-        """Copy `DGLMiniBatch` to the specified device using reflection."""
+        """Copy `CSCSamplingGraph` to the specified device."""
 
         def _to(x, device):
             return x.to(device) if hasattr(x, "to") else x
