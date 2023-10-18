@@ -25,14 +25,18 @@ torch::Tensor IsIn(
   AT_DISPATCH_INTEGRAL_TYPES(
       elements.scalar_type(), "IsInOperation", ([&] {
         const scalar_t* elements_ptr = elements.data_ptr<scalar_t>();
-        const scalar_t* sorted_test_elements_ptr = sorted_test_elements.data_ptr<scalar_t>();
+        const scalar_t* sorted_test_elements_ptr =
+            sorted_test_elements.data_ptr<scalar_t>();
         bool* result_ptr = result.data_ptr<bool>();
-        torch::parallel_for(0, num_test_elements, kSearchGrainSize, [&](size_t start, size_t end) {
-          for (auto i = start; i < end; i++) {
-            result_ptr[i] = std::binary_search(
-                sorted_test_elements_ptr, sorted_test_elements_ptr + num_elements, elements_ptr[i]);
-          }
-        });
+        torch::parallel_for(
+            0, num_elements, kSearchGrainSize, [&](size_t start, size_t end) {
+              for (auto i = start; i < end; i++) {
+                result_ptr[i] = std::binary_search(
+                    sorted_test_elements_ptr,
+                    sorted_test_elements_ptr + num_test_elements,
+                    elements_ptr[i]);
+              }
+            });
       }));
   return result;
 }
