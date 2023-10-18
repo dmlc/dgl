@@ -38,6 +38,12 @@ if __name__ == "__main__":
         "--num_nodes", type=int, default=8, help="Number of nodes in the graph"
     )
     parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=4,
+        help="Number of epochs used to train",
+    )
+    parser.add_argument(
         "--gpu_idx",
         type=int,
         default=0,
@@ -149,7 +155,7 @@ if __name__ == "__main__":
     # Dataloader========================================================================================================
 
     # use WeightedRandomSampler to balance the training dataset
-    NUM_WORKERS = 4
+    _NUM_WORKERS = args.num_workers
 
     labels_unique, counts = np.unique(y, return_counts=True)
 
@@ -172,7 +178,7 @@ if __name__ == "__main__":
         dataset=train_dataset,
         batch_size=_BATCH_SIZE,
         sampler=weighted_sampler,
-        num_workers=NUM_WORKERS,
+        num_workers=_NUM_WORKERS,
         pin_memory=True,
     )
 
@@ -181,7 +187,7 @@ if __name__ == "__main__":
         dataset=train_dataset,
         batch_size=_BATCH_SIZE,
         shuffle=False,
-        num_workers=NUM_WORKERS,
+        num_workers=_NUM_WORKERS,
         pin_memory=True,
     )
 
@@ -194,7 +200,7 @@ if __name__ == "__main__":
         dataset=test_dataset,
         batch_size=_BATCH_SIZE,
         shuffle=False,
-        num_workers=NUM_WORKERS,
+        num_workers=_NUM_WORKERS,
         pin_memory=True,
     )
 
