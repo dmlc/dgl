@@ -134,12 +134,21 @@ class ItemShufflerAndBatcher:
                 if self._drop_last and i + self._batch_size > len(indices):
                     break
                 batch_indices = indices[i : i + self._batch_size]
-                if len(self._item_set._items) == 1:
+                if isinstance(self._item_set._items, int):
+                    # For integer-initialized item set, `buffer` is a tensor.
+                    yield buffer[batch_indices]
+                elif len(self._item_set._items) == 1:
                     if isinstance(buffer[0], DGLGraph):
+                        # For item set that's initialized with a list of
+                        # DGLGraphs, `buffer` is a list of DGLGraphs.
                         yield dgl_batch([buffer[idx] for idx in batch_indices])
                     else:
+                        # For item set that's initialized with a single
+                        # tensor, `buffer` is a tensor.
                         yield buffer[batch_indices]
                 else:
+                    # For item set that's initialized with a tuple of items,
+                    # `buffer` is a tuple of tensors.
                     yield tuple(item[batch_indices] for item in buffer)
             buffer = None
             start = end

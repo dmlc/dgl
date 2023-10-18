@@ -101,6 +101,34 @@ def test_ItemSet_Iterable_Only(batch_size, shuffle, drop_last):
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSet_integer(batch_size, shuffle, drop_last):
+    # Node IDs.
+    num_ids = 103
+    item_set = gb.ItemSet(num_ids, names="seed_nodes")
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    minibatch_ids = []
+    for i, minibatch in enumerate(item_sampler):
+        assert isinstance(minibatch, gb.MiniBatch)
+        assert minibatch.seed_nodes is not None
+        assert minibatch.labels is None
+        is_last = (i + 1) * batch_size >= num_ids
+        if not is_last or num_ids % batch_size == 0:
+            assert len(minibatch.seed_nodes) == batch_size
+        else:
+            if not drop_last:
+                assert len(minibatch.seed_nodes) == num_ids % batch_size
+            else:
+                assert False
+        minibatch_ids.append(minibatch.seed_nodes)
+    minibatch_ids = torch.cat(minibatch_ids)
+    assert torch.all(minibatch_ids[:-1] <= minibatch_ids[1:]) is not shuffle
+
+
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
 def test_ItemSet_seed_nodes(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 103
