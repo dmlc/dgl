@@ -22,7 +22,7 @@ ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
 def isin(elements, test_elements):
     """Tests if each element of elements is in test_elements. Returns a boolean
     tensor of the same shape as elements that is True for elements in
-    test_elements and False otherwise..
+    test_elements and False otherwise.
 
     Parameters
     ----------

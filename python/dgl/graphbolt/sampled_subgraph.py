@@ -107,7 +107,7 @@ class SampledSubgraph:
         assume_int32_value: bool
             If True, assumes the node IDs in both elements and test_elements
             fall within the int32 range, which can significantly enhance
-            computation speed. Default: False
+            computation speed. Default: True
 
         Returns
         -------

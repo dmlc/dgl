@@ -84,8 +84,6 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const torch::optional<torch::Tensor>& type_per_edge,
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
-  static torch::Tensor MyIsIn(const torch::Tensor& E, const torch::Tensor& S);
-
   /** @brief Get the number of nodes. */
   int64_t NumNodes() const { return indptr_.size(0) - 1; }
 
