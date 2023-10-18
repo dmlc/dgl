@@ -133,7 +133,7 @@ class SAGE(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, fanouts, batch_size, num_workers, dataset):
+    def __init__(self, dataset, fanouts, batch_size, num_workers):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
@@ -210,10 +210,10 @@ if __name__ == "__main__":
 
     dataset = gb.BuiltinDataset("ogbn-products").load()
     datamodule = DataModule(
+        dataset,
         [15, 10, 5],
         args.batch_size,
         args.num_workers,
-        dataset,
     )
     in_size = dataset.feature.size("node", None, "feat")[0]
     model = SAGE(in_size, 256, datamodule.num_classes).to(torch.double)
