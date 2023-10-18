@@ -1875,10 +1875,8 @@ def test_OnDiskDataset_load_1D_feature():
             os.path.join(test_dir, input_config["feature_data"][0]["path"])
         )
         dataset = gb.OnDiskDataset(test_dir).load()
-        assert torch.equal(
-            torch.from_numpy(node_feat.reshape(-1, 1)),
-            dataset.feature.read("node", None, "feat"),
-        )
+        feature = dataset.feature.read("node", None, "feat")
+        assert torch.equal(torch.from_numpy(node_feat.reshape(-1, 1)), feature)
 
 
 def test_BuiltinDataset():
