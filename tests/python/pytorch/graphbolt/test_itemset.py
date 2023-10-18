@@ -114,16 +114,20 @@ def test_ItemSet_seed_nodes():
         assert i == item.item()
         assert i == item_set[i]
     # Indexing with a slice.
+    assert torch.equal(item_set[:], torch.arange(0, 5))
+    # Indexing with an integer.
+    assert item_set[0] == 0
+    assert item_set[-1] == 4
+    # Indexing that is out of range.
+    with pytest.raises(IndexError, match="ItemSet index out of range."):
+        _ = item_set[5]
+    with pytest.raises(IndexError, match="ItemSet index out of range."):
+        _ = item_set[-10]
+    # Indexing with tensor.
     with pytest.raises(
-        AssertionError,
-        match=(
-            "Indexing of integer-initialized ItemSet instance must be int or "
-            "torch.Tensor."
-        ),
+        TypeError, match="ItemSet indices must be integer or slice."
     ):
-        _ = item_set[:]
-    # Indexing with an Tensor.
-    assert torch.equal(item_set[torch.arange(0, 5)], torch.arange(0, 5))
+        _ = item_set[torch.arange(3)]
 
 
 def test_ItemSet_seed_nodes_labels():
