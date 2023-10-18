@@ -321,7 +321,7 @@ class MiniBatch:
         # Need input nodes to fetch feature.
         if self.node_features is None:
             minibatch.input_nodes = self.input_nodes
-        # Need output nodes to fetch feature.
+        # Need output nodes to fetch label.
         if self.labels is None:
             minibatch.output_nodes = self.seed_nodes
         assert (
