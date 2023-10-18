@@ -121,6 +121,8 @@ def test_ItemSet_seed_nodes():
     # Indexing that is out of range.
     with pytest.raises(IndexError, match="ItemSet index out of range."):
         _ = item_set[5]
+    with pytest.raises(IndexError, match="ItemSet index out of range."):
+        _ = item_set[-10]
     # Indexing with tensor.
     with pytest.raises(
         TypeError, match="ItemSet indices must be integer or slice."

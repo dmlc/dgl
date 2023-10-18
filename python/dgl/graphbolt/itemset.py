@@ -157,7 +157,7 @@ class ItemSet:
             if isinstance(idx, int):
                 if idx < 0:
                     idx += self._items
-                if idx >= self._items:
+                if idx < 0 or idx >= self._items:
                     raise IndexError(
                         f"{type(self).__name__} index out of range."
                     )
