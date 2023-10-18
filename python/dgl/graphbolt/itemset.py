@@ -266,6 +266,15 @@ class ItemSetDict:
         assert all(
             self._names == itemset.names for itemset in itemsets.values()
         ), "All itemsets must have the same names."
+        try:
+            # For indexable itemsets, we compute the offsets for each itemset
+            # in advance to speed up indexing.
+            offsets = [0] + [
+                len(itemset) for itemset in self._itemsets.values()
+            ]
+            self._offsets = torch.tensor(offsets).cumsum(0)
+        except TypeError:
+            self._offsets = None
 
     def __iter__(self) -> Iterator:
         for key, itemset in self._itemsets.items():
@@ -276,34 +285,37 @@ class ItemSetDict:
         return sum(len(itemset) for itemset in self._itemsets.values())
 
     def __getitem__(self, idx: Union[int, slice, Iterable]) -> Dict[str, Tuple]:
-        try:
-            len(self)
-        except TypeError:
+        if self._offsets is None:
             raise TypeError(
                 f"{type(self).__name__} instance doesn't support indexing."
             )
-        offsets = [len(itemset) for itemset in self._itemsets.values()]
-        total_num = sum(offsets)
+        total_num = self._offsets[-1]
         if isinstance(idx, int):
             if idx < 0:
                 idx += total_num
             if idx < 0 or idx >= total_num:
                 raise IndexError(f"{type(self).__name__} index out of range.")
-            cumsum_offsets = torch.cumsum(torch.tensor(offsets), dim=0)
-            offset_idx = torch.searchsorted(cumsum_offsets, idx, right=True)
-            idx -= cumsum_offsets[offset_idx]
+            offset_idx = torch.searchsorted(self._offsets, idx, right=True)
+            offset_idx -= 1
+            idx -= self._offsets[offset_idx]
             key = list(self._itemsets.keys())[offset_idx]
             return {key: self._itemsets[key][idx]}
         elif isinstance(idx, slice):
             start, stop, step = idx.indices(total_num)
+            assert step == 1, "Step must be 1."
+            assert start < stop, "Start must be smaller than stop."
             data = {}
-            for key, offset in zip(self._itemsets.keys(), offsets):
-                if start < offset:
-                    data[key] = self._itemsets[key][start:stop:step]
-                start -= offset
-                start = max(start, 0)
-                stop -= offset
-                if stop <= 0:
+            offset_idx_start = max(
+                1, torch.searchsorted(self._offsets, start, right=False)
+            )
+            keys = list(self._itemsets.keys())
+            for offset_idx in range(offset_idx_start, len(self._offsets)):
+                key = keys[offset_idx - 1]
+                data[key] = self._itemsets[key][
+                    max(0, start - self._offsets[offset_idx - 1]) : stop
+                    - self._offsets[offset_idx - 1]
+                ]
+                if stop <= self._offsets[offset_idx]:
                     break
             return data
 

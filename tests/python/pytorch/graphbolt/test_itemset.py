@@ -374,6 +374,17 @@ def test_ItemSetDict_iteration_seed_nodes():
     assert torch.equal(partial_data["user"], user_ids[3:5])
     assert torch.equal(partial_data["item"], item_ids[:2])
 
+    # Exception cases.
+    with pytest.raises(AssertionError, match="Step must be 1."):
+        _ = item_set[::2]
+    with pytest.raises(
+        AssertionError, match="Start must be smaller than stop."
+    ):
+        _ = item_set[5:3]
+    with pytest.raises(
+        AssertionError, match="Start must be smaller than stop."
+    ):
+        _ = item_set[-1:3]
     with pytest.raises(IndexError, match="ItemSetDict index out of range."):
         _ = item_set[20]
     with pytest.raises(IndexError, match="ItemSetDict index out of range."):
