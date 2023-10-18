@@ -284,7 +284,7 @@ class ItemSetDict:
     def __len__(self) -> int:
         return sum(len(itemset) for itemset in self._itemsets.values())
 
-    def __getitem__(self, idx: Union[int, slice, Iterable]) -> Dict[str, Tuple]:
+    def __getitem__(self, idx: Union[int, slice]) -> Dict[str, Tuple]:
         if self._offsets is None:
             raise TypeError(
                 f"{type(self).__name__} instance doesn't support indexing."
