@@ -319,10 +319,7 @@ class ItemSetDict:
                     break
             return data
 
-        raise TypeError(
-            f"Indexing of {type(self).__name__} instance must be int or "
-            f"slice."
-        )
+        raise TypeError(f"{type(self).__name__} indices must be int or slice.")
 
     @property
     def names(self) -> Tuple[str]:

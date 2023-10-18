@@ -389,6 +389,10 @@ def test_ItemSetDict_iteration_seed_nodes():
         _ = item_set[20]
     with pytest.raises(IndexError, match="ItemSetDict index out of range."):
         _ = item_set[-20]
+    with pytest.raises(
+        TypeError, match="ItemSetDict indices must be int or slice."
+    ):
+        _ = item_set[torch.arange(3)]
 
 
 def test_ItemSetDict_iteration_seed_nodes_labels():
