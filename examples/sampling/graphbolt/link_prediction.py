@@ -301,9 +301,9 @@ def train(args, graph, features, train_set, valid_set, model):
                 break
 
     # Evaluate the model.
-    # print("Validation")
-    # valid_mrr = evaluate(args, graph, features, valid_set, model)
-    # print(f"Valid MRR {valid_mrr.item():.4f}")
+    print("Validation")
+    valid_mrr = evaluate(args, graph, features, valid_set, model)
+    print(f"Valid MRR {valid_mrr.item():.4f}")
 
 
 def parse_args():
@@ -348,17 +348,14 @@ def main(args):
     valid_set = dataset.tasks[0].validation_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
-    in_size = 128
+    in_size = features.size("node", None, "feat")[0]
     hidden_channels = 256
     model = SAGE(in_size, hidden_channels)
 
     # Model training.
     print("Training...")
-    import time
-
-    s = time.perf_counter()
     train(args, graph, features, train_set, valid_set, model)
-    print(f"{time.perf_counter() - s} seconds elpased. ")
+
     # Test the model.
     print("Testing...")
     test_set = dataset.tasks[0].test_set
