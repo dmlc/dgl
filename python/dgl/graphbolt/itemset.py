@@ -151,11 +151,20 @@ class ItemSet:
                 f"{type(self).__name__} instance doesn't support indexing."
             )
         if isinstance(self._items, int):
-            # [Warning] Index range is not checked.
             if isinstance(idx, slice):
                 start, stop, step = idx.indices(self._items)
                 return torch.arange(start, stop, step)
-            return idx
+            if isinstance(idx, int):
+                if idx < 0:
+                    idx += self._items
+                if idx >= self._items:
+                    raise IndexError(
+                        f"{type(self).__name__} index out of range."
+                    )
+                return idx
+            raise TypeError(
+                f"{type(self).__name__} indices must be integer or slice."
+            )
         if len(self._items) == 1:
             return self._items[0][idx]
         return tuple(item[idx] for item in self._items)
