@@ -12,15 +12,15 @@ __all__ = [
     "etype_str_to_tuple",
     "etype_tuple_to_str",
     "CopyTo",
-    "my_isin",
+    "isin",
 ]
 
 CANONICAL_ETYPE_DELIMITER = ":"
 ORIGINAL_EDGE_ID = "_ORIGINAL_EDGE_ID"
 
 
-def my_isin(elements, test_elements):
-    return torch.ops.graphbolt.my_isin(elements, test_elements)
+def isin(elements, test_elements):
+    return torch.ops.graphbolt.isin(elements, test_elements)
 
 
 def etype_tuple_to_str(c_etype):

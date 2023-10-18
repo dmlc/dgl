@@ -4,7 +4,7 @@ from typing import Dict, Tuple, Union
 
 import torch
 
-from .base import etype_str_to_tuple, my_isin
+from .base import etype_str_to_tuple, isin
 
 
 __all__ = ["SampledSubgraph"]
@@ -195,19 +195,9 @@ def _relabel_two_arrays(lhs_array, rhs_array):
 
 def _exclude_homo_edges(edges, edges_to_exclude):
     """Return the indices of edges that are not in edges_to_exclude."""
-    # # 1. Relabel edges.
-    # src, src_to_exclude = _relabel_two_arrays(edges[0], edges_to_exclude[0])
-    # dst, dst_to_exclude = _relabel_two_arrays(edges[1], edges_to_exclude[1])
-    # # 2. Compact the edges to integers.
-    # dst_max_range = dst.numel() + dst_to_exclude.numel()
-    # val = src * dst_max_range + dst
-    # val_to_exclude = src_to_exclude * dst_max_range + dst_to_exclude
-    # # 3. Use torch.isin to get the indices of edges to keep.
-    # mask = ~torch.isin(val, val_to_exclude)
-    # return torch.nonzero(mask, as_tuple=True)[0]
     val = edges[0] << 32 | edges[1]
     val_to_exclude = edges_to_exclude[0] << 32 | edges_to_exclude[1]
-    mask = ~my_isin(val, val_to_exclude)
+    mask = ~isin(val, val_to_exclude)
     return torch.nonzero(mask, as_tuple=True)[0]
 
 

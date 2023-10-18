@@ -61,53 +61,6 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
       indptr, indices, node_type_offset, type_per_edge, edge_attributes);
 }
 
-// Test if E in S
-torch::Tensor CSCSamplingGraph::MyIsIn(
-    const torch::Tensor& E, const torch::Tensor& S) {
-  torch::Tensor sorted_S, sorted_order;
-  std::tie(sorted_S, sorted_order) = S.sort(
-      /*stable=*/false, /*dim=*/0, /*descending=*/false);
-  torch::Tensor result = torch::empty_like(E, torch::kBool);
-  size_t num_S = S.size(0);
-  size_t num_E = E.size(0);
-
-  AT_DISPATCH_INTEGRAL_TYPES(
-      E.scalar_type(), "MyIsIn", ([&] {
-        const scalar_t* E_ptr = E.data_ptr<scalar_t>();
-        const scalar_t* sorted_S_ptr = sorted_S.data_ptr<scalar_t>();
-        bool* res = result.data_ptr<bool>();
-        torch::parallel_for(0, num_E, 4096, [&](size_t start, size_t end) {
-          for (auto i = start; i < end; i++) {
-            res[i] = std::binary_search(
-                sorted_S_ptr, sorted_S_ptr + num_S, E_ptr[i]);
-          }
-        });
-      }));
-  return result;
-}
-
-// Test if E in S
-// torch::Tensor CSCSamplingGraph::MyIsIn(
-//     const torch::Tensor& E, const torch::Tensor& S) {
-//       torch::Tensor sorted_S, sorted_order;
-//       std::tie (sorted_S, sorted_order) = S.sort(
-//       /*stable=*/ false, /*dim=*/ 0, /*descending=*/ false);
-//       torch::Tensor result = torch::empty_like(E, torch::kBool);
-//       int len = S.size(0);
-
-//       AT_DISPATCH_INTEGRAL_TYPES(
-//         E.scalar_type(), "MyIsIn", ([&] {
-//           const scalar_t* E_ptr = E.data_ptr<scalar_t>();
-//           const scalar_t* sorted_S_ptr = sorted_S.data_ptr<scalar_t>();
-//           bool* res = result.data_ptr<bool>();
-//           for (int i = 0; i < E.size(0); i++) {
-//             res[i] = std::binary_search(sorted_S_ptr, sorted_S_ptr + len,
-//             E_ptr[i]);
-//           }
-//       }));
-//       return result;
-// }
-
 void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   const int64_t magic_num =
       read_from_archive(archive, "CSCSamplingGraph/magic_num").toInt();

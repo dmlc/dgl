@@ -5,6 +5,7 @@
  */
 
 #include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/isin.h>
 #include <graphbolt/serialize.h>
 #include <graphbolt/unique_and_compact.h>
 
@@ -56,7 +57,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("save_csc_sampling_graph", &SaveCSCSamplingGraph);
   m.def("load_from_shared_memory", &CSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
-  m.def("my_isin", &CSCSamplingGraph::MyIsIn);
+  m.def("isin", &IsIn);
 }
 
 }  // namespace sampling
