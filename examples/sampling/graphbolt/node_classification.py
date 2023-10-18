@@ -48,7 +48,9 @@ import torchmetrics.functional as MF
 import tqdm
 
 
-def create_dataloader(args, graph, features, itemset, is_train=True):
+def create_dataloader(
+    args, graph, features, itemset, is_train=True, is_infer=False
+):
     """
     [HIGHLIGHT]
     Get a GraphBolt version of a dataloader for node classification tasks.
@@ -90,7 +92,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
-    datapipe = datapipe.sample_neighbor(graph, args.fanout)
+    datapipe = datapipe.sample_neighbor(
+        graph, [-1] if is_infer else args.fanout
+    )
 
     ############################################################################
     # [Step-3]:
@@ -151,10 +155,10 @@ class SAGE(nn.Module):
         # Set the dtype for the layers manually.
         self.set_layer_dtype(torch.float64)
 
-    def set_layer_dtype(self, dtype):
+    def set_layer_dtype(self, _dtype):
         for layer in self.layers:
             for param in layer.parameters():
-                param.data = param.data.to(dtype)
+                param.data = param.data.to(_dtype)
 
     def forward(self, blocks, x):
         hidden_x = x
@@ -169,32 +173,43 @@ class SAGE(nn.Module):
     def inference(self, args, graph, features, all_nodes_set):
         """Conduct layer-wise inference to get all the node embeddings."""
         dataloader = create_dataloader(
-            args, graph, features, all_nodes_set, is_train=False
+            args, graph, features, all_nodes_set, is_train=False, is_infer=True
         )
-        buffer_device = torch.device("cpu")
-        pin_memory = buffer_device != args.device
+
+        feat = [] # features.read("node", None, "feat")
 
         for layer_idx, layer in enumerate(self.layers):
+            print(f"Layer: {layer_idx}")
+            is_first_layer = layer_idx == 0
             is_last_layer = layer_idx == len(self.layers) - 1
             y = torch.empty(
                 graph.total_num_nodes,
                 self.out_size if is_last_layer else self.hidden_size,
-                device=buffer_device,
-                pin_memory=pin_memory,
+                dtype=torch.float64,
             )
             # features = features.to(args.device)
 
-            for step, data in tqdm.tqdm(enumerate(dataloader)):
-                x = data.node_features["feat"]
+            for step, data in enumerate(dataloader):
+                if step % 1000 == 0:
+                    print(f"now on step {step}")
+                x = (
+                    data.node_features["feat"]
+                    if is_first_layer
+                    else feat[data.input_nodes]
+                )
                 hidden_x = layer(data.blocks[0], x)
+                # import pdb ; pdb.set_trace()
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
+                # if is_first_layer:
+                #     feat.append(hidden_x)
+                # else:
+                #     feat[step] = hidden_x
+
                 # By design, our output nodes are contiguous.
-                y[
-                    data.output_nodes[0] : data.output_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device)
-            features = y
+                y[data.output_nodes[0] : data.output_nodes[-1] + 1] = hidden_x
+            feat = y
         return y
 
 
@@ -323,6 +338,8 @@ def main(args):
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
+    # all_nodes_set = dataset.all_nodes_set
+    all_nodes_set = gb.ItemSet(graph.total_num_nodes, names="seed_nodes")
     args.fanout = list(map(int, args.fanout.split(",")))
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
@@ -339,10 +356,11 @@ def main(args):
         graph,
         features,
         test_set,
-        dataset.all_nodes_set,
+        all_nodes_set,
         model,
         num_classes,
     )
+    print(f"Test Accuracy is {test_acc.item():.4f}")
 
     # Model training.
     print("Training...")
@@ -363,6 +381,8 @@ def main(args):
         num_classes,
     )
     print(f"Test Accuracy is {test_acc.item():.4f}")
+
+    dataset = None
 
 
 if __name__ == "__main__":
