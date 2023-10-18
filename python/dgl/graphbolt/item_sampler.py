@@ -100,7 +100,6 @@ class ItemShufflerAndBatcher:
         Option to drop the last batch if it's not full.
     buffer_size : int
         The size of the buffer to store items sliced from the :class:`ItemSet`.
-
     """
 
     def __init__(
