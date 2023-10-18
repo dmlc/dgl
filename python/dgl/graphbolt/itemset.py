@@ -281,10 +281,11 @@ class ItemSetDict:
                 idx += total_num
             if idx < 0 or idx >= total_num:
                 raise IndexError(f"{type(self).__name__} index out of range.")
-            for key, offset in zip(self._itemsets.keys(), offsets):
-                if idx < offset:
-                    return {key: self._itemsets[key][idx]}
-                idx -= offset
+            cumsum_offsets = torch.cumsum(torch.tensor(offsets), dim=0)
+            offset_idx = torch.searchsorted(cumsum_offsets, idx, right=True)
+            idx -= cumsum_offsets[offset_idx]
+            key = list(self._itemsets.keys())[offset_idx]
+            return {key: self._itemsets[key][idx]}
         elif isinstance(idx, slice):
             start, stop, step = idx.indices(total_num)
             data = {}
