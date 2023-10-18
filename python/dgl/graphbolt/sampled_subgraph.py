@@ -204,8 +204,12 @@ def _relabel_two_arrays(lhs_array, rhs_array):
 
 def _exclude_homo_edges(edges, edges_to_exclude, assume_int32_value):
     """Return the indices of edges that are not in edges_to_exclude."""
-    val = edges[0] << 32 | edges[1]
-    val_to_exclude = edges_to_exclude[0] << 32 | edges_to_exclude[1]
+    if assume_int32_value:
+        val = edges[0] << 32 | edges[1]
+        val_to_exclude = edges_to_exclude[0] << 32 | edges_to_exclude[1]
+    else:
+        # TODO: Add support for value > int32.
+        raise NotImplemented("Values out of range int32 are not supported yet")
     mask = ~isin(val, val_to_exclude)
     return torch.nonzero(mask, as_tuple=True)[0]
 
