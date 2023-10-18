@@ -81,3 +81,19 @@ def test_save_data(data_fmt, save_fmt, contiguous):
             assert np.array_equal(tensor_data.numpy(), loaded_data)
 
         data = tensor_data = loaded_data = None
+
+
+@pytest.mark.parametrize("fmt", ["torch", "numpy"])
+def test_get_npy_dim(fmt):
+    with tempfile.TemporaryDirectory() as test_dir:
+        data = np.array([[1, 2, 4], [2, 5, 3]])
+        type_name = "pt" if fmt == "torch" else "npy"
+        file_name = os.path.join(test_dir, f"save_data.{type_name}")
+        if fmt == "numpy":
+            np.save(file_name, data)
+            assert utils.get_npy_dim(file_name) == 2
+        elif fmt == "torch":
+            torch.save(torch.from_numpy(data), file_name)
+            with pytest.raises(ValueError):
+                utils.get_npy_dim(file_name)
+        data = None
