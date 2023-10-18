@@ -29,15 +29,24 @@ void FarthestPointSampler(
   CHECK_EQ(result->shape[0], batch_size * sample_points)
       << "Invalid shape of result";
 
-  ATEN_FLOAT_TYPE_SWITCH(array->dtype, FloatType, "values", {
+
+  ATEN_XPU_SWITCH_CUDA(array->ctx.device_type, XPU, "FarthestPointSampler", {
     ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
-      ATEN_XPU_SWITCH_CUDA(
-          array->ctx.device_type, XPU, "FarthestPointSampler", {
-            impl::FarthestPointSampler<XPU, FloatType, IdType>(
-                array, batch_size, sample_points, dist, start_idx, result);
-          });
+      ATEN_FLOAT_TYPE_SWITCH_16BITS(array->dtype, FloatType, XPU, "values", {
+        impl::FarthestPointSampler<XPU, FloatType, IdType>(array, batch_size, sample_points, dist, start_idx, result);
+      });
     });
   });
+
+  // ATEN_FLOAT_TYPE_SWITCH_16BITS(array->dtype, FloatType, XPU, "values", {
+  //   ATEN_ID_TYPE_SWITCH(result->dtype, IdType, {
+  //     ATEN_XPU_SWITCH_CUDA(
+  //         array->ctx.device_type, XPU, "FarthestPointSampler", {
+  //           impl::FarthestPointSampler<XPU, FloatType, IdType>(
+  //               array, batch_size, sample_points, dist, start_idx, result);
+  //         });
+  //   });
+  // });
 }
 
 void NeighborMatching(

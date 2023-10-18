@@ -124,7 +124,7 @@
       typedef double FloatType;                                             \
       { __VA_ARGS__ }                                                       \
     } else {                                                                \
-      LOG(FATAL) << (val_name) << " can only be float32 or float64";        \
+      LOG(FATAL) << (val_name) << " can only be float32, float64 or float16";\
     }                                                                       \
   } while (0)
 

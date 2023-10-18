@@ -129,7 +129,20 @@ template void FarthestPointSampler<kDGLCUDA, double, int32_t>(
 template void FarthestPointSampler<kDGLCUDA, double, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist,
     IdArray start_idx, IdArray result);
-
+template void FarthestPointSampler<kDGLCUDA, __half, int32_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist,
+    IdArray start_idx, IdArray result);
+template void FarthestPointSampler<kDGLCUDA, __half, int64_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist,
+    IdArray start_idx, IdArray result);
+#if BF16_ENABLED
+template void FarthestPointSampler<kDGLCUDA, __nv_bfloat16, int32_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist,
+    IdArray start_idx, IdArray result);
+template void FarthestPointSampler<kDGLCUDA, __nv_bfloat16, int64_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist,
+    IdArray start_idx, IdArray result);
+#endif  // BF16_ENABLED
 }  // namespace impl
 }  // namespace geometry
 }  // namespace dgl

@@ -159,6 +159,12 @@ template void FarthestPointSampler<kDGLCPU, double, int32_t>(
 template void FarthestPointSampler<kDGLCPU, double, int64_t>(
     NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist,
     IdArray start_idx, IdArray result);
+template void FarthestPointSampler<kDGLCPU, BFloat16, int32_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist,
+    IdArray start_idx, IdArray result);
+template void FarthestPointSampler<kDGLCPU, BFloat16, int64_t>(
+    NDArray array, int64_t batch_size, int64_t sample_points, NDArray dist,
+    IdArray start_idx, IdArray result);
 
 template <DGLDeviceType XPU, typename FloatType, typename IdType>
 void WeightedNeighborMatching(
