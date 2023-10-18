@@ -133,12 +133,11 @@ class SAGE(LightningModule):
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, fanouts, batch_size, num_workers):
+    def __init__(self, dataset, fanouts, batch_size, num_workers):
         super().__init__()
         self.fanouts = fanouts
         self.batch_size = batch_size
         self.num_workers = num_workers
-        dataset = gb.BuiltinDataset("ogbn-products").load()
         self.feature_store = dataset.feature
         self.graph = dataset.graph
         self.train_set = dataset.tasks[0].train_set
@@ -209,8 +208,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    datamodule = DataModule([15, 10, 5], args.batch_size, args.num_workers)
-    model = SAGE(100, 256, datamodule.num_classes).to(torch.double)
+    dataset = gb.BuiltinDataset("ogbn-products").load()
+    datamodule = DataModule(
+        dataset,
+        [15, 10, 5],
+        args.batch_size,
+        args.num_workers,
+    )
+    in_size = dataset.feature.size("node", None, "feat")[0]
+    model = SAGE(in_size, 256, datamodule.num_classes).to(torch.double)
 
     # Train.
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", mode="max")
