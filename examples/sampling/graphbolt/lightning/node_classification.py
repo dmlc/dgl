@@ -215,8 +215,8 @@ if __name__ == "__main__":
         args.num_workers,
         dataset,
     )
-    in_feat = dataset.feature.size("node", None, "feat")[0]
-    model = SAGE(in_feat, 256, datamodule.num_classes).to(torch.double)
+    in_size = dataset.feature.size("node", None, "feat")[0]
+    model = SAGE(in_size, 256, datamodule.num_classes).to(torch.double)
 
     # Train.
     checkpoint_callback = ModelCheckpoint(monitor="val_acc", mode="max")
