@@ -1879,6 +1879,7 @@ def test_OnDiskDataset_load_1D_feature():
         assert torch.equal(torch.from_numpy(node_feat.reshape(-1, 1)), feature)
 
         dataset = None
+        node_feat = None
 
 
 def test_BuiltinDataset():
