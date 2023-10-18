@@ -63,16 +63,13 @@ def save_data(data, path, fmt):
 def get_npy_dim(npy_path):
     """Get the dim of numpy file."""
     with open(npy_path, "rb") as f:
-        magic_str = f.read(6)
-        if magic_str != b"\x93NUMPY":
-            raise ValueError("Not a .npy file")
-        # Use the corresponding version of func to get header.
-        version = f.read(2)
-        if version == b"\x01\x00":
-            header, _, _ = read_array_header_1_0(f)
-        elif version == b"\x02\x00":
-            header, _, _ = read_array_header_2_0(f)
-        else:
-            raise ValueError("Unsupported .npy version")
+        f.seek(8, 1)
+        try:
+            shape, _, _ = read_array_header_1_0(f)
+        except ValueError:
+            try:
+                shape, _, _ = read_array_header_2_0(f)
+            except ValueError:
+                raise ValueError("Invalid file format")
 
-        return len(header)
+        return len(shape)

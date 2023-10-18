@@ -55,6 +55,8 @@ def _copy_or_convert_data(
     else:
         # If the original format is not numpy, convert it to numpy.
         data = read_data(input_path, input_format, in_memory)
+        if data.dim() == 1:
+            data = data.reshape(-1, 1)
         save_data(data, output_path, output_format)
 
 
