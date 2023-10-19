@@ -631,11 +631,7 @@ def main(args):
         args.dataset
     )
 
-    # TODO: featch from ``feature store``.
-    if args.dataset == "ogbn-mag":
-        feat_size = 128
-    else:
-        feat_size = 768
+    feat_size = features.size("node", "paper", "feat")[0]
 
     # As `ogb-lsc-mag240m` is a large dataset, features of `author` and
     # `institution` are generated in advance and stored in the feature store.

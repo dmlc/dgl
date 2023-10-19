@@ -17,7 +17,7 @@ from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from ..utils import read_data, save_data
+from ..utils import get_npy_dim, read_data, save_data
 from .csc_sampling_graph import (
     CSCSamplingGraph,
     from_dglgraph,
@@ -44,12 +44,20 @@ def _copy_or_convert_data(
 ):
     """Copy or convert the data from input_path to output_path."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    # If the original format is numpy, just copy the file.
     if input_format == "numpy":
-        # If the original format is numpy, just copy the file.
-        shutil.copyfile(input_path, output_path)
+        # If dim of the data is 1, reshape it to n * 1 and save it to output_path.
+        if get_npy_dim(input_path) == 1:
+            data = read_data(input_path, input_format, in_memory)
+            data = data.reshape(-1, 1)
+            save_data(data, output_path, output_format)
+        else:
+            shutil.copyfile(input_path, output_path)
     else:
         # If the original format is not numpy, convert it to numpy.
         data = read_data(input_path, input_format, in_memory)
+        if data.dim() == 1:
+            data = data.reshape(-1, 1)
         save_data(data, output_path, output_format)
 
 

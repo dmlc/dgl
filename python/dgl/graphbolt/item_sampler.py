@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Callable, Iterator, Optional
 
+import numpy as np
+import torch
 import torch.distributed as dist
 from torch.utils.data import default_collate
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
@@ -75,6 +77,81 @@ def minibatcher_default(batch, names):
                 item = (item[:, 0], item[:, 1])
         setattr(minibatch, name, item)
     return minibatch
+
+
+class ItemShufflerAndBatcher:
+    """A shuffler to shuffle items and create batches.
+
+    This class is used internally by :class:`ItemSampler` to shuffle items and
+    create batches. It is not supposed to be used directly. The intention of
+    this class is to avoid time-consuming iteration over :class:`ItemSet`. As
+    an optimization, it slices from the :class:`ItemSet` via indexing first,
+    then shuffle and create batches.
+
+    Parameters
+    ----------
+    item_set : ItemSet
+        Data to be iterated.
+    shuffle : bool
+        Option to shuffle before batching.
+    batch_size : int
+        The size of each batch.
+    drop_last : bool
+        Option to drop the last batch if it's not full.
+    buffer_size : int
+        The size of the buffer to store items sliced from the :class:`ItemSet`.
+    """
+
+    def __init__(
+        self,
+        item_set: ItemSet,
+        shuffle: bool,
+        batch_size: int,
+        drop_last: bool,
+        buffer_size: Optional[int] = 10 * 1000,
+    ):
+        self._item_set = item_set
+        self._shuffle = shuffle
+        self._batch_size = batch_size
+        self._drop_last = drop_last
+        self._buffer_size = max(buffer_size, 20 * batch_size)
+        # Round up the buffer size to the nearest multiple of batch size.
+        self._buffer_size = (
+            (self._buffer_size + batch_size - 1) // batch_size * batch_size
+        )
+
+    def __iter__(self):
+        buffer = None
+        num_items = len(self._item_set)
+        start = 0
+        while start < num_items:
+            end = min(start + self._buffer_size, num_items)
+            buffer = self._item_set[start:end]
+            indices = torch.arange(end - start)
+            if self._shuffle:
+                np.random.shuffle(indices.numpy())
+            for i in range(0, len(indices), self._batch_size):
+                if self._drop_last and i + self._batch_size > len(indices):
+                    break
+                batch_indices = indices[i : i + self._batch_size]
+                if isinstance(self._item_set._items, int):
+                    # For integer-initialized item set, `buffer` is a tensor.
+                    yield buffer[batch_indices]
+                elif len(self._item_set._items) == 1:
+                    if isinstance(buffer[0], DGLGraph):
+                        # For item set that's initialized with a list of
+                        # DGLGraphs, `buffer` is a list of DGLGraphs.
+                        yield dgl_batch([buffer[idx] for idx in batch_indices])
+                    else:
+                        # For item set that's initialized with a single
+                        # tensor, `buffer` is a tensor.
+                        yield buffer[batch_indices]
+                else:
+                    # For item set that's initialized with a tuple of items,
+                    # `buffer` is a tuple of tensors.
+                    yield tuple(item[batch_indices] for item in buffer)
+            buffer = None
+            start = end
 
 
 class ItemSampler(IterDataPipe):
@@ -287,14 +364,28 @@ class ItemSampler(IterDataPipe):
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
         shuffle: Optional[bool] = False,
+        # [TODO][Rui] For now, it's a temporary knob to disable indexing. In
+        # the future, we will enable indexing for all the item sets.
+        use_indexing: Optional[bool] = True,
     ) -> None:
         super().__init__()
         self._names = item_set.names
-        self._item_set = IterableWrapper(item_set)
+        # Check if the item set supports indexing.
+        try:
+            item_set[0]
+        except TypeError:
+            use_indexing = False
+        # [TODO][Rui] For now, we disable indexing for ItemSetDict.
+        use_indexing = (not isinstance(item_set, ItemSetDict)) and use_indexing
+        self._use_indexing = use_indexing
+        self._item_set = (
+            item_set if self._use_indexing else IterableWrapper(item_set)
+        )
         self._batch_size = batch_size
         self._minibatcher = minibatcher
         self._drop_last = drop_last
         self._shuffle = shuffle
+        self._use_indexing = use_indexing
 
     def _organize_items(self, data_pipe) -> None:
         # Shuffle before batch.
@@ -333,11 +424,21 @@ class ItemSampler(IterDataPipe):
         return default_collate(batch)
 
     def __iter__(self) -> Iterator:
-        # Organize items.
-        data_pipe = self._organize_items(self._item_set)
+        if self._use_indexing:
+            data_pipe = IterableWrapper(
+                ItemShufflerAndBatcher(
+                    self._item_set,
+                    self._shuffle,
+                    self._batch_size,
+                    self._drop_last,
+                )
+            )
+        else:
+            # Organize items.
+            data_pipe = self._organize_items(self._item_set)
 
-        # Collate.
-        data_pipe = data_pipe.collate(collate_fn=self._collate)
+            # Collate.
+            data_pipe = data_pipe.collate(collate_fn=self._collate)
 
         # Map to minibatch.
         data_pipe = data_pipe.map(partial(self._minibatcher, names=self._names))
@@ -504,7 +605,15 @@ class DistributedItemSampler(ItemSampler):
         num_replicas: Optional[int] = None,
         drop_uneven_inputs: Optional[bool] = False,
     ) -> None:
-        super().__init__(item_set, batch_size, minibatcher, drop_last, shuffle)
+        # [TODO][Rui] For now, always set use_indexing to False.
+        super().__init__(
+            item_set,
+            batch_size,
+            minibatcher,
+            drop_last,
+            shuffle,
+            use_indexing=False,
+        )
         self._drop_uneven_inputs = drop_uneven_inputs
         # Apply a sharding filter to distribute the items.
         self._item_set = self._item_set.sharding_filter()

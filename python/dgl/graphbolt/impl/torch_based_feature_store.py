@@ -69,7 +69,8 @@ class TorchBasedFeature(Feature):
             f"dimension of torch_feature in TorchBasedFeature must be greater "
             f"than 1, but got {torch_feature.dim()} dimension."
         )
-        self._tensor = torch_feature
+        # Make sure the tensor is contiguous.
+        self._tensor = torch_feature.contiguous()
 
     def read(self, ids: torch.Tensor = None):
         """Read the feature by index.

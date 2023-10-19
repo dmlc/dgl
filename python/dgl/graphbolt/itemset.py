@@ -37,7 +37,7 @@ class ItemSet:
     >>> list(item_set)
     [tensor(0), tensor(1), tensor(2), tensor(3), tensor(4), tensor(5),
      tensor(6), tensor(7), tensor(8), tensor(9)]
-    >>> item_set[torch.arange(0, num)]
+    >>> item_set[:]
     tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     >>> item_set.names
     ('seed_nodes',)
@@ -151,12 +151,20 @@ class ItemSet:
                 f"{type(self).__name__} instance doesn't support indexing."
             )
         if isinstance(self._items, int):
-            assert isinstance(idx, (int, torch.Tensor)), (
-                f"Indexing of integer-initialized {type(self).__name__} "
-                f"instance must be int or torch.Tensor."
+            if isinstance(idx, slice):
+                start, stop, step = idx.indices(self._items)
+                return torch.arange(start, stop, step)
+            if isinstance(idx, int):
+                if idx < 0:
+                    idx += self._items
+                if idx < 0 or idx >= self._items:
+                    raise IndexError(
+                        f"{type(self).__name__} index out of range."
+                    )
+                return idx
+            raise TypeError(
+                f"{type(self).__name__} indices must be integer or slice."
             )
-            # [Warning] Index range is not checked.
-            return idx
         if len(self._items) == 1:
             return self._items[0][idx]
         return tuple(item[idx] for item in self._items)
@@ -194,6 +202,8 @@ class ItemSetDict:
      {"user": tensor(3)}, {"user": tensor(4)}, {"item": tensor(5)},
      {"item": tensor(6)}, {"item": tensor(7)}, {"item": tensor(8)},
      {"item": tensor(9)}}]
+    >>> item_set[:]
+    {"user": tensor([0, 1, 2, 3, 4]), "item": tensor([5, 6, 7, 8, 9])}
     >>> item_set.names
     ('seed_nodes',)
 
@@ -214,6 +224,9 @@ class ItemSetDict:
     [{"user": (tensor(0), tensor(0))}, {"user": (tensor(1), tensor(1))},
      {"item": (tensor(2), tensor(2))}, {"item": (tensor(3), tensor(3))},
      {"item": (tensor(4), tensor(4))}}]
+    >>> item_set[:]
+    {"user": (tensor([0, 1]), tensor([0, 1])),
+     "item": (tensor([2, 3, 4]), tensor([2, 3, 4]))}
     >>> item_set.names
     ('seed_nodes', 'labels')
 
@@ -236,6 +249,13 @@ class ItemSetDict:
      {"user:follow:user": (tensor([0, 1]), tensor([ 6,  7,  8,  9, 10, 11]))},
      {"user:follow:user": (tensor([2, 3]), tensor([12, 13, 14, 15, 16, 17]))},
      {"user:follow:user": (tensor([4, 5]), tensor([18, 19, 20, 21, 22, 23]))}]
+    >>> item_set[:]
+    {"user:like:item": (tensor([[0, 1], [2, 3]]),
+                        tensor([[4, 5, 6], [7, 8, 9]])),
+     "user:follow:user": (tensor([[0, 1], [2, 3], [4, 5]]),
+                          tensor([[ 6,  7,  8,  9, 10, 11],
+                                  [12, 13, 14, 15, 16, 17],
+                                  [18, 19, 20, 21, 22, 23]]))}
     >>> item_set.names
     ('node_pairs', 'negative_dsts')
     """
@@ -246,6 +266,15 @@ class ItemSetDict:
         assert all(
             self._names == itemset.names for itemset in itemsets.values()
         ), "All itemsets must have the same names."
+        try:
+            # For indexable itemsets, we compute the offsets for each itemset
+            # in advance to speed up indexing.
+            offsets = [0] + [
+                len(itemset) for itemset in self._itemsets.values()
+            ]
+            self._offsets = torch.tensor(offsets).cumsum(0)
+        except TypeError:
+            self._offsets = None
 
     def __iter__(self) -> Iterator:
         for key, itemset in self._itemsets.items():
@@ -254,6 +283,43 @@ class ItemSetDict:
 
     def __len__(self) -> int:
         return sum(len(itemset) for itemset in self._itemsets.values())
+
+    def __getitem__(self, idx: Union[int, slice]) -> Dict[str, Tuple]:
+        if self._offsets is None:
+            raise TypeError(
+                f"{type(self).__name__} instance doesn't support indexing."
+            )
+        total_num = self._offsets[-1]
+        if isinstance(idx, int):
+            if idx < 0:
+                idx += total_num
+            if idx < 0 or idx >= total_num:
+                raise IndexError(f"{type(self).__name__} index out of range.")
+            offset_idx = torch.searchsorted(self._offsets, idx, right=True)
+            offset_idx -= 1
+            idx -= self._offsets[offset_idx]
+            key = list(self._itemsets.keys())[offset_idx]
+            return {key: self._itemsets[key][idx]}
+        elif isinstance(idx, slice):
+            start, stop, step = idx.indices(total_num)
+            assert step == 1, "Step must be 1."
+            assert start < stop, "Start must be smaller than stop."
+            data = {}
+            offset_idx_start = max(
+                1, torch.searchsorted(self._offsets, start, right=False)
+            )
+            keys = list(self._itemsets.keys())
+            for offset_idx in range(offset_idx_start, len(self._offsets)):
+                key = keys[offset_idx - 1]
+                data[key] = self._itemsets[key][
+                    max(0, start - self._offsets[offset_idx - 1]) : stop
+                    - self._offsets[offset_idx - 1]
+                ]
+                if stop <= self._offsets[offset_idx]:
+                    break
+            return data
+
+        raise TypeError(f"{type(self).__name__} indices must be int or slice.")
 
     @property
     def names(self) -> Tuple[str]:
