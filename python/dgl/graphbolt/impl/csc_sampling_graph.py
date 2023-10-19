@@ -828,7 +828,9 @@ def from_dglgraph(
 
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
 
-    if not is_homogeneous:
+    if is_homogeneous:
+        metadata = None
+    else:
         # Initialize metadata.
         node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
         edge_type_to_id = {
@@ -858,5 +860,5 @@ def from_dglgraph(
             type_per_edge,
             edge_attributes,
         ),
-        None if is_homogeneous else metadata,
+        metadata,
     )
