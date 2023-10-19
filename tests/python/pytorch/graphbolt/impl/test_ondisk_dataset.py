@@ -1806,6 +1806,7 @@ def test_OnDiskDataset_all_nodes_set_homo():
         dataset = gb.OnDiskDataset(test_dir).load()
         all_nodes_set = dataset.all_nodes_set
         assert isinstance(all_nodes_set, gb.ItemSet)
+        assert all_nodes_set.names == ("seed_nodes",)
         for i, item in enumerate(all_nodes_set):
             assert i == item
 
@@ -1842,6 +1843,7 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         dataset = gb.OnDiskDataset(test_dir).load()
         all_nodes_set = dataset.all_nodes_set
         assert isinstance(all_nodes_set, gb.ItemSetDict)
+        assert all_nodes_set.names == ("seed_nodes",)
         for i, item in enumerate(all_nodes_set):
             assert len(item) == 1
             assert isinstance(item, dict)
