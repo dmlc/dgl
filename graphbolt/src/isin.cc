@@ -13,6 +13,7 @@ static constexpr int kSearchGrainSize = 4096;
 
 namespace graphbolt {
 namespace sampling {
+
 torch::Tensor IsIn(
     const torch::Tensor& elements, const torch::Tensor& test_elements) {
   torch::Tensor sorted_test_elements;

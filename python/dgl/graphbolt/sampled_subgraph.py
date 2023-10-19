@@ -85,7 +85,7 @@ class SampledSubgraph:
             Dict[str, Tuple[torch.Tensor, torch.Tensor]],
             Tuple[torch.Tensor, torch.Tensor],
         ],
-        assume_int32_value: bool = True,
+        assume_num_node_within_int32: bool = True,
     ):
         r"""Exclude edges from the sampled subgraph.
 
@@ -104,10 +104,10 @@ class SampledSubgraph:
             should be a pair of tensors representing the edges to exclude. If
             sampled subgraph is heterogeneous, then `edges` should be a dictionary
             of edge types and the corresponding edges to exclude.
-        assume_int32_value: bool
-            If True, assumes the node IDs in both elements and test_elements
-            fall within the int32 range, which can significantly enhance
-            computation speed. Default: True
+        assume_num_node_within_int32: bool
+            If True, assumes the value of node IDs in the provided `edges` fall
+            within the int32 range, which can significantly enhance computation
+            speed. Default: True
 
         Returns
         -------
@@ -139,7 +139,9 @@ class SampledSubgraph:
         {"A:relation:B": tensor([19])}
         """
         # TODO: Add support for value > in32, then remove this line.
-        assert assume_int32_value, "Values > int32 are not supported yet."
+        assert (
+            assume_num_node_within_int32
+        ), "Values > int32 are not supported yet."
         assert isinstance(self.node_pairs, tuple) == isinstance(edges, tuple), (
             "The sampled subgraph and the edges to exclude should be both "
             "homogeneous or both heterogeneous."
@@ -158,7 +160,7 @@ class SampledSubgraph:
                 self.original_column_node_ids,
             )
             index = _exclude_homo_edges(
-                reverse_edges, edges, assume_int32_value
+                reverse_edges, edges, assume_num_node_within_int32
             )
             return calling_class(*_slice_subgraph(self, index))
         else:
@@ -181,7 +183,9 @@ class SampledSubgraph:
                     original_column_node_ids,
                 )
                 index[etype] = _exclude_homo_edges(
-                    reverse_edges, edges.get(etype), assume_int32_value
+                    reverse_edges,
+                    edges.get(etype),
+                    assume_num_node_within_int32,
                 )
             return calling_class(*_slice_subgraph(self, index))
 
@@ -202,9 +206,9 @@ def _relabel_two_arrays(lhs_array, rhs_array):
     return mapping[: lhs_array.numel()], mapping[lhs_array.numel() :]
 
 
-def _exclude_homo_edges(edges, edges_to_exclude, assume_int32_value):
+def _exclude_homo_edges(edges, edges_to_exclude, assume_num_node_within_int32):
     """Return the indices of edges that are not in edges_to_exclude."""
-    if assume_int32_value:
+    if assume_num_node_within_int32:
         val = edges[0] << 32 | edges[1]
         val_to_exclude = edges_to_exclude[0] << 32 | edges_to_exclude[1]
     else:

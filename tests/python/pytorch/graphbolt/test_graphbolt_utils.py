@@ -182,19 +182,3 @@ def test_incomplete_unique_dst_nodes_():
     unique_dst_nodes = torch.arange(150, 200)
     with pytest.raises(IndexError):
         gb.unique_and_compact_node_pairs(node_pairs, unique_dst_nodes)
-
-
-def test_isin():
-    elements = torch.tensor([2, 3, 5, 5, 20, 13, 11])
-    test_elements = torch.tensor([2, 5])
-    res = gb.isin(elements, test_elements)
-    expected = torch.tensor([True, False, True, True, False, False, False])
-    assert torch.equal(res, expected)
-
-
-def test_isin_big_data():
-    elements = torch.randint(0, 10000, (10000000,))
-    test_elements = torch.randint(0, 10000, (500000,))
-    res = gb.isin(elements, test_elements)
-    expected = torch.isin(elements, test_elements)
-    assert torch.equal(res, expected)

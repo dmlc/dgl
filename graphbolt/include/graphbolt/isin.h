@@ -1,7 +1,7 @@
 /**
  *  Copyright (c) 2023 by Contributors
  *
- * @file isin.h
+ * @file graphbolt/isin.h
  * @brief isin op.
  */
 #ifndef GRAPHBOLT_ISIN_H_
@@ -11,6 +11,7 @@
 
 namespace graphbolt {
 namespace sampling {
+
 /**
  * @brief Tests if each element of elements is in test_elements. Returns a
  * boolean tensor of the same shape as elements that is True for elements
