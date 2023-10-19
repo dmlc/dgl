@@ -88,7 +88,10 @@ def random_homo_graphbolt_graph(
     np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
 
     # Generate random node-feats.
-    node_feats = np.random.rand(num_nodes, num_classes)
+    if num_classes == 1:
+        node_feats = np.random.rand(num_nodes)
+    else:
+        node_feats = np.random.rand(num_nodes, num_classes)
     node_feat_path = os.path.join("data", "node-feat.npy")
     np.save(os.path.join(test_dir, node_feat_path), node_feats)
 

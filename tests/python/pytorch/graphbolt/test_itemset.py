@@ -312,8 +312,14 @@ def test_ItemSetDict_length():
             "item": gb.ItemSet(InvalidLength()),
         }
     )
-    with pytest.raises(TypeError):
+    with pytest.raises(
+        TypeError, match="ItemSet instance doesn't have valid length."
+    ):
         _ = len(item_set)
+    with pytest.raises(
+        TypeError, match="ItemSetDict instance doesn't support indexing."
+    ):
+        _ = item_set[0]
 
     # Tuple of iterables with invalid length.
     item_set = gb.ItemSetDict(
@@ -322,8 +328,14 @@ def test_ItemSetDict_length():
             "user:follow:user": gb.ItemSet((InvalidLength(), InvalidLength())),
         }
     )
-    with pytest.raises(TypeError):
+    with pytest.raises(
+        TypeError, match="ItemSet instance doesn't have valid length."
+    ):
         _ = len(item_set)
+    with pytest.raises(
+        TypeError, match="ItemSetDict instance doesn't support indexing."
+    ):
+        _ = item_set[0]
 
 
 def test_ItemSetDict_iteration_seed_nodes():
@@ -339,11 +351,48 @@ def test_ItemSetDict_iteration_seed_nodes():
         chained_ids += [(key, v) for v in value]
     item_set = gb.ItemSetDict(ids)
     assert item_set.names == ("seed_nodes",)
+    # Iterating over ItemSetDict and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
         assert chained_ids[i][0] in item
         assert item[chained_ids[i][0]] == chained_ids[i][1]
+        assert item_set[i] == item
+        assert item_set[i - len(item_set)] == item
+    # Indexing all with a slice.
+    assert torch.equal(item_set[:]["user"], user_ids)
+    assert torch.equal(item_set[:]["item"], item_ids)
+    # Indexing partial with a slice.
+    partial_data = item_set[:3]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["user"], user_ids[:3])
+    partial_data = item_set[7:]
+    assert len(list(partial_data.keys())) == 1
+    assert torch.equal(partial_data["item"], item_ids[2:])
+    partial_data = item_set[3:7]
+    assert len(list(partial_data.keys())) == 2
+    assert torch.equal(partial_data["user"], user_ids[3:5])
+    assert torch.equal(partial_data["item"], item_ids[:2])
+
+    # Exception cases.
+    with pytest.raises(AssertionError, match="Step must be 1."):
+        _ = item_set[::2]
+    with pytest.raises(
+        AssertionError, match="Start must be smaller than stop."
+    ):
+        _ = item_set[5:3]
+    with pytest.raises(
+        AssertionError, match="Start must be smaller than stop."
+    ):
+        _ = item_set[-1:3]
+    with pytest.raises(IndexError, match="ItemSetDict index out of range."):
+        _ = item_set[20]
+    with pytest.raises(IndexError, match="ItemSetDict index out of range."):
+        _ = item_set[-20]
+    with pytest.raises(
+        TypeError, match="ItemSetDict indices must be int or slice."
+    ):
+        _ = item_set[torch.arange(3)]
 
 
 def test_ItemSetDict_iteration_seed_nodes_labels():
@@ -365,11 +414,18 @@ def test_ItemSetDict_iteration_seed_nodes_labels():
         chained_ids += [(key, v) for v in value]
     item_set = gb.ItemSetDict(ids_labels)
     assert item_set.names == ("seed_nodes", "labels")
+    # Iterating over ItemSetDict and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
         assert chained_ids[i][0] in item
         assert item[chained_ids[i][0]] == chained_ids[i][1]
+        assert item_set[i] == item
+    # Indexing with a slice.
+    assert torch.equal(item_set[:]["user"][0], user_ids)
+    assert torch.equal(item_set[:]["user"][1], user_labels)
+    assert torch.equal(item_set[:]["item"][0], item_ids)
+    assert torch.equal(item_set[:]["item"][1], item_labels)
 
 
 def test_ItemSetDict_iteration_node_pairs():
@@ -384,11 +440,18 @@ def test_ItemSetDict_iteration_node_pairs():
         expected_data += [(key, v) for v in value]
     item_set = gb.ItemSetDict(node_pairs_dict)
     assert item_set.names == ("node_pairs",)
+    # Iterating over ItemSetDict and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
         assert expected_data[i][0] in item
         assert torch.equal(item[expected_data[i][0]], expected_data[i][1])
+        assert item_set[i].keys() == item.keys()
+        key = list(item.keys())[0]
+        assert torch.equal(item_set[i][key], item[key])
+    # Indexing with a slice.
+    assert torch.equal(item_set[:]["user:like:item"], node_pairs)
+    assert torch.equal(item_set[:]["user:follow:user"], node_pairs)
 
 
 def test_ItemSetDict_iteration_node_pairs_labels():
@@ -408,6 +471,7 @@ def test_ItemSetDict_iteration_node_pairs_labels():
         expected_data += [(key, v) for v in value]
     item_set = gb.ItemSetDict(node_pairs_labels)
     assert item_set.names == ("node_pairs", "labels")
+    # Iterating over ItemSetDict and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -415,6 +479,15 @@ def test_ItemSetDict_iteration_node_pairs_labels():
         assert key in item
         assert torch.equal(item[key][0], value[0])
         assert item[key][1] == value[1]
+        assert item_set[i].keys() == item.keys()
+        key = list(item.keys())[0]
+        assert torch.equal(item_set[i][key][0], item[key][0])
+        assert torch.equal(item_set[i][key][1], item[key][1])
+    # Indexing with a slice.
+    assert torch.equal(item_set[:]["user:like:item"][0], node_pairs)
+    assert torch.equal(item_set[:]["user:like:item"][1], labels)
+    assert torch.equal(item_set[:]["user:follow:user"][0], node_pairs)
+    assert torch.equal(item_set[:]["user:follow:user"][1], labels)
 
 
 def test_ItemSetDict_iteration_node_pairs_neg_dsts():
@@ -434,6 +507,7 @@ def test_ItemSetDict_iteration_node_pairs_neg_dsts():
         expected_data += [(key, v) for v in value]
     item_set = gb.ItemSetDict(node_pairs_neg_dsts)
     assert item_set.names == ("node_pairs", "negative_dsts")
+    # Iterating over ItemSetDict and indexing one by one.
     for i, item in enumerate(item_set):
         assert len(item) == 1
         assert isinstance(item, dict)
@@ -441,3 +515,12 @@ def test_ItemSetDict_iteration_node_pairs_neg_dsts():
         assert key in item
         assert torch.equal(item[key][0], value[0])
         assert torch.equal(item[key][1], value[1])
+        assert item_set[i].keys() == item.keys()
+        key = list(item.keys())[0]
+        assert torch.equal(item_set[i][key][0], item[key][0])
+        assert torch.equal(item_set[i][key][1], item[key][1])
+    # Indexing with a slice.
+    assert torch.equal(item_set[:]["user:like:item"][0], node_pairs)
+    assert torch.equal(item_set[:]["user:like:item"][1], neg_dsts)
+    assert torch.equal(item_set[:]["user:follow:user"][0], node_pairs)
+    assert torch.equal(item_set[:]["user:follow:user"][1], neg_dsts)

@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 import torch
+from numpy.lib.format import read_array_header_1_0, read_array_header_2_0
 
 
 def _read_torch_data(path):
@@ -57,3 +58,23 @@ def save_data(data, path, fmt):
             )
             data = data.contiguous()
         torch.save(data, path)
+
+
+def get_npy_dim(npy_path):
+    """Get the dim of numpy file."""
+    with open(npy_path, "rb") as f:
+        # For the read_array_header API provided by numpy will only read the
+        # length of the header, it will cause parsing failure and error if
+        # first 8 bytes which contains magin string and version are not read
+        # ahead of time. So, we need to make sure we have skipped these 8
+        # bytes.
+        f.seek(8, 0)
+        try:
+            shape, _, _ = read_array_header_1_0(f)
+        except ValueError:
+            try:
+                shape, _, _ = read_array_header_2_0(f)
+            except ValueError:
+                raise ValueError("Invalid file format")
+
+        return len(shape)
