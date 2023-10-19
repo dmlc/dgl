@@ -825,14 +825,17 @@ def from_dglgraph(
     include_original_edge_id: bool = False,
 ) -> CSCSamplingGraph:
     """Convert a DGLGraph to CSCSamplingGraph."""
+
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
-    # Initialize metadata.
-    node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
-    edge_type_to_id = {
-        etype_tuple_to_str(etype): g.get_etype_id(etype)
-        for etype in g.canonical_etypes
-    }
-    metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
+
+    if not is_homogeneous:
+        # Initialize metadata.
+        node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
+        edge_type_to_id = {
+            etype_tuple_to_str(etype): g.get_etype_id(etype)
+            for etype in g.canonical_etypes
+        }
+        metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
 
     # Obtain CSC matrix.
     indptr, indices, edge_ids = homo_g.adj_tensors("csc")
@@ -855,5 +858,5 @@ def from_dglgraph(
             type_per_edge,
             edge_attributes,
         ),
-        metadata,
+        None if is_homogeneous else metadata,
     )
