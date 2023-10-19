@@ -3684,12 +3684,13 @@ def lap_pe(g, k, padding=False, return_eigval=False):
     if k + 1 < n - 1:
         # Use scipy if k + 1 < n - 1 for memory efficiency.
         EigVal, EigVec = scipy.sparse.linalg.eigs(
-            L, k=k + 1, which="SR", tol=1e-2
+            L, k=k + 1, which="SR", ncv=4 * k, tol=1e-2
         )
+        max_freqs = k
         topk_indices = EigVal.argsort()[1:]
         # Since scipy may return complex value, to avoid crashing in NN code,
         # convert them to real number.
-        topk_eigvals = EigVal[topk_indices].real
+        topk_EigVal = EigVal[topk_indices].real
         topk_EigVec = EigVec[:, topk_indices].real
     else:
         # Fallback to numpy since scipy.sparse do not support this case.
