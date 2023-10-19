@@ -1321,8 +1321,7 @@ def test_from_dglgraph_homogeneous():
     assert gb_g.total_num_edges == dgl_g.num_edges()
     assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 1000]))
     assert gb_g.type_per_edge is None
-    assert gb_g.metadata.node_type_to_id == {"_N": 0}
-    assert gb_g.metadata.edge_type_to_id == {"_N:_E:_N": 0}
+    assert gb_g.metadata is None
 
 
 @unittest.skipIf(
