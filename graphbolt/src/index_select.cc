@@ -17,7 +17,7 @@ torch::Tensor IndexSelect(torch::Tensor input, torch::Tensor index) {
         c10::DeviceType::CUDA, "UVAIndexSelect",
         { return UVAIndexSelectImpl(input, index); });
   }
-  return torch::index_select(input, 0, index);
+  return input.index({index});
 }
 
 }  // namespace ops
