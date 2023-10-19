@@ -108,7 +108,8 @@ def create_dataloader(
     # Initialize a feature fetcher for fetching features of the sampled
     # subgraphs.
     ############################################################################
-    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    if not is_infer:
+        datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
     # [Step-4]:
@@ -176,37 +177,25 @@ class SAGE(nn.Module):
             args, graph, features, all_nodes_set, is_train=False, is_infer=True
         )
 
-        feat = [] # features.read("node", None, "feat")
+        feat = features.read("node", None, "feat")
 
         for layer_idx, layer in enumerate(self.layers):
             print(f"Layer: {layer_idx}")
-            is_first_layer = layer_idx == 0
             is_last_layer = layer_idx == len(self.layers) - 1
             y = torch.empty(
                 graph.total_num_nodes,
                 self.out_size if is_last_layer else self.hidden_size,
                 dtype=torch.float64,
             )
-            # features = features.to(args.device)
 
             for step, data in enumerate(dataloader):
                 if step % 1000 == 0:
                     print(f"now on step {step}")
-                x = (
-                    data.node_features["feat"]
-                    if is_first_layer
-                    else feat[data.input_nodes]
-                )
+                x = feat[data.input_nodes]
                 hidden_x = layer(data.blocks[0], x)
-                # import pdb ; pdb.set_trace()
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
-                # if is_first_layer:
-                #     feat.append(hidden_x)
-                # else:
-                #     feat[step] = hidden_x
-
                 # By design, our output nodes are contiguous.
                 y[data.output_nodes[0] : data.output_nodes[-1] + 1] = hidden_x
             feat = y
@@ -361,6 +350,7 @@ def main(args):
         num_classes,
     )
     print(f"Test Accuracy is {test_acc.item():.4f}")
+    input()
 
     # Model training.
     print("Training...")
@@ -376,7 +366,7 @@ def main(args):
         graph,
         features,
         test_set,
-        dataset.all_nodes_set,
+        all_nodes_set,
         model,
         num_classes,
     )
