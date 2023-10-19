@@ -210,7 +210,12 @@ def layerwise_infer(
     pred = model.inference(args, graph, features, all_nodes_set)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
-    return MF.accuracy(pred, label, task="multiclass", num_classes=num_classes)
+    return MF.accuracy(
+        pred.squeeze(),
+        label.squeeze(),
+        task="multiclass",
+        num_classes=num_classes,
+    )
 
 
 @torch.no_grad()
@@ -339,18 +344,18 @@ def main(args):
 
     model = SAGE(in_size, hidden_size, out_size)
 
-    print("Debugging...")
-    test_acc = layerwise_infer(
-        args,
-        graph,
-        features,
-        test_set,
-        all_nodes_set,
-        model,
-        num_classes,
-    )
-    print(f"Test Accuracy is {test_acc.item():.4f}")
-    input()
+    # print("Debugging...")
+    # test_acc = layerwise_infer(
+    #     args,
+    #     graph,
+    #     features,
+    #     test_set,
+    #     all_nodes_set,
+    #     model,
+    #     num_classes,
+    # )
+    # print(f"Test Accuracy is {test_acc.item():.4f}")
+    # input()
 
     # Model training.
     print("Training...")
