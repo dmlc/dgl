@@ -277,12 +277,13 @@ class CSCSamplingGraph(SamplingGraph):
         # TODO: change the result to 'SampledSubgraphImpl'.
         return self._c_csc_graph.in_subgraph(nodes)
 
-    def _convert_to_sampled_subgraph(
+    def _generate_sampled_subgraph_node_pairs_and_eids(
         self,
         C_sampled_subgraph: torch.ScriptObject,
     ):
-        """An internal function used to convert a fused homogeneous sampled
-        subgraph to general struct 'SampledSubgraphImpl'."""
+        """An internal function used to generate node pairs and eids of
+        structure `SampledSubgraphImpl` from a fused homogeneous sampled
+        subgraph."""
         column_num = (
             C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
         )
@@ -326,7 +327,7 @@ class CSCSamplingGraph(SamplingGraph):
             node_pairs=node_pairs, original_edge_ids=original_edge_ids
         )
 
-    def _convert_to_all_sampled_subgraph(
+    def _convert_to_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
     ):
@@ -457,9 +458,9 @@ class CSCSamplingGraph(SamplingGraph):
             nodes, fanouts, replace, probs_name
         )
         if deduplicate:
-            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+            return self._generate_sampled_subgraph_node_pairs_and_eids(C_sampled_subgraph)
         else:
-            return self._convert_to_all_sampled_subgraph(C_sampled_subgraph)
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
