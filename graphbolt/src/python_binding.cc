@@ -5,6 +5,7 @@
  */
 
 #include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/isin.h>
 #include <graphbolt/serialize.h>
 #include <graphbolt/unique_and_compact.h>
 
@@ -31,6 +32,11 @@ TORCH_LIBRARY(graphbolt, m) {
       .def("node_type_offset", &CSCSamplingGraph::NodeTypeOffset)
       .def("type_per_edge", &CSCSamplingGraph::TypePerEdge)
       .def("edge_attributes", &CSCSamplingGraph::EdgeAttributes)
+      .def("set_csc_indptr", &CSCSamplingGraph::SetCSCIndptr)
+      .def("set_indices", &CSCSamplingGraph::SetIndices)
+      .def("set_node_type_offset", &CSCSamplingGraph::SetNodeTypeOffset)
+      .def("set_type_per_edge", &CSCSamplingGraph::SetTypePerEdge)
+      .def("set_edge_attributes", &CSCSamplingGraph::SetEdgeAttributes)
       .def("in_subgraph", &CSCSamplingGraph::InSubgraph)
       .def("sample_neighbors", &CSCSamplingGraph::SampleNeighbors)
       .def(
@@ -56,6 +62,7 @@ TORCH_LIBRARY(graphbolt, m) {
   m.def("save_csc_sampling_graph", &SaveCSCSamplingGraph);
   m.def("load_from_shared_memory", &CSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
+  m.def("isin", &IsIn);
 }
 
 }  // namespace sampling

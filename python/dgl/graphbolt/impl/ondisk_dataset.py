@@ -11,6 +11,7 @@ import yaml
 
 import dgl
 
+from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
@@ -498,13 +499,16 @@ class OnDiskDataset(Dataset):
 
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
         if graph is None:
+            dgl_warning(
+                "`all_node_set` is returned as None, since graph is None."
+            )
             return None
         num_nodes = graph.num_nodes
         if isinstance(num_nodes, int):
-            return ItemSet(num_nodes)
+            return ItemSet(num_nodes, names="seed_nodes")
         else:
             data = {
-                node_type: ItemSet(num_node)
+                node_type: ItemSet(num_node, names="seed_nodes")
                 for node_type, num_node in num_nodes.items()
             }
             return ItemSetDict(data)

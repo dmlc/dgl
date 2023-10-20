@@ -1321,8 +1321,7 @@ def test_from_dglgraph_homogeneous():
     assert gb_g.total_num_edges == dgl_g.num_edges()
     assert torch.equal(gb_g.node_type_offset, torch.tensor([0, 1000]))
     assert gb_g.type_per_edge is None
-    assert gb_g.metadata.node_type_to_id == {"_N": 0}
-    assert gb_g.metadata.edge_type_to_id == {"_N:_E:_N": 0}
+    assert gb_g.metadata is None
 
 
 @unittest.skipIf(
@@ -1605,3 +1604,56 @@ def test_sample_neighbors_hetero_pick_number(
             else:
                 # Etype 2: 0 valid neighbors.
                 assert pairs[0].size(0) == 0
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="`to` function needs GPU to test.",
+)
+def test_csc_sampling_graph_to_device():
+    # Initialize data.
+    total_num_nodes = 10
+    total_num_edges = 9
+    ntypes = {"N0": 0, "N1": 1, "N2": 2, "N3": 3}
+    etypes = {
+        "N0:R0:N1": 0,
+        "N0:R1:N2": 1,
+        "N0:R2:N3": 2,
+    }
+    metadata = gb.GraphMetadata(ntypes, etypes)
+    indptr = torch.LongTensor([0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9])
+    indices = torch.LongTensor([1, 2, 3, 4, 5, 6, 7, 8, 9])
+    node_type_offset = torch.LongTensor([0, 1, 4, 7, 10])
+    type_per_edge = torch.LongTensor([0, 0, 0, 1, 1, 1, 2, 2, 2])
+    assert indptr[-1] == total_num_edges
+    assert indptr[-1] == len(indices)
+    assert node_type_offset[-1] == total_num_nodes
+    assert all(type_per_edge < len(etypes))
+
+    edge_attributes = {
+        "mask": torch.BoolTensor([1, 1, 0, 1, 1, 1, 0, 0, 0]),
+        "all": torch.BoolTensor([1, 1, 1, 1, 1, 1, 1, 1, 1]),
+        "zero": torch.BoolTensor([0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    }
+
+    # Construct CSCSamplingGraph.
+    graph = gb.from_csc(
+        indptr,
+        indices,
+        edge_attributes=edge_attributes,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        metadata=metadata,
+    )
+
+    # Copy to device.
+    graph = graph.to("cuda")
+
+    # Check.
+    assert graph.csc_indptr.device.type == "cuda"
+    assert graph.indices.device.type == "cuda"
+    assert graph.node_type_offset.device.type == "cuda"
+    assert graph.type_per_edge.device.type == "cuda"
+    assert graph.csc_indptr.device.type == "cuda"
+    for key in graph.edge_attributes:
+        assert graph.edge_attributes[key].device.type == "cuda"

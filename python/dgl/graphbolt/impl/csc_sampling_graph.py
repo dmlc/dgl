@@ -8,6 +8,8 @@ from typing import Dict, Optional, Union
 
 import torch
 
+from dgl.utils import recursive_apply
+
 from ...base import EID, ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
@@ -181,6 +183,11 @@ class CSCSamplingGraph(SamplingGraph):
         """
         return self._c_csc_graph.csc_indptr()
 
+    @csc_indptr.setter
+    def csc_indptr(self, csc_indptr: torch.tensor) -> None:
+        """Sets the indices pointer in the CSC graph."""
+        self._c_csc_graph.set_csc_indptr(csc_indptr)
+
     @property
     def indices(self) -> torch.tensor:
         """Returns the indices in the CSC graph.
@@ -197,6 +204,11 @@ class CSCSamplingGraph(SamplingGraph):
         ids.
         """
         return self._c_csc_graph.indices()
+
+    @indices.setter
+    def indices(self, indices: torch.tensor) -> None:
+        """Sets the indices in the CSC graph."""
+        self._c_csc_graph.set_indices(indices)
 
     @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
@@ -215,6 +227,13 @@ class CSCSamplingGraph(SamplingGraph):
         """
         return self._c_csc_graph.node_type_offset()
 
+    @node_type_offset.setter
+    def node_type_offset(
+        self, node_type_offset: Optional[torch.Tensor]
+    ) -> None:
+        """Sets the node type offset tensor if present."""
+        self._c_csc_graph.set_node_type_offset(node_type_offset)
+
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
         """Returns the edge type tensor if present.
@@ -226,6 +245,11 @@ class CSCSamplingGraph(SamplingGraph):
             containing the type of each edge in the graph.
         """
         return self._c_csc_graph.type_per_edge()
+
+    @type_per_edge.setter
+    def type_per_edge(self, type_per_edge: Optional[torch.Tensor]) -> None:
+        """Sets the edge type tensor if present."""
+        self._c_csc_graph.set_type_per_edge(type_per_edge)
 
     @property
     def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
@@ -240,6 +264,13 @@ class CSCSamplingGraph(SamplingGraph):
             should match the total number of edges."
         """
         return self._c_csc_graph.edge_attributes()
+
+    @edge_attributes.setter
+    def edge_attributes(
+        self, edge_attributes: Optional[Dict[str, torch.Tensor]]
+    ) -> None:
+        """Sets the edge attributes dictionary."""
+        self._c_csc_graph.set_edge_attributes(edge_attributes)
 
     @property
     def metadata(self) -> Optional[GraphMetadata]:
@@ -498,12 +529,17 @@ class CSCSamplingGraph(SamplingGraph):
         """
         # Ensure nodes is 1-D tensor.
         self._check_sampler_arguments(nodes, fanouts, probs_name)
-        has_origin_eids = (
+        has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, False, has_origin_eids, probs_name
+            nodes,
+            fanouts.tolist(),
+            replace,
+            False,
+            has_original_eids,
+            probs_name,
         )
 
     def sample_layer_neighbors(
@@ -669,6 +705,28 @@ class CSCSamplingGraph(SamplingGraph):
             self._metadata,
         )
 
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy `CSCSamplingGraph` to the specified device."""
+
+        def _to(x, device):
+            return x.to(device) if hasattr(x, "to") else x
+
+        self.csc_indptr = recursive_apply(
+            self.csc_indptr, lambda x: _to(x, device)
+        )
+        self.indices = recursive_apply(self.indices, lambda x: _to(x, device))
+        self.node_type_offset = recursive_apply(
+            self.node_type_offset, lambda x: _to(x, device)
+        )
+        self.type_per_edge = recursive_apply(
+            self.type_per_edge, lambda x: _to(x, device)
+        )
+        self.edge_attributes = recursive_apply(
+            self.edge_attributes, lambda x: _to(x, device)
+        )
+
+        return self
+
 
 def from_csc(
     csc_indptr: torch.Tensor,
@@ -825,14 +883,19 @@ def from_dglgraph(
     include_original_edge_id: bool = False,
 ) -> CSCSamplingGraph:
     """Convert a DGLGraph to CSCSamplingGraph."""
+
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
-    # Initialize metadata.
-    node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
-    edge_type_to_id = {
-        etype_tuple_to_str(etype): g.get_etype_id(etype)
-        for etype in g.canonical_etypes
-    }
-    metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
+
+    if is_homogeneous:
+        metadata = None
+    else:
+        # Initialize metadata.
+        node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
+        edge_type_to_id = {
+            etype_tuple_to_str(etype): g.get_etype_id(etype)
+            for etype in g.canonical_etypes
+        }
+        metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
 
     # Obtain CSC matrix.
     indptr, indices, edge_ids = homo_g.adj_tensors("csc")
