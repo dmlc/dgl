@@ -500,8 +500,7 @@ class OnDiskDataset(Dataset):
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
         if graph is None:
             dgl_warning(
-                "Initializing `all_nodes_set` with a graph whose type does "
-                "not belong to SamplingGraph"
+                "`all_node_set` is returned as None, since graph is None."
             )
             return None
         num_nodes = graph.num_nodes
