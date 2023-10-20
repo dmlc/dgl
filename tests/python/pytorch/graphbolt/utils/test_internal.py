@@ -97,3 +97,47 @@ def test_get_npy_dim(fmt):
             with pytest.raises(ValueError):
                 utils.get_npy_dim(file_name)
         data = None
+
+
+@pytest.mark.parametrize(
+    "data_fmt, save_fmt, is_feature",
+    [
+        ("numpy", "torch", False),
+        ("numpy", "torch", True),
+        ("torch", "torch", True),
+        ("torch", "torch", False),
+        ("torch", "numpy", True),
+        ("torch", "numpy", False),
+        ("numpy", "numpy", True),
+        ("numpy", "numpy", False),
+    ],
+)
+def test_copy_or_convert_data(data_fmt, save_fmt, is_feature):
+    with tempfile.TemporaryDirectory() as test_dir:
+        data = np.arange(10)
+        tensor_data = torch.from_numpy(data)
+        in_type_name = "npy" if data_fmt == "numpy" else "pt"
+        input_path = os.path.join(test_dir, f"data.{in_type_name}")
+        out_type_name = "npy" if save_fmt == "numpy" else "pt"
+        output_path = os.path.join(test_dir, f"out_data.{out_type_name}")
+        if data_fmt == "numpy":
+            np.save(input_path, data)
+        else:
+            torch.save(tensor_data, input_path)
+        utils.copy_or_convert_data(
+            input_path, output_path, data_fmt, save_fmt, is_feature=is_feature
+        )
+        if save_fmt == "numpy":
+            out_data = np.load(output_path)
+        else:
+            out_data = torch.load(output_path)
+        if is_feature:
+            data = data.reshape(-1, 1)
+            tensor_data = tensor_data.reshape(-1, 1)
+        if save_fmt == "numpy":
+            assert (data == out_data).all()
+        else:
+            assert torch.equal(tensor_data, out_data)
+        data = None
+        tensor_data = None
+        out_data = None

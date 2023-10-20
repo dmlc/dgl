@@ -1878,7 +1878,9 @@ def test_OnDiskDataset_load_1D_feature():
         np.save(os.path.join(test_dir, train_path), torch.tensor([0, 1, 0]))
         dataset = gb.OnDiskDataset(test_dir).load()
         feature = dataset.feature.read("node", None, "feat")
+        # Test whether feature has changed.
         assert torch.equal(torch.from_numpy(node_feat.reshape(-1, 1)), feature)
+        # Test whether itemsets keep same.
         assert torch.equal(
             dataset.tasks[0].train_set._items[0], torch.tensor([0, 1, 0])
         )
