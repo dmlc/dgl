@@ -1879,7 +1879,9 @@ def test_OnDiskDataset_load_1D_feature():
         dataset = gb.OnDiskDataset(test_dir).load()
         feature = dataset.feature.read("node", None, "feat")
         assert torch.equal(torch.from_numpy(node_feat.reshape(-1, 1)), feature)
-        assert torch.equal(dataset.tasks[0].train_set._items[0], torch.tensor([0, 1, 0]))
+        assert torch.equal(
+            dataset.tasks[0].train_set._items[0], torch.tensor([0, 1, 0])
+        )
         dataset = None
         node_feat = None
         feature = None
