@@ -4,6 +4,8 @@ from typing import Dict, Tuple, Union
 
 import torch
 
+from dgl.utils import recursive_apply
+
 from .base import etype_str_to_tuple, isin
 
 
@@ -188,6 +190,25 @@ class SampledSubgraph:
                     assume_num_node_within_int32,
                 )
             return calling_class(*_slice_subgraph(self, index))
+
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy `SampledSubgraph` to the specified device using reflection."""
+
+        def _to(x, device):
+            return x.to(device) if hasattr(x, "to") else x
+
+        for attr in dir(self):
+            # Only copy member variables.
+            if not callable(getattr(self, attr)) and not attr.startswith("__"):
+                setattr(
+                    self,
+                    attr,
+                    recursive_apply(
+                        getattr(self, attr), lambda x: _to(x, device)
+                    ),
+                )
+
+        return self
 
 
 def _to_reverse_ids(node_pair, original_row_node_ids, original_column_node_ids):
