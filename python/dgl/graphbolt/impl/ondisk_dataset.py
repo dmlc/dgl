@@ -40,13 +40,14 @@ def _copy_or_convert_data(
     input_format,
     output_format="numpy",
     in_memory=True,
+    is_feature=False,
 ):
     """Copy or convert the data from input_path to output_path."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     # If the original format is numpy, just copy the file.
     if input_format == "numpy":
         # If dim of the data is 1, reshape it to n * 1 and save it to output_path.
-        if get_npy_dim(input_path) == 1:
+        if is_feature and get_npy_dim(input_path) == 1:
             data = read_data(input_path, input_format, in_memory)
             data = data.reshape(-1, 1)
             save_data(data, output_path, output_format)
@@ -55,7 +56,7 @@ def _copy_or_convert_data(
     else:
         # If the original format is not numpy, convert it to numpy.
         data = read_data(input_path, input_format, in_memory)
-        if data.dim() == 1:
+        if is_feature and data.dim() == 1:
             data = data.reshape(-1, 1)
         save_data(data, output_path, output_format)
 
@@ -199,6 +200,7 @@ def preprocess_ondisk_dataset(
                 feature["format"],
                 out_feature["format"],
                 feature["in_memory"],
+                is_feature=True,
             )
 
     # 7. Save tasks and train/val/test split according to the output_config.

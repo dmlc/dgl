@@ -1853,8 +1853,8 @@ def test_OnDiskDataset_load_1D_feature():
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
         dataset_name = "graphbolt_test"
-        num_nodes = 4000
-        num_edges = 20000
+        num_nodes = 4
+        num_edges = 20
         num_classes = 1
 
         # Generate random graph.
@@ -1874,10 +1874,12 @@ def test_OnDiskDataset_load_1D_feature():
         node_feat = np.load(
             os.path.join(test_dir, input_config["feature_data"][0]["path"])
         )
+        train_path = os.path.join("set", "train.npy")
+        np.save(os.path.join(test_dir, train_path), torch.tensor([0, 1, 0]))
         dataset = gb.OnDiskDataset(test_dir).load()
         feature = dataset.feature.read("node", None, "feat")
         assert torch.equal(torch.from_numpy(node_feat.reshape(-1, 1)), feature)
-
+        assert torch.equal(dataset.tasks[0].train_set._items[0], torch.tensor([0, 1, 0]))
         dataset = None
         node_feat = None
         feature = None
