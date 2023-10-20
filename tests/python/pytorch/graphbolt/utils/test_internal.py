@@ -99,19 +99,9 @@ def test_get_npy_dim(fmt):
         data = None
 
 
-@pytest.mark.parametrize(
-    "data_fmt, save_fmt, is_feature",
-    [
-        ("numpy", "torch", False),
-        ("numpy", "torch", True),
-        ("torch", "torch", True),
-        ("torch", "torch", False),
-        ("torch", "numpy", True),
-        ("torch", "numpy", False),
-        ("numpy", "numpy", True),
-        ("numpy", "numpy", False),
-    ],
-)
+@pytest.mark.parametrize("data_fmt", ["numpy", "torch"])
+@pytest.mark.parametrize("save_fmt", ["numpy", "torch"])
+@pytest.mark.parametrize("is_feature", [True, False])
 def test_copy_or_convert_data(data_fmt, save_fmt, is_feature):
     with tempfile.TemporaryDirectory() as test_dir:
         data = np.arange(10)
