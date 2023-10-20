@@ -11,12 +11,13 @@ import yaml
 
 import dgl
 
+from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from ..utils import read_data, save_data
+from ..utils import get_npy_dim, read_data, save_data
 from .csc_sampling_graph import (
     CSCSamplingGraph,
     from_dglgraph,
@@ -43,12 +44,20 @@ def _copy_or_convert_data(
 ):
     """Copy or convert the data from input_path to output_path."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    # If the original format is numpy, just copy the file.
     if input_format == "numpy":
-        # If the original format is numpy, just copy the file.
-        shutil.copyfile(input_path, output_path)
+        # If dim of the data is 1, reshape it to n * 1 and save it to output_path.
+        if get_npy_dim(input_path) == 1:
+            data = read_data(input_path, input_format, in_memory)
+            data = data.reshape(-1, 1)
+            save_data(data, output_path, output_format)
+        else:
+            shutil.copyfile(input_path, output_path)
     else:
         # If the original format is not numpy, convert it to numpy.
         data = read_data(input_path, input_format, in_memory)
+        if data.dim() == 1:
+            data = data.reshape(-1, 1)
         save_data(data, output_path, output_format)
 
 
@@ -490,13 +499,16 @@ class OnDiskDataset(Dataset):
 
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
         if graph is None:
+            dgl_warning(
+                "`all_node_set` is returned as None, since graph is None."
+            )
             return None
         num_nodes = graph.num_nodes
         if isinstance(num_nodes, int):
-            return ItemSet(num_nodes)
+            return ItemSet(num_nodes, names="seed_nodes")
         else:
             data = {
-                node_type: ItemSet(num_node)
+                node_type: ItemSet(num_node, names="seed_nodes")
                 for node_type, num_node in num_nodes.items()
             }
             return ItemSetDict(data)

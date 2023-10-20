@@ -1806,6 +1806,7 @@ def test_OnDiskDataset_all_nodes_set_homo():
         dataset = gb.OnDiskDataset(test_dir).load()
         all_nodes_set = dataset.all_nodes_set
         assert isinstance(all_nodes_set, gb.ItemSet)
+        assert all_nodes_set.names == ("seed_nodes",)
         for i, item in enumerate(all_nodes_set):
             assert i == item
 
@@ -1842,11 +1843,46 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         dataset = gb.OnDiskDataset(test_dir).load()
         all_nodes_set = dataset.all_nodes_set
         assert isinstance(all_nodes_set, gb.ItemSetDict)
+        assert all_nodes_set.names == ("seed_nodes",)
         for i, item in enumerate(all_nodes_set):
             assert len(item) == 1
             assert isinstance(item, dict)
 
         dataset = None
+
+
+def test_OnDiskDataset_load_1D_feature():
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 1
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        with open(yaml_file, "r") as f:
+            input_config = yaml.safe_load(f)
+        node_feat = np.load(
+            os.path.join(test_dir, input_config["feature_data"][0]["path"])
+        )
+        dataset = gb.OnDiskDataset(test_dir).load()
+        feature = dataset.feature.read("node", None, "feat")
+        assert torch.equal(torch.from_numpy(node_feat.reshape(-1, 1)), feature)
+
+        dataset = None
+        node_feat = None
+        feature = None
 
 
 def test_BuiltinDataset():
@@ -1868,6 +1904,8 @@ def test_BuiltinDataset():
         assert dataset.feature is not None
         assert dataset.tasks is not None
         assert dataset.dataset_name == dataset_name
+
+        dataset = None
 
         # Case 3: dataset is not available.
         dataset_name = "fake_name"

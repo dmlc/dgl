@@ -68,6 +68,67 @@ def test_ItemSampler_minibatcher():
 @pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSet_Iterable_Only(batch_size, shuffle, drop_last):
+    num_ids = 103
+
+    class InvalidLength:
+        def __iter__(self):
+            return iter(torch.arange(0, num_ids))
+
+    seed_nodes = gb.ItemSet(InvalidLength())
+    item_set = gb.ItemSet(seed_nodes, names="seed_nodes")
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    minibatch_ids = []
+    for i, minibatch in enumerate(item_sampler):
+        assert isinstance(minibatch, gb.MiniBatch)
+        assert minibatch.seed_nodes is not None
+        assert minibatch.labels is None
+        is_last = (i + 1) * batch_size >= num_ids
+        if not is_last or num_ids % batch_size == 0:
+            assert len(minibatch.seed_nodes) == batch_size
+        else:
+            if not drop_last:
+                assert len(minibatch.seed_nodes) == num_ids % batch_size
+            else:
+                assert False
+        minibatch_ids.append(minibatch.seed_nodes)
+    minibatch_ids = torch.cat(minibatch_ids)
+    assert torch.all(minibatch_ids[:-1] <= minibatch_ids[1:]) is not shuffle
+
+
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSet_integer(batch_size, shuffle, drop_last):
+    # Node IDs.
+    num_ids = 103
+    item_set = gb.ItemSet(num_ids, names="seed_nodes")
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    minibatch_ids = []
+    for i, minibatch in enumerate(item_sampler):
+        assert isinstance(minibatch, gb.MiniBatch)
+        assert minibatch.seed_nodes is not None
+        assert minibatch.labels is None
+        is_last = (i + 1) * batch_size >= num_ids
+        if not is_last or num_ids % batch_size == 0:
+            assert len(minibatch.seed_nodes) == batch_size
+        else:
+            if not drop_last:
+                assert len(minibatch.seed_nodes) == num_ids % batch_size
+            else:
+                assert False
+        minibatch_ids.append(minibatch.seed_nodes)
+    minibatch_ids = torch.cat(minibatch_ids)
+    assert torch.all(minibatch_ids[:-1] <= minibatch_ids[1:]) is not shuffle
+
+
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
 def test_ItemSet_seed_nodes(batch_size, shuffle, drop_last):
     # Node IDs.
     num_ids = 103
@@ -325,6 +386,52 @@ def test_append_with_other_datapipes():
     for i, (idx, data) in enumerate(data_pipe):
         assert i == idx
         assert len(data) == batch_size
+
+
+@pytest.mark.parametrize("batch_size", [1, 4])
+@pytest.mark.parametrize("shuffle", [True, False])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_ItemSetDict_iterable_only(batch_size, shuffle, drop_last):
+    class IterableOnly:
+        def __init__(self, start, stop):
+            self._start = start
+            self._stop = stop
+
+        def __iter__(self):
+            return iter(torch.arange(self._start, self._stop))
+
+    num_ids = 205
+    ids = {
+        "user": gb.ItemSet(IterableOnly(0, 99), names="seed_nodes"),
+        "item": gb.ItemSet(IterableOnly(99, num_ids), names="seed_nodes"),
+    }
+    chained_ids = []
+    for key, value in ids.items():
+        chained_ids += [(key, v) for v in value]
+    item_set = gb.ItemSetDict(ids)
+    item_sampler = gb.ItemSampler(
+        item_set, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last
+    )
+    minibatch_ids = []
+    for i, minibatch in enumerate(item_sampler):
+        is_last = (i + 1) * batch_size >= num_ids
+        if not is_last or num_ids % batch_size == 0:
+            expected_batch_size = batch_size
+        else:
+            if not drop_last:
+                expected_batch_size = num_ids % batch_size
+            else:
+                assert False
+        assert isinstance(minibatch, gb.MiniBatch)
+        assert minibatch.seed_nodes is not None
+        ids = []
+        for _, v in minibatch.seed_nodes.items():
+            ids.append(v)
+        ids = torch.cat(ids)
+        assert len(ids) == expected_batch_size
+        minibatch_ids.append(ids)
+    minibatch_ids = torch.cat(minibatch_ids)
+    assert torch.all(minibatch_ids[:-1] <= minibatch_ids[1:]) is not shuffle
 
 
 @pytest.mark.parametrize("batch_size", [1, 4])
