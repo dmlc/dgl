@@ -90,6 +90,9 @@ def copy_or_convert_data(
     is_feature=False,
 ):
     """Copy or convert the data from input_path to output_path."""
+    assert (
+        output_format == "numpy"
+    ), "The output format of the data should be numpy."
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     # If the original format is numpy, just copy the file.
     if input_format == "numpy":

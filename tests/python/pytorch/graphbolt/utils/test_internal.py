@@ -114,20 +114,30 @@ def test_copy_or_convert_data(data_fmt, save_fmt, is_feature):
             np.save(input_path, data)
         else:
             torch.save(tensor_data, input_path)
-        utils.copy_or_convert_data(
-            input_path, output_path, data_fmt, save_fmt, is_feature=is_feature
-        )
-        if save_fmt == "numpy":
-            out_data = np.load(output_path)
+        if save_fmt == "torch":
+            with pytest.raises(AssertionError):
+                utils.copy_or_convert_data(
+                    input_path,
+                    output_path,
+                    data_fmt,
+                    save_fmt,
+                    is_feature=is_feature,
+                )
         else:
-            out_data = torch.load(output_path)
+            utils.copy_or_convert_data(
+                input_path,
+                output_path,
+                data_fmt,
+                save_fmt,
+                is_feature=is_feature,
+            )
         if is_feature:
             data = data.reshape(-1, 1)
             tensor_data = tensor_data.reshape(-1, 1)
         if save_fmt == "numpy":
+            out_data = np.load(output_path)
             assert (data == out_data).all()
-        else:
-            assert torch.equal(tensor_data, out_data)
+
         data = None
         tensor_data = None
         out_data = None
