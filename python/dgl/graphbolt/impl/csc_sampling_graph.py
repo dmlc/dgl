@@ -652,7 +652,9 @@ class CSCSamplingGraph(SamplingGraph):
             probs_name,
         )
         if deduplicate:
-            return self._generate_sampled_subgraph_node_pairs_and_eids(C_sampled_subgraph)
+            return self._generate_sampled_subgraph_node_pairs_and_eids(
+                C_sampled_subgraph
+            )
         else:
             return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
