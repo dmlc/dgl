@@ -141,9 +141,11 @@ def test_torch_based_pinned_feature(dtype, idtype):
     b = torch.tensor(
         [[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype
     ).pin_memory()
+    c = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).pin_memory()
 
     feature_a = gb.TorchBasedFeature(a)
     feature_b = gb.TorchBasedFeature(b)
+    feature_c = gb.TorchBasedFeature(c)
 
     assert torch.equal(
         feature_a.read(),
@@ -165,6 +167,13 @@ def test_torch_based_pinned_feature(dtype, idtype):
         torch.tensor([[[4, 5], [6, 7]]], dtype=dtype).cuda(),
     )
     assert feature_b.read(torch.tensor([1], dtype=idtype).cuda()).is_cuda
+
+    assert feature_c.read().is_cuda
+    assert torch.equal(
+        feature_c.read(torch.tensor([0], dtype=idtype)),
+        torch.tensor([[1, 2, 3]], dtype=dtype),
+    )
+    assert not feature_c.read(torch.tensor([0], dtype=idtype)).is_cuda
 
 
 def write_tensor_to_disk(dir, name, t, fmt="torch"):
