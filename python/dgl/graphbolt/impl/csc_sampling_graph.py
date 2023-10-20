@@ -652,9 +652,9 @@ class CSCSamplingGraph(SamplingGraph):
             probs_name,
         )
         if deduplicate:
-            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+            return self._generate_sampled_subgraph_node_pairs_and_eids(C_sampled_subgraph)
         else:
-            return self._convert_to_all_sampled_subgraph(C_sampled_subgraph)
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
