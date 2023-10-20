@@ -1,5 +1,8 @@
 """Graph Bolt DataLoaders"""
 
+import queue
+import threading
+
 import torch.utils.data
 import torchdata.dataloader2.graph as dp_utils
 import torchdata.datapipes as dp
@@ -13,6 +16,7 @@ from .utils import datapipe_graph_to_adjlist
 __all__ = [
     "SingleProcessDataLoader",
     "MultiProcessDataLoader",
+    "ThreadingWrapper",
 ]
 
 
@@ -59,6 +63,46 @@ class MultiprocessingWrapper(dp.iter.IterDataPipe):
 
     def __iter__(self):
         yield from self.dataloader
+
+
+class ThreadingWrapper(dp.iter.IterDataPipe):
+    """Wraps a datapipe with a prefetch thread.
+
+    Parameters
+    ----------
+    datapipe : DataPipe
+        The data pipeline.
+    """
+
+    def __init__(self, datapipe, num_workers=0):
+        self.datapipe = datapipe
+        self.dataloader = torch.utils.data.DataLoader(
+            datapipe,
+            batch_size=None,
+            num_workers=num_workers,
+        )
+
+    def __iter__(self):
+        q = queue.Queue()
+
+        def worker(q):
+            for item in self.dataloader:
+                q.put(item)
+            q.put(None)
+
+        prefetch_thread = threading.Thread(
+            target=worker, args=(q,), daemon=True
+        )
+        prefetch_thread.start()
+
+        while True:
+            item = q.get()
+            if item is not None:
+                yield item
+            else:
+                break
+
+        prefetch_thread.join()
 
 
 class MultiProcessDataLoader(torch.utils.data.DataLoader):
