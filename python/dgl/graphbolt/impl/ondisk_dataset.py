@@ -15,7 +15,7 @@ from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from ..utils import copy_or_convert_data, read_data, save_data
+from ..utils import copy_or_convert_data, read_data
 from .csc_sampling_graph import (
     CSCSamplingGraph,
     from_dglgraph,
