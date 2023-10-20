@@ -2,7 +2,6 @@
 
 import os
 import shutil
-import warnings
 from copy import deepcopy
 from typing import Dict, List, Union
 
@@ -12,6 +11,7 @@ import yaml
 
 import dgl
 
+from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
@@ -499,10 +499,9 @@ class OnDiskDataset(Dataset):
 
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
         if graph is None:
-            warnings.warn(
+            dgl_warning(
                 "Initializing `all_nodes_set` with a graph whose type does "
-                "not belong to SamplingGraph",
-                Warning,
+                "not belong to SamplingGraph"
             )
             return None
         num_nodes = graph.num_nodes
