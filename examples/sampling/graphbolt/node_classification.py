@@ -35,7 +35,7 @@ main
 │           │
 │           └───> Validation set evaluation
 │
-└───> Test set evaluation
+└───> All nodes set inference & Test set evaluation
 """
 import argparse
 
@@ -45,7 +45,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-import tqdm
+from tqdm import tqdm
 
 
 def create_dataloader(
@@ -171,28 +171,20 @@ class SAGE(nn.Module):
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
 
-    def inference(self, args, graph, features, all_nodes_set):
+    def inference(self, graph, features, dataloader):
         """Conduct layer-wise inference to get all the node embeddings."""
-        dataloader = create_dataloader(
-            args, graph, features, all_nodes_set, is_train=False, is_infer=True
-        )
-
         feat = features.read("node", None, "feat")
 
         for layer_idx, layer in enumerate(self.layers):
-            print(f"Layer: {layer_idx}")
             is_last_layer = layer_idx == len(self.layers) - 1
             y = torch.empty(
                 graph.total_num_nodes,
                 self.out_size if is_last_layer else self.hidden_size,
                 dtype=torch.float64,
             )
-
-            for step, data in enumerate(dataloader):
-                if step % 1000 == 0:
-                    print(f"now on step {step}")
+            for step, data in tqdm(enumerate(dataloader)):
                 x = feat[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)
+                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
@@ -207,12 +199,15 @@ def layerwise_infer(
     args, graph, features, test_set, all_nodes_set, model, num_classes
 ):
     model.eval()
-    pred = model.inference(args, graph, features, all_nodes_set)
+    dataloader = create_dataloader(
+        args, graph, features, all_nodes_set, is_train=False, is_infer=True
+    )
+    pred = model.inference(graph, features, dataloader)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
     return MF.accuracy(
-        pred.squeeze(),
-        label.squeeze(),
+        pred,
+        label,
         task="multiclass",
         num_classes=num_classes,
     )
@@ -227,7 +222,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         args, graph, features, itemset, is_train=False
     )
 
-    for step, data in tqdm.tqdm(enumerate(dataloader)):
+    for step, data in tqdm(enumerate(dataloader)):
         x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model(data.blocks, x))
@@ -248,10 +243,11 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         args, graph, features, train_set, is_train=True
     )
 
-    for epoch in tqdm.trange(args.epochs):
+    for epoch in tqdm(range(args.epochs)):
+        print("Training...")
         model.train()
         total_loss = 0
-        for step, data in tqdm.tqdm(enumerate(dataloader)):
+        for step, data in tqdm(enumerate(dataloader)):
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]
@@ -325,15 +321,15 @@ def main(args):
     print(f"Training in {args.device} mode.")
 
     # Load and preprocess dataset.
-    dataset = gb.BuiltinDataset("ogbn-products").load()
+    # dataset = gb.BuiltinDataset("ogbn-products").load()
+    dataset = gb.OnDiskDataset("/home/ubuntu/datasets/ogbn-products").load()
 
     graph = dataset.graph
     features = dataset.feature
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
     test_set = dataset.tasks[0].test_set
-    # all_nodes_set = dataset.all_nodes_set
-    all_nodes_set = gb.ItemSet(graph.total_num_nodes, names="seed_nodes")
+    all_nodes_set = dataset.all_nodes_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
     num_classes = dataset.tasks[0].metadata["num_classes"]
@@ -344,28 +340,12 @@ def main(args):
 
     model = SAGE(in_size, hidden_size, out_size)
 
-    # print("Debugging...")
-    # test_acc = layerwise_infer(
-    #     args,
-    #     graph,
-    #     features,
-    #     test_set,
-    #     all_nodes_set,
-    #     model,
-    #     num_classes,
-    # )
-    # print(f"Test Accuracy is {test_acc.item():.4f}")
-    # input()
-
     # Model training.
-    print("Training...")
+    print("Begin training...")
     train(args, graph, features, train_set, valid_set, num_classes, model)
 
     # Test the model.
     print("Testing...")
-    # test_acc = evaluate(
-    #     args, model, graph, features, itemset=test_set, num_classes=num_classes
-    # )
     test_acc = layerwise_infer(
         args,
         graph,
