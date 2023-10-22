@@ -45,7 +45,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-from tqdm import tqdm
+import tqdm
 
 
 def create_dataloader(
@@ -177,12 +177,14 @@ class SAGE(nn.Module):
 
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
+
             y = torch.empty(
                 graph.total_num_nodes,
                 self.out_size if is_last_layer else self.hidden_size,
                 dtype=torch.float64,
             )
-            for step, data in tqdm(enumerate(dataloader)):
+
+            for step, data in tqdm.tqdm(enumerate(dataloader)):
                 x = feat[data.input_nodes]
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
@@ -191,6 +193,7 @@ class SAGE(nn.Module):
                 # By design, our output nodes are contiguous.
                 y[data.output_nodes[0] : data.output_nodes[-1] + 1] = hidden_x
             feat = y
+
         return y
 
 
@@ -205,6 +208,7 @@ def layerwise_infer(
     pred = model.inference(graph, features, dataloader)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
+
     return MF.accuracy(
         pred,
         label,
@@ -222,19 +226,17 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         args, graph, features, itemset, is_train=False
     )
 
-    for step, data in tqdm(enumerate(dataloader)):
+    for step, data in tqdm.tqdm(enumerate(dataloader)):
         x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model(data.blocks, x))
 
-    res = MF.accuracy(
+    return MF.accuracy(
         torch.cat(y_hats),
         torch.cat(y),
         task="multiclass",
         num_classes=num_classes,
     )
-
-    return res
 
 
 def train(args, graph, features, train_set, valid_set, num_classes, model):
@@ -243,11 +245,11 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         args, graph, features, train_set, is_train=True
     )
 
-    for epoch in tqdm(range(args.epochs)):
+    for epoch in tqdm.trange(args.epochs):
         print("Training...")
         model.train()
         total_loss = 0
-        for step, data in tqdm(enumerate(dataloader)):
+        for step, data in tqdm.tqdm(enumerate(dataloader)):
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]
@@ -306,23 +308,12 @@ def parse_args():
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
         " identical with the number of layers in your model. Default: 15,10,5",
     )
-    parser.add_argument(
-        "--device",
-        default="cpu",
-        choices=["cpu", "cuda"],
-        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
-    )
     return parser.parse_args()
 
 
 def main(args):
-    if not torch.cuda.is_available():
-        args.device = "cpu"
-    print(f"Training in {args.device} mode.")
-
     # Load and preprocess dataset.
-    # dataset = gb.BuiltinDataset("ogbn-products").load()
-    dataset = gb.OnDiskDataset("/home/ubuntu/datasets/ogbn-products").load()
+    dataset = gb.BuiltinDataset("ogbn-products").load()
 
     graph = dataset.graph
     features = dataset.feature
