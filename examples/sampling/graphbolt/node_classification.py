@@ -351,6 +351,8 @@ def main(args):
     )
     print(f"Test Accuracy is {test_acc.item():.4f}")
 
+    dataset = None
+
 
 if __name__ == "__main__":
     args = parse_args()
