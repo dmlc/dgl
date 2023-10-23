@@ -3,12 +3,12 @@
  * @file cuda/index_select_impl.cu
  * @brief Index select operator implementation on CUDA.
  */
+#include <c10/cuda/CUDAException.h>
 #include <torch/script.h>
 
 #include <numeric>
 
 #include "../index_select.h"
-#include "./macro.h"
 
 namespace graphbolt {
 namespace ops {
@@ -56,9 +56,9 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
     block.y <<= 1;
   }
   const dim3 grid((return_len + block.y - 1) / block.y);
-  GRAPHBOLT_CUDA_KERNEL_CALL(
-      IndexSelectMultiKernel, grid, block, 0, stream, input_ptr, input_len,
-      feature_size, index_ptr, return_len, ret_ptr);
+  IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
+      input_ptr, input_len, feature_size, index_ptr, return_len, ret_ptr);
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
   auto return_shape = std::vector<int64_t>({return_len});
   return_shape.insert(
       return_shape.end(), input.sizes().begin() + 1, input.sizes().end());
