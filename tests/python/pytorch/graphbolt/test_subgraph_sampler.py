@@ -1,3 +1,4 @@
+import dgl
 import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
@@ -192,3 +193,36 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_test_SubgraphSampler_without_dedpulication(labor):
+    graph = dgl.graph(
+        ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
+    )
+    graph = gb.from_dglgraph(graph, True)
+    seed_nodes = torch.LongTensor([0, 3, 4])
+
+    itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
+    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes))
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    datapipe = Sampler(item_sampler, graph, fanouts, deduplicate=False)
+
+    length = [17, 7]
+    compacted_dst = [
+        torch.tensor([0, 1, 2, 2, 4, 4, 5, 5, 6, 6]),
+        torch.tensor([0, 1, 2, 2]),
+    ]
+    seeds = [torch.tensor([0, 3, 4, 5, 2, 2, 4]), torch.tensor([0, 3, 4])]
+    for data in datapipe:
+        for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
+            assert len(sampled_subgraph.original_row_node_ids) == length[step]
+            assert torch.equal(
+                sampled_subgraph.node_pairs[1], compacted_dst[step]
+            )
+            assert torch.equal(
+                sampled_subgraph.original_column_node_ids, seeds[step]
+            )
