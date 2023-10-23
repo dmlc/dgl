@@ -59,6 +59,20 @@ def create_dataloader(
     This function demonstrates how to utilize functional forms of datapipes in
     GraphBolt.
     Alternatively, you can create a datapipe using its class constructor.
+
+    Parameters
+    ----------
+    args : Namespace
+        The arguments parsed by `parser.parse_args()`.
+    graph : SamplingGraph
+        The network topology for sampling.
+    features : FeatureStore
+        The node features.
+    itemset : Union[ItemSet, ItemSetDict]
+        Data to be sampled.
+    job : Literal["train", "evaluate", "infer"]
+        The stage where dataloader is created, with options "train", "evaluate"
+        and "infer".
     """
 
     ############################################################################
@@ -80,7 +94,7 @@ def create_dataloader(
     # Initialize the ItemSampler to sample mini-batche from the dataset.
     ############################################################################
     datapipe = gb.ItemSampler(
-        itemset, batch_size=args.batch_size, shuffle=job == "train"
+        itemset, batch_size=args.batch_size, shuffle=(job == "train")
     )
 
     ############################################################################
@@ -111,7 +125,8 @@ def create_dataloader(
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs. Please note that this step is skipped in inference.
+    # subgraphs. This step is skipped in inference because features are updated
+    # as a whole during it, thus storing features in minibatch is unnecessary.
     ############################################################################
     if job != "infer":
         datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
@@ -178,7 +193,7 @@ class SAGE(nn.Module):
 
     def inference(self, graph, features, dataloader):
         """Conduct layer-wise inference to get all the node embeddings."""
-        feat = features.read("node", None, "feat")
+        feature = features.read("node", None, "feat")
 
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
@@ -190,14 +205,14 @@ class SAGE(nn.Module):
             )
 
             for step, data in tqdm.tqdm(enumerate(dataloader)):
-                x = feat[data.input_nodes]
+                x = feature[data.input_nodes]
                 hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
                 # By design, our output nodes are contiguous.
                 y[data.output_nodes[0] : data.output_nodes[-1] + 1] = hidden_x
-            feat = y
+            feature = y
 
         return y
 
