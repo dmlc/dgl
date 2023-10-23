@@ -993,7 +993,13 @@ def test_OnDiskDataset_Graph_heterogeneous():
         metadata,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        None,
+        None,
+        metadata,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -1618,8 +1624,14 @@ def test_OnDiskDataset_load_graph():
 
         # Check the different original_edge_id option to load edge_attributes.
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=True
+            test_dir,
+            include_original_node_id=True,
+            include_original_edge_id=True,
         ).load()
+        assert (
+            dataset.graph.node_attributes is not None
+            and gb.ORIGINAL_NODE_ID in dataset.graph.node_attributes
+        )
         assert (
             dataset.graph.edge_attributes is not None
             and gb.ORIGINAL_EDGE_ID in dataset.graph.edge_attributes
@@ -1685,8 +1697,14 @@ def test_OnDiskDataset_load_graph():
 
         # Test do not generate original_edge_id.
         dataset = gb.OnDiskDataset(
-            test_dir, include_original_edge_id=False
+            test_dir,
+            include_original_node_id=False,
+            include_original_edge_id=False,
         ).load()
+        assert (
+            dataset.graph.node_attributes is None
+            or gb.ORIGINAL_NODE_ID not in dataset.graph.node_attributes
+        )
         assert (
             dataset.graph.edge_attributes is None
             or gb.ORIGINAL_EDGE_ID not in dataset.graph.edge_attributes
@@ -1823,7 +1841,13 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         metadata,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        None,
+        None,
+        metadata,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:

@@ -48,6 +48,7 @@ struct SamplerArgs<SamplerType::LABOR> {
  */
 class CSCSamplingGraph : public torch::CustomClassHolder {
  public:
+  using NodeAttrMap = torch::Dict<std::string, torch::Tensor>;
   using EdgeAttrMap = torch::Dict<std::string, torch::Tensor>;
   /** @brief Default constructor. */
   CSCSamplingGraph() = default;
@@ -65,6 +66,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,
+      const torch::optional<NodeAttrMap>& node_attributes,
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /**
@@ -82,6 +84,7 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
       const torch::Tensor& indptr, const torch::Tensor& indices,
       const torch::optional<torch::Tensor>& node_type_offset,
       const torch::optional<torch::Tensor>& type_per_edge,
+      const torch::optional<NodeAttrMap>& node_attributes,
       const torch::optional<EdgeAttrMap>& edge_attributes);
 
   /** @brief Get the number of nodes. */
@@ -106,6 +109,11 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
     return type_per_edge_;
   }
 
+  /** @brief Get the node attributes dictionary. */
+  inline const torch::optional<NodeAttrMap> NodeAttributes() const {
+    return node_attributes_;
+  }
+
   /** @brief Get the edge attributes dictionary. */
   inline const torch::optional<EdgeAttrMap> EdgeAttributes() const {
     return edge_attributes_;
@@ -127,6 +135,12 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
   inline void SetTypePerEdge(
       const torch::optional<torch::Tensor>& type_per_edge) {
     type_per_edge_ = type_per_edge;
+  }
+
+  /** @brief Set the node attributes dictionary. */
+  inline void SetNodeAttributes(
+      const torch::optional<NodeAttrMap>& node_attributes) {
+    node_attributes_ = node_attributes;
   }
 
   /** @brief Set the edge attributes dictionary. */
@@ -301,6 +315,13 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
    * edge types. The length of it is equal to the number of edges.
    */
   torch::optional<torch::Tensor> type_per_edge_;
+
+  /**
+   * @brief A dictionary of node attributes. Each key represents the attribute's
+   * name, while the corresponding value holds the attribute's specific value.
+   * The length of each value should match the total number of nodes."
+   */
+  torch::optional<NodeAttrMap> node_attributes_;
 
   /**
    * @brief A dictionary of edge attributes. Each key represents the attribute's

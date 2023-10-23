@@ -28,11 +28,13 @@ CSCSamplingGraph::CSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<NodeAttrMap>& node_attributes,
     const torch::optional<EdgeAttrMap>& edge_attributes)
     : indptr_(indptr),
       indices_(indices),
       node_type_offset_(node_type_offset),
       type_per_edge_(type_per_edge),
+      node_attributes_(node_attributes),
       edge_attributes_(edge_attributes) {
   TORCH_CHECK(indptr.dim() == 1);
   TORCH_CHECK(indices.dim() == 1);
@@ -43,6 +45,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
+    const torch::optional<NodeAttrMap>& node_attributes,
     const torch::optional<EdgeAttrMap>& edge_attributes) {
   if (node_type_offset.has_value()) {
     auto& offset = node_type_offset.value();
@@ -52,13 +55,18 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
     TORCH_CHECK(type_per_edge.value().dim() == 1);
     TORCH_CHECK(type_per_edge.value().size(0) == indices.size(0));
   }
+  if (node_attributes.has_value()) {
+    for (const auto& pair : node_attributes.value()) {
+      TORCH_CHECK(pair.value().size(0) == indptr.size(0) - 1);
+    }
+  }
   if (edge_attributes.has_value()) {
     for (const auto& pair : edge_attributes.value()) {
       TORCH_CHECK(pair.value().size(0) == indices.size(0));
     }
   }
   return c10::make_intrusive<CSCSamplingGraph>(
-      indptr, indices, node_type_offset, type_per_edge, edge_attributes);
+      indptr, indices, node_type_offset, type_per_edge, node_attributes, edge_attributes);
 }
 
 void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
@@ -79,6 +87,25 @@ void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
           .toBool()) {
     type_per_edge_ =
         read_from_archive(archive, "CSCSamplingGraph/type_per_edge").toTensor();
+  }
+
+  // Optional node attributes.
+  torch::IValue has_node_attributes;
+  if (archive.try_read(
+          "CSCSamplingGraph/has_node_attributes", has_node_attributes) &&
+      has_node_attributes.toBool()) {
+    torch::Dict<torch::IValue, torch::IValue> generic_dict =
+        read_from_archive(archive, "CSCSamplingGraph/node_attributes")
+            .toGenericDict();
+    NodeAttrMap target_dict;
+    for (const auto& pair : generic_dict) {
+      std::string key = pair.key().toStringRef();
+      torch::Tensor value = pair.value().toTensor();
+      // Use move to avoid copy.
+      target_dict.insert(std::move(key), std::move(value));
+    }
+    // Same as above.
+    node_attributes_ = std::move(target_dict);
   }
 
   // Optional edge attributes.
@@ -117,6 +144,12 @@ void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
     archive.write("CSCSamplingGraph/type_per_edge", type_per_edge_.value());
   }
   archive.write(
+      "CSCSamplingGraph/has_node_attributes", node_attributes_.has_value());
+  if (node_attributes_) {
+    archive.write(
+        "CSCSamplingGraph/node_attributes", node_attributes_.value());
+  }
+  archive.write(
       "CSCSamplingGraph/has_edge_attributes", edge_attributes_.has_value());
   if (edge_attributes_) {
     archive.write("CSCSamplingGraph/edge_attributes", edge_attributes_.value());
@@ -127,7 +160,7 @@ void CSCSamplingGraph::SetState(
     const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
         state) {
   // State is a dict of dicts. The tensor-type attributes are stored in the dict
-  // with key "independent_tensors". The dict-type attributes (edge_attributes)
+  // with key "independent_tensors". The dict-type attributes (node/edge_attributes)
   // are stored directly with the their name as the key.
   const auto& independent_tensors = state.at("independent_tensors");
   TORCH_CHECK(
@@ -143,6 +176,9 @@ void CSCSamplingGraph::SetState(
   if (independent_tensors.find("type_per_edge") != independent_tensors.end()) {
     type_per_edge_ = independent_tensors.at("type_per_edge");
   }
+  if (state.find("node_attributes") != state.end()) {
+    node_attributes_ = state.at("node_attributes");
+  }
   if (state.find("edge_attributes") != state.end()) {
     edge_attributes_ = state.at("edge_attributes");
   }
@@ -151,7 +187,7 @@ void CSCSamplingGraph::SetState(
 torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
 CSCSamplingGraph::GetState() const {
   // State is a dict of dicts. The tensor-type attributes are stored in the dict
-  // with key "independent_tensors". The dict-type attributes (edge_attributes)
+  // with key "independent_tensors". The dict-type attributes (node/edge_attributes)
   // are stored directly with the their name as the key.
   torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>> state;
   torch::Dict<std::string, torch::Tensor> independent_tensors;
@@ -167,6 +203,9 @@ CSCSamplingGraph::GetState() const {
     independent_tensors.insert("type_per_edge", type_per_edge_.value());
   }
   state.insert("independent_tensors", independent_tensors);
+  if (node_attributes_.has_value()) {
+    state.insert("node_attributes", node_attributes_.value());
+  }
   if (edge_attributes_.has_value()) {
     state.insert("edge_attributes", edge_attributes_.value());
   }
@@ -469,9 +508,11 @@ static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
   auto indices = helper.ReadTorchTensor();
   auto node_type_offset = helper.ReadTorchTensor();
   auto type_per_edge = helper.ReadTorchTensor();
+  auto node_attributes = helper.ReadTorchTensorDict();
   auto edge_attributes = helper.ReadTorchTensorDict();
   auto graph = c10::make_intrusive<CSCSamplingGraph>(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
+      node_attributes,
       edge_attributes);
   auto shared_memory = helper.ReleaseSharedMemory();
   graph->HoldSharedMemoryObject(
@@ -486,6 +527,7 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
   helper.WriteTorchTensor(indices_);
   helper.WriteTorchTensor(node_type_offset_);
   helper.WriteTorchTensor(type_per_edge_);
+  helper.WriteTorchTensorDict(node_attributes_);
   helper.WriteTorchTensorDict(edge_attributes_);
   helper.Flush();
   return BuildGraphFromSharedMemoryHelper(std::move(helper));

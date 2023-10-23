@@ -10,10 +10,15 @@ import torch
 
 from dgl.utils import recursive_apply
 
-from ...base import EID, ETYPE
+from ...base import EID, ETYPE, NID
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
-from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
+from ..base import (
+    etype_str_to_tuple,
+    etype_tuple_to_str,
+    ORIGINAL_EDGE_ID,
+    ORIGINAL_NODE_ID,
+)
 from ..sampling_graph import SamplingGraph
 from .sampled_subgraph_impl import SampledSubgraphImpl
 
@@ -252,6 +257,27 @@ class CSCSamplingGraph(SamplingGraph):
         self._c_csc_graph.set_type_per_edge(type_per_edge)
 
     @property
+    def node_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Returns the node attributes dictionary.
+
+        Returns
+        -------
+        torch.Tensor or None
+            If present, returns a dictionary of node attributes. Each key
+            represents the attribute's name, while the corresponding value
+            holds the attribute's specific value. The length of each value
+            should match the total number of nodes."
+        """
+        return self._c_csc_graph.node_attributes()
+
+    @node_attributes.setter
+    def node_attributes(
+        self, node_attributes: Optional[Dict[str, torch.Tensor]]
+    ) -> None:
+        """Sets the node attributes dictionary."""
+        self._c_csc_graph.set_node_attributes(node_attributes)
+
+    @property
     def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
         """Returns the edge attributes dictionary.
 
@@ -321,6 +347,7 @@ class CSCSamplingGraph(SamplingGraph):
             column_num
         )
         row = C_sampled_subgraph.indices
+
         type_per_edge = C_sampled_subgraph.type_per_edge
         original_edge_ids = C_sampled_subgraph.original_edge_ids
         has_original_eids = (
@@ -529,6 +556,10 @@ class CSCSamplingGraph(SamplingGraph):
         """
         # Ensure nodes is 1-D tensor.
         self._check_sampler_arguments(nodes, fanouts, probs_name)
+        has_original_nids = (
+            self.node_attributes is not None
+            and ORIGINAL_NODE_ID in self.node_attributes
+        )
         has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
@@ -618,6 +649,10 @@ class CSCSamplingGraph(SamplingGraph):
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
         self._check_sampler_arguments(nodes, fanouts, probs_name)
+        has_original_nids = (
+            self.node_attributes is not None
+            and ORIGINAL_NODE_ID in self.node_attributes
+        )
         has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
@@ -721,6 +756,9 @@ class CSCSamplingGraph(SamplingGraph):
         self.type_per_edge = recursive_apply(
             self.type_per_edge, lambda x: _to(x, device)
         )
+        self.node_attributes = recursive_apply(
+            self.node_attributes, lambda x: _to(x, device)
+        )
         self.edge_attributes = recursive_apply(
             self.edge_attributes, lambda x: _to(x, device)
         )
@@ -733,6 +771,7 @@ def from_csc(
     indices: torch.Tensor,
     node_type_offset: Optional[torch.tensor] = None,
     type_per_edge: Optional[torch.tensor] = None,
+    node_attributes: Optional[Dict[str, torch.tensor]] = None,
     edge_attributes: Optional[Dict[str, torch.tensor]] = None,
     metadata: Optional[GraphMetadata] = None,
 ) -> CSCSamplingGraph:
@@ -750,6 +789,8 @@ def from_csc(
         Offset of node types in the graph, by default None.
     type_per_edge : Optional[torch.tensor], optional
         Type ids of each edge in the graph, by default None.
+    node_attributes: Optional[Dict[str, torch.tensor]], optional
+        Node attributes of the graph, by default None.
     edge_attributes: Optional[Dict[str, torch.tensor]], optional
         Edge attributes of the graph, by default None.
     metadata: Optional[GraphMetadata], optional
@@ -785,6 +826,7 @@ def from_csc(
             indices,
             node_type_offset,
             type_per_edge,
+            node_attributes,
             edge_attributes,
         ),
         metadata,
@@ -880,6 +922,7 @@ def save_csc_sampling_graph(graph, filename):
 def from_dglgraph(
     g: DGLGraph,
     is_homogeneous: bool = False,
+    include_original_node_id: bool = False,
     include_original_edge_id: bool = False,
 ) -> CSCSamplingGraph:
     """Convert a DGLGraph to CSCSamplingGraph."""
@@ -905,6 +948,11 @@ def from_dglgraph(
     # Assign edge type according to the order of CSC matrix.
     type_per_edge = None if is_homogeneous else homo_g.edata[ETYPE][edge_ids]
 
+    node_attributes = {}
+    if include_original_node_id:
+        # Assign node attributes according to the original nids mapping.
+        node_attributes[ORIGINAL_NODE_ID] = homo_g.ndata[NID]
+
     edge_attributes = {}
     if include_original_edge_id:
         # Assign edge attributes according to the original eids mapping.
@@ -916,6 +964,7 @@ def from_dglgraph(
             indices,
             node_type_offset,
             type_per_edge,
+            node_attributes,
             edge_attributes,
         ),
         metadata,
