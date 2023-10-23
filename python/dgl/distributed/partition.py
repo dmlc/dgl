@@ -6,6 +6,7 @@ import os
 import time
 
 import numpy as np
+import torch
 
 from .. import backend as F
 from ..base import DGLError, EID, ETYPE, NID, NTYPE
@@ -1271,15 +1272,15 @@ def convert_dgl_partition_to_csc_sampling_graph(
         # requires `node_type_offset` is set correctly and nodes are sorted
         # according to their types. This is not guaranteed in current partitioned
         # graph.
+        _, _, ntypes, etypes = load_partition_book(part_config, part_id)
         metadata = None
         if store_metadata:
             # Construct GraphMetadata.
-            _, _, ntypes, etypes = load_partition_book(part_config, part_id)
-            etypes = {
+            c_etypes = {
                 graphbolt.etype_tuple_to_str(etype): v
                 for etype, v in etypes.items()
             }
-            metadata = graphbolt.GraphMetadata(ntypes, etypes)
+            metadata = graphbolt.GraphMetadata(ntypes, c_etypes)
         # Obtain CSC indtpr and indices.
         indptr, indices, _ = graph.adj().csc()
         # Initalize type per edge.
@@ -1287,6 +1288,8 @@ def convert_dgl_partition_to_csc_sampling_graph(
         if store_etypes:
             type_per_edge = init_type_per_edge(graph, gpb)
             type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
+            if len(etypes) < 128:
+                type_per_edge = type_per_edge.to(torch.int8)
             # Sanity check.
             assert len(type_per_edge) == graph.num_edges()
 

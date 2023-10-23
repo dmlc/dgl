@@ -18,6 +18,10 @@ args = {}
 # Initialize distributed environment
 dgl.distributed.initialize(args.ip_config)
 th.distributed.init_process_group(backend=args.backend)
+# [TODO][P0] Convert dgl partitioned graphs to graphbolt.CSCSamplingGraph.
+#           done@2023-10-23 16:49:00
+#           see details in: https://github.com/Rhett-Ying/dgl/commits/gb_distdgl
+#                           ddce1d42de016be040cd0f8a5e71f2a10148de82
 # [TODO][P0] Load `CSCSamplingGraph` into `DistGraph`.
 ## NID/EIDs are required.
 g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
