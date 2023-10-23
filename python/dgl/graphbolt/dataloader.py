@@ -124,7 +124,7 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
         :class:`SingleProcessDataLoader`.
     """
 
-    def __init__(self, datapipe, num_workers=0):
+    def __init__(self, datapipe, num_workers=0, use_prefetch_thread=False):
         # Multiprocessing requires two modifications to the datapipe:
         #
         # 1. Insert a stage after ItemSampler to distribute the
@@ -162,8 +162,14 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     parent_datapipe,
-                    MultiprocessingWrapper(parent_datapipe, num_workers),
+                    MultiprocessingWrapper(parent_datapipe, num_workers)
+                    if use_prefetch_thread == False or num_workers > 0
+                    else ThreadingWrapper(parent_datapipe, num_workers),
                 )
+
+        # (3) Wrap the datapipe with a ThreadingWrapper to enable prefetching.
+        if use_prefetch_thread:
+            datapipe = ThreadingWrapper(datapipe, num_workers=0)
 
         # The stages after feature fetching is still done in the main process.
         # So we set num_workers to 0 here.
