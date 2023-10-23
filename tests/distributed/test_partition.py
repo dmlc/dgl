@@ -4,6 +4,7 @@ import tempfile
 
 import backend as F
 import dgl
+import dgl.graphbolt as gb
 import numpy as np
 import pytest
 import torch as th
@@ -679,8 +680,17 @@ def test_UnknownPartitionBook():
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
+@pytest.mark.parametrize("store_orig_nids", [True, False])
+@pytest.mark.parametrize("store_orig_eids", [True, False])
+@pytest.mark.parametrize("store_etypes", [True, False])
+@pytest.mark.parametrize("store_metadata", [True, False])
 def test_convert_dgl_partition_to_csc_sampling_graph_homo(
-    part_method, num_parts
+    part_method,
+    num_parts,
+    store_orig_nids,
+    store_orig_eids,
+    store_etypes,
+    store_metadata,
 ):
     with tempfile.TemporaryDirectory() as test_dir:
         g = create_random_graph(1000)
@@ -689,7 +699,13 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
             g, graph_name, num_parts, test_dir, part_method=part_method
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
-        convert_dgl_partition_to_csc_sampling_graph(part_config)
+        convert_dgl_partition_to_csc_sampling_graph(
+            part_config,
+            store_orig_nids,
+            store_orig_eids,
+            store_etypes,
+            store_metadata,
+        )
         for part_id in range(num_parts):
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
@@ -701,17 +717,51 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
             assert new_g.node_type_offset is None
-            assert all(new_g.type_per_edge == 0)
-            for node_type, type_id in new_g.metadata.node_type_to_id.items():
-                assert g.get_ntype_id(node_type) == type_id
-            for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
-                assert g.get_etype_id(edge_type) == type_id
+            if store_orig_nids:
+                assert th.equal(
+                    orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+                )
+            else:
+                assert new_g.node_attributes is None
+            if store_orig_eids:
+                assert th.equal(
+                    orig_g.edata[dgl.EID], new_g.edge_attributes[dgl.EID]
+                )
+            else:
+                assert new_g.edge_attributes is None
+            if store_etypes:
+                assert th.all(0 == new_g.type_per_edge)
+            else:
+                assert new_g.type_per_edge is None
+            if store_metadata:
+                for (
+                    node_type,
+                    type_id,
+                ) in new_g.metadata.node_type_to_id.items():
+                    assert g.get_ntype_id(node_type) == type_id
+                for (
+                    edge_type,
+                    type_id,
+                ) in new_g.metadata.edge_type_to_id.items():
+                    edge_type = gb.etype_str_to_tuple(edge_type)
+                    assert g.get_etype_id(edge_type) == type_id
+            else:
+                assert new_g.metadata is None
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
+@pytest.mark.parametrize("store_orig_nids", [True, False])
+@pytest.mark.parametrize("store_orig_eids", [True, False])
+@pytest.mark.parametrize("store_etypes", [True, False])
+@pytest.mark.parametrize("store_metadata", [True, False])
 def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
-    part_method, num_parts
+    part_method,
+    num_parts,
+    store_orig_nids,
+    store_orig_eids,
+    store_etypes,
+    store_metadata,
 ):
     with tempfile.TemporaryDirectory() as test_dir:
         g = create_random_hetero()
@@ -720,7 +770,13 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
             g, graph_name, num_parts, test_dir, part_method=part_method
         )
         part_config = os.path.join(test_dir, f"{graph_name}.json")
-        convert_dgl_partition_to_csc_sampling_graph(part_config)
+        convert_dgl_partition_to_csc_sampling_graph(
+            part_config,
+            store_orig_nids,
+            store_orig_eids,
+            store_etypes,
+            store_metadata,
+        )
         for part_id in range(num_parts):
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
@@ -731,12 +787,35 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
             orig_indptr, orig_indices, _ = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
-            for node_type, type_id in new_g.metadata.node_type_to_id.items():
-                assert g.get_ntype_id(node_type) == type_id
-            for edge_type, type_id in new_g.metadata.edge_type_to_id.items():
-                assert g.get_etype_id(edge_type) == type_id
+            if store_orig_nids:
+                assert th.equal(
+                    orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+                )
+            else:
+                assert new_g.node_attributes is None
+            if store_orig_eids:
+                assert th.equal(
+                    orig_g.edata[dgl.EID], new_g.edge_attributes[dgl.EID]
+                )
+            else:
+                assert new_g.edge_attributes is None
+            if store_etypes:
+                assert th.equal(orig_g.edata[dgl.ETYPE], new_g.type_per_edge)
+            else:
+                assert new_g.type_per_edge is None
+            if store_metadata:
+                for (
+                    node_type,
+                    type_id,
+                ) in new_g.metadata.node_type_to_id.items():
+                    assert g.get_ntype_id(node_type) == type_id
+                for (
+                    edge_type,
+                    type_id,
+                ) in new_g.metadata.edge_type_to_id.items():
+                    edge_type = gb.etype_str_to_tuple(edge_type)
+                    assert g.get_etype_id(edge_type) == type_id
             assert new_g.node_type_offset is None
-            assert th.equal(orig_g.edata[dgl.ETYPE], new_g.type_per_edge)
 
 
 def test_not_sorted_node_edge_map():

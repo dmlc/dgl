@@ -1221,7 +1221,13 @@ def partition_graph(
         return orig_nids, orig_eids
 
 
-def convert_dgl_partition_to_csc_sampling_graph(part_config):
+def convert_dgl_partition_to_csc_sampling_graph(
+    part_config,
+    store_orig_nids=False,
+    store_orig_eids=False,
+    store_etypes=False,
+    store_metadata=False,
+):
     """Convert partitions of dgl to CSCSamplingGraph of GraphBolt.
 
     This API converts `DGLGraph` partitions to `CSCSamplingGraph` which is
@@ -1235,6 +1241,14 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
     ----------
     part_config : str
         The partition configuration JSON file.
+    store_orig_nids : bool, optional
+        Whether to store original node IDs in the new graph.
+    store_orig_eids : bool, optional
+        Whether to store original edge IDs in the new graph.
+    store_etypes : bool, optional
+        Whether to store edge types in the new graph.
+    store_metadata : bool, optional
+        Whether to store metadata in the new graph.
     """
     # As only this function requires GraphBolt for now, let's import here.
     from .. import graphbolt
@@ -1252,18 +1266,57 @@ def convert_dgl_partition_to_csc_sampling_graph(part_config):
         graph, _, _, gpb, _, _, _ = load_partition(
             part_config, part_id, load_feats=False
         )
-        # Construct GraphMetadata.
-        _, _, ntypes, etypes = load_partition_book(part_config, part_id)
-        metadata = graphbolt.GraphMetadata(ntypes, etypes)
+        # [Rui] We can always treat partitioned graph as homogeneous graph. Then
+        # we don't need metadata at all. What's more, heterogeneous graph
+        # requires `node_type_offset` is set correctly and nodes are sorted
+        # according to their types. This is not guaranteed in current partitioned
+        # graph.
+        metadata = None
+        if store_metadata:
+            # Construct GraphMetadata.
+            _, _, ntypes, etypes = load_partition_book(part_config, part_id)
+            etypes = {
+                graphbolt.etype_tuple_to_str(etype): v
+                for etype, v in etypes.items()
+            }
+            metadata = graphbolt.GraphMetadata(ntypes, etypes)
         # Obtain CSC indtpr and indices.
         indptr, indices, _ = graph.adj().csc()
         # Initalize type per edge.
-        type_per_edge = init_type_per_edge(graph, gpb)
-        type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
-        # Sanity check.
-        assert len(type_per_edge) == graph.num_edges()
+        type_per_edge = None
+        if store_etypes:
+            type_per_edge = init_type_per_edge(graph, gpb)
+            type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
+            # Sanity check.
+            assert len(type_per_edge) == graph.num_edges()
+
+        # Original node IDs.
+        node_attributes = None
+        if store_orig_nids:
+            # Sanity check.
+            assert len(graph.ndata[NID]) == graph.num_nodes()
+            node_attributes = {
+                NID: graph.ndata[NID].to(RESERVED_FIELD_DTYPE[NID])
+            }
+
+        # Original edge IDs.
+        edge_attributes = None
+        if store_orig_eids:
+            # Sanity check.
+            assert len(graph.edata[EID]) == graph.num_edges()
+            edge_attributes = {
+                EID: graph.edata[EID].to(RESERVED_FIELD_DTYPE[EID])
+            }
+
+        # Construct CSCSamplingGraph
         csc_graph = graphbolt.from_csc(
-            indptr, indices, None, type_per_edge, metadata=metadata
+            indptr,
+            indices,
+            node_type_offset=None,
+            type_per_edge=type_per_edge,
+            node_attributes=node_attributes,
+            edge_attributes=edge_attributes,
+            metadata=metadata,
         )
         orig_graph_path = os.path.join(
             os.path.dirname(part_config),

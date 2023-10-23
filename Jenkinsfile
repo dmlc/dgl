@@ -580,7 +580,6 @@ pipeline {
                   steps {
                     unit_distributed_linux('pytorch', 'cpu')
                   }
-                  when { expression { false } }
                 }
               }
               post {
