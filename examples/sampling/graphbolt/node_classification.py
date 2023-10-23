@@ -39,6 +39,8 @@ main
 """
 import argparse
 
+from typing import Literal
+
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch
@@ -49,7 +51,7 @@ import tqdm
 
 
 def create_dataloader(
-    args, graph, features, itemset, is_train=True, is_infer=False
+    args, graph, features, itemset, job: Literal["train", "evaluate", "infer"]
 ):
     """
     [HIGHLIGHT]
@@ -68,7 +70,7 @@ def create_dataloader(
     # referred to as a 'mini-batch'. (The term 'mini-batch' is used here to
     # indicate a subset of the entire dataset that is processed together. This
     # is in contrast to processing the entire dataset, known as a 'full batch'.)
-    # 'is_train': Determining if data should be shuffled. (Shuffling is
+    # 'job': Determines whether data should be shuffled. (Shuffling is
     # generally used only in training to improve model generalization. It's
     # not used in validation and testing as the focus there is to evaluate
     # performance rather than to learn from the data.)
@@ -78,7 +80,7 @@ def create_dataloader(
     # Initialize the ItemSampler to sample mini-batche from the dataset.
     ############################################################################
     datapipe = gb.ItemSampler(
-        itemset, batch_size=args.batch_size, shuffle=is_train
+        itemset, batch_size=args.batch_size, shuffle=job == "train"
     )
 
     ############################################################################
@@ -86,14 +88,17 @@ def create_dataloader(
     # self.sample_neighbor()
     # [Input]:
     # 'graph': The network topology for sampling.
-    # 'args.fanout': Number of neighbors to sample per node.
+    # '[-1] or args.fanout': Number of neighbors to sample per node. In
+    # training or validation, the length of args.fanout should be equal to the
+    # number of layers in the model. In inference, this parameter is set to
+    # [-1], indicating that all neighbors of a node are sampled.
     # [Output]:
     # A NeighborSampler object to sample neighbors.
     # [Role]:
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
     datapipe = datapipe.sample_neighbor(
-        graph, [-1] if is_infer else args.fanout
+        graph, args.fanout if job != "infer" else [-1]
     )
 
     ############################################################################
@@ -106,9 +111,9 @@ def create_dataloader(
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs.
+    # subgraphs. Please note that this step is skipped in inference.
     ############################################################################
-    if not is_infer:
+    if job != "infer":
         datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
@@ -203,7 +208,7 @@ def layerwise_infer(
 ):
     model.eval()
     dataloader = create_dataloader(
-        args, graph, features, all_nodes_set, is_train=False, is_infer=True
+        args, graph, features, all_nodes_set, job="infer"
     )
     pred = model.inference(graph, features, dataloader)
     pred = pred[test_set._items[0]]
@@ -223,7 +228,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
     y = []
     y_hats = []
     dataloader = create_dataloader(
-        args, graph, features, itemset, is_train=False
+        args, graph, features, itemset, job="evaluate"
     )
 
     for step, data in tqdm.tqdm(enumerate(dataloader)):
@@ -242,11 +247,10 @@ def evaluate(args, model, graph, features, itemset, num_classes):
 def train(args, graph, features, train_set, valid_set, num_classes, model):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     dataloader = create_dataloader(
-        args, graph, features, train_set, is_train=True
+        args, graph, features, train_set, job="train"
     )
 
     for epoch in tqdm.trange(args.epochs):
-        print("Training...")
         model.train()
         total_loss = 0
         for step, data in tqdm.tqdm(enumerate(dataloader)):
@@ -270,7 +274,6 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             total_loss += loss.item()
 
         # Evaluate the model.
-        print("Validating...")
         acc = evaluate(args, model, graph, features, valid_set, num_classes)
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (step + 1):.4f} | "
@@ -332,7 +335,7 @@ def main(args):
     model = SAGE(in_size, hidden_size, out_size)
 
     # Model training.
-    print("Begin training...")
+    print("Training...")
     train(args, graph, features, train_set, valid_set, num_classes, model)
 
     # Test the model.
@@ -347,8 +350,6 @@ def main(args):
         num_classes,
     )
     print(f"Test Accuracy is {test_acc.item():.4f}")
-
-    dataset = None
 
 
 if __name__ == "__main__":
