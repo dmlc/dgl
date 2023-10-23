@@ -917,9 +917,9 @@ def from_dglgraph(
         torch.ops.graphbolt.from_csc(
             indptr,
             indices,
-            node_type_offset=node_type_offset,
-            type_per_edge=type_per_edge,
-            edge_attributes=edge_attributes,
+            node_type_offset,
+            type_per_edge,
+            edge_attributes,
         ),
         metadata,
     )
