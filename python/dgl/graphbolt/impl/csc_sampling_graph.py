@@ -277,7 +277,7 @@ class CSCSamplingGraph(SamplingGraph):
         # TODO: change the result to 'SampledSubgraphImpl'.
         return self._c_csc_graph.in_subgraph(nodes)
 
-    def _generate_sampled_subgraph_node_pairs_and_eids(
+    def _convert_to_sampled_subgraph_node_pairs_and_eids(
         self,
         C_sampled_subgraph: torch.ScriptObject,
     ):
@@ -347,7 +347,7 @@ class CSCSamplingGraph(SamplingGraph):
                 self.edge_attributes is not None
                 and ORIGINAL_EDGE_ID in self.edge_attributes
             )
-            if has_original_eids:
+            if has_original_eids and original_edge_ids is not None:
                 original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
                     original_edge_ids
                 ]
@@ -424,7 +424,7 @@ class CSCSamplingGraph(SamplingGraph):
             equalling the total number of edges.
         deduplicate: bool
             Boolean indicating whether seeds between hops will be deduplicated.
-            If True, the same elements in seeds will be deleted to only one.
+            If True, the same elements in seeds will be removed to only one.
             Otherwise, the same elements will be remained.
         Returns
         -------
@@ -458,7 +458,7 @@ class CSCSamplingGraph(SamplingGraph):
             nodes, fanouts, replace, probs_name
         )
         if deduplicate:
-            return self._generate_sampled_subgraph_node_pairs_and_eids(
+            return self._convert_to_sampled_subgraph_node_pairs_and_eids(
                 C_sampled_subgraph
             )
         else:
@@ -652,7 +652,7 @@ class CSCSamplingGraph(SamplingGraph):
             probs_name,
         )
         if deduplicate:
-            return self._generate_sampled_subgraph_node_pairs_and_eids(
+            return self._convert_to_sampled_subgraph_node_pairs_and_eids(
                 C_sampled_subgraph
             )
         else:
