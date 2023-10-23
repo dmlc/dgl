@@ -1823,7 +1823,12 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         metadata,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+        csc_indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        edge_attributes=None,
+        metadata=metadata,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:

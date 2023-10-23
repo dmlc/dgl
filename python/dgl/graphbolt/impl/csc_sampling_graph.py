@@ -768,8 +768,11 @@ def from_csc(
     >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
-    >>> graph = graphbolt.from_csc(csc_indptr, indices, node_type_offset, \
-    >>>                            type_per_edge, None, metadata)
+    >>> graph = graphbolt.from_csc(csc_indptr, indices,
+    ...             node_type_offset=node_type_offset,
+    ...             type_per_edge=type_per_edge,
+    ...             edge_attributes=None, metadata=metadata)
+    None, metadata)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
@@ -914,9 +917,9 @@ def from_dglgraph(
         torch.ops.graphbolt.from_csc(
             indptr,
             indices,
-            node_type_offset,
-            type_per_edge,
-            edge_attributes,
+            node_type_offset=node_type_offset,
+            type_per_edge=type_per_edge,
+            edge_attributes=edge_attributes,
         ),
         metadata,
     )
