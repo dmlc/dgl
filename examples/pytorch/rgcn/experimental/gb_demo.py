@@ -459,6 +459,8 @@ def run(args, device, data):
     fanouts = [int(fanout) for fanout in args.fanout.split(",")]
     val_fanouts = [int(fanout) for fanout in args.validation_fanout.split(",")]
 
+    g.barrier()
+    return
     sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
     dataloader = dgl.dataloading.DistNodeDataLoader(
         g,
@@ -717,9 +719,6 @@ def main(args):
     )
     print("rank:", g.rank())
 
-    g.barrier()
-    return
-
     pb = g.get_partition_book()
     if "trainer_id" in g.nodes["paper"].data:
         train_nid = dgl.distributed.node_split(
@@ -774,6 +773,7 @@ def main(args):
             len(np.intersect1d(test_nid.numpy(), local_nid)),
         )
     )
+
     if args.num_gpus == -1:
         device = th.device("cpu")
     else:

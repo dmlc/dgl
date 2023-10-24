@@ -37,6 +37,9 @@ total 1.1G
 '''
 
 # [TODO][P0] Load `CSCSamplingGraph` into `DistGraph`.
+#           done@2023-10-24 15:10:00
+#           see details in: https://github.com/Rhett-Ying/dgl/commits/gb_distdgl
+#                           222dd2bd51084cc4f242148b0a7e6e5d91e0ae80
 ## NID/EIDs are required.
 g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
 
