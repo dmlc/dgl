@@ -382,6 +382,7 @@ def main(args):
     out_size = num_classes
 
     model = SAGE(in_size, hidden_size, out_size)
+    assert len(args.fanout) == len(model.layers)
     model = model.to(args.device)
 
     # Model training.
