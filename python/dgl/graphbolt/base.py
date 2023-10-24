@@ -77,6 +77,8 @@ def etype_str_to_tuple(c_etype):
 
 
 def apply_to(x, device):
+    """Apply `to` function to object x only if it has `to`."""
+
     return x.to(device) if hasattr(x, "to") else x
 
 
