@@ -210,6 +210,7 @@ def initialize(
     max_queue_size=MAX_QUEUE_SIZE,
     net_type=None,
     num_worker_threads=1,
+    use_graphbolt=False,
 ):
     """Initialize DGL's distributed module
 
@@ -231,6 +232,8 @@ def initialize(
         [Deprecated] Networking type, can be 'socket' only.
     num_worker_threads: int
         The number of OMP threads in each sampler process.
+    use_graphbolt: bool
+        Whether to use graphbolt for sampling.
 
     Note
     ----
@@ -270,6 +273,7 @@ def initialize(
             int(os.environ.get("DGL_NUM_CLIENT")),
             os.environ.get("DGL_CONF_PATH"),
             graph_format=formats,
+            use_graphbolt=use_graphbolt,
         )
         serv.start()
         sys.exit()
