@@ -39,8 +39,6 @@ main
 """
 import argparse
 
-from typing import Literal
-
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch
@@ -50,9 +48,7 @@ import torchmetrics.functional as MF
 from tqdm import tqdm
 
 
-def create_dataloader(
-    args, graph, features, itemset, job: Literal["train", "evaluate", "infer"]
-):
+def create_dataloader(args, graph, features, itemset, job):
     """
     [HIGHLIGHT]
     Get a GraphBolt version of a dataloader for node classification tasks.
@@ -70,7 +66,7 @@ def create_dataloader(
         The node features.
     itemset : Union[ItemSet, ItemSetDict]
         Data to be sampled.
-    job : Literal["train", "evaluate", "infer"]
+    job : one of ["train", "evaluate", "infer"]
         The stage where dataloader is created, with options "train", "evaluate"
         and "infer".
     """
