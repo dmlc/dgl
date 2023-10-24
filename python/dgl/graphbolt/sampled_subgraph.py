@@ -6,7 +6,7 @@ import torch
 
 from dgl.utils import recursive_apply
 
-from .base import etype_str_to_tuple, isin
+from .base import apply_to, etype_str_to_tuple, isin
 
 
 __all__ = ["SampledSubgraph"]
@@ -194,9 +194,6 @@ class SampledSubgraph:
     def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
         """Copy `SampledSubgraph` to the specified device using reflection."""
 
-        def _to(x, device):
-            return x.to(device) if hasattr(x, "to") else x
-
         for attr in dir(self):
             # Only copy member variables.
             if not callable(getattr(self, attr)) and not attr.startswith("__"):
@@ -204,7 +201,7 @@ class SampledSubgraph:
                     self,
                     attr,
                     recursive_apply(
-                        getattr(self, attr), lambda x: _to(x, device)
+                        getattr(self, attr), lambda x: apply_to(x, device)
                     ),
                 )
 
