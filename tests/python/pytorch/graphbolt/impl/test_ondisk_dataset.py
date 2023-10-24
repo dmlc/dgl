@@ -1823,7 +1823,12 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         metadata,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
     graph = gb.from_csc(
-        csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
+        csc_indptr,
+        indices,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        edge_attributes=None,
+        metadata=metadata,
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
@@ -1851,37 +1856,106 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         dataset = None
 
 
-def test_OnDiskDataset_load_1D_feature():
+@pytest.mark.parametrize("fmt", ["numpy", "torch"])
+def test_OnDiskDataset_load_1D_feature(fmt):
     with tempfile.TemporaryDirectory() as test_dir:
         # All metadata fields are specified.
         dataset_name = "graphbolt_test"
-        num_nodes = 4000
-        num_edges = 20000
+        num_nodes = 4
+        num_edges = 20
         num_classes = 1
 
-        # Generate random graph.
-        yaml_content = gbt.random_homo_graphbolt_graph(
-            test_dir,
-            dataset_name,
-            num_nodes,
-            num_edges,
-            num_classes,
+        type_name = "npy" if fmt == "numpy" else "pt"
+        # Generate random edges.
+        nodes = np.repeat(np.arange(num_nodes), 5)
+        neighbors = np.random.randint(0, num_nodes, size=(num_edges))
+        edges = np.stack([nodes, neighbors], axis=1)
+        # Wrtie into edges/edge.csv
+        os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
+        edges = pd.DataFrame(edges, columns=["src", "dst"])
+        edge_path = os.path.join("edges", "edge.csv")
+        edges.to_csv(
+            os.path.join(test_dir, edge_path),
+            index=False,
+            header=False,
         )
+
+        # Generate random graph edge-feats.
+        edge_feats = np.random.rand(num_edges, 5)
+        os.makedirs(os.path.join(test_dir, "data"), exist_ok=True)
+        edge_feat_path = os.path.join("data", f"edge-feat.{type_name}")
+
+        # Generate random 1-D node-feats.
+        node_feats = np.random.rand(num_nodes)
+        node_feat_path = os.path.join("data", f"node-feat.{type_name}")
+        assert node_feats.ndim == 1
+
+        # Generate 1-D train set.
+        os.makedirs(os.path.join(test_dir, "set"), exist_ok=True)
+        train_path = os.path.join("set", f"train.{type_name}")
+
+        if fmt == "numpy":
+            np.save(os.path.join(test_dir, edge_feat_path), edge_feats)
+            np.save(os.path.join(test_dir, node_feat_path), node_feats)
+            np.save(os.path.join(test_dir, train_path), np.array([0, 1, 0]))
+        else:
+            torch.save(
+                torch.from_numpy(edge_feats),
+                os.path.join(test_dir, edge_feat_path),
+            )
+            torch.save(
+                torch.from_numpy(node_feats),
+                os.path.join(test_dir, node_feat_path),
+            )
+            torch.save(
+                torch.tensor([0, 1, 0]), os.path.join(test_dir, train_path)
+            )
+
+        yaml_content = f"""
+            dataset_name: {dataset_name}
+            graph: # graph structure and required attributes.
+              nodes:
+                - num: {num_nodes}
+              edges:
+                - format: csv
+                  path: {edge_path}
+              feature_data:
+                  - domain: edge
+                    type: null
+                    name: feat
+                    format: {fmt}
+                    in_memory: true
+                    path: {edge_feat_path}
+            feature_data:
+              - domain: node
+                type: null
+                name: feat
+                format: {fmt}
+                in_memory: false
+                path: {node_feat_path}
+            tasks:
+                - name: node_classification
+                  num_classes: {num_classes}
+                  train_set:
+                    - type_name: null
+                      data:
+                        - format: {fmt}
+                          path: {train_path}
+        """
         yaml_file = os.path.join(test_dir, "metadata.yaml")
         with open(yaml_file, "w") as f:
             f.write(yaml_content)
 
-        with open(yaml_file, "r") as f:
-            input_config = yaml.safe_load(f)
-        node_feat = np.load(
-            os.path.join(test_dir, input_config["feature_data"][0]["path"])
-        )
         dataset = gb.OnDiskDataset(test_dir).load()
         feature = dataset.feature.read("node", None, "feat")
-        assert torch.equal(torch.from_numpy(node_feat.reshape(-1, 1)), feature)
-
+        # Test whether feature has changed.
+        assert torch.equal(torch.from_numpy(node_feats.reshape(-1, 1)), feature)
+        # Test whether itemsets keep same.
+        assert torch.equal(
+            dataset.tasks[0].train_set._items[0], torch.tensor([0, 1, 0])
+        )
         dataset = None
-        node_feat = None
+        node_feats = None
         feature = None
 
 
