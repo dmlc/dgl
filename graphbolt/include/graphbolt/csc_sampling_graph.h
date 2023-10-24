@@ -111,6 +111,30 @@ class CSCSamplingGraph : public torch::CustomClassHolder {
     return edge_attributes_;
   }
 
+  /** @brief Set the csc index pointer tensor. */
+  inline void SetCSCIndptr(const torch::Tensor& indptr) { indptr_ = indptr; }
+
+  /** @brief Set the index tensor. */
+  inline void SetIndices(const torch::Tensor& indices) { indices_ = indices; }
+
+  /** @brief Set the node type offset tensor for a heterogeneous graph. */
+  inline void SetNodeTypeOffset(
+      const torch::optional<torch::Tensor>& node_type_offset) {
+    node_type_offset_ = node_type_offset;
+  }
+
+  /** @brief Set the edge type tensor for a heterogeneous graph. */
+  inline void SetTypePerEdge(
+      const torch::optional<torch::Tensor>& type_per_edge) {
+    type_per_edge_ = type_per_edge;
+  }
+
+  /** @brief Set the edge attributes dictionary. */
+  inline void SetEdgeAttributes(
+      const torch::optional<EdgeAttrMap>& edge_attributes) {
+    edge_attributes_ = edge_attributes;
+  }
+
   /**
    * @brief Magic number to indicate graph version in serialize/deserialize
    * stage.

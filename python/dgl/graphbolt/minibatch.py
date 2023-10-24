@@ -314,12 +314,16 @@ class MiniBatch:
         """
         minibatch = DGLMiniBatch(
             blocks=self._to_dgl_blocks(),
-            input_nodes=self.input_nodes,
-            output_nodes=self.seed_nodes,
             node_features=self.node_features,
             edge_features=self.edge_features,
             labels=self.labels,
         )
+        # Need input nodes to fetch feature.
+        if self.node_features is None:
+            minibatch.input_nodes = self.input_nodes
+        # Need output nodes to fetch label.
+        if self.labels is None:
+            minibatch.output_nodes = self.seed_nodes
         assert (
             minibatch.blocks is not None
         ), "Sampled subgraphs for computation are missing."

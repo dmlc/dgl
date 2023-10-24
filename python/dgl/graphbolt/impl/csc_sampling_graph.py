@@ -8,6 +8,8 @@ from typing import Dict, Optional, Union
 
 import torch
 
+from dgl.utils import recursive_apply
+
 from ...base import EID, ETYPE
 from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
@@ -181,6 +183,11 @@ class CSCSamplingGraph(SamplingGraph):
         """
         return self._c_csc_graph.csc_indptr()
 
+    @csc_indptr.setter
+    def csc_indptr(self, csc_indptr: torch.tensor) -> None:
+        """Sets the indices pointer in the CSC graph."""
+        self._c_csc_graph.set_csc_indptr(csc_indptr)
+
     @property
     def indices(self) -> torch.tensor:
         """Returns the indices in the CSC graph.
@@ -197,6 +204,11 @@ class CSCSamplingGraph(SamplingGraph):
         ids.
         """
         return self._c_csc_graph.indices()
+
+    @indices.setter
+    def indices(self, indices: torch.tensor) -> None:
+        """Sets the indices in the CSC graph."""
+        self._c_csc_graph.set_indices(indices)
 
     @property
     def node_type_offset(self) -> Optional[torch.Tensor]:
@@ -215,6 +227,13 @@ class CSCSamplingGraph(SamplingGraph):
         """
         return self._c_csc_graph.node_type_offset()
 
+    @node_type_offset.setter
+    def node_type_offset(
+        self, node_type_offset: Optional[torch.Tensor]
+    ) -> None:
+        """Sets the node type offset tensor if present."""
+        self._c_csc_graph.set_node_type_offset(node_type_offset)
+
     @property
     def type_per_edge(self) -> Optional[torch.Tensor]:
         """Returns the edge type tensor if present.
@@ -226,6 +245,11 @@ class CSCSamplingGraph(SamplingGraph):
             containing the type of each edge in the graph.
         """
         return self._c_csc_graph.type_per_edge()
+
+    @type_per_edge.setter
+    def type_per_edge(self, type_per_edge: Optional[torch.Tensor]) -> None:
+        """Sets the edge type tensor if present."""
+        self._c_csc_graph.set_type_per_edge(type_per_edge)
 
     @property
     def edge_attributes(self) -> Optional[Dict[str, torch.Tensor]]:
@@ -240,6 +264,13 @@ class CSCSamplingGraph(SamplingGraph):
             should match the total number of edges."
         """
         return self._c_csc_graph.edge_attributes()
+
+    @edge_attributes.setter
+    def edge_attributes(
+        self, edge_attributes: Optional[Dict[str, torch.Tensor]]
+    ) -> None:
+        """Sets the edge attributes dictionary."""
+        self._c_csc_graph.set_edge_attributes(edge_attributes)
 
     @property
     def metadata(self) -> Optional[GraphMetadata]:
@@ -277,12 +308,13 @@ class CSCSamplingGraph(SamplingGraph):
         # TODO: change the result to 'SampledSubgraphImpl'.
         return self._c_csc_graph.in_subgraph(nodes)
 
-    def _convert_to_sampled_subgraph(
+    def _convert_to_sampled_subgraph_node_pairs_and_eids(
         self,
         C_sampled_subgraph: torch.ScriptObject,
     ):
-        """An internal function used to convert a fused homogeneous sampled
-        subgraph to general struct 'SampledSubgraphImpl'."""
+        """An internal function used to generate node pairs and eids of
+        structure `SampledSubgraphImpl` from a fused homogeneous sampled
+        subgraph."""
         column_num = (
             C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
         )
@@ -326,6 +358,48 @@ class CSCSamplingGraph(SamplingGraph):
             node_pairs=node_pairs, original_edge_ids=original_edge_ids
         )
 
+    def _convert_to_sampled_subgraph(
+        self,
+        C_sampled_subgraph: torch.ScriptObject,
+    ):
+        """An internal function used to convert a fused homogeneous sampled
+        subgraph to general struct 'SampledSubgraphImpl'."""
+        type_per_edge = C_sampled_subgraph.type_per_edge
+        if type_per_edge is None:
+            column_num = (
+                C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
+            )
+            column = torch.arange(len(column_num)).repeat_interleave(column_num)
+            row = torch.arange(len(C_sampled_subgraph.indices)) + len(
+                column_num
+            )
+            original_edge_ids = C_sampled_subgraph.original_edge_ids
+            has_original_eids = (
+                self.edge_attributes is not None
+                and ORIGINAL_EDGE_ID in self.edge_attributes
+            )
+            if has_original_eids and original_edge_ids is not None:
+                original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
+                    original_edge_ids
+                ]
+            # The sampled graph is already a homogeneous graph.
+            node_pairs = (row, column)
+            return SampledSubgraphImpl(
+                node_pairs=node_pairs,
+                original_edge_ids=original_edge_ids,
+                original_column_node_ids=(
+                    C_sampled_subgraph.original_column_node_ids
+                ),
+                original_row_node_ids=torch.cat(
+                    (
+                        C_sampled_subgraph.original_column_node_ids,
+                        C_sampled_subgraph.indices,
+                    )
+                ),
+            )
+        else:
+            raise RuntimeError("Not implemented yet.")
+
     def _convert_to_homogeneous_nodes(self, nodes):
         homogeneous_nodes = []
         for ntype, ids in nodes.items():
@@ -339,6 +413,7 @@ class CSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        deduplicate=True,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -378,6 +453,10 @@ class CSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        deduplicate: bool
+            Boolean indicating whether seeds between hops will be deduplicated.
+            If True, the same elements in seeds will be removed to only one.
+            Otherwise, the same elements will be remained.
         Returns
         -------
         SampledSubgraphImpl
@@ -409,8 +488,12 @@ class CSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, probs_name
         )
-
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        if deduplicate:
+            return self._convert_to_sampled_subgraph_node_pairs_and_eids(
+                C_sampled_subgraph
+            )
+        else:
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
@@ -498,12 +581,17 @@ class CSCSamplingGraph(SamplingGraph):
         """
         # Ensure nodes is 1-D tensor.
         self._check_sampler_arguments(nodes, fanouts, probs_name)
-        has_origin_eids = (
+        has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
         return self._c_csc_graph.sample_neighbors(
-            nodes, fanouts.tolist(), replace, False, has_origin_eids, probs_name
+            nodes,
+            fanouts.tolist(),
+            replace,
+            False,
+            has_original_eids,
+            probs_name,
         )
 
     def sample_layer_neighbors(
@@ -512,6 +600,7 @@ class CSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        deduplicate=True,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
@@ -553,6 +642,10 @@ class CSCSamplingGraph(SamplingGraph):
             corresponding to each neighboring edge of a node. It must be a 1D
             floating-point or boolean tensor, with the number of elements
             equalling the total number of edges.
+        deduplicate: bool
+            Boolean indicating whether seeds between hops will be deduplicated.
+            If True, the same elements in seeds will be deleted to only one.
+            Otherwise, the same elements will be remained.
         Returns
         -------
         SampledSubgraphImpl
@@ -594,8 +687,12 @@ class CSCSamplingGraph(SamplingGraph):
             has_original_eids,
             probs_name,
         )
-
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        if deduplicate:
+            return self._convert_to_sampled_subgraph_node_pairs_and_eids(
+                C_sampled_subgraph
+            )
+        else:
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
@@ -669,6 +766,28 @@ class CSCSamplingGraph(SamplingGraph):
             self._metadata,
         )
 
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy `CSCSamplingGraph` to the specified device."""
+
+        def _to(x, device):
+            return x.to(device) if hasattr(x, "to") else x
+
+        self.csc_indptr = recursive_apply(
+            self.csc_indptr, lambda x: _to(x, device)
+        )
+        self.indices = recursive_apply(self.indices, lambda x: _to(x, device))
+        self.node_type_offset = recursive_apply(
+            self.node_type_offset, lambda x: _to(x, device)
+        )
+        self.type_per_edge = recursive_apply(
+            self.type_per_edge, lambda x: _to(x, device)
+        )
+        self.edge_attributes = recursive_apply(
+            self.edge_attributes, lambda x: _to(x, device)
+        )
+
+        return self
+
 
 def from_csc(
     csc_indptr: torch.Tensor,
@@ -710,8 +829,11 @@ def from_csc(
     >>> indices = torch.tensor([1, 3, 0, 1, 2, 0, 3])
     >>> node_type_offset = torch.tensor([0, 1, 2, 3])
     >>> type_per_edge = torch.tensor([0, 1, 0, 1, 1, 0, 0])
-    >>> graph = graphbolt.from_csc(csc_indptr, indices, node_type_offset, \
-    >>>                            type_per_edge, None, metadata)
+    >>> graph = graphbolt.from_csc(csc_indptr, indices,
+    ...             node_type_offset=node_type_offset,
+    ...             type_per_edge=type_per_edge,
+    ...             edge_attributes=None, metadata=metadata)
+    None, metadata)
     >>> print(graph)
     CSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),
@@ -825,14 +947,19 @@ def from_dglgraph(
     include_original_edge_id: bool = False,
 ) -> CSCSamplingGraph:
     """Convert a DGLGraph to CSCSamplingGraph."""
+
     homo_g, ntype_count, _ = to_homogeneous(g, return_count=True)
-    # Initialize metadata.
-    node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
-    edge_type_to_id = {
-        etype_tuple_to_str(etype): g.get_etype_id(etype)
-        for etype in g.canonical_etypes
-    }
-    metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
+
+    if is_homogeneous:
+        metadata = None
+    else:
+        # Initialize metadata.
+        node_type_to_id = {ntype: g.get_ntype_id(ntype) for ntype in g.ntypes}
+        edge_type_to_id = {
+            etype_tuple_to_str(etype): g.get_etype_id(etype)
+            for etype in g.canonical_etypes
+        }
+        metadata = GraphMetadata(node_type_to_id, edge_type_to_id)
 
     # Obtain CSC matrix.
     indptr, indices, edge_ids = homo_g.adj_tensors("csc")
