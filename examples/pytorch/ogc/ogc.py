@@ -15,7 +15,8 @@ decline = 0.9            # the dcline rate
 eta_sup = 0.001          # the learning rate for supervised loss
 eta_W = 0.5              # the learning rate for updating W
 beta = 0.1               # in [0,1], the moving probability that a node moves to its neighbors
-max_similar_tol = 0.995  # the max_tol test set label prediction similarity between two iterations
+max_similar_tol = 0.995  # The max_tol test set label prediction similarity
+                         # between two iterations.
 max_patience = 2         # the tolreance for consecutively getting very similar test prediction
 
 
