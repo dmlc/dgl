@@ -311,20 +311,20 @@ def parse_args():
         help="Learning rate for optimization.",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=256, help="Batch size for training."
+        "--batch-size", type=int, default=1024, help="Batch size for training."
     )
     parser.add_argument(
         "--num-workers",
         type=int,
-        default=4,
+        default=0,
         help="Number of workers for data loading.",
     )
     parser.add_argument(
         "--fanout",
         type=str,
-        default="15,10,5",
+        default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
-        " identical with the number of layers in your model. Default: 15,10,5",
+        " identical with the number of layers in your model. Default: 10,10,10",
     )
     return parser.parse_args()
 
@@ -344,7 +344,7 @@ def main(args):
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
     in_size = features.size("node", None, "feat")[0]
-    hidden_size = 128
+    hidden_size = 256
     out_size = num_classes
 
     model = SAGE(in_size, hidden_size, out_size)
