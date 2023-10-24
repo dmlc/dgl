@@ -116,21 +116,22 @@ class NeighborSampler(SubgraphSampler):
                 self.fanouts[hop],
                 self.replace,
                 self.prob_name,
-                self.deduplicate,
             )
             if self.deduplicate:
                 (
                     original_row_node_ids,
                     compacted_node_pairs,
                 ) = unique_and_compact_node_pairs(subgraph.node_pairs, seeds)
-                subgraph = SampledSubgraphImpl(
-                    node_pairs=compacted_node_pairs,
-                    original_column_node_ids=seeds,
-                    original_row_node_ids=original_row_node_ids,
-                    original_edge_ids=subgraph.original_edge_ids,
-                )
+            else:
+                raise RuntimeError("Not implemented yet.")
+            subgraph = SampledSubgraphImpl(
+                node_pairs=compacted_node_pairs,
+                original_column_node_ids=seeds,
+                original_row_node_ids=original_row_node_ids,
+                original_edge_ids=subgraph.original_edge_ids,
+            )
             subgraphs.insert(0, subgraph)
-            seeds = subgraph.original_row_node_ids
+            seeds = original_row_node_ids
         return seeds, subgraphs
 
 
