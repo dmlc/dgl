@@ -48,9 +48,7 @@ import torchmetrics.functional as MF
 import tqdm
 
 
-def create_dataloader(
-    args, graph, features, itemset, job
-):
+def create_dataloader(args, graph, features, itemset, job):
     """
     [HIGHLIGHT]
     Get a GraphBolt version of a dataloader for node classification tasks.
