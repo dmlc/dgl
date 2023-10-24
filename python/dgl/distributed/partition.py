@@ -5,13 +5,16 @@ import logging
 import os
 import time
 
+from copy import deepcopy
+
 import numpy as np
 import torch
 
-from .. import backend as F
+from .. import backend as F, graphbolt as gb
 from ..base import DGLError, EID, ETYPE, NID, NTYPE
 from ..convert import to_homogeneous
 from ..data.utils import load_graphs, load_tensors, save_graphs, save_tensors
+from ..heterograph import DGLGraph
 from ..partition import (
     get_peak_mem,
     metis_partition_assignment,
@@ -141,7 +144,7 @@ def _get_part_ranges(id_ranges):
     return res
 
 
-def load_partition(part_config, part_id, load_feats=True):
+def load_partition(part_config, part_id, load_feats=True, use_graphbolt=False):
     """Load data of a partition from the data path.
 
     A partition data includes a graph structure of the partition, a dict of node tensors,
@@ -163,6 +166,8 @@ def load_partition(part_config, part_id, load_feats=True):
     load_feats : bool, optional
         Whether to load node/edge feats. If False, the returned node/edge feature
         dictionaries will be empty. Default: True.
+    use_graphbolt : bool, optional
+        Whether to load the partition graph structure in the GraphBolt format.
 
     Returns
     -------
@@ -190,10 +195,13 @@ def load_partition(part_config, part_id, load_feats=True):
         "part-{}".format(part_id) in part_metadata
     ), "part-{} does not exist".format(part_id)
     part_files = part_metadata["part-{}".format(part_id)]
+    part_graph_field = "part_graph"
+    if use_graphbolt:
+        part_graph_field = "gb_part_graph"
     assert (
-        "part_graph" in part_files
-    ), "the partition does not contain graph structure."
-    partition_path = relative_to_config(part_files["part_graph"])
+        part_graph_field in part_files
+    ), f"the partition does not contain graph structure: {part_graph_field}."
+    partition_path = relative_to_config(part_files[part_graph_field])
     logging.info(
         "Start to load partition from %s which is "
         "%d bytes. It may take non-trivial "
@@ -201,20 +209,35 @@ def load_partition(part_config, part_id, load_feats=True):
         partition_path,
         os.path.getsize(partition_path),
     )
-    graph = load_graphs(partition_path)[0][0]
-    logging.info("Finished loading partition.")
+    graph = None
+    if partition_path.endswith(".tar"):
+        assert use_graphbolt, (
+            "The partition is stored in the GraphBolt format. "
+            "Please set use_graphbolt=True to load it."
+        )
+        graph = gb.load_csc_sampling_graph(partition_path)
+        assert isinstance(graph, gb.CSCSamplingGraph)
+    else:
+        assert not use_graphbolt, (
+            "The partition is stored in the DGL format. "
+            "Please set use_graphbolt=False to load it."
+        )
+        graph = load_graphs(partition_path)[0][0]
+        assert isinstance(graph, DGLGraph)
+    logging.info(f"Finished loading partition from {partition_path}")
 
-    assert (
-        NID in graph.ndata
-    ), "the partition graph should contain node mapping to global node ID"
-    assert (
-        EID in graph.edata
-    ), "the partition graph should contain edge mapping to global edge ID"
+    if isinstance(graph, DGLGraph):
+        assert (
+            NID in graph.ndata
+        ), "the partition graph should contain node mapping to global node ID"
+        assert (
+            EID in graph.edata
+        ), "the partition graph should contain edge mapping to global edge ID"
 
     gpb, graph_name, ntypes, etypes = load_partition_book(part_config, part_id)
     ntypes_list = list(ntypes.keys())
     etypes_list = list(etypes.keys())
-    if "DGL_DIST_DEBUG" in os.environ:
+    if "DGL_DIST_DEBUG" in os.environ and isinstance(graph, DGLGraph):
         for ntype in ntypes:
             ntype_id = ntypes[ntype]
             # graph.ndata[NID] are global homogeneous node IDs.
@@ -547,6 +570,11 @@ def partition_graph(
     num_trainers_per_machine=1,
     objtype="cut",
     graph_formats=None,
+    use_graphbolt=False,
+    gb_store_orig_nids=False,
+    gb_store_orig_eids=False,
+    gb_store_etypes=False,
+    gb_store_metadata=False,
 ):
     """Partition a graph for distributed training and store the partitions on files.
 
@@ -720,6 +748,16 @@ def partition_graph(
         ``csc`` and ``csr``. If not specified, save one format only according to what
         format is available. If multiple formats are available, selection priority
         from high to low is ``coo``, ``csc``, ``csr``.
+    use_graphbolt : bool
+        Whether to convert the partitioned graph to GraphBolt format.
+    gb_store_orig_nids : bool
+        Whether to store the original node IDs in the partitioned graph.
+    gb_store_orig_eids : bool
+        Whether to store the original edge IDs in the partitioned graph.
+    gb_store_etypes : bool
+        Whether to store the edge types in the partitioned graph.
+    gb_store_metadata : bool
+        Whether to store the metadata of the partitioned graph.
 
     Returns
     -------
@@ -1207,7 +1245,8 @@ def partition_graph(
         )
     )
 
-    _dump_part_config(f"{out_path}/{graph_name}.json", part_metadata)
+    part_config = os.path.join(out_path, graph_name + ".json")
+    _dump_part_config(part_config, part_metadata)
 
     num_cuts = sim_g.num_edges() - tot_num_inner_edges
     if num_parts == 1:
@@ -1217,6 +1256,16 @@ def partition_graph(
             g.num_edges(), num_cuts, num_parts
         )
     )
+
+    if use_graphbolt:
+        convert_dgl_partition_to_csc_sampling_graph(
+            part_config,
+            store_orig_nids=gb_store_orig_nids,
+            store_orig_eids=gb_store_orig_eids,
+            store_etypes=gb_store_etypes,
+            store_metadata=gb_store_metadata,
+        )
+        print("Converted to GraphBolt format.")
 
     if return_mapping:
         return orig_nids, orig_eids
@@ -1255,6 +1304,7 @@ def convert_dgl_partition_to_csc_sampling_graph(
     from .. import graphbolt
 
     part_meta = _load_part_config(part_config)
+    new_part_meta = deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
 
     # Utility functions.
@@ -1329,3 +1379,11 @@ def convert_dgl_partition_to_csc_sampling_graph(
             os.path.dirname(orig_graph_path), "csc_sampling_graph.tar"
         )
         graphbolt.save_csc_sampling_graph(csc_graph, csc_graph_path)
+
+        # Update graph path.
+        new_part_meta[f"part-{part_id}"]["gb_part_graph"] = os.path.relpath(
+            csc_graph_path, os.path.dirname(part_config)
+        )
+
+    # Update partition config.
+    _dump_part_config(part_config, new_part_meta)

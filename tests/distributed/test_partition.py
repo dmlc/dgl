@@ -926,3 +926,125 @@ def test_not_sorted_node_edge_map():
         gpb, _, _, _ = load_partition_book(part_config, 1)
         assert gpb.local_ntype_offset == [0, 300, 700]
         assert gpb.local_etype_offset == [0, 500, 1100, 1800, 2600]
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1])
+@pytest.mark.parametrize("num_trainers_per_machine", [1, 4])
+@pytest.mark.parametrize("load_feats", [True, False])
+def test_partition_homo_graphbolt(
+    part_method,
+    num_parts,
+    num_trainers_per_machine,
+    load_feats,
+):
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    if part_method == "random" and num_parts > 1:
+        num_trainers_per_machine = 1
+
+    g = create_random_graph(1000)
+    g.ndata["labels"] = F.arange(0, g.num_nodes())
+    g.ndata["feats"] = F.tensor(np.random.randn(g.num_nodes(), 10), F.float32)
+    g.edata["feats"] = F.tensor(np.random.randn(g.num_edges(), 10), F.float32)
+    g.update_all(fn.copy_u("feats", "msg"), fn.sum("msg", "h"))
+    g.update_all(fn.copy_e("feats", "msg"), fn.sum("msg", "eh"))
+    num_hops = 2
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        orig_nids, orig_eids = partition_graph(
+            g,
+            "test",
+            num_parts,
+            test_dir,
+            num_hops=num_hops,
+            part_method=part_method,
+            return_mapping=True,
+            num_trainers_per_machine=num_trainers_per_machine,
+            use_graphbolt=True,
+        )
+        part_config = os.path.join(test_dir, "test.json")
+        for i in range(num_parts):
+            part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
+                part_config, i, load_feats=load_feats, use_graphbolt=True
+            )
+            assert isinstance(part_g, gb.CSCSamplingGraph)
+            assert gpb.num_partitions() == num_parts
+            gpb_meta = gpb.metadata()
+            assert len(gpb_meta) == num_parts
+            assert len(gpb.partid2nids(i)) == gpb_meta[i]["num_nodes"]
+            assert len(gpb.partid2eids(i)) == gpb_meta[i]["num_edges"]
+            assert len(gpb.partid2nids(i)) == part_g.total_num_nodes
+            assert len(gpb.partid2eids(i)) == part_g.total_num_edges
+            if load_feats:
+                assert "_N/labels" in node_feats
+                assert "_N/feats" in node_feats
+                assert "_N:_E:_N/feats" in edge_feats
+            else:
+                assert node_feats == {}
+                assert edge_feats == {}
+
+    reset_envs()
+
+
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1])
+@pytest.mark.parametrize("num_trainers_per_machine", [1, 4])
+@pytest.mark.parametrize("load_feats", [True, False])
+def test_partition_hetero_graphbolt(
+    part_method,
+    num_parts,
+    num_trainers_per_machine,
+    load_feats,
+):
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    if part_method == "random" and num_parts > 1:
+        num_trainers_per_machine = 1
+
+    hg = create_random_hetero()
+    test_ntype = "n1"
+    test_etype = ("n1", "r1", "n2")
+    hg.nodes[test_ntype].data["labels"] = F.arange(0, hg.num_nodes(test_ntype))
+    hg.nodes[test_ntype].data["feats"] = F.tensor(
+        np.random.randn(hg.num_nodes(test_ntype), 10), F.float32
+    )
+    hg.edges[test_etype].data["feats"] = F.tensor(
+        np.random.randn(hg.num_edges(test_etype), 10), F.float32
+    )
+    hg.edges[test_etype].data["labels"] = F.arange(0, hg.num_edges(test_etype))
+
+    num_hops = 2
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        orig_nids, orig_eids = partition_graph(
+            hg,
+            "test",
+            num_parts,
+            test_dir,
+            num_hops=num_hops,
+            part_method=part_method,
+            return_mapping=True,
+            num_trainers_per_machine=num_trainers_per_machine,
+            use_graphbolt=True,
+        )
+        part_config = os.path.join(test_dir, "test.json")
+        for i in range(num_parts):
+            part_g, node_feats, edge_feats, gpb, _, _, _ = load_partition(
+                part_config, i, load_feats=load_feats, use_graphbolt=True
+            )
+            assert isinstance(part_g, gb.CSCSamplingGraph)
+            assert gpb.num_partitions() == num_parts
+            gpb_meta = gpb.metadata()
+            assert len(gpb_meta) == num_parts
+            assert len(gpb.partid2nids(i)) == gpb_meta[i]["num_nodes"]
+            assert len(gpb.partid2eids(i)) == gpb_meta[i]["num_edges"]
+            assert len(gpb.partid2nids(i)) == part_g.total_num_nodes
+            assert len(gpb.partid2eids(i)) == part_g.total_num_edges
+            if load_feats:
+                assert "n1/labels" in node_feats
+                assert "n1/feats" in node_feats
+                assert "n1:r1:n2/feats" in edge_feats
+            else:
+                assert node_feats == {}
+                assert edge_feats == {}
+
+    reset_envs()

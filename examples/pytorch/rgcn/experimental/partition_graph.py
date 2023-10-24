@@ -69,6 +69,11 @@ if __name__ == "__main__":
         "--part_method", type=str, default="metis", help="the partition method"
     )
     argparser.add_argument(
+        "--graphbolt",
+        action="store_true",
+        help="convert DGL to GraphBolt partitions.",
+    )
+    argparser.add_argument(
         "--balance_train",
         action="store_true",
         help="balance the training size in each partition.",
@@ -127,4 +132,5 @@ if __name__ == "__main__":
         balance_ntypes=balance_ntypes,
         balance_edges=args.balance_edges,
         num_trainers_per_machine=args.num_trainers_per_machine,
+        use_graphbolt=args.graphbolt,
     )
