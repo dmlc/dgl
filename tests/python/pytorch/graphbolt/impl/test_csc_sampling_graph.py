@@ -1130,10 +1130,10 @@ def test_hetero_graph_on_shared_memory(
     graph = gb.from_csc(
         csc_indptr,
         indices,
-        node_type_offset,
-        type_per_edge,
-        edge_attributes,
-        metadata,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        edge_attributes=edge_attributes,
+        metadata=metadata,
     )
 
     shm_name = "test_hetero_g"
@@ -1253,10 +1253,10 @@ def test_multiprocessing_with_shared_memory():
     graph = gb.from_csc(
         csc_indptr,
         indices,
-        node_type_offset,
-        type_per_edge,
-        None,
-        metadata,
+        node_type_offset=node_type_offset,
+        type_per_edge=type_per_edge,
+        edge_attributes=None,
+        metadata=metadata,
     )
 
     ctx = mp.get_context("spawn")  # Use spawn method.
