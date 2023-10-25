@@ -102,9 +102,12 @@ class NeighborSampler(SubgraphSampler):
 
     @staticmethod
     def distributed_sample_neighbor(graph, seeds, fanouts):
-        src_nodes = seeds.flip(0)
-        dst_nodes = seeds
-        return src_nodes, dst_nodes
+        if isinstance(fanouts, int):
+            fanouts = torch.LongTensor([fanouts])
+        subgraph = graph.sample_neighbors(seeds, fanouts)
+        src_nodes, dst_nodes = subgraph.node_pairs
+        etype_ids = subgraph.original_etype_ids
+        return src_nodes, dst_nodes, etype_ids
 
     def _sample_subgraphs(self, seeds):
         subgraphs = []

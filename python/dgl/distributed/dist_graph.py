@@ -54,7 +54,7 @@ from .shared_mem_utils import (
 
 INIT_GRAPH = 800001
 
-
+from torchdata.datapipes.iter import IterDataPipe
 @functional_datapipe("distributed_sample_neighbor")
 class DistributedNeighborSampler(gb.NeighborSampler):
     """Distributed Neighbor Sampler.
@@ -76,6 +76,7 @@ class DistributedNeighborSampler(gb.NeighborSampler):
                     seeds, fanout.item(), use_graphbolt=True
                 )
             )
+        print("sampled_graphs: ", sampled_graphs)
         return seeds, sampled_graphs
 
 

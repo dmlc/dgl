@@ -122,8 +122,11 @@ def _sample_etype_neighbors(
         local_ids = F.astype(local_ids, local_g.idtype)
     local_src, local_dst, local_eids = None, None, None
     if use_graphbolt:
-        local_src, local_dst = gb.NeighborSampler.distributed_sample_neighbor(
+        local_src, local_dst, local_eids = gb.NeighborSampler.distributed_sample_neighbor(
             local_g, local_ids, fan_out
+        )
+        assert local_src is not None and local_dst is not None and local_eids is not None, (
+            "GraphBolt NeighborSampler.distributed_sample_neighbor() failed."
         )
     else:
         sampled_graph = local_sample_etype_neighbors(
@@ -149,9 +152,6 @@ def _sample_etype_neighbors(
         global_nid_mapping, local_src
     ), F.gather_row(global_nid_mapping, local_dst)
 
-    # [Rui] Hack for graphbolt case as EID is not returned for now.
-    if global_eids is None:
-        global_eids = torch.zeros((global_src.shape[0],), dtype=torch.int64)
     return global_src, global_dst, global_eids
 
 
@@ -594,6 +594,45 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
     return hg
 
 
+def _frontier_to_heterogeneous_graph_gb(g, frontier, gpb):
+    '''[Rui] Do not use EID.'''
+    # We need to handle empty frontiers correctly.
+    if frontier.num_edges() == 0:
+        data_dict = {
+            etype: (np.zeros(0), np.zeros(0)) for etype in g.canonical_etypes
+        }
+        return heterograph(
+            data_dict,
+            {ntype: g.num_nodes(ntype) for ntype in g.ntypes},
+            idtype=g.idtype,
+        )
+
+    # For GraphBolt, we store ETYPE into EID field.
+    etype_ids = frontier.edata[EID]
+    src, dst = frontier.edges()
+    etype_ids, idx = F.sort_1d(etype_ids)
+    src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
+    _, src = gpb.map_to_per_ntype(src)
+    _, dst = gpb.map_to_per_ntype(dst)
+
+    data_dict = dict()
+    for etid, etype in enumerate(g.canonical_etypes):
+        type_idx = etype_ids == etid
+        if F.sum(type_idx, 0) > 0:
+            data_dict[etype] = (
+                F.boolean_mask(src, type_idx),
+                F.boolean_mask(dst, type_idx),
+            )
+    hg = heterograph(
+        data_dict,
+        {ntype: g.num_nodes(ntype) for ntype in g.ntypes},
+        idtype=g.idtype,
+    )
+
+    return hg
+
+
+
 def sample_etype_neighbors(
     g,
     nodes,
@@ -748,10 +787,11 @@ def sample_etype_neighbors(
         )
 
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
-    return frontier
     if not gpb.is_homogeneous:
-        # [Rui] Crashed due to incorrect eids.
-        return _frontier_to_heterogeneous_graph(g, frontier, gpb)
+        if use_graphbolt:
+            return _frontier_to_heterogeneous_graph_gb(g, frontier, gpb)
+        else:
+            return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:
         return frontier
 

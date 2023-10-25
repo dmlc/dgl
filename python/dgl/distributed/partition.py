@@ -1340,6 +1340,8 @@ def convert_dgl_partition_to_csc_sampling_graph(
             type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
             if len(etypes) < 128:
                 type_per_edge = type_per_edge.to(torch.int8)
+            elif len(etypes) < 32768:
+                type_per_edge = type_per_edge.to(torch.int16)
             # Sanity check.
             assert len(type_per_edge) == graph.num_edges()
 
@@ -1360,6 +1362,13 @@ def convert_dgl_partition_to_csc_sampling_graph(
             edge_attributes = {
                 EID: graph.edata[EID].to(RESERVED_FIELD_DTYPE[EID])
             }
+
+        if store_etypes:
+            # [Rui] Let's store as edge attributes for now.
+            if edge_attributes is None:
+                edge_attributes = {}
+            edge_attributes[ETYPE] = type_per_edge
+            type_per_edge = None
 
         # Construct CSCSamplingGraph
         csc_graph = graphbolt.from_csc(

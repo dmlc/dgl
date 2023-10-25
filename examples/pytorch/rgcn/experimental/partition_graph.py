@@ -134,5 +134,6 @@ if __name__ == "__main__":
         num_trainers_per_machine=args.num_trainers_per_machine,
         use_graphbolt=args.graphbolt,
         gb_store_orig_nids=True,
-        gb_store_orig_eids=True,
+        gb_store_orig_eids=False,
+        gb_store_etypes=True,
     )

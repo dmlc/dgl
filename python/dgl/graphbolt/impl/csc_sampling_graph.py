@@ -358,6 +358,18 @@ class CSCSamplingGraph(SamplingGraph):
             original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
                 original_edge_ids
             ]
+
+        # [Rui] Extract ETYPEs from edge attributes.
+        original_etype_ids = None
+        has_original_etype_ids = (
+            self.edge_attributes is not None
+            and ETYPE in self.edge_attributes
+        )
+        if has_original_etype_ids:
+            original_etype_ids = self.edge_attributes[ETYPE][
+                original_edge_ids
+            ]
+
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
@@ -381,7 +393,8 @@ class CSCSamplingGraph(SamplingGraph):
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
         return SampledSubgraphImpl(
-            node_pairs=node_pairs, original_edge_ids=original_edge_ids
+            node_pairs=node_pairs, original_edge_ids=original_edge_ids,
+            original_etype_ids=original_etype_ids,
         )
 
     def _convert_to_homogeneous_nodes(self, nodes):
