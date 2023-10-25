@@ -1,5 +1,8 @@
 import os
 import tempfile
+import unittest
+
+import backend as F
 
 import numpy as np
 import pydantic
@@ -123,6 +126,54 @@ def test_torch_based_feature(in_memory):
 
         contiguous_numpy = non_contiguous_numpy = None
         feature_a = feature_b = None
+
+
+@unittest.skipIf(
+    F._default_context_str == "cpu",
+    reason="Tests for pinned memory are only meaningful on GPU.",
+)
+@pytest.mark.parametrize(
+    "dtype", [torch.float32, torch.float64, torch.int32, torch.int64]
+)
+@pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
+def test_torch_based_pinned_feature(dtype, idtype):
+    a = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).pin_memory()
+    b = torch.tensor(
+        [[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype
+    ).pin_memory()
+    c = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).pin_memory()
+
+    feature_a = gb.TorchBasedFeature(a)
+    feature_b = gb.TorchBasedFeature(b)
+    feature_c = gb.TorchBasedFeature(c)
+
+    assert torch.equal(
+        feature_a.read(),
+        torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).cuda(),
+    )
+    assert feature_a.read().is_cuda
+    assert torch.equal(
+        feature_b.read(),
+        torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype).cuda(),
+    )
+    assert feature_b.read().is_cuda
+    assert torch.equal(
+        feature_a.read(torch.tensor([0], dtype=idtype).cuda()),
+        torch.tensor([[1, 2, 3]], dtype=dtype).cuda(),
+    )
+    assert feature_a.read(torch.tensor([0], dtype=idtype).cuda()).is_cuda
+    assert torch.equal(
+        feature_b.read(torch.tensor([1], dtype=idtype).cuda()),
+        torch.tensor([[[4, 5], [6, 7]]], dtype=dtype).cuda(),
+    )
+    assert feature_b.read(torch.tensor([1], dtype=idtype).cuda()).is_cuda
+
+    assert feature_c.read().is_cuda
+    assert torch.equal(
+        feature_c.read(torch.tensor([0], dtype=idtype)),
+        torch.tensor([[1, 2, 3]], dtype=dtype),
+    )
+    assert not feature_c.read(torch.tensor([0], dtype=idtype)).is_cuda
 
 
 def write_tensor_to_disk(dir, name, t, fmt="torch"):

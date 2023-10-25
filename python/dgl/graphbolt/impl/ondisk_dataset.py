@@ -1,7 +1,6 @@
 """GraphBolt OnDiskDataset."""
 
 import os
-import shutil
 from copy import deepcopy
 from typing import Dict, List, Union
 
@@ -11,12 +10,13 @@ import yaml
 
 import dgl
 
+from ...base import dgl_warning
 from ...data.utils import download, extract_archive
 from ..base import etype_str_to_tuple
 from ..dataset import Dataset, Task
 from ..itemset import ItemSet, ItemSetDict
 from ..sampling_graph import SamplingGraph
-from ..utils import get_npy_dim, read_data, save_data
+from ..utils import copy_or_convert_data, read_data
 from .csc_sampling_graph import (
     CSCSamplingGraph,
     from_dglgraph,
@@ -32,32 +32,6 @@ from .ondisk_metadata import (
 from .torch_based_feature_store import TorchBasedFeatureStore
 
 __all__ = ["OnDiskDataset", "preprocess_ondisk_dataset", "BuiltinDataset"]
-
-
-def _copy_or_convert_data(
-    input_path,
-    output_path,
-    input_format,
-    output_format="numpy",
-    in_memory=True,
-):
-    """Copy or convert the data from input_path to output_path."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    # If the original format is numpy, just copy the file.
-    if input_format == "numpy":
-        # If dim of the data is 1, reshape it to n * 1 and save it to output_path.
-        if get_npy_dim(input_path) == 1:
-            data = read_data(input_path, input_format, in_memory)
-            data = data.reshape(-1, 1)
-            save_data(data, output_path, output_format)
-        else:
-            shutil.copyfile(input_path, output_path)
-    else:
-        # If the original format is not numpy, convert it to numpy.
-        data = read_data(input_path, input_format, in_memory)
-        if data.dim() == 1:
-            data = data.reshape(-1, 1)
-        save_data(data, output_path, output_format)
 
 
 def preprocess_ondisk_dataset(
@@ -193,12 +167,13 @@ def preprocess_ondisk_dataset(
             out_feature["path"] = os.path.join(
                 processed_dir_prefix, feature["path"].replace("pt", "npy")
             )
-            _copy_or_convert_data(
+            copy_or_convert_data(
                 os.path.join(dataset_dir, feature["path"]),
                 os.path.join(dataset_dir, out_feature["path"]),
                 feature["format"],
                 out_feature["format"],
                 feature["in_memory"],
+                is_feature=True,
             )
 
     # 7. Save tasks and train/val/test split according to the output_config.
@@ -221,7 +196,7 @@ def preprocess_ondisk_dataset(
                             processed_dir_prefix,
                             input_data["path"].replace("pt", "npy"),
                         )
-                        _copy_or_convert_data(
+                        copy_or_convert_data(
                             os.path.join(dataset_dir, input_data["path"]),
                             os.path.join(dataset_dir, output_data["path"]),
                             input_data["format"],
@@ -498,13 +473,16 @@ class OnDiskDataset(Dataset):
 
     def _init_all_nodes_set(self, graph) -> Union[ItemSet, ItemSetDict]:
         if graph is None:
+            dgl_warning(
+                "`all_node_set` is returned as None, since graph is None."
+            )
             return None
         num_nodes = graph.num_nodes
         if isinstance(num_nodes, int):
-            return ItemSet(num_nodes)
+            return ItemSet(num_nodes, names="seed_nodes")
         else:
             data = {
-                node_type: ItemSet(num_node)
+                node_type: ItemSet(num_node, names="seed_nodes")
                 for node_type, num_node in num_nodes.items()
             }
             return ItemSetDict(data)

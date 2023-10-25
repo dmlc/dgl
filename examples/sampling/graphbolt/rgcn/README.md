@@ -11,7 +11,7 @@ python3 hetero_rgcn.py --dataset ogbn-mag
 
 ### Sample on CPU and train/infer on GPU
 ```
-python3 hetero_rgcn.py --dataset ogbn-mag --num_gups 1
+python3 hetero_rgcn.py --dataset ogbn-mag --num_gpus 1
 ```
 
 ### Resource usage and time cost
@@ -19,8 +19,8 @@ Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 9
 
 | Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
 | ------------ | ------------- | ----------- | ---------- | --------- | ---------------------------    |
-| ~1.1GB       | ~4.5GB        | 0           |  0GB       | ~4min14s(615it, 2.41it/s)   | ~0min28s(154it, 5.46it/s) + ~0min2s(16it, 5.48it/s) + ~0min2s(11it, 5.44it/s)   |
-| ~1.1GB       | ~2GB          | 1           |  4.4GB     | ~1min15s(615it, 8.11it/s)   | ~0min27s(154it, 5.63it/s) + ~0min2s(16it, 5.90it/s) + ~0min1s(11it, 5.82it/s)   |
+| ~1.1GB       | ~4.5GB        | 0           |  0GB       | ~3min55s(615it, 2.62it/s)   | ~0min18s(154it, 8.37it/s) + ~0min1s(16it, 8.37it/s) + ~0min1s(11it, 8.88it/s)   |
+| ~1.1GB       | ~2GB          | 1           |  4.4GB     | ~58s(615it, 10.43it/s)   | ~0min18s(154it, 8.29it/s) + ~0min1s(16it, 8.46it/s) + ~0min1s(11it, 8.82it/s)   |
 
 ### Accuracies
 ```
@@ -41,7 +41,7 @@ python3 hetero_rgcn.py --dataset ogb-lsc-mag240m
 
 ### Sample on CPU and train/infer on GPU
 ```
-python3 hetero_rgcn.py --dataset ogb-lsc-mag240m --num_gups 1
+python3 hetero_rgcn.py --dataset ogb-lsc-mag240m --num_gpus 1
 ```
 
 ### Resource usage and time cost
@@ -49,7 +49,7 @@ Below results are roughly collected from an AWS EC2 **g4dn.metal**, 384GB RAM, 9
 
 | Dataset Size | CPU RAM Usage | Num of GPUs | GPU RAM Usage | Time Per Epoch(Training) | Time Per Epoch(Inference: train/val/test set)      |
 | ------------ | ------------- | ----------- | ---------- | --------- | ---------------------------    |
-| ~404GB       | ~55GB       | 0           |  0GB       | ~3min51s(1087it, 4.70it/s)  | ~2min21s(272it, 1.93it/s) + ~0min22s(34it, 1.48it/s) + ~0min14s(22it, 1.51it/s)   |
+| ~404GB       | ~55GB       | 0           |  0GB       | ~3min25s(1087it, 5.29it/s)  | ~2min26s(272it, 1.86it/s) + ~0min20s(34it, 1.62it/s) + ~0min13s(22it, 1.68it/s)   |
 | ~404GB       | ~55GB       | 1           |  7GB       | ~2min41s(1087it, 6.73it/s)  | ~1min52s(272it, 2.41it/s) + ~0min17s(34it, 1.93it/s) + ~0min11s(22it, 1.99it/s)  |
 
 ### Accuracies
