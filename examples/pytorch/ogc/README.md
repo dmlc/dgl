@@ -9,6 +9,13 @@ With only one trainable layer, OGC is a very simple but powerful graph convoluti
 This example was implemented by [Sinuo Xu](https://github.com/SinuoXu) when she was an undergraduate at SJTU.
 
 
+## Dependencies
+
+Python     3.11.5
+PyTorch    2.0.1 
+DGL       1.1.2 
+scikit-learn 1.3.1
+
 
 ## Dataset
 
