@@ -64,10 +64,19 @@ class DistributedNeighborSampler(gb.NeighborSampler):
     """
 
     def __init__(self, datapipe, graph, fanouts):
-        super().__init__(datapipe, graph, fanouts)
+        super().__init__(datapipe, graph._g, fanouts)
+        self.dist_graph = graph
 
     def _sample_subgraphs(self, seeds):
-        return seeds, []
+        sampled_graphs = []  # In DGLGraph or DGLHeteroGraph format.
+        for fanout in self.fanouts:
+            # fanout is a tensor. We need to convert it to integer.
+            sampled_graphs.append(
+                self.dist_graph.sample_neighbors(
+                    seeds, fanout.item(), use_graphbolt=True
+                )
+            )
+        return seeds, sampled_graphs
 
 
 class InitGraphRequest(rpc.Request):
@@ -1400,6 +1409,7 @@ class DistGraph:
         replace=False,
         etype_sorted=True,
         output_device=None,
+        use_graphbolt=False,
     ):
         # pylint: disable=unused-argument
         """Sample neighbors from a distributed graph."""
@@ -1411,10 +1421,16 @@ class DistGraph:
                 replace=replace,
                 etype_sorted=etype_sorted,
                 prob=prob,
+                use_graphbolt=use_graphbolt,
             )
         else:
             frontier = graph_services.sample_neighbors(
-                self, seed_nodes, fanout, replace=replace, prob=prob
+                self,
+                seed_nodes,
+                fanout,
+                replace=replace,
+                prob=prob,
+                use_graphbolt=use_graphbolt,
             )
         return frontier
 

@@ -100,6 +100,12 @@ class NeighborSampler(SubgraphSampler):
         self.deduplicate = deduplicate
         self.sampler = graph.sample_neighbors
 
+    @staticmethod
+    def distributed_sample_neighbor(graph, seeds, fanouts):
+        src_nodes = seeds.flip(0)
+        dst_nodes = seeds
+        return src_nodes, dst_nodes
+
     def _sample_subgraphs(self, seeds):
         subgraphs = []
         num_layers = len(self.fanouts)

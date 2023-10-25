@@ -133,4 +133,6 @@ if __name__ == "__main__":
         balance_edges=args.balance_edges,
         num_trainers_per_machine=args.num_trainers_per_machine,
         use_graphbolt=args.graphbolt,
+        gb_store_orig_nids=True,
+        gb_store_orig_eids=True,
     )

@@ -3,8 +3,10 @@ from collections import namedtuple
 
 import numpy as np
 
-from .. import backend as F
-from ..base import EID, NID
+import torch
+
+from .. import backend as F, graphbolt as gb
+from ..base import dgl_warning, DGLError, EID, NID
 from ..convert import graph, heterograph
 from ..sampling import (
     sample_etype_neighbors as local_sample_etype_neighbors,
@@ -106,6 +108,7 @@ def _sample_etype_neighbors(
     prob,
     replace,
     etype_sorted=False,
+    use_graphbolt=False,
 ):
     """Sample from local partition.
 
@@ -115,25 +118,40 @@ def _sample_etype_neighbors(
     and edge IDs.
     """
     local_ids = partition_book.nid2localnid(seed_nodes, partition_book.partid)
-    local_ids = F.astype(local_ids, local_g.idtype)
-
-    sampled_graph = local_sample_etype_neighbors(
-        local_g,
-        local_ids,
-        etype_offset,
-        fan_out,
-        edge_dir,
-        prob,
-        replace,
-        etype_sorted=etype_sorted,
-        _dist_training=True,
-    )
-    global_nid_mapping = local_g.ndata[NID]
-    src, dst = sampled_graph.edges()
+    if not use_graphbolt:
+        local_ids = F.astype(local_ids, local_g.idtype)
+    local_src, local_dst, local_eids = None, None, None
+    if use_graphbolt:
+        local_src, local_dst = gb.NeighborSampler.distributed_sample_neighbor(
+            local_g, local_ids, fan_out
+        )
+    else:
+        sampled_graph = local_sample_etype_neighbors(
+            local_g,
+            local_ids,
+            etype_offset,
+            fan_out,
+            edge_dir,
+            prob,
+            replace,
+            etype_sorted=etype_sorted,
+            _dist_training=True,
+        )
+        local_src, local_dst = sampled_graph.edges()
+        local_eids = sampled_graph.edata[EID]
+    if use_graphbolt:
+        global_nid_mapping = local_g.node_attributes[NID]
+        global_eids = local_eids
+    else:
+        global_nid_mapping = local_g.ndata[NID]
+        global_eids = F.gather_row(local_g.edata[EID], local_eids)
     global_src, global_dst = F.gather_row(
-        global_nid_mapping, src
-    ), F.gather_row(global_nid_mapping, dst)
-    global_eids = F.gather_row(local_g.edata[EID], sampled_graph.edata[EID])
+        global_nid_mapping, local_src
+    ), F.gather_row(global_nid_mapping, local_dst)
+
+    # [Rui] Hack for graphbolt case as EID is not returned for now.
+    if global_eids is None:
+        global_eids = torch.zeros((global_src.shape[0],), dtype=torch.int64)
     return global_src, global_dst, global_eids
 
 
@@ -268,6 +286,7 @@ class SamplingRequestEtype(Request):
         prob=None,
         replace=False,
         etype_sorted=True,
+        use_graphbolt=False,
     ):
         self.seed_nodes = nodes
         self.edge_dir = edge_dir
@@ -275,6 +294,7 @@ class SamplingRequestEtype(Request):
         self.replace = replace
         self.fan_out = fan_out
         self.etype_sorted = etype_sorted
+        self.use_graphbolt = use_graphbolt
 
     def __setstate__(self, state):
         (
@@ -284,6 +304,7 @@ class SamplingRequestEtype(Request):
             self.replace,
             self.fan_out,
             self.etype_sorted,
+            self.use_graphbolt,
         ) = state
 
     def __getstate__(self):
@@ -294,6 +315,7 @@ class SamplingRequestEtype(Request):
             self.replace,
             self.fan_out,
             self.etype_sorted,
+            self.use_graphbolt,
         )
 
     def process_request(self, server_state):
@@ -319,6 +341,7 @@ class SamplingRequestEtype(Request):
             probs,
             self.replace,
             self.etype_sorted,
+            use_graphbolt=self.use_graphbolt,
         )
         return SubgraphResponse(global_src, global_dst, global_eids)
 
@@ -526,6 +549,7 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
         res_list.extend(results)
 
     sampled_graph = merge_graphs(res_list, g.num_nodes())
+    print("sampled_graph: ", sampled_graph)
     return sampled_graph
 
 
@@ -578,6 +602,7 @@ def sample_etype_neighbors(
     prob=None,
     replace=False,
     etype_sorted=True,
+    use_graphbolt=False,
 ):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
@@ -631,6 +656,8 @@ def sample_etype_neighbors(
         neighbors are sampled. If fanout == -1, all neighbors are collected.
     etype_sorted : bool, optional
         Indicates whether etypes are sorted.
+    use_graphbolt : bool, optional
+        Whether to use GraphBolt to sample neighbors.
 
     Returns
     -------
@@ -640,6 +667,10 @@ def sample_etype_neighbors(
     if isinstance(fanout, int):
         fanout = F.full_1d(len(g.canonical_etypes), fanout, F.int64, F.cpu())
     else:
+        if use_graphbolt:
+            dgl_warning(
+                "----------- [Rui] Not covered in demo test yet. -----------"
+            )
         etype_ids = {etype: i for i, etype in enumerate(g.canonical_etypes)}
         fanout_array = [None] * len(g.canonical_etypes)
         for etype, v in fanout.items():
@@ -688,6 +719,7 @@ def sample_etype_neighbors(
             prob=_prob,
             replace=replace,
             etype_sorted=etype_sorted,
+            use_graphbolt=use_graphbolt,
         )
 
     def local_access(local_g, partition_book, local_nids):
@@ -712,16 +744,27 @@ def sample_etype_neighbors(
             _prob,
             replace,
             etype_sorted=etype_sorted,
+            use_graphbolt=use_graphbolt,
         )
 
     frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
+    return frontier
     if not gpb.is_homogeneous:
+        # [Rui] Crashed due to incorrect eids.
         return _frontier_to_heterogeneous_graph(g, frontier, gpb)
     else:
         return frontier
 
 
-def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
+def sample_neighbors(
+    g,
+    nodes,
+    fanout,
+    edge_dir="in",
+    prob=None,
+    replace=False,
+    use_graphbolt=False,
+):
     """Sample from the neighbors of the given nodes from a distributed graph.
 
     For each node, a number of inbound (or outbound when ``edge_dir == 'out'``) edges
@@ -770,6 +813,7 @@ def sample_neighbors(g, nodes, fanout, edge_dir="in", prob=None, replace=False):
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
+    assert not use_graphbolt, "GraphBolt is not supported in distributed mode."
     gpb = g.get_partition_book()
     if not gpb.is_homogeneous:
         assert isinstance(nodes, dict)

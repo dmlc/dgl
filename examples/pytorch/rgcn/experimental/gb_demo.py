@@ -447,19 +447,18 @@ def evaluate(
 def create_itemset(g, nodes, labels):
     gpb = g.get_partition_book()
     if isinstance(nodes, dict):
-        homo_nids = []
-        homo_labels = []
-        for ntype in nodes.keys():
+        data = {}
+        for ntype in nodes:
             assert (
                 ntype in gpb.ntypes
             ), "The sampled node type {} does not exist in the input graph".format(
                 ntype
             )
-            homo_nids.append(gpb.map_to_homo_nid(nodes[ntype], ntype))
             assert ntype in labels, f"{ntype} not found in labels."
-            homo_labels.append(labels[ntype])
-        nodes = th.cat(homo_nids, 0)
-        labels = th.cat(homo_labels, 0)
+            data[ntype] = gb.ItemSet(
+                (nodes[ntype], labels[ntype]), names=("seed_nodes", "labels")
+            )
+        return gb.ItemSetDict(data)
     return gb.ItemSet((nodes, labels), names=("seed_nodes", "labels"))
 
 
