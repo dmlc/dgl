@@ -4,6 +4,7 @@ set (CMAKE_CXX_STANDARD 17)
 
 if(USE_CUDA)
   enable_language(CUDA)
+  add_definitions(-DGRAPHBOLT_USE_CUDA)
 endif()
 
 # Find PyTorch cmake files and PyTorch versions with the python interpreter
@@ -55,6 +56,11 @@ target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
                            "../third_party/dmlc-core/include"
                            "../third_party/pcg/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
+
+# TODO: upgrade to 17 for consistency with CXX standard once our linux CI supports it.
+if(USE_CUDA)
+  set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 14)
+endif()
 
 # The Torch CMake configuration only sets up the path for the MKL library when
 # using the conda distribution. The following is a workaround to address this
