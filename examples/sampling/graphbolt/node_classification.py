@@ -283,9 +283,9 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
     )
 
     for epoch in range(args.epochs):
+        t0 = time.time()
         model.train()
         total_loss = 0
-        t0 = time.time()
         for step, data in tqdm(enumerate(dataloader)):
             # The input features from the source nodes in the first layer's
             # computation graph.
