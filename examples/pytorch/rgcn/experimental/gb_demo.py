@@ -444,14 +444,11 @@ def evaluate(
         return -1, -1
 
 
-def create_itemset(g, nodes, labels, category):
+def create_itemset(g, nodes, labels):
     gpb = g.get_partition_book()
     if isinstance(nodes, dict):
-        assert (
-            category in nodes
-        ), f"Category {category} not in nodes: {nodes.keys()}."
-        labels = labels[nodes[category]]
         homo_nids = []
+        homo_labels = []
         for ntype in nodes.keys():
             assert (
                 ntype in gpb.ntypes
@@ -459,14 +456,15 @@ def create_itemset(g, nodes, labels, category):
                 ntype
             )
             homo_nids.append(gpb.map_to_homo_nid(nodes[ntype], ntype))
+            assert ntype in labels, f"{ntype} not found in labels."
+            homo_labels.append(labels[ntype])
         nodes = th.cat(homo_nids, 0)
-        print(nodes)
-
+        labels = th.cat(homo_labels, 0)
     return gb.ItemSet((nodes, labels), names=("seed_nodes", "labels"))
 
 
 def create_dataloader(g, nodes, labels, batch_size, shuffle, fanouts):
-    item_set = create_itemset(g, nodes, labels, "paper")
+    item_set = create_itemset(g, nodes, labels)
 
     datapipe = gb.ItemSampler(item_set, batch_size=batch_size, shuffle=shuffle)
 
@@ -501,7 +499,12 @@ def run(args, device, data):
 
     # Create dataloaders
     train_dl = create_dataloader(
-        g, {"paper": train_nid}, labels, args.batch_size, True, fanouts
+        g,
+        {"paper": train_nid},
+        {"paper": labels},
+        args.batch_size,
+        True,
+        fanouts,
     )
     # val_dl = create_dataloader(g, {"paper": val_nid}, labels, args.batch_size, True, val_fanouts)
     # test_dl = create_dataloader(g, {"paper": test_nid}, labels, args.eval_batch_size, True, val_fanouts)
