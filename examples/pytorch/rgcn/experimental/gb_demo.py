@@ -69,7 +69,7 @@ class RelGraphConvLayer(nn.Module):
         bias=True,
         activation=None,
         self_loop=False,
-        dropout=0.0
+        dropout=0.0,
     ):
         super(RelGraphConvLayer, self).__init__()
         self.in_feat = in_feat
@@ -444,6 +444,42 @@ def evaluate(
         return -1, -1
 
 
+def create_itemset(g, nodes, labels, category):
+    gpb = g.get_partition_book()
+    if isinstance(nodes, dict):
+        assert (
+            category in nodes
+        ), f"Category {category} not in nodes: {nodes.keys()}."
+        labels = labels[nodes[category]]
+        homo_nids = []
+        for ntype in nodes.keys():
+            assert (
+                ntype in gpb.ntypes
+            ), "The sampled node type {} does not exist in the input graph".format(
+                ntype
+            )
+            homo_nids.append(gpb.map_to_homo_nid(nodes[ntype], ntype))
+        nodes = th.cat(homo_nids, 0)
+        print(nodes)
+
+    return gb.ItemSet((nodes, labels), names=("seed_nodes", "labels"))
+
+
+def create_dataloader(g, nodes, labels, batch_size, shuffle, fanouts):
+    item_set = create_itemset(g, nodes, labels, "paper")
+
+    datapipe = gb.ItemSampler(item_set, batch_size=batch_size, shuffle=shuffle)
+
+    datapipe = datapipe.distributed_sample_neighbor(g, fanouts=fanouts)
+
+    # datapipe = datapipe.to_dgl()
+
+    # device=th.device("cpu")
+    # datapipe = datapipe.copy_to(device)
+
+    return gb.MultiProcessDataLoader(datapipe, num_workers=0)
+
+
 def run(args, device, data):
     (
         g,
@@ -459,37 +495,24 @@ def run(args, device, data):
     fanouts = [int(fanout) for fanout in args.fanout.split(",")]
     val_fanouts = [int(fanout) for fanout in args.validation_fanout.split(",")]
 
+    print(
+        f"Rank[{g.rank()}] train_nid: {train_nid.shape}, labels: {labels.shape}"
+    )
+
+    # Create dataloaders
+    train_dl = create_dataloader(
+        g, {"paper": train_nid}, labels, args.batch_size, True, fanouts
+    )
+    # val_dl = create_dataloader(g, {"paper": val_nid}, labels, args.batch_size, True, val_fanouts)
+    # test_dl = create_dataloader(g, {"paper": test_nid}, labels, args.eval_batch_size, True, val_fanouts)
+
+    for step, data in enumerate(tqdm.tqdm(train_dl, desc="DistDGL Training")):
+        pass
+
     g.barrier()
+    if g.rank() == 0:
+        time.sleep(5)
     return
-    sampler = dgl.dataloading.MultiLayerNeighborSampler(fanouts)
-    dataloader = dgl.dataloading.DistNodeDataLoader(
-        g,
-        {"paper": train_nid},
-        sampler,
-        batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=False,
-    )
-
-    valid_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
-    valid_dataloader = dgl.dataloading.DistNodeDataLoader(
-        g,
-        {"paper": val_nid},
-        valid_sampler,
-        batch_size=args.batch_size,
-        shuffle=False,
-        drop_last=False,
-    )
-
-    test_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
-    test_dataloader = dgl.dataloading.DistNodeDataLoader(
-        g,
-        {"paper": test_nid},
-        test_sampler,
-        batch_size=args.eval_batch_size,
-        shuffle=False,
-        drop_last=False,
-    )
 
     embed_layer = DistEmbedLayer(
         device,

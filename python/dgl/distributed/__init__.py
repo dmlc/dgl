@@ -2,7 +2,13 @@
 from . import optim
 from .dist_context import exit_client, initialize
 from .dist_dataloader import DistDataLoader
-from .dist_graph import DistGraph, DistGraphServer, edge_split, node_split
+from .dist_graph import (
+    DistGraph,
+    DistGraphServer,
+    DistributedNeighborSampler,
+    edge_split,
+    node_split,
+)
 from .dist_tensor import DistTensor
 from .graph_partition_book import GraphPartitionBook, PartitionPolicy
 from .graph_services import *

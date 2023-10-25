@@ -8,6 +8,9 @@ from collections.abc import MutableMapping
 
 import numpy as np
 
+import torch
+from torch.utils.data import functional_datapipe
+
 from .. import backend as F, graphbolt as gb, heterograph_index
 from .._ffi.ndarray import empty_shared_mem
 from ..base import ALL, DGLError, EID, ETYPE, is_all, NID
@@ -50,6 +53,21 @@ from .shared_mem_utils import (
 )
 
 INIT_GRAPH = 800001
+
+
+@functional_datapipe("distributed_sample_neighbor")
+class DistributedNeighborSampler(gb.NeighborSampler):
+    """Distributed Neighbor Sampler.
+
+    This is a wrapper of :py:class:`dgl.dataloading.NeighborSampler` to support distributed
+    training. It samples neighbors from a distributed graph.
+    """
+
+    def __init__(self, datapipe, graph, fanouts):
+        super().__init__(datapipe, graph, fanouts)
+
+    def _sample_subgraphs(self, seeds):
+        return seeds, []
 
 
 class InitGraphRequest(rpc.Request):
