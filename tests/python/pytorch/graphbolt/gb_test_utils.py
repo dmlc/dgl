@@ -1,5 +1,6 @@
 import os
 
+import dgl
 import dgl.graphbolt as gb
 
 import numpy as np
@@ -43,24 +44,44 @@ def get_metadata(num_ntypes, num_etypes):
     return gb.GraphMetadata(ntypes, etypes)
 
 
-def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
-    csc_indptr, indices = random_homo_graph(num_nodes, num_edges)
-    metadata = get_metadata(num_ntypes, num_etypes)
-    # Randomly get node type split point.
-    node_type_offset = torch.sort(
-        torch.randint(0, num_nodes, (num_ntypes + 1,))
-    )[0]
-    node_type_offset[0] = 0
-    node_type_offset[-1] = num_nodes
+def get_ntypes_and_etypes(num_nodes, num_ntypes, num_etypes):
+    ntypes = {f"n{i}": num_nodes // num_ntypes for i in range(num_ntypes)}
+    if num_nodes % num_ntypes != 0:
+        ntypes["n0"] += num_nodes % num_ntypes
+    etypes = []
+    count = 0
+    for n1 in range(num_ntypes):
+        for n2 in range(n1, num_ntypes):
+            if count >= num_etypes:
+                break
+            etypes.append((f"n{n1}", f"e{count}", f"n{n2}"))
+            count += 1
+    return ntypes, etypes
 
-    type_per_edge = []
-    for i in range(num_nodes):
-        num = csc_indptr[i + 1] - csc_indptr[i]
-        type_per_edge.append(
-            torch.sort(torch.randint(0, num_etypes, (num,)))[0]
+
+def random_hetero_graph(num_nodes, num_edges, num_ntypes, num_etypes):
+    ntypes, etypes = get_ntypes_and_etypes(num_nodes, num_ntypes, num_etypes)
+    edges = {}
+    for step, etype in enumerate(etypes):
+        src_ntype, _, dst_ntype = etype
+        num_e = num_edges // num_etypes + (
+            0 if step != 0 else num_edges % num_etypes
         )
-    type_per_edge = torch.cat(type_per_edge, dim=0)
-    return (csc_indptr, indices, node_type_offset, type_per_edge, metadata)
+        if ntypes[src_ntype] == 0 or ntypes[dst_ntype] == 0:
+            continue
+        src = torch.randint(0, ntypes[src_ntype], (num_e,))
+        dst = torch.randint(0, ntypes[dst_ntype], (num_e,))
+
+        edges[etype] = (src, dst)
+
+    gb_g = gb.from_dglgraph(dgl.heterograph(edges, ntypes))
+    return (
+        gb_g.csc_indptr,
+        gb_g.indices,
+        gb_g.node_type_offset,
+        gb_g.type_per_edge,
+        gb_g.metadata,
+    )
 
 
 def random_homo_graphbolt_graph(
