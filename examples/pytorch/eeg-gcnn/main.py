@@ -103,6 +103,7 @@ if __name__ == "__main__":
     _EXPERIMENT_NAME = args.exp_name
     _BATCH_SIZE = args.batch_size
     num_feats = args.num_feats
+    num_workers = args.num_workers
 
     # set up input and targets from files
     x = _load_memory_mapped_array(f"psd_features_data_X")
@@ -155,7 +156,6 @@ if __name__ == "__main__":
     # Dataloader========================================================================================================
 
     # use WeightedRandomSampler to balance the training dataset
-    _NUM_WORKERS = args.num_workers
 
     labels_unique, counts = np.unique(y, return_counts=True)
 
@@ -178,7 +178,7 @@ if __name__ == "__main__":
         dataset=train_dataset,
         batch_size=_BATCH_SIZE,
         sampler=weighted_sampler,
-        num_workers=_NUM_WORKERS,
+        num_workers=num_workers,
         pin_memory=True,
     )
 
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         dataset=train_dataset,
         batch_size=_BATCH_SIZE,
         shuffle=False,
-        num_workers=_NUM_WORKERS,
+        num_workers=num_workers,
         pin_memory=True,
     )
 
@@ -200,7 +200,7 @@ if __name__ == "__main__":
         dataset=test_dataset,
         batch_size=_BATCH_SIZE,
         shuffle=False,
-        num_workers=_NUM_WORKERS,
+        num_workers=num_workers,
         pin_memory=True,
     )
 
