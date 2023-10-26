@@ -102,9 +102,10 @@ class NeighborSampler(SubgraphSampler):
 
     @staticmethod
     def distributed_sample_neighbor(graph, seeds, fanouts):
-        assert isinstance(fanouts, int), f"Fanouts should be an integer but got {fanouts}."
-        fanouts = torch.LongTensor([fanouts])
-        subgraph = graph.sample_neighbors(seeds, fanouts)
+        if isinstance(fanouts, int):
+            fanouts = torch.LongTensor([fanouts])
+        assert isinstance(fanouts, torch.Tensor), f"Invalid fanouts: {fanouts}"
+        subgraph = graph.sample_neighbors(seeds, fanouts, keep_homo=True)
         src_nodes, dst_nodes = subgraph.node_pairs
         etype_ids = subgraph.original_etype_ids
         assert src_nodes.shape == dst_nodes.shape == etype_ids.shape, f"Shape mismatch: {src_nodes.shape}, {dst_nodes.shape}, {etype_ids.shape}"

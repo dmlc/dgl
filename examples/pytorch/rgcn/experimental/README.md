@@ -53,9 +53,7 @@ python3 /home/ubuntu/workspace/dgl_2/tools/launch.py \
 #### Results
 `g4dn.metal` x 2, `ogbn-mag`.
 
-[**NOTE**] `sample_etype_neighbors()` is not correctly enabled in DistDGL with GraphBolt.
-
-DistDGL with GraphBolt takes less time for sampling(-60%) and for whole epoch(-30%) while keeping comparable accuracies in validation and test.
+DistDGL with GraphBolt takes less time for sampling(from **73s** to **11s**) and for whole epoch(from **178s** to **70s**) while keeping comparable accuracies in validation and test.
 
 ##### DistDGL
 
@@ -68,7 +66,16 @@ Val Acc 0.4618, Test Acc 0.4485, time: 16.9179
 
 ##### DistDGL with GraphBolt
 
-fanout = [25, 10], multiplied by `num_etypes`. [**Default**]
+fanout = [25, 10], call `gb.sample_etype_neighbors()` correctly. [**Default**]
+
+```
+Epoch Time(s): 70.3498, sample: 10.6339, data copy: 8.9492, forward: 2.6577, backward: 36.1793, update: 11.9295, #train: 78696, #input
+: 34559464
+
+Val Acc 0.4572, Test Acc 0.4498, time: 3.5830
+```
+
+fanout = [25, 10], multiplied by `num_etypes`. [**Deprecated**]
 
 ```
 [3]Epoch Time(s): 137.0454, sample: 27.0914, data copy: 32.2842, forward: 3.5588, backward: 60.5921, update: 13.5188, #train: 78696, #inp

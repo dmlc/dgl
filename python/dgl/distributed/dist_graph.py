@@ -195,7 +195,15 @@ def _get_graph_from_shared_mem(graph_name, use_graphbolt):
     through shared memory to reduce the overhead of data access.
     """
     if use_graphbolt:
-        g = gb.load_from_shared_memory(graph_name, None)
+        metadata = gb.GraphMetadata(
+            {'author': 0, 'field_of_study': 1, 'institution': 2, 'paper': 3},
+            {'author:affiliated_with:institution': 0, 'author:writes:paper': 1,
+             'field_of_study:rev-has_topic:paper': 2,
+             'institution:rev-affiliated_with:author': 3, 'paper:cites:paper': 4,
+             'paper:has_topic:field_of_study': 5, 'paper:rev-cites:paper': 6,
+             'paper:rev-writes:author': 7}
+        )
+        g = gb.load_from_shared_memory(graph_name, metadata)
         return g
 
     g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(

@@ -732,7 +732,6 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
                     assert new_g.edge_attributes is None
             if store_etypes:
                 assert th.all(0 == new_g.edge_attributes[dgl.ETYPE])
-                assert new_g.type_per_edge is None
             else:
                 assert new_g.type_per_edge is None
             if store_metadata:
@@ -804,7 +803,6 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
                     assert new_g.edge_attributes is None
             if store_etypes:
                 assert th.equal(orig_g.edata[dgl.ETYPE][orig_eids], new_g.edge_attributes[dgl.ETYPE])
-                assert new_g.type_per_edge is None
             else:
                 assert new_g.type_per_edge is None
             if store_metadata:
@@ -1093,10 +1091,7 @@ def test_partition_hetero_graphbolt_sample_neighbors(
             return_mapping=True,
             num_trainers_per_machine=num_trainers_per_machine,
             use_graphbolt=True,
-            gb_store_orig_nids=True,
-            gb_store_orig_eids=True,
-            gb_store_ntypes=True,
-            gb_store_etypes=True,
+            gb_save_all=True,
         )
         part_config = os.path.join(test_dir, "test.json")
         for i in range(num_parts):
@@ -1120,7 +1115,7 @@ def test_partition_hetero_graphbolt_sample_neighbors(
                 assert edge_feats == {}
 
             # sample_neighbors()
-            subg = part_g.sample_neighbors(th.arange(10), th.LongTensor([-1]))
+            subg = part_g.sample_neighbors(th.arange(10), th.LongTensor([-1]), keep_homo=True)
             src, dst = subg.node_pairs
             orig_src = part_g.node_attributes[dgl.NID][src]
             orig_dst = part_g.node_attributes[dgl.NID][dst]

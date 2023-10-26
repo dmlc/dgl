@@ -337,6 +337,7 @@ class CSCSamplingGraph(SamplingGraph):
     def _convert_to_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
+        keep_homo: bool = False,
     ):
         """An internal function used to convert a fused homogeneous sampled
         subgraph to general struct 'SampledSubgraphImpl'."""
@@ -372,7 +373,7 @@ class CSCSamplingGraph(SamplingGraph):
             ]
             assert original_etype_ids is not None, "original_etype_ids is None"
 
-        if type_per_edge is None:
+        if type_per_edge is None or keep_homo:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
         else:
@@ -412,6 +413,7 @@ class CSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        keep_homo: bool = False,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -483,7 +485,7 @@ class CSCSamplingGraph(SamplingGraph):
             nodes, fanouts, replace, probs_name
         )
 
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        return self._convert_to_sampled_subgraph(C_sampled_subgraph, keep_homo=keep_homo)
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
@@ -494,8 +496,8 @@ class CSCSamplingGraph(SamplingGraph):
         assert len(fanouts) in [
             expected_fanout_len,
             1,
-        ], "Fanouts should have the same number of elements as etypes or \
-            should have a length of 1."
+        ], f"Fanouts should have the same number of elements as etypes or \
+            should have a length of 1, but got {fanouts} while {self.metadata.edge_type_to_id}"
         if fanouts.size(0) > 1:
             assert (
                 self.type_per_edge is not None

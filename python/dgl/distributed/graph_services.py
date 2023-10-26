@@ -712,28 +712,20 @@ def sample_etype_neighbors(
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
-    if use_graphbolt:
-        assert isinstance(fanout, int), "GraphBolt only supports int fanout."
-        # [Rui] As CSCSamplingGraph is always homogeneous in GB,
-        # sample_etype_neighbors() not supported yet though it's available in
-        # underlying GB. So I increase the fanout to mimic the behavior of
-        # sample_etype_neighbors(). But I know it's quite not right.
-        fanout *= len(g.canonical_etypes)
+    if isinstance(fanout, int):
+        fanout = F.full_1d(len(g.canonical_etypes), fanout, F.int64, F.cpu())
     else:
-        if isinstance(fanout, int):
-            fanout = F.full_1d(len(g.canonical_etypes), fanout, F.int64, F.cpu())
-        else:
-            etype_ids = {etype: i for i, etype in enumerate(g.canonical_etypes)}
-            fanout_array = [None] * len(g.canonical_etypes)
-            for etype, v in fanout.items():
-                c_etype = g.to_canonical_etype(etype)
-                fanout_array[etype_ids[c_etype]] = v
-            assert all(v is not None for v in fanout_array), (
-                "Not all etypes have valid fanout. Please make sure passed-in "
-                "fanout in dict includes all the etypes in graph. Passed-in "
-                f"fanout: {fanout}, graph etypes: {g.canonical_etypes}."
-            )
-            fanout = F.tensor(fanout_array, dtype=F.int64)
+        etype_ids = {etype: i for i, etype in enumerate(g.canonical_etypes)}
+        fanout_array = [None] * len(g.canonical_etypes)
+        for etype, v in fanout.items():
+            c_etype = g.to_canonical_etype(etype)
+            fanout_array[etype_ids[c_etype]] = v
+        assert all(v is not None for v in fanout_array), (
+            "Not all etypes have valid fanout. Please make sure passed-in "
+            "fanout in dict includes all the etypes in graph. Passed-in "
+            f"fanout: {fanout}, graph etypes: {g.canonical_etypes}."
+        )
+        fanout = F.tensor(fanout_array, dtype=F.int64)
 
     gpb = g.get_partition_book()
     if isinstance(nodes, dict):

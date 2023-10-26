@@ -571,11 +571,7 @@ def partition_graph(
     objtype="cut",
     graph_formats=None,
     use_graphbolt=False,
-    gb_store_orig_nids=False,
-    gb_store_orig_eids=False,
-    gb_store_ntypes=False,
-    gb_store_etypes=False,
-    gb_store_metadata=False,
+    gb_save_all=False,
 ):
     """Partition a graph for distributed training and store the partitions on files.
 
@@ -751,16 +747,6 @@ def partition_graph(
         from high to low is ``coo``, ``csc``, ``csr``.
     use_graphbolt : bool
         Whether to convert the partitioned graph to GraphBolt format.
-    gb_store_orig_nids : bool
-        Whether to store the original node IDs in the partitioned graph.
-    gb_store_orig_eids : bool
-        Whether to store the original edge IDs in the partitioned graph.
-    gb_store_ntypes : bool
-        Whether to store the node types in the partitioned graph.
-    gb_store_etypes : bool
-        Whether to store the edge types in the partitioned graph.
-    gb_store_metadata : bool
-        Whether to store the metadata of the partitioned graph.
 
     Returns
     -------
@@ -1261,14 +1247,19 @@ def partition_graph(
     )
 
     if use_graphbolt:
-        convert_dgl_partition_to_csc_sampling_graph(
-            part_config,
-            store_orig_nids=gb_store_orig_nids,
-            store_orig_eids=gb_store_orig_eids,
-            store_ntypes=gb_store_ntypes,
-            store_etypes=gb_store_etypes,
-            store_metadata=gb_store_metadata,
-        )
+        if gb_save_all:
+            convert_dgl_partition_to_csc_sampling_graph(
+                part_config,
+                store_orig_nids=True,
+                store_orig_eids=True,
+                store_ntypes=True,
+                store_etypes=True,
+                store_metadata=True,
+            )
+        else:
+            convert_dgl_partition_to_csc_sampling_graph(
+                part_config,
+            )
         print("Converted to GraphBolt format.")
 
     if return_mapping:
@@ -1281,7 +1272,7 @@ def convert_dgl_partition_to_csc_sampling_graph(
     store_orig_eids=False,
     store_ntypes=False,
     store_etypes=True,
-    store_metadata=False,
+    store_metadata=True,
 ):
     """Convert partitions of dgl to CSCSamplingGraph of GraphBolt.
 
@@ -1383,7 +1374,6 @@ def convert_dgl_partition_to_csc_sampling_graph(
             if edge_attributes is None:
                 edge_attributes = {}
             edge_attributes[ETYPE] = type_per_edge
-            type_per_edge = None
 
         # Construct CSCSamplingGraph
         csc_graph = graphbolt.from_csc(
