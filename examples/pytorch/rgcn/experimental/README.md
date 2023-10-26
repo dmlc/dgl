@@ -1,3 +1,78 @@
+## DistDGL with GraphBolt partitions and sampling
+
+### How to partition graph
+
+#### Partition from original dataset with `dgl.distributed.partition_graph()`
+
+```
+DGL_HOME=/home/ubuntu/workspace/dgl_2 DGL_LIBRARY_PATH=$DGL_HOME/build PYTHONPATH=tests:$DGL_HOME/python:tests/python/pytorch/graphbolt:$PYTHONPATH python3 examples/pytorch/rgcn/experimental/partition_graph.py --dataset ogbn-mag --num_parts 2 --balance_train --balance_edges --graphbolt
+```
+
+#### Convert existing partitions into GraphBolt formats
+
+```
+import dgl
+part_config = "./data/ogbn-mag.json"
+dgl.distributed.convert_dgl_partition_to_csc_sampling_graph(
+    part_config,
+    store_orig_nids=True,
+    store_etypes=True,
+)
+```
+
+#### Partition sizes compared between GraphBolt and DistDGL
+
+`csc_sampling_graph.tar` is the GraphBolt partitions.
+`graph.dgl` is the original DistDGL partitions, namely, DGLGraph.
+
+```
+-rw-rw-r-- 1 ubuntu ubuntu 231M Oct 26 01:51 data/part0/csc_sampling_graph.tar
+-rw-rw-r-- 1 ubuntu ubuntu   24 Oct 26 01:51 data/part0/edge_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 701M Oct 26 01:51 data/part0/graph.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 182M Oct 26 01:51 data/part0/node_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 235M Oct 26 01:51 data/part1/csc_sampling_graph.tar
+-rw-rw-r-- 1 ubuntu ubuntu   24 Oct 26 01:51 data/part1/edge_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 711M Oct 26 01:51 data/part1/graph.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 187M Oct 26 01:51 data/part1/node_feat.dgl
+```
+
+### Train with GraphBolt partitions
+just append `--graphbolt`.
+
+```
+python3 /home/ubuntu/workspace/dgl_2/tools/launch.py \
+    --workspace /home/ubuntu/workspace/dgl_2/examples/pytorch/rgcn/experimental/ \
+    --num_trainers 4 \
+    --num_servers 2 \
+    --num_samplers 0 \
+    --part_config /home/ubuntu/workspace/dgl_2/data/ogbn-mag.json \
+    --ip_config /home/ubuntu/workspace/ip_config.txt \
+    "DGL_LIBRARY_PATH=/home/ubuntu/workspace/dgl_2/build PYTHONPATH=tests:/home/ubuntu/workspace/dgl_2/python:tests/python/pytorch/graphbolt:$PYTHONPATH python3 entity_classify_dist.py --graph-name ogbn-mag --dataset ogbn-mag --ip-config /home/ubuntu/workspace/ip_config.txt --fanout='25,10' --batch-size 1024  --n-hidden 64 --lr 0.01 --eval-batch-size 1024 --low-mem --dropout 0.5 --use-self-loop --n-bases 2 --n-epochs 1 --layer-norm --sparse-embedding --sparse-lr 0.06  --graphbolt"
+```
+
+#### Results
+`g4dn.metal` x 2, `ogbn-mag`.
+
+[**NOTE**]Epoch time drops in DistDGL with GraphBolt, so does accuracy, probably partially caused by the difference between `sample_neighbors()` and `sample_etype_neighbors()`.
+
+##### DistDGL
+
+```
+Epoch Time(s): 177.6757, sample: 73.0354, data copy: 27.7802, forward: 2.4314, backward: 63.2740, update: 11.1546, #train: 78696, #inp
+ut: 34579790
+
+Val Acc 0.4618, Test Acc 0.4485, time: 16.9179
+```
+
+##### DistDGL with GraphBolt
+
+```
+Epoch Time(s): 32.7923, sample: 5.4970, data copy: 4.9976, forward: 2.4069, backward: 15.4529, update: 4.4377, #train: 78696, #input: 
+18370936
+
+Val Acc 0.3901, Test Acc 0.3844, time: 2.2284
+```
+
 ## Distributed training
 
 This is an example of training RGCN node classification in a distributed fashion. Currently, the example train RGCN graphs with input node features. The current implementation follows ../rgcn/entity_claasify_mp.py.

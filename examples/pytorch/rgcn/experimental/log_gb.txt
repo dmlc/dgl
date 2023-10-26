@@ -1,0 +1,231 @@
+/home/ubuntu/workspace/dgl_2/tools/launch.py:148: DeprecationWarning: setDaemon() is deprecated, set the daemon attribute instead
+  thread.setDaemon(True)
+The number of OMP threads per trainer is set to 12
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+Client [174058] waits on 172.31.8.229:58369
+Client [174059] waits on 172.31.8.229:57779
+Client [174060] waits on 172.31.8.229:33865
+Client [174061] waits on 172.31.8.229:33205
+Client [1882912] waits on 172.31.14.101:35629
+Client [1882909] waits on 172.31.14.101:43017
+Client [1882910] waits on 172.31.14.101:34859
+Client [1882911] waits on 172.31.14.101:33033
+Machine (0) group (0) client (0) connect to server successfuly!
+Machine (0) group (0) client (1) connect to server successfuly!
+Machine (0) group (0) client (2) connect to server successfuly!
+Machine (0) group (0) client (3) connect to server successfuly!
+Machine (1) group (0) client (4) connect to server successfuly!
+Machine (1) group (0) client (5) connect to server successfuly!
+Machine (1) group (0) client (6) connect to server successfuly!
+Machine (1) group (0) client (7) connect to server successfuly!
+rank: 0
+rank: 7
+rank: 2
+rank: 6
+rank: 5
+rank: 3
+rank: 4
+rank: 1
+part 6, train: 78696 (local: 78696), val: 8110 (local: 7735), test: 5242 (local: 5072)
+part 7, train: 78696 (local: 78696), val: 8109 (local: 7738), test: 5242 (local: 5092)
+part 0, train: 78697 (local: 76971), val: 8110 (local: 8110), test: 5243 (local: 5243)
+part 3, train: 78696 (local: 76932), val: 8110 (local: 8110), test: 5242 (local: 5242)
+part 5, train: 78696 (local: 78696), val: 8110 (local: 7714), test: 5242 (local: 5108)
+part 4, train: 78697 (local: 78697), val: 8110 (local: 7708), test: 5243 (local: 5072)
+part 2, train: 78696 (local: 77008), val: 8110 (local: 8110), test: 5242 (local: 5242)
+part 1, train: 78697 (local: 76875), val: 8110 (local: 8110), test: 5243 (local: 5243)
+#classes: 349
+node paper has data feat
+#classes: 349
+node paper has data feat
+#classes: 349
+#classes: 349
+node paper has data feat
+node paper has data feat
+#classes: 349
+node paper has data feat
+#classes: 349
+node paper has data feat
+#classes: 349
+node paper has data feat
+#classes: 349
+node paper has data feat
+optimize Pytorch sparse embedding: ModuleDict(
+  (author): Embedding(1134649, 64, sparse=True)
+  (field_of_study): Embedding(59965, 64, sparse=True)
+  (institution): Embedding(8740, 64, sparse=True)
+)
+optimize dense projection: ModuleDict(
+  (paper): Linear(in_features=128, out_features=64, bias=True)
+)
+start training...
+optimize Pytorch sparse embedding: ModuleDict(
+  (author): Embedding(1134649, 64, sparse=True)
+  (field_of_study): Embedding(59965, 64, sparse=True)
+  (institution): Embedding(8740, 64, sparse=True)
+)
+optimize dense projection: ModuleDict(
+  (paper): Linear(in_features=128, out_features=64, bias=True)
+)
+start training...
+optimize Pytorch sparse embedding: ModuleDict(
+  (author): Embedding(1134649, 64, sparse=True)
+  (field_of_study): Embedding(59965, 64, sparse=True)
+  (institution): Embedding(8740, 64, sparse=True)
+)
+optimize dense projection: ModuleDict(
+  (paper): Linear(in_features=128, out_features=64, bias=True)
+)
+start training...
+optimize Pytorch sparse embedding: ModuleDict(
+  (author): Embedding(1134649, 64, sparse=True)
+  (field_of_study): Embedding(59965, 64, sparse=True)
+  (institution): Embedding(8740, 64, sparse=True)
+)
+optimize dense projection: ModuleDict(
+  (paper): Linear(in_features=128, out_features=64, bias=True)
+)
+start training...
+optimize Pytorch sparse embedding: ModuleDict(
+  (author): Embedding(1134649, 64, sparse=True)
+  (field_of_study): Embedding(59965, 64, sparse=True)
+  (institution): Embedding(8740, 64, sparse=True)
+)
+optimize dense projection: ModuleDict(
+  (paper): Linear(in_features=128, out_features=64, bias=True)
+)
+start training...
+optimize Pytorch sparse embedding: ModuleDict(
+  (author): Embedding(1134649, 64, sparse=True)
+  (field_of_study): Embedding(59965, 64, sparse=True)
+  (institution): Embedding(8740, 64, sparse=True)
+)
+optimize dense projection: ModuleDict(
+  (paper): Linear(in_features=128, out_features=64, bias=True)
+)
+start training...
+optimize Pytorch sparse embedding: ModuleDict(
+  (author): Embedding(1134649, 64, sparse=True)
+  (field_of_study): Embedding(59965, 64, sparse=True)
+  (institution): Embedding(8740, 64, sparse=True)
+)
+optimize dense projection: ModuleDict(
+  (paper): Linear(in_features=128, out_features=64, bias=True)
+)
+start training...
+optimize Pytorch sparse embedding: ModuleDict(
+  (author): Embedding(1134649, 64, sparse=True)
+  (field_of_study): Embedding(59965, 64, sparse=True)
+  (institution): Embedding(8740, 64, sparse=True)
+)
+optimize dense projection: ModuleDict(
+  (paper): Linear(in_features=128, out_features=64, bias=True)
+)
+start training...
+[4] Epoch 00000 | Step 00000 | Train acc 0.0020 | Loss 5.8798 | time 0.442 s| sample 0.070 | copy 0.053 | forward 0.051 | backward 0.187 | update 0.081
+[6] Epoch 00000 | Step 00000 | Train acc 0.0020 | Loss 5.8951 | time 0.658 s| sample 0.076 | copy 0.053 | forward 0.053 | backward 0.381 | update 0.096
+[1] Epoch 00000 | Step 00000 | Train acc 0.0049 | Loss 5.8799 | time 0.656 s| sample 0.075 | copy 0.073 | forward 0.054 | backward 0.343 | update 0.111
+[5] Epoch 00000 | Step 00000 | Train acc 0.0020 | Loss 5.8777 | time 0.875 s| sample 0.082 | copy 0.049 | forward 0.056 | backward 0.591 | update 0.096
+[2] Epoch 00000 | Step 00000 | Train acc 0.0059 | Loss 5.8630 | time 0.452 s| sample 0.077 | copy 0.056 | forward 0.032 | backward 0.184 | update 0.103
+[0] Epoch 00000 | Step 00000 | Train acc 0.0059 | Loss 5.8723 | time 0.914 s| sample 0.077 | copy 0.057 | forward 0.071 | backward 0.598 | update 0.111
+[7] Epoch 00000 | Step 00000 | Train acc 0.0020 | Loss 5.8806 | time 0.823 s| sample 0.079 | copy 0.064 | forward 0.051 | backward 0.536 | update 0.092
+[3] Epoch 00000 | Step 00000 | Train acc 0.0059 | Loss 5.8844 | time 0.843 s| sample 0.075 | copy 0.061 | forward 0.054 | backward 0.538 | update 0.115
+[4] Epoch 00000 | Step 00020 | Train acc 0.2246 | Loss 3.5885 | time 8.594 s| sample 1.276 | copy 1.007 | forward 0.527 | backward 4.970 | update 0.815
+[5] Epoch 00000 | Step 00020 | Train acc 0.1982 | Loss 3.5712 | time 8.583 s| sample 1.432 | copy 1.035 | forward 0.653 | backward 4.079 | update 1.384
+[1] Epoch 00000 | Step 00020 | Train acc 0.2383 | Loss 3.4027 | time 8.584 s| sample 1.425 | copy 1.238 | forward 0.630 | backward 4.100 | update 1.191
+[3] Epoch 00000 | Step 00020 | Train acc 0.2197 | Loss 3.4913 | time 8.584 s| sample 1.455 | copy 1.353 | forward 0.645 | backward 3.976 | update 1.155
+[2] Epoch 00000 | Step 00020 | Train acc 0.2539 | Loss 3.3632 | time 8.591 s| sample 1.383 | copy 1.344 | forward 0.592 | backward 4.106 | update 1.167
+[6] Epoch 00000 | Step 00020 | Train acc 0.2188 | Loss 3.4466 | time 8.606 s| sample 1.294 | copy 1.040 | forward 0.559 | backward 4.691 | update 1.022
+[7] Epoch 00000 | Step 00020 | Train acc 0.2373 | Loss 3.4916 | time 8.627 s| sample 1.316 | copy 1.006 | forward 0.556 | backward 4.750 | update 1.000
+[0] Epoch 00000 | Step 00020 | Train acc 0.2363 | Loss 3.5446 | time 8.631 s| sample 1.424 | copy 1.255 | forward 0.583 | backward 4.229 | update 1.141
+[4] Epoch 00000 | Step 00040 | Train acc 0.3047 | Loss 2.8568 | time 8.660 s| sample 1.259 | copy 0.921 | forward 0.501 | backward 5.221 | update 0.757
+[0] Epoch 00000 | Step 00040 | Train acc 0.3408 | Loss 2.6664 | time 8.603 s| sample 1.514 | copy 1.253 | forward 0.586 | backward 4.111 | update 1.139
+[1] Epoch 00000 | Step 00040 | Train acc 0.3330 | Loss 2.7342 | time 8.649 s| sample 1.480 | copy 1.296 | forward 0.609 | backward 3.941 | update 1.324
+[2] Epoch 00000 | Step 00040 | Train acc 0.3135 | Loss 2.7676 | time 8.656 s| sample 1.400 | copy 1.158 | forward 0.558 | backward 4.337 | update 1.202
+[6] Epoch 00000 | Step 00040 | Train acc 0.3018 | Loss 2.8101 | time 8.683 s| sample 1.329 | copy 1.064 | forward 0.565 | backward 4.614 | update 1.112
+[5] Epoch 00000 | Step 00040 | Train acc 0.3086 | Loss 2.9863 | time 8.696 s| sample 1.366 | copy 1.041 | forward 0.563 | backward 4.509 | update 1.216
+[3] Epoch 00000 | Step 00040 | Train acc 0.3535 | Loss 2.6234 | time 8.689 s| sample 1.409 | copy 1.307 | forward 0.628 | backward 4.060 | update 1.285
+[7] Epoch 00000 | Step 00040 | Train acc 0.2861 | Loss 2.8887 | time 8.652 s| sample 1.307 | copy 1.031 | forward 0.545 | backward 4.737 | update 1.033
+[4] Epoch 00000 | Step 00060 | Train acc 0.3398 | Loss 2.6324 | time 8.234 s| sample 1.266 | copy 0.933 | forward 0.486 | backward 4.762 | update 0.787
+[5] Epoch 00000 | Step 00060 | Train acc 0.3359 | Loss 2.5936 | time 8.186 s| sample 1.360 | copy 1.045 | forward 0.564 | backward 4.062 | update 1.155
+[6] Epoch 00000 | Step 00060 | Train acc 0.3096 | Loss 2.7593 | time 8.192 s| sample 1.326 | copy 1.029 | forward 0.544 | backward 4.208 | update 1.085
+[1] Epoch 00000 | Step 00060 | Train acc 0.3809 | Loss 2.4687 | time 8.238 s| sample 1.438 | copy 1.241 | forward 0.619 | backward 3.767 | update 1.172
+[3] Epoch 00000 | Step 00060 | Train acc 0.3613 | Loss 2.5116 | time 8.201 s| sample 1.436 | copy 1.265 | forward 0.607 | backward 3.814 | update 1.079
+[0] Epoch 00000 | Step 00060 | Train acc 0.3896 | Loss 2.4396 | time 8.246 s| sample 1.533 | copy 1.252 | forward 0.594 | backward 3.909 | update 0.957
+[2] Epoch 00000 | Step 00060 | Train acc 0.3887 | Loss 2.4081 | time 8.236 s| sample 1.411 | copy 1.195 | forward 0.604 | backward 4.009 | update 1.016
+[7] Epoch 00000 | Step 00060 | Train acc 0.3408 | Loss 2.7524 | time 8.208 s| sample 1.355 | copy 1.045 | forward 0.575 | backward 4.182 | update 1.051
+[4]Epoch Time(s): 32.4171, sample: 4.9020, data copy: 3.6422, forward: 1.9722, backward: 18.8446, update: 3.0559, #train: 78697, #input: 16666112
+[0]Epoch Time(s): 32.8553, sample: 5.6930, data copy: 4.7914, forward: 2.3189, backward: 15.8580, update: 4.1937, #train: 78697, #input: 18370334
+[1]Epoch Time(s): 32.5985, sample: 5.6200, data copy: 4.8302, forward: 2.3978, backward: 15.1472, update: 4.6032, #train: 78697, #input: 18381034
+[7]Epoch Time(s): 32.7594, sample: 5.0083, data copy: 3.9177, forward: 2.1759, backward: 17.6220, update: 4.0355, #train: 78696, #input: 16686254
+[3]Epoch Time(s): 32.7923, sample: 5.4970, data copy: 4.9976, forward: 2.4069, backward: 15.4529, update: 4.4377, #train: 78696, #input: 18370936
+[2]Epoch Time(s): 32.4160, sample: 5.4193, data copy: 4.7859, forward: 2.2797, backward: 15.5506, update: 4.3803, #train: 78696, #input: 18378296
+[5]Epoch Time(s): 32.8164, sample: 5.3067, data copy: 3.9895, forward: 2.2805, backward: 16.5132, update: 4.7265, #train: 78696, #input: 16678362
+[6]Epoch Time(s): 32.6269, sample: 5.0835, data copy: 3.9453, forward: 2.1211, backward: 17.3780, update: 4.0990, #train: 78696, #input: 16674232
+0it [00:00, ?it/s]0it [00:00, ?it/s]0it [00:00, ?it/s]0it [00:00, ?it/s]0it [00:00, ?it/s]0it [00:00, ?it/s]0it [00:00, ?it/s]0it [00:00, ?it/s]1it [00:00,  6.32it/s]1it [00:00,  6.20it/s]1it [00:00,  6.17it/s]1it [00:00,  5.95it/s]1it [00:00,  4.79it/s]1it [00:00,  4.08it/s]1it [00:00,  3.56it/s]1it [00:00,  3.55it/s]2it [00:00,  6.44it/s]2it [00:00,  6.38it/s]2it [00:00,  6.31it/s]2it [00:00,  5.97it/s]2it [00:00,  5.86it/s]2it [00:00,  5.77it/s]2it [00:00,  4.99it/s]2it [00:00,  4.86it/s]3it [00:00,  6.66it/s]3it [00:00,  6.48it/s]3it [00:00,  6.42it/s]3it [00:00,  6.23it/s]3it [00:00,  6.23it/s]3it [00:00,  6.46it/s]3it [00:00,  5.75it/s]3it [00:00,  5.69it/s]4it [00:00,  6.85it/s]4it [00:00,  6.82it/s]4it [00:00,  6.52it/s]4it [00:00,  6.87it/s]4it [00:00,  6.54it/s]4it [00:00,  6.65it/s]4it [00:00,  6.08it/s]4it [00:00,  5.76it/s]5it [00:00,  7.30it/s]5it [00:00,  6.75it/s]5it [00:00,  6.84it/s]5it [00:00,  6.70it/s]5it [00:00,  6.66it/s]5it [00:00,  6.86it/s]5it [00:00,  6.47it/s]5it [00:00,  6.34it/s]6it [00:00,  7.43it/s]6it [00:00,  6.97it/s]6it [00:00,  7.30it/s]6it [00:00,  6.64it/s]6it [00:00,  6.51it/s]6it [00:00,  6.62it/s]6it [00:00,  6.74it/s]6it [00:01,  6.71it/s]7it [00:01,  7.45it/s]7it [00:01,  7.52it/s]7it [00:01,  6.79it/s]7it [00:01,  6.74it/s]7it [00:01,  6.39it/s]7it [00:01,  6.23it/s]7it [00:01,  6.90it/s]7it [00:01,  6.83it/s]8it [00:01,  7.79it/s]8it [00:01,  6.98it/s]
+8it [00:01,  7.40it/s]8it [00:01,  6.98it/s]
+0it [00:00, ?it/s]0it [00:00, ?it/s]8it [00:01,  6.93it/s]8it [00:01,  6.77it/s]
+0it [00:00, ?it/s]8it [00:01,  6.89it/s]8it [00:01,  6.75it/s]
+0it [00:00, ?it/s]8it [00:01,  6.68it/s]8it [00:01,  6.52it/s]
+0it [00:00, ?it/s]8it [00:01,  6.46it/s]8it [00:01,  6.45it/s]
+0it [00:00, ?it/s]8it [00:01,  7.18it/s]8it [00:01,  6.31it/s]
+8it [00:01,  7.05it/s]8it [00:01,  6.31it/s]
+0it [00:00, ?it/s]0it [00:00, ?it/s]1it [00:00,  5.84it/s]1it [00:00,  5.66it/s]1it [00:00,  7.06it/s]1it [00:00,  6.43it/s]1it [00:00,  6.56it/s]1it [00:00,  6.56it/s]1it [00:00,  5.36it/s]2it [00:00,  6.48it/s]2it [00:00,  6.28it/s]1it [00:00,  4.84it/s]2it [00:00,  6.79it/s]2it [00:00,  6.64it/s]2it [00:00,  6.31it/s]2it [00:00,  6.43it/s]3it [00:00,  6.92it/s]3it [00:00,  6.86it/s]2it [00:00,  5.92it/s]2it [00:00,  5.88it/s]3it [00:00,  6.86it/s]3it [00:00,  6.49it/s]3it [00:00,  6.75it/s]3it [00:00,  6.41it/s]4it [00:00,  7.27it/s]4it [00:00,  7.03it/s]3it [00:00,  6.63it/s]3it [00:00,  6.41it/s]4it [00:00,  6.89it/s]4it [00:00,  6.65it/s]4it [00:00,  6.53it/s]5it [00:00,  7.62it/s]4it [00:00,  6.57it/s]5it [00:00,  7.16it/s]4it [00:00,  6.98it/s]4it [00:00,  6.93it/s]6it [00:00,  7.99it/s]
+5it [00:00,  6.79it/s]5it [00:00,  6.82it/s]6it [00:00,  7.67it/s]
+6it [00:00,  7.53it/s]
+5it [00:00,  6.50it/s]5it [00:00,  7.38it/s]5it [00:00,  6.62it/s]6it [00:00,  7.33it/s]
+5it [00:00,  7.07it/s]6it [00:00,  7.30it/s]
+6it [00:00,  7.66it/s]
+6it [00:00,  7.32it/s]
+6it [00:00,  7.49it/s]
+Val Acc 0.3901, Test Acc 0.3844, time: 2.2284
+Client[4] in group[0] is exiting...
+Client[2] in group[0] is exiting...
+Client[3] in group[0] is exiting...
+Client[1] in group[0] is exiting...
+Client[6] in group[0] is exiting...
+Client[7] in group[0] is exiting...
+Client[5] in group[0] is exiting...
+Client[0] in group[0] is exiting...
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+[Server_2] Loaded ogbn-mag with use_graphbolt[True] in size[240.7109375 MB]
+start graph service on server 2 for part 1
+Server is waiting for connections on [172.31.8.229:30050]...
+Server (2) shutdown.
+Server is exiting...
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+[Server_0] Loaded ogbn-mag with use_graphbolt[True] in size[235.8046875 MB]
+start graph service on server 0 for part 0
+Server is waiting for connections on [172.31.14.101:30050]...
+Server (0) shutdown.
+Server is exiting...
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+start graph service on server 3 for part 1
+Server is waiting for connections on [172.31.8.229:30051]...
+Server (3) shutdown.
+Server is exiting...
+Namespace(batch_size=1024, conf_path=None, dataset='ogbn-mag', dgl_sparse=False, dropout=0.5, eval_batch_size=1024, fanout='25,10', graph_name='ogbn-mag', graphbolt=True, id=None, ip_config='/home/ubuntu/workspace/ip_config.txt', l2norm=0, layer_norm=True, local_rank=None, log_every=20, low_mem=True, lr=0.01, n_bases=2, n_epochs=1, n_hidden=64, n_layers=2, num_gpus=-1, relabel=False, sparse_embedding=True, sparse_lr=0.06, standalone=False, use_self_loop=True, validation_fanout='25,10')
+Using GraphBolt
+start graph service on server 1 for part 0
+Server is waiting for connections on [172.31.14.101:30051]...
+Server (1) shutdown.
+Server is exiting...
+cleanup process runs

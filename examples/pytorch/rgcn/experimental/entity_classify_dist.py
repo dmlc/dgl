@@ -10,6 +10,7 @@ import argparse
 import gc, os
 import itertools
 import time
+import psutil
 
 import numpy as np
 
@@ -607,9 +608,6 @@ def run(args, device, data):
         # blocks.
         step_time = []
         for step, sample_data in enumerate(dataloader):
-            g.barrier()
-            time.sleep(5)
-            return
             input_nodes, seeds, blocks = sample_data
             seeds = seeds["paper"]
             number_train += seeds.shape[0]

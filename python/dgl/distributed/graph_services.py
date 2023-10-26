@@ -551,7 +551,6 @@ def _distributed_access(g, nodes, issue_remote_req, local_access, use_graphbolt=
         res_list.extend(results)
 
     sampled_graph = merge_graphs(res_list, g.num_nodes())
-    print("sampled_graph: ", sampled_graph)
     return sampled_graph
 
 
@@ -617,7 +616,6 @@ def _frontier_to_heterogeneous_graph_gb(g, frontier, gpb):
     dst_ntype_ids, dst = gpb.map_to_per_ntype(dst)
 
     data_dict = dict()
-    print("g.canonical_etypes: ", g.canonical_etypes)
     for etid, etype in enumerate(g.canonical_etypes):
         src_ntype, _, dst_ntype = etype
         src_ntype_id = g.get_ntype_id(src_ntype)

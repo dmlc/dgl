@@ -1277,10 +1277,10 @@ def partition_graph(
 
 def convert_dgl_partition_to_csc_sampling_graph(
     part_config,
-    store_orig_nids=False,
+    store_orig_nids=True,
     store_orig_eids=False,
     store_ntypes=False,
-    store_etypes=False,
+    store_etypes=True,
     store_metadata=False,
 ):
     """Convert partitions of dgl to CSCSamplingGraph of GraphBolt.
