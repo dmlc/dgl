@@ -102,8 +102,15 @@ class InitGraphRequest(rpc.Request):
 
     def process_request(self, server_state):
         if server_state.graph is None:
+            gb_metadata = None
+            if self._use_graphbolt:
+                gpb = server_state.partition_book
+                gb_metadata = gb.GraphMetadata(
+                    {ntype: i for i, ntype in enumerate(gpb.ntypes)},
+                    {gb.etype_tuple_to_str(etype): i for i, etype in enumerate(gpb.canonical_etypes)},
+                )
             server_state.graph = _get_graph_from_shared_mem(
-                self._graph_name, self._use_graphbolt
+                self._graph_name, self._use_graphbolt, gb_metadata
             )
         return InitGraphResponse(self._graph_name)
 
@@ -187,7 +194,7 @@ def _exist_shared_mem_array(graph_name, name):
     return exist_shared_mem_array(_get_edata_path(graph_name, name))
 
 
-def _get_graph_from_shared_mem(graph_name, use_graphbolt):
+def _get_graph_from_shared_mem(graph_name, use_graphbolt, gb_metadata):
     """Get the graph from the DistGraph server.
 
     The DistGraph server puts the graph structure of the local partition in the shared memory.
@@ -195,15 +202,7 @@ def _get_graph_from_shared_mem(graph_name, use_graphbolt):
     through shared memory to reduce the overhead of data access.
     """
     if use_graphbolt:
-        metadata = gb.GraphMetadata(
-            {'author': 0, 'field_of_study': 1, 'institution': 2, 'paper': 3},
-            {'author:affiliated_with:institution': 0, 'author:writes:paper': 1,
-             'field_of_study:rev-has_topic:paper': 2,
-             'institution:rev-affiliated_with:author': 3, 'paper:cites:paper': 4,
-             'paper:has_topic:field_of_study': 5, 'paper:rev-cites:paper': 6,
-             'paper:rev-writes:author': 7}
-        )
-        g = gb.load_from_shared_memory(graph_name, metadata)
+        g = gb.load_from_shared_memory(graph_name, gb_metadata)
         return g
 
     g, ntypes, etypes = heterograph_index.create_heterograph_from_shared_memory(
@@ -686,10 +685,16 @@ class DistGraph:
         assert (
             self._client is not None
         ), "Distributed module is not initialized. Please call dgl.distributed.initialize."
-        self._g = _get_graph_from_shared_mem(self.graph_name, use_graphbolt)
         self._gpb = get_shared_mem_partition_book(self.graph_name)
         if self._gpb is None:
             self._gpb = gpb
+        gb_metadata = None
+        if use_graphbolt:
+            gb_metadata = gb.GraphMetadata(
+                {ntype: i for i, ntype in enumerate(self._gpb.ntypes)},
+                {gb.etype_tuple_to_str(etype): i for i, etype in enumerate(self._gpb.canonical_etypes)},
+            )
+        self._g = _get_graph_from_shared_mem(self.graph_name, use_graphbolt, gb_metadata)
         self._client.map_shared_data(self._gpb)
 
     def _init_ndata_store(self):
