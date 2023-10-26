@@ -455,6 +455,7 @@ class ItemSampler(IterDataPipe):
 
     def __iter__(self) -> Iterator:
         if self._use_indexing:
+            print("!!!")
             data_pipe = IterableWrapper(
                 ItemShufflerAndBatcher(
                     self._item_set,
@@ -462,7 +463,7 @@ class ItemSampler(IterDataPipe):
                     self._batch_size,
                     self._drop_last,
                 )
-            )
+            ).sharding_filter()
         else:
             # Organize items.
             data_pipe = self._organize_items(self._item_set)
@@ -642,11 +643,11 @@ class DistributedItemSampler(ItemSampler):
             minibatcher,
             drop_last,
             shuffle,
-            use_indexing=False,
+            use_indexing=True,
         )
         self._drop_uneven_inputs = drop_uneven_inputs
         # Apply a sharding filter to distribute the items.
-        self._item_set = self._item_set.sharding_filter()
+        # self._item_set = self._item_set.sharding_filter()
         # Get world size.
         if num_replicas is None:
             assert (
