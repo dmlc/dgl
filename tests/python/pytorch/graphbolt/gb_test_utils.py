@@ -50,12 +50,13 @@ def get_ntypes_and_etypes(num_nodes, num_ntypes, num_etypes):
         ntypes["n0"] += num_nodes % num_ntypes
     etypes = []
     count = 0
-    for n1 in range(num_ntypes):
-        for n2 in range(n1, num_ntypes):
-            if count >= num_etypes:
-                break
-            etypes.append((f"n{n1}", f"e{count}", f"n{n2}"))
-            count += 1
+    while count < num_etypes:
+        for n1 in range(num_ntypes):
+            for n2 in range(num_ntypes):
+                if count >= num_etypes:
+                    break
+                etypes.append((f"n{n1}", f"e{count}", f"n{n2}"))
+                count += 1
     return ntypes, etypes
 
 
