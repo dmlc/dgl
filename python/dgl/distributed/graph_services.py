@@ -487,7 +487,7 @@ LocalSampledGraph = namedtuple(
 )
 
 
-def _distributed_access(g, nodes, issue_remote_req, local_access):
+def _distributed_access(g, nodes, issue_remote_req, local_access, use_graphbolt=False):
     """A routine that fetches local neighborhood of nodes from the distributed graph.
 
     The local neighborhood of some nodes are stored in the local machine and the other
@@ -506,6 +506,8 @@ def _distributed_access(g, nodes, issue_remote_req, local_access):
         The function that issues requests to access remote data.
     local_access : callable
         The function that reads data on the local machine.
+    use_graphbolt : bool
+        Whether to use GraphBolt.
 
     Returns
     -------
@@ -595,7 +597,6 @@ def _frontier_to_heterogeneous_graph(g, frontier, gpb):
 
 
 def _frontier_to_heterogeneous_graph_gb(g, frontier, gpb):
-    '''[Rui] Do not use EID.'''
     # We need to handle empty frontiers correctly.
     if frontier.num_edges() == 0:
         data_dict = {
@@ -612,16 +613,26 @@ def _frontier_to_heterogeneous_graph_gb(g, frontier, gpb):
     src, dst = frontier.edges()
     etype_ids, idx = F.sort_1d(etype_ids)
     src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
-    _, src = gpb.map_to_per_ntype(src)
-    _, dst = gpb.map_to_per_ntype(dst)
+    src_ntype_ids, src = gpb.map_to_per_ntype(src)
+    dst_ntype_ids, dst = gpb.map_to_per_ntype(dst)
 
     data_dict = dict()
+    print("g.canonical_etypes: ", g.canonical_etypes)
     for etid, etype in enumerate(g.canonical_etypes):
+        src_ntype, _, dst_ntype = etype
+        src_ntype_id = g.get_ntype_id(src_ntype)
+        dst_ntype_id = g.get_ntype_id(dst_ntype)
         type_idx = etype_ids == etid
         if F.sum(type_idx, 0) > 0:
             data_dict[etype] = (
                 F.boolean_mask(src, type_idx),
                 F.boolean_mask(dst, type_idx),
+            )
+            assert torch.all(src_ntype_id == src_ntype_ids[type_idx]), (
+                "source ntype is is not expected."
+            )
+            assert torch.all(dst_ntype_id == dst_ntype_ids[type_idx]), (
+                "destination ntype is is not expected."
             )
     hg = heterograph(
         data_dict,
@@ -703,24 +714,21 @@ def sample_etype_neighbors(
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
-    if isinstance(fanout, int):
-        fanout = F.full_1d(len(g.canonical_etypes), fanout, F.int64, F.cpu())
-    else:
-        if use_graphbolt:
-            dgl_warning(
-                "----------- [Rui] Not covered in demo test yet. -----------"
+    if not use_graphbolt:
+        if isinstance(fanout, int):
+            fanout = F.full_1d(len(g.canonical_etypes), fanout, F.int64, F.cpu())
+        else:
+            etype_ids = {etype: i for i, etype in enumerate(g.canonical_etypes)}
+            fanout_array = [None] * len(g.canonical_etypes)
+            for etype, v in fanout.items():
+                c_etype = g.to_canonical_etype(etype)
+                fanout_array[etype_ids[c_etype]] = v
+            assert all(v is not None for v in fanout_array), (
+                "Not all etypes have valid fanout. Please make sure passed-in "
+                "fanout in dict includes all the etypes in graph. Passed-in "
+                f"fanout: {fanout}, graph etypes: {g.canonical_etypes}."
             )
-        etype_ids = {etype: i for i, etype in enumerate(g.canonical_etypes)}
-        fanout_array = [None] * len(g.canonical_etypes)
-        for etype, v in fanout.items():
-            c_etype = g.to_canonical_etype(etype)
-            fanout_array[etype_ids[c_etype]] = v
-        assert all(v is not None for v in fanout_array), (
-            "Not all etypes have valid fanout. Please make sure passed-in "
-            "fanout in dict includes all the etypes in graph. Passed-in "
-            f"fanout: {fanout}, graph etypes: {g.canonical_etypes}."
-        )
-        fanout = F.tensor(fanout_array, dtype=F.int64)
+            fanout = F.tensor(fanout_array, dtype=F.int64)
 
     gpb = g.get_partition_book()
     if isinstance(nodes, dict):
@@ -786,7 +794,7 @@ def sample_etype_neighbors(
             use_graphbolt=use_graphbolt,
         )
 
-    frontier = _distributed_access(g, nodes, issue_remote_req, local_access)
+    frontier = _distributed_access(g, nodes, issue_remote_req, local_access, use_graphbolt=use_graphbolt)
     if not gpb.is_homogeneous:
         if use_graphbolt:
             return _frontier_to_heterogeneous_graph_gb(g, frontier, gpb)

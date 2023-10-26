@@ -167,7 +167,7 @@ class NodeCollator(Collator):
     :doc:`Minibatch Training Tutorials <tutorials/large/L0_neighbor_sampling_overview>`.
     """
 
-    def __init__(self, g, nids, graph_sampler):
+    def __init__(self, g, nids, graph_sampler, use_graphbolt=False):
         self.g = g
         if not isinstance(nids, Mapping):
             assert (
@@ -177,6 +177,7 @@ class NodeCollator(Collator):
 
         self.nids = utils.prepare_tensor_or_dict(g, nids, "nids")
         self._dataset = utils.maybe_flatten_dict(self.nids)
+        self._use_graphbolt = use_graphbolt
 
     @property
     def dataset(self):
@@ -213,7 +214,7 @@ class NodeCollator(Collator):
         items = utils.prepare_tensor_or_dict(self.g, items, "items")
 
         input_nodes, output_nodes, blocks = self.graph_sampler.sample_blocks(
-            self.g, items
+            self.g, items, use_graphbolt=self._use_graphbolt
         )
 
         return input_nodes, output_nodes, blocks
@@ -591,7 +592,7 @@ class DistNodeDataLoader(DistDataLoader):
     dgl.dataloading.DataLoader
     """
 
-    def __init__(self, g, nids, graph_sampler, device=None, **kwargs):
+    def __init__(self, g, nids, graph_sampler, device=None, use_graphbolt=False, **kwargs):
         collator_kwargs = {}
         dataloader_kwargs = {}
         _collator_arglist = inspect.getfullargspec(NodeCollator).args
@@ -608,7 +609,7 @@ class DistNodeDataLoader(DistDataLoader):
         ), "Only cpu is supported in the case of a DistGraph."
         # Distributed DataLoader currently does not support heterogeneous graphs
         # and does not copy features.  Fallback to normal solution
-        self.collator = NodeCollator(g, nids, graph_sampler, **collator_kwargs)
+        self.collator = NodeCollator(g, nids, graph_sampler, use_graphbolt=use_graphbolt, **collator_kwargs)
         _remove_kwargs_dist(dataloader_kwargs)
         super().__init__(
             self.collator.dataset,

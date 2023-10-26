@@ -366,9 +366,11 @@ class CSCSamplingGraph(SamplingGraph):
             and ETYPE in self.edge_attributes
         )
         if has_original_etype_ids:
+            assert original_edge_ids is not None, "original_edge_ids is None."
             original_etype_ids = self.edge_attributes[ETYPE][
                 original_edge_ids
             ]
+            assert original_etype_ids is not None, "original_etype_ids is None"
 
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
@@ -577,12 +579,16 @@ class CSCSamplingGraph(SamplingGraph):
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
+        has_original_etype_ids=(
+            self.edge_attributes is not None
+            and ETYPE in self.edge_attributes
+        )
         return self._c_csc_graph.sample_neighbors(
             nodes,
             fanouts.tolist(),
             replace,
             False,
-            has_original_eids,
+            has_original_eids or has_original_etype_ids,
             probs_name,
         )
 

@@ -148,7 +148,7 @@ class NeighborSampler(BlockSampler):
         self.mapping = {}
         self.g = None
 
-    def sample_blocks(self, g, seed_nodes, exclude_eids=None):
+    def sample_blocks(self, g, seed_nodes, exclude_eids=None, use_graphbolt=False):
         output_nodes = seed_nodes
         blocks = []
         # sample_neighbors_fused function requires multithreading to be more efficient
@@ -191,6 +191,7 @@ class NeighborSampler(BlockSampler):
                 replace=self.replace,
                 output_device=self.output_device,
                 exclude_edges=exclude_eids,
+                use_graphbolt=use_graphbolt,
             )
             eid = frontier.edata[EID]
             block = to_block(frontier, seed_nodes)

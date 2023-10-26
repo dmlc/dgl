@@ -466,6 +466,7 @@ def run(args, device, data):
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
+        use_graphbolt=args.graphbolt,
     )
 
     valid_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
@@ -476,6 +477,7 @@ def run(args, device, data):
         batch_size=args.batch_size,
         shuffle=False,
         drop_last=False,
+        use_graphbolt=args.graphbolt,
     )
 
     test_sampler = dgl.dataloading.MultiLayerNeighborSampler(val_fanouts)
@@ -486,6 +488,7 @@ def run(args, device, data):
         batch_size=args.eval_batch_size,
         shuffle=False,
         drop_last=False,
+        use_graphbolt=args.graphbolt,
     )
 
     embed_layer = DistEmbedLayer(
@@ -604,6 +607,9 @@ def run(args, device, data):
         # blocks.
         step_time = []
         for step, sample_data in enumerate(dataloader):
+            g.barrier()
+            time.sleep(5)
+            return
             input_nodes, seeds, blocks = sample_data
             seeds = seeds["paper"]
             number_train += seeds.shape[0]
@@ -703,11 +709,14 @@ def run(args, device, data):
 
 
 def main(args):
-    dgl.distributed.initialize(args.ip_config)
+    if args.graphbolt:
+        print("Using GraphBolt")
+    dgl.distributed.initialize(args.ip_config, use_graphbolt=args.graphbolt)
     if not args.standalone:
         th.distributed.init_process_group(backend="gloo")
 
-    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.conf_path)
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.conf_path,
+                                  use_graphbolt=args.graphbolt)
     print("rank:", g.rank())
 
     pb = g.get_partition_book()
@@ -802,6 +811,12 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RGCN")
     # distributed training related
+    parser.add_argument(
+        "--graphbolt",
+        default=False,
+        action="store_true",
+        help="train with GraphBolt",
+    )
     parser.add_argument("--graph-name", type=str, help="graph name")
     parser.add_argument("--id", type=int, help="the partition id")
     parser.add_argument(

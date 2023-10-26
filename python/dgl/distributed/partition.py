@@ -573,6 +573,7 @@ def partition_graph(
     use_graphbolt=False,
     gb_store_orig_nids=False,
     gb_store_orig_eids=False,
+    gb_store_ntypes=False,
     gb_store_etypes=False,
     gb_store_metadata=False,
 ):
@@ -754,6 +755,8 @@ def partition_graph(
         Whether to store the original node IDs in the partitioned graph.
     gb_store_orig_eids : bool
         Whether to store the original edge IDs in the partitioned graph.
+    gb_store_ntypes : bool
+        Whether to store the node types in the partitioned graph.
     gb_store_etypes : bool
         Whether to store the edge types in the partitioned graph.
     gb_store_metadata : bool
@@ -1262,6 +1265,7 @@ def partition_graph(
             part_config,
             store_orig_nids=gb_store_orig_nids,
             store_orig_eids=gb_store_orig_eids,
+            store_ntypes=gb_store_ntypes,
             store_etypes=gb_store_etypes,
             store_metadata=gb_store_metadata,
         )
@@ -1275,6 +1279,7 @@ def convert_dgl_partition_to_csc_sampling_graph(
     part_config,
     store_orig_nids=False,
     store_orig_eids=False,
+    store_ntypes=False,
     store_etypes=False,
     store_metadata=False,
 ):
@@ -1295,6 +1300,8 @@ def convert_dgl_partition_to_csc_sampling_graph(
         Whether to store original node IDs in the new graph.
     store_orig_eids : bool, optional
         Whether to store original edge IDs in the new graph.
+    store_ntypes : bool, optional
+        Whether to store node types in the new graph.
     store_etypes : bool, optional
         Whether to store edge types in the new graph.
     store_metadata : bool, optional
@@ -1332,11 +1339,12 @@ def convert_dgl_partition_to_csc_sampling_graph(
             }
             metadata = graphbolt.GraphMetadata(ntypes, c_etypes)
         # Obtain CSC indtpr and indices.
-        indptr, indices, _ = graph.adj().csc()
+        indptr, indices, edge_ids = graph.adj_tensors("csc") #graph.adj().csc()
         # Initalize type per edge.
         type_per_edge = None
         if store_etypes:
             type_per_edge = init_type_per_edge(graph, gpb)
+            type_per_edge = type_per_edge[edge_ids]
             type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
             if len(etypes) < 128:
                 type_per_edge = type_per_edge.to(torch.int8)
@@ -1360,8 +1368,15 @@ def convert_dgl_partition_to_csc_sampling_graph(
             # Sanity check.
             assert len(graph.edata[EID]) == graph.num_edges()
             edge_attributes = {
-                EID: graph.edata[EID].to(RESERVED_FIELD_DTYPE[EID])
+                EID: graph.edata[EID][edge_ids].to(RESERVED_FIELD_DTYPE[EID])
             }
+
+        if store_ntypes:
+            if node_attributes is None:
+                node_attributes = {}
+            node_attributes[NTYPE] = graph.ndata[NTYPE].to(
+                RESERVED_FIELD_DTYPE[NTYPE]
+            )
 
         if store_etypes:
             # [Rui] Let's store as edge attributes for now.
