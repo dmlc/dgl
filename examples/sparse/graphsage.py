@@ -92,16 +92,18 @@ class SAGE(nn.Module):
                 hidden_x = F.relu(hidden_x)
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
-    
+
     def inference(self, A, dataset, device, batch_size):
         """Conduct layer-wise inference to get all the node embeddings."""
         feat = dataset[0].ndata["feat"]
         inf_idx = dataset.val_idx.to(device)
-        inf_dataloader = torch.utils.data.DataLoader(inf_idx, batch_size=batch_size)
+        inf_dataloader = torch.utils.data.DataLoader(
+            inf_idx, batch_size=batch_size
+        )
 
         buffer_device = torch.device("cpu")
         pin_memory = buffer_device != device
-        
+
         node_num = A.shape[0]
         for l, layer in enumerate(self.layers):
             y = torch.empty(
@@ -115,7 +117,7 @@ class SAGE(nn.Module):
 
             for it, (dst) in enumerate(inf_dataloader):
                 # Sampling full neighbors.
-                mat = A.sample(1, fanout = node_num, ids=dst)
+                mat = A.sample(1, fanout=node_num, ids=dst)
                 # Compact the matrix.
                 mat_cmp, src = mat.compact(0)
                 x = feat[src]
@@ -161,6 +163,7 @@ def evaluate(model, dataloader, dataset, num_classes):
         num_classes=num_classes,
     )
 
+
 def layerwise_infer(device, A, dataset, model, num_classes, batch_size):
     model.eval()
     nid = dataset.test_idx
@@ -173,6 +176,7 @@ def layerwise_infer(device, A, dataset, model, num_classes, batch_size):
         return MF.accuracy(
             pred, label, task="multiclass", num_classes=num_classes
         )
+
 
 def train(device, A, dataset, model, num_classes):
     # Create sampler & dataloader.
