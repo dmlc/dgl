@@ -53,7 +53,9 @@ python3 /home/ubuntu/workspace/dgl_2/tools/launch.py \
 #### Results
 `g4dn.metal` x 2, `ogbn-mag`.
 
-[**NOTE**]Epoch time drops in DistDGL with GraphBolt, so does accuracy, probably partially caused by the difference between `sample_neighbors()` and `sample_etype_neighbors()`.
+[**NOTE**] `sample_etype_neighbors()` is not correctly enabled in DistDGL with GraphBolt.
+
+DistDGL with GraphBolt takes less time for sampling(-60%) and for whole epoch(-30%) while keeping comparable accuracies in validation and test.
 
 ##### DistDGL
 
@@ -66,12 +68,25 @@ Val Acc 0.4618, Test Acc 0.4485, time: 16.9179
 
 ##### DistDGL with GraphBolt
 
+fanout = [25, 10], multiplied by `num_etypes`. [**Default**]
+
+```
+[3]Epoch Time(s): 137.0454, sample: 27.0914, data copy: 32.2842, forward: 3.5588, backward: 60.5921, update: 13.5188, #train: 78696, #inp
+ut: 76402212
+
+Val Acc 0.4648, Test Acc 0.4498, time: 10.4527
+```
+
+fanout = [25, 10], not multiplied by `num_etypes`. [**Deprecated**]
+
 ```
 Epoch Time(s): 32.7923, sample: 5.4970, data copy: 4.9976, forward: 2.4069, backward: 15.4529, update: 4.4377, #train: 78696, #input: 
 18370936
 
 Val Acc 0.3901, Test Acc 0.3844, time: 2.2284
 ```
+
+---------------------------------------
 
 ## Distributed training
 

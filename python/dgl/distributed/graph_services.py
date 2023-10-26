@@ -712,7 +712,14 @@ def sample_etype_neighbors(
     DGLGraph
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
-    if not use_graphbolt:
+    if use_graphbolt:
+        assert isinstance(fanout, int), "GraphBolt only supports int fanout."
+        # [Rui] As CSCSamplingGraph is always homogeneous in GB,
+        # sample_etype_neighbors() not supported yet though it's available in
+        # underlying GB. So I increase the fanout to mimic the behavior of
+        # sample_etype_neighbors(). But I know it's quite not right.
+        fanout *= len(g.canonical_etypes)
+    else:
         if isinstance(fanout, int):
             fanout = F.full_1d(len(g.canonical_etypes), fanout, F.int64, F.cpu())
         else:
