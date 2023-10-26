@@ -1,4 +1,4 @@
-## DistDGL with GraphBolt partitions and sampling
+## DistDGL with GraphBolt(Heterograph only)
 
 ### How to partition graph
 
