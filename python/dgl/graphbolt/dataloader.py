@@ -15,6 +15,7 @@ from .utils import datapipe_graph_to_adjlist
 
 __all__ = [
     "SingleProcessDataLoader",
+    "MultiprocessingWrapper",
     "MultiProcessDataLoader",
     "ThreadingWrapper",
 ]
@@ -74,19 +75,14 @@ class ThreadingWrapper(dp.iter.IterDataPipe):
         The data pipeline.
     """
 
-    def __init__(self, datapipe, num_workers=0):
+    def __init__(self, datapipe):
         self.datapipe = datapipe
-        self.dataloader = torch.utils.data.DataLoader(
-            datapipe,
-            batch_size=None,
-            num_workers=num_workers,
-        )
 
     def __iter__(self):
         q = queue.Queue()
 
         def worker(q):
-            for item in self.dataloader:
+            for item in self.datapipe:
                 q.put(item)
             q.put(None)
 
@@ -162,14 +158,15 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
                 datapipe_graph = dp_utils.replace_dp(
                     datapipe_graph,
                     parent_datapipe,
-                    MultiprocessingWrapper(parent_datapipe, num_workers)
-                    if use_prefetch_thread == False or num_workers > 0
-                    else ThreadingWrapper(parent_datapipe, num_workers),
+                    MultiprocessingWrapper(parent_datapipe, num_workers),
                 )
-
-        # (3) Wrap the datapipe with a ThreadingWrapper to enable prefetching.
-        if use_prefetch_thread:
-            datapipe = ThreadingWrapper(datapipe, num_workers=0)
+            # (3) Wrap the datapipe with a ThreadingWrapper to enable prefetching.
+            if use_prefetch_thread:
+                datapipe_graph = dp_utils.replace_dp(
+                    datapipe_graph,
+                    feature_fetcher,
+                    ThreadingWrapper(feature_fetcher),
+                )
 
         # The stages after feature fetching is still done in the main process.
         # So we set num_workers to 0 here.
