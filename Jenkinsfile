@@ -336,7 +336,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-cpu"
-                  image "dgllib/dgl-ci-gpu:cu118_v231027_1600"
+                  image "dgllib/dgl-ci-gpu:cu116_v231027_1600"
                   args "-u root"
                   alwaysPull true
                 }
@@ -410,7 +410,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-gpu"
-                  image "dgllib/dgl-ci-gpu:cu118_v231027_1600"
+                  image "dgllib/dgl-ci-gpu:cu116_v231027_1600"
                   args "-u root --runtime nvidia"
                   alwaysPull true
                 }
@@ -463,7 +463,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-gpu"
-                  image "dgllib/dgl-ci-gpu:cu118_v231027_1600"
+                  image "dgllib/dgl-ci-gpu:cu116_v231027_1600"
                   args "-u root --runtime nvidia"
                   alwaysPull true
                 }
@@ -541,7 +541,7 @@ pipeline {
               agent {
                 docker {
                   label "dgl-ci-linux-gpu"
-                  image "dgllib/dgl-ci-gpu:cu118_v231027_1600"
+                  image "dgllib/dgl-ci-gpu:cu116_v231027_1600"
                   args "-u root --runtime nvidia --shm-size=8gb"
                   alwaysPull true
                 }
