@@ -2,8 +2,6 @@
 
 import gc
 import psutil
-#import tracemalloc
-#from  pympler import asizeof
 import os
 from collections import namedtuple
 from collections.abc import MutableMapping
@@ -392,7 +390,6 @@ class DistGraphServer(KVServer):
         graph_format=("csc", "coo"),
         use_graphbolt=False,
     ):
-        #tracemalloc.start()
         super(DistGraphServer, self).__init__(
             server_id=server_id,
             ip_config=ip_config,
@@ -410,7 +407,6 @@ class DistGraphServer(KVServer):
             self.client_g = None
         else:
             # Loading of node/edge_feats are deferred to lower the peak memory consumption.
-            #snapshot1 = tracemalloc.take_snapshot()
             prev_rss = psutil.Process(os.getpid()).memory_info().rss
             (
                 self.client_g,
@@ -426,18 +422,8 @@ class DistGraphServer(KVServer):
                 load_feats=False,
                 use_graphbolt=use_graphbolt,
             )
-            #print(f"[Server_{self.server_id}] Loaded {graph_name} with use_graphbolt[{use_graphbolt}].")
             new_rss = psutil.Process(os.getpid()).memory_info().rss
             print(f"[Server_{self.server_id}] Loaded {graph_name} with use_graphbolt[{use_graphbolt}] in size[{(new_rss - prev_rss)/1024/1024} MB]")
-            #print(f"[Server_{self.server_id}] Loaded {graph_name} with use_graphbolt[{use_graphbolt}] in size[{asizeof.asizeof(self.client_g)}]")
-            '''
-            snapshot2 = tracemalloc.take_snapshot()
-            top_stats = snapshot2.compare_to(snapshot1, "lineno")
-            print(f"[Server_{self.server_id}][ Top 10 differences ]")
-            for stat in top_stats[:10]:
-                print(f"[Server_{self.server_id}]: {stat}")
-            tracemalloc.stop()
-            '''
             if not use_graphbolt:
                 # formatting dtype
                 # TODO(Rui) Formatting forcely is not a perfect solution.
@@ -618,6 +604,7 @@ class DistGraph:
         self.graph_name = graph_name
         self._use_graphbolt = use_graphbolt
         if os.environ.get("DGL_DIST_MODE", "standalone") == "standalone":
+            assert not use_graphbolt, "GraphBolt is not supported in standalone mode."
             assert (
                 part_config is not None
             ), "When running in the standalone model, the partition config file is required"
