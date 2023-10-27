@@ -45,7 +45,7 @@ if [[ $1 == "cugraph" ]]; then
     # test inplace build (for cython)
     python3 setup.py build_ext --inplace
 else
-    for backend in pytorch mxnet tensorflow
+    for backend in pytorch tensorflow
     do
     conda activate "${backend}-ci"
     rm -rf build *.egg-info dist
