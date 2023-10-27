@@ -7,7 +7,7 @@ dependencies:
     - pytest
     - nose
     - numpy
-    - cython
+    - cython==0.29
     - scipy
     - networkx
     - matplotlib

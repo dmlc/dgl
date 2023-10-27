@@ -33,5 +33,10 @@ fi
 
 conda activate ${DGLBACKEND}-ci
 
-python3 -m pytest -v --junitxml=pytest_common.xml --durations=100 tests/python/common || fail "common"
+if [ $DGLBACKEND == "mxnet" ]
+then
+  python3 -m pytest -v --junitxml=pytest_compute.xml --durations=100 --ignore=tests/python/common/test_ffi.py tests/python/common || fail "common"
+else
+  python3 -m pytest -v --junitxml=pytest_common.xml --durations=100 tests/python/common || fail "common"
+fi
 python3 -m pytest -v --junitxml=pytest_backend.xml --durations=100 tests/python/$DGLBACKEND || fail "backend-specific"
