@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from functools import partial
-from typing import Callable, Iterator, Optional
+from typing import Callable, Iterator, Optional, Union
 
 import numpy as np
 import torch
@@ -200,7 +200,7 @@ class ItemSampler(IterDataPipe):
 
     Parameters
     ----------
-    item_set : ItemSet or ItemSetDict
+    item_set : Union[ItemSet, ItemSetDict]
         Data to be sampled.
     batch_size : int
         The size of each batch.
@@ -391,7 +391,7 @@ class ItemSampler(IterDataPipe):
 
     def __init__(
         self,
-        item_set: ItemSet or ItemSetDict,
+        item_set: Union[ItemSet, ItemSetDict],
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
@@ -501,7 +501,7 @@ class DistributedItemSampler(ItemSampler):
 
     Parameters
     ----------
-    item_set : ItemSet or ItemSetDict
+    item_set : Union[ItemSet, ItemSetDict]
         Data to be sampled.
     batch_size : int
         The size of each batch.
@@ -627,7 +627,7 @@ class DistributedItemSampler(ItemSampler):
 
     def __init__(
         self,
-        item_set: ItemSet or ItemSetDict,
+        item_set: Union[ItemSet, ItemSetDict],
         batch_size: int,
         minibatcher: Optional[Callable] = minibatcher_default,
         drop_last: Optional[bool] = False,
