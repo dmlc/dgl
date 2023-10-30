@@ -1274,6 +1274,7 @@ def convert_dgl_partition_to_csc_sampling_graph(
     store_etypes=True,
     store_metadata=True,
     graph_file_name=None,
+    part_config_file_name=None,
 ):
     """Convert partitions of dgl to CSCSamplingGraph of GraphBolt.
 
@@ -1301,6 +1302,9 @@ def convert_dgl_partition_to_csc_sampling_graph(
     graph_file_name : str, optional
         The name of the new graph file. If not provided, the name will be
         `csc_sampling_graph.tar`.
+    part_config_file_name : str, optional
+        The name of the new partition configuration file. If not provided, the
+        name will be the passed-in one.
     """
     # As only this function requires GraphBolt for now, let's import here.
     from .. import graphbolt
@@ -1472,4 +1476,9 @@ def convert_dgl_partition_to_csc_sampling_graph(
         )
 
     # Update partition config.
-    _dump_part_config(part_config, new_part_meta)
+    if part_config_file_name is None:
+        part_config_file_name = os.path.basename(part_config)
+    new_part_config = os.path.join(
+        os.path.dirname(part_config), part_config_file_name
+    )
+    _dump_part_config(new_part_config, new_part_meta)

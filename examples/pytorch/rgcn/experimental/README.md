@@ -25,15 +25,24 @@ dgl.distributed.convert_dgl_partition_to_csc_sampling_graph(
 `csc_sampling_graph.tar` is the GraphBolt partitions.
 `graph.dgl` is the original DistDGL partitions, namely, DGLGraph.
 
+###### ogbn-mag
+heterogeneous, ~1.9M nodes, ~42M edges(reverse edges are added),  4 ntypes, 8 etypes, 2 parts.
+
+| DGL(MB) | GraphBolt w/o EIDs(MB) | GraphBolt w/ EIDs(MB) |
+| --- | ------------------ | ----------------- |
+| 701/711 | 151/153 | 243/247 |
+
 ```
--rw-rw-r-- 1 ubuntu ubuntu 231M Oct 26 01:51 data/part0/csc_sampling_graph.tar
--rw-rw-r-- 1 ubuntu ubuntu   24 Oct 26 01:51 data/part0/edge_feat.dgl
--rw-rw-r-- 1 ubuntu ubuntu 701M Oct 26 01:51 data/part0/graph.dgl
--rw-rw-r-- 1 ubuntu ubuntu 182M Oct 26 01:51 data/part0/node_feat.dgl
--rw-rw-r-- 1 ubuntu ubuntu 235M Oct 26 01:51 data/part1/csc_sampling_graph.tar
--rw-rw-r-- 1 ubuntu ubuntu   24 Oct 26 01:51 data/part1/edge_feat.dgl
--rw-rw-r-- 1 ubuntu ubuntu 711M Oct 26 01:51 data/part1/graph.dgl
--rw-rw-r-- 1 ubuntu ubuntu 187M Oct 26 01:51 data/part1/node_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 151M Oct 30 07:35 data/part0/csc_sampling_graph.tar
+-rw-rw-r-- 1 ubuntu ubuntu 243M Oct 30 07:48 data/part0/csc_sampling_graph_eids.tar
+-rw-rw-r-- 1 ubuntu ubuntu   24 Oct 30 07:35 data/part0/edge_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 701M Oct 30 07:35 data/part0/graph.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 182M Oct 30 07:35 data/part0/node_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 153M Oct 30 07:35 data/part1/csc_sampling_graph.tar
+-rw-rw-r-- 1 ubuntu ubuntu 247M Oct 30 07:48 data/part1/csc_sampling_graph_eids.tar
+-rw-rw-r-- 1 ubuntu ubuntu   24 Oct 30 07:35 data/part1/edge_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 711M Oct 30 07:35 data/part1/graph.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 187M Oct 30 07:35 data/part1/node_feat.dgl
 ```
 
 ### Train with GraphBolt partitions
