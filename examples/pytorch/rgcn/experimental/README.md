@@ -30,16 +30,16 @@ heterogeneous, ~1.9M nodes, ~42M edges(reverse edges are added),  4 ntypes, 8 et
 
 | DGL(MB) | GraphBolt w/o EIDs(MB) | GraphBolt w/ EIDs(MB) |
 | --- | ------------------ | ----------------- |
-| 701/711 | 128/129 | 243/247 |
+| 701/711 | 128/129 | 220/223 |
 
 ```
 -rw-rw-r-- 1 ubuntu ubuntu 128M Oct 30 08:30 data/part0/csc_sampling_graph.tar
--rw-rw-r-- 1 ubuntu ubuntu 243M Oct 30 07:48 data/part0/csc_sampling_graph_eids.tar
+-rw-rw-r-- 1 ubuntu ubuntu 220M Oct 30 08:45 data/part0/csc_sampling_graph_eids.tar
 -rw-rw-r-- 1 ubuntu ubuntu   24 Oct 30 07:35 data/part0/edge_feat.dgl
 -rw-rw-r-- 1 ubuntu ubuntu 701M Oct 30 07:35 data/part0/graph.dgl
 -rw-rw-r-- 1 ubuntu ubuntu 182M Oct 30 07:35 data/part0/node_feat.dgl
 -rw-rw-r-- 1 ubuntu ubuntu 129M Oct 30 08:30 data/part1/csc_sampling_graph.tar
--rw-rw-r-- 1 ubuntu ubuntu 247M Oct 30 07:48 data/part1/csc_sampling_graph_eids.tar
+-rw-rw-r-- 1 ubuntu ubuntu 223M Oct 30 08:45 data/part1/csc_sampling_graph_eids.tar
 -rw-rw-r-- 1 ubuntu ubuntu   24 Oct 30 07:35 data/part1/edge_feat.dgl
 -rw-rw-r-- 1 ubuntu ubuntu 711M Oct 30 07:35 data/part1/graph.dgl
 -rw-rw-r-- 1 ubuntu ubuntu 187M Oct 30 07:35 data/part1/node_feat.dgl
