@@ -360,19 +360,6 @@ class CSCSamplingGraph(SamplingGraph):
                 original_edge_ids
             ]
 
-        # [Rui] Extract ETYPEs from edge attributes.
-        original_etype_ids = None
-        has_original_etype_ids = (
-            self.edge_attributes is not None
-            and ETYPE in self.edge_attributes
-        )
-        if has_original_etype_ids:
-            assert original_edge_ids is not None, "original_edge_ids is None."
-            original_etype_ids = self.edge_attributes[ETYPE][
-                original_edge_ids
-            ]
-            assert original_etype_ids is not None, "original_etype_ids is None"
-
         if type_per_edge is None or keep_homo:
             # The sampled graph is already a homogeneous graph.
             node_pairs = (row, column)
@@ -397,7 +384,7 @@ class CSCSamplingGraph(SamplingGraph):
                 original_edge_ids = original_hetero_edge_ids
         return SampledSubgraphImpl(
             node_pairs=node_pairs, original_edge_ids=original_edge_ids,
-            original_etype_ids=original_etype_ids,
+            original_etype_ids=type_per_edge,
         )
 
     def _convert_to_homogeneous_nodes(self, nodes):
@@ -414,6 +401,7 @@ class CSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_name: Optional[str] = None,
         keep_homo: bool = False,
+        return_orig_edge_ids: bool = False,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -482,10 +470,12 @@ class CSCSamplingGraph(SamplingGraph):
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
         C_sampled_subgraph = self._sample_neighbors(
-            nodes, fanouts, replace, probs_name
+            nodes, fanouts, replace, probs_name, return_orig_edge_ids
         )
 
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph, keep_homo=keep_homo)
+        return self._convert_to_sampled_subgraph(
+            C_sampled_subgraph, keep_homo=keep_homo,
+        )
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
@@ -531,6 +521,7 @@ class CSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
+        return_orig_edge_ids: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -577,10 +568,6 @@ class CSCSamplingGraph(SamplingGraph):
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
         )
-        has_original_etype_ids=(
-            self.edge_attributes is not None
-            and ETYPE in self.edge_attributes
-        )
         # [Rui] Formatting to avoid `RuntimeError: expected scalar type Int but found Long`.
         nodes = nodes.to(self.indices.dtype)
         fanouts = fanouts.to(self.indices.dtype)
@@ -589,7 +576,7 @@ class CSCSamplingGraph(SamplingGraph):
             fanouts.tolist(),
             replace,
             False,
-            has_original_eids or has_original_etype_ids,
+            has_original_eids or return_orig_edge_ids,
             probs_name,
         )
 

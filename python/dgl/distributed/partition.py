@@ -1370,12 +1370,6 @@ def convert_dgl_partition_to_csc_sampling_graph(
                 node_attributes = {}
             node_attributes[NTYPE] = graph.ndata[NTYPE]
 
-        if store_etypes:
-            # [Rui] Let's store as edge attributes for now.
-            if edge_attributes is None:
-                edge_attributes = {}
-            edge_attributes[ETYPE] = type_per_edge
-
         # Data type formatting before saving.
         num_nodes = part_meta["num_nodes"]
         num_edges = part_meta["num_edges"]
