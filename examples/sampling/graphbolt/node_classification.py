@@ -399,7 +399,7 @@ def main(args):
         model,
         num_classes,
     )
-    print(f"Test Accuracy is {test_acc.item():.4f}")
+    print(f"Test accuracy is {test_acc.item():.4f}")
 
 
 if __name__ == "__main__":
