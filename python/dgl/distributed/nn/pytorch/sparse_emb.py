@@ -60,10 +60,10 @@ class DistEmbedding:
 
     Note
     ----
-    When a ``DistEmbedding``  object is used when the deep learning framework is recording
-    the forward computation, users have to invoke
-    py:meth:`~dgl.distributed.optim.SparseAdagrad.step` afterwards. Otherwise, there will be
-    some memory leak.
+    When a ``DistEmbedding``  object is used in the forward computation, users
+    have to invoke
+    :py:meth:`~dgl.distributed.optim.SparseAdagrad.step` afterwards. Otherwise,
+    there will be some memory leak.
     """
 
     def __init__(

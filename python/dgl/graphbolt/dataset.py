@@ -32,17 +32,17 @@ class Task:
         raise NotImplementedError
 
     @property
-    def train_set(self) -> ItemSet or ItemSetDict:
+    def train_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the training set."""
         raise NotImplementedError
 
     @property
-    def validation_set(self) -> ItemSet or ItemSetDict:
+    def validation_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the validation set."""
         raise NotImplementedError
 
     @property
-    def test_set(self) -> ItemSet or ItemSetDict:
+    def test_set(self) -> Union[ItemSet, ItemSetDict]:
         """Return the test set."""
         raise NotImplementedError
 

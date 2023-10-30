@@ -192,3 +192,66 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
     neighbor_dp = Sampler(negative_dp, graph, fanouts)
     assert len(list(neighbor_dp)) == 5
+
+
+@pytest.mark.parametrize("labor", [False, True])
+def test_SubgraphSampler_Random_Hetero_Graph(labor):
+    num_nodes = 5
+    num_edges = 9
+    num_ntypes = 3
+    num_etypes = 3
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gb_test_utils.random_hetero_graph(
+        num_nodes, num_edges, num_ntypes, num_etypes
+    )
+    edge_attributes = {
+        "A1": torch.randn(num_edges),
+        "A2": torch.randn(num_edges),
+    }
+    graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
+    )
+    itemset = gb.ItemSetDict(
+        {
+            "n2": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
+            "n1": gb.ItemSet(torch.tensor([1]), names="seed_nodes"),
+        }
+    )
+
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
+    num_layer = 2
+    fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
+    Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
+    sampler_dp = Sampler(item_sampler, graph, fanouts, replace=True)
+
+    for data in sampler_dp:
+        for sampledsubgraph in data.sampled_subgraphs:
+            for _, value in sampledsubgraph.node_pairs.items():
+                assert torch.equal(
+                    torch.ge(value[0], torch.zeros(len(value[0]))),
+                    torch.ones(len(value[0])),
+                )
+                assert torch.equal(
+                    torch.ge(value[1], torch.zeros(len(value[1]))),
+                    torch.ones(len(value[1])),
+                )
+            for _, value in sampledsubgraph.original_column_node_ids.items():
+                assert torch.equal(
+                    torch.ge(value, torch.zeros(len(value))),
+                    torch.ones(len(value)),
+                )
+            for _, value in sampledsubgraph.original_row_node_ids.items():
+                assert torch.equal(
+                    torch.ge(value, torch.zeros(len(value))),
+                    torch.ones(len(value)),
+                )

@@ -45,8 +45,8 @@ class SubgraphSampler(MiniBatchTransformer):
             seeds = minibatch.seed_nodes
         else:
             raise ValueError(
-                f"Invalid minibatch {minibatch}: Either 'node_pairs' or \
-                'seed_nodes' should have a value."
+                f"Invalid minibatch {minibatch}: Either `node_pairs` or "
+                "`seed_nodes` should have a value."
             )
         (
             minibatch.input_nodes,

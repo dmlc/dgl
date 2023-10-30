@@ -44,6 +44,8 @@ def preprocess_ondisk_dataset(
     ----------
     dataset_dir : str
         The path to the dataset directory.
+    include_original_edge_id : bool, optional
+        Whether to include the original edge id in the CSCSamplingGraph.
 
     Returns
     -------
@@ -337,6 +339,8 @@ class OnDiskDataset(Dataset):
     ----------
     path: str
         The YAML file path.
+    include_original_edge_id: bool, optional
+        Whether to include the original edge id in the CSCSamplingGraph.
     """
 
     def __init__(

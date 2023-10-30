@@ -38,6 +38,7 @@ main
 └───> All nodes set inference & Test set evaluation
 """
 import argparse
+import time
 
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
@@ -282,6 +283,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
     )
 
     for epoch in range(args.epochs):
+        t0 = time.time()
         model.train()
         total_loss = 0
         for step, data in tqdm(enumerate(dataloader)):
@@ -304,11 +306,12 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
 
             total_loss += loss.item()
 
+        t1 = time.time()
         # Evaluate the model.
         acc = evaluate(args, model, graph, features, valid_set, num_classes)
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (step + 1):.4f} | "
-            f"Accuracy {acc.item():.4f} "
+            f"Accuracy {acc.item():.4f} | Time {t1 - t0:.4f}"
         )
 
 
