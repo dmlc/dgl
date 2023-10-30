@@ -1273,6 +1273,7 @@ def convert_dgl_partition_to_csc_sampling_graph(
     store_ntypes=False,
     store_etypes=True,
     store_metadata=True,
+    graph_file_name=None,
 ):
     """Convert partitions of dgl to CSCSamplingGraph of GraphBolt.
 
@@ -1297,6 +1298,9 @@ def convert_dgl_partition_to_csc_sampling_graph(
         Whether to store edge types in the new graph.
     store_metadata : bool, optional
         Whether to store metadata in the new graph.
+    graph_file_name : str, optional
+        The name of the new graph file. If not provided, the name will be
+        `csc_sampling_graph.tar`.
     """
     # As only this function requires GraphBolt for now, let's import here.
     from .. import graphbolt
@@ -1336,11 +1340,6 @@ def convert_dgl_partition_to_csc_sampling_graph(
         if store_etypes:
             type_per_edge = init_type_per_edge(graph, gpb)
             type_per_edge = type_per_edge[edge_ids]
-            type_per_edge = type_per_edge.to(RESERVED_FIELD_DTYPE[ETYPE])
-            if len(etypes) < 128:
-                type_per_edge = type_per_edge.to(torch.int8)
-            elif len(etypes) < 32768:
-                type_per_edge = type_per_edge.to(torch.int16)
             # Sanity check.
             assert len(type_per_edge) == graph.num_edges()
 
@@ -1350,7 +1349,7 @@ def convert_dgl_partition_to_csc_sampling_graph(
             # Sanity check.
             assert len(graph.ndata[NID]) == graph.num_nodes()
             node_attributes = {
-                NID: graph.ndata[NID].to(RESERVED_FIELD_DTYPE[NID])
+                NID: graph.ndata[NID]
             }
 
         # Original edge IDs.
@@ -1359,21 +1358,92 @@ def convert_dgl_partition_to_csc_sampling_graph(
             # Sanity check.
             assert len(graph.edata[EID]) == graph.num_edges()
             edge_attributes = {
-                EID: graph.edata[EID][edge_ids].to(RESERVED_FIELD_DTYPE[EID])
+                EID: graph.edata[EID][edge_ids]
             }
 
         if store_ntypes:
             if node_attributes is None:
                 node_attributes = {}
-            node_attributes[NTYPE] = graph.ndata[NTYPE].to(
-                RESERVED_FIELD_DTYPE[NTYPE]
-            )
+            node_attributes[NTYPE] = graph.ndata[NTYPE]
 
         if store_etypes:
             # [Rui] Let's store as edge attributes for now.
             if edge_attributes is None:
                 edge_attributes = {}
             edge_attributes[ETYPE] = type_per_edge
+
+        # Data type formatting before saving.
+        num_nodes = part_meta["num_nodes"]
+        num_edges = part_meta["num_edges"]
+        local_num_nodes = graph.num_nodes()
+        local_num_edges = graph.num_edges()
+        # 1. csc matrix. [Required]
+        if local_num_nodes < torch.iinfo(torch.int32).max:
+            indices = indices.to(torch.int32)
+        else:
+            indices = indices.to(torch.int64)
+        if local_num_edges < torch.iinfo(torch.int32).max:
+            indptr = indptr.to(torch.int32)
+        else:
+            indptr = indptr.to(torch.int64)
+        # 2. NID. [Required]
+        if node_attributes is not None and NID in node_attributes:
+            if num_nodes < torch.iinfo(torch.int32).max:
+                node_attributes[NID] = node_attributes[NID].to(torch.int32)
+            else:
+                node_attributes[NID] = node_attributes[NID].to(torch.int64)
+        # 3. ETYPE. [Required].
+        # [TODO] `type_per_edge` and edge_attributes[ETYPE] are duplicated.
+        if type_per_edge is not None:
+            if len(etypes) < torch.iinfo(torch.int8).max:
+                type_per_edge = type_per_edge.to(torch.int8)
+            elif len(etypes) < torch.iinfo(torch.int16).max:
+                type_per_edge = type_per_edge.to(torch.int16)
+            elif len(etypes) < torch.iinfo(torch.int32).max:
+                type_per_edge = type_per_edge.to(torch.int32)
+            else:
+                type_per_edge = type_per_edge.to(torch.int64)
+        if edge_attributes is not None and ETYPE in edge_attributes:
+            if len(etypes) < torch.iinfo(torch.int8).max:
+                edge_attributes[ETYPE] = edge_attributes[ETYPE].to(
+                    torch.int8
+                )
+            elif len(etypes) < torch.iinfo(torch.int16).max:
+                edge_attributes[ETYPE] = edge_attributes[ETYPE].to(
+                    torch.int16
+                )
+            elif len(etypes) < torch.iinfo(torch.int32).max:
+                edge_attributes[ETYPE] = edge_attributes[ETYPE].to(
+                    torch.int32
+                )
+            else:
+                edge_attributes[ETYPE] = edge_attributes[ETYPE].to(
+                    torch.int64
+                )
+        # 4. NTYPE. [Optional]
+        if node_attributes is not None and NTYPE in node_attributes:
+            if len(ntypes) < torch.iinfo(torch.int8).max:
+                node_attributes[NTYPE] = node_attributes[NTYPE].to(
+                    torch.int8
+                )
+            elif len(ntypes) < torch.iinfo(torch.int16).max:
+                node_attributes[NTYPE] = node_attributes[NTYPE].to(
+                    torch.int16
+                )
+            elif len(ntypes) < torch.iinfo(torch.int32).max:
+                node_attributes[NTYPE] = node_attributes[NTYPE].to(
+                    torch.int32
+                )
+            else:
+                node_attributes[NTYPE] = node_attributes[NTYPE].to(
+                    torch.int64
+                )
+        # 5. EID. [Optional]
+        if edge_attributes is not None and EID in edge_attributes:
+            if num_edges < torch.iinfo(torch.int32).max:
+                edge_attributes[EID] = edge_attributes[EID].to(torch.int32)
+            else:
+                edge_attributes[EID] = edge_attributes[EID].to(torch.int64)
 
         # Construct CSCSamplingGraph
         csc_graph = graphbolt.from_csc(
@@ -1389,8 +1459,10 @@ def convert_dgl_partition_to_csc_sampling_graph(
             os.path.dirname(part_config),
             part_meta[f"part-{part_id}"]["part_graph"],
         )
+        if graph_file_name is None:
+            graph_file_name = "csc_sampling_graph.tar"
         csc_graph_path = os.path.join(
-            os.path.dirname(orig_graph_path), "csc_sampling_graph.tar"
+            os.path.dirname(orig_graph_path), graph_file_name
         )
         graphbolt.save_csc_sampling_graph(csc_graph, csc_graph_path)
 

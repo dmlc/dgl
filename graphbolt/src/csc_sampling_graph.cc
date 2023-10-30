@@ -357,7 +357,8 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
         auto num_picked_neighbors_data_ptr =
             num_picked_neighbors_per_node.data_ptr<scalar_t>();
         num_picked_neighbors_data_ptr[0] = 0;
-        const auto nodes_data_ptr = nodes.data_ptr<int64_t>();
+        //const auto nodes_data_ptr = nodes.data_ptr<int64_t>();
+        const auto nodes_data_ptr = nodes.data_ptr<scalar_t>();
 
         // Step 1. Calculate pick number of each node.
         torch::parallel_for(
@@ -378,7 +379,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
 
         // Step 2. Calculate prefix sum to get total length and offsets of each
         // node. It's also the indptr of the generated subgraph.
-        subgraph_indptr = torch::cumsum(num_picked_neighbors_per_node, 0);
+        subgraph_indptr = torch::cumsum(num_picked_neighbors_per_node, 0).to(indptr_.dtype());
 
         // Step 3. Allocate the tensor for picked neighbors.
         const auto total_length =

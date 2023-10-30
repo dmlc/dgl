@@ -573,10 +573,6 @@ class CSCSamplingGraph(SamplingGraph):
         """
         # Ensure nodes is 1-D tensor.
         self._check_sampler_arguments(nodes, fanouts, probs_name)
-        has_original_nids = (
-            self.node_attributes is not None
-            and ORIGINAL_NODE_ID in self.node_attributes
-        )
         has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes
@@ -585,6 +581,9 @@ class CSCSamplingGraph(SamplingGraph):
             self.edge_attributes is not None
             and ETYPE in self.edge_attributes
         )
+        # [Rui] Formatting to avoid `RuntimeError: expected scalar type Int but found Long`.
+        nodes = nodes.to(self.indices.dtype)
+        fanouts = fanouts.to(self.indices.dtype)
         return self._c_csc_graph.sample_neighbors(
             nodes,
             fanouts.tolist(),

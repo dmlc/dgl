@@ -610,6 +610,7 @@ def _frontier_to_heterogeneous_graph_gb(g, frontier, gpb):
     # For GraphBolt, we store ETYPE into EID field.
     etype_ids = frontier.edata[EID]
     src, dst = frontier.edges()
+    src, dst = F.astype(src, g.idtype), F.astype(dst, g.idtype)
     etype_ids, idx = F.sort_1d(etype_ids)
     src, dst = F.gather_row(src, idx), F.gather_row(dst, idx)
     src_ntype_ids, src = gpb.map_to_per_ntype(src)
@@ -713,7 +714,7 @@ def sample_etype_neighbors(
         A sampled subgraph containing only the sampled neighboring edges.  It is on CPU.
     """
     if isinstance(fanout, int):
-        fanout = F.full_1d(len(g.canonical_etypes), fanout, F.int64, F.cpu())
+        fanout = F.full_1d(len(g.canonical_etypes), fanout, F.int32, F.cpu())
     else:
         etype_ids = {etype: i for i, etype in enumerate(g.canonical_etypes)}
         fanout_array = [None] * len(g.canonical_etypes)

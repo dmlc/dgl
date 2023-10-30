@@ -103,7 +103,7 @@ class NeighborSampler(SubgraphSampler):
     @staticmethod
     def distributed_sample_neighbor(graph, seeds, fanouts):
         if isinstance(fanouts, int):
-            fanouts = torch.LongTensor([fanouts])
+            fanouts = torch.IntTensor([fanouts])
         assert isinstance(fanouts, torch.Tensor), f"Invalid fanouts: {fanouts}"
         subgraph = graph.sample_neighbors(seeds, fanouts, keep_homo=True)
         src_nodes, dst_nodes = subgraph.node_pairs

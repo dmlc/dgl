@@ -1115,21 +1115,21 @@ def test_partition_hetero_graphbolt_sample_neighbors(
                 assert edge_feats == {}
 
             # sample_neighbors()
-            subg = part_g.sample_neighbors(th.arange(10), th.LongTensor([-1]), keep_homo=True)
+            subg = part_g.sample_neighbors(th.arange(10), th.IntTensor([-1]), keep_homo=True)
             src, dst = subg.node_pairs
             orig_src = part_g.node_attributes[dgl.NID][src]
             orig_dst = part_g.node_attributes[dgl.NID][dst]
             orig_ntype_src = part_g.node_attributes[dgl.NTYPE][src]
             orig_ntype_dst = part_g.node_attributes[dgl.NTYPE][dst]
             etype_ids = subg.original_etype_ids
-            orig_eids = part_g.edge_attributes[dgl.EID][subg.original_edge_ids]
+            orig_eids = part_g.edge_attributes[dgl.EID].to(hg.idtype)[subg.original_edge_ids]
             etype_idsA, _ = gpb.map_to_per_etype(orig_eids)
             assert th.equal(etype_ids, etype_idsA), "etype_ids is not expected."
 
             etype_ids, idx = F.sort_1d(etype_ids)
             sorted_orig_src, sorted_orig_dst = F.gather_row(orig_src, idx), F.gather_row(orig_dst, idx)
-            src_ntype_ids, ntype_wised_src = gpb.map_to_per_ntype(sorted_orig_src)
-            dst_ntype_ids, ntype_wised_dst = gpb.map_to_per_ntype(sorted_orig_dst)
+            src_ntype_ids, ntype_wised_src = gpb.map_to_per_ntype(sorted_orig_src.to(hg.idtype))
+            dst_ntype_ids, ntype_wised_dst = gpb.map_to_per_ntype(sorted_orig_dst.to(hg.idtype))
 
             data_dict = dict()
             print("gpb.canonical_etypes: ", gpb.canonical_etypes)
