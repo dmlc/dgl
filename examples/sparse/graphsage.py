@@ -95,44 +95,8 @@ class SAGE(nn.Module):
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
 
-    def inference(self, A, dataset, device, batch_size):
-        """Conduct layer-wise inference to get all the node embeddings."""
-        feat = dataset[0].ndata["feat"]
-        inf_idx = dataset.val_idx.to(device)
-        inf_dataloader = torch.utils.data.DataLoader(
-            inf_idx, batch_size=batch_size
-        )
 
-        buffer_device = torch.device("cpu")
-        pin_memory = buffer_device != device
-
-        node_num = A.shape[0]
-        for l, layer in enumerate(self.layers):
-            y = torch.empty(
-                node_num,
-                self.hid_size if l != len(self.layers) - 1 else self.out_size,
-                dtype=feat.dtype,
-                device=buffer_device,
-                pin_memory=pin_memory,
-            )
-            feat = feat.to(device)
-
-            for it, (seeds) in enumerate(inf_dataloader):
-                # Sampling all neighbors.
-                sampled_mat = A.sample(1, fanout=node_num, ids=seeds)
-                # Compact the matrix.
-                compacted_mat, row_ids = sampled_mat.compact(0)
-                x = feat[row_ids]
-                h = layer(compacted_mat, x)
-                if l != len(self.layers) - 1:
-                    h = F.relu(h)
-                    h = self.dropout(h)
-                y[seeds] = h.to(buffer_device)
-            feat = y
-        return y
-
-
-def evaluate(model, dataloader, g, num_classes):
+def evaluate(model, A, dataloader, ndata, num_classes):
     model.eval()
     ys = []
     y_hats = []
@@ -149,8 +113,8 @@ def evaluate(model, dataloader, g, num_classes):
                 sampled_mats.insert(0, compacted_mat)
                 src = row_ids
 
-            x = g.ndata["feat"][src]
-            y = g.ndata["label"][seeds]
+            x = ndata["feat"][src]
+            y = ndata["label"][seeds]
             ys.append(y)
             y_hats.append(model(sampled_mats, x))
 
@@ -162,21 +126,15 @@ def evaluate(model, dataloader, g, num_classes):
     )
 
 
-def layerwise_infer(device, A, dataset, model, num_classes, batch_size):
+def validate(device, A, ndata, dataset, model, batch_size):
     model.eval()
-    nid = dataset.test_idx
-    with torch.no_grad():
-        pred = model.inference(
-            A, dataset, device, batch_size
-        )  # pred in buffer_device
-        pred = pred[nid]
-        label = dataset[0].ndata["label"][nid].to(pred.device)
-        return MF.accuracy(
-            pred, label, task="multiclass", num_classes=num_classes
-        )
+    inf_id = dataset.test_idx.to(device)
+    inf_dataloader = torch.utils.data.DataLoader(inf_id, batch_size=batch_size)
+    acc = evaluate(model, A, inf_dataloader, ndata, dataset.num_classes)
+    return acc
 
 
-def train(device, A, g, dataset, model, num_classes):
+def train(device, A, ndata, dataset, model):
     # Create sampler & dataloader.
     train_idx = dataset.train_idx.to(device)
     val_idx = dataset.val_idx.to(device)
@@ -203,8 +161,8 @@ def train(device, A, g, dataset, model, num_classes):
                 sampled_mats.insert(0, compacted_mat)
                 src = row_ids
 
-            x = g.ndata["feat"][src]
-            y = g.ndata["label"][seeds]
+            x = ndata["feat"][src]
+            y = ndata["label"][seeds]
             y_hat = model(sampled_mats, x)
             loss = F.cross_entropy(y_hat, y)
             opt.zero_grad()
@@ -212,7 +170,7 @@ def train(device, A, g, dataset, model, num_classes):
             opt.step()
             total_loss += loss.item()
 
-        acc = evaluate(model, val_dataloader, g, num_classes)
+        acc = evaluate(model, A, val_dataloader, ndata, dataset.num_classes)
         print(
             "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(
                 epoch, total_loss / (it + 1), acc.item()
@@ -251,7 +209,6 @@ if __name__ == "__main__":
     dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
     g = dataset[0]
     g = g.to(device)
-    num_classes = dataset.num_classes
 
     # Create GraphSAGE model.
     in_size = g.ndata["feat"].shape[1]
@@ -265,11 +222,9 @@ if __name__ == "__main__":
 
     # Model training.
     print("Training...")
-    train(device, A, g, dataset, model, num_classes)
+    train(device, A, g.ndata, dataset, model)
 
     # Test the model.
     print("Testing...")
-    acc = layerwise_infer(
-        device, A, dataset, model, num_classes, batch_size=4096
-    )
+    acc = validate(device, A, g.ndata, dataset, model, batch_size=4096)
     print(f"Test accuracy {acc:.4f}")
