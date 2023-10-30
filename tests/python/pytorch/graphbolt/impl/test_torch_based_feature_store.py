@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from math import prod
 
 import backend as F
 
@@ -136,44 +137,34 @@ def test_torch_based_feature(in_memory):
     "dtype", [torch.float32, torch.float64, torch.int32, torch.int64]
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
-def test_torch_based_pinned_feature(dtype, idtype):
-    a = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).pin_memory()
-    b = torch.tensor(
-        [[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype
-    ).pin_memory()
-    c = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).pin_memory()
+@pytest.mark.parametrize("feature_size", [1, 3, (2, 2)])
+def test_torch_based_pinned_feature(dtype, idtype, feature_size):
+    num_feature = 2
+    shape = (
+        (num_feature, feature_size)
+        if isinstance(feature_size, int)
+        else (num_feature, *feature_size)
+    )
+    tensor = torch.arange(0, prod(shape), dtype=dtype).reshape(shape)
+    test_tensor = tensor.clone().detach()
+    test_tensor_cuda = test_tensor.cuda()
+    pinned_tensor = tensor.pin_memory()
 
-    feature_a = gb.TorchBasedFeature(a)
-    feature_b = gb.TorchBasedFeature(b)
-    feature_c = gb.TorchBasedFeature(c)
+    feature = gb.TorchBasedFeature(pinned_tensor)
 
+    assert torch.equal(feature.read(), test_tensor_cuda)
+    assert feature.read().is_cuda
     assert torch.equal(
-        feature_a.read(),
-        torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=dtype).cuda(),
+        feature.read(torch.tensor([0], dtype=idtype).cuda()),
+        test_tensor_cuda[[0]],
     )
-    assert feature_a.read().is_cuda
-    assert torch.equal(
-        feature_b.read(),
-        torch.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]], dtype=dtype).cuda(),
-    )
-    assert feature_b.read().is_cuda
-    assert torch.equal(
-        feature_a.read(torch.tensor([0], dtype=idtype).cuda()),
-        torch.tensor([[1, 2, 3]], dtype=dtype).cuda(),
-    )
-    assert feature_a.read(torch.tensor([0], dtype=idtype).cuda()).is_cuda
-    assert torch.equal(
-        feature_b.read(torch.tensor([1], dtype=idtype).cuda()),
-        torch.tensor([[[4, 5], [6, 7]]], dtype=dtype).cuda(),
-    )
-    assert feature_b.read(torch.tensor([1], dtype=idtype).cuda()).is_cuda
+    assert feature.read(torch.tensor([0], dtype=idtype).cuda()).is_cuda
 
-    assert feature_c.read().is_cuda
+    assert feature.read().is_cuda
     assert torch.equal(
-        feature_c.read(torch.tensor([0], dtype=idtype)),
-        torch.tensor([[1, 2, 3]], dtype=dtype),
+        feature.read(torch.tensor([0], dtype=idtype)), test_tensor[[0]]
     )
-    assert not feature_c.read(torch.tensor([0], dtype=idtype)).is_cuda
+    assert not feature.read(torch.tensor([0], dtype=idtype)).is_cuda
 
 
 def write_tensor_to_disk(dir, name, t, fmt="torch"):
