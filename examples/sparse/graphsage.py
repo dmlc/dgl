@@ -57,8 +57,8 @@ class SAGEConv(nn.Module):
     def forward(self, A, feat):
         # Remove duplicate edges.
         A = A.coalesce()
-        feat_src = feat_dst = feat
-        feat_dst = feat_src[: A.shape[1]]
+        feat_src = feat
+        feat_dst = feat[: A.shape[1]]
 
         # Aggregator type: mean.
         srcdata = self.fc_neigh(feat_src)
@@ -76,7 +76,7 @@ class SAGE(nn.Module):
     def __init__(self, in_size, hid_size, out_size):
         super().__init__()
         self.layers = nn.ModuleList()
-        # Two-layer GraphSAGE-gcn.
+        # Three-layer GraphSAGE-gcn.
         self.layers.append(SAGEConv(in_size, hid_size))
         self.layers.append(SAGEConv(hid_size, hid_size))
         self.layers.append(SAGEConv(hid_size, out_size))
@@ -84,10 +84,12 @@ class SAGE(nn.Module):
         self.hid_size = hid_size
         self.out_size = out_size
 
-    def forward(self, A_sample, x):
+    def forward(self, sampled_mats, x):
         hidden_x = x
-        for layer_idx, (layer, A) in enumerate(zip(self.layers, A_sample)):
-            hidden_x = layer(A, hidden_x)
+        for layer_idx, (layer, sampled_mat) in enumerate(
+            zip(self.layers, sampled_mats)
+        ):
+            hidden_x = layer(sampled_mat, hidden_x)
             if layer_idx != len(self.layers) - 1:
                 hidden_x = F.relu(hidden_x)
                 hidden_x = self.dropout(hidden_x)
@@ -115,46 +117,42 @@ class SAGE(nn.Module):
             )
             feat = feat.to(device)
 
-            for it, (dst) in enumerate(inf_dataloader):
-                # Sampling full neighbors.
-                mat = A.sample(1, fanout=node_num, ids=dst)
+            for it, (seeds) in enumerate(inf_dataloader):
+                # Sampling all neighbors.
+                sampled_mat = A.sample(1, fanout=node_num, ids=seeds)
                 # Compact the matrix.
-                mat_cmp, src = mat.compact(0)
-                x = feat[src]
-                h = layer(mat_cmp, x)
+                compacted_mat, row_ids = sampled_mat.compact(0)
+                x = feat[row_ids]
+                h = layer(compacted_mat, x)
                 if l != len(self.layers) - 1:
                     h = F.relu(h)
                     h = self.dropout(h)
-                y[dst] = h.to(buffer_device)
+                y[seeds] = h.to(buffer_device)
             feat = y
         return y
 
 
-def evaluate(model, dataloader, dataset, num_classes):
+def evaluate(model, dataloader, g, num_classes):
     model.eval()
     ys = []
     y_hats = []
-    fanout = [10, 10, 10]
-    for it, (dst) in enumerate(dataloader):
+    fanouts = [10, 10, 10]
+    for it, (seeds) in enumerate(dataloader):
         with torch.no_grad():
-            src = dst
-            A_sample = []
-            for fout in fanout:
+            src = seeds
+            sampled_mats = []
+            for fanout in fanouts:
                 # Sampling neighbor
-                mat = A.sample(1, fout, ids=src, replace=True)
+                sampled_mat = A.sample(1, fanout, ids=src, replace=True)
                 # Compact the matrix
-                mat_cmp, src_idx = mat.compact(0)
-                A_sample.append(mat_cmp)
-                src = src_idx
+                compacted_mat, row_ids = sampled_mat.compact(0)
+                sampled_mats.insert(0, compacted_mat)
+                src = row_ids
 
-            A_sample.reverse()
-            csrc = src.to("cpu")
-            cdst = dst.to("cpu")
-
-            x = dataset[0].ndata["feat"].index_select(0, csrc).to(device)
-            y = dataset[0].ndata["label"].index_select(0, cdst).to(device)
+            x = g.ndata["feat"][src]
+            y = g.ndata["label"][seeds]
             ys.append(y)
-            y_hats.append(model(A_sample, x))
+            y_hats.append(model(sampled_mats, x))
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -178,7 +176,7 @@ def layerwise_infer(device, A, dataset, model, num_classes, batch_size):
         )
 
 
-def train(device, A, dataset, model, num_classes):
+def train(device, A, g, dataset, model, num_classes):
     # Create sampler & dataloader.
     train_idx = dataset.train_idx.to(device)
     val_idx = dataset.val_idx.to(device)
@@ -190,37 +188,31 @@ def train(device, A, dataset, model, num_classes):
 
     opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
 
-    fanout = [10, 10, 10]
+    fanouts = [10, 10, 10]
     for epoch in range(10):
         model.train()
         total_loss = 0
-        for it, (dst) in enumerate(train_dataloader):
-            # print(dst)
-            src = dst
-            A_sample = []
-            for fout in fanout:
+        for it, (seeds) in enumerate(train_dataloader):
+            src = seeds
+            sampled_mats = []
+            for fanout in fanouts:
                 # Sampling neighbor
-                mat = A.sample(1, fout, ids=src, replace=True)
+                sampled_mat = A.sample(1, fanout, ids=src, replace=True)
                 # Compact the matrix
-                mat_cmp, src_idx = mat.compact(0)
-                A_sample.append(mat_cmp)
-                src = src_idx
+                compacted_mat, row_ids = sampled_mat.compact(0)
+                sampled_mats.insert(0, compacted_mat)
+                src = row_ids
 
-            A_sample.reverse()
-            csrc = src.to("cpu")
-            cdst = dst.to("cpu")
-
-            x = dataset[0].ndata["feat"].index_select(0, csrc).to(device)
-            y = dataset[0].ndata["label"].index_select(0, cdst).to(device)
-
-            y_hat = model(A_sample, x)
+            x = g.ndata["feat"][src]
+            y = g.ndata["label"][seeds]
+            y_hat = model(sampled_mats, x)
             loss = F.cross_entropy(y_hat, y)
             opt.zero_grad()
             loss.backward()
             opt.step()
             total_loss += loss.item()
 
-        acc = evaluate(model, val_dataloader, dataset, num_classes)
+        acc = evaluate(model, val_dataloader, g, num_classes)
         print(
             "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(
                 epoch, total_loss / (it + 1), acc.item()
@@ -232,10 +224,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GraphSAGE")
     parser.add_argument(
         "--mode",
-        default="puregpu",
-        choices=["cpu", "puregpu"],
+        default="gpu",
+        choices=["cpu", "gpu"],
         help="Training mode. 'cpu' for CPU training, "
-        "'puregpu' for pure-GPU training.",
+        "'gpu' for pure-GPU training.",
     )
     args = parser.parse_args()
     if not torch.cuda.is_available():
@@ -249,17 +241,17 @@ if __name__ == "__main__":
     # A good accuracy can be achieved after a few steps of training.
     #
     # First, the whole graph is loaded and transformed. Then the training
-    # process is performed on a model which is composed of 2 GraphSAGE-gcn
-    # layer. Finally, the performance of the model is evaluated on test set.
+    # process is performed on a model which is composed of 3 GraphSAGE-gcn
+    # layers. Finally, the performance of the model is evaluated on test set.
     #####################################################################
 
     # Load and preprocess dataset.
     print("Loading data")
+    device = torch.device("cpu" if args.mode == "cpu" else "cuda")
     dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
     g = dataset[0]
-    g = g.to("cuda" if args.mode == "puregpu" else "cpu")
+    g = g.to(device)
     num_classes = dataset.num_classes
-    device = torch.device("cpu" if args.mode == "cpu" else "cuda")
 
     # Create GraphSAGE model.
     in_size = g.ndata["feat"].shape[1]
@@ -273,7 +265,7 @@ if __name__ == "__main__":
 
     # Model training.
     print("Training...")
-    train(device, A, dataset, model, num_classes)
+    train(device, A, g, dataset, model, num_classes)
 
     # Test the model.
     print("Testing...")
