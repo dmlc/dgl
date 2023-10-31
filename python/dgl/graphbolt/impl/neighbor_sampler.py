@@ -108,7 +108,9 @@ class NeighborSampler(SubgraphSampler):
         subgraph = graph.sample_neighbors(seeds, fanouts, keep_homo=True)
         src_nodes, dst_nodes = subgraph.node_pairs
         etype_ids = subgraph.original_etype_ids
-        assert src_nodes.shape == dst_nodes.shape == etype_ids.shape, f"Shape mismatch: {src_nodes.shape}, {dst_nodes.shape}, {etype_ids.shape}"
+        assert src_nodes.shape == dst_nodes.shape, f"Shape mismatch: {src_nodes.shape}, {dst_nodes.shape}"
+        if etype_ids is not None:
+            assert src_nodes.shape == etype_ids.shape, f"Shape mismatch: {src_nodes.shape}, {etype_ids.shape}"
         return src_nodes, dst_nodes, etype_ids
 
     def _sample_subgraphs(self, seeds):

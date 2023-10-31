@@ -66,7 +66,7 @@ class DistSAGE(nn.Module):
                 h = self.dropout(h)
         return h
 
-    def inference(self, g, x, batch_size, device):
+    def inference(self, g, x, batch_size, device, use_graphbolt):
         """
         Distributed layer-wise inference with the GraphSAGE model on full
         neighbors.
@@ -116,6 +116,7 @@ class DistSAGE(nn.Module):
                 batch_size=batch_size,
                 shuffle=False,
                 drop_last=False,
+                use_graphbolt=use_graphbolt,
             )
 
             for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
@@ -155,7 +156,7 @@ def compute_acc(pred, labels):
     return (th.argmax(pred, dim=1) == labels).float().sum() / len(pred)
 
 
-def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
+def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device, use_graphbolt):
     """
     Evaluate the model on the validation and test set.
 
@@ -187,7 +188,7 @@ def evaluate(model, g, inputs, labels, val_nid, test_nid, batch_size, device):
     """
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, inputs, batch_size, device)
+        pred = model.inference(g, inputs, batch_size, device, use_graphbolt)
     model.train()
     return compute_acc(pred[val_nid], labels[val_nid]), compute_acc(
         pred[test_nid], labels[test_nid]
@@ -219,6 +220,7 @@ def run(args, device, data):
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
+        use_graphbolt=args.graphbolt,
     )
     model = DistSAGE(
         in_feats,
@@ -325,6 +327,7 @@ def run(args, device, data):
                 test_nid,
                 args.batch_size_eval,
                 device,
+                args.graphbolt,
             )
             print(
                 f"Part {g.rank()}, Val Acc {val_acc:.4f}, "
@@ -338,13 +341,16 @@ def main(args):
     """
     Main function.
     """
+    if args.graphbolt:
+        print("DistDGL with GraphBolt...")
     host_name = socket.gethostname()
     print(f"{host_name}: Initializing DistDGL.")
-    dgl.distributed.initialize(args.ip_config)
+    dgl.distributed.initialize(args.ip_config, use_graphbolt=args.graphbolt)
     print(f"{host_name}: Initializing PyTorch process group.")
     th.distributed.init_process_group(backend=args.backend)
     print(f"{host_name}: Initializing DistGraph.")
-    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config)
+    g = dgl.distributed.DistGraph(args.graph_name, part_config=args.part_config,
+                                  use_graphbolt=args.graphbolt)
     print(f"Rank of {host_name}: {g.rank()}")
 
     # Split train/val/test IDs for each trainer.
@@ -415,6 +421,12 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Distributed GraphSAGE.")
+    parser.add_argument(
+        "--graphbolt",
+        default=False,
+        action="store_true",
+        help="train with GraphBolt",
+    )
     parser.add_argument("--graph_name", type=str, help="graph name")
     parser.add_argument(
         "--ip_config", type=str, help="The file for IP configuration"

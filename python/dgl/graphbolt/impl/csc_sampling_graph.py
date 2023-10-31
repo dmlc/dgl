@@ -401,7 +401,7 @@ class CSCSamplingGraph(SamplingGraph):
         replace: bool = False,
         probs_name: Optional[str] = None,
         keep_homo: bool = False,
-        return_orig_edge_ids: bool = False,
+        return_eids: bool = False,
     ) -> SampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -470,7 +470,7 @@ class CSCSamplingGraph(SamplingGraph):
             nodes = self._convert_to_homogeneous_nodes(nodes)
 
         C_sampled_subgraph = self._sample_neighbors(
-            nodes, fanouts, replace, probs_name, return_orig_edge_ids
+            nodes, fanouts, replace, probs_name, return_eids
         )
 
         return self._convert_to_sampled_subgraph(
@@ -521,7 +521,7 @@ class CSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-        return_orig_edge_ids: bool = False,
+        return_eids: bool = False,
     ) -> torch.ScriptObject:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
@@ -576,7 +576,7 @@ class CSCSamplingGraph(SamplingGraph):
             fanouts.tolist(),
             replace,
             False,
-            has_original_eids or return_orig_edge_ids,
+            has_original_eids or return_eids,
             probs_name,
         )
 

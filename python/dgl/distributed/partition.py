@@ -11,7 +11,7 @@ import numpy as np
 import torch
 
 from .. import backend as F, graphbolt as gb
-from ..base import DGLError, EID, ETYPE, NID, NTYPE
+from ..base import dgl_warning, DGLError, EID, ETYPE, NID, NTYPE
 from ..convert import to_homogeneous
 from ..data.utils import load_graphs, load_tensors, save_graphs, save_tensors
 from ..heterograph import DGLGraph
@@ -745,8 +745,10 @@ def partition_graph(
         ``csc`` and ``csr``. If not specified, save one format only according to what
         format is available. If multiple formats are available, selection priority
         from high to low is ``coo``, ``csc``, ``csr``.
-    use_graphbolt : bool
+    use_graphbolt : bool, optional
         Whether to convert the partitioned graph to GraphBolt format.
+    gb_save_all : bool, optional
+        Whether to save all data into `CSCSamplingGraph`.
 
     Returns
     -------
@@ -1247,19 +1249,10 @@ def partition_graph(
     )
 
     if use_graphbolt:
-        if gb_save_all:
-            convert_dgl_partition_to_csc_sampling_graph(
-                part_config,
-                store_orig_nids=True,
-                store_orig_eids=True,
-                store_ntypes=True,
-                store_etypes=True,
-                store_metadata=True,
-            )
-        else:
-            convert_dgl_partition_to_csc_sampling_graph(
-                part_config,
-            )
+        convert_dgl_partition_to_csc_sampling_graph(
+            part_config,
+            store_all=gb_save_all,
+        )
         print("Converted to GraphBolt format.")
 
     if return_mapping:
@@ -1268,13 +1261,10 @@ def partition_graph(
 
 def convert_dgl_partition_to_csc_sampling_graph(
     part_config,
-    store_orig_nids=True,
-    store_orig_eids=False,
-    store_ntypes=False,
-    store_etypes=True,
-    store_metadata=True,
+    store_eids=False,
     graph_file_name=None,
     part_config_file_name=None,
+    store_all=False,
 ):
     """Convert partitions of dgl to CSCSamplingGraph of GraphBolt.
 
@@ -1285,33 +1275,48 @@ def convert_dgl_partition_to_csc_sampling_graph(
     In the near future, partitions are supposed to be saved as
     `CSCSamplingGraph` directly. At that time, this API should be deprecated.
 
+    For homogeneous graph, below attributes are required:
+        dgl.NID: original node IDs. saved into `node_attributes`.
+    
+    For heterogeneous graph, below attributes are required:
+        dgl.NID: original node IDs. saved into `node_attributes`.
+        dgl.ETYPE: original edge types. saved into `type_per_edge`.
+    
+    If `store_eids` is True, below attributes are additional saved:
+        dgl.EID: original edge IDs. saved into `edge_attributes`.
+
     Parameters
     ----------
     part_config : str
         The partition configuration JSON file.
-    store_orig_nids : bool, optional
-        Whether to store original node IDs in the new graph.
-    store_orig_eids : bool, optional
+    store_eids : bool, optional
         Whether to store original edge IDs in the new graph.
-    store_ntypes : bool, optional
-        Whether to store node types in the new graph.
-    store_etypes : bool, optional
-        Whether to store edge types in the new graph.
-    store_metadata : bool, optional
-        Whether to store metadata in the new graph.
     graph_file_name : str, optional
         The name of the new graph file. If not provided, the name will be
         `csc_sampling_graph.tar`.
     part_config_file_name : str, optional
         The name of the new partition configuration file. If not provided, the
         name will be the passed-in one.
+    store_all : bool, optional
+        Whether to store all attributes in the new graph. If False, only
+        required attributes will be stored.
     """
     # As only this function requires GraphBolt for now, let's import here.
     from .. import graphbolt
 
+    if store_all:
+        dgl_warning(
+            "Storing all attributes in the new graph is not recommended."
+        )
+    if store_eids:
+        dgl_warning("Storing edge IDs is not supported yet.")
+
     part_meta = _load_part_config(part_config)
     new_part_meta = deepcopy(part_meta)
     num_parts = part_meta["num_parts"]
+    p_ntypes = part_meta["ntypes"]
+    p_etypes = part_meta["etypes"]
+    is_homo = len(p_ntypes) == 1 and DEFAULT_NTYPE in p_ntypes and len(p_etypes) and DEFAULT_ETYPE in p_etypes
 
     # Utility functions.
     def init_type_per_edge(graph, gpb):
@@ -1330,7 +1335,7 @@ def convert_dgl_partition_to_csc_sampling_graph(
         # graph.
         _, _, ntypes, etypes = load_partition_book(part_config, part_id)
         metadata = None
-        if store_metadata:
+        if not is_homo:
             # Construct GraphMetadata.
             c_etypes = {
                 graphbolt.etype_tuple_to_str(etype): v
@@ -1341,33 +1346,31 @@ def convert_dgl_partition_to_csc_sampling_graph(
         indptr, indices, edge_ids = graph.adj_tensors("csc") #graph.adj().csc()
         # Initalize type per edge.
         type_per_edge = None
-        if store_etypes:
+        if not is_homo:
             type_per_edge = init_type_per_edge(graph, gpb)
             type_per_edge = type_per_edge[edge_ids]
             # Sanity check.
             assert len(type_per_edge) == graph.num_edges()
 
-        # Original node IDs.
+        # Original node IDs. [Required]
         node_attributes = None
-        if store_orig_nids:
-            # Sanity check.
-            assert len(graph.ndata[NID]) == graph.num_nodes()
-            node_attributes = {
-                NID: graph.ndata[NID]
-            }
+        # Sanity check.
+        assert len(graph.ndata[NID]) == graph.num_nodes()
+        node_attributes = {
+            NID: graph.ndata[NID]
+        }
 
-        # Original edge IDs.
+        # Original edge IDs. [Optional]
         edge_attributes = None
-        if store_orig_eids:
+        if store_eids or store_all:
             # Sanity check.
             assert len(graph.edata[EID]) == graph.num_edges()
             edge_attributes = {
                 EID: graph.edata[EID][edge_ids]
             }
 
-        if store_ntypes:
-            if node_attributes is None:
-                node_attributes = {}
+        # Storing NTYPE is mainly for debug.
+        if store_all and (not is_homo):
             node_attributes[NTYPE] = graph.ndata[NTYPE]
 
         # Data type formatting before saving.
@@ -1385,13 +1388,14 @@ def convert_dgl_partition_to_csc_sampling_graph(
         else:
             indptr = indptr.to(torch.int64)
         # 2. NID. [Required]
-        if node_attributes is not None and NID in node_attributes:
-            if num_nodes < torch.iinfo(torch.int32).max:
-                node_attributes[NID] = node_attributes[NID].to(torch.int32)
-            else:
-                node_attributes[NID] = node_attributes[NID].to(torch.int64)
-        # 3. ETYPE. [Required].
-        # [TODO] `type_per_edge` and edge_attributes[ETYPE] are duplicated.
+        assert node_attributes is not None and NID in node_attributes, (
+            "NID is required for GraphBolt."
+        )
+        if num_nodes < torch.iinfo(torch.int32).max:
+            node_attributes[NID] = node_attributes[NID].to(torch.int32)
+        else:
+            node_attributes[NID] = node_attributes[NID].to(torch.int64)
+        # 3. ETYPE. [Required for heterograph].
         if type_per_edge is not None:
             if len(etypes) < torch.iinfo(torch.int8).max:
                 type_per_edge = type_per_edge.to(torch.int8)
@@ -1401,23 +1405,6 @@ def convert_dgl_partition_to_csc_sampling_graph(
                 type_per_edge = type_per_edge.to(torch.int32)
             else:
                 type_per_edge = type_per_edge.to(torch.int64)
-        if edge_attributes is not None and ETYPE in edge_attributes:
-            if len(etypes) < torch.iinfo(torch.int8).max:
-                edge_attributes[ETYPE] = edge_attributes[ETYPE].to(
-                    torch.int8
-                )
-            elif len(etypes) < torch.iinfo(torch.int16).max:
-                edge_attributes[ETYPE] = edge_attributes[ETYPE].to(
-                    torch.int16
-                )
-            elif len(etypes) < torch.iinfo(torch.int32).max:
-                edge_attributes[ETYPE] = edge_attributes[ETYPE].to(
-                    torch.int32
-                )
-            else:
-                edge_attributes[ETYPE] = edge_attributes[ETYPE].to(
-                    torch.int64
-                )
         # 4. NTYPE. [Optional]
         if node_attributes is not None and NTYPE in node_attributes:
             if len(ntypes) < torch.iinfo(torch.int8).max:

@@ -193,9 +193,12 @@ class NeighborSampler(BlockSampler):
                 exclude_edges=exclude_eids,
                 use_graphbolt=use_graphbolt,
             )
-            eid = frontier.edata[EID]
+            eid = None
+            if EID in frontier.edata:
+                eid = frontier.edata[EID]
             block = to_block(frontier, seed_nodes)
-            block.edata[EID] = eid
+            if eid is not None:
+                block.edata[EID] = eid
             seed_nodes = block.srcdata[NID]
             blocks.insert(0, block)
 

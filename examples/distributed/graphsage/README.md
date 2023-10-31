@@ -1,3 +1,83 @@
+## DistDGL with GraphBolt(Homograph + Node Classification)
+
+### How to partition graph
+
+#### Partition from original dataset with `dgl.distributed.partition_graph()`
+
+```
+DGL_HOME=/home/ubuntu/workspace/dgl_2 DGL_LIBRARY_PATH=$DGL_HOME/build PYTHONPATH=tests:$DGL_HOME/python:tests/python/pytorch/graphbolt:$PYTHONPATH python3 examples/distributed/graphsage/partition_graph.py --dataset ogbn-products --num_parts 2 --balance_train --balance_edges --graphbolt
+```
+
+#### Convert existing partitions into GraphBolt formats
+
+```
+DGL_LIBRARY_PATH=$DGL_HOME/build PYTHONPATH=tests:$DGL_HOME/python:tests/python/pytorch/graphbolt:$PYTHONPATH python3 -c "from dgl.distributed import convert_dgl_partition_to_csc_sampling_graph as f;f('data/ogbn-products.json')"
+```
+
+#### Partition sizes compared between GraphBolt and DistDGL
+
+`csc_sampling_graph.tar` is the GraphBolt partitions.
+`graph.dgl` is the original DistDGL partitions, namely, DGLGraph.
+
+###### ogbn-products
+homogeneous, ~2.4M nodes, ~123.7M edges(reverse edges are added), 2 parts.
+
+| DGL(GB) | GraphBolt w/o EIDs(MB) | GraphBolt w/ EIDs(MB) |
+| --- | ------------------ | ----------------- |
+| 1.6/1.7 | 258/272 | 502/530 |
+
+```
+-rw-rw-r-- 1 ubuntu ubuntu 258M Oct 31 01:56 homo_data/part0/csc_sampling_graph.tar
+-rw-rw-r-- 1 ubuntu ubuntu 502M Oct 31 04:45 homo_data/part0/csc_sampling_graph_eids.tar
+-rw-rw-r-- 1 ubuntu ubuntu   24 Oct 31 00:51 homo_data/part0/edge_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 1.6G Oct 31 00:51 homo_data/part0/graph.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 501M Oct 31 00:51 homo_data/part0/node_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 272M Oct 31 01:56 homo_data/part1/csc_sampling_graph.tar
+-rw-rw-r-- 1 ubuntu ubuntu 530M Oct 31 04:45 homo_data/part1/csc_sampling_graph_eids.tar
+-rw-rw-r-- 1 ubuntu ubuntu   24 Oct 31 00:51 homo_data/part1/edge_feat.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 1.7G Oct 31 00:51 homo_data/part1/graph.dgl
+-rw-rw-r-- 1 ubuntu ubuntu 460M Oct 31 00:51 homo_data/part1/node_feat.dgl
+```
+
+### Train with GraphBolt partitions
+just append `--graphbolt`.
+
+```
+python3 /home/ubuntu/workspace/dgl_2/tools/launch.py \
+    --workspace /home/ubuntu/workspace/dgl_2/examples/distributed/graphsage/ \
+    --num_trainers 4 \
+    --num_servers 2 \
+    --num_samplers 0 \
+    --part_config /home/ubuntu/workspace/dgl_2/homo_data/ogbn-products.json \
+    --ip_config /home/ubuntu/workspace/ip_config.txt \
+    "DGL_LIBRARY_PATH=/home/ubuntu/workspace/dgl_2/build PYTHONPATH=tests:/home/ubuntu/workspace/dgl_2/python:tests/python/pytorch/graphbolt:$PYTHONPATH python3 node_classification.py --graph_name ogbn-products --ip_config /home/ubuntu/workspace/ip_config.txt --num_epochs 3 --eval_every 2 --graphbolt"
+```
+
+#### Results
+`g4dn.metal` x 2, `ogbn-products`.
+
+DistDGL with GraphBolt takes less time for sampling(from **1.8283s** to **1.4470s**) and for whole epoch(from **4.9259s** to **4.4898s**) while keeping comparable accuracies in validation and test.
+
+##### DistDGL
+
+```
+Part 0, Epoch Time(s): 4.9648, sample+data_copy: 1.8283, forward: 0.2912, backward: 1.1307, update: 0.0232, #seeds: 24577, #inputs: 4136843
+
+Summary of node classification(GraphSAGE): GraphName ogbn-products | TrainEpochTime(mean) 4.9259 | TestAccuracy 0.6213
+```
+
+##### DistDGL with GraphBolt
+
+```
+Part 0, Epoch Time(s): 4.4826, sample+data_copy: 1.4470, forward: 0.2517, backward: 0.9081, update: 0.0175, #seeds: 24577, #inputs: 41369
+80
+
+Summary of node classification(GraphSAGE): GraphName ogbn-products | TrainEpochTime(mean) 4.4898 | TestAccuracy 0.6174
+```
+
+---------------------------------------
+
+
 ## Distributed training
 
 This is an example of training GraphSage in a distributed fashion. Before training, please install some python libs by pip:

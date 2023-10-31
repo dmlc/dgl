@@ -818,6 +818,12 @@ class DistGraph:
         int
         """
         # TODO(da?): describe when self._g is None and idtype shouldn't be called.
+        '''
+        if isinstance(self.local_partition, DGLGraph):
+            return self.local_partition.idtype
+        else:
+            return self.local_partition.indices.dtype
+        '''
         return F.int64
 
     @property

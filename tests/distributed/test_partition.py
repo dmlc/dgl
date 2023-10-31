@@ -680,17 +680,13 @@ def test_UnknownPartitionBook():
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-@pytest.mark.parametrize("store_orig_nids", [True, False])
-@pytest.mark.parametrize("store_orig_eids", [True, False])
-@pytest.mark.parametrize("store_etypes", [True, False])
-@pytest.mark.parametrize("store_metadata", [True, False])
+@pytest.mark.parametrize("store_eids", [True, False])
+@pytest.mark.parametrize("store_all", [True, False])
 def test_convert_dgl_partition_to_csc_sampling_graph_homo(
     part_method,
     num_parts,
-    store_orig_nids,
-    store_orig_eids,
-    store_etypes,
-    store_metadata,
+    store_eids,
+    store_all,
 ):
     with tempfile.TemporaryDirectory() as test_dir:
         g = create_random_graph(1000)
@@ -701,10 +697,8 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         convert_dgl_partition_to_csc_sampling_graph(
             part_config,
-            store_orig_nids=store_orig_nids,
-            store_orig_eids=store_orig_eids,
-            store_etypes=store_etypes,
-            store_metadata=store_metadata,
+            store_eids=store_eids,
+            store_all=store_all,
         )
         for part_id in range(num_parts):
             orig_g = dgl.load_graphs(
@@ -717,51 +711,31 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
             assert new_g.node_type_offset is None
-            if store_orig_nids:
-                assert th.equal(
-                    orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
-                )
-            else:
-                assert new_g.node_attributes is None
-            if store_orig_eids:
+            assert th.equal(
+                orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+            )
+            assert dgl.NTYPE not in new_g.node_attributes
+            if store_eids or store_all:
                 assert th.equal(
                     orig_g.edata[dgl.EID][orig_eids], new_g.edge_attributes[dgl.EID]
                 )
             else:
                 assert new_g.edge_attributes is None
-            if store_etypes:
-                assert th.all(0 == new_g.type_per_edge)
-            else:
-                assert new_g.type_per_edge is None
-            if store_metadata:
-                for (
-                    node_type,
-                    type_id,
-                ) in new_g.metadata.node_type_to_id.items():
-                    assert g.get_ntype_id(node_type) == type_id
-                for (
-                    edge_type,
-                    type_id,
-                ) in new_g.metadata.edge_type_to_id.items():
-                    edge_type = gb.etype_str_to_tuple(edge_type)
-                    assert g.get_etype_id(edge_type) == type_id
-            else:
-                assert new_g.metadata is None
+            # For homogeneous graph, ETYPE is not stored.
+            assert new_g.type_per_edge is None
+            # For homogeneous graph, metadata is not stored.
+            assert new_g.metadata is None
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
 @pytest.mark.parametrize("num_parts", [1, 4])
-@pytest.mark.parametrize("store_orig_nids", [True, False])
-@pytest.mark.parametrize("store_orig_eids", [True, False])
-@pytest.mark.parametrize("store_etypes", [True, False])
-@pytest.mark.parametrize("store_metadata", [True, False])
+@pytest.mark.parametrize("store_eids", [True, False])
+@pytest.mark.parametrize("store_all", [True, False])
 def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
     part_method,
     num_parts,
-    store_orig_nids,
-    store_orig_eids,
-    store_etypes,
-    store_metadata,
+    store_eids,
+    store_all,
 ):
     with tempfile.TemporaryDirectory() as test_dir:
         g = create_random_hetero()
@@ -772,10 +746,8 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
         part_config = os.path.join(test_dir, f"{graph_name}.json")
         convert_dgl_partition_to_csc_sampling_graph(
             part_config,
-            store_orig_nids=store_orig_nids,
-            store_orig_eids=store_orig_eids,
-            store_etypes=store_etypes,
-            store_metadata=store_metadata,
+            store_eids=store_eids,
+            store_all=store_all,
         )
         for part_id in range(num_parts):
             orig_g = dgl.load_graphs(
@@ -787,34 +759,35 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
             orig_indptr, orig_indices, orig_eids = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)
             assert th.equal(orig_indices, new_g.indices)
-            if store_orig_nids:
-                assert th.equal(
-                    orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
-                )
-            else:
-                assert new_g.node_attributes is None
-            if store_orig_eids:
+            # dgl.NID is required.
+            assert th.equal(
+                orig_g.ndata[dgl.NID], new_g.node_attributes[dgl.NID]
+            )
+            if store_eids or store_all:
                 assert th.equal(
                     orig_g.edata[dgl.EID][orig_eids], new_g.edge_attributes[dgl.EID]
                 )
             else:
                 assert new_g.edge_attributes is None
-            if store_etypes:
-                assert th.equal(orig_g.edata[dgl.ETYPE][orig_eids], new_g.type_per_edge)
-            else:
-                assert new_g.type_per_edge is None
-            if store_metadata:
-                for (
-                    node_type,
-                    type_id,
-                ) in new_g.metadata.node_type_to_id.items():
-                    assert g.get_ntype_id(node_type) == type_id
-                for (
-                    edge_type,
-                    type_id,
-                ) in new_g.metadata.edge_type_to_id.items():
-                    edge_type = gb.etype_str_to_tuple(edge_type)
-                    assert g.get_etype_id(edge_type) == type_id
+            # dgl.ETYPE is required for heterograph.
+            assert th.equal(orig_g.edata[dgl.ETYPE][orig_eids], new_g.type_per_edge)
+            # dgl.NTYPE is optional for heterograph.
+            if store_all:
+                assert th.equal(
+                    orig_g.ndata[dgl.NTYPE], new_g.node_attributes[dgl.NTYPE]
+                )
+            # metadata is required for heterograph.
+            for (
+                node_type,
+                type_id,
+            ) in new_g.metadata.node_type_to_id.items():
+                assert g.get_ntype_id(node_type) == type_id
+            for (
+                edge_type,
+                type_id,
+            ) in new_g.metadata.edge_type_to_id.items():
+                edge_type = gb.etype_str_to_tuple(edge_type)
+                assert g.get_etype_id(edge_type) == type_id
             assert new_g.node_type_offset is None
 
 
@@ -929,7 +902,7 @@ def test_not_sorted_node_edge_map():
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
-@pytest.mark.parametrize("num_parts", [1])
+@pytest.mark.parametrize("num_parts", [1, 4])
 @pytest.mark.parametrize("num_trainers_per_machine", [1, 4])
 @pytest.mark.parametrize("load_feats", [True, False])
 def test_partition_homo_graphbolt(
@@ -973,8 +946,9 @@ def test_partition_homo_graphbolt(
             assert len(gpb_meta) == num_parts
             assert len(gpb.partid2nids(i)) == gpb_meta[i]["num_nodes"]
             assert len(gpb.partid2eids(i)) == gpb_meta[i]["num_edges"]
-            assert len(gpb.partid2nids(i)) == part_g.total_num_nodes
-            assert len(gpb.partid2eids(i)) == part_g.total_num_edges
+            if num_parts == 1:
+                assert len(gpb.partid2nids(i)) == part_g.total_num_nodes
+                assert len(gpb.partid2eids(i)) == part_g.total_num_edges
             if load_feats:
                 assert "_N/labels" in node_feats
                 assert "_N/feats" in node_feats
@@ -987,7 +961,7 @@ def test_partition_homo_graphbolt(
 
 
 @pytest.mark.parametrize("part_method", ["metis", "random"])
-@pytest.mark.parametrize("num_parts", [1])
+@pytest.mark.parametrize("num_parts", [1, 4])
 @pytest.mark.parametrize("num_trainers_per_machine", [1, 4])
 @pytest.mark.parametrize("load_feats", [True, False])
 def test_partition_hetero_graphbolt(
@@ -1037,8 +1011,9 @@ def test_partition_hetero_graphbolt(
             assert len(gpb_meta) == num_parts
             assert len(gpb.partid2nids(i)) == gpb_meta[i]["num_nodes"]
             assert len(gpb.partid2eids(i)) == gpb_meta[i]["num_edges"]
-            assert len(gpb.partid2nids(i)) == part_g.total_num_nodes
-            assert len(gpb.partid2eids(i)) == part_g.total_num_edges
+            if num_parts == 1:
+                assert len(gpb.partid2nids(i)) == part_g.total_num_nodes
+                assert len(gpb.partid2eids(i)) == part_g.total_num_edges
             if load_feats:
                 assert "n1/labels" in node_feats
                 assert "n1/feats" in node_feats
@@ -1050,10 +1025,10 @@ def test_partition_hetero_graphbolt(
     reset_envs()
 
 
-@pytest.mark.parametrize("part_method", ["metis"])
-@pytest.mark.parametrize("num_parts", [4])
-@pytest.mark.parametrize("num_trainers_per_machine", [1])
-@pytest.mark.parametrize("load_feats", [True])
+@pytest.mark.parametrize("part_method", ["metis", "random"])
+@pytest.mark.parametrize("num_parts", [1, 4])
+@pytest.mark.parametrize("num_trainers_per_machine", [1, 4])
+@pytest.mark.parametrize("load_feats", [True, False])
 def test_partition_hetero_graphbolt_sample_neighbors(
     part_method,
     num_parts,
@@ -1102,8 +1077,9 @@ def test_partition_hetero_graphbolt_sample_neighbors(
             assert len(gpb_meta) == num_parts
             assert len(gpb.partid2nids(i)) == gpb_meta[i]["num_nodes"]
             assert len(gpb.partid2eids(i)) == gpb_meta[i]["num_edges"]
-            #assert len(gpb.partid2nids(i)) == part_g.total_num_nodes
-            #assert len(gpb.partid2eids(i)) == part_g.total_num_edges
+            if num_parts == 1:
+                assert len(gpb.partid2nids(i)) == part_g.total_num_nodes
+                assert len(gpb.partid2eids(i)) == part_g.total_num_edges
             if load_feats:
                 assert "n1/labels" in node_feats
                 assert "n1/feats" in node_feats
@@ -1114,12 +1090,10 @@ def test_partition_hetero_graphbolt_sample_neighbors(
 
             # sample_neighbors()
             subg = part_g.sample_neighbors(th.arange(10), th.IntTensor([-1]), keep_homo=True,
-                                           return_orig_edge_ids=True)
+                                           return_eids=True)
             src, dst = subg.node_pairs
             orig_src = part_g.node_attributes[dgl.NID][src]
             orig_dst = part_g.node_attributes[dgl.NID][dst]
-            orig_ntype_src = part_g.node_attributes[dgl.NTYPE][src]
-            orig_ntype_dst = part_g.node_attributes[dgl.NTYPE][dst]
             etype_ids = subg.original_etype_ids
             orig_eids = part_g.edge_attributes[dgl.EID].to(hg.idtype)[subg.original_edge_ids]
             etype_idsA, _ = gpb.map_to_per_etype(orig_eids)
@@ -1127,19 +1101,107 @@ def test_partition_hetero_graphbolt_sample_neighbors(
 
             etype_ids, idx = F.sort_1d(etype_ids)
             sorted_orig_src, sorted_orig_dst = F.gather_row(orig_src, idx), F.gather_row(orig_dst, idx)
-            src_ntype_ids, ntype_wised_src = gpb.map_to_per_ntype(sorted_orig_src.to(hg.idtype))
-            dst_ntype_ids, ntype_wised_dst = gpb.map_to_per_ntype(sorted_orig_dst.to(hg.idtype))
+            src_ntype_ids, _ = gpb.map_to_per_ntype(sorted_orig_src.to(hg.idtype))
+            dst_ntype_ids, _ = gpb.map_to_per_ntype(sorted_orig_dst.to(hg.idtype))
 
-            data_dict = dict()
             print("gpb.canonical_etypes: ", gpb.canonical_etypes)
             ntype_map = {ntype: i for i, ntype in enumerate(gpb.ntypes)}
-            etype_map = {
-                etype: i for i, etype in enumerate(gpb.canonical_etypes)
-            }
             for etid, etype in enumerate(gpb.canonical_etypes):
                 src_ntype, _, dst_ntype = etype
                 src_ntype_id = ntype_map[src_ntype]
                 dst_ntype_id = ntype_map[dst_ntype]
+                type_idx = etype_ids == etid
+                if F.sum(type_idx, 0) > 0:
+                    assert th.all(src_ntype_id == src_ntype_ids[type_idx]), (
+                        "source ntype is is not expected."
+                    )
+                    assert th.all(dst_ntype_id == dst_ntype_ids[type_idx]), (
+                        "destination ntype is is not expected."
+                    )
+
+
+@pytest.mark.parametrize("part_method", ["metis"])
+@pytest.mark.parametrize("num_parts", [4])
+@pytest.mark.parametrize("num_trainers_per_machine", [1])
+@pytest.mark.parametrize("load_feats", [True])
+def test_partition_homo_graphbolt_sample_neighbors(
+    part_method,
+    num_parts,
+    num_trainers_per_machine,
+    load_feats,
+):
+    os.environ["DGL_DIST_DEBUG"] = "1"
+    if part_method == "random" and num_parts > 1:
+        num_trainers_per_machine = 1
+
+    g = create_random_graph(1000)
+    g.ndata["labels"] = F.arange(0, g.num_nodes())
+    g.ndata["feats"] = F.tensor(np.random.randn(g.num_nodes(), 10), F.float32)
+    g.edata["feats"] = F.tensor(np.random.randn(g.num_edges(), 10), F.float32)
+    g.update_all(fn.copy_u("feats", "msg"), fn.sum("msg", "h"))
+    g.update_all(fn.copy_e("feats", "msg"), fn.sum("msg", "eh"))
+    num_hops = 2
+
+    with tempfile.TemporaryDirectory() as test_dir:
+        orig_nids, orig_eids = dgl.distributed.partition_graph(
+            g,
+            "test",
+            num_parts,
+            test_dir,
+            num_hops=num_hops,
+            part_method=part_method,
+            return_mapping=True,
+            num_trainers_per_machine=num_trainers_per_machine,
+            use_graphbolt=True,
+            gb_save_all=True,
+        )
+        part_config = os.path.join(test_dir, "test.json")
+        for i in range(num_parts):
+            part_g, node_feats, edge_feats, gpb, _, _, _ = dgl.distributed.load_partition(
+                part_config, i, load_feats=load_feats, use_graphbolt=True
+            )
+            assert isinstance(part_g, gb.CSCSamplingGraph)
+            assert gpb.num_partitions() == num_parts
+            gpb_meta = gpb.metadata()
+            assert len(gpb_meta) == num_parts
+            assert len(gpb.partid2nids(i)) == gpb_meta[i]["num_nodes"]
+            assert len(gpb.partid2eids(i)) == gpb_meta[i]["num_edges"]
+            if num_parts == 1:
+                assert len(gpb.partid2nids(i)) == part_g.total_num_nodes
+                assert len(gpb.partid2eids(i)) == part_g.total_num_edges
+            if load_feats:
+                assert "_N/labels" in node_feats
+                assert "_N/feats" in node_feats
+                assert "_N:_E:_N/feats" in edge_feats
+            else:
+                assert node_feats == {}
+                assert edge_feats == {}
+
+            # sample_neighbors()
+            subg = part_g.sample_neighbors(th.arange(10), th.IntTensor([-1]), keep_homo=True,
+                                           return_eids=True)
+            src, dst = subg.node_pairs
+            orig_src = part_g.node_attributes[dgl.NID][src]
+            orig_dst = part_g.node_attributes[dgl.NID][dst]
+            etype_ids = subg.original_etype_ids
+            assert etype_ids is None, "subgraph from homograph should not have etypes."
+            orig_eids = part_g.edge_attributes[dgl.EID].to(g.idtype)[subg.original_edge_ids]
+            etype_idsA, _ = gpb.map_to_per_etype(orig_eids)
+            #assert th.equal(etype_ids, etype_idsA), "etype_ids is not expected."
+
+            continue
+            etype_ids, idx = F.sort_1d(etype_ids)
+            sorted_orig_src, sorted_orig_dst = F.gather_row(orig_src, idx), F.gather_row(orig_dst, idx)
+            src_ntype_ids, _ = gpb.map_to_per_ntype(sorted_orig_src.to(g.idtype))
+            dst_ntype_ids, _ = gpb.map_to_per_ntype(sorted_orig_dst.to(g.idtype))
+
+            print("gpb.canonical_etypes: ", gpb.canonical_etypes)
+            ntype_map = {ntype: i for i, ntype in enumerate(gpb.ntypes)}
+            for etid, etype in enumerate(gpb.canonical_etypes):
+                src_ntype, _, dst_ntype = etype
+                src_ntype_id = ntype_map[src_ntype]
+                dst_ntype_id = ntype_map[dst_ntype]
+                continue
                 type_idx = etype_ids == etid
                 if F.sum(type_idx, 0) > 0:
                     assert th.all(src_ntype_id == src_ntype_ids[type_idx]), (
