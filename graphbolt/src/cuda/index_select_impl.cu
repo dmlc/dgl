@@ -118,6 +118,7 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
   cudaStream_t stream = 0;
 
   if (feature_size == 1) {
+    // Use a single thread to process each output row to avoid wasting threads.
     const int num_threads = cuda::FindNumThreads(return_len);
     const int num_blocks = (return_len + num_threads - 1) / num_threads;
     IndexSelectSingleKernel<<<num_blocks, num_threads, 0, stream>>>(
@@ -130,11 +131,14 @@ torch::Tensor UVAIndexSelectImpl_(torch::Tensor input, torch::Tensor index) {
       block.y <<= 1;
     }
     const dim3 grid((return_len + block.y - 1) / block.y);
-    if (feature_size * sizeof(DType) < 2 * GPU_CACHE_LINE_SIZE) {
+    if (feature_size * sizeof(DType) <= GPU_CACHE_LINE_SIZE) {
+      // When feature size is smaller than GPU cache line size, use unaligned
+      // version for less SM usage, which is more resource efficient.
       IndexSelectMultiKernel<<<grid, block, 0, stream>>>(
           input_ptr, input_len, feature_size, index_sorted_ptr, return_len,
           ret_ptr, permutation_ptr);
     } else {
+      // Use aligned version to improve the memory access pattern.
       IndexSelectMultiKernelAligned<<<grid, block, 0, stream>>>(
           input_ptr, input_len, feature_size, index_sorted_ptr, return_len,
           ret_ptr, permutation_ptr);

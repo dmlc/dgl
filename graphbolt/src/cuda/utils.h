@@ -18,7 +18,7 @@ namespace cuda {
 
 /** @brief Calculate the number of threads needed given the dimension length.
  *
- * It finds the biggest number that is smaller than min(dim, max_nthrs)
+ * It finds the biggest number that is smaller than min(dim, max_num_nthreads)
  * and is also power of two.
  */
 inline int FindNumThreads(int dim, int max_num_threads = CUDA_MAX_NUM_THREADS) {

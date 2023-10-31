@@ -1,7 +1,8 @@
 import os
 import tempfile
 import unittest
-from math import prod
+from functools import reduce
+from operator import mul
 
 import backend as F
 
@@ -145,7 +146,7 @@ def test_torch_based_pinned_feature(dtype, idtype, feature_size):
         if isinstance(feature_size, int)
         else (num_feature, *feature_size)
     )
-    tensor = torch.arange(0, prod(shape), dtype=dtype).reshape(shape)
+    tensor = torch.arange(0, reduce(mul, shape), dtype=dtype).reshape(shape)
     test_tensor = tensor.clone().detach()
     test_tensor_cuda = test_tensor.cuda()
     pinned_tensor = tensor.pin_memory()
