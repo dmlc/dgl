@@ -10,14 +10,28 @@ import torch.nn.functional as F
 import torchmetrics.functional as MF
 
 
+############################################################################
+# (HIGHLIGHT) Create a single process dataloader with dgl graphbolt package.
+############################################################################
 def create_dataloader(dateset, itemset, device):
+    # Sample seed nodes from the itemset.
     datapipe = gb.ItemSampler(itemset, batch_size=8)
-    datapipe = datapipe.sample_neighbor(dataset.graph, [4, 2])
+
+    # Sample neighbors for the seed nodes.
+    datapipe = datapipe.sample_neighbor(dataset.graph, fanouts=[4, 2])
+
+    # Fetch features for sampled nodes.
     datapipe = datapipe.fetch_feature(
         dataset.feature, node_feature_keys=["feat"]
     )
+
+    # Convert the mini-batch to DGL format to train a DGL model.
     datapipe = datapipe.to_dgl()
+
+    # Copy the mini-batch to the designated device for training.
     datapipe = datapipe.copy_to(device)
+
+    # Initiate the dataloader for the datapipe.
     return gb.SingleProcessDataLoader(datapipe)
 
 
@@ -62,13 +76,16 @@ def evaluate(model, dataset, itemset, device):
 
 def train(model, dataset, device):
     task = dataset.tasks[0]
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
     dataloader = create_dataloader(dataset, task.train_set, device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 
     for epoch in range(20):
         model.train()
         total_loss = 0
+        ########################################################################
+        # (HIGHLIGHT) Iterate over the dataloader and train the model with all
+        # mini-batches.
+        ########################################################################
         for step, data in enumerate(dataloader):
             # The features of sampled nodes.
             x = data.node_features["feat"]
