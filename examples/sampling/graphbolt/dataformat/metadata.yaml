@@ -1,0 +1,49 @@
+dataset_name: cora
+feature_data:
+- domain: node
+  format: numpy
+  in_memory: true
+  name: feat
+  path: node-feat.npy
+  type: null
+graph:
+  nodes:
+    - num: 2708
+  edges:
+    - path: edges.csv
+tasks:
+- name: node_classification
+  num_classes: 7
+  train_set:
+  - data:
+    - format: numpy
+      in_memory: true
+      name: seed_nodes
+      path: train_node.npy
+    - format: numpy
+      in_memory: true
+      name: labels
+      path: train_label.npy
+    type_name: null
+  validation_set:
+  - data:
+    - format: numpy
+      in_memory: true
+      name: seed_nodes
+      path: valid_node.npy
+    - format: numpy
+      in_memory: true
+      name: labels
+      path: valid_label.npy
+    type_name: null
+  test_set:
+  - data:
+    - format: numpy
+      in_memory: true
+      name: seed_nodes
+      path: test_node.npy
+    - format: numpy
+      in_memory: true
+      name: labels
+      path: test_label.npy
+    type_name: null
