@@ -7,6 +7,7 @@ dependencies:
   - pygraphviz
   - pip:
     - --find-links https://download.pytorch.org/whl/torch_stable.html
+    - cmake
     - cython
     - filelock
     - matplotlib
