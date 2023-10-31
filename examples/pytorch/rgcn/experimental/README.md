@@ -1,4 +1,4 @@
-## DistDGL with GraphBolt(Heterograph only)
+## DistDGL with GraphBolt(Heterograph + Node Classification)
 
 ### How to partition graph
 
@@ -15,8 +15,6 @@ import dgl
 part_config = "./data/ogbn-mag.json"
 dgl.distributed.convert_dgl_partition_to_csc_sampling_graph(
     part_config,
-    store_orig_nids=True,
-    store_etypes=True,
 )
 ```
 
@@ -75,31 +73,11 @@ Val Acc 0.4618, Test Acc 0.4485, time: 16.9179
 
 ##### DistDGL with GraphBolt
 
-fanout = [25, 10], call `gb.sample_etype_neighbors()` correctly. [**Default**]
-
 ```
 Epoch Time(s): 70.3498, sample: 10.6339, data copy: 8.9492, forward: 2.6577, backward: 36.1793, update: 11.9295, #train: 78696, #input
 : 34559464
 
 Val Acc 0.4572, Test Acc 0.4498, time: 3.5830
-```
-
-fanout = [25, 10], multiplied by `num_etypes`. [**Deprecated**]
-
-```
-[3]Epoch Time(s): 137.0454, sample: 27.0914, data copy: 32.2842, forward: 3.5588, backward: 60.5921, update: 13.5188, #train: 78696, #inp
-ut: 76402212
-
-Val Acc 0.4648, Test Acc 0.4498, time: 10.4527
-```
-
-fanout = [25, 10], not multiplied by `num_etypes`. [**Deprecated**]
-
-```
-Epoch Time(s): 32.7923, sample: 5.4970, data copy: 4.9976, forward: 2.4069, backward: 15.4529, update: 4.4377, #train: 78696, #input: 
-18370936
-
-Val Acc 0.3901, Test Acc 0.3844, time: 2.2284
 ```
 
 ---------------------------------------

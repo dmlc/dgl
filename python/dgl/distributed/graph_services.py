@@ -144,6 +144,7 @@ def _sample_etype_neighbors(
             "GraphBolt NeighborSampler.distributed_sample_neighbor() failed."
         )
     else:
+        fan_out = F.astype(fan_out, local_g.idtype)
         sampled_graph = local_sample_etype_neighbors(
             local_g,
             local_ids,
