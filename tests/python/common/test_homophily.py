@@ -51,3 +51,18 @@ def test_linkx_homophily(idtype):
 
     y = F.tensor([0, 1, 2, 3, 4])
     assert math.isclose(dgl.linkx_homophily(graph, y), 0.0000000000000000)
+
+
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="Only support PyTorch for now"
+)
+@parametrize_idtype
+def test_adjusted_homophily(idtype):
+    # IfChangeThenChange: python/dgl/homophily.py
+    # Update the docstring example.
+    device = F.ctx()
+    graph = dgl.graph(
+        ([1, 2, 0, 4], [0, 1, 2, 3]), idtype=idtype, device=device
+    )
+    y = F.tensor([0, 0, 0, 0, 1])
+    assert math.isclose(dgl.adjusted_homophily(graph, y), -0.14285714285714285)
