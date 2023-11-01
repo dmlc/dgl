@@ -26,7 +26,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-import tqdm
 from dgl.data import AsNodePredDataset
 from ogb.nodeproppred import DglNodePropPredDataset
 
@@ -56,7 +55,6 @@ class SAGEConv(nn.Module):
 
     def forward(self, A, feat):
         # Remove duplicate edges.
-        A = A.coalesce()
         feat_src = feat
         feat_dst = feat[: A.shape[1]]
 
@@ -96,23 +94,35 @@ class SAGE(nn.Module):
         return hidden_x
 
 
+def multilayer_sample(A, fanouts, seeds):
+    sampled_mats = []
+    src = seeds
+
+    #####################################################################
+    # (HIGHLIGHT) Using the sparse sample operator to preform random
+    # sampling on the neighboring nodes of the seeds nodes. The sparse
+    # compact operator is then employed to compact and relabel the sampled
+    # matrix, resulting in the sampled matrix and the relabel index.
+    #####################################################################
+
+    for fanout in fanouts:
+        # Sampling neighbor
+        sampled_mat = A.sample(1, fanout, ids=src)
+        # Compact the matrix
+        compacted_mat, row_ids = sampled_mat.compact(0)
+        sampled_mats.insert(0, compacted_mat)
+        src = row_ids
+    return sampled_mats, src
+
+
 def evaluate(model, A, dataloader, ndata, num_classes):
     model.eval()
     ys = []
     y_hats = []
     fanouts = [10, 10, 10]
-    for it, (seeds) in enumerate(dataloader):
+    for it, seeds in enumerate(dataloader):
         with torch.no_grad():
-            src = seeds
-            sampled_mats = []
-            for fanout in fanouts:
-                # Sampling neighbor
-                sampled_mat = A.sample(1, fanout, ids=src, replace=True)
-                # Compact the matrix
-                compacted_mat, row_ids = sampled_mat.compact(0)
-                sampled_mats.insert(0, compacted_mat)
-                src = row_ids
-
+            sampled_mats, src = multilayer_sample(A, fanouts, seeds)
             x = ndata["feat"][src]
             y = ndata["label"][seeds]
             ys.append(y)
@@ -144,30 +154,21 @@ def train(device, A, ndata, dataset, model):
     )
     val_dataloader = torch.utils.data.DataLoader(val_idx, batch_size=1024)
 
-    opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
 
     fanouts = [10, 10, 10]
     for epoch in range(10):
         model.train()
         total_loss = 0
-        for it, (seeds) in enumerate(train_dataloader):
-            src = seeds
-            sampled_mats = []
-            for fanout in fanouts:
-                # Sampling neighbor
-                sampled_mat = A.sample(1, fanout, ids=src, replace=True)
-                # Compact the matrix
-                compacted_mat, row_ids = sampled_mat.compact(0)
-                sampled_mats.insert(0, compacted_mat)
-                src = row_ids
-
+        for it, seeds in enumerate(train_dataloader):
+            sampled_mats, src = multilayer_sample(A, fanouts, seeds)
             x = ndata["feat"][src]
             y = ndata["label"][seeds]
             y_hat = model(sampled_mats, x)
             loss = F.cross_entropy(y_hat, y)
-            opt.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            opt.step()
+            optimizer.step()
             total_loss += loss.item()
 
         acc = evaluate(model, A, val_dataloader, ndata, dataset.num_classes)
