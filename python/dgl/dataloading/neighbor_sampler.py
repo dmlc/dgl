@@ -193,6 +193,10 @@ class NeighborSampler(BlockSampler):
                 exclude_edges=exclude_eids,
                 use_graphbolt=use_graphbolt,
             )
+            # [Rui] For heterograph + DGL, it returns EIDs.
+            # For heterograph + GraphBolt, it returns {} as I didn't set it.
+            # For homogeneous graph + DGL, it returns EIDs.
+            # For homogeneous graph + GraphBolt, it crashed as no key[EID] exist.
             eid = None
             if EID in frontier.edata:
                 eid = frontier.edata[EID]
