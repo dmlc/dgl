@@ -181,7 +181,7 @@ class SAGE(nn.Module):
         self.hidden_size = hidden_size
         self.out_size = out_size
         # Set the dtype for the layers manually.
-        self.set_layer_dtype(torch.float64)
+        self.set_layer_dtype(torch.float32)
 
     def set_layer_dtype(self, _dtype):
         for layer in self.layers:
@@ -221,7 +221,7 @@ class SAGE(nn.Module):
 
             for step, data in tqdm(enumerate(dataloader)):
                 x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], x.float())  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
@@ -266,7 +266,7 @@ def evaluate(args, model, graph, features, itemset, num_classes):
     for step, data in tqdm(enumerate(dataloader)):
         x = data.node_features["feat"]
         y.append(data.labels)
-        y_hats.append(model(data.blocks, x))
+        y_hats.append(model(data.blocks, x.float()))
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -286,7 +286,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         t0 = time.time()
         model.train()
         total_loss = 0
-        for step, data in tqdm(enumerate(dataloader)):
+        for step, data in enumerate(dataloader):
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]
@@ -295,7 +295,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             # in the last layer's computation graph.
             y = data.labels
 
-            y_hat = model(data.blocks, x)
+            y_hat = model(data.blocks, x.float())
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)
@@ -399,7 +399,7 @@ def main(args):
         model,
         num_classes,
     )
-    print(f"Test accuracy is {test_acc.item():.4f}")
+    print(f"Test accuracy {test_acc.item():.4f}")
 
 
 if __name__ == "__main__":
