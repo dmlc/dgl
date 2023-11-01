@@ -287,6 +287,8 @@ def initialize(
         is_standalone = (
             os.environ.get("DGL_DIST_MODE", "standalone") == "standalone"
         )
+        if use_graphbolt:
+            assert num_workers == 0, "GraphBolt does not support multiprocessing sampling."
         if num_workers > 0 and not is_standalone:
             SAMPLER_POOL = CustomPool(
                 num_workers,
