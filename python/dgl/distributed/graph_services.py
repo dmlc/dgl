@@ -652,6 +652,10 @@ def _frontier_to_heterogeneous_graph_gb(g, frontier, gpb):
     src_ntype_ids, src = gpb.map_to_per_ntype(src)
     dst_ntype_ids, dst = gpb.map_to_per_ntype(dst)
 
+    #[Rui] `g.get_ntype_id()` crashed due to
+    # 'DistGraph' object has no attribute '_ntype_map' if `num_samplers>0`.
+    # `DistGraph` is not sharable between processes?
+
     data_dict = dict()
     for etid, etype in enumerate(g.canonical_etypes):
         src_ntype, _, dst_ntype = etype
