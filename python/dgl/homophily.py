@@ -9,8 +9,12 @@ except ImportError:
 else:
     HAS_TORCH = True
 
-__all__ = ["node_homophily", "edge_homophily", "linkx_homophily",
-           "adjusted_homophily"]
+__all__ = [
+    "node_homophily",
+    "edge_homophily",
+    "linkx_homophily",
+    "adjusted_homophily",
+]
 
 
 def check_pytorch():
@@ -246,8 +250,8 @@ def adjusted_homophily(graph, y):
     >>> dgl.adjusted_homophily(graph, y)
     -0.14285714285714285
     """
-    import numpy as np
     import networkx as nx
+    import numpy as np
 
     check_pytorch()
 
@@ -279,7 +283,7 @@ def adjusted_homophily(graph, y):
         label = labels[u]
         degree_sums[label] += graph.degree(u)
 
-    adjust = (degree_sums ** 2 / (len(graph.edges) * 2) ** 2).sum()
+    adjust = (degree_sums**2 / (len(graph.edges) * 2) ** 2).sum()
 
     h_adj = (h_edge - adjust) / (1 - adjust)
 

@@ -1,6 +1,6 @@
 """Utils for computing graph label informativeness"""
-import numpy as np
 import networkx as nx
+import numpy as np
 
 try:
     import torch
@@ -119,8 +119,9 @@ def edge_label_informativeness(graph, y, eps=1e-8):
     edge_probs += eps
 
     numerator = (edge_probs * np.log(edge_probs)).sum()
-    denominator = (class_degree_weighted_probs *
-                   np.log(class_degree_weighted_probs)).sum()
+    denominator = (
+        class_degree_weighted_probs * np.log(class_degree_weighted_probs)
+    ).sum()
     li_edge = 2 - numerator / denominator
 
     return li_edge
@@ -226,18 +227,24 @@ def node_label_informativeness(graph, y, eps=1e-8):
     for u, v in graph.edges:
         label_u = labels[u]
         label_v = labels[v]
-        edge_probs[label_u, label_v] += \
-            1 / (num_nonzero_degree_nodes * graph.degree(u))
-        edge_probs[label_v, label_u] += \
-            1 / (num_nonzero_degree_nodes * graph.degree(v))
+        edge_probs[label_u, label_v] += 1 / (
+            num_nonzero_degree_nodes * graph.degree(u)
+        )
+        edge_probs[label_v, label_u] += 1 / (
+            num_nonzero_degree_nodes * graph.degree(v)
+        )
 
     edge_probs += eps
 
-    log = np.log(edge_probs /
-                 (class_probs.reshape(-1, 1) *
-                  class_degree_weighted_probs.reshape(1, -1)))
+    log = np.log(
+        edge_probs
+        / (
+            class_probs.reshape(-1, 1)
+            * class_degree_weighted_probs.reshape(1, -1)
+        )
+    )
     numerator = (edge_probs * log).sum()
     denominator = (class_probs * np.log(class_probs)).sum()
-    li_node = - numerator / denominator
+    li_node = -numerator / denominator
 
     return li_node

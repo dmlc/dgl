@@ -19,8 +19,9 @@ def test_edge_label_informativeness(idtype):
         ([0, 1, 2, 2, 3, 4], [1, 2, 0, 3, 4, 5]), idtype=idtype, device=device
     )
     y = F.tensor([0, 0, 0, 0, 1, 1])
-    assert math.isclose(dgl.edge_label_informativeness(graph, y),
-                        0.2517760099956565)
+    assert math.isclose(
+        dgl.edge_label_informativeness(graph, y), 0.2517760099956565
+    )
 
 
 @unittest.skipIf(
@@ -35,5 +36,6 @@ def test_node_label_informativeness(idtype):
         ([0, 1, 2, 2, 3, 4], [1, 2, 0, 3, 4, 5]), idtype=idtype, device=device
     )
     y = F.tensor([0, 0, 0, 0, 1, 1])
-    assert math.isclose(dgl.node_label_informativeness(graph, y),
-                        0.3381873621927896)
+    assert math.isclose(
+        dgl.node_label_informativeness(graph, y), 0.3381873621927896
+    )
