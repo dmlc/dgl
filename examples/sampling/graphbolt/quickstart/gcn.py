@@ -110,8 +110,8 @@ def train(model, dataset, device):
         val_acc = evaluate(model, dataset, task.validation_set, device)
         test_acc = evaluate(model, dataset, task.test_set, device)
         print(
-            f"Epoch {epoch:03d} | Loss {total_loss / (step + 1):.4f} | "
-            f"Val Acc {val_acc.item():.4f} | Test Acc {test_acc.item():.4f}"
+            f"Epoch {epoch:03d} | Loss {total_loss / (step + 1):.3f} | "
+            f"Val Acc {val_acc.item():.3f} | Test Acc {test_acc.item():.3f}"
         )
 
 
