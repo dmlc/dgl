@@ -1,6 +1,7 @@
 """
-This script trains and tests a GraphSAGE model based on the information of 
-a full graph.
+This script demonstrate how to use sparse to sample on graph and train model.
+It trains and tests a GraphSAGE model using the sparse sample and compact 
+operators to sample submatrix from the whole matrix.
 
 This flowchart describes the main functional sequence of the provided example.
 main
@@ -13,8 +14,12 @@ main
 │     │
 │     └───> Training loop
 │           │
+│           ├───> Sample submatrix
+│           │
 │           └───> SAGE.forward
 └───> test
+      │
+      ├───> Sample submatrix
       │
       └───> Evaluate the model
 """
@@ -54,7 +59,6 @@ class SAGEConv(nn.Module):
         nn.init.xavier_uniform_(self.fc_neigh.weight, gain=gain)
 
     def forward(self, A, feat):
-        # Remove duplicate edges.
         feat_src = feat
         feat_dst = feat[: A.shape[1]]
 
@@ -82,20 +86,20 @@ class SAGE(nn.Module):
         self.hid_size = hid_size
         self.out_size = out_size
 
-    def forward(self, sampled_mats, x):
+    def forward(self, sampled_matrices, x):
         hidden_x = x
-        for layer_idx, (layer, sampled_mat) in enumerate(
-            zip(self.layers, sampled_mats)
+        for layer_idx, (layer, sampled_matrix) in enumerate(
+            zip(self.layers, sampled_matrices)
         ):
-            hidden_x = layer(sampled_mat, hidden_x)
+            hidden_x = layer(sampled_matrix, hidden_x)
             if layer_idx != len(self.layers) - 1:
                 hidden_x = F.relu(hidden_x)
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
 
 
-def multilayer_sample(A, fanouts, seeds):
-    sampled_mats = []
+def multilayer_sample(A, fanouts, seeds, ndata):
+    sampled_matrices = []
     src = seeds
 
     #####################################################################
@@ -106,13 +110,16 @@ def multilayer_sample(A, fanouts, seeds):
     #####################################################################
 
     for fanout in fanouts:
-        # Sampling neighbor
-        sampled_mat = A.sample(1, fanout, ids=src)
-        # Compact the matrix
-        compacted_mat, row_ids = sampled_mat.compact(0)
-        sampled_mats.insert(0, compacted_mat)
+        # Sample neighbors.
+        sampled_matrix = A.sample(1, fanout, ids=src).coalesce()
+        # Compact the sampled matrix.
+        compacted_mat, row_ids = sampled_matrix.compact(0)
+        sampled_matrices.insert(0, compacted_mat)
         src = row_ids
-    return sampled_mats, src
+
+    x = ndata["feat"][src]
+    y = ndata["label"][seeds]
+    return sampled_matrices, x, y
 
 
 def evaluate(model, A, dataloader, ndata, num_classes):
@@ -122,11 +129,9 @@ def evaluate(model, A, dataloader, ndata, num_classes):
     fanouts = [10, 10, 10]
     for it, seeds in enumerate(dataloader):
         with torch.no_grad():
-            sampled_mats, src = multilayer_sample(A, fanouts, seeds)
-            x = ndata["feat"][src]
-            y = ndata["label"][seeds]
+            sampled_matrices, x, y = multilayer_sample(A, fanouts, seeds, ndata)
             ys.append(y)
-            y_hats.append(model(sampled_mats, x))
+            y_hats.append(model(sampled_matrices, x))
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -161,10 +166,8 @@ def train(device, A, ndata, dataset, model):
         model.train()
         total_loss = 0
         for it, seeds in enumerate(train_dataloader):
-            sampled_mats, src = multilayer_sample(A, fanouts, seeds)
-            x = ndata["feat"][src]
-            y = ndata["label"][seeds]
-            y_hat = model(sampled_mats, x)
+            sampled_matrices, x, y = multilayer_sample(A, fanouts, seeds, ndata)
+            y_hat = model(sampled_matrices, x)
             loss = F.cross_entropy(y_hat, y)
             optimizer.zero_grad()
             loss.backward()
@@ -185,8 +188,7 @@ if __name__ == "__main__":
         "--mode",
         default="gpu",
         choices=["cpu", "gpu"],
-        help="Training mode. 'cpu' for CPU training, "
-        "'gpu' for pure-GPU training.",
+        help="Training mode. 'cpu' for CPU training, 'gpu' for GPU training.",
     )
     args = parser.parse_args()
     if not torch.cuda.is_available():
@@ -194,14 +196,15 @@ if __name__ == "__main__":
     print(f"Training in {args.mode} mode.")
 
     #####################################################################
-    # (HIGHLIGHT) Node classification task is a supervise learning task
-    # in which the model try to predict the label of a certain node.
-    # In this example, graph sage algorithm is applied to this task.
-    # A good accuracy can be achieved after a few steps of training.
+    # (HIGHLIGHT) This example implements a graphSAGE algorithm by sparse
+    # operators, which involves sampling a subgraph from a full graph and
+    # conducting training.
     #
-    # First, the whole graph is loaded and transformed. Then the training
-    # process is performed on a model which is composed of 3 GraphSAGE-gcn
-    # layers. Finally, the performance of the model is evaluated on test set.
+    # First, the whole graph is loaded onto the CPU or GPU and transformed
+    # to sparse matrix. To obtain the training subgraph, it samples three
+    # submatrices by seed nodes, which contains their randomly sampled
+    # 1-hop, 2-hop, and 3-hop neighbors. Then, the features of the
+    # subgraph are input to the network for training.
     #####################################################################
 
     # Load and preprocess dataset.
