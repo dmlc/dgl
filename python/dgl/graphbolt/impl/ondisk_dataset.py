@@ -498,6 +498,10 @@ class BuiltinDataset(OnDiskDataset):
 
     Available built-in datasets include:
 
+    **cora**
+        The cora dataset is a homogeneous citation network dataset, which is
+        designed for the node classification task.
+
     **ogbn-mag**
         The ogbn-mag dataset is a heterogeneous network composed of a subset of
         the Microsoft Academic Graph (MAG). See more details in
@@ -549,6 +553,7 @@ class BuiltinDataset(OnDiskDataset):
         "https://dgl-data.s3-accelerate.amazonaws.com/dataset/graphbolt/"
     )
     _datasets = [
+        "cora",
         "ogbn-mag",
         "ogbl-citation2",
         "ogbn-products",
