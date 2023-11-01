@@ -79,7 +79,7 @@ def train(model, dataset, device):
     dataloader = create_dataloader(dataset, task.train_set, device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 
-    for epoch in range(20):
+    for epoch in range(10):
         model.train()
         total_loss = 0
         ########################################################################
