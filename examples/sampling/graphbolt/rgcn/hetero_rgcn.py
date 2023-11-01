@@ -106,7 +106,7 @@ def create_dataloader(
 
     # Sample neighbors for each seed node in the mini-batch.
     # `graph`:
-    #   The graph(CSCSamplingGraph) from which to sample neighbors.
+    #   The graph(FusedCSCSamplingGraph) from which to sample neighbors.
     # `fanouts`:
     #   The number of neighbors to sample for each node in each layer.
     datapipe = datapipe.sample_neighbor(graph, fanouts=fanouts)
@@ -166,7 +166,7 @@ def rel_graph_embed(graph, embed_size):
 
     Parameters
     ----------
-    graph : CSCSamplingGraph
+    graph : FusedCSCSamplingGraph
         The graph for which to create the heterogenous embedding layer.
     embed_size : int
         The size of the embedding vectors.
