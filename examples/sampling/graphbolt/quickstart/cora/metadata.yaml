@@ -19,31 +19,31 @@ tasks:
     - format: numpy
       in_memory: true
       name: seed_nodes
-      path: train_node.npy
+      path: nodeclassification/train_node.npy
     - format: numpy
       in_memory: true
       name: labels
-      path: train_label.npy
+      path: nodeclassification/train_label.npy
     type_name: null
   validation_set:
   - data:
     - format: numpy
       in_memory: true
       name: seed_nodes
-      path: valid_node.npy
+      path: nodeclassification/valid_node.npy
     - format: numpy
       in_memory: true
       name: labels
-      path: valid_label.npy
+      path: nodeclassification/valid_label.npy
     type_name: null
   test_set:
   - data:
     - format: numpy
       in_memory: true
       name: seed_nodes
-      path: test_node.npy
+      path: nodeclassification/test_node.npy
     - format: numpy
       in_memory: true
       name: labels
-      path: test_label.npy
+      path: nodeclassification/test_label.npy
     type_name: null
