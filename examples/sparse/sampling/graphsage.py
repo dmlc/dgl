@@ -1,7 +1,7 @@
 """
-This script demonstrate how to use sparse to sample on graph and train model.
-It trains and tests a GraphSAGE model using the sparse sample and compact 
-operators to sample submatrix from the whole matrix.
+This script demonstrate how to use dgl sparse library to sample on graph and 
+train model. It trains and tests a GraphSAGE model using the sparse sample and 
+compact operators to sample submatrix from the whole matrix.
 
 This flowchart describes the main functional sequence of the provided example.
 main
@@ -142,7 +142,6 @@ def evaluate(model, A, dataloader, ndata, num_classes):
 
 
 def validate(device, A, ndata, dataset, model, batch_size):
-    model.eval()
     inf_id = dataset.test_idx.to(device)
     inf_dataloader = torch.utils.data.DataLoader(inf_id, batch_size=batch_size)
     acc = evaluate(model, A, inf_dataloader, ndata, dataset.num_classes)
