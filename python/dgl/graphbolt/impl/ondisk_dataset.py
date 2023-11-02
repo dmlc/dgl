@@ -529,6 +529,7 @@ class BuiltinDataset(OnDiskDataset):
 
         .. note::
             Reverse edges are added to the original graph.
+            Node features are stored as float32.
 
     **ogb-lsc-mag240m**
         The ogb-lsc-mag240m dataset is a heterogeneous academic graph extracted
