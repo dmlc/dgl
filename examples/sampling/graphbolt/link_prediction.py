@@ -249,8 +249,8 @@ def evaluate(args, graph, features, itemset, model):
         )
 
         # Split the score into positive and negative parts.
-        pos_score = score[: data.compacted_node_pairs[0].shape[0]]
-        neg_score = score[data.compacted_node_pairs[0].shape[0] :]
+        pos_score = score[: data.positive_node_pairs[0].shape[0]]
+        neg_score = score[data.positive_node_pairs[0].shape[0] :]
 
         # Append the score to the list.
         pos_pred.append(pos_score)
@@ -350,7 +350,7 @@ def main(args):
 
     in_size = features.size("node", None, "feat")[0]
     hidden_channels = 256
-    model = SAGE(in_size, hidden_channels)
+    model = SAGE(in_size, hidden_channels).to(args.device)
 
     # Model training.
     print("Training...")
