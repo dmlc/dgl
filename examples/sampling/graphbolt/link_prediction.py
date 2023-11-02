@@ -103,7 +103,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # Initialize the ItemSampler to sample mini-batche from the dataset.
     ############################################################################
     datapipe = gb.ItemSampler(
-        itemset, batch_size=args.batch_size, shuffle=is_train
+        itemset,
+        batch_size=args.train_batch_size if is_train else args.eval_batch_size,
+        shuffle=is_train,
     )
 
     ############################################################################
@@ -311,7 +313,8 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=0.0005)
     parser.add_argument("--neg-ratio", type=int, default=1)
-    parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument("--train-batch-size", type=int, default=512)
+    parser.add_argument("--eval-batch-size", type=int, default=2)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument(
         "--early-stop",
