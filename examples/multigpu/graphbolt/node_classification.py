@@ -138,7 +138,7 @@ def create_dataloader(
     # A CopyTo object copying data in the datapipe to a specified device.\
     ############################################################################
     datapipe = datapipe.copy_to(device)
-    dataloader = gb.SingleProcessDataLoader(datapipe)
+    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=args.num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -342,7 +342,7 @@ def run(rank, world_size, args, devices, dataset):
     )
     dist.reduce(tensor=test_acc, dst=0)
     if rank == 0:
-        print(f"Test Accuracy is {test_acc.item():.4f}")
+        print(f"Test Accuracy {test_acc.item():.4f}")
 
 
 def parse_args():
@@ -375,6 +375,9 @@ def parse_args():
         default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
         " identical with the number of layers in your model. Default: 15,10,5",
+    )
+    parser.add_argument(
+        "--num-workers", type=int, default=0, help="The number of processes."
     )
     return parser.parse_args()
 
