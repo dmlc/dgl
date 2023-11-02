@@ -13,8 +13,8 @@ EXAMPLE_ROOT = os.path.join(
 )
 
 
-def test_gcn():
-    script = os.path.join(EXAMPLE_ROOT, "gcn.py")
+def test_node_classification():
+    script = os.path.join(EXAMPLE_ROOT, "node_classification.py")
     out = subprocess.run(["python", str(script)], capture_output=True)
     assert out.returncode == 0
     stdout = out.stdout.decode("utf-8")
