@@ -164,7 +164,7 @@ def evaluate(rank, args, model, graph, features, itemset, num_classes, device):
         tqdm.tqdm(enumerate(dataloader)) if rank == 0 else enumerate(dataloader)
     ):
         blocks = data.blocks
-        x = data.node_features["feat"].float()
+        x = data.node_features["feat"]
         y.append(data.labels)
         y_hats.append(model.module(blocks, x))
 
@@ -228,7 +228,7 @@ def train(
             ):
                 # The input features are from the source nodes in the first
                 # layer's computation graph.
-                x = data.node_features["feat"].float()
+                x = data.node_features["feat"]
 
                 # The ground truth labels are from the destination nodes
                 # in the last layer's computation graph.
