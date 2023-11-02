@@ -64,9 +64,9 @@ tasks:
     - format: numpy
       in_memory: true
       name: negative_srcs
-      path: linkprediction/test_negative_srcs.npy
+      path: linkprediction/test-negative-srcs.npy
     - format: numpy
       in_memory: true
       name: negative_dsts
-      path: linkprediction/test_negative_dsts.npy
+      path: linkprediction/test-negative-dsts.npy
     type_name: null
