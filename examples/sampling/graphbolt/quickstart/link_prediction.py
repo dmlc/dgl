@@ -19,6 +19,7 @@ from torcheval.metrics import BinaryAUROC
 # (HIGHLIGHT) Create a single process dataloader with dgl graphbolt package.
 ############################################################################
 def create_dataloader(dateset, device, is_train=True):
+    # The second of two tasks in the dataset is node classification.
     task = dataset.tasks[1]
     itemset = task.train_set if is_train else task.test_set
 
@@ -27,7 +28,9 @@ def create_dataloader(dateset, device, is_train=True):
 
     if is_train:
         # Sample negative edges for the seed edges.
-        datapipe = datapipe.sample_uniform_negative(dataset.graph, 1)
+        datapipe = datapipe.sample_uniform_negative(
+            dataset.graph, negative_ratio=1
+        )
 
         # Sample neighbors for the seed nodes.
         datapipe = datapipe.sample_neighbor(dataset.graph, fanouts=[4, 2])
@@ -168,9 +171,12 @@ if __name__ == "__main__":
 
     # Load and preprocess dataset.
     print("Loading data...")
-    dataset = gb.OnDiskDataset(
-        "examples/sampling/graphbolt/quickstart/cora/"
-    ).load()
+    dataset = gb.BuiltinDataset("cora").load()
+
+    # Uncomment to use the example cora dataset.
+    # dataset = gb.OnDiskDataset(
+    #     "examples/sampling/graphbolt/quickstart/cora/"
+    # ).load()
 
     in_size = dataset.feature.size("node", None, "feat")[0]
     model = GraphSAGE(in_size).to(device)
