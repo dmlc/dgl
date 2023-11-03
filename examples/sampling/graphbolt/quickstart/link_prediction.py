@@ -7,13 +7,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn import SAGEConv
-from sklearn.metrics import roc_auc_score
+from torcheval.metrics import BinaryAUROC
 
 
 ############################################################################
 # (HIGHLIGHT) Create a single process dataloader with dgl graphbolt package.
 ############################################################################
-def create_dataloader(dateset, itemset, device, is_train=True):
+def create_dataloader(dateset, device, is_train=True):
+    task = dataset.tasks[1]
+    itemset = task.train_set if is_train else task.test_set
+
     # Sample seed edges from the itemset.
     datapipe = gb.ItemSampler(itemset, batch_size=8)
 
@@ -21,8 +24,29 @@ def create_dataloader(dateset, itemset, device, is_train=True):
         # Sample negative edges for the seed edges.
         datapipe = datapipe.sample_uniform_negative(dataset.graph, 1)
 
-    # Sample neighbors for the seed nodes.
-    datapipe = datapipe.sample_neighbor(dataset.graph, fanouts=[4, 2])
+        # Sample neighbors for the seed nodes.
+        datapipe = datapipe.sample_neighbor(dataset.graph, fanouts=[4, 2])
+
+        # Exclude seed edges from the subgraph.
+        datapipe = datapipe.transform(gb.exclude_seed_edges)
+
+    else:
+        # Sample neighbors for the seed nodes.
+        datapipe = datapipe.sample_neighbor(dataset.graph, fanouts=[-1, -1])
+
+    test_node_pairs, _, _ = task.test_set[0:1055]
+    test_node_pairs = test_node_pairs.T
+    test_node_pairs = (test_node_pairs[0], test_node_pairs[1])
+
+    def exclude_test_set(minibatch):
+        minibatch.sampled_subgraphs = [
+            subgraph.exclude_edges(test_node_pairs)
+            for subgraph in minibatch.sampled_subgraphs
+        ]
+        return minibatch
+
+    # Exclude seed edges from the subgraph.
+    datapipe = datapipe.transform(exclude_test_set)
 
     # Fetch features for sampled nodes.
     datapipe = datapipe.fetch_feature(
@@ -78,9 +102,7 @@ def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
 @torch.no_grad()
 def evaluate(model, dataset, device):
     model.eval()
-    dataloader = create_dataloader(
-        dataset, dataset.tasks[1].test_set, device, is_train=False
-    )
+    dataloader = create_dataloader(dataset, device, is_train=False)
 
     pos_pred = []
     neg_pred = []
@@ -111,15 +133,20 @@ def evaluate(model, dataset, device):
     pos_pred = torch.cat(pos_pred, dim=0)
     neg_pred = torch.cat(neg_pred, dim=0)
 
-    scores = torch.cat([pos_pred, neg_pred]).numpy()
+    scores = torch.cat([pos_pred, neg_pred])
     labels = torch.cat(
         [torch.ones(pos_pred.shape[0]), torch.zeros(neg_pred.shape[0])]
-    ).numpy()
-    print(f"AUC: {roc_auc_score(labels, scores):.3f}")
+    ).to(device)
+
+    # Compute the AUROC score.
+    metric = BinaryAUROC()
+    metric.update(scores, labels)
+    score = metric.compute().item()
+    print(f"AUC: {score:.3f}")
 
 
 def train(model, dataset, device):
-    dataloader = create_dataloader(dataset, dataset.tasks[1].train_set, device)
+    dataloader = create_dataloader(dataset, device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 
     for epoch in range(10):
