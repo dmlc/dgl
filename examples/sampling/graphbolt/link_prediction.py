@@ -207,7 +207,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     return dataloader
 
 
-def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
+def to_binary_link_dgl_computing_pack(data: gb.DGLMiniBatch):
     """Convert the minibatch to a training pair and a label tensor."""
     pos_src, pos_dst = data.positive_node_pairs
     neg_src, neg_dst = data.negative_node_pairs
@@ -353,6 +353,7 @@ def main(args):
 
     in_size = features.size("node", None, "feat")[0]
     hidden_channels = 256
+    args.device = torch.device(args.device)
     model = SAGE(in_size, hidden_channels).to(args.device)
 
     # Model training.
