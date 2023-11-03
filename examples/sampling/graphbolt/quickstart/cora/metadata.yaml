@@ -47,3 +47,26 @@ tasks:
       name: labels
       path: nodeclassification/test-label.npy
     type_name: null
+- name: link_prediction
+  train_set:
+  - data:
+    - format: numpy
+      in_memory: true
+      name: node_pairs
+      path: linkprediction/train-node-pairs.npy
+    type_name: null
+  test_set:
+  - data:
+    - format: numpy
+      in_memory: true
+      name: node_pairs
+      path: linkprediction/test-node-pairs.npy
+    - format: numpy
+      in_memory: true
+      name: negative_srcs
+      path: linkprediction/test-negative-srcs.npy
+    - format: numpy
+      in_memory: true
+      name: negative_dsts
+      path: linkprediction/test-negative-dsts.npy
+    type_name: null
