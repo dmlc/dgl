@@ -41,8 +41,6 @@ class GCN(nn.Module):
         self.layers = nn.ModuleList()
         self.layers.append(dglnn.GraphConv(in_size, hidden_size))
         self.layers.append(dglnn.GraphConv(hidden_size, out_size))
-        self.hidden_size = hidden_size
-        self.out_size = out_size
 
     def forward(self, blocks, x):
         hidden_x = x
