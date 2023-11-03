@@ -10,7 +10,8 @@ of the data in the dataset.
 
 ## Examples
 
- - The node_classification.py shows how to create a Graphbolt dataloader to train a 2 layer Graph
-   Convolutional Networks node classification model.
- - The link_prediction.py shows how to create a Graphbolt dataloader to train a 2 layer GraphSage
-   link prediction model.
+ - The [node_classification.py](https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/quickstart/node_classification.py)
+   shows how to create a Graphbolt dataloader to train a 2 layer Graph Convolutional Networks node
+   classification model.
+ - The [link_prediction.py](https://github.com/dmlc/dgl/blob/master/examples/sampling/graphbolt/quickstart/link_prediction.py)
+   shows how to create a Graphbolt dataloader to train a 2 layer GraphSage link prediction model.
