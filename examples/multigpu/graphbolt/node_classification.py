@@ -406,7 +406,6 @@ if __name__ == "__main__":
 
     # Thread limiting to avoid resource competition.
     os.environ["OMP_NUM_THREADS"] = str(mp.cpu_count() // 2 // world_size)
-    torch.set_num_threads(mp.cpu_count() // 2 // world_size)
 
     mp.set_sharing_strategy("file_system")
     mp.spawn(
