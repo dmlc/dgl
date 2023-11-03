@@ -138,30 +138,27 @@ def test_torch_based_feature(in_memory):
     "dtype", [torch.float32, torch.float64, torch.int32, torch.int64]
 )
 @pytest.mark.parametrize("idtype", [torch.int32, torch.int64])
-@pytest.mark.parametrize("feature_size", [1, 3, (2, 2)])
-def test_torch_based_pinned_feature(dtype, idtype, feature_size):
-    num_feature = 2
-    shape = (
-        (num_feature, feature_size)
-        if isinstance(feature_size, int)
-        else (num_feature, *feature_size)
-    )
+@pytest.mark.parametrize("shape", [(2, 1), (2, 3), (2, 2, 2)])
+def test_torch_based_pinned_feature(dtype, idtype, shape):
     tensor = torch.arange(0, reduce(mul, shape), dtype=dtype).reshape(shape)
     test_tensor = tensor.clone().detach()
     test_tensor_cuda = test_tensor.cuda()
-    pinned_tensor = tensor.pin_memory()
 
-    feature = gb.TorchBasedFeature(pinned_tensor)
+    feature = gb.TorchBasedFeature(tensor)
+    feature.pin_memory_()
 
+    # Test read entire pinned feature, the result should be on cuda.
     assert torch.equal(feature.read(), test_tensor_cuda)
     assert feature.read().is_cuda
     assert torch.equal(
         feature.read(torch.tensor([0], dtype=idtype).cuda()),
         test_tensor_cuda[[0]],
     )
+
+    # Test read pinned feature with idx on cuda, the result should be on cuda.
     assert feature.read(torch.tensor([0], dtype=idtype).cuda()).is_cuda
 
-    assert feature.read().is_cuda
+    # Test read pinned feature with idx on cpu, the result should be on cpu.
     assert torch.equal(
         feature.read(torch.tensor([0], dtype=idtype)), test_tensor[[0]]
     )
