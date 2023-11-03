@@ -19,3 +19,11 @@ def test_node_classification():
     assert out.returncode == 0
     stdout = out.stdout.decode("utf-8")
     assert float(stdout[-5:]) > 0.60
+
+
+def test_link_prediction():
+    script = os.path.join(EXAMPLE_ROOT, "link_prediction.py")
+    out = subprocess.run(["python", str(script)], capture_output=True)
+    assert out.returncode == 0
+    stdout = out.stdout.decode("utf-8")
+    assert float(stdout[-5:]) > 0.80
