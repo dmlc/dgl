@@ -1,10 +1,10 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file csc_sampling_graph.cc
+ * @file fused_csc_sampling_graph.cc
  * @brief Source file of sampling graph.
  */
 
-#include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/fused_csc_sampling_graph.h>
 #include <graphbolt/serialize.h>
 #include <torch/torch.h>
 
@@ -24,7 +24,7 @@ namespace sampling {
 
 static const int kPickleVersion = 6199;
 
-CSCSamplingGraph::CSCSamplingGraph(
+FusedCSCSamplingGraph::FusedCSCSamplingGraph(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
@@ -39,7 +39,7 @@ CSCSamplingGraph::CSCSamplingGraph(
   TORCH_CHECK(indptr.device() == indices.device());
 }
 
-c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
+c10::intrusive_ptr<FusedCSCSamplingGraph> FusedCSCSamplingGraph::FromCSC(
     const torch::Tensor& indptr, const torch::Tensor& indices,
     const torch::optional<torch::Tensor>& node_type_offset,
     const torch::optional<torch::Tensor>& type_per_edge,
@@ -57,37 +57,40 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::FromCSC(
       TORCH_CHECK(pair.value().size(0) == indices.size(0));
     }
   }
-  return c10::make_intrusive<CSCSamplingGraph>(
+  return c10::make_intrusive<FusedCSCSamplingGraph>(
       indptr, indices, node_type_offset, type_per_edge, edge_attributes);
 }
 
-void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
+void FusedCSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   const int64_t magic_num =
-      read_from_archive(archive, "CSCSamplingGraph/magic_num").toInt();
+      read_from_archive(archive, "FusedCSCSamplingGraph/magic_num").toInt();
   TORCH_CHECK(
       magic_num == kCSCSamplingGraphSerializeMagic,
-      "Magic numbers mismatch when loading CSCSamplingGraph.");
-  indptr_ = read_from_archive(archive, "CSCSamplingGraph/indptr").toTensor();
-  indices_ = read_from_archive(archive, "CSCSamplingGraph/indices").toTensor();
-  if (read_from_archive(archive, "CSCSamplingGraph/has_node_type_offset")
+      "Magic numbers mismatch when loading FusedCSCSamplingGraph.");
+  indptr_ =
+      read_from_archive(archive, "FusedCSCSamplingGraph/indptr").toTensor();
+  indices_ =
+      read_from_archive(archive, "FusedCSCSamplingGraph/indices").toTensor();
+  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_node_type_offset")
           .toBool()) {
     node_type_offset_ =
-        read_from_archive(archive, "CSCSamplingGraph/node_type_offset")
+        read_from_archive(archive, "FusedCSCSamplingGraph/node_type_offset")
             .toTensor();
   }
-  if (read_from_archive(archive, "CSCSamplingGraph/has_type_per_edge")
+  if (read_from_archive(archive, "FusedCSCSamplingGraph/has_type_per_edge")
           .toBool()) {
     type_per_edge_ =
-        read_from_archive(archive, "CSCSamplingGraph/type_per_edge").toTensor();
+        read_from_archive(archive, "FusedCSCSamplingGraph/type_per_edge")
+            .toTensor();
   }
 
   // Optional edge attributes.
   torch::IValue has_edge_attributes;
   if (archive.try_read(
-          "CSCSamplingGraph/has_edge_attributes", has_edge_attributes) &&
+          "FusedCSCSamplingGraph/has_edge_attributes", has_edge_attributes) &&
       has_edge_attributes.toBool()) {
     torch::Dict<torch::IValue, torch::IValue> generic_dict =
-        read_from_archive(archive, "CSCSamplingGraph/edge_attributes")
+        read_from_archive(archive, "FusedCSCSamplingGraph/edge_attributes")
             .toGenericDict();
     EdgeAttrMap target_dict;
     for (const auto& pair : generic_dict) {
@@ -101,29 +104,35 @@ void CSCSamplingGraph::Load(torch::serialize::InputArchive& archive) {
   }
 }
 
-void CSCSamplingGraph::Save(torch::serialize::OutputArchive& archive) const {
-  archive.write("CSCSamplingGraph/magic_num", kCSCSamplingGraphSerializeMagic);
-  archive.write("CSCSamplingGraph/indptr", indptr_);
-  archive.write("CSCSamplingGraph/indices", indices_);
+void FusedCSCSamplingGraph::Save(
+    torch::serialize::OutputArchive& archive) const {
   archive.write(
-      "CSCSamplingGraph/has_node_type_offset", node_type_offset_.has_value());
+      "FusedCSCSamplingGraph/magic_num", kCSCSamplingGraphSerializeMagic);
+  archive.write("FusedCSCSamplingGraph/indptr", indptr_);
+  archive.write("FusedCSCSamplingGraph/indices", indices_);
+  archive.write(
+      "FusedCSCSamplingGraph/has_node_type_offset",
+      node_type_offset_.has_value());
   if (node_type_offset_) {
     archive.write(
-        "CSCSamplingGraph/node_type_offset", node_type_offset_.value());
+        "FusedCSCSamplingGraph/node_type_offset", node_type_offset_.value());
   }
   archive.write(
-      "CSCSamplingGraph/has_type_per_edge", type_per_edge_.has_value());
+      "FusedCSCSamplingGraph/has_type_per_edge", type_per_edge_.has_value());
   if (type_per_edge_) {
-    archive.write("CSCSamplingGraph/type_per_edge", type_per_edge_.value());
+    archive.write(
+        "FusedCSCSamplingGraph/type_per_edge", type_per_edge_.value());
   }
   archive.write(
-      "CSCSamplingGraph/has_edge_attributes", edge_attributes_.has_value());
+      "FusedCSCSamplingGraph/has_edge_attributes",
+      edge_attributes_.has_value());
   if (edge_attributes_) {
-    archive.write("CSCSamplingGraph/edge_attributes", edge_attributes_.value());
+    archive.write(
+        "FusedCSCSamplingGraph/edge_attributes", edge_attributes_.value());
   }
 }
 
-void CSCSamplingGraph::SetState(
+void FusedCSCSamplingGraph::SetState(
     const torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>&
         state) {
   // State is a dict of dicts. The tensor-type attributes are stored in the dict
@@ -133,7 +142,7 @@ void CSCSamplingGraph::SetState(
   TORCH_CHECK(
       independent_tensors.at("version_number")
           .equal(torch::tensor({kPickleVersion})),
-      "Version number mismatches when loading pickled CSCSamplingGraph.")
+      "Version number mismatches when loading pickled FusedCSCSamplingGraph.")
   indptr_ = independent_tensors.at("indptr");
   indices_ = independent_tensors.at("indices");
   if (independent_tensors.find("node_type_offset") !=
@@ -149,7 +158,7 @@ void CSCSamplingGraph::SetState(
 }
 
 torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
-CSCSamplingGraph::GetState() const {
+FusedCSCSamplingGraph::GetState() const {
   // State is a dict of dicts. The tensor-type attributes are stored in the dict
   // with key "independent_tensors". The dict-type attributes (edge_attributes)
   // are stored directly with the their name as the key.
@@ -173,7 +182,7 @@ CSCSamplingGraph::GetState() const {
   return state;
 }
 
-c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::InSubgraph(
+c10::intrusive_ptr<SampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
     const torch::Tensor& nodes) const {
   using namespace torch::indexing;
   const int32_t kDefaultGrainSize = 100;
@@ -296,7 +305,7 @@ auto GetPickFn(
 }
 
 template <typename NumPickFn, typename PickFn>
-c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
+c10::intrusive_ptr<SampledSubgraph> FusedCSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
     PickFn pick_fn) const {
   const int64_t num_nodes = nodes.size(0);
@@ -413,7 +422,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighborsImpl(
       subgraph_reverse_edge_ids, subgraph_type_per_edge);
 }
 
-c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
+c10::intrusive_ptr<SampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {
@@ -451,7 +460,7 @@ c10::intrusive_ptr<SampledSubgraph> CSCSamplingGraph::SampleNeighbors(
 }
 
 std::tuple<torch::Tensor, torch::Tensor>
-CSCSamplingGraph::SampleNegativeEdgesUniform(
+FusedCSCSamplingGraph::SampleNegativeEdgesUniform(
     const std::tuple<torch::Tensor, torch::Tensor>& node_pairs,
     int64_t negative_ratio, int64_t max_node_id) const {
   torch::Tensor pos_src;
@@ -462,15 +471,15 @@ CSCSamplingGraph::SampleNegativeEdgesUniform(
   return std::make_tuple(neg_src, neg_dst);
 }
 
-static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
-    SharedMemoryHelper&& helper) {
+static c10::intrusive_ptr<FusedCSCSamplingGraph>
+BuildGraphFromSharedMemoryHelper(SharedMemoryHelper&& helper) {
   helper.InitializeRead();
   auto indptr = helper.ReadTorchTensor();
   auto indices = helper.ReadTorchTensor();
   auto node_type_offset = helper.ReadTorchTensor();
   auto type_per_edge = helper.ReadTorchTensor();
   auto edge_attributes = helper.ReadTorchTensorDict();
-  auto graph = c10::make_intrusive<CSCSamplingGraph>(
+  auto graph = c10::make_intrusive<FusedCSCSamplingGraph>(
       indptr.value(), indices.value(), node_type_offset, type_per_edge,
       edge_attributes);
   auto shared_memory = helper.ReleaseSharedMemory();
@@ -479,7 +488,8 @@ static c10::intrusive_ptr<CSCSamplingGraph> BuildGraphFromSharedMemoryHelper(
   return graph;
 }
 
-c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
+c10::intrusive_ptr<FusedCSCSamplingGraph>
+FusedCSCSamplingGraph::CopyToSharedMemory(
     const std::string& shared_memory_name) {
   SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
   helper.WriteTorchTensor(indptr_);
@@ -491,13 +501,14 @@ c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::CopyToSharedMemory(
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
-c10::intrusive_ptr<CSCSamplingGraph> CSCSamplingGraph::LoadFromSharedMemory(
+c10::intrusive_ptr<FusedCSCSamplingGraph>
+FusedCSCSamplingGraph::LoadFromSharedMemory(
     const std::string& shared_memory_name) {
   SharedMemoryHelper helper(shared_memory_name, SERIALIZED_METAINFO_SIZE_MAX);
   return BuildGraphFromSharedMemoryHelper(std::move(helper));
 }
 
-void CSCSamplingGraph::HoldSharedMemoryObject(
+void FusedCSCSamplingGraph::HoldSharedMemoryObject(
     SharedMemoryPtr tensor_metadata_shm, SharedMemoryPtr tensor_data_shm) {
   tensor_metadata_shm_ = std::move(tensor_metadata_shm);
   tensor_data_shm_ = std::move(tensor_data_shm);

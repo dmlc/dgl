@@ -119,7 +119,7 @@ def get_hetero_graph():
     indices = torch.LongTensor([2, 4, 2, 3, 0, 1, 1, 0, 0, 1])
     type_per_edge = torch.LongTensor([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     node_type_offset = torch.LongTensor([0, 2, 5])
-    return gb.from_csc(
+    return gb.from_fused_csc(
         indptr,
         indices,
         node_type_offset=node_type_offset,
