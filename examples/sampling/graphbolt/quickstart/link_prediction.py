@@ -1,5 +1,10 @@
 """
-Link Prediction with cora dataset using Graphbolt dataloader.
+This example shows how to create a GraphBolt dataloader to sample and train a
+link prediction model with the Cora dataset.
+
+Disclaimer: Please note that the test edges are not excluded from the original
+graph in the dataset, which could lead to data leakage. We are ignoring this
+issue for this example because we are focused on demonstrating usability.
 """
 
 import dgl.graphbolt as gb
@@ -18,7 +23,7 @@ def create_dataloader(dateset, device, is_train=True):
     itemset = task.train_set if is_train else task.test_set
 
     # Sample seed edges from the itemset.
-    datapipe = gb.ItemSampler(itemset, batch_size=8)
+    datapipe = gb.ItemSampler(itemset, batch_size=256)
 
     if is_train:
         # Sample negative edges for the seed edges.
@@ -33,20 +38,6 @@ def create_dataloader(dateset, device, is_train=True):
     else:
         # Sample neighbors for the seed nodes.
         datapipe = datapipe.sample_neighbor(dataset.graph, fanouts=[-1, -1])
-
-    test_node_pairs, _, _ = task.test_set[0:1055]
-    test_node_pairs = test_node_pairs.T
-    test_node_pairs = (test_node_pairs[0], test_node_pairs[1])
-
-    def exclude_test_set(minibatch):
-        minibatch.sampled_subgraphs = [
-            subgraph.exclude_edges(test_node_pairs)
-            for subgraph in minibatch.sampled_subgraphs
-        ]
-        return minibatch
-
-    # Exclude seed edges from the subgraph.
-    datapipe = datapipe.transform(exclude_test_set)
 
     # Fetch features for sampled nodes.
     datapipe = datapipe.fetch_feature(
@@ -96,7 +87,7 @@ def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
     pos_label = torch.ones_like(pos_src)
     neg_label = torch.zeros_like(neg_src)
     labels = torch.cat([pos_label, neg_label], dim=0)
-    return (node_pairs, labels.float())
+    return (node_pairs, labels)
 
 
 @torch.no_grad()
@@ -104,43 +95,32 @@ def evaluate(model, dataset, device):
     model.eval()
     dataloader = create_dataloader(dataset, device, is_train=False)
 
-    pos_pred = []
-    neg_pred = []
+    logits = []
+    labels = []
     for step, data in enumerate(dataloader):
         # Unpack MiniBatch.
-        compacted_pairs, _ = to_binary_link_dgl_computing_pack(data)
+        compacted_pairs, label = to_binary_link_dgl_computing_pack(data)
 
         # The features of sampled nodes.
         x = data.node_features["feat"]
 
         # Forward.
         y = model(data.blocks, x)
-
-        score = (
+        logit = (
             model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
             .squeeze()
             .detach()
         )
 
-        # Split the score into positive and negative parts.
-        pos_score = score[: data.positive_node_pairs[0].shape[0]]
-        neg_score = score[data.positive_node_pairs[0].shape[0] :]
+        logits.append(logit)
+        labels.append(label)
 
-        # Append the score to the list.
-        pos_pred.append(pos_score)
-        neg_pred.append(neg_score)
-
-    pos_pred = torch.cat(pos_pred, dim=0)
-    neg_pred = torch.cat(neg_pred, dim=0)
-
-    scores = torch.cat([pos_pred, neg_pred])
-    labels = torch.cat(
-        [torch.ones(pos_pred.shape[0]), torch.zeros(neg_pred.shape[0])]
-    ).to(device)
+    logits = torch.cat(logits, dim=0)
+    labels = torch.cat(labels, dim=0)
 
     # Compute the AUROC score.
     metric = BinaryAUROC()
-    metric.update(scores, labels)
+    metric.update(logits, labels)
     score = metric.compute().item()
     print(f"AUC: {score:.3f}")
 
@@ -165,15 +145,18 @@ def train(model, dataset, device):
 
             # Forward.
             y = model(data.blocks, x)
-
             logits = model.predictor(
                 y[compacted_pairs[0]] * y[compacted_pairs[1]]
             ).squeeze()
+
             # Compute loss.
-            loss = F.binary_cross_entropy_with_logits(logits, labels)
+            loss = F.binary_cross_entropy_with_logits(logits, labels.float())
+
+            # Backward.
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
             total_loss += loss.item()
 
         print(f"Epoch {epoch:03d} | Loss {total_loss / (step + 1):.3f}")
