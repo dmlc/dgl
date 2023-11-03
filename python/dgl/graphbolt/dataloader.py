@@ -82,20 +82,20 @@ class ThreadingWrapper(dp.iter.IterDataPipe):
         self.buffer_size = buffer_size
 
     def __iter__(self):
-        q = queue.Queue(self.buffer_size)
+        buffer = queue.Queue(self.buffer_size)
 
-        def worker(q):
+        def worker(buffer):
             for item in self.datapipe:
-                q.put(item)
-            q.put(None)  # Put None as an indication of finishing
+                buffer.put(item)
+            buffer.put(None)  # Put None as an indication of finishing
 
         prefetch_thread = threading.Thread(
-            target=worker, args=(q,), daemon=True
+            target=worker, args=(buffer,), daemon=True
         )
         prefetch_thread.start()
 
         while True:
-            item = q.get()
+            item = buffer.get()
             if item is not None:
                 yield item
             else:
