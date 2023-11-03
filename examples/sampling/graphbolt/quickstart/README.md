@@ -5,8 +5,8 @@ Graphbolt provides all you need to create a dataloader to train a Graph Neural N
 ## Dataset
 
 The [cora/](https://github.com/dmlc/dgl/tree/master/examples/sampling/graphbolt/quickstart/cora)
-dataset shows how to create a Graphbolt OnDiskDataset, where metadata.yaml is the directory for all
-of the data in the dataset.
+dataset shows how to create a Graphbolt OnDiskDataset, where metadata.yaml is the catalog for all of
+the data in the dataset.
 
 ## Examples
 
