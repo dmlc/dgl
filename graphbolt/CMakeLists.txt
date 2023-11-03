@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.18)
 project(graphbolt C CXX)
 set (CMAKE_CXX_STANDARD 17)
 
@@ -57,9 +57,8 @@ target_include_directories(${LIB_GRAPHBOLT_NAME} PRIVATE ${BOLT_DIR}
                            "../third_party/pcg/include")
 target_link_libraries(${LIB_GRAPHBOLT_NAME} "${TORCH_LIBRARIES}")
 
-# TODO: upgrade to 17 for consistency with CXX standard once our linux CI supports it.
 if(USE_CUDA)
-  set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 14)
+  set_target_properties(${LIB_GRAPHBOLT_NAME} PROPERTIES CUDA_STANDARD 17)
 endif()
 
 # The Torch CMake configuration only sets up the path for the MKL library when

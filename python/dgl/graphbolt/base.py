@@ -76,7 +76,9 @@ def etype_str_to_tuple(c_etype):
     return ret
 
 
-def _to(x, device):
+def apply_to(x, device):
+    """Apply `to` function to object x only if it has `to`."""
+
     return x.to(device) if hasattr(x, "to") else x
 
 
@@ -107,5 +109,5 @@ class CopyTo(IterDataPipe):
 
     def __iter__(self):
         for data in self.datapipe:
-            data = recursive_apply(data, _to, self.device)
+            data = recursive_apply(data, apply_to, self.device)
             yield data

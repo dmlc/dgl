@@ -1,4 +1,3 @@
-import dgl
 import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
@@ -196,33 +195,63 @@ def test_SubgraphSampler_Link_Hetero_With_Negative(labor):
 
 
 @pytest.mark.parametrize("labor", [False, True])
-def test_test_SubgraphSampler_without_dedpulication(labor):
-    graph = dgl.graph(
-        ([5, 0, 1, 5, 6, 7, 2, 2, 4], [0, 1, 2, 2, 2, 2, 3, 4, 4])
+def test_SubgraphSampler_Random_Hetero_Graph(labor):
+    num_nodes = 5
+    num_edges = 9
+    num_ntypes = 3
+    num_etypes = 3
+    (
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        metadata,
+    ) = gb_test_utils.random_hetero_graph(
+        num_nodes, num_edges, num_ntypes, num_etypes
     )
-    graph = gb.from_dglgraph(graph, True)
-    seed_nodes = torch.LongTensor([0, 3, 4])
+    edge_attributes = {
+        "A1": torch.randn(num_edges),
+        "A2": torch.randn(num_edges),
+    }
+    graph = gb.from_csc(
+        csc_indptr,
+        indices,
+        node_type_offset,
+        type_per_edge,
+        edge_attributes,
+        metadata,
+    )
+    itemset = gb.ItemSetDict(
+        {
+            "n2": gb.ItemSet(torch.tensor([0]), names="seed_nodes"),
+            "n1": gb.ItemSet(torch.tensor([1]), names="seed_nodes"),
+        }
+    )
 
-    itemset = gb.ItemSet(seed_nodes, names="seed_nodes")
-    item_sampler = gb.ItemSampler(itemset, batch_size=len(seed_nodes))
+    item_sampler = gb.ItemSampler(itemset, batch_size=2)
     num_layer = 2
     fanouts = [torch.LongTensor([2]) for _ in range(num_layer)]
-
     Sampler = gb.LayerNeighborSampler if labor else gb.NeighborSampler
-    datapipe = Sampler(item_sampler, graph, fanouts, deduplicate=False)
+    sampler_dp = Sampler(item_sampler, graph, fanouts, replace=True)
 
-    length = [17, 7]
-    compacted_dst = [
-        torch.tensor([0, 1, 2, 2, 4, 4, 5, 5, 6, 6]),
-        torch.tensor([0, 1, 2, 2]),
-    ]
-    seeds = [torch.tensor([0, 3, 4, 5, 2, 2, 4]), torch.tensor([0, 3, 4])]
-    for data in datapipe:
-        for step, sampled_subgraph in enumerate(data.sampled_subgraphs):
-            assert len(sampled_subgraph.original_row_node_ids) == length[step]
-            assert torch.equal(
-                sampled_subgraph.node_pairs[1], compacted_dst[step]
-            )
-            assert torch.equal(
-                sampled_subgraph.original_column_node_ids, seeds[step]
-            )
+    for data in sampler_dp:
+        for sampledsubgraph in data.sampled_subgraphs:
+            for _, value in sampledsubgraph.node_pairs.items():
+                assert torch.equal(
+                    torch.ge(value[0], torch.zeros(len(value[0]))),
+                    torch.ones(len(value[0])),
+                )
+                assert torch.equal(
+                    torch.ge(value[1], torch.zeros(len(value[1]))),
+                    torch.ones(len(value[1])),
+                )
+            for _, value in sampledsubgraph.original_column_node_ids.items():
+                assert torch.equal(
+                    torch.ge(value, torch.zeros(len(value))),
+                    torch.ones(len(value)),
+                )
+            for _, value in sampledsubgraph.original_row_node_ids.items():
+                assert torch.equal(
+                    torch.ge(value, torch.zeros(len(value))),
+                    torch.ones(len(value)),
+                )

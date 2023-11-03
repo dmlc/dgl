@@ -44,6 +44,8 @@ def preprocess_ondisk_dataset(
     ----------
     dataset_dir : str
         The path to the dataset directory.
+    include_original_edge_id : bool, optional
+        Whether to include the original edge id in the CSCSamplingGraph.
 
     Returns
     -------
@@ -337,6 +339,8 @@ class OnDiskDataset(Dataset):
     ----------
     path: str
         The YAML file path.
+    include_original_edge_id: bool, optional
+        Whether to include the original edge id in the CSCSamplingGraph.
     """
 
     def __init__(
@@ -494,6 +498,10 @@ class BuiltinDataset(OnDiskDataset):
 
     Available built-in datasets include:
 
+    **cora**
+        The cora dataset is a homogeneous citation network dataset, which is
+        designed for the node classification task.
+
     **ogbn-mag**
         The ogbn-mag dataset is a heterogeneous network composed of a subset of
         the Microsoft Academic Graph (MAG). See more details in
@@ -521,6 +529,7 @@ class BuiltinDataset(OnDiskDataset):
 
         .. note::
             Reverse edges are added to the original graph.
+            Node features are stored as float32.
 
     **ogb-lsc-mag240m**
         The ogb-lsc-mag240m dataset is a heterogeneous academic graph extracted
@@ -545,6 +554,7 @@ class BuiltinDataset(OnDiskDataset):
         "https://dgl-data.s3-accelerate.amazonaws.com/dataset/graphbolt/"
     )
     _datasets = [
+        "cora",
         "ogbn-mag",
         "ogbl-citation2",
         "ogbn-products",

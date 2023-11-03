@@ -38,8 +38,7 @@ main
 └───> All nodes set inference & Test set evaluation
 """
 import argparse
-
-from typing import Literal
+import time
 
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
@@ -47,12 +46,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-import tqdm
+from tqdm import tqdm
 
 
-def create_dataloader(
-    args, graph, features, itemset, job: Literal["train", "evaluate", "infer"]
-):
+def create_dataloader(args, graph, features, itemset, job):
     """
     [HIGHLIGHT]
     Get a GraphBolt version of a dataloader for node classification tasks.
@@ -70,7 +67,7 @@ def create_dataloader(
         The node features.
     itemset : Union[ItemSet, ItemSetDict]
         Data to be sampled.
-    job : Literal["train", "evaluate", "infer"]
+    job : one of ["train", "evaluate", "infer"]
         The stage where dataloader is created, with options "train", "evaluate"
         and "infer".
     """
@@ -145,6 +142,16 @@ def create_dataloader(
 
     ############################################################################
     # [Step-5]:
+    # self.copy_to()
+    # [Input]:
+    # 'device': The device to copy the data to.
+    # [Output]:
+    # A CopyTo object to copy the data to the specified device.
+    ############################################################################
+    datapipe = datapipe.copy_to(device=args.device)
+
+    ############################################################################
+    # [Step-6]:
     # gb.MultiProcessDataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
@@ -174,7 +181,7 @@ class SAGE(nn.Module):
         self.hidden_size = hidden_size
         self.out_size = out_size
         # Set the dtype for the layers manually.
-        self.set_layer_dtype(torch.float64)
+        self.set_layer_dtype(torch.float32)
 
     def set_layer_dtype(self, _dtype):
         for layer in self.layers:
@@ -191,9 +198,14 @@ class SAGE(nn.Module):
                 hidden_x = self.dropout(hidden_x)
         return hidden_x
 
-    def inference(self, graph, features, dataloader):
+    def inference(self, graph, features, dataloader, device):
         """Conduct layer-wise inference to get all the node embeddings."""
         feature = features.read("node", None, "feat")
+
+        buffer_device = torch.device("cpu")
+        # Enable pin_memory for faster CPU to GPU data transfer if the
+        # model is running on a GPU.
+        pin_memory = buffer_device != device
 
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
@@ -202,16 +214,21 @@ class SAGE(nn.Module):
                 graph.total_num_nodes,
                 self.out_size if is_last_layer else self.hidden_size,
                 dtype=torch.float64,
+                device=buffer_device,
+                pin_memory=pin_memory,
             )
+            feature = feature.to(device)
 
-            for step, data in tqdm.tqdm(enumerate(dataloader)):
+            for step, data in tqdm(enumerate(dataloader)):
                 x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], x.float())  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
                 # By design, our output nodes are contiguous.
-                y[data.output_nodes[0] : data.output_nodes[-1] + 1] = hidden_x
+                y[
+                    data.output_nodes[0] : data.output_nodes[-1] + 1
+                ] = hidden_x.to(buffer_device)
             feature = y
 
         return y
@@ -225,7 +242,7 @@ def layerwise_infer(
     dataloader = create_dataloader(
         args, graph, features, all_nodes_set, job="infer"
     )
-    pred = model.inference(graph, features, dataloader)
+    pred = model.inference(graph, features, dataloader, args.device)
     pred = pred[test_set._items[0]]
     label = test_set._items[1].to(pred.device)
 
@@ -246,10 +263,10 @@ def evaluate(args, model, graph, features, itemset, num_classes):
         args, graph, features, itemset, job="evaluate"
     )
 
-    for step, data in tqdm.tqdm(enumerate(dataloader)):
+    for step, data in tqdm(enumerate(dataloader)):
         x = data.node_features["feat"]
         y.append(data.labels)
-        y_hats.append(model(data.blocks, x))
+        y_hats.append(model(data.blocks, x.float()))
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -265,10 +282,11 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
         args, graph, features, train_set, job="train"
     )
 
-    for epoch in tqdm.trange(args.epochs):
+    for epoch in range(args.epochs):
+        t0 = time.time()
         model.train()
         total_loss = 0
-        for step, data in tqdm.tqdm(enumerate(dataloader)):
+        for step, data in enumerate(dataloader):
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]
@@ -277,7 +295,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             # in the last layer's computation graph.
             y = data.labels
 
-            y_hat = model(data.blocks, x)
+            y_hat = model(data.blocks, x.float())
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)
@@ -288,11 +306,12 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
 
             total_loss += loss.item()
 
+        t1 = time.time()
         # Evaluate the model.
         acc = evaluate(args, model, graph, features, valid_set, num_classes)
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (step + 1):.4f} | "
-            f"Accuracy {acc.item():.4f} "
+            f"Accuracy {acc.item():.4f} | Time {t1 - t0:.4f}"
         )
 
 
@@ -311,29 +330,43 @@ def parse_args():
         help="Learning rate for optimization.",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=256, help="Batch size for training."
+        "--batch-size", type=int, default=1024, help="Batch size for training."
     )
     parser.add_argument(
         "--num-workers",
         type=int,
-        default=4,
+        default=0,
         help="Number of workers for data loading.",
     )
     parser.add_argument(
         "--fanout",
         type=str,
-        default="15,10,5",
+        default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
-        " identical with the number of layers in your model. Default: 15,10,5",
+        " identical with the number of layers in your model. Default: 10,10,10",
+    )
+    parser.add_argument(
+        "--device",
+        default="cpu",
+        choices=["cpu", "cuda"],
+        help="Train device: 'cpu' for CPU, 'cuda' for GPU.",
     )
     return parser.parse_args()
 
 
 def main(args):
+    if not torch.cuda.is_available():
+        args.device = "cpu"
+    print(f"Training in {args.device} mode.")
+    args.device = torch.device(args.device)
+
     # Load and preprocess dataset.
+    print("Loading data...")
     dataset = gb.BuiltinDataset("ogbn-products").load()
 
     graph = dataset.graph
+    # Currently the neighbor-sampling process can only be done on the CPU,
+    # therefore there is no need to copy the graph to the GPU.
     features = dataset.feature
     train_set = dataset.tasks[0].train_set
     valid_set = dataset.tasks[0].validation_set
@@ -344,10 +377,12 @@ def main(args):
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
     in_size = features.size("node", None, "feat")[0]
-    hidden_size = 128
+    hidden_size = 256
     out_size = num_classes
 
     model = SAGE(in_size, hidden_size, out_size)
+    assert len(args.fanout) == len(model.layers)
+    model = model.to(args.device)
 
     # Model training.
     print("Training...")
@@ -364,7 +399,7 @@ def main(args):
         model,
         num_classes,
     )
-    print(f"Test Accuracy is {test_acc.item():.4f}")
+    print(f"Test accuracy {test_acc.item():.4f}")
 
 
 if __name__ == "__main__":
