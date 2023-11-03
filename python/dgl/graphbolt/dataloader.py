@@ -73,18 +73,21 @@ class ThreadingWrapper(dp.iter.IterDataPipe):
     ----------
     datapipe : DataPipe
         The data pipeline.
+    buffer_size : int, optional
+        The size of the buffer queue.
     """
 
-    def __init__(self, datapipe):
+    def __init__(self, datapipe, buffer_size=4):
         self.datapipe = datapipe
+        self.buffer_size = buffer_size
 
     def __iter__(self):
-        q = queue.Queue()
+        q = queue.Queue(self.buffer_size)
 
         def worker(q):
             for item in self.datapipe:
                 q.put(item)
-            q.put(None)
+            q.put(None)  # Put None as an indication of finishing
 
         prefetch_thread = threading.Thread(
             target=worker, args=(q,), daemon=True
@@ -120,7 +123,7 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
         :class:`SingleProcessDataLoader`.
     """
 
-    def __init__(self, datapipe, num_workers=0, use_prefetch_thread=False):
+    def __init__(self, datapipe, num_workers=0):
         # Multiprocessing requires two modifications to the datapipe:
         #
         # 1. Insert a stage after ItemSampler to distribute the
@@ -159,13 +162,6 @@ class MultiProcessDataLoader(torch.utils.data.DataLoader):
                     datapipe_graph,
                     parent_datapipe,
                     MultiprocessingWrapper(parent_datapipe, num_workers),
-                )
-            # (3) Wrap the datapipe with a ThreadingWrapper to enable prefetching.
-            if use_prefetch_thread:
-                datapipe_graph = dp_utils.replace_dp(
-                    datapipe_graph,
-                    feature_fetcher,
-                    ThreadingWrapper(feature_fetcher),
                 )
 
         # The stages after feature fetching is still done in the main process.
