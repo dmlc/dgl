@@ -22,7 +22,7 @@ class UniformNegativeSampler(NegativeSampler):
     ----------
     datapipe : DataPipe
         The datapipe.
-    graph : CSCSamplingGraph
+    graph : FusedCSCSamplingGraph
         The graph on which to perform negative sampling.
     negative_ratio : int
         The proportion of negative samples to positive samples.
@@ -32,7 +32,7 @@ class UniformNegativeSampler(NegativeSampler):
     >>> from dgl import graphbolt as gb
     >>> indptr = torch.LongTensor([0, 2, 4, 5])
     >>> indices = torch.LongTensor([1, 2, 0, 2, 0])
-    >>> graph = gb.from_csc(indptr, indices)
+    >>> graph = gb.from_fused_csc(indptr, indices)
     >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
     >>> item_sampler = gb.ItemSampler(

@@ -64,7 +64,7 @@ class OnDiskFeatureData(pydantic.BaseModel):
 class OnDiskGraphTopologyType(str, Enum):
     """Enum of graph topology type."""
 
-    CSC_SAMPLING = "CSCSamplingGraph"
+    FUSED_CSC_SAMPLING = "FusedCSCSamplingGraph"
 
 
 class OnDiskGraphTopology(pydantic.BaseModel):

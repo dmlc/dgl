@@ -11,14 +11,14 @@ namespace torch {
 
 serialize::InputArchive& operator>>(
     serialize::InputArchive& archive,
-    graphbolt::sampling::CSCSamplingGraph& graph) {
+    graphbolt::sampling::FusedCSCSamplingGraph& graph) {
   graph.Load(archive);
   return archive;
 }
 
 serialize::OutputArchive& operator<<(
     serialize::OutputArchive& archive,
-    const graphbolt::sampling::CSCSamplingGraph& graph) {
+    const graphbolt::sampling::FusedCSCSamplingGraph& graph) {
   graph.Save(archive);
   return archive;
 }
@@ -27,15 +27,15 @@ serialize::OutputArchive& operator<<(
 
 namespace graphbolt {
 
-c10::intrusive_ptr<sampling::CSCSamplingGraph> LoadCSCSamplingGraph(
+c10::intrusive_ptr<sampling::FusedCSCSamplingGraph> LoadFusedCSCSamplingGraph(
     const std::string& filename) {
-  auto&& graph = c10::make_intrusive<sampling::CSCSamplingGraph>();
+  auto&& graph = c10::make_intrusive<sampling::FusedCSCSamplingGraph>();
   torch::load(*graph, filename);
   return graph;
 }
 
-void SaveCSCSamplingGraph(
-    c10::intrusive_ptr<sampling::CSCSamplingGraph> graph,
+void SaveFusedCSCSamplingGraph(
+    c10::intrusive_ptr<sampling::FusedCSCSamplingGraph> graph,
     const std::string& filename) {
   torch::save(*graph, filename);
 }

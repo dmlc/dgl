@@ -19,5 +19,6 @@ scikit-learn
 scipy
 torch==1.13.0+cpu
 torchdata
+torcheval
 torchmetrics
 tqdm
