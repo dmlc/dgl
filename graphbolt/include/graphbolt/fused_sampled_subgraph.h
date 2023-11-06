@@ -24,7 +24,8 @@ namespace sampling {
  * auto indices = torch::tensor({55, 101, 3, 3}, {torch::kInt64});
  * auto original_column_node_ids = torch::tensor({3, 3, 101}, {torch::kInt64});
  *
- * FusedSampledSubgraph sampledSubgraph(indptr, indices, original_column_node_ids);
+ * FusedSampledSubgraph sampledSubgraph(indptr, indices,
+ * original_column_node_ids);
  * ```
  *
  * The `original_column_node_ids` indicates that nodes `[3, 3, 101]` in the
