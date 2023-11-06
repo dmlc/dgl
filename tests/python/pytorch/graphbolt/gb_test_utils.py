@@ -17,7 +17,7 @@ def rand_csc_graph(N, density):
     indptr = torch.LongTensor(adj.indptr)
     indices = torch.LongTensor(adj.indices)
 
-    graph = gb.from_csc(indptr, indices)
+    graph = gb.from_fused_csc(indptr, indices)
 
     return graph
 

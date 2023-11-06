@@ -1,4 +1,4 @@
-"""Sampled subgraph for CSCSamplingGraph."""
+"""Sampled subgraph for FusedCSCSamplingGraph."""
 # pylint: disable= invalid-name
 from dataclasses import dataclass
 from typing import Dict, Tuple, Union
@@ -13,7 +13,7 @@ __all__ = ["SampledSubgraphImpl"]
 
 @dataclass
 class SampledSubgraphImpl(SampledSubgraph):
-    r"""Sampled subgraph of CSCSamplingGraph.
+    r"""Sampled subgraph of FusedCSCSamplingGraph.
 
     Examples
     --------

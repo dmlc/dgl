@@ -56,7 +56,7 @@ Standard Implementations
 
     OnDiskDataset
     BuiltinDataset
-    CSCSamplingGraph
+    FusedCSCSamplingGraph
     UniformNegativeSampler
     NeighborSampler
     LayerNeighborSampler

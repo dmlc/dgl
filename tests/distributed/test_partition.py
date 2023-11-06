@@ -694,8 +694,10 @@ def test_convert_dgl_partition_to_csc_sampling_graph_homo(
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
-            new_g = dgl.graphbolt.load_csc_sampling_graph(
-                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            new_g = dgl.graphbolt.load_fused_csc_sampling_graph(
+                os.path.join(
+                    test_dir, f"part{part_id}/fused_csc_sampling_graph.tar"
+                )
             )
             orig_indptr, orig_indices, _ = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)
@@ -725,8 +727,10 @@ def test_convert_dgl_partition_to_csc_sampling_graph_hetero(
             orig_g = dgl.load_graphs(
                 os.path.join(test_dir, f"part{part_id}/graph.dgl")
             )[0][0]
-            new_g = dgl.graphbolt.load_csc_sampling_graph(
-                os.path.join(test_dir, f"part{part_id}/csc_sampling_graph.tar")
+            new_g = dgl.graphbolt.load_fused_csc_sampling_graph(
+                os.path.join(
+                    test_dir, f"part{part_id}/fused_csc_sampling_graph.tar"
+                )
             )
             orig_indptr, orig_indices, _ = orig_g.adj().csc()
             assert th.equal(orig_indptr, new_g.csc_indptr)

@@ -35,6 +35,7 @@ main
 """
 
 import argparse
+import time
 
 import dgl
 import dgl.nn as dglnn
@@ -228,6 +229,7 @@ def train(args, device, g, dataset, model, num_classes, use_uva):
     opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
 
     for epoch in range(10):
+        t0 = time.time()
         model.train()
         total_loss = 0
         # A block is a graph consisting of two sets of nodes: the
@@ -252,10 +254,11 @@ def train(args, device, g, dataset, model, num_classes, use_uva):
             loss.backward()
             opt.step()
             total_loss += loss.item()
+        t1 = time.time()
         acc = evaluate(model, g, val_dataloader, num_classes)
         print(
             f"Epoch {epoch:05d} | Loss {total_loss / (it + 1):.4f} | "
-            f"Accuracy {acc.item():.4f} "
+            f"Accuracy {acc.item():.4f} | Time {t1 - t0:.4f}"
         )
 
 
@@ -297,4 +300,4 @@ if __name__ == "__main__":
     acc = layerwise_infer(
         device, g, dataset.test_idx, model, num_classes, batch_size=4096
     )
-    print(f"Test Accuracy {acc.item():.4f}")
+    print(f"Test accuracy {acc.item():.4f}")

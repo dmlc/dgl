@@ -28,7 +28,7 @@ class NeighborSampler(SubgraphSampler):
     ----------
     datapipe : DataPipe
         The datapipe.
-    graph : CSCSamplingGraph
+    graph : FusedCSCSamplingGraph
         The graph on which to perform subgraph sampling.
     fanouts: list[torch.Tensor] or list[int]
         The number of edges to be sampled for each node with or without
@@ -59,7 +59,7 @@ class NeighborSampler(SubgraphSampler):
     >>> from dgl import graphbolt as gb
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
-    >>> graph = gb.from_csc(indptr, indices)
+    >>> graph = gb.from_fused_csc(indptr, indices)
     >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
@@ -165,7 +165,7 @@ class LayerNeighborSampler(NeighborSampler):
     ----------
     datapipe : DataPipe
         The datapipe.
-    graph : CSCSamplingGraph
+    graph : FusedCSCSamplingGraph
         The graph on which to perform subgraph sampling.
     fanouts: list[torch.Tensor]
         The number of edges to be sampled for each node with or without
@@ -192,7 +192,7 @@ class LayerNeighborSampler(NeighborSampler):
     >>> from dgl import graphbolt as gb
     >>> indptr = torch.LongTensor([0, 2, 4, 5, 6, 7 ,8])
     >>> indices = torch.LongTensor([1, 2, 0, 3, 5, 4, 3, 5])
-    >>> graph = gb.from_csc(indptr, indices)
+    >>> graph = gb.from_fused_csc(indptr, indices)
     >>> data_format = gb.LinkPredictionEdgeFormat.INDEPENDENT
     >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")

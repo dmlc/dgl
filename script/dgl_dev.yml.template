@@ -7,6 +7,7 @@ dependencies:
   - pygraphviz
   - pip:
     - --find-links https://download.pytorch.org/whl/torch_stable.html
+    - cmake>=3.18
     - cython
     - filelock
     - matplotlib
@@ -27,6 +28,7 @@ dependencies:
     - scipy
     - torch==__TORCH_VERSION__
     - torchdata
+    - torcheval
     - torchmetrics
     - tqdm
     - boto3 # AWS SDK for python
