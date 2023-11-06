@@ -422,8 +422,6 @@ class DistGraphServer(KVServer):
                 load_feats=False,
                 use_graphbolt=use_graphbolt,
             )
-            new_rss = psutil.Process(os.getpid()).memory_info().rss
-            print(f"[Server_{self.server_id}] Loaded {graph_name} with use_graphbolt[{use_graphbolt}] in size[{(new_rss - prev_rss)/1024/1024} MB]")
             if not use_graphbolt:
                 # formatting dtype
                 # TODO(Rui) Formatting forcely is not a perfect solution.
@@ -446,6 +444,8 @@ class DistGraphServer(KVServer):
                 self.client_g = self.client_g.formats(graph_format)
                 self.client_g.create_formats_()
                 print("Finished creating specified graph formats.")
+            new_rss = psutil.Process(os.getpid()).memory_info().rss
+            print(f"[Server_{self.server_id}] Loaded {graph_name} with use_graphbolt[{use_graphbolt}] in size[{(new_rss - prev_rss)/1024/1024} MB]")
             if not disable_shared_mem:
                 self.client_g = _copy_graph_to_shared_mem(
                     self.client_g, graph_name, graph_format, use_graphbolt
