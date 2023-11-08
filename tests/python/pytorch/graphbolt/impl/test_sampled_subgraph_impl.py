@@ -4,7 +4,7 @@ import backend as F
 import pytest
 import torch
 
-from dgl.graphbolt.impl.sampled_subgraph_impl import SampledSubgraphImpl
+from dgl.graphbolt.impl.sampled_subgraph_impl import FusedSampledSubgraphImpl
 
 
 def _assert_container_equal(lhs, rhs):
@@ -42,7 +42,7 @@ def test_exclude_edges_homo(reverse_row, reverse_column):
         original_column_node_ids = None
         dst_to_exclude = torch.tensor([4])
     original_edge_ids = torch.Tensor([5, 9, 10])
-    subgraph = SampledSubgraphImpl(
+    subgraph = FusedSampledSubgraphImpl(
         node_pairs,
         original_column_node_ids,
         original_row_node_ids,
@@ -95,7 +95,7 @@ def test_exclude_edges_hetero(reverse_row, reverse_column):
         original_column_node_ids = None
         dst_to_exclude = torch.tensor([0, 2])
     original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
-    subgraph = SampledSubgraphImpl(
+    subgraph = FusedSampledSubgraphImpl(
         node_pairs=node_pairs,
         original_column_node_ids=original_column_node_ids,
         original_row_node_ids=original_row_node_ids,
@@ -158,7 +158,7 @@ def test_sampled_subgraph_to_device():
     }
     dst_to_exclude = torch.tensor([10, 12])
     original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
-    subgraph = SampledSubgraphImpl(
+    subgraph = FusedSampledSubgraphImpl(
         node_pairs=node_pairs,
         original_column_node_ids=original_column_node_ids,
         original_row_node_ids=original_row_node_ids,

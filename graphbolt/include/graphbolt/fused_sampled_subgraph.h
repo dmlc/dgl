@@ -1,11 +1,11 @@
 /**
  *  Copyright (c) 2023 by Contributors
- * @file graphbolt/sampled_subgraph.h
+ * @file graphbolt/fused_sampled_subgraph.h
  * @brief Header file of sampled sub graph.
  */
 
-#ifndef GRAPHBOLT_SAMPLED_SUBGRAPH_H_
-#define GRAPHBOLT_SAMPLED_SUBGRAPH_H_
+#ifndef GRAPHBOLT_FUSED_SAMPLED_SUBGRAPH_H_
+#define GRAPHBOLT_FUSED_SAMPLED_SUBGRAPH_H_
 
 #include <torch/custom_class.h>
 #include <torch/torch.h>
@@ -24,7 +24,8 @@ namespace sampling {
  * auto indices = torch::tensor({55, 101, 3, 3}, {torch::kInt64});
  * auto original_column_node_ids = torch::tensor({3, 3, 101}, {torch::kInt64});
  *
- * SampledSubgraph sampledSubgraph(indptr, indices, original_column_node_ids);
+ * FusedSampledSubgraph sampledSubgraph(indptr, indices,
+ * original_column_node_ids);
  * ```
  *
  * The `original_column_node_ids` indicates that nodes `[3, 3, 101]` in the
@@ -37,10 +38,10 @@ namespace sampling {
  * inconsistent with column, which is legal, as `3` is mapped to `0` and `1` in
  * the column while `2` in the row.
  */
-struct SampledSubgraph : torch::CustomClassHolder {
+struct FusedSampledSubgraph : torch::CustomClassHolder {
  public:
   /**
-   * @brief Constructor for the SampledSubgraph struct.
+   * @brief Constructor for the FusedSampledSubgraph struct.
    *
    * @param indptr CSC format index pointer array.
    * @param indices CSC format index array.
@@ -51,7 +52,7 @@ struct SampledSubgraph : torch::CustomClassHolder {
    * @param original_edge_ids Reverse edge ids in the original graph.
    * @param type_per_edge Type id of each edge.
    */
-  SampledSubgraph(
+  FusedSampledSubgraph(
       torch::Tensor indptr, torch::Tensor indices,
       torch::Tensor original_column_node_ids,
       torch::optional<torch::Tensor> original_row_node_ids = torch::nullopt,
@@ -64,7 +65,7 @@ struct SampledSubgraph : torch::CustomClassHolder {
         original_edge_ids(original_edge_ids),
         type_per_edge(type_per_edge) {}
 
-  SampledSubgraph() = default;
+  FusedSampledSubgraph() = default;
 
   /**
    * @brief CSC format index pointer array, where the implicit node ids are
@@ -118,4 +119,4 @@ struct SampledSubgraph : torch::CustomClassHolder {
 }  // namespace sampling
 }  // namespace graphbolt
 
-#endif  // GRAPHBOLT_SAMPLED_SUBGRAPH_H_
+#endif  // GRAPHBOLT_FUSED_SAMPLED_SUBGRAPH_H_

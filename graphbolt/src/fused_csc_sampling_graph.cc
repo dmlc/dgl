@@ -182,7 +182,7 @@ FusedCSCSamplingGraph::GetState() const {
   return state;
 }
 
-c10::intrusive_ptr<SampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
+c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
     const torch::Tensor& nodes) const {
   using namespace torch::indexing;
   const int32_t kDefaultGrainSize = 100;
@@ -211,7 +211,7 @@ c10::intrusive_ptr<SampledSubgraph> FusedCSCSamplingGraph::InSubgraph(
   torch::Tensor compact_indptr =
       torch::zeros({nonzero_idx.size(0) + 1}, indptr_.dtype());
   compact_indptr.index_put_({Slice(1, None)}, indptr.index({nonzero_idx}));
-  return c10::make_intrusive<SampledSubgraph>(
+  return c10::make_intrusive<FusedSampledSubgraph>(
       compact_indptr.cumsum(0), torch::cat(indices_arr), nonzero_idx - 1,
       torch::arange(0, NumNodes()), torch::cat(edge_ids_arr),
       type_per_edge_
@@ -305,7 +305,8 @@ auto GetPickFn(
 }
 
 template <typename NumPickFn, typename PickFn>
-c10::intrusive_ptr<SampledSubgraph> FusedCSCSamplingGraph::SampleNeighborsImpl(
+c10::intrusive_ptr<FusedSampledSubgraph>
+FusedCSCSamplingGraph::SampleNeighborsImpl(
     const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
     PickFn pick_fn) const {
   const int64_t num_nodes = nodes.size(0);
@@ -417,12 +418,12 @@ c10::intrusive_ptr<SampledSubgraph> FusedCSCSamplingGraph::SampleNeighborsImpl(
   torch::optional<torch::Tensor> subgraph_reverse_edge_ids = torch::nullopt;
   if (return_eids) subgraph_reverse_edge_ids = std::move(picked_eids);
 
-  return c10::make_intrusive<SampledSubgraph>(
+  return c10::make_intrusive<FusedSampledSubgraph>(
       subgraph_indptr, subgraph_indices, nodes, torch::nullopt,
       subgraph_reverse_edge_ids, subgraph_type_per_edge);
 }
 
-c10::intrusive_ptr<SampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
+c10::intrusive_ptr<FusedSampledSubgraph> FusedCSCSamplingGraph::SampleNeighbors(
     const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
     bool replace, bool layer, bool return_eids,
     torch::optional<std::string> probs_name) const {

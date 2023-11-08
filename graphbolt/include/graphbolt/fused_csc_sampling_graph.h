@@ -6,7 +6,7 @@
 #ifndef GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 #define GRAPHBOLT_CSC_SAMPLING_GRAPH_H_
 
-#include <graphbolt/sampled_subgraph.h>
+#include <graphbolt/fused_sampled_subgraph.h>
 #include <graphbolt/shared_memory.h>
 #include <torch/torch.h>
 
@@ -172,9 +172,9 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * @brief Return the subgraph induced on the inbound edges of the given nodes.
    * @param nodes Type agnostic node IDs to form the subgraph.
    *
-   * @return SampledSubgraph.
+   * @return FusedSampledSubgraph.
    */
-  c10::intrusive_ptr<SampledSubgraph> InSubgraph(
+  c10::intrusive_ptr<FusedSampledSubgraph> InSubgraph(
       const torch::Tensor& nodes) const;
 
   /**
@@ -208,10 +208,10 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
    * a 1D floating-point or boolean tensor, with the number of elements
    * equalling the total number of edges.
    *
-   * @return An intrusive pointer to a SampledSubgraph object containing the
-   * sampled graph's information.
+   * @return An intrusive pointer to a FusedSampledSubgraph object containing
+   * the sampled graph's information.
    */
-  c10::intrusive_ptr<SampledSubgraph> SampleNeighbors(
+  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighbors(
       const torch::Tensor& nodes, const std::vector<int64_t>& fanouts,
       bool replace, bool layer, bool return_eids,
       torch::optional<std::string> probs_name) const;
@@ -276,7 +276,7 @@ class FusedCSCSamplingGraph : public torch::CustomClassHolder {
 
  private:
   template <typename NumPickFn, typename PickFn>
-  c10::intrusive_ptr<SampledSubgraph> SampleNeighborsImpl(
+  c10::intrusive_ptr<FusedSampledSubgraph> SampleNeighborsImpl(
       const torch::Tensor& nodes, bool return_eids, NumPickFn num_pick_fn,
       PickFn pick_fn) const;
 
