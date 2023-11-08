@@ -190,10 +190,12 @@ class ItemShufflerAndBatcher:
         else:
             total_count = len(self._item_set)
             big_batch_size = self._num_replicas * self._batch_size
-            big_batch_count = total_count // big_batch_size
-            big_batch_remain = total_count % big_batch_size
-            batch_remain = big_batch_remain % self._batch_size
-            last_batch_count = big_batch_remain // self._batch_size
+            big_batch_count, big_batch_remain = divmod(
+                total_count, big_batch_size
+            )
+            last_batch_count, batch_remain = divmod(
+                big_batch_remain, self._batch_size
+            )
             if self._rank < last_batch_count:
                 last_batch = self._batch_size
             elif self._rank == last_batch_count:
@@ -208,6 +210,7 @@ class ItemShufflerAndBatcher:
             if not self._drop_uneven_inputs or (
                 not self._drop_last and last_batch_count == self._num_replicas
             ):
+                # No need to drop uneven batches.
                 num_evened_items = num_items
                 if num_workers > 1:
                     total_batch_count = (
@@ -232,6 +235,9 @@ class ItemShufflerAndBatcher:
                         )
                     )
             else:
+                # Needs to drop uneven batches. As many items as `last_batch`
+                # size will be dropped. It would be better not to let those
+                # dropped items come from the same worker.
                 num_evened_items = big_batch_count * self._batch_size
                 if num_workers > 1:
                     total_batch_count = big_batch_count
