@@ -370,6 +370,8 @@ def train(args, device, g, reverse_eids, seed_edges, model, use_uva):
             loss.backward()
             opt.step()
             total_loss += loss.item()
+            if (it + 1) == args.early_stop:
+                break
         print(f"Epoch {epoch:05d} | Loss {total_loss / (it + 1):.4f}")
 
 
@@ -386,6 +388,12 @@ def parse_args():
         type=int,
         default=512,
         help="Batch size. Default: 512",
+    )
+    parser.add_argument(
+        "--early-stop",
+        type=int,
+        default=0,
+        help="0 means no early stop, otherwise stop at the input-th step",
     )
     parser.add_argument(
         "--mode",
