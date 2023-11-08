@@ -176,11 +176,11 @@ class ItemShufflerAndBatcher:
         return torch.tensor(offsets)
 
     def __iter__(self):
-        try:
-            worker_info = torch.utils.data.get_worker_info()
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:
             num_workers = worker_info.num_workers
             worker_id = worker_info.id
-        except:
+        else:
             num_workers = 1
             worker_id = 0
         buffer = None
