@@ -201,6 +201,10 @@ class ItemShufflerAndBatcher:
             else:
                 last_batch = 0
             num_items = big_batch_count * self._batch_size + last_batch
+            start_offset = (
+                big_batch_count * self._batch_size * self._rank
+                + min(self._rank * self._batch_size, big_batch_remain)
+            )
             if not self._drop_uneven_inputs or (
                 not self._drop_last and last_batch_count == self._num_replicas
             ):
