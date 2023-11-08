@@ -15,7 +15,7 @@ from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
 from ..sampling_graph import SamplingGraph
-from .sampled_subgraph_impl import SampledSubgraphImpl
+from .sampled_subgraph_impl import FusedSampledSubgraphImpl
 
 
 __all__ = [
@@ -305,7 +305,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         assert len(torch.unique(nodes)) == len(
             nodes
         ), "Nodes cannot have duplicate values."
-        # TODO: change the result to 'SampledSubgraphImpl'.
+        # TODO: change the result to 'FusedSampledSubgraphImpl'.
         return self._c_csc_graph.in_subgraph(nodes)
 
     def _convert_to_sampled_subgraph(
@@ -313,7 +313,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph: torch.ScriptObject,
     ):
         """An internal function used to convert a fused homogeneous sampled
-        subgraph to general struct 'SampledSubgraphImpl'."""
+        subgraph to general struct 'FusedSampledSubgraphImpl'."""
         column_num = (
             C_sampled_subgraph.indptr[1:] - C_sampled_subgraph.indptr[:-1]
         )
@@ -353,7 +353,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     original_hetero_edge_ids[etype] = original_edge_ids[mask]
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
-        return SampledSubgraphImpl(
+        return FusedSampledSubgraphImpl(
             node_pairs=node_pairs, original_edge_ids=original_edge_ids
         )
 
@@ -370,7 +370,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-    ) -> SampledSubgraphImpl:
+    ) -> FusedSampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
 
@@ -411,7 +411,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             equalling the total number of edges.
         Returns
         -------
-        SampledSubgraphImpl
+        FusedSampledSubgraphImpl
             The sampled subgraph.
 
         Examples
@@ -548,7 +548,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-    ) -> SampledSubgraphImpl:
+    ) -> FusedSampledSubgraphImpl:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
         `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
@@ -591,7 +591,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             equalling the total number of edges.
         Returns
         -------
-        SampledSubgraphImpl
+        FusedSampledSubgraphImpl
             The sampled subgraph.
 
         Examples

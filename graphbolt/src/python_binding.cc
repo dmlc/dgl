@@ -15,17 +15,18 @@ namespace graphbolt {
 namespace sampling {
 
 TORCH_LIBRARY(graphbolt, m) {
-  m.class_<SampledSubgraph>("SampledSubgraph")
+  m.class_<FusedSampledSubgraph>("FusedSampledSubgraph")
       .def(torch::init<>())
-      .def_readwrite("indptr", &SampledSubgraph::indptr)
-      .def_readwrite("indices", &SampledSubgraph::indices)
+      .def_readwrite("indptr", &FusedSampledSubgraph::indptr)
+      .def_readwrite("indices", &FusedSampledSubgraph::indices)
       .def_readwrite(
-          "original_row_node_ids", &SampledSubgraph::original_row_node_ids)
+          "original_row_node_ids", &FusedSampledSubgraph::original_row_node_ids)
       .def_readwrite(
           "original_column_node_ids",
-          &SampledSubgraph::original_column_node_ids)
-      .def_readwrite("original_edge_ids", &SampledSubgraph::original_edge_ids)
-      .def_readwrite("type_per_edge", &SampledSubgraph::type_per_edge);
+          &FusedSampledSubgraph::original_column_node_ids)
+      .def_readwrite(
+          "original_edge_ids", &FusedSampledSubgraph::original_edge_ids)
+      .def_readwrite("type_per_edge", &FusedSampledSubgraph::type_per_edge);
   m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
       .def("num_nodes", &FusedCSCSamplingGraph::NumNodes)
       .def("num_edges", &FusedCSCSamplingGraph::NumEdges)
