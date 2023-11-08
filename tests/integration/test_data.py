@@ -128,6 +128,23 @@ def test_COCO_superpixels():
     F._default_context_str == "gpu",
     reason="Datasets don't need to be tested on GPU.",
 )
+@unittest.skipIf(
+    dgl.backend.backend_name != "pytorch", reason="only supports pytorch"
+)
+def test_super_pixel():
+    transform = dgl.AddSelfLoop(allow_duplicate=True)
+    dataset1 = data.SuperPixelDataset()
+    g1, _ = dataset1[0]
+    dataset2 = data.SuperPixelDataset(transform=transform)
+    g2, _ = dataset2[0]
+
+    assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
+
+
+@unittest.skipIf(
+    F._default_context_str == "gpu",
+    reason="Datasets don't need to be tested on GPU.",
+)
 @unittest.skipIf(dgl.backend.backend_name == "mxnet", reason="Skip MXNet")
 def test_as_graphpred():
     ds = data.GINDataset(name="MUTAG", self_loop=True)
