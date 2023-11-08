@@ -77,7 +77,7 @@ def test_FeatureFetcher_with_edges_homo():
         subgraphs = []
         for _ in range(3):
             subgraphs.append(
-                gb.SampledSubgraphImpl(
+                gb.FusedSampledSubgraphImpl(
                     node_pairs=(torch.tensor([]), torch.tensor([])),
                     original_edge_ids=torch.randint(
                         0, graph.total_num_edges, (10,)
@@ -168,7 +168,7 @@ def test_FeatureFetcher_with_edges_hetero():
         }
         for _ in range(3):
             subgraphs.append(
-                gb.SampledSubgraphImpl(
+                gb.FusedSampledSubgraphImpl(
                     node_pairs=(torch.tensor([]), torch.tensor([])),
                     original_edge_ids=original_edge_ids,
                 )

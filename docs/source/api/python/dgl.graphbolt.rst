@@ -60,7 +60,7 @@ Standard Implementations
     UniformNegativeSampler
     NeighborSampler
     LayerNeighborSampler
-    SampledSubgraphImpl
+    FusedSampledSubgraphImpl
     BasicFeatureStore
     TorchBasedFeature
     TorchBasedFeatureStore
