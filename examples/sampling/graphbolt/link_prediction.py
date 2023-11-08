@@ -103,7 +103,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # Initialize the ItemSampler to sample mini-batche from the dataset.
     ############################################################################
     datapipe = gb.ItemSampler(
-        itemset, batch_size=args.batch_size, shuffle=is_train
+        itemset,
+        batch_size=args.train_batch_size if is_train else args.eval_batch_size,
+        shuffle=is_train,
     )
 
     ############################################################################
@@ -205,7 +207,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     return dataloader
 
 
-def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
+def to_binary_link_dgl_computing_pack(data: gb.DGLMiniBatch):
     """Convert the minibatch to a training pair and a label tensor."""
     pos_src, pos_dst = data.positive_node_pairs
     neg_src, neg_dst = data.negative_node_pairs
@@ -249,8 +251,8 @@ def evaluate(args, graph, features, itemset, model):
         )
 
         # Split the score into positive and negative parts.
-        pos_score = score[: data.compacted_node_pairs[0].shape[0]]
-        neg_score = score[data.compacted_node_pairs[0].shape[0] :]
+        pos_score = score[: data.positive_node_pairs[0].shape[0]]
+        neg_score = score[data.positive_node_pairs[0].shape[0] :]
 
         # Append the score to the list.
         pos_pred.append(pos_score)
@@ -311,7 +313,11 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=0.0005)
     parser.add_argument("--neg-ratio", type=int, default=1)
-    parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument("--train-batch-size", type=int, default=512)
+    # TODO [Issue#6534]: Use model.inference instead of dataloader to evaluate.
+    # Since neg_ratio in valid/test set is 1000, which is too large to GPU
+    # memory, we should use small batch size to evaluate.
+    parser.add_argument("--eval-batch-size", type=int, default=2)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument(
         "--early-stop",
@@ -350,7 +356,8 @@ def main(args):
 
     in_size = features.size("node", None, "feat")[0]
     hidden_channels = 256
-    model = SAGE(in_size, hidden_channels)
+    args.device = torch.device(args.device)
+    model = SAGE(in_size, hidden_channels).to(args.device)
 
     # Model training.
     print("Training...")

@@ -153,8 +153,8 @@ def test_minibatch_representation():
     negative_dsts = torch.tensor([[2], [8], [8]])
     input_nodes = torch.tensor([8, 1, 6, 5, 9, 0, 2, 4])
     compacted_node_pairs = (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5]))
-    compacted_negative_srcs = torch.tensor([0, 1, 2])
-    compacted_negative_dsts = torch.tensor([6, 0, 0])
+    compacted_negative_srcs = torch.tensor([[0], [1], [2]])
+    compacted_negative_dsts = torch.tensor([[6], [0], [0]])
     labels = torch.tensor([0.0, 1.0, 2.0])
     # Test minibatch without data.
     minibatch = gb.MiniBatch()
@@ -217,8 +217,12 @@ def test_minibatch_representation():
                                        [8],
                                        [8]])}],
           compacted_node_pairs=(tensor([0, 1, 2]), tensor([3, 4, 5])),
-          compacted_negative_srcs=tensor([0, 1, 2]),
-          compacted_negative_dsts=tensor([6, 0, 0]),
+          compacted_negative_srcs=tensor([[0],
+                                          [1],
+                                          [2]]),
+          compacted_negative_dsts=tensor([[6],
+                                          [0],
+                                          [0]]),
        )"""
     )
     result = str(minibatch)
@@ -267,8 +271,8 @@ def test_dgl_minibatch_representation():
     negative_dsts = torch.tensor([[2], [8], [8]])
     input_nodes = torch.tensor([8, 1, 6, 5, 9, 0, 2, 4])
     compacted_node_pairs = (torch.tensor([0, 1, 2]), torch.tensor([3, 4, 5]))
-    compacted_negative_srcs = torch.tensor([0, 1, 2])
-    compacted_negative_dsts = torch.tensor([6, 0, 0])
+    compacted_negative_srcs = torch.tensor([[0], [1], [2]])
+    compacted_negative_dsts = torch.tensor([[6], [0], [0]])
     labels = torch.tensor([0.0, 1.0, 2.0])
     # Test dglminibatch with all attributes.
     minibatch = gb.MiniBatch(
