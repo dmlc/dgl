@@ -278,6 +278,7 @@ def train(
         dist.reduce(tensor=acc, dst=0)
         total_loss /= step + 1
         dist.reduce(tensor=total_loss, dst=0)
+        dist.barrier()
 
         epoch_end = time.time()
         if rank == 0:
@@ -349,6 +350,7 @@ def run(rank, world_size, args, devices, dataset):
         / world_size
     )
     dist.reduce(tensor=test_acc, dst=0)
+    dist.barrier()
     if rank == 0:
         print(f"Test Accuracy {test_acc.item():.4f}")
 
