@@ -176,6 +176,13 @@ class ItemShufflerAndBatcher:
         return torch.tensor(offsets)
 
     def __iter__(self):
+        try:
+            worker_info = torch.utils.data.get_worker_info()
+            num_workers = worker_info.num_workers
+            worker_id = worker_info.id
+        except:
+            num_workers = 1
+            worker_id = 0
         buffer = None
         if not self._distributed:
             num_items = len(self._item_set)
@@ -194,14 +201,56 @@ class ItemShufflerAndBatcher:
             else:
                 last_batch = 0
             num_items = big_batch_count * self._batch_size + last_batch
-            num_even_items = big_batch_count * self._batch_size
-            if not self._drop_last and last_batch_count == self._num_replicas:
-                num_even_items = num_items
-            start_offset = (
-                big_batch_count * self._batch_size * self._rank
-                + min(self._rank * self._batch_size, big_batch_remain)
-            )
-            # print(f"#{self._rank}: {start_offset} - {num_items} [{total_count}]")
+            if not self._drop_uneven_inputs or (
+                not self._drop_last and last_batch_count == self._num_replicas
+            ):
+                num_evened_items = num_items
+                if num_workers > 1:
+                    total_batch_count = (
+                        num_items + self._batch_size - 1
+                    ) // self._batch_size
+                    split_batch_count = total_batch_count // num_workers + (
+                        worker_id < total_batch_count % num_workers
+                    )
+                    split_num_items = split_batch_count * self._batch_size
+                    num_items = (
+                        min(num_items, split_num_items * (worker_id + 1))
+                        - split_num_items * worker_id
+                    )
+                    num_evened_items = num_items
+                    start_offset = (
+                        big_batch_count * self._batch_size * self._rank
+                        + min(self._rank * self._batch_size, big_batch_remain)
+                        + self._batch_size
+                        * (
+                            total_batch_count // num_workers * worker_id
+                            + min(worker_id, total_batch_count % num_workers)
+                        )
+                    )
+            else:
+                num_evened_items = big_batch_count * self._batch_size
+                if num_workers > 1:
+                    total_batch_count = big_batch_count
+                    split_batch_count = total_batch_count // num_workers + (
+                        worker_id < total_batch_count % num_workers
+                    )
+                    split_num_items = split_batch_count * self._batch_size
+                    split_item_remain = last_batch // num_workers + (
+                        worker_id < last_batch % num_workers
+                    )
+                    num_items = split_num_items + split_item_remain
+                    num_evened_items = split_num_items
+                    start_offset = (
+                        big_batch_count * self._batch_size * self._rank
+                        + min(self._rank * self._batch_size, big_batch_remain)
+                        + self._batch_size
+                        * (
+                            total_batch_count // num_workers * worker_id
+                            + min(worker_id, total_batch_count % num_workers)
+                        )
+                        + last_batch // num_workers * worker_id
+                        + min(worker_id, last_batch % num_workers)
+                    )
         start = 0
         while start < num_items:
             end = min(start + self._buffer_size, num_items)
@@ -216,7 +265,7 @@ class ItemShufflerAndBatcher:
                 if (
                     self._distributed
                     and self._drop_uneven_inputs
-                    and i >= num_even_items
+                    and i >= num_evened_items
                 ):
                     break
                 batch_indices = indices[i : i + self._batch_size]
@@ -579,6 +628,7 @@ class DistributedItemSampler(ItemSampler):
 
     Examples
     --------
+    TODO[Kaicheng]: Modify examples here.
     0. Preparation: DistributedItemSampler needs multi-processing environment to
     work. You need to spawn subprocesses and initialize processing group before
     executing following examples. Due to randomness, the output is not always

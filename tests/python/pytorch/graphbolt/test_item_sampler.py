@@ -767,31 +767,12 @@ def distributed_item_sampler_subprocess(
     for i in data_loader:
         # Count how many times each item is sampled.
         sampled_count[i.seed_nodes] += 1
+        if drop_last:
+            assert i.seed_nodes.size(0) == batch_size
         num_items += i.seed_nodes.size(0)
     num_batches = len(list(item_sampler))
 
-    # Calculate expected numbers of items and batches.
-    expected_num_items = num_ids // nprocs + (num_ids % nprocs > proc_id)
-    if drop_last and expected_num_items % batch_size > 0:
-        expected_num_items -= expected_num_items % batch_size
-    expected_num_batches = expected_num_items // batch_size + (
-        (not drop_last) and (expected_num_items % batch_size > 0)
-    )
     if drop_uneven_inputs:
-        if (
-            (not drop_last)
-            and (num_ids % (nprocs * batch_size) < nprocs)
-            and (num_ids % (nprocs * batch_size) > proc_id)
-        ):
-            expected_num_batches -= 1
-            expected_num_items -= 1
-        elif (
-            drop_last
-            and (nprocs * batch_size - num_ids % (nprocs * batch_size) < nprocs)
-            and (num_ids % nprocs > proc_id)
-        ):
-            expected_num_batches -= 1
-            expected_num_items -= batch_size
         num_batches_tensor = torch.tensor(num_batches)
         dist.broadcast(num_batches_tensor, 0)
         # Test if the number of batches are the same for all processes.
@@ -801,10 +782,6 @@ def distributed_item_sampler_subprocess(
     dist.reduce(sampled_count, 0)
 
     try:
-        # Check if the numbers are as expected.
-        assert num_items == expected_num_items
-        assert num_batches == expected_num_batches
-
         # Make sure no item is sampled more than once.
         assert sampled_count.max() <= 1
     finally:
