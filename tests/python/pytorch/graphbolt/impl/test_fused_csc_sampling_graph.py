@@ -562,7 +562,10 @@ def test_in_subgraph_heterogeneous():
     )
 
     # Extract in subgraph.
-    nodes = torch.LongTensor([1, 3, 4])
+    nodes = {
+        "N0": torch.LongTensor([1]),
+        "N1": torch.LongTensor([1, 2]),
+    }
     in_subgraph = graph.in_subgraph(nodes)
 
     # Verify in subgraph.

@@ -283,7 +283,9 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """
         return self._metadata
 
-    def in_subgraph(self, nodes: torch.Tensor) -> torch.ScriptObject:
+    def in_subgraph(
+        self, nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
+    ) -> FusedSampledSubgraphImpl:
         """Return the subgraph induced on the inbound edges of the given nodes.
 
         An in subgraph is equivalent to creating a new graph using the incoming
@@ -291,20 +293,27 @@ class FusedCSCSamplingGraph(SamplingGraph):
 
         Parameters
         ----------
-        nodes : torch.Tensor
-            The nodes to form the subgraph which are type agnostic.
+        nodes: torch.Tensor or Dict[str, torch.Tensor]
+            IDs of the given seed nodes.
+              - If `nodes` is a tensor: It means the graph is homogeneous
+                graph, and ids inside are homogeneous ids.
+              - If `nodes` is a dictionary: The keys should be node type and
+                ids inside are heterogeneous ids.
 
         Returns
         -------
-        torch.classes.graphbolt.SampledSubgraph
+        FusedSampledSubgraphImpl
             The in subgraph.
         """
+        if isinstance(nodes, dict):
+            nodes = self._convert_to_homogeneous_nodes(nodes)
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         # Ensure that there are no duplicate nodes.
         assert len(torch.unique(nodes)) == len(
             nodes
         ), "Nodes cannot have duplicate values."
+
         _in_subgraph = self._c_csc_graph.in_subgraph(nodes)
         return self._convert_to_sampled_subgraph(_in_subgraph)
 
