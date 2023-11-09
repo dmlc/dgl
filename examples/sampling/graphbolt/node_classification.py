@@ -56,7 +56,8 @@ def create_dataloader(
     [HIGHLIGHT]
     Get a GraphBolt version of a dataloader for node classification tasks.
     This function demonstrates how to utilize functional forms of datapipes in
-    GraphBolt.
+    GraphBolt. For a more detailed tutorial, please read the examples in
+    `dgl/notebooks/graphbolt/walkthrough.ipynb`.
     Alternatively, you can create a datapipe using its class constructor.
 
     Parameters

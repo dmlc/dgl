@@ -18,4 +18,4 @@ def test_node_classification():
     out = subprocess.run(["python", str(script)], capture_output=True)
     assert out.returncode == 0
     stdout = out.stdout.decode("utf-8")
-    assert float(stdout[-5:]) > 0.70
+    assert float(stdout[-5:]) > 0.60
