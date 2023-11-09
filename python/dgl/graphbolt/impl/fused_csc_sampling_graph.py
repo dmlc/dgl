@@ -304,6 +304,32 @@ class FusedCSCSamplingGraph(SamplingGraph):
         -------
         FusedSampledSubgraphImpl
             The in subgraph.
+
+        Examples
+        --------
+        >>> import dgl.graphbolt as gb
+        >>> import torch
+        >>> total_num_nodes = 5
+        >>> total_num_edges = 12
+        >>> ntypes = {"N0": 0, "N1": 1}
+        >>> etypes = {
+        ...     "N0:R0:N0": 0, "N0:R1:N1": 1, "N1:R2:N0": 2, "N1:R3:N1": 3}
+        >>> metadata = gb.GraphMetadata(ntypes, etypes)
+        >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+        >>> node_type_offset = torch.LongTensor([0, 2, 5])
+        >>> type_per_edge = torch.LongTensor(
+        ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
+        ...     type_per_edge, None, metadata)
+        >>> nodes = {"N0":torch.LongTensor([1]), "N1":torch.LongTensor([1, 2])}
+        >>> in_subgraph = graph.in_subgraph(nodes)
+        >>> print(in_subgraph.node_pairs)
+        defaultdict(<class 'list'>, {
+            'N0:R0:N0': (tensor([]), tensor([])),
+            'N0:R1:N1': (tensor([1, 0]), tensor([1, 2])),
+            'N1:R2:N0': (tensor([0, 1]), tensor([1, 1])),
+            'N1:R3:N1': (tensor([0, 1, 2]), tensor([1, 2, 2]))}
         """
         if isinstance(nodes, dict):
             nodes = self._convert_to_homogeneous_nodes(nodes)
