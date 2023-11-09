@@ -133,9 +133,9 @@ def test_COCO_superpixels():
 )
 def test_super_pixel():
     transform = dgl.AddSelfLoop(allow_duplicate=True)
-    dataset1 = data.SuperPixelDataset()
+    dataset1 = data.MNISTSuperPixelDataset()
     g1, _ = dataset1[0]
-    dataset2 = data.SuperPixelDataset(transform=transform)
+    dataset2 = data.MNISTSuperPixelDataset(transform=transform)
     g2, _ = dataset2[0]
 
     assert g2.num_edges() - g1.num_edges() == g1.num_nodes()
