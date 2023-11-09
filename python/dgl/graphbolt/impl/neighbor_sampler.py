@@ -63,15 +63,14 @@ class NeighborSampler(SubgraphSampler):
     >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
-        ...item_set, batch_size=1,
-        ...)
+    ...     item_set, batch_size=1,)
     >>> neg_sampler = gb.UniformNegativeSampler(
-        ...item_sampler, graph, 2)
+    ...     item_sampler, graph, 2)
     >>> subgraph_sampler = gb.NeighborSampler(
-        ...neg_sampler, graph, [5, 10, 15])
+    ...     neg_sampler, graph, [5, 10, 15])
     >>> for data in subgraph_sampler:
-        ... print(data.compacted_node_pairs)
-        ... print(len(data.sampled_subgraphs))
+    ...     print(data.compacted_node_pairs)
+    ...     print(len(data.sampled_subgraphs))
     (tensor([0, 0, 0]), tensor([1, 0, 2]))
     3
     (tensor([0, 0, 0]), tensor([1, 1, 1]))
@@ -197,17 +196,16 @@ class LayerNeighborSampler(NeighborSampler):
     >>> node_pairs = torch.LongTensor([[0, 1], [1, 2]])
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
-        ...item_set, batch_size=1,
-        ...)
+    ...     item_set, batch_size=1,)
     >>> neg_sampler = gb.UniformNegativeSampler(
-        ...item_sampler, 2, data_format, graph)
+    ...     item_sampler, 2, data_format, graph)
     >>> fanouts = [torch.LongTensor([5]), torch.LongTensor([10]),
-        ...torch.LongTensor([15])]
+    ...     torch.LongTensor([15])]
     >>> subgraph_sampler = gb.LayerNeighborSampler(
-        ...neg_sampler, graph, fanouts)
+    ...     neg_sampler, graph, fanouts)
     >>> for data in subgraph_sampler:
-        ... print(data.compacted_node_pairs)
-        ... print(len(data.sampled_subgraphs))
+    ...      print(data.compacted_node_pairs)
+    ...      print(len(data.sampled_subgraphs))
     (tensor([0, 0, 0]), tensor([1, 0, 2]))
     3
     (tensor([0, 0, 0]), tensor([1, 1, 1]))

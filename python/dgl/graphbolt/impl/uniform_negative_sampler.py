@@ -36,14 +36,12 @@ class UniformNegativeSampler(NegativeSampler):
     >>> node_pairs = (torch.tensor([0, 1]), torch.tensor([1, 2]))
     >>> item_set = gb.ItemSet(node_pairs, names="node_pairs")
     >>> item_sampler = gb.ItemSampler(
-        ...item_set, batch_size=1,
-        ...)
+    ...     item_set, batch_size=1,)
     >>> neg_sampler = gb.UniformNegativeSampler(
-        ...item_sampler, graph, 2)
+    ...     item_sampler, graph, 2)
     >>> for minibatch in neg_sampler:
-        ...  print(minibatch.negative_srcs)
-        ...  print(minibatch.negative_dsts)
-        ...
+    ...       print(minibatch.negative_srcs)
+    ...       print(minibatch.negative_dsts)
     (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([1, 0, 0]))
     (tensor([1, 1, 1]), tensor([2, 1, 2]), tensor([1, 0, 0]))
     """
