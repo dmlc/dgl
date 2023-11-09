@@ -8,7 +8,7 @@ import torch
 from ..base import etype_str_to_tuple
 from ..sampled_subgraph import SampledSubgraph
 
-__all__ = ["FusedSampledSubgraphImpl"]
+__all__ = ["FusedSampledSubgraphImpl", "newFusedSampledSubgraphImpl"]
 
 
 @dataclass
@@ -66,4 +66,65 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
             ), "Node pair should be a source-destination tuple (u, v)."
             assert all(
                 isinstance(item, torch.Tensor) for item in self.node_pairs
+            ), "Nodes in pairs should be of type torch.Tensor."
+
+
+@dataclass
+class newFusedSampledSubgraphImpl(SampledSubgraph):
+    r"""Sampled subgraph of CSCSamplingGraph.
+
+    Examples
+    --------
+    >>> node_pairs = {"A:relation:B": {"indptr": torch.tensor([0, 1, 2, 3]),
+    ... "indice": torch.tensor([0, 1, 2])}}
+    >>> original_column_node_ids = {'B': torch.tensor([10, 11, 12])}
+    >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
+    >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
+    >>> subgraph = gb.SampledSubgraphImpl(
+    ... node_pairs=node_pairs,
+    ... original_column_node_ids=original_column_node_ids,
+    ... original_row_node_ids=original_row_node_ids,
+    ... original_edge_ids=original_edge_ids
+    ... )
+    >>> print(subgraph.node_pairs)
+    {"A:relation:B": {"indptr": torch.tensor([0, 1, 2, 3]), "indice": torch.tensor([0, 1, 2])}}
+    >>> print(subgraph.original_column_node_ids)
+    {'B': tensor([10, 11, 12])}
+    >>> print(subgraph.original_row_node_ids)
+    {'A': tensor([13, 14, 15])}
+    >>> print(subgraph.original_edge_ids)
+    {"A:relation:B": tensor([19, 20, 21])}
+    """
+    node_pairs: Union[
+        Dict[str, torch.Tensor],
+        Dict[str, Dict[str, torch.Tensor]],
+    ] = None
+    original_column_node_ids: Union[
+        Dict[str, torch.Tensor], torch.Tensor
+    ] = None
+    original_row_node_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
+    original_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
+
+    def __post_init__(self):
+        if self.node_pairs.get("indptr") is None:
+            for etype, pair in self.node_pairs.items():
+                assert (
+                    isinstance(etype, str)
+                    and len(etype_str_to_tuple(etype)) == 3
+                ), "Edge type should be a string in format of str:str:str."
+                assert (
+                    pair.get("indptr") is not None
+                    and pair.get("indice") is not None
+                ), "Node pair should be have indptr and indice."
+                assert all(
+                    isinstance(item, torch.Tensor) for item in pair.values()
+                ), "Nodes in pairs should be of type torch.Tensor."
+        else:
+            assert (
+                self.node_pairs.get("indptr") is not None
+                and self.node_pairs.get("indice") is not None
+            ), "Node pair should be have indptr and indice."
+            assert all(
+                isinstance(item, torch.Tensor)
+                for item in self.node_pairs.values()
             ), "Nodes in pairs should be of type torch.Tensor."

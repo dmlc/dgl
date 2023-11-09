@@ -15,7 +15,10 @@ from ...convert import to_homogeneous
 from ...heterograph import DGLGraph
 from ..base import etype_str_to_tuple, etype_tuple_to_str, ORIGINAL_EDGE_ID
 from ..sampling_graph import SamplingGraph
-from .sampled_subgraph_impl import FusedSampledSubgraphImpl
+from .sampled_subgraph_impl import (
+    FusedSampledSubgraphImpl,
+    newFusedSampledSubgraphImpl,
+)
 
 
 __all__ = [
@@ -400,13 +403,110 @@ class FusedCSCSamplingGraph(SamplingGraph):
             homogeneous_nodes.append(ids + self.node_type_offset[ntype_id])
         return torch.cat(homogeneous_nodes)
 
+    def _new_convert_to_sampled_subgraph(
+        self,
+        C_sampled_subgraph: torch.ScriptObject,
+    ):
+        """An internal function used to convert a fused homogeneous sampled
+        subgraph to general struct 'newFusedSampledSubgraphImpl'."""
+        indptr = C_sampled_subgraph.indptr
+        indices = C_sampled_subgraph.indices
+        type_per_edge = C_sampled_subgraph.type_per_edge
+        column = C_sampled_subgraph.original_column_node_ids
+        original_edge_ids = C_sampled_subgraph.original_edge_ids
+        print(type_per_edge)
+        has_original_eids = (
+            self.edge_attributes is not None
+            and ORIGINAL_EDGE_ID in self.edge_attributes
+        )
+        if has_original_eids:
+            original_edge_ids = self.edge_attributes[ORIGINAL_EDGE_ID][
+                original_edge_ids
+            ]
+        if type_per_edge is None:
+            # The sampled graph is already a homogeneous graph.
+            node_pairs = {"indptr": indptr, "indice": indices}
+        else:
+            # The sampled graph is a fused homogenized graph, which need to be
+            # converted to heterogeneous graphs.
+            # Pre-calculate the number of each etype
+            num = {}
+            for etype in type_per_edge:
+                num[etype.item()] = num.get(etype.item(), 0) + 1
+            # Preallocate
+            subgraph_indice_position = {}
+            subgraph_indice = {}
+            subgraph_indptr = {}
+            node_edge_type = defaultdict(list)
+            original_hetero_edge_ids = {}
+            for etype, etype_id in self.metadata.edge_type_to_id.items():
+                subgraph_indice[etype] = torch.empty(
+                    (num.get(etype_id, 0),), dtype=indices.dtype
+                )
+                if has_original_eids:
+                    original_hetero_edge_ids[etype] = torch.empty(
+                        (num.get(etype_id, 0),), dtype=original_edge_ids.dtype
+                    )
+                subgraph_indptr[etype] = [0]
+                subgraph_indice_position[etype] = 0
+                # Preprocessing saves the type of seed_nodes as the edge type
+                # of dst_ntype.
+                _, _, dst_ntype = etype_str_to_tuple(etype)
+                dst_ntype_id = self.metadata.node_type_to_id[dst_ntype]
+                node_edge_type[dst_ntype_id].append((etype, etype_id))
+            # construct subgraphs
+            for (i, seed) in enumerate(column):
+                l = indptr[i].item()
+                r = indptr[i + 1].item()
+                node_type = _get_nodetype(seed, self.node_type_offset)
+                for (etype, etype_id) in node_edge_type[node_type]:
+                    src_ntype, _, _ = etype_str_to_tuple(etype)
+                    src_ntype_id = self.metadata.node_type_to_id[src_ntype]
+                    mask = type_per_edge[l:r] == etype_id
+                    sub_indice = indices[l:r][mask]
+                    # [TODO] These comments in this loop and commented-out
+                    # binary search function are original strategy to
+                    # implement this function, keep them here to ensure it
+                    # may be restored.
+                    # end = _binary_search_etype_end(
+                    #     type_per_edge, l, r, etype_id
+                    # )
+                    # num_edges = end - l
+                    num_edges = sub_indice.size(0)
+                    subgraph_indptr[etype].append(
+                        subgraph_indptr[etype][-1] + num_edges
+                    )
+                    offset = subgraph_indice_position[etype]
+                    subgraph_indice_position[etype] += num_edges
+                    subgraph_indice[etype][offset : offset + num_edges] = (
+                        sub_indice - self.node_type_offset[src_ntype_id]
+                    )
+                    if has_original_eids:
+                        original_hetero_edge_ids[etype][
+                            offset : offset + num_edges
+                        ] = original_edge_ids[l:r][mask]
+                    # l = end
+            if has_original_eids:
+                original_edge_ids = original_hetero_edge_ids
+            node_pairs = {
+                etype: {
+                    "indptr": torch.tensor(subgraph_indptr[etype]),
+                    "indice": subgraph_indice[etype],
+                }
+                for etype in self.metadata.edge_type_to_id.keys()
+            }
+        return newFusedSampledSubgraphImpl(
+            node_pairs=node_pairs, original_edge_ids=original_edge_ids
+        )
+
     def sample_neighbors(
         self,
         nodes: Union[torch.Tensor, Dict[str, torch.Tensor]],
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-    ) -> FusedSampledSubgraphImpl:
+        deduplicate=True,
+    ) -> Union[FusedSampledSubgraphImpl, newFusedSampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph.
 
@@ -476,8 +576,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
         C_sampled_subgraph = self._sample_neighbors(
             nodes, fanouts, replace, probs_name
         )
-
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        if deduplicate is True:
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        else:
+            return self._new_convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def _check_sampler_arguments(self, nodes, fanouts, probs_name):
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
@@ -584,7 +686,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         fanouts: torch.Tensor,
         replace: bool = False,
         probs_name: Optional[str] = None,
-    ) -> FusedSampledSubgraphImpl:
+        deduplicate=True,
+    ) -> Union[FusedSampledSubgraphImpl, newFusedSampledSubgraphImpl]:
         """Sample neighboring edges of the given nodes and return the induced
         subgraph via layer-neighbor sampling from the NeurIPS 2023 paper
         `Layer-Neighbor Sampling -- Defusing Neighborhood Explosion in GNNs
@@ -667,7 +770,10 @@ class FusedCSCSamplingGraph(SamplingGraph):
             probs_name,
         )
 
-        return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        if deduplicate:
+            return self._convert_to_sampled_subgraph(C_sampled_subgraph)
+        else:
+            return self._new_convert_to_sampled_subgraph(C_sampled_subgraph)
 
     def sample_negative_edges_uniform(
         self, edge_type, node_pairs, negative_ratio
@@ -958,3 +1064,27 @@ def from_dglgraph(
         ),
         metadata,
     )
+
+
+def _get_nodetype(index, node_type_offset):
+    """Get node type through node_type_offset."""
+    ntype = -1
+    for offset in node_type_offset:
+        if index >= offset:
+            ntype += 1
+        else:
+            break
+    return ntype
+
+
+# def _binary_search_etype_end(type_per_edge, l, r, etype_id):
+#     """Get the end of this etype."""
+#     if l >= len(type_per_edge) or type_per_edge[l] != etype_id:
+#         return l
+#     while l < r:
+#         mid = (l + r) // 2
+#         if type_per_edge[mid] == etype_id:
+#             l = mid + 1
+#         else:
+#             r = mid
+#     return l

@@ -177,6 +177,68 @@ def test_unique_and_compact_node_pairs_homo():
     assert torch.equal(unique_nodes[: unique_v.size(0)], unique_v)
 
 
+def test_compact_node_pairs_hetero():
+    N1 = torch.randint(0, 50, (30,))
+    N2 = torch.randint(0, 50, (20,))
+    N3 = torch.randint(0, 50, (10,))
+
+    expected_original_row_ids = {
+        "n1": N1,
+        "n2": torch.cat((N2[:10], N2[10:])),
+        "n3": N3,
+    }
+    node_pairs = {
+        "n1:e1:n2": {
+            "indptr": torch.arange(0, 20, 2),
+            "indice": N1[:20],
+        },
+        "n1:e2:n3": {
+            "indptr": torch.arange(0, 10, 2),
+            "indice": N1[20:30],
+        },
+        "n2:e3:n3": {
+            "indptr": torch.arange(0, 10, 2),
+            "indice": N2[10:],
+        },
+    }
+    dst_nodes = {"n2": N2[:10], "n3": N3}
+    original_row_ids, compacted_node_pairs = gb.compact_node_pairs(
+        node_pairs, dst_nodes
+    )
+
+    for ntype, nodes in original_row_ids.items():
+        expected_nodes = expected_original_row_ids[ntype]
+        assert torch.equal(nodes, expected_nodes)
+    for etype, pair in compacted_node_pairs.items():
+        indptr = pair["indptr"]
+        indice = pair["indice"]
+        src_type, _, _ = gb.etype_str_to_tuple(etype)
+        indice = original_row_ids[src_type][indice]
+        expected_indptr = node_pairs[etype]["indptr"]
+        expected_indice = node_pairs[etype]["indice"]
+        assert torch.equal(indptr, expected_indptr)
+        assert torch.equal(indice, expected_indice)
+
+
+def test_compact_node_pairs_homo():
+    N = torch.randint(0, 50, (200,))
+    expected_original_row_ids = N
+
+    node_pairs = {"indptr": torch.arange(0, 100), "indice": N[100:]}
+    dst_nodes = N[:100]
+    original_row_ids, compacted_node_pairs = gb.compact_node_pairs(
+        node_pairs, dst_nodes
+    )
+
+    indptr = compacted_node_pairs["indptr"]
+    indice = N[compacted_node_pairs["indice"]]
+    expected_indptr = node_pairs["indptr"]
+    expected_indice = node_pairs["indice"]
+    assert torch.equal(indptr, expected_indptr)
+    assert torch.equal(indice, expected_indice)
+    assert torch.equal(original_row_ids, expected_original_row_ids)
+
+
 def test_incomplete_unique_dst_nodes_():
     node_pairs = (torch.randint(0, 50, (50,)), torch.randint(100, 150, (50,)))
     unique_dst_nodes = torch.arange(150, 200)

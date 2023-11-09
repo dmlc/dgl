@@ -1,5 +1,6 @@
 """Utility functions for sampling."""
 
+import copy
 from collections import defaultdict
 from typing import Dict, List, Tuple, Union
 
@@ -267,3 +268,51 @@ def unique_and_compact_node_pairs(
         unique_nodes = list(unique_nodes.values())[0]
 
     return unique_nodes, compacted_node_pairs
+
+
+def compact_node_pairs(
+    node_pairs: Union[
+        Dict[str, torch.Tensor],
+        Dict[str, Dict[str, torch.Tensor]],
+    ],
+    dst_nodes: Union[
+        torch.Tensor,
+        Dict[str, torch.Tensor],
+    ],
+):
+    is_homogeneous = node_pairs.get("indice") is not None
+    compacted_node_pairs = {}
+    if is_homogeneous:
+        if dst_nodes is not None:
+            assert isinstance(
+                dst_nodes, torch.Tensor
+            ), "Edge type not supported in homogeneous graph."
+        offset = dst_nodes.size(0)
+        original_row_ids = torch.cat((dst_nodes, node_pairs["indice"]))
+        compacted_node_pairs["indptr"] = node_pairs["indptr"]
+        compacted_node_pairs["indice"] = (
+            torch.arange(0, node_pairs["indice"].size(0)) + offset
+        )
+    else:
+        original_row_ids = copy.deepcopy(dst_nodes)
+        for etype, pair in node_pairs.items():
+            src_type, _, _ = etype_str_to_tuple(etype)
+            offset = original_row_ids.get(src_type, torch.tensor([])).size(0)
+            original_row_ids[src_type] = torch.cat(
+                (
+                    original_row_ids.get(
+                        src_type, torch.tensor([], dtype=pair["indice"].dtype)
+                    ),
+                    pair["indice"],
+                )
+            )
+            compacted_node_pairs[etype] = {
+                "indptr": pair["indptr"],
+                "indice": (
+                    torch.arange(
+                        0, pair["indice"].size(0), dtype=pair["indice"].dtype
+                    )
+                    + offset
+                ),
+            }
+    return original_row_ids, compacted_node_pairs
