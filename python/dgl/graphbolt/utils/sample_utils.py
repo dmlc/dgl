@@ -280,6 +280,53 @@ def compact_node_pairs(
         Dict[str, torch.Tensor],
     ],
 ):
+    """
+    Compact node pairs and return original_row_ids (per type).
+
+    Parameters
+    ----------
+    node_pairs : Union[Dict(str, torch.Tensor),
+                    Dict(str, Dict(str, torch.Tensor)]
+        Node pairs representing source-destination edges.
+        - If `node_pairs` is a Dict(str, torch.Tensor): It means the graph is
+        homogeneous. Also, indptr and indice in it should be torch.tensor
+        representing source and destination pairs in csc format. And IDs inside
+        are homogeneous ids.
+        - If `node_pairs` is a Dict(str, Dict(str, torch.Tensor): The keys
+        should be edge type and the values should be csc format node pairs.
+        And IDs inside are heterogeneous ids.
+    dst_nodes: torch.Tensor or Dict[str, torch.Tensor]
+        Nodes of all destination nodes in the node pairs.
+        - If `dst_nodes` is a tensor: It means the graph is homogeneous.
+        - If `dst_nodes` is a dictionary: The keys are node type and the
+        values are corresponding nodes. And IDs inside are heterogeneous ids.
+
+    Returns
+    -------
+    Tuple[original_row_node_ids, compacted_node_pairs]
+        The compacted node pairs, where node IDs are replaced with mapped node
+        IDs, and all nodes (per type).
+        "Compacted node pairs" indicates that the node IDs in the input node
+        pairs are replaced with mapped node IDs, where each type of node is
+        mapped to a contiguous space of IDs ranging from 0 to N.
+
+    Examples
+    --------
+    >>> import dgl.graphbolt as gb
+    >>> N1 = torch.LongTensor([1, 2, 2])
+    >>> N2 = torch.LongTensor([5, 6, 5])
+    >>> node_pairs = {"n2:e2:n1": {"indptr": torch.tensor([0, 1]),
+    ... "indice": torch.tensor([5])}}
+    >>> dst_nodes = {"n1": N1[:1]}
+    >>> original_row_node_ids, compacted_node_pairs = gb.unique_and_compact_node_pairs(
+    ...     node_pairs, dst_nodes
+    ... )
+    >>> print(original_row_node_ids)
+    {'n1': tensor([1]), 'n2': tensor([5])}
+    >>> print(compacted_node_pairs)
+    {"n2:e2:n1": {"indptr": tensor([0, 1]),
+    ... "indice": tensor([0])}}
+    """
     is_homogeneous = node_pairs.get("indice") is not None
     compacted_node_pairs = {}
     if is_homogeneous:
