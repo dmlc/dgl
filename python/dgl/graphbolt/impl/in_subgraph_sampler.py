@@ -1,6 +1,5 @@
 """In-subgraph sampler for GraphBolt."""
 
-import torch
 from torch.utils.data import functional_datapipe
 
 from ..subgraph_sampler import SubgraphSampler
@@ -15,43 +14,15 @@ __all__ = ["InSubgraphSampler"]
 class InSubgraphSampler(SubgraphSampler):
     """Sample neighbor edges from a graph and return a subgraph.
 
-    Neighbor sampler is responsible for sampling a subgraph from given data. It
-    returns an induced subgraph along with compacted information. In the
-    context of a node classification task, the neighbor sampler directly
-    utilizes the nodes provided as seed nodes. However, in scenarios involving
-    link prediction, the process needs another pre-peocess operation. That is,
-    gathering unique nodes from the given node pairs, encompassing both
-    positive and negative node pairs, and employs these nodes as the seed nodes
-    for subsequent steps.
+    In subgraph sampler is responsible for sampling a subgraph from given data,
+    returning an induced subgraph along with compacted information.
 
     Parameters
     ----------
     datapipe : DataPipe
         The datapipe.
     graph : FusedCSCSamplingGraph
-        The graph on which to perform subgraph sampling.
-    fanouts: list[torch.Tensor] or list[int]
-        The number of edges to be sampled for each node with or without
-        considering edge types. The length of this parameter implicitly
-        signifies the layer of sampling being conducted.
-        Note: The fanout order is from the outermost layer to innermost layer.
-        For example, the fanout '[15, 10, 5]' means that 15 to the outermost
-        layer, 10 to the intermediate layer and 5 corresponds to the innermost
-        layer.
-    replace: bool
-        Boolean indicating whether the sample is preformed with or
-        without replacement. If True, a value can be selected multiple
-        times. Otherwise, each value can be selected only once.
-    prob_name: str, optional
-        The name of an edge attribute used as the weights of sampling for
-        each node. This attribute tensor should contain (unnormalized)
-        probabilities corresponding to each neighboring edge of a node.
-        It must be a 1D floating-point or boolean tensor, with the number
-        of elements equalling the total number of edges.
-    deduplicate: bool
-        Boolean indicating whether seeds between hops will be deduplicated.
-        If True, the same elements in seeds will be deleted to only one.
-        Otherwise, the same elements will be remained.
+        The graph on which to perform in_subgraph sampling.
 
     Examples
     -------
