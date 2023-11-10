@@ -42,8 +42,8 @@ main
 └───> Test set evaluation
 """
 import argparse
+import time
 
-import dgl
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch
@@ -87,6 +87,7 @@ class SAGE(nn.Module):
         # model is running on a GPU.
         pin_memory = buffer_device != device
 
+        print("Start node embedding inference.")
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx == len(self.layers) - 1
 
@@ -329,6 +330,7 @@ def train(args, model, graph, features, train_set):
     for epoch in tqdm.trange(args.epochs):
         model.train()
         total_loss = 0
+        start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
             # Unpack MiniBatch.
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
@@ -349,15 +351,15 @@ def train(args, model, graph, features, train_set):
             optimizer.step()
 
             total_loss += loss.item()
-            if (step % 100 == 0) and (step != 0):
-                print(
-                    f"Epoch {epoch:05d} | "
-                    f"Step {step:05d} | "
-                    f"Loss {(total_loss) / (step + 1):.4f}",
-                    end="\n",
-                )
             if step + 1 == args.early_stop:
                 break
+
+        end_epoch_time = time.time()
+        print(
+            f"Epoch {epoch:05d} | "
+            f"Loss {(total_loss) / (step + 1):.4f} | "
+            f"Time {(end_epoch_time - start_epoch_time):.4f} s"
+        )
 
 
 def parse_args():
