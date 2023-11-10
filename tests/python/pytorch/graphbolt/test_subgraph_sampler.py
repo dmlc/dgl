@@ -1,4 +1,3 @@
-import dgl
 import dgl.graphbolt as gb
 import gb_test_utils
 import pytest
