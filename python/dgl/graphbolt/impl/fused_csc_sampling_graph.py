@@ -406,7 +406,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
     def _new_convert_to_sampled_subgraph(
         self,
         C_sampled_subgraph: torch.ScriptObject,
-    ):
+    ) -> newFusedSampledSubgraphImpl:
         """An internal function used to convert a fused homogeneous sampled
         subgraph to general struct 'newFusedSampledSubgraphImpl'."""
         indptr = C_sampled_subgraph.indptr
@@ -414,7 +414,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
         type_per_edge = C_sampled_subgraph.type_per_edge
         column = C_sampled_subgraph.original_column_node_ids
         original_edge_ids = C_sampled_subgraph.original_edge_ids
-        print(type_per_edge)
+
         has_original_eids = (
             self.edge_attributes is not None
             and ORIGINAL_EDGE_ID in self.edge_attributes

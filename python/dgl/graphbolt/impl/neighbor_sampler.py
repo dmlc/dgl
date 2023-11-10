@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import functional_datapipe
 
 from ..subgraph_sampler import SubgraphSampler
-from ..utils import compact_node_pairs, unique_and_compact_node_pairs
+from ..utils import unique_and_compact_node_pairs
 from .sampled_subgraph_impl import (
     FusedSampledSubgraphImpl,
     newFusedSampledSubgraphImpl,
@@ -125,23 +125,14 @@ class NeighborSampler(SubgraphSampler):
                     original_row_node_ids,
                     compacted_node_pairs,
                 ) = unique_and_compact_node_pairs(subgraph.node_pairs, seeds)
-                subgraph = FusedSampledSubgraphImpl(
-                    node_pairs=compacted_node_pairs,
-                    original_column_node_ids=seeds,
-                    original_row_node_ids=original_row_node_ids,
-                    original_edge_ids=subgraph.original_edge_ids,
-                )
             else:
-                (
-                    original_row_node_ids,
-                    compacted_node_pairs,
-                ) = compact_node_pairs(subgraph.node_pairs, seeds)
-                subgraph = newFusedSampledSubgraphImpl(
-                    node_pairs=compacted_node_pairs,
-                    original_column_node_ids=seeds,
-                    original_row_node_ids=original_row_node_ids,
-                    original_edge_ids=subgraph.original_edge_ids,
-                )
+                raise RuntimeError("Not implemented yet.")
+            subgraph = FusedSampledSubgraphImpl(
+                node_pairs=compacted_node_pairs,
+                original_column_node_ids=seeds,
+                original_row_node_ids=original_row_node_ids,
+                original_edge_ids=subgraph.original_edge_ids,
+            )
             subgraphs.insert(0, subgraph)
             seeds = original_row_node_ids
         return seeds, subgraphs
