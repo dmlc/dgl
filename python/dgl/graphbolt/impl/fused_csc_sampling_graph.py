@@ -289,7 +289,8 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """Return the subgraph induced on the inbound edges of the given nodes.
 
         An in subgraph is equivalent to creating a new graph using the incoming
-        edges of the given nodes.
+        edges of the given nodes. Subgraph is compacted according to the order
+        of passed-in `nodes`.
 
         Parameters
         ----------
