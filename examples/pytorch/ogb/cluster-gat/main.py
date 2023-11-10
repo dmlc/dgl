@@ -283,6 +283,7 @@ def run(args, device, data, nfeat):
 
     if epoch >= 5:
         print("Avg epoch time: {}".format(avg / (epoch - 4)))
+    print(type(best_test_acc))
     return best_test_acc.to(th.device("cpu"))
 
 

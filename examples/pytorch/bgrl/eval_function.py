@@ -11,7 +11,7 @@ def fit_logistic_regression(X, y, data_random_seed=1, repeat=1):
     # transform targets to one-hot vector
     one_hot_encoder = OneHotEncoder(categories="auto", sparse=False)
 
-    y = one_hot_encoder.fit_transform(y.reshape(-1, 1)).astype(np.bool)
+    y = one_hot_encoder.fit_transform(y.reshape(-1, 1)).astype(np.bool_)
 
     # normalize x
     X = normalize(X, norm="l2")
@@ -42,7 +42,7 @@ def fit_logistic_regression(X, y, data_random_seed=1, repeat=1):
         y_pred = clf.predict_proba(X_test)
         y_pred = np.argmax(y_pred, axis=1)
         y_pred = one_hot_encoder.transform(y_pred.reshape(-1, 1)).astype(
-            np.bool
+            np.bool_
         )
 
         test_acc = metrics.accuracy_score(y_test, y_pred)
@@ -55,7 +55,7 @@ def fit_logistic_regression_preset_splits(
 ):
     # transform targets to one-hot vector
     one_hot_encoder = OneHotEncoder(categories="auto", sparse=False)
-    y = one_hot_encoder.fit_transform(y.reshape(-1, 1)).astype(np.bool)
+    y = one_hot_encoder.fit_transform(y.reshape(-1, 1)).astype(np.bool_)
 
     # normalize x
     X = normalize(X, norm="l2")
@@ -84,7 +84,7 @@ def fit_logistic_regression_preset_splits(
             y_pred = clf.predict_proba(X_val)
             y_pred = np.argmax(y_pred, axis=1)
             y_pred = one_hot_encoder.transform(y_pred.reshape(-1, 1)).astype(
-                np.bool
+                np.bool_
             )
             val_acc = metrics.accuracy_score(y_val, y_pred)
             if val_acc > best_acc:
@@ -93,7 +93,7 @@ def fit_logistic_regression_preset_splits(
                 y_pred = np.argmax(y_pred, axis=1)
                 y_pred = one_hot_encoder.transform(
                     y_pred.reshape(-1, 1)
-                ).astype(np.bool)
+                ).astype(np.bool_)
                 best_test_acc = metrics.accuracy_score(y_test, y_pred)
 
         accuracies.append(best_test_acc)

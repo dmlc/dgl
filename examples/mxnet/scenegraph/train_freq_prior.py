@@ -89,7 +89,7 @@ for _, item in train_data.items():
             for col, row in zip(cols, rows):
                 bg_matrix[gt_classes[col], gt_classes[row]] += 1
         else:
-            all_possib = np.ones_like(iou_mat, dtype=np.bool)
+            all_possib = np.ones_like(iou_mat, dtype=np.bool_)
             np.fill_diagonal(all_possib, 0)
             cols, rows = np.where(all_possib)
             for col, row in zip(cols, rows):
