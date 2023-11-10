@@ -5,10 +5,7 @@ from torch.utils.data import functional_datapipe
 
 from ..subgraph_sampler import SubgraphSampler
 from ..utils import unique_and_compact_node_pairs
-from .sampled_subgraph_impl import (
-    FusedSampledSubgraphImpl,
-    newFusedSampledSubgraphImpl,
-)
+from .sampled_subgraph_impl import FusedSampledSubgraphImpl
 
 
 __all__ = ["NeighborSampler", "LayerNeighborSampler"]
