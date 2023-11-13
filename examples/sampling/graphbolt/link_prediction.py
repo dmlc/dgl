@@ -107,7 +107,7 @@ class SAGE(nn.Module):
                 # By design, our output nodes are contiguous.
                 y[
                     data.output_nodes[0] : data.output_nodes[-1] + 1
-                ] = hidden_x.to(buffer_device)
+                ] = hidden_x.to(buffer_device, non_blocking=True)
             feature = y
 
         return y
@@ -368,10 +368,7 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=0.0005)
     parser.add_argument("--neg-ratio", type=int, default=1)
     parser.add_argument("--train-batch-size", type=int, default=512)
-    # TODO [Issue#6534]: Use model.inference instead of dataloader to evaluate.
-    # Since neg_ratio in valid/test set is 1000, which is too large to GPU
-    # memory, we should use small batch size to evaluate.
-    parser.add_argument("--eval-batch-size", type=int, default=2)
+    parser.add_argument("--eval-batch-size", type=int, default=1024)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument(
         "--early-stop",
