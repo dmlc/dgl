@@ -11,9 +11,9 @@ import tqdm
 # takes.  It essentially follows the intuition of "training on the past and predict the future".
 # One can also change the threshold to make validation and test set take larger proportions.
 def train_test_split_by_time(df, timestamp, user):
-    df["train_mask"] = np.ones((len(df),), dtype=np.bool)
-    df["val_mask"] = np.zeros((len(df),), dtype=np.bool)
-    df["test_mask"] = np.zeros((len(df),), dtype=np.bool)
+    df["train_mask"] = np.ones((len(df),), dtype=np.bool_)
+    df["val_mask"] = np.zeros((len(df),), dtype=np.bool_)
+    df["test_mask"] = np.zeros((len(df),), dtype=np.bool_)
     df = dd.from_pandas(df, npartitions=10)
 
     def train_test_split(df):

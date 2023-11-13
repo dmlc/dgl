@@ -157,7 +157,7 @@ def HEM_one_level(rr, cc, vv, rid, weights):
     nnz = rr.shape[0]
     N = rr[nnz - 1] + 1
 
-    marked = np.zeros(N, np.bool)
+    marked = np.zeros(N, np.bool_)
     rowstart = np.zeros(N, np.int32)
     rowlength = np.zeros(N, np.int32)
     cluster_id = np.zeros(N, np.int32)
