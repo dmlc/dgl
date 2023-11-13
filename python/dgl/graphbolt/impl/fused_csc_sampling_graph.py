@@ -143,15 +143,15 @@ class FusedCSCSamplingGraph(SamplingGraph):
         >>> total_num_edges = 12
         >>> ntypes = {"N0": 0, "N1": 1}
         >>> etypes = {"N0:R0:N0": 0, "N0:R1:N1": 1,
-        ... "N1:R2:N0": 2, "N1:R3:N1": 3}
+        ...     "N1:R2:N0": 2, "N1:R3:N1": 3}
         >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
         >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
         >>> node_type_offset = torch.LongTensor([0, 2, 5])
         >>> type_per_edge = torch.LongTensor(
-        ... [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+        ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
         >>> metadata = gb.GraphMetadata(ntypes, etypes)
         >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
-        ... type_per_edge, None, metadata)
+        ...     type_per_edge, None, metadata)
         >>> print(graph.num_nodes)
         {'N0': 2, 'N1': 3}
         """
@@ -283,30 +283,66 @@ class FusedCSCSamplingGraph(SamplingGraph):
         """
         return self._metadata
 
-    def in_subgraph(self, nodes: torch.Tensor) -> torch.ScriptObject:
+    def in_subgraph(
+        self, nodes: Union[torch.Tensor, Dict[str, torch.Tensor]]
+    ) -> FusedSampledSubgraphImpl:
         """Return the subgraph induced on the inbound edges of the given nodes.
 
         An in subgraph is equivalent to creating a new graph using the incoming
-        edges of the given nodes.
+        edges of the given nodes. Subgraph is compacted according to the order
+        of passed-in `nodes`.
 
         Parameters
         ----------
-        nodes : torch.Tensor
-            The nodes to form the subgraph which are type agnostic.
+        nodes: torch.Tensor or Dict[str, torch.Tensor]
+            IDs of the given seed nodes.
+              - If `nodes` is a tensor: It means the graph is homogeneous
+                graph, and ids inside are homogeneous ids.
+              - If `nodes` is a dictionary: The keys should be node type and
+                ids inside are heterogeneous ids.
 
         Returns
         -------
-        torch.classes.graphbolt.SampledSubgraph
+        FusedSampledSubgraphImpl
             The in subgraph.
+
+        Examples
+        --------
+        >>> import dgl.graphbolt as gb
+        >>> import torch
+        >>> total_num_nodes = 5
+        >>> total_num_edges = 12
+        >>> ntypes = {"N0": 0, "N1": 1}
+        >>> etypes = {
+        ...     "N0:R0:N0": 0, "N0:R1:N1": 1, "N1:R2:N0": 2, "N1:R3:N1": 3}
+        >>> metadata = gb.GraphMetadata(ntypes, etypes)
+        >>> indptr = torch.LongTensor([0, 3, 5, 7, 9, 12])
+        >>> indices = torch.LongTensor([0, 1, 4, 2, 3, 0, 1, 1, 2, 0, 3, 4])
+        >>> node_type_offset = torch.LongTensor([0, 2, 5])
+        >>> type_per_edge = torch.LongTensor(
+        ...     [0, 0, 2, 2, 2, 1, 1, 1, 3, 1, 3, 3])
+        >>> graph = gb.from_fused_csc(indptr, indices, node_type_offset,
+        ...     type_per_edge, None, metadata)
+        >>> nodes = {"N0":torch.LongTensor([1]), "N1":torch.LongTensor([1, 2])}
+        >>> in_subgraph = graph.in_subgraph(nodes)
+        >>> print(in_subgraph.node_pairs)
+        defaultdict(<class 'list'>, {
+            'N0:R0:N0': (tensor([]), tensor([])),
+            'N0:R1:N1': (tensor([1, 0]), tensor([1, 2])),
+            'N1:R2:N0': (tensor([0, 1]), tensor([1, 1])),
+            'N1:R3:N1': (tensor([0, 1, 2]), tensor([1, 2, 2]))}
         """
+        if isinstance(nodes, dict):
+            nodes = self._convert_to_homogeneous_nodes(nodes)
         # Ensure nodes is 1-D tensor.
         assert nodes.dim() == 1, "Nodes should be 1-D tensor."
         # Ensure that there are no duplicate nodes.
         assert len(torch.unique(nodes)) == len(
             nodes
         ), "Nodes cannot have duplicate values."
-        # TODO: change the result to 'FusedSampledSubgraphImpl'.
-        return self._c_csc_graph.in_subgraph(nodes)
+
+        _in_subgraph = self._c_csc_graph.in_subgraph(nodes)
+        return self._convert_to_sampled_subgraph(_in_subgraph)
 
     def _convert_to_sampled_subgraph(
         self,
@@ -772,7 +808,6 @@ def from_fused_csc(
     ...             node_type_offset=node_type_offset,
     ...             type_per_edge=type_per_edge,
     ...             edge_attributes=None, metadata=metadata)
-    None, metadata)
     >>> print(graph)
     FusedCSCSamplingGraph(csc_indptr=tensor([0, 2, 5, 7]),
                      indices=tensor([1, 3, 0, 1, 2, 0, 3]),

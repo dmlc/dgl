@@ -39,6 +39,7 @@ class ClusterIter(object):
             else:
                 os.makedirs("./datasets/", exist_ok=True)
                 self.par_li = get_partition_list(g, psize)
+                self.par_li = np.array(self.par_li, dtype=object)
                 np.save(fn, self.par_li)
         else:
             self.par_li = get_partition_list(g, psize)

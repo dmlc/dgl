@@ -497,22 +497,21 @@ def test_in_subgraph_homogeneous():
     graph = gb.from_fused_csc(indptr, indices)
 
     # Extract in subgraph.
-    nodes = torch.LongTensor([1, 3, 4])
+    nodes = torch.LongTensor([4, 1, 3])
     in_subgraph = graph.in_subgraph(nodes)
 
     # Verify in subgraph.
-    assert torch.equal(in_subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
     assert torch.equal(
-        in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
-    )
-    assert torch.equal(in_subgraph.original_column_node_ids, nodes)
-    assert torch.equal(
-        in_subgraph.original_row_node_ids, torch.arange(0, total_num_nodes)
+        in_subgraph.node_pairs[0], torch.LongTensor([0, 3, 4, 2, 3, 1, 2])
     )
     assert torch.equal(
-        in_subgraph.original_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
+        in_subgraph.node_pairs[1], torch.LongTensor([4, 4, 4, 1, 1, 3, 3])
     )
-    assert in_subgraph.type_per_edge is None
+    assert in_subgraph.original_column_node_ids is None
+    assert in_subgraph.original_row_node_ids is None
+    assert torch.equal(
+        in_subgraph.original_edge_ids, torch.LongTensor([9, 10, 11, 3, 4, 7, 8])
+    )
 
 
 @unittest.skipIf(
@@ -563,23 +562,41 @@ def test_in_subgraph_heterogeneous():
     )
 
     # Extract in subgraph.
-    nodes = torch.LongTensor([1, 3, 4])
+    nodes = {
+        "N0": torch.LongTensor([1]),
+        "N1": torch.LongTensor([2, 1]),
+    }
     in_subgraph = graph.in_subgraph(nodes)
 
     # Verify in subgraph.
-    assert torch.equal(in_subgraph.indptr, torch.LongTensor([0, 2, 4, 7]))
     assert torch.equal(
-        in_subgraph.indices, torch.LongTensor([2, 3, 1, 2, 0, 3, 4])
-    )
-    assert torch.equal(in_subgraph.original_column_node_ids, nodes)
-    assert torch.equal(
-        in_subgraph.original_row_node_ids, torch.arange(0, total_num_nodes)
+        in_subgraph.node_pairs["N0:R0:N0"][0], torch.LongTensor([])
     )
     assert torch.equal(
-        in_subgraph.original_edge_ids, torch.LongTensor([3, 4, 7, 8, 9, 10, 11])
+        in_subgraph.node_pairs["N0:R0:N0"][1], torch.LongTensor([])
     )
     assert torch.equal(
-        in_subgraph.type_per_edge, torch.LongTensor([2, 2, 1, 3, 1, 3, 3])
+        in_subgraph.node_pairs["N0:R1:N1"][0], torch.LongTensor([0, 1])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N0:R1:N1"][1], torch.LongTensor([2, 1])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N1:R2:N0"][0], torch.LongTensor([0, 1])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N1:R2:N0"][1], torch.LongTensor([1, 1])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N1:R3:N1"][0], torch.LongTensor([1, 2, 0])
+    )
+    assert torch.equal(
+        in_subgraph.node_pairs["N1:R3:N1"][1], torch.LongTensor([2, 2, 1])
+    )
+    assert in_subgraph.original_column_node_ids is None
+    assert in_subgraph.original_row_node_ids is None
+    assert torch.equal(
+        in_subgraph.original_edge_ids, torch.LongTensor([3, 4, 9, 10, 11, 7, 8])
     )
 
 
