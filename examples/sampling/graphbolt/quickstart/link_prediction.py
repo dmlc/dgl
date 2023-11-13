@@ -173,11 +173,6 @@ if __name__ == "__main__":
     print("Loading data...")
     dataset = gb.BuiltinDataset("cora").load()
 
-    # Uncomment to use the example cora dataset.
-    # dataset = gb.OnDiskDataset(
-    #     "examples/sampling/graphbolt/quickstart/cora/"
-    # ).load()
-
     in_size = dataset.feature.size("node", None, "feat")[0]
     model = GraphSAGE(in_size).to(device)
 
