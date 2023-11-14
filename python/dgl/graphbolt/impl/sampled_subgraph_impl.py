@@ -72,7 +72,7 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
 @dataclass
 class CSCFormatBase:
     r"""Basic class representing data in Compressed Sparse Column (CSC) format.
-    
+
     Examples
     --------
     >>> indptr = torch.tensor([0, 1, 3])
