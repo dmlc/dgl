@@ -9,9 +9,10 @@ import scipy.sparse as sp
 import torch
 
 
-def rand_csc_graph(N, density):
+def rand_csc_graph(N, density, bidirection_edge=True):
     adj = sp.random(N, N, density)
-    adj = adj + adj.T
+    if bidirection_edge:
+        adj = adj + adj.T
     adj = adj.tocsc()
 
     indptr = torch.LongTensor(adj.indptr)
