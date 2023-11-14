@@ -210,8 +210,7 @@ def genereate_raw_data_for_hetero_dataset(
     # Generate edges.
     edges_path = {}
     for etype, num_edge in num_edges.items():
-        src_ntype, _, dst_ntype = etype
-        etype_str = gb.etype_tuple_to_str(etype)
+        src_ntype, etype_str, dst_ntype = etype
         src = torch.randint(0, num_nodes[src_ntype], (num_edge,))
         dst = torch.randint(0, num_nodes[dst_ntype], (num_edge,))
         # Wrtie into edges/edge.csv
@@ -267,10 +266,10 @@ def genereate_raw_data_for_hetero_dataset(
           edges:
             - type: "user:follow:user"
               format: csv
-              path: {edges_path["user:follow:user"]}
+              path: {edges_path["follow"]}
             - type: "user:click:item"
               format: csv
-              path: {edges_path["user:click:item"]}
+              path: {edges_path["click"]}
         feature_data:
           - domain: node
             type: user
