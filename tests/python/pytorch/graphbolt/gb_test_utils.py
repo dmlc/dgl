@@ -125,8 +125,7 @@ def random_homo_graphbolt_graph(
         np.arange(each_set_size),
         np.arange(each_set_size, 2 * each_set_size),
     )
-    train_labels = np.random.randint(0, num_classes, size=each_set_size)
-    train_data = np.vstack([train_pairs, train_labels]).T
+    train_data = np.vstack(train_pairs).T
     train_path = os.path.join("set", "train.npy")
     np.save(os.path.join(test_dir, train_path), train_data)
 
@@ -134,8 +133,7 @@ def random_homo_graphbolt_graph(
         np.arange(each_set_size, 2 * each_set_size),
         np.arange(2 * each_set_size, 3 * each_set_size),
     )
-    validation_labels = np.random.randint(0, num_classes, size=each_set_size)
-    validation_data = np.vstack([validation_pairs, validation_labels]).T
+    validation_data = np.vstack(validation_pairs).T
     validation_path = os.path.join("set", "validation.npy")
     np.save(os.path.join(test_dir, validation_path), validation_data)
 
@@ -143,8 +141,7 @@ def random_homo_graphbolt_graph(
         np.arange(2 * each_set_size, 3 * each_set_size),
         np.arange(3 * each_set_size, 4 * each_set_size),
     )
-    test_labels = np.random.randint(0, num_classes, size=each_set_size)
-    test_data = np.vstack([test_pairs, test_labels]).T
+    test_data = np.vstack(test_pairs).T
     test_path = os.path.join("set", "test.npy")
     np.save(os.path.join(test_dir, test_path), test_data)
 
