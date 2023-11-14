@@ -105,7 +105,8 @@ class SampledSubgraphImpl(SampledSubgraph):
     ... original_edge_ids=original_edge_ids
     ... )
     >>> print(subgraph.node_pairs)
-    {"A:relation:B": CSCForamtBase(indptr=torch.tensor([0, 1, 2, 3]), indices=torch.tensor([0, 1, 2]))}
+    {"A:relation:B": CSCForamtBase(indptr=torch.tensor([0, 1, 2, 3]),
+    ... indices=torch.tensor([0, 1, 2]))}
     >>> print(subgraph.original_column_node_ids)
     {'B': tensor([10, 11, 12])}
     >>> print(subgraph.original_row_node_ids)
