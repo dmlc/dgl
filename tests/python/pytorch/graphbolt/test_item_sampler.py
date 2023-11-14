@@ -728,8 +728,8 @@ def distributed_item_sampler_subprocess(
     nprocs,
     item_set,
     num_ids,
+    num_workers,
     batch_size,
-    shuffle,
     drop_last,
     drop_uneven_inputs,
 ):
@@ -750,7 +750,7 @@ def distributed_item_sampler_subprocess(
     item_sampler = gb.DistributedItemSampler(
         item_set,
         batch_size=batch_size,
-        shuffle=shuffle,
+        shuffle=True,
         drop_last=drop_last,
         drop_uneven_inputs=drop_uneven_inputs,
     )
@@ -759,7 +759,9 @@ def distributed_item_sampler_subprocess(
         gb.BasicFeatureStore({}),
         [],
     )
-    data_loader = gb.SingleProcessDataLoader(feature_fetcher)
+    data_loader = gb.MultiProcessDataLoader(
+        feature_fetcher, num_workers=num_workers
+    )
 
     # Count the numbers of items and batches.
     num_items = 0
@@ -789,11 +791,11 @@ def distributed_item_sampler_subprocess(
 
 
 @pytest.mark.parametrize("num_ids", [24, 30, 32, 34, 36])
-@pytest.mark.parametrize("shuffle", [False, True])
+@pytest.mark.parametrize("num_workers", [0, 2, 4])
 @pytest.mark.parametrize("drop_last", [False, True])
 @pytest.mark.parametrize("drop_uneven_inputs", [False, True])
 def test_DistributedItemSampler(
-    num_ids, shuffle, drop_last, drop_uneven_inputs
+    num_ids, num_workers, drop_last, drop_uneven_inputs
 ):
     nprocs = 4
     batch_size = 4
@@ -813,8 +815,8 @@ def test_DistributedItemSampler(
             nprocs,
             item_set,
             num_ids,
+            num_workers,
             batch_size,
-            shuffle,
             drop_last,
             drop_uneven_inputs,
         ),

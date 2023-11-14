@@ -109,3 +109,24 @@ def copy_or_convert_data(
         if is_feature and data.dim() == 1:
             data = data.reshape(-1, 1)
         save_data(data, output_path, output_format)
+
+
+def count_split(total: int, num_workers: int, worker_id: int, batch_size=1):
+    """Calculate the number of assigned items after splitting them by batch
+    size evenly. It will return the number for this worker and also a sum of
+    previous workers.
+    """
+    quotient, remainder = divmod(total, num_workers * batch_size)
+    if batch_size == 1:
+        assigned = quotient + (worker_id < remainder)
+    else:
+        batch_count, last_batch = divmod(remainder, batch_size)
+        assigned = quotient * batch_size + (
+            batch_size
+            if worker_id < batch_count
+            else (last_batch if worker_id == batch_count else 0)
+        )
+    prefix_sum = quotient * worker_id * batch_size + min(
+        worker_id * batch_size, remainder
+    )
+    return (assigned, prefix_sum)
