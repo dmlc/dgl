@@ -165,7 +165,7 @@ def random_homo_graphbolt_graph(
               type: null
               name: feat
               format: numpy
-              in_memory: false
+              in_memory: true
               path: {node_feat_path}
             - domain: edge
               type: null
