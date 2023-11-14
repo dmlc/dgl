@@ -307,4 +307,3 @@ def genereate_raw_data_for_hetero_dataset(
     yaml_file = os.path.join(test_dir, "metadata.yaml")
     with open(yaml_file, "w") as f:
         f.write(yaml_content)
-    return yaml_file
