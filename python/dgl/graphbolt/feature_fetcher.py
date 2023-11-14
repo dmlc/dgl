@@ -4,6 +4,8 @@ from typing import Dict
 
 from torch.utils.data import functional_datapipe
 
+from .base import etype_tuple_to_str
+
 from .minibatch_transformer import MiniBatchTransformer
 
 
@@ -68,13 +70,13 @@ class FeatureFetcher(MiniBatchTransformer):
             An instance of :class:`MiniBatch` filled with required features.
         """
         node_features = {}
-        num_layers = data.get_num_layers()
+        num_layers = data.num_layers()
         edge_features = [{} for _ in range(num_layers)]
         is_heterogeneous = isinstance(
             self.node_feature_keys, Dict
         ) or isinstance(self.edge_feature_keys, Dict)
         # Read Node features.
-        input_nodes = data.get_input_nodes()
+        input_nodes = data.node_ids()
         if self.node_feature_keys and input_nodes is not None:
             if is_heterogeneous:
                 for type_name, feature_names in self.node_feature_keys.items():
@@ -101,10 +103,17 @@ class FeatureFetcher(MiniBatchTransformer):
         # Read Edge features.
         if self.edge_feature_keys and num_layers > 0:
             for i in range(num_layers):
-                original_edge_ids = data.get_original_edge_ids(i)
+                original_edge_ids = data.edge_ids(i)
                 if original_edge_ids is None:
                     continue
                 if is_heterogeneous:
+                    # Convert edge type to string for DGLMiniBatch.
+                    original_edge_ids = {
+                        etype_tuple_to_str(key)
+                        if isinstance(key, tuple)
+                        else key: value
+                        for key, value in original_edge_ids.items()
+                    }
                     for (
                         type_name,
                         feature_names,

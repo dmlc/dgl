@@ -1,8 +1,7 @@
 """Unified data structure for input and ouput of all the stages in loading process."""
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 
@@ -16,25 +15,23 @@ from .sampled_subgraph import SampledSubgraph
 __all__ = ["DGLMiniBatch", "MiniBatch"]
 
 
-class MiniBatchBase(ABC):
+@dataclass
+class MiniBatchBase(object):
     """Base class for `MiniBatch` and `DGLMiniBatch`."""
 
-    @abstractmethod
-    def get_input_nodes(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        """A representation of input nodes in the outermost layer. Conatins all
-        nodes in the 'sampled_subgraphs'.
+    def node_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        """A representation of input nodes in the outermost layer. Contains all
+        nodes in the MiniBatch.
         - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
         - If `input_nodes` is a dictionary: The keys should be node type and the
           value should be corresponding heterogeneous node id.
         """
         raise NotImplementedError
 
-    @abstractmethod
-    def get_num_layers(self) -> int:
-        """Get the number of layers."""
+    def num_layers(self) -> int:
+        """Return the number of layers."""
         raise NotImplementedError
 
-    @abstractmethod
     def set_node_features(
         self,
         node_features: Union[
@@ -44,7 +41,6 @@ class MiniBatchBase(ABC):
         """Set node features."""
         raise NotImplementedError
 
-    @abstractmethod
     def set_edge_features(
         self,
         edge_features: List[
@@ -54,21 +50,19 @@ class MiniBatchBase(ABC):
         """Set edge features."""
         raise NotImplementedError
 
-    @abstractmethod
-    def get_original_edge_ids(
+    def edge_ids(
         self, layer_id: int
     ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
-        """Get original edge ids."""
+        """Get the edge ids of a layer."""
         raise NotImplementedError
 
-    @abstractmethod
-    def to(self, device: torch.device) -> None:
-        """Copy `MiniBatch` to the specified device using reflection."""
+    def to(self, device: torch.device) -> None:  # pylint: disable=invalid-name
+        """Copy MiniBatch to the specified device."""
         raise NotImplementedError
 
 
 @dataclass
-class DGLMiniBatch:
+class DGLMiniBatch(MiniBatchBase):
     r"""A data class designed for the DGL library, encompassing all the
     necessary fields for computation using the DGL library."""
 
@@ -150,20 +144,28 @@ class DGLMiniBatch:
 
     def __repr__(self) -> str:
         return _dgl_minibatch_str(self)
-    
-    def get_input_nodes(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+
+    def node_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        """A representation of input nodes in the outermost layer. Contains all
+        nodes in the `blocks`.
+        - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
+        - If `input_nodes` is a dictionary: The keys should be node type and the
+          value should be corresponding heterogeneous node id.
+        """
         return self.input_nodes
 
-    def get_num_layers(self) -> int:
-        """Get the number of layers."""
+    def num_layers(self) -> int:
+        """Return the number of layers."""
         if self.blocks is None:
             return 0
         return len(self.blocks)
 
-    def get_original_edge_ids(
+    def edge_ids(
         self, layer_id: int
-    ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
-        """Get original edge ids."""
+    ) -> Optional[Union[Dict[str, torch.Tensor], torch.Tensor]]:
+        """Get edge ids of a layer."""
+        if dgl.EID not in self.blocks[layer_id].edata:
+            return None
         return self.blocks[layer_id].edata[dgl.EID]
 
     def set_node_features(
@@ -321,19 +323,25 @@ class MiniBatch:
     def __repr__(self) -> str:
         return _minibatch_str(self)
 
-    def get_input_nodes(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+    def node_ids(self) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        """A representation of input nodes in the outermost layer. Contains all
+        nodes in the `sampled_subgraphs`.
+        - If `input_nodes` is a tensor: It indicates the graph is homogeneous.
+        - If `input_nodes` is a dictionary: The keys should be node type and the
+          value should be corresponding heterogeneous node id.
+        """
         return self.input_nodes
 
-    def get_num_layers(self) -> int:
-        """Get the number of layers."""
+    def num_layers(self) -> int:
+        """Return the number of layers."""
         if self.sampled_subgraphs is None:
             return 0
         return len(self.sampled_subgraphs)
 
-    def get_original_edge_ids(
+    def edge_ids(
         self, layer_id: int
     ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
-        """Get original edge ids."""
+        """Get the edge ids of a layer."""
         return self.sampled_subgraphs[layer_id].original_edge_ids
 
     def set_node_features(
