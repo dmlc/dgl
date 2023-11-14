@@ -68,9 +68,9 @@ Datasets for node classification/regression tasks
     TolokersDataset
     QuestionsDataset
     MovieLensDataset
-    PeptidesStructuralDataset
-    PeptidesFunctionalDataset
     VOCSuperpixelsDataset
+    COCOSuperpixelsDataset
+
 
 Edge Prediction Datasets
 ---------------------------------------
@@ -109,6 +109,10 @@ Datasets for graph classification/regression tasks
     FakeNewsDataset
     BA2MotifDataset
     ZINCDataset
+    PeptidesStructuralDataset
+    PeptidesFunctionalDataset
+    MNISTSuperPixelDataset
+    CIFAR10SuperPixelDataset
 
 Dataset adapters
 -------------------

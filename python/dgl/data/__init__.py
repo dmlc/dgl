@@ -83,6 +83,7 @@ try:
 except ImportError:
     pass
 from .pattern import PATTERNDataset
+from .superpixel import CIFAR10SuperPixelDataset, MNISTSuperPixelDataset
 from .wikics import WikiCSDataset
 from .yelp import YelpDataset
 from .zinc import ZINCDataset
