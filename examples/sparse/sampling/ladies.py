@@ -31,8 +31,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as MF
-from dgl.data import CoraGraphDataset
+from dgl.data import AsNodePredDataset
 from dgl.sparse import sp_broadcast_v
+from ogb.nodeproppred import DglNodePropPredDataset
 
 
 class LADIESConv(nn.Module):
@@ -82,6 +83,7 @@ class LADIES(nn.Module):
         self.layers.append(LADIESConv(in_size, hid_size))
         self.layers.append(LADIESConv(hid_size, hid_size))
         self.layers.append(LADIESConv(hid_size, out_size))
+
         self.dropout = nn.Dropout(0.5)
         self.hid_size = hid_size
         self.out_size = out_size
@@ -116,10 +118,9 @@ def multilayer_sample(A, fanouts, seeds, ndata):
         # Compute probability weight.
         row_probs = (sub_A**2).sum(1)
         row_probs = row_probs / row_probs.sum(0)
-
         # Layer-wise sample nodes.
         row_ids = torch.multinomial(row_probs, fanout, replacement=False)
-        # add self-loop
+        # Add self-loop.
         row_ids = torch.cat((row_ids, src), 0).unique()
         sampled_matrix = sub_A.index_select(0, row_ids)
         # Normalize edge weights.
@@ -137,20 +138,16 @@ def multilayer_sample(A, fanouts, seeds, ndata):
     return sampled_matrices, x, y
 
 
-def evaluate(device, model, A, mask, ndata, num_classes):
+def evaluate(model, A, dataloader, ndata, num_classes):
     model.eval()
     ys = []
     y_hats = []
-    fanouts = [2000, 2000, 2000]
-    with torch.no_grad():
-        sampled_matrices, x, y = multilayer_sample(
-            A,
-            fanouts,
-            torch.randperm(len(mask))[:512].to(device),
-            ndata,
-        )
-        ys.append(y)
-        y_hats.append(model(sampled_matrices, x))
+    fanouts = [4000, 4000, 4000]
+    for seeds in dataloader:
+        with torch.no_grad():
+            sampled_matrices, x, y = multilayer_sample(A, fanouts, seeds, ndata)
+            ys.append(y)
+            y_hats.append(model(sampled_matrices, x))
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -160,40 +157,42 @@ def evaluate(device, model, A, mask, ndata, num_classes):
     )
 
 
-def validate(device, A, ndata, dataset, model):
-    acc = evaluate(
-        device, model, A, ndata["test_mask"], ndata, dataset.num_classes
-    )
+def validate(device, A, ndata, dataset, model, batch_size):
+    inf_id = dataset.test_idx.to(device)
+    inf_dataloader = torch.utils.data.DataLoader(inf_id, batch_size=batch_size)
+    acc = evaluate(model, A, inf_dataloader, ndata, dataset.num_classes)
     return acc
 
 
 def train(device, A, ndata, dataset, model):
-    train_mask = ndata["train_mask"]
+    # Create sampler & dataloader.
+    train_idx = dataset.train_idx.to(device)
+    val_idx = dataset.val_idx.to(device)
+
+    train_dataloader = torch.utils.data.DataLoader(
+        train_idx, batch_size=1024, shuffle=True
+    )
+    val_dataloader = torch.utils.data.DataLoader(val_idx, batch_size=1024)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
 
-    fanouts = [2000, 2000, 2000]
-    for epoch in range(200):
+    fanouts = [4000, 4000, 4000]
+    for epoch in range(20):
         model.train()
         total_loss = 0
-        sampled_matrices, x, y = multilayer_sample(
-            A,
-            fanouts,
-            torch.randperm(len(train_mask))[:512].to(device),
-            ndata,
-        )
-        y_hat = model(sampled_matrices, x)
-        loss = F.cross_entropy(y_hat, y)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
+        for it, seeds in enumerate(train_dataloader):
+            sampled_matrices, x, y = multilayer_sample(A, fanouts, seeds, ndata)
+            y_hat = model(sampled_matrices, x)
+            loss = F.cross_entropy(y_hat, y)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
 
-        acc = evaluate(
-            device, model, A, ndata["val_mask"], ndata, dataset.num_classes
-        )
+        acc = evaluate(model, A, val_dataloader, ndata, dataset.num_classes)
         print(
             "Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(
-                epoch, total_loss, acc.item()
+                epoch, total_loss / (it + 1), acc.item()
             )
         )
 
@@ -226,9 +225,8 @@ if __name__ == "__main__":
     # Load and preprocess dataset.
     print("Loading data")
     device = torch.device("cpu" if args.mode == "cpu" else "cuda")
-    dataset = CoraGraphDataset()
+    dataset = AsNodePredDataset(DglNodePropPredDataset("ogbn-products"))
     g = dataset[0]
-    g = g.to(device)
 
     # Create LADIES model.
     in_size = g.ndata["feat"].shape[1]
@@ -238,18 +236,21 @@ if __name__ == "__main__":
     # Create sparse.
     indices = torch.stack(g.edges())
     N = g.num_nodes()
-    A = dglsp.spmatrix(indices, shape=(N, N))
-    I = dglsp.identity(A.shape).to(device)
+    A = dglsp.spmatrix(indices, shape=(N, N)).coalesce()
+    I = dglsp.identity(A.shape)
+
+    # Initialize laplacian matrix.
     A_hat = A + I
     D_hat = dglsp.diag(A_hat.sum(1)) ** -0.5
     A_norm = D_hat @ A_hat @ D_hat
-    A = A_norm
+    A_norm = A_norm.to(device)
+    g = g.to(device)
 
     # Model training.
     print("Training...")
-    train(device, A, g.ndata, dataset, model)
+    train(device, A_norm, g.ndata, dataset, model)
 
     # Test the model.
     print("Testing...")
-    acc = validate(device, A, g.ndata, dataset, model)
+    acc = validate(device, A_norm, g.ndata, dataset, model, batch_size=2048)
     print(f"Test accuracy {acc:.4f}")
