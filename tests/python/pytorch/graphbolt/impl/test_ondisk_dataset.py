@@ -1631,6 +1631,7 @@ def test_OnDiskDataset_load_feature():
         dataset = gb.OnDiskDataset(test_dir)
         # If `format` is torch and `in_memory` is False, it will
         # raise an AssertionError.
+        dataset.yaml_data["feature_data"][0]["in_memory"] = False
         dataset.yaml_data["feature_data"][0]["format"] = "torch"
         with pytest.raises(
             AssertionError,
