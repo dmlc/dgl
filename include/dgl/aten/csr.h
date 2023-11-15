@@ -53,18 +53,15 @@ struct CSRMatrix {
   /** @brief constructor */
   CSRMatrix(
       int64_t nrows, int64_t ncols, IdArray parr, IdArray iarr,
-      IdArray darr = NullArray(), bool sorted_flag = false)
+      IdArray darr = NullArray(), bool sorted_flag = false,
+      bool pin_memory = false)
       : num_rows(nrows),
         num_cols(ncols),
         indptr(parr),
         indices(iarr),
         data(darr),
-        sorted(sorted_flag) {
-    if (!IsEmpty()) {
-      is_pinned = (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
-                  (aten::IsNullArray(indices) || indices.IsPinned()) &&
-                  (aten::IsNullArray(data) || data.IsPinned());
-    }
+        sorted(sorted_flag),
+        is_pinned(pin_memory) {
     CheckValidity();
   }
 
@@ -128,6 +125,12 @@ struct CSRMatrix {
            aten::IsNullArray(data);
   }
 
+  inline bool IsPinned() const {
+    return (aten::IsNullArray(indptr) || indptr.IsPinned()) &&
+           (aten::IsNullArray(indices) || indices.IsPinned()) &&
+           (aten::IsNullArray(data) || data.IsPinned());
+  }
+
   /** @brief Return a copy of this matrix on the give device context. */
   inline CSRMatrix CopyTo(const DGLContext& ctx) const {
     if (ctx == indptr->ctx) return *this;
@@ -142,8 +145,8 @@ struct CSRMatrix {
       if (is_pinned) return *this;
       auto new_csr = CSRMatrix(
           num_rows, num_cols, indptr.PinMemory(), indices.PinMemory(),
-          aten::IsNullArray(data) ? data : data.PinMemory(), sorted);
-      CHECK(new_csr.is_pinned)
+          aten::IsNullArray(data) ? data : data.PinMemory(), sorted, /*is_pinned=*/true);
+      CHECK(new_csr.IsPinned())
           << "An internal DGL error has occured while trying to pin a CSR "
              "matrix. Please file a bug at "
              "'https://github.com/dmlc/dgl/issues' "

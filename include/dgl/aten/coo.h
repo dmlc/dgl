@@ -56,19 +56,16 @@ struct COOMatrix {
   /** @brief constructor */
   COOMatrix(
       int64_t nrows, int64_t ncols, IdArray rarr, IdArray carr,
-      IdArray darr = NullArray(), bool rsorted = false, bool csorted = false)
+      IdArray darr = NullArray(), bool rsorted = false, bool csorted = false,
+      bool pin_memory = false)
       : num_rows(nrows),
         num_cols(ncols),
         row(rarr),
         col(carr),
         data(darr),
         row_sorted(rsorted),
-        col_sorted(csorted) {
-    if (!IsEmpty()) {
-      is_pinned = (aten::IsNullArray(row) || row.IsPinned()) &&
-                  (aten::IsNullArray(col) || col.IsPinned()) &&
-                  (aten::IsNullArray(data) || data.IsPinned());
-    }
+        col_sorted(csorted),
+        is_pinned(pin_memory) {
     CheckValidity();
   }
 
@@ -134,6 +131,12 @@ struct COOMatrix {
            aten::IsNullArray(data);
   }
 
+  inline bool IsPinned() const {
+    return (aten::IsNullArray(row) || row.IsPinned()) &&
+           (aten::IsNullArray(col) || col.IsPinned()) &&
+           (aten::IsNullArray(data) || data.IsPinned());
+  }
+
   /** @brief Return a copy of this matrix on the give device context. */
   inline COOMatrix CopyTo(const DGLContext& ctx) const {
     if (ctx == row->ctx) return *this;
@@ -150,8 +153,8 @@ struct COOMatrix {
       auto new_coo = COOMatrix(
           num_rows, num_cols, row.PinMemory(), col.PinMemory(),
           aten::IsNullArray(data) ? data : data.PinMemory(), row_sorted,
-          col_sorted);
-      CHECK(new_coo.is_pinned)
+          col_sorted, /*is_pinned=*/true);
+      CHECK(new_coo.IsPinned())
           << "An internal DGL error has occured while trying to pin a COO "
              "matrix. Please file a bug at "
              "'https://github.com/dmlc/dgl/issues' "
