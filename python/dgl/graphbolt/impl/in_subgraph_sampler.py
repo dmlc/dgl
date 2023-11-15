@@ -12,7 +12,7 @@ __all__ = ["InSubgraphSampler"]
 
 @functional_datapipe("sample_in_subgraph")
 class InSubgraphSampler(SubgraphSampler):
-    """Sample neighbor edges from a graph and return a subgraph.
+    """Sample the subgraph induced on the inbound edges of the given nodes.
 
     In-subgraph sampler is responsible for sampling a subgraph from given data,
     returning an induced subgraph along with compacted information.
