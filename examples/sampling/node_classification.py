@@ -177,8 +177,8 @@ def layerwise_infer(device, graph, nid, model, num_classes, batch_size):
 
 def train(args, device, g, dataset, model, num_classes, use_uva):
     # Create sampler & dataloader.
-    train_idx = dataset.train_idx.to(device)
-    val_idx = dataset.val_idx.to(device)
+    train_idx = dataset.train_idx.to(g.device if not use_uva else device)
+    val_idx = dataset.val_idx.to(g.device if not use_uva else device)
     #####################################################################
     # (HIGHLIGHT) Instantiate a NeighborSampler object for efficient
     # training of Graph Neural Networks (GNNs) on large-scale graphs.
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         default="mixed",
-        choices=["cpu", "mixed", "gpu"],
+        choices=["cpu", "mixed", "gpu", "non-uva"],
         help="Training mode. 'cpu' for CPU training, 'mixed' for "
         "CPU-GPU mixed training, 'gpu' for pure-GPU training.",
     )
