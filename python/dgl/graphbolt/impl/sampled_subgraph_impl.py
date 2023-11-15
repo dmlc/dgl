@@ -5,10 +5,10 @@ from typing import Dict, Tuple, Union
 
 import torch
 
-from ..base import etype_str_to_tuple
+from ..base import CSCFormatBase, etype_str_to_tuple
 from ..sampled_subgraph import SampledSubgraph
 
-__all__ = ["FusedSampledSubgraphImpl", "SampledSubgraphImpl", "CSCFormatBase"]
+__all__ = ["FusedSampledSubgraphImpl", "SampledSubgraphImpl"]
 
 
 @dataclass
@@ -70,41 +70,23 @@ class FusedSampledSubgraphImpl(SampledSubgraph):
 
 
 @dataclass
-class CSCFormatBase:
-    r"""Basic class representing data in Compressed Sparse Column (CSC) format.
-
-    Examples
-    --------
-    >>> indptr = torch.tensor([0, 1, 3])
-    >>> indices = torch.tensor([1, 4, 2])
-    >>> csc_foramt_base = CSCFormatBase(indptr=indptr, indices=indices)
-    >>> print(csc_format_base.indptr)
-    ... torch.tensor([0, 1, 3])
-    >>> print(csc_foramt_base)
-    ... torch.tensor([1, 4, 2])
-    """
-    indptr: torch.Tensor = None
-    indices: torch.Tensor = None
-
-
-@dataclass
 class SampledSubgraphImpl(SampledSubgraph):
     r"""Sampled subgraph of CSCSamplingGraph.
 
     Examples
     --------
-    >>> node_pairs = {"A:relation:B": CSCFormatBase(indptr=torch.tensor([0, 1, 2, 3]),
+    >>> edge_index_mappings = {"A:relation:B": CSCFormatBase(indptr=torch.tensor([0, 1, 2, 3]),
     ... indices=torch.tensor([0, 1, 2]))}
     >>> original_column_node_ids = {'B': torch.tensor([10, 11, 12])}
     >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
     >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     >>> subgraph = gb.SampledSubgraphImpl(
-    ... node_pairs=node_pairs,
+    ... edge_index_mappings=edge_index_mappings,
     ... original_column_node_ids=original_column_node_ids,
     ... original_row_node_ids=original_row_node_ids,
     ... original_edge_ids=original_edge_ids
     ... )
-    >>> print(subgraph.node_pairs)
+    >>> print(subgraph.edge_index_mappings)
     {"A:relation:B": CSCForamtBase(indptr=torch.tensor([0, 1, 2, 3]),
     ... indices=torch.tensor([0, 1, 2]))}
     >>> print(subgraph.original_column_node_ids)
@@ -114,7 +96,7 @@ class SampledSubgraphImpl(SampledSubgraph):
     >>> print(subgraph.original_edge_ids)
     {"A:relation:B": tensor([19, 20, 21])}
     """
-    node_pairs: Union[
+    edge_index_mappings: Union[
         CSCFormatBase,
         Dict[str, CSCFormatBase],
     ] = None
@@ -125,8 +107,8 @@ class SampledSubgraphImpl(SampledSubgraph):
     original_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
 
     def __post_init__(self):
-        if isinstance(self.node_pairs, dict):
-            for etype, pair in self.node_pairs.items():
+        if isinstance(self.edge_index_mappings, dict):
+            for etype, pair in self.edge_index_mappings.items():
                 assert (
                     isinstance(etype, str)
                     and len(etype_str_to_tuple(etype)) == 3
@@ -139,11 +121,11 @@ class SampledSubgraphImpl(SampledSubgraph):
                 ), "Nodes in pairs should be of type torch.Tensor."
         else:
             assert (
-                self.node_pairs.indptr is not None
-                and self.node_pairs.indices is not None
+                self.edge_index_mappings.indptr is not None
+                and self.edge_index_mappings.indices is not None
             ), "Node pair should be have indptr and indice."
             assert isinstance(
-                self.node_pairs.indptr, torch.Tensor
+                self.edge_index_mappings.indptr, torch.Tensor
             ) and isinstance(
-                self.node_pairs.indices, torch.Tensor
+                self.edge_index_mappings.indices, torch.Tensor
             ), "Nodes in pairs should be of type torch.Tensor."
