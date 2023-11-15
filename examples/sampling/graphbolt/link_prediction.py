@@ -42,8 +42,8 @@ main
 └───> Test set evaluation
 """
 import argparse
+import time
 
-import dgl
 import dgl.graphbolt as gb
 import dgl.nn as dglnn
 import torch
@@ -78,12 +78,47 @@ class SAGE(nn.Module):
                 hidden_x = F.relu(hidden_x)
         return hidden_x
 
+    def inference(self, graph, features, dataloader, device):
+        """Conduct layer-wise inference to get all the node embeddings."""
+        feature = features.read("node", None, "feat")
+
+        buffer_device = torch.device("cpu")
+        # Enable pin_memory for faster CPU to GPU data transfer if the
+        # model is running on a GPU.
+        pin_memory = buffer_device != device
+
+        print("Start node embedding inference.")
+        for layer_idx, layer in enumerate(self.layers):
+            is_last_layer = layer_idx == len(self.layers) - 1
+
+            y = torch.empty(
+                graph.total_num_nodes,
+                self.hidden_size,
+                dtype=torch.float32,
+                device=buffer_device,
+                pin_memory=pin_memory,
+            )
+            feature = feature.to(device)
+            for step, data in tqdm.tqdm(enumerate(dataloader)):
+                x = feature[data.input_nodes]
+                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+                if not is_last_layer:
+                    hidden_x = F.relu(hidden_x)
+                # By design, our output nodes are contiguous.
+                y[
+                    data.output_nodes[0] : data.output_nodes[-1] + 1
+                ] = hidden_x.to(buffer_device, non_blocking=True)
+            feature = y
+
+        return y
+
 
 def create_dataloader(args, graph, features, itemset, is_train=True):
     """Get a GraphBolt version of a dataloader for link prediction tasks. This
     function demonstrates how to utilize functional forms of datapipes in
     GraphBolt. Alternatively, you can create a datapipe using its class
-    constructor.
+    constructor. For a more detailed tutorial, please read the examples in
+    `dgl/notebooks/graphbolt/walkthrough.ipynb`.
     """
 
     ############################################################################
@@ -103,7 +138,9 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # Initialize the ItemSampler to sample mini-batche from the dataset.
     ############################################################################
     datapipe = gb.ItemSampler(
-        itemset, batch_size=args.batch_size, shuffle=is_train
+        itemset,
+        batch_size=args.train_batch_size if is_train else args.eval_batch_size,
+        shuffle=is_train,
     )
 
     ############################################################################
@@ -163,9 +200,12 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     # A FeatureFetcher object to fetch node features.
     # [Role]:
     # Initialize a feature fetcher for fetching features of the sampled
-    # subgraphs.
+    # subgraphs. This step is skipped in evaluation/inference because features
+    # are updated as a whole during it, thus storing features in minibatch is
+    # unnecessary.
     ############################################################################
-    datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
+    if is_train:
+        datapipe = datapipe.fetch_feature(features, node_feature_keys=["feat"])
 
     ############################################################################
     # [Step-4]:
@@ -205,7 +245,7 @@ def create_dataloader(args, graph, features, itemset, is_train=True):
     return dataloader
 
 
-def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
+def to_binary_link_dgl_computing_pack(data: gb.DGLMiniBatch):
     """Convert the minibatch to a training pair and a label tensor."""
     pos_src, pos_dst = data.positive_node_pairs
     neg_src, neg_dst = data.negative_node_pairs
@@ -220,60 +260,81 @@ def to_binary_link_dgl_computing_pack(data: gb.MiniBatch):
 
 
 @torch.no_grad()
-def evaluate(args, graph, features, itemset, model):
-    evaluator = Evaluator(name="ogbl-citation2")
+def compute_mrr(args, model, evaluator, node_emb, src, dst, neg_dst):
+    """Compute the Mean Reciprocal Rank (MRR) for given source and destination
+    nodes.
 
-    # Since we need to evaluate the model, we need to set the number
-    # of layers to 3 and the fanout to -1.
-    args.fanout = [-1] * 3
-    dataloader = create_dataloader(
-        args, graph, features, itemset, is_train=False
-    )
-    pos_pred = []
-    neg_pred = []
+    This function computes the MRR for a set of node pairs, dividing the task
+    into batches to handle potentially large graphs.
+    """
+    rr = torch.zeros(src.shape[0])
+    # Loop over node pairs in batches.
+    for start in tqdm.trange(
+        0, src.shape[0], args.eval_batch_size, desc="Evaluate"
+    ):
+        end = min(start + args.eval_batch_size, src.shape[0])
 
-    model.eval()
-    for step, data in tqdm.tqdm(enumerate(dataloader)):
-        # Unpack MiniBatch.
-        compacted_pairs, _ = to_binary_link_dgl_computing_pack(data)
-        node_feature = data.node_features["feat"].float()
-        blocks = data.blocks
+        # Concatenate positive and negative destination nodes.
+        all_dst = torch.cat([dst[start:end, None], neg_dst[start:end]], 1)
 
-        # Get the embeddings of the input nodes.
-        y = model(blocks, node_feature)
-        # Calculate the score for positive and negative edges.
-        score = (
-            model.predictor(y[compacted_pairs[0]] * y[compacted_pairs[1]])
-            .squeeze()
-            .detach()
+        # Fetch embeddings for current batch of source and destination nodes.
+        h_src = node_emb[src[start:end]][:, None, :].to(args.device)
+        h_dst = (
+            node_emb[all_dst.view(-1)].view(*all_dst.shape, -1).to(args.device)
         )
 
-        # Split the score into positive and negative parts.
-        pos_score = score[: data.compacted_node_pairs[0].shape[0]]
-        neg_score = score[data.compacted_node_pairs[0].shape[0] :]
+        # Compute prediction scores using the model.
+        pred = model.predictor(h_src * h_dst).squeeze(-1)
 
-        # Append the score to the list.
-        pos_pred.append(pos_score)
-        neg_pred.append(neg_score)
-    pos_pred = torch.cat(pos_pred, dim=0)
-    neg_pred = torch.cat(neg_pred, dim=0).view(pos_pred.shape[0], -1)
-
-    input_dict = {"y_pred_pos": pos_pred, "y_pred_neg": neg_pred}
-    mrr = evaluator.eval(input_dict)["mrr_list"]
-    return mrr.mean()
+        # Evaluate the predictions to obtain MRR values.
+        input_dict = {"y_pred_pos": pred[:, 0], "y_pred_neg": pred[:, 1:]}
+        rr[start:end] = evaluator.eval(input_dict)["mrr_list"]
+    return rr.mean()
 
 
-def train(args, graph, features, train_set, valid_set, model):
+@torch.no_grad()
+def evaluate(args, model, graph, features, all_nodes_set, valid_set, test_set):
+    """Evaluate the model on validation and test sets."""
+    model.eval()
+    evaluator = Evaluator(name="ogbl-citation2")
+
+    # Since we need to use all neghborhoods for evaluation, we set the fanout
+    # to -1.
+    args.fanout = [-1]
+    dataloader = create_dataloader(
+        args, graph, features, all_nodes_set, is_train=False
+    )
+
+    # Compute node embeddings for the entire graph.
+    node_emb = model.inference(graph, features, dataloader, args.device)
+    results = []
+
+    # Loop over both validation and test sets.
+    for split in [valid_set, test_set]:
+        # Unpack the item set.
+        src = split._items[0][:, 0].to(node_emb.device)
+        dst = split._items[0][:, 1].to(node_emb.device)
+        neg_dst = split._items[1].to(node_emb.device)
+
+        # Compute MRR values for the current split.
+        results.append(
+            compute_mrr(args, model, evaluator, node_emb, src, dst, neg_dst)
+        )
+    return results
+
+
+def train(args, model, graph, features, train_set):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     dataloader = create_dataloader(args, graph, features, train_set)
 
     for epoch in tqdm.trange(args.epochs):
         model.train()
         total_loss = 0
+        start_epoch_time = time.time()
         for step, data in enumerate(dataloader):
             # Unpack MiniBatch.
             compacted_pairs, labels = to_binary_link_dgl_computing_pack(data)
-            node_feature = data.node_features["feat"].float()
+            node_feature = data.node_features["feat"]
             # Convert sampled subgraphs to DGL blocks.
             blocks = data.blocks
 
@@ -290,20 +351,15 @@ def train(args, graph, features, train_set, valid_set, model):
             optimizer.step()
 
             total_loss += loss.item()
-            if (step % 100 == 0) and (step != 0):
-                print(
-                    f"Epoch {epoch:05d} | "
-                    f"Step {step:05d} | "
-                    f"Loss {(total_loss) / (step + 1):.4f}",
-                    end="\n",
-                )
             if step + 1 == args.early_stop:
                 break
 
-    # Evaluate the model.
-    print("Validation")
-    valid_mrr = evaluate(args, graph, features, valid_set, model)
-    print(f"Valid MRR {valid_mrr.item():.4f}")
+        end_epoch_time = time.time()
+        print(
+            f"Epoch {epoch:05d} | "
+            f"Loss {(total_loss) / (step + 1):.4f} | "
+            f"Time {(end_epoch_time - start_epoch_time):.4f} s"
+        )
 
 
 def parse_args():
@@ -311,7 +367,8 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=0.0005)
     parser.add_argument("--neg-ratio", type=int, default=1)
-    parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument("--train-batch-size", type=int, default=512)
+    parser.add_argument("--eval-batch-size", type=int, default=1024)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument(
         "--early-stop",
@@ -345,22 +402,29 @@ def main(args):
     graph = dataset.graph
     features = dataset.feature
     train_set = dataset.tasks[0].train_set
-    valid_set = dataset.tasks[0].validation_set
     args.fanout = list(map(int, args.fanout.split(",")))
 
     in_size = features.size("node", None, "feat")[0]
     hidden_channels = 256
-    model = SAGE(in_size, hidden_channels)
+    args.device = torch.device(args.device)
+    model = SAGE(in_size, hidden_channels).to(args.device)
 
     # Model training.
     print("Training...")
-    train(args, graph, features, train_set, valid_set, model)
+    train(args, model, graph, features, train_set)
 
     # Test the model.
     print("Testing...")
     test_set = dataset.tasks[0].test_set
-    test_mrr = evaluate(args, graph, features, test_set, model)
-    print(f"Test MRR {test_mrr.item():.4f}")
+    valid_set = dataset.tasks[0].validation_set
+    all_nodes_set = dataset.all_nodes_set
+    valid_mrr, test_mrr = evaluate(
+        args, model, graph, features, all_nodes_set, valid_set, test_set
+    )
+    print(
+        f"Validation MRR {valid_mrr.item():.4f}, "
+        f"Test MRR {test_mrr.item():.4f}"
+    )
 
 
 if __name__ == "__main__":

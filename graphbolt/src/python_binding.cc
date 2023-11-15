@@ -4,7 +4,7 @@
  * @brief Graph bolt library Python binding.
  */
 
-#include <graphbolt/csc_sampling_graph.h>
+#include <graphbolt/fused_csc_sampling_graph.h>
 #include <graphbolt/isin.h>
 #include <graphbolt/serialize.h>
 #include <graphbolt/unique_and_compact.h>
@@ -15,54 +15,56 @@ namespace graphbolt {
 namespace sampling {
 
 TORCH_LIBRARY(graphbolt, m) {
-  m.class_<SampledSubgraph>("SampledSubgraph")
+  m.class_<FusedSampledSubgraph>("FusedSampledSubgraph")
       .def(torch::init<>())
-      .def_readwrite("indptr", &SampledSubgraph::indptr)
-      .def_readwrite("indices", &SampledSubgraph::indices)
+      .def_readwrite("indptr", &FusedSampledSubgraph::indptr)
+      .def_readwrite("indices", &FusedSampledSubgraph::indices)
       .def_readwrite(
-          "original_row_node_ids", &SampledSubgraph::original_row_node_ids)
+          "original_row_node_ids", &FusedSampledSubgraph::original_row_node_ids)
       .def_readwrite(
           "original_column_node_ids",
-          &SampledSubgraph::original_column_node_ids)
-      .def_readwrite("original_edge_ids", &SampledSubgraph::original_edge_ids)
-      .def_readwrite("type_per_edge", &SampledSubgraph::type_per_edge);
-  m.class_<CSCSamplingGraph>("CSCSamplingGraph")
-      .def("num_nodes", &CSCSamplingGraph::NumNodes)
-      .def("num_edges", &CSCSamplingGraph::NumEdges)
-      .def("csc_indptr", &CSCSamplingGraph::CSCIndptr)
-      .def("indices", &CSCSamplingGraph::Indices)
-      .def("node_type_offset", &CSCSamplingGraph::NodeTypeOffset)
-      .def("type_per_edge", &CSCSamplingGraph::TypePerEdge)
-      .def("edge_attributes", &CSCSamplingGraph::EdgeAttributes)
-      .def("set_csc_indptr", &CSCSamplingGraph::SetCSCIndptr)
-      .def("set_indices", &CSCSamplingGraph::SetIndices)
-      .def("set_node_type_offset", &CSCSamplingGraph::SetNodeTypeOffset)
-      .def("set_type_per_edge", &CSCSamplingGraph::SetTypePerEdge)
-      .def("set_edge_attributes", &CSCSamplingGraph::SetEdgeAttributes)
-      .def("in_subgraph", &CSCSamplingGraph::InSubgraph)
-      .def("sample_neighbors", &CSCSamplingGraph::SampleNeighbors)
+          &FusedSampledSubgraph::original_column_node_ids)
+      .def_readwrite(
+          "original_edge_ids", &FusedSampledSubgraph::original_edge_ids)
+      .def_readwrite("type_per_edge", &FusedSampledSubgraph::type_per_edge);
+  m.class_<FusedCSCSamplingGraph>("FusedCSCSamplingGraph")
+      .def("num_nodes", &FusedCSCSamplingGraph::NumNodes)
+      .def("num_edges", &FusedCSCSamplingGraph::NumEdges)
+      .def("csc_indptr", &FusedCSCSamplingGraph::CSCIndptr)
+      .def("indices", &FusedCSCSamplingGraph::Indices)
+      .def("node_type_offset", &FusedCSCSamplingGraph::NodeTypeOffset)
+      .def("type_per_edge", &FusedCSCSamplingGraph::TypePerEdge)
+      .def("edge_attributes", &FusedCSCSamplingGraph::EdgeAttributes)
+      .def("set_csc_indptr", &FusedCSCSamplingGraph::SetCSCIndptr)
+      .def("set_indices", &FusedCSCSamplingGraph::SetIndices)
+      .def("set_node_type_offset", &FusedCSCSamplingGraph::SetNodeTypeOffset)
+      .def("set_type_per_edge", &FusedCSCSamplingGraph::SetTypePerEdge)
+      .def("set_edge_attributes", &FusedCSCSamplingGraph::SetEdgeAttributes)
+      .def("in_subgraph", &FusedCSCSamplingGraph::InSubgraph)
+      .def("sample_neighbors", &FusedCSCSamplingGraph::SampleNeighbors)
       .def(
           "sample_negative_edges_uniform",
-          &CSCSamplingGraph::SampleNegativeEdgesUniform)
-      .def("copy_to_shared_memory", &CSCSamplingGraph::CopyToSharedMemory)
+          &FusedCSCSamplingGraph::SampleNegativeEdgesUniform)
+      .def("copy_to_shared_memory", &FusedCSCSamplingGraph::CopyToSharedMemory)
       .def_pickle(
           // __getstate__
-          [](const c10::intrusive_ptr<CSCSamplingGraph>& self)
+          [](const c10::intrusive_ptr<FusedCSCSamplingGraph>& self)
               -> torch::Dict<
                   std::string, torch::Dict<std::string, torch::Tensor>> {
             return self->GetState();
           },
           // __setstate__
           [](torch::Dict<std::string, torch::Dict<std::string, torch::Tensor>>
-                 state) -> c10::intrusive_ptr<CSCSamplingGraph> {
-            auto g = c10::make_intrusive<CSCSamplingGraph>();
+                 state) -> c10::intrusive_ptr<FusedCSCSamplingGraph> {
+            auto g = c10::make_intrusive<FusedCSCSamplingGraph>();
             g->SetState(state);
             return g;
           });
-  m.def("from_csc", &CSCSamplingGraph::FromCSC);
-  m.def("load_csc_sampling_graph", &LoadCSCSamplingGraph);
-  m.def("save_csc_sampling_graph", &SaveCSCSamplingGraph);
-  m.def("load_from_shared_memory", &CSCSamplingGraph::LoadFromSharedMemory);
+  m.def("from_fused_csc", &FusedCSCSamplingGraph::FromCSC);
+  m.def("load_fused_csc_sampling_graph", &LoadFusedCSCSamplingGraph);
+  m.def("save_fused_csc_sampling_graph", &SaveFusedCSCSamplingGraph);
+  m.def(
+      "load_from_shared_memory", &FusedCSCSamplingGraph::LoadFromSharedMemory);
   m.def("unique_and_compact", &UniqueAndCompact);
   m.def("isin", &IsIn);
   m.def("index_select", &ops::IndexSelect);

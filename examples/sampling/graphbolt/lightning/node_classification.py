@@ -211,7 +211,7 @@ if __name__ == "__main__":
     dataset = gb.BuiltinDataset("ogbn-products").load()
     datamodule = DataModule(
         dataset,
-        [15, 10, 5],
+        [10, 10, 10],
         args.batch_size,
         args.num_workers,
     )

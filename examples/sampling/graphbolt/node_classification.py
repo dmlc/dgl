@@ -49,27 +49,23 @@ import torchmetrics.functional as MF
 from tqdm import tqdm
 
 
-def create_dataloader(args, graph, features, itemset, job):
+def create_dataloader(
+    graph, features, itemset, batch_size, fanout, device, num_workers, job
+):
     """
     [HIGHLIGHT]
     Get a GraphBolt version of a dataloader for node classification tasks.
     This function demonstrates how to utilize functional forms of datapipes in
-    GraphBolt.
+    GraphBolt. For a more detailed tutorial, please read the examples in
+    `dgl/notebooks/graphbolt/walkthrough.ipynb`.
     Alternatively, you can create a datapipe using its class constructor.
 
     Parameters
     ----------
-    args : Namespace
-        The arguments parsed by `parser.parse_args()`.
-    graph : SamplingGraph
-        The network topology for sampling.
-    features : FeatureStore
-        The node features.
-    itemset : Union[ItemSet, ItemSetDict]
-        Data to be sampled.
     job : one of ["train", "evaluate", "infer"]
         The stage where dataloader is created, with options "train", "evaluate"
         and "infer".
+    Other parameters are explicated in the comments below.
     """
 
     ############################################################################
@@ -77,7 +73,7 @@ def create_dataloader(args, graph, features, itemset, job):
     # gb.ItemSampler()
     # [Input]:
     # 'itemset': The current dataset. (e.g. `train_set` or `valid_set`)
-    # 'args.batch_size': Specify the number of samples to be processed together,
+    # 'batch_size': Specify the number of samples to be processed together,
     # referred to as a 'mini-batch'. (The term 'mini-batch' is used here to
     # indicate a subset of the entire dataset that is processed together. This
     # is in contrast to processing the entire dataset, known as a 'full batch'.)
@@ -91,7 +87,7 @@ def create_dataloader(args, graph, features, itemset, job):
     # Initialize the ItemSampler to sample mini-batche from the dataset.
     ############################################################################
     datapipe = gb.ItemSampler(
-        itemset, batch_size=args.batch_size, shuffle=(job == "train")
+        itemset, batch_size=batch_size, shuffle=(job == "train")
     )
 
     ############################################################################
@@ -99,8 +95,8 @@ def create_dataloader(args, graph, features, itemset, job):
     # self.sample_neighbor()
     # [Input]:
     # 'graph': The network topology for sampling.
-    # '[-1] or args.fanout': Number of neighbors to sample per node. In
-    # training or validation, the length of args.fanout should be equal to the
+    # '[-1] or fanout': Number of neighbors to sample per node. In
+    # training or validation, the length of `fanout` should be equal to the
     # number of layers in the model. In inference, this parameter is set to
     # [-1], indicating that all neighbors of a node are sampled.
     # [Output]:
@@ -109,7 +105,7 @@ def create_dataloader(args, graph, features, itemset, job):
     # Initialize a neighbor sampler for sampling the neighborhoods of nodes.
     ############################################################################
     datapipe = datapipe.sample_neighbor(
-        graph, args.fanout if job != "infer" else [-1]
+        graph, fanout if job != "infer" else [-1]
     )
 
     ############################################################################
@@ -148,22 +144,20 @@ def create_dataloader(args, graph, features, itemset, job):
     # [Output]:
     # A CopyTo object to copy the data to the specified device.
     ############################################################################
-    datapipe = datapipe.copy_to(device=args.device)
+    datapipe = datapipe.copy_to(device=device)
 
     ############################################################################
     # [Step-6]:
     # gb.MultiProcessDataLoader()
     # [Input]:
     # 'datapipe': The datapipe object to be used for data loading.
-    # 'args.num_workers': The number of processes to be used for data loading.
+    # 'num_workers': The number of processes to be used for data loading.
     # [Output]:
     # A MultiProcessDataLoader object to handle data loading.
     # [Role]:
     # Initialize a multi-process dataloader to load the data in parallel.
     ############################################################################
-    dataloader = gb.MultiProcessDataLoader(
-        datapipe, num_workers=args.num_workers
-    )
+    dataloader = gb.MultiProcessDataLoader(datapipe, num_workers=num_workers)
 
     # Return the fully-initialized DataLoader object.
     return dataloader
@@ -181,7 +175,7 @@ class SAGE(nn.Module):
         self.hidden_size = hidden_size
         self.out_size = out_size
         # Set the dtype for the layers manually.
-        self.set_layer_dtype(torch.float64)
+        self.set_layer_dtype(torch.float32)
 
     def set_layer_dtype(self, _dtype):
         for layer in self.layers:
@@ -221,7 +215,7 @@ class SAGE(nn.Module):
 
             for step, data in tqdm(enumerate(dataloader)):
                 x = feature[data.input_nodes]
-                hidden_x = layer(data.blocks[0], x)  # len(blocks) = 1
+                hidden_x = layer(data.blocks[0], x.float())  # len(blocks) = 1
                 if not is_last_layer:
                     hidden_x = F.relu(hidden_x)
                     hidden_x = self.dropout(hidden_x)
@@ -240,7 +234,14 @@ def layerwise_infer(
 ):
     model.eval()
     dataloader = create_dataloader(
-        args, graph, features, all_nodes_set, job="infer"
+        graph=graph,
+        features=features,
+        itemset=all_nodes_set,
+        batch_size=4 * args.batch_size,
+        fanout=[-1],
+        device=args.device,
+        num_workers=args.num_workers,
+        job="infer",
     )
     pred = model.inference(graph, features, dataloader, args.device)
     pred = pred[test_set._items[0]]
@@ -260,13 +261,20 @@ def evaluate(args, model, graph, features, itemset, num_classes):
     y = []
     y_hats = []
     dataloader = create_dataloader(
-        args, graph, features, itemset, job="evaluate"
+        graph=graph,
+        features=features,
+        itemset=itemset,
+        batch_size=args.batch_size,
+        fanout=args.fanout,
+        device=args.device,
+        num_workers=args.num_workers,
+        job="evaluate",
     )
 
     for step, data in tqdm(enumerate(dataloader)):
         x = data.node_features["feat"]
         y.append(data.labels)
-        y_hats.append(model(data.blocks, x))
+        y_hats.append(model(data.blocks, x.float()))
 
     return MF.accuracy(
         torch.cat(y_hats),
@@ -279,14 +287,21 @@ def evaluate(args, model, graph, features, itemset, num_classes):
 def train(args, graph, features, train_set, valid_set, num_classes, model):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     dataloader = create_dataloader(
-        args, graph, features, train_set, job="train"
+        graph=graph,
+        features=features,
+        itemset=train_set,
+        batch_size=args.batch_size,
+        fanout=args.fanout,
+        device=args.device,
+        num_workers=args.num_workers,
+        job="train",
     )
 
     for epoch in range(args.epochs):
         t0 = time.time()
         model.train()
         total_loss = 0
-        for step, data in tqdm(enumerate(dataloader)):
+        for step, data in enumerate(dataloader):
             # The input features from the source nodes in the first layer's
             # computation graph.
             x = data.node_features["feat"]
@@ -295,7 +310,7 @@ def train(args, graph, features, train_set, valid_set, num_classes, model):
             # in the last layer's computation graph.
             y = data.labels
 
-            y_hat = model(data.blocks, x)
+            y_hat = model(data.blocks, x.float())
 
             # Compute loss.
             loss = F.cross_entropy(y_hat, y)
@@ -330,20 +345,20 @@ def parse_args():
         help="Learning rate for optimization.",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=256, help="Batch size for training."
+        "--batch-size", type=int, default=1024, help="Batch size for training."
     )
     parser.add_argument(
         "--num-workers",
         type=int,
-        default=4,
+        default=0,
         help="Number of workers for data loading.",
     )
     parser.add_argument(
         "--fanout",
         type=str,
-        default="15,10,5",
+        default="10,10,10",
         help="Fan-out of neighbor sampling. It is IMPORTANT to keep len(fanout)"
-        " identical with the number of layers in your model. Default: 15,10,5",
+        " identical with the number of layers in your model. Default: 10,10,10",
     )
     parser.add_argument(
         "--device",
@@ -377,7 +392,7 @@ def main(args):
     num_classes = dataset.tasks[0].metadata["num_classes"]
 
     in_size = features.size("node", None, "feat")[0]
-    hidden_size = 128
+    hidden_size = 256
     out_size = num_classes
 
     model = SAGE(in_size, hidden_size, out_size)
@@ -399,7 +414,7 @@ def main(args):
         model,
         num_classes,
     )
-    print(f"Test Accuracy is {test_acc.item():.4f}")
+    print(f"Test accuracy {test_acc.item():.4f}")
 
 
 if __name__ == "__main__":

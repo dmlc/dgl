@@ -62,6 +62,77 @@ def test_OnDiskDataset_TVTSet_exceptions():
             _ = gb.OnDiskDataset(test_dir).load()
 
 
+def test_OnDiskDataset_multiple_tasks():
+    """Teset multiple tasks are supported."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        train_ids = np.arange(1000)
+        train_ids_path = os.path.join(test_dir, "train_ids.npy")
+        np.save(train_ids_path, train_ids)
+        train_labels = np.random.randint(0, 10, size=1000)
+        train_labels_path = os.path.join(test_dir, "train_labels.npy")
+        np.save(train_labels_path, train_labels)
+
+        yaml_content = f"""
+            tasks:
+              - name: node_classification_1
+                num_classes: 10
+                train_set:
+                  - type: null
+                    data:
+                      - name: seed_nodes
+                        format: numpy
+                        in_memory: true
+                        path: {train_ids_path}
+                      - name: labels
+                        format: numpy
+                        in_memory: true
+                        path: {train_labels_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {train_labels_path}
+              - name: node_classification_2
+                num_classes: 10
+                train_set:
+                  - type: null
+                    data:
+                      - name: seed_nodes
+                        format: numpy
+                        in_memory: true
+                        path: {train_ids_path}
+                      - name: labels
+                        format: numpy
+                        in_memory: true
+                        path: {train_labels_path}
+                      - format: numpy
+                        in_memory: true
+                        path: {train_labels_path}
+        """
+        os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
+        yaml_file = os.path.join(test_dir, "preprocessed/metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(test_dir).load()
+        assert len(dataset.tasks) == 2
+
+        for task_id in range(2):
+            assert (
+                dataset.tasks[task_id].metadata["name"]
+                == f"node_classification_{task_id + 1}"
+            )
+            assert dataset.tasks[task_id].metadata["num_classes"] == 10
+            # Verify train set.
+            train_set = dataset.tasks[task_id].train_set
+            assert len(train_set) == 1000
+            assert isinstance(train_set, gb.ItemSet)
+            for i, (id, label, _) in enumerate(train_set):
+                assert id == train_ids[i]
+                assert label == train_labels[i]
+            assert train_set.names == ("seed_nodes", "labels", None)
+            train_set = None
+        dataset = None
+
+
 def test_OnDiskDataset_TVTSet_ItemSet_names():
     """Test TVTSet which returns ItemSet with IDs, labels and corresponding names."""
     with tempfile.TemporaryDirectory() as test_dir:
@@ -951,15 +1022,15 @@ def test_OnDiskDataset_Graph_Exceptions():
 def test_OnDiskDataset_Graph_homogeneous():
     """Test homogeneous graph topology."""
     csc_indptr, indices = gbt.random_homo_graph(1000, 10 * 1000)
-    graph = gb.from_csc(csc_indptr, indices)
+    graph = gb.from_fused_csc(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
-        gb.save_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
+        gb.save_fused_csc_sampling_graph(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
-              type: CSCSamplingGraph
+              type: FusedCSCSamplingGraph
               path: {graph_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
@@ -992,17 +1063,17 @@ def test_OnDiskDataset_Graph_heterogeneous():
         type_per_edge,
         metadata,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
-    graph = gb.from_csc(
+    graph = gb.from_fused_csc(
         csc_indptr, indices, node_type_offset, type_per_edge, None, metadata
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
-        gb.save_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
+        gb.save_fused_csc_sampling_graph(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
-              type: CSCSamplingGraph
+              type: FusedCSCSamplingGraph
               path: {graph_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
@@ -1084,19 +1155,24 @@ def test_OnDiskDataset_preprocess_homogeneous():
         assert "graph" not in processed_dataset
         assert "graph_topology" in processed_dataset
 
-        csc_sampling_graph = gb.csc_sampling_graph.load_csc_sampling_graph(
-            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
+        fused_csc_sampling_graph = (
+            gb.fused_csc_sampling_graph.load_fused_csc_sampling_graph(
+                os.path.join(
+                    test_dir, processed_dataset["graph_topology"]["path"]
+                )
+            )
         )
-        assert csc_sampling_graph.total_num_nodes == num_nodes
-        assert csc_sampling_graph.total_num_edges == num_edges
+        assert fused_csc_sampling_graph.total_num_nodes == num_nodes
+        assert fused_csc_sampling_graph.total_num_edges == num_edges
         assert (
-            csc_sampling_graph.edge_attributes is None
-            or gb.ORIGINAL_EDGE_ID not in csc_sampling_graph.edge_attributes
+            fused_csc_sampling_graph.edge_attributes is None
+            or gb.ORIGINAL_EDGE_ID
+            not in fused_csc_sampling_graph.edge_attributes
         )
 
         num_samples = 100
         fanout = 1
-        subgraph = csc_sampling_graph.sample_neighbors(
+        subgraph = fused_csc_sampling_graph.sample_neighbors(
             torch.arange(num_samples),
             torch.tensor([fanout]),
         )
@@ -1126,14 +1202,19 @@ def test_OnDiskDataset_preprocess_homogeneous():
         )
         with open(output_file, "rb") as f:
             processed_dataset = yaml.load(f, Loader=yaml.Loader)
-        csc_sampling_graph = gb.csc_sampling_graph.load_csc_sampling_graph(
-            os.path.join(test_dir, processed_dataset["graph_topology"]["path"])
+        fused_csc_sampling_graph = (
+            gb.fused_csc_sampling_graph.load_fused_csc_sampling_graph(
+                os.path.join(
+                    test_dir, processed_dataset["graph_topology"]["path"]
+                )
+            )
         )
         assert (
-            csc_sampling_graph.edge_attributes is not None
-            and gb.ORIGINAL_EDGE_ID not in csc_sampling_graph.edge_attributes
+            fused_csc_sampling_graph.edge_attributes is not None
+            and gb.ORIGINAL_EDGE_ID
+            not in fused_csc_sampling_graph.edge_attributes
         )
-        csc_sampling_graph = None
+        fused_csc_sampling_graph = None
 
 
 def test_OnDiskDataset_preprocess_path():
@@ -1253,17 +1334,17 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
               - name: node_classification
                 num_classes: {num_classes}
                 train_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set/train.npy
                 validation_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set/validation.npy
                 test_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set/test.npy
@@ -1279,8 +1360,8 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
         target_yaml_content = f"""
             dataset_name: {dataset_name}
             graph_topology:
-              type: CSCSamplingGraph
-              path: preprocessed/csc_sampling_graph.tar
+              type: FusedCSCSamplingGraph
+              path: preprocessed/fused_csc_sampling_graph.tar
             feature_data:
               - domain: node
                 type: null
@@ -1292,17 +1373,17 @@ def test_OnDiskDataset_preprocess_yaml_content_unix():
               - name: node_classification
                 num_classes: {num_classes}
                 train_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed/set/train.npy
                 validation_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed/set/validation.npy
                 test_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed/set/test.npy
@@ -1407,17 +1488,17 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
               - name: node_classification
                 num_classes: {num_classes}
                 train_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set\\train.npy
                 validation_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set\\validation.npy
                 test_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: set\\test.npy
@@ -1433,8 +1514,8 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
         target_yaml_content = f"""
             dataset_name: {dataset_name}
             graph_topology:
-              type: CSCSamplingGraph
-              path: preprocessed\\csc_sampling_graph.tar
+              type: FusedCSCSamplingGraph
+              path: preprocessed\\fused_csc_sampling_graph.tar
             feature_data:
               - domain: node
                 type: null
@@ -1446,17 +1527,17 @@ def test_OnDiskDataset_preprocess_yaml_content_windows():
               - name: node_classification
                 num_classes: {num_classes}
                 train_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed\\set\\train.npy
                 validation_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed\\set\\validation.npy
                 test_set:
-                  - type_name: null
+                  - type: null
                     data:
                       - format: numpy
                         path: preprocessed\\set\\test.npy
@@ -1550,6 +1631,7 @@ def test_OnDiskDataset_load_feature():
         dataset = gb.OnDiskDataset(test_dir)
         # If `format` is torch and `in_memory` is False, it will
         # raise an AssertionError.
+        dataset.yaml_data["feature_data"][0]["in_memory"] = False
         dataset.yaml_data["feature_data"][0]["format"] = "torch"
         with pytest.raises(
             AssertionError,
@@ -1632,7 +1714,7 @@ def test_OnDiskDataset_load_graph():
             pydantic.ValidationError,
             # As error message diffs in pydantic 1.x and 2.x, we just match
             # keyword only.
-            match="'CSCSamplingGraph'",
+            match="'FusedCSCSamplingGraph'",
         ):
             dataset.load()
 
@@ -1787,15 +1869,15 @@ def test_OnDiskDataset_load_tasks():
 def test_OnDiskDataset_all_nodes_set_homo():
     """Test homograph's all nodes set of OnDiskDataset."""
     csc_indptr, indices = gbt.random_homo_graph(1000, 10 * 1000)
-    graph = gb.from_csc(csc_indptr, indices)
+    graph = gb.from_fused_csc(csc_indptr, indices)
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
-        gb.save_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
+        gb.save_fused_csc_sampling_graph(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
-              type: CSCSamplingGraph
+              type: FusedCSCSamplingGraph
               path: {graph_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
@@ -1822,7 +1904,7 @@ def test_OnDiskDataset_all_nodes_set_hetero():
         type_per_edge,
         metadata,
     ) = gbt.random_hetero_graph(1000, 10 * 1000, 3, 4)
-    graph = gb.from_csc(
+    graph = gb.from_fused_csc(
         csc_indptr,
         indices,
         node_type_offset=node_type_offset,
@@ -1832,12 +1914,12 @@ def test_OnDiskDataset_all_nodes_set_hetero():
     )
 
     with tempfile.TemporaryDirectory() as test_dir:
-        graph_path = os.path.join(test_dir, "csc_sampling_graph.tar")
-        gb.save_csc_sampling_graph(graph, graph_path)
+        graph_path = os.path.join(test_dir, "fused_csc_sampling_graph.tar")
+        gb.save_fused_csc_sampling_graph(graph, graph_path)
 
         yaml_content = f"""
             graph_topology:
-              type: CSCSamplingGraph
+              type: FusedCSCSamplingGraph
               path: {graph_path}
         """
         os.makedirs(os.path.join(test_dir, "preprocessed"), exist_ok=True)
@@ -1937,7 +2019,7 @@ def test_OnDiskDataset_load_1D_feature(fmt):
                 - name: node_classification
                   num_classes: {num_classes}
                   train_set:
-                    - type_name: null
+                    - type: null
                       data:
                         - format: {fmt}
                           path: {train_path}
@@ -1988,3 +2070,143 @@ def test_BuiltinDataset():
             match=rf"Dataset {dataset_name} is not available.*",
         ):
             _ = gb.BuiltinDataset(name=dataset_name, root=test_dir).load()
+
+
+@pytest.mark.parametrize("include_original_edge_id", [True, False])
+def test_OnDiskDataset_homogeneous(include_original_edge_id):
+    """Preprocess and instantiate OnDiskDataset for homogeneous graph."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        # All metadata fields are specified.
+        dataset_name = "graphbolt_test"
+        num_nodes = 4000
+        num_edges = 20000
+        num_classes = 10
+
+        # Generate random graph.
+        yaml_content = gbt.random_homo_graphbolt_graph(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+        yaml_file = os.path.join(test_dir, "metadata.yaml")
+        with open(yaml_file, "w") as f:
+            f.write(yaml_content)
+
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=include_original_edge_id
+        ).load()
+
+        assert dataset.dataset_name == dataset_name
+
+        graph = dataset.graph
+        assert isinstance(graph, gb.FusedCSCSamplingGraph)
+        assert graph.total_num_nodes == num_nodes
+        assert graph.total_num_edges == num_edges
+        assert graph.edge_attributes is not None
+        assert (
+            not include_original_edge_id
+        ) or gb.ORIGINAL_EDGE_ID in graph.edge_attributes
+
+        tasks = dataset.tasks
+        assert len(tasks) == 1
+        assert isinstance(tasks[0].train_set, gb.ItemSet)
+        assert isinstance(tasks[0].validation_set, gb.ItemSet)
+        assert isinstance(tasks[0].test_set, gb.ItemSet)
+        assert tasks[0].metadata["num_classes"] == num_classes
+        assert tasks[0].metadata["name"] == "link_prediction"
+
+        assert dataset.feature.size("node", None, "feat")[0] == num_classes
+        assert dataset.feature.size("edge", None, "feat")[0] == num_classes
+
+        for itemset in [
+            tasks[0].train_set,
+            tasks[0].validation_set,
+            tasks[0].test_set,
+        ]:
+            datapipe = gb.ItemSampler(itemset, batch_size=10)
+            datapipe = datapipe.sample_neighbor(graph, [-1])
+            datapipe = datapipe.fetch_feature(
+                dataset.feature, node_feature_keys=["feat"]
+            )
+            datapipe = datapipe.to_dgl()
+            dataloader = gb.MultiProcessDataLoader(datapipe)
+            for _ in dataloader:
+                pass
+
+        graph = None
+        tasks = None
+        dataset = None
+
+
+@pytest.mark.parametrize("include_original_edge_id", [True, False])
+def test_OnDiskDataset_heterogeneous(include_original_edge_id):
+    """Preprocess and instantiate OnDiskDataset for heterogeneous graph."""
+    with tempfile.TemporaryDirectory() as test_dir:
+        dataset_name = "OnDiskDataset_hetero"
+        num_nodes = {
+            "user": 1000,
+            "item": 2000,
+        }
+        num_edges = {
+            ("user", "follow", "user"): 10000,
+            ("user", "click", "item"): 20000,
+        }
+        num_classes = 10
+        gbt.genereate_raw_data_for_hetero_dataset(
+            test_dir,
+            dataset_name,
+            num_nodes,
+            num_edges,
+            num_classes,
+        )
+
+        dataset = gb.OnDiskDataset(
+            test_dir, include_original_edge_id=include_original_edge_id
+        ).load()
+
+        assert dataset.dataset_name == dataset_name
+
+        graph = dataset.graph
+        assert isinstance(graph, gb.FusedCSCSamplingGraph)
+        assert graph.total_num_nodes == sum(
+            num_nodes for num_nodes in num_nodes.values()
+        )
+        assert graph.total_num_edges == sum(
+            num_edge for num_edge in num_edges.values()
+        )
+        assert graph.edge_attributes is not None
+        assert (
+            not include_original_edge_id
+        ) or gb.ORIGINAL_EDGE_ID in graph.edge_attributes
+
+        tasks = dataset.tasks
+        assert len(tasks) == 1
+        assert isinstance(tasks[0].train_set, gb.ItemSetDict)
+        assert isinstance(tasks[0].validation_set, gb.ItemSetDict)
+        assert isinstance(tasks[0].test_set, gb.ItemSetDict)
+        assert tasks[0].metadata["num_classes"] == num_classes
+        assert tasks[0].metadata["name"] == "node_classification"
+
+        assert dataset.feature.size("node", "user", "feat")[0] == num_classes
+        assert dataset.feature.size("node", "item", "feat")[0] == num_classes
+
+        for itemset in [
+            tasks[0].train_set,
+            tasks[0].validation_set,
+            tasks[0].test_set,
+        ]:
+            datapipe = gb.ItemSampler(itemset, batch_size=10)
+            datapipe = datapipe.sample_neighbor(graph, [-1])
+            datapipe = datapipe.fetch_feature(
+                dataset.feature, node_feature_keys={"user": ["feat"]}
+            )
+            datapipe = datapipe.to_dgl()
+            dataloader = gb.MultiProcessDataLoader(datapipe)
+            for _ in dataloader:
+                pass
+
+        graph = None
+        tasks = None
+        dataset = None
