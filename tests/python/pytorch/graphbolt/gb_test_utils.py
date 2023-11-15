@@ -210,7 +210,7 @@ def genereate_raw_data_for_hetero_dataset(
         src_ntype, etype_str, dst_ntype = etype
         src = torch.randint(0, num_nodes[src_ntype], (num_edge,))
         dst = torch.randint(0, num_nodes[dst_ntype], (num_edge,))
-        # Wrtie into edges/edge.csv
+        # Write into edges/edge.csv
         os.makedirs(os.path.join(test_dir, "edges"), exist_ok=True)
         edges = pd.DataFrame(
             np.stack([src, dst], axis=1), columns=["src", "dst"]
