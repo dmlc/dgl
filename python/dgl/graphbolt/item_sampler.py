@@ -16,7 +16,7 @@ from ..batch import batch as dgl_batch
 from ..heterograph import DGLGraph
 from .itemset import ItemSet, ItemSetDict
 from .minibatch import MiniBatch
-from .utils import count_split
+from .utils import calculate_range
 
 __all__ = ["ItemSampler", "DistributedItemSampler", "minibatcher_default"]
 
@@ -189,43 +189,17 @@ class ItemShufflerAndBatcher:
             num_items = len(self._item_set)
             start_offset = 0
         else:
-            # First, equally distribute items into all replicas.
-            total_count = len(self._item_set)
-            count_div_replicas = total_count // self._num_replicas
-            num_items, start_offset = count_split(
-                total_count, self._num_replicas, self._rank
+            total = len(self._item_set)
+            start_offset, num_items, evened_count = calculate_range(
+                total,
+                self._num_replicas,
+                self._rank,
+                num_workers,
+                worker_id,
+                self._batch_size,
+                self._drop_last,
+                self._drop_uneven_inputs,
             )
-            # Calculate the number of outputs when drop_uneven_inputs is True.
-            # `num_items` is the number of items distributed to the current
-            # process. `evened_count` is the number of items should be output
-            # by this process after dropping uneven inputs.
-            if not self._drop_uneven_inputs:
-                evened_count = num_items
-            elif not self._drop_last:
-                evened_count = (
-                    count_div_replicas
-                    if count_div_replicas % self._batch_size == 0
-                    else num_items
-                )
-            elif self._drop_last:
-                evened_count = (
-                    count_div_replicas // self._batch_size * self._batch_size
-                )
-            # If there are multiple workers, equally distribute the batches to
-            # all workers.
-            if num_workers > 1:
-                # Equally distribute the dropped number too.
-                dropped_items, prev_dropped_items = count_split(
-                    num_items - evened_count, num_workers, worker_id
-                )
-                evened_count, prev_evened_count = count_split(
-                    evened_count,
-                    num_workers,
-                    worker_id,
-                    self._batch_size,
-                )
-                num_items = evened_count + dropped_items
-                start_offset += prev_evened_count + prev_dropped_items
         start = 0
         while start < num_items:
             end = min(start + self._buffer_size, num_items)
@@ -606,7 +580,7 @@ class DistributedItemSampler(ItemSampler):
 
     >>> import torch
     >>> from dgl import graphbolt as gb
-    >>> item_set = gb.ItemSet(torch.arange(0, 14))
+    >>> item_set = gb.ItemSet(torch.arange(15))
     >>> num_replicas = 4
     >>> batch_size = 2
     >>> mp.spawn(...)
@@ -621,8 +595,8 @@ class DistributedItemSampler(ItemSampler):
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     Replica#0: [tensor([0, 1]), tensor([2, 3])]
     Replica#1: [tensor([4, 5]), tensor([6, 7])]
-    Replica#2: [tensor([8, 9]), tensor([10])]
-    Replica#3: [tensor([11, 12]), tensor([13])]
+    Replica#2: [tensor([8, 9]), tensor([10, 11])]
+    Replica#3: [tensor([12, 13]), tensor([14])]
 
     2. shuffle = False, drop_last = True, drop_uneven_inputs = False.
 
@@ -634,8 +608,8 @@ class DistributedItemSampler(ItemSampler):
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     Replica#0: [tensor([0, 1]), tensor([2, 3])]
     Replica#1: [tensor([4, 5]), tensor([6, 7])]
-    Replica#2: [tensor([8, 9])]
-    Replica#3: [tensor([11, 12])]
+    Replica#2: [tensor([8, 9]), tensor([10, 11])]
+    Replica#3: [tensor([12, 13])]
 
     3. shuffle = False, drop_last = False, drop_uneven_inputs = True.
 
@@ -647,8 +621,8 @@ class DistributedItemSampler(ItemSampler):
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     Replica#0: [tensor([0, 1]), tensor([2, 3])]
     Replica#1: [tensor([4, 5]), tensor([6, 7])]
-    Replica#2: [tensor([8, 9]), tensor([10])]
-    Replica#3: [tensor([11, 12]), tensor([13])]
+    Replica#2: [tensor([8, 9]), tensor([10, 11])]
+    Replica#3: [tensor([12, 13]), tensor([14])]
 
     4. shuffle = False, drop_last = True, drop_uneven_inputs = True.
 
@@ -661,7 +635,7 @@ class DistributedItemSampler(ItemSampler):
     Replica#0: [tensor([0, 1])]
     Replica#1: [tensor([4, 5])]
     Replica#2: [tensor([8, 9])]
-    Replica#3: [tensor([11, 12])]
+    Replica#3: [tensor([12, 13])]
 
     5. shuffle = True, drop_last = True, drop_uneven_inputs = False.
 
@@ -672,10 +646,10 @@ class DistributedItemSampler(ItemSampler):
     >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     (One possible output:)
-    Replica#0: [tensor([1, 3]), tensor([0, 2])]
-    Replica#1: [tensor([4, 5]), tensor([7, 6])]
+    Replica#0: [tensor([3, 2]), tensor([0, 1])]
+    Replica#1: [tensor([6, 5]), tensor([7, 4])]
     Replica#2: [tensor([8, 10])]
-    Replica#3: [tensor([13, 11])]
+    Replica#3: [tensor([14, 12])]
 
     6. shuffle = True, drop_last = True, drop_uneven_inputs = True.
 
@@ -686,10 +660,10 @@ class DistributedItemSampler(ItemSampler):
     >>> data_loader = gb.SingleProcessDataLoader(item_sampler)
     >>> print(f"Replica#{proc_id}: {list(data_loader)})
     (One possible output:)
-    Replica#0: [tensor([3, 2])]
-    Replica#1: [tensor([4, 6])]
-    Replica#2: [tensor([9, 8])]
-    Replica#3: [tensor([13, 11])]
+    Replica#0: [tensor([1, 3])]
+    Replica#1: [tensor([7, 5])]
+    Replica#2: [tensor([11, 9])]
+    Replica#3: [tensor([13, 14])]
     """
 
     def __init__(

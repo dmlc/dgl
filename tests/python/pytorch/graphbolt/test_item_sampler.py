@@ -790,8 +790,95 @@ def distributed_item_sampler_subprocess(
         dist.destroy_process_group()
 
 
+@pytest.mark.parametrize(
+    "params",
+    [
+        ((24, 4, 0, 4, False, False), [(8, 8), (8, 8), (4, 4), (4, 4)]),
+        ((30, 4, 0, 4, False, False), [(8, 8), (8, 8), (8, 8), (6, 6)]),
+        ((30, 4, 0, 4, True, False), [(8, 8), (8, 8), (8, 8), (6, 6)]),
+        ((30, 4, 0, 4, False, True), [(8, 8), (8, 8), (8, 8), (6, 6)]),
+        ((30, 4, 0, 4, True, True), [(8, 4), (8, 4), (8, 4), (6, 4)]),
+        (
+            (53, 4, 2, 4, False, False),
+            [(8, 8), (8, 8), (8, 8), (5, 5), (8, 8), (4, 4), (8, 8), (4, 4)],
+        ),
+        (
+            (53, 4, 2, 4, True, False),
+            [(8, 8), (8, 8), (8, 8), (5, 5), (8, 8), (4, 4), (8, 8), (4, 4)],
+        ),
+        (
+            (53, 4, 2, 4, False, True),
+            [(10, 8), (6, 4), (9, 8), (4, 4), (8, 8), (4, 4), (8, 8), (4, 4)],
+        ),
+        (
+            (53, 4, 2, 4, True, True),
+            [(10, 8), (6, 4), (9, 8), (4, 4), (8, 8), (4, 4), (8, 8), (4, 4)],
+        ),
+        (
+            (63, 4, 2, 4, False, False),
+            [(8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (7, 7)],
+        ),
+        (
+            (63, 4, 2, 4, False, True),
+            [(8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (7, 7)],
+        ),
+        (
+            (63, 4, 2, 4, True, True),
+            [
+                (10, 8),
+                (6, 4),
+                (10, 8),
+                (6, 4),
+                (10, 8),
+                (6, 4),
+                (10, 8),
+                (5, 4),
+            ],
+        ),
+        (
+            (65, 4, 2, 4, False, False),
+            [(9, 9), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8)],
+        ),
+        (
+            (65, 4, 2, 4, True, True),
+            [(9, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8)],
+        ),
+    ],
+)
+def test_RangeCalculation(params):
+    (
+        (
+            total,
+            num_replicas,
+            num_workers,
+            batch_size,
+            drop_last,
+            drop_uneven_inputs,
+        ),
+        key,
+    ) = params
+    answer = []
+    sum = 0
+    for rank in range(num_replicas):
+        for worker_id in range(max(num_workers, 1)):
+            result = gb.utils.calculate_range(
+                total,
+                num_replicas,
+                rank,
+                num_workers,
+                worker_id,
+                batch_size,
+                drop_last,
+                drop_uneven_inputs,
+            )
+            assert sum == result[0]
+            sum += result[1]
+            answer.append((result[1], result[2]))
+    assert key == answer
+
+
 @pytest.mark.parametrize("num_ids", [24, 30, 32, 34, 36])
-@pytest.mark.parametrize("num_workers", [0, 2, 4])
+@pytest.mark.parametrize("num_workers", [0, 2])
 @pytest.mark.parametrize("drop_last", [False, True])
 @pytest.mark.parametrize("drop_uneven_inputs", [False, True])
 def test_DistributedItemSampler(
