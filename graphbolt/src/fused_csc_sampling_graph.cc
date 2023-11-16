@@ -300,9 +300,13 @@ auto GetPickFn(
           offset, num_neighbors, fanouts, replace, options,
           type_per_edge.value(), probs_or_mask, args, picked_data_ptr);
     } else {
-      return Pick(
+      int64_t num_sampled = Pick(
           offset, num_neighbors, fanouts[0], replace, options, probs_or_mask,
           args, picked_data_ptr);
+      if (type_per_edge) {
+        std::sort(picked_data_ptr, picked_data_ptr + num_sampled);
+      }
+      return num_sampled;
     }
   };
 }
