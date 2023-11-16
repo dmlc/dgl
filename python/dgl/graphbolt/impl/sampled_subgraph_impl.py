@@ -75,18 +75,18 @@ class SampledSubgraphImpl(SampledSubgraph):
 
     Examples
     --------
-    >>> edge_index_mappings = {"A:relation:B": CSCFormatBase(indptr=torch.tensor([0, 1, 2, 3]),
+    >>> node_pairs = {"A:relation:B": CSCFormatBase(indptr=torch.tensor([0, 1, 2, 3]),
     ... indices=torch.tensor([0, 1, 2]))}
     >>> original_column_node_ids = {'B': torch.tensor([10, 11, 12])}
     >>> original_row_node_ids = {'A': torch.tensor([13, 14, 15])}
     >>> original_edge_ids = {"A:relation:B": torch.tensor([19, 20, 21])}
     >>> subgraph = gb.SampledSubgraphImpl(
-    ... edge_index_mappings=edge_index_mappings,
+    ... node_pairs=node_pairs,
     ... original_column_node_ids=original_column_node_ids,
     ... original_row_node_ids=original_row_node_ids,
     ... original_edge_ids=original_edge_ids
     ... )
-    >>> print(subgraph.edge_index_mappings)
+    >>> print(subgraph.node_pairs)
     {"A:relation:B": CSCForamtBase(indptr=torch.tensor([0, 1, 2, 3]),
     ... indices=torch.tensor([0, 1, 2]))}
     >>> print(subgraph.original_column_node_ids)
@@ -96,7 +96,7 @@ class SampledSubgraphImpl(SampledSubgraph):
     >>> print(subgraph.original_edge_ids)
     {"A:relation:B": tensor([19, 20, 21])}
     """
-    edge_index_mappings: Union[
+    node_pairs: Union[
         CSCFormatBase,
         Dict[str, CSCFormatBase],
     ] = None
@@ -107,8 +107,8 @@ class SampledSubgraphImpl(SampledSubgraph):
     original_edge_ids: Union[Dict[str, torch.Tensor], torch.Tensor] = None
 
     def __post_init__(self):
-        if isinstance(self.edge_index_mappings, dict):
-            for etype, pair in self.edge_index_mappings.items():
+        if isinstance(self.node_pairs, dict):
+            for etype, pair in self.node_pairs.items():
                 assert (
                     isinstance(etype, str)
                     and len(etype_str_to_tuple(etype)) == 3
@@ -121,11 +121,11 @@ class SampledSubgraphImpl(SampledSubgraph):
                 ), "Nodes in pairs should be of type torch.Tensor."
         else:
             assert (
-                self.edge_index_mappings.indptr is not None
-                and self.edge_index_mappings.indices is not None
+                self.node_pairs.indptr is not None
+                and self.node_pairs.indices is not None
             ), "Node pair should be have indptr and indice."
             assert isinstance(
-                self.edge_index_mappings.indptr, torch.Tensor
+                self.node_pairs.indptr, torch.Tensor
             ) and isinstance(
-                self.edge_index_mappings.indices, torch.Tensor
+                self.node_pairs.indices, torch.Tensor
             ), "Nodes in pairs should be of type torch.Tensor."

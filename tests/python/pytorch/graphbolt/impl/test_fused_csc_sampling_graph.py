@@ -1712,8 +1712,8 @@ def test_sample_neighbors_homo_csc_format():
     )
 
     # Verify in subgraph.
-    sampled_indptr_num = subgraph.edge_index_mappings.indptr.size(0)
-    sampled_num = subgraph.edge_index_mappings.indices.size(0)
+    sampled_indptr_num = subgraph.node_pairs.indptr.size(0)
+    sampled_num = subgraph.node_pairs.indices.size(0)
     assert sampled_indptr_num == 4
     assert sampled_num == 6
     assert subgraph.original_column_node_ids is None
@@ -1765,7 +1765,7 @@ def test_sample_neighbors_hetero_csc_format(labor):
     subgraph = sampler(nodes, fanouts, deduplicate=False)
 
     # Verify in subgraph.
-    expected_edge_index_mappings = {
+    expected_node_pairs = {
         "n1:e1:n2": gb.CSCFormatBase(
             indptr=torch.LongTensor([0, 2]),
             indices=torch.LongTensor([0, 1]),
@@ -1775,14 +1775,10 @@ def test_sample_neighbors_hetero_csc_format(labor):
             indices=torch.LongTensor([0, 2]),
         ),
     }
-    assert len(subgraph.edge_index_mappings) == 2
-    for etype, pairs in expected_edge_index_mappings.items():
-        assert torch.equal(
-            subgraph.edge_index_mappings[etype].indptr, pairs.indptr
-        )
-        assert torch.equal(
-            subgraph.edge_index_mappings[etype].indices, pairs.indices
-        )
+    assert len(subgraph.node_pairs) == 2
+    for etype, pairs in expected_node_pairs.items():
+        assert torch.equal(subgraph.node_pairs[etype].indptr, pairs.indptr)
+        assert torch.equal(subgraph.node_pairs[etype].indices, pairs.indices)
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
@@ -1794,7 +1790,7 @@ def test_sample_neighbors_hetero_csc_format(labor):
     subgraph = sampler(nodes, fanouts, deduplicate=False)
 
     # Verify in subgraph.
-    expected_edge_index_mappings = {
+    expected_node_pairs = {
         "n1:e1:n2": gb.CSCFormatBase(
             indptr=torch.LongTensor([0]),
             indices=torch.LongTensor([]),
@@ -1804,14 +1800,10 @@ def test_sample_neighbors_hetero_csc_format(labor):
             indices=torch.LongTensor([0, 2]),
         ),
     }
-    assert len(subgraph.edge_index_mappings) == 2
-    for etype, pairs in expected_edge_index_mappings.items():
-        assert torch.equal(
-            subgraph.edge_index_mappings[etype].indptr, pairs.indptr
-        )
-        assert torch.equal(
-            subgraph.edge_index_mappings[etype].indices, pairs.indices
-        )
+    assert len(subgraph.node_pairs) == 2
+    for etype, pairs in expected_node_pairs.items():
+        assert torch.equal(subgraph.node_pairs[etype].indptr, pairs.indptr)
+        assert torch.equal(subgraph.node_pairs[etype].indices, pairs.indices)
     assert subgraph.original_column_node_ids is None
     assert subgraph.original_row_node_ids is None
     assert subgraph.original_edge_ids is None
@@ -1880,16 +1872,16 @@ def test_sample_neighbors_fanouts_csc_format(
     # Verify in subgraph.
     assert (
         expected_sampled_num1 == 0
-        or subgraph.edge_index_mappings["n1:e1:n2"].indices.numel()
+        or subgraph.node_pairs["n1:e1:n2"].indices.numel()
         == expected_sampled_num1
     )
-    assert subgraph.edge_index_mappings["n1:e1:n2"].indptr.size(0) == 2
+    assert subgraph.node_pairs["n1:e1:n2"].indptr.size(0) == 2
     assert (
         expected_sampled_num2 == 0
-        or subgraph.edge_index_mappings["n2:e2:n1"].indices.numel()
+        or subgraph.node_pairs["n2:e2:n1"].indices.numel()
         == expected_sampled_num2
     )
-    assert subgraph.edge_index_mappings["n2:e2:n1"].indptr.size(0) == 2
+    assert subgraph.node_pairs["n2:e2:n1"].indptr.size(0) == 2
 
 
 @unittest.skipIf(
@@ -1941,15 +1933,13 @@ def test_sample_neighbors_replace_csc_format(
 
     # Verify in subgraph.
     assert (
-        subgraph.edge_index_mappings["n1:e1:n2"].indices.numel()
-        == expected_sampled_num1
+        subgraph.node_pairs["n1:e1:n2"].indices.numel() == expected_sampled_num1
     )
-    assert subgraph.edge_index_mappings["n1:e1:n2"].indptr.size(0) == 2
+    assert subgraph.node_pairs["n1:e1:n2"].indptr.size(0) == 2
     assert (
-        subgraph.edge_index_mappings["n2:e2:n1"].indices.numel()
-        == expected_sampled_num2
+        subgraph.node_pairs["n2:e2:n1"].indices.numel() == expected_sampled_num2
     )
-    assert subgraph.edge_index_mappings["n2:e2:n1"].indptr.size(0) == 2
+    assert subgraph.node_pairs["n2:e2:n1"].indptr.size(0) == 2
 
 
 @unittest.skipIf(
@@ -2100,8 +2090,8 @@ def test_sample_neighbors_probs_csc_format(replace, labor, probs_name):
     )
 
     # Verify in subgraph.
-    sampled_num = subgraph.edge_index_mappings.indices.size(0)
-    assert subgraph.edge_index_mappings.indptr.size(0) == 4
+    sampled_num = subgraph.node_pairs.indices.size(0)
+    assert subgraph.node_pairs.indptr.size(0) == 4
     if replace:
         assert sampled_num == 6
     else:
@@ -2147,8 +2137,8 @@ def test_sample_neighbors_zero_probs_csc_format(replace, labor, probs_or_mask):
     )
 
     # Verify in subgraph.
-    sampled_num = subgraph.edge_index_mappings.indices.size(0)
-    assert subgraph.edge_index_mappings.indptr.size(0) == 4
+    sampled_num = subgraph.node_pairs.indices.size(0)
+    assert subgraph.node_pairs.indptr.size(0) == 4
     assert sampled_num == 0
 
 
@@ -2216,8 +2206,8 @@ def test_sample_neighbors_homo_pick_number_csc_format(
         probs_name=probs_name if probs_name != "none" else None,
         deduplicate=False,
     )
-    sampled_num = subgraph.edge_index_mappings.indices.size(0)
-    assert subgraph.edge_index_mappings.indptr.size(0) == 3
+    sampled_num = subgraph.node_pairs.indices.size(0)
+    assert subgraph.node_pairs.indptr.size(0) == 3
     # Verify in subgraph.
     if probs_name == "mask":
         if fanouts[0] == -1:
@@ -2310,7 +2300,7 @@ def test_sample_neighbors_hetero_pick_number_csc_format(
     )
     print(subgraph)
     if probs_name == "none":
-        for etype, pairs in subgraph.edge_index_mappings.items():
+        for etype, pairs in subgraph.node_pairs.items():
             assert pairs.indptr.size(0) == 2
             sampled_num = pairs.indices.size(0)
             fanout = fanouts[etypes[etype]]
@@ -2323,7 +2313,7 @@ def test_sample_neighbors_hetero_pick_number_csc_format(
                     assert sampled_num == min(fanout, 3)
     else:
         fanout = fanouts[0]  # Here fanout is the same for all etypes.
-        for etype, pairs in subgraph.edge_index_mappings.items():
+        for etype, pairs in subgraph.node_pairs.items():
             assert pairs.indptr.size(0) == 2
             sampled_num = pairs.indices.size(0)
             if etypes[etype] == 0:

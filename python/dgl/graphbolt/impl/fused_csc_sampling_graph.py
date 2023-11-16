@@ -426,7 +426,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
             ]
         if type_per_edge is None:
             # The sampled graph is already a homogeneous graph.
-            edge_index_mappings = CSCFormatBase(indptr=indptr, indices=indices)
+            node_pairs = CSCFormatBase(indptr=indptr, indices=indices)
         else:
             # The sampled graph is a fused homogenized graph, which need to be
             # converted to heterogeneous graphs.
@@ -487,7 +487,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                     l = end
             if has_original_eids:
                 original_edge_ids = original_hetero_edge_ids
-            edge_index_mappings = {
+            node_pairs = {
                 etype: CSCFormatBase(
                     indptr=torch.tensor(subgraph_indptr[etype]),
                     indices=subgraph_indice[etype],
@@ -495,7 +495,7 @@ class FusedCSCSamplingGraph(SamplingGraph):
                 for etype in self.metadata.edge_type_to_id.keys()
             }
         return SampledSubgraphImpl(
-            edge_index_mappings=edge_index_mappings,
+            node_pairs=node_pairs,
             original_edge_ids=original_edge_ids,
         )
 
