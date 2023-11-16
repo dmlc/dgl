@@ -911,6 +911,9 @@ def test_OnDiskDataset_Feature_heterograph():
             edge_data_label.clone().detach(),
         )
 
+        feature_data = None
+        dataset = None
+
 
 def test_OnDiskDataset_Feature_homograph():
     """Test Feature storage."""
@@ -990,6 +993,9 @@ def test_OnDiskDataset_Feature_homograph():
             feature_data.read("edge", None, "labels"),
             edge_data_label.clone().detach(),
         )
+
+        feature_data = None
+        dataset = None
 
 
 def test_OnDiskDataset_Graph_Exceptions():
